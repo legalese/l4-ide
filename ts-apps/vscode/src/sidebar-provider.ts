@@ -53,6 +53,7 @@ import {
   SidebarConnectionStatusChanged,
   type GetSidebarConnectionStatusResponse,
   type RemoteFunctionSchema,
+  isDeonticFunction,
 } from 'jl4-client-rpc'
 import { getTokenColors } from './theme-colors.js'
 
@@ -391,6 +392,7 @@ interface DeploymentResponse {
         required: string[]
       }
       returnType?: string
+      isDeontic?: boolean
     }>
     files?: Array<{ path: string; exports: string[] }>
     version?: string
@@ -728,7 +730,7 @@ export function initializeSidebarMessenger(
             description: fn.description ?? '',
             isDefault: false,
             returnType: fn.returnType ?? '',
-            isDeontic: false,
+            isDeontic: isDeonticFunction(fn),
             parameters: fn.parameters ?? {
               type: 'object' as const,
               properties: {},
@@ -952,6 +954,7 @@ export function initializeSidebarMessenger(
               name: string
               parameters?: RemoteFunctionSchema['parameters']
               returnType?: string
+              isDeontic?: boolean
               returnSchema?: RemoteFunctionSchema['returnSchema']
             }>
           }
@@ -960,6 +963,7 @@ export function initializeSidebarMessenger(
         name: f.name,
         parameters: f.parameters,
         returnType: f.returnType,
+        isDeontic: f.isDeontic,
         returnSchema: f.returnSchema,
       }))
       return { functions }

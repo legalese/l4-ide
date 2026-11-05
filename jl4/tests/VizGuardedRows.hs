@@ -33,6 +33,49 @@ import Test.Hspec
 -- sources
 ------------------------------------------------------------------------
 
+-- | Guards written as negations. The ELSE route, a later row's prefix and the
+-- OTHERWISE prefix all negate them again.
+ifNotThenElse :: Text
+ifNotThenElse =
+  "GIVEN a IS A BOOLEAN\n\
+  \      b IS A BOOLEAN\n\
+  \      c IS A BOOLEAN\n\
+  \DECIDE compliant IF\n\
+  \  IF NOT a THEN b ELSE c\n"
+
+ifNotFalseElse :: Text
+ifNotFalseElse =
+  "GIVEN a IS A BOOLEAN\n\
+  \      b IS A BOOLEAN\n\
+  \DECIDE compliant IF\n\
+  \  IF NOT a THEN FALSE ELSE b\n"
+
+branchNegatedGuard :: Text
+branchNegatedGuard =
+  "GIVEN a IS A BOOLEAN\n\
+  \      b IS A BOOLEAN\n\
+  \DECIDE compliant IF\n\
+  \  BRANCH\n\
+  \   IF NOT a THEN TRUE\n\
+  \   IF b THEN TRUE\n\
+  \   OTHERWISE FALSE\n"
+
+branchNegatedOtherwise :: Text
+branchNegatedOtherwise =
+  "GIVEN a IS A BOOLEAN\n\
+  \      b IS A BOOLEAN\n\
+  \DECIDE compliant IF\n\
+  \  BRANCH\n\
+  \   IF NOT a THEN FALSE\n\
+  \   IF NOT b THEN FALSE\n\
+  \   OTHERWISE TRUE\n"
+
+notNotAsWritten :: Text
+notNotAsWritten =
+  "GIVEN a IS A BOOLEAN\n\
+  \DECIDE compliant IF\n\
+  \  NOT (NOT a)\n"
+
 -- | The degenerate chain everyone writes by accident. Renders today as a box
 -- containing the string @"IF c THEN TRUE ELSE FALSE"@.
 ifTrueFalse :: Text
@@ -534,6 +577,35 @@ spec = describe "guarded chains are ladder structure, not leaves (GUARDED-ROWS)"
   it "survives simplify=True" $
     atomsOf (vizBody True ifTrueFalse) `shouldBe` ["c"]
 
+  -- A guard written NOT x fails where x holds. The negation the expansion adds
+  -- cancels the guard's own, so no route reads NOT (NOT x) (L4.Viz.VizExpr.negateIR).
+  describe "a negated guard is not negated twice" $ do
+    it "IF NOT a THEN b ELSE c: the ELSE route reads a" $ do
+      shapeOf (vizBody False ifNotThenElse)
+        `shouldBe` "(or (and (not atom a) atom b) (and atom a atom c))"
+      hasDoubleNot (vizBody True ifNotThenElse) `shouldBe` False
+
+    it "IF NOT a THEN FALSE ELSE b draws a and b, with no NOT" $
+      shapeOf (vizBody False ifNotFalseElse) `shouldBe` "(and atom a atom b)"
+
+    it "a later BRANCH row's prefix reads a where row 1's guard is NOT a" $ do
+      let body = vizBody False branchNegatedGuard
+      hasDoubleNot body `shouldBe` False
+      countNots body `shouldBe` 1   -- row 1's guard, as written; row 2's prefix is a
+
+    it "the OTHERWISE prefix cancels too" $
+      hasDoubleNot (vizBody False branchNegatedOtherwise) `shouldBe` False
+
+    -- The guard and its cancelled twin are one proposition, so they must keep one
+    -- identity, or a binding on one would not move the other.
+    it "the cancelled guard keeps the guard's identity" $ do
+      let ids = [u | (u, "a") <- identitiesOf (vizBody False ifNotThenElse)]
+      length ids `shouldBe` 2
+      length (nub ids) `shouldBe` 1
+
+    it "a NOT NOT the author wrote is drawn as written" $
+      countNots (vizBody False notNotAsWritten) `shouldBe` 2
+
   -- A BOOLEAN rule written as DECIDE clauses is compiled to a CONSIDER (and a
   -- LET for the clauses not yet tried) that have no source range. The checker
   -- used to record a result type only on a node that has one, so the rule was
@@ -713,6 +785,12 @@ countNots :: V.IRExpr -> Int
 countNots = countWhere $ \case
   V.Not{} -> True
   _ -> False
+
+-- | Is there a NOT directly over a NOT anywhere in the body?
+hasDoubleNot :: V.IRExpr -> Bool
+hasDoubleNot = \case
+  V.Not _ (V.Not _ _) -> True
+  e -> any hasDoubleNot (children e)
 
 countOrs :: V.IRExpr -> Int
 countOrs = countWhere $ \case

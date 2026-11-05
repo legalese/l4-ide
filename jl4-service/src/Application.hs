@@ -9,7 +9,11 @@ import FileBrowser (FileBrowseApi, fileBrowseHandler)
 import McpServer (mcpHandler, reapExpiredTasks, supportedProtocolVersions, defaultProtocolVersion, tasksExtensionKey)
 import DeploymentLoader (loadAllAndRegister)
 import Logging (Logger, logInfo, logDebug, logError, logWarn, newLogger)
-import Options (Options (..), buildOpts)
+import CheckStore (runCheckStore)
+import Ledger.Mcp (withLedgerTool)
+import Ledger.Service (newLedgerService, posixClock)
+import Ledger.Store.Config (ResolvedStore (..), describeResolved, resolveStoreConfig)
+import Options (Options (..), buildOpts, parseOptions)
 import OpenApiDoc (buildOpenApiDoc)
 import Shared (collectDeploymentMetadata)
 import Types
@@ -26,7 +30,8 @@ import Control.Monad (forever)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
 import Control.Exception (SomeException, finally, displayException)
 import Control.Monad (forM_)
-import System.Environment (lookupEnv)
+import System.Environment (getArgs, lookupEnv)
+import System.Exit (exitFailure)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (ReaderT (..), ask)
 import Data.IORef (newIORef, readIORef, atomicModifyIORef')
@@ -41,7 +46,7 @@ import Data.ByteString.Builder (toLazyByteString)
 import Network.Wai.Handler.Warp (defaultSettings, runSettings, setHost, setPort, setOnException, setOnExceptionResponse)
 import Network.Wai.Handler.Warp (defaultShouldDisplayException)
 import Network.Wai.Middleware.Cors (cors, simpleCorsResourcePolicy, corsMethods, corsRequestHeaders)
-import Options.Applicative (execParser)
+import System.Exit (exitWith)
 import Servant
 
 import ExplorerPage (renderExplorerPageBS)
@@ -85,7 +90,12 @@ type McpScopedLongApi = "deployments" :> Capture "deploymentId" Text :> ".mcp" :
 defaultMain :: IO ()
 defaultMain = do
   optsInfo <- buildOpts
-  options@Options{port, storePath, lazyLoad, debug} <- execParser optsInfo
+  options@Options{port, storePath, lazyLoad, debug} <- parseOptions optsInfo =<< getArgs
+
+  -- --check-store DIR compiles what is stored in DIR, reports, and exits; it
+  -- serves nothing and writes nothing (see "CheckStore").
+  forM_ options.checkStore $ \dir ->
+    runCheckStore options dir >>= exitWith
 
   logger <- newLogger debug
 
@@ -103,6 +113,8 @@ defaultMain = do
     , ("maxCompileMemoryMb", toJSON options.maxCompileMemoryMb)
     , ("evalTimeout", toJSON options.evalTimeout)
     , ("compileTimeout", toJSON options.compileTimeout)
+    , ("ledgerMaxEvalMemoryMb", toJSON options.ledgerMaxEvalMemoryMb)
+    , ("ledgerMcpWrite", toJSON options.ledgerMcpWrite)
     ]
 
   -- A deployment's IMPORTs resolve against its own files and the stdlib built
@@ -118,6 +130,23 @@ defaultMain = do
     [("path", toJSON storePath)]
   store <- BundleStore.initStore storePath
   BundleStore.cleanupStore logger store
+
+  -- The instance ledger's store (OPERATIONAL-LOWERING-SPEC §3.7) is chosen
+  -- here, so a misconfiguration stops the service at start. It is opened by
+  -- the first request to the ledger's routes or its MCP tool
+  -- ("Ledger.Service"), not here: opening the sqlite default creates a
+  -- database file under the store path, a hosted one on a network
+  -- filesystem included, and a service no one asks for an instance needs
+  -- none.
+  resolvedLedger <- case resolveStoreConfig storePath options.ledgerStore of
+    Left why -> do
+      logError logger "Ledger store misconfigured" [("error", toJSON why)]
+      exitFailure
+    Right resolved -> do
+      (if resolved == MemoryForTests then logWarn else logInfo) logger "Ledger store selected"
+        [("store", toJSON (describeResolved resolved))]
+      pure resolved
+  ledgerService <- newLedgerService options resolvedLedger posixClock
   registry <- newTVarIO Map.empty
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
@@ -125,7 +154,7 @@ defaultMain = do
   let effectiveServerName = case options.serverName of
         Just s  -> Just s
         Nothing -> Just ("http://localhost:" <> Text.pack (show options.port))
-      env = MkAppEnv registry pendingUpd store effectiveServerName logger options tasksReg slots
+      env = MkAppEnv registry pendingUpd store effectiveServerName logger options tasksReg slots (Just ledgerService)
 
   -- Fork a background sweeper that drops MCP tasks past their TTL.
   -- 30s tick is fine: tasks are 1h TTL by default.
@@ -243,7 +272,7 @@ app env req sendResp = do
       -- Override serverName with X-L4-Origin header if present (set by auth proxy).
       -- This allows the OpenAPI spec to reflect the org's external URL.
       reqEnv = case lookup "X-L4-Origin" (requestHeaders req) of
-        Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks env.batchSlots
+        Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks env.batchSlots env.ledger
         Nothing     -> env
   serve (Proxy @ServiceApi) (serverT reqEnv vis) req sendResp
 
@@ -268,7 +297,10 @@ extractVisibility req =
       includeEvaluate = case lookup "X-Include-Evaluate" headers of
         Just "false" -> False
         _ -> True
-  in Visibility { showFunctions = includeFunctions, showFiles = includeFiles, showEvaluate = includeEvaluate }
+      party = case Text.strip . Text.Encoding.decodeUtf8Lenient <$> lookup "X-L4-Party" headers of
+        Just p | not (Text.null p) -> Just p
+        _ -> Nothing
+  in Visibility { showFunctions = includeFunctions, showFiles = includeFiles, showEvaluate = includeEvaluate, callerParty = party }
 
 -- | GET /health — health check handler.
 healthHandler :: ServerT HealthApi AppM
@@ -372,18 +404,24 @@ mcpManifestHandler = do
     , "endpoints" .= Aeson.object [ "mcp" .= ("/.mcp" :: Text) ]
     ]
 
+-- | The MCP handler every endpoint serves: 'mcpHandler', with the instance
+-- ledger's own tool registered in front of it ("Ledger.Mcp"), so that the
+-- decision tools' dispatch and the code it calls stay as they were.
+mcp :: Visibility -> Maybe Text -> Aeson.Value -> AppM Aeson.Value
+mcp = withLedgerTool mcpHandler
+
 -- | POST /.mcp — org-wide MCP JSON-RPC endpoint (no deployment scope).
 -- GET /.mcp returns 405 per MCP Streamable HTTP spec (POST-only).
 mcpRootHandler :: Visibility -> ServerT McpApi AppM
-mcpRootHandler vis = mcpHandler vis Nothing :<|> throwError err405
+mcpRootHandler vis = mcp vis Nothing :<|> throwError err405
 
 -- | POST /{deploymentId}/.mcp — deployment-scoped MCP JSON-RPC endpoint.
 mcpScopedHandler :: Visibility -> ServerT McpScopedApi AppM
-mcpScopedHandler vis deployIdText = mcpHandler vis (Just deployIdText) :<|> throwError err405
+mcpScopedHandler vis deployIdText = mcp vis (Just deployIdText) :<|> throwError err405
 
 -- | POST /deployments/{deploymentId}/.mcp — deployment-scoped MCP JSON-RPC endpoint (long route).
 mcpScopedLongHandler :: Visibility -> ServerT McpScopedLongApi AppM
-mcpScopedLongHandler vis deployIdText = mcpHandler vis (Just deployIdText) :<|> throwError err405
+mcpScopedLongHandler vis deployIdText = mcp vis (Just deployIdText) :<|> throwError err405
 
 -- | Middleware: serve raw .l4 files for paths like /{id}/path/to/file.l4
 -- or /deployments/{id}/path/to/file.l4. Responds with plain text.

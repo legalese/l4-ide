@@ -304,6 +304,7 @@ Check succeeded.
 ```
 
 Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics). `--json` and `--fixed-now` work here too.
+`l4 render` still writes its document when an imported file has an error, and then exits with status 1.
 
 ---
 
@@ -373,22 +374,28 @@ Late Fee Policy
 ===============
 
 
-Definitions
+§ 1  Interpretation
 
-• Invoice means a record with:
-    - amount — NUMBER
-    - days overdue — NUMBER
+In this document, unless the context otherwise requires:
+
+1. Invoice consists of:
+    - amount — number
+    - days overdue — number
 
 
-Provisions
+§ 2  Provisions
 
-• Late fee means:
-    - if the invoice's days overdue is at most 0: 0
-    - otherwise, if the invoice's days overdue is at most 30: the invoice's amount × 0.02
-    - otherwise: the invoice's amount × 0.05
+1. Late fee is:
+    | Condition                                              | Result                      |
+    |--------------------------------------------------------|-----------------------------|
+    | the invoice's days overdue is at most 0                | 0                           |
+    | otherwise, if the invoice's days overdue is at most 30 | the invoice's amount × 0.02 |
+    | otherwise                                              | the invoice's amount × 0.05 |
 ```
 
-Options: `--format html|text|json|plan|akn` (`xml` is accepted as a synonym for `akn`, which emits Akoma Ntoso 3.0), `-o/--output FILE`, `--toc` (table of contents), `--number-sections`, `--number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`, and in `akn` the language of the FRBR Expression URIs).
+Options: `--format html|text|json|plan|akn` (`xml` is accepted as a synonym for `akn`, which emits Akoma Ntoso 3.0), `-o/--output FILE`, `--toc` (table of contents), `--no-number-sections`, `--no-number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`, and in `akn` the language of the FRBR Expression URIs).
+
+With no flags, `l4 render` writes the same document as the VS Code Render tab: sections and clauses numbered, and the file's own rules only. Imported modules still decide how those rules read. Definitions and assumptions open the document as an interpretation section, branches with short results become decision tables, long constant lists move to numbered Schedules at the end, and a citation with a `@ref-map` entry is a link in `html`. `--include-imports` adds the imported rules the document uses, `--include-import NAME` adds those of one module, and `--include-unused` adds everything.
 
 ### `l4 batch` — many cases at once
 

@@ -95,4 +95,4 @@ subjects: `anti-social.l4`, `british-citizen-act.l4`, `ceo-performance-award.l4`
 Four goldens ship in the same commit as the `.l4`, or the whole suite goes red for the next person
 — `failFirstTime` is `True`, so a file with no `tests/` directory fails rather than quietly
 blessing itself. `etc/check-corpus-goldens.mjs` runs on every PR with no path filter and names
-what is missing. See `CLAUDE.md` §3.1 for the full rule and the two incidents that produced it.
+what is missing. See `CLAUDE.md` §3.1 for the full rule; the incidents that produced it are in its git history.

@@ -1,0 +1,13 @@
+-- `the month before` and `the month after` give the first day of the
+-- previous or next month, across a change of year too.
+
+IMPORT daydate
+
+#ASSERT `the month before` (Date 15 1 2026) EQUALS Date 1 12 2025
+#ASSERT `the month before` (Date 1 1 2026) EQUALS Date 1 12 2025
+#ASSERT `the month before` (Date 31 3 2026) EQUALS Date 1 2 2026
+#ASSERT `the month before` (Date 15 12 2026) EQUALS Date 1 11 2026
+#ASSERT `the month after` (Date 15 12 2026) EQUALS Date 1 1 2027
+#ASSERT `the month after` (Date 31 1 2026) EQUALS Date 1 2 2026
+
+#EVAL `the month before` (Date 15 1 2026)

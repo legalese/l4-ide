@@ -1,0 +1,111 @@
+IMPORT prelude
+IMPORT properties
+
+-- MUTANT of d3-atomic.l4: an accepted purchase is recorded twice. P2 MUST
+-- FAIL.
+--
+-- P2 says Alice buys at most one dinner, and in D3 it holds by
+-- construction: the ledger records one dinner per accepted purchase, and
+-- Alice buys nothing after that. A check that cannot fail proves nothing
+-- about the checker, so this mutant changes one line and the property
+-- must go red on it (REGULATIVE-LOWERING-SPEC.md section 6.3). The ledger
+-- appends the accepted purchase twice, as a retried request after a lost
+-- acknowledgement would be if nothing recognised it as a repeat.
+--
+-- The whole difference from d3-atomic.l4, apart from comments, section
+-- names and the traces: one more COMMIT to `dinners bought` in the
+-- ledger's answer. The count of dinners goes from 0 to 2 in one step and
+-- is never 1, so P4 (once one dinner, always one) still holds here: this
+-- mutant fails P2 alone, and d3-cancel.l4 fails P4 alone.
+-- properties.l4 here is a link to ../properties.l4: an IMPORT cannot reach
+-- a parent directory.
+
+DECLARE Act IS ONE OF
+    `ledger records Bob's purchase`            -- BobBuys
+    `Messages delivers the message`            -- Deliver
+    `Alice checks whether dinner is bought`    -- CheckBought
+    `Alice is done`                            -- Done
+    `Alice buys dinner`                        -- BuyChecked if answered, NoAnswer if not
+        HAS `ledger answered` IS A BOOLEAN
+
+`closing` MEANS 75600
+
+§ `D3 bought twice: the guards`
+
+GIVEN act IS AN Act
+GIVETH A BOOLEAN
+`the brief allows` MEANS
+    CONSIDER act
+    WHEN `ledger records Bob's purchase`         THEN `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`)
+    WHEN `Messages delivers the message`         THEN (RECALL Messages's `message`) EQUALS JUST `in transit`
+    WHEN `Alice checks whether dinner is bought` THEN `where Alice is` (RECALL Alice's `plan`) EQUALS planning
+    WHEN `Alice is done`                         THEN `Alice has bought or stopped` (RECALL Alice's `plan`)
+    WHEN `Alice buys dinner` answered            THEN `where Alice is` (RECALL Alice's `plan`) EQUALS checked
+
+§ `D3 bought twice: the arrangement`
+
+-- The arrangement opens with dinner unbought: the ledger's first record.
+GIVETH A DEONTIC Party Act
+`the arrangement` MEANS
+    COMMIT `dinner status record` IS opened
+    HENCE `the evening`
+
+GIVETH A DEONTIC Party Act
+`the evening` MEANS
+    PARTY World
+    MAY   act PROVIDED `the brief allows` act
+    WITHIN 0 OF closing
+    HENCE CONSIDER act
+          WHEN `ledger records Bob's purchase` THEN
+              COMMIT `dinner status record` IS taken
+              HENCE RECORD Messages's `message` IS `in transit`
+              HENCE `the evening`
+          WHEN `Messages delivers the message` THEN
+              RECORD Messages's `message` IS delivered
+              HENCE RECORD Alice's `belief` IS taken
+              HENCE `Alice stops unless she has bought` (RECALL Alice's `plan`)
+          WHEN `Alice checks whether dinner is bought` THEN
+              RECORD Alice's `belief` IS `the ledger's status` (RECALL ALL OFFICIAL's `dinner status record`)
+              HENCE RECORD Alice's `plan` IS checked
+              HENCE `the evening`
+          WHEN `Alice is done` THEN `the evening`
+          WHEN `Alice buys dinner` answered THEN
+              IF NOT answered
+              THEN `the evening`
+              ELSE `the ledger answers the purchase` (RECALL ALL OFFICIAL's `dinner status record`)
+    LEST  FULFILLED
+
+-- The ledger's answer, in one step: accept and record the purchase if
+-- dinner is open at this instant, refuse it if Bob's purchase has taken it.
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A DEONTIC Party Act
+`the ledger answers the purchase` MEANS
+    IF `the ledger is open` `dinner status record`
+    THEN COMMIT `dinners bought` IS `dinner for two`
+         HENCE COMMIT `dinners bought` IS `dinner for two`    -- THE MUTATION: recorded twice
+         HENCE COMMIT `open at acceptance` IS `the ledger is open` `dinner status record`
+         HENCE RECORD Alice's `plan` IS bought
+         HENCE `the evening`
+    ELSE RECORD Alice's `belief` IS taken
+         HENCE RECORD Alice's `plan` IS stopped
+         HENCE `the evening`
+
+-- The message stops Alice if she is still on her way to buying.
+GIVEN plan IS A MAYBE Plan
+GIVETH A DEONTIC Party Act
+`Alice stops unless she has bought` MEANS
+    IF `Alice has bought or stopped` plan
+    THEN `the evening`
+    ELSE RECORD Alice's `plan` IS stopped
+         HENCE `the evening`
+
+§ `D3 bought twice: the traces`
+
+-- Sequence B: Alice asks the ledger to buy at 18:05:30 and it accepts.
+-- Official record: opened, dinner for two, dinner for two, open at
+-- acceptance TRUE, taken. Two dinners are bought: P2 fails.
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `Alice checks whether dinner is bought` AT 65100
+    PARTY World DOES (`Alice buys dinner` TRUE)              AT 65130
+    PARTY World DOES `ledger records Bob's purchase`         AT 65160
+    (`WAIT UNTIL` 75601)

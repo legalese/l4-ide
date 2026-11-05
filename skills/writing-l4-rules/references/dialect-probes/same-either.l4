@@ -1,6 +1,6 @@
 GIVEN result IS AN EITHER STRING NUMBER
 GIVETH A STRING
-`handle the result` result MEANS
+`handle the result` MEANS
   CONSIDER result
   WHEN LEFT OF err THEN err
   WHEN RIGHT OF val THEN TOSTRING val

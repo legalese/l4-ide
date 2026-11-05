@@ -412,8 +412,67 @@ data Expr n =
     -- is deliberately wildcard-free) and keeps a per-reason static analysis
     -- possible.
   | Inert      Anno Text InertContext  -- ... "inert text" - grammatical scaffolding with context-aware evaluation
+  | Lifecycle  Anno LifecyclePoint
+    -- ^ @THE JOIN@, @THE DEADLINE@ or @THE ARMING@ as a VALUE: a NUMBER, the
+    -- instant that position had in the life of the nearest enclosing
+    -- obligation (EVERY-EACH-QUANTIFIER-SPEC §2.6 card B1, RULED 2026-09-21;
+    -- built 2026-10-24, in part — the 'Anchor' slot keeps its own three
+    -- constructors, see there). Scope is lexical: the noun reads the
+    -- bindings of the environment it is evaluated in, which a hand-off made
+    -- ('L4.EvaluateLazy.Machine.bindLifecycle'), so a @WHERE@ alias over a
+    -- noun captures that hand-off's instant and carries it inward, while a
+    -- noun written inside an obligation VALUE reads the hand-off it is
+    -- attached to. The checker applies the anchor's position refusals to it
+    -- ('L4.TypeCheck.checkLifecycle'). The point carries no tokens: @THE@ and
+    -- the noun are tokens of this node's own 'Anno', and the point's field
+    -- is a placeholder hole, the way 'ReadCell'\'s 'RecallMode' is.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | Which lifecycle position a 'Lifecycle' expression names. The same three
+-- an 'Anchor' names after @OF@; 'lifecyclePointOfAnchor' maps one onto the
+-- other.
+data LifecyclePoint
+  = LifecycleJoin      -- ^ @THE JOIN@
+  | LifecycleDeadline  -- ^ @THE DEADLINE@
+  | LifecycleArming    -- ^ @THE ARMING@
+  deriving stock (GHC.Generic, Eq, Ord, Show, Enum, Bounded)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The lifecycle position an anchor names, if it names one: a bare noun
+-- (@OF THE JOIN@), or a lifecycle value that is the WHOLE anchor
+-- (@OF (THE JOIN)@, §2.6 B1). The two spellings are two trees with one
+-- meaning, and every consumer that asks "which noun is this anchor?" asks
+-- here, so they cannot drift apart: until 2026-10-24 the check-time
+-- empty-window refusal matched the bare constructors only and let
+-- @AFTER 30 WITHIN 5 OF (THE JOIN)@ through
+-- (@not-ok/tc/after-empty-window-value.l4@). An anchor that does
+-- arithmetic on a noun (@OF (THE JOIN PLUS 5)@) names an instant, not the
+-- position, and is 'Nothing'.
+lifecyclePointOfAnchor :: Anchor n -> Maybe LifecyclePoint
+lifecyclePointOfAnchor = \ case
+  AnchorJoin _     -> Just LifecycleJoin
+  AnchorDeadline _ -> Just LifecycleDeadline
+  AnchorArming _   -> Just LifecycleArming
+  AnchorAt _ (Lifecycle _ p) -> Just p
+  AnchorAt _ _     -> Nothing
+
+-- | The words a drafter writes for a lifecycle position, in ONE place: the
+-- printer, the diagnostics and the run-time refusals read this.
+lifecyclePointWords :: LifecyclePoint -> Text
+lifecyclePointWords = \ case
+  LifecycleJoin     -> "THE JOIN"
+  LifecycleDeadline -> "THE DEADLINE"
+  LifecycleArming   -> "THE ARMING"
+
+-- | The noun alone, as the identifier it is spelled like (@JOIN@,
+-- @DEADLINE@, @ARMING@): the nouns are not reserved words, so a program may
+-- bind one of these names.
+lifecyclePointNoun :: LifecyclePoint -> Text
+lifecyclePointNoun = \ case
+  LifecycleJoin     -> "JOIN"
+  LifecycleDeadline -> "DEADLINE"
+  LifecycleArming   -> "ARMING"
 
 -- | Context for inert element evaluation.
 -- Inert elements evaluate to the identity for their containing boolean operator.
@@ -708,9 +767,17 @@ data Opening n
 --     is the obligation's own arming, i.e. the default.
 --
 -- @THE@ is a keyword; @JOIN@, @DEADLINE@ and @ARMING@ are matched by
--- SPELLING in this one position and are not reserved — the move @UPON EACH@
--- makes for @EACH@ — so each constructor's 'Anno' carries its own words and
--- a program may still name a value @DEADLINE@.
+-- SPELLING after it and are not reserved — the move @UPON EACH@ makes for
+-- @EACH@ — so each constructor's 'Anno' carries its own words and a program
+-- may still name a value @DEADLINE@.
+--
+-- Since 2026-10-24 the three nouns are also VALUES anywhere an expression
+-- goes ('Lifecycle', §2.6 card B1), so @OF (THE JOIN PLUS 5)@ and
+-- @OF (fromMaybe THE ARMING (RECALL …))@ are the fourth form, an expression,
+-- and a bare @OF THE JOIN@ is still the first: two trees with one meaning.
+-- Collapsing this type to @Maybe (Expr n)@, which B1 also rules, is not
+-- built. A bare noun followed on its own line by an arithmetic operator
+-- (@OF THE JOIN PLUS 5@) is read as the expression ('L4.Parser.anchor').
 --
 -- The fourth form is an expression whose value is an instant: a NUMBER on the
 -- trace's own scale (@WITHIN 5 OF closingDate@, a ledger read), or a DATE,
@@ -1650,6 +1717,16 @@ instance ToConcreteNodes PosToken InertContext where
 instance ToConcreteNodes PosToken RecallMode where
   toNodes _ = pure []
 
+-- LifecyclePoint has no concrete syntax nodes: THE and the noun are tokens of
+-- the surrounding 'Lifecycle' node's Anno, like RecallMode's ALL.
+instance ToConcreteNodes PosToken LifecyclePoint where
+  toNodes _ = pure []
+
+-- Its field still occupies one holeFit slot ('L4.Parser.lifecycleExpr'
+-- emits the placeholder), so the hole needs a range hint: none.
+instance HasSrcRange LifecyclePoint where
+  rangeOf _ = Nothing
+
 -- The empty-surface payload fields (Bool isOfficial, RecallMode mode) still
 -- occupy one holeFit slot in the generic exactprint traversal, so the parser
 -- emits a placeholder 'annoHole' for each in field-declaration order (see
@@ -1788,6 +1865,7 @@ deriving anyclass instance Serialise n => Serialise (ConDecl n)
 deriving anyclass instance Serialise n => Serialise (Expr n)
 deriving anyclass instance Serialise InertContext
 deriving anyclass instance Serialise RecallMode
+deriving anyclass instance Serialise LifecyclePoint
 deriving anyclass instance Serialise n => Serialise (GuardedExpr n)
 deriving anyclass instance Serialise n => Serialise (Deonton n)
 deriving anyclass instance Serialise n => Serialise (Subject n)

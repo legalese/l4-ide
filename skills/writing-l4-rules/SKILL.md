@@ -108,7 +108,7 @@ L4 has three function-definition forms. Use whichever reads most like the source
 -- General form: DECIDE … IS / … MEANS
 GIVEN driver IS A Driver
 GIVETH A RiskCategory
-DECIDE `assess risk` driver IS
+DECIDE `assess risk` IS
     CONSIDER driver's `accident count`
     WHEN 0 THEN IF driver's `ticketed`
                 THEN MediumRisk
@@ -125,8 +125,15 @@ DECIDE `meets minimum age` IF
 
 -- Plain MEANS
 GIVEN n IS A NUMBER
-`square of` n MEANS n TIMES n
+`square of` MEANS n TIMES n
 ```
+
+**Name the inputs once, in the `GIVEN`; do not repeat them in the head.**
+Write ``DECIDE `assess risk` IS``, not ``DECIDE `assess risk` driver IS``, and the same for `IF` and `MEANS`.
+Callers are unaffected: a head without arguments still takes them positionally in `GIVEN` order (`` `square of` 4 ``, `` `square of` OF 4 ``), and by name with `WITH`.
+Repeating the names buys nothing, because the head must list every `GIVEN` name in `GIVEN` order or `l4 check` rejects it ("The names in a type signature must match those in the definition"), and it costs something: when the head repeats its inputs, `l4 nlg` renders them by their bare names and every `@nlg` gloss on the `GIVEN` is lost (`` `is big` where `floor` is 100 `` rather than `` `is big` where the threshold is 100 ``; [references/gotchas.md](references/gotchas.md), smucclaw/l4-ide#995).
+**The one exception is mixfix**, where the names in the head are the notation: `` `employee` `works for` `employer` MEANS … `` needs them to say where each argument goes.
+A local helper under `WHERE` with no `GIVEN` of its own (``WHERE `inc` x MEANS x PLUS 1``) also names its inputs in the head, since there is nowhere else to name them.
 
 **Key idioms:**
 

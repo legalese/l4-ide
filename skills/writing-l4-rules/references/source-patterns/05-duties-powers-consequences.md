@@ -306,7 +306,7 @@ can see which provision each belongs to:
 @ref British Nationality Act 1981 s 1(4)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
-DECIDE `entitled to be registered under subsection (4)` person IF
+DECIDE `entitled to be registered under subsection (4)` IF
         person's `born in the United Kingdom after commencement`
     AND person's `the first ten years of that person's life`
 
@@ -485,7 +485,7 @@ consequence the rules compute.
 @ref Probate and Administration Act 1934 s 42
 GIVEN c IS A `Conduct under section 42`
 GIVETH A BOOLEAN
-DECIDE `s 42 — guilty of an offence` c IF
+DECIDE `s 42 — guilty of an offence` IF
         c's `acted without lawful authority`
     AND (   c's `removed or attempted to remove from Singapore property of which a receiver was appointed under section 39`
          OR c's `destroyed, concealed or refused to yield up the property to the receiver` )
@@ -551,7 +551,7 @@ period **inside** the `HENCE`, where the clock re-anchors at the event:
 @ref 17 CFR 227.304(b)(2)-(3)
 GIVEN n IS A Notice
 GIVETH A DEONTIC `Reg CF party` `Reg CF act`
-`the early-close notice and the period it opens` n MEANS
+`the early-close notice and the period it opens` MEANS
     PARTY  `the issuer`
     MUST   `give notice of the new, anticipated deadline of the offering`
            PROVIDED `304(b)(2) — the early-close notice says what it must` n
@@ -693,7 +693,7 @@ warranty untrue — that the rules test. The remedy is the duty or power that fa
 @ref Housing Act 1988 Sch 2 Ground 8
 GIVEN claim IS A Ground8Claim
 GIVETH A BOOLEAN
-`Ground 8 made out` claim MEANS
+`Ground 8 made out` MEANS
         "Both at the date of the service of the notice under section 8 of this Act relating to the proceedings for possession and at the date of the hearing—"
     ... `per-period threshold met` claim (claim's `rent unpaid at the date of service of the section 8 notice`)
     AND `per-period threshold met` claim (claim's `rent unpaid at the date of the hearing`)
@@ -701,7 +701,7 @@ GIVETH A BOOLEAN
 @ref Housing Act 1988 Sch 2 Part I; Ground 8
 GIVEN claim IS A Ground8Claim
 GIVETH A DEONTIC Actor Action
-`ground 8 possession order` claim MEANS
+`ground 8 possession order` MEANS
     IF   `Ground 8 made out` claim
     THEN PARTY Court MUST `order possession` WITHIN 30
     ELSE FULFILLED

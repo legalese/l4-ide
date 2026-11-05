@@ -1,0 +1,158 @@
+IMPORT prelude
+IMPORT properties
+
+-- D1, naive: Alice buys on the belief her check left. WRONG ON PURPOSE.
+--
+-- Alice and Bob each mean to buy dinner tonight, and neither wants to buy
+-- it if the other already has. This file models Alice's side; Bob's
+-- purchase is the environment's act, recorded by the dinner ledger. Alice
+-- checks whether dinner is bought, and if her check said it was open she
+-- buys, without asking again. If Bob's purchase is recorded between her
+-- check and her purchase, two dinners are bought. That is the race, and
+-- this design does nothing about it: P1 is violated, by the three steps
+-- check, Bob's purchase, buy (the traces at the end). Do not fix it; see
+-- README.md.
+--
+-- The model is the brief's, transition for transition (README.md has the
+-- table). One chain, one acting party, World, and each act names its
+-- actor (REGULATIVE-LOWERING-SPEC.md section 4.3, option C). Every act is
+-- a permission, so the chain is a MAY at every point, which is the shape
+-- option C is sound for. A transition's guard is the PROVIDED of the
+-- permission: an act whose guard is false is passed over and changes
+-- nothing. Its effect is the CONSIDER under HENCE. The six variables are
+-- ledger cells (properties.l4 lists them).
+--
+-- Times are seconds after midnight: the arrangement opens at 18:00
+-- (64800) and closes at 21:00 (75600). The brief's model is untimed;
+-- the closing time only ends each trace.
+
+DECLARE Act IS ONE OF
+    `ledger records Bob's purchase`            -- BobBuys
+    `Messages delivers the message`            -- Deliver
+    `Alice checks whether dinner is bought`    -- CheckBought
+    `Alice is done`                            -- Done
+    `Alice buys dinner`                        -- Buy
+    `Alice gives up`                           -- Abandon
+
+`closing` MEANS 75600
+
+§ `D1: the guards`
+
+GIVEN act IS AN Act
+GIVETH A BOOLEAN
+`the brief allows` MEANS
+    CONSIDER act
+    WHEN `ledger records Bob's purchase`         THEN `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`)
+    WHEN `Messages delivers the message`         THEN (RECALL Messages's `message`) EQUALS JUST `in transit`
+    WHEN `Alice checks whether dinner is bought` THEN `where Alice is` (RECALL Alice's `plan`) EQUALS planning
+    WHEN `Alice is done`                         THEN `Alice has bought or stopped` (RECALL Alice's `plan`)
+    WHEN `Alice buys dinner`                     THEN `where Alice is` (RECALL Alice's `plan`) EQUALS checked
+                                                      AND (RECALL Alice's `belief`) EQUALS JUST opened
+    WHEN `Alice gives up`                        THEN `where Alice is` (RECALL Alice's `plan`) EQUALS checked
+                                                      AND (RECALL Alice's `belief`) EQUALS JUST taken
+
+§ `D1: the arrangement`
+
+-- The arrangement opens with dinner unbought: the ledger's first record.
+GIVETH A DEONTIC Party Act
+`the arrangement` MEANS
+    COMMIT `dinner status record` IS opened
+    HENCE `the evening`
+
+GIVETH A DEONTIC Party Act
+`the evening` MEANS
+    PARTY World
+    MAY   act PROVIDED `the brief allows` act
+    WITHIN 0 OF closing
+    HENCE CONSIDER act
+          WHEN `ledger records Bob's purchase` THEN
+              COMMIT `dinner status record` IS taken
+              HENCE RECORD Messages's `message` IS `in transit`
+              HENCE `the evening`
+          WHEN `Messages delivers the message` THEN
+              RECORD Messages's `message` IS delivered
+              HENCE RECORD Alice's `belief` IS taken
+              HENCE `Alice stops unless she has bought` (RECALL Alice's `plan`)
+          WHEN `Alice checks whether dinner is bought` THEN
+              RECORD Alice's `belief` IS `the ledger's status` (RECALL ALL OFFICIAL's `dinner status record`)
+              HENCE RECORD Alice's `plan` IS checked
+              HENCE `the evening`
+          WHEN `Alice is done` THEN `the evening`
+          WHEN `Alice buys dinner` THEN
+              COMMIT `dinners bought` IS `dinner for two`
+              HENCE COMMIT `open at acceptance` IS `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`)
+              HENCE RECORD Alice's `plan` IS bought
+              HENCE `the evening`
+          WHEN `Alice gives up` THEN
+              RECORD Alice's `plan` IS stopped
+              HENCE `the evening`
+    LEST  FULFILLED
+
+-- The message stops Alice if she is still on her way to buying.
+GIVEN plan IS A MAYBE Plan
+GIVETH A DEONTIC Party Act
+`Alice stops unless she has bought` MEANS
+    IF `Alice has bought or stopped` plan
+    THEN `the evening`
+    ELSE RECORD Alice's `plan` IS stopped
+         HENCE `the evening`
+
+§ `D1: the traces`
+
+-- Read each trace's ledgers, not its FULFILLED line: every trace ends
+-- FULFILLED, because the evening is a permission that lapses at closing.
+-- The official record lists the dinner ledger's COMMITs in the order they
+-- happened, so a bad purchase shows as `taken` before `dinners bought`,
+-- followed by `open at acceptance IS FALSE`.
+
+-- The counterexample, three steps: Alice checks at 18:05 and finds dinner
+-- open; Bob's purchase is recorded at 18:06; Alice buys at 18:07 on what
+-- her check told her. Official record: opened, taken, dinner for two,
+-- open at acceptance FALSE. P1 is violated.
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `Alice checks whether dinner is bought` AT 65100
+    PARTY World DOES `ledger records Bob's purchase`         AT 65160
+    PARTY World DOES `Alice buys dinner`                     AT 65220
+    (`WAIT UNTIL` 75601)
+
+-- Sequence A in full: the same three steps, then the message "I bought
+-- it" reaches Alice at 18:08, too late to stop her. Her belief becomes
+-- taken; her plan stays bought. Same official record as above.
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `Alice checks whether dinner is bought` AT 65100
+    PARTY World DOES `ledger records Bob's purchase`         AT 65160
+    PARTY World DOES `Alice buys dinner`                     AT 65220
+    PARTY World DOES `Messages delivers the message`         AT 65280
+    PARTY World DOES `Alice is done`                         AT 65290
+    (`WAIT UNTIL` 75601)
+
+-- Sequence B: Alice buys at 18:05:30, before Bob's purchase is recorded.
+-- Official record: opened, dinner for two, open at acceptance TRUE, taken.
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `Alice checks whether dinner is bought` AT 65100
+    PARTY World DOES `Alice buys dinner`                     AT 65130
+    PARTY World DOES `ledger records Bob's purchase`         AT 65160
+    PARTY World DOES `Messages delivers the message`         AT 65280
+    (`WAIT UNTIL` 75601)
+
+-- Alice checks after Bob's purchase is recorded: her check says taken, so
+-- the purchase at 18:07 is passed over (its guard is false) and she gives
+-- up. No dinner of hers is recorded.
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `ledger records Bob's purchase`         AT 65160
+    PARTY World DOES `Alice checks whether dinner is bought` AT 65190
+    PARTY World DOES `Alice buys dinner`                     AT 65220
+    PARTY World DOES `Alice gives up`                        AT 65230
+    (`WAIT UNTIL` 75601)
+
+-- Guards: a purchase before any check, a second purchase of Bob's, and a
+-- second message are all passed over. Then the message stops Alice before
+-- she has checked, and her late check is passed over too.
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `Alice buys dinner`                     AT 65000
+    PARTY World DOES `ledger records Bob's purchase`         AT 65160
+    PARTY World DOES `ledger records Bob's purchase`         AT 65170
+    PARTY World DOES `Messages delivers the message`         AT 65280
+    PARTY World DOES `Messages delivers the message`         AT 65290
+    PARTY World DOES `Alice checks whether dinner is bought` AT 65300
+    (`WAIT UNTIL` 75601)

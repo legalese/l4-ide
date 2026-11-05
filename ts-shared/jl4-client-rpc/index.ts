@@ -20,3 +20,7 @@ export * from './render-l4-value.js'
 // The "Show state graph" lens: its reply, and the position
 // arithmetic a host needs to redraw the pane after an edit
 export * from './state-graph.js'
+
+// Whether a function takes the DEONTIC simulation envelope, for the deploy
+// sidebar's schema diff
+export * from './deontic-envelope.js'

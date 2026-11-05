@@ -1,0 +1,166 @@
+-- A condition that fills a slot of a rule's sentence, as `l4 render` and
+-- `l4 nlg` read it: a denial, an IMPLIES, an IF, an AND or an OR has no closing
+-- word, and nor has a call that ends with one, so when the sentence goes on
+-- after the slot, the rest of it must not read as part of the filler. A slot at
+-- the end of the sentence has nothing after it.
+-- The rules are stubs; each pair below states two different conditions, and
+-- what is tested is that they are worded apart.
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`the Act governs` n MEANS n > 5
+
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %p% is disclosed
+`disclosed` p MEANS TRUE
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %a% is told %b%
+`told` a b MEANS b
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %a% outweighs %b% in law
+`outweighs` a b MEANS a OR b
+
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+p `is published` MEANS TRUE
+
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+`fb` p MEANS p
+
+-- The denial fills the slot, and the denial is of the whole sentence: two rules.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `denial in the slot` n IF `disclosed` (NOT (`the Act governs` n))
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `denial of the sentence` n IF NOT (`disclosed` (`the Act governs` n))
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `denied or in the slot` n q IF `disclosed` (NOT ((`the Act governs` n) OR q))
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `denied or around the sentence` n q IF NOT ((`the Act governs` n) OR (`disclosed` q))
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `implies in the slot` n q IF `disclosed` ((`the Act governs` n) IMPLIES q)
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `implies around the sentence` n q IF (`the Act governs` n) IMPLIES (`disclosed` q)
+
+-- The first of two slots, a slot in the middle, and a mixfix hole.
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `denial in the first slot` n p IF `told` (NOT (`the Act governs` n)) p
+
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `denial of the two-slot sentence` n p IF NOT (`told` (`the Act governs` n) p)
+
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `denial in the middle slot` n p IF `outweighs` p (NOT (`the Act governs` n))
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `denial in the hole` n IF (NOT (`the Act governs` n)) `is published`
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `denial of the pattern` n IF NOT ((`the Act governs` n) `is published`)
+
+-- An AND that fills the slot, and an AND of which the sentence is one part.
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `and in the slot` n p r IF (`disclosed` (p AND (NOT (`the Act governs` n)))) IMPLIES r
+
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `and beside the slot` n p r IF (p AND (`disclosed` (NOT (`the Act governs` n)))) IMPLIES r
+
+-- A call with no sentence of its own ends with its last argument, so a call
+-- that ends with a condition has no closing word either.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `call ending in a denial in the slot` n IF `disclosed` (`fb` (NOT (`the Act governs` n)))
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `call around a denied sentence` n IF `fb` (NOT (`disclosed` (`the Act governs` n)))
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `call ending in an implies in the slot` p q r IF `disclosed` (`fb` (p AND (q IMPLIES r)))
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `call around an and with the sentence` p q r IF `fb` (p AND (`disclosed` (q IMPLIES r)))
+
+-- Controls. A denial or an AND in the last slot ends where the sentence does,
+-- and is left as it was.
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `denial in the last slot` n p IF `told` p (NOT (`the Act governs` n))
+
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `last slot then and` n p r IF `disclosed` ((`told` p (NOT (`the Act governs` n))) AND r)
+
+GIVEN n IS A NUMBER
+      p IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `and in the last slot` n p r IF `disclosed` (`told` p ((NOT (`the Act governs` n)) AND r))
+
+-- A denial that already says where it ends.
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `one word denied` p IF `disclosed` (NOT p)
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `inequality in the slot` n IF `disclosed` (NOT (n EQUALS 3))
+
+#EVAL `disclosed` (NOT (`the Act governs` 3))
+#EVAL NOT (`disclosed` (`the Act governs` 3))
+#EVAL `told` (NOT (`the Act governs` 3)) TRUE
+#EVAL NOT (`told` (`the Act governs` 3) TRUE)
+#EVAL `told` TRUE (NOT (`the Act governs` 3))
+#EVAL `disclosed` (TRUE IMPLIES FALSE)
+#EVAL TRUE IMPLIES (`disclosed` FALSE)
+#EVAL `disclosed` (IF TRUE THEN FALSE ELSE TRUE)
+#EVAL IF TRUE THEN FALSE ELSE (`disclosed` TRUE)
+#EVAL `disclosed` (TRUE OR FALSE)
+#EVAL TRUE OR (`disclosed` FALSE)
+#EVAL `disclosed` (`fb` (TRUE OR FALSE))
+#EVAL `fb` (TRUE OR (`disclosed` FALSE))

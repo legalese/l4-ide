@@ -2,4 +2,4 @@ IMPORT daydate
 
 GIVEN d IS A DATE
 GIVETH A BOOLEAN
-`is recent` d MEANS d AT LEAST YMD 2025 7 1
+`is recent` MEANS d AT LEAST YMD 2025 7 1

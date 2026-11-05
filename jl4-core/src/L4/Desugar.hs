@@ -103,6 +103,7 @@ carameliseExprWithContext ctx = carameliseNode >>> \ case
   -- Inert elements: update the context based on the desugaring context.
   -- The evaluator (Machine.hs) will read this context to determine the value.
   Inert      ann txt _oldCtx -> Inert ann txt ctx
+  Lifecycle  ann p -> Lifecycle ann p
 
 carameliseLocalDecl :: HasName n => LocalDecl n -> LocalDecl n
 carameliseLocalDecl = \ case
@@ -754,6 +755,7 @@ openFields table shadowed (MkModule mAnn uri sect) =
     Event {}            -> pure expr  -- regulative events are complex; leave as-is
     Regulative {}       -> pure expr  -- regulative rules: leave as-is
     Inert {}            -> pure expr
+    Lifecycle {}        -> pure expr
 
   -- @r's f@, carrying the bare read's source range on the projection AND on
   -- its record operand, so that a diagnostic on either still points at what

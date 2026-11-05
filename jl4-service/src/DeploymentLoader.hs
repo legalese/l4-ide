@@ -4,6 +4,7 @@
 module DeploymentLoader (
   loadAndRegister,
   loadAllAndRegister,
+  checkDeployments,
   triggerCompilationIfPending,
   tryCompileWithTimeout,
   CompilationResult (..),
@@ -18,13 +19,13 @@ import qualified Shared
 import Types
 
 import Control.Concurrent (getNumCapabilities, newQSem, signalQSem, waitQSem)
-import Control.Concurrent.Async (async, mapConcurrently_)
+import Control.Concurrent.Async (async, mapConcurrently)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', readTVar, retry)
 import Control.Exception (ErrorCall (..), SomeAsyncException, SomeException, bracket_, catch, displayException, fromException, throwIO, try)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (asks, ask)
 import Data.Aeson (toJSON)
-import Control.Monad (when)
+import Control.Monad (void, when)
 import Data.Int (Int64)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map.Strict as Map
@@ -58,9 +59,7 @@ loadAndRegister logger options registry store deployId = do
     Left e
       | Just (_ :: SomeAsyncException) <- fromException e -> throwIO e
       | otherwise -> do
-          let msg = case fromException e of
-                Just (ErrorCall err) -> Text.pack err
-                Nothing -> Text.pack (displayException e)
+          let msg = failureMessage e
           logError logger "Deployment failed"
             [ ("deploymentId", toJSON deployId)
             , ("error", toJSON msg)
@@ -151,12 +150,50 @@ loadAndRegisterThrowing logger options registry store deployId = do
 -- for the CPU behind all the others, and a store large enough would run every
 -- one of them out of time at once.
 loadAllAndRegister :: Logger -> Options -> TVar (Map.Map DeploymentId DeploymentState) -> BundleStore -> [Text] -> IO ()
-loadAllAndRegister logger options registry store deployIds = do
+loadAllAndRegister logger options registry store deployIds =
+  void (boundedByCapabilities (loadAndRegister logger options registry store) deployIds)
+
+-- | Run an action on every item, as many at once as there are capabilities, and
+-- give the results in the order of the items.
+boundedByCapabilities :: (a -> IO b) -> [a] -> IO [b]
+boundedByCapabilities act items = do
   capabilities <- getNumCapabilities
   slot <- newQSem capabilities
-  mapConcurrently_
-    (bracket_ (waitQSem slot) (signalQSem slot) . loadAndRegister logger options registry store)
-    deployIds
+  mapConcurrently (bracket_ (waitQSem slot) (signalQSem slot) . act) items
+
+-- | What a deployment's failure says: the message of an @error@ the compiler
+-- raised, or the exception as it displays.
+failureMessage :: SomeException -> Text
+failureMessage e = case fromException e of
+  Just (ErrorCall err) -> Text.pack err
+  Nothing -> Text.pack (displayException e)
+
+-- | Compile every deployment of a store, as a restart would, and say for each
+-- whether it compiles: the number of functions it publishes, or why it does not.
+--
+-- This is 'loadAllAndRegister' without what it keeps. Each deployment is read
+-- from the store and compiled by the same code, under the same
+-- @--compile-timeout@ and @--max-compile-memory-mb@, with the same bound on how
+-- many compile at once, and a deployment that cannot be loaded (a
+-- @metadata.json@ that does not decode, a compiler error) is failed with its
+-- message. Nothing is registered and nothing is written: not the backfilled
+-- version that a load persists, not the metadata cache. The store is only read.
+checkDeployments :: Logger -> Options -> BundleStore -> [Text] -> IO [(Text, Either Text Int)]
+checkDeployments logger options store =
+  boundedByCapabilities (\deployId -> (,) deployId <$> checkDeployment logger options store deployId)
+
+-- | 'checkDeployments', for one.
+checkDeployment :: Logger -> Options -> BundleStore -> Text -> IO (Either Text Int)
+checkDeployment logger options store deployId = do
+  outcome <- try $ do
+    (sources, _storedMeta) <- BundleStore.loadBundle store deployId
+    result <- compileFromSource logger (options.compileTimeout * 1_000_000) options.maxCompileMemoryMb deployId sources
+    pure (Map.size . fst <$> result)
+  case outcome of
+    Right result -> pure result
+    Left e
+      | Just (_ :: SomeAsyncException) <- fromException e -> throwIO e
+      | otherwise -> pure (Left (failureMessage e))
 
 -- | If the deployment is in Pending state, compile it synchronously.
 -- Atomically transitions Pending → Compiling, then blocks until compilation

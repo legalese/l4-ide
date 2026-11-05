@@ -73,6 +73,7 @@ The seller delivers at 2, within 3; the buyer then has 7 from 2, and pays at 5. 
 `#TRACE` reads the events in order and gives `FULFILLED`, `BREACH`, or the rule still waiting for more events. A `` `WAIT UNTIL` `` event lets time pass without anyone acting.
 `#EVAL` of a rule only shows the rule itself; see [#EVAL shows the rule instead of an outcome](../errors/README.md#eval-shows-the-rule-instead-of-an-outcome).
 `l4 run` prints what the contract has become after the events. To have that read out as a list — what is owed now, what would discharge it, what would put someone in breach, and the next deadline — run `l4 lts` on the same file; see [What is owed now: `l4 lts`](lts-list.md).
+To keep a trace alive while the contract runs, with each new act checked against the history as it stands at that moment, see [The instance ledger](ledger.md).
 See [DEONTIC: Evaluation](DEONTIC.md#evaluation) and [EVENT](EVENT.md).
 
 ## Pages
@@ -85,6 +86,8 @@ See [DEONTIC: Evaluation](DEONTIC.md#evaluation) and [EVENT](EVENT.md).
 - [DEONTIC](DEONTIC.md): the type of rules, and `EVALTRACE`
 - [EVENT](EVENT.md): events and `` `WAIT UNTIL` ``
 - [What is owed now: `l4 lts`](lts-list.md): read a `#TRACE` out as a list of what is owed, what would discharge it and what would breach it
+- [Every position a contract can reach: `l4 explore`](explore.md): every position a contract can get to and every move between them, with a coverage line, property checks and a GraphViz picture
 - [State graph and `--dominators`](STATE-GRAPH.md): the map of a rule's `HENCE`/`LEST` paths, as **Show state graph** in the editor and `l4 state-graph` on the command line
+- [The instance ledger](ledger.md): run one contract as it happens, one proposed act at a time, each checked and recorded in a single step against the history as it stands at that instant
 
 [How obligations unfold](../../concepts/legal-modeling/regulative-rules.md) explains the model, and [Foundation module 6](../../courses/foundation/module-6-regulative.md) teaches it step by step.

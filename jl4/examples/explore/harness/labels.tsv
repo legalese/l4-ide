@@ -1,0 +1,33 @@
+# The label of each act in the explored graph, and the label of the reference LTS it stands for, per design, tab-separated.
+# Read off the act table of brief/README.md ("The acts, and the reference labels they stand for").
+# The harness relabels each emitted .aut by these rows before comparing it with its reference.
+# A label in a graph with no row here fails the run: an unmapped label is never passed through.
+# d3-cancel is D3 plus its cancel act; it has no reference LTS, and its rows name its acts in reports only.
+design	act	reference
+d1	PARTY World DOES `ledger records Bob's purchase`	step(BobBuys)
+d1	PARTY World DOES `Messages delivers the message`	step(Deliver)
+d1	PARTY World DOES `Alice checks whether dinner is bought`	step(CheckBought)
+d1	PARTY World DOES `Alice is done`	step(Done)
+d1	PARTY World DOES `Alice buys dinner`	step(Buy)
+d1	PARTY World DOES `Alice gives up`	step(Abandon)
+d2	PARTY World DOES `ledger records Bob's purchase`	step(BobBuys)
+d2	PARTY World DOES `Messages delivers the message`	step(Deliver)
+d2	PARTY World DOES `Alice checks whether dinner is bought`	step(CheckBought)
+d2	PARTY World DOES `Alice is done`	step(Done)
+d2	PARTY World DOES `Alice buys dinner`	step(Send)
+d2	PARTY World DOES `Alice gives up`	step(AbandonR)
+d2	PARTY World DOES `Alice reads the ledger again` OF TRUE	step(ReadAgain)
+d2	PARTY World DOES `Alice reads the ledger again` OF FALSE	step(NoAnswer)
+d3	PARTY World DOES `ledger records Bob's purchase`	step(BobBuys)
+d3	PARTY World DOES `Messages delivers the message`	step(Deliver)
+d3	PARTY World DOES `Alice checks whether dinner is bought`	step(CheckBought)
+d3	PARTY World DOES `Alice is done`	step(Done)
+d3	PARTY World DOES `Alice buys dinner` OF TRUE	step(BuyChecked)
+d3	PARTY World DOES `Alice buys dinner` OF FALSE	step(NoAnswer)
+d3-cancel	PARTY World DOES `ledger records Bob's purchase`	step(BobBuys)
+d3-cancel	PARTY World DOES `Messages delivers the message`	step(Deliver)
+d3-cancel	PARTY World DOES `Alice checks whether dinner is bought`	step(CheckBought)
+d3-cancel	PARTY World DOES `Alice is done`	step(Done)
+d3-cancel	PARTY World DOES `Alice buys dinner` OF TRUE	step(BuyChecked)
+d3-cancel	PARTY World DOES `Alice buys dinner` OF FALSE	step(NoAnswer)
+d3-cancel	PARTY World DOES `Alice cancels the dinner`	step(Cancel)

@@ -1,0 +1,25 @@
+-- Definitions that nlg-owner-main.l4 imports. Each has a herald; the main module
+-- reuses their names for definitions of its own, and a call must read the herald
+-- of the definition it resolved to, not of one that has the same name.
+
+-- A prefix function. The main module has a RECORD of the same name.
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+@nlg the distance from %x% to %y%
+`Pt` x y MEANS y MINUS x
+
+-- A mixfix function and a prefix function, on numbers. The main module defines
+-- an operator with the same pattern and a prefix function with the same name on
+-- strings, each with a herald of its own.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the smaller of %a% and %b%
+`the lower of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the smaller number of %a% and %b%
+`lower` a b MEANS IF a AT MOST b THEN a ELSE b

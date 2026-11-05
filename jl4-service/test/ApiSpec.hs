@@ -8,10 +8,53 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Map.Strict as Map
+import Data.Text (Text)
 import Test.Hspec
+import L4.FunctionSchema (Parameters (..))
+import Types (FunctionSummary (..))
 
 spec :: Spec
 spec = do
+  -- The metadata cache holds a rule's summary, and a deployment that is not
+  -- compiled yet is listed from it. An entry written before the cache held
+  -- isDeontic reads it from the display name of the return type, and one that
+  -- holds it is believed.
+  describe "FunctionSummary from the metadata cache" $ do
+    let cached returnType fields =
+          Aeson.eitherDecode $ Aeson.encode $ Aeson.object $
+            [ "name" Aeson..= ("f" :: Text)
+            , "description" Aeson..= ("" :: Text)
+            , "parameters" Aeson..= Aeson.object
+                [ "type" Aeson..= ("object" :: Text)
+                , "properties" Aeson..= Aeson.object []
+                , "required" Aeson..= ([] :: [Text]) ]
+            , "returnType" Aeson..= (returnType :: Text)
+            ] <> fields
+        flagOf :: Either String FunctionSummary -> Either String Bool
+        flagOf = fmap (.fsIsDeontic)
+
+    it "takes an entry with no isDeontic for a DEONTIC when it is displayed as one" $ do
+      flagOf (cached "DEONTIC Party Action" []) `shouldBe` Right True
+
+    it "takes an entry with no isDeontic for a DEONTIC when it is displayed as PROVISION OF" $ do
+      flagOf (cached "PROVISION OF Driver, Driver Action" []) `shouldBe` Right True
+
+    it "takes an entry with no isDeontic for an ordinary function otherwise" $ do
+      flagOf (cached "BOOLEAN" []) `shouldBe` Right False
+
+    -- the flag is written to the cache; the display name does not stand in for it
+    it "writes isDeontic to the cache, whatever the return type is displayed as" $ do
+      let summary flag = FunctionSummary
+            { fsName = "f", fsDescription = "", fsParameters = MkParameters Map.empty []
+            , fsReturnType = "BOOLEAN", fsReturnSchema = Nothing, fsSection = Nothing
+            , fsIsDeontic = flag, fsSourceFile = Nothing }
+          roundTrip flag = flagOf (Aeson.eitherDecode (Aeson.encode (summary flag)))
+      (roundTrip True, roundTrip False) `shouldBe` (Right True, Right False)
+
+    it "believes the isDeontic an entry holds over the name" $ do
+      flagOf (cached "BOOLEAN" ["isDeontic" Aeson..= True]) `shouldBe` Right True
+      flagOf (cached "PROVISION OF Driver, Driver Action" ["isDeontic" Aeson..= False]) `shouldBe` Right False
+
   describe "FnLiteral JSON parsing" $ do
     it "should preserve JSON String type (not coerce to number)" $ do
       let jsonString = "{\"value\": \"5\"}"

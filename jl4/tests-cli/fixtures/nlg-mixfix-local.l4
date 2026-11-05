@@ -1,0 +1,198 @@
+-- An @nlg on a MIXFIX definition, read at a call site in the SAME module.
+-- The harness is `l4 nlg` (jl4/tests-cli/Main.hs, "an @nlg on a mixfix
+-- definition"); this file is outside the golden globs on purpose, and
+-- nlg-mixfix-import.l4 makes the same calls across an IMPORT.
+--
+-- A mixfix call resolves to the operator's CANONICAL name, the slot/keyword
+-- pattern `the lower of _ and _`, while the definition's head keeps only the
+-- first keyword. The herald table used to be keyed on the head alone, so none
+-- of the interleaved calls below found their herald.
+
+-- Keyword-first, two keywords, herald on its own line above the head.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the smaller of %a% and %b%
+`the lower of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+-- Keyword-first, herald trailing the last input: the placement the prelude's
+-- `the amount by which` is written in (#788). The herald lands on `b` and is
+-- moved to the rule.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the amount by which` a `exceeds` b @nlg the amount by which %a% exceeds %b%
+  MEANS a MINUS b
+
+-- The herald names the slots in the OTHER order: a slot is filled by the input
+-- it names, not by where it sits in the sentence.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg %b% less %a%
+`the shortfall of` a `against` b MEANS b MINUS a
+
+-- Param-first infix.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg %a% and %b% together
+a `plus` b MEANS a PLUS b
+
+-- A herald that never mentions %b%: the argument is appended, not dropped.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the first of %a%
+`the first of` a `then` b MEANS a
+
+-- No herald: the call keeps the linearizer's reading.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the bare` a `and` b MEANS a PLUS b
+
+-- Control: a PREFIX function with a herald, which has always worked.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the greater of %a% and %b%
+`the greater` a b MEANS IF a AT LEAST b THEN a ELSE b
+
+-- Control: a PREFIX function whose herald trails its last input, which a WITH
+-- call from another module used to print a second time as that input's label.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the gap` a b @nlg the gap between %a% and %b%
+  MEANS a MINUS b
+
+-- The interleaved spelling, one call per row above.
+#EVAL `the lower of` 840 `and` 160
+#EVAL `the amount by which` 840 `exceeds` 160
+#EVAL `the shortfall of` 160 `against` 840
+#EVAL 840 `plus` 160
+#EVAL `the first of` 840 `then` 160
+#EVAL `the bare` 840 `and` 160
+#EVAL `the greater` 3 4
+
+-- Nested: the inner call is expanded first.
+#EVAL `the lower of` (`the lower of` 5 `and` 6) `and` 7
+
+-- The OF spelling resolves to the head keyword alone, and a WITH call to the
+-- head name. Neither goes through the canonical name, and neither may change.
+#EVAL `the lower of` OF 840, 160
+#EVAL `the amount by which` OF 840, 160
+#EVAL `the lower of` WITH a IS 840, b IS 160
+#EVAL `the amount by which` WITH a IS 840, b IS 160
+
+-- The prefix control, positional and WITH.
+#EVAL `the gap` 840 160
+#EVAL `the gap` WITH a IS 840, b IS 160
+
+-- Render rows. `l4 nlg` prints directives only, so these add nothing to the
+-- output above; they give `l4 render` a call to each function inside the body
+-- of another rule, which is the other place a herald is read at a call site.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render lower` n MEANS `the lower of` n `and` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render exceeds` n MEANS `the amount by which` n `exceeds` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render shortfall` n MEANS `the shortfall of` n `against` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render plus` n MEANS n `plus` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render first` n MEANS `the first of` n `then` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render bare` n MEANS `the bare` n `and` 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render greater` n MEANS `the greater` n 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render nested` n MEANS `the lower of` (`the lower of` n `and` 100) `and` 200
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render of` n MEANS `the lower of` OF n, 100
+
+-- A WITH call inside another rule's body. The herald of `the amount by which`
+-- and `the gap` follows their last input, so it used to be read a second time as
+-- the label of that input; the herald of `the lower of` sits above its head and
+-- never was.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render exceeds with` n MEANS (`the amount by which` WITH a IS n, b IS 100) PLUS 1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render gap with` n MEANS (`the gap` WITH a IS n, b IS 100) PLUS 1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render lower with` n MEANS (`the lower of` WITH a IS n, b IS 100) PLUS 1
+
+-- Two prefix functions used as a projection's selector (`s's size's half`): the
+-- herald of one follows its input, the other's sits above its head. The same two
+-- are in nlg-mixfix-import-lib.l4.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`half` x @nlg half of %x%
+  MEANS x DIVIDED BY 2
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+@nlg the third of %x%
+`third` x MEANS x DIVIDED BY 3
+
+-- A function used as a projection's selector keeps its plain name: "the span's
+-- size's half", not "the span's size's half of x". A herald that follows the
+-- input is moved onto the rule before a call is read (see `render exceeds with`
+-- above), which gives the name a herald; only a call should read it.
+DECLARE Span HAS size IS A NUMBER
+
+GIVEN s IS A Span
+GIVETH A NUMBER
+`render half selector` s MEANS s's size's half
+
+GIVEN s IS A Span
+GIVETH A NUMBER
+`render third selector` s MEANS s's size's third
+
+-- A WITH call as the WHOLE body of a rule. It is a call, not a record
+-- construction, so it reads as the function's herald with the arguments in a
+-- where clause, as `l4 nlg` prints it, and not as "is a the gap with" and a list
+-- of fields. `Pt`, a record that carries a herald of its own, is the control: its
+-- literal is still a record literal.
+DECLARE Pt @nlg a point
+  HAS x IS A NUMBER
+      y IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render exceeds direct` n MEANS `the amount by which` WITH a IS n, b IS 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render gap direct` n MEANS `the gap` WITH a IS n, b IS 100
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`render lower direct` n MEANS `the lower of` WITH a IS n, b IS 100
+
+GIVEN n IS A NUMBER
+GIVETH A Pt
+`render point` n MEANS Pt WITH x IS n, y IS 100

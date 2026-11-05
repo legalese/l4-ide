@@ -1118,6 +1118,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       "REFUSE" <+> printWithLayout msg
     Inert _ txt _ctx ->
       surround (pretty $ escapeSourceStringLiteral txt) "\"" "\""
+    Lifecycle _ p -> pretty (lifecyclePointWords p)
 
   parensIfNeeded :: LayoutPrinter a => Expr a -> Doc ann
   parensIfNeeded e = case e of
@@ -1128,6 +1129,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Breach _ Nothing Nothing -> printWithLayout e
     -- REFUSE is a keyword followed by a literal: an atom.
     Refuse{} -> printWithLayout e
+    -- THE JOIN \/ THE DEADLINE \/ THE ARMING: two words, one atom, admitted
+    -- as a juxtaposed argument ('L4.Parser.atomicExpr'' — keep the two in step)
+    Lifecycle{} -> printWithLayout e
     _ -> surround (printWithLayout e) "(" ")"
 
 -- | Bracket a conjunct of an @AND@/@OR@/@RAND@/@ROR@ chain, but only when its
@@ -1204,6 +1208,7 @@ parensIfOpenTailed e
       Breach _ Nothing Nothing -> False -- a bare BREACH is an atom
       Breach{}      -> True  -- open BY/BECAUSE clauses
       Refuse{}      -> False -- REFUSE plus a literal: no open tail
+      Lifecycle{}   -> False -- THE plus a noun: an atom
       -- `NOT` binds LOOSER than the connectives, not tighter: measured,
       -- `NOT TRUE AND FALSE` evaluates as `NOT (TRUE AND FALSE)`. So a negated
       -- conjunct is always bracketed — inheriting the operand's tail was not
@@ -1349,6 +1354,10 @@ instance LayoutPrinterWithName n => LayoutPrinter (Anchor n) where
     AnchorJoin _     -> "THE JOIN"
     AnchorDeadline _ -> "THE DEADLINE"
     AnchorArming _   -> "THE ARMING"
+    -- a lifecycle VALUE as the whole anchor keeps its brackets: bare, it
+    -- would re-parse as the noun anchor above — the same instant, but a
+    -- different tree, and the printer's round trip should not move the AST
+    AnchorAt _ e@Lifecycle{} -> surround (printWithLayout e) "(" ")"
     AnchorAt _ e     -> parensIfNeeded e
 
 instance LayoutPrinter UponEach where

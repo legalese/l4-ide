@@ -685,7 +685,7 @@ The change to `Transform.hs` is the function and its type only, so that it can b
 
 Nothing in the service caps the time of `/query-plan`, and a refusal is not remembered; after the change a refusal of such a table took 1.5 s at most in the grid above.
 `queryPlanHandler'` builds the plan on the first request for a function and stores it only when the build succeeded (`jl4-service/src/DataPlane.hs:362-369`); a refusal is thrown from `buildDecisionQueryCacheFromCompiled` before anything is stored (`jl4-service/src/Backend/DecisionQueryPlan.hs:182`), so every request for a refused rule pays the whole cost again.
-The deployment timeouts guard compiling (`tryCompileWithTimeout`) and evaluation (`timeoutAction`), not the plan.
+The deployment timeouts guard compiling (`tryCompileWithTimeout`) and evaluation (`withEvalLimits`), not the plan.
 
 `ClauseGroupTooLarge` and its message ("These clauses would draw a ladder of more than 300 boxes, too many to show. ...") are kept as on `unstable` (`clauseGroupLadderBudget`, `jl4-core/src/L4/Transform.hs:168`).
 A CONSIDER is one box here, so a group that reads through to a CONSIDER is one box, however many rows it has.

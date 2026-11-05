@@ -1,0 +1,52 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+lifecycle-type-spelled-like-noun.l4:39:27-32:
+  I found a problem while checking the definition of `nouns beside types of their spelling`:
+    In this action, `alice` refers to
+    
+      alice (at lifecycle-type-spelled-like-noun.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+lifecycle-type-spelled-like-noun.l4:40:36-41:
+  I found a problem while checking the definition of `nouns beside types of their spelling`:
+    In this action, `alice` refers to
+    
+      alice (at lifecycle-type-spelled-like-noun.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+lifecycle-type-spelled-like-noun.l4:41:39-44:
+  I found a problem while checking the definition of `nouns beside types of their spelling`:
+    In this action, `alice` refers to
+    
+      alice (at lifecycle-type-spelled-like-noun.l4:25:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+lifecycle-type-spelled-like-noun.l4:43:1-45:37:
+  DEONTIC BREACHED:
+    party
+      Tenant OF "Alice"
+    who did action
+      Refund OF (Tenant OF "Alice")
+    at
+      8
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Refund alice
+    before their deadline, which was at
+      7
+lifecycle-type-spelled-like-noun.l4:47:1-48:41:
+  DEONTIC BREACHED:
+    party
+      Tenant OF "Alice"
+    who did action
+      Apologise OF (Tenant OF "Alice")
+    at
+      14
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Apologise alice
+    before their deadline, which was at
+      13

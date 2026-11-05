@@ -759,10 +759,13 @@ buildFunctionCallExpr funName args =
 -- type. The test is conservative: the direct path could express some of
 -- these (a @null@ in a MAYBE slot is NOTHING in 'fnLiteralToExprTyped'), but
 -- not all. It handles everything else, records, enums and lists included.
--- A DEONTIC function called on @/evaluation@, and a module that did not
--- precompile, take the wrapper path whatever this says
--- ('evaluateWithCompiledDeontic', 'createFunction'); MCP and batch call a
--- DEONTIC function through 'evaluateWithCompiled' like any other.
+-- A DEONTIC function, and a module that did not precompile, take the wrapper
+-- path whatever this says ('evaluateWithCompiledDeontic', 'createFunction').
+-- A DEONTIC function takes it on every surface: @/evaluation@, MCP and batch
+-- all replay its trace through 'DeonticTrace.runDeonticLimited', and none of
+-- them calls it through 'evaluateWithCompiled', which has no trace to give it
+-- (MCP and batch used to, and answered the initial obligation whatever the
+-- trace).
 --
 -- A 'Nothing' does not take it. That is a parameter left out, a top-level
 -- @null@ on the single evaluation endpoint, which 'FnArguments' decodes as a

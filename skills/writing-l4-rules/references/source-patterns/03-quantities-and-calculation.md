@@ -145,11 +145,11 @@ than chance suggests — it is the number somebody was aiming at.
 -- "not more than 21" / "at most 21"   -> AT MOST    (inclusive)
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
-DECIDE `the amount is not less than 21` n IF n AT LEAST 21
+DECIDE `the amount is not less than 21` IF n AT LEAST 21
 
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
-DECIDE `the amount exceeds 21` n IF n GREATER THAN 21
+DECIDE `the amount exceeds 21` IF n GREATER THAN 21
 
 #ASSERT     `the amount is not less than 21` 21
 #ASSERT NOT `the amount exceeds 21` 21
@@ -173,7 +173,7 @@ and nothing type-checks it for you:
 ```l4
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
-DECIDE `the amount is not less than 21 (wrong)` n IF n GREATER THAN 21
+DECIDE `the amount is not less than 21 (wrong)` IF n GREATER THAN 21
 
 #ASSERT `the amount is not less than 21 (wrong)` 21
 ```
@@ -314,7 +314,7 @@ do not have sufficient information", the fix is almost always the argument types
 @ref 17 CFR 227.100(a)(1); 17 CFR 227.201(t) Instruction 1
 GIVEN offering IS AN Offering
 GIVETH A NUMBER
-`aggregate offering amount` offering MEANS
+`aggregate offering amount` MEANS
         offering's `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months`
     PLUS offering's `maximum offering amount the issuer will accept`
 ```
@@ -340,14 +340,14 @@ DECLARE Offering HAS
 @ref 17 CFR 227.100(a)(1)
 GIVEN offering IS AN Offering
 GIVETH A NUMBER
-`aggregate offering amount` offering MEANS
+`aggregate offering amount` MEANS
          offering's `the amount already sold in the preceding 12 months`
     PLUS offering's `the maximum amount the issuer will accept`
 
 -- "the sum of all payments made": the source ranges over an open class, so sum a LIST.
 GIVEN payments IS A LIST OF NUMBER
 GIVETH A NUMBER
-`the sum of the payments made` payments MEANS sum payments
+`the sum of the payments made` MEANS sum payments
 ```
 
 _(Probe `q04-aggregate.l4`, exit 0, no errors; two assertions satisfied.)_
@@ -403,7 +403,7 @@ a number, but the shape is the same one a fee schedule uses:
 @ref 17 CFR 227.201(t)(1)-(3)
 GIVEN offering IS AN Offering
 GIVETH A FinancialStatementRequirement
-`financial statements required` offering MEANS
+`financial statements required` MEANS
     BRANCH IF `the COVID-19 temporary relief could change this answer` THEN `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
            IF `aggregate` AT MOST `tier 1 ceiling`                     THEN `financial statements certified by the principal executive officer, with tax return information`
            IF `aggregate` AT MOST `tier 2 ceiling`                     THEN `financial statements reviewed by an independent public accountant`
@@ -479,7 +479,7 @@ GIVETH A NUMBER
 
 GIVEN amount IS A NUMBER
 GIVETH A NUMBER
-`the duty on` amount MEANS
+`the duty on` MEANS
     sum (map `the duty on this slice` `the duty bands`)
     WHERE
         `the duty on this slice` band MEANS `the duty on the slice of` amount `falling in` band
@@ -520,7 +520,7 @@ amount:
 ```l4
 GIVEN amount IS A NUMBER
 GIVETH A NUMBER
-`the duty on (wrong)` amount MEANS
+`the duty on (wrong)` MEANS
     BRANCH IF amount AT MOST 180000 THEN amount TIMES 1%
            IF amount AT MOST 360000 THEN amount TIMES 2%
            OTHERWISE                     amount TIMES 3%
@@ -572,7 +572,7 @@ the largest, and it is `min`. Swap them and both protections invert.
 -- "10 percent ..., not to exceed $124,000"         -- a CAP,   so min.
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
-`the investment limit for` investor MEANS
+`the investment limit for` MEANS
     IF   `either measure is below the cut point`
     THEN max `the minimum permitted investment` `five percent of the measure`
     ELSE min `ten percent of the measure` `the maximum amount sold to any one investor in 12 months`
@@ -645,7 +645,7 @@ the parties, which is why instruments spell out the direction rather than leavin
 -- There is no ROUND. "Rounded to the nearest dollar, half up" is written out.
 GIVEN amount IS A NUMBER
 GIVETH A NUMBER
-`rounded to the nearest dollar, half up` amount MEANS FLOOR (amount PLUS 0.5)
+`rounded to the nearest dollar, half up` MEANS FLOOR (amount PLUS 0.5)
 
 #ASSERT `the levy rounded down`   EQUALS 6199
 #ASSERT `the levy rounded up`     EQUALS 6200
@@ -976,7 +976,7 @@ convention where you divide.
 ```l4
 GIVEN principal IS A NUMBER
 GIVETH A NUMBER
-`the interest for one year (wrong)` principal MEANS
+`the interest for one year (wrong)` MEANS
     principal TIMES `Interest Rate Per Annum` TIMES 12
 
 #EVAL `the interest for one year (wrong)` 25000

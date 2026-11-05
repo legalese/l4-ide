@@ -145,7 +145,7 @@ The principle generalizes a hard-won lesson: bugs hide in the _contexts you did 
 > below is about obligations, clocks and defeasible priority; none of them is asked by the pure
 > decision fragment Phase 1 targets, whose reference semantics already exists and is executable —
 > the jl4 evaluator, already the oracle of record for the Catala backend's expected values, the DMN
-> engine harnesses and the Blawx s(CASP) comparison (portfolio invariant I1).
+> engine harnesses and the Blawx s(CASP) comparison (portfolio invariant I2).
 >
 > **This re-scoping is a deferral, not a cancellation, and it is the one most likely to evaporate.**
 > Meng's note on R-V1: _"What I'm worried about is that we will do Phase 1 now and never get around
@@ -187,6 +187,8 @@ The principle generalizes a hard-won lesson: bugs hide in the _contexts you did 
 
 - [ ] Counterexample → IDE visualization (reuse the trace visualizer)
 - [ ] Per-query backend selection heuristic (timed? arithmetic? liveness? → tool)
+
+For the explicit-LTS route, REGULATIVE-LOWERING-SPEC R-L7 orders the emitters TLA+ with NuSMV, then PNML as a picture; Z3 and Alloy are untouched by it.
 
 ## Phase 1 rulings — R-V1 to R-V10
 
@@ -495,11 +497,11 @@ two of Meng's ruling notes say, in different words, _don't let this evaporate_. 
 table only when the work is done or the deferral is explicitly withdrawn — not because it stopped
 being convenient.
 
-| id     | what was deferred                                                                          | trigger                                                                                                     | owed by |
-| ------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------- |
-| **D1** | Phase 0 — core IR, reference semantics, defeasibility strategy, assertion-language surface | **The first deontic, timed or defeasible property anyone wants to check.** Phase 2 cannot start without it. | R-V1    |
-| **D2** | Lifting `analyzeSafety` and `vizExprToBoolExpr` out of the `Dmn`/`Viz` namespaces          | The PR immediately after the prover's first. It does nothing else.                                          | R-V9    |
-| **D3** | An `sbv`-backed implementation behind the same interface                                   | Hand-rolled SMT-LIB2 emission or model parsing costing more than it saves — pivot, do not endure.           | R-V6    |
+| id     | what was deferred                                                                          | trigger                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | owed by |
+| ------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| **D1** | Phase 0 — core IR, reference semantics, defeasibility strategy, assertion-language surface | **The first deontic, timed or defeasible property anyone wants to check.** Phase 2 cannot start without it, except the explicit-LTS route. Triggered 2026-10-24 by the safety property of a check-then-act race. [REGULATIVE-LOWERING-SPEC.md](REGULATIVE-LOWERING-SPEC.md) §3 answers the IR and reference-semantics items for the explicit-LTS route only (its R-L1); they reopen for the symbolic lowering (its D-L1). Defeasibility is still owed (its D-L3, trigger: a priority, an exception or a contrary-to-duty chain); the assertion surface is still owed (its D-L2, trigger: the first property not writable as a boolean decision). | R-V1    |
+| **D2** | Lifting `analyzeSafety` and `vizExprToBoolExpr` out of the `Dmn`/`Viz` namespaces          | The PR immediately after the prover's first. It does nothing else.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | R-V9    |
+| **D3** | An `sbv`-backed implementation behind the same interface                                   | Hand-rolled SMT-LIB2 emission or model parsing costing more than it saves — pivot, do not endure.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | R-V6    |
 
 **D1 is the one to watch.** It is deferred by a whole phase rather than a PR, it is the only one
 whose absence is invisible while Phase 1 works fine, and it is the one Meng flagged in his own
@@ -508,7 +510,7 @@ words. A Phase 1 that ships and a Phase 0 that never starts is the failure this 
 ## Open Questions
 
 - **Backend selection:** automatic (infer from which IR features a query touches) vs explicit annotation?
-- **Witness translation:** can a backend counterexample always be lifted back to an L4-level, citation-bearing trace a non-lawyer can read? — **Answered for Phase 1 by R-V5**: an SMT model is a concrete input, so the lift is an evaluator run rather than a translation, and the replay doubles as the confirmation. Open for the backends whose counterexample is a _path_ rather than an assignment.
+- **Witness translation:** can a backend counterexample always be lifted back to an L4-level, citation-bearing trace a non-lawyer can read? — **Answered for Phase 1 by R-V5**: an SMT model is a concrete input, so the lift is an evaluator run rather than a translation, and the replay doubles as the confirmation. Open for the backends whose counterexample is a _path_ rather than an assignment. Answered for the explicit-LTS route by REGULATIVE-LOWERING-SPEC §5.4: a state is a path of events, so a counterexample is a `#TRACE`.
 - **Scope/bounds discipline:** for bounded engines, how do we communicate "checked up to scope N" honestly (no silent truncation of assurance)? — **Answered for Phase 1 by R-V8**: three verdicts, every `unknown` naming its reason, and a per-run coverage line. Open for the bounded engines, where the honest statement is about scope rather than about theory.
 - **Defeasibility round-trip:** if the ASP layer changes the in-force set, must every downstream backend re-run, and how is that cached?
 

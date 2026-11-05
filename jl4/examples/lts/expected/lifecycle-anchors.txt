@@ -1,0 +1,75 @@
+`noun anchor` — after 1 event, the clock stands at 8 (the #TRACE on line 44)
+    PARTY alice DOES Sign OF alice AT 8
+  Standing: in progress.
+
+  Owed now:
+    - alice MUST Deliver OF (Tenant OF "Alice") — due by 13 (WITHIN 5 OF THE JOIN)
+
+  What would discharge it (the contract ends fulfilled):
+    - alice does Deliver OF (Tenant OF "Alice") now (at 8) → fulfilled
+
+  What would put someone in breach:
+    - nothing happens by 13 (the clock reaches 14) → Tenant OF "Alice" is in breach: MUST Deliver alice was due by 13; the clock reached 14 without it
+
+  Next deadline: 13 (alice: Deliver OF (Tenant OF "Alice"))
+
+  Steps, in order:
+    at 8: Tenant OF "Alice" does Sign OF … at 8; Tenant OF "Alice" MUST — done; on to what follows
+    at 8: alice (as written; not yet resolved) MUST — no more events; still waiting
+
+`bracketed noun` — after 1 event, the clock stands at 8 (the #TRACE on line 47)
+    PARTY alice DOES Sign OF alice AT 8
+  Standing: in progress.
+
+  Owed now:
+    - alice MUST Deliver OF (Tenant OF "Alice") — due by 13 (WITHIN 5 OF (THE JOIN))
+
+  What would discharge it (the contract ends fulfilled):
+    - alice does Deliver OF (Tenant OF "Alice") now (at 8) → fulfilled
+
+  What would put someone in breach:
+    - nothing happens by 13 (the clock reaches 14) → Tenant OF "Alice" is in breach: MUST Deliver alice was due by 13; the clock reached 14 without it
+
+  Next deadline: 13 (alice: Deliver OF (Tenant OF "Alice"))
+
+  Steps, in order:
+    at 8: Tenant OF "Alice" does Sign OF … at 8; Tenant OF "Alice" MUST — done; on to what follows
+    at 8: alice (as written; not yet resolved) MUST — no more events; still waiting
+
+`bracketed arming` — after 1 event, the clock stands at 8 (the #TRACE on line 50)
+    PARTY alice DOES Sign OF alice AT 8
+  Standing: in progress.
+
+  Owed now:
+    - alice MUST Deliver OF (Tenant OF "Alice") — due by 13 (WITHIN 10 OF (THE ARMING))
+
+  What would discharge it (the contract ends fulfilled):
+    - alice does Deliver OF (Tenant OF "Alice") now (at 8) → fulfilled
+
+  What would put someone in breach:
+    - nothing happens by 13 (the clock reaches 14) → Tenant OF "Alice" is in breach: MUST Deliver alice was due by 13; the clock reached 14 without it
+
+  Next deadline: 13 (alice: Deliver OF (Tenant OF "Alice"))
+
+  Steps, in order:
+    at 8: Tenant OF "Alice" does Sign OF … at 8; Tenant OF "Alice" MUST — done; on to what follows
+    at 8: alice (as written; not yet resolved) MUST — no more events; still waiting
+
+`arithmetic on the noun` — after 1 event, the clock stands at 8 (the #TRACE on line 53)
+    PARTY alice DOES Sign OF alice AT 8
+  Standing: in progress.
+
+  Owed now:
+    - alice MUST Deliver OF (Tenant OF "Alice") — due WITHIN 0 OF (THE JOIN PLUS 5)
+
+  What would discharge it (the contract ends fulfilled):
+    - alice does Deliver OF (Tenant OF "Alice") now (at 8) → fulfilled
+
+  What could not be tried:
+    - time runs out on alice MUST Deliver alice — the anchor of the WITHIN is not a literal, so its deadline is not known here
+
+  Next deadline: not known here — alice: Deliver OF (Tenant OF "Alice") has a deadline this list could not work out
+
+  Steps, in order:
+    at 8: Tenant OF "Alice" does Sign OF … at 8; Tenant OF "Alice" MUST — done; on to what follows
+    at 8: alice (as written; not yet resolved) MUST — no more events; still waiting
