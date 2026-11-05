@@ -127,6 +127,10 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 
 `POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. Terminal jobs are retained for 10 minutes, then pruned.
 
+While the [instance ledger](#instance-ledger) holds instances of a deployment, `DELETE` and an overwriting `POST` are refused with `409`, naming the instances, and with `503` when the ledger's store cannot say whether it holds any.
+A `POST` of the same bytes is no overwrite and is still answered `ready`.
+`PUT` is not refused: it changes the rule the instances replay against, which is open (OPERATIONAL-LOWERING-SPEC D-O9).
+
 **An annotation line the compiler ignores is a compile failure here.** `l4 check` and the editor lex an `@name` that is none of the annotations L4 knows as a comment and warn about it, so that a file written for a newer L4 still opens. A deployment is what this service publishes, and a misspelt `@export` is a rule that silently is not, so a deploy (`POST` or `PUT`) of a bundle that holds one is `rejected`, with the file, the line and the column, and the warning's own text, which names the annotation and suggests the known one. The same goes for a known annotation without the form it needs, such as a bare `@lang`. A service older than the file it is given therefore refuses an annotation it cannot honour, and names it. This is what the service always did with such a line, as a lexer error, now with a better message; nothing already stored can hold one, so a restart refuses nothing it accepted before. Each ignored line is also logged at warn level (`Ignored annotation`, with the deployment and the file).
 
 A name that merely begins with a known annotation's is not an ignored line: `@exports` is `@export` followed by the text `s`, and `@descr` is `@desc` followed by `r`, as they always were. The service accepts them, as it did, and does not warn about them; an `@exports` does not publish a function (a bundle whose only `@export` is spelt that way is `applied` with `functions: []`). `l4 check` does not warn about them either.
@@ -162,6 +166,25 @@ Evaluate functions within a deployment. All routes are available in both short f
 | `GET`  | `/deployments/{id}/files/{path}.l4`                    | `/{id}/{path}.l4`                |
 
 Function names with spaces can use hyphens or URL-encoding in the path (e.g., `check-person` or `check%20person` for `check person`).
+
+### Instance Ledger
+
+A deployment whose contract is a regulative rule can run instances of it: an instance is the event history of one `#TRACE` of the contract, kept in the instance ledger's store, and acts are proposed to it one at a time (`specs/proposals/OPERATIONAL-LOWERING-SPEC.md`).
+Long routes only.
+
+| Method | Endpoint                                          | Body                                                                                             | Answer                                                                         |
+| ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `POST` | `/deployments/{id}/instances`                     | `instance`, `contract`                                                                           | `201` and row 1; `409` if the instance exists                                  |
+| `POST` | `/deployments/{id}/instances/{instance}/events`   | `party`, `action`, `idempotencyKey`; optionally `decidedAgainst`, `strict`, `cells`, `claimedAt` | `200` and the row; `409` for a strict proposal whose cell moved; `422` refused |
+| `GET`  | `/deployments/{id}/instances/{instance}/position` |                                                                                                  | `200`: the head, the enabled set in the words of `l4 lts`, the next deadline   |
+
+Every reply is JSON and says whether it `applied` anything.
+`404` is an instance the ledger does not hold: an append or a read never creates one.
+`503` applied nothing: the evaluator could not decide, a limit stopped the request, every one of the ledger's slots was taken, or the store could not be opened.
+A retry with the same `idempotencyKey` is always safe; if the row was written before the reply was lost, the retry reads it back.
+The contract's source is the one `.l4` file of the deployment that no other `.l4` file imports, and a deployment with two such files is refused with `422`.
+The ledger clock is whole seconds since the Unix epoch, and what one unit of a contract's time is against wall time is not decided (D-O8), so a contract written against another unit or epoch runs with every deadline shifted, and nothing says so.
+Each request runs under `--eval-timeout` and the ledger's own allocation limit, `--ledger-max-eval-memory-mb`.
 
 ### File Browsing
 
@@ -239,7 +262,7 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 **Absent with no default, or `null`.**
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
-Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every `/evaluation` request to a `DEONTIC` function; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type (smucclaw/l4-ide#1021); on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every request to a `DEONTIC` function, whether to `/evaluation`, over MCP or as a batch case; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type (smucclaw/l4-ide#1021); on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
 On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
 A rule that reads it where the other facts decide anyway, as in `walks OR TRUE`, still answers.
 If the answer does depend on it, evaluation stops and names it, and every other input the answer is waiting for:
@@ -321,6 +344,23 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 - `startTime` — start time for contract simulation (required for DEONTIC)
 - `events` — list of trace events, each with `party`, `action`, and `at` timestamp (required for DEONTIC)
 
+The same trace goes to a `DEONTIC` function over MCP and in a batch, and the answer is the same as `/evaluation`'s.
+Over MCP, `startTime` and `events` go beside `arguments`, as above (see [MCP Schema Design](#mcp-schema-design)).
+`tools/list` also lists them inside `arguments`, among the function's parameters, so a call may put them there; when both places have one, the one beside `arguments` is used, and a `null` is a field left out.
+In a batch, each case carries its own `startTime` and `events` among its attributes, beside the function's inputs: `{"@id": 1, "startTime": 0, "events": [...], "<input>": ...}`.
+A call or a case with no `startTime`, or no `events`, is refused with the message `/evaluation` gives: `startTime is required for functions returning DEONTIC`, or `events is required for functions returning DEONTIC`.
+Over MCP the refusal is an error result (`isError`) whose text is the body of `/evaluation`'s 400, `{"error": "..."}`; in a batch it is an `@error` on that case, and the cases beside it are still answered.
+That refusal is **assumed, not ruled**: MCP and batch used to answer such a call with the contract's initial obligation, whatever trace the call carried and with no error, and the refusal turns that answer into the error `/evaluation` already gives.
+The field names inside an event's party or action are read as sent on `/evaluation` and in a batch.
+Over MCP they are read as `tools/list` spells them, as an input's are: a field the rule calls `full name` is `full-name` in the schema, and is mapped back to the rule's name, and a name that is not a sanitized one is read as it was sent.
+That is **assumed, not ruled**: the rulings of 2026-10-26 do not cover it.
+A time is a number and may be written with a decimal point: `0.0`, `0.05` and `12345678.5` are read as written.
+A function whose return type is written `PROVISION OF …`, the deprecated alias of `DEONTIC`, is a `DEONTIC` function on every surface: it takes a trace, and `tools/list`, the explorer and the WebMCP page show it as one.
+Whether a function is `DEONTIC` is read from its return type, not from the names of its inputs.
+A `startTime` or `events` sent to a function that is not `DEONTIC` is refused on all three surfaces with `startTime and events are only valid for functions returning DEONTIC`: `/evaluation` answers `400`, MCP returns an error result, and a batch case is an `@error` while the cases beside it are answered.
+A `null` is a field left out.
+A function that is not `DEONTIC` and has inputs called `startTime` or `events` reads them as inputs; `/evaluation` used to take such a function for a `DEONTIC` one, because the compiler gives a `DEONTIC` function parameters of those names, and asked it for a trace.
+
 In the structured fields of the answer, a party and an action are spelled as an enum answer is (above): the name, without backticks.
 An `OBLIGATION` names them in `party` and `action`, and so does each operand of a `RAND` or `ROR` that is an `OBLIGATION`.
 A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligatedParty` and `obligationAction` (the obligation that was missed), and in the `party` and `action` of each entry of `failures`.
@@ -372,6 +412,9 @@ Every case carries its own `@presumed`, the inputs it left out whose defaults it
 A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
 That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 Neither has a `value`.
+A case whose evaluation fails on the service's own fault, and not on a limit or on what the case said, is an `@error` too: it says the case could not be evaluated, the details are in the service log, and the cases beside it are answered.
+That wording and that treatment are **assumed, not ruled**.
+A case for a `DEONTIC` function carries its own `startTime` and `events`, and its `value` is the contract after them; a case without them is an `@error` (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
 The three `processor…` fields of `summary` are not measured, and are always `0`.
 The deployment's OpenAPI document, `GET /deployments/{id}/openapi.json`, describes this response key by key.
 
@@ -537,6 +580,13 @@ The service exposes an [MCP](https://modelcontextprotocol.io/) JSON-RPC 2.0 endp
 
 The org-wide endpoint (`/.mcp`) exposes tools from all deployments. The scoped endpoints (`/{id}/.mcp`) restrict tool visibility to a single deployment.
 
+Beside the decision tools, every endpoint lists one tool of the [instance ledger](#instance-ledger), `what-may-I-do-now`, to callers that may evaluate.
+Given an `instance` (and on the org-wide endpoint its `deployment`), it answers with the instance's position, the same answer as `GET .../position`, and, given a `party` and an `action`, what the ledger would do with that act were it proposed now.
+It never appends: to act, an agent proposes the act on the instance's events route, naming the head the tool reported as `decidedAgainst`, and the ledger decides there against the head current when the act arrives.
+On a service started with `--ledger-mcp-write` a deployment's own endpoint also lists a write tool, `act-…`, for each act the caller's party may perform; the party is the `X-L4-Party` request header and is a claim, not an authentication.
+See [Write tools over MCP](../doc/reference/regulative/ledger.md#write-tools-over-mcp).
+The tool is registered in front of the MCP handler, so the decision tools are answered as before, and still answered when the ledger's store cannot be opened.
+
 #### Field Name Sanitization
 
 L4 uses backtick identifiers with spaces (e.g., `` `function or purpose` ``), but JSON schema property names and URL path segments work better with hyphens. The service automatically sanitizes field names:
@@ -585,8 +635,8 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
 
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
-- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`.
-- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`.
+- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`. A `startTime` or `events` that is not one of the function's inputs is an error result. An `arguments` that is not one of the function's inputs is left out, and one that is, is read as an input.
+- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`, and the contract is replayed against that trace as it is on `/evaluation`. A call without a trace is an error result, not the contract's initial obligation (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)). A function with an input of its own called `arguments` takes its inputs nested as the schema lists them, `{"arguments": {"arguments": ...}}`; a call that sends them flat loses that input (a known limit, read from the code and not run).
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
 
@@ -656,21 +706,28 @@ The proxy injects these headers to control what jl4-service includes in response
 
 All options can also be set via environment variables. CLI arguments take precedence over environment variables.
 
-| Option                      | Env Var                       | Description                                                                                                                                                                              | Default          |
-| --------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `--port`, `-p`              | `JL4_PORT`                    | HTTP port                                                                                                                                                                                | `8080`           |
-| `--store-path`              | `JL4_STORE_PATH`              | Directory for persisting deployment bundles                                                                                                                                              | `/tmp/jl4-store` |
-| `--server-name`, `-s`       | `JL4_SERVER_NAME`             | Server URL for OpenAPI metadata                                                                                                                                                          | -                |
-| `--lazy-load`               | `JL4_LAZY_LOAD`               | Register deployments as pending on startup; compile on first evaluation/function access (optimistic 2s timeout, returns 202 if still compiling). File browsing always works immediately. | `false`          |
-| `--debug`                   | `JL4_DEBUG`                   | Enable debug mode (verbose errors, debug-level logs)                                                                                                                                     | `false`          |
-| `--max-zip-size`            | `JL4_MAX_ZIP_SIZE`            | Maximum zip upload size in bytes                                                                                                                                                         | `2097152` (2 MB) |
-| `--max-file-count`          | `JL4_MAX_FILE_COUNT`          | Maximum number of files per zip upload                                                                                                                                                   | `5096`           |
-| `--max-deployments`         | `JL4_MAX_DEPLOYMENTS`         | Maximum number of concurrent deployments                                                                                                                                                 | `1024`           |
-| `--max-concurrent-requests` | `JL4_MAX_CONCURRENT_REQUESTS` | Maximum concurrent requests (503 when exceeded)                                                                                                                                          | `20`             |
-| `--max-eval-memory-mb`      | `JL4_MAX_EVAL_MEMORY_MB`      | Per-evaluation allocation limit in MB                                                                                                                                                    | `256`            |
-| `--eval-timeout`            | `JL4_EVAL_TIMEOUT`            | Evaluation timeout in seconds                                                                                                                                                            | `60`             |
-| `--compile-timeout`         | `JL4_COMPILE_TIMEOUT`         | Compilation timeout in seconds                                                                                                                                                           | `60`             |
-| `--max-ladder-nodes`        | `JL4_MAX_LADDER_NODES`        | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                         | `10000`          |
+| Option                        | Env Var                         | Description                                                                                                                                                                                                                                   | Default          |
+| ----------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `--port`, `-p`                | `JL4_PORT`                      | HTTP port                                                                                                                                                                                                                                     | `8080`           |
+| `--store-path`                | `JL4_STORE_PATH`                | Directory for persisting deployment bundles                                                                                                                                                                                                   | `/tmp/jl4-store` |
+| `--server-name`, `-s`         | `JL4_SERVER_NAME`               | Server URL for OpenAPI metadata                                                                                                                                                                                                               | -                |
+| `--lazy-load`                 | `JL4_LAZY_LOAD`                 | Register deployments as pending on startup; compile on first evaluation/function access (optimistic 2s timeout, returns 202 if still compiling). File browsing always works immediately.                                                      | `false`          |
+| `--debug`                     | `JL4_DEBUG`                     | Enable debug mode (verbose errors, debug-level logs)                                                                                                                                                                                          | `false`          |
+| `--max-zip-size`              | `JL4_MAX_ZIP_SIZE`              | Maximum zip upload size in bytes                                                                                                                                                                                                              | `2097152` (2 MB) |
+| `--max-file-count`            | `JL4_MAX_FILE_COUNT`            | Maximum number of files per zip upload                                                                                                                                                                                                        | `5096`           |
+| `--max-deployments`           | `JL4_MAX_DEPLOYMENTS`           | Maximum number of concurrent deployments                                                                                                                                                                                                      | `1024`           |
+| `--max-concurrent-requests`   | `JL4_MAX_CONCURRENT_REQUESTS`   | Maximum concurrent requests (503 when exceeded)                                                                                                                                                                                               | `20`             |
+| `--max-eval-memory-mb`        | `JL4_MAX_EVAL_MEMORY_MB`        | Per-evaluation allocation limit in MB                                                                                                                                                                                                         | `256`            |
+| `--eval-timeout`              | `JL4_EVAL_TIMEOUT`              | Evaluation timeout in seconds                                                                                                                                                                                                                 | `60`             |
+| `--compile-timeout`           | `JL4_COMPILE_TIMEOUT`           | Compilation timeout in seconds                                                                                                                                                                                                                | `60`             |
+| `--max-ladder-nodes`          | `JL4_MAX_LADDER_NODES`          | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                                                                              | `10000`          |
+| `--ledger-store`              | `JL4_LEDGER_STORE`              | Instance-ledger store: `sqlite` (`ledger.sqlite3` under the store path, one process), `postgres` (several processes), `memory` (tests only). Checked at startup; opened on first use                                                          | `sqlite`         |
+| `--ledger-postgres-url`       | `JL4_LEDGER_POSTGRES_URL`       | Connection string for `--ledger-store postgres`; needs a binary built with `cabal build -f postgres jl4-service`, and libpq                                                                                                                   | -                |
+| `--ledger-allow-nondurable`   | `JL4_LEDGER_ALLOW_NONDURABLE`   | Allow `--ledger-store memory`, which loses every instance on restart                                                                                                                                                                          | `false`          |
+| `--ledger-max-eval-memory-mb` | `JL4_LEDGER_MAX_EVAL_MEMORY_MB` | Allocation limit in MB of one instance-ledger request, in place of `--max-eval-memory-mb`: one append re-typechecks its contract and allocated about 2.1 GB on the dinner fixture                                                             | `8192`           |
+| `--ledger-mcp-write`          | `JL4_LEDGER_MCP_WRITE`          | Let an agent append over MCP: one `act-…` write tool per act the caller's party (the `X-L4-Party` header, a claim and not an authentication) may perform, listed on a deployment's own endpoint; off until who the caller is has been decided | `false`          |
+| `--check-store`               | -                               | Do not serve: compile every deployment stored in the given directory, report, and exit (see [Checking a store before a rollout](#checking-a-store-before-a-rollout))                                                                          | -                |
+| `--json`                      | -                               | With `--check-store`, print the report as one JSON document                                                                                                                                                                                   | `false`          |
 
 Boolean env vars accept `1`, `true`, or `yes` (case-insensitive).
 
@@ -723,6 +780,49 @@ What is still outside the limits:
 - **`X-Eval-Alloc-Bytes` counts the calling thread only.** On the wrapper path that is not where the evaluating happens, so the header understates what the call allocated: measured on 2026-10-07, a wrapper-path call that spent 1.2 s evaluating reported 29,520 bytes.
 - **Turning the answer into JSON text is outside both limits.** The answer is fully computed inside them, but writing it out happens after. That work grows with the size of the answer, not with how it was reached; it has not been measured separately, but the largest answer tried, 400 KB of digits, came back whole in 0.76 s end to end under a 1-second limit.
 - **A limit that stops a very deep recursion answers a little late.** Before it answers, the evaluator makes the values it was part-way through usable again, and that cannot be cut short. It costs about 0.2 µs for each frame of the evaluator's own stack, and the evaluator stops at 1,000,000 frames. A frame is not a level of recursion: a non-tail recursion such as `sum to` takes about 2.2 frames a level (measured on 2026-10-07, `sum to 400000` answers and `sum to 500000` is refused for exceeding 1,000,000). So the cost is at most about a quarter of a second, and only for a recursion some 450,000 levels deep. Measured with a 1-second limit and a call of `sum to 900000`, which the limit stops before it finishes, the answer came back after 1.12 to 1.27 s, where before it came back after 1.00 to 1.09 s.
+
+## Checking a store before a rollout
+
+A restart compiles every stored deployment with the binary that is starting (see [Persistence](#persistence)). A new binary can therefore refuse a deployment that the old one served: its sources type-check differently under the new compiler, a library it imports has changed, or it no longer fits the compile limits. That is found only once the new binary is serving, as a deployment that is `failed`.
+
+`jl4-service --check-store DIR` runs that compile first, with the new binary and the store it is about to serve.
+It compiles every deployment in `DIR` the way a restart does, under the same `--compile-timeout` and `--max-compile-memory-mb`, and no more at once than a restart compiles (one per capability).
+It prints one line for each deployment and a summary, and exits.
+It starts no server, and it writes nothing to `DIR`: it does not create the directory, clean up a stale `<id>.tmp` directory, backfill a `metadata.json`, or save a metadata cache.
+The log goes to stderr, so stdout holds the report alone. `--store-path` is not read in this mode: the directory is the argument.
+
+```
+$ jl4-service --check-store /var/lib/jl4-service/store --compile-timeout 120
+sales-rules	ok	3 functions
+claims-pilot	failed	Compilation timed out or exceeded memory limit
+travel-policy	failed	I found a problem while checking the definition of `is big`: There are multiple definitions for the identifier `__GT__` and I do not have sufficient information to make a choice between them. The options are: ...
+3 deployments: 1 ok, 2 failed
+```
+
+Each line is the deployment's id, `ok` or `failed`, and then the number of functions it publishes or the error, separated by tabs. An error that spans lines is joined onto one. A deployment is `failed` for the reasons a restart would register it as failed: its sources do not parse or type-check, the compiler raises an error (inputs whose names collide once sanitised), its `metadata.json` does not decode, or it does not compile within the limits.
+With `--json` the report is one JSON document instead, with each error as it is:
+
+```json
+{
+  "store": "/var/lib/jl4-service/store",
+  "deployments": [
+    {
+      "id": "sales-rules",
+      "status": "ok",
+      "functions": 3,
+      "error": null,
+      "bundleCbor": { "present": false, "writtenBy": null }
+    }
+  ],
+  "summary": { "total": 1, "ok": 1, "failed": 0 }
+}
+```
+
+The exit status is `0` when every deployment compiles (a store with none is `0 deployments`), `1` when any does not, and `2` when the check could not be made: the directory is not there or cannot be read, or the command line is wrong. A script can therefore stop a rollout on anything but `0`, and tell a failed deployment from a failed check.
+
+A `bundle.cbor` that an older build left beside a deployment's sources is not read, and the check does not touch it. The report says `bundle.cbor present, written by an unknown build` for such a deployment, because nothing in the file says which build wrote it.
+
+The check compiles; it does not evaluate. A deployment that compiles can still answer a call differently under a new binary.
 
 ## Persistence
 
@@ -785,6 +885,10 @@ jl4-service/
     ControlPlane.hs         -- POST/GET/PUT/DELETE /deployments + async deploy/update jobs
     DataPlane.hs            -- /deployments/{id}/functions/... evaluation handlers + short routes
     DeploymentLoader.hs     -- Shared compilation logic (eager startup, lazy compile-on-access)
+    Ledger.hs               -- Instance-ledger routes: /deployments/{id}/instances/...
+    Ledger/Mcp.hs           -- The ledger's MCP tools (what-may-I-do-now; the act-* write tools when on), registered in front of McpServer
+    Ledger/Service.hs       -- The ledger as the service holds it: store opened on first use, clock, limits, slots
+    Ledger/Store/           -- The ledger's stores: sqlite (the default), Postgres, in-memory (tests)
     ExplorerPage.hs         -- Landing page HTML (deployment explorer, API docs)
     McpServer.hs            -- MCP JSON-RPC 2.0 handler (tools/list, tools/call)
     Schema.hs               -- OpenAPI spec generation

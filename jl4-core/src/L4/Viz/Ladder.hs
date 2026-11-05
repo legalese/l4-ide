@@ -466,7 +466,7 @@ translateExpr shouldSimplify = top
         notId <- getFresh
         p' <- go p
         q' <- go q
-        pure $ VizExpr.Or orId [VizExpr.Not notId p', q']
+        pure $ VizExpr.Or orId [VizExpr.negateIR notId p', q']
 
       And {} -> do
         vid <- getFresh

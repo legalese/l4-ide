@@ -1,0 +1,17 @@
+-- THE JOIN as a value under a LEST other than a SHANT's (§2.6 card A3, B1):
+-- the LEST runs because the join did NOT fire, so there is no join to read.
+-- Refused as OF THE JOIN is there (anchor-lest-join.l4).
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+    Pay  HAS amount IS A NUMBER
+
+alice MEANS Tenant OF "Alice"
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    LEST (PARTY alice MUST Sign alice WITHIN 0 OF (THE JOIN PLUS 5))

@@ -1124,10 +1124,80 @@ Hover changes only at the definition, and that matches every other placement: th
 The same golden pins all three, with the head-name and declaration placements as controls that #979 does not move.
 One residue it also pins, not a #979 defect: hovering a `GIVEN` type variable prints `TYPE VAR` and drops its herald, because `LSP.L4.Actions.infoToHover` reads the nlg only in its `TypeInfo` branch; the gloss appears instead inside the rule's type, as `FOR ALL a [the kind of thing]`.
 
-**Still owed: the cross-module case.**
-`promoteHeadInputNlg` folds over the module it is given, so a call to a heralded rule defined in an IMPORTED module still prints the bare name — the prelude's 67 among them.
-`l4 render` handles that, and it needs a different key to do it: `L4.Export.Document.nlgFnInfo` is keyed by `(name, arity)` rather than by `Unique` precisely because each module is resolved independently and a call site does not share a `Unique` with its definition.
-Extending the promotion across imports therefore means a second mechanism, and it would move goldens wherever a directive calls a prelude function — measured as zero of the 10 changed goldens above, because every heralded rule the corpus reaches is defined in the module that calls it.
+**The cross-module case.**
+`promoteHeadInputNlg` folds over the module it is given.
+A positional call to a heralded rule defined in an imported module reads that rule's sentence all the same: `L4.Nlg.nlgFnInfo` builds one table of sentences over the module and its dependencies, keyed by the `Unique` of each definition's head (§8a.4), and `l4 nlg` (`linearizeDirectivesIn`) and `l4 render` (`L4.Export.Document.allUnits`) both read it.
+Measured on `jl4/tests-cli/fixtures/nlg-mixfix-import.l4`: across the `IMPORT`, `` `the greater` 3 4 `` reads "the greater of 3 and 4" and `` `the gap` 840 160 ``, a rule with its herald after its last input, reads "the gap between 840 and 160".
+
+### 8a.4 A mixfix definition's herald at its call sites (draft PR #791, not landed)
+
+A mixfix call resolves to the operator's canonical pattern name (`the lower of _ and _`), while the definition's head keeps only its first keyword (`the lower of`).
+`nlgFnInfo` was keyed on the head alone, so an interleaved call never found its herald.
+Measured on `unstable` at `bcbec1419`: at a call in the same module `l4 nlg` printed the pattern with the arguments after it (`` `the lower of _ and _` with 840 and 160 ``) or, where the herald followed the last input, the herald with its slots unfilled (``the amount by which `a` exceeds `b` with 840 and 160``); across an `IMPORT` it printed the pattern in every case.
+The `OF` spelling and a `WITH` call resolve to the head keyword, and read the herald already.
+
+The table of heralds is keyed by the `Unique` of the definition's head, which is what a call resolved to.
+A mixfix call's canonical name is registered by the type checker as an alias of the definition with the head's `Unique` (`defAka`), so the interleaved spelling, the `OF` spelling, a `WITH` call and a call through an `AKA` name all find the same entry.
+A call's head carries the dependency's `Unique` across an `IMPORT`, for a prefix and a mixfix rule alike; the import rows of the CLI tests fail if it does not.
+The slots are filled by position: the call's arguments are the definition's inputs in the order the pattern lists them.
+
+The table was keyed by a name's text and its number of arguments, and a call read the sentence of any definition with that name.
+That gave the wrong sentence in four ways, all with exit 0 (`jl4/tests-cli/fixtures/nlg-owner-*.l4`, `nlg-bare-reference.l4`):
+
+- A rule of the drafter's own with no herald, named like one that has one, read the other's sentence: `` `LESS` `` and `` `is in` `` on numbers read the prelude's set sentences ("the elements of 100 not in 20"), and a one-input `` `sum` `` read "the sum of 5".
+- A rule of the drafter's own lost its herald to an imported one of the same name and shape, and two overloads in one module read the later one's sentence.
+  `jl4/examples/ok/tests/pattern-matching-overloads-own-annotations.nlg.golden` had `shown 3` read "3 is shown", the sentence of the BOOLEAN overload, when the NUMBER overload it resolves to has none; it reads `` `shown` with 3 `` now, and is the one golden of the suite that moved for this.
+- A record literal of a record named like a heralded rule rendered as that rule's sentence (`decideRendering` read a `WITH` body as a call when the head's text was in the set): `range WITH low IS n, high IS 100` with the prelude's `range` imported read "the whole numbers from low to high ...".
+  A body is a call now when its head's `Unique` is the head of a rule with a herald.
+- A rule named but not called read as its sentence with the slots unbound: `filter even xs` read "for which x is even holds".
+  A bare reference to a rule with at least one input, and a projection's selector (`startDate's day`), read as the rule's name.
+  A rule with no inputs has no slots and keeps its herald.
+
+A positional call was taken for building a record whenever its head had the text of a record's name, which is a fifth way and the same mistake: `normalizePositionalRecords` looked the head up by that text (`recordCtorFields` was keyed by name), so a function named like a record was read as constructing it (`jl4/tests-cli/fixtures/nlg-positional-main.l4`).
+A record `Pt` beside an imported function `Pt` with no herald read "is a Pt with:" for a call that returns a number.
+A record `range` with fields `start` and `finish` beside the prelude's `range` read "the whole numbers from low to high where start is 1 and finish is n" for `range 1 n`.
+`recordCtorFields` is keyed by the `Unique` of the record's constructor, the one the type checker stores in the `RecordDecl`, as `L4.Dmn.Lower` already does; the call reads "Pt with n and 100" and "the whole numbers from 1 to n", and a positional call to the record's own constructor still reads as building it.
+Rendering the 909 files with the binary before and after this one change moves none of them, because no file in the corpus has a record named like a function it also calls.
+
+Measured over the whole `jl4-test` suite on `lhs`, 2026-10-30: 4830 examples, 5 failures, all of them `.nlg.golden` files under `jl4/examples/ok/tests/`, none in the canon mirror.
+The five are the prelude's own set operators (`is in`, `set equals`, `is subset of`, `UNION`, `INTERSECT`, `LESS`, `WITHOUT`), which carry heralds (`jl4-core/libraries/prelude.l4:1209` for `is in`) that had never reached a call in `l4 nlg`.
+The changes are of two kinds: a call to an operator that has a herald now reads as that herald (`` `_ is in _` with 3 and `SET` ... `` becomes ``3 is one of `SET` ...``), and an operator with no herald (`LOCALOP` in `infix-under-connective-imported.l4`) reads as it did.
+
+ANSWERED 2026-10-30 (Meng, as relayed by the explore-verify lead: "Yes render should use `@nlg` unless you recommend otherwise."): `l4 render` reads the `@nlg` herald at call sites.
+`L4.Export.Document.allUnits` builds the table over the module and its dependencies and expands every call with it.
+Measured by rendering every `.l4` under `jl4/examples`, `doc` and `jl4-core/libraries` (908 files) before and after: four renders move, none under `jl4/examples/canon/`.
+Two have only wording changes: `prelude.l4` (three lines, for example `p UNION q` becomes "the union of p and q") and `doc/reference/syntax/nlg-mixfix-example.l4`.
+Two also gain a provision (`doc/reference/libraries/sets-example.l4` and `jl4/examples/ok/set-operators-overloads.l4` now show `eligible`, and in the first `new yorkers`).
+That follows from `isInstanceValueUnit`, which takes a no-input rule whose body is a call to be a fixture and drops it when only directives use it; a body that has become a herald is no longer a call.
+A heralded PREFIX call already behaved so: with the 2026-10-28 `l4`, `x MEANS max 3 4` renders and `x MEANS plain 3 4`, with no herald, is dropped.
+No page under `doc/` quotes a render that moves.
+
+A `WITH` call across an `IMPORT` to a rule whose herald follows its last input printed that herald a second time, as the label of the last input (``the amount by which `a` exceeds `b` where `a` is 840 and the amount by which `a` exceeds `b` is 160``).
+A prefix function did the same, so it was not about mixfix.
+`promoteHeadInputNlg` decides from the rules of the module it is given, and the importing module holds a copy of the imported input taken before any promotion, so nothing cleared the herald from it.
+`promoteHeadInputNlgWith` decides from the dependencies' rules as well, and `prepareModules` (which `linearizeDirectivesIn` uses) applies it to every module, so a dependency's own calls to a module below it are read right too.
+It matches by `Unique`: the input names of an imported rule keep the dependency's `Unique`s in the importing module, which this change relies on and which the import fixture tests.
+With it, the full `jl4-test` suite gives 4830 examples and 0 failures against the five goldens above, so no other golden moves.
+
+`l4 render` had the same fault, in one file as well as across an `IMPORT`: a `WITH` call in the body of another rule printed the herald a second time (`the gap between a and b where a is n and the gap between a and b is 100`), because render never moved a herald onto the rule.
+It now prepares its modules with `prepareModules`, as `l4 nlg` does, and so do the LSP's document and plan handlers.
+A rule imported through two levels (`top` imports `mid` imports `deep`, `mid` calls `deep` with `WITH`) is shown in `top`'s document from `mid`'s own copy, so `prepareModules` gives each dependency the others' rules as well as the module being rendered; the three-module CLI fixture pins it.
+A `WITH` call that is the whole body of a rule rendered as "is a the gap with" and a field list, as though it built a record; `decideRendering` now reads it as the herald with its arguments in a `where` clause, as `l4 nlg` prints it.
+A named-argument call to a rule WITHOUT a herald still reads as a construction; that is not owed here.
+Measured by rendering every `.l4` under `jl4/examples`, `doc` and `jl4-core/libraries` (909 files) before and after the whole of this round: the only render that moves relative to the head the audit read (`981e1b880`) is `jl4-core/libraries/prelude.l4`, `MapPairs means fmap.`, which that head had as "f applied to each item of list" and which reads `fmap` again.
+Rendering the same 909 files with the binary built from the base of this PR and with the binary built from this branch (2026-10-31), five renders move, none under `jl4/examples/canon/`, and no exit code or stderr differs: the four listed above, and the hover fixture `jl4/examples/lsp/hover/nlg-site-hover-import.l4` (added here), which the base prints as a record construction (`is a absNumber with:`) and this branch prints as the herald (`Size of loss means the absolute value of value where value is 5.`).
+At the same head the full `jl4-test` suite gives 4832 examples and 0 failures on `nye`, with six `.nlg.golden` files moved relative to the base (the five measured on `lhs` above and `pattern-matching-overloads-own-annotations`) and none in the canon mirror.
+
+Hover does not repeat the fault.
+`outputNlgMap` (`jl4-lsp/src/LSP/L4/Rules.hs`) also promotes per module, but hover reads the herald from the module's own range map, which is stamped at the definitions only, so a call site in another module shows the type and no sentence, on the rule's name and on the label of its last input.
+`jl4/examples/lsp/hover/nlg-site-hover-import.l4` pins it; it is a control, and passed the first time it was read.
+
+**Known limit: a sentence is spliced in without brackets.**
+Two different groupings of nested calls can read as the same words.
+With `the lower of` carrying "the smaller of %a% and %b%" and `plus` carrying "%a% and %b% together", both ``(`the lower of` 1 `and` 5) `plus` 10`` (11) and `` `the lower of` 1 `and` (5 `plus` 10) `` (1) read "the smaller of 1 and 5 and 10 together", in `l4 nlg` and in `l4 render` (rules `r1` and `r2` of the audit's `ambig.l4`).
+A prefix function's herald does the same; it was true before this section.
+It is not fixed here: bracketing the arguments of a splice would change every golden that nests heralded calls, and which brackets to print is a drafting decision.
+`doc/reference/syntax/README.md` states the limit.
 
 ## 9. Reproducing the measurements
 

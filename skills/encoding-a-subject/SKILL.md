@@ -143,12 +143,18 @@ A reviewer reads this first. It carries:
 
 1. **What is encoded and what is not**, in a paragraph — the scope, stated as provisions.
 2. **The coverage table** from step 3, with no row left `deferred` (or with the reason if some are).
-3. **The fork register**: every ambiguity you met — the readings you saw, the one you took, and why, with the text that licenses each reading.
+3. **The fork register**: every ambiguity you met — the readings you saw, the one you took, and why, with the text that licenses each reading.[^judgment-calls]
    A fork resolved by a court or the regulator says who settled it. "No ambiguities found" is a claim a reviewer will not believe; if you found none, say where you looked.
 4. **An answer table** where the subject has one — the fee for each service in each vintage, the threshold for each grade — with the provision cited per cell.
 5. **What `check.sh` prints**, main columns included, and the main build it compared with, and which failing assertions are expected, and why.
    Also the **target** the encoding was written for, `main` or `unstable`.
 6. **Open questions** for a domain expert.
+
+[^judgment-calls]:
+    Why every reading, and not only the one taken: an ambiguity is a judgment call, and people working with an agent tend to take the reading it argues for.
+    In a randomised study, 50 analysts doing a causal-inference task with Claude Code went with the agent's lean on 86% of four such choices, where about 50% would mean the lean made no difference; 77% later repeated the agent's arguments, and 15% credited it (Herdağdelen, Joren and Tamkin, ["How AI agents shape experts' judgment calls"](https://www.anthropic.com/research/agents-judgment-calls), Anthropic, 27 October 2026).
+    The authors note that such deferral is hard to catch, because "the work can look sound whichever option is chosen", and suggest that agents make the best case for each option.
+    The study is of one statistics task, with one model and leans the authors strengthened on purpose, not of law; the register is where a reviewer can see the reading you did not take, and choose it.
 
 ### 10. Deposit it in canon
 

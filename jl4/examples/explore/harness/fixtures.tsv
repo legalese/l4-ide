@@ -1,0 +1,12 @@
+# The fixtures the harness explores, one per line, tab-separated.
+# fixture: the .l4 file, relative to jl4/examples/explore/
+# labels: the design whose rows in labels.tsv name its acts
+# reference: the vendored reference LTS it must be bisimilar to, relative to jl4/examples/explore/, or - for none
+# until: the clock bound given to l4 explore --until (the closing deadline; see brief/README.md, "What the explorer must know" 2)
+# variants: the fairness assumptions it is explored and emitted under (see variants in harness.py)
+fixture	labels	reference	until	variants
+brief/d1-naive.l4	d1	brief/reference/d1.aut	75600	alice,none,world
+brief/d2-reread.l4	d2	brief/reference/d2.aut	75600	alice,none,world
+brief/d3-atomic.l4	d3	brief/reference/d3.aut	75600	alice,none,world
+brief/mutants/d3-cancel.l4	d3-cancel	-	75600	alice
+brief/mutants/d3-double.l4	d3	brief/reference/d3.aut	75600	alice

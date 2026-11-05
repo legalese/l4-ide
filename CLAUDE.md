@@ -1,12 +1,9 @@
 # CLAUDE.md — `legalese/l4-ide`
 
-Repo-specific working notes. Everything here was verified against the tree on 2026-07-27; where a
-claim is time-sensitive it says so. If you find one of these wrong, **fix it here in the same PR as
-the work that revealed it** — a stale entry in this file is worse than a missing one, because it is
-believed.
-
-Each rule carries a **Why**. Those blocks are scaffolding for readers (human or model) who would
-otherwise route around the rule; delete them once the rule is obviously self-justifying.
+Repo-specific working notes.
+Where a claim is time-sensitive, it says so.
+If you find one of these wrong, **fix it here in the same PR as the work that revealed it** — a stale entry in this file is worse than a missing one, because it is believed.
+The incidents behind these rules are in this file's git history (`git log -p -- CLAUDE.md`).
 
 ---
 
@@ -15,35 +12,25 @@ otherwise route around the rule; delete them once the rule is obviously self-jus
 - **`smucclaw/l4-ide`** is upstream. **Issues are filed there.**
 - **`legalese/l4-ide`** is the fork where **PRs are raised and merged**.
 - **`main`** is the GitHub default branch and is the stable/releasable line.
-- **`unstable`** is a long-lived integration branch. **Feature branches PR into `unstable`, not
-  `main`.** ~~Releases are a `unstable` → `main` PR plus a tag.~~ **Corrected 2026-09-06 (ruling D9,
-  `specs/todo/RELEASE-MODEL-SPEC.md`): that sentence was drifted in both halves.** `unstable`
-  reaches `main` through a wave of human-reviewable **topic PRs**, not one merge PR (D9.1) — and the
-  merge is **not** the release: the release is a manual `workflow_dispatch` of `main-tag.yml`, which
-  mints its own tag from `github.run_number`. **A hand-pushed tag runs nothing.**
-- **There are TWO release tracks, cut from different refs (D9.3), and "cut a release" is ambiguous
-  between them.** The **VS Code extension** (with `jl4-service` and the LSP binaries) comes from
-  `main` via `main-tag.yml` — 49 of them, latest `l4-ide-build-90`, 2026-08-07. Standalone **`l4` /
-  `jl4-lsp` prereleases** come from `unstable` via the shelf at `legalese/prereleases`, tagged
-  `unstable-<date>-<shortsha>`; its own description says "Not the stable line." Say which track you
-  mean. **The consequence that catches people: the shelf ships off `unstable`, so anything merged
-  there can reach users at the next cut — "not released yet" is not a defence for a known defect.**
+- **`unstable`** is a long-lived integration branch.
+  **Feature branches PR into `unstable`, not `main`.**
+  `unstable` reaches `main` through a wave of human-reviewable **topic PRs**, not one merge PR (ruling D9.1, `specs/todo/RELEASE-MODEL-SPEC.md`).
+  The merge is **not** the release: the release is a manual `workflow_dispatch` of `main-tag.yml`, which mints its own tag from `github.run_number`.
+  **A hand-pushed tag runs nothing.**
+- **There are TWO release tracks, cut from different refs (D9.3), and "cut a release" is ambiguous between them.**
+  The **VS Code extension** (with `jl4-service` and the LSP binaries) comes from `main` via `main-tag.yml`.
+  Standalone **`l4` / `jl4-lsp` prereleases** come from `unstable` via the shelf at `legalese/prereleases`, tagged `unstable-<date>-<shortsha>`; its own description says "Not the stable line."
+  Say which track you mean.
+  **The consequence that catches people: the shelf ships off `unstable`, so anything merged there can reach users at the next cut — "not released yet" is not a defence for a known defect.**
 
 ### 1.0 The skills live in TWO repos — correct here, port in the same session
 
-Every skill under `skills/` is duplicated in **`legalese/l4-plugin`**, at the same path: today
-`writing-l4-rules` (the language) and `encoding-a-subject` (encoding a whole body of law and filing
-it in canon). `.claude/skills/<name>` are symlinks to them. The pipeline skill,
-`running-the-l4-pipeline`, is in neither: Meng ruled on 2026-09-26 that it does not ship with the
-public plugin (recorded in `specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md` on the `ci/skills-layout`
-branch), and on 2026-09-29 it left this repo with the `go` pipeline for the private
-`legalese/l4-pipeline`. That repo is cloned into `etc/go/`, which `.gitignore` excludes here, and
-ships the skill as its own plugin. **Nothing in this repo's CI runs the pipeline any more**; its
-own CI runs against `unstable` daily.
-This repo is upstream: the `package-plugin` job of `.github/workflows/main-tag.yml` packages `skills/`
-into `l4-plugin.zip` when that workflow is run by hand to cut a release. There are two marketplace
-entries, `/plugin marketplace add legalese/l4-ide` and
-`/plugin marketplace add legalese/l4-plugin`; canon's `CLAUDE.md` sends people to the second.
+Every skill under `skills/` is duplicated in **`legalese/l4-plugin`**, at the same path: today `writing-l4-rules` (the language) and `encoding-a-subject` (encoding a whole body of law and filing it in canon).
+`.claude/skills/<name>` are symlinks to them.
+The pipeline skill, `running-the-l4-pipeline`, is in neither: Meng ruled on 2026-09-26 that it does not ship with the public plugin (recorded in `specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md` on the `ci/skills-layout` branch), and it lives in the private `legalese/l4-pipeline`, cloned into `etc/go/`, which `.gitignore` excludes here.
+**Nothing in this repo's CI runs the pipeline**; its own CI runs `unstable` daily.
+This repo is upstream: the `package-plugin` job of `.github/workflows/main-tag.yml` packages `skills/` into `l4-plugin.zip` when that workflow is run by hand to cut a release.
+There are two marketplace entries, `/plugin marketplace add legalese/l4-ide` and `/plugin marketplace add legalese/l4-plugin`; canon's `CLAUDE.md` sends people to the second.
 
 **So a correction to a skill lands here first**, and its other copies are found and corrected in
 the same session. The bundle names this repo as its source, so the
@@ -66,35 +53,13 @@ What the script does, sorted by how its failures show up:
 - **Loud, not fatal:** with `--l4-release`, it pins `scripts/install-l4.sh` to a release on `legalese/prereleases`; if the shelf cannot be reached, it prints `NO INSTALLER EMITTED` and builds the rest.
 - **Silent:** without `--l4-release`, no installer is written, and because the directory was emptied first, the bundle's existing `scripts/install-l4.sh` is deleted with no message. Pass the flag every time.
 
-**The copies are identical only just after a regeneration.** Measured 2026-09-27:
-`diff -rq skills <l4-plugin>/skills` is empty (28 files each), with `l4-plugin` at `cc907b5`
-(generated from `a3ebc0e76`) and `unstable` at `98a975c72`. Every skill change that lands here
-afterwards leaves the bundle BEHIND until the next regeneration.
-
-So `diff` is still the right instrument, but read it as **"how far behind is the bundle"** and not
-as "this should be empty".
-Against today's tree a non-empty diff is normal between regenerations; to ask whether anyone edited the bundle by hand, diff it against the l4-ide commit its README names.
-What IS worth checking is whether a specific claim you are porting matches: the citations into
-canon, for instance
-(`etc/check-canon-citations.mjs --dir <l4-plugin>/skills <l4-plugin>/specs` checks exactly that,
-and both trees resolved 7 of 7 on 2026-09-27). One thing does not port: prose asserting something is "verifiable in situ" is false
-in the packaged bundle, which ships the skill **without** `jl4-core/src` beside it. Say which tree a
-check needs. Edit the tracked path, `skills/<name>/`, not the `.claude/skills/<name>` symlink (see
-the skill-path symlink hazard).
-
-> **Why.** PR #382 corrected two claims in the skill — `#EVAL`'s `OF` form, and a provenance note
-> asserting the DMN exporter was not on `unstable`. Both were equally wrong in `l4-plugin`, and
-> nothing in this repo pointed at that one; the duplication was found only by searching the org for
-> the repo name. I then hand-edited the bundle, which its own README forbids on the first screen —
-> because I ported before reading it. The generator's absence from `unstable` was found only after
-> that, which is the more useful half of the finding.
->
-> The generator landed on 2026-09-11 (`3c92bbc4e`), and this section went on saying it had not.
-> On 2026-09-25 legalese/l4-plugin#2 believed it and hand-copied the bundle, and the copy lost
-> `scripts/validate.sh`'s executable bit (`100755` here, `100644` there), so the command
-> `scripts/README.md` tells users to run failed with "Permission denied". legalese/l4-plugin#3
-> regenerated the bundle the next day and the bit came back. A hand-copy fails silently; the
-> generator does not.
+**The copies are identical only just after a regeneration.**
+Every skill change that lands here afterwards leaves the bundle behind until the next one, so read `diff -rq skills <l4-plugin>/skills` as "how far behind is the bundle", not as "this should be empty".
+To ask whether anyone edited the bundle by hand, diff it against the l4-ide commit its README names.
+When you port a claim, check that it matches in the bundle; for citations into canon, `etc/check-canon-citations.mjs --dir <l4-plugin>/skills <l4-plugin>/specs` does exactly that.
+One thing does not port: prose asserting something is "verifiable in situ" is false in the packaged bundle, which ships the skill **without** `jl4-core/src` beside it.
+Say which tree a check needs.
+Edit the tracked path, `skills/<name>/`, not the `.claude/skills/<name>` symlink.
 
 ### 1.1 GitHub issue auto-close never fires here — close by hand
 
@@ -108,11 +73,6 @@ Both conditions fail independently.
 gh issue close <n> --repo smucclaw/l4-ide \
   --comment "Resolved by legalese/l4-ide#<pr> — https://github.com/legalese/l4-ide/pull/<pr>"
 ```
-
-> **Why.** Five issues (#915, #920, #921, #922, #924) sat open for days after their fixes had
-> merged, because the keyword was assumed to have done the job. The tracker then said "open" while
-> the code said "fixed" — which is how a later session nearly re-filed bugs that were already
-> closed, and wasted a review cycle re-deriving fixes that existed.
 
 ### 1.2 `legalese/l4-ide` must never depend on `smucclaw/dmnmd`
 
@@ -144,10 +104,6 @@ parallel.
 When several agents share a worktree, **exactly one may build at a time**. Prefer giving read-only
 agents committed goldens and corpus files, which need no build at all.
 
-> **Why.** Three agents were once told to "build first" in one shared worktree and produced a burst
-> of phantom compile failures. The rule costs a little parallelism and buys back an entire class of
-> unreproducible error.
-
 **Wait on a PID, never on a process name.** The obvious way to honour the rule above is
 `until ! pgrep -f 'cabal test'; do sleep 20; done` — and it never exits, because **the waiting shell
 is itself a process whose command line contains that string**, so `pgrep` matches the waiter. It
@@ -157,57 +113,9 @@ or wait on a file the run itself creates. A bracketed class (`pgrep -f '[c]abal 
 a trick that survives only as long as the next person copying the line knows why the bracket is
 there.
 
-> **Why.** 2026-09-05: **sixteen deadlocked waiter shells across four deputies**, two with a
-> `cabal test` queued behind a wait that would never fire. At least two "still running" status
-> reports were about runs that had never started, and one build was reported finished when it had
-> barely begun. Nothing looks wrong from inside the waiter; `ps` was the only thing that disagreed
-> with it. Same family as §3.2.1's snapshot rule — a probe that reads a name rather than a fact
-> reports confidently about a world it is not observing.
-
 ### 2.2 Cloud sessions (claude.ai/code): one shallow clone, and the toolchain is not on PATH
 
-A cloud session gets one fresh clone at `/home/user/l4-ide`, checked out on whatever branch the
-session was pointed at. Treat `/home/user/l4-ide` as the reference checkout and add worktrees beside it, e.g.
-`git -C /home/user/l4-ide worktree add -b <branch> /home/user/l4wt/<name> origin/unstable`. The
-clone is **shallow**, so `git log -S` and `git blame` answer from a truncated history — a pickaxe
-that finds only a merge commit is reporting the depth limit, not the origin of the change.
-
-**The toolchain is installed but not reachable.** Measured 2026-09-24 in a default cloud
-environment:
-
-| tool           | installed at            | on the agent's PATH?                                    |
-| -------------- | ----------------------- | ------------------------------------------------------- |
-| GHC 9.10.2     | `~/.ghcup/bin`          | **no** — `ghc: command not found`                       |
-| cabal 3.16.1.0 | `~/.ghcup/bin`          | **no**                                                  |
-| Node           | `/opt/node22/bin` (v22) | yes, and it is the **wrong** one                        |
-| nvm            | `/opt/nvm`              | loaded by `~/.bashrc`, which agent shells do not source |
-
-Node 22 fails `npm ci` outright with `EBADENGINE`: `package.json` requires `>=24` and `.npmrc`
-sets `engine-strict=true`. `nvm install 24` succeeds and sets the default alias, **and the next
-shell is still on 22**, because `/opt/node22/bin` is hard-coded in PATH and nothing loads nvm.
-`/root/.local/bin` is first on PATH, so linking into it is what works. Put this in the
-environment's setup script (tested by hand, not yet as a setup script):
-
-```bash
-source /opt/nvm/nvm.sh
-nvm install 24
-N="$(dirname "$(nvm which 24)")"
-for b in node npm npx corepack; do ln -sf "$N/$b" /root/.local/bin/$b; done
-for b in ghc ghc-pkg ghci cabal; do ln -sf /root/.ghcup/bin/$b /root/.local/bin/$b; done
-```
-
-With that, `npm ci` completes (40 s) and `npm run format:check` passes. Two things it does not fix:
-the cabal store starts **empty** — `cabal build all --dry-run` plans 254 units from scratch, so the
-first build is a cold one unless the setup script pre-builds dependencies (whether that is cached
-across sessions is unmeasured); and npm 11, which ships with Node 24, **skipped package install
-scripts** in that run, esbuild's among them, which has not been checked against the
-Vite/Svelte builds.
-
-> **Why.** On 2026-09-24 the pre-commit gate in `AGENTS.md` could not run in a cloud session at
-> either of its first two steps (`cabal test all`, then `npm ci`), while `etc/verify-branch.sh`'s
-> prettier step still worked — so a session that trusted the latter could believe it had run the
-> gate. `.nvmrc` said `20` at the time, contradicting `>=24`; nothing in the tree or in CI reads it
-> (every workflow pins `24.x`), which is how it drifted unnoticed.
+In a cloud session, read `specs/CLOUD-SESSIONS.md` before you start: `/home/user/l4-ide` is the reference checkout, so add worktrees beside it; the clone is shallow, so `git log -S` and `git blame` answer from a truncated history; and the toolchain is installed but not on the agent's PATH.
 
 ---
 
@@ -261,13 +169,6 @@ that §3.2.1's evaluation differential is now owed by hand.
 Three probes run only when the diff touches what they guard: parse time at 1,000 against 4,000 lines when `jl4-core/src/L4/Parser*` changes, the same `jl4-service` calls before and after a restart when `jl4-service/` changes, and a warning for CLI tests that compare output without dropping `'\r'` when `jl4/tests-cli/` changes (`specs/todo/MAIN-PRE-REVIEW.md` §6).
 
 **A green run is not a green CI** — the script says so at the end, and lists what it did not run.
-See §3.3.
-
-> **Why.** On 2026-09-08 one session hand-assembled this gate four times and omitted the `cd` in
-> two of them, so the build ran in whichever worktree the shell happened to be in. Both runs went
-> green, and both were green about the wrong tree. One was caught only because the two candidate
-> trees happened to report different example counts — `368` from one and `365` from the other — and
-> had they matched, a branch would have been pushed on a verification of something else entirely.
 
 ### 3.1 Five traps that produce fake failures
 
@@ -283,20 +184,17 @@ touch. Run `npx prettier@3.4.2` or the repo-local binary.
 
 **A new corpus file ships its goldens in the same commit as its `.l4` — if it is under a goldened
 glob.** `jl4-test` writes four goldens per file (`<dir>/tests/<stem>.{golden,ep.golden,nlg.golden,schema.golden}`)
-and `failFirstTime` is `True`, so a `.l4` with no `tests/` directory turns the whole suite red. You
-will not see it: no paths filter matches a `.l4` under `jl4/examples/`, so the Haskell job does not
-run on your PR, and the failure surfaces on the next person's branch instead.
+and `failFirstTime` is `True`, so a `.l4` with no `tests/` directory turns the whole suite red.
+No paths filter that starts the Haskell job matches a `.l4` under `jl4/examples/`, so that job does not run on your PR.
+`etc/check-corpus-goldens.mjs` is what catches the gap: it runs in CI on every event, with no filter and no build (`pr-checks.yml`, job `corpus-goldens`), and names the missing files.
 
-**Which globs, exactly** (`jl4/tests/Main.hs:78-90`, kept in step by `etc/check-corpus-goldens.mjs:32-43`):
-`ok/**`, `legal/**`, `canon/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `not-ok/import/unresolved-*.l4`,
-`lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/*.l4`. **`jl4/examples/docassemble/` and
-`jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
-directory and adding one there needs no goldens. State this rule with its scope: an earlier
-unqualified reading of this paragraph sent a session hunting a golden trap in `docassemble/` that
-does not exist there. Generate them by running `cabal test
-jl4-test` once (it creates them and fails), then again to prove they hold, then commit **only** the
-`.golden` files — `.actual` is gitignored. Read them before committing: blessing output you have not
-looked at is how a wrong answer becomes the expected answer.
+**Which globs, exactly** (`jl4/tests/Main.hs:88-119`; `etc/check-corpus-goldens.mjs:31-74` must be kept in step with every one of them except the two `lsp/` ones, which use a different golden mechanism, so a glob added to one is added to the other in the same commit):
+`ok/**`, `legal/**`, `canon/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `not-ok/import/*-refused.l4`, `not-ok/import/unresolved-*.l4`,
+`lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/*.l4`.
+**`jl4/examples/docassemble/` and `jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/` directory and adding one there needs no goldens.
+State this rule with its scope wherever you repeat it.
+Generate goldens by running `cabal test jl4-test` once (it creates them and fails), then again to prove they hold, then commit **only** the `.golden` files — `.actual` is gitignored.
+Read them before committing: blessing output you have not looked at is how a wrong answer becomes the expected answer.
 
 **The canon glob is the one exception to that procedure, and it is a prohibition.**
 `jl4/examples/canon/` is a VENDORED MIRROR of blessed directories in `legalese/canon`, at the SHA
@@ -314,91 +212,27 @@ involves a branch moving subjects into canon, run `node etc/sync-canon.mjs --che
 `etc/verify-branch.sh` now does. To repair, restore the mirror copies (`--pull` when the pin is
 right) and make the intended edit in canon instead.
 
-> **Why.** 2026-09-24: #490 respelled two comments in `legal/miles-card/uob-ladys-solitaire.l4`,
-> and #489 moved that file to `canon/contracts/payments/sg-miles-card/`. Merging the
-> first into the second put the respelled text into the mirror. The full local gate passed on the
-> merged tree, and only CI's `Canon Mirror` job caught it.
-
-> **Do not wrap a code span in bold when the span itself ends in two asterisks.** Doing that
-> unbalances markdown emphasis for the rest of the paragraph, and `prettier --write` then
-> silently rewrites two LATER, untouched globs: the asterisk in the export-placement glob and
-> the one in the libraries glob each become an underscore. Measured 2026-09-15 — it reached a
-> commit, in the one paragraph whose whole job is to state the globs exactly, and nothing
-> complained. Plain backticks with no bold are inert; use those.
+> **Do not wrap a code span in bold when the span itself ends in two asterisks.**
+> Doing that unbalances markdown emphasis for the rest of the paragraph, and `prettier --write` then silently rewrites later, untouched text in it: the spaces around code spans disappear, and the single asterisk in a later glob such as `not-ok/export-*.l4` can become an underscore.
+> Plain backticks with no bold are inert; use those.
 >
-> **The same applies inside a bold lead-in, where it fails worse.** Measured: a lead-in
-> containing such a code span corrupts the two later globs AND eats the spaces around three
-> code spans. That is the shape the obvious fix invites, so name the glob in prose there —
-> "the canon glob" — rather than in a code span.
+> **The same applies inside a bold lead-in, which is the shape the obvious fix produces.**
+> Measured 2026-10-27 on the globs paragraph above: a lead-in containing such a code span turned `not-ok/export-*.l4` into `not-ok/export-_.l4`, escaped the asterisk in other globs, AND ate the spaces around several code spans.
+> So name the glob in prose there — "the canon glob" — rather than in a code span.
 
-> **Why.** This went off twice in one day. The BNA corpus landed without goldens in PR #195 and was
-> repaired by #202; eleven hours later the Jersey charities cleanroom did the same in #201 and was
-> repaired by #212 — after it had already knocked another PR out of the merge queue. `etc/check-corpus-goldens.mjs`
-> now runs in CI on every event with no filter and no build, and names the missing files. If you are
-> reading this because that check failed, it has done its job.
+**Pin `CAMUNDA_CHECK_JAVA_HOME` to a JDK 21, as CI does, and clear the harness's class cache when you change it** — why, and the commands, are in `etc/camunda-dmn-check/README.md`.
 
-**Pin `CAMUNDA_CHECK_JAVA_HOME`, and clear the harness's class cache when you change it.** The
-Camunda leg picks its own JDK from a candidate list whose FIRST entry is
-`/opt/homebrew/opt/openjdk/…` — deliberately "the newest JDK we can find" (`run.sh:51-53`), which
-on a machine that also has plain `openjdk` is **26**, where CI runs **21**. The bare `java` on PATH
-is irrelevant; the harness ignores it. Worse, `run.sh:84` recompiles `CamundaDmnCheck.java` only
-when the class is **missing or the source is newer** — it does not key on the JDK — so a class
-compiled by an earlier run under a different JDK is silently reused. Together those make a local
-green possibly a different JVM _and_ different bytecode from CI's, with nothing said. Do not trust
-which `java` you invoked: read the class-file major version
-(`od -An -tu1 -N8 "$TMPDIR/l4-camunda-dmn-check/classes/CamundaDmnCheck.class"`; `65` is Java 21),
-and reset with `rm -rf "$TMPDIR/l4-camunda-dmn-check/classes"`. The `kie-dmn-check` leg is immune
-because it compiles `--release 11` (`etc/kie-dmn-check/run.sh:81`); `--release 21` on the Camunda
-leg would fix it the same way. **That fix is deliberately not applied** — changing what every CI
-run compiles is not a corpus or exporter branch's call, and two branches have now declined it on
-that ground.
-
-> **Why.** 2026-09-05: a deputy reported Camunda results, was asked to re-run them on 21, did, and
-> reported them as reproduced. Both passes were in fact wrong in different ways — the first ran the
-> engine on 26, and the second reused bytecode the first had not compiled either. The numbers did
-> not move, but that was luck, and it was only visible after reading the class-file version. "I
-> re-ran it on 21" is a weaker claim than it sounds: re-running a command is not the same as
-> re-establishing a condition.
-
-**Never point an `l4` binary at a prelude newer than itself.** New prelude annotations
-(`@nonexhaustive`, in `jl4-core/libraries/prelude.l4` since #256) are parse errors to a binary
-built before them, and the failure does NOT present as a version mismatch: the prelude fails to
-load, so whatever you are checking drowns in cascading `could not find a definition` errors for
-`setFromList`, `UNION`, and every other prelude name — which reads as a broken spec or example. A
-binary run with `JL4_LIBRARY_PATH` unset resolves its own **embedded** prelude, which matches by
-construction (resolution order: `JL4_LIBRARY_PATH → root → importer-relative → embedded → XDG →
-bundle`); the trap is pinning `JL4_LIBRARY_PATH` at a tree newer than the binary. Two rigs that
-both "run the prelude" are therefore not interchangeable: pinned-path and embedded-prelude runs
-can resolve different prelude versions. Rebuild, or drop the pin.
-
-> **Why.** 2026-08-27: a 7 Aug `dist-newstyle` binary pointed at the current tree's libraries made
-> a known-green Style 2 probe produce nine errors that looked like the prelude had lost
-> `setFromList`. The same probe on the 4 Aug installed binary with its embedded prelude: zero
-> errors. The mismatch was one `@nonexhaustive` annotation the older parser could not read, and
-> nothing in the output said so.
-
-**The same trap arrives from the CORPUS side, and the paragraph above does not cover it**: a binary
-older than the code it reads reports newly-landed **syntax** as broken source. Since #335
-(`f48cdddb`, in `unstable`) a bodiless `DECLARE T` is the opaque-type spelling; on any binary built
-before it, `DECLARE Thing` followed by a rule is a parse error at the NEXT token — which reads as a
-broken example, not a stale binary. **The direction of safety is not symmetric and is easy to
-invert**: a binary NEWER than the tree is fine; it is older-than-what-it-reads that breaks. So the
-question is never "is my binary current" but "is it at least as new as everything it will parse" —
-prelude, corpus and docs alike. `doc/test-docs.sh` is the usual route in, because it prefers any
-`l4` on `PATH` over the one you built (`:323`), and an `l4` installed there weeks ago is the one it
-will find; put your worktree's binary first on `PATH`, or run with no `l4` on it at
-all. How many errors a stale binary invents is a function of BOTH the binary and the corpus, so
-it is a symptom to read, never a constant to memorise — a count quoted from a previous session
-is the first thing to distrust here.
-
-> **Why.** 2026-09-05, twice in one evening and from both directions. `gm-docs`'s shim was pinned to
-> a pre-#335 build and flagged the opaque-type spelling as invalid documentation. Independently
-> confirmed here on this branch's own binary (base `b2a3faac`, which predates `f48cdddb`): the probe
-> `DECLARE Thing` + a rule reading it is a `parser` error at `3:1-3:6`, the line AFTER the
-> declaration — so the message points at the reader, not at the unsupported declaration, which is
-> what makes it read as broken code. `git diff <binary's commit> HEAD -- jl4-core/libraries/` is a
-> cheap check, but **read the diff rather than its exit code**: deleted comment lines are safe, an
-> added annotation is not.
+**A binary must be at least as new as everything it will parse: prelude, corpus and docs alike.**
+A binary older than the code it reads reports newly-landed prelude annotations (`@nonexhaustive` is one) and newly-landed syntax (a bodiless `DECLARE T`, the opaque-type spelling) as broken source, and the failure does NOT present as a version mismatch.
+A prelude the binary cannot parse fails to load, so whatever you are checking drowns in cascading `could not find a definition` errors for `setFromList`, `UNION` and every other prelude name.
+Newer syntax in a corpus file gives a parse error at the NEXT token, so the message points at the reader and not at the declaration.
+Either reads as a broken spec or example.
+The direction of safety is not symmetric and is easy to invert: a binary NEWER than the tree is fine, and the question is never "is my binary current" but "is it at least as new as everything it will parse".
+Leaving `JL4_LIBRARY_PATH` unset lets the binary fall back to its own **embedded** prelude, which matches it by construction (resolution order: §5), so the trap is pinning `JL4_LIBRARY_PATH` at a tree newer than the binary; pinned-path and embedded-prelude runs can resolve different prelude versions.
+Rebuild, or drop the pin.
+`doc/test-docs.sh` is the usual route in, because it prefers any `l4` on `PATH` over the one you built (`doc/test-docs.sh:329`), so an `l4` installed there weeks ago is the one it finds: put your worktree's binary first on `PATH`, or run with no `l4` on it at all.
+`git diff <binary's commit> HEAD -- jl4-core/libraries/` is a cheap check for the prelude, but **read the diff rather than its exit code**: deleted comment lines are safe, an added annotation is not.
+How many errors a stale binary invents depends on both the binary and the corpus, so treat the count as a symptom to read, never a constant to memorise.
 
 ### 3.1.1 A golden that captures an absolute path cannot fail locally
 
@@ -412,15 +246,8 @@ Not through carelessness: the golden and the actual output come from the same fi
 machine they agree _by construction_. Running the suite again, or through
 `etc/verify-branch.sh`, cannot help. A local green is not weak evidence here — it is no evidence.
 
-The harness scrubs two prefixes for exactly this reason (`mkPathScrubber`, `jl4/tests/Main.hs`):
-`JL4_LIBRARY_PATH` → `$JL4_LIBRARY_PATH`, and the examples root → `$JL4_EXAMPLES`. If you add a
-resolution path that is rooted somewhere else again, scrub it there rather than hand-editing the
-golden — a hand-edit relocates the rake instead of removing it.
-
-> **Why.** The three `not-ok/import/**` goldens on PR #369 shipped with a developer's own worktree
-> path baked in. `jl4-test` ran locally twice and passed honestly both times; the merge-queue run
-> failed on all three, its checkout being at `/__w/l4-ide/l4-ide`. Fixed by extending the scrubber
-> (2026-09-08), which had until then covered only the library path.
+The harness scrubs four prefixes for exactly this reason (`mkPathScrubber`, `jl4/tests/Main.hs`): `JL4_LIBRARY_PATH` → `$JL4_LIBRARY_PATH`, the examples root → `$JL4_EXAMPLES`, the executable's directory → `$EXE_DIR`, and the XDG data store → `$XDG_DATA_JL4`.
+If you add a resolution path that is rooted somewhere else again, scrub it there rather than hand-editing the golden — a hand-edit relocates the rake instead of removing it.
 
 ### 3.2 There are TWO printers, and they are guarded differently
 
@@ -431,8 +258,7 @@ golden — a hand-edit relocates the rake instead of removing it.
 
 `prettyLayout` is what **`l4 batch` and the REPL** re-emit a module through (`filterIdeDirectives`
 then print then re-run the front end), and what the DMN exporter falls back to for an expression it
-cannot lower. It used to have no test of its own at all, which is how it accumulated a printer that
-could not render its own corpus back into parseable source (smucclaw/l4-ide#932).
+cannot lower.
 
 The round-trip block in `jl4/tests/Main.hs` runs over **every file the golden suite type-checks** —
 `ok/**`, `legal/**`, `canon/**` and `jl4-core/libraries/*.l4` — and asserts three things per file:
@@ -445,25 +271,16 @@ emitted module is written to `<dir>/<name>.l4.pl.l4` — a plain `.l4` file you 
 `l4 check` on.
 
 **That dump is the FILTERED print, and it is the wrong file for an evaluation question.**
-`filterIdeDirectives` has already removed every `#EVAL` and `#ASSERT` from it, so a module with
-six assertions dumps with none. Use it to read the printed SHAPE; never to compare results.
-`JL4_EVALDIFF=1` writes the UNFILTERED print instead, next to the source so its `IMPORT`s still
-resolve (§3.2.1). Measured 2026-09-19: a differential built on the dump reported a corpus module
-dropping from six `Result:` blocks to one, and the drop was the filter, not the printer. Its
-author caught it with a positive control — appending an `#EVAL` to the printed side returned
-FEWER results, which is impossible if the harness measures what it claims — and not by reading
-this paragraph, which until now said "the whole emitted module".
+`filterIdeDirectives` has already removed every `#EVAL` and `#ASSERT` from it, so a module with six assertions dumps with none.
+Use it to read the printed SHAPE; never to compare results.
+`JL4_EVALDIFF=1` writes the UNFILTERED print instead, next to the source so its `IMPORT`s still resolve (§3.2.1).
 
 #### 3.2.1 Re-parsing is not re-meaning — run the evaluation differential
 
 Parse + type-check is a **weaker** property than it looks, and the gap is where the expensive bugs
 live: a printer that drops a bracket emits source that parses fine, checks fine, and **evaluates to
-a different answer**. That is not hypothetical — it was the state of this tree. `prettyConj`
-rendered `(TRUE OR FALSE) AND FALSE` and `TRUE OR (FALSE AND FALSE)` as the _same_ string, so
-`ok/logic.l4` went from `LIST TRUE, TRUE, FALSE, FALSE` to `LIST TRUE, TRUE, TRUE, TRUE`, an
-assertion in `legal/regcf/regcf.l4` went from satisfied to failed, and the Tesla CEO award's
-`PROVIDED` guard re-associated — all through `l4 batch`, silently, with the round-trip property
-green throughout.
+a different answer**.
+That is not hypothetical: `prettyConj` once rendered `(TRUE OR FALSE) AND FALSE` and `TRUE OR (FALSE AND FALSE)` as the _same_ string, silently, through `l4 batch`, with the round-trip property green throughout.
 
 So when you touch `L4.Print`, run this too:
 
@@ -485,56 +302,27 @@ partially written binary fails on **both** sides — which a harness that compar
 this harness is looking for. The comparison above keeps only `Result:` blocks, so two runs that
 produced no output at all compare **equal**: the instrument cannot tell "identical" from "neither
 one started". Copy the binary somewhere unique first and point both sides at the copy.
+The same holds for any before/after probe that greps for a marker instead of checking the exit code (`l4 check`, `l4 export`, the engine harnesses): assert that the run HAPPENED before you compare what it said.
 
-> **Why.** 2026-09-05 (`gm-module-boundary`): one file in a 493-file evaluation differential was
-> scored SAME this way, and it surfaced only because a _different_ file in the same run recorded a
-> DIFF that would not reproduce. Nothing about the false SAME was visible on its own. The same shape
-> applies to any before/after probe that greps for a marker rather than checking the exit code —
-> `l4 check`, `l4 export`, the engine harnesses. Assert that the run HAPPENED before you compare
-> what it said.
-
-Measured on this tree: **288 of 291 comparable files identical**. The three that differ are
-clock-dependent, not printer defects — `ok/excel-date/serials.l4` and the bitemporal ledger files
-stamp wall-clock transaction time (`at=2026-08-02T22:14:22Z` vs `…23Z`), and the original disagrees
-with _itself_ across two runs. Eight more files exit non-zero on both sides by design.
+Files that read the wall clock (`ok/excel-date/serials.l4`, the bitemporal ledger files) disagree with themselves across two runs, so run both sides under the same `JL4_FIXED_NOW`; with the clock pinned, a difference in them is a printer difference like any other.
+(Measured 2026-10-27 with the installed `l4`: `serials.l4` and `ok/ledger/bitemporal-stamps.l4` each differ across two runs, and are byte-identical across two runs under `JL4_FIXED_NOW=2025-01-31T15:45:30Z`.)
+A few files exit non-zero on both sides by design.
 
 It is deliberately **not** a test: it is slow, and the clock-dependent files would need exactly the
 known-failure list §3.2 forbids. It is a tool you run by hand.
 
 #### 3.2.2 Mixfix names, and the head-keyword collision that used to break them
 
-**Fixed 2026-09-21 (smucclaw/l4-ide#967); this section is kept because the failure mode is instructive and because one case remains.**
-
-Two mixfix operators that share a **head keyword** used to print to the same text, because a call site is resolved to the canonical pattern (`_ tax on _ …`) and the printer could only re-emit the head keyword.
-`l4 batch` and the REPL re-print a module and re-run it, so that was a correctness path, not a cosmetic one: `canon/sg/succession/sg-wills.l4` printed to a module that **stack-overflowed on 4 of its 62 assertions**, and `ok/mixfix-garden-path.l4` — whose own comment predicted the limitation — printed to one that would not resolve.
-
-Both now round-trip.
-`L4.Print.restoreMixfixPatterns` stamps each mixfix application and definition with its canonical pattern from the typechecker's `MixfixRegistry`, keyed by `Unique`, and the printer re-emits the full surface form on both sides.
-Run it wherever you print a whole module; `l4 batch`, the REPL and the round-trip harness already do.
-
-**Three things a future reader should not have to rediscover.**
-
-_The pattern really is gone from the AST, not merely suppressed._
-Removing the `mixfixHeadKeyword` reduction from `LayoutPrinter RawName` produces byte-identical output — measured.
-The registry is the only thing that still has it, which is why a pass is needed at all.
-An earlier note here proposed threading `MixfixRegistry` through `LayoutPrinter`; stamping the `Anno` instead avoids touching ~100 instances.
-
-_Both sides must change together._
-Re-emitting the surface form at the CALL SITE alone was built and measured and breaks `fixity-nary-guard.l4`: definitions print from their restructured `AppForm`, so the printed module has no later keywords to match.
-
-_Only mixfixes DEFINED IN THE MODULE get the surface form._
-The infix spelling parses only where the parser can see the definition, because the mixfix hint registry is built from definitions; the `OF` fallback needs no hint.
-Including imported operators made `ok/closing-the-loop/fristberechnung.l4` print text that checked fine in place and failed to re-parse standing alone.
-The residue — two IMPORTED operators sharing a head keyword — is **smucclaw/l4-ide#968**, and it fails LOUDLY ("multiple definitions for the identifier"), unlike the in-module case it replaces.
-
+Fixed 2026-09-21 (smucclaw/l4-ide#967): two mixfix operators that share a head keyword used to print to the same text.
+`L4.Print.restoreMixfixPatterns` is what fixed it, and it must run wherever a whole module is printed; `l4 batch` (`jl4/app/L4/Cli/Batch.hs`), the REPL (`jl4-repl/app/Main.hs`) and the round-trip harness (`jl4/tests/Main.hs`) already call it.
+The residue is smucclaw/l4-ide#968, open on 2026-10-27: only mixfixes DEFINED IN THE MODULE are restored, so two IMPORTED operators that share a head keyword, an arity and an argument-type vector still print to the same text, and that one fails LOUDLY ("multiple definitions for the identifier").
+No golden captures `prettyLayout` output; the guard is a CLI test (`l4 batch` over `jl4/tests-cli/fixtures/batch-mixfix-shared-head.l4`) plus the §3.2.1 differential.
+Two constraints on changing this, each measured, are recorded in `jl4-core/src/L4/Print.hs` (`:244-260` and `:403-411`): call sites and definitions must change together, and imported operators keep the `OF` spelling because their surface form does not re-parse standing alone.
 **The risk check on a file is one line**, and still worth running before trusting printed output from anything this section does not cover:
 
 ```
 grep -oE '^`[^`]+`' <file> | sort | uniq -d
 ```
-
-**No golden captures `prettyLayout` output**, which is how this survived for as long as it did — `sg-wills.l4` was green on every golden it has while printing to a module that could not run.
-The guard is therefore a CLI test (`l4 batch` over `tests-cli/fixtures/batch-mixfix-shared-head.l4`) plus the §3.2.1 differential, not a golden.
 
 ---
 
@@ -549,11 +337,6 @@ numbered ruling — and update it in the same change.
 When a spec carries numbered rulings, follow its existing house style: mark the ruling
 `ANSWERED <date>, see §n`, state the measurement that drove it, and keep a "what review changed"
 note so a later editor does not silently un-change a repair.
-
-> **Why.** Ruling **R7** in `specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` was decided, written into
-> `specs/todo/lexipedia-superset/SPEC.md` as **K8**, and written into an upstream issue — while
-> §11 of the spec that owns R7 still read "open". Meng sat down to read that spec to understand the
-> state of the rulings and got a stale answer from the authoritative file.
 
 ### 4.1 Spec status headers
 
@@ -606,18 +389,6 @@ under `doc/`, and **fails on orphans** — a page nothing links to turns the bui
 locally before pushing; it takes seconds. Note what it does _not_ check: that a page exists at all.
 Nothing mechanical will tell you this rule was skipped.
 
-> **Why.** The transpiler programme shipped five backends — OpenFisca, Catala, Blawx, docassemble,
-> DMN/BPMN — across dozens of merged PRs, with specs, rulings, goldens, executed harnesses against
-> real third-party toolchains, and per-example READMEs. On 2026-08-27 Meng asked whether we had
-> docs describing the work. We did not. Of the fifteen `l4` CLI verbs, five were transpilers and
-> **none of them appeared anywhere in `doc/` or in `doc/SUMMARY.md`**; the only mentions of these
-> systems in the whole user-facing tree were as ecosystem _neighbours_ in a concepts essay. A user
-> reading the manual cover to cover could not have learned that `l4 docassemble` exists.
->
-> The trap is that the work felt heavily documented, because it was — in `specs/`, which had grown
-> past a hundred files, none of them addressed to a user. Volume of developer-facing writing is
-> what made the user-facing hole invisible.
-
 ---
 
 ## 7. Retired vocabulary
@@ -642,9 +413,6 @@ reader rather than about us:
 
 > never "binder" — to lawyers a binder is a ream of paper with ink and holes.
 
-That is why the word fails **this audience** specifically, which is the only kind of argument that
-survives being re-litigated. "Jargon" would not have been.
-
 **The list binds the learning-oriented pages, not every page.** Meng ruled on **2026-09-05**:
 the retired list is _"excluded from the tutorial and cookbook guides, but if they find their way
 into a Diataxis theory reference we could allow that iff we appropriately introduce PLT
@@ -656,11 +424,9 @@ nothing to a beginner L4 programmer".
 | `doc/tutorials/`, `doc/courses/`, the cookbook when it exists | **excluded.** Swept by CI.                                                                                                                                   |
 | `doc/reference/`, `doc/concepts/`                             | **permitted iff the page introduces the term** — lay words first, then the technical label as a bold-quoted defined term, the house pattern from 2026-09-04. |
 
-The mechanical test for "introduces" already exists in prose — _used before a bold-quoted
-definition on the same page_ — but **it is not yet enforced**; there is no script for it in the
-tree. Reference and concepts pages are clean of _unintroduced_ uses today only because two
-sweeps happened to clear them. **A green CI run says nothing about a reference page.** Whoever
-builds that check gets to delete this paragraph.
+The mechanical test for "introduces" already exists in prose — _used before a bold-quoted definition on the same page_ — but **it is not yet enforced**; there is no script for it in the tree.
+**A green CI run says nothing about a reference page.**
+Whoever builds that check gets to delete this paragraph.
 
 One narrowing worth stating, because the ruling's subject is broader than the list: the entry
 matches `binder` and deliberately **not** `binding`. "Symbol binding" is the phrase the ruling
@@ -680,41 +446,13 @@ type-checks `.l4` files and has no opinion about the text inside a fence. So **w
 diagnostic owns every page that quotes it, in the same PR.**
 
 **This section is not the style guide.** It holds only what is _retired by ruling_ and swept by
-CI. The wording to lead with — the twenty-five substitutions, the introduce-then-bold pattern, the
+CI. The wording to lead with — the substitution table, the introduce-then-bold pattern, the
 audience — is [`doc/STYLE.md`](doc/STYLE.md), and a word moves from there to here only by a
 ruling.
 
-**Adding a word here needs a ruling, not a preference.** Cite the date and the document. The
-distinction that makes this list checkable by plain search is that a retired term is suspect
-_everywhere_, and a merely discouraged one is not. Measured over `doc/`, with the checker's own
-stripping, on `props/discharge` @ `3625b533`: `binder` 9 lines, `parameter` 140 lines across 49
-files. A list that admitted the second word could only ever be advisory; this one can gate CI.
-`discharge` and `assumed term` are current, in-use terms. `read-set`, `elaboration` and
-`section binder` have no retiring ruling to cite, so they are not here.
+**Adding a word here needs a ruling, not a preference.**
+Cite the date and the document; the list holds only terms we coined and then retired, because for those a plain search is a sound check and for a merely discouraged word it is not.
+`discharge` and `assumed term` are current, in-use terms.
+`read-set`, `elaboration` and `section binder` have no retiring ruling to cite, so they are not here.
 
-**Plainer is not always truer, and one diagnostic is kept as evidence of that.**
-`NonDistinctQuantifiers` in `jl4-core/src/L4/TypeCheck.hs` still says "All quantified variables in
-a polymorphic type must have distinct names", sitting between four sibling messages that were
-re-voiced into `constructors` / `fields` / `inputs`. Its subject is the type variables of a
-polymorphic signature rather than a rule's inputs, so "input" there would be _false_, and
-"quantified" and "polymorphic" each carry meaning no shorter word carries. It is deliberately
-untouched, with a `Note [Vocabulary of the NonDistinct messages]` at the site saying so. A future
-sweep that tidies it to match its neighbours would be trading a correct sentence for a consistent
-one. If you have a better sentence, take it; a shorter one is not the same thing.
-
-> **Why.** Note what the incident below is and is not evidence of. The ruling is from 2026-09-04;
-> the incident is from the day after. So this is not a case of a rule being invented after a
-> mistake — it is a case of **an existing ruling not being held, by people who believed they were
-> holding it**. That is a stronger argument for a mechanical check than any new policy would be,
-> because it is the only failure mode a rule cannot fix by being clearer.
->
-> On 2026-09-05 the word was removed from `doc/reference/syntax/section-given.md` by #336 and put
-> back into that same page **five times within hours** by #338. Nothing caught it, and no
-> `paths:` filter could have: the PR that reintroduced it was not a docs PR.
->
-> The second half of the incident is the coupling. The same ruling had been enforced on every page
-> a reviewer could reach and **ratified** on the text those pages quote, because quoted tool output
-> is exempt — so the compiler went on saying the retired word, and the pages went on glossing it as
-> "L4's own wording". When the diagnostics were finally re-voiced, four quoted screens and four
-> glosses across four pages became false at once, silently. They were repaired in the same PR that
-> re-voiced the messages. That is the rule above, and it is why it is a rule.
+**Plainer is not always truer:** `NonDistinctQuantifiers` in `jl4-core/src/L4/TypeCheck.hs` is deliberately left in its technical wording; do not tidy it to match its neighbours unless you have a truer sentence, not merely a shorter one, and `Note [Vocabulary of the NonDistinct messages]` there says why.

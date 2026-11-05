@@ -245,11 +245,22 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Section n) where
   addNlg a = extendNlgA a $ case a of
     MkSection ann lbl maka mgiven topDecls -> do
-      lbl' <- traverse addNlg lbl
+      -- An annotation on its own line describes what follows, so with a
+      -- declaration below it, the line under a heading is that declaration's.
+      -- A section with nothing in it has only its heading to describe.
+      lbl' <- case (topDecls, lbl) of
+        (_ : _, Just l) -> Just <$> confineToEndOfLine l (addNlg l)
+        _               -> traverse addNlg lbl
       maka' <- traverse addNlg maka
       -- The section's own GIVEN is traversed BEFORE the declarations: these
       -- passes consume a range-sorted annotation list in source order, and the
       -- section binder is written above the first declaration.
+      --
+      -- A rule under a section GIVEN has no GIVEN of its own, so an @\@nlg@ on
+      -- its own line above it is its sentence, as for any rule with no GIVEN;
+      -- one indented under the section GIVEN is a binder's (assumed, not
+      -- ruled, 2026-11-01, porting legalese/l4-ide#802; witnessed by
+      -- @jl4/tests-cli/fixtures/nlg-own-line-section-given.l4@).
       mgiven' <- traverse addNlg mgiven
       topDecls' <- traverse addNlg topDecls
       pure (MkSection ann lbl' maka' mgiven' topDecls')
@@ -282,7 +293,8 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Declare n) where
     MkDeclare ann tySig appFormAka tyDecl -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
-      tyDecl' <- addNlgTypeDecl (maybe (const True) indentedPast (fromSrcRange <$> rangeOf a)) tyDecl
+      tyDecl' <- hoistNlgA (leavingTheNextRuleItsNlg a tyDecl)
+        (addNlgTypeDecl (maybe (const True) indentedPast (fromSrcRange <$> rangeOf a)) tyDecl)
       pure $ MkDeclare ann tySig' appFormAka' tyDecl'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
@@ -298,9 +310,32 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
       -- clause below (a pattern, say) can take the one written above it.
       (expr', ann') <- hoistNlgA (\ m -> do
         ann'' <- claimLaterClauseNlgs ann
-        e <- m
+        e <- leavingTheNextRuleItsNlg a expr m
         pure (e, ann'')) (addNlg expr)
       pure $ MkDecide ann' tySig' appFormAka' expr'
+
+-- | Keep a rule's body from taking what is written below it at the rule's own
+-- column. The last name in a body has no node after it to bound its region, so
+-- it reached as far as the next rule's head, and an @\@nlg@ on its own line above
+-- that head, the placement the reference recommends, landed on a name in the rule
+-- before it. That rule then read the sentence and the next rule had none.
+--
+-- An annotation indented under the body is still the body's.
+leavingTheNextRuleItsNlg :: (HasSrcRange rule, HasSrcRange body) => rule -> body -> NlgM a -> NlgM a
+leavingTheNextRuleItsNlg rule body m =
+  case (fromSrcRange <$> rangeOf rule, fromSrcRange <$> rangeOf body) of
+    (Just ruleSpan, Just bodySpan) -> do
+      pending <- use #nlgs
+      let nextRules =
+            [ w.range.start
+            | w <- pending
+            , w.range.start.line > bodySpan.end.line
+            , w.range.start.column <= ruleSpan.start.column
+            ]
+      case nextRules of
+        [] -> m
+        _  -> inLocRange (locRangeTo (Just (minimum nextRules))) m
+    _ -> m
 
 -- | The head form of a group of clauses: its head and its @AKA@. Its inputs
 -- are the @GIVEN@'s, copied into it with the @GIVEN@'s own location
@@ -425,7 +460,13 @@ signatureBeforeKeyword ann =
   keywords = [ r.start | AnnoCsn (Just r) _ <- drop 1 ann.payload ]
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
-  addNlg a = extendNlgA a $ case a of
+  -- A directive, like a rule's body, stops short of an annotation written
+  -- below it at its own column: its last name has no node after it to bound
+  -- its region either, so an @\@nlg@ on its own line above the next rule
+  -- landed on the directive's expression (porting legalese/l4-ide#802, where
+  -- main bounds bodies and type declarations the same way; the libraries'
+  -- worked examples put an #EVAL before a rule).
+  addNlg a = extendNlgA a $ hoistNlgA (leavingTheNextRuleItsNlg a a) $ case a of
     LazyEval ann e -> do
       e' <- addNlg e
       pure $ LazyEval ann e'
@@ -1111,6 +1152,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       pure $ Breach ann mParty' mReason'
     Refuse ann msg -> Refuse ann <$> addNlg msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
+    Lifecycle ann p -> pure $ Lifecycle ann p
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
   addNlg (MkDeonton ann' subj event opens deadline mjoin followup lest) = do
@@ -1430,6 +1472,7 @@ instance HasDesc (Expr n) where
     Breach     ann mp mr -> Breach     ann <$> traverse addDesc mp <*> traverse addDesc mr
     Refuse     ann msg   -> Refuse     ann <$> addDesc msg
     Inert      ann t c   -> pure (Inert ann t c)
+    Lifecycle  ann p     -> pure (Lifecycle ann p)
 
 instance HasDesc (GuardedExpr n) where
   addDesc (MkGuardedExpr ann g r) = MkGuardedExpr ann <$> addDesc g <*> addDesc r
@@ -2310,6 +2353,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       pure $ Breach ann' mParty' mReason'
     Refuse ann msg -> attachRef expr ann >>= \ann' -> Refuse ann' <$> addRef msg
     Inert ann txt ctx -> attachRef expr ann >>= \ann' -> pure (Inert ann' txt ctx)
+    Lifecycle ann p -> attachRef expr ann >>= \ann' -> pure (Lifecycle ann' p)
    where
     bin f ann e1 e2 = do
       ann' <- attachRef expr ann

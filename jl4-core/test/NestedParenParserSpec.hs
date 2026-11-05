@@ -209,14 +209,14 @@ brokenNests =
         ]
     , (9, 44)
     , "unexpected 's\n"
-        <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
+        <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, THE, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
     )
   , ("WHEN (((EXACTLY 1 PLUS) z PLUS) w PLUS)", inWhen "(((EXACTLY 1 PLUS) z PLUS) w PLUS)", (3, 32), closeBracketExpected)
   , ( "WHEN (((x ,) z PLUS) w PLUS)"
     , inWhen "(((x ,) z PLUS) w PLUS)"
     , (3, 24)
     , "unexpected ,\n"
-        <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, EXACTLY, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
+        <> "expecting %, &&, (, ), *, +, -, .., ..., /, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, EXACTLY, FOLLOWED, Float Literal, GREATER, IMPLIES, LESS, MINUS, MODULO, Numeric Literal, OF, OR, PLUS, RAND, ROR, String Literal, THE, TIMES, UNLESS, WHERE, identifier, infix identifier, mixfix keyword, space token, ||, or \8226\n"
     )
   , ("WHEN (f ((g (1 PLUS) y PLUS)) x PLUS)", inWhen "(f ((g (1 PLUS) y PLUS)) x PLUS)", (3, 29), closeBracketExpected)
   , ("WHEN (f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)", inWhen "(f (g (h (1 PLUS) a PLUS) b PLUS) c PLUS)", (3, 31), closeBracketExpected)

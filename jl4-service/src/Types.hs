@@ -60,6 +60,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
 import GHC.Generics (Generic)
+import Ledger.Service (LedgerService)
 import Logging (Logger)
 import Options (Options (..))
 import Servant (FromHttpApiData, Handler, ToHttpApiData)
@@ -190,11 +191,14 @@ instance FromJSON FunctionSummary where
     returnType   <- o .: "returnType"  <|> o .: "fsReturnType"
     returnSchema <- o .:? "returnSchema"
     section      <- o .:? "section"    <|> o .:? "fsSection"
-    -- isDeontic is now persisted in the metadata cache. For caches written
-    -- before this field existed, fall back to deriving it from the return
-    -- type (the same signal McpServer uses) so older deployments are still
-    -- correct without waiting for a recompile.
-    isDeontic    <- o .:? "isDeontic" .!= ("DEONTIC" `Text.isPrefixOf` returnType)
+    -- isDeontic is persisted in the metadata cache, from the function's type.
+    -- For caches written before this field existed, fall back to reading it
+    -- from the display name of the return type, so older deployments are
+    -- still right without waiting for a recompile: DEONTIC, or its deprecated
+    -- alias PROVISION OF, which is the same type. A recompile replaces the
+    -- guess with the type's own answer.
+    isDeontic    <- o .:? "isDeontic" .!=
+      (any (`Text.isPrefixOf` returnType) ["DEONTIC", "PROVISION OF"])
     sourceFile   <- o .:? "sourceFile" <|> o .:? "fsSourceFile"
     pure FunctionSummary
       { fsName         = name
@@ -233,6 +237,11 @@ data Visibility = Visibility
   { showFunctions :: !Bool
   , showFiles     :: !Bool
   , showEvaluate  :: !Bool
+  , callerParty   :: !(Maybe Text)
+  -- ^ The party the caller says it is, from the proxy-set header
+  -- @X-L4-Party@ (OPERATIONAL-LOWERING-SPEC D-O13). A claim and not an
+  -- authentication; it scopes the ledger's MCP write tools and nothing
+  -- else. 'Nothing' when the header is absent or empty.
   }
   deriving stock (Show, Eq)
 
@@ -673,6 +682,12 @@ data AppEnv = MkAppEnv
   -- with affinity.
   , batchSlots         :: BatchSlots
   -- ^ How many batch cases may run at once, across every batch in flight.
+  , ledger             :: Maybe LedgerService
+  -- ^ The instance ledger (OPERATIONAL-LOWERING-SPEC §9 WPO3), written
+  -- only by its own routes ("Ledger") and read besides only by its own MCP
+  -- tool ("Ledger.Mcp"). 'Nothing' when the service runs without one, as
+  -- most tests do: the decision routes and the decision tools never read
+  -- it.
   }
 
 -- | The batch slots: one per capability ('newBatchSlots'), shared by every

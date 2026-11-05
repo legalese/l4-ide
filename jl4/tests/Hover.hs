@@ -98,6 +98,12 @@ hoverGolden evalConfig dir inputFile = do
       , (Position 49 25, "aka-alias")
       , (Position 53 28, "aka-call-site")
       ]
+    -- A WITH call across an IMPORT to a rule whose herald follows its last
+    -- input: neither the head nor the label of that input shows a sentence.
+    "nlg-site-hover-import.l4" ->
+      [ (Position 7 27, "import-call-head")
+      , (Position 7 42, "import-call-label")
+      ]
     -- A rule written as a list of clauses binds its inputs at the GIVEN's
     -- own location (L4.Parser.givenInputBinding), so two nodes sit there.
     "multi-clause-hover.l4" ->

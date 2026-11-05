@@ -1,0 +1,18 @@
+-- THE DEADLINE as a value where the enclosing obligation has no closing
+-- edge (refusal 4 of §5.1.1.1, ratified for the value by §2.6 card B1):
+-- Alice's obligation has no WITHIN, so there is no deadline to read in its
+-- HENCE, however the noun is written.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+    Pay  HAS amount IS A NUMBER
+
+alice MEANS Tenant OF "Alice"
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    PARTY alice MUST Sign alice
+    HENCE (PARTY alice MUST Pay 1 WITHIN 0 OF (THE DEADLINE PLUS 5))

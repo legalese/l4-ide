@@ -25,6 +25,7 @@ import Compatibility (FnIface, ifaceFromFunction, ifaceFromSummary, detectBreaki
 import Compiler (compileBundle, computeVersion)
 import qualified Version
 import DeploymentLoader (triggerCompilationIfPending)
+import Ledger (refuseIfInstancesHeld, withCreationLock)
 import Logging (logInfo, logWarn)
 import Options (Options (..))
 import Shared (jsonError, encodeMetadataCache)
@@ -185,6 +186,11 @@ postDeploymentHandler multipart = do
           isNew = not (Map.member deployId registry)
       when (isNew && Map.size registry >= cfg.maxDeployments) $
         throwError err400 { errBody = jsonError "Maximum deployment limit reached" }
+      -- A POST with the id of a deployment the instance ledger holds
+      -- instances of would put another contract under their rows, ungated
+      -- (OPERATIONAL-LOWERING-SPEC R-O5). Checked when the POST arrives: an
+      -- instance created while this job compiles is not looked for again.
+      refuseIfInstancesHeld deployId.unDeploymentId "overwritten by an ungated POST (PUT updates it through the compatibility check)"
 
       now <- liftIO getCurrentTime
       let storedMeta = BundleStore.StoredMetadata
@@ -362,7 +368,10 @@ deleteDeploymentHandler deployIdText = do
   registry <- liftIO $ readTVarIO env.deploymentRegistry
   case Map.lookup deployId registry of
     Nothing -> throwError err404
-    Just _ -> do
+    -- Not while the instance ledger holds instances of it (R-O5), checked
+    -- and deleted under the lock an instance is created under.
+    Just _ -> withCreationLock do
+      refuseIfInstancesHeld deployIdText "deleted"
       ok <- liftIO $ BundleStore.deleteBundle env.bundleStore (deployId.unDeploymentId)
       if ok
         then do

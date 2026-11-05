@@ -1,0 +1,43 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: lifecycle-value-on-join-line.l4
+  Hidden: no
+  Range: 18:58-18:72
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    THE JOIN cannot be read in the WITHIN on a join line.
+
+    A join line's WITHIN is the deadline on the whole group, so it is what
+    THE DEADLINE would name, and the group's join has not fired when it is
+    read. Only THE ARMING (the EVERY's own arming) and other instants can be
+    used there.
+
+File: lifecycle-value-on-join-line.l4
+  Hidden: no
+  Range: 22:27-22:32
+  Source: check
+  Severity: DiagnosticSeverity_Information
+  Code: <none>
+  Message:
+    In this action, `alice` refers to
+
+      alice (at lifecycle-value-on-join-line.l4:14:1-6)
+
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+
+File: lifecycle-value-on-join-line.l4
+  Hidden: no
+  Range: 23:60-23:78
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    THE DEADLINE cannot be read in the WITHIN on a join line.
+
+    A join line's WITHIN is the deadline on the whole group, so it is what
+    THE DEADLINE would name, and the group's join has not fired when it is
+    read. Only THE ARMING (the EVERY's own arming) and other instants can be
+    used there.

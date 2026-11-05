@@ -13,6 +13,7 @@ Step-by-step guides for getting a task done with L4: from installing it and writ
 - [Fix errors](getting-started/debugging-type-errors.md): read a diagnostic, and fix the errors that come up most.
 - [Encode legislation](getting-started/encoding-legislation.md): turn a statutory provision into a tested rule, alone or with an AI assistant.
 - [Make rules read like law](natural-language-functions/optimising-natural-language-generation.md): infix and mixfix names, and rules that render as readable documents.
+- [Fix wording with @nlg](natural-language-functions/fix-wording-with-nlg.md): the fix for each kind of bad wording in a rendered document
 - [Common patterns](getting-started/common-patterns.md): recipes for records, decisions, calculations, lists, dates and obligations.
 - [What a Section Needs to Know](section-given/what-a-section-needs-to-know.md): name the facts a whole run of rules needs once, under the heading, instead of repeating them in every rule.
 - [Grouping and Precedence: What Binds to What](getting-started/grouping-and-precedence.md): why L4 groups by indentation, and three cases where a comma was the whole dispute.
@@ -32,6 +33,7 @@ Who must do what, by when, and what follows: one tenancy, carried through four p
 ## Publish rules
 
 - [Deploy your rules](deploying-rules/exporting-rules-for-deployment.md): mark rules with `@export`, deploy them to Legalese Cloud and call them.
+- [Checking a Store Before You Switch Versions](deploying-rules/checking-a-store-before-a-rollout.md): run `jl4-service --check-store` to find out which stored deployments a new version would refuse, before it serves them.
 - [Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md): compile L4 decisions into a Blawx project with `l4 export blawx`, run them under s(CASP) with English justification trees, and lift Blawx projects back into L4.
 
 ## Use deployed rules

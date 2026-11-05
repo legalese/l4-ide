@@ -316,7 +316,7 @@ This is the ONLY form of field access. No `.field`, no `->`, no `[]`.
 
 ```l4
 GIVEN p IS A Person
-DECIDE `is of legal age` p IS p's age AT LEAST 18
+DECIDE `is of legal age` IS p's age AT LEAST 18
     AKA `has reached majority`
 
 -- both of these now work:
@@ -415,7 +415,7 @@ placement that reaches a rule:
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
 @nlg:he שורה משלה
-DECIDE `כפול` n IS n TIMES 2
+DECIDE `כפול` IS n TIMES 2
 ```
 
 `l4 nlg --lang he` prints `שורה משלה עם 21`.
@@ -553,7 +553,7 @@ A herald takes a language subtag, and **a name may carry more than one**:
 GIVEN n IS A NUMBER
 @nlg:he שורה משלה
 @nlg:en the doubling rule
-DECIDE `כפול` n IS n TIMES 2
+DECIDE `כפול` IS n TIMES 2
 ```
 
 - `l4 nlg FILE --lang he` → `שורה משלה עם 21`

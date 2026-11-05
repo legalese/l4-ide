@@ -1,0 +1,95 @@
+-- A slot that another slot, or punctuation and then a slot, comes after, and a
+-- call with a sentence of its own that fills such a slot. Companion to
+-- slot-scope.l4, as `l4 render` and `l4 nlg` read it.
+-- A slot is the end of the sentence only when nothing of the sentence follows
+-- it: "%a% %b%", "%a%, %b%" and "%a% (%b%)" go on after slot a.
+-- A call with a sentence ends where its sentence does, unless the slot at the
+-- end of that sentence holds a condition with no closing word: then the call
+-- has none either.
+-- The rules are stubs; each pair below states two different conditions, and
+-- what is tested is that they are worded apart.
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`the Act governs` n MEANS n > 5
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %a% %b%
+`juxt` a b MEANS a AND b
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %a%, %b%
+`comma` a b MEANS a AND b
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %a% (%b%)
+`paren` a b MEANS a AND b
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %x% is shown
+`shown` x MEANS NOT x
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg it is shown that %x%
+`shown that` x MEANS NOT x
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %a% is told %b%
+`told` a b MEANS a AND (NOT b)
+
+-- A denial in the first of two slots, and the denial of the whole sentence.
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `juxt inside` n q IF `juxt` (NOT (`the Act governs` n)) q
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `juxt outside` n q IF NOT (`juxt` (`the Act governs` n) q)
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `comma inside` n q IF `comma` (NOT (`the Act governs` n)) q
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `comma outside` n q IF NOT (`comma` (`the Act governs` n) q)
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `paren inside` n q IF `paren` (NOT (`the Act governs` n)) q
+
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `paren outside` n q IF NOT (`paren` (`the Act governs` n) q)
+
+-- Control: a denial in the last slot is left as it was.
+GIVEN n IS A NUMBER
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `juxt last` n q IF `juxt` q (NOT (`the Act governs` n))
+
+#EVAL `shown` (`shown that` (TRUE OR (FALSE AND TRUE)))
+#EVAL `shown that` (TRUE OR (`shown` (FALSE AND TRUE)))
+#EVAL `shown` (`told` TRUE (NOT (FALSE AND TRUE)))
+#EVAL `told` TRUE (NOT (`shown` (FALSE AND TRUE)))
+#EVAL `juxt` TRUE (NOT FALSE)
+#EVAL `juxt` (NOT FALSE) TRUE
+#EVAL NOT (`juxt` FALSE TRUE)
+#EVAL `comma` (NOT FALSE) TRUE
+#EVAL NOT (`comma` FALSE TRUE)

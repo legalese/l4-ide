@@ -13,6 +13,7 @@
 - [Fix errors](getting-started/debugging-type-errors.md)
 - [Encode legislation](getting-started/encoding-legislation.md)
 - [Make rules read like law](natural-language-functions/optimising-natural-language-generation.md)
+  - [Fix wording with @nlg](natural-language-functions/fix-wording-with-nlg.md)
 - [Common patterns](getting-started/common-patterns.md)
 - [What a Section Needs to Know](section-given/what-a-section-needs-to-know.md)
 - [Grouping and Precedence: What Binds to What](getting-started/grouping-and-precedence.md)
@@ -31,6 +32,7 @@
 
 - [Deploy your rules](deploying-rules/exporting-rules-for-deployment.md)
 - [Deploy a project that has folders (proposed, not landed)](deploying-rules/deploy-a-project-with-folders.md)
+- [Checking a Store Before You Switch Versions](deploying-rules/checking-a-store-before-a-rollout.md)
 - [Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)
 
 ## Use deployed rules

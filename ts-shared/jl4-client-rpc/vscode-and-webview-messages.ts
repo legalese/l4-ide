@@ -440,6 +440,10 @@ export interface RemoteFunctionSchema {
   parameters?: FunctionParameters
   /** Display name of the return type (e.g. "BOOLEAN", "DEONTIC"). */
   returnType?: string
+  /** Whether the function takes the DEONTIC simulation envelope, as the
+   *  service decided from the function's type. Absent when the deployment was
+   *  stored before the service kept it. */
+  isDeontic?: boolean
   /** Structured schema of the return value, when the deployment exposes it. */
   returnSchema?: FunctionParameter
 }

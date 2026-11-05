@@ -69,6 +69,7 @@ executable l4
     L4.Cli.Deploy
     L4.Cli.DeployPlan
     L4.Cli.Docassemble
+    L4.Cli.Explore
     L4.Cli.Export
     L4.Cli.Format
     L4.Cli.Install
@@ -128,6 +129,7 @@ test-suite jl4-test
   main-is: Main.hs
   other-modules:
     BpmnExport
+    LtsExplore
     LtsList
     Hover
     SemanticTokens
@@ -177,6 +179,8 @@ test-suite l4-cli-test
     CliTest.Deploy
     CliTest.DmnBpmn
     CliTest.Docassemble
+    CliTest.Ledger
+    CliTest.Explore
     CliTest.OpenFisca
     CliTest.Yscript
     L4.Cli.DeployPlan

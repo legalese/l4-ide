@@ -1,0 +1,167 @@
+New York Codes, Rules and Regulations
+=====================================
+
+
+§ 1  Title 16 - DEPARTMENT OF PUBLIC SERVICE
+
+
+1.1  Chapter I - RULES OF PROCEDURE
+
+
+1.1.1  Subchapter A - GENERAL
+
+
+1.1.1.1  Part 7 - Implementation Of State Environmental Quality Review Act
+
+
+1.1.1.1.1  Section 7.3 - Environmental review procedures
+
+
+1.1.1.1.1.1  Section 7.3 (a)
+
+Definitions:
+
+1. Commission consists of:
+    - Name — text
+
+2. Newspaper consists of:
+    - Name — text
+    - General circulation area — text
+
+3. Applicant consists of:
+    - Name — text
+
+4. Environmental Impact Statement consists of:
+    - Draft filing date — date
+    - Final filing date — date, if any
+
+5. Notice consists of:
+    - Publish date — date
+    - Scheduled date — date
+    - Publishing medium — Newspaper
+    - Is in accordance with the requirements of 6 NYCRR 617.10 — yes or no
+
+6. File draft copy of EIS and cause notice of hearing to be published consists of:
+    - Hearing Notice — Notice
+    - Notice of EIS Completion — Notice
+    - Prepared draft copy of EIS — Environmental Impact Statement, if any
+
+7. Action that may have a significant adverse effect on the environment consists of:
+    - Proposed by — Applicant
+    - Lead agency — Commission
+    - Potential effect area — text
+    - Has hearing required by statute — yes or no
+    - Has been withdrawn — yes or no
+    - EIS — Environmental Impact Statement
+
+Provisions:
+
+1. Filing of draft copy of EIS and causing notice of hearing to be published is:
+    (a) If the commission is the action's Lead agency and the action Has hearing required by statute: the commission must File draft copy of EIS and cause notice of hearing to be published (Hearing Notice, Notice of EIS Completion, and Prepared draft copy of EIS) within the day number of the Monday of the ISO week after the one containing 2 March 2028:
+        (i) Provided that all of the following:
+            (1) Hearing Notice's Scheduled date is at least Hearing Notice's Publish date + 14;
+            (2) Hearing Notice's Scheduled date is at most Hearing Notice's Publish date + 60;
+            (3) depending on Prepared draft copy of EIS:
+                (A) If Prepared draft copy of EIS is absent: false;
+                (B) If Prepared draft copy of EIS is present, with the value EIS: all of the following:
+                    (a) Hearing Notice's Scheduled date is at least EIS's Draft filing date + 15; and
+                    (b) Hearing Notice's Scheduled date is at most EIS's Draft filing date + 60;
+            (4) Hearing Notice's Publishing medium's General circulation area is the action's Potential effect area;
+            (5) Hearing Notice Is in accordance with the requirements of 6 NYCRR 617.10; and
+            (6) Notice of EIS Completion Is in accordance with the requirements of 6 NYCRR 617.10.
+    (b) Otherwise: FULFILLED.
+
+2. Example Newspaper is a Newspaper with:
+    - Name — New York Times
+    - General circulation area — Brooklyn
+
+
+1.1.1.1.1.2  Section 7.3 (b)
+
+
+1.1.1.1.1.2.1  Section 7.3 (b) (1)
+
+Definitions:
+
+1. Proceeding Record consists of:
+    - Closing date — date
+
+2. Tentative or recommended decision consists of:
+    - Action — Action that may have a significant adverse effect on the environment
+    - Proceeding Record — Proceeding Record
+    - On the basis of the record of the proceeding (including the draft EIS and any comments received thereon), the Administrative Law Judge issuing this decision determined that the action will not have a significant adverse effect on the environment — yes or no
+
+Provisions:
+
+1. Tentative or recommended decision will contain a final EIS if:
+    (a) it is not the case that the decision's Action Has been withdrawn; and
+    (b) it is not the case that On the basis of the record of the proceeding (including the draft EIS and any comments received thereon), the Administrative Law Judge issuing this decision determined that the action will not have a significant adverse effect on the environment, for the decision.
+
+2. Example Proceeding Record is a Proceeding Record with:
+    - Closing date — the date the month number for August/20/2025
+
+
+1.1.1.1.1.2.2  Section 7.3 (b) (2)
+
+Definitions:
+
+1. Final EIS Issuance Extension Cause means one of:
+    - (i) Additional time is necessary to prepare the EIS adequately
+    - (ii) Problems have been identified which require the material reconsideration or modification of the action
+    - (iii) Other good cause
+
+2. Final EIS Issuance means one of:
+    - No issuance
+    - Issued within 45 days of the close of the record
+    - Issued extended beyond 45 days of the close of the record
+
+Provisions:
+
+1. Determining issuance for final EIS is:
+    (a) If it is not the case that Tentative or recommended decision will contain a final EIS for the decision: No issuance;
+    (b) Otherwise: depending on Cause for extension:
+        (i) If Cause for extension is absent: Issued within 45 days of the close of the record;
+        (ii) If Cause for extension is present, with the value cause: Issued extended beyond 45 days of the close of the record.
+
+2. Determining days till issuance for final EIS is:
+    (a) If Tentative or recommended decision will contain a final EIS for the decision: Never;
+    (b) Otherwise: depending on Cause for extension:
+        (i) If Cause for extension is absent: the day number of Closing date;
+        (ii) If Cause for extension is present, with the value cause: the day number of (Closing date + 45 + Days of extension).
+    where:
+    - Closing date equals the decision's Proceeding Record's Closing date + 45.
+
+
+1.1.1.1.1.2.3  Section 7.3 (b) (3)
+
+1. Notice of no significant adverse effect on the environment determination will be filed in accordance with 6 NYCRR 617.10 means On the basis of the record of the proceeding (including the draft EIS and any comments received thereon), the Administrative Law Judge issuing this decision determined that the action will not have a significant adverse effect on the environment, for the decision.
+
+2. Copies of the decision (together with a notice of its completion) will be filed in accordance with 6 NYCRR 617.10. means Tentative or recommended decision will contain a final EIS for the decision.
+
+
+1.1.1.1.1.2.4  Section 7.3 (c)
+
+Definitions:
+
+1. Render decision on whether or not to approve action consists of:
+    - Action — Action that may have a significant adverse effect on the environment
+
+Provisions:
+
+1. Rendering of the decision on whether or not to approve action proposed by applicant is:
+    (a) If Good cause to delay: FULFILLED;
+    (b) Otherwise: depending on the action's EIS's Final filing date:
+        (i) If the action's EIS's Final filing date is absent: FULFILLED;
+        (ii) If the action's EIS's Final filing date is present, with the value date: Commission must Render decision on whether or not to approve action (the action) within (the day number of date) + 30.
+
+2. Never means -1.
+
+
+Coverage
+left out: Example Commission
+left out: Example EIS
+left out: Example Action
+left out: Example Filing
+left out: Example Hearing Notice
+left out: Example Notice of EIS Completion
+left out: Example Decision

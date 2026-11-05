@@ -1,0 +1,9 @@
+-- A library alias used at two types in one module. `singleton` and `fromList`
+-- are singleToDict and listToDict under another name, and polymorphic as they
+-- are, so this module checks.
+IMPORT prelude
+
+`numbers to letters` MEANS singleton 1 "a"
+`letters to numbers` MEANS singleton "b" 2
+`pairs of numbers to letters` MEANS fromList (LIST PAIR OF 1, "a")
+`pairs of letters to numbers` MEANS fromList (LIST PAIR OF "b", 2)

@@ -1,0 +1,18 @@
+-- Library sentences at a call: a count of one, and a one-entry dictionary.
+IMPORT prelude
+IMPORT daydate
+IMPORT `excel-date`
+IMPORT `actus-schedule`
+
+`one entry` MEANS singleton 1 "a"
+`from pairs` MEANS fromList (LIST PAIR OF 1, "a")
+
+#EVAL `add months` (Date 31 1 2025) 1
+#EVAL `add years` (Date 29 2 2024) 1
+#EVAL singleton 1 "a"
+#EVAL (Date 31 1 2025) PLUS 1
+#EVAL (Date 31 1 2025) MINUS 1
+#EVAL 1 PLUS (Date 31 1 2025)
+#EVAL ExcelEDate (Date 31 1 2025) 1
+#EVAL ExcelEOMonth (Date 31 1 2025) 1
+#EVAL `add days` (Date 31 1 2025) 1

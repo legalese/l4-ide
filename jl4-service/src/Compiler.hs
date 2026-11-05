@@ -12,7 +12,7 @@ import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
 import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule, typicallyToJson)
-import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
+import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), CheckWarning (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import Types
 import Control.Monad (forM, forM_, unless)
@@ -32,7 +32,8 @@ import qualified Data.Text.Encoding as Text.Encoding
 import Data.Time (getCurrentTime)
 import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams, honouredDefault, isRequiredInput)
 import L4.Print (prettyTypeForDisplay)
-import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), getActual, rawName, rawNameToText)
+import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), Name, LifecyclePoint, getActual, lifecyclePointNoun, lifecyclePointWords, rawName, rawNameToText)
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import Logging (Logger, logInfo, logWarn)
 import qualified LSP.L4.Rules as Rules
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -203,7 +204,7 @@ processTypecheckedFile
   -> Map FilePath EvalEnv.Environment  -- ^ Import environments from shared session
   -> IO (FilePath, Either Text [ValidatedFunction])
 processTypecheckedFile logger deployId filepath content moduleContext
-  tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors}
+  tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors, infos = tcInfos}
   evalMap = do
     let exports = enrichReturnTypes ei $ getExportedFunctions resolvedModule
         -- Both spellings of "this export's input is a rule, not a value", so
@@ -241,6 +242,20 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , severity e == SError
           , not (isOutOfScope kind)
           ]
+        -- THE JOIN / THE DEADLINE / THE ARMING written where the program has
+        -- its own value of that spelling. The editor and `l4 check` warn; the
+        -- service REFUSES (EVERY-EACH-QUANTIFIER-SPEC §2.6, B1a, ruled
+        -- 2026-10-24), as it refuses an ignored annotation above: until
+        -- 2026-10-24 that THE was an optional article, so such a module may
+        -- mean the program's value, and under a HENCE the change is a
+        -- different number with no error. A deployment stored before then that
+        -- holds one is refused when a restart recompiles it, which is the
+        -- point: its answers would have moved silently. A warning is in
+        -- 'infos', not 'errors', which carries only what blocks 'success'.
+        hidesNameErrs =
+          [ hidesNameRefusal filepath p mr defined imported
+          | MkCheckErrorWithContext{kind = CheckWarning (LifecycleNounHidesName p mr defined imported)} <- tcInfos
+          ]
     if not (null exportFnTypeErrs)
       then do
         logWarn logger "Deploy rejected: an @export input is a rule, not a value"
@@ -257,6 +272,14 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , ("errors", toJSON blockingErrs)
           ]
         pure (filepath, Left (Text.intercalate "\n" blockingErrs))
+      else if not (null hidesNameErrs)
+      then do
+        logWarn logger "Deploy rejected: THE before a noun hides a name"
+          [ ("deploymentId", toJSON deployId)
+          , ("file", toJSON filepath)
+          , ("errors", toJSON hidesNameErrs)
+          ]
+        pure (filepath, Left (Text.intercalate "\n" hidesNameErrs))
       else if null exports
       then pure (filepath, Right [])
       else do
@@ -552,3 +575,29 @@ buildFileEntries deployId sources summaries =
          }
      | fp <- sortBy (comparing id) l4Paths
      ]
+
+-- | Why a module whose @THE JOIN@ (or @THE DEADLINE@, @THE ARMING@) hides a
+-- name of the program's own is not deployed ('LifecycleNounHidesName'): which
+-- name is hidden, and that dropping THE reaches it. Renaming is offered only
+-- when this module defines every such name; an imported one may be defined in
+-- a file the deployer does not own.
+hidesNameRefusal :: FilePath -> LifecyclePoint -> Maybe SrcRange -> [Name] -> [Name] -> Text
+hidesNameRefusal filepath p mr defined imported =
+  Text.pack filepath <> at <> ": " <> words' <> " here is the lifecycle position, and it hides "
+    <> Text.intercalate ", " names <> ", which this module " <> whose <> "."
+    <> " Write " <> noun <> " without THE to reach the program's own " <> firstName <> rename <> "."
+  where
+    at = maybe "" (\ r -> ":" <> Text.pack (show r.start.line) <> ":" <> Text.pack (show r.start.column)) mr
+    words' = lifecyclePointWords p
+    noun = lifecyclePointNoun p
+    names = [ "`" <> rawNameToText (rawName n) <> "`" | n <- defined <> imported ]
+    firstName = case names of
+      n : _ -> n
+      []    -> "`" <> noun <> "`"
+    whose = case (defined, imported) of
+      (_ : _, _ : _) -> "defines and imports"
+      ([], _)        -> "imports"
+      (_, [])        -> "defines"
+    rename
+      | null imported = ", or rename it to keep " <> words'
+      | otherwise     = ""

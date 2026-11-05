@@ -2,22 +2,22 @@
 `deadline`
 `london meeting`
 `start of day`
-`Date of` with `meeting time`
-`Time of` with `meeting time`
-`Timezone of` with `meeting time`
-`the hour of` with `meeting time`
-`the minute of` with `meeting time`
-`the day of` with `meeting time`
-`the month of` with `meeting time`
-`the year of` with `meeting time`
-`_ Datetime to serial` with `meeting time`
-`_ is afternoon` with `meeting time`
-`_ is morning` with `start of day`
-`at midnight` with `meeting time`
-`at noon` with `meeting time`
-`_ at _` with `meeting time` and `TIME_FROM_HMS` with 15, 0 and 0
-`the earlier of` with `meeting time` and `deadline`
-`the later of` with `meeting time` and `deadline`
+the date of `meeting time` in its own time zone
+the time of `meeting time` in its own time zone
+the IANA time zone name of `meeting time`
+the hour of `meeting time` on the 24-hour clock in its own time zone
+the minute of `meeting time` in its own time zone
+the day of the month of `meeting time` in its own time zone
+the month number of `meeting time` in its own time zone
+the year of `meeting time` in its own time zone
+the UTC day number of `meeting time` (with the time as a fraction of a day)
+`meeting time` is in the afternoon (from noon until 6 pm) in its own time zone
+`start of day` is in the morning (before noon) in its own time zone
+midnight at the start of the date of `meeting time` in its own time zone
+noon on the date of `meeting time` in its own time zone
+`TIME_FROM_HMS` with 15, 0 and 0 on the date of `meeting time` in its own time zone
+the earlier of `meeting time` and `deadline`
+the later of `meeting time` and `deadline`
 `meeting before deadline`
 `deadline after meeting`
 `leq datetime`
@@ -38,5 +38,5 @@
 `date equal`
 `days diff`
 `same date check`
-`the earlier of` with `date1` and `date2`
-`the later of` with `date1` and `date2`
+the earlier of `date1` and `date2`
+the later of `date1` and `date2`

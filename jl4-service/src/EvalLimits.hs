@@ -12,6 +12,7 @@
 module EvalLimits (
   LimitHit (..),
   withEvalLimits,
+  withThreadLimits,
   currentAllocationLimit,
   limitHitMessage,
 ) where
@@ -69,9 +70,25 @@ limitHitMessage cfg = \case
 -- with a trace writes the tree, so the trace now counts against both limits
 -- (measured 2026-10-07 at 1,000 steps: 79 MB traced against 6.7 MB without).
 withEvalLimits :: NFData b => Options -> IO b -> IO (Either (LimitHit, Int64) (b, Int64))
-withEvalLimits cfg act =
+withEvalLimits cfg act = do
+  writeIORef allocationLimitRef (Just (megabytes cfg.maxEvalMemoryMb))
+  withThreadLimits cfg.evalTimeout cfg.maxEvalMemoryMb act
+
+-- | The two limits of 'withEvalLimits', given in seconds and megabytes, on
+-- the calling thread alone: the limit is not published to
+-- 'currentAllocationLimit', so the wrapper path's evaluations go on running
+-- under @--max-eval-memory-mb@ while this one runs under another.
+--
+-- The instance ledger runs here ("Ledger"), under an allocation limit of its
+-- own, because one append to it re-typechecks the contract with its imports
+-- and allocated about 2.1 GB on the dinner fixture (measured 2026-10-26),
+-- against the 256 MB default of a decision. Publishing that limit would
+-- raise the wrapper path's for as long as the append ran, with no sign. A
+-- ledger evaluation never takes the wrapper path, so it needs nothing
+-- published.
+withThreadLimits :: NFData b => Int -> Int -> IO b -> IO (Either (LimitHit, Int64) (b, Int64))
+withThreadLimits seconds mb act =
   ( do
-      writeIORef allocationLimitRef (Just memLimitBytes)
       setAllocationCounter memLimitBytes
       enableAllocationLimit
       result <- timeout timeoutMicros (act >>= evaluate . force)
@@ -80,8 +97,11 @@ withEvalLimits cfg act =
   ) `catch` (\AllocationLimitExceeded -> pure (Left (AllocationLimitHit, memLimitBytes)))
     `finally` disableAllocationLimit
  where
-  timeoutMicros = cfg.evalTimeout * 1_000_000
-  memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
+  timeoutMicros = seconds * 1_000_000
+  memLimitBytes = megabytes mb
+
+megabytes :: Int -> Int64
+megabytes mb = fromIntegral mb * 1024 * 1024
 
 -- | The allocation limit, in bytes, that the service's evaluations run under;
 -- 'Nothing' until the first 'withEvalLimits'.

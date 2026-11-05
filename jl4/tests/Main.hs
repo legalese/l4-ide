@@ -18,6 +18,8 @@ import L4.TracePolicy (lspDefaultPolicy)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.Export (ExportedFunction (..))
 import qualified L4.Export as Export
+import qualified L4.Export.Document as Doc
+import qualified L4.Export.Render as Render
 import L4.JsonSchema (SchemaContext (..))
 import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
@@ -53,6 +55,7 @@ import qualified System.OsPath as OsPath
 import LSP.L4.Rules
 
 import qualified BpmnExport
+import qualified LtsExplore
 import qualified LtsList
 import qualified Hover
 import qualified SemanticTokens
@@ -147,6 +150,12 @@ main = do
       corpusNonEmpty "import-refusal"   importRefusalFiles
       corpusNonEmpty "import-unresolved" importUnresolvedFiles
     describe "ok files" $ tests checkMemo evalConfig (True, True) goldenCorpus examplesRoot
+    -- The legal examples are what a reader of a rendered document sees. A change
+    -- to the wording shows here as a diff, line by line, across all of them.
+    describe "rendered documents" $
+      forM_ legalFiles $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4RenderGolden checkMemo evalConfig (takeDirectory inputFile </> "tests") inputFile
     -- The built-in connectives used to be closures over two parameters named
     -- @a@ and @b@, whose @IF a THEN b ELSE FALSE@ bodies showed in every trace
     -- that reached one. They are frames now, with no parameters to name
@@ -216,6 +225,7 @@ main = do
     RelationalExport.spec examplesRoot
     describe "bpmn export" BpmnExport.spec
     describe "lts list" LtsList.spec
+    describe "lts explore" LtsExplore.spec
   where
     tests memo evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do
@@ -247,12 +257,12 @@ l4Golden memo evalConfig isOk examplesRoot dir inputFile = do
       , failFirstTime = True
       }
 
--- | Build a scrubber that replaces the two absolute, machine-specific path
+-- | Build a scrubber that replaces the absolute, machine-specific path
 -- prefixes that reach golden output with stable tokens, so goldens capturing
 -- import-resolution logs like @Found on filesystem: <abspath>@ are portable
 -- across machines and CI.
 --
--- There are TWO such prefixes and scrubbing only one is not enough:
+-- There are FOUR such prefixes, and scrubbing only some is not enough:
 --
 --   * @JL4_LIBRARY_PATH@ -> @$JL4_LIBRARY_PATH@, for an import resolved out of
 --     the stdlib. In jl4-test the variable is always set (see 'main').
@@ -586,6 +596,48 @@ jl4NlgAnnotationsGolden memo evalConfig isOk dir inputFile = do
       , actualFile = Just (dir </> takeFileName inputFile -<.> "nlg.actual")
       , failFirstTime = True
       }
+
+-- | What @l4 render --format text@ prints for a file, then what it left out: every
+-- definition appears exactly once, or is named here.
+jl4RenderGolden :: CheckMemo -> JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden Text)
+jl4RenderGolden memo evalConfig dir inputFile = do
+  (_, moutput) <- typeCheckedShared memo "render-golden" evalConfig inputFile LogNotNeeded Remember
+  let output = normalizeWhitespace $ case moutput of
+        Nothing -> "Cannot render a module that doesn't typecheck\n"
+        Just checkResult ->
+          let rawDeps = map (.module') (Rules.transitiveDependencies checkResult)
+              -- The configuration @l4 render@ builds (jl4/app/L4/Cli/Render.hs).
+              cfg = Doc.defaultExportConfig
+                { Doc.moduleDispositions = Doc.hiddenImports (const False) rawDeps
+                , Doc.mixfixHeadings = Doc.mixfixHeadingsFromRegistry checkResult.mixfixRegistry
+                , Doc.mixfixPatterns = Doc.mixfixPatternsFromRegistry checkResult.mixfixRegistry
+                }
+              (mainModule, deps) = Nlg.prepareModules Nothing checkResult.module' rawDeps
+              doc = Doc.buildDocument cfg mainModule deps
+          in Render.renderText Render.defaultRenderConfig doc
+               <> coverageNote (Doc.buildPlan cfg mainModule deps) doc
+  pure
+    Golden
+      { output
+      , encodePretty = Text.unpack
+      , writeToFile = Text.writeFile
+      , readFromFile = fmap normalizeWhitespace . Text.readFile
+      , goldenFile = dir </> takeFileName inputFile -<.> "render.golden"
+      , actualFile = Just (dir </> takeFileName inputFile -<.> "render.actual")
+      , failFirstTime = True
+      }
+
+-- | Which of a module's definitions a document does not show once.
+coverageNote :: Doc.ExportPlan -> Doc.Document -> Text
+coverageNote plan doc =
+  "\n\nCoverage\n" <> Text.unlines
+    ( [ "left out: " <> u.planHeading | u <- units, u.planId `notElem` shown ]
+   <> [ "shown twice: " <> u.planHeading | u <- units, length (filter (== u.planId) shown) > 1 ]
+    )
+ where
+  units = [ u | m <- plan.planModules, m.planModuleIsMain, u <- m.planUnits ]
+  shown = concatMap sectionIds doc.docSections
+  sectionIds s = [ b.blockId | g <- s.sectionGroups, b <- g.groupBlocks ] <> concatMap sectionIds s.sectionSubs
 
 jl4JsonSchemaGolden :: CheckMemo -> JL4Lazy.EvalConfig -> String -> FilePath -> IO (Golden String)
 jl4JsonSchemaGolden memo evalConfig dir inputFile = do

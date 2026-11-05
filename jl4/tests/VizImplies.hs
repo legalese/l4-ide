@@ -60,6 +60,14 @@ nestedSrc =
   \DECIDE compliant IF\n\
   \  c AND (a IMPLIES b)\n"
 
+nestedNegatedSrc :: Text
+nestedNegatedSrc =
+  "GIVEN a IS A BOOLEAN\n\
+  \      b IS A BOOLEAN\n\
+  \      c IS A BOOLEAN\n\
+  \DECIDE compliant IF\n\
+  \  c AND ((NOT a) IMPLIES b)\n"
+
 spec :: Spec
 spec = describe "IMPLIES is a seam, not sugar (ladder DESIGN §25a)" $ do
   -- The regression that matters. `simplify` is ON in the LSP's default viz path, and
@@ -101,6 +109,14 @@ spec = describe "IMPLIES is a seam, not sugar (ladder DESIGN §25a)" $ do
         -- three real atoms survive; nothing was swallowed into a single leaf
         sort (concatMap atomsOf args) `shouldBe` ["a", "b", "c"]
       other -> expectationFailure $ "expected an And, got: " <> show other
+
+  -- Read classically, a nested implication is NOT scope OR requirement. A scope that
+  -- is already a NOT cancels (L4.Viz.VizExpr.negateIR), so it reads a OR b.
+  it "a NESTED implication whose scope is NOT a reads a OR b, not NOT (NOT a) OR b" $
+    case vizBody False nestedNegatedSrc of
+      V.And _ [_, V.Or _ [V.UBoolVar _ a _ _ _ _ _, V.UBoolVar _ b _ _ _ _ _]] ->
+        (a.label, b.label) `shouldBe` ("a", "b")
+      other -> expectationFailure $ "expected c AND (a OR b), got: " <> show other
 
   -- The seam is not a barrier to the atom walk. If it were, every TYPICALLY inside a
   -- scope or requirement would silently vanish from the question-ordering priors —

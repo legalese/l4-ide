@@ -1,0 +1,183 @@
+`the arrangement`, explored from its outset at 64800: 15 states, 30 transitions
+
+s0  depth 0, residual r0
+    at the outset
+    OFFICIAL's `dinner status record`: opened
+s1  depth 1, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s2  depth 1, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): checked
+    OFFICIAL's `dinner status record`: opened
+s3  depth 2, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Messages delivers the message` AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): stopped
+    Messages's `message` (latest): delivered
+    OFFICIAL's `dinner status record`: opened, taken
+s4  depth 2, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): checked
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s5  depth 2, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): checked
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s6  depth 2, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): reading
+    OFFICIAL's `dinner status record`: opened
+s7  depth 3, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): reading
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s8  depth 3, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): reading
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s9  depth 3, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+      PARTY World DOES `Alice buys dinner` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): bought
+    OFFICIAL's `dinner status record`: opened
+    OFFICIAL's `dinners bought`: `dinner for two`
+    OFFICIAL's `open at acceptance`: TRUE
+s10  depth 4, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+      PARTY World DOES `Alice gives up` AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): stopped
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s11  depth 4, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Alice buys dinner` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): bought
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+    OFFICIAL's `dinners bought`: `dinner for two`
+    OFFICIAL's `open at acceptance`: FALSE
+s12  depth 4, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+      PARTY World DOES `Alice buys dinner` AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): bought
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+    OFFICIAL's `dinners bought`: `dinner for two`
+    OFFICIAL's `open at acceptance`: TRUE
+s13  depth 5, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Alice buys dinner` AT 64800
+      PARTY World DOES `Messages delivers the message` AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): bought
+    Messages's `message` (latest): delivered
+    OFFICIAL's `dinner status record`: opened, taken
+    OFFICIAL's `dinners bought`: `dinner for two`
+    OFFICIAL's `open at acceptance`: FALSE
+s14  depth 5, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice reads the ledger again` OF TRUE AT 64800
+      PARTY World DOES `Alice buys dinner` AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Messages delivers the message` AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): bought
+    Messages's `message` (latest): delivered
+    OFFICIAL's `dinner status record`: opened, taken
+    OFFICIAL's `dinners bought`: `dinner for two`
+    OFFICIAL's `open at acceptance`: TRUE
+
+Transitions (30):
+  s0 -> s1  PARTY World DOES `ledger records Bob's purchase`
+  s0 -> s2  PARTY World DOES `Alice checks whether dinner is bought`
+  s1 -> s3  PARTY World DOES `Messages delivers the message`
+  s1 -> s4  PARTY World DOES `Alice checks whether dinner is bought`
+  s2 -> s5  PARTY World DOES `ledger records Bob's purchase`
+  s2 -> s6  PARTY World DOES `Alice reads the ledger again` OF TRUE
+  s2 -> s2  PARTY World DOES `Alice reads the ledger again` OF FALSE
+  s3 -> s3  PARTY World DOES `Alice is done`
+  s4 -> s3  PARTY World DOES `Messages delivers the message`
+  s4 -> s7  PARTY World DOES `Alice reads the ledger again` OF TRUE
+  s4 -> s4  PARTY World DOES `Alice reads the ledger again` OF FALSE
+  s5 -> s3  PARTY World DOES `Messages delivers the message`
+  s5 -> s7  PARTY World DOES `Alice reads the ledger again` OF TRUE
+  s5 -> s5  PARTY World DOES `Alice reads the ledger again` OF FALSE
+  s6 -> s8  PARTY World DOES `ledger records Bob's purchase`
+  s6 -> s9  PARTY World DOES `Alice buys dinner`
+  s7 -> s3  PARTY World DOES `Messages delivers the message`
+  s7 -> s10  PARTY World DOES `Alice gives up`
+  s8 -> s3  PARTY World DOES `Messages delivers the message`
+  s8 -> s11  PARTY World DOES `Alice buys dinner`
+  s9 -> s12  PARTY World DOES `ledger records Bob's purchase`
+  s9 -> s9  PARTY World DOES `Alice is done`
+  s10 -> s3  PARTY World DOES `Messages delivers the message`
+  s10 -> s10  PARTY World DOES `Alice is done`
+  s11 -> s13  PARTY World DOES `Messages delivers the message`
+  s11 -> s11  PARTY World DOES `Alice is done`
+  s12 -> s14  PARTY World DOES `Messages delivers the message`
+  s12 -> s12  PARTY World DOES `Alice is done`
+  s13 -> s13  PARTY World DOES `Alice is done`
+  s14 -> s14  PARTY World DOES `Alice is done`
+
+Residuals (1):
+  r0  PARTY World
+        MAY act PROVIDED (`the brief allows` OF act)
+        WITHIN 0 OF closing
+        HENCE (CONSIDER act
+                 WHEN `ledger records Bob's purchase` THEN COMMIT "dinner status record" IS taken HENCE RECORD Messages's "message" IS `in transit` HENCE `the evening`
+                 WHEN `Messages delivers the message` THEN RECORD Messages's "message" IS delivered HENCE RECORD Alice's "belief" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's "plan")
+                 WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's "belief" IS `the ledger's status` OF (RECALL ALL OFFICIAL's "dinner status record") HENCE RECORD Alice's "plan" IS checked HENCE `the evening`
+                 WHEN `Alice is done` THEN `the evening`
+                 WHEN `Alice reads the ledger again` answered THEN IF answered THEN (RECORD Alice's "belief" IS `the ledger's status` OF (RECALL ALL OFFICIAL's "dinner status record") HENCE RECORD Alice's "plan" IS reading HENCE `the evening`) ELSE `the evening`
+                 WHEN `Alice buys dinner` THEN COMMIT "dinners bought" IS `dinner for two` HENCE COMMIT "open at acceptance" IS `the ledger is open` OF (RECALL ALL OFFICIAL's "dinner status record") HENCE RECORD Alice's "plan" IS bought HENCE `the evening`
+                 WHEN `Alice gives up` THEN RECORD Alice's "plan" IS stopped HENCE `the evening`)
+        LEST FULFILLED
+
+Coverage: 15 states, 30 transitions; frontier exhausted; nothing refused; nothing untried; 90 acts passed over; 15 ticks past the clock bound not taken; no write-only cell dropped; time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state), clock bounded at 75600
