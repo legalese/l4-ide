@@ -93,6 +93,17 @@ The rules that decide whether a reviewer can trust the result:
 - **Inputs as `GIVEN`**, threading a record where there are many facts. `ASSUME` is deprecated for inputs.
 - **`BRANCH IF … IF … OTHERWISE`, not chains of `ELSE IF`.**
 - **Several modules, not one.** A 2,000-line single file cannot be reviewed section by section. Split along the source's own structure: the domain module, then one module per Part or topic, then the tests.
+- **Another law's encoding is copied in, never referenced.**
+  When a provision depends on another law that has its own encoding (an Interpretation Act's rules for counting time are the usual case), copy that encoding's module into your encoding folder and `IMPORT` it by name.
+  Do not reach into the other encoding's folder, by a relative path or through `JL4_LIBRARY_PATH`: it is a different bundle, maintained on its own schedule, so when it changes your answers change with it, unreviewed, and when it moves your encoding stops loading.
+  The reviewer who asked for this put it as "Copy dependencies, don't live reference them if they belong to a different bundle" (serrynaimo, 2026-11-05); it is how `npm` treats a package, and why a deployment packs the libraries it uses.
+  The rules for the copy:
+  - **Byte for byte.** Never edit a copied module, not even to add a comment, so that anyone can check it against its source with one `diff`. If it needs a fix, fix it in its own encoding first, then copy it again.
+  - **Its imports come too.** Copy every module it imports, other than the libraries that ship with `l4` (`prelude`, `daydate` and the rest).
+  - **It must check under your target.** A module written for `unstable` (one that uses `REFUSE`, say) will not load in an encoding for `main`. Then do not copy it: take its effect as a named input, and say so in the fork register.
+  - **If it does not answer your question, do not bend it.** Write what you need in your own module, and say in the fork register why the copy was not enough.
+  - **Record where it came from** in `NOTES.md` (step 9): the source folder, the commit you copied it at, and its `sha256`. List it in `encoding.json`'s `modules` like any other module.
+  - **Refresh it on purpose.** A newer version of the source is not picked up by itself. Copying it again is a change to your encoding: re-run `check.sh`, and record the new commit and `sha256` in `NOTES.md`.
 
 ### 6. Tests: from the source, never from the code
 
@@ -149,6 +160,7 @@ A reviewer reads this first. It carries:
 5. **What `check.sh` prints**, main columns included, and the main build it compared with, and which failing assertions are expected, and why.
    Also the **target** the encoding was written for, `main` or `unstable`.
 6. **Open questions** for a domain expert.
+7. **Copied modules**, if any (step 5): for each module copied from another encoding, the folder it came from, the commit it was copied at, and its `sha256`.
 
 [^judgment-calls]:
     Why every reading, and not only the one taken: an ambiguity is a judgment call, and people working with an agent tend to take the reading it argues for.
