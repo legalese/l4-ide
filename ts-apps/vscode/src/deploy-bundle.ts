@@ -34,12 +34,18 @@
  * is not made.
  *
  * A path import (a backticked name with a `/`, `IMPORT \`../b/mod\``; see
- * specs/proposals/RELATIVE-IMPORTS-SPEC.md) needs no such check here. The
+ * specs/proposals/RELATIVE-IMPORTS-SPEC.md) mostly needs no such check here. The
  * service looks it up where its path names, counted from the importing file's
  * folder in the zip, and the language server resolves it the same way, against
  * the importing file's URI with `..` collapsed by its letters. Entry names keep
  * every file's place relative to every other, so the file the language server
- * returned for a path is where the path names it in the zip. Unlike `l4 deploy`,
+ * returned for a path is where the path names it in the zip, with one
+ * exception this deploy cannot see: a path that leaves the common ancestor and
+ * comes back into it. `fees/late-fee.l4` saying `IMPORT \`../fees/rates\`` with
+ * both files in `fees` is uploaded as `late-fee.l4` and `rates.l4` (measured
+ * 2026-11-05 with `collectBundle` from out/), and from `late-fee.l4` at the top
+ * the path leaves the bundle: the service says "ready" and a call answers 422.
+ * `l4 deploy` refuses it and names the path to write (`./rates`). Unlike `l4 deploy`,
  * which names a file by its folder with links followed and refuses a path whose
  * folder is a link, this deploy names a file by its URI, so a folder reached
  * through a link goes up under the name the path wrote. With no workspace

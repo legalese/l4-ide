@@ -131,6 +131,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Char (isAscii, isAlphaNum, toLower)
 import Data.List (find, intercalate, isPrefixOf, nub, nubBy)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import System.FilePath
   ( isAbsolute
   , joinPath
@@ -271,11 +272,16 @@ renderPlanError hints = \case
                  <> ", but the file l4 found for it would be uploaded as " <> Text.pack u.importedName
                  <> " (from " <> Text.pack u.importedFile <> ")"
              | u <- byPath ]
-          <> [ "The deployed service looks an IMPORT written as a path up only where the path names, counted from the folder of the file that imports it, and never above the top of the upload."
-             , "l4 names each uploaded file by its folder as the disk spells it, with links followed, so a folder on the path that is a link, or that is written with other capitals than the disk has, puts the file somewhere the path does not name."
+          <> [ "The deployed service looks an IMPORT written as a path up only where the path names, counted from the folder of the file that imports it, and never above the top of the upload (the folder that holds all the uploaded files)."
              , "The deploy would say it is ready and every call would then fail."
-             , "Write the path the way the folders are named on the disk, not through a link, and deploy again."
-             ] )
+             ]
+          <> [ "l4 names each uploaded file by its folder as the disk spells it, with links followed, so a folder on the path that is a link, or that is written with other capitals than the disk has, puts the file somewhere the path does not name."
+             | any (\u -> isJust u.pathNames) byPath ]
+          <> [ "A path climbs above the top of the upload when it leaves the folder that holds all the uploaded files, even if it then comes back into it."
+             | any (\u -> isNothing u.pathNames) byPath ]
+          <> [ "Write each path as the place of the file in the upload, counted from the folder of the file that imports it, and deploy again:" ]
+          <> [ "  in " <> Text.pack u.importerName <> ", `" <> u.written <> "` as `" <> pathToUploaded u <> "`"
+             | u <- byPath ] )
   UnsafeFolder us ->
     Text.unlines $
       [ case us of
@@ -310,6 +316,23 @@ libraryAdvice hints =
   <> [ "l4 reads a library from JL4_LIBRARY_PATH before it reads one beside the importing file, so with that variable set a copy in the project is not used: unset the variable, or move the file instead of copying it."
      | hints.libraryPathSet ]
   <> [ "A library from the per-user library folder is read after the one beside the importing file, so a copy there is enough." ]
+
+-- | What to write in place of a path import the plan refuses: the path that
+-- names the file where it would be uploaded, counted from the folder of the
+-- importing file in the zip, without the @.l4@. It starts with @./@ when it does
+-- not climb, so that it stays a path import and is not looked up as a bare name.
+-- Both names are names in the zip, so the path never climbs above its top.
+pathToUploaded :: Unreachable -> Text
+pathToUploaded u = Text.intercalate "/" (lead <> ups <> drop shared toFolder <> [stem])
+  where
+    parts = Text.splitOn "/" . Text.pack
+    from = init (parts u.importerName)
+    to = parts u.importedName
+    toFolder = init to
+    stem = let f = last to in fromMaybe f (Text.stripSuffix ".l4" f)
+    shared = length (takeWhile id (zipWith (==) from toFolder))
+    ups = replicate (length from - shared) ".."
+    lead = if null ups then ["."] else []
 
 -- | The folder part of a name in the zip.
 folderOf :: FilePath -> FilePath

@@ -321,7 +321,8 @@ planSpec = describe "l4 deploy: which files are uploaded, and under what name" $
       said `shouldSatisfy` ("a/main.l4 imports `sub/helper`, which names a/sub/helper.l4 in the upload" `isInfixOf`)
       said `shouldSatisfy` ("would be uploaded as a/helper.l4" `isInfixOf`)
       said `shouldSatisfy` ("a folder on the path that is a link" `isInfixOf`)
-      said `shouldSatisfy` ("Write the path the way the folders are named on the disk" `isInfixOf`)
+      said `shouldSatisfy` ("in a/main.l4, `sub/helper` as `./helper`" `isInfixOf`)
+      said `shouldNotSatisfy` ("A path climbs above the top of the upload" `isInfixOf`)
       -- The advice for a bare name would be false of a path.
       said `shouldNotSatisfy` ("Put each library beside the file that imports it" `isInfixOf`)
       said `shouldNotSatisfy` ("JL4_LIBRARY_PATH" `isInfixOf`)
@@ -332,6 +333,19 @@ planSpec = describe "l4 deploy: which files are uploaded, and under what name" $
           r = planBundle (at ["p"]) entry [("mod", Just modl)] [imp entry "../../p/b/mod" modl]
       fmap (map (.pathNames)) (refused r) `shouldBe` Just [Nothing]
       message r `shouldSatisfy` ("imports `../../p/b/mod`, which climbs above the top of the upload" `isInfixOf`)
+      message r `shouldSatisfy` ("A path climbs above the top of the upload when it leaves the folder that holds all the uploaded files" `isInfixOf`)
+      message r `shouldSatisfy` ("in a/main.l4, `../../p/b/mod` as `../b/mod`" `isInfixOf`)
+      message r `shouldNotSatisfy` ("a folder on the path that is a link" `isInfixOf`)
+
+    -- Every file in one folder is uploaded under its plain name, so a path that
+    -- leaves that folder and comes back climbs above the top of the upload.
+    it "refuses a path that leaves the folder of a one-folder upload and comes back, and names the path to write" $ do
+      let entry = at ["p", "fees", "late-fee.l4"]
+          rates = at ["p", "fees", "rates.l4"]
+          r = planBundle (at ["p"]) entry [("rates", Just rates)] [imp entry "../fees/rates" rates]
+      fmap (map (\u -> (u.importerName, u.importedName, u.pathNames))) (refused r)
+        `shouldBe` Just [("late-fee.l4", "rates.l4", Nothing)]
+      message r `shouldSatisfy` ("in late-fee.l4, `../fees/rates` as `./rates`" `isInfixOf`)
 
     it "judges a bare line and a path line in one plan each by its own rule, and says both" $ do
       let entry = at ["p", "a", "main.l4"]
@@ -790,6 +804,7 @@ serviceSpec bin = describe "l4 deploy: the zip it sends" $ do
             code `shouldNotBe` ExitSuccess
             serr `shouldSatisfy` ("a/main.l4 imports `../b/mod`, which names b/mod.l4 in the upload" `isInfixOf`)
             serr `shouldSatisfy` ("would be uploaded as c/mod.l4" `isInfixOf`)
+            serr `shouldSatisfy` ("in a/main.l4, `../b/mod` as `../c/mod`" `isInfixOf`)
             sent <- requests
             sent `shouldBe` []
 
@@ -809,6 +824,7 @@ serviceSpec bin = describe "l4 deploy: the zip it sends" $ do
           code `shouldNotBe` ExitSuccess
           serr `shouldSatisfy` ("a/main.l4 imports `../B/mod`, which names B/mod.l4 in the upload" `isInfixOf`)
           serr `shouldSatisfy` ("would be uploaded as b/mod.l4" `isInfixOf`)
+          serr `shouldSatisfy` ("in a/main.l4, `../B/mod` as `../b/mod`" `isInfixOf`)
           sent <- requests
           sent `shouldBe` []
 
