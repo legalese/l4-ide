@@ -144,7 +144,7 @@ On your own machine a `..` may leave the folder you started from, because the co
 **What a path import cannot do yet.** These are limits, not oversights:
 
 - The browser editor has no folder to start from, so a path import there does not work.
-- `l4 deploy` and the VS Code deploy action upload every file at the top level, so a project that uses path imports fails after it is deployed that way ([what a deployment contains](README.md#what-a-deployment-contains)).
+- In every release so far, `l4 deploy` and the VS Code deploy action upload every file at the top level, so a project that uses path imports fails after it is deployed that way ([what a deployment contains](README.md#what-a-deployment-contains)); the draft legalese/l4-ide#749 (proposed, not landed) keeps folders.
 - A deployed bundle that cannot resolve a path import is accepted, and the only trace is a warning in the service's log.
 - The service does not find a file at the top of an upload whose own name has a space or a non-ASCII letter, nor a file inside a top-level folder whose name has a space, a non-ASCII letter or punctuation such as `#` `'` `+` `(` `%` (a deployment says `ready` and every call then answers 422, and the service's log says the import resolves to nothing). This was measured for a bare import; a path import into such a folder was seen to fail the same way in review. A file inside a plain top-level folder is found whatever its own name or deeper folders are called. `l4` on your machine is not affected.
 - The REPL looks every import up from the folder it was started in, not from the loaded file's.
