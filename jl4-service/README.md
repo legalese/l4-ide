@@ -824,6 +824,11 @@ A `bundle.cbor` that an older build left beside a deployment's sources is not re
 
 The check compiles; it does not evaluate. A deployment that compiles can still answer a call differently under a new binary.
 
+An `IMPORT` that resolves to nothing does not fail a deployment, under a restart or under the check: the compile logs a `WARN`, `Bundle IMPORT resolves to nothing`, with the deployment, the file and the module, the deployment is `ok`, and every call that needs the missing names then fails.
+So a new binary that resolves an `IMPORT` differently is not caught by the exit status.
+Run the check with the old binary and with the new one over the same store, keep each one's stderr, and compare their `Bundle IMPORT resolves to nothing` lines: a line only the new binary writes is a deployment the new binary breaks.
+The change that made this matter is where a bare `IMPORT` looks inside a bundle with folders (see [Libraries and `IMPORT`](#libraries-and-import)); the tutorial [Checking a Store Before You Switch Versions](../doc/tutorials/deploying-rules/checking-a-store-before-a-rollout.md) walks through it.
+
 ## Persistence
 
 Deployments are stored on disk at `{store-path}/{deployment-id}/`:
