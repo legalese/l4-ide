@@ -615,7 +615,8 @@ Deployed 'late-fee' (version 1.0.0) with 1 function:
 API: https://api.legalese.cloud/acme/late-fee
 ```
 
-The deployment is named after the file unless you pass `--name`. `l4` typechecks the file first, then uploads it with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
+The deployment is named after the file unless you pass `--name`.
+`l4` typechecks the file first, then uploads it with the files it imports; [What gets uploaded](#what-gets-uploaded) says which, and under what names.
 
 | Command            | What it does                                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -625,6 +626,96 @@ The deployment is named after the file unless you pass `--name`. `l4` typechecks
 | `l4 undeploy NAME` | Deletes a deployment after you type its name to confirm. In scripts, pass `--yes`.                                                                                  |
 
 `--json` prints machine-readable results, and `--no-wait` returns as soon as the upload is accepted instead of waiting for it to compile.
+
+### What gets uploaded
+
+The upload is your file and every file it imports, directly or through other files.
+The note `l4` prints before it uploads lists them, for example `Deploying 'late-fee' to …: late-fee.l4, helper.l4`.
+
+The service that runs the deployment reads only those files and the standard libraries built into it.
+It does not read your `JL4_LIBRARY_PATH` or your per-user library folder, where `l4` may have found a library.
+Within the upload, it looks for an `IMPORT` of a bare name (one with no `/`, such as `IMPORT helper`) in two places only: beside the file that imports it, and at the top of the upload, which is the folder that holds all the uploaded files.
+An `IMPORT` written as a path, such as `` IMPORT `../shared/defs` ``, it looks up only where the path names, counted from the folder of the file that imports it, and never above the top of the upload.
+`l4` checks that before it sends anything, and stops when a file would end up where the service does not look.
+[Deploy a project that has folders](../deploying-rules/deploy-a-project-with-folders.md) (proposed, not landed, like the change itself) works through this with a small project, quotes the messages `l4` stops with, and says how to tell whether your `l4` and your service have the change.
+
+- **Folders are kept.**
+  Each file is named by its path below the folder that holds all of them, with `/` between the parts.
+  When all the files sit in one folder, the upload holds their plain names, as in the example above.
+  When the main file sits in a folder and a library sits at the top of the project, the upload holds both paths.
+  For example, from the folder `project/`, with `JL4_LIBRARY_PATH` set to that folder, `l4 deploy a/main.l4` uploads `a/main.l4` and `defs.l4` when `a/main.l4` says `IMPORT defs` and `defs.l4` is in `project/`.
+  With that variable set, `l4` does not read the standard libraries from the copy built into it (see [Step 5](#step-5-libraries-and-jl4_library_path)), so that example is for a project that imports none.
+  A path needs no variable: when `a/main.l4` says `` IMPORT `../defs` `` instead, `l4 deploy a/main.l4` uploads the same two names with `JL4_LIBRARY_PATH` unset, and `a/main.l4` may also say `IMPORT prelude`.
+- **A service built before the top of the upload became its root reads that example differently.**
+  A service built before the commit that makes the bundle root the top of the upload looks a bare `IMPORT` up from the folder of the first file of the upload in alphabetical order, and not at the top.
+  That is how it compiles the deployment and answers an ordinary call; a call that holds a `{}` in an input goes through the service's wrapper path, which looks from the folder of the function's own file instead.
+  So the project in the example above, which the old flat upload deployed and which worked, is uploaded now as `a/main.l4` and `defs.l4`; such an old service reports the deployment as ready, and every call answers "zmark is not in scope".
+  A service built without path imports reads `` IMPORT `../b/mod` `` as `IMPORT mod` and fails the same way: measured on 2026-11-05 with a service that had neither change, `l4 deploy` of `a/main.l4`, `b/mod.l4` and `b/helper.l4` said "Deployed", and a call answered 422 with "`the base` is not in scope".
+  The default target of `l4 deploy` is Legalese Cloud.
+  `l4` does not check the version of the service it deploys to, and a service built without `JL4_SERVICE_VERSION` set reports `0.0.0-dev` on `/health` whichever changes it has.
+  **The service this version needs** is a build that has both path imports (legalese/l4-ide#748) and the bundle root at the top of the upload (`bundleRoot` in `jl4-service/src/Backend/Jl4.hs`).
+  Ruled on 2026-11-05: the service ships first, and this change stays a draft until Legalese Cloud runs such a build.
+- **A library imported by a bare name has to be beside the file that imports it.**
+  Suppose `main.l4` says `IMPORT shared` and `l4` finds `lib/shared.l4`, for example because `JL4_LIBRARY_PATH` names that `lib` folder.
+  The upload would hold `lib/shared.l4`, a place the service does not look in, so the deployment would be reported as ready and every call to it would fail.
+  So `l4` uploads nothing, names the importing file, the module and the folder, and exits with an error.
+  Move the library beside the file that imports it, and deploy again.
+  The service also looks at the top of the upload, so a library there is found; but `l4` itself looks for a library beside the main file, in `JL4_LIBRARY_PATH` and in the per-user library folder, so a library at the top of the project is found by `l4` only when `JL4_LIBRARY_PATH` names that folder, as in the example above.
+  A name written as a path, such as `` IMPORT `lib/shared` ``, is judged by its path instead: the file has to be uploaded where the path names, counted from the folder of the importing file, and `lib/shared.l4`, in the folder `lib` beside `main.l4`, is, so `l4` uploads `main.l4` and `lib/shared.l4`.
+  So importing the library by its path is the other fix.
+- **A path that the upload would not keep stops the deploy.**
+  `l4` names each uploaded file by its folder as the disk spells it, with links followed.
+  So a path through a folder that is a link, or through a folder written with other capitals than the disk has (on macOS and Windows, which ignore capitals), would name a place in the upload where the file is not, and a path that leaves the folder that holds all the uploaded files climbs above the top of the upload, even if it comes back into it.
+  In each case `l4` uploads nothing, names the importing file and the path, and gives the path to write instead, such as `./rates` for `` `../fees/rates` `` when every file is in `fees`.
+  Refusing a link or other capitals, rather than uploading the file under the name the path wrote, is assumed and not ruled.
+- **Where `l4` found the library decides whether a copy helps.**
+  `l4` reads `JL4_LIBRARY_PATH` before it reads the folder of the importing file, so with that variable set a copy of the library in your project is not used: unset the variable, or move the file instead of copying it.
+  The per-user library folder (`jl4/libraries` in `$XDG_DATA_HOME`, or in `~/.local/share`) is read after the folder of the importing file, so a copy in the project is used.
+- **A folder whose name has anything but letters from A to Z, digits, `.`, `-` and `_` stops the deploy.**
+  The deployed service does not find a file beside the file that imports it when the first folder of the file's path in the upload has a space, a letter outside A to Z (an accented letter, a Hebrew letter), or one of `#` `'` `+` `(` `)` `%` `,` `=` `@` `&` `!` `$` `;` `[` `]` in its name.
+  The deployment would be reported as ready and every call to it would fail.
+  So when an imported file would be uploaded in a folder with any character outside that set in its name, `l4` uploads nothing, names the file and the folder, and exits with an error.
+  Rename the folder to use only letters, digits, `.`, `-` and `_`.
+  The cause is in the service: it builds the place to look from a relative path, and a relative path cannot carry the escape that these characters need in a `file:` URI.
+  That is a residual of the fix for [smucclaw/l4-ide#971](https://github.com/smucclaw/l4-ide/issues/971), which is closed, and no issue tracks it yet.
+  Measured on 2026-10-26 with hand-built zips: a folder called `a`, `my-dir_2.x`, `v1.2` or `a~b` is fine, and one called `my dir`, `dossier é`, a Hebrew name, `a#b` or `a'b` is not.
+  Only the first folder of the path decides on the service: `ok/my dir` and `ok/dossier é` are found, and `my dir` and `a b/c` are not.
+  `l4` stops at a character other than a letter from A to Z, a digit, `.`, `-` and `_` in any folder of the path, so it also stops a few names that the service would find, for example `ok/my dir` and `a~b`.
+  This refusal is there because of how the service behaves today, and it can go when the service finds those files.
+  A folder is judged only for the files that are imported: the folder of the main file is not, a library at the top of the upload is not, and when all the files sit in one folder the upload holds plain names and there is no folder to judge.
+  The same limit applies to a file at the top of the upload whose own name has a space or such a letter (an `IMPORT` of a module called `my mod`): the service does not find it, and `l4` does not stop it.
+  A zip built by hand with such a file at the top fails in the same way, so this is not new with keeping folders.
+- **Files outside the project folder stop the deploy.**
+  The project folder is the folder you run `l4 deploy` from, if the file you are deploying is inside it, and otherwise the folder the file is in.
+  The top of a drive is never the project folder, so run from there it is the file's own folder.
+  If an import lives outside the project folder, `l4` uploads nothing, names the file and the folder, and exits with an error.
+  Put the library inside the project folder, beside the file that imports it.
+  This stop is new with keeping folders: before it, `l4 deploy` uploaded such a file, for example a shared library in a folder beside your project that `JL4_LIBRARY_PATH` names, under its plain file name, and so did the VS Code Deploy button.
+- **Nothing is skipped or renamed.**
+  A file `l4` cannot read stops the deploy too, and the message names it.
+  The one exception is the standard libraries.
+- **The standard libraries are not uploaded.**
+  A deployment finds `prelude`, `daydate` and the others in the copy built into the service.
+  A file that `l4` read from disk and that is exactly the copy built into `l4` is not uploaded either, wherever it is: a copy of the libraries kept in your project, or the `jl4-core/libraries` folder that `JL4_LIBRARY_PATH` names.
+  The exception is a file that an `IMPORT` reaches by its path, such as `` IMPORT `libs/daydate` ``: the service looks a path up among the uploaded files only, never in its built-in libraries, so such a file is uploaded whatever its bytes.
+  For each such file `l4` prints one line, for example `Not uploaded, the deployed service has it built in: daydate`, and does not judge where the file sits or count it as outside the project folder.
+  A copy that differs, even by one character (an edited copy, or a checkout newer than the `l4` you run), is a project file like any other: it is judged by the rules above and, if it is outside the project folder or in a folder the service does not look in, the deploy stops.
+  If you have set `JL4_LIBRARY_PATH` (see [Step 5](#step-5-libraries-and-jl4_library_path)), the standard libraries are read from files on your disk instead of the copy built into `l4`.
+  A pinned copy that is the same as the built-in one goes through as above.
+  A pinned copy that differs stops the deploy when it is outside your project folder: unset `JL4_LIBRARY_PATH` for the deploy, and the copy built into `l4` is used.
+- **The VS Code Deploy button keeps folders too, and checks less.**
+  It stops at a file outside the workspace folder, at a file it cannot read, and at an imported file in a folder whose name has anything but letters from A to Z, digits, `.`, `-` and `_`, as above.
+  It cannot judge the rest of this section: the language server hands the extension the imported files and not the `IMPORT` lines, so it cannot tell whether an `IMPORT` of a bare name is found beside its importer or at the top of the upload.
+  A library in some other folder of the project, imported by a bare name, is uploaded, the service reports the deployment as ready, and a call that needs the library fails.
+  A file imported by its path is uploaded where the path names, with one exception it cannot see: a path that leaves the folder of a one-folder upload and comes back, such as `` `../fees/rates` `` with every file in `fees`, is uploaded under plain names, and the deployment is ready and fails.
+  A folder reached through a link goes up under the name the path wrote, which is where the service looks.
+  It needs the same service as `l4 deploy` (above).
+  For the same reason it cannot tell that a file is the built-in copy of a standard library, so a copy outside the workspace folder stops the deploy; unset `JL4_LIBRARY_PATH` for the editor, or move the library into the project instead of copying it.
+  The same goes for a copy of a standard library module in a folder of the kind that stops a deploy (above): `l4 deploy` leaves it out when it is exactly the built-in copy, and the Deploy button stops at it.
+  Rename the folder.
+  If the editor found the copy through `JL4_LIBRARY_PATH`, you can instead unset that variable for the editor; its language server reads the variable from the environment VS Code was started in.
+  A copy in the project, beside the file that imports it, is read when the variable is unset too, so unsetting it does not help there.
+  `l4 deploy` has the `IMPORT` lines and the text of every file, so it does judge them.
 
 ### Your own jl4-service
 

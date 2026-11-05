@@ -64,7 +64,7 @@ In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab
 4. Enter a **deployment name**, such as `insurance-premium`. It becomes part of the API address: 1 to 36 characters, using letters, digits, hyphens and underscores.
 5. Click **Deploy Now**.
 
-The extension uploads the file and the service compiles it, and its status goes through **Pending** (uploaded), **Compiling**, then **Ready** (live) or **Failed** (with the compiler's error message).
+The extension uploads the file, and the files it imports, and the service compiles it; [Deploy a project that has folders](deploy-a-project-with-folders.md) (proposed, not landed) says which files go up, under what names, and which build of the service they need. The deployment's status goes through **Pending** (uploaded), **Compiling**, then **Ready** (live) or **Failed** (with the compiler's error message).
 
 ### Update a deployment
 

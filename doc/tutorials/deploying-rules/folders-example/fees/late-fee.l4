@@ -1,0 +1,13 @@
+-- late-fee.l4: the late fee on an overdue invoice (the file to deploy).
+IMPORT rates
+
+@export default What late fee does a customer owe on an overdue invoice?
+GIVEN `invoice amount` IS A NUMBER @desc The amount of the invoice
+      `days overdue`   IS A NUMBER @desc How many days the invoice has been unpaid after its due date
+GIVETH A NUMBER
+DECIDE `late fee` IS
+    IF `days overdue` <= `the grace period in days`
+    THEN 0
+    ELSE `the flat fee` + `invoice amount` * `the monthly late rate`
+
+#EVAL `late fee` 1000 20

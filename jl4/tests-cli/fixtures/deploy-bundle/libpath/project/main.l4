@@ -1,0 +1,8 @@
+-- Imports `shared`, which JL4_LIBRARY_PATH finds in project/lib/ (a folder the
+-- deployed service does not look in for a bare name) or, in another run of the
+-- tests, in ../outside/ (outside the project). No prelude import: with
+-- JL4_LIBRARY_PATH set, the built-in standard library is skipped.
+IMPORT shared
+
+GIVEN n IS A NUMBER
+`double it` MEANS n * 2

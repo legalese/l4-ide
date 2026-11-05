@@ -1,0 +1,3 @@
+-- grace.l4: how long a customer has to pay, kept beside payment-deadline.l4.
+`the grace period in days` MEANS 14
+`courtesy days` MEANS 3

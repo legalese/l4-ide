@@ -1,0 +1,7 @@
+-- Imports `shared`, which the per-user library folder holds: in project/data/ in
+-- one run of the test (inside the project) and in ../outside/data/ in the other.
+-- The test points XDG_DATA_HOME there and leaves JL4_LIBRARY_PATH unset.
+IMPORT shared
+
+GIVEN n IS A NUMBER
+`double it` MEANS n * 2

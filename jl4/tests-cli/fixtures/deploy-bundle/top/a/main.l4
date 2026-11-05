@@ -1,0 +1,8 @@
+-- Imports `defs`, which JL4_LIBRARY_PATH finds at the top of the project (top/),
+-- one folder above this file: the service looks there for a bare name, after
+-- the folder of the importing file. No prelude import: with JL4_LIBRARY_PATH
+-- set, the built-in standard library is skipped.
+IMPORT defs
+
+GIVEN n IS A NUMBER
+`double it` MEANS n * 2

@@ -1,0 +1,4 @@
+-- rates.l4: what a late invoice costs, kept beside late-fee.l4.
+`the grace period in days` MEANS 14
+`the flat fee` MEANS 25
+`the monthly late rate` MEANS 0.015
