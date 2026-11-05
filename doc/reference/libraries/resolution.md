@@ -82,7 +82,9 @@ The deployment is still reported as ready, and every call that needs the file th
 A file at the top of the bundle whose own name has a space or such a letter is not found either.
 The cause is that a relative path cannot be spelled in a `file:` URI that reads back.
 This is a residual of the fix for smucclaw/l4-ide#971, which is closed, and no issue tracks it yet.
-`l4 deploy` and the extension's Deploy button refuse such a folder, and a few more names that the service finds, such as `a~b`, because they stop at any character other than letters from A to Z, digits, `.`, `-` and `_` in any folder of the path.
+Today's `l4 deploy` and the extension's Deploy button upload every file under its plain file name, so a bundle they make has no folders, and of this limit only the sentence about a file's own name can apply to it.
+A bundle with folders comes from a zip made by hand or by another client.
+The deploy tools that keep folders (legalese/l4-ide#749, proposed, not landed) are to refuse such a folder before any request, and a few more names that the service finds, such as `a~b`, because they stop at any character other than letters from A to Z, digits, `.`, `-` and `_` in any folder of the path.
 `jl4-service/test/BundleRootSpec.hs` has a pending case for the day the service finds the file.
 
 A bundle that ships a file with the name of a standard library module, such as
