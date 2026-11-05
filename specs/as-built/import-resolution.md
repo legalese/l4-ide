@@ -78,7 +78,7 @@ Measured on 2026-10-13 with the `l4`, `jl4-lsp` and `jl4-service` built from pla
   A reviewer measured on 2026-10-26 against the real service that such an old service reports that deployment as ready and that every call then answers "zmark is not in scope".
   The default target of `l4 deploy` is Legalese Cloud (`jl4/app/L4/Cli/Cloud.hs`: "No --server given, so this goes to Legalese Cloud").
   Neither `l4 deploy` nor the extension's deploy checks the version of the service.
-  Whether the service has to be released before `l4 deploy` and the extension are is not decided.
+  Whether the service has to be released before `l4 deploy` and the extension are was not decided on 2026-10-26; it was ruled on 2026-11-05 (RI3, see Rulings): the service ships first, and the client work stays a draft until Legalese Cloud runs a build that has #748 and the service commit.
   What the files read on 2026-10-26 show about how the service change would reach Legalese Cloud follows.
   The Cloud runbook `runbooks/binary-rollout.md` of `legalese/jl4-auth-proxy` takes the URL and SHA256 of the service binary, `jl4-service-linux-x64`, from a release of `smucclaw/l4-ide` (its steps 1 and 2), and applies it by hand.
   `.github/workflows/rollout-jl4-service.yml` of the same repository is a `workflow_dispatch` workflow that reads the release with `-R smucclaw/l4-ide`.
