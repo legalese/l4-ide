@@ -1,0 +1,5 @@
+IMPORT `my-helpers.l4`
+
+hyphenvalue MEANS hyphenmarker + 1
+
+#EVAL hyphenvalue
