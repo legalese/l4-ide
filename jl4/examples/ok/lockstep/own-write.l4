@@ -1,0 +1,15 @@
+-- NORM-LOG N10 goal A: an operand reads its own chain's write made at the same event.
+-- Pass: FULFILLED on all three traces, as before A.
+IMPORT prelude
+DECLARE Person IS ONE OF patron
+DECLARE Action IS ONE OF go, later
+GIVETH DEONTIC Person Action
+own MEANS
+  PARTY patron MAY go
+  HENCE RECORD `flag` IS TRUE
+  HENCE (IF RECALL patron's `flag` EQUALS NOTHING THEN BREACH ELSE (PARTY patron MAY later WITHIN 10))
+GIVETH DEONTIC Person Action
+other MEANS PARTY patron MAY later WITHIN 100
+#TRACE own AT 0 WITH PARTY patron DOES go AT 5  PARTY patron DOES later AT 6
+#TRACE own RAND other AT 0 WITH PARTY patron DOES go AT 5  PARTY patron DOES later AT 6
+#TRACE other RAND own AT 0 WITH PARTY patron DOES go AT 5  PARTY patron DOES later AT 6

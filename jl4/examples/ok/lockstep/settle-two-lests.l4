@@ -1,0 +1,15 @@
+-- NORM-LOG N10 goal A: passed deadlines settle in order of effective instant (NORM-LOG-SPEC :335).
+-- Pass: both orders FULFILLED; P is late at 2 and Q at 4, so the status a reader sees at 11 is "Q late".
+-- Before A, (b RAND a) left the reader waiting.
+IMPORT prelude
+DECLARE Who IS ONE OF P, Q, R
+DECLARE Act IS ONE OF x, y, z
+GIVETH DEONTIC Who Act
+a MEANS PARTY P MUST x WITHIN 2 LEST COMMIT `status` IS "P late" HENCE FULFILLED
+GIVETH DEONTIC Who Act
+b MEANS PARTY Q MUST y WITHIN 4 LEST COMMIT `status` IS "Q late" HENCE FULFILLED
+-- one event at 10 reveals both misses; which status does a reader at 11 see?
+GIVETH DEONTIC Who Act
+reader MEANS PARTY R MAY z PROVIDED RECALL OFFICIAL's `status` EQUALS JUST "Q late" WITHIN 20
+#TRACE (a RAND b) RAND reader AT 0 WITH (`WAIT UNTIL` 10) PARTY R DOES z AT 11
+#TRACE (b RAND a) RAND reader AT 0 WITH (`WAIT UNTIL` 10) PARTY R DOES z AT 11

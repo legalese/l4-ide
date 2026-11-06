@@ -9,6 +9,8 @@ module L4.EvaluateLazy.Machine
 , Machine
 , Eval
 , EvalState (..)
+, LockstepState
+, newLockstepState
 , Stack (..)
 , emptyStack
 , runEval
@@ -339,6 +341,9 @@ data EvalState =
       -- mark never withholds an event from a layer; it only lets the
       -- machine refuse a chain whose deadlines have stopped advancing,
       -- loudly, instead of walking it forever.
+    , lockstep :: !LockstepState
+      -- ^ N10 goal A (NORM-LOG-SPEC §6.1): the side tables of the lockstep
+      -- driver ('LockstepState')
     , notes :: !(IORef (DList Note))
       -- ^ what the run wants REPORTED without failing: a non-fatal note,
       -- appended by 'tellNote', collected per directive (swapped fresh by
@@ -677,14 +682,48 @@ peekClock rf = peekWHNF rf >>= pure . \ case
 -- deadline, or a kept SHANT's discharge) — its party, action and stamp.
 -- Peeked, never forced: a re-offered copy is allocated as a value, so a head
 -- that is still a thunk is not one.
+-- | N10 goal A: the lockstep driver's tree, as a residual value, without
+-- reducing it (what a nested driver hands up beside the tree itself).
+lockstepResidual :: LTree -> WHNF
+lockstepResidual = \ case
+  LLeaf v _        -> v
+  LFinal v         -> v
+  LNode env op l r -> ValROp env op (Right (lockstepResidual l)) (Right (lockstepResidual r))
+
+-- | The paths of the live leaves, left to right ('False' = left operand).
+lockstepLeaves :: LTree -> [[Bool]]
+lockstepLeaves = \ case
+  LLeaf {}       -> [[]]
+  LFinal {}      -> []
+  LNode _ _ l r  -> map (False :) (lockstepLeaves l) <> map (True :) (lockstepLeaves r)
+
+lockstepLeafAt :: [Bool] -> LTree -> Maybe LTree
+lockstepLeafAt [] t = Just t
+lockstepLeafAt (b : bs) (LNode _ _ l r) = lockstepLeafAt bs (if b then r else l)
+lockstepLeafAt _ _ = Nothing
+
+lockstepReplace :: [Bool] -> LTree -> LTree -> LTree
+lockstepReplace [] new _ = new
+lockstepReplace (b : bs) new (LNode env op l r)
+  | b         = LNode env op l (lockstepReplace bs new r)
+  | otherwise = LNode env op (lockstepReplace bs new l) r
+lockstepReplace _ _ t = t
+
 revealingEvent :: Reference -> Eval (Maybe (Reference, Reference, Rational))
-revealingEvent evs = peekWHNF evs >>= \ case
-  Just (ValCons hd _) -> isReoffered hd >>= \ case
-    Nothing -> pure Nothing
-    Just _  -> peekWHNF hd >>= \ case
-      Just (ValEvent p a tR) -> fmap (p, a,) <$> peekClock tR
-      _                      -> pure Nothing
-  _ -> pure Nothing
+revealingEvent evs = isFeedEnd evs >>= \ case
+  -- N10 goal A: a compound armed by a lockstep driver is armed on an inner
+  -- end before it is fed its first event; the event that headed the stream
+  -- the end was cut from is the one a breach armed there was revealed by
+  Just MkFeedEnd {pendingHead = Just hd} -> fromHead hd
+  _ -> peekWHNF evs >>= \ case
+    Just (ValCons hd _) -> fromHead hd
+    _ -> pure Nothing
+  where
+    fromHead hd = isReoffered hd >>= \ case
+      Nothing -> pure Nothing
+      Just _  -> peekWHNF hd >>= \ case
+        Just (ValEvent p a tR) -> fmap (p, a,) <$> peekClock tR
+        _                      -> pure Nothing
 
 -- | A breach whose declared failures have no timing yet, given one (SEESAW,
 -- spec §6.1.2). When nothing in it had a timing — one @BREACH@, naming one
@@ -1336,6 +1375,106 @@ putTemporalContext ctx = do
   r <- asks (.temporalContext)
   liftIO (writeIORef r ctx)
 
+-- | N10 goal A (lockstep compounds): the driver's side tables. Each is keyed
+-- by a store address, as 'reofferedEvents' is, because the values that flow
+-- through the machine cannot carry them.
+data LockstepState = MkLockstepState
+  { feedEnds :: !(IORef (Map Address FeedEnd))
+    -- ^ the inner ends of the streams the driver feeds its operands: a scan
+    -- that reaches one has not reached the end of the trace, and parks
+  , witnesses :: !(IORef (Map Address Witness))
+    -- ^ the event copies the driver feeds while settling, and what each may do
+  , probeMin :: !(IORef (Maybe Rational))
+    -- ^ the earliest passed deadline a 'WitnessProbe' pass has found
+  , parked :: !(IORef (Maybe Parked))
+    -- ^ what the last feed to reach an inner end left for the driver; read
+    -- and cleared as soon as that feed's value reaches the driver
+  , resume :: !(IORef (Maybe Carried))
+    -- ^ the carried state the next application of a residual obligation
+    -- resumes with, instead of arming afresh; set by the driver immediately
+    -- before it applies the residual
+  }
+
+-- | An inner end: the real stream it stands for (what an island runs over),
+-- and the re-offered event that headed the stream it was cut from, if any
+-- (what a breach armed on it was revealed by, 'revealingEvent').
+data FeedEnd = MkFeedEnd {realRest :: !Reference, pendingHead :: !(Maybe Reference)}
+
+newLockstepState :: IO LockstepState
+newLockstepState =
+  MkLockstepState <$> newIORef mempty <*> newIORef mempty <*> newIORef Nothing
+    <*> newIORef Nothing <*> newIORef Nothing
+
+-- | N10 goal A: a fresh inner end, standing for the real stream @rest@.
+newFeedEnd :: Reference -> Maybe Reference -> Eval Reference
+newFeedEnd rest hd = do
+  nilR <- allocateValue ValNil
+  r <- asks (.lockstep)
+  liftIO (modifyIORef' r.feedEnds (Map.insert nilR.address MkFeedEnd {realRest = rest, pendingHead = hd}))
+  pure nilR
+
+-- | N10 goal A: is this reference an inner end of a lockstep feed?
+isFeedEnd :: Reference -> Eval (Maybe FeedEnd)
+isFeedEnd rf = do
+  r <- asks (.lockstep)
+  liftIO (Map.lookup rf.address <$> readIORef r.feedEnds)
+
+-- | N10 goal A: the real stream a lockstep feed stands for, with its inner
+-- end replaced by the stream it was cut from; 'Nothing' when @rf@ is not a
+-- feed. A feed is built of values, so it is walked by peeking; a cell that
+-- is still a thunk belongs to a real stream.
+realStreamOf :: Reference -> Eval (Maybe Reference)
+realStreamOf rf = isFeedEnd rf >>= \ case
+  -- the stream an inner end stands for may itself end in an outer feed's end
+  Just fe -> Just . fromMaybe fe.realRest <$> realStreamOf fe.realRest
+  Nothing -> peekWHNF rf >>= \ case
+    Just (ValCons h t) -> realStreamOf t >>= traverse (allocateValue . ValCons h)
+    _ -> pure Nothing
+
+-- | N10 goal A: mark an event copy as a settle-phase witness.
+markWitness :: Reference -> Witness -> Eval ()
+markWitness rf w = do
+  r <- asks (.lockstep)
+  liftIO (modifyIORef' r.witnesses (Map.insert rf.address w))
+
+witnessOf :: Reference -> Eval (Maybe Witness)
+witnessOf rf = do
+  r <- asks (.lockstep)
+  liftIO (Map.lookup rf.address <$> readIORef r.witnesses)
+
+-- | N10 goal A: a probe found a deadline the event has passed.
+noteProbe :: Rational -> Eval ()
+noteProbe d = do
+  r <- asks (.lockstep)
+  liftIO (modifyIORef' r.probeMin (Just . maybe d (min d)))
+
+takeProbe :: Eval (Maybe Rational)
+takeProbe = do
+  r <- asks (.lockstep)
+  liftIO (atomicModifyIORef' r.probeMin (Nothing,))
+
+-- | N10 goal A: leave the driver what this feed ended with. Each feed parks
+-- at most once before its value reaches the driver, which takes it at once.
+park :: Parked -> Eval ()
+park p = do
+  r <- asks (.lockstep)
+  liftIO (writeIORef r.parked (Just p))
+
+takeParked :: Eval (Maybe Parked)
+takeParked = do
+  r <- asks (.lockstep)
+  liftIO (atomicModifyIORef' r.parked (Nothing,))
+
+setResume :: Carried -> Eval ()
+setResume c = do
+  r <- asks (.lockstep)
+  liftIO (writeIORef r.resume (Just c))
+
+takeResume :: Eval (Maybe Carried)
+takeResume = do
+  r <- asks (.lockstep)
+  liftIO (atomicModifyIORef' r.resume (Nothing,))
+
 -- | Record that an EVENT value (identified by its store address) is a copy
 -- re-offered to a HENCE/LEST continuation, with its 'Reoffered' mark. See
 -- the Contract5 expiry NOTE in 'backwardContractFrame'.
@@ -1978,15 +2117,24 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
-        -- P2b: this is the ENTRY into the obligation's site — the activation
-        -- the step log's key counts. Lazy when the log is off.
-        norm <- armNormKey party act
-        -- this is the arming point: the clock now is what THE ARMING will
-        -- name in this obligation's continuation (R-Q7B), so keep it —
-        -- 'time' itself advances with every scrutinised event; no event has
-        -- been taken from the stream yet
-        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, seen = 0, env = withOwnArming time env, ..}))
-        continueRef events
+        takeResume >>= \ case
+          -- N10 goal A: the lockstep driver is feeding this residual its next
+          -- event. It is the same activation, armed when it was armed, with
+          -- the events it has already seen; 'time' is the clock its
+          -- remaining due is relative to.
+          Just c -> do
+            pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = c.cArmed, seen = c.cSeen, norm = c.cNorm, stream = events, env = withOwnArming c.cArmed env, ..}))
+            continueRef events
+          Nothing -> do
+            -- P2b: this is the ENTRY into the obligation's site — the activation
+            -- the step log's key counts. Lazy when the log is off.
+            norm <- armNormKey party act
+            -- this is the arming point: the clock now is what THE ARMING will
+            -- name in this obligation's continuation (R-Q7B), so keep it —
+            -- 'time' itself advances with every scrutinised event; no event has
+            -- been taken from the stream yet
+            pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, seen = 0, stream = events, env = withOwnArming time env, ..}))
+            continueRef events
       ValQuantified env deonton -> do
         -- EVERY meets its event stream: this is the arming point, so the roll
         -- call runs here (spec §2.2.7.5 point 5, R-Q6).
@@ -1994,13 +2142,45 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
-        startRollCall env deonton time events
+        case deonton.join of
+          -- N10 goal A: a barrier runs its members over the whole stream, so
+          -- inside a lockstep feed it is an island over the real rest
+          Just JoinOnce{} -> realStreamOf events >>= \ case
+            Just real -> do
+              pushFrame (ContractFrame IslandPark)
+              startRollCall env deonton time real
+            Nothing -> startRollCall env deonton time events
+          _ -> startRollCall env deonton time events
+      -- N10 goal A (NORM-LOG-SPEC §6.1, ruled 2026-10-11): a RAND runs its
+      -- operands in lockstep. Both are armed on an inner end before any
+      -- event, and then the driver ('Lockstep') feeds them one event at a
+      -- time; see 'LockstepFrame'.
+      ValROp env ValRAnd rexpr1 rexpr2 | [time, events] <- rs -> do
+        nested <- isJust <$> realStreamOf events
+        hd <- peekWHNF events >>= \ case
+          Just (ValCons h _) -> pure (Just h)
+          _ -> pure Nothing
+        nilA <- newFeedEnd events hd
+        pushFrame $ ContractFrame $ Lockstep MkLockstepFrame
+          { lsEnv = env, lsStage = LsArmLeft rexpr2 nilA, lsTree = LFinal ValFulfilled
+          , lsClock = time, lsRest = events, lsNested = nested }
+        pushFrame (App1 [time, nilA] Nothing)
+        operandHandoff env rexpr1
+        maybeEvaluate env rexpr1
       ValROp env op rexpr1 rexpr2 -> do
+        -- N10 goal A: an ROR is not lockstep yet (NORM-LOG-SPEC N17-N19 are
+        -- open), so inside a lockstep feed it is an island: it runs the old
+        -- way over the real rest of the stream, and its value is final
+        rs' <- case rs of
+          [t, evs] -> realStreamOf evs >>= \ case
+            Just real -> pushFrame (ContractFrame IslandPark) >> pure [t, real]
+            Nothing -> pure rs
+          _ -> pure rs
         -- make sure to reassemble the operation after returning
-        pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
+        pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs', ..}
         -- apply the arguments of the left hand expression to the
         -- expression
-        pushFrame f
+        pushFrame (App1 rs' mTy)
         -- R-Q7B: the operand is handed off here, exactly as a HENCE's
         -- value is, so a continuation that arrives as a VALUE inside a
         -- compound anchors to the obligation the compound is attached
@@ -2486,17 +2666,27 @@ backwardContractFrame val = \ case
         -- P2b: the state layer's mark, read (and, for a barrier member,
         -- written) beside the act layer's; 'False' with the log off
         ev'relooked <- relookAt norm e
+        -- N10 goal A: a copy the lockstep driver feeds while settling
+        ev'witness <- witnessOf e
         -- one more event taken: 'seen' is now this event's position in the
         -- stream, which is what a barrier orders same-stamp failures by
         pushCFrame (Contract2 ScrutinizeEvent {events = es, seen = seen + 1, ..})
         continueRef e
-      ValNil -> do
-        -- P2b: the stream ran out; the residual stands. The clock is peeked,
-        -- not forced: with no event seen yet it may still be a thunk.
-        whenDeonticLog \ l -> do
-          clock <- peekClock time
-          logStep l (plainStep clock Nothing NoEvent norm Waiting)
-        continueBackward (ValObligation env party act opens due followup lest)
+      ValNil -> isFeedEnd stream >>= \ case
+        -- N10 goal A: the end of a lockstep feed, not of the trace. The
+        -- residual parks what it must carry to the next feed; nothing is
+        -- logged, since it is not waiting yet.
+        Just _ -> do
+          p <- getCurrentParty
+          park (ParkedLeaf MkCarried {cTime = time, cArmed = armed, cSeen = seen, cNorm = norm, cParty = p})
+          continueBackward (ValObligation env party act opens due followup lest)
+        Nothing -> do
+          -- P2b: the stream ran out; the residual stands. The clock is peeked,
+          -- not forced: with no event seen yet it may still be a thunk.
+          whenDeonticLog \ l -> do
+            clock <- peekClock time
+            logStep l (plainStep clock Nothing NoEvent norm Waiting)
+          continueBackward (ValObligation env party act opens due followup lest)
       _ -> internalException $ RuntimeTypeError $
         "expected LIST EVENT but found: " <> prettyLayout val <> " when scrutinizing regulative events"
   Contract2 ScrutinizeEvent {..} -> case val of
@@ -2581,7 +2771,9 @@ backwardContractFrame val = \ case
     -- the note's wording is per shape (adversarial pass of 2026-09-16, F3).
     -- The obligation then runs as written: every act is early or late, and
     -- the expiry is what ends it.
-    case (opens, due) of
+    -- (not from a settle-phase copy that leaves this obligation as it was,
+    -- below: the copy that expires it reports it)
+    unless (stamp > deadline && maybe False (\ case WitnessProbe -> True; WitnessSettle c -> deadline > c) ev'witness) $ case (opens, due) of
       (Left (Just opening), Left (Just closing)) -> forM_ openT \ open ->
         when (open > deadline) $
           tellNote (emptyWindowNote opening closing openAbsolute (origin == Just time') open deadline)
@@ -2601,211 +2793,234 @@ backwardContractFrame val = \ case
       -- @[13, 43]@, not @[13, 44]@), and the next scrutiny adds it back to
       -- the same instant ('scrutinizeDue', 'origin').
       newDue = deadline - relativeDue openT stamp
-    -- NOTE: the deadline comparison is strict: an event arriving EXACTLY at
-    -- the deadline instant is timely; expiry requires stamp strictly greater.
-    -- The spec (doc/reference/regulative/README.md) speaks of the deadline
-    -- "passing", which at the boundary instant it has not yet done.
-    if stamp > deadline
-      -- NOTE: the deadline has passed. What happens depends on the deontic modal:
-      -- MUST/DO: deadline passed without action = BREACH (or LEST if specified)
-      -- MUST NOT: deadline passed without prohibited action = FULFILLED (or HENCE if specified)
-      -- MAY: deadline passed without exercising permission = FULFILLED (or LEST if specified)
-      --
-      -- NOTE: the event whose timestamp reveals that the deadline has passed
-      -- is only a WITNESS that time advanced; it is not consumed by the
-      -- expired obligation (CSL residuation: the obligation reduces to its
-      -- continuation, which then processes the event). So we re-offer the
-      -- revealing event to the HENCE/LEST continuation — e.g. a payment
-      -- arriving after the deadline must still be able to discharge the LEST
-      -- reparation it was authored for.
-      --
-      -- The continuation's CLOCK — what an unanchored WITHIN inside it
-      -- counts from (R-Q7's default, spec §5.1/§5.2) — depends on the slot:
-      --
-      --   * under LEST it is the FAILURE TIME, which R-Q5 fixes by modal:
-      --     for MUST/DO/MAY the deadline that was just missed (§5.2, built
-      --     2026-09-16), so a defaulting party's silence cannot postpone
-      --     the start of its own cure period; the re-offered event then
-      --     decrements the continuation's WITHIN by the time that had
-      --     already passed since the deadline. (For SHANT the failure is a
-      --     violation, handled at 'Contract10' with the violating event's
-      --     own stamp.)
-      --   * under HENCE — here, a kept prohibition — it is the window's end
-      --     (§2.6 card A3, built 2026-10-09): a kept SHANT achieves at its
-      --     deadline, and that instant is also THE JOIN there. The
-      --     revealing event's stamp would make the clock depend on how
-      --     many idle events the trace carried before it (measured:
-      --     @WAIT UNTIL 10@ alone left a @WITHIN 1@ follow-up pending,
-      --     @WAIT UNTIL 6@ then 10 breached it).
-      --
-      -- Both are floored at the obligation's own arming (§2.6 card A2,
-      -- built 2026-10-09): an obligation armed after its deadline — an
-      -- anchored WITHIN whose anchor lay before it was entered — could
-      -- never have been met, and fails (or lapses, or is kept) when it is
-      -- armed, not before it existed; the run says so in a note
-      -- ('armedAfterDeadlineNote'). THE DEADLINE in the continuation is
-      -- still the deadline as written ('lifecycleAt'); it and the clock
-      -- part only when the floor engages, so @WITHIN d@ and @WITHIN d OF
-      -- THE DEADLINE@ agree under LEST everywhere else.
-      --
-      -- Before 2026-09-16 both slots used the revealing event's stamp,
-      -- which made the re-offered event decrement a LEST's WITHIN by zero.
-      --
-      -- Termination. Because a LEST continuation counts from the missed
-      -- deadline, its own deadline can lie BEFORE the re-offered event's
-      -- stamp — the ordinary case whenever the miss came to light late —
-      -- so the very same event reveals a second expiry, a third, and so
-      -- on down a chain of LEST layers (or a continuation that names the
-      -- enclosing obligation, @x MEANS PARTY p MUST a WITHIN d LEST x@).
-      -- Every one of those layers is a real obligation whose window the
-      -- event is past, and the event must reach the first layer whose
-      -- window it is NOT past: that is the layer it can perform, or fail
-      -- (spec §5.2, R-Q5). So a re-offered copy is ALWAYS handed on to the
-      -- next layer, whatever that layer's deadline: a chain of DISTINCT
-      -- layers is finite by its syntax, and withholding the copy from any
-      -- of them is a wrong answer (round 2 of the adversarial pass of
-      -- 2026-09-16: a middle layer anchored at or before the missed
-      -- deadline, or a @WITHIN 0@, swallowed the next layer's timely
-      -- performance, and the verdict at an instant depended on how many
-      -- events the trace carried). The only chain that does not end is
-      -- one that reaches ITSELF without the deadline advancing — a
-      -- self-naming LEST with a non-positive WITHIN, or anchored at an
-      -- instant no later than the deadline just missed — whose every
-      -- incarnation is already past when it is entered. That is an
-      -- ill-founded contract, and the machine refuses it by name rather
-      -- than walking it forever: the copy carries a 'Reoffered' mark
-      -- ('markReoffered', read back at Contract1 as 'ev'reoffered') with
-      -- the latest deadline it has revealed the expiry of and the number
-      -- of hand-offs in a row that failed to pass that mark; past
-      -- 'maximumStalledReoffers' of those the walk stops with
-      -- 'stalledChainRefusal'. A chain whose deadlines advance is finite
-      -- whenever the durations are bounded away from zero (the deadlines
-      -- are increasing and bounded above by the stamp); the one chain
-      -- neither bound catches is a Zeno chain — durations shrinking
-      -- geometrically, so the deadlines advance forever without reaching
-      -- the stamp — which is left to the machine's 'StackOverflow' guard
-      -- ('maximumFrameDepth': every nested hand-off leaves a
-      -- 'RestoreCurrentParty' frame on the stack, so a 1,500,000-layer
-      -- chain of cheap steps reports the overflow in about a second); a
-      -- halving chain's rationals grow a bit per layer, so it hangs long
-      -- before that guard is reached — as ordinary non-terminating
-      -- recursion (@f x MEANS f (x PLUS 1)@, a tail call that pushes no
-      -- frame) hangs too. Until round 2 of the adversarial pass a copy
-      -- whose deadline had not advanced was CONSUMED — applied to the
-      -- events after it — which dropped it before the first layer whose
-      -- window it was not past; until round 1 it was consumed on its
-      -- second expiry, whatever the deadline did (spec §5.2.1).
-      --
-      -- STATE-AS-LEDGER (M4) integration: rather than calling 'continueWithFollowup'
-      -- directly (as the re-offer logic did before the ledger landed),
-      -- 'reofferResolve' pushes a 'ResolveParty' frame and forces the obligation
-      -- party first, so a RECORD in the followup/reparation is attributed to the
-      -- real acting party rather than the anonymous ledger. The (possibly
-      -- re-offered) event stream and anchored time are carried in the frame and
-      -- handed to 'continueWithFollowup' once the party has been keyed.
-      then do
-        -- What the continuation may anchor to (R-Q7B): the deadline that
-        -- just passed, this obligation's arming, and — only when the
-        -- continuation is the HENCE, i.e. the join fired — the hand-off
-        -- clock as THE JOIN. Under LEST the hand-off clock is the deadline
-        -- (§5.2), floored at the arming ('clockR', §2.6 card A2), and THE
-        -- DEADLINE is the deadline as written; the two are one reference
-        -- unless the floor engages. A barrier member
-        -- hands that same reference to the failure sentinel as its anchor
-        -- ('continueWithFollowup', 'sentinelArgs'), which is how the
-        -- barrier's LEST comes to count from the failing member's deadline
-        -- without a mechanism of its own ('barrierFail').
-        deadlineR <- allocateValue (ValNumber deadline)
-        -- A2: the hand-off clock, no earlier than the arming, and a note
-        -- when that floor engages (see the clock NOTE above)
-        armedT <- peekClock armed
-        let effective = maybe deadline (max deadline) armedT
-        clockR <- case armedT of
-          Just a | a > deadline -> do
-            tellNote (armedAfterDeadlineNote act.modal act.action due a deadline)
-            allocateValue (ValNumber a)
-          _ -> pure deadlineR
-        -- P2b: the 'Expired' step. It is built here, where the deadline and
-        -- the revealing event are in hand, but LOGGED at the ResolveParty
-        -- frame for the routed cases, because that is where the party gets
-        -- forced and the key wants the bearer. The scrutiny follows the
-        -- re-offer rule above: a fresh event's look is 'WitnessedOnly' (it
-        -- is re-offered onward), a re-offered copy's look is 'Reoffered' —
-        -- and since round 2 of the LEST pass (spec §5.2.1, 2026-09-16) the
-        -- copy is handed on again either way, never consumed.
-        let expiredStep :: DS.Branch -> Maybe WHNF -> Eval (Maybe DeonticStep)
-            expiredStep branch mBearer = asks (.deonticLog) >>= \ case
-              Nothing -> pure Nothing
-              Just _  -> do
-                mParty <- peekWHNF ev'party
-                ev <- eventKeyAt stamp mParty ev'act
-                norm' <- maybe (pure norm) (`naming` norm) mBearer
-                pure $ Just $ plainStep (Just time') (Just ev)
-                  (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm' (Expired branch deadline)
-        let lifecycleAt isHence = MkLifecycle
-              { join = if isHence then Just clockR else Nothing
-              , deadline = Just deadlineR
-              , armed }
-            reofferResolve isHence followup' branch = do
-              pending <- expiredStep branch Nothing
-              -- The mark the copy carries on: a fresh event starts the walk
-              -- at this deadline; a copy that has revealed an earlier
-              -- expiry advances its high-water mark when this deadline
-              -- passes it, and otherwise counts one more stalled hand-off
-              -- — refused, by name, once there have been too many in a row
-              -- (see NOTE above). The failure time is the deadline whether
-              -- the event that revealed the miss was fresh or already
-              -- marked.
-              mark <- case ev'reoffered of
-                Nothing -> pure MkReoffered {highWater = deadline, stalled = 0}
-                Just m
-                  | deadline > m.highWater -> pure MkReoffered {highWater = deadline, stalled = 0}
-                  | m.stalled >= maximumStalledReoffers -> userException (UserError (stalledChainRefusal m.highWater stamp))
-                  | otherwise -> pure m {stalled = m.stalled + 1}
-              ev'timeR <- allocateValue ev'time
-              evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
-              markReoffered evR mark
-              eventsR <- allocateValue (ValCons evR events)
-              pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockR, pending, seen, lifecycle = lifecycleAt isHence})
-              maybeEvaluate env party
-        case act.modal of
-          DMustNot ->
-            -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
-            -- Continue with HENCE (followup), which defaults to FULFILLED
-            reofferResolve True followup ToHence
-          DMay ->
-            -- Permission was NOT EXERCISED: per the README default-consequence
-            -- matrix, expiry of a MAY routes to LEST (default FULFILLED);
-            -- HENCE fires only when the permitted action is taken. The
-            -- LEST counts from the deadline, as a MUST's does (R-Q5: a MAY
-            -- fails at its deadline).
-            reofferResolve False (fromMaybe fulfilExpr lest) ToLest
-          _ -> -- DMust, DDo: deadline passed = failure
-            case lest of
-              Nothing -> do
-                -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
-                -- The breach is DATED at the revealing event ('stamp') and
-                -- carries the deadline it missed; §5.2 moves the LEST's
-                -- clock, not this stamp (spec §3.4's last paragraph).
-                partyR <- either (`allocate_` env) allocateValue party
-                -- P2b: no continuation to force the party in; the bearer is
-                -- what the breach's own party cell holds, if anything has
-                -- forced it (a nullary constructor is allocated as a value,
-                -- so @PARTY Alice@ is known; a computed party may not be).
-                whenDeonticLog \ _ -> do
-                  mBearer <- peekWHNF partyR
-                  expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
-                let timing = Timing {effective, observed = stamp, revealedBy = Just (ev'party, ev'act)}
-                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline timing))))
-              Just lestFollowup -> reofferResolve False lestFollowup ToLest
+      -- N10 goal A: whether a settle-phase copy expires this obligation
+      witnessExpires = case ev'witness of
+        Nothing                -> True
+        Just WitnessProbe      -> False
+        Just (WitnessSettle c) -> deadline <= c
+    -- N10 goal A: a settle-phase copy that does not expire this obligation
+    -- stops here, and a probe reports the deadline if the event has passed
+    -- it. An obligation whose deadline has passed is left exactly as it
+    -- was: the copy that expires it, in a later round, evaluates its
+    -- deadline as today's first scrutiny does (and its notes say what they
+    -- say today). Any other keeps the deadline and the opening evaluated
+    -- now, before anything this event settles is written, relative to its
+    -- unchanged clock, so later feeds see the same absolute instants.
+    if isJust ev'witness && not (stamp > deadline && witnessExpires)
+      then
+        if stamp > deadline
+          then do
+            when (ev'witness == Just WitnessProbe) (noteProbe deadline)
+            parkWitnessed time opens due armed (seen - 1) norm env party act followup lest
+          else parkWitnessed time (relOpening openT time' opens) (Right (ValNumber (deadline - relativeDue openT time'))) armed (seen - 1) norm env party act followup lest
       else do
-        -- NOTE: we have observed the event and do not branch, either, the
-        -- only thing that may now happen is that we try a new event. Hence we
-        -- drop the ev'time, set our time to ev'time and set our due to the new due
-        -- (and the opening edge, when there is one, to what is still to run
-        -- until the window opens — 'relOpening')
-        pushCFrame (Contract6 PartyWHNF {time = ev'time, opens = relOpening openT stamp opens, due = Right $ ValNumber newDue, ..})
-        maybeEvaluate env party
+        -- NOTE: the deadline comparison is strict: an event arriving EXACTLY at
+        -- the deadline instant is timely; expiry requires stamp strictly greater.
+        -- The spec (doc/reference/regulative/README.md) speaks of the deadline
+        -- "passing", which at the boundary instant it has not yet done.
+        if stamp > deadline
+          -- NOTE: the deadline has passed. What happens depends on the deontic modal:
+          -- MUST/DO: deadline passed without action = BREACH (or LEST if specified)
+          -- MUST NOT: deadline passed without prohibited action = FULFILLED (or HENCE if specified)
+          -- MAY: deadline passed without exercising permission = FULFILLED (or LEST if specified)
+          --
+          -- NOTE: the event whose timestamp reveals that the deadline has passed
+          -- is only a WITNESS that time advanced; it is not consumed by the
+          -- expired obligation (CSL residuation: the obligation reduces to its
+          -- continuation, which then processes the event). So we re-offer the
+          -- revealing event to the HENCE/LEST continuation — e.g. a payment
+          -- arriving after the deadline must still be able to discharge the LEST
+          -- reparation it was authored for.
+          --
+          -- The continuation's CLOCK — what an unanchored WITHIN inside it
+          -- counts from (R-Q7's default, spec §5.1/§5.2) — depends on the slot:
+          --
+          --   * under LEST it is the FAILURE TIME, which R-Q5 fixes by modal:
+          --     for MUST/DO/MAY the deadline that was just missed (§5.2, built
+          --     2026-09-16), so a defaulting party's silence cannot postpone
+          --     the start of its own cure period; the re-offered event then
+          --     decrements the continuation's WITHIN by the time that had
+          --     already passed since the deadline. (For SHANT the failure is a
+          --     violation, handled at 'Contract10' with the violating event's
+          --     own stamp.)
+          --   * under HENCE — here, a kept prohibition — it is the window's end
+          --     (§2.6 card A3, built 2026-10-09): a kept SHANT achieves at its
+          --     deadline, and that instant is also THE JOIN there. The
+          --     revealing event's stamp would make the clock depend on how
+          --     many idle events the trace carried before it (measured:
+          --     @WAIT UNTIL 10@ alone left a @WITHIN 1@ follow-up pending,
+          --     @WAIT UNTIL 6@ then 10 breached it).
+          --
+          -- Both are floored at the obligation's own arming (§2.6 card A2,
+          -- built 2026-10-09): an obligation armed after its deadline — an
+          -- anchored WITHIN whose anchor lay before it was entered — could
+          -- never have been met, and fails (or lapses, or is kept) when it is
+          -- armed, not before it existed; the run says so in a note
+          -- ('armedAfterDeadlineNote'). THE DEADLINE in the continuation is
+          -- still the deadline as written ('lifecycleAt'); it and the clock
+          -- part only when the floor engages, so @WITHIN d@ and @WITHIN d OF
+          -- THE DEADLINE@ agree under LEST everywhere else.
+          --
+          -- Before 2026-09-16 both slots used the revealing event's stamp,
+          -- which made the re-offered event decrement a LEST's WITHIN by zero.
+          --
+          -- Termination. Because a LEST continuation counts from the missed
+          -- deadline, its own deadline can lie BEFORE the re-offered event's
+          -- stamp — the ordinary case whenever the miss came to light late —
+          -- so the very same event reveals a second expiry, a third, and so
+          -- on down a chain of LEST layers (or a continuation that names the
+          -- enclosing obligation, @x MEANS PARTY p MUST a WITHIN d LEST x@).
+          -- Every one of those layers is a real obligation whose window the
+          -- event is past, and the event must reach the first layer whose
+          -- window it is NOT past: that is the layer it can perform, or fail
+          -- (spec §5.2, R-Q5). So a re-offered copy is ALWAYS handed on to the
+          -- next layer, whatever that layer's deadline: a chain of DISTINCT
+          -- layers is finite by its syntax, and withholding the copy from any
+          -- of them is a wrong answer (round 2 of the adversarial pass of
+          -- 2026-09-16: a middle layer anchored at or before the missed
+          -- deadline, or a @WITHIN 0@, swallowed the next layer's timely
+          -- performance, and the verdict at an instant depended on how many
+          -- events the trace carried). The only chain that does not end is
+          -- one that reaches ITSELF without the deadline advancing — a
+          -- self-naming LEST with a non-positive WITHIN, or anchored at an
+          -- instant no later than the deadline just missed — whose every
+          -- incarnation is already past when it is entered. That is an
+          -- ill-founded contract, and the machine refuses it by name rather
+          -- than walking it forever: the copy carries a 'Reoffered' mark
+          -- ('markReoffered', read back at Contract1 as 'ev'reoffered') with
+          -- the latest deadline it has revealed the expiry of and the number
+          -- of hand-offs in a row that failed to pass that mark; past
+          -- 'maximumStalledReoffers' of those the walk stops with
+          -- 'stalledChainRefusal'. A chain whose deadlines advance is finite
+          -- whenever the durations are bounded away from zero (the deadlines
+          -- are increasing and bounded above by the stamp); the one chain
+          -- neither bound catches is a Zeno chain — durations shrinking
+          -- geometrically, so the deadlines advance forever without reaching
+          -- the stamp — which is left to the machine's 'StackOverflow' guard
+          -- ('maximumFrameDepth': every nested hand-off leaves a
+          -- 'RestoreCurrentParty' frame on the stack, so a 1,500,000-layer
+          -- chain of cheap steps reports the overflow in about a second); a
+          -- halving chain's rationals grow a bit per layer, so it hangs long
+          -- before that guard is reached — as ordinary non-terminating
+          -- recursion (@f x MEANS f (x PLUS 1)@, a tail call that pushes no
+          -- frame) hangs too. Until round 2 of the adversarial pass a copy
+          -- whose deadline had not advanced was CONSUMED — applied to the
+          -- events after it — which dropped it before the first layer whose
+          -- window it was not past; until round 1 it was consumed on its
+          -- second expiry, whatever the deadline did (spec §5.2.1).
+          --
+          -- STATE-AS-LEDGER (M4) integration: rather than calling 'continueWithFollowup'
+          -- directly (as the re-offer logic did before the ledger landed),
+          -- 'reofferResolve' pushes a 'ResolveParty' frame and forces the obligation
+          -- party first, so a RECORD in the followup/reparation is attributed to the
+          -- real acting party rather than the anonymous ledger. The (possibly
+          -- re-offered) event stream and anchored time are carried in the frame and
+          -- handed to 'continueWithFollowup' once the party has been keyed.
+          then do
+            -- What the continuation may anchor to (R-Q7B): the deadline that
+            -- just passed, this obligation's arming, and — only when the
+            -- continuation is the HENCE, i.e. the join fired — the hand-off
+            -- clock as THE JOIN. Under LEST the hand-off clock is the deadline
+            -- (§5.2), floored at the arming ('clockR', §2.6 card A2), and THE
+            -- DEADLINE is the deadline as written; the two are one reference
+            -- unless the floor engages. A barrier member
+            -- hands that same reference to the failure sentinel as its anchor
+            -- ('continueWithFollowup', 'sentinelArgs'), which is how the
+            -- barrier's LEST comes to count from the failing member's deadline
+            -- without a mechanism of its own ('barrierFail').
+            deadlineR <- allocateValue (ValNumber deadline)
+            -- A2: the hand-off clock, no earlier than the arming, and a note
+            -- when that floor engages (see the clock NOTE above)
+            armedT <- peekClock armed
+            let effective = maybe deadline (max deadline) armedT
+            clockR <- case armedT of
+              Just a | a > deadline -> do
+                tellNote (armedAfterDeadlineNote act.modal act.action due a deadline)
+                allocateValue (ValNumber a)
+              _ -> pure deadlineR
+            -- P2b: the 'Expired' step. It is built here, where the deadline and
+            -- the revealing event are in hand, but LOGGED at the ResolveParty
+            -- frame for the routed cases, because that is where the party gets
+            -- forced and the key wants the bearer. The scrutiny follows the
+            -- re-offer rule above: a fresh event's look is 'WitnessedOnly' (it
+            -- is re-offered onward), a re-offered copy's look is 'Reoffered' —
+            -- and since round 2 of the LEST pass (spec §5.2.1, 2026-09-16) the
+            -- copy is handed on again either way, never consumed.
+            let expiredStep :: DS.Branch -> Maybe WHNF -> Eval (Maybe DeonticStep)
+                expiredStep branch mBearer = asks (.deonticLog) >>= \ case
+                  Nothing -> pure Nothing
+                  Just _  -> do
+                    mParty <- peekWHNF ev'party
+                    ev <- eventKeyAt stamp mParty ev'act
+                    norm' <- maybe (pure norm) (`naming` norm) mBearer
+                    pure $ Just $ plainStep (Just time') (Just ev)
+                      (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm' (Expired branch deadline)
+            let lifecycleAt isHence = MkLifecycle
+                  { join = if isHence then Just clockR else Nothing
+                  , deadline = Just deadlineR
+                  , armed }
+                reofferResolve isHence followup' branch = do
+                  pending <- expiredStep branch Nothing
+                  -- The mark the copy carries on: a fresh event starts the walk
+                  -- at this deadline; a copy that has revealed an earlier
+                  -- expiry advances its high-water mark when this deadline
+                  -- passes it, and otherwise counts one more stalled hand-off
+                  -- — refused, by name, once there have been too many in a row
+                  -- (see NOTE above). The failure time is the deadline whether
+                  -- the event that revealed the miss was fresh or already
+                  -- marked.
+                  mark <- case ev'reoffered of
+                    Nothing -> pure MkReoffered {highWater = deadline, stalled = 0}
+                    Just m
+                      | deadline > m.highWater -> pure MkReoffered {highWater = deadline, stalled = 0}
+                      | m.stalled >= maximumStalledReoffers -> userException (UserError (stalledChainRefusal m.highWater stamp))
+                      | otherwise -> pure m {stalled = m.stalled + 1}
+                  ev'timeR <- allocateValue ev'time
+                  evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
+                  markReoffered evR mark
+                  -- N10 goal A: a settle-phase copy stays one down the chain
+                  for_ ev'witness (markWitness evR)
+                  eventsR <- allocateValue (ValCons evR events)
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockR, pending, seen, lifecycle = lifecycleAt isHence})
+                  maybeEvaluate env party
+            case act.modal of
+              DMustNot ->
+                -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
+                -- Continue with HENCE (followup), which defaults to FULFILLED
+                reofferResolve True followup ToHence
+              DMay ->
+                -- Permission was NOT EXERCISED: per the README default-consequence
+                -- matrix, expiry of a MAY routes to LEST (default FULFILLED);
+                -- HENCE fires only when the permitted action is taken. The
+                -- LEST counts from the deadline, as a MUST's does (R-Q5: a MAY
+                -- fails at its deadline).
+                reofferResolve False (fromMaybe fulfilExpr lest) ToLest
+              _ -> -- DMust, DDo: deadline passed = failure
+                case lest of
+                  Nothing -> do
+                    -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
+                    -- The breach is DATED at the revealing event ('stamp') and
+                    -- carries the deadline it missed; §5.2 moves the LEST's
+                    -- clock, not this stamp (spec §3.4's last paragraph).
+                    partyR <- either (`allocate_` env) allocateValue party
+                    -- P2b: no continuation to force the party in; the bearer is
+                    -- what the breach's own party cell holds, if anything has
+                    -- forced it (a nullary constructor is allocated as a value,
+                    -- so @PARTY Alice@ is known; a computed party may not be).
+                    whenDeonticLog \ _ -> do
+                      mBearer <- peekWHNF partyR
+                      expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
+                    let timing = Timing {effective, observed = stamp, revealedBy = Just (ev'party, ev'act)}
+                    continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline timing))))
+                  Just lestFollowup -> reofferResolve False lestFollowup ToLest
+          else do
+            -- NOTE: we have observed the event and do not branch, either, the
+            -- only thing that may now happen is that we try a new event. Hence we
+            -- drop the ev'time, set our time to ev'time and set our due to the new due
+            -- (and the opening edge, when there is one, to what is still to run
+            -- until the window opens — 'relOpening')
+            pushCFrame (Contract6 PartyWHNF {time = ev'time, opens = relOpening openT stamp opens, due = Right $ ValNumber newDue, ..})
+            maybeEvaluate env party
   Contract6 PartyWHNF {..} -> do
     -- P2b: the party is forced now; every later frame's key knows the bearer.
     pushCFrame (Contract7 PartyEqual {party = val, norm = bearing val norm, ..})
@@ -2830,7 +3045,7 @@ backwardContractFrame val = \ case
           ev <- eventKeyAt stamp (Just ev'party) ev'act
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) named PartyMismatch)
         newTime <- allocateValue time
-        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, norm = named, ..} events
+        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, stream = events, norm = named, ..} events
       -- whether the event's party is the obligation's depends on an
       -- unknown: Stuck on it, never a type error (§8 step 3)
       _ | Just ns <- unknownNames val -> stuckOn ns
@@ -2878,7 +3093,7 @@ backwardContractFrame val = \ case
           ev <- eventKeyAt stamp (Just ev'party) ev'act
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm (EarlyAct open))
         newTime <- allocateValue time
-        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
+        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, stream = events, ..} events
       ValBool True -> do
         -- P2b: the match, routed per modal. Logged before the continuation
         -- is entered, so the log reads in machine order.
@@ -2947,7 +3162,7 @@ backwardContractFrame val = \ case
           ev <- eventKeyAt stamp (Just ev'party) ev'act
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm GuardFailed)
         newTime <- allocateValue time
-        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
+        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, stream = events, ..} events
       -- a PROVIDED that depends on an unknown: Stuck on it (§8 step 3)
       _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
@@ -3207,6 +3422,10 @@ backwardContractFrame val = \ case
       else do
         pushCFrame (BarrierTrim BarrierTrimFrame {cell = rest, ..})
         continueRef rest
+  IslandPark -> do
+    park ParkedFinal
+    continueBackward val
+  Lockstep frame -> lockstepStep val frame
   RBinOp1 MkRBinOp1 {..}
     -- NOTE: this is weirdly asymmetric because
     -- in case of AND we can never abort earlier but have to instead
@@ -3372,6 +3591,11 @@ backwardContractFrame val = \ case
       Left (Just (MkBefore _ instant)) -> do
         pushCFrame (Contract5 CheckTiming {time = timeW, origin = Nothing, openT, openAbsolute, ..})
         continueExpr env instant
+      -- N10 goal A: a settle-phase copy has nothing to expire here, and
+      -- must not be matched
+      Left Nothing | Just _ <- ev'witness -> do
+        clock <- assertTime timeW
+        parkWitnessed timeW (relOpening openT clock opens) due armed (seen - 1) norm env party act followup lest
       Left Nothing -> do
         stamp <- assertTime ev'time
         pushCFrame (Contract6 PartyWHNF {time = ev'time, opens = relOpening openT stamp opens, ..})
@@ -3485,6 +3709,249 @@ backwardContractFrame val = \ case
       pushFrame (App1 args Nothing)
       pushCFrame (Handoff lifecycle)
       continueExpr (bindLifecycle lifecycle env) followup
+
+    -- N10 goal A: a settle-phase copy stops at an obligation it does not
+    -- expire. The residual keeps its clock; its opening and remaining due
+    -- are relative to that clock, as after any scrutiny; and it parks what
+    -- the driver must carry to the next feed. Nothing is logged: a copy is
+    -- not a look.
+    parkWitnessed :: WHNF -> MaybeOpened -> MaybeEvaluated' (Maybe (Deadline Resolved)) -> Reference -> Int -> NormKey -> Environment -> MaybeEvaluated -> RAction Resolved -> RExpr -> Maybe RExpr -> Machine Config
+    parkWitnessed clock opens' due' armed seen' norm env party act followup lest = do
+      timeR <- allocateValue clock
+      p <- getCurrentParty
+      park (ParkedLeaf MkCarried {cTime = timeR, cArmed = armed, cSeen = seen', cNorm = norm, cParty = p})
+      continueBackward (ValObligation env party act opens' due' followup lest)
+
+    -- N10 goal A (NORM-LOG-SPEC §6.1, ruled 2026-10-11): the lockstep
+    -- driver of a RAND. Until 2026-10 a RAND ran its left operand over the
+    -- whole trace and then its right one (RBinOp1/RBinOp2), so a write in
+    -- one operand reached a read in the other in operand order, not time
+    -- order. Now:
+    --
+    --   * Both operands are ARMED first, each applied to an inner end
+    --     ('newFeedEnd'), so a scan that reaches it parks instead of
+    --     reporting 'Waiting' ('Contract1'). What a residual must carry to
+    --     its next feed (its clock, its arming, the events it has seen, its
+    --     step-log key, the acting party) is parked beside it ('Carried').
+    --     A compound armed inside an operand parks its own tree, which the
+    --     driver flattens into its own, so every obligation is fed by the
+    --     outermost driver, once per event.
+    --   * Each event is then SETTLED and then MATCHED. Settling is rounds:
+    --     a probe copy finds the earliest deadline the event has passed, in
+    --     any operand (evaluating any deadline not yet evaluated, against
+    --     the ledger as it stands before the event); a settle copy then
+    --     expires every passed deadline up to it, with the LEST and HENCE
+    --     hand-offs and writes that follow; and that repeats until none is
+    --     left. That is N10's settle order: "in order of effective and then
+    --     trace position" (NORM-LOG-SPEC :335). A copy never matches
+    --     ('Witness'). Then the event itself is offered to every operand,
+    --     left to right.
+    --   * At the real end of the trace each residual is applied to it once,
+    --     to log its 'Waiting' step, and the tree is reduced by RBinOp2's
+    --     table ('combineTree'), so a RAND with a breached side is BREACHED.
+    --     The driver stops early once nothing in the tree is live.
+    --
+    -- An ROR or a barrier met inside a feed is an ISLAND: it runs the old
+    -- way over the real rest of the stream ('realStreamOf'), and its value
+    -- is final ('IslandPark'). ROR is not lockstep yet: its rules are open
+    -- (NORM-LOG-SPEC N17-N19).
+    lockstepStep :: WHNF -> LockstepFrame -> Machine Config
+    lockstepStep got fr@MkLockstepFrame {..} = case lsStage of
+      LsArmLeft rexpr2 nilA -> do
+        left <- lockstepCollect got
+        pushCFrame (Lockstep MkLockstepFrame {lsStage = LsArmRight nilA, lsTree = left, ..})
+        pushFrame (App1 [lsClock, nilA] Nothing)
+        operandHandoff lsEnv rexpr2
+        maybeEvaluate lsEnv rexpr2
+      LsArmRight _ -> do
+        right <- lockstepCollect got
+        lockstepAdvance MkLockstepFrame {lsTree = LNode lsEnv ValRAnd lsTree right, ..} lsRest
+      LsNext -> case got of
+        ValCons e es -> do
+          pushCFrame (Lockstep MkLockstepFrame {lsStage = LsEvent e es, ..})
+          continueRef e
+        ValNil -> isFeedEnd lsRest >>= \ case
+          -- the end of this driver's own feed: hand the tree up, to be
+          -- flattened into the enclosing driver's
+          Just _ -> do
+            park (ParkedTree lsTree)
+            continueBackward (lockstepResidual lsTree)
+          -- the end of the trace
+          Nothing -> lockstepWait fr (lockstepLeaves lsTree)
+        _ -> internalException $ RuntimeTypeError $
+          "expected LIST EVENT but found: " <> prettyLayout got <> " when running the operands of a RAND in lockstep"
+      LsEvent e es -> case got of
+        ValEvent _ _ t -> do
+          pushCFrame (Lockstep MkLockstepFrame {lsStage = LsStamp e es got, ..})
+          continueRef t
+        _ -> internalException $ RuntimeTypeError $
+          "expected an EVENT but found: " <> prettyLayout got <> " when running the operands of a RAND in lockstep"
+      LsStamp e es ev -> do
+        stamp <- assertTime got
+        witnessOf e >>= \ case
+          -- this driver was itself fed a settle copy: pass it on, once
+          Just WitnessProbe -> lockstepFeed fr (PassProbe stamp e Nothing False) es (lockstepLeaves lsTree)
+          Just (WitnessSettle c) -> lockstepFeed fr (PassSettle stamp c e False) es (lockstepLeaves lsTree)
+          Nothing -> do
+            w <- lockstepCopy e ev WitnessProbe
+            lockstepFeed fr (PassProbe stamp w Nothing True) es (lockstepLeaves lsTree)
+      LsFeed pass queue path es -> do
+        t <- lockstepCollect got
+        lockstepFeed MkLockstepFrame {lsTree = lockstepReplace path t lsTree, ..} pass es queue
+      LsWait queue path -> do
+        -- the residual has logged its 'Waiting' step; it is unchanged
+        lockstepWait MkLockstepFrame {lsTree = lockstepReplace path (lockstepKeep got (lockstepLeafAt path lsTree)) lsTree, ..} queue
+
+    -- One pass: feed every leaf still live, left to right, then move on.
+    lockstepFeed :: LockstepFrame -> LockstepPass -> Reference -> [[Bool]] -> Machine Config
+    lockstepFeed fr@MkLockstepFrame {..} pass es = \ case
+      [] -> lockstepPassDone fr pass es
+      path : queue -> case lockstepLeafAt path lsTree of
+        Just (LLeaf v c) -> do
+          stream <- case pass of
+            PassProbe _ w _ _    -> lockstepCopyStream w lsRest
+            PassSettle _ _ w _   -> lockstepCopyStream w lsRest
+            PassMatch e          -> do
+              nil <- newFeedEnd es Nothing
+              allocateValue (ValCons e nil)
+          pushCFrame (Lockstep MkLockstepFrame {lsStage = LsFeed pass queue path es, ..})
+          lockstepApply v c stream
+        _ -> lockstepFeed fr pass es queue
+
+    lockstepPassDone :: LockstepFrame -> LockstepPass -> Reference -> Machine Config
+    lockstepPassDone fr@MkLockstepFrame {..} pass es = case pass of
+      PassProbe stamp _ lastCut True -> takeProbe >>= \ case
+        Nothing -> do
+          -- nothing left to settle: offer the event itself
+          e <- lockstepHead lsRest
+          lockstepFeed fr (PassMatch e) es (lockstepLeaves lsTree)
+        Just cut
+          | Just prev <- lastCut, cut <= prev ->
+              internalException $ RuntimeTypeError $
+                "lockstep: settling the event at " <> Text.textShow stamp <> " made no progress past the deadline " <> Text.textShow prev
+          | otherwise -> do
+              e <- lockstepHead lsRest
+              ev <- peekWHNF e >>= maybe (internalException (RuntimeTypeError "lockstep: an event was not evaluated")) pure
+              w <- lockstepCopy e ev (WitnessSettle cut)
+              lockstepFeed fr (PassSettle stamp cut w True) es (lockstepLeaves lsTree)
+      PassSettle stamp cut _ True -> do
+        e <- lockstepHead lsRest
+        ev <- peekWHNF e >>= maybe (internalException (RuntimeTypeError "lockstep: an event was not evaluated")) pure
+        w <- lockstepCopy e ev WitnessProbe
+        lockstepFeed fr (PassProbe stamp w (Just cut) True) es (lockstepLeaves lsTree)
+      -- a copy passed on, or the event itself offered: the next event
+      _ -> lockstepAdvance fr es
+
+    -- the next event, unless nothing in the tree is live any more
+    lockstepAdvance :: LockstepFrame -> Reference -> Machine Config
+    lockstepAdvance MkLockstepFrame {..} rest
+      | null (lockstepLeaves lsTree) =
+          if lsNested
+            then do
+              park (ParkedTree lsTree)
+              continueBackward (lockstepResidual lsTree)
+            else combineTree lsTree >>= continueBackward
+      | otherwise = do
+          pushCFrame (Lockstep MkLockstepFrame {lsStage = LsNext, lsRest = rest, ..})
+          continueRef rest
+
+    -- the real end of the trace: each residual meets it once, then the
+    -- tree is reduced
+    lockstepWait :: LockstepFrame -> [[Bool]] -> Machine Config
+    lockstepWait MkLockstepFrame {..} = \ case
+      [] -> combineTree lsTree >>= continueBackward
+      path : queue -> case lockstepLeafAt path lsTree of
+        Just (LLeaf v c) -> do
+          pushCFrame (Lockstep MkLockstepFrame {lsStage = LsWait queue path, ..})
+          lockstepApply v c lsRest
+        _ -> lockstepWait MkLockstepFrame {..} queue
+
+    -- apply a residual to one feed, resuming its carried state, under the
+    -- acting party of the hand-off that armed it
+    lockstepApply :: WHNF -> Carried -> Reference -> Machine Config
+    lockstepApply v c stream = do
+      orig <- getCurrentParty
+      putCurrentParty c.cParty
+      pushFrame (RestoreCurrentParty orig False)
+      pushFrame (App1 [c.cTime, stream] Nothing)
+      setResume c
+      continueBackward v
+
+    -- what a feed's value becomes in the driver's tree
+    lockstepCollect :: WHNF -> Machine LTree
+    lockstepCollect v = takeParked >>= \ case
+      Just (ParkedLeaf c) -> pure (LLeaf v c)
+      Just (ParkedTree t) -> pure t
+      Just ParkedFinal    -> pure (LFinal v)
+      Nothing -> case v of
+        ValObligation {} -> lost
+        ValROp {}        -> lost
+        _                -> pure (LFinal v)
+      where
+        lost = internalException $ RuntimeTypeError $
+          "lockstep: a residual reached the driver without what it must carry to the next event: " <> prettyLayout v
+
+    lockstepKeep :: WHNF -> Maybe LTree -> LTree
+    lockstepKeep v = \ case
+      Just (LLeaf _ c) -> LLeaf v c
+      _                -> LFinal v
+
+    -- a copy of the event, marked; it keeps a re-offered event's mark, so
+    -- the stall guard and the breach's revealing event still see it
+    lockstepCopy :: Reference -> WHNF -> Witness -> Machine Reference
+    lockstepCopy e ev w = do
+      copy <- allocateValue ev
+      markWitness copy w
+      isReoffered e >>= traverse_ (markReoffered copy)
+      pure copy
+
+    -- a copy, alone on a feed whose inner end stands for the stream from
+    -- the real event on (what an island armed while settling runs over)
+    lockstepCopyStream :: Reference -> Reference -> Machine Reference
+    lockstepCopyStream w fromEvent = do
+      nil <- newFeedEnd fromEvent Nothing
+      allocateValue (ValCons w nil)
+
+    lockstepHead :: Reference -> Machine Reference
+    lockstepHead rest = peekWHNF rest >>= \ case
+      Just (ValCons e _) -> pure e
+      _ -> internalException (RuntimeTypeError "lockstep: the event being handled is not at the head of the stream")
+
+    -- RBinOp2's table, over the whole tree, with the same Joined steps
+    combineTree :: LTree -> Machine WHNF
+    combineTree = \ case
+      LLeaf v _ -> pure v
+      LFinal v  -> pure v
+      LNode env op l r -> do
+        a <- combineTree l
+        b <- combineTree r
+        case (a, b) of
+          (ValBreached r1, ValBreached r2) -> do
+            let (decider, blame) = combineBlame op (breachBlame r1) (breachBlame r2)
+                chosen = breachOf blame
+            whenDeonticLog \ _ -> do
+              summary <- breachSummary chosen
+              joinedStep op (JoinBreached summary) (Just (case decider of
+                LeftDecides  -> LeftSide
+                RightDecides -> RightSide
+                BothDecide   -> BothSides)) False
+            pure (ValBreached chosen)
+          (ValFulfilled, ValFulfilled) -> do
+            joinedStep op JoinFulfilled (Just BothSides) False
+            pure ValFulfilled
+          (ValBreached reason, _) | ValRAnd <- op -> do
+            whenDeonticLog \ _ -> do
+              summary <- breachSummary reason
+              joinedStep op (JoinBreached summary) (Just LeftSide) False
+            pure a
+          (_, ValBreached reason) | ValRAnd <- op -> do
+            whenDeonticLog \ _ -> do
+              summary <- breachSummary reason
+              joinedStep op (JoinBreached summary) (Just RightSide) False
+            pure b
+          _ -> do
+            joinedStep op JoinPending Nothing False
+            pure (ValROp env op (Right a) (Right b))
 
     -- the obligation's absolute deadline at hand-off, if it has one: after
     -- 'Contract5' the due is the REMAINING due relative to 'time', so the
@@ -4713,7 +5180,7 @@ patternMatchFailure = withPoppedFrame $ \ case
       ev <- eventKeyAt stamp (Just ev'party) ev'act
       logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm ActionMismatch)
     newTime <- allocateValue time
-    pushFrame $ ContractFrame $ Contract1 ScrutinizeEvents {party = Right party, time = newTime, ..}
+    pushFrame $ ContractFrame $ Contract1 ScrutinizeEvents {party = Right party, time = newTime, stream = events, ..}
     continueRef events
   Just _ ->
     patternMatchFailure

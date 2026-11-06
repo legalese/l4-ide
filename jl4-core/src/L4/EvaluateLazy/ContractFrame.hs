@@ -67,6 +67,13 @@ data ContractFrame
   -- ^ Regulative BinOp frame while evaluating a regulative expression
   | RBinOp2 RBinOp2
   -- ^ Regulative BinOp frame while evaluating the second expression of a bin op
+  | Lockstep LockstepFrame
+  -- ^ N10 goal A (NORM-LOG-SPEC §6.1): a @RAND@ applied to its event stream
+  -- runs its operands in lockstep, one event at a time ('LockstepFrame').
+  | IslandPark
+  -- ^ N10 goal A: an @ROR@ or a barrier met inside a lockstep feed has run
+  -- the old way, over the real rest of the stream; its value is final, and
+  -- this frame tells the driver so ('ParkedFinal') before passing it on.
   | QuantRoll QuantRollFrame
   -- ^ EVERY, the roll call (EVERY-EACH-QUANTIFIER-SPEC §2.2.7.5 point 5): walks
   -- the list the @WHO@ filter tests membership in, one cons cell per step,
@@ -179,7 +186,95 @@ data ScrutinizeEvents = ScrutinizeEvents
     -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
+  , stream :: Reference
+    -- ^ the stream this scan is about to force: what 'Contract1' receives
+    -- the value of. N10 goal A reads it to tell a lockstep feed's inner end
+    -- ('isFeedEnd') from the real end of the trace.
   }
+  deriving stock Show
+
+-- | N10 goal A (lockstep compounds, NORM-LOG-SPEC §6.1): what a COPY of an
+-- event, fed to an operand while the driver settles that event's passed
+-- deadlines, may do. A copy never matches: it reaches 'Contract5' and stops
+-- there, unless it is the one that expires the obligation, and then it is
+-- re-offered down the continuation chain with the same mark, as a fresh
+-- event would be.
+data Witness
+  = WitnessProbe
+    -- ^ report the obligation's deadline if the event has passed it
+    -- ('probeMin'), evaluating a deadline or an opening not yet evaluated,
+    -- and change nothing else
+  | WitnessSettle !Rational
+    -- ^ expire the obligation if the event has passed its deadline and the
+    -- deadline is no later than this cutoff
+  deriving stock (Eq, Show)
+
+-- | N10 goal A: what a residual obligation must carry from one feed of the
+-- lockstep driver to the next, because today it lives only in the frames of
+-- a scan that the end of a feed pops (skeptic-design §1.3 closed the list).
+data Carried = MkCarried
+  { cTime :: Reference      -- ^ the clock the residual's remaining due is relative to
+  , cArmed :: Reference     -- ^ when the obligation was entered (@THE ARMING@, the A2 floor)
+  , cSeen :: Int            -- ^ events taken since it was armed
+  , cNorm :: NormKey        -- ^ the step log's key (one activation, not one per feed)
+  , cParty :: Maybe Text    -- ^ the acting party of the hand-off that armed it
+  }
+  deriving stock Show
+
+-- | N10 goal A: what a feed that ended at an inner end left for the driver.
+data Parked
+  = ParkedLeaf Carried      -- ^ one residual obligation and its carried state
+  | ParkedTree LTree        -- ^ a nested lockstep compound, to be flattened in
+  | ParkedFinal             -- ^ an island: final, never to be fed again
+  deriving stock Show
+
+-- | N10 goal A: the lockstep driver's operands, flattened.
+data LTree
+  = LLeaf WHNF Carried      -- ^ a residual obligation, fed one event at a time
+  | LNode Environment RBinOp LTree LTree
+  | LFinal WHNF             -- ^ decided, or an island
+  deriving stock Show
+
+data LockstepFrame = MkLockstepFrame
+  { lsEnv :: Environment
+  , lsStage :: LockstepStage
+  , lsTree :: LTree
+  , lsClock :: Reference     -- ^ the stamp of the last event fed (the arming clock before)
+  , lsRest :: Reference      -- ^ the stream from the event being handled, or still to handle
+  , lsNested :: Bool         -- ^ whether this driver's stream is itself a feed
+  }
+  deriving stock Show
+
+data LockstepStage
+  = LsArmLeft MaybeEvaluated Reference
+    -- ^ the left operand is being armed; the right operand and the inner end it is armed on
+  | LsArmRight Reference
+    -- ^ the right operand is being armed, on this inner end
+  | LsNext
+    -- ^ 'lsRest' is being forced
+  | LsEvent Reference Reference
+    -- ^ the head event is being forced (the head, and the tail)
+  | LsStamp Reference Reference WHNF
+    -- ^ its stamp is being forced (the head, the tail, the event)
+  | LsFeed LockstepPass [[Bool]] [Bool] Reference
+    -- ^ one pass over the leaves: the pass, the leaves still to feed, the
+    -- leaf being fed, and the event's tail
+  | LsWait [[Bool]] [Bool]
+    -- ^ the real end of the trace: each leaf is applied to it once, so that
+    -- it logs its 'Waiting' step
+  deriving stock Show
+
+data LockstepPass
+  = PassProbe Rational Reference (Maybe Rational) Bool
+    -- ^ find the earliest passed deadline: the event's stamp, the probe
+    -- copy, the cutoff of the round before (settling must advance past it),
+    -- and whether this driver runs the rounds itself ('False' when it was
+    -- itself fed a copy, and only passes it on)
+  | PassSettle Rational Rational Reference Bool
+    -- ^ settle every passed deadline up to the cutoff: stamp, cutoff, the
+    -- copy, and whether this driver runs the rounds itself
+  | PassMatch Reference
+    -- ^ offer the event itself
   deriving stock Show
 
 -- | The mark on an EVENT copy that an expiring obligation has re-offered to
@@ -222,7 +317,7 @@ data Reoffered = MkReoffered
 
 data ScrutinizeEvent = ScrutinizeEvent
   { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
-  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -237,7 +332,7 @@ data ScrutinizeEvent = ScrutinizeEvent
 data CurrentTimeWHNF = CurrentTimeWHNF
   { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
-  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -252,7 +347,7 @@ data CurrentTimeWHNF = CurrentTimeWHNF
 data ScrutinizeDue = ScrutinizeDue
   { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -269,7 +364,7 @@ data ScrutinizeDue = ScrutinizeDue
 data ScrutinizeAnchor = ScrutinizeAnchor
   { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , seen :: Int
     -- ^ how many events this scan has taken from its stream: the position
@@ -288,7 +383,7 @@ data ScrutinizeAnchor = ScrutinizeAnchor
 data ScrutinizeOpeningAnchor = ScrutinizeOpeningAnchor
   { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -304,7 +399,7 @@ data ScrutinizeOpeningAnchor = ScrutinizeOpeningAnchor
 data ScrutinizeOpening = ScrutinizeOpening
   { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -322,7 +417,7 @@ data ScrutinizeOpening = ScrutinizeOpening
 data CheckTiming = CheckTiming
   { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -360,7 +455,7 @@ data CheckTiming = CheckTiming
 data PartyWHNF = PartyWHNF
   { act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -375,7 +470,7 @@ data PartyWHNF = PartyWHNF
 data PartyEqual = PartyEqual
   { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -390,7 +485,7 @@ data PartyEqual = PartyEqual
 data ScrutinizeParty = ScrutinizeParty
   { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -405,7 +500,7 @@ data ScrutinizeParty = ScrutinizeParty
 data ScrutinizeEnvironment = ScrutinizeEnvironment
   { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -420,7 +515,7 @@ data ScrutinizeEnvironment = ScrutinizeEnvironment
 data ScrutinizeActions = ScrutinizeActions
   { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment, henceEnv :: Environment -- ^ the environment to extend by when evaluating the hence clause
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int
@@ -434,7 +529,7 @@ data ScrutinizeActions = ScrutinizeActions
 data ActionDoesn'tmatch = ActionDoesn'tmatch
   { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool, ev'witness :: Maybe Witness
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , seen :: Int

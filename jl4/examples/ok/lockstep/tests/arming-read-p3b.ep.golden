@@ -1,0 +1,11 @@
+-- NORM-LOG N10 goal A: SEESAW's P3b, with the party-qualified read.
+-- Pass: BREACHED in both orders (b decides at its arming, at 0, before P's act at 4). Before A, a RAND b was FULFILLED.
+IMPORT prelude
+DECLARE Who IS ONE OF P, Q
+DECLARE Act IS ONE OF x, y
+GIVETH DEONTIC Who Act
+a MEANS PARTY P MUST x WITHIN 5 HENCE RECORD `waived` IS TRUE HENCE FULFILLED
+GIVETH DEONTIC Who Act
+b MEANS IF RECALL P's `waived` EQUALS NOTHING THEN PARTY Q MUST y WITHIN 3 ELSE FULFILLED
+#TRACE a RAND b AT 0 WITH PARTY P DOES x AT 4
+#TRACE b RAND a AT 0 WITH PARTY P DOES x AT 4

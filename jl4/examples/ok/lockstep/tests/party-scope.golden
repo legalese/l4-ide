@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+party-scope.l4:17:1-83:
+  FULFILLED
+  Ledger (patron):
+    RECORD `returned` IS TRUE   [party=patron, source=RECORD, at=2025-01-31T15:45:30Z]
+party-scope.l4:18:1-94:
+  FULFILLED AND PARTY clerk MAY stamp WITHIN 98 HENCE FULFILLED
+  Ledger (patron):
+    RECORD `returned` IS TRUE   [party=patron, source=RECORD, at=2025-01-31T15:45:30Z]
+party-scope.l4:19:1-94:
+  PARTY clerk MAY stamp WITHIN 98 HENCE FULFILLED AND FULFILLED
+  Ledger (patron):
+    RECORD `returned` IS TRUE   [party=patron, source=RECORD, at=2025-01-31T15:45:30Z]

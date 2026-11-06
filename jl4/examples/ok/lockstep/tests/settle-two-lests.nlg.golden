@@ -1,0 +1,2 @@
+executing contract `a` and `b` and `reader` at 0 with the following events: `WAIT UNTIL` with 10 party `R` did `z` at 11
+executing contract `b` and `a` and `reader` at 0 with the following events: `WAIT UNTIL` with 10 party `R` did `z` at 11

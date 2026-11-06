@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+settle-idle-tick.l4:13:1-44:
+  FULFILLED
+  Ledger (p):
+    RECORD `waived` IS TRUE   [party=p, source=RECORD, at=2025-01-31T15:45:30Z]
+settle-idle-tick.l4:14:1-44:
+  FULFILLED
+  Ledger (p):
+    RECORD `waived` IS TRUE   [party=p, source=RECORD, at=2025-01-31T15:45:30Z]
+settle-idle-tick.l4:16:1-63:
+  FULFILLED
+  Ledger (p):
+    RECORD `waived` IS TRUE   [party=p, source=RECORD, at=2025-01-31T15:45:30Z]

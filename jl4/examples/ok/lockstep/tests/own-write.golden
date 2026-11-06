@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+own-write.l4:13:1-77:
+  FULFILLED
+  Ledger (patron):
+    RECORD `flag` IS TRUE   [party=patron, source=RECORD, at=2025-01-31T15:45:30Z]
+own-write.l4:14:1-88:
+  FULFILLED
+  Ledger (patron):
+    RECORD `flag` IS TRUE   [party=patron, source=RECORD, at=2025-01-31T15:45:30Z]
+own-write.l4:15:1-88:
+  FULFILLED
+  Ledger (patron):
+    RECORD `flag` IS TRUE   [party=patron, source=RECORD, at=2025-01-31T15:45:30Z]

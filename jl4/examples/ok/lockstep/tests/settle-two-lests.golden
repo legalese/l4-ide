@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+settle-two-lests.l4:14:1-79:
+  FULFILLED
+  Official record:
+    COMMIT `status` IS "P late"   [party=P, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `status` IS "Q late"   [party=Q, source=COMMIT, at=2025-01-31T15:45:30Z]
+settle-two-lests.l4:15:1-79:
+  FULFILLED
+  Official record:
+    COMMIT `status` IS "P late"   [party=P, source=COMMIT, at=2025-01-31T15:45:30Z]
+    COMMIT `status` IS "Q late"   [party=Q, source=COMMIT, at=2025-01-31T15:45:30Z]

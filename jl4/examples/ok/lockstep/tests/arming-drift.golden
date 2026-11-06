@@ -1,0 +1,57 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+arming-drift.l4:17:1-20:19:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      3.8
+    surpassed the deadline of party
+      Q
+    who had to do obligatory action
+      MUST y
+    before their deadline, which was at
+      3.5
+    and the breach names, in order
+      R
+        who had to do obligatory action
+          MUST z
+        before their deadline, which was at
+          3
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          3.5
+  NOTE: An obligation, MUST z, was entered at 4, after its own deadline of 3, so it could never be met in time: it fails at 4, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+arming-drift.l4:21:1-24:19:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      3.8
+    surpassed the deadline of party
+      Q
+    who had to do obligatory action
+      MUST y
+    before their deadline, which was at
+      3.5
+    and the breach names, in order
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          3.5
+      R
+        who had to do obligatory action
+          MUST z
+        before their deadline, which was at
+          3
+  NOTE: An obligation, MUST z, was entered at 4, after its own deadline of 3, so it could never be met in time: it fails at 4, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+arming-drift.l4:28:1-46:
+  PARTY R MUST z WITHIN 1.8 HENCE FULFILLED
