@@ -251,14 +251,16 @@ fillTests fields oracle m =
 -- | Render an L4 normal form the way @catala interpret -F json@ prints the
 -- corresponding Catala value.
 --
--- The shapes were read off the real toolchain (catala 1.2.1): numbers are exact
--- rationals rendered as strings (@\"1000\"@, @\"5/2\"@, @\"1/3\"@), booleans are
--- JSON booleans, dates are @\"YYYY-MM-DD\"@, a payload-free constructor is its
--- own name, a constructor with a payload is a one-key object, a record is an
--- object keyed by its (mangled) field names, and a list is an array. Using JSON
--- rather than the human renderer is R7's amendment: the pretty printer writes
--- @1,000.0@ where L4 writes @1000@, and there is no reason to solve a
--- canonicalisation problem we can decline to have.
+-- The shapes were read off the real toolchain, Catala built from upstream commit
+-- fdf4ccd5 (it reports 1.2.1, but it is not the 1.2.1 release, which prints
+-- numbers as decimals and fails these tests; see the Catala page under doc):
+-- numbers are exact rationals rendered as strings (@\"1000\"@, @\"5/2\"@,
+-- @\"1/3\"@), booleans are JSON booleans, dates are @\"YYYY-MM-DD\"@, a
+-- payload-free constructor is its own name, a constructor with a payload is a
+-- one-key object, a record is an object keyed by its (mangled) field names, and
+-- a list is an array. Using JSON rather than the human renderer is R7's
+-- amendment: the pretty printer writes @1,000.0@ where L4 writes @1000@, and
+-- there is no reason to solve a canonicalisation problem we can decline to have.
 catalaJson :: ConstructorFieldNames -> NF -> Maybe Text
 catalaJson fields = goNF
  where

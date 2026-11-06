@@ -18,7 +18,9 @@ spec :: FilePath -> Spec
 spec bin = do
   -- `l4 export catala` (specs/todo/CATALA-EXPORT-SPEC.md). Each golden below has been
   -- run through the real toolchain — `catala typecheck` and `clerk test`
-  -- against catala 1.2.1 — so the goldens are not merely "what the emitter
+  -- against Catala built from upstream commit fdf4ccd5, which reports 1.2.1
+  -- but is not the 1.2.1 release (on the release, `clerk test` fails 41 of the
+  -- 83 tests in the goldens) — so the goldens are not merely "what the emitter
   -- currently prints"; see examples/catala/README.md.
   describe "l4 export catala" $ do
     it "compiles the spec's Appendix A example to its golden Catala module" $

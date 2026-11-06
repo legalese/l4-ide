@@ -118,11 +118,46 @@ name has to be exported anyway — see
 `export-chain-*` under `jl4/examples/catala/not-ok/` are the two ways of getting it wrong, one of
 them through a rule handed to `map` rather than called directly.
 
+## Which Catala to check it with
+
+`l4 export catala` does not need Catala installed.
+You need Catala only to check the module it wrote, by running Catala's own `catala typecheck`, `catala proof` and `clerk test` over it.
+`node etc/validate-catala.mjs` runs all three over the examples.
+
+For that check, use Catala 1.3.0, released on 2026-09-30.
+Do not use the 1.2.1 release.
+The generated tests expect numbers written as exact fractions, so a quarter is `"1/4"`.
+The 1.2.1 release writes a quarter as the decimal `0.25`, and it also crashes on a result that holds an enumerated value.
+Measured on 2026-10-30 over the examples in `jl4/examples/catala/`, `clerk test` fails 41 of 83 tests on the 1.2.1 release.
+It passes all 83 on 1.3.0, and on upstream commit `fdf4ccd5`, which is the commit the goldens were first checked with and which reports itself as 1.2.1; 1.3.0 contains that commit.
+`catala typecheck` and `catala proof` pass on all three.
+
+To install it with opam, the OCaml package manager:
+
+```
+opam switch create catala 5.2.1
+opam install --switch catala catala.1.3.0
+opam pin add --switch catala catala-proof.1.3.0 https://github.com/CatalaLang/catala/archive/refs/tags/1.3.0.tar.gz
+```
+
+The `catala-proof` plugin, which `catala proof` needs, is not in opam-repository (checked 2026-10-30), so it is pinned from the same tag.
+The pin spells the version `1.3.0` so that the plugin finds the `catala` beside it.
+That pin also installs the Z3 solver.
+`etc/validate-catala.mjs` finds a switch named `catala` by itself.
+
+Two things about 1.3.0 matter if you write your own script around `clerk test`:
+
+- Its summary has no `tests` row.
+  It prints one row per backend, and the number of tests is on the `Interpreted` row.
+  `etc/validate-catala.mjs` reads both that banner and the older one, and it fails when the number of tests `clerk` ran differs from the number the goldens declare.
+- Its `clerk` stops with "Conflicting module name" when two files declare the same module, and it silently skips a directory whose name is another directory's name plus a dash and a suffix (`bands` and `bands-boolean-only`).
+  The harness stages each golden in a numbered directory, and `bands-boolean-only.catala_en` declares `Bands_boolean_only`, because the test that pins it writes it with `-o bands_boolean_only.catala_en`.
+
 ## Where to look
 
 - **Worked examples:** `jl4/examples/catala/`, with byte-for-byte goldens pinned by the test suite
   and a `not-ok/` directory of deliberate refusals.
 - **Design and rulings:** `CATALA-EXPORT-SPEC.md` under `specs/`.
-- **Evidence:** the goldens have been run through the real toolchain at Catala 1.2.1 —
-  `catala typecheck`, `catala proof`, and `clerk test` — via `etc/validate-catala.mjs`, which skips
-  cleanly when no toolchain is installed.
+- **Evidence:** the goldens have been run through the real toolchain, Catala 1.3.0 (see "Which
+  Catala to check it with" above) — `catala typecheck`, `catala proof`, and `clerk test` — via
+  `etc/validate-catala.mjs`, which skips cleanly when no toolchain is installed.
