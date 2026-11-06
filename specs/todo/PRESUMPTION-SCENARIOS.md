@@ -1,6 +1,6 @@
 # Presumptions at the end of a chain: what today's L4 can and cannot say
 
-**Status:** a design note with measurements, written 2026-10-09 and revised the same day after an Opus adversarial review (§9 says what it changed); nothing here is built.
+**Status:** a design note with measurements, written 2026-10-09 and revised the same day after an Opus adversarial review, and again on 2026-10-11 for an input rename (§9 says what each changed); nothing here is built.
 §7 records a ruling Meng made in chat; it is written in its owning document, `UNKNOWN-EVALUATION-SPEC.md` §5, and so decided (repo `CLAUDE.md` §4).
 It answers Meng's question of 2026-10-09: write the Alice scenarios in plain L4 using only what the tree has, run them soft and hard, and report what the language cannot say, or says with a wrong or missing explanation.
 It also measures the footgun Meng named the same day: a `MAYBE` and a `TYPICALLY` are two mechanisms for one idea, and `TYPICALLY NOTHING` sits where they meet.
@@ -12,6 +12,7 @@ Its batch behaviour is W2/W3's (#539): the TYPICALLY spec's §2 census, measured
 The one census row re-run here is p4, a `DECLARE` field default refused at construction, which still holds.
 The construction probes also ran on a binary built from the `#551` branch (`feat/typically-w4w5`: W4 and W5, a default applied at a named call and at a record construction), copied 2026-10-09 05:19 and deleted after the probes.
 `JL4_LIBRARY_PATH` was unset throughout, so each binary used its embedded prelude.
+The eight outputs of the `presumed`, `presumed-extra`, `presumed-section` and `presumed-known` families were captured on 2026-10-11 on a snapshot of an `l4` built from `c32814ccb`, the tip of the #606 branch (§9).
 Every probe file is in Appendix A and every raw output in Appendix B, modulo trailing whitespace.
 
 **Owning documents.** `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (T1, T3, T4, T6; D7.3 as restated in its §1.1), `IMPLICIT-PROPS-DESIGN.md` §11.5 (R8), `SURFACE-SUGAR-CLUSTER-2026-09.md` (D7.3), `UNKNOWN-EVALUATION-SPEC.md`, and `UNKNOWNS-BACKEND-CONTRACT.md` (the newer per-backend survey of `TYPICALLY`).
@@ -25,13 +26,13 @@ A ruling that comes out of this note is recorded in one of those, not here (repo
 `age at` compares year, month and day; `majority for` is SG: voting 21, beer 18; US: voting 18, beer 21, so the two jurisdictions cross.
 The chain birthdate → as_at → age → jurisdiction → purpose → adult is then written four ways:
 
-| route                          | spelling                                                                                    | the presumption lives in                    |
-| ------------------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| 1 `adult derived`              | `GIVETH A MAYBE BOOLEAN`; `WHEN NOTHING THEN NOTHING`                                       | nowhere; unknown stays unknown              |
-| 2 `adult presumed`             | a rule `GIVEN `presumed adult` IS A BOOLEAN TYPICALLY TRUE`, read only in the `NOTHING` arm | a rule input at the end of the chain        |
-| 2b `adult presumed by section` | the same default as a section `GIVEN`                                                       | a section input                             |
-| 3 `adult stored`               | `citizen's `is adult``                                                                      | a stored field (Meng's model of 2026-10-09) |
-| 3c `stored agrees with chain`  | route 3 compared against the derivation                                                     | an author-written consistency check         |
+| route                          | spelling                                                                                | the presumption lives in                    |
+| ------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------- |
+| 1 `adult derived`              | `GIVETH A MAYBE BOOLEAN`; `WHEN NOTHING THEN NOTHING`                                   | nowhere; unknown stays unknown              |
+| 2 `adult presumed`             | a rule ``GIVEN `is adult` IS A BOOLEAN TYPICALLY TRUE``, read only in the `NOTHING` arm | a rule input at the end of the chain        |
+| 2b `adult presumed by section` | the same default as a section `GIVEN`                                                   | a section input                             |
+| 3 `adult stored`               | `citizen's `is adult``                                                                  | a stored field (Meng's model of 2026-10-09) |
+| 3c `stored agrees with chain`  | route 3 compared against the derivation                                                 | an author-written consistency check         |
 
 `as_at` is an input, not `TODAY`, so no run depends on the clock.
 
@@ -57,20 +58,24 @@ Carol becomes an adult for Singapore voting on her 21st birthday and not the day
 
 ### 2.2 Alice with no birthdate, SG Voting
 
-| route                 | `birthdate` absent, soft                                    | `birthdate: null`, soft                 | absent, hard                                                    | `null`, hard                        |
-| --------------------- | ----------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------- | ----------------------------------- |
-| 1 derived             | `null`; presumed `person.birthdate`                         | `null`; presumed none                   | refused: `person.birthdate` missing                             | `null`; presumed none               |
-| 2 presumed (rule)     | TRUE; presumed `person.birthdate`, `presumed adult`         | TRUE; presumed `presumed adult`         | refused: `presumed adult` missing                               | refused: `presumed adult` missing   |
-| 2b presumed (section) | TRUE; presumed `person.birthdate`, `section presumed adult` | TRUE; presumed `section presumed adult` | refused                                                         | refused                             |
-| 3 stored              | TRUE; presumed `citizen.is adult`                           | TRUE; presumed `citizen.is adult`       | refused, naming both `citizen.birthdate` and `citizen.is adult` | refused: `citizen.is adult` missing |
+| route                 | `birthdate` absent, soft                              | `birthdate: null`, soft           | absent, hard                                                    | `null`, hard                        |
+| --------------------- | ----------------------------------------------------- | --------------------------------- | --------------------------------------------------------------- | ----------------------------------- |
+| 1 derived             | `null`; presumed `person.birthdate`                   | `null`; presumed none             | refused: `person.birthdate` missing                             | `null`; presumed none               |
+| 2 presumed (rule)     | TRUE; presumed `person.birthdate`, `is adult`         | TRUE; presumed `is adult`         | refused: `is adult` missing                                     | refused: `is adult` missing         |
+| 2b presumed (section) | TRUE; presumed `person.birthdate`, `section is adult` | TRUE; presumed `section is adult` | refused                                                         | refused                             |
+| 3 stored              | TRUE; presumed `citizen.is adult`                     | TRUE; presumed `citizen.is adult` | refused, naming both `citizen.birthdate` and `citizen.is adult` | refused: `citizen.is adult` missing |
 
-Supplying `"presumed adult": false` rebuts route 2 in both modes: FALSE, presumed none.
-Supplying `"presumed adult": null` is refused in both modes: "null … never takes the TYPICALLY default".
+Supplying `"is adult": false` rebuts route 2 in both modes: FALSE, presumed none.
+Supplying `"is adult": null` is refused in both modes: "null … never takes the TYPICALLY default".
+A known birthdate is a separate case from Alice's: Bob, born 2006-01-01, answers from his birthdate whatever `"is adult"` says, and `presumed` is empty (`presumed-known.json`).
+`"is adult": false` leaves US voting `true`, and `"is adult": true` leaves SG voting `false`, in either mode.
+The value changes nothing, but its presence is still required under hard (§2.3).
+Alice with no birthdate and `"is adult": false` answers `false`, so the same file shows the input is read where the birthdate is missing; route 1 answers `null` on that row.
 
 ### 2.3 Hard mode refuses the whole function, not the presumption
 
 Under `--presumption hard`, routes 2 and 2b refuse **every** row, Bob's and Carol's included, whose birthdates are known and whose evaluation never reaches the `NOTHING` arm.
-The message is the same on each: "Missing required field 'presumed adult' … presumption is hard, so the default is not used".
+The message is the same on each: "Missing required field 'is adult' … presumption is hard, so the default is not used".
 The decoder refuses an absent defaulted input before evaluation starts (`Machine.hs:4903–4908`, the `missing` check), while soft mode reports a default only when it is forced (`registerPresumable`, T6).
 So the two modes are not symmetric: soft says "the answer rests on X" only when it does, and hard says "X exists" whether or not it was needed.
 
@@ -80,15 +85,15 @@ Route 1 under hard accepts `null` and refuses absent, so in hard mode the only w
 
 Route 3 on Dave, born 2010-01-01, as at 2026-10-09 (age 16), and one Alice row:
 
-| row                                         | soft                              | hard                |
-| ------------------------------------------- | --------------------------------- | ------------------- |
-| `is adult: true` supplied                   | TRUE; presumed none               | TRUE; presumed none |
-| `is adult` omitted                          | TRUE; presumed `citizen.is adult` | refused             |
-| `is adult: null` (Alice, `birthdate: null`) | refused (never takes the default) | refused             |
+| row                                                 | soft                              | hard                |
+| --------------------------------------------------- | --------------------------------- | ------------------- |
+| `citizen.is adult: true` supplied                   | TRUE; presumed none               | TRUE; presumed none |
+| `citizen.is adult` omitted                          | TRUE; presumed `citizen.is adult` | refused             |
+| `citizen.is adult: null` (Alice, `birthdate: null`) | refused (never takes the default) | refused             |
 
 Nothing notices that TRUE contradicts the birthdate.
 Route 3c, the author-written check, returns FALSE for both Dave rows under soft, and under hard refuses the omitted row; that FALSE is a value, not a diagnostic, and the author had to think of writing it.
-With `is adult` omitted the check's FALSE rests on the presumption and says so (`presumed: citizen.is adult`), which is the one place the two mechanisms touched.
+With `citizen.is adult` omitted the check's FALSE rests on the presumption and says so (`presumed: citizen.is adult`), which is the one place the two mechanisms touched.
 
 ### 2.5 Construction inside the rules
 
@@ -158,6 +163,14 @@ And on the client side, absent and `null` are two spellings of "no value" that d
   Corrected 2026-10-09 after the bench skeptic for this question: the first version called it "a presumption that is not one".
 - **G5 (silent).** There is no presumption mode inside the rules: today's binary refuses a `WITH` that omits a defaulted field, in every mode, and #551's fills it, in every mode (§2.5); #551 lists such a fill under `presumed`, and nothing withholds it.
   Only the flag's absence from `l4 run --help` is loud.
+- **G6 (silent).** A value supplied for a fallback input is read only where the fallback is read, so it cannot overrule a derivation (§2.2).
+  Route 2's `is adult`, sent beside a known birthdate, has its value ignored in either direction and in either mode: no diagnostic, and `presumed` stays empty.
+  Its presence is not ignored: under hard it is still required (§2.3), so a hard-mode client must send a value that is then thrown away, which is G4 and G6 together.
+  What is silent is that a correctly named input is never read; a misspelt key is refused loudly.
+  Naming the input for the fact, as it is now, does not change that.
+  Overruling a derivation is what an assertion is for (`presumption-assertion/CONTRACT.md` §5.1, asserted over derived over presumed), on a named step that §3 there admits.
+  Route 2 as written has no such step, since its helper rules take inputs of their own and its final answer is the root.
+  A presumption written on the step (§7 there, proposed, not ruled) would not help, because it applies only where the derivation is unknown.
 - **G4 (loud, wrong scope).** Hard mode on `l4 batch` and on the service's direct path refuses at decode, so a presumption at the end of a chain blocks every request that omits it, including those whose evaluation never reaches it (§2.3).
   The service's wrapper path is already lazy there (`UNKNOWNS-BACKEND-CONTRACT.md:128–130`, measured), and TU-wire-b names lazy binding on the direct path as its own work item (TYPICALLY spec `:290`); so the scope is known and the item exists, and this note adds the measurement that a presumption input shows it plainly.
   It cannot say "refused because the answer would have rested on a presumption"; it says "a presumption is declared here".
@@ -167,9 +180,9 @@ And on the client side, absent and `null` are two spellings of "no value" that d
 Given the measurements, the smallest changes that remove a spelling or make a silent gap loud, in the order I would take them.
 
 1. **Refuse at force, which is TU-wire-b's open item (G4).** Make hard mode's refusal happen where soft mode's report happens: when the defaulted input is forced, not when the request is decoded.
-   Then Bob's row succeeds under hard, Alice's is refused with "the answer would rest on `presumed adult`", and the two modes become the same event with two outcomes.
+   Then Bob's row succeeds under hard, Alice's is refused with "the answer would rest on `is adult`", and the two modes become the same event with two outcomes.
    `EvalConfig.presumeDefaults`'s own doc (`EvaluateLazy.hs:111–115`) already describes lazy withholding for a section `GIVEN` under hard: one that nothing supplies "is an assumed term", which costs nothing unless forced.
-   Route 2b shows why `l4 batch` refused it anyway: the refusal is the decoder's "Missing required field 'section presumed adult' in JSON object", so the section input had been lifted into the request record and met the decode-time check before the assumed-term behaviour could apply.
+   Route 2b shows why `l4 batch` refused it anyway: the refusal is the decoder's "Missing required field 'section is adult' in JSON object", so the section input had been lifted into the request record and met the decode-time check before the assumed-term behaviour could apply.
    Moving the refusal to force time gives the request's own decode the behaviour the evaluator already has.
    No syntax.
 2. **`TYPICALLY` on a `MAYBE` (G3): keep D7.3, and fix the exporter.** Either refuse it and let every `MAYBE` input or field be omitted at every supply site inside the rules (smucclaw#645 as filed, amending D7.3's "and only then" and "never inferred from the type", `SURFACE-SUGAR-CLUSTER-2026-09.md:71–74`, and R8 rule 3 for the `MAYBE` case, `IMPLICIT-PROPS-DESIGN.md:1096`), or keep D7.3 and say on the reference page that `TYPICALLY NOTHING` extends the wire's `NOTHING` presumption to construction sites.
@@ -186,7 +199,7 @@ Given the measurements, the smallest changes that remove a spelling or make a si
 
 ## 6. Open for Meng
 
-- Does an explicit supply of `is adult` win over a contradicting birthdate, or is the clash an error? (G2; asked 2026-10-09, not yet ruled. §7 settles precedence within one node, asserted over derived; this is two nodes, a stored field and a derivation, that ought to agree, and §7 does not reach it.)
+- Does an explicit supply of route 3's `citizen.is adult` win over a contradicting birthdate, or is the clash an error? (G2; asked 2026-10-09, not yet ruled. §7 settles precedence within one node, asserted over derived; this is two nodes, a stored field and a derivation, that ought to agree, and §7 does not reach it. Route 2's fallback input is the other case, and G6 measures what it does today.)
 - Should `TYPICALLY` be refused on a `MAYBE`, amending D7.3? (G3.)
 - Should hard mode refuse at force rather than at decode? (G4; a behaviour change to `l4 batch` and the service, so a service client would notice.)
 
@@ -235,11 +248,19 @@ Four families: natively defeasible (Catala, Blawx, PROLEG) take the design as id
 Obligations: every exporter with a fidelity report (DMN, dmn-md, BPMN, docassemble, Blawx) gains "assertable nodes" and "presumed conclusions" rows, emitted-as or dropped; OpenFisca and yscript have none, so their limits pages carry it; the OpenFisca enum default is a standing silent wrong answer independent of this design.
 Guard 2 appears in no target column: it is ours alone.
 
-## 9. What review changed (2026-10-09)
+## 9. What review changed (2026-10-09, and the input rename of 2026-10-11)
 
 An Opus adversarial review of the first version found 28 problems, 7 of them overturning a sentence; each was re-verified against the tree at `c6d081622` or re-run on the installed binary before it was applied, and all held.
 The overturned sentences: the installed binary "matches the census on every row" (it honours what the pre-W2/W3 census refused); "all four routes agree … soft and hard" (hard refuses routes 2 and 2b, and route 3 has no chain); `TYPICALLY NOTHING` "changes no answer" (it changes `#EVAL` on a section input, is refused by docassemble, and is published as `"default": null`); G5's "always fill" (true of #551, not of today's binary); §7 "decided when filed" (not decided until recorded in its owning document); Blawx "dropped, disclosed" (that is the ruling, not the code); and docassemble "answered/pre-filled already distinguished" (the exporter's own note says user-confirmed).
 The rest: line numbers moved to the new base after #553/#554; four raw outputs were missing from Appendix B; two table cells understated a refusal; `fallback.l4`'s row 2 was misread in §3; G4's scope was generalised beyond `l4 batch` and the direct path, where `UNKNOWNS-BACKEND-CONTRACT` already records the wrapper path as lazy and TU-wire-b names the item; §5.2 ignored that option 1 amends D7.3 and R8 rule 3; §5.3's lint fired on the honest route; §6 Q1 and §7 were not related; V1–V6 and the guards were undefined; the abduction rationale assumed what abducibles are declared; V3 was not related to T1; docassemble falls back upward, not downward; the mlir row was mis-attributed; the yscript row ignored T5b; OpenFisca has no fidelity report; and PRIORITY's catch-all wins by priority, not position.
+
+**Revised 2026-10-11.** The input of routes 2 and 2b is renamed from `presumed adult` and `section presumed adult` to `is adult` and `section is adult`, because a value sent for it is evidence, and `presumed` already says when a default was used.
+The six affected outputs in Appendix B were re-run, not edited, with the appendix's own flags, on an `l4` built from `c32814ccb`, the tip of the #606 branch.
+A run of the unrenamed probe on that binary first reproduced all six recorded outputs byte for byte.
+The renamed run then matched them row for row apart from the name and, in the `presumed-extra` outputs, the position of the key in the echoed input, which the printer sorts.
+`presumed-known.json`, its two outputs and G6 are new.
+A second Opus review of the rename found three sentences wrong: an assertion said to land on the root, a step presumption said to overrule, and "changes nothing" said where hard still requires the key, and a handful of smaller faults.
+All were corrected, and the third row of `presumed-known.json` now pins which export ran.
 
 ---
 
@@ -316,12 +337,12 @@ GIVEN person IS A Person
       asat   IS A DATE
       j      IS A Jurisdiction
       p      IS A Purpose
-      `presumed adult` IS A BOOLEAN TYPICALLY TRUE
+      `is adult` IS A BOOLEAN TYPICALLY TRUE
 GIVETH A BOOLEAN
 `adult presumed` MEANS
   CONSIDER person's birthdate
     WHEN JUST b  THEN `age at` b asat AT LEAST `majority for` j p
-    WHEN NOTHING THEN `presumed adult`
+    WHEN NOTHING THEN `is adult`
 
 -- Route 3: Meng's model; the stored field answers, and the chain is not consulted.
 @export Stored
@@ -343,7 +364,7 @@ GIVETH A BOOLEAN
 
 -- Route 2b: the same presumption as a section GIVEN, which hard mode treats differently.
 § `Presumptions`
-    GIVEN `section presumed adult` IS A BOOLEAN TYPICALLY TRUE
+    GIVEN `section is adult` IS A BOOLEAN TYPICALLY TRUE
 
 @export PresumedSection
 GIVEN person IS A Person
@@ -354,7 +375,7 @@ GIVETH A BOOLEAN
 `adult presumed by section` MEANS
   CONSIDER person's birthdate
     WHEN JUST b  THEN `age at` b asat AT LEAST `majority for` j p
-    WHEN NOTHING THEN `section presumed adult`
+    WHEN NOTHING THEN `section is adult`
 ```
 
 **`chain.json`**
@@ -471,8 +492,18 @@ GIVETH A STRING
 
 ```text
 [
- {"person":{"name":"Alice","birthdate":null}, "asat":"2026-10-09","j":"SG","p":"Voting", "presumed adult": false},
- {"person":{"name":"Alice","birthdate":null}, "asat":"2026-10-09","j":"SG","p":"Voting", "presumed adult": null}
+ {"person":{"name":"Alice","birthdate":null}, "asat":"2026-10-09","j":"SG","p":"Voting", "is adult": false},
+ {"person":{"name":"Alice","birthdate":null}, "asat":"2026-10-09","j":"SG","p":"Voting", "is adult": null}
+]
+```
+
+**`presumed-known.json`**
+
+```text
+[
+ {"person":{"name":"Bob","birthdate":"2006-01-01"}, "asat":"2026-10-09","j":"US","p":"Voting", "is adult": false},
+ {"person":{"name":"Bob","birthdate":"2006-01-01"}, "asat":"2026-10-09","j":"SG","p":"Voting", "is adult": true},
+ {"person":{"name":"Alice","birthdate":null}, "asat":"2026-10-09","j":"SG","p":"Voting", "is adult": false}
 ]
 ```
 
@@ -640,6 +671,8 @@ GIVETH A BOOLEAN
 ## Appendix B. Raw outputs
 
 `<name>-<mode>.json` is `l4 batch ... --presumption <mode> -f json -c`; `*-check.txt` is `l4 check`; `*-run.txt` is `l4 run` on the installed binary; `construct-*-installed.txt` and `construct-*-551.txt` are `l4 run` on the two binaries; `tmtowtdi-docassemble.txt` is `l4 export docassemble`.
+The outputs named `presumed`, `presumed-extra` and `presumed-section`, six files, were re-captured on 2026-10-11 under the new input names (§9), and the two `presumed-known` outputs are new that day.
+Each of those eight ran with `-e "adult presumed"`, except the two `presumed-section` ones, which ran with `-e "adult presumed by section"`.
 
 **`out/construct-a-551.txt`**
 
@@ -841,8 +874,8 @@ File:     construct-c.l4
 
 ```text
 [
-  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"},"presumed adult":false},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
-  {"diagnostics":["Field 'presumed adult' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"},"presumed adult":null},"output":[{"result":{"error":"Field 'presumed adult' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default\n"},"trace":null}],"presumed":[],"status":"error"}
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
+  {"diagnostics":["Field 'is adult' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"],"input":{"asat":"2026-10-09","is adult":null,"j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":{"error":"Field 'is adult' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default\n"},"trace":null}],"presumed":[],"status":"error"}
 ]
 ```
 
@@ -850,8 +883,8 @@ File:     construct-c.l4
 
 ```text
 [
-  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"},"presumed adult":false},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
-  {"diagnostics":["Field 'presumed adult' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"},"presumed adult":null},"output":[{"result":{"error":"Field 'presumed adult' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default\n"},"trace":null}],"presumed":[],"status":"error"}
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
+  {"diagnostics":["Field 'is adult' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"],"input":{"asat":"2026-10-09","is adult":null,"j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":{"error":"Field 'is adult' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default\n"},"trace":null}],"presumed":[],"status":"error"}
 ]
 ```
 
@@ -859,15 +892,35 @@ File:     construct-c.l4
 
 ```text
 [
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"name":"Alice"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2000-05-01","name":"Alice"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"US","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"US","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2005-10-10","name":"Carol"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-10","j":"SG","p":"Voting","person":{"birthdate":"2005-10-10","name":"Carol"}},"output":[{"result":{"error":"Missing required field 'presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"}
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"name":"Alice"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2000-05-01","name":"Alice"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"US","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"US","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2005-10-10","name":"Carol"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-10","j":"SG","p":"Voting","person":{"birthdate":"2005-10-10","name":"Carol"}},"output":[{"result":{"error":"Missing required field 'is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"}
+]
+```
+
+**`out/presumed-known-hard.json`**
+
+```text
+[
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"US","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":true,"trace":null}],"presumed":[],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":true,"j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
+]
+```
+
+**`out/presumed-known-soft.json`**
+
+```text
+[
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"US","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":true,"trace":null}],"presumed":[],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":true,"j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","is adult":false,"j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"}
 ]
 ```
 
@@ -875,15 +928,15 @@ File:     construct-c.l4
 
 ```text
 [
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"name":"Alice"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2000-05-01","name":"Alice"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"US","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"US","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2005-10-10","name":"Carol"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
-  {"diagnostics":["Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-10","j":"SG","p":"Voting","person":{"birthdate":"2005-10-10","name":"Carol"}},"output":[{"result":{"error":"Missing required field 'section presumed adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"}
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"name":"Alice"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2000-05-01","name":"Alice"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"US","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"US","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2005-10-10","name":"Carol"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"},
+  {"diagnostics":["Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)"],"input":{"asat":"2026-10-10","j":"SG","p":"Voting","person":{"birthdate":"2005-10-10","name":"Carol"}},"output":[{"result":{"error":"Missing required field 'section is adult' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)\n"},"trace":null}],"presumed":[],"status":"error"}
 ]
 ```
 
@@ -891,8 +944,8 @@ File:     construct-c.l4
 
 ```text
 [
-  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":["person.birthdate","section presumed adult"],"status":"success"},
-  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":["section presumed adult"],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":["person.birthdate","section is adult"],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":["section is adult"],"status":"success"},
   {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2000-05-01","name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":[],"status":"success"},
   {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
   {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":true,"trace":null}],"presumed":[],"status":"success"},
@@ -907,8 +960,8 @@ File:     construct-c.l4
 
 ```text
 [
-  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":["person.birthdate","presumed adult"],"status":"success"},
-  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":["presumed adult"],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":["person.birthdate","is adult"],"status":"success"},
+  {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":null,"name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":["is adult"],"status":"success"},
   {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2000-05-01","name":"Alice"}},"output":[{"result":true,"trace":null}],"presumed":[],"status":"success"},
   {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Voting","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":false,"trace":null}],"presumed":[],"status":"success"},
   {"diagnostics":[],"input":{"asat":"2026-10-09","j":"SG","p":"Beer","person":{"birthdate":"2006-01-01","name":"Bob"}},"output":[{"result":true,"trace":null}],"presumed":[],"status":"success"},
