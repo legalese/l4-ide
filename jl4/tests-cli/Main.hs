@@ -56,6 +56,7 @@ import qualified CliTest.BuildVersion as BuildVersion
 import qualified CliTest.Catala as Catala
 import qualified CliTest.DmnBpmn as DmnBpmn
 import qualified CliTest.Ledger as Ledger
+import qualified CliTest.Lint as Lint
 import qualified CliTest.Explore as Explore
 import qualified CliTest.Docassemble as Docassemble
 import qualified CliTest.OpenFisca as OpenFisca
@@ -699,6 +700,7 @@ main = do
          , Explore.fixtures
          , BuildIdentity.fixtures
          , Ledger.fixtures
+         , Lint.fixtures
          ]) \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
@@ -5069,6 +5071,7 @@ spec bin = do
   BuildVersion.spec bin
   BuildIdentity.spec
   Ledger.spec bin
+  Lint.spec bin
   where
     for_ xs f = mapM_ f xs
 

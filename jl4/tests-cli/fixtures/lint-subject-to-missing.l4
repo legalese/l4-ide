@@ -1,0 +1,13 @@
+-- l4 lint fixture: the s 8(3) of the Probate Act says "Subject to section 6"
+-- and its body never calls the decision for section 6. A finding.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`s 6(1) — granted to more than 4 persons` n MEANS
+    n GREATER THAN 4
+
+@ref Probate Act s 8(3) — "Subject to section 6, probate may be granted to one or more of the persons so appointed."
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`s 8(3) — probate may be granted` n MEANS
+        "Subject to section 6,"
+    ... n GREATER THAN 1
