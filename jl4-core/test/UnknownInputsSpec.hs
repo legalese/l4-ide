@@ -20,7 +20,7 @@ import Test.Hspec
 
 import L4.API (l4Eval, l4EvalDirective)
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
-import L4.Evaluate.Ledger (LedgerStore (..))
+import L4.Evaluate.Ledger (LedgerStore' (..))
 import L4.Evaluate.ValueLazy (Term (..))
 import L4.EvaluateLazy
   ( AssertionOutcome (..)

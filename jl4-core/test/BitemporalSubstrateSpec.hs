@@ -31,7 +31,7 @@ import qualified Data.Map.Strict as Map
 
 import L4.Evaluate.Ledger
   ( Ledger
-  , LedgerEvent (..)
+  , LedgerEvent, LedgerEvent' (..)
   , Provenance (..)
   , effectiveVt
   , emptyStore
@@ -44,6 +44,7 @@ import L4.Evaluate.Ledger
   , storeOwnLedger
   )
 import L4.Evaluate.ValueLazy (Value (..), WHNF)
+import L4.TemporalContext (initialTemporalContext)
 
 import Data.Text (Text)
 import Data.Time (Day, UTCTime (..), fromGregorian, secondsToDiffTime)
@@ -67,7 +68,7 @@ d = fromGregorian
 entry :: Text -> Rational -> UTCTime -> Maybe Day -> LedgerEvent
 entry cell n tx vt =
   Assign [cell] (ValNumber n)
-    MkProvenance { party = "t", source = "RECORD", txTime = tx, vtFrom = vt }
+    MkProvenance { party = "t", source = "RECORD", txTime = tx, vtFrom = vt, writeCtx = initialTemporalContext tx }
 
 -- 'WHNF' has no 'Eq' (it can contain 'Reference's); the literal numbers we
 -- store contain none, so their 'Show' is total and stable.
@@ -182,8 +183,8 @@ spec = describe "bitemporal ledger fold (#914 §2B)" $ do
 
   describe "effectiveVt" $ do
     it "an explicit valid-from wins" $
-      effectiveVt MkProvenance { party = "t", source = "RECORD", txTime = tx1, vtFrom = Just (d 2020 5 5) }
+      effectiveVt MkProvenance { party = "t", source = "RECORD", txTime = tx1, vtFrom = Just (d 2020 5 5), writeCtx = initialTemporalContext tx1 }
         `shouldBe` d 2020 5 5
     it "a contemporaneous write is valid from its (UTC) transaction day" $
-      effectiveVt MkProvenance { party = "t", source = "RECORD", txTime = tx2, vtFrom = Nothing }
+      effectiveVt MkProvenance { party = "t", source = "RECORD", txTime = tx2, vtFrom = Nothing, writeCtx = initialTemporalContext tx2 }
         `shouldBe` d 2026 6 1

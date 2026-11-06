@@ -1,0 +1,80 @@
+IMPORT prelude
+-- A RECORD of a structured value (a record, a list, a nested record) must
+-- render in the "Ledger:" block as the value, not as the heap references
+-- its fields were still thunked under when the write happened. The machine
+-- stores a WHNF per write, so a constructor's fields are References; before
+-- the fix the ledger line read
+--
+--   RECORD `r` IS Purchase OF &571@shopping-session.l4, &564@shopping-session.l4
+--
+-- while a RECALL of the same cell computed the right answer. Only the
+-- rendering was wrong, and it is the rendering that is fixed: the directive
+-- forces each stored value to normal form for display AFTER its own result
+-- is settled, the same way an #EVAL's own result is forced. A value that
+-- cannot be forced (a field that raises, or REFUSEs) shows the reason in its
+-- place, and the directive's own verdict is untouched.
+--
+-- The test harness pins the clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+TIMEZONE IS "Etc/UTC"
+
+DECLARE Item
+  HAS name  IS A STRING
+      price IS A NUMBER
+
+DECLARE Purchase
+  HAS `on day` IS A NUMBER
+      items    IS A LIST OF Item
+
+DECLARE Person IS ONE OF Agent
+DECLARE Act IS ONE OF `check out`
+
+lozenges MEANS Item "Lozenges" 3
+syrup    MEANS Item "Syrup" 12
+
+-- Top-level: a record whose second field is a list of records.
+#EVAL RECORD `orders` IS (Purchase 2 (LIST lozenges, syrup))
+
+-- A bare list, and a nullary constructor.
+#EVAL RECORD `cart` IS (LIST lozenges)
+#EVAL RECORD `who` IS Agent
+
+-- Inside a regulative rule, as the shopping session does it.
+`checking out` MEANS
+  PARTY Agent
+  MUST `check out`
+  WITHIN 10
+  HENCE RECORD `orders` IS (Purchase 2 (LIST lozenges, syrup))
+  HENCE FULFILLED
+
+#TRACE `checking out` AT 0 WITH
+  (PARTY Agent DOES `check out` AT 1)
+
+-- The recorded value is read back whole: the fields were always right.
+`total of` purchase MEANS
+  sum (map (GIVEN i YIELD i's price) (purchase's items))
+
+#EVAL `total of` (Purchase 2 (LIST lozenges, syrup))
+
+-- A recorded value whose field cannot be evaluated, and one whose field
+-- refuses. Neither is forced by the rule, so each trace is FULFILLED; the
+-- display pass meets the exception and prints it in the value's place.
+`recording a bad price` MEANS
+  PARTY Agent
+  MUST `check out`
+  WITHIN 10
+  HENCE RECORD `orders` IS (Purchase 2 (LIST (Item "Free" (1 DIVIDED BY 0))))
+  HENCE FULFILLED
+
+#TRACE `recording a bad price` AT 0 WITH
+  (PARTY Agent DOES `check out` AT 1)
+
+`recording a refusal` MEANS
+  PARTY Agent
+  MUST `check out`
+  WITHIN 10
+  HENCE RECORD `orders` IS (Purchase (REFUSE "the day is not known") EMPTY)
+  HENCE FULFILLED
+
+#TRACE `recording a refusal` AT 0 WITH
+  (PARTY Agent DOES `check out` AT 1)

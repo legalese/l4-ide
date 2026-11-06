@@ -18,6 +18,9 @@ module L4.EvaluateLazy.Machine
 -- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
 , tickUnknownSteps
 , resetUnknownSteps
+, tickDisplaySteps
+, startDisplayBudget
+, stopDisplayBudget
 , reachedUnknowns
 , unknownNames
 , withPoppedFrame
@@ -113,8 +116,8 @@ import L4.Annotation
 import L4.Evaluate.Ledger
   ( EventRoute (..)
   , Ledger
-  , LedgerEvent (..)
-  , LedgerStore (..)
+  , LedgerEvent, LedgerEvent' (..)
+  , LedgerStore, LedgerStore' (..)
   , Provenance (..)
   , anonymousParty
   , readCellBitemporal
@@ -353,6 +356,12 @@ data EvalState =
       -- ^ UNKNOWN-EVALUATION-SPEC §4.5's step counter (C4): negative until a
       -- site of §4.3's table first receives a term in this directive, then
       -- the machine steps still allowed. Reset per directive.
+    , displaySteps :: !(IORef Int)
+      -- ^ the display pass's own step budget (LED, 2026-10-24): negative
+      -- while no ledger row is being forced for display, then the machine
+      -- steps the current row may still take. Started and stopped per row
+      -- by 'L4.EvaluateLazy.nfDirectiveWith'; running out raises
+      -- 'DisplayBudgetExhausted', which that pass catches for the row.
     , unknownReached :: !(IORef [Term])
       -- ^ every input, or field of one, that reached a §4.3 site in this
       -- directive, first first: what a directive that runs out of steps is
@@ -1177,6 +1186,32 @@ tickUnknownSteps = do
       else liftIO (writeIORef stepsRef (steps - 1))
 {-# INLINE tickUnknownSteps #-}
 
+-- | One machine step against the display budget: counted only while a
+-- ledger row is being forced for display, and running out raises
+-- 'DisplayBudgetExhausted' (LED, 2026-10-24).
+tickDisplaySteps :: Eval ()
+tickDisplaySteps = do
+  stepsRef <- asks (.displaySteps)
+  steps <- liftIO (readIORef stepsRef)
+  if steps < 0
+    then pure ()
+    else if steps == 0
+      then userException DisplayBudgetExhausted
+      else liftIO (writeIORef stepsRef (steps - 1))
+{-# INLINE tickDisplaySteps #-}
+
+-- | Give the next display force a full budget of 'maximumDisplaySteps'.
+startDisplayBudget :: Eval ()
+startDisplayBudget = do
+  stepsRef <- asks (.displaySteps)
+  liftIO (writeIORef stepsRef maximumDisplaySteps)
+
+-- | Stop counting against the display budget.
+stopDisplayBudget :: Eval ()
+stopDisplayBudget = do
+  stepsRef <- asks (.displaySteps)
+  liftIO (writeIORef stepsRef (-1))
+
 -- | Start a directive with the counter stopped and nothing reached.
 resetUnknownSteps :: Eval ()
 resetUnknownSteps = do
@@ -1221,7 +1256,9 @@ termValue = \ case
 --
 -- UNCATCHABLE, and that is the point. 'tryEval' is the only @try@ over an
 -- 'EvalException' anywhere in the tree, and it is used only at the directive
--- boundary ('L4.EvaluateLazy.nfDirective') and in @withEvalClauses@ (which
+-- boundary ('L4.EvaluateLazy.nfDirective', including its display-only pass
+-- over the ledger AFTER the verdict is fixed, which turns a refusal into the
+-- text of a refusal and never into a value) and in @withEvalClauses@ (which
 -- rethrows). There is no user-facing catch construct, and A REFUSAL IS NEVER
 -- TURNED INTO A VALUE: not by a CONSIDER arm, not by a boolean connective, not
 -- by a WHERE\/LET binding. One frame does observe a refusal as it unwinds: the
@@ -4456,15 +4493,20 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
   -- axis is read through the instrumented reader per the READER CONTRACT;
   -- the enclosing force is write-poisoned by 'tellEventRouted' anyway, so
   -- the observation can never install a context-fingerprint cache entry.
+  -- The whole context is stamped on the row as well ('writeCtx'), raw: it
+  -- affects no value here, only where the row's value is later forced for
+  -- display, and that force runs under it (see 'Provenance').
   evalNow <- getEvalTime
   mVt     <- readTcValidTime
+  ctx     <- getTemporalContext
   mParty  <- getCurrentParty
   let prov = MkProvenance
-        { party  = fromMaybe "" mParty
-        , source = if isOfficial then "COMMIT"
-                   else maybe "RECORD" (const "NOTIFY") mRecipientKey
-        , txTime = evalNow
-        , vtFrom = mVt
+        { party    = fromMaybe "" mParty
+        , source   = if isOfficial then "COMMIT"
+                     else maybe "RECORD" (const "NOTIFY") mRecipientKey
+        , txTime   = evalNow
+        , vtFrom   = mVt
+        , writeCtx = ctx
         }
       -- NOTIFY v1: a recipient-qualified RECORD routes the write to the named
       -- recipient's own ledger ('RouteNotify recipientKey'); a bare RECORD routes

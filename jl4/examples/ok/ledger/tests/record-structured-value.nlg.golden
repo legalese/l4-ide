@@ -1,0 +1,7 @@
+record orders is `Purchase` with 2 and list of `lozenges` and `syrup`
+record cart is list of `lozenges`
+record who is `Agent`
+executing contract `checking out` at 0 with the following events: party `Agent` did `check out` at 1
+`total of` with `Purchase` with 2 and list of `lozenges` and `syrup`
+executing contract `recording a bad price` at 0 with the following events: party `Agent` did `check out` at 1
+executing contract `recording a refusal` at 0 with the following events: party `Agent` did `check out` at 1

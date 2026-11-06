@@ -11,6 +11,7 @@ module L4.EvaluateLazy.Exceptions
 , maximumStackSize
 , maximumFrameDepth
 , maximumUnknownSteps
+, maximumDisplaySteps
 )
 where
 
@@ -88,6 +89,12 @@ data UserEvalException =
     -- (§4.5, build step 3). Never reported as such: the connective whose
     -- right operand ran out, or the directive boundary, rewrites it into
     -- 'Stuck' naming the inputs that started the count.
+  | DisplayBudgetExhausted
+    -- ^ forcing a ledger row's value for display took more machine steps
+    -- than 'maximumDisplaySteps' allows (LED, 2026-10-24). Raised only
+    -- inside the display pass of 'L4.EvaluateLazy.nfDirectiveWith', where
+    -- it is caught per row and shown in the row's value column; showing the
+    -- ledger must not change whether a run ends.
   | UserError Text -- ^ general user-facing error (e.g. missing TIMEZONE declaration)
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -185,6 +192,9 @@ prettyUserEvalException = \ case
   RanOutOfSteps ->
     [ "I gave up evaluating: working this out over an unknown took more than "
       <> Text.textShow maximumUnknownSteps <> " steps." ]
+  DisplayBudgetExhausted ->
+    [ "I gave up showing this value: working it out took more than "
+      <> Text.textShow maximumDisplaySteps <> " steps." ]
   UserError msg ->
     [ msg ]
 
@@ -204,6 +214,17 @@ indentStuckName = \ case
 -- take far more, measures it again.
 maximumUnknownSteps :: Int
 maximumUnknownSteps = 250_000
+
+-- | The step budget for forcing ONE ledger row's value for display (LED,
+-- 2026-10-24: showing the ledger must not change whether a run ends). A
+-- separate counter from 'maximumUnknownSteps', which belongs to the
+-- directive's own evaluation; this one is started and stopped around each
+-- row by the display pass. The size is assumed, not ruled. Measured on
+-- 2026-10-25 (`ok/ledger/record-diverging-value.l4`, an M-series Mac): a
+-- row that exhausts it costs about 0.3 s, and no row of the ledger corpus
+-- comes near it (a golden would show the budget wording if one did).
+maximumDisplaySteps :: Int
+maximumDisplaySteps = 1_000_000
 
 -- | Depth cutoff when converting WHNF results to normal form (deeper parts
 -- of the result are 'Omitted').

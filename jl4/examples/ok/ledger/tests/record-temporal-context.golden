@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+record-temporal-context.l4:26:1-29:100:
+  Out OF 7, 9, (Box OF (JUST OF 7))
+  Ledger:
+    RECORD `rate` IS 7   [source=RECORD, at=2025-01-31T15:45:30Z, vt=2023-01-01]
+    RECORD `rate` IS 9   [source=RECORD, at=2025-01-31T15:45:30Z, vt=2024-01-01]
+    RECORD `snap` IS Box OF (JUST OF 7)   [source=RECORD, at=2025-01-31T15:45:30Z, vt=2023-06-01]
+record-temporal-context.l4:42:1-43:58:
+  Dated OF (DATE OF 31, 1, 2025)
+  Ledger:
+    RECORD `when` IS Dated OF (DATE OF 1, 6, 2023)   [source=RECORD, at=2025-01-31T15:45:30Z]
