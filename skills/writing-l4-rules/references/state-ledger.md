@@ -130,9 +130,8 @@ PARTY Landlord MUST `serve notice` WITHIN 14
         HENCE PARTY Tenant MUST acknowledge WITHIN 14
 ```
 
-After this performs, `RECALL Tenant's `noticeReceived``sees a`JUST`; the acting party's own `RECALL`does not.
-**"Notify the world" is still`COMMIT`/`ATTEST`to`OFFICIAL`** (anyone can `RECALL OFFICIAL's …`it);
-recipient-qualification is a`RECORD`-only feature.
+After this performs, ``RECALL Tenant's `noticeReceived` `` sees a `JUST`; the acting party's own `RECALL` does not.
+"Notify the world" is still `COMMIT`/`ATTEST` to `OFFICIAL` (anyone can `RECALL OFFICIAL's …` it); recipient-qualification is a `RECORD`-only feature.
 
 ---
 
