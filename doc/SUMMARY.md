@@ -21,6 +21,7 @@
   - [The instance ledger](reference/regulative/ledger.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
+  - [calendar: business days](reference/libraries/calendar.md)
 - [Patterns](tutorials/getting-started/common-patterns.md)
 - [Errors and Troubleshooting](reference/errors/README.md)
 

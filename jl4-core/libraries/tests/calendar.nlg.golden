@@ -1,0 +1,73 @@
+`Weekday of` with `Day` with 31, 10 and 2026 is equal to `Saturday`
+`Weekday of` with `Day` with 2, 11 and 2026 is equal to `Monday`
+`next business day on or after` with `weekdays only` and `Day` with 31, 10 and 2026 is equal to `Day` with 2, 11 and 2026
+`next business day on or after` with `weekdays only` and `Day` with 2, 11 and 2026 is equal to `Day` with 2, 11 and 2026
+`add business days` with `weekdays only`, 1 and `Day` with 2, 11 and 2026 is equal to `Day` with 3, 11 and 2026
+`add business days` with `weekdays only`, 1 and `Day` with 31, 10 and 2026 is equal to `Day` with 2, 11 and 2026
+`add business days` with `weekdays only`, 1 and `Day` with 30, 10 and 2026 is equal to `Day` with 2, 11 and 2026
+`previous business day on or before` with `weekdays only` and `Day` with 31, 10 and 2026 is equal to `Day` with 30, 10 and 2026
+`previous business day on or before` with `weekdays only` and `Day` with 30, 10 and 2026 is equal to `Day` with 30, 10 and 2026
+`modified following business day` with `weekdays only` and `Day` with 31, 10 and 2026 is equal to `Day` with 30, 10 and 2026
+`modified following business day` with `weekdays only` and `Day` with 7, 11 and 2026 is equal to `Day` with 9, 11 and 2026
+`modified following business day` with `weekdays only` and `Day` with 30, 10 and 2026 is equal to `Day` with 30, 10 and 2026
+`next business day on or after` with `weekdays except` with list of `Day` with 2, 11 and 2026 and `Day` with 31, 10 and 2026 is equal to `Day` with 3, 11 and 2026
+`is a business day` with `weekdays except` with list of `Day` with 2, 11 and 2026 and `Day` with 3, 11 and 2026
+not `is a business day` with `weekdays except` with list of `Day` with 2, 11 and 2026 and `Day` with 2, 11 and 2026
+not `is a business day` with `weekdays except` with list of the sum of `Day` with 2, 11 and 2026 and 0.5 and `Day` with 2, 11 and 2026
+not `is a business day` with `weekdays except the dates` with list of 2 November 2026 and `Day` with 2, 11 and 2026
+`add business days` with `weekdays except` with list of `Day` with 2, 11 and 2026, 3 and `Day` with 30, 10 and 2026 is equal to `Day` with 5, 11 and 2026
+`add business days` with `weekdays only`, 3 and `Day` with 30, 10 and 2026 is equal to `Day` with 4, 11 and 2026
+`add business days` with `weekdays only`, 0 and `Day` with 31, 10 and 2026 is equal to `Day` with 31, 10 and 2026
+`business days between` with `weekdays only`, `Day` with 30, 10 and 2026 and `Day` with 6, 11 and 2026 is equal to 5
+`business days between` with `weekdays only`, `Day` with 30, 10 and 2026 and `add business days` with `weekdays only`, 7 and `Day` with 30, 10 and 2026 is equal to 7
+`business days between` with `weekdays only`, `Day` with 31, 10 and 2026 and `Day` with 31, 10 and 2026 is equal to 0
+`business days between` with `weekdays only`, `Day` with 30, 10 and 2026 and `Day` with 31, 10 and 2026 is equal to 0
+`business days between` with `weekdays only`, `Day` with 31, 10 and 2026 and `Day` with 2, 11 and 2026 is equal to 1
+`next business day on or after` with `weekdays only` and the sum of `Day` with 2, 11 and 2026 and 0.5 is equal to `Day` with 2, 11 and 2026
+`next business day on or after` with `weekdays only` and the sum of `Day` with 2, 11 and 2026 and 0.9 is equal to `Day` with 2, 11 and 2026
+`next business day on or after` with `weekdays only` and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 2, 11 and 2026
+`add business days` with `weekdays only`, 1 and the sum of `Day` with 30, 10 and 2026 and 0.5 is equal to `Day` with 2, 11 and 2026
+`previous business day on or before` with `weekdays only` and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 30, 10 and 2026
+`modified following business day` with `weekdays only` and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 30, 10 and 2026
+`add business days` with `weekdays only`, 0 and the sum of `Day` with 31, 10 and 2026 and 0.5 is equal to `Day` with 31, 10 and 2026
+`add business days` with `weekdays only`, 3 and the sum of `Day` with 30, 10 and 2026 and 0.5 is equal to `Day` with 4, 11 and 2026
+`is a business day` with `weekdays only` and the sum of `Day` with 2, 11 and 2026 and 0.5
+`business days between` with `weekdays only`, the sum of `Day` with 7, 11 and 2026 and 0.2 and the sum of `Day` with 8, 11 and 2026 and 0.5 is equal to 0
+`business days between` with given `d` then `d` is equal to `Day` with 2, 11 and 2026, the sum of `Day` with 30, 10 and 2026 and 0.5 and the sum of `Day` with 2, 11 and 2026 and 0.5 is equal to 1
+`is a business day` with given `d` then `d` is equal to `Day` with 2, 11 and 2026 and the sum of `Day` with 2, 11 and 2026 and 0.5
+`next business day on or after` with `weekdays only` and 31 October 2026 is equal to 2 November 2026
+`next business day on or after` with `weekdays only` and 2 November 2026 is equal to 2 November 2026
+`add business days` with `weekdays only`, 1 and 30 October 2026 is equal to 2 November 2026
+`previous business day on or before` with `weekdays only` and 31 October 2026 is equal to 30 October 2026
+`previous business day on or before` with `weekdays only` and 30 October 2026 is equal to 30 October 2026
+`modified following business day` with `weekdays only` and 31 October 2026 is equal to 30 October 2026
+`modified following business day` with `weekdays only` and 7 November 2026 is equal to 9 November 2026
+`add business days` with `weekdays only`, 3 and 30 October 2026 is equal to 4 November 2026
+`business days between` with `weekdays only`, 30 October 2026 and 6 November 2026 is equal to 5
+`is a business day` with `weekdays only` and 30 October 2026
+not `is a business day` with `weekdays only` and 31 October 2026
+the following must refuse: `next business day on or after` with `weekdays only` and 5
+the following must refuse: `add business days` with `weekdays only`, 1 and 5
+the following must refuse: `previous business day on or before` with `weekdays only` and 5
+the following must refuse: `modified following business day` with `weekdays only` and 5
+the following must refuse: `add business days` with `weekdays only`, 0 and 5
+the following must refuse: `add business days` with `weekdays only`, 2 and 5
+the following must refuse: `business days between` with `weekdays only`, 5 and 10
+the following must refuse: `business days between` with `weekdays only`, `Day` with 30, 10 and 2026 and 5
+the following must refuse: `is a business day` with `weekdays only` and 364.9
+the following must refuse: `is a business day` with given `d` then `TRUE` and 364
+`is a business day` with given `d` then `TRUE` and 365
+the following must refuse: `next business day on or after` with given `d` then `TRUE` and 364
+`next business day on or after` with given `d` then `TRUE` and 365 is equal to 365
+the following must refuse: `add business days` with `weekdays only`, the difference between 1 and 0 and `Day` with 30, 10 and 2026
+the following must refuse: `add business days` with `weekdays only`, 1.5 and `Day` with 30, 10 and 2026
+the following must refuse: `business days between` with `weekdays only`, `Day` with 2, 11 and 2026 and `Day` with 30, 10 and 2026
+the following must refuse: `next business day on or after` with given `d` then `FALSE` and `Day` with 30, 10 and 2026
+the following must refuse: `previous business day on or before` with given `d` then `FALSE` and `Day` with 30, 10 and 2026
+`next business day on or after` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 365 and `Day` with 30, 10 and 2026 is equal to the sum of `Day` with 30, 10 and 2026 and 365
+the following must refuse: `next business day on or after` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 366 and `Day` with 30, 10 and 2026
+`add business days` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 366, 1 and `Day` with 30, 10 and 2026 is equal to the sum of `Day` with 30, 10 and 2026 and 366
+the following must refuse: `add business days` with given `d` then `d` is equal to the sum of `Day` with 30, 10 and 2026 and 367, 1 and `Day` with 30, 10 and 2026
+`previous business day on or before` with given `d` then `d` is equal to the difference between 365 and `Day` with 30, 10 and 2026 and `Day` with 30, 10 and 2026 is equal to the difference between 365 and `Day` with 30, 10 and 2026
+the following must refuse: `previous business day on or before` with given `d` then `d` is equal to the difference between 366 and `Day` with 30, 10 and 2026 and `Day` with 30, 10 and 2026
+`modified following business day` with given `d` then `d` is equal to `Day` with 14, 1 and 2026 or `d` is equal to `Day` with 15, 1 and 2027 and `Day` with 15, 1 and 2026 is equal to `Day` with 14, 1 and 2026

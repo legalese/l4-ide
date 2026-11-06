@@ -1,0 +1,4 @@
+executing contract `pay within five days of notice, rolled` at `Mon 26 Oct` with the following events: party `Seller` did `notify` at `Mon 26 Oct` party `Buyer` did `pay` at `Mon 2 Nov`
+executing contract `pay within five days of notice, rolled` at `Mon 26 Oct` with the following events: party `Seller` did `notify` at `Mon 26 Oct` party `Buyer` did `pay` at `Tue 3 Nov`
+executing contract `serve on a business day within ten days, rolled` at `Wed 21 Oct` with the following events: party `Landlord` did `serve` with `Sat 31 Oct` at `Sat 31 Oct` party `Landlord` did `serve` with `Mon 2 Nov` at `Mon 2 Nov`
+executing contract `pay on a business day, written wrongly` at `Mon 26 Oct` with the following events: party `Seller` did `notify` at `Fri 30 Oct` party `Buyer` did `pay` at `Sat 31 Oct`
