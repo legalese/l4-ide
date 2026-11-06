@@ -1,0 +1,36 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: two-meanings-before-a-where-constant.l4
+  Hidden: no
+  Range: 29:17-29:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      size
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      size (defined at two-meanings-before-a-where-constant.l4:26:8-12) of type FOR ALL a FUNCTION FROM a TO NUMBER
+      size (defined at two-meanings-before-a-where-constant.l4:21:8-12) of type FUNCTION FROM Colour TO NUMBER
+
+File: two-meanings-before-a-where-constant.l4
+  Hidden: no
+  Range: 29:23-29:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      thing
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      thing (defined at two-meanings-before-a-where-constant.l4:17:8-13) of type Light
+      thing (defined at two-meanings-before-a-where-constant.l4:14:8-13) of type Colour
