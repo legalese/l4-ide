@@ -1,9 +1,14 @@
--- A library alias used at two types in one module. `singleton` and `fromList`
--- are singleToDict and listToDict under another name, and polymorphic as they
--- are, so this module checks.
+-- A library alias used at two types in one module, and looked up in.
+-- `singleton` and `fromList` are singleToDict and listToDict under another name,
+-- and polymorphic as they are.
 IMPORT prelude
 
 `numbers to letters` MEANS singleton 1 "a"
 `letters to numbers` MEANS singleton "b" 2
 `pairs of numbers to letters` MEANS fromList (LIST PAIR OF 1, "a")
 `pairs of letters to numbers` MEANS fromList (LIST PAIR OF "b", 2)
+
+#EVAL dictLookup 1 (`numbers to letters`)
+#EVAL dictLookup "b" (`letters to numbers`)
+#EVAL dictLookup "late filing" (singleton "late filing" 250)
+#EVAL dictLookup "late filing" (fromList (LIST PAIR OF "late filing", 250))

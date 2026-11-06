@@ -1,0 +1,15 @@
+-- A call with a sentence inside a call without one, 32 levels deep. l4 render
+-- used to rewrite an argument again to decide its brackets, so its time doubled
+-- with each level, and this file would take hours.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %x% is shown
+`shown` MEANS x
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+`fb` MEANS x
+
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+`top` MEANS `fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (`fb` (`shown` (p))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
