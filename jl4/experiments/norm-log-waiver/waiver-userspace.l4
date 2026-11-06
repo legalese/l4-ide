@@ -1,0 +1,82 @@
+-- A waiver built from existing L4 only, for NORM-LOG-SPEC ruling N9 (Meng's note, 2026-09-28).
+-- Tutorial and findings: specs/todo/norm-log-waiver-userspace-draft.md.
+-- Not under a goldened glob; run with `l4 run`. Expected results are on each #TRACE.
+-- Three traps are demonstrated, all silent (exit 0): W6 reader-before-writer, W7 a false time.
+IMPORT prelude
+
+DECLARE Person IS ONE OF patron, librarian
+DECLARE Action IS ONE OF
+  `return` HAS book IS A NUMBER
+  payFine HAS at IS A NUMBER
+  borrow HAS book IS A NUMBER
+             at IS A NUMBER
+  waive HAS at IS A NUMBER
+
+-- every act carries its own contract time, because a guard has no name for "now"
+GIVETH DEONTIC Person Action
+loan MEANS
+  PARTY patron MUST `return` 1 WITHIN 14
+  HENCE FULFILLED
+  LEST  RECORD `overdue since` IS 14
+        HENCE PARTY patron MUST payFine t WITHIN 100
+              HENCE RECORD `cured at` IS t
+              HENCE FULFILLED
+
+GIVETH DEONTIC Person Action
+waiverPower MEANS
+  PARTY librarian MAY waive t WITHIN 100
+  HENCE COMMIT `waived at` IS t
+  HENCE FULFILLED
+
+GIVEN now IS A NUMBER
+      cell IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+`happened by` MEANS
+  CONSIDER cell
+  WHEN NOTHING THEN FALSE
+  WHEN JUST x THEN x AT MOST now
+
+-- "continuing" at a given instant: failed by then, and neither cured nor waived by then
+GIVEN now IS A NUMBER
+GIVETH A BOOLEAN
+`default continuing at` MEANS
+      `happened by` now (RECALL patron's `overdue since`)
+  AND NOT `happened by` now (RECALL patron's `cured at`)
+  AND NOT `happened by` now (RECALL OFFICIAL's `waived at`)
+
+GIVETH DEONTIC Person Action
+borrowing MEANS
+  PARTY patron MAY borrow 2 t PROVIDED NOT `default continuing at` t WITHIN 100
+
+GIVETH DEONTIC Person Action
+lwb MEANS loan RAND waiverPower RAND borrowing
+GIVETH DEONTIC Person Action
+bwl MEANS borrowing RAND waiverPower RAND loan
+
+-- W1 late, unpaid, not waived: expect blocked
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES borrow 2 30 AT 30
+-- W2 waived at 25, borrow 30: expect allowed
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY librarian DOES waive 25 AT 25
+  PARTY patron DOES borrow 2 30 AT 30
+-- W3 borrow 30, waived 40: expect blocked
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES borrow 2 30 AT 30
+  PARTY librarian DOES waive 40 AT 40
+-- W4 fine paid at 21: expect allowed
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES payFine 21 AT 21
+  PARTY patron DOES borrow 2 30 AT 30
+-- W6 = W1 with the reader on the LEFT: should block; ALLOWS (trap: reader before writer, N10)
+#TRACE bwl AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES borrow 2 30 AT 30
+-- W7 = W1, but the patron claims the borrow happened at 10: should block; ALLOWS (trap: party-asserted time)
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES borrow 2 10 AT 30
