@@ -21,6 +21,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
   ( createDirectoryIfMissing
+  , findExecutable
   , createFileLink
   , doesFileExist
   , getTemporaryDirectory
@@ -387,3 +388,28 @@ shouldNotContain' what haystack needle =
   when (needle `isInfixOf` haystack) $
     expectationFailure $
       what ++ " unexpectedly contains " ++ show needle ++ "\n--- got ---\n" ++ haystack
+
+----------------------------------------------------------------------------
+-- An SMT solver (l4 prove, and the Catala witness gate)
+----------------------------------------------------------------------------
+
+-- | Run the body only when a solver can be found, as @l4 prove@ itself finds
+-- one (@Z3_EXE@, then @z3@ on @PATH@).
+withZ3 :: IO () -> IO ()
+withZ3 act = do
+  configured <- lookupEnv "Z3_EXE"
+  found <- case configured of
+    Just p | not (null p) -> pure True
+    _ -> maybe False (const True) <$> findExecutable "z3"
+  required <- lookupEnv "Z3_CHECK_REQUIRED"
+  if found
+    then act
+    else if required == Just "1"
+      then expectationFailure "Z3_CHECK_REQUIRED=1, but no z3 was found (set Z3_EXE or put z3 on PATH)"
+      else pendingWith "skipped: z3 not found (set Z3_EXE or put z3 on PATH); no verdict was measured"
+
+-- | Run l4 with these variables set over the inherited environment.
+runL4WithEnvExtra :: [(String, String)] -> FilePath -> [String] -> IO Output
+runL4WithEnvExtra extra bin args = do
+  parent <- getEnvironment
+  runL4WithEnv (Just (extra <> filter ((`notElem` map fst extra) . fst) parent)) bin args

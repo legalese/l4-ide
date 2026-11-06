@@ -1,0 +1,26 @@
+-- A rate table with nine nested bands, so its exception ladder has nine
+-- atomic conditions: past the exhaustive grid's cap of 8 (2^9 = 512 rows), so
+-- before the witness gate this ladder fell back to the boolean rendering.
+-- Ten of the 512 combinations are realisable (the bands nest), and the solver
+-- proves the other 502 impossible.
+
+DECLARE Earner HAS
+    income IS A NUMBER
+
+@export The marginal rate an earner pays.
+GIVEN e IS AN Earner
+GIVETH A NUMBER
+`marginal rate` e MEANS
+  BRANCH
+    IF e's income GREATER THAN 900000 THEN 0.50
+    IF e's income GREATER THAN 800000 THEN 0.45
+    IF e's income GREATER THAN 700000 THEN 0.40
+    IF e's income GREATER THAN 600000 THEN 0.35
+    IF e's income GREATER THAN 500000 THEN 0.30
+    IF e's income GREATER THAN 400000 THEN 0.25
+    IF e's income GREATER THAN 300000 THEN 0.20
+    IF e's income GREATER THAN 200000 THEN 0.15
+    IF e's income GREATER THAN 100000 THEN 0.10
+    OTHERWISE                              0.05
+
+#EVAL `marginal rate` (Earner WITH income IS 650000)

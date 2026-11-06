@@ -806,6 +806,7 @@ jobs:
           zlib1g-dev
           liblzma-dev
           xz-utils
+          z3
       - name: Update git config
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: actions/checkout@v5
@@ -1036,6 +1037,9 @@ jobs:
         run: cabal test all
         env:
           JL4_LIBRARY_PATH: ${{ github.workspace }}/jl4-core/libraries
+          # z3 is installed above for `l4 prove`; without this, a missing solver
+          # would leave its CLI tests PENDING rather than red.
+          Z3_CHECK_REQUIRED: "1"
 
       - name: Run documentation tests
         run: ./doc/test-docs.sh

@@ -31,3 +31,4 @@
 ## Reviewing
 
 - [Reviewing Encoded Law](reviewing/reviewing-encoded-law.md)
+- [Proving an assertion: `l4 prove`](reviewing/proving-assertions.md)
