@@ -40,6 +40,12 @@ module L4.Import.Resolution
   , moduleNameToProjectUri
   , moduleNameToCandidateUris
   , CandidateUri(..)
+    -- * Written import names: bare or path
+  , ImportForm(..)
+  , classifyImport
+  , pathImportFile
+  , CollapsedPath(..)
+  , collapsePath
     -- * Import Extraction
   , extractImportNames
     -- * Resolution
@@ -55,6 +61,7 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import System.FilePath (isAbsolute, joinPath, splitDirectories)
 
 import L4.Annotation (emptyAnno)
 import L4.Lexer (PError(..))
@@ -120,6 +127,85 @@ moduleNameToCandidateUris mBaseUri mRoot modName =
     rootCandidate _root =
       -- TODO: compute file:// URI from root
       []
+
+-- ----------------------------------------------------------------------------
+-- Written import names: bare or path
+-- ----------------------------------------------------------------------------
+
+-- | How the text of a written @IMPORT@ name is resolved
+-- (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.2).
+--
+-- The class is decided by the text alone, and only by whether it contains a
+-- @\/@: a name without one is resolved by the bare-name ladder, exactly as it
+-- was before path imports existed.
+data ImportForm
+  = BareImport
+    -- ^ No @\/@: @IMPORT prelude@, @IMPORT \`sg-succession-domain\`@, and also
+    -- @IMPORT foo.l4@ and @IMPORT a.b@, which the bare-name ladder reduces to
+    -- @foo@ and @a@.
+  | PathImport
+    -- ^ A relative path with at least one @\/@: @IMPORT \`..\/other-row\/mod\`@.
+  | RootedImport
+    -- ^ A path with a leading @\/@. Reserved for a root-relative form that is
+    -- not specified yet, and refused until it is.
+  deriving stock (Eq, Show)
+
+-- | Classify the text of a written import name. A backslash is not a path
+-- separator on any platform: it is an ordinary character of a name.
+classifyImport :: Text -> ImportForm
+classifyImport t
+  | not (Text.isInfixOf "/" t) = BareImport
+  | Text.isPrefixOf "/" t      = RootedImport
+  | otherwise                  = PathImport
+
+-- | The file a path import names, relative to the importing file's directory:
+-- one trailing @.l4@ is dropped if present and @.l4@ appended, so
+-- @..\/b\/mod@ and @..\/b\/mod.l4@ name the same file.
+pathImportFile :: Text -> FilePath
+pathImportFile t =
+  joinPath (filter (not . null) (map Text.unpack (Text.splitOn "/" bare)))
+    <> ".l4"
+  where
+    bare = fromMaybe t (Text.stripSuffix ".l4" t)
+
+-- | A path with its @.@ and @x\/..@ segments removed by a lexical walk that
+-- never consults the filesystem.
+data CollapsedPath = CollapsedPath
+  { cpPath    :: FilePath
+  , cpEscaped :: Bool
+    -- ^ The walk stepped above the start of a relative path (so @cpPath@ begins
+    -- with @..@), or above the root of an absolute one. A runtime that serves
+    -- somebody else's files refuses such a path before it reads anything.
+  }
+  deriving stock (Eq, Show)
+
+-- | Collapse @.@ and @..@ segments lexically.
+--
+-- 'System.FilePath.normalise' alone is not enough: it removes @.@ segments and
+-- leaves @sub\/..\/core.l4@ as it is (RELATIVE-IMPORTS-SPEC §0 #11), so the
+-- same file reached by two spellings would be two modules.
+collapsePath :: FilePath -> CollapsedPath
+collapsePath fp =
+  CollapsedPath
+    { cpPath = case joinPath (rootSegment <> reverse kept) of
+        "" -> "."
+        p  -> p
+    , cpEscaped = escaped
+    }
+  where
+    (rootSegment, segments) = case splitDirectories fp of
+      (r : rest) | isAbsolute r -> ([r], rest)
+      ss                        -> ([], ss)
+
+    (kept, escaped) = foldl' step ([], False) segments
+
+    step (ks, esc) = \ case
+      "."  -> (ks, esc)
+      ".." -> case ks of
+        (k : ks') | k /= ".." -> (ks', esc)
+        _ | null rootSegment  -> (".." : ks, True)
+          | otherwise         -> (ks, True)
+      seg  -> (seg : ks, esc)
 
 -- ----------------------------------------------------------------------------
 -- Import Extraction

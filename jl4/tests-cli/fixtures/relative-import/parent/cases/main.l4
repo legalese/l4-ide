@@ -1,0 +1,5 @@
+IMPORT `../domain`
+
+casevalue MEANS domainmarker * 6
+
+#EVAL casevalue
