@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Classpath-only pom for the dmn-check harness. Nothing here is part of the L4
+  build: `run.sh` uses it exclusively to resolve a classpath into $TMPDIR, and the
+  jars never enter the repo.
+
+  WHAT dmn-check IS. red6/dmn-check, https://github.com/red6/dmn-check, Apache-2.0
+  (the licence block of the 1.4.0 parent pom on Maven Central says so). A set of
+  static analyses over a DMN file's STRUCTURE: duplicate, conflicting and shadowed
+  rules, missing ids and names, input/output type declarations, entries whose
+  FEEL does not match the declared type, aggregation misuse, and requirement-graph
+  shape. It reads the file with Camunda 7's camunda-dmn-model and never executes
+  anything. It is therefore a third kind of evidence beside etc/validate-dmn.mjs
+  (is the XML well-formed DMN 1.3?) and etc/camunda-dmn-check (does a Camunda 8
+  engine load and evaluate it?).
+
+  VERSION IS PINNED, and so is every transitive jar: jars.sha256 holds the
+  SHA-256 of each file on the resolved classpath, and run.sh refuses to run if
+  one differs. 1.4.0 is the latest release on Maven Central (maven-metadata.xml,
+  lastUpdated 2026-07-15) and its parent pom sets java.version to 21, so the
+  harness needs JDK 21+. Bumping the version means regenerating jars.sha256
+  (README, "Bumping the pin").
+
+  dmn-check-cli is the artifact the project ships as a command line; it pulls in
+  dmn-check-plugin-base, -validators and -core. The harness drives the validators
+  from its own small main class (src/main/java/DmnCheckRun.java) rather than
+  through the CLI's, because the CLI prints nothing for a file with no findings,
+  cannot say which validator produced a finding, and names no file when one
+  cannot be read. README, "Why a driver and not the CLI".
+
+  Keep this classpath apart from etc/camunda-dmn-check's and etc/kie-dmn-check's.
+  dmn-check carries Camunda 7's camunda-dmn-model 7.24.0, and the pom in
+  etc/camunda-dmn-check records that Camunda 7 and Camunda 8 artifacts must never
+  share a classpath. Nobody has tried merging these; separate directories make
+  the question moot.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.legalese.l4</groupId>
+  <artifactId>dmn-check-harness</artifactId>
+  <version>1.0</version>
+  <packaging>jar</packaging>
+  <properties>
+    <dmncheck.version>1.4.0</dmncheck.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>de.redsix</groupId>
+      <artifactId>dmn-check-cli</artifactId>
+      <version>${dmncheck.version}</version>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <!-- The plugin run.sh invokes, pinned so that "mvn dependency:build-classpath"
+           does not mean a different plugin on every machine. 3.7.0 is what
+           resolved on 2026-10-30. Its jars run BEFORE jars.sha256 is checked, so this
+           is a version pin and not a checksum pin; README, "What is not verified". -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.7.0</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>

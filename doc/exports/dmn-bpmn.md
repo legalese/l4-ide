@@ -390,3 +390,10 @@ The worked example is `jl4/examples/dmn/refuse.l4` — one of each position a re
 - **Evidence:** the DMN goldens are executed in CI against **two independent engines**, KIE and
   Camunda, and the BPMN output is checked for soundness — so the exports are validated against
   real implementations rather than against our reading of the standard.
+
+A further, optional check is [dmn-check](https://github.com/red6/dmn-check) 1.4.0 (Apache-2.0), a linter that reads a DMN file's structure, such as duplicate or shadowed rules, missing types and the shape of the decision graph, and never runs it.
+Run `etc/dmn-check/run.sh FILE.dmn` on one export, or `etc/dmn-check/run.sh --corpus` to run `l4 export dmn` over every `.l4` file under `jl4/examples` (except those below a `not-ok` directory and `*.evaldiff.l4` scratch files) and check the ones that export, using the `l4` on your `PATH` or in `DMN_CHECK_L4`.
+It needs Maven and a JDK 21 or later, which it finds itself (`DMN_CHECK_JAVA_HOME`, else a fixed list of install paths; it does not read `JAVA_HOME` or look for a `java` on `PATH`), and its first run downloads dmn-check and its dependencies from Maven Central.
+It is not run in CI, and it prints one `skipped:` line and exits 0, rather than failing, when Maven, a JDK 21 or later, `shasum` or `sha256sum`, or (with `--corpus`) an `l4` is missing, or when it is offline and has not yet downloaded dmn-check.
+Read what it says as evidence and not as a score: it speaks Camunda 7's vocabulary, so on the 2026-10-30 run about 94% of its 5,677 findings on 488 exported files were dmn-check's own model or opinion and not a problem in the rules or the export (for example, it cannot parse the type `number` or a function call, it reads a decision service's input reference as an input with no id, it asks for a type on every output where DMN 1.3 makes one optional, and it expects one connected graph with a single final decision).
+`etc/dmn-check/README.md` sorts every kind of finding into real, exporter and dmn-check, with the evidence for each.
