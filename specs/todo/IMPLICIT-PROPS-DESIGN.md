@@ -1882,9 +1882,9 @@ the toolchain was absent, with no way to distinguish that from a pass, and it ra
 `KIE_CHECK_REQUIRED` pattern), and `pr-checks.yml` gains a `catala` paths filter plus a
 `catala-validate` job. The filter is the load-bearing half: a hand-edited `.catala_en` golden or a
 new `.l4` under `jl4/examples/catala/` previously matched **no** filter in that file, so such a PR
-ran no Catala-aware job — only the four unfiltered ones — and merged green. The job itself skips on a hosted runner — ubuntu-latest has no OCaml
-catala and R9 forbids a hard dependency — and its header says so, so a green tick is not misread as
-validation.
+ran no Catala-aware job — only the four unfiltered ones — and merged green.
+The harness is still optional when present (R9 forbids a hard dependency), but with legalese/l4-ide#786 the job installs Catala 1.3.0 through opam and sets `CATALA_CHECK_REQUIRED=1` when the `catala` filter matches, so on such a PR a missing toolchain is a failure and a green tick means Catala accepted the goldens.
+A PR that matches only the `haskell` filter still runs the job and the harness skips; that tick is not evidence about Catala, and the job header says so.
 
 ### 11.11 R11 — `@reads`. RULED 2026-09-04 (marked accept).
 
