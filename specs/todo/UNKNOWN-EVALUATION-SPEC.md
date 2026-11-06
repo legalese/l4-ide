@@ -976,6 +976,7 @@ An assumption is not a ruling: a builder who finds one wrong changes it here, in
 Row 58, every corpus directive not stuck after build step 1, holds from step 2 on; each step measures it by rerunning §2.6's census on its own build and comparing every directive's result kind and value with the tree after step 1, while §7's item 4 measures wall clock.
 
 **Steps 4 to 7 are parked** (Meng, 2026-10-02, MOTHBALL): they are not planned until a user asks for them, and the build stops after step 3.
+_Un-parked in part, 2026-10-10:_ step 6's two dependencies (W1's placeholders extended to every input that is not a `MAYBE`, and lazy binding on the direct path) were accepted on bench card C1 of the Presumption and Assertion bench, recorded in `presumption-assertion/CONTRACT.md` §5.4; the rest of steps 4 to 7 stays parked.
 Their text below, and the rulings whose full form lands in them, stay as recorded, so that a later build starts from the decisions already made; none is reversed.
 Where steps 1 to 3 carry an interim for such a ruling (step 3's step counter, its re-raising of an error or refusal under an unknown as `Stuck`, and `IF`, `BRANCH` and `CONSIDER` on a term staying `Stuck`), the interim is what ships.
 The decision followed a review that weighed this spec, none of whose §4 to §8 was built then, against §2.6's census: 9 stuck results among the corpus's 7,211.
