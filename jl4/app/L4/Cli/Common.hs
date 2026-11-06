@@ -23,6 +23,10 @@ module L4.Cli.Common
   , runOneshot
   , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , LoadedModule(..)
+  , Rules.TypeCheckResult(..)
+  , loadChecked
+  , loadCheckedEvaluated
   , transitiveDeps
   , dedupModules
   , hasBlockingError
@@ -49,7 +53,7 @@ module L4.Cli.Common
 import Base.Text (Text)
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Time (UTCTime)
 import Options.Applicative (ReadM, eitherReader, long, metavar, help, option, optional)
 import qualified Options.Applicative as Options
@@ -68,7 +72,8 @@ import LSP.Logger
   , makeRefRecorder
   , pretty
   )
-import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
+import qualified LSP.Core.Shake as Shake
+import Language.LSP.Protocol.Types (NormalizedFilePath, NormalizedUri, Diagnostic(..), DiagnosticSeverity(..), normalizedFilePathToUri)
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
@@ -479,6 +484,52 @@ putDiagnostics = mapM_ (hPutStrLn stderr . Text.unpack)
 -- JSON envelope quotes the already-prettified LSP log text.
 diagnosticsToJson :: [Text] -> Aeson.Value
 diagnosticsToJson = Aeson.toJSON
+
+-- | A file that type-checked, with the modules it imports. ('Rules.TypeCheckResult'
+-- is exported from here, so that a package that only reads it need not depend
+-- on @jl4-lsp@; its fields have types of @jl4-core@.)
+data LoadedModule = MkLoadedModule
+  { lmCheck   :: Rules.TypeCheckResult
+    -- ^ the result of checking the file; its @module'@ is the module itself
+  , lmImports :: [Module Resolved]
+    -- ^ every module it imports, transitively, once each ('transitiveDeps')
+  }
+
+-- | The loading that @l4 export@ does, for a command that reads a whole
+-- checked module (an export format added through "L4.Cli.Extensions", for
+-- one): run the pipeline on the file, and give back the module with its
+-- imports if it type-checked. The diagnostics come first, warnings among
+-- them; print them as an export does, since the output is handed to someone
+-- else. 'Nothing' means there is no successful type check, and the caller says
+-- so and fails.
+loadChecked :: EvalConfig -> FilePath -> IO ([Text], Maybe LoadedModule)
+loadChecked evalConfig fp = fmap (fmap fst) <$> loadWith evalConfig fp (\ _ -> pure ())
+
+-- | 'loadChecked', and the results of evaluating the file's directives
+-- (@#EVAL@, @#ASSERT@ and the like), in the order @l4 run@ prints them, for an
+-- export that needs the evaluator's verdicts. It is the same load: the
+-- file is read and checked once, and the evaluation is a rule of the same run
+-- that uses the check. The results are given only when the file type-checked,
+-- and a file with no directives has none. (@l4 run@ treats a missing
+-- evaluation the same way; if the evaluation rule produced nothing, the
+-- diagnostics say why.) What is in a result is in "L4.EvaluateLazy", in
+-- @jl4-core@.
+loadCheckedEvaluated :: EvalConfig -> FilePath -> IO ([Text], Maybe (LoadedModule, [EvalDirectiveResult]))
+loadCheckedEvaluated evalConfig fp =
+  loadWith evalConfig fp \ uri -> fromMaybe [] <$> Shake.use Rules.EvaluateLazy uri
+
+-- | One run of the pipeline on the file: the type check and, if it succeeded,
+-- whatever else the caller asks of the same run.
+loadWith :: EvalConfig -> FilePath -> (NormalizedUri -> Action a) -> IO ([Text], Maybe (LoadedModule, a))
+loadWith evalConfig fp more = do
+  (errs, loaded) <- runOneshot evalConfig fp \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    mTc <- Shake.use Rules.SuccessfulTypeCheck uri
+    case mTc of
+      Just tc | tc.success -> Just . (,) tc <$> more uri
+      _ -> pure Nothing
+  pure (errs, fmap (\ (tc, a) -> (MkLoadedModule {lmCheck = tc, lmImports = transitiveDeps tc}, a)) loaded)
 
 -- | Every module the checked one reaches through @IMPORT@, transitively, once
 -- each, in the order a depth-first walk of the imports first meets it

@@ -84,3 +84,8 @@ anthropic-apikey-*.api
 # cloned here by those who have it (see its README). Every path it names is
 # relative to this checkout's root, which is why it lives inside one.
 /etc/go/
+
+# A package cloned here is built with the rest, through `optional-packages:` in
+# cabal.project, and may add to the `l4` command line (L4.Cli.Extensions). It
+# is another repository, and nothing in this one depends on it.
+/etc/verify/

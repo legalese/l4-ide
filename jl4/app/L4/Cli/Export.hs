@@ -318,6 +318,7 @@ includeTestsSwitch = switch
 exportCmd :: ExportOptions -> IO ()
 exportCmd opts = do
   evalConfig <- makeEvalConfig (FixedNowOpt Nothing)
+  -- the same loading as 'loadChecked' in "L4.Cli.Common", which an extension's export format calls
   (errs, mTc) <- runOneshot evalConfig opts.exportFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
