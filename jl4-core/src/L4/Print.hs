@@ -851,6 +851,11 @@ inlineNlgFragment = \ case
 bareName :: (LayoutPrinter a, HasName a) => a -> Doc ann
 bareName = printWithLayout . rawName . getName
 
+-- | The same expression with no @\@nlg@ on any name in it, for printing an
+-- expression that is part of an evaluation RESULT rather than of source.
+withoutNlg :: Optics.GPlate Name s => s -> s
+withoutNlg = Optics.over (Optics.gplate @Name) (Optics.over annoOf (Optics.set annNlg Nothing . Optics.set annNlgAlts []))
+
 -- | Escape a close bracket, so a LINE-form annotation survives being re-emitted
 -- in the bracket form.
 --
@@ -932,9 +937,15 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
       [ "DEONTIC BREACHED:"
       , indent 2 $ printWithLayout reason
       ]
+    -- An obligation's party, action and deadlines are still EXPRESSIONS, and
+    -- their names are use occurrences that may carry an annotation written in
+    -- the rule (@PARTY Alice [the payer]@). Printed here they are part of a
+    -- result, so the annotations come off first, for the same reason as the
+    -- bare names above (pinned by @l4 run prints a value without its
+    -- annotations@ in @jl4\/tests-cli\/Main.hs@).
     Lazy.ValObligation _env p a t f l -> case t of
-      Left te -> prettyObligation p a te (Just f) l
-      Right tv -> prettyObligation p a (Just tv) (Just f) l
+      Left te -> prettyObligation (bimap withoutNlg id p) (withoutNlg a) (fmap withoutNlg te) (Just (withoutNlg f)) (fmap withoutNlg l)
+      Right tv -> prettyObligation (bimap withoutNlg id p) (withoutNlg a) (Just tv) (Just (withoutNlg f)) (fmap withoutNlg l)
     Lazy.ValROp _env op l r -> hsep
       [ printWithLayout l
       , case op of ValROr -> "OR"; ValRAnd -> "AND"
@@ -969,13 +980,13 @@ prettyNFWithConstructorFields fields = goNF
         | Just names <- Map.lookup (getUnique r) fields
         , length names == length vs
         , not (null vs)
-        -> printWithLayout r <+> "WITH"
+        -> bareName r <+> "WITH"
            <+> hsep (punctuate comma (zipWith fieldPair names vs))
       -- For everything else, delegate to the standard LayoutPrinter,
       -- but recurse into nested NF values with field-name awareness.
       Lazy.ValCons hd tl ->
         "LIST" <+> goList hd tl
-      Lazy.ValConstructor r vs -> printWithLayout r <> case vs of
+      Lazy.ValConstructor r vs -> bareName r <> case vs of
         [] -> mempty
         vals@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap goNFParens vals))
       other -> printWithLayout other
@@ -1077,7 +1088,7 @@ instance LayoutPrinter Lazy.NF where
     MkNF (Lazy.ValClosure{})              -> printWithLayout v
     MkNF (Lazy.ValUnappliedConstructor{}) -> printWithLayout v
     MkNF (Lazy.ValAssumed{})              -> printWithLayout v
-    MkNF (Lazy.ValConstructor r [])       -> printWithLayout r
+    MkNF (Lazy.ValConstructor r [])       -> bareName r
     _ -> surround (printWithLayout v) "(" ")"
 
 instance LayoutPrinter Reference where
