@@ -55,7 +55,7 @@ import L4.Syntax
   , nameToText
   , getOriginal
   )
-import L4.Print (prettyLayout, withoutNlg)
+import L4.Print (prettyLayout)
 
 -- GraphViz imports
 import qualified Data.GraphViz as GV
@@ -279,13 +279,12 @@ extractDeonton mFromState MkDeonton{..} = do
     Just sid -> pure sid
     Nothing  -> newState "initial" InitialState
 
-  -- Build the transition label. A label, not source: the rule's @nlg
-  -- annotations come off first ('withoutNlg'), as for a ladder's labels.
-  let partyText = Just $ prettyLayout (withoutNlg party)
+  -- Build the transition label
+  let partyText = Just $ prettyLayout party
       modalVal  = Just (action.modal)
       actionText = prettyPattern action.action
-      deadlineText = fmap (prettyLayout . withoutNlg) due
-      guardText = fmap (prettyLayout . withoutNlg) action.provided
+      deadlineText = fmap prettyLayout due
+      guardText = fmap prettyLayout action.provided
 
       label = TransitionLabel
         { labelParty    = partyText
@@ -400,7 +399,7 @@ classifyTarget = \case
 -- | Generate a descriptive name for an obligation (for intermediate states)
 describeDeonton :: Deonton Resolved -> Text
 describeDeonton MkDeonton{..} =
-  let partyT = prettyLayout (withoutNlg party)
+  let partyT = prettyLayout party
       modalT = case action.modal of
         DMust    -> "must"
         DMay     -> "may"
@@ -415,7 +414,7 @@ prettyPattern = \case
   PatVar _ n      -> resolvedToText n
   PatApp _ n args -> resolvedToText n <> if null args then "" else " ..."
   PatCons _ h _   -> prettyPattern h <> " ..."
-  PatExpr _ e     -> prettyLayout (withoutNlg e)
+  PatExpr _ e     -> prettyLayout e
   PatLit _ lit    -> prettyLayout lit
 
 --------------------------------------------------------------------------------

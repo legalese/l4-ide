@@ -46,7 +46,7 @@ import qualified L4.TypeCheck as TC
 import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
-import L4.Print (prettyBareName, prettyLayout)
+import L4.Print (prettyLayout)
 import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import L4.Desugar
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
@@ -255,7 +255,7 @@ findAllVisualizableDecides uri mod' subst =
           case rangeOf d of
             Just (MkSrcRange (MkSrcPos startLine startCol) _ _ _) ->
               [MkVisualizableDecide
-                { vdName = prettyBareName (getActual funResolved)
+                { vdName = prettyLayout (getActual funResolved)
                 , vdStartLine = startLine
                 , vdStartCol = startCol
                 }]
@@ -288,7 +288,7 @@ findDecideByName mod' targetName =
   where
     matchByName :: Decide Resolved -> [Decide Resolved]
     matchByName d@(MkDecide _ _ (MkAppForm _ funResolved _ _) _body) =
-      let funName = prettyBareName (getActual funResolved)
+      let funName = prettyLayout (getActual funResolved)
       in [d | funName == targetName]
 
 ------------------------------------------------------
@@ -445,7 +445,7 @@ leafFromExpr expr = do
 ------------------------------------------------------
 
 mkPrettyVizName :: Resolved -> VizExpr.Name
-mkPrettyVizName = mkVizNameWith prettyBareName
+mkPrettyVizName = mkVizNameWith prettyLayout
 
 mkVizNameWith :: (L4.Syntax.Name -> Text) -> Resolved -> VizExpr.Name
 mkVizNameWith printer (getUniqueName -> (MkUnique {unique}, name)) =

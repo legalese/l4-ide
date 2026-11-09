@@ -1,7 +1,7 @@
 -- An `@nlg` annotation is wording for whoever reads a rule. It is not part of
 -- what the rule evaluates to, so `l4 run` prints a value without it. Each
 -- annotation below sits where an evaluation result would print it if the
--- value printer wrote annotations back, as the source printer does.
+-- printer wrote annotations back.
 
 DECLARE Colour IS ONE OF
   Red [a red colour]

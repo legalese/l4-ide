@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
--- | @\@nlg@ annotations survive 'L4.Print.prettyLayout' (smucclaw\/l4-ide#966).
+-- | @\@nlg@ annotations survive 'L4.Print.prettyLayoutWithNlg', the printer a
+-- module is re-emitted through to be read again (smucclaw\/l4-ide#966), and
+-- stay out of 'L4.Print.prettyLayout', which every other caller uses.
 --
 -- 'prettyLayout' used to drop every annotation in the corpus. Nothing caught
 -- it: the @.ep.golden@ files come from the OTHER printer
@@ -25,7 +27,7 @@ import L4.API (l4CodeLenses, l4VisualizeByName)
 import L4.Annotation (getAnno)
 import L4.Nlg (simpleLinearizer)
 import L4.Parser (execProgramParserWithHintPass)
-import L4.Print (prettyLayout)
+import L4.Print (prettyLayout, prettyLayoutWithNlg)
 import L4.Syntax (Module, Name, annNlg, nameToText)
 import qualified Optics
 import Test.Hspec
@@ -58,7 +60,7 @@ survivesPrinting name mustContain src =
       Left errs -> expectationFailure ("fixture source failed to parse: " <> show errs)
       Right (modul, _hints, _warnings) -> do
         let original = annotatedNames modul
-            printed = prettyLayout modul
+            printed = prettyLayoutWithNlg modul
         -- Guard the fixture itself. A fixture whose annotations silently
         -- failed to attach would make the comparison below [] == [], which
         -- passes while testing nothing.
@@ -178,6 +180,26 @@ spec = describe "prettyLayout re-emits @nlg annotations (#966)" $ do
     \@nlg the code of %c%\n\
     \DECIDE code Red IS 1\n\
     \DECIDE code Green IS 2\n"
+
+  -- Everything that is not a module re-emitted to be read again prints bare:
+  -- 'prettyLayout' is what labels, keys, answers, traces and diagnostics go
+  -- through, and an annotation there is noise or worse.
+  it "leaves every annotation out of plain prettyLayout" $ do
+    let uri = toNormalizedUri (Uri "file:///pretty-layout-nlg-spec")
+        src = "DECLARE Colour IS ONE OF Red [a red colour], Green\n\n\
+              \GIVEN c [the colour] IS A Colour\n\
+              \GIVETH A NUMBER\n\
+              \@nlg the code of %c%\n\
+              \DECIDE code Red IS 1\n\
+              \DECIDE code Green IS 2\n"
+    case execProgramParserWithHintPass uri src of
+      Left errs -> expectationFailure ("fixture source failed to parse: " <> show errs)
+      Right (modul, _, _) -> do
+        when (null (annotatedNames modul)) $
+          expectationFailure "fixture carries no @nlg annotations at all"
+        let printed = prettyLayout modul
+        printed `shouldNotSatisfy` T.isInfixOf "@nlg"
+        printed `shouldNotSatisfy` T.isInfixOf "["
 
   -- The other side of the same change. A name is also printed where it is a
   -- LABEL, or a key a client looks something up by, and there the annotation

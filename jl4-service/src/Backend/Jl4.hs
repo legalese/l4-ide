@@ -1313,7 +1313,7 @@ valueToFnLiteral ei = \case
 
   Eval.ValEnvironment{} -> throwError $ InterpreterError "#EVAL produced environment."
   Eval.ValUnappliedConstructor name ->
-    pure $ FnLitString $ prettyBareName name
+    pure $ FnLitString $ prettyLayout name
   -- NOTHING is the absence of a value, and JSON spells that null.
   -- Emitting the string "NOTHING" made an optional field's empty case
   -- indistinguishable from a genuine string answer, and made

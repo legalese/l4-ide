@@ -33,15 +33,36 @@ prettyLayout a = docText $ printWithLayout a
 docText :: Doc ann -> Text
 docText = renderStrict . layoutPretty (LayoutOptions Unbounded)
 
--- | A name as 'prettyLayout' spells it, with no @\@nlg@ annotation after it.
+-- | 'prettyLayout' for a module that will be READ AGAIN: every name's @\@nlg@
+-- annotation is written back after it, in the bracket form, and a clause
+-- group's on a line of its own above its first clause.
 --
--- For a caller that shows a name as a LABEL, or compares it with a name a
--- client sent, rather than writing it back as source: a ladder diagram's node,
--- the function a visualisation is looked up by, a value in the inspector. Those
--- printed through 'prettyLayout' until it began re-emitting annotations, and
--- this keeps what they print unchanged. See 'inlineNlgOf'.
-prettyBareName :: (LayoutPrinter a, HasName a) => a -> Text
-prettyBareName = docText . bareName
+-- Opt-in, and the only way in. 'prettyLayout' prints every name bare, as it
+-- always has, because almost every caller prints a name as a label, a key or
+-- an answer — a ladder atom and its atomId, a query plan, a diagnostic, a
+-- trace, a service field, a jl4-mlir schema — and there an annotation is noise
+-- or worse: the query planner stopped recognising the input that settles a rule
+-- once its atom label carried one. The callers that re-emit a whole module to
+-- parse it again are few and are named here, so they choose this instead:
+-- @l4 batch@ ("L4.Cli.Batch"). The REPL re-emits a module too, and reads no
+-- annotation back from it, so it stays on 'prettyLayout'.
+--
+-- It works by printing the module over 'WithNlg' names, so every printer that
+-- is generic in its name type writes the annotation through 'LayoutPrinter'
+-- 'WithNlg', and nothing else changes.
+prettyLayoutWithNlg :: (Functor f, LayoutPrinter (f (WithNlg n))) => f n -> Text
+prettyLayoutWithNlg = prettyLayout . fmap WithNlg
+
+-- | A name that prints its @\@nlg@ annotation after it. See
+-- 'prettyLayoutWithNlg', the only place that builds one.
+newtype WithNlg n = WithNlg n
+
+instance HasName n => HasName (WithNlg n) where
+  getName (WithNlg n) = getName n
+
+instance LayoutPrinterWithName n => LayoutPrinter (WithNlg n) where
+  printWithLayout (WithNlg n) = printWithLayout n <> inlineNlgOf (getName n)
+  ownLineNlg (WithNlg n) = ownLineNlgOf (getName n)
 
 -- | A map from constructor 'Unique' to its field names (in order).
 -- Used for pretty-printing constructor values with named fields.
@@ -91,11 +112,15 @@ class LayoutPrinter a where
   printWithLayout :: a -> Doc ann
   parensIfNeeded :: a -> Doc ann
   parensIfNeeded = printWithLayout
+  -- | The line a clause group's head writes above its first clause: nothing,
+  -- except for a 'WithNlg' name with an annotation ('ownLineNlgOf').
+  ownLineNlg :: a -> [Doc ann]
+  ownLineNlg _ = []
 
 type LayoutPrinterWithName name = (LayoutPrinter name, HasName name)
 
 instance LayoutPrinter Name where
-  printWithLayout n = printWithLayout (rawName n) <> inlineNlgOf n
+  printWithLayout n = printWithLayout (rawName n)
 
 instance LayoutPrinter Resolved where
   printWithLayout r = printWithLayout (getActual r)
@@ -341,7 +366,7 @@ writtenClauses ann (MkAppForm _ hd _ _) expr = do
   bodies <- clauseBodies matrix.scrutinees patterns expr
   let clauses = zip patterns bodies
   guard (length clauses >= 2 || any (any isDistinguishablePat . fst) clauses)
-  pure $ ownLineNlgOf (getName hd) <>
+  pure $ ownLineNlg hd <>
     [ vcat
         -- Each clause with its own @AKA@ ('PmMatrixClause'): a run of bare
         -- names that the checker separates into overloads gives each its
@@ -810,13 +835,14 @@ instance LayoutPrinter Desc where
     MkDesc _ann n -> pretty n
 
 -- | Re-emit the @\@nlg@ annotation carried by a name, in the bare inline form.
+-- Only 'LayoutPrinter' 'WithNlg' calls this; see 'prettyLayoutWithNlg'.
 --
 -- Measured 2026-09-19: an @\@nlg@ annotation attaches to a 'Name' node and to
 -- nothing else. That includes a trailing annotation which reads as though it
 -- sat on an expression — in @ok\/nlg_decide2.l4@ the @\@nlg Expression@ under
 -- @(a PLUS c)@ lands on the USE occurrence of @c@, not on the 'Expr'. So the
 -- name printer is the one hook that recovers all of them, and until it existed
--- 'prettyLayout' dropped every annotation in the corpus (smucclaw\/l4-ide#966).
+-- every re-printed module had lost every annotation (smucclaw\/l4-ide#966).
 --
 -- __The bracket form, not the @\@nlg@ herald, and that is forced.__ A heralded
 -- line annotation runs to the end of the line, so emitting one for a name in
@@ -827,10 +853,11 @@ instance LayoutPrinter Desc where
 -- parameter, GIVEN parameter, a type name, a record field, an enum constructor,
 -- and a use occurrence inside a body.
 --
--- __Not on a type name, and that exclusion is load-bearing.__ A 'Type'' is
--- printed in places that are not source — an evaluation result, a diagnostic,
--- an LSP hover — so an annotation re-emitted there is noise rather than
--- fidelity. @ok\/nlg-percent.l4@ made the point concretely: its @#CHECK@
+-- __Not on a type name, even in a re-emitted module.__ When this printed
+-- through every 'prettyLayout' (as on @unstable@), a type was printed in
+-- places that are not source — an evaluation result, a diagnostic, an LSP
+-- hover — so an annotation there was noise rather than fidelity.
+-- @ok\/nlg-percent.l4@ made the point concretely: its @#CHECK@
 -- answered @BOOLEAN [5% with %amount%]@, because the annotation the author
 -- wrote above the @DECIDE@ had attached to the @GIVETH@ type. Which is the
 -- second reason for the exclusion — measured 2026-09-19, an annotation that
@@ -879,11 +906,6 @@ inlineNlgFragment = \ case
 bareName :: (LayoutPrinter a, HasName a) => a -> Doc ann
 bareName = printWithLayout . rawName . getName
 
--- | The same expression with no @\@nlg@ on any name in it, for printing an
--- expression that is part of an evaluation RESULT rather than of source.
-withoutNlg :: Optics.GPlate Name s => s -> s
-withoutNlg = Optics.over (Optics.gplate @Name) (Optics.over annoOf (Optics.set annNlg Nothing . Optics.set annNlgAlts []))
-
 -- | Escape a close bracket, so a LINE-form annotation survives being re-emitted
 -- in the bracket form.
 --
@@ -928,12 +950,6 @@ instance LayoutPrinterWithName a => LayoutPrinter (NlgFragment a) where
 instance (LayoutPrinter a, LayoutPrinter b) => LayoutPrinter (Either a b) where
   printWithLayout = either printWithLayout printWithLayout
 
--- The name-bearing arms print BARE names. A value is a RESULT, not source:
--- @#EVAL foo@ answering @foo [the foo]@ would be handing the reader an
--- authoring annotation where it asked for an answer. Same reason as the
--- 'Type'' instance above; see 'inlineNlgOf'. (Those fields are 'Resolved'
--- whatever @a@ is — @a@ is the recursive payload — so this needs no extra
--- constraint.)
 instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
   printWithLayout = \ case
     Lazy.ValNumber i               -> pretty (prettyRatio i)
@@ -955,9 +971,9 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValTernaryBuiltinFun{}    -> "<builtin-function>"
     Lazy.ValPartialTernary{}       -> "<partial-function>"
     Lazy.ValPartialTernary2{}      -> "<partial-function>"
-    Lazy.ValAssumed r              -> bareName r
-    Lazy.ValUnappliedConstructor r -> bareName r
-    Lazy.ValConstructor r vs       -> bareName r <> case vs of
+    Lazy.ValAssumed r              -> printWithLayout r
+    Lazy.ValUnappliedConstructor r -> printWithLayout r
+    Lazy.ValConstructor r vs       -> printWithLayout r <> case vs of
       [] -> mempty
       vals@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded vals))
     Lazy.ValEnvironment _env       -> "<environment>"
@@ -965,15 +981,9 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
       [ "DEONTIC BREACHED:"
       , indent 2 $ printWithLayout reason
       ]
-    -- An obligation's party, action and deadlines are still EXPRESSIONS, and
-    -- their names are use occurrences that may carry an annotation written in
-    -- the rule (@PARTY Alice [the payer]@). Printed here they are part of a
-    -- result, so the annotations come off first, for the same reason as the
-    -- bare names above (pinned by @l4 run prints a value without its
-    -- annotations@ in @jl4\/tests-cli\/Main.hs@).
     Lazy.ValObligation _env p a t f l -> case t of
-      Left te -> prettyObligation (bimap withoutNlg id p) (withoutNlg a) (fmap withoutNlg te) (Just (withoutNlg f)) (fmap withoutNlg l)
-      Right tv -> prettyObligation (bimap withoutNlg id p) (withoutNlg a) (Just tv) (Just (withoutNlg f)) (fmap withoutNlg l)
+      Left te -> prettyObligation p a te (Just f) l
+      Right tv -> prettyObligation p a (Just tv) (Just f) l
     Lazy.ValROp _env op l r -> hsep
       [ printWithLayout l
       , case op of ValROr -> "OR"; ValRAnd -> "AND"
@@ -990,7 +1000,7 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValClosure{}              -> printWithLayout v
     Lazy.ValUnappliedConstructor{} -> printWithLayout v
     Lazy.ValAssumed{}              -> printWithLayout v
-    Lazy.ValConstructor r []       -> bareName r
+    Lazy.ValConstructor r []       -> printWithLayout r
     _ -> surround (printWithLayout v) "(" ")"
 
 -- | Pretty-print an 'NF' value, using named fields (WITH / IS syntax) for
@@ -1008,13 +1018,13 @@ prettyNFWithConstructorFields fields = goNF
         | Just names <- Map.lookup (getUnique r) fields
         , length names == length vs
         , not (null vs)
-        -> bareName r <+> "WITH"
+        -> printWithLayout r <+> "WITH"
            <+> hsep (punctuate comma (zipWith fieldPair names vs))
       -- For everything else, delegate to the standard LayoutPrinter,
       -- but recurse into nested NF values with field-name awareness.
       Lazy.ValCons hd tl ->
         "LIST" <+> goList hd tl
-      Lazy.ValConstructor r vs -> bareName r <> case vs of
+      Lazy.ValConstructor r vs -> printWithLayout r <> case vs of
         [] -> mempty
         vals@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap goNFParens vals))
       other -> printWithLayout other
@@ -1116,7 +1126,7 @@ instance LayoutPrinter Lazy.NF where
     MkNF (Lazy.ValClosure{})              -> printWithLayout v
     MkNF (Lazy.ValUnappliedConstructor{}) -> printWithLayout v
     MkNF (Lazy.ValAssumed{})              -> printWithLayout v
-    MkNF (Lazy.ValConstructor r [])       -> bareName r
+    MkNF (Lazy.ValConstructor r [])       -> printWithLayout r
     _ -> surround (printWithLayout v) "(" ")"
 
 instance LayoutPrinter Reference where

@@ -574,8 +574,8 @@ isRefEscapable c = c == '\\' || c == '>'
 -- Contrast 'L4.Nlg.unescapeNlgText', which canNOT decode at its node: the text
 -- 'L4.Syntax.MkNlgText' holds is 'displayTokenType' of the annotation's inner
 -- token (@TNlgString t -> t@), which is also what exactprint prints back, so it
--- has to stay raw. 'L4.Print.prettyLayout' writes it back raw too, in the
--- bracket form.
+-- has to stay raw. 'L4.Print.prettyLayoutWithNlg' writes it back raw too, in
+-- the bracket form.
 -- Same feature, opposite placement, and the difference is which text exactprint
 -- reads.
 unescapeRefText :: Text -> Text

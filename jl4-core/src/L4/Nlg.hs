@@ -1056,8 +1056,9 @@ instance Linearize Nlg where
 -- this instance and 'L4.Export.Document.renderNlgWith'; a new renderer that
 -- reads annotation text has to call it too. The abstainer is exactprint, which
 -- keeps the text raw because it is the printer and must re-emit the source
--- bytes. So does 'L4.Print.prettyLayout', which writes an annotation back in
--- the bracket form ('L4.Print.inlineNlgOf') and must keep its escapes.
+-- bytes. So does 'L4.Print.prettyLayoutWithNlg', which writes an annotation
+-- back in the bracket form ('L4.Print.inlineNlgOf') and must keep its escapes;
+-- plain 'L4.Print.prettyLayout' writes none back.
 --
 -- @\\%@, @\\]@, @\\[@ and @\\\\@ decode; that set is 'L4.Lexer.isNlgEscapable',
 -- which this decoder CALLS rather than restates, and the lexer consumes exactly
