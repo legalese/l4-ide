@@ -147,8 +147,8 @@ Put a backslash before the angle bracket:
 A backslash immediately before `>>` is an escape, so `\>` is a literal `>` and the citation goes on.
 Any other character after a backslash is left alone, so `\q` is a backslash followed by a `q`.
 
-This is the same idea as the `\%` and `\]` escapes in `@nlg`, but the set of characters is deliberately different.
-`%` and `]` are ordinary text in a citation, and `>` is ordinary text in an `@nlg` annotation.
+This is the same idea as the `\%`, `\]` and `\[` escapes in `@nlg`, but the set of characters is deliberately different.
+`%`, `]` and `[` are ordinary text in a citation, and `>` is ordinary text in an `@nlg` annotation.
 Each annotation escapes only what would otherwise be read as punctuation in that annotation.
 
 ### @export
