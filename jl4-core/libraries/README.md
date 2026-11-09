@@ -128,11 +128,16 @@ L4 distinguishes between **type constructors** and **value constructors** (data 
 
 #### Value Constructors (Data Constructors)
 
-- **`Date` function** (in `daydate.l4`) - **Recommended** way to construct DATE values
+- **`Date` function** (in `daydate.l4`) - constructs DATE values
 
-  - `Date 15 3 1990` - from day, month, year
+  - `Date 15 3 1990` - from day, month, year; a day past the end of the month, or a month past 12, rolls forward (`Date 29 2 2025` is 1 March 2025)
   - `Date 738000` - from serial number
   - `Date someDate` - identity/normalization
+
+- **`YMD` function** (in `daydate.l4`, also named `Year month day`) - constructs a DATE from year, month, day
+
+  - `YMD 1990 3 15` - the same date as `Date 15 3 1990`; a year that is not a whole number, or a month or a day that does not exist, refuses, with a reason that says which part is wrong
+  - a rule that calls `YMD` has no query plan, even when the date exists; the same rule written with `Date` has one
 
 - **`DATE` function** (in `date-compat.l4`) - Legacy compatibility constructor
 
@@ -199,7 +204,8 @@ The naming is potentially confusing because:
 IMPORT daydate
 
 GIVEN birthDate IS A DATE  -- DATE is the type
-DECIDE myBirthday IS Date 15 3 1990  -- Date is the constructor
+DECIDE myBirthday IS Date 15 3 1990  -- Date is a constructor, day first
+DECIDE myBirthdayYmd IS YMD 1990 3 15  -- YMD is a constructor, year first: the same date
 
 #EVAL DATE_DAY myBirthday   -- Use DATE_DAY, DATE_MONTH, DATE_YEAR for field access
 ```
@@ -219,12 +225,12 @@ DECIDE modernDate IS Date 28 6 1971
 
 ## Documentation
 
-Detailed documentation for each library is available in `doc/libraries/`:
+Detailed documentation for each library is available in `doc/reference/`:
 
-- [daydate.md](../../doc/libraries/daydate.md) - Comprehensive date/time documentation
-- [excel-date.md](../../doc/libraries/excel-date.md) - Excel compatibility guide
-- [coercions.md](../../doc/libraries/coercions.md) - Type coercion functions
-- [math.md](../../doc/libraries/math.md) - Mathematical functions reference
+- [daydate.md](../../doc/reference/libraries/daydate.md) - Comprehensive date/time documentation
+- [excel-date.md](../../doc/reference/libraries/excel-date.md) - Excel compatibility guide
+- [coercions.md](../../doc/reference/types/coercions.md) - Type coercion functions
+- [math.md](../../doc/reference/libraries/math.md) - Mathematical functions reference
 
 ## Testing
 

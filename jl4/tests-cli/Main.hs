@@ -11,13 +11,13 @@
 module Main where
 
 import Control.Applicative ((<|>))
-import Control.Concurrent (forkIO)
+import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import Control.Exception (IOException, finally, throwIO, try)
+import Control.Exception (IOException, finally, onException, throwIO, try)
 import Control.Monad (forM, forM_, unless, void, when)
 import qualified Data.Char as Char
 import Data.Foldable (toList, traverse_)
-import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, tails)
+import Data.List (intercalate, isInfixOf, isPrefixOf, isSuffixOf, nub, tails)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
@@ -59,6 +59,7 @@ import System.Process
   , readCreateProcessWithExitCode
   , terminateProcess
   , waitForProcess
+  , withCreateProcess
   )
 import System.Timeout (timeout)
 import Test.Hspec
@@ -171,17 +172,24 @@ runL4In mCwd mEnv bin args = do
         , env     = mEnv
         , cwd     = mCwd
         }
-  (Just hin, Just hout, Just herr, ph) <- createProcess cp
-  hClose hin
-  hSetBinaryMode hout True
-  hSetBinaryMode herr True
-  (soutBytes, serrBytes) <- readOutputs hout herr
-  code <- waitForProcess ph
-  pure Output
-    { outExit   = code
-    , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
-    , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
-    }
+  -- 'withCreateProcess' terminates the child if this thread is interrupted, by a
+  -- 'timeout' round the call or anything else. Without it a child that never
+  -- finishes outlives the suite: an old jl4-schema on a long import ring did,
+  -- seven times over, with launchd as its parent.
+  withCreateProcess cp \mhin mhout mherr ph -> do
+    (hin, hout, herr) <- case (mhin, mhout, mherr) of
+      (Just i, Just o, Just e) -> pure (i, o, e)
+      _ -> fail ("runL4In: no pipes to " <> bin)
+    hClose hin
+    hSetBinaryMode hout True
+    hSetBinaryMode herr True
+    (soutBytes, serrBytes) <- readOutputs hout herr
+    code <- waitForProcess ph
+    pure Output
+      { outExit   = code
+      , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
+      , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
+      }
 
 -- | Read a child's stdout and stderr to their ends at the same time. Reading
 -- them one after the other deadlocks as soon as the child fills the pipe that
@@ -191,9 +199,13 @@ runL4In mCwd mEnv bin args = do
 readOutputs :: Handle -> Handle -> IO (BS.ByteString, BS.ByteString)
 readOutputs hout herr = do
   errVar <- newEmptyMVar
-  _ <- forkIO (BS.hGetContents herr >>= putMVar errVar)
-  outBytes <- BS.hGetContents hout
-  errBytes <- takeMVar errVar
+  reader <- forkIO (BS.hGetContents herr >>= putMVar errVar)
+  -- If this thread is interrupted, stop the reader too: it holds stderr's lock,
+  -- so closing stderr afterwards ('withCreateProcess') would otherwise wait for
+  -- an end that never comes when a child ignores SIGTERM or a grandchild holds
+  -- the pipe open.
+  outBytes <- BS.hGetContents hout `onException` killThread reader
+  errBytes <- takeMVar errVar `onException` killThread reader
   pure (outBytes, errBytes)
 
 -- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
@@ -440,6 +452,33 @@ nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
 -- A rule named but not called: passed on as a value, or named with no inputs.
 nlgBareReference :: FilePath
 nlgBareReference = fixtureDir </> "nlg-bare-reference.l4"
+
+-- Nested arithmetic, each #EVAL commented with its value.
+nlgArithGrouping :: FilePath
+nlgArithGrouping = fixtureDir </> "nlg-arith-grouping.l4"
+
+-- Arithmetic whose operand is a call, a rule's sentence or an IF.
+nlgArithOperands, renderArithOperands :: FilePath
+nlgArithOperands    = fixtureDir </> "nlg-arith-operands.l4"
+renderArithOperands = fixtureDir </> "render-arith-operands.l4"
+
+-- A NOT beside AND or OR, in each shape that denies with more than one word.
+renderNotScope :: FilePath
+renderNotScope = fixtureDir </> "render-not-scope.l4"
+
+-- A condition that fills a slot of a rule's sentence.
+slotScope :: FilePath
+slotScope = fixtureDir </> "slot-scope.l4"
+
+-- A slot that another slot comes after, and a sentence that fills a slot.
+slotScopeSentence :: FilePath
+slotScopeSentence = fixtureDir </> "slot-scope-sentence.l4"
+
+-- Library sentences at a call site, and library aliases used at two types.
+nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting :: FilePath
+nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
+libraryAliasTwoTypes = fixtureDir </> "library-alias-two-types.l4"
+renderDeepNesting = fixtureDir </> "render-deep-nesting.l4"
 
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
@@ -712,6 +751,8 @@ main = do
        , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
        , nlgTransTop, nlgTransMid, nlgTransDeep
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
+       , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
+       , slotScope, slotScopeSentence, nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
        , nlgPositionalMain, nlgPositionalLib
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
@@ -883,8 +924,22 @@ spec bin = do
           writeFile (dir </> "plain.l4") (rule [])
           writeFile (dir </> "inputs.json") "[{\"x\": 1}]"
           act dir
-        schemaGenerator =
-          findExecutable "jl4-schema" >>= maybe (fail "jl4-schema is not on the PATH: run this with cabal test") pure
+        -- Found as 'locateL4Binary' finds l4, so the jl4-schema tested is the one
+        -- built here: PATH can put an older install first, and one did.
+        schemaGenerator = do
+          fromEnv <- lookupEnv "JL4_SCHEMA_BIN"
+          fromCabal <- case fromEnv of
+            Just p -> pure (Just p)
+            Nothing -> do
+              listed <- try (readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-schema"]) "")
+              case listed :: Either IOException (ExitCode, String, String) of
+                Right (ExitSuccess, out, _) -> do
+                  let path = T.unpack (T.strip (T.pack out))
+                  ok <- doesFileExist path
+                  pure (if ok then Just path else Nothing)
+                _ -> pure Nothing
+          found <- maybe (findExecutable "jl4-schema") (pure . Just) fromCabal
+          maybe (fail "jl4-schema not found: set JL4_SCHEMA_BIN or run this with cabal test") pure found
 
     it "the same rule with no ring goes through both, which is what the rest refuses" $
       withProject \dir -> do
@@ -2937,9 +2992,9 @@ spec bin = do
           , "Render greater means the greater of [n] and 100."
           , "Render nested means the smaller of the smaller of [n] and 100 and 200."
           , "Render of [n] means the smaller of [n] and 100."
-          , "Render exceeds with [n] equals the amount by which a exceeds b where a is n and b is 100 + 1."
-          , "Render gap with [n] equals the gap between a and b where a is n and b is 100 + 1."
-          , "Render lower with [n] equals the smaller of a and b where a is n and b is 100 + 1."
+          , "Render exceeds with [n] equals (the amount by which a exceeds b where a is n and b is 100) + 1."
+          , "Render gap with [n] equals (the gap between a and b where a is n and b is 100) + 1."
+          , "Render lower with [n] equals (the smaller of a and b where a is n and b is 100) + 1."
           , "Render half selector means the span's size's half."
           , "Render third selector means the span's size's third."
           , "Render exceeds direct means the amount by which a exceeds b where a is n and b is 100."
@@ -2973,7 +3028,7 @@ spec bin = do
           pure [ dropWhile (not . Char.isAlpha) l
                | l <- map (filter (/= '\r')) (lines sout)
                , "Mid rule " `isInfixOf` l ]
-        expected = ["Mid rule equals the gap between a and b where a is n and b is 100 + 1."]
+        expected = ["Mid rule equals (the gap between a and b where a is n and b is 100) + 1."]
 
     it "reads the same when the middle module is the one rendered" $ do
       rows <- midRows nlgTransMid
@@ -3288,6 +3343,300 @@ spec bin = do
         , "Own biggest means the items of [xs] combined from the right with max, starting from 0."
         , "Own mapper means fmap."
         ]
+
+  -- An operand of an arithmetic phrase says where it starts and ends, or two
+  -- calculations with different answers read alike.
+  describe "l4 nlg and nested arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgArithGrouping]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads each grouping as it is written" $
+      rows >>= (`shouldBe`
+        [ "10 minus (5 minus 2)"
+        , "(10 minus 5) minus 2"
+        , "the product of 4 and (5 minus 2)"
+        , "(the product of 4 and 5) minus 2"
+        , "the sum of 4 and (5 minus 2)"
+        , "(the sum of 4 and 5) minus 2"
+        , "10 minus (the sum of 5 and 2)"
+        , "the sum of (10 minus 5) and 2"
+        , "the result of dividing 12 by (6 minus 2)"
+        , "(the result of dividing 12 by 6) minus 2"
+        , "the product of (the sum of 4 and 5) and 2"
+        , "the sum of 4 and (the product of 5 and 2)"
+        , "(the result of 12 modulo 5) minus 1"
+        , "the result of 12 modulo (5 minus 1)"
+        , "the result of (10 minus 4) modulo 3"
+        , "10 minus (the result of 4 modulo 3)"
+        , "10 minus 4 is greater than 5"
+        ])
+
+    it "gives no two groupings the same words" $ do
+      out <- rows
+      length (nub out) `shouldBe` length out
+
+  -- A call's arguments, an IF's ELSE and a rule's own sentence do not say where
+  -- they end, so "minus" after one would read as part of it.
+  describe "l4 nlg and operands that are not arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgArithOperands]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads each grouping as it is written" $
+      rows >>= (`shouldBe`
+        [ "(`f2` with 2 and 5) minus 3"
+        , "`f2` with 2 and (5 minus 3)"
+        , "(5 doubled) minus 2"
+        , "(5 minus 2) doubled"
+        , "5 minus (2 doubled)"
+        , "(twice 5) minus 2"
+        , "twice (5 minus 2)"
+        , "(if `TRUE` then 1 else 10) minus 3"
+        , "if `TRUE` then 1 else 10 minus 3"
+        , "(the sum of 5 and 2) doubled"
+        , "the sum of 5 and (2 doubled)"
+        , "the sum of (`f2` with 2 and 5) and 3"
+        , "`f2` with 2 and the sum of 5 and 3"
+        , "2 less (3 minus 5)"
+        , "(2 less 3) minus 5"
+        ])
+
+    it "gives no two groupings the same words" $ do
+      out <- rows
+      length (nub out) `shouldBe` length out
+
+  describe "l4 render and operands that are not arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderArithOperands]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a call, a sentence or an IF beside an operator" $ do
+      hasRow "Call then minus equals (f2 for 2 and x) − 3."
+      hasRow "Sentence then minus equals (twice [x]) − 3."
+      hasRow "If then minus equals (if c then 1 else 10) − x."
+      hasRow "Year then minus equals (the year of d) − 1."
+      hasRow "Call then minus then call equals a − (f2 for b and c) − d."
+
+    it "brackets arithmetic given to a call or a sentence" $ do
+      hasRow "Minus in a call means f2 for 2 and (x − 3)."
+      hasRow "Minus in a sentence means twice (x − 3)."
+      hasRow "Months less one means the date (n − 1) months after [d]"
+      hasRow "Minus of a call of minus equals a − (f2 for b and (c − d))."
+
+    it "leaves arithmetic inside arithmetic as the formula has it" $
+      hasRow "Times of minus equals 4 × (x − 2)."
+
+    it "brackets a call named like a maths function unless it reads as f(x)" $ do
+      hasRow "Round then minus equals (round for a and b) − c."
+      hasRow "Minus in a round means round for a and (b − c)."
+      hasRow "Floor then minus equals (the floor of [x]) − 3."
+      hasRow "Minus in a floor means the floor of (x − 3)."
+      hasRow "Exp then minus equals (e raised to the power of [x]) − 3."
+      hasRow "Minus in exp means e raised to the power of (x − 3)."
+
+    it "brackets a mod beside a × or a ÷, which do not reassociate with it" $ do
+      hasRow "Times of mod equals a × (b mod c)."
+      hasRow "Mod of times equals (a × b) mod c."
+      hasRow "Mod then times equals (a mod b) × c."
+      hasRow "Mod of a product equals a mod (b × c)."
+      hasRow "Mod then divided equals (a mod b) ÷ c."
+      hasRow "Mod of a quotient equals a mod (b ÷ c)."
+      hasRow "Quotient then mod equals (a ÷ b) mod c."
+      hasRow "Divided by a mod equals a ÷ (b mod c)."
+
+    it "brackets a mod beside a + or a −, where the word could reach further" $ do
+      hasRow "Plus of mod equals a + (b mod c)."
+      hasRow "Minus of mod equals a − (b mod c)."
+      hasRow "Mod then minus equals (a mod b) − c."
+      hasRow "Mod of a difference equals (a − b) mod c."
+
+  -- A denial in more than one word, next to AND or OR, is bracketed, so that it
+  -- cannot be read as denying what follows it as well.
+  describe "l4 render and the scope of a NOT" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderNotScope]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denied call beside OR or AND" $ do
+      hasRow "(a) If (it is not the case that the Act governs for n) or b: 1;"
+      hasRow "(a) If (it is not the case that the Act governs for n) and b: 1;"
+
+    it "brackets a denied AND beside OR" $
+      hasRow "(a) If (it is not the case that both the Act governs for n and c) or b: 1;"
+
+    it "brackets a denied call inside a group" $
+      hasRow "(a) If a and either (it is not the case that the Act governs for n) or b: 1;"
+
+    it "brackets a denied OR beside AND or OR" $ do
+      hasRow "(a) If (neither the Act governs for n nor b) and c: 1;"
+      hasRow "(a) If (n is not one of 1 or 2) or b: 1;"
+      hasRow "(a) If (it is not the case that the Act governs for n) and (neither b nor c) and d: 1;"
+
+    it "brackets an IMPLIES or an IF inside a group" $ do
+      hasRow "(a) If neither p nor (q implies r): 1;"
+      hasRow "(a) If neither (q implies r) nor p: 1;"
+      hasRow "(a) If it is not the case that both p and (q implies r): 1;"
+      hasRow "(a) If s and either (q implies r) or p: 1;"
+      hasRow "(a) If neither (if q then r else s) nor p: 1;"
+      hasRow "(a) If not (p or q) implies r: 1;"
+
+    it "leaves a denial that is already delimited as it was" $ do
+      hasRow "(a) If neither the Act governs for n nor b: 1;"
+      hasRow "(a) If a is false or b: 1;"
+
+  -- A denial, an IMPLIES or an IF that fills a slot is bracketed when the
+  -- sentence goes on after the slot, so that the rest of the sentence cannot
+  -- read as part of it. A slot at the end of the sentence is left as it was.
+  describe "l4 render and a condition in a sentence's slot" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", slotScope]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denial in a slot the sentence goes on after" $ do
+      hasRow "Denial in the slot if (it is not the case that the Act governs for n) is disclosed."
+      hasRow "Denial of the sentence if it is not the case that the Act governs for n is disclosed."
+      hasRow "Denial in the first slot if (it is not the case that the Act governs for n) is told [p]."
+      hasRow "Denial of the two-slot sentence if it is not the case that the Act governs for n is told [p]."
+      hasRow "Denial in the middle slot if [p] outweighs (it is not the case that the Act governs for n) in law."
+
+    it "brackets a denial in a pattern's hole the pattern goes on after" $ do
+      hasRow "Denial in the hole if (it is not the case that the Act governs for n) is published."
+      hasRow "Denial of the pattern if it is not the case that the Act governs for n is published."
+
+    it "brackets a denied OR or an IMPLIES in such a slot" $ do
+      hasRow "Denied or in the slot if (neither the Act governs for n nor q) is disclosed."
+      hasRow "Denied or around the sentence if neither the Act governs for n nor [q] is disclosed."
+      hasRow "Implies in the slot if (the Act governs for n implies q) is disclosed."
+      hasRow "Implies around the sentence if the Act governs for n implies [q] is disclosed."
+
+    it "brackets an AND in such a slot, so that it is not read as the sentence beside an AND" $ do
+      hasRow "And in the slot if (p and (it is not the case that the Act governs for n)) is disclosed implies r."
+      hasRow "And beside the slot if p and (it is not the case that the Act governs for n) is disclosed implies r."
+      hasRow "Last slot then and if ([p] is told it is not the case that the Act governs for n and r) is disclosed."
+
+    it "brackets a call that ends with such a condition, in such a slot" $ do
+      hasRow "Call ending in a denial in the slot if (fb for it is not the case that the Act governs for n) is disclosed."
+      hasRow "Call around a denied sentence if fb for it is not the case that the Act governs for n is disclosed."
+      hasRow "Call ending in an implies in the slot if (fb for p and (q implies r)) is disclosed."
+      hasRow "Call around an and with the sentence if fb for p and (q implies r) is disclosed."
+      hasRow "And in the last slot if ([p] is told (it is not the case that the Act governs for n) and r) is disclosed."
+
+    it "leaves a slot at the end of the sentence, and a delimited denial, as they were" $ do
+      hasRow "Denial in the last slot if [p] is told it is not the case that the Act governs for n."
+      hasRow "One word denied if p is false is disclosed."
+      hasRow "Inequality in the slot if n is not 3 is disclosed."
+
+  describe "l4 nlg and a condition in a sentence's slot" $
+    it "brackets a denial, an IMPLIES, an IF, an OR, or a call ending in one, in a slot the sentence goes on after" $ do
+      Output code sout _ <- runL4 bin ["nlg", slotScope]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "(not `the Act governs` with 3) is disclosed"
+        , "not `the Act governs` with 3 is disclosed"
+        , "(not `the Act governs` with 3) is told `TRUE`"
+        , "not `the Act governs` with 3 is told `TRUE`"
+        , "`TRUE` is told not `the Act governs` with 3"
+        , "(`TRUE` implies `FALSE`) is disclosed"
+        , "`TRUE` implies `FALSE` is disclosed"
+        , "(if `TRUE` then `FALSE` else `TRUE`) is disclosed"
+        , "if `TRUE` then `FALSE` else `TRUE` is disclosed"
+        , "(`TRUE` or `FALSE`) is disclosed"
+        , "`TRUE` or `FALSE` is disclosed"
+        , "(`fb` with `TRUE` or `FALSE`) is disclosed"
+        , "`fb` with `TRUE` or `FALSE` is disclosed"
+        ]
+
+  -- A slot is the end of the sentence only when nothing of the sentence comes
+  -- after it, words or another slot. And a call with a sentence of its own has
+  -- no closing word when the slot at the end of its sentence holds a condition
+  -- that has none, so in such a slot it is bracketed as a whole.
+  describe "l4 render and a slot that another slot comes after" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", slotScopeSentence]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denial in a slot that a slot, or punctuation and a slot, comes after" $ do
+      hasRow "Juxt inside if (it is not the case that the Act governs for n) [q]."
+      hasRow "Juxt outside if it is not the case that the Act governs for n [q]."
+      hasRow "Comma inside if (it is not the case that the Act governs for n), [q]."
+      hasRow "Comma outside if it is not the case that the Act governs for n, [q]."
+      hasRow "Paren inside if (it is not the case that the Act governs for n) ([q])."
+      hasRow "Paren outside if it is not the case that the Act governs for n ([q])."
+
+    it "leaves a denial in the last slot as it was" $
+      hasRow "Juxt last if [q] it is not the case that the Act governs for n."
+
+  describe "l4 nlg and a sentence in a slot" $
+    it "brackets a sentence whose last slot holds a condition, and a condition in a slot another slot comes after" $ do
+      Output code sout _ <- runL4 bin ["nlg", slotScopeSentence]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "(it is shown that `TRUE` or (`FALSE` and `TRUE`)) is shown"
+        , "it is shown that `TRUE` or (`FALSE` and `TRUE`) is shown"
+        , "(`TRUE` is told not (`FALSE` and `TRUE`)) is shown"
+        , "`TRUE` is told not (`FALSE` and `TRUE`) is shown"
+        , "`TRUE` not `FALSE`"
+        , "(not `FALSE`) `TRUE`"
+        , "not `FALSE` `TRUE`"
+        , "(not `FALSE`), `TRUE`"
+        , "not `FALSE`, `TRUE`"
+        ]
+
+  describe "library sentences at a call" $ do
+    let nlgRows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgLibraryWording]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads a count of one without a plural" $
+      nlgRows >>= (`shouldBe`
+        [ "the date 1 month after 31 January 2025 (capped at the last day of that month)"
+        , "the date 1 year after 29 February 2024 (capped at the last day of that month)"
+        , "a one-entry dictionary mapping 1 to a"
+        , "the date 1 day after 31 January 2025"
+        , "the date 1 day before 31 January 2025"
+        , "the date 1 day after 31 January 2025"
+        , "the date 1 month after 31 January 2025 (capped at the last day of that month)"
+        , "the day before the date 1 month plus one month after 31 January 2025"
+        , "the date 1 day after 31 January 2025"
+        ])
+
+    it "reads a dictionary alias by its sentence in l4 render too" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgLibraryWording]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      out `shouldSatisfy` ("One entry means a one-entry dictionary mapping 1 to a." `isInfixOf`)
+      out `shouldSatisfy` ("From pairs means a dictionary holding the entries list of PAIR where fst is 1 and snd is a." `isInfixOf`)
+
+    it "lets a module use singleton and fromList at two types" $ do
+      Output code _ _ <- runL4 bin ["check", libraryAliasTwoTypes]
+      code `shouldBe` ExitSuccess
+
+    it "looks up what singleton and fromList build" $ do
+      Output code sout _ <- runL4 bin ["run", libraryAliasTwoTypes]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("JUST OF \"a\"" `isInfixOf`)
+      sout `shouldSatisfy` ("JUST OF 2" `isInfixOf`)
+      length (filter ("JUST OF 250" `isInfixOf`) (lines sout)) `shouldSatisfy` (>= 2)
+
+    it "renders a deeply nested call without its time doubling at each level" $ do
+      finished <- timeout 60000000 (runL4 bin ["render", "--format", "text", renderDeepNesting])
+      case finished of
+        Nothing -> expectationFailure "l4 render did not finish in 60 s"
+        Just (Output code sout _) -> do
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("[p] is shown" `isInfixOf`)
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do
