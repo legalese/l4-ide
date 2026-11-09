@@ -15,7 +15,7 @@ These differ from #427 by hand:
 
 - `printInlineNlg` matches `main`'s three-field `MkParsedNlg` and `MkResolvedNlg`, whose middle field is the language tag (#726), as `unstable` does after #429.
 - `main`'s NF printer, which #427 never saw, prints a constructor bare, and an obligation's expressions print without their annotations (`withoutNlg`). #427's own rule is that a value is a result, not source, and `main` pins it: `l4 run prints a value without its annotations` in `jl4/tests-cli/Main.hs:4322`.
-- A name shown as a label, or used as a lookup key, prints bare through `prettyBareName`: the core and LSP ladders, the LSP inspector, and jl4-service's answer for an unapplied constructor. Assumed, not ruled; `unstable` still prints the annotation at every one of those call sites.
+- A name shown as a label, or used as a lookup key, prints bare through `prettyBareName`: the core and LSP ladders, the LSP inspector, and jl4-service's answer for an unapplied constructor. A state graph's edge labels go through `withoutNlg`. Assumed, not ruled; `unstable` still prints the annotation at every one of those call sites.
 - A clause group's wording prints on a line of its own above the first clause, not after each clause's head. `main`'s clause printer is not in #427, and the bracket form there re-parsed onto the wrong node. The spelling is assumed, not ruled.
 
 ## What it does
@@ -23,7 +23,7 @@ These differ from #427 by hand:
 - `L4.Print.prettyLayout` prints each name's `@nlg` annotation back, in the bracket form, straight after the name: ``DECIDE `is large` [the amount %a% is large] a IS``.
   Before, it dropped every one, so `l4 batch` and the REPL, which re-parse a printed module, ran a module with no wordings.
 - A clause group prints its wording as `@nlg …` between the signature and the first clause.
-- Types, evaluation results, ladder labels, the inspector, and the service's constructor answers print as on `main`, without annotations.
+- Types, evaluation results, ladder and state-graph labels, the inspector, and the service's constructor answers print as on `main`, without annotations.
 
 ## Behaviour and rules (read in code)
 
@@ -40,6 +40,7 @@ These differ from #427 by hand:
   The line form ends at the end of its line, which is the end of the annotation, and every escape `printInlineNlg` writes decodes the same in both forms.
 - `prettyBareName` (`Print.hs:43-44`) is `bareName` as `Text`.
   Its callers: `jl4-core/src/L4/Viz/Ladder.hs:258,291,448`, `jl4-lsp/src/LSP/L4/Viz/Ladder.hs:492`, `jl4-lsp/src/LSP/L4/Inspector.hs:180,187,188`, `jl4-service/src/Backend/Jl4.hs:1316`.
+- `L4.StateGraph` passes an obligation's party, deadline, guard and expression pattern through `withoutNlg` before printing them into an edge label (`jl4-core/src/L4/StateGraph.hs:282-288`, `:403`, `:418`).
 
 ## Measured against `main`
 
@@ -63,8 +64,9 @@ Before the clause-group commit, two more files differed, `pattern-matching-first
 This stands in for `CLAUDE.md` §3.2.1's differential, which needs a harness `main` does not have.
 `l4 batch` against `l4 run` on `#TRACE` files was not run: printed by `prettyLayout`, none of the 23 files with a `#TRACE` in `ok/`, `legal/` and `doc/` parses again (measured on this branch), for reasons outside this PR, so that comparison could not tell this change apart.
 
-**The binaries on the corpus.** `main`'s `l4` and this PR's, on the 657 tracked `.l4` files that make no network call, under the same clock: `l4 run`, `l4 nlg`, `l4 render --format json` and `l4 render --format text` give byte-identical output and exit codes on every file.
-On the PR's printer commit alone, `l4 run` differed on one file, `tests-cli/fixtures/annotated-values.l4`, the value leak the NF commit closes.
+**The binaries on the corpus.** `main`'s `l4` and this PR's, on the 657 tracked `.l4` files with no `FETCH`, `POST`, `ENV` or `llm` in them, under the same clock: `l4 run`, `l4 nlg`, `l4 render --format json`, `l4 render --format text` and `l4 state-graph` give byte-identical output and exit codes on every file, except `jl4/experiments/thailand-cosmetics/orchestrator.l4`, which reaches the network through an import and prints a different request id and timestamp on every run.
+Before their commits, `l4 run` differed on one file, `tests-cli/fixtures/annotated-values.l4`, the value leak the NF commit closes, and `l4 state-graph` on the same file, the edge label the state-graph commit closes.
+`l4 trace --format dot` and the `#EVALTRACE` text are unchanged on a probe with annotations on a body's use occurrences and on a constructor; they were not run over the corpus.
 
 **Labels.** With `GIVEN amount [the amount claimed]` and ``DECIDE `may proceed` @nlg …``, before the label commit: the code lens named the rule `` `may proceed` [the claim for %amount% may proceed] ``, the ladder's input nodes read `amount [the amount claimed]`, and ``l4VisualizeByName … "`may proceed`"`` answered not found.
 After it, all three are as on `main`.
@@ -91,6 +93,7 @@ Where in `L4.Parser.ResolveAnnotation` the superlinear part is was not profiled.
   All seven of #427's cases fail on `main`; the clause-group case and the two ladder cases fail without their commits.
 - `jl4/tests-cli/Main.hs:4322`, `l4 run prints a value without its annotations`, from `main`: a constructor inside a value, and an obligation's party and action.
 - `jl4/tests-cli/Main.hs:4312`, `l4 batch runs an export whose annotation names its input`, from `main`: the annotation is now printed back and the row still runs.
+- `jl4/tests-cli/Main.hs:4343`, `l4 state-graph labels an edge without its annotations`, on the same fixture as the `l4 run` test.
 - `doc/reference/syntax/annotation-example.l4:42` uses `\[`; `doc/test-docs.sh` type-checks it.
 - No golden captures `prettyLayout` output.
 
@@ -104,5 +107,5 @@ Where in `L4.Parser.ResolveAnnotation` the superlinear part is was not profiled.
 
 - The bracket form has no spelling for a language tag, and the printer prints only the default rendering, so a re-printed module loses its tags and its other languages, and `@lang` is not printed either. Measured above; the same is true on `unstable`.
 - An annotation that failed to parse (`MkInvalidNlg`) prints as nothing, with no diagnostic.
-- Every other caller of the name printer gets the `[…]` suffix: diagnostics, `#EVALTRACE` text, hover text of an expression, the service's error messages. None changed on the corpus; that is the evidence, not a guarantee.
+- Every other caller of the name printer gets the `[…]` suffix where the name it prints carries an annotation: diagnostics, hover text of an expression, the service's error messages, and whatever is added later, such as the breach's `obligationAction` in #817. The evidence is that none of the five verbs above changed on the corpus, and diagnostics did not change on a probe either; it is not a guarantee.
 - `l4 batch` now pays `main`'s superlinear annotation checking once per row (see Cost).
