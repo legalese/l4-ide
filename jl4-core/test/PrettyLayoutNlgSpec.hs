@@ -181,6 +181,24 @@ spec = describe "prettyLayout re-emits @nlg annotations (#966)" $ do
     \DECIDE code Red IS 1\n\
     \DECIDE code Green IS 2\n"
 
+  -- A wording over two lines, the second at the margin. Printed with its
+  -- line break, the continuation lands at the margin again and ends the
+  -- definition, so `l4 batch` failed every row; it prints on one line.
+  -- `l4 nlg` and `l4 render` read the one-line wording as they read the
+  -- source's (measured on main).
+  it "prints a wording that runs over two lines on one line" $ do
+    let uri = toNormalizedUri (Uri "file:///pretty-layout-nlg-spec")
+        src = "GIVEN n IS A NUMBER\nGIVETH A NUMBER\n`the f` [the f of\n%n%] n MEANS n PLUS 1\n"
+    case execProgramParserWithHintPass uri src of
+      Left errs -> expectationFailure ("fixture source failed to parse: " <> show errs)
+      Right (modul, _, _) -> do
+        let printed = prettyLayoutWithNlg modul
+        printed `shouldSatisfy` T.isInfixOf "[the f of %n%]"
+        case execProgramParserWithHintPass uri printed of
+          Left errs -> expectationFailure ("printed module did not re-parse: " <> show errs <> "\n" <> T.unpack printed)
+          Right (modul', _, _) ->
+            annotatedNames modul' `shouldBe` [("the f", "the f of `n`")]
+
   -- Everything that is not a module re-emitted to be read again prints bare:
   -- 'prettyLayout' is what labels, keys, answers, traces and diagnostics go
   -- through, and an annotation there is noise or worse.

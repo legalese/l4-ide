@@ -920,9 +920,27 @@ bareName = printWithLayout . rawName . getName
 -- source. @[@ is ordinary text in BOTH forms, and @\\[@, though
 -- 'L4.Nlg.unescapeNlgText' honours it, protects nothing, so leaving @[@ bare
 -- re-emits what was written.
+--
+-- __And it puts the annotation on one line.__ A wording may run over several
+-- lines in the source, @[the f of@ then @%n%] n MEANS …@ at the margin, and
+-- printed with its line break the continuation lands at the margin again, where
+-- it ends the definition: @l4 batch@ failed every row of such a file (measured
+-- 2026-11-09). The clause group's line form ('ownLineNlgOf') cannot hold a line
+-- break at all. So a line break, with the spaces around it, prints as one
+-- space. Rendering already treats it as one: @l4 nlg@ and @l4 render@ read the
+-- wording the same either way.
 escapeInlineNlgText :: Text -> Text
-escapeInlineNlgText = Text.pack . go . Text.unpack
+escapeInlineNlgText = Text.pack . go . Text.unpack . oneLine
  where
+  oneLine :: Text -> Text
+  oneLine t = case Text.splitOn "\n" t of
+    []       -> t
+    [_]      -> t
+    (l : ls) ->
+      Text.intercalate " " $
+        [Text.stripEnd l]
+          <> filter (not . Text.null) (map Text.strip (init ls))
+          <> [Text.stripStart (last ls)]
   go :: String -> String
   go = \ case
     []             -> []

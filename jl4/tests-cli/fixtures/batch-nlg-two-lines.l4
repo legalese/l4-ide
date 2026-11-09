@@ -1,0 +1,10 @@
+-- `l4 batch` prints the checked module back, annotations included, and checks
+-- it again. This wording runs over two lines with the second at the margin;
+-- printed with its line break, the continuation lands at the margin again and
+-- ends the definition, so every row failed. The printer puts it on one line.
+
+@export default f
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`the f` [the f of
+%n%] n MEANS n PLUS 1

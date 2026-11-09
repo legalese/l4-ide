@@ -4315,6 +4315,11 @@ spec bin = do
       batchAnswer bin (fixtureDir </> "batch-nlg-input-slot.l4") (fixtureDir </> "batch-nlg-input-slot.json") "is large"
         `shouldReturn` Bool True
 
+  describe "l4 batch runs an export whose wording runs over two lines" $
+    it "answers instead of failing to parse the printed module" $
+      batchAnswer bin (fixtureDir </> "batch-nlg-two-lines.l4") (fixtureDir </> "batch-nlg-two-lines.json") "the f"
+        `shouldReturn` Number 6
+
   -- An `@nlg` annotation is wording for the reader of a rule, not part of what
   -- the rule evaluates to. `prettyLayout` prints evaluation results, and it
   -- writes no annotation back (only `prettyLayoutWithNlg`, which `l4 batch`
