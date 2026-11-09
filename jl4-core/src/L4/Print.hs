@@ -341,18 +341,36 @@ writtenClauses ann (MkAppForm _ hd _ _) expr = do
   bodies <- clauseBodies matrix.scrutinees patterns expr
   let clauses = zip patterns bodies
   guard (length clauses >= 2 || any (any isDistinguishablePat . fst) clauses)
-  pure
+  pure $ ownLineNlgOf (getName hd) <>
     [ vcat
         -- Each clause with its own @AKA@ ('PmMatrixClause'): a run of bare
         -- names that the checker separates into overloads gives each its
         -- own, so a printed module must keep them with their clauses.
-        [ "DECIDE" <+> printWithLayout hd <> foldMap ((space <>) . clauseHeadPattern) pats
+        [ "DECIDE" <+> bareName hd <> foldMap ((space <>) . clauseHeadPattern) pats
             <> foldMap ((space <>) . printWithLayout) cl.clauseAka
             <+> "IS"
         , indent 2 (printWithLayout body)
         ]
     | (cl, (pats, body)) <- zip matrix.clauses clauses
     ]
+
+-- | The group's wording, on a line of its own above the first clause, which
+-- is where a drafter writes it and where the parser reads it as the rule's.
+--
+-- Not the bracket form after each clause's head, which is what the name
+-- printer would emit: the group has ONE head, so every clause would repeat
+-- it, and the parser does not read a bracket after a clause head as the
+-- rule's. Measured 2026-11-09: @DECIDE code [the code of %c%] Red IS 1@ gives
+-- the wording to the group's input @c@, and the same bracket on the second
+-- clause gives it to the constructor @Green@, so the printed module said the
+-- rule's sentence was an input's. The line form runs to the end of the line,
+-- which here is the end of the annotation, so it needs nothing but the
+-- escapes 'printInlineNlg' already writes (each decodes the same in both
+-- forms).
+ownLineNlgOf :: Name -> [Doc ann]
+ownLineNlgOf n = case Optics.view (annoOf Optics.% annNlg) n of
+  Nothing  -> []
+  Just nlg -> ["@nlg" <+> printInlineNlg nlg]
 
 -- | A pattern in a clause head, as 'L4.Parser.pmClause' reads one: all on one
 -- line, and in brackets unless it is a single name or a literal, with every

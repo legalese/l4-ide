@@ -164,6 +164,21 @@ spec = describe "prettyLayout re-emits @nlg annotations (#966)" $ do
     \GIVETH A NUMBER\n\
     \`note on` r [see s.3\\q here] MEANS r TIMES 1\n"
 
+  -- A group of clauses has one head, and its wording is the rule's. Printed
+  -- in the bracket form after each clause's head, it re-parsed onto the
+  -- group's input `c` and onto the constructor `Green` (measured), so the
+  -- printer writes it on its own line above the first clause, where a drafter
+  -- writes it.
+  survivesPrinting "a clause group's wording, on its own line above the first clause"
+    ["@nlg the code of %c%\nDECIDE code Red IS"]
+    "DECLARE Colour IS ONE OF Red, Green\n\
+    \\n\
+    \GIVEN c IS A Colour\n\
+    \GIVETH A NUMBER\n\
+    \@nlg the code of %c%\n\
+    \DECIDE code Red IS 1\n\
+    \DECIDE code Green IS 2\n"
+
   -- The other side of the same change. A name is also printed where it is a
   -- LABEL, or a key a client looks something up by, and there the annotation
   -- is noise: a ladder diagram's nodes, and the function a visualisation is
