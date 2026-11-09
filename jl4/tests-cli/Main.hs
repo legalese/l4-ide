@@ -4337,6 +4337,17 @@ spec bin = do
       sout `shouldNotSatisfy` ("the payer" `isInfixOf`)
       sout `shouldNotSatisfy` ("paying" `isInfixOf`)
 
+  -- A state graph's edge is a label, not source, so it is drawn without the
+  -- rule's annotations too: printed through `prettyLayout` as it stands, the
+  -- edge read "Alice [the payer] MUST pay the price [30]".
+  describe "l4 state-graph labels an edge without its annotations" $
+    it "leaves an annotation off the party of an obligation" $ do
+      Output code sout0 _ <- runL4 bin ["state-graph", fixtureDir </> "annotated-values.l4"]
+      code `shouldBe` ExitSuccess
+      let sout = filter (/= '\r') sout0
+      sout `shouldSatisfy` ("Alice MUST pay the price" `isInfixOf`)
+      sout `shouldNotSatisfy` ("the payer" `isInfixOf`)
+
   -- Regression test for smucclaw/l4-ide#906: a diamond import over the
   -- embedded-library fallback used to starve the second sibling of the shared
   -- bottom's environment. `main.l4` imports two embedded siblings
