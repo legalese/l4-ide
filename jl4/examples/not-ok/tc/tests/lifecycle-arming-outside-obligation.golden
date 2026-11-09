@@ -1,0 +1,88 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: lifecycle-arming-outside-obligation.l4
+  Hidden: no
+  Range: 24:27-24:32
+  Source: check
+  Severity: DiagnosticSeverity_Information
+  Code: <none>
+  Message:
+    In this action, `alice` refers to
+
+      alice (at lifecycle-arming-outside-obligation.l4:18:1-6)
+
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+
+File: lifecycle-arming-outside-obligation.l4
+  Hidden: no
+  Range: 25:19-25:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    THE ARMING cannot be read here: no obligation has been entered where this
+    is written.
+
+    THE ARMING is the instant an obligation was entered. It can be read in an
+    obligation's own lines (its party, its action and PROVIDED, its AFTER and
+    WITHIN, an EVERY's join line) and anywhere inside a HENCE or LEST. This is
+    outside all of them: at the top level, in a top-level rule's WHERE, in the
+    body of a function, or in an EVERY's IN, WHO or WHOSE, which are read
+    before any member's obligation is entered.
+
+    Write it in one of those places. To use it in a function or a rule defined
+    elsewhere, pass it as an argument from there: WITHIN 0 OF (f THE ARMING).
+
+File: lifecycle-arming-outside-obligation.l4
+  Hidden: no
+  Range: 31:28-31:43
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    THE ARMING cannot be read here: no obligation has been entered where this
+    is written.
+
+    THE ARMING is the instant an obligation was entered. It can be read in an
+    obligation's own lines (its party, its action and PROVIDED, its AFTER and
+    WITHIN, an EVERY's join line) and anywhere inside a HENCE or LEST. This is
+    outside all of them: at the top level, in a top-level rule's WHERE, in the
+    body of a function, or in an EVERY's IN, WHO or WHOSE, which are read
+    before any member's obligation is entered.
+
+    Write it in one of those places. To use it in a function or a rule defined
+    elsewhere, pass it as an argument from there: WITHIN 0 OF (f THE ARMING).
+
+File: lifecycle-arming-outside-obligation.l4
+  Hidden: no
+  Range: 35:20-35:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    THE ARMING cannot be read here: no obligation has been entered where this
+    is written.
+
+    THE ARMING is the instant an obligation was entered. It can be read in an
+    obligation's own lines (its party, its action and PROVIDED, its AFTER and
+    WITHIN, an EVERY's join line) and anywhere inside a HENCE or LEST. This is
+    outside all of them: at the top level, in a top-level rule's WHERE, in the
+    body of a function, or in an EVERY's IN, WHO or WHOSE, which are read
+    before any member's obligation is entered.
+
+    Write it in one of those places. To use it in a function or a rule defined
+    elsewhere, pass it as an argument from there: WITHIN 0 OF (f THE ARMING).
+
+File: lifecycle-arming-outside-obligation.l4
+  Hidden: no
+  Range: 41:27-41:32
+  Source: check
+  Severity: DiagnosticSeverity_Information
+  Code: <none>
+  Message:
+    In this action, `alice` refers to
+
+      alice (at lifecycle-arming-outside-obligation.l4:18:1-6)
+
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.

@@ -1,0 +1,143 @@
+IMPORT prelude
+IMPORT properties
+
+-- D3, with Bob's purchase recorded and then cancelled: the fixture pair for
+-- the instance ledger's strict mode (OPERATIONAL-LOWERING-SPEC section 2,
+-- ruling R-O4). An operational-lowering fixture only; the brief's d1, d2
+-- and d3 have no cancellation, and a cancel act there is the d3-cancel
+-- mutant, which is a different act (it cancels Alice's dinner).
+--
+-- Alice checks whether dinner is bought at 18:05 and reads the dinner
+-- status record with one entry, opened. Then Bob's purchase is recorded
+-- (taken, at 18:06) and Bob cancels it (opened again, at 18:06:30), both
+-- between Alice's read and her buy at 18:07. Dinner is unbought again, so
+-- the rule lets Alice buy: the trace below ends with one dinner, accepted
+-- while open. That is the ledger's default, the semantic guard.
+--
+-- The ledger's strict mode is the version-number discipline on top of it:
+-- the record's version is the count of its recorded status events, not of
+-- the distinct states, so it moved from one, when Alice read it, to three,
+-- and a strict proposal of the same buy is refused as a conflict, nothing
+-- appended. Strictness is the ledger's, not the rule's, so no trace here
+-- can show it; the ledger's tests (jl4-core/test/LedgerSpec.hs) drive both
+-- proposals.
+--
+-- Same shape as d3-atomic.l4, with two changes. Bob's cancellation is an
+-- act. And every reading of the record takes its latest entry: the
+-- brief's `the ledger's status` (properties.l4) treats a record that ever
+-- held `taken` as taken for good, which is right for the brief, where
+-- nothing reopens, and would refuse Alice's buy here.
+
+DECLARE Act IS ONE OF
+    `ledger records Bob's purchase`            -- BobBuys
+    `ledger records Bob's cancellation`        -- the record reopens
+    `Messages delivers the message`            -- Deliver
+    `Alice checks whether dinner is bought`    -- CheckBought
+    `Alice is done`                            -- Done
+    `Alice buys dinner`                        -- BuyChecked if answered, NoAnswer if not
+        HAS `ledger answered` IS A BOOLEAN
+
+`closing` MEANS 75600
+
+§ `Reading the latest status`
+
+-- Every reader takes the cell's value as its input, and the call site does
+-- the RECALL (README.md of the brief, "Traps").
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A Status
+`the latest status` MEANS
+    CONSIDER reverse `dinner status record`
+    WHEN EMPTY                      THEN opened
+    WHEN latest FOLLOWED BY earlier THEN latest
+
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A BOOLEAN
+`dinner is open now` MEANS `the latest status` `dinner status record` EQUALS opened
+
+§ `The guards`
+
+GIVEN act IS AN Act
+GIVETH A BOOLEAN
+`the brief allows` MEANS
+    CONSIDER act
+    WHEN `ledger records Bob's purchase`         THEN `dinner is open now` (RECALL ALL OFFICIAL's `dinner status record`)
+    WHEN `ledger records Bob's cancellation`     THEN NOT (`dinner is open now` (RECALL ALL OFFICIAL's `dinner status record`))
+    WHEN `Messages delivers the message`         THEN (RECALL Messages's `message`) EQUALS JUST `in transit`
+    WHEN `Alice checks whether dinner is bought` THEN `where Alice is` (RECALL Alice's `plan`) EQUALS planning
+    WHEN `Alice is done`                         THEN `Alice has bought or stopped` (RECALL Alice's `plan`)
+    WHEN `Alice buys dinner` answered            THEN `where Alice is` (RECALL Alice's `plan`) EQUALS checked
+
+§ `The arrangement`
+
+GIVETH A DEONTIC Party Act
+`the arrangement` MEANS
+    COMMIT `dinner status record` IS opened
+    HENCE `the evening`
+
+GIVETH A DEONTIC Party Act
+`the evening` MEANS
+    PARTY World
+    MAY   act PROVIDED `the brief allows` act
+    WITHIN 0 OF closing
+    HENCE CONSIDER act
+          WHEN `ledger records Bob's purchase` THEN
+              COMMIT `dinner status record` IS taken
+              HENCE RECORD Messages's `message` IS `in transit`
+              HENCE `the evening`
+          WHEN `ledger records Bob's cancellation` THEN
+              COMMIT `dinner status record` IS opened
+              HENCE `the evening`
+          WHEN `Messages delivers the message` THEN
+              RECORD Messages's `message` IS delivered
+              HENCE RECORD Alice's `belief` IS taken
+              HENCE `Alice stops unless she has bought` (RECALL Alice's `plan`)
+          WHEN `Alice checks whether dinner is bought` THEN
+              RECORD Alice's `belief` IS `the latest status` (RECALL ALL OFFICIAL's `dinner status record`)
+              HENCE RECORD Alice's `plan` IS checked
+              HENCE `the evening`
+          WHEN `Alice is done` THEN `the evening`
+          WHEN `Alice buys dinner` answered THEN
+              IF NOT answered
+              THEN `the evening`
+              ELSE `the ledger answers the purchase` (RECALL ALL OFFICIAL's `dinner status record`)
+    LEST  FULFILLED
+
+-- The ledger's answer, in one step, read off the latest status.
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A DEONTIC Party Act
+`the ledger answers the purchase` MEANS
+    IF `dinner is open now` `dinner status record`
+    THEN COMMIT `dinners bought` IS `dinner for two`
+         HENCE COMMIT `open at acceptance` IS `dinner is open now` `dinner status record`
+         HENCE RECORD Alice's `plan` IS bought
+         HENCE `the evening`
+    ELSE RECORD Alice's `belief` IS taken
+         HENCE RECORD Alice's `plan` IS stopped
+         HENCE `the evening`
+
+GIVEN plan IS A MAYBE Plan
+GIVETH A DEONTIC Party Act
+`Alice stops unless she has bought` MEANS
+    IF `Alice has bought or stopped` plan
+    THEN `the evening`
+    ELSE RECORD Alice's `plan` IS stopped
+         HENCE `the evening`
+
+§ `The latest status, by hand`
+
+#ASSERT `the latest status` (LIST opened) EQUALS opened
+#ASSERT `the latest status` (LIST opened, taken) EQUALS taken
+#ASSERT `the latest status` (LIST opened, taken, opened) EQUALS opened
+#ASSERT NOT (`dinner is open now` (LIST opened, taken))
+
+§ `The trace`
+
+-- The pair's history, then Alice's buy, as the default semantic guard
+-- takes it. Official record: opened, taken, opened, dinner for two, open
+-- at acceptance TRUE.
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `Alice checks whether dinner is bought` AT 65100
+    PARTY World DOES `ledger records Bob's purchase`         AT 65160
+    PARTY World DOES `ledger records Bob's cancellation`     AT 65190
+    PARTY World DOES (`Alice buys dinner` TRUE)              AT 65220
+    (`WAIT UNTIL` 75601)

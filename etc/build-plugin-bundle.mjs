@@ -3,11 +3,12 @@
 // every file those skills cite, and nothing else.
 //
 // WHICH SKILLS. Every directory under `skills/`, read from disk. The pipeline
-// skill, `.claude/skills/running-the-l4-pipeline/`, is a plain directory there
-// and has no entry under `skills/`, so it is never bundled: it drives
-// `etc/go/`, which a plugin does not carry, and Meng ruled on 2026-09-26 that it
-// stays repo-local (specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md on
-// ci/skills-layout). A skill meant to travel goes under `skills/`.
+// skill, `running-the-l4-pipeline`, is not among them and is never bundled:
+// Meng ruled on 2026-09-26 that it does not ship with this plugin
+// (specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md on ci/skills-layout), and since
+// 2026-09-29 it lives with the pipeline in the private legalese/l4-pipeline,
+// which ships it as a plugin of its own. A skill meant to travel goes under
+// `skills/`.
 //
 // WHY THIS IS COMPUTED RATHER THAN A LIST. The skill teaches by example: it
 // names ~46 files it does not carry (`jl4/examples/canon/us/regcf/regcf.l4` alone
@@ -251,9 +252,17 @@ async function shelfRelease(spec) {
   if (spec === "latest") {
     // NOT /releases/latest: that endpoint excludes prereleases, and every
     // release on this shelf is one, so it answers 404 forever.
-    const r = await fetch(`${API}?per_page=10`, { headers: h });
+    //
+    // NOR the listing's first entry: the listing is not ordered by date. On
+    // 2026-10-14 it began unstable-20261013-c53e743 (published 14:44Z), with
+    // the newer unstable-20261013-72964e7 (20:13Z) second, and a bundle built
+    // with "latest" pinned the older one without a word. So sort by
+    // published_at here, newest first; a draft has none and is skipped.
+    const r = await fetch(`${API}?per_page=100`, { headers: h });
     if (!r.ok) throw new Error(`shelf listing: HTTP ${r.status}`);
-    const list = await r.json();
+    const list = (await r.json())
+      .filter((rel) => !rel.draft && rel.published_at)
+      .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
     if (!list.length) throw new Error("the shelf has published no releases");
     tag = list[0].tag_name;
   }

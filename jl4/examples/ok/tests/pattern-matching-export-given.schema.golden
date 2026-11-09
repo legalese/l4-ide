@@ -1,0 +1,27 @@
+{
+    "$defs": {
+        "Colour": {
+            "enum": [
+                "Red",
+                "Green",
+                "Blue"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+        "c": {
+            "$ref": "#/$defs/Colour"
+        },
+        "n": {
+            "type": "number"
+        }
+    },
+    "required": [
+        "c",
+        "n"
+    ],
+    "title": "size",
+    "type": "object"
+}

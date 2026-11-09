@@ -10,8 +10,7 @@
         }
     },
     "required": [
-        "amount",
-        "the rate"
+        "amount"
     ],
     "title": "tax on",
     "type": "object"

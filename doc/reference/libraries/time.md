@@ -1,70 +1,61 @@
-# Time Library
+# time
 
-Wall-clock time-of-day for legal rules involving time constraints. Uses 24-hour format internally with no date or timezone component.
-Can be imported into L4 files with `IMPORT time`.
+Time of day, with no date and no time zone, for rules about opening hours, cut-off times and the like. Import it with `IMPORT time`. Times are kept in 24-hour form; arithmetic wraps around midnight.
 
-### Location
+**Example:** [time-example.l4](time-example.l4)
 
-[jl4-core/libraries/time.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/time.l4)
+## Constants
 
-### Features
+| Constant                                    | Value    |
+| ------------------------------------------- | -------- |
+| `Midnight`                                  | 00:00:00 |
+| `Noon`                                      | 12:00:00 |
+| `Seconds in a minute`, `Minutes in an hour` | 60       |
+| `Hours in a day`                            | 24       |
+| `Seconds in an hour`                        | 3600     |
+| `Seconds in a day`                          | 86400    |
 
-- Time construction from hours/minutes/seconds, serial numbers, strings, or DATETIME extraction
-- AM/PM support via `Meridiem Indicator` enum
-- Time arithmetic (add/subtract hours, minutes, seconds) with midnight wrapping
-- Time-of-day predicates (morning, afternoon, evening)
-- Serial conversion (fraction of day: 0.0 = midnight, 0.5 = noon)
-- Comparison operators and min/max functions
-- String parsing for JSON interoperability
+`Meridiem Indicator` is an enumeration with the values `am` and `pm`.
 
-### Key Functions
+## Building a time
 
-**Constants:**
+| Function                      | Gives      | What it does                                             |
+| ----------------------------- | ---------- | -------------------------------------------------------- |
+| `Time` h m s                  | TIME       | From hours (0 to 23), minutes and seconds                |
+| `Time` h m                    | TIME       | Seconds are 0                                            |
+| `Time` h                      | TIME       | Minutes and seconds are 0                                |
+| `Time` h m s `am` (or `pm`)   | TIME       | 12-hour form; also `Time h m am` and `Time h pm`         |
+| `Time` text                   | MAYBE TIME | Reads `"HH:MM:SS"` or `"HH:MM"`                          |
+| `Time` datetime               | TIME       | The time part of a DATETIME, ignoring date and time zone |
+| serial `` `Serial to time` `` | TIME       | From a fraction of a day: 0 is midnight, 0.5 is noon     |
 
-- `Midnight` - 00:00:00
-- `Noon` - 12:00:00
-- `Hours in a day`, `Minutes in an hour`, `Seconds in a minute`, etc.
+## Reading a time
 
-**Time Construction:**
+| Function                 | Gives   | What it does                    |
+| ------------------------ | ------- | ------------------------------- |
+| `the hour of` t          | NUMBER  | 0 to 23                         |
+| `the minute of` t        | NUMBER  | 0 to 59                         |
+| `the second of` t        | NUMBER  | 0 to 59                         |
+| t `` `Time to serial` `` | NUMBER  | The time as a fraction of a day |
+| t `` `is morning` ``     | BOOLEAN | Before 12:00                    |
+| t `` `is afternoon` ``   | BOOLEAN | 12:00 to 17:59                  |
+| t `` `is evening` ``     | BOOLEAN | 18:00 or later                  |
+| t `` `is before noon` `` | BOOLEAN | Before 12:00                    |
+| t `` `is after noon` ``  | BOOLEAN | 12:00 or later                  |
 
-- `Time h m s` - Create time from hours, minutes, seconds
-- `Time h m` - Create time (seconds default to 0)
-- `Time h` - Create time (minutes and seconds default to 0)
-- `Time h m s am` / `Time h m s pm` - 12-hour AM/PM format
-- `Time h am` / `Time h pm` - Shorthand 12-hour format
-- `Time str` - Parse time string ("HH:MM:SS" or "HH:MM"), returns MAYBE TIME
-- `Time dt` - Extract time from DATETIME (ignores date and timezone)
-- `serial Serial to time` - Create time from day fraction
+## Moving a time
 
-**Time Extractors:**
+Each of these wraps around midnight: ``(Time 23 0 0) `plus hours` 2`` is 01:00. Put a time built with `Time` in parentheses, as here, before a word written after it.
 
-- `the hour of` t - Get hour (0-23)
-- `the minute of` t - Get minute (0-59)
-- `the second of` t - Get second (0-59)
+| Function                                            | Gives |
+| --------------------------------------------------- | ----- |
+| t `` `plus hours` `` n, t `` `minus hours` `` n     | TIME  |
+| t `` `plus minutes` `` n, t `` `minus minutes` `` n | TIME  |
+| t `` `plus seconds` `` n, t `` `minus seconds` `` n | TIME  |
 
-**Time Arithmetic (wraps at midnight):**
+## Comparing times
 
-- t `plus hours` n, t `minus hours` n
-- t `plus minutes` n, t `minus minutes` n
-- t `plus seconds` n, t `minus seconds` n
-
-**Predicates:**
-
-- `is morning` - Before noon (hour < 12)
-- `is afternoon` - 12:00 to 17:59
-- `is evening` - 18:00 onwards
-- `is before noon`, `is after noon`
-
-**Comparators:**
-
-- `the earlier of` t1 t2
-- `the later of` t1 t2
-- t1 `is before` t2, t1 `is after` t2
-- Standard comparison operators: LESS THAN, GREATER THAN, AT MOST, AT LEAST
-- TIME MINUS TIME returns difference in seconds
-
-### Example: Time Operations
-
-[time-example.l4](time-example.l4)
-
-**See [time.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/time.l4) source for all functions.**
+- `=`, `<`, `<=`, `>`, `>=` and their word forms compare two times.
+- t1 `MINUS` t2 is the difference in seconds.
+- t1 `` `is before` `` t2 and t1 `` `is after` `` t2 read as sentences.
+- `` `the earlier of` `` t1 t2 and `` `the later of` `` t1 t2 pick one of two times.

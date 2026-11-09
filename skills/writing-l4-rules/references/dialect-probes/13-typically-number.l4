@@ -1,0 +1,2 @@
+DECLARE Fee HAS
+    amount IS A NUMBER TYPICALLY 2

@@ -62,9 +62,9 @@ DECIDE `is adult` IF `person age` >= 18
 GIVEN `person age 2` IS A NUMBER
 DECIDE `is adult 2` IS IF `person age 2` >= 18 THEN TRUE ELSE FALSE
 
--- Both work the same way (using #CHECK since they use ASSUME-like params)
-#CHECK `is adult` WITH `person age` IS 21
-#CHECK `is adult 2` WITH `person age 2` IS 15
+-- Both work the same way; an input can also be given by name with WITH
+#EVAL `is adult` 21
+#EVAL `is adult 2` WITH `person age 2` IS 15
 
 -- Returning Different Types
 

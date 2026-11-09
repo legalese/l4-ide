@@ -1,0 +1,35 @@
+-- A CSV cell for an input that is not a NUMBER or a BOOLEAN is the text
+-- written: a choice, a date, and a synonym of a number are all read from it.
+DECLARE Answer IS ONE OF True, False, Unknown
+
+DECLARE Year IS A NUMBER
+
+DECLARE Flag IS A BOOLEAN
+
+@export Echo an answer
+GIVEN a IS AN Answer
+GIVETH A STRING
+`echo answer` a MEANS
+  CONSIDER a
+    WHEN True THEN "yes"
+    WHEN False THEN "no"
+    WHEN Unknown THEN "dunno"
+
+@export Echo an answer that may be left out
+GIVEN a IS A MAYBE Answer
+GIVETH A STRING
+`echo optional answer` a MEANS
+  CONSIDER a
+    WHEN NOTHING THEN "none"
+    WHEN JUST x THEN `echo answer` x
+
+@export Echo a date
+GIVEN d IS A DATE
+GIVETH A DATE
+`echo date` d MEANS d
+
+@export Echo a year if the flag is set
+GIVEN y IS A Year
+      f IS A Flag
+GIVETH A NUMBER
+`echo year` y f MEANS IF f THEN y ELSE 0

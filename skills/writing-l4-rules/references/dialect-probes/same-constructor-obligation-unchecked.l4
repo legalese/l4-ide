@@ -1,0 +1,10 @@
+DECLARE Party IS ONE OF Borrower, Lender, Stranger
+DECLARE Act IS ONE OF Pay HAS payer IS A Party, to IS A Party, amount IS A NUMBER
+
+GIVETH A DEONTIC Party Act
+g MEANS
+  PARTY Lender
+  MUST Pay Borrower Lender 10
+  WITHIN 5
+  HENCE FULFILLED
+  LEST BREACH

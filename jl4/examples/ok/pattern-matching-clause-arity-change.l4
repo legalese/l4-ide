@@ -1,0 +1,28 @@
+-- A definition with no GIVEN of its own, right after clauses of the same name,
+-- with another number of inputs than they have patterns, is not another clause.
+-- It is a rule of its own whose inputs are called Red and Blue, so f Green Red
+-- gives 3 (found by the pre-review of legalese/l4-ide#545, 2026-10-13). The
+-- warning says so, at the definition. A definition with a GIVEN of its own is
+-- that rule written out, and draws none.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE f Red IS 1
+DECIDE f c IS 2
+DECIDE f Red Blue IS 3
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE g Red IS 1
+DECIDE g c IS 2
+
+GIVEN c IS A Colour
+      d IS A Colour
+GIVETH A NUMBER
+g c d MEANS 3
+
+#EVAL f Red
+#EVAL f Green
+#EVAL f Green Red
+#EVAL g Green Red

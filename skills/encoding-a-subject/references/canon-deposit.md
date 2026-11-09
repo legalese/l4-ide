@@ -30,12 +30,18 @@ subjects/<jurisdiction>/<slug>/
     SOURCE-LICENSE.md       the terms the quoted source text carries
     *.l4                    the modules
     check.sh                the self-check from this skill
+    fetch-main-l4.sh        beside check.sh: fetches the main build it compares with (target main)
 ```
 
 **`subject.json`** — `id` (the slug), `display_name`, `citation`, `extent`, `authority` where the path is coarser than the enacting body, and `source` (URL, and a note on versions and provenance).
 
 **`encoding.json`** — `id`, `encoder`, `display_name`, `status` (`draft` until a domain expert has reviewed it), `version` (semver, starting `0.1.0`), `license`, `maintainer`, `modules` (the list, in reading order), `scope` (the provisions encoded, and those not), and a `not_reviewed` note saying who has and has not read it against the source.
 If some tests are meant to fail, say which file and how many under `expected_red`.
+
+**The target.** An encoding deposited in commons states which compiler it was written to be read by, `main` or `unstable` (the brief's target), in `NOTES.md`.
+For target `main`, `NOTES.md` also carries the output of `check.sh` with its main columns, and the main build it compared with: the `l4 --version` line, such as `1.6.98 (main, 7689b0d, 2026-10-19)`.
+If the row's `encoding.json` already has a `checks` object with a `note`, put the main step's result there too; some rows also have `l4_build`, which records the build the encoding was written with.
+If it has no such field, leave `encoding.json` alone.
 
 The fullest worked example is `subjects/il/hvac-work-licensing-2025/encodings/legalese/`; read its `encoding.json` and `NOTES.md` before writing your own.
 
@@ -66,4 +72,4 @@ gh pr create --repo legalese/canon --base main
 ```
 
 Canon has no CI of its own.
-Nothing re-runs your tests after you push, so the numbers in `NOTES.md` are a point-in-time record: say which `l4` build produced them.
+Nothing re-runs your tests after you push, so the numbers in `NOTES.md` are a point-in-time record: say which `l4` build produced them, and, for target `main`, which main build `check.sh` compared them with.

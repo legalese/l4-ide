@@ -1,22 +1,22 @@
-# ACTUS Library
+# actus
 
-Algorithmic Contract Types Unified Standards ([actusfrf.org](https://www.actusfrf.org)) implementation in L4. Provides types and functions for modelling standardised financial contracts.
+An L4 implementation of ACTUS, the Algorithmic Contract Types Unified Standards ([actusfrf.org](https://www.actusfrf.org)): types and functions for modelling standardised financial contracts.
 
-Import with `IMPORT actus` to get all modules, or import individual modules selectively.
+`IMPORT actus` gives you every module below. To use only part of it, import a module by name, such as ``IMPORT `actus-core` ``.
 
-### Location
+## Modules
 
-| File                                                                                                   | Purpose                                   |
-| ------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| [actus.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/actus.l4)                   | Main entry point (re-exports all modules) |
-| [actus-core.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/actus-core.l4)         | Core types (contract types, roles, enums) |
-| [actus-terms.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/actus-terms.l4)       | Contract term definitions                 |
-| [actus-state.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/actus-state.l4)       | Contract state variables                  |
-| [actus-events.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/actus-events.l4)     | Event types and operations                |
-| [actus-daycount.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/actus-daycount.l4) | Day count conventions and year fractions  |
-| [actus-schedule.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/actus-schedule.l4) | Schedule generation                       |
+| Module           | Contents                                     |
+| ---------------- | -------------------------------------------- |
+| `actus`          | Everything below, plus the evaluation engine |
+| `actus-core`     | Contract types, roles and other enumerations |
+| `actus-terms`    | Contract terms                               |
+| `actus-state`    | Contract state                               |
+| `actus-events`   | Event types and events                       |
+| `actus-daycount` | Day count conventions and year fractions     |
+| `actus-schedule` | Schedule generation                          |
 
-### Core Types (`actus-core`)
+## Core types (`actus-core`)
 
 **Contract Type Taxonomy** (~32 ACTUS contract types organised into families):
 
@@ -33,7 +33,7 @@ Import with `IMPORT actus` to get all modules, or import individual modules sele
 
 - `` `is non-performing` ``, `` `is active` `` — performance predicates
 
-**Day Count Convention** — AA, A360, A365, `30E360`, `30E360ISDA`, BUS252
+**Day Count Convention** — AA, A360, A365, `30E360`, `30E360ISDA`, BUS252; `` `days in year for` `` gives the days in a year under a convention
 
 **Other Enums:**
 
@@ -46,23 +46,25 @@ Import with `IMPORT actus` to get all modules, or import individual modules sele
 - `Penalty Type` — NoPenalty, AbsolutePenalty, RelativePenalty, InterestPenalty
 - `Option Type` / `Option Exercise Type` — Call, Put, Straddle / European, American, Bermudan
 - `Scaling Effect` — NoScaling, InterestScaling, PrincipalScaling, BothScaling
-- `ACTUS Currency` — USD, EUR, GBP, JPY, CHF, CAD, AUD, CNY, HKD, SGD, or custom via `ACTUS Other`
+- `ACTUS Currency` — `` `ACTUS USD` ``, `` `ACTUS EUR` ``, `` `ACTUS GBP` ``, `` `ACTUS JPY` ``, `` `ACTUS CHF` ``, `` `ACTUS CAD` ``, `` `ACTUS AUD` ``, `` `ACTUS CNY` ``, `` `ACTUS HKD` ``, `` `ACTUS SGD` ``, or `` `ACTUS Other` `` with an ISO code; `` `currency code` `` gives the ISO 4217 code as a STRING
+
+**ACTUS Amount** — record with `value` and `currency`; `` `ACTUS_USD` ``, `` `ACTUS_EUR` ``, `` `ACTUS_GBP` `` and `` `ACTUS_SGD` `` build one from a number
 
 **Cycle** — record with `period`, `periodUnit`, `stub`; convenience constructors: `` `Monthly Cycle` ``, `` `Quarterly Cycle` ``, `` `Semi-Annual Cycle` ``, `` `Annual Cycle` ``
 
-### Contract Terms (`actus-terms`)
+## Contract terms (`actus-terms`)
 
 - `ACTUS Contract Terms` — core contract parameters (ID, type, role, dates, principal, rate, day count convention)
 - `FXOUT Terms` — FX outright transaction parameters
 - `` `implied exchange rate` `` — derive rate from FX term amounts
 
-### Contract State (`actus-state`)
+## Contract state (`actus-state`)
 
 - `Contract State` — runtime state (statusDate, contractPerformance, notionalPrincipal, accruedInterest, nominalInterestRate, feeAccrued)
 - `` `is fully paid` ``, `` `is in default` ``, `` `outstanding balance` `` — state predicates
 - `` `empty state` `` — default initial state
 
-### Contract Events (`actus-events`)
+## Contract events (`actus-events`)
 
 **Event Types:** IED, PR, PP, MD, IP, IPCI, RR, RRF, FP, PY, TD, XD, STD, DV, CE, AD
 
@@ -72,20 +74,21 @@ Import with `IMPORT actus` to get all modules, or import individual modules sele
 - `` `is principal event` ``, `` `is interest event` ``, `` `has cash flow` `` — event predicates
 - `` `total payoff` `` — sum payoffs across a list of events
 
-### Day Count Conventions (`actus-daycount`)
+## Day count conventions (`actus-daycount`)
 
 - `` `year fraction` `` — Y(S,E) calculation dispatching on convention
 - `` `year fraction A365` ``, `` `year fraction A360` `` — specific convention implementations
 - `` `days between` `` — raw day count between two dates
 - `` `accrued interest for period` `` — interest accrual given principal, rate, dates, and convention
 
-### Schedule Generation (`actus-schedule`)
+## Schedule generation (`actus-schedule`)
 
-- `` `add months` ``, `` `add days` `` — date arithmetic with month-end clamping
+- `` `add days` `` — date arithmetic on a number of days
+- `` `add months` `` — month arithmetic with month-end clamping; it is defined in [`daydate`](daydate.md), which `actus-schedule` imports and passes on
 - `` `monthly schedule` `` — generate a list of monthly dates from a start date
 - `` `schedule length` `` — count dates in a schedule
 
-### Evaluation Engine (`actus`)
+## Evaluation engine (`actus`)
 
 **Payoff Functions (POF):**
 
@@ -112,5 +115,3 @@ Import with `IMPORT actus` to get all modules, or import individual modules sele
 **Cash Flow Projection:**
 
 - `` `net cash flow` `` — sum all cash flows from a list of events
-
-**See the [actus.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/actus.l4) source and sub-modules for full details.**

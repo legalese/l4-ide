@@ -1,14 +1,8 @@
-# Jurisdiction Library
+# jurisdiction
 
 Jurisdiction definitions for multi-jurisdictional legal rules. Uses ISO 3166-1 country codes (alpha-2, alpha-3, and numeric) and ISO 3166-2 subdivision codes. Import with `IMPORT jurisdiction`.
 
-**Status:** Prototype (version 1.0.0). API may change.
-
-### Location
-
-[jl4-core/libraries/jurisdiction.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/jurisdiction.l4)
-
-### Constants
+## Constants
 
 Twenty major countries are provided with three constants each, e.g. for the United States:
 
@@ -29,7 +23,7 @@ Additional constant groups (each providing `... code` and `... name` STRING cons
 | Canadian provinces        | Ontario, Quebec, British Columbia, Alberta                                                        |
 | UK constituent countries  | England (`"GB-ENG"`), Scotland (`"GB-SCT"`), Wales (`"GB-WLS"`), Northern Ireland (`"GB-NIR"`)    |
 
-### Validation Functions
+## Validation functions
 
 | Function                           | Signature          | Description                                                    |
 | ---------------------------------- | ------------------ | -------------------------------------------------------------- |
@@ -39,7 +33,7 @@ Additional constant groups (each providing `... code` and `... name` STRING cons
 
 These are format checks only — they do not verify that the code is an assigned ISO code.
 
-### Country Name Lookup
+## Country name lookup
 
 Both lookups return `RIGHT name` for known codes and `LEFT errorMessage` for unknown ones.
 
@@ -48,7 +42,7 @@ Both lookups return `RIGHT name` for known codes and `LEFT errorMessage` for unk
 | `country name from alpha-2` code | `STRING → EITHER STRING STRING` | English name from 2-letter code |
 | `country name from alpha-3` code | `STRING → EITHER STRING STRING` | English name from 3-letter code |
 
-### Code Conversion Functions
+## Code conversion functions
 
 | Function                  | Signature                       | Description                               |
 | ------------------------- | ------------------------------- | ----------------------------------------- |
@@ -56,5 +50,3 @@ Both lookups return `RIGHT name` for known codes and `LEFT errorMessage` for unk
 | `alpha-3 to alpha-2` code | `STRING → EITHER STRING STRING` | Convert 3-letter to 2-letter country code |
 
 Lookups and conversions cover the twenty countries listed above; other codes produce a `LEFT` error.
-
-**See [jurisdiction.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/jurisdiction.l4) source for all definitions.**

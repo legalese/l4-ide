@@ -1,0 +1,12 @@
+-- l4 batch over two defaulted inputs, one of them with a name holding a
+-- semicolon: names may contain the characters a separator would need, which
+-- is why the CSV `presumed` column is a JSON list.
+
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export Can contract
+GIVEN `is adult` IS A BOOLEAN
+      `of sound mind; sober` IS A BOOLEAN TYPICALLY TRUE
+GIVETH A BOOLEAN
+`can contract` MEANS `is adult` AND `has capacity` AND `of sound mind; sober`

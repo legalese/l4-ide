@@ -107,6 +107,8 @@ const prims: ScenePrim[] = [
   },
   { kind: "glyph", at: { x: 1, y: 1 }, role: "changeover" },
   { kind: "glyph", at: { x: 2, y: 2 }, role: "inverter" },
+  { kind: "glyph", at: { x: 2, y: 3 }, role: "inverter", value: "TrueV" },
+  { kind: "glyph", at: { x: 2, y: 4 }, role: "inverter", value: "FalseV" },
   { kind: "glyph", at: { x: 3, y: 3 }, role: "open-contact" },
   { kind: "glyph", at: { x: 4, y: 4 }, role: "power-terminal" },
   {
@@ -193,10 +195,40 @@ const scene: Scene = { size: { w: 400, h: 200 }, prims };
 /** `complete` and `provisional` are SCENE-level and mutually exclusive in what they select
  *  — `wireMade` needs a made circuit, `wireMadeProvisional` needs a made-but-presumed one —
  *  so no single render can reach both. The contract test unions all three readings. */
+/** The call-panel fields appear only in a scene that HAS panels (`panelDepth`): its backdrop
+ *  (one level: one step below the innermost) is `panelDeep`, its one panel at the innermost
+ *  depth is `panelNear`, and its open wire is `wireOpenPanel`. */
+const withPanel: Scene = {
+  ...scene,
+  panelDepth: 1,
+  prims: [
+    ...prims,
+    {
+      kind: "panel",
+      id: 9,
+      at: { x: 0, y: 0 },
+      w: 50,
+      h: 40,
+      depth: 0,
+      label: "f x",
+    },
+    {
+      kind: "text",
+      at: { x: 4, y: 12 },
+      text: "▾ f x",
+      anchor: "start",
+      state: "inert",
+      tag: "panel",
+      id: 9,
+      act: { t: "fold", id: 9 },
+    },
+  ],
+};
 const scenes: Scene[] = [
   scene,
   { ...scene, complete: true },
   { ...scene, complete: true, provisional: true },
+  withPanel,
 ];
 
 /* --------------------------------------------------------------- byte-identity (R3) */
@@ -249,6 +281,13 @@ const REACHABLE: Array<keyof Palette> = [
   "coilGreenSoft",
   "coilRedSoft",
   "assumed",
+  "panelNear",
+  "panelDeep",
+  "panelEdge",
+  "panelLabel",
+  "wireOpenPanel",
+  "inverterTrue",
+  "inverterFalse",
 ];
 
 /** A palette whose every field is a distinct sentinel, so "did this field reach the emit"
@@ -261,7 +300,7 @@ const sentinelPalette = (): Palette => {
   return out as unknown as Palette;
 };
 
-test("the palette has exactly the 33 fields the specs quote", () => {
+test("the palette has exactly the 40 fields the specs quote", () => {
   // Pinned because the count is quoted in prose that cannot check itself: E1-IDE-INTEGRATION
   // .md's S8 row and EMBEDDABLE.md §2 / §9 R8 all name it. An earlier draft of those rows said
   // "21 colours … 14 literals" — 14 was a count of SITES (svg.ts:41 carried three colours,
@@ -272,10 +311,16 @@ test("the palette has exactly the 33 fields the specs quote", () => {
   // 26 -> 33: the FALSE-vs-UNKNOWN fix wired `dead` up and brought seven new colours (the
   // two state washes, the two made-circuit inks, the two soft coils, and `assumed`). The
   // three owning documents moved in the same commit.
-  assert.equal(Object.keys(SCREEN_PALETTE).length, 33);
-  assert.equal(Object.keys(INK_PALETTE).length, 33);
-  assert.equal(Object.keys(DARK_PALETTE).length, 33);
-  assert.equal(REACHABLE.length, 33, "REACHABLE must cover the type");
+  //
+  // 33 -> 38: call panels brought five (the two ends of the panel shade scale, the panel
+  // edge, the panel name, and the open-wire ink for a shaded backdrop). Moved with them.
+  //
+  // 38 -> 40: the filled NOT bubble got its own two fills (`inverterTrue`/`inverterFalse`),
+  // because `live`/`dead` are text inks — a bright grey in DARK, near-identical greys in INK.
+  assert.equal(Object.keys(SCREEN_PALETTE).length, 40);
+  assert.equal(Object.keys(INK_PALETTE).length, 40);
+  assert.equal(Object.keys(DARK_PALETTE).length, 40);
+  assert.equal(REACHABLE.length, 40, "REACHABLE must cover the type");
 });
 
 test("every reachable Palette field actually reaches the emit", () => {

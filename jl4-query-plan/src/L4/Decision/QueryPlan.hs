@@ -9,9 +9,11 @@ module L4.Decision.QueryPlan (
   QueryImpact (..),
   QueryInput (..),
   QueryAsk (..),
+  QueryRefusal (..),
   QueryPlanResponse (..),
   BDQ.Verdict (..),
   atomIdByUnique,
+  leafAtomIds,
   queryPlan,
 ) where
 
@@ -30,10 +32,9 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Data.Ord (Down (..))
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
 import Text.Read (readMaybe)
 
-import qualified L4.Crypto.UUID5 as UUID5
+import L4.Viz.AtomKey (atomIdOfKey)
 
 inputRefsClosureByUnique :: CachedDecisionQuery -> IntMap (Set InputRef)
 inputRefsClosureByUnique cached =
@@ -99,6 +100,17 @@ data CachedDecisionQuery = CachedDecisionQuery
     -- ^ Per-atom prior @P(atom = TRUE)@ from boolean @TYPICALLY@ defaults, keyed
     -- by atom unique. Absent atoms are prior-free (0.5). Feeds the info-gain
     -- question ordering; built once from the ladder's @typically@ fields.
+  , refusalsByUnique :: !(IntMap Text)
+    -- ^ The refusing leaves (a @REFUSE@, or a reference to a rule of no inputs
+    -- that always refuses), with the reason each refuses with. Each is compiled
+    -- as 'BDQ.BRefuse' and so is never asked; a plan that reaches one says so in
+    -- 'refusal'. Fill it from the ladder's state ('getRefusingAtoms').
+  , leafKeyByUnique :: !(IntMap Text)
+    -- ^ The C1 key of every ladder leaf's term, by leaf id, exactly as the ladder
+    -- recorded it while drawing ("L4.Viz.AtomKey"). Every atomId the plan names
+    -- is computed from these, and the ladder's own are too, so the two cannot
+    -- disagree (smucclaw/l4-ide#935). Fill it from the ladder's state, never
+    -- from labels.
   }
 
 data QueryAtom = QueryAtom
@@ -197,56 +209,51 @@ data QueryPlanResponse = QueryPlanResponse
   , impact :: !(Map Int QueryImpact)
   , impactByAtomId :: !(Map Text QueryImpact)
   , note :: !Text
+  , refusal :: !(Maybe QueryRefusal)
+  -- ^ Where evaluation of this case is sure to refuse: why, as it would say it.
+  -- 'Nothing' everywhere else.
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
+-- | A refusal the plan has reached (ruling R7): evaluation of the same case
+-- refuses, with one of these reasons. Usually one; more only where which
+-- refusal evaluation reaches first is still open (@IF a THEN r1 ELSE r2@ with
+-- @a@ unanswered).
+data QueryRefusal = QueryRefusal
+  { reasons :: ![Text]
+  , atoms :: ![QueryAtom]
+  -- ^ The refusing leaves evaluation can reach first: a @REFUSE@, or a rule of no
+  -- inputs that always refuses. None of them is a question.
+  }
+  deriving stock (Show, Read, Ord, Eq, Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+-- | The atomId of each of the plan's variables (the BDD's atoms), in the
+-- diagram of the decision named @name@.
+--
+-- An atomId names a QUESTION, not an occurrence: it is the hash of the leaf's
+-- C1 term key (WHERE-INLINING-SPEC §10.1, R3), so two occurrences of one
+-- proposition, which the planner holds as two variables, share it.
 atomIdByUnique ::
   Text ->
-  -- | Parameter labels keyed by unique.
-  Map Int Text ->
   CachedDecisionQuery ->
   Map Int Text
-atomIdByUnique name paramsByUnique cached =
-  let
-    refsByUnique :: IntMap (Set InputRef)
-    refsByUnique = inputRefsClosureByUnique cached
+atomIdByUnique name cached =
+  Map.restrictKeys (leafAtomIds name cached) (Map.keysSet cached.varLabelByUnique)
 
-    renderInputRef :: InputRef -> Text
-    renderInputRef ref =
-      let
-        rootLbl =
-          Maybe.fromMaybe
-            (Text.pack (show ref.rootUnique))
-            ( Map.lookup ref.rootUnique paramsByUnique
-                <|> Map.lookup ref.rootUnique cached.varLabelByUnique
-            )
-        pathTxt =
-          case ref.path of
-            [] -> ""
-            xs -> "." <> Text.intercalate "." xs
-       in rootLbl <> pathTxt
-
-    stableAtomId :: Int -> Text -> Text
-    stableAtomId u lbl =
-      let
-        refs =
-          List.sort
-            [ renderInputRef ref
-            | ref <- Set.toList (IntMap.findWithDefault Set.empty u refsByUnique)
-            ]
-        canonical =
-          Text.intercalate
-            "|"
-            ( [name, lbl]
-                <> ["refs=" <> Text.intercalate ";" refs | not (null refs)]
-            )
-       in UUID5.toText (UUID5.generateNamed UUID5.namespaceURL (Text.encodeUtf8 canonical))
-   in
-    Map.fromList
-      [ (u, stableAtomId u lbl)
-      | (u, lbl) <- Map.toList cached.varLabelByUnique
-      ]
+-- | The atomId of every leaf the ladder drew, not only of the plan's variables:
+-- an App's arguments and the leaves of a call's expansion too, which the
+-- planner does not see as variables (WHERE-INLINING-SPEC §10).
+leafAtomIds ::
+  Text ->
+  CachedDecisionQuery ->
+  Map Int Text
+leafAtomIds name cached =
+  Map.fromList
+    [ (u, atomIdOfKey name key)
+    | (u, key) <- IntMap.toList cached.leafKeyByUnique
+    ]
 
 queryPlan ::
   Text ->
@@ -269,15 +276,14 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
         ]
 
     atomIdByUniqueMap :: Map Int Text
-    atomIdByUniqueMap = atomIdByUnique name paramsByUnique cached
+    atomIdByUniqueMap = atomIdByUnique name cached
 
     -- | The inverse of 'atomIdByUniqueMap', kept ONE-TO-MANY on purpose.
     --
-    -- An atomId is a hash of (function, label, input refs) — it names a
-    -- QUESTION, not an occurrence. Two occurrences of one compound leaf get
-    -- fresh @unique@s from 'L4.Viz.Ladder.leafFromExpr' but identical labels and
-    -- identical ref closures, so they are twins under one atomId: one question,
-    -- two BDD variables.
+    -- An atomId is the hash of a term (R3) — it names a QUESTION, not an
+    -- occurrence. Two occurrences of one compound leaf get fresh @unique@s from
+    -- 'L4.Viz.Ladder.leafFromExpr' but one term, so they are twins under one
+    -- atomId: one question, two BDD variables.
     --
     -- This used to be a @Map.fromList@, which is last-wins. A user who answered
     -- that question bound exactly one twin and the other stayed unknown forever
@@ -622,6 +628,7 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
       "StillNeeded/ranked are boolean atoms from ladder visualization; these may be derived predicates rather than original user inputs. Bindings are matched by atom label (including dotted labels for nested fields), atom unique (as a decimal string), or atomId (a stable UUIDv5 derived from function name, atom label, and input refs). `inputs` ranks function parameters using a simple dependency-based heuristic."
         <> " `asks` ranks askable keys; for record parameters this includes projected field paths discovered via `Proj`."
         <> " Report `verdict`, not `determined`: when the rule is stated as a seam (`scope IMPLIES requirement`), `Complies` and `NotApplicable` are BOTH `determined = true`, and telling a user they complied with a rule that never reached them is a category error, not a rounding error."
+        <> " `Refused` means evaluation of this case refuses to answer, for the reasons in `refusal`; a `REFUSE`, or a rule of no inputs that always refuses, is never asked."
    in
     QueryPlanResponse
       { determined = res.determined
@@ -633,4 +640,13 @@ queryPlan name paramsByUnique cached flattenedLabelBindings =
       , impact = impactJson
       , impactByAtomId = impactByAtomIdJson
       , note = noteTxt
+      , refusal =
+          if Set.null res.refusedAt
+            then Nothing
+            else
+              Just
+                QueryRefusal
+                  { reasons = List.nub [r | u <- Set.toList res.refusedAt, Just r <- [IntMap.lookup u cached.refusalsByUnique]]
+                  , atoms = atomsOfSet res.refusedAt
+                  }
       }

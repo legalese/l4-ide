@@ -1,0 +1,6 @@
+§ `Act`
+    GIVEN a IS A BOOLEAN
+
+§§ `Main rule`
+
+DECIDE `r` IF a

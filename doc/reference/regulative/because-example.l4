@@ -120,6 +120,7 @@ DECLARE Action IS ONE OF
 -- Test 2: Obligation breached (deadline passes without action)
 -- This will show the BECAUSE reason in the breach output
 #TRACE `delivery full form` AT 0 WITH
+  (`WAIT UNTIL` 15)
 
 -- Test 3: Prohibition violated
 #TRACE `no smoking policy` AT 0 WITH
@@ -128,3 +129,4 @@ DECLARE Action IS ONE OF
 -- Test 4: Chained obligation - first party fulfills, second breaches
 #TRACE `rental agreement` AT 0 WITH
   PARTY Tenant DOES `pay rent` 2000 AT 3
+  (`WAIT UNTIL` 40)

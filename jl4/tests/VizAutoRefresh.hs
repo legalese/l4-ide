@@ -5,7 +5,7 @@
 -- refresh @verDocId@, @moduleUri@ and @substitution@ from the fresh typecheck
 -- result but NOT @module'@ — it kept re-using the module snapshot captured by the
 -- last *manual* Visualize. Because @canInline@ (the @+@/unfold affordance) is
--- computed from @cfg.module'@ (via 'collectDefsForInlining'), adding a DECIDE that
+-- computed from @cfg.module'@ (via 'defsForInliningOf'), adding a DECIDE that
 -- makes an atom inline-able updated the ladder structure but left @canInline@
 -- frozen — you only got the @+@ after a manual re-visualize.
 --
@@ -64,8 +64,8 @@ spec =
               staleF = findDecide "f" stale.tcdModule
               freshF = findDecide "f" fresh.tcdModule
 
-              vizStateStale = case Ladder.doVisualize staleF cfgStale of
-                Right (_, s) -> s
+              (ladderStale, vizStateStale) = case Ladder.doVisualize staleF cfgStale of
+                Right r -> r
                 Left e -> error ("stale doVisualize failed: " <> show e)
 
               recentlyVisualised =
@@ -75,6 +75,7 @@ spec =
                   , decide = staleF
                   , type' = decideType staleF
                   , vizState = vizStateStale
+                  , ladderInfo = ladderStale
                   }
 
               freshTc = partialTypeCheckResult fresh
@@ -128,11 +129,11 @@ decideType (MkDecide anno _ _ _) =
 firstAtomCanInline :: V.IRExpr -> Maybe Bool
 firstAtomCanInline = go
   where
-    go (V.UBoolVar _ _ _ ci _ _) = Just ci
+    go (V.UBoolVar _ _ _ ci _ _ _) = Just ci
     go (V.And _ es) = listToMaybe (mapMaybe go es)
     go (V.Or _ es) = listToMaybe (mapMaybe go es)
     go (V.Not _ e) = go e
-    go (V.App _ _ es _) = listToMaybe (mapMaybe go es)
+    go (V.App _ _ es _ _) = listToMaybe (mapMaybe go es)
     go _ = Nothing
 
 -- | A 'Rules.TypeCheckResult' carrying only the two fields the visualise/

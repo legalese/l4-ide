@@ -1,0 +1,8 @@
+DECLARE Person HAS
+    `full name` IS A STRING
+    age         IS A NUMBER
+
+alex MEANS Person WITH `full name` IS "Alex Tan", age IS 19
+
+#ASSERT alex's age EQUALS 19
+#ASSERT alex's `full name` EQUALS "Alex Tan"

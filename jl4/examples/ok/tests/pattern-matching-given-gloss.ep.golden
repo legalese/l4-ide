@@ -1,0 +1,20 @@
+-- An @nlg written on a GIVEN item of a rule written as clauses is attached, as
+-- it is on a rule written as one definition (refutation of
+-- legalese/l4-ide#545's review, round 4). It used to be reported as not
+-- attached: the head form of a group held a copy of each GIVEN input, with
+-- the GIVEN's location, and took what was written around the head instead.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour @nlg the colour %c%
+GIVETH A NUMBER
+@nlg the code of %c%
+DECIDE grouped Red IS 1
+DECIDE grouped c IS 2
+
+GIVEN c IS A Colour @nlg the colour %c%
+GIVETH A NUMBER
+@nlg the code of %c%
+DECIDE single c IS 1
+
+#EVAL grouped Red
+#EVAL single Red

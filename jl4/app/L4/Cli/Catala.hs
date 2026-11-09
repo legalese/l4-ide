@@ -29,7 +29,6 @@ module L4.Cli.Catala
 
 import Base (Map, Text)
 import Data.Char (isAlpha, isAlphaNum, isAscii, toUpper)
-import qualified Data.List as List
 import qualified Base.Text as Text
 import Data.Ratio (denominator, numerator)
 import qualified Data.Map.Strict as Map
@@ -156,14 +155,10 @@ catalaCmd opts = do
 -- the v1 Catala fragment (§6)", which reads as a language limit rather than a
 -- missing scan.
 --
--- Same shape as 'L4.Cli.Render.transitiveDeps'; the MLIR pipeline takes only
--- @tc.dependencies@'s first level, which would miss a type two imports away.
+-- The same list as 'L4.Cli.Common.transitiveDeps': each module once, in the
+-- order a depth-first walk of the imports meets it.
 importClosure :: Rules.TypeCheckResult -> [Module Resolved]
-importClosure tc = nubOnUri (go tc.dependencies)
- where
-  go = concatMap (\d -> d.module' : go d.dependencies)
-  nubOnUri = List.nubBy (\a b -> muri a == muri b)
-  muri (MkModule _ u _) = u
+importClosure tc = map (.module') (Rules.transitiveDependencies tc)
 
 -- | The module name Catala will demand for a file with this basename, or
 -- 'Nothing' when no module can live in a file so named.
@@ -207,6 +202,11 @@ fillTests fields oracle m =
         Just (Reduction (ReducedErrored _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
         Just (Assertion (Errored _)) ->
+          ([], [ note t "evaluating it in L4 raised" ])
+        -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        Just (Reduction (ReducedUndetermined _)) ->
+          ([], [ note t "evaluating it in L4 raised" ])
+        Just (Assertion (Undetermined _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
         -- A refusal is not an oracle either, and it is not a raise: say which,
         -- so a reader of the run does not go hunting for a crash.

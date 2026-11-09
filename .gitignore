@@ -62,6 +62,7 @@ tsconfig.tsbuildinfo
 ts-apps/vscode/bin
 ts-apps/vscode/static/webview/
 ts-apps/vscode/static/skills/
+ts-apps/vscode/static/pvrecorder/
 *.exe
 *.vsix
 yarn-debug.log*
@@ -78,3 +79,8 @@ jl4-mlir/parity-report/
 
 # local API-key files dropped into a worktree for a demo; never commit
 anthropic-apikey-*.api
+
+# The "<body of law>: go" pipeline: the private repository legalese/l4-pipeline,
+# cloned here by those who have it (see its README). Every path it names is
+# relative to this checkout's root, which is why it lives inside one.
+/etc/go/

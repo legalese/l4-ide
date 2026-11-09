@@ -1,0 +1,18 @@
+-- `l4 format` prints a postfix mixfix call (Alice `is eligible`, 50 `percent`)
+-- back with its argument. It used to delete the argument, with exit code 0.
+DECLARE Person IS ONE OF Alice, Bob
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+p `is eligible` MEANS p EQUALS Alice
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+n `percent` MEANS n / 100
+
+GIVEN q IS A Person
+GIVETH A BOOLEAN
+chk q MEANS q `is eligible`
+
+#EVAL Alice `is eligible`
+#EVAL 50 `percent`

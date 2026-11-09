@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-unclaimed-annotations.l4:29:1-12:
+  1
+pattern-matching-unclaimed-annotations.l4:30:1-12:
+  2
+pattern-matching-unclaimed-annotations.l4:31:1-14:
+  5

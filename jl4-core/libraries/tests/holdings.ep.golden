@@ -12,25 +12,37 @@ IMPORT `legal-persons`
 
 §§ `Version`
 
+@nlg the version of the Holdings Library
 `Holdings Library Version` MEANS "1.0.0"
 
 
 §§ `Security Types`
 
+@nlg the security type for common stock
 `Common Stock` MEANS "COMMON_STOCK"
+@nlg the security type for preferred stock
 `Preferred Stock` MEANS "PREFERRED_STOCK"
+@nlg the security type for a convertible note
 `Convertible Note` MEANS "CONVERTIBLE_NOTE"
+@nlg the security type for a Simple Agreement for Future Equity
 `SAFE` MEANS "SAFE"  -- Simple Agreement for Future Equity
+@nlg the security type for a warrant
 `Warrant` MEANS "WARRANT"
+@nlg the security type for a stock option
 `Stock Option` MEANS "STOCK_OPTION"
+@nlg the security type for a restricted stock unit
 `RSU` MEANS "RSU"  -- Restricted Stock Unit
 
 
 §§ `Debt Types`
 
+@nlg the debt type for senior debt
 `Senior Debt` MEANS "SENIOR_DEBT"
+@nlg the debt type for subordinated debt
 `Subordinated Debt` MEANS "SUBORDINATED_DEBT"
+@nlg the debt type for convertible debt
 `Convertible Debt` MEANS "CONVERTIBLE_DEBT"
+@nlg the debt type for a bridge loan
 `Bridge Loan` MEANS "BRIDGE_LOAN"
 
 
@@ -40,6 +52,7 @@ IMPORT `legal-persons`
 GIVEN sharesOwned IS A NUMBER
       totalShares IS A NUMBER
 GIVETH A NUMBER
+@nlg %sharesOwned% shares as a percentage of %totalShares% shares, or 0 if the total is zero
 `ownership percentage` MEANS
     IF totalShares EQUALS 0
         THEN 0
@@ -48,6 +61,7 @@ GIVETH A NUMBER
 -- Check if fully diluted shares needed
 GIVEN securityType IS A STRING
 GIVETH A BOOLEAN
+@nlg %securityType% is a dilutive security, namely a convertible note, SAFE, warrant, stock option or convertible debt
 `is dilutive` MEANS
     BRANCH
         IF securityType EQUALS `Convertible Note` THEN TRUE
@@ -64,6 +78,7 @@ GIVETH A BOOLEAN
 GIVEN investmentAmount IS A NUMBER
       preferenceMultiple IS A NUMBER
 GIVETH A NUMBER
+@nlg the liquidation preference on an investment of %investmentAmount% at a multiple of %preferenceMultiple%
 `liquidation preference` MEANS
     investmentAmount TIMES preferenceMultiple
 
@@ -73,6 +88,7 @@ GIVEN isParticipating IS A BOOLEAN
       preferenceAmount IS A NUMBER
       ownershipPct IS A NUMBER
 GIVETH A NUMBER
+@nlg the preferred payout of %preferenceAmount% plus %ownershipPct% percent of %liquidationValue% if %isParticipating%, otherwise whichever is greater
 `preferred payout` MEANS
     IF isParticipating
         THEN preferenceAmount PLUS proRataShare
@@ -92,6 +108,7 @@ GIVEN totalShares IS A NUMBER
       vestingMonths IS A NUMBER
       currentDate IS A DATE
 GIVETH A NUMBER
+@nlg the whole shares of %totalShares% vested on %currentDate%, over %vestingMonths% calendar months from %vestingStartDate% with a %cliffMonths% month cliff
 `vested shares` MEANS
     IF monthsElapsed LESS THAN cliffMonths
         THEN 0
@@ -105,6 +122,7 @@ GIVETH A NUMBER
 GIVEN startDate IS A DATE
       endDate IS A DATE
 GIVETH A NUMBER
+@nlg the number of calendar months from %startDate% to %endDate%, ignoring the day of the month
 `approximate months since` MEANS
     ((DATE_YEAR endDate MINUS DATE_YEAR startDate) TIMES 12)
         PLUS (DATE_MONTH endDate MINUS DATE_MONTH startDate)
@@ -120,6 +138,7 @@ GIVEN principalAmount IS A NUMBER
       conversionPrice IS A NUMBER
       discountPct IS A NUMBER
 GIVETH A NUMBER
+@nlg the whole shares from converting %principalAmount% plus simple interest at %interestRate% percent a year from %issueDate% to %conversionDate%, at %conversionPrice% less %discountPct% percent, or none if the undiscounted price is zero
 `shares from convertible` MEANS
     IF conversionPrice EQUALS 0
         THEN 0
@@ -137,6 +156,7 @@ GIVEN investmentAmount IS A NUMBER
       discountPct IS A NUMBER
       pricePerShare IS A NUMBER
 GIVETH A NUMBER
+@nlg the whole SAFE shares for %investmentAmount% at the lower of any valuation cap %valuationCap% divided by one million and %pricePerShare% less %discountPct% percent, or none at a zero price
 `shares from SAFE` MEANS
     IF effectivePrice EQUALS 0
         THEN 0
@@ -161,6 +181,7 @@ GIVEN principalAmount IS A NUMBER
       issueDate IS A DATE
       currentDate IS A DATE
 GIVETH A NUMBER
+@nlg the simple interest accrued on %principalAmount% at %annualRate% percent a year, actual/365, from %issueDate% to %currentDate%
 `accrued interest` MEANS
     (principalAmount TIMES annualRate TIMES daysElapsed) DIVIDED BY 36500
     WHERE
@@ -170,6 +191,7 @@ GIVETH A NUMBER
 GIVEN operatingIncome IS A NUMBER
       debtPayment IS A NUMBER
 GIVETH A NUMBER
+@nlg the debt service coverage ratio of %operatingIncome% to %debtPayment%, or 0 if that payment is zero
 `debt service coverage` MEANS
     IF debtPayment EQUALS 0
         THEN 0
@@ -181,6 +203,7 @@ GIVETH A NUMBER
 -- Sum shares by class
 GIVEN sharesList IS A LIST OF NUMBER
 GIVETH A NUMBER
+@nlg the total number of shares in %sharesList%
 `total shares` MEANS
     CONSIDER sharesList
     WHEN EMPTY THEN 0
@@ -192,6 +215,7 @@ GIVEN commonShares IS A NUMBER
       optionPoolShares IS A NUMBER
       convertibleShares IS A NUMBER
 GIVETH A NUMBER
+@nlg the fully diluted shares of %commonShares% common, %preferredShares% preferred, %optionPoolShares% option pool and %convertibleShares% convertible shares
 `fully diluted shares` MEANS
     commonShares PLUS preferredShares PLUS optionPoolShares PLUS convertibleShares
 
@@ -202,6 +226,7 @@ GIVETH A NUMBER
 GIVEN pricePerShare IS A NUMBER
       fullyDilutedShares IS A NUMBER
 GIVETH A NUMBER
+@nlg the post-money valuation at %pricePerShare% per share on %fullyDilutedShares% fully diluted shares
 `post-money valuation` MEANS
     pricePerShare TIMES fullyDilutedShares
 
@@ -209,6 +234,7 @@ GIVETH A NUMBER
 GIVEN postMoneyValuation IS A NUMBER
       investmentAmount IS A NUMBER
 GIVETH A NUMBER
+@nlg the pre-money valuation, being post-money valuation %postMoneyValuation% less investment %investmentAmount%
 `pre-money valuation` MEANS
     postMoneyValuation MINUS investmentAmount
 
@@ -220,6 +246,7 @@ GIVEN issuanceDate IS A DATE
       maturityDate IS A DATE
       checkDate IS A DATE
 GIVETH A BOOLEAN
+@nlg a holding is active on %checkDate%, from issuance on %issuanceDate% to maturity on %maturityDate% inclusive
 `is active at` MEANS
     checkDate AT LEAST issuanceDate
     AND checkDate AT MOST maturityDate
@@ -228,5 +255,6 @@ GIVETH A BOOLEAN
 GIVEN maturityDate IS A DATE
       checkDate IS A DATE
 GIVETH A BOOLEAN
+@nlg %checkDate% is after the maturity date %maturityDate%
 `has matured` MEANS
     checkDate GREATER THAN maturityDate

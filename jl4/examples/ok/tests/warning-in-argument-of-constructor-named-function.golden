@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+warning-in-argument-of-constructor-named-function.l4:24:32-79:
+  I found a problem while checking the definition of `missing case`:
+    The following branches still need to be considered:
+    
+      WHEN Blue THEN
+    
+warning-in-argument-of-constructor-named-function.l4:27:33-115:
+  I found a problem while checking the definition of `repeated case`:
+    The following CONSIDER branch is redundant: 
+    
+      WHEN Red THEN 2
+    
+warning-in-argument-of-constructor-named-function.l4:32:1-25:
+  4
+warning-in-argument-of-constructor-named-function.l4:33:1-28:
+  5
+warning-in-argument-of-constructor-named-function.l4:34:1-22:
+  5

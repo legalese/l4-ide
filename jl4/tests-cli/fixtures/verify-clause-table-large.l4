@@ -1,0 +1,78 @@
+-- A table of two enums, five values each, written as 25 clauses, beside the
+-- CONSIDER a drafter would write. `l4 verify` reads the clauses as the CONSIDER
+-- they stand for before it puts any other binding in, so it answers both in a
+-- moment. It used to put every binding in first, which walked the clauses'
+-- shared fall-through once for every branch that reached it: sixteen rows took
+-- 18 s and 2.9 GB, and these 25 did not finish in 4 GiB.
+DECLARE C1 IS ONE OF A0, A1, A2, A3, A4
+DECLARE C2 IS ONE OF B0, B1, B2, B3, B4
+
+GIVEN c1 IS A C1
+      c2 IS A C2
+GIVETH A BOOLEAN
+DECIDE `table rule` A0 B0 IS TRUE
+DECIDE `table rule` A0 B1 IS TRUE
+DECIDE `table rule` A0 B2 IS TRUE
+DECIDE `table rule` A0 B3 IS TRUE
+DECIDE `table rule` A0 B4 IS TRUE
+DECIDE `table rule` A1 B0 IS TRUE
+DECIDE `table rule` A1 B1 IS FALSE
+DECIDE `table rule` A1 B2 IS TRUE
+DECIDE `table rule` A1 B3 IS FALSE
+DECIDE `table rule` A1 B4 IS TRUE
+DECIDE `table rule` A2 B0 IS TRUE
+DECIDE `table rule` A2 B1 IS FALSE
+DECIDE `table rule` A2 B2 IS TRUE
+DECIDE `table rule` A2 B3 IS FALSE
+DECIDE `table rule` A2 B4 IS TRUE
+DECIDE `table rule` A3 B0 IS FALSE
+DECIDE `table rule` A3 B1 IS FALSE
+DECIDE `table rule` A3 B2 IS FALSE
+DECIDE `table rule` A3 B3 IS TRUE
+DECIDE `table rule` A3 B4 IS TRUE
+DECIDE `table rule` A4 B0 IS TRUE
+DECIDE `table rule` A4 B1 IS FALSE
+DECIDE `table rule` A4 B2 IS TRUE
+DECIDE `table rule` A4 B3 IS FALSE
+DECIDE `table rule` A4 B4 IS FALSE
+
+GIVEN c1 IS A C1
+      c2 IS A C2
+GIVETH A BOOLEAN
+DECIDE `table rule by hand` c1 c2 IS
+  CONSIDER c1
+    WHEN A0 THEN
+      CONSIDER c2
+        WHEN B0 THEN TRUE
+        WHEN B1 THEN TRUE
+        WHEN B2 THEN TRUE
+        WHEN B3 THEN TRUE
+        WHEN B4 THEN TRUE
+    WHEN A1 THEN
+      CONSIDER c2
+        WHEN B0 THEN TRUE
+        WHEN B1 THEN FALSE
+        WHEN B2 THEN TRUE
+        WHEN B3 THEN FALSE
+        WHEN B4 THEN TRUE
+    WHEN A2 THEN
+      CONSIDER c2
+        WHEN B0 THEN TRUE
+        WHEN B1 THEN FALSE
+        WHEN B2 THEN TRUE
+        WHEN B3 THEN FALSE
+        WHEN B4 THEN TRUE
+    WHEN A3 THEN
+      CONSIDER c2
+        WHEN B0 THEN FALSE
+        WHEN B1 THEN FALSE
+        WHEN B2 THEN FALSE
+        WHEN B3 THEN TRUE
+        WHEN B4 THEN TRUE
+    WHEN A4 THEN
+      CONSIDER c2
+        WHEN B0 THEN TRUE
+        WHEN B1 THEN FALSE
+        WHEN B2 THEN TRUE
+        WHEN B3 THEN FALSE
+        WHEN B4 THEN FALSE

@@ -1,0 +1,11 @@
+DECLARE Actor IS ONE OF Eater, Drinker
+
+DECLARE Action HAS
+  actor IS AN Actor
+  verb  IS A STRING
+
+eat   MEANS Action OF Eater,   "eat"
+drink MEANS Action OF Drinker, "drink"
+
+GIVETH DEONTIC Actor Action
+bad MEANS PARTY Drinker MUST eat WITHIN 30

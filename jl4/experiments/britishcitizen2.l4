@@ -12,13 +12,13 @@ DECLARE Date
       month   IS A NUMBER
       day     ^  ^ ^
 
-BNA_commencement    MEANS Date OF 1983, 1, 1  -- of the main British Nationality Act 1981
 @ref (British Nationality Act 1981 c.61 Section 15)
 -- URL: https://www.legislation.gov.uk/ukpga/1981/61/section/15
+BNA_commencement    MEANS Date OF 1983, 1, 1  -- of the main British Nationality Act 1981
 
-`appointed day` MEANS Date OF 2002, 2, 21 -- from various acts that subsequently updated the British Nationality Act 1981
 @ref (British Overseas Territories Act 2002 c.8 Section 1)
 -- URL: https://www.legislation.gov.uk/ukpga/2002/8/section/1
+`appointed day` MEANS Date OF 2002, 2, 21 -- from various acts that subsequently updated the British Nationality Act 1981
 
 DECLARE Place
   HAS `English name` IS A STRING

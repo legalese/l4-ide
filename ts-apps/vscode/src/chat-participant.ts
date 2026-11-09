@@ -1,17 +1,15 @@
 import * as vscode from 'vscode'
 import { randomUUID } from 'node:crypto'
 import type { AuthManager } from './auth.js'
-import type { AiProxyClient, AiProxyTool } from './ai/ai-proxy-client.js'
-import type { AiLogger } from './ai/logger.js'
-import { BUILTIN_TOOLS } from './ai/tool-registry.js'
 import {
-  fsCreateFile,
-  fsDeleteFile,
-  fsEditFile,
-  fsReadFile,
-} from './ai/tools/fs.js'
-import { l4Evaluate } from './ai/tools/l4-evaluate.js'
-import { categoryForTool, getPermission } from './ai/permissions.js'
+  BUILTIN_TOOLS,
+  categoryForTool,
+  type AiProxyClient,
+  type AiProxyTool,
+  type BuiltinTools,
+  type PermissionPolicy,
+} from '@repo/legalese-agent'
+import type { AiLogger } from './ai/logger.js'
 import { LM_TOOL_NAMES } from './lm-tools.js'
 import type { AiChatMessage } from 'jl4-client-rpc'
 
@@ -53,6 +51,10 @@ export function registerChatParticipant(deps: {
   auth: AuthManager
   proxy: AiProxyClient
   logger: AiLogger
+  /** The participant's own built-in tool session (its directive
+   *  snapshots are independent of the sidebar chat's). */
+  tools: BuiltinTools
+  permissions: PermissionPolicy
   iconPath: vscode.Uri
 }): vscode.Disposable {
   const handler: vscode.ChatRequestHandler = async (
@@ -184,6 +186,7 @@ export function registerChatParticipant(deps: {
           let result: string
           try {
             result = await dispatchToolCall(
+              deps,
               call,
               lmByWireName,
               request.toolInvocationToken,
@@ -299,6 +302,7 @@ function sanitizeToolName(name: string): string {
  * everything else is dispatched to `vscode.lm.invokeTool`.
  */
 async function dispatchToolCall(
+  builtins: { tools: BuiltinTools; permissions: PermissionPolicy },
   call: ToolCall,
   lmByWireName: Map<string, vscode.LanguageModelToolInformation>,
   // Threaded from `request.toolInvocationToken` so VS Code can attach
@@ -311,7 +315,7 @@ async function dispatchToolCall(
   const args = parseArgs(call.argsJson)
 
   if (BUILTIN_TOOL_NAMES.has(call.name)) {
-    return runBuiltin(call.name, args, stream)
+    return runBuiltin(builtins, call.name, args, stream)
   }
 
   const lmTool = lmByWireName.get(call.name)
@@ -332,6 +336,10 @@ async function dispatchToolCall(
 }
 
 async function runBuiltin(
+  {
+    tools,
+    permissions,
+  }: { tools: BuiltinTools; permissions: PermissionPolicy },
   name: string,
   args: unknown,
   stream: vscode.ChatResponseStream
@@ -352,7 +360,7 @@ async function runBuiltin(
 
   const category = categoryForTool(name)
   if (category) {
-    const perm = getPermission(category)
+    const perm = permissions.getPermission(category)
     if (perm === 'never') {
       return `User has disallowed the "${category}" category. Update the setting in the Legalese AI settings to enable it.`
     }
@@ -364,15 +372,15 @@ async function runBuiltin(
 
   switch (name) {
     case 'fs__read_file':
-      return fsReadFile(args as Parameters<typeof fsReadFile>[0])
+      return tools.readFile(args as Parameters<BuiltinTools['readFile']>[0])
     case 'fs__create_file':
-      return fsCreateFile(args as Parameters<typeof fsCreateFile>[0])
+      return tools.createFile(args as Parameters<BuiltinTools['createFile']>[0])
     case 'fs__edit_file':
-      return fsEditFile(args as Parameters<typeof fsEditFile>[0])
+      return tools.editFile(args as Parameters<BuiltinTools['editFile']>[0])
     case 'fs__delete_file':
-      return fsDeleteFile(args as Parameters<typeof fsDeleteFile>[0])
+      return tools.deleteFile(args as Parameters<BuiltinTools['deleteFile']>[0])
     case 'l4__evaluate':
-      return l4Evaluate(args as Parameters<typeof l4Evaluate>[0])
+      return tools.evaluate(args as Parameters<BuiltinTools['evaluate']>[0])
     default:
       return `No executor wired for built-in: ${name}`
   }

@@ -81,6 +81,7 @@ export const ASCII_GEOMETRY: Geometry = {
   NOT_LABEL: CELL_H,
   NOT_BUBBLE: 2 * CELL_W,
   NOT_R: CELL_W,
+  NOT_BREAK_ROOM: 0, // the ASCII break is a character on the wire, not bars about a centre
   CONNECTIVE_GAP: 0,
   STRADDLE_MIN_WIDTH: Infinity, // a code cell has no sub-line room: use 'on-wire'
   SEAM_W: 10 * CELL_W, //  ══MUST══▶
@@ -88,6 +89,10 @@ export const ASCII_GEOMETRY: Geometry = {
   COIL_R: CELL_W, //       a lamp is one cell: (✓) / (✗)
   COIL_SEP: 2 * CELL_H, // exactly two rows off the axis, so the fork is drawable
   COIL_LABEL: 12 * CELL_W,
+  PANEL_PAD_X: 2 * CELL_W,
+  PANEL_PAD_Y: CELL_H, //     with the name band, 2 cells top and 2 bottom, so heights stay even
+  PANEL_LABEL: CELL_H, //     the name sits one row inside the panel's top border
+  PANEL_FONT: 14, //          monoMetrics ignores size; kept for the interface
 };
 
 /* -------------------------------------------------------------------- edges */
@@ -463,6 +468,20 @@ export function sceneToAscii(scene: Scene, opts: AsciiOpts = {}): string {
     g.vline(c0, r0, r1, COARSE);
     g.vline(c1, r0, r1, COARSE);
     g.text(c0 + 2, r0, ` ${p.label} `);
+  }
+
+  /* call panels — a light outline; the shade is the SVG's business, and the name is a
+     `panel` text prim that lands one row inside the top border */
+  for (const p of scene.prims) {
+    if (p.kind !== "panel") continue;
+    const c0 = col(p.at.x),
+      c1 = col(p.at.x + p.w);
+    const r0 = row(p.at.y),
+      r1 = row(p.at.y + p.h);
+    g.hline(c0, c1, r0, FINE);
+    g.hline(c0, c1, r1, FINE);
+    g.vline(c0, r0, r1, FINE);
+    g.vline(c1, r0, r1, FINE);
   }
 
   /* text last — it wins the cell */

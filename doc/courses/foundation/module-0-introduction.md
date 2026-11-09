@@ -1,8 +1,6 @@
 # Module 0: Introduction to L4
 
-**Prerequisites:** none
-
-Welcome to L4! This module introduces you to the language and helps you get started.
+This module introduces the language and gets you set up.
 
 ## Learning Objectives
 
@@ -100,36 +98,13 @@ This models a simple sale: the seller must deliver within 14 days, then the buye
 
 ## Setting Up Your Environment
 
-### Option 1: VS Code (Recommended)
+You can write L4 in three places:
 
-1. Install [VS Code](https://code.visualstudio.com/)
-2. Install the [L4 extension from the marketplace](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode)
-3. Create a file ending in `.l4`
-4. Start writing!
+- **VS Code** (recommended): install the [L4 extension](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode) and create a file ending in `.l4`. You get syntax highlighting, errors as you type, hover documentation and visualisations.
+- **The web editor**: [jl4.legalese.com](https://jl4.legalese.com/) runs L4 in your browser, with nothing to install.
+- **The command line**: `l4 run myfile.l4` checks a file and prints its results.
 
-The extension provides:
-
-- Syntax highlighting
-- Error checking as you type
-- Hover documentation
-- Visualization tools
-
-### Option 2: Web Editor
-
-Visit the [L4 Web Editor](https://jl4.legalese.com/) to try L4 in your browser without installing anything.
-
-### Option 3: Command Line
-
-If you have the L4 tools installed:
-
-```bash
-# Run a file
-l4 run myfile.l4                        # when the `l4` CLI is on PATH
-cabal run l4 -- run myfile.l4           # from a Haskell checkout
-
-# Interactive REPL
-cabal run jl4-repl -- myfile.l4
-```
+[Install L4 and write your first rule](../../tutorials/getting-started/first-l4-file.md) walks through each option step by step.
 
 ---
 
@@ -148,26 +123,6 @@ Save the file. If you're using VS Code with the L4 extension, you'll see:
 
 ## L4 Design Philosophy
 
-L4 follows several key principles:
+L4 is built so that code mirrors the structure of the legal text it encodes, can be read by lawyers, and has one precise, checkable meaning. [Design principles](../../concepts/language-design/principles.md) explains these choices and the trade-offs between them.
 
-### 1. Layout Sensitivity
-
-Indentation matters (like Python). This makes code visually match its logical structure.
-
-### 2. Legal Isomorphism
-
-L4 code mirrors the structure of legal text. A section in legislation becomes a section in L4.
-
-### 3. Strong Typing
-
-Types catch errors early. If a function expects a `DATE`, you can't pass it a `STRING`.
-
-### 4. Functional Style
-
-L4 is based on functional programming. You define _what_ things are, not step-by-step procedures.
-
----
-
-## What's Next?
-
-In [Module 1: Your First Legal Rule](module-1-first-rule.md), you'll write a complete legal obligation with conditions, deadlines, and consequences.
+Next, [Module 1: Your first legal rule](module-1-first-rule.md) writes a complete legal obligation with a condition, a deadline and consequences.

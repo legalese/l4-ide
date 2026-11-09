@@ -112,6 +112,7 @@
     store = s
     b.signalReady()
     void s.refreshHistory()
+    void s.refreshDictationStatus()
     // Bind the deployment with its intended-use up front; new turns route here.
     s.startDeploymentChat(deployment, apiBaseUrl, intendedUse)
     s.usageSubscribe()

@@ -1,0 +1,7 @@
+-- Test: an exported function whose description and input name are not ASCII.
+-- Its schema golden must hold each character once, as UTF-8, not double-encoded
+-- (smucclaw/l4-ide#962; see jl4JsonSchemaGolden in jl4/tests/Main.hs).
+
+@export default Gebühr für eine Änderung des Antrags — in Euro
+GIVEN `Zahl der Änderungen` IS A NUMBER @desc Wie oft der Antrag geändert wurde
+`Gebühr für` `Zahl der Änderungen` MEANS `Zahl der Änderungen` * 5

@@ -1,0 +1,63 @@
+-- loan-rules.l4
+-- An eligibility rule and a repayment obligation, with tests.
+
+§ `Loan Rules`
+
+DECLARE Applicant
+    HAS `name`          IS A STRING
+        `age`           IS A NUMBER
+        `annual income` IS A NUMBER
+
+GIVEN applicant IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `is eligible for a loan` IF
+        applicant's `age` AT LEAST 21
+    AND applicant's `annual income` AT LEAST 30000
+
+§§ `Test data`
+
+`Alice` MEANS Applicant WITH
+    `name`          IS "Alice"
+    `age`           IS 34
+    `annual income` IS 55000
+
+`Bob` MEANS Applicant WITH
+    `name`          IS "Bob"
+    `age`           IS 19
+    `annual income` IS 42000
+
+§§ `Tests`
+
+#EVAL `is eligible for a loan` `Alice`
+#EVAL `is eligible for a loan` `Bob`
+
+#ASSERT `is eligible for a loan` `Alice`
+#ASSERT NOT `is eligible for a loan` `Bob`
+
+#CHECK `is eligible for a loan`
+
+§§ `Repayment obligation`
+
+DECLARE Actor IS ONE OF Borrower, Lender
+
+DECLARE RepaymentAction IS ONE OF
+    `repay loan` HAS amount IS A NUMBER
+
+GIVEN `loan amount` IS A NUMBER
+GIVETH A DEONTIC Actor RepaymentAction
+DECIDE `repayment obligation` IS
+    PARTY Borrower
+    MUST `repay loan` `loan amount`
+    WITHIN 30
+    HENCE FULFILLED
+    LEST BREACH BY Borrower BECAUSE "the loan was not repaid on time"
+
+§§ `Behaviour tests`
+
+-- The borrower repays on day 12: the obligation is fulfilled.
+#TRACE `repayment obligation` 10000 AT 0 WITH
+    PARTY Borrower DOES `repay loan` 10000 AT 12
+
+-- The wrong party, too late: the deadline passes and the LEST branch fires.
+#TRACE `repayment obligation` 10000 AT 0 WITH
+    PARTY Lender DOES `repay loan` 10000 AT 45

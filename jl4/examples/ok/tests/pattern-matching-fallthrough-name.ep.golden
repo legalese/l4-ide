@@ -1,0 +1,38 @@
+-- =============================================================================
+-- A multi-clause group is compiled to local definitions holding its later
+-- clauses. Until 2026-10-07 they were named `__pm_fallthrough_<k>`, a name a
+-- drafter can spell too; now no source can spell their names. A definition
+-- the drafter calls `__pm_fallthrough_0` is the drafter's own, and every
+-- clause body that names it reads it (review of legalese/l4-ide#545).
+--
+-- Here the clauses after the first one can never run, so their binding is
+-- checked and then dropped; the first clause's body reads the drafter's
+-- `__pm_fallthrough_0`, and answers 7 (probe h02). An earlier build let it
+-- read the dropped binding instead, and failed with an internal error when it
+-- ran.
+-- =============================================================================
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+`__pm_fallthrough_0` MEANS 7
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `refs user` c   IS `__pm_fallthrough_0`
+DECIDE `refs user` Red IS 2
+
+#EVAL `refs user` Green -- 7
+#EVAL `refs user` Red   -- 7: the first clause matches every input
+
+-- Here the clause after the first can run, and the first clause's body still
+-- reads the drafter's `__pm_fallthrough_0`. A build that gave its own binding
+-- of the later clauses that name read the binding instead: `refs user live`
+-- Red then found no clause for Red, though the first clause is for Red (probe
+-- userft).
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `refs user live` Red   IS `__pm_fallthrough_0`
+DECIDE `refs user live` Green IS 2
+DECIDE `refs user live` Blue  IS 3
+
+#EVAL `refs user live` Red   -- 7
+#EVAL `refs user live` Green -- 2

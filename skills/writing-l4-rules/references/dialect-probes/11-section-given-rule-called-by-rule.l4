@@ -1,0 +1,10 @@
+§ `Rates`
+    GIVEN rate IS A NUMBER
+
+GIVETH A NUMBER
+doubled MEANS rate TIMES 2
+
+GIVETH A NUMBER
+quadrupled MEANS doubled TIMES 2
+
+#EVAL quadrupled WITH rate IS 5

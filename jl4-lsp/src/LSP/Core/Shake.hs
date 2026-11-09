@@ -57,6 +57,7 @@ module LSP.Core.Shake(
     actionLogger,
     getVirtualFile, addVirtualFile, addVirtualFileUri, addVirtualFileFromFS, getVirtualFileText,
     embeddedLibraryUri,
+    embeddedLibraryText,
     FileVersion(..),
     updatePositionMapping,
     updatePositionMappingHelper,
@@ -157,6 +158,7 @@ import Base.Text (Text)
 import GHC.Generics
 import Data.Hashable (Hashable)
 import qualified LSP.L4.Viz.Ladder as Ladder
+import LSP.L4.Viz.VizExpr (RenderAsLadderInfo)
 
 data Log
   = LogCreateHieDbExportsMapStart
@@ -304,6 +306,12 @@ data RecentlyVisualised = RecentlyVisualised
   -}
   , type'     :: !(Type' Resolved)
   , vizState  :: !Ladder.VizState
+  , ladderInfo :: !RenderAsLadderInfo
+  {- ^ The ladder that 'vizState' was built with, before its atomIds were
+    annotated. @l4/queryPlan@ plans from this pair rather than drawing the
+    decision again: with call expansions on, drawing it again costs every
+    expansion, and the plan reads none of them (WHERE-INLINING-SPEC §10).
+  -}
   }
   deriving stock (Show)
 
@@ -343,13 +351,17 @@ class Typeable a => IsIdeGlobal a where
 -- filesystem tier. So any file path the embedded copy occupies is a path a
 -- probe can forge, and forging it makes the embedded copy beat every
 -- project-scoped source, inverting the precedence order
--- LIBRARY-RESOLUTION-SHADOW-SPEC (Option B′) defines.
+-- Option B′ defines (specs/as-built/import-resolution.md).
 --
 -- The old @.\/\<name\>.l4@ key was forgeable in exactly that way, twice over:
 --
 --   * @l4 check main.l4@ (no directory component) makes @rootDirectory@ @"."@,
---     so the root candidate for @prelude@ /is/ @.\/prelude.l4@ — the embedded
---     prelude then silently beat the project's own @prelude.l4@;
+--     so the root candidate for @prelude@ /is/ @.\/prelude.l4@. On unstable the
+--     embedded prelude then silently beat the project's own @prelude.l4@; on
+--     main, which registered the embedded copy at that key only after the
+--     filesystem tiers had missed, the same spelling left the prelude's names
+--     out of scope (@l4 run total.l4@ with @IMPORT prelude@ could not find
+--     @sum@; measured);
 --   * an embedded importer's own URI was @file:\/\/\<name\>.l4@, so
 --     @takeDirectory@ of it was @"."@ and its dependencies' relative candidates
 --     hit the same keys — binding one module name to two different sources
@@ -389,6 +401,13 @@ embeddedLibraryVfs =
     [ (embeddedLibraryUri name, VirtualFile 0 0 (Rope.fromText content))
     | (name, content) <- Map.toList EmbeddedLibraries.embeddedLibraries
     ]
+
+-- | The source of the embedded library at an 'embeddedLibraryUri', if there is
+-- one: the very text 'getVirtualFile' hands the build graph, so the ranges the
+-- server reports for that module are ranges into this text. The @l4/embeddedLibrary@
+-- request serves it to editors, which cannot open a @jl4-embedded:@ URI themselves.
+embeddedLibraryText :: NormalizedUri -> Maybe Text
+embeddedLibraryText nuri = Rope.toText . _file_text <$> Map.lookup nuri embeddedLibraryVfs
 
 -- | Read a virtual file from the current snapshot
 getVirtualFile :: NormalizedUri -> Action (Maybe VirtualFile)

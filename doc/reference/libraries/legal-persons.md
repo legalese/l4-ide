@@ -1,14 +1,10 @@
-# Legal-persons Library
+# legal-persons
 
 Legal entity definitions for natural persons and corporate entities: name/address formatting, identity document validation, age and legal capacity checks, citizenship helpers, and beneficial ownership. Import with `` IMPORT `legal-persons` `` (backticks are required because of the hyphen in the name). Also imports prelude, daydate, and jurisdiction.
 
-**Status:** Prototype (version 1.0.0). API may change.
+**Example:** [legal-persons-example.l4](legal-persons-example.l4)
 
-### Location
-
-[jl4-core/libraries/legal-persons.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/legal-persons.l4)
-
-### Name Formatting
+## Name formatting
 
 | Function                                              | Signature                           | Description         |
 | ----------------------------------------------------- | ----------------------------------- | ------------------- |
@@ -16,7 +12,7 @@ Legal entity definitions for natural persons and corporate entities: name/addres
 | `full name with middle` firstName middleName lastName | `STRING → STRING → STRING → STRING` | "First Middle Last" |
 | `formal name` prefix firstName lastName               | `STRING → STRING → STRING → STRING` | "Prefix First Last" |
 
-### Address Components
+## Address components
 
 | Function                                                  | Signature                                             | Description                |
 | --------------------------------------------------------- | ----------------------------------------------------- | -------------------------- |
@@ -25,7 +21,7 @@ Legal entity definitions for natural persons and corporate entities: name/addres
 | `is valid UK postcode` postalCode                         | `STRING → BOOLEAN`                                    | Format check               |
 | `is valid Canadian postal code` postalCode                | `STRING → BOOLEAN`                                    | Format check               |
 
-### Identity Document Validation
+## Identity document validation
 
 Constants for document type codes (`Passport type`, `National ID type`, `Drivers License type`, `Social Security type`, `Tax ID type`, `Residence Permit type`), plus format validators (length/separator checks only):
 
@@ -35,7 +31,7 @@ Constants for document type codes (`Passport type`, `National ID type`, `Drivers
 | `is valid Canadian SIN format` sin | `STRING → BOOLEAN` | `XXX-XXX-XXX`         |
 | `is valid UK NINO format` nino     | `STRING → BOOLEAN` | `AB123456C` (9 chars) |
 
-### Age Calculations
+## Age calculations
 
 | Function                                             | Signature                        | Description                              |
 | ---------------------------------------------------- | -------------------------------- | ---------------------------------------- |
@@ -44,7 +40,7 @@ Constants for document type codes (`Passport type`, `National ID type`, `Drivers
 | `is at least age` birthDate minimumAge referenceDate | `DATE → NUMBER → DATE → BOOLEAN` | Age check at a reference date            |
 | `is currently at least age` birthDate minimumAge     | `DATE → NUMBER → BOOLEAN`        | Age check as of TODAY                    |
 
-### Legal Capacity Checks
+## Legal capacity checks
 
 Jurisdiction-aware (ISO alpha-2 codes; majority age defaults to 18, with e.g. Japan 20 and South Korea 19):
 
@@ -55,7 +51,7 @@ Jurisdiction-aware (ISO alpha-2 codes; majority age defaults to 18, with e.g. Ja
 | `can enter contract` birthDate jurisdictionCode | `DATE → STRING → BOOLEAN` | Currently same as `is adult`      |
 | `can vote` birthDate jurisdictionCode           | `DATE → STRING → BOOLEAN` | Voting age check (e.g. Brazil 16) |
 
-### Citizenship Status
+## Citizenship status
 
 | Function                                      | Signature                           | Description                      |
 | --------------------------------------------- | ----------------------------------- | -------------------------------- |
@@ -64,7 +60,7 @@ Jurisdiction-aware (ISO alpha-2 codes; majority age defaults to 18, with e.g. Ja
 | `has multiple citizenships` citizenships      | `LIST OF STRING → BOOLEAN`          | At least two citizenships        |
 | `citizenship count` citizenships              | `LIST OF STRING → NUMBER`           | Number of citizenships           |
 
-### Corporate Entities
+## Corporate entities
 
 Entity type constants: `Corporation type`, `LLC type`, `LLP type`, `Partnership type`, `Sole Proprietorship type`, `Non-Profit type`, `Cooperative type`, `Trust type`, `Foundation type`. Relationship constants: `Wholly-owned subsidiary relationship`, `Majority-owned subsidiary relationship`, `Minority stake relationship`, `Joint venture relationship`, `Parent company relationship`, `Sister company relationship`, `Affiliated entity relationship`.
 
@@ -85,7 +81,7 @@ Entity type constants: `Corporation type`, `LLC type`, `LLP type`, `Partnership 
 | `is dissolved` incorporationDate dissolutionDate          | `DATE → DATE → BOOLEAN`   | Dissolution date is in the past   |
 | `is active corporation` incorporationDate                 | `DATE → BOOLEAN`          | Incorporation date is in the past |
 
-### Beneficial Ownership
+## Beneficial ownership
 
 | Function                                      | Signature          | Threshold |
 | --------------------------------------------- | ------------------ | --------- |
@@ -94,7 +90,7 @@ Entity type constants: `Corporation type`, `LLC type`, `LLP type`, `Partnership 
 | `is controlling owner` ownershipPercentage    | `NUMBER → BOOLEAN` | > 50%     |
 | `has significant control` ownershipPercentage | `NUMBER → BOOLEAN` | >= 25%    |
 
-### Corporate Jurisdiction
+## Corporate jurisdiction
 
 | Function                                                                       | Signature                   | Description                                           |
 | ------------------------------------------------------------------------------ | --------------------------- | ----------------------------------------------------- |
@@ -102,9 +98,3 @@ Entity type constants: `Corporation type`, `LLC type`, `LLP type`, `Partnership 
 | `is US corporation` / `is UK corporation` / `is Canadian corporation`          | `STRING → BOOLEAN`          | Country prefix / constituent-country checks           |
 | `requires registered agent` jurisdictionCode                                   | `STRING → BOOLEAN`          | US, UK, or Canadian corporation                       |
 | `is foreign qualification required` businessJurisdiction operatingJurisdiction | `STRING → STRING → BOOLEAN` | Different US jurisdictions for business vs operations |
-
-### Example: Legal Persons
-
-[legal-persons-example.l4](legal-persons-example.l4)
-
-**See [legal-persons.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/legal-persons.l4) source for all functions.**

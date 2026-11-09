@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+synonym-same-name-two-arities.l4:21:1-12:
+  LIST 1, 2
+synonym-same-name-two-arities.l4:22:1-11:
+  PAIR OF "x", 41

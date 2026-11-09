@@ -241,10 +241,12 @@ runRunCmd opts = do
     Right resp -> do
       -- Wrap ResponseWithReason in the service's SimpleResponse envelope
       -- so a compiled .wasm returns the exact same JSON shape as the
-      -- jl4-service HTTP /evaluation endpoint.
+      -- jl4-service HTTP /evaluation endpoint, report included
+      -- (UNKNOWN-EVALUATION-SPEC U7b; see 'wrapEvaluationEnvelope').
       let wrapped = Aeson.object
             [ "tag" Aeson..= ("SimpleResponse" :: Text)
             , "contents" Aeson..= resp
+            , "report" Aeson..= ("default" :: Text)
             ]
           out = if opts.runPretty
             then Aeson.Pretty.encodePretty wrapped

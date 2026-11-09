@@ -18,10 +18,10 @@ import qualified Base.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
 import Control.Applicative ((<|>))
 import L4.EvaluateLazy.Trace (EvalTrace(..))
-import L4.EvaluateLazy.Machine (boolView)
+import L4.EvaluateLazy.Machine (boolView, builtinConnective)
 import L4.EvaluateLazy.Exceptions (EvalException (..), Refusal (..))
 import L4.EvaluateLazy.GraphVizOptions (GraphVizOptions(..), defaultGraphVizOptions)
-import L4.Evaluate.ValueLazy (NF(..))
+import L4.Evaluate.ValueLazy (Connective (..), NF(..))
 import L4.Syntax (Expr(..), Resolved, Branch(..), BranchLhs(..), Module(..), TopDecl(..), Decide(..), Section(..), AppForm(..), LocalDecl(..), Unique, getUnique, Desc, getDesc, annDesc)
 import L4.Print (prettyLayout)
 import Optics ((^.))
@@ -258,7 +258,7 @@ buildGraph opts mModule depth nodeId (Trace mlabel steps result) =
 
       -- Recursively build nodes/edges for each step
       (childNodes, childEdges, nextId) =
-        buildSteps opts mModule (depth + 1) (nodeId + 1) nodeId steps
+        buildSteps opts mModule (depth + 1) (nodeId + 1) nodeId (isRight result) steps
 
       -- Combine with simple list concatenation
       allNodes = thisNode ++ childNodes
@@ -266,12 +266,14 @@ buildGraph opts mModule depth nodeId (Trace mlabel steps result) =
 
   in (allNodes, allEdges, nextId)
 
--- | Build nodes/edges for all steps
+-- | Build nodes/edges for all steps. The 'Bool' says whether the node's
+-- evaluation succeeded, which, for its last step, tells a connective whose
+-- right operand was skipped from one whose left operand raised.
 buildSteps :: GraphVizOptions -> Maybe (Module Resolved) -> Int -> Node -> Node
-           -> [(Expr Resolved, [EvalTrace])]
+           -> Bool -> [(Expr Resolved, [EvalTrace])]
            -> ([LNode NodeAttrs], [LEdge EdgeAttrs], Node)
-buildSteps _opts _mModule _depth nextId _parentId [] = ([], [], nextId)
-buildSteps opts mModule depth nodeId parentId ((expr, subtraces):rest) =
+buildSteps _opts _mModule _depth nextId _parentId _ok [] = ([], [], nextId)
+buildSteps opts mModule depth nodeId parentId ok ((expr, subtraces):rest) =
   let -- Get edge configurations for this expression type
       edgeConfigs = edgeConfigsFor expr subtraces
 
@@ -282,12 +284,12 @@ buildSteps opts mModule depth nodeId parentId ((expr, subtraces):rest) =
       -- Add stub nodes for IF unevaluated branches if needed
       (stubNodes, stubEdges, afterStubId) =
         if opts.showUnevaluated
-          then buildStubs opts afterSubId parentId expr subtraces
+          then buildStubs opts afterSubId parentId expr subtraces (ok && null rest)
           else ([], [], afterSubId)
 
       -- Build remaining sibling steps
       (restNodes, restEdges, finalId) =
-        buildSteps opts mModule depth afterStubId parentId rest
+        buildSteps opts mModule depth afterStubId parentId ok rest
 
       -- Combine everything with list concatenation
       allNodes = subNodes ++ stubNodes ++ restNodes
@@ -326,10 +328,29 @@ buildSubtraces opts mModule depth nodeId parentId (tr:trs) [] =
   -- No more configs, use default
   buildSubtraces opts mModule depth nodeId parentId (tr:trs) [defaultEdgeConfig]
 
--- | Build stub nodes for unevaluated branches
-buildStubs :: GraphVizOptions -> Node -> Node -> Expr Resolved -> [EvalTrace]
+-- | Build stub nodes for unevaluated branches, and for the right operand of
+-- a connective that its left operand decided. The 'Bool' says the step is the
+-- last of a node that succeeded: a connective evaluates its right operand in
+-- tail position, as the node's next step, so when there is none, the right
+-- operand was skipped.
+buildStubs :: GraphVizOptions -> Node -> Node -> Expr Resolved -> [EvalTrace] -> Bool
            -> ([LNode NodeAttrs], [LEdge EdgeAttrs], Node)
-buildStubs _opts nodeId parentId (IfThenElse _ _ thenE elseE) subtraces =
+buildStubs _opts nodeId parentId expr _subtraces True
+  | Just rightE <- connectiveRightOperand expr =
+      let stubNode = (nodeId, NodeAttrs
+            { nodeLabel = Text.take 50 (prettyLayout rightE)
+            , fillColor = "#e0e0e0"
+            , nodeStyle = "filled,dashed"
+            , bindingId = Nothing  -- Stub nodes have no binding identity
+            })
+          stubEdge = (parentId, nodeId, EdgeAttrs
+            { edgeLabel = Just "skipped"
+            , edgeColor = "#999999"
+            , edgeStyle = "dashed"
+            , edgeDir = Nothing
+            })
+      in ([stubNode], [stubEdge], nodeId + 1)
+buildStubs _opts nodeId parentId (IfThenElse _ _ thenE elseE) subtraces _ =
   case (traceBoolValue <$> listToMaybe subtraces) of
     Just (Just True) ->
       -- THEN taken, stub ELSE
@@ -365,7 +386,17 @@ buildStubs _opts nodeId parentId (IfThenElse _ _ thenE elseE) subtraces =
 
     _ -> ([], [], nodeId)
 
-buildStubs _opts nodeId _parentId _expr _subtraces = ([], [], nodeId)
+buildStubs _opts nodeId _parentId _expr _subtraces _ = ([], [], nodeId)
+
+-- | The right operand of a call to a built-in binary connective.
+connectiveRightOperand :: Expr Resolved -> Maybe (Expr Resolved)
+connectiveRightOperand = \ case
+  App _ n [_, rightE]
+    | Just conn <- builtinConnective (getUnique n), conn /= ConnNot -> Just rightE
+  And _ _ rightE     -> Just rightE
+  Or _ _ rightE      -> Just rightE
+  Implies _ _ rightE -> Just rightE
+  _                  -> Nothing
 
 -- ============================================================================
 -- Phase 2: Visual Optimization - IF/THEN/ELSE grouping

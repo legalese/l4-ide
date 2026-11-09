@@ -1,5 +1,13 @@
 import * as vscode from 'vscode'
 import { createHash } from 'crypto'
+import {
+  buildLoginUrl,
+  createPendingLogin,
+  exchangeHandoffCode,
+  isPendingLoginFresh,
+  parseAuthCallback,
+  parsePendingLogin,
+} from './auth-handoff.js'
 
 type ConnectionStatus = 'connected' | 'not-configured' | 'connecting' | 'error'
 
@@ -11,7 +19,13 @@ export interface ConnectionState {
 }
 
 export const LEGALESE_CLOUD_DOMAIN = 'legalese.cloud'
+/** Where sign-in starts: the console confirms account and org. */
+export const LEGALESE_CONSOLE_URL = 'https://legalese.com/console'
 const SECRET_KEY_SESSION = 'l4.sessionToken'
+// The PKCE verifier of a login in progress (see auth-handoff.ts). Kept in
+// SecretStorage, not memory: the OS may deliver the callback URI to a
+// different window than the one that started the login.
+const SECRET_KEY_PENDING_LOGIN = 'l4.pendingLogin'
 
 function sameState(
   a: ConnectionState | undefined,
@@ -304,31 +318,77 @@ export class AuthManager {
       return
     }
 
-    // No service URL → Legalese Cloud browser login
+    // No service URL → Legalese Cloud browser login, through the console
+    // (account, org, Switch account). The PKCE challenge gets the extension
+    // its own sign-in and a hand-off code instead of a session token in the
+    // callback URL.
     const callbackUri = await vscode.env.asExternalUri(
       vscode.Uri.parse(
         `${vscode.env.uriScheme}://legalese.l4-vscode/auth-callback`
       )
     )
-    const loginUrl = `https://${LEGALESE_CLOUD_DOMAIN}/auth/login?return_to=${encodeURIComponent(callbackUri.toString())}`
+    const { pending, challenge } = createPendingLogin()
+    await this.secrets.store(SECRET_KEY_PENDING_LOGIN, JSON.stringify(pending))
+    const loginUrl = buildLoginUrl(
+      LEGALESE_CONSOLE_URL,
+      callbackUri.toString(),
+      challenge
+    )
 
     this.outputChannel.appendLine(`[auth] Opening login: ${loginUrl}`)
     await vscode.env.openExternal(vscode.Uri.parse(loginUrl))
   }
 
   async handleAuthCallback(uri: vscode.Uri): Promise<void> {
-    const params = new URLSearchParams(uri.query)
-    const token = params.get('token')
+    const callback = parseAuthCallback(uri.query)
+    const pending = parsePendingLogin(
+      await this.secrets.get(SECRET_KEY_PENDING_LOGIN)
+    )
+    let token: string
 
-    if (!token) {
+    if (callback.kind === 'code') {
+      // Hand-off: redeem the code with this login's verifier.
+      await this.secrets.delete(SECRET_KEY_PENDING_LOGIN)
+      if (!isPendingLoginFresh(pending)) {
+        this.outputChannel.appendLine(
+          '[auth] Callback code without a pending login on this machine'
+        )
+        vscode.window.showErrorMessage(
+          'Login expired or was started elsewhere. Please sign in again.'
+        )
+        return
+      }
+      try {
+        token = await exchangeHandoffCode(
+          fetch,
+          LEGALESE_CLOUD_DOMAIN,
+          callback.code,
+          pending.verifier
+        )
+      } catch (err) {
+        this.outputChannel.appendLine(
+          `[auth] Hand-off exchange failed: ${err instanceof Error ? err.message : String(err)}`
+        )
+        vscode.window.showErrorMessage(
+          'Login failed: could not complete sign-in. Please try again.'
+        )
+        return
+      }
+      this.outputChannel.appendLine('[auth] Received session via hand-off')
+    } else if (callback.kind === 'token') {
+      // Legacy callback from a proxy without hand-off support.
+      await this.secrets.delete(SECRET_KEY_PENDING_LOGIN)
+      token = callback.token
       this.outputChannel.appendLine(
-        `[auth] Callback missing token: ${uri.toString()}`
+        '[auth] Received session token from callback'
       )
+    } else {
+      // Never log the URI: it may carry a credential.
+      this.outputChannel.appendLine('[auth] Callback missing code and token')
       vscode.window.showErrorMessage('Login failed: no token received.')
       return
     }
 
-    this.outputChannel.appendLine('[auth] Received session token from callback')
     await this.setSessionToken(token)
 
     // Resolve the org slug, then verify the connection.

@@ -1,0 +1,1 @@
+[{"cfg":{"retries":2}},{"cfg":{"retries":2,"timeout":5,"colour":"Green"}},{"cfg":{"retries":2},"shade":"Red"}]

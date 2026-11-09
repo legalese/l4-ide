@@ -496,6 +496,54 @@ export class DeonticInputError extends Error {
   }
 }
 
+/**
+ * A required input the request leaves out, or sends as null, or a record
+ * input with a required field left out or null, or a list input with a
+ * null element. jl4-service refuses each with a 422 naming the first such
+ * input in parameter order, "Parameter 'y': missing required parameter",
+ * and so does the runtime ('refuseMissingInputs'); a MAYBE input or field,
+ * which the schema does not list as required, may be left out and is
+ * NOTHING. Before, each was marshalled as 0, so `{"x": true}` to `x AND y`
+ * answered FALSE. For a field or element sent as null the service's
+ * message is its JSON decoder's instead ("Expected JSON boolean but got:
+ * Null"); the status is the same.
+ */
+export class MissingInputError extends Error {
+  constructor(parameter) {
+    super("Parameter '" + parameter + "': missing required parameter");
+    this.name = "MissingInputError";
+    this.parameter = parameter;
+  }
+}
+
+/**
+ * The HTTP status and body for an evaluation that threw, and whether the
+ * worker's wasm state may be inconsistent after it. A missing input gets
+ * jl4-service's own 422 body, byte for byte: an 'InterpreterError' under
+ * the 'Error' tag, with the report every response states (U7b). A
+ * malformed deontic request is a 400 and a memory cap a 413, each with a
+ * plain error body; anything else is a 500. Only the last two are fatal.
+ */
+export function evaluationErrorResponse(err) {
+  if (err instanceof MissingInputError) {
+    return {
+      status: 422,
+      body: aesonStringify({
+        contents: { contents: err.message, tag: "InterpreterError" },
+        report: "default",
+        tag: "Error",
+      }),
+      fatal: false,
+    };
+  }
+  const body = JSON.stringify({ error: String(err.message || err) });
+  if (err instanceof DeonticInputError)
+    return { status: 400, body, fatal: false };
+  if (err instanceof MemoryLimitError)
+    return { status: 413, body, fatal: true };
+  return { status: 500, body, fatal: true };
+}
+
 // ===========================================================================
 // M6 — deontic interpreter. Walks 'schema.deonticContract' against the
 // request's startTime + events stream, returning a wire-shaped value
@@ -701,7 +749,16 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     case "FULFILLED":
       return { value: "FULFILLED", residual: null, ctx };
     case "BREACH":
-      return { value: deonticBreachToWire(current), residual: null, ctx };
+      // The wire answer prints the party as the plain name, as jl4-service
+      // does; how the trace's source text must spell it (a name is
+      // backticked, rule source is not) is the contract node's @byKind@, and
+      // travels beside the answer, not in it.
+      return {
+        value: deonticBreachToWire(current),
+        residual: null,
+        ctx,
+        breachByKind: current.byKind,
+      };
     default:
       throw new Error(
         "deontic interpreter: unexpected node kind: " + current.kind,
@@ -822,16 +879,6 @@ function deonticStripBackticks(s) {
   return s;
 }
 
-// The L4 SOURCE spelling of a name: backticked unless it is a bare identifier.
-// This is what `Print.prettyLayout` emits, and it is what the reference falls
-// back to when it prints an UNEVALUATED party expression. The evaluated value
-// of the same party is the plain name (`Backend.Jl4.constructorText`) — see
-// 'deonticObligationToWire' for which case gets which.
-function deonticSourceSpelling(s) {
-  if (typeof s !== "string") return s;
-  return /^[A-Za-z][A-Za-z0-9_]*$/.test(s) ? s : "`" + s + "`";
-}
-
 function deonticObligationToWire(o, ctx, remainingNum, observed) {
   const resolvedParty = resolveDeonticExpr(o.party, ctx);
   const resolvedAction = resolveDeonticExpr(o.action, ctx);
@@ -840,24 +887,23 @@ function deonticObligationToWire(o, ctx, remainingNum, observed) {
   // is only *resolved* once an event has been scrutinized against it: if the
   // relevant event stream was empty ('observed' false), jl4-service prints the
   // un-evaluated parameter NAME ("driver"), not the record value
-  // (Jl4.hs:1085 serializeEitherValue Left → prettyLayout of the party expr).
+  // (Backend.Jl4.serializeParty, Left → partyText of the party expression).
   // Once an event has been compared, the party is a resolved value that
   // records tag as @{<TypeName>: …}@ from the bundle's @x-l4-type@ stamp.
   //
-  // A LITERAL party (@PARTY `the seller`@) splits the same way, and an earlier
-  // version of this comment claimed it "prints identically either way". That
-  // stopped being true at a9caf2f6: unobserved, the reference still prints the
-  // unevaluated expression via `prettyLayout` and the backticks survive;
-  // observed, it prints the constructor VALUE via `constructorText` and they do
-  // not. The schema carries the plain name, so the source spelling is
-  // reconstructed here rather than stored twice.
+  // A LITERAL party (@PARTY `the seller`@) is the plain name either way. Until
+  // 2026-10-13 it was not: unobserved, the reference printed the unevaluated
+  // expression via `prettyLayout` and the backticks survived, and this
+  // function re-added them. The reference now prints a bare name through
+  // `constructorText` whether or not an event has been compared, so the schema's
+  // plain name is the answer.
   let party;
   if (o.party && typeof o.party === "object" && o.party.param != null) {
     party = observed
       ? deonticTagRecord(resolvedParty, ctx, o.party.param)
       : o.party.param;
   } else {
-    party = observed ? resolvedParty : deonticSourceSpelling(resolvedParty);
+    party = resolvedParty;
   }
   // 'deadline' on the wire: number = "remaining time after observed
   // events", string = "original WITHIN literal, untouched". The
@@ -909,9 +955,8 @@ function deonticDeadlineMissedNode(
 // The obligation's OWN party, rendered as jl4-service renders the obligated
 // party of a DeadlineMissed breach: the breach is normalised before it is
 // serialized, so the party is always the EVALUATED value — a record tagged
-// with its L4 type name, a constructor by its plain name — never the source
-// spelling (compare the residual-obligation case in
-// 'deonticObligationToWire', where an unobserved party keeps its backticks).
+// with its L4 type name, a constructor by its plain name. A residual
+// obligation's party ('deonticObligationToWire') is spelled the same way.
 function deonticEvaluatedParty(obligation, ctx) {
   const resolvedParty = resolveDeonticExpr(obligation.party, ctx);
   if (
@@ -927,7 +972,7 @@ function deonticEvaluatedParty(obligation, ctx) {
 // Render an event's party the way jl4-service serializes 'ev'party':
 // record-typed parties tag with the obligation party's L4 type name
 // (@{Driver: {...}}@); scalar/enum parties render as their L4 constructor
-// name (backtick-quoted when not a plain identifier).
+// name, plain.
 function deonticRenderEventParty(evParty, obligation, ctx) {
   if (
     evParty != null &&
@@ -943,10 +988,6 @@ function deonticRenderEventParty(evParty, obligation, ctx) {
   return deonticRenderEnumName(evParty);
 }
 
-// Approximate L4's 'Print.prettyLayout' of an enum-constructor name: a name
-// that is a plain identifier prints bare; anything with spaces / punctuation
-// is backtick-quoted. Enum constructors in the deontic corpus follow this
-// rule (@drive@ vs @`wear seatbelt`@).
 // A party / event-action name as the JSON payload should carry it: PLAIN.
 //
 // This used to backtick anything that wasn't a bare identifier, mirroring
@@ -954,9 +995,10 @@ function deonticRenderEventParty(evParty, obligation, ctx) {
 // constructor through `Backend.Jl4.constructorText`, which carries no
 // backticks, because the service declares the un-backticked spelling in its own
 // `returnSchema` enum and was otherwise handing out a schema its responses
-// fail. `eventAction` and every party field follow the plain spelling;
-// `obligationAction` does NOT — that one is still `prettyLayout` of an
-// unevaluated Name on the reference side, so it keeps its backticks.
+// fail. `eventAction`, `obligationAction` and every party field follow the
+// plain spelling. `obligationAction` and the OBLIGATION's `action` joined them
+// on 2026-10-13: until then the reference printed those with `prettyLayout`
+// of an unevaluated Name, so they kept their backticks.
 function deonticRenderEnumName(name) {
   return name;
 }
@@ -1087,6 +1129,7 @@ function synthesizeDeonticReasoning(
   residualContract,
   residualDeadline,
   args,
+  breachByKind,
 ) {
   const givenParams = (meta.paramOrder || []).filter(
     (p) => p !== "startTime" && p !== "events",
@@ -1104,6 +1147,7 @@ function synthesizeDeonticReasoning(
       residualDeadline,
       args,
       givenParams,
+      breachByKind,
     );
   }
 
@@ -1126,7 +1170,7 @@ function synthesizeDeonticReasoning(
       : value === "BREACH"
         ? "BREACH"
         : explicitBreach
-          ? deonticBreachResultText(value.BREACH)
+          ? deonticBreachResultText(value.BREACH, breachByKind)
           : residualContract
             ? renderContractAsSource(residualContract, residualDeadline)
             : contractBodyText;
@@ -1174,7 +1218,7 @@ function synthesizeDeonticReasoning(
   ];
   if (explicitBreach) {
     callChildren.push({
-      exampleCode: [renderExplicitBreachClause(value.BREACH)],
+      exampleCode: [renderExplicitBreachClause(value.BREACH, breachByKind)],
       explanation: ["Result: " + resultText],
       children: [],
     });
@@ -1210,19 +1254,26 @@ function synthesizeDeonticReasoning(
 // 'BREACH BY <party> BECAUSE "<detail>"' — source form for the extra
 // child node svc inserts under 'a OF b, c' on an explicit-BREACH
 // outcome. 'detail' is the un-quoted L4 string literal; re-quote it
-// so the rendered clause matches the original source.
-function renderExplicitBreachClause(br) {
+// so the rendered clause matches the original source. 'byKind' is the
+// contract's @byKind@ for the party (`breachByKind` of the interpreter's
+// result): a name is backticked as L4's printer does, anything else is printed
+// as given.
+function renderExplicitBreachClause(br, byKind) {
   const parts = ["BREACH"];
-  if (br.party != null) parts.push("BY " + br.party);
+  if (br.party != null) {
+    parts.push("BY " + deonticLiteralAsSource(br.party, byKind));
+  }
   if (br.detail != null) parts.push('BECAUSE "' + br.detail + '"');
   return parts.join(" ");
 }
 
 // 'DEONTIC BREACHED:\n  BREACH\n  BY p\n  BECAUSE "r"' — the
 // "Result:" line text on every node that ends in an explicit BREACH.
-function deonticBreachResultText(br) {
+function deonticBreachResultText(br, byKind) {
   const lines = ["DEONTIC BREACHED:", "  BREACH"];
-  if (br.party != null) lines.push("  BY " + br.party);
+  if (br.party != null) {
+    lines.push("  BY " + deonticLiteralAsSource(br.party, byKind));
+  }
   if (br.detail != null) lines.push('  BECAUSE "' + br.detail + '"');
   return lines.join("\n");
 }
@@ -1259,6 +1310,7 @@ function synthesizeParameterizedDeonticReasoning(
   residualDeadline,
   args,
   givenParams,
+  breachByKind,
 ) {
   const fnNameRendered =
     (meta.traceMeta && meta.traceMeta.fnName) || meta.name || "";
@@ -1273,7 +1325,7 @@ function synthesizeParameterizedDeonticReasoning(
       : value === "BREACH"
         ? "BREACH"
         : explicitBreach
-          ? deonticBreachResultText(value.BREACH)
+          ? deonticBreachResultText(value.BREACH, breachByKind)
           : residualContract
             ? renderResidualForParamCtx(
                 residualContract,
@@ -1479,7 +1531,7 @@ function renderEventsAsArgListParam(events) {
 function renderEventOfTextParam(ev, actionForced) {
   let partyText;
   if (typeof ev.party === "string") {
-    partyText = /\s/.test(ev.party) ? "`" + ev.party + "`" : ev.party;
+    partyText = quoteL4NameIfNeeded(ev.party);
   } else {
     partyText = "`event party 0`";
   }
@@ -1973,7 +2025,7 @@ function renderParamEvent(ev, _idx, paramSchemas, activePartySchema) {
   let exampleParty;
   let resultParty;
   if (typeof ev.party === "string") {
-    exampleParty = /\s/.test(ev.party) ? "`" + ev.party + "`" : ev.party;
+    exampleParty = quoteL4NameIfNeeded(ev.party);
     resultParty = exampleParty;
   } else {
     // Record-typed party — placeholder + resolved value. Svc uses a
@@ -2167,8 +2219,12 @@ function renderResidualForParamCtx(
       args,
       meta,
       givenParams,
+      contract.partyKind,
     );
-    const actionText = renderDeonticExprForSource(contract.action);
+    const actionText = renderDeonticExprForSource(
+      contract.action,
+      contract.actionKind,
+    );
     const lines = ["PARTY " + partyText, contract.modal + " " + actionText];
     const deadlineToShow =
       deadlineOverride != null ? String(deadlineOverride) : contract.deadline;
@@ -2186,9 +2242,9 @@ function renderResidualForParamCtx(
 
 // Render the primary obligation's party with its type tag —
 // 'driver' → 'Driver OF "Alice"' (no backticks, no JUST wrapper).
-function renderActiveDeonticExpr(expr, args, meta, _givenParams) {
+function renderActiveDeonticExpr(expr, args, meta, _givenParams, kind) {
   if (expr == null) return "";
-  if (typeof expr === "string") return expr;
+  if (typeof expr === "string") return deonticLiteralAsSource(expr, kind);
   if (expr.param != null) {
     const props = (meta && meta.parameters && meta.parameters.properties) || {};
     const schema = props[expr.param];
@@ -2209,8 +2265,8 @@ function renderContractAsSource(c, deadlineOverride) {
   if (c.kind === "FULFILLED") return "FULFILLED";
   if (c.kind === "BREACH") return "BREACH";
   if (c.kind === "OBLIGATION") {
-    const partyText = renderDeonticExprForSource(c.party);
-    const actionText = renderDeonticExprForSource(c.action);
+    const partyText = renderDeonticExprForSource(c.party, c.partyKind);
+    const actionText = renderDeonticExprForSource(c.action, c.actionKind);
     const lines = ["PARTY " + partyText, c.modal + " " + actionText];
     const deadlineToShow =
       deadlineOverride != null ? String(deadlineOverride) : c.deadline;
@@ -2222,9 +2278,24 @@ function renderContractAsSource(c, deadlineOverride) {
   return "";
 }
 
-function renderDeonticExprForSource(e) {
+// A literal party or action as L4 source. The schema carries a bare name and
+// rule source alike as a string, and says which in the obligation's sibling
+// key @partyKind@ / @actionKind@ (`Schema.hs`, 'DeonticExpr'). The answer's wire
+// prints a name plain, as jl4-service does, so a name with a space has to be
+// backticked again here for the trace's source text to be L4, as
+// 'formatEventComponent' does for an event's. Only a literal tagged "name" is
+// touched. Anything else is rule source (an action that carries a value,
+// @pay 100@ or @say "pay"@, or a record built @WITH@ fields), or a literal from
+// a bundle compiled before the key existed, and is printed as given. The key is
+// a sibling, so a runtime that predates it reads the same bundle correctly and
+// only its trace text lacks the backticks.
+function deonticLiteralAsSource(text, kind) {
+  return kind === "name" ? quoteL4NameIfNeeded(text) : text;
+}
+
+function renderDeonticExprForSource(e, kind) {
   if (e == null) return "";
-  if (typeof e === "string") return e; // already a literal text
+  if (typeof e === "string") return deonticLiteralAsSource(e, kind);
   if (e.param != null) return e.param; // bare param name
   return String(e);
 }
@@ -2269,11 +2340,125 @@ function renderEventOfText(ev, actionForced) {
   );
 }
 
+// A name as L4 source, as the printer (`quoteIfNeeded` in jl4-core's
+// L4/Print.hs) spells it: bare when it starts with a letter and holds only
+// letters, digits and underscores and does not spell a reserved word,
+// backticked otherwise. So `ship-it`, `50%`, `x.y`, `it's`, `2nd buyer` and `A`
+// are backticked, as well as `the seller`; the trace's source text then parses.
+//
+// The reserved words are the lexer's keywords except those the grammar also
+// accepts as a name (`LIST`). jl4-mlir-test reads the list below and asserts it
+// equals that set, so a keyword added to the lexer fails the test until it is
+// added here.
+// BEGIN L4_RESERVED_WORDS
+const L4_RESERVED_WORDS = new Set([
+  "GIVEN",
+  "GIVETH",
+  "GIVES",
+  "DECIDE",
+  "EXACTLY",
+  "MEANS",
+  "DECLARE",
+  "IF",
+  "BRANCH",
+  "THEN",
+  "ELSE",
+  "OTHERWISE",
+  "AND",
+  "OR",
+  "RAND",
+  "ROR",
+  "NOT",
+  "IS",
+  "ONE",
+  "OF",
+  "WITH",
+  "A",
+  "AN",
+  "HAS",
+  "THE",
+  "YIELD",
+  "CONSIDER",
+  "WHERE",
+  "ASSUME",
+  "WHEN",
+  "TYPE",
+  "PARTY",
+  "DO",
+  "DOES",
+  "MUST",
+  "MAY",
+  "SHANT",
+  "BREACH",
+  "REFUSE",
+  "REFUSED",
+  "BECAUSE",
+  "PROVIDED",
+  "WITHIN",
+  "HENCE",
+  "LEST",
+  "FUNCTION",
+  "FROM",
+  "TO",
+  "EQUALS",
+  "IMPLIES",
+  "PLUS",
+  "MINUS",
+  "TIMES",
+  "DIVIDED",
+  "MODULO",
+  "BY",
+  "GREATER",
+  "LESS",
+  "THAN",
+  "ABOVE",
+  "BELOW",
+  "AT",
+  "STARTING",
+  "LEAST",
+  "MOST",
+  "FOLLOWED",
+  "FOR",
+  "ALL",
+  "AKA",
+  "IMPORT",
+  "FETCH",
+  "POST",
+  "ENV",
+  "RECORD",
+  "COMMIT",
+  "ATTEST",
+  "RECALL",
+  "OFFICIAL",
+  "CONCAT",
+  "AS",
+  "LET",
+  "IN",
+  "BE",
+  "MEAN",
+  "UNLESS",
+  "TYPICALLY",
+  "EVERY",
+  "WHO",
+  "WHOSE",
+  "ONCE",
+  "HAVE",
+  "SOME",
+  "UPON",
+  "AFTER",
+  "BEFORE",
+]);
+// END L4_RESERVED_WORDS
+
+function quoteL4NameIfNeeded(name) {
+  return name === "" ||
+    (/^\p{L}[\p{L}\p{N}_]*$/u.test(name) && !L4_RESERVED_WORDS.has(name))
+    ? name
+    : "`" + name + "`";
+}
+
 function formatEventComponent(v) {
-  if (typeof v === "string") {
-    // Match svc's prettyLayout: backtick only multi-word names.
-    return /\s/.test(v) ? "`" + v + "`" : v;
-  }
+  if (typeof v === "string") return quoteL4NameIfNeeded(v);
   return JSON.stringify(v);
 }
 
@@ -3289,6 +3474,45 @@ export function createRuntime(opts) {
     };
   }
 
+  // A required input that does not supply what its schema requires is
+  // refused, naming the first in parameter order, as jl4-service refuses it
+  // ('MissingInputError').
+  function refuseMissingInputs(meta, args) {
+    const props = meta.parameters.properties || {};
+    const order = meta.paramOrder || Object.keys(props);
+    const required = new Set(meta.parameters.required || order);
+    for (const pn of order) {
+      const v = args == null ? undefined : args[pn];
+      if (required.has(pn) && !suppliesRequired(v, props[pn]))
+        throw new MissingInputError(pn);
+    }
+  }
+
+  // Whether a value is there, and so is everything inside it its schema
+  // requires: a record's required fields, a list's elements. A MAYBE field
+  // may be left out. A value of another shape than its schema's is left to
+  // the marshaller, as before.
+  function suppliesRequired(value, schema) {
+    if (value === undefined || value === null) return false;
+    if (!schema) return true;
+    if (
+      schema.type === "object" &&
+      schema.properties &&
+      typeof value === "object"
+    ) {
+      const order = schema.propertyOrder || Object.keys(schema.properties);
+      const required = new Set(schema.required || order);
+      return order.every(
+        (name) =>
+          !required.has(name) ||
+          suppliesRequired(value[name], schema.properties[name]),
+      );
+    }
+    if (schema.type === "array" && Array.isArray(value))
+      return value.every((v) => suppliesRequired(v, schema.items || {}));
+    return true;
+  }
+
   // ---- High-level helper: marshal args, call an exported function,
   //      decode the return per the schema's return type. ----
   function invokeFunction(instance, meta, args) {
@@ -3300,6 +3524,7 @@ export function createRuntime(opts) {
     if (meta.isDeontic) {
       return invokeDeontic(meta, args);
     }
+    refuseMissingInputs(meta, args);
     const props = meta.parameters.properties || {};
     const order = meta.paramOrder || Object.keys(props);
     const required = new Set(meta.parameters.required || order);
@@ -3446,6 +3671,7 @@ export function createRuntime(opts) {
         result.residual,
         result.residualDeadline,
         args,
+        result.breachByKind,
       );
       return { value: result.value, reasoning };
     }
@@ -3468,6 +3694,7 @@ export function createRuntime(opts) {
   // route to `<fn>$trace` without duplicating the marshalling pipeline.
   function invokeFunctionRaw(instance, meta, args, wasmSymbol) {
     resetHeap();
+    refuseMissingInputs(meta, args);
     const props = meta.parameters.properties || {};
     const order = meta.paramOrder || Object.keys(props);
     const required = new Set(meta.parameters.required || order);
@@ -3512,13 +3739,11 @@ export function createRuntime(opts) {
     // compile-time metadata has `special` set (M5 slice 4A), we patch
     // the children list to match what `traceToReasoning` produces:
     //
-    //   * short-circuit filter — drop the rhs sibling when the prelude
-    //     would have skipped it (AND with FALSE lhs, OR with TRUE lhs);
-    //     our wasm codegen is eager so both frames exist in the pool.
-    //   * synthetic IF sub-tree — `__AND__ a b` desugars to
-    //     @IF a THEN b ELSE FALSE@; jl4-service's trace shows this IF as
-    //     an additional child of the AND node, with `a`/`b` Var leaves.
-    //     Mirror the same shape here.
+    //   * short-circuit filter — drop the rhs sibling when jl4-core would
+    //     have skipped it (AND or IMPLIES with a FALSE lhs, OR with a TRUE
+    //     lhs). jl4-core evaluates the connectives in frames of their own,
+    //     so its trace shows the connective with a child per operand it
+    //     evaluated, and no IF sub-tree (UNKNOWN-EVALUATION-SPEC §4.4).
     // M5 — second arg is the label inherited from an enclosing
     // WHERE/LET binding wrapper. jl4-core's `traceToReasoning`
     // propagates the wrapper's label down through the LAST
@@ -3596,13 +3821,12 @@ export function createRuntime(opts) {
         };
       }
       let kidFrames = frame.children;
-      let extras = [];
-      if (node.special === "AND" || node.special === "OR") {
-        const filtered = filterShortCircuitChildren(frame, node, lookupNode);
-        kidFrames = filtered.kids;
-        extras = synthesizeBoolDesugar(node, filtered, resultText, lookupNode);
-      } else if (node.special === "NOT") {
-        extras = synthesizeNotDesugar(frame, node, resultText, lookupNode);
+      if (
+        node.special === "AND" ||
+        node.special === "OR" ||
+        node.special === "IMPLIES"
+      ) {
+        kidFrames = filterShortCircuitChildren(frame, node, lookupNode).kids;
       }
       // Effective label for THIS frame: the schema's bindingLabel if
       // the frame is a wrapper, else whatever the parent passed down.
@@ -3620,7 +3844,7 @@ export function createRuntime(opts) {
       return {
         exampleCode: ec,
         explanation: ["Result: " + resultText],
-        children: [...renderedKids, ...extras],
+        children: renderedKids,
       };
     };
     // Synthesised top: `<fn name> OF <args>` Result: …. Children list
@@ -3691,139 +3915,23 @@ export function createRuntime(opts) {
     return null;
   }
 
-  // M5 slice 4A — drop the rhs frame when the prelude would have
-  // short-circuited. Our wasm codegen evaluates AND/OR eagerly so both
-  // arg frames exist in the pool; this filter brings the trace shape
-  // back in line with jl4-service's lazy evaluation order.
+  // M5 slice 4A — drop the rhs frame when jl4-core would have
+  // short-circuited. Our wasm codegen may evaluate the operands eagerly
+  // so both arg frames can exist in the pool; this filter brings the
+  // trace shape back in line with jl4-service's lazy evaluation order.
   function filterShortCircuitChildren(frame, node, lookupNode) {
     const kids = frame.children;
-    if (kids.length < 1) return { kids, dropped: false, lhsTruth: null };
-    // M5 slice 4D — always read lhs from the FIRST child if present.
-    // With slice-4D's short-circuit AND/OR codegen, the rhs frame is
-    // absent (only 1 child); we still need lhsTruth to drive the IF
-    // sub-tree's taken-branch leaf (FALSE / TRUE / b).
+    if (kids.length < 2) return { kids, dropped: false };
+    // M5 slice 4D — the lhs is the FIRST child. With slice-4D's
+    // short-circuit codegen the rhs frame is already absent.
     const lhsTruth = frameTruth(kids[0], lookupNode);
-    if (kids.length < 2) return { kids, dropped: false, lhsTruth };
-    let kept = kids;
-    let dropped = false;
-    if (node.special === "AND" && lhsTruth === false) {
-      kept = kids.slice(0, 1);
-      dropped = true;
-    } else if (node.special === "OR" && lhsTruth === true) {
-      kept = kids.slice(0, 1);
-      dropped = true;
-    }
-    return { kids: kept, dropped, lhsTruth };
-  }
-
-  // M5 slice 4A — append the synthetic IF sub-tree the prelude desugar
-  // for @__AND__@ / @__OR__@ produces in jl4-service's trace.
-  //
-  //   __AND__ a b ⟶ IF a THEN b ELSE FALSE
-  //   __OR__  a b ⟶ IF a THEN TRUE ELSE b
-  //
-  // The IF sub-tree's "a" and "b" leaves use the *evaluated* truths
-  // from the AND/OR's sibling sub-traces — the lambda body sees @a@
-  // and @b@ already reduced to WHNF. When short-circuit dropped the
-  // rhs, we drop the corresponding child from the IF sub-tree too.
-  function synthesizeBoolDesugar(node, filtered, parentResultText, lookupNode) {
-    const kids = filtered.kids;
-    if (kids.length < 1) return [];
-    const lhsTruth = filtered.lhsTruth;
-    const rhsTruth = kids.length >= 2 ? frameTruth(kids[1], lookupNode) : null;
-    const aText =
-      lhsTruth === true ? "TRUE" : lhsTruth === false ? "FALSE" : "";
-    const bText =
-      rhsTruth === true ? "TRUE" : rhsTruth === false ? "FALSE" : "";
-    // IF sub-tree's exampleCode literal differs by operator. AND emits
-    // `IF a THEN b ELSE FALSE`; OR emits `IF a THEN TRUE ELSE b`.
-    const ifText =
-      node.special === "AND"
-        ? "IF a THEN b ELSE FALSE"
-        : "IF a THEN TRUE ELSE b";
-    const ifChildren = [
-      { exampleCode: ["a"], explanation: ["Result: " + aText], children: [] },
-    ];
-    // The second IF child is the *taken* branch:
-    //   AND, lhs TRUE  → `b` (the rhs eval)            ⇒ Result = b's truth
-    //   AND, lhs FALSE → `FALSE` (the ELSE literal)    ⇒ Result = FALSE
-    //   OR,  lhs TRUE  → `TRUE`  (the THEN literal)    ⇒ Result = TRUE
-    //   OR,  lhs FALSE → `b` (the rhs eval)            ⇒ Result = b's truth
-    // jl4-service traces the taken branch as a leaf node with the
-    // branch expression as exampleCode and its NF result as the line.
-    if (node.special === "AND") {
-      if (lhsTruth === true && kids.length >= 2) {
-        ifChildren.push({
-          exampleCode: ["b"],
-          explanation: ["Result: " + bText],
-          children: [],
-        });
-      } else if (lhsTruth === false) {
-        ifChildren.push({
-          exampleCode: ["FALSE"],
-          explanation: ["Result: FALSE"],
-          children: [],
-        });
-      }
-    } else {
-      // OR
-      if (lhsTruth === true) {
-        ifChildren.push({
-          exampleCode: ["TRUE"],
-          explanation: ["Result: TRUE"],
-          children: [],
-        });
-      } else if (lhsTruth === false && kids.length >= 2) {
-        ifChildren.push({
-          exampleCode: ["b"],
-          explanation: ["Result: " + bText],
-          children: [],
-        });
-      }
-    }
-    return [
-      {
-        exampleCode: [ifText],
-        explanation: ["Result: " + parentResultText],
-        children: ifChildren,
-      },
-    ];
-  }
-
-  // M5 slice 4A — synthetic IF sub-tree for `__NOT__ a` ⟶
-  // `IF a THEN FALSE ELSE TRUE`. Single arg, no short-circuit.
-  function synthesizeNotDesugar(frame, _node, parentResultText, lookupNode) {
-    if (frame.children.length < 1) return [];
-    const argTruth = frameTruth(frame.children[0], lookupNode);
-    const aText =
-      argTruth === true ? "TRUE" : argTruth === false ? "FALSE" : "";
-    // Mirror 'synthesizeBoolDesugar' for AND/OR — the IF sub-tree
-    // includes a 'taken-branch' leaf after the @a@ input leaf:
-    //   argTruth === true  → @FALSE@ (the THEN literal)
-    //   argTruth === false → @TRUE@  (the ELSE literal)
-    const ifChildren = [
-      { exampleCode: ["a"], explanation: ["Result: " + aText], children: [] },
-    ];
-    if (argTruth === true) {
-      ifChildren.push({
-        exampleCode: ["FALSE"],
-        explanation: ["Result: FALSE"],
-        children: [],
-      });
-    } else if (argTruth === false) {
-      ifChildren.push({
-        exampleCode: ["TRUE"],
-        explanation: ["Result: TRUE"],
-        children: [],
-      });
-    }
-    return [
-      {
-        exampleCode: ["IF a THEN FALSE ELSE TRUE"],
-        explanation: ["Result: " + parentResultText],
-        children: ifChildren,
-      },
-    ];
+    const decided =
+      ((node.special === "AND" || node.special === "IMPLIES") &&
+        lhsTruth === false) ||
+      (node.special === "OR" && lhsTruth === true);
+    return decided
+      ? { kids: kids.slice(0, 1), dropped: true }
+      : { kids, dropped: false };
   }
 
   // M5 — walk a wasm-allocated compound value at `raw` using the
@@ -4231,9 +4339,9 @@ export function createRuntime(opts) {
 // until later slices replace this with a real instrumented trace.
 //
 // `wrapEvaluationEnvelope({value, reasoning})` builds the
-// `{contents: {result: {value}, reasoning?}, tag}` envelope `jl4-service`
-// returns, with `tag = TraceResponse` whenever `reasoning` is non-empty
-// (matching `responseTag` in jl4-service's Api.hs).
+// `{contents: {result: {value}, reasoning?}, report, tag}` envelope
+// `jl4-service` returns, with `tag = TraceResponse` whenever `reasoning` is
+// non-empty (matching `responseTag` in jl4-service's Api.hs).
 // ---------------------------------------------------------------------------
 
 export function isEmptyReasoning(r) {
@@ -4715,9 +4823,12 @@ export function synthesizeArgEvalTree(value, schema, _opts) {
 }
 
 // Build the wire envelope matching jl4-service's `SimpleResponse` ToJSON
-// instance: `{tag, contents}` where `contents` is `ResponseWithReason` (so
-// `{result, reasoning?}`). The tag flips to "TraceResponse" whenever
-// `reasoning` is non-empty (= `responseTag` in Backend/Api.hs).
+// instance: `{tag, contents, report}` where `contents` is
+// `ResponseWithReason` (so `{result, reasoning?}`). The tag flips to
+// "TraceResponse" whenever `reasoning` is non-empty (= `responseTag` in
+// Backend/Api.hs). Every response states its report, as the service's do
+// (UNKNOWN-EVALUATION-SPEC U7b); WASM evaluates only fully supplied inputs,
+// so it is always the default one.
 export function wrapEvaluationEnvelope({ value, reasoning }) {
   const result = { value };
   const contents =
@@ -4728,5 +4839,5 @@ export function wrapEvaluationEnvelope({ value, reasoning }) {
     reasoning && !isEmptyReasoning(reasoning)
       ? "TraceResponse"
       : "SimpleResponse";
-  return { contents, tag };
+  return { contents, report: "default", tag };
 }

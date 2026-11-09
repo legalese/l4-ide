@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="581" height="704" viewBox="0 0 581 704">
+<rect width="581" height="704" fill="#ffffff"/>
+<rect data-fnid="156" data-value="156" class="lad-box lad-clickable" x="249.1" y="70.0" width="82.9" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="156" data-value="156" class="lad-clickable" x="290.6" y="94.8" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">canning</text>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,89.8 136.0,89.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,89.8 C 458.1,89.8 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="136.0,89.8 249.1,89.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="332.0,89.8 445.1,89.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="157" data-value="157" class="lad-box lad-clickable" x="237.4" y="135.6" width="106.4" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="157" data-value="157" class="lad-clickable" x="290.6" y="160.4" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">processing</text>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,155.4 136.0,155.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,155.4 C 458.1,155.4 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="136.0,155.4 237.4,155.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="343.8,155.4 445.1,155.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="158" data-value="158" class="lad-box lad-clickable" x="237.4" y="201.2" width="106.4" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="158" data-value="158" class="lad-clickable" x="290.6" y="226.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">preserving</text>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,221.0 136.0,221.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,221.0 C 458.1,221.0 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="136.0,221.0 237.4,221.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="343.8,221.0 445.1,221.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="159" data-value="159" class="lad-box lad-clickable" x="245.2" y="266.8" width="90.7" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="159" data-value="159" class="lad-clickable" x="290.6" y="291.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">freezing</text>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,286.6 136.0,286.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,286.6 C 458.1,286.6 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="136.0,286.6 245.2,286.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="335.9,286.6 445.1,286.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="160" data-value="160" class="lad-box lad-clickable" x="253.0" y="332.4" width="75.0" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="160" data-value="160" class="lad-clickable" x="290.6" y="357.2" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">drying</text>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,352.2 136.0,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,352.2 C 458.1,352.2 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="136.0,352.2 253.0,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="328.1,352.2 445.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="161" data-value="161" class="lad-box lad-clickable" x="241.3" y="398.0" width="98.6" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="161" data-value="161" class="lad-clickable" x="290.6" y="422.8" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">marketing</text>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,417.8 136.0,417.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,417.8 C 458.1,417.8 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="136.0,417.8 241.3,417.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="339.8,417.8 445.1,417.8" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="162" data-value="162" class="lad-box lad-clickable" x="249.1" y="463.6" width="82.9" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="162" data-value="162" class="lad-clickable" x="290.6" y="488.4" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">storing</text>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,483.4 136.0,483.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,483.4 C 458.1,483.4 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="136.0,483.4 249.1,483.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="332.0,483.4 445.1,483.4" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="164" data-value="164" class="lad-box lad-clickable" x="136.0" y="529.2" width="82.9" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="164" data-value="164" class="lad-clickable" x="177.4" y="554.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">packing</text>
+<text x="286.6" y="542.9" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#555" font-style="italic">for</text>
+<rect data-fnid="166" data-value="166" class="lad-box lad-clickable" x="354.4" y="529.2" width="90.7" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="166" data-value="166" class="lad-clickable" x="399.8" y="554.0" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">shipment</text>
+<polyline class="lad-wire lad-clickable" data-fold="163" points="218.9,549.0 262.9,549.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="163" points="310.4,549.0 354.4,549.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="163" points="262.9,549.0 310.4,549.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,549.0 136.0,549.0" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,549.0 C 458.1,549.0 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<rect data-fnid="167" data-value="167" class="lad-box lad-clickable" x="229.5" y="594.8" width="122.1" height="39.6" rx="7" fill="#ffffff" stroke="#777" stroke-width="1.5"/>
+<text data-fnid="167" data-value="167" class="lad-clickable" x="290.6" y="619.6" font-family="Georgia, serif" font-size="14" text-anchor="middle" fill="#111">distribution</text>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 110.0,352.2 C 123.0,352.2 123.0,614.6 136.0,614.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<path class="lad-wire lad-clickable" data-fold="155" d="M 445.1,614.6 C 458.1,614.6 458.1,352.2 471.1,352.2" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="136.0,614.6 229.5,614.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire lad-clickable" data-fold="155" points="351.6,614.6 445.1,614.6" fill="none" stroke="#777" stroke-width="1.5"/>
+<polyline class="lad-wire" points="70.0,352.2 110.0,352.2" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="70.0" cy="352.2" r="3.5" fill="#222"/>
+<polyline class="lad-wire" points="471.1,352.2 511.1,352.2" fill="none" stroke="#222" stroke-width="1.5"/>
+<circle cx="511.1" cy="352.2" r="3.5" fill="#222"/>
+</svg>

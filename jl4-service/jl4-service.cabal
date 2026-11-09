@@ -8,6 +8,18 @@ source-repository head
   type: git
   location: https://github.com/legalese/l4-ide/tree/main/jl4-service
 
+-- Off by default because postgresql-simple links libpq dynamically, and the
+-- binaries this repository ships do not carry it: the Dockerfile's runtime
+-- stage installs no libpq, and main-tag.yml builds the published Linux
+-- jl4-service after installing only pkg-config, liblzma-dev and libgmp-dev,
+-- so every machine that runs it would need libpq too. The sqlite default
+-- needs nothing: direct-sqlite compiles sqlite in. Without the flag,
+-- `--ledger-store postgres` refuses to start, naming it.
+flag postgres
+  description: Build the Postgres adapter of the instance ledger's store (Ledger.Store.Postgres). Needs libpq at build and run time.
+  default: False
+  manual: True
+
 common defaults
   default-language: GHC2021
   ghc-options:
@@ -52,13 +64,23 @@ library
     Backend.Jl4
     Backend.MaybeLift
     BundleStore
+    CheckStore
     Compatibility
     Compiler
     ControlPlane
     DataPlane
+    DeonticTrace
     DeploymentLoader
+    EvalLimits
     FileBrowser
     ExplorerPage
+    Ledger
+    Ledger.Mcp
+    Ledger.Service
+    Ledger.Store.Config
+    Ledger.Store.Postgres
+    Ledger.Store.Sql
+    Ledger.Store.Sqlite
     Logging
     McpServer
     OpenApiDoc
@@ -91,9 +113,10 @@ library
     vector,
     -- Concurrency / state
     async,
+    deepseq,
     stm,
-    -- Serialization (CBOR)
-    serialise,
+    -- The instance ledger's default store (bundles its own sqlite)
+    sqlite-simple,
     -- Crypto / archiving
     cryptohash-sha256,
     zip-archive,
@@ -112,10 +135,19 @@ library
     transformers,
     uuid,
 
+  if flag(postgres)
+    build-depends: postgresql-simple
+    cpp-options: -DLEDGER_POSTGRES
+
 executable jl4-service
   import: defaults
   main-is: Main.hs
   hs-source-dirs: app
+  -- The threaded RTS on every core. The service runs as many batch cases at
+  -- once, across all batches, as there are capabilities (Types.batchSlots),
+  -- so this is what lets batches use more than one core; -rtsopts lets an
+  -- operator say +RTS -N2 -RTS (or GHCRTS=-N2) to use fewer.
+  ghc-options: -threaded -rtsopts "-with-rtsopts=-N"
   build-depends:
     jl4-service
 
@@ -127,27 +159,41 @@ test-suite jl4-service-test
     ApiSpec
     BooleanDecisionQuerySpec
     BundleStoreSpec
+    CheckStoreSpec
     CodeGenSpec
     CompatibilitySpec
     DecisionQueryCacheKeySpec
     DeploymentIdSpec
     IntegrationSpec
+    LedgerMcpSpec
+    LedgerRoutesSpec
+    LedgerStoreSpec
+    LoggingSpec
     MaybeLiftSpec
     PutGuardSpec
     QueryPlanSpec
     SchemaSpec
     SanitizationSpec
-    SerialisationSpec
+    StdlibResolutionSpec
     TestData
+    TestStoreDir
+    UnresolvedImportSpec
 
   hs-source-dirs:
     test
+
+  -- The threaded RTS, as the executable runs, so that System.Timeout takes the
+  -- timer-manager path it takes in production. No -N: a test that depends on
+  -- the capability count sets it itself (setNumCapabilities), so that GHCRTS
+  -- cannot change it underneath the test.
+  ghc-options: -threaded
 
   build-tool-depends:
     hspec-discover:hspec-discover
 
   build-depends:
     aeson,
+    async,
     bytestring,
     containers,
     directory,
@@ -160,15 +206,23 @@ test-suite jl4-service-test
     jl4-query-plan,
     jl4-service,
     lsp-types,
+    optparse-applicative,
     QuickCheck,
     quickcheck-instances,
-    serialise,
     servant >=0.20.2 && <0.21,
     servant-server >=0.20.2 && <0.21,
     stm,
     string-interpolate,
+    temporary,
     text,
     time,
     transformers,
     warp,
-    zip-archive,
+    zip-archive
+
+  -- LedgerStoreSpec runs the store items against a live server when
+  -- JL4_LEDGER_TEST_POSTGRES_URL names one, and needs the driver to make
+  -- its own schema.
+  if flag(postgres)
+    build-depends: postgresql-simple
+    cpp-options: -DLEDGER_POSTGRES

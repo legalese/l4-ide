@@ -1,0 +1,8 @@
+-- Two `@lang` lines, and the last one wins, so this module is Hebrew.
+-- Neither line is redundant, so neither gets the hint.
+@lang en
+@lang he
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE echo x IS x

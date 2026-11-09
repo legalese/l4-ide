@@ -12,8 +12,17 @@
 -- results to a file.
 --
 -- Each result row is an envelope
--- @{ input, output, status, diagnostics }@ (validate-only mode emits
--- @{ input, status, errors }@ instead).
+-- @{ input, output, status, presumed, diagnostics }@ (validate-only mode emits
+-- @{ input, status, errors }@ instead). @presumed@ lists the inputs whose
+-- @TYPICALLY@ default the row's answer rests on: those the row left out, that
+-- took their default (or, for a MAYBE input with none, NOTHING), and that the
+-- evaluation actually read (T6 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@).
+--
+-- An input the row leaves out takes its default while presumption is on
+-- (@--presumption soft@, the default); with @--presumption hard@ it is a
+-- missing input, and the row is an error naming it (T4). @null@ never takes a
+-- default (T3). In CSV input an empty cell is a left-out input, not @null@
+-- (T3c).
 --
 -- Error handling follows the spec: batch processing stops at the first
 -- failing row by default; pass @--continue-on-error@ to process every row
@@ -22,6 +31,7 @@
 module L4.Cli.Batch
   ( BatchOptions(..)
   , OutputFormat(..)
+  , Presumption(..)
   , batchOptionsParser
   , batchCmd
   ) where
@@ -37,13 +47,22 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import qualified Data.Attoparsec.ByteString as A
+import qualified Data.Attoparsec.ByteString.Lazy as AL
 import qualified Data.Csv as Csv
+import qualified Data.Csv.Parser as CsvParser
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
+import Control.Monad (void)
+import Data.Maybe (fromMaybe, isJust)
+import Data.Word (Word8)
 import Data.Char (isAlpha, isAlphaNum)
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, decodeUtf8With, encodeUtf8)
+import Data.Text.Encoding.Error (lenientDecode)
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
 import System.IO
@@ -66,28 +85,60 @@ import L4.Export
   , extractAssumeParamResolveds
   , getDefaultFunction
   , getExportedFunctions
+  , honouredDefault
+  , isRequiredInput
   , rewriteModuleAssumes
   )
 import L4.DirectiveFilter (filterIdeDirectives)
 import L4.EvaluateLazy
-  ( EvalConfig
+  ( EvalConfig(..)
   , EvalDirectiveResult(..)
+  , requestPresumed
+  , renderPresumedPath
+  , moduleDeclares
   , EvalDirectiveValue(..)
   , AssertionOutcome(..)
   , ReductionOutcome(..)
   , prettyEvalException
   , prettyRefusal
+  , prettyUndetermined
   )
-import L4.Lexer (showStringLit)
+import L4.IgnoredAnnotation (ignoredAnnotations, renderIgnoredAnnotation)
+import L4.Lexer (execLexer, showStringLit)
+import L4.Presumption (nearestName, requestRecordName, unrecognisedMessage)
 import L4.Print (prettyLayout, restoreMixfixPatterns)
-import qualified Data.Set as Set
 import L4.Syntax
-  ( AppForm(..), Assume(..), Decide(..), GivenSig(..), Module, Resolved
-  , Type'(..), TypeSig(..), getUnique
+  ( AppForm(..), Assume(..), Declare(..), Decide(..), Expr, GivenSig(..), Module(..), Resolved
+  , Type'(..), TypeDecl(..), TypedName(..), TypeSig(..), Unique, getActual, getUnique, rawName
+  , rawNameToText
   )
-import L4.TypeCheck.Environment (maybeUnique)
+import L4.TypeCheck.Environment (listUnique, maybeUnique)
 
 import L4.Cli.Common
+
+----------------------------------------------------------------------------
+-- Ignored annotations
+----------------------------------------------------------------------------
+
+-- | Say, on stderr, which annotation lines of a file this version of L4
+-- ignores (an unknown name, or a known one without the form it needs), one
+-- line each: @file:line:column: message@.
+--
+-- The lexer lets such a line through as trivia, and the checker's warnings
+-- reach the user only through the commands that print them (@l4 check@,
+-- @l4 run@). This command prints none, so without this a misspelt @\@export@
+-- is a function it never finds, with nothing to say why. A file the lexer
+-- refuses says so itself, in the checker's own report: nothing to add for it.
+warnIgnoredAnnotations :: FilePath -> IO ()
+warnIgnoredAnnotations path = do
+  src <- decodeUtf8With lenientDecode <$> BS.readFile path
+  case execLexer (normalizedFilePathToUri (toNormalizedFilePath path)) src of
+    Left _ -> pure ()
+    Right toks ->
+      putDiagnostics
+        [ Text.pack path <> ":" <> renderIgnoredAnnotation a
+        | a <- ignoredAnnotations toks
+        ]
 
 ----------------------------------------------------------------------------
 -- Options
@@ -101,6 +152,20 @@ data OutputFormat
   | FmtYaml    -- ^ A YAML sequence of the row envelopes.
   deriving (Eq, Show)
 
+-- | T4's presumption switch, under the names Meng's original Default design
+-- gave its two modes (T3c): soft uses @TYPICALLY@ defaults, hard does not.
+data Presumption
+  = PresumeSoft  -- ^ an input the row leaves out takes its default (the default)
+  | PresumeHard  -- ^ an input the row leaves out is missing, default or no
+  deriving (Eq, Show)
+
+presumptionReader :: ReadM Presumption
+presumptionReader = eitherReader \input ->
+  case Text.toLower (Text.pack input) of
+    "soft" -> Right PresumeSoft
+    "hard" -> Right PresumeHard
+    other  -> Left $ "Invalid presumption: " <> Text.unpack other <> " (expected soft|hard)"
+
 data BatchOptions = BatchOptions
   { batchFile           :: FilePath
   , batchInputs         :: FilePath      -- path or "-" for stdin
@@ -111,6 +176,7 @@ data BatchOptions = BatchOptions
   , batchContinueOnErr  :: Bool
   , batchValidateOnly   :: Bool
   , batchFixedNow       :: FixedNowOpt
+  , batchPresumption    :: Presumption
   }
 
 outputFormatReader :: ReadM OutputFormat
@@ -170,6 +236,13 @@ batchOptionsParser = BatchOptions
         <> help "Validate each row against the @export parameter schema without evaluating"
         )
   <*> fixedNowParser
+  <*> option presumptionReader
+        ( long "presumption"
+        <> metavar "MODE"
+        <> value PresumeSoft
+        <> showDefaultWith (const "soft")
+        <> help "soft (default): an input a row leaves out takes its TYPICALLY default; hard: it is a missing input, and the row is an error naming it"
+        )
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -177,7 +250,16 @@ batchOptionsParser = BatchOptions
 
 batchCmd :: BatchOptions -> IO ()
 batchCmd opts = do
-  evalConfig <- makeEvalConfig opts.batchFixedNow
+  evalConfig0 <- makeEvalConfig opts.batchFixedNow
+  -- T4: one switch for the whole evaluation. The JSON decoder reads it for
+  -- every input and record field it fills; discharge reads it for a section
+  -- binder (which batch supplies through the decoder anyway, see below).
+  -- The wrapper decodes each row into 'requestRecordName'; that decode is the
+  -- request's, the one the switch reaches (T4b).
+  let evalConfig = evalConfig0
+        { presumeDefaults = opts.batchPresumption == PresumeSoft
+        , requestRecord   = Just requestRecordName
+        }
 
   -- Step 1: read & parse the input rows.
   let inferredFormat = case opts.batchInputs of
@@ -201,6 +283,11 @@ batchCmd opts = do
     Left err -> do
       TIO.putStrLn $ "Error: failed to parse inputs: " <> Text.pack err
       exitFailure
+
+  -- An annotation line this version ignores is trivia to the lexer, and this
+  -- command prints no checker warnings: say so, or a misspelt @export is a
+  -- function it never finds.
+  warnIgnoredAnnotations opts.batchFile
 
   -- Step 2: typecheck the source file, find the target @export function.
   (initErrs, mTc) <- runOneshot evalConfig opts.batchFile \nfp -> do
@@ -243,26 +330,50 @@ batchCmd opts = do
       filteredModule = rewriteModuleAssumes unbindRead (filterIdeDirectives (restoreMixfixPatterns tcRes.mixfixRegistry tcRes.module'))
       filteredSource = prettyLayout filteredModule
       schema         = exportFn.exportParams
+      -- Every input the export reads is a field of the wrapper's InputArgs
+      -- record, so a default the row may take is that field's TYPICALLY, and
+      -- the JSON decoder fills it (W3; T1b). That is one fill site for rule
+      -- GIVENs, section GIVENs and record fields alike, it survives the
+      -- re-print (the wrapper is source text), and the decoder reports each
+      -- default it filled when the evaluation forces it.
+      defaults       = Map.fromList
+        [ (p.paramName, d) | p <- schema, Just d <- [honouredDefault p] ]
 
   -- Step 3: process each row into an envelope, honoring stop-on-error, and
   -- write the results in the requested format.
-  let process = processRow opts evalConfig filteredSource exportFn givenParams assumeParams schema
+      declares       = concatMap (moduleDeclares . (.module')) (tcRes : allDependencies tcRes)
+      -- every record an input may hold, this module's and its imports', for
+      -- --validate-only's check of an unknown key (review M1)
+      shapes         = recordShapes declares
+      -- what each input declares, for reading a case against it (the synonyms
+      -- are this module's and its imports', as the records are)
+      synonyms       = typeSynonyms declares
+      declared       = declaredInputs synonyms schema
+
+  let process = processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes synonyms declared
   withOutputHandle opts.batchOutput \h ->
     case opts.batchOutputFormat of
       -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
       -- each envelope, let it become garbage, and never build the row list.
       FmtNdjson -> do
-        anyFail <- streamRows opts.batchContinueOnErr inputs process
+        outcome <- streamRows opts.batchContinueOnErr inputs process
           (\env -> BSL8.hPutStrLn h (Aeson.encode env) >> hFlush h)
-        finish anyFail
+        finish outcome
       -- The buffered formats must see every row before they can render, so
       -- here (and only here) we retain the whole list of envelopes.
       _ -> do
-        (envs, anyFail) <- bufferRows opts.batchContinueOnErr inputs process
+        (envs, outcome) <- bufferRows opts.batchContinueOnErr inputs process
         writeBuffered h opts.batchOutputFormat envs
-        finish anyFail
+        finish outcome
   where
-    finish anyFail = if anyFail then exitFailure else exitSuccess
+    -- A batch exits 1 if any row failed, and also if any row was
+    -- undetermined, once every row has run: an undetermined row never stops
+    -- the batch, but the batch has not answered every case
+    -- (UNKNOWN-EVALUATION-SPEC §4.7.4, U7b, build step 3).
+    finish outcome = case outcome of
+      RowFine         -> exitSuccess
+      RowUndetermined -> exitFailure
+      RowFailed       -> exitFailure
 
 -- | Open the requested output sink (a file, or stdout) and run an action
 -- against its handle.
@@ -284,20 +395,25 @@ withOutputHandle (Just path) act = withFile path WriteMode \h -> do
 -- Stops at the first failing row unless @continueOnErr@ is set.
 streamRows
   :: Bool
-  -> [Aeson.Value]
-  -> (Int -> Aeson.Value -> IO (Aeson.Value, Bool))
+  -> [row]
+  -> (Int -> row -> IO (Aeson.Value, RowOutcome))
   -> (Aeson.Value -> IO ())
-  -> IO Bool
-streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) False
+  -> IO RowOutcome
+streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) RowFine
   where
-    go [] !anyFail = pure anyFail
-    go ((idx, input) : rest) !anyFail = do
-      (env, isErr) <- process idx input
+    go [] !worst = pure worst
+    go ((idx, input) : rest) !worst = do
+      (env, outcome) <- process idx input
       emit env
-      let !anyFail' = anyFail || isErr
-      if isErr && not continueOnErr
-        then pure True                   -- stop-on-error (the default)
-        else go rest anyFail'
+      let !worst' = max worst outcome
+      if outcome == RowFailed && not continueOnErr
+        then pure RowFailed              -- stop-on-error (the default)
+        else go rest worst'
+
+-- | What a row came to, for the batch's exit code, worst last. Only a failed
+-- row trips stop-on-error; an undetermined one does not (U7b).
+data RowOutcome = RowFine | RowUndetermined | RowFailed
+  deriving stock (Eq, Ord, Show)
 
 -- | Fold over the input rows for the buffered formats (json/yaml/csv), which
 -- genuinely need every row in hand before they can render. Returns the
@@ -305,19 +421,19 @@ streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) Fal
 -- the first failing row unless @continueOnErr@ is set.
 bufferRows
   :: Bool
-  -> [Aeson.Value]
-  -> (Int -> Aeson.Value -> IO (Aeson.Value, Bool))
-  -> IO ([Aeson.Value], Bool)
-bufferRows continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] False
+  -> [row]
+  -> (Int -> row -> IO (Aeson.Value, RowOutcome))
+  -> IO ([Aeson.Value], RowOutcome)
+bufferRows continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] RowFine
   where
-    go [] acc anyFail = pure (reverse acc, anyFail)
-    go ((idx, input) : rest) acc anyFail = do
-      (env, isErr) <- process idx input
-      let acc'     = env : acc
-          anyFail' = anyFail || isErr
-      if isErr && not continueOnErr
-        then pure (reverse acc', True)   -- stop-on-error (the default)
-        else go rest acc' anyFail'
+    go [] acc worst = pure (reverse acc, worst)
+    go ((idx, input) : rest) acc worst = do
+      (env, outcome) <- process idx input
+      let acc'   = env : acc
+          worst' = max worst outcome
+      if outcome == RowFailed && not continueOnErr
+        then pure (reverse acc', RowFailed)  -- stop-on-error (the default)
+        else go rest acc' worst'
 
 -- | Process a single input row into a result envelope, returning the
 -- envelope and whether the row failed.
@@ -328,29 +444,54 @@ processRow
   -> ExportedFunction
   -> [(Text, Maybe (Type' Resolved))]        -- ^ GIVEN params (call arguments)
   -> [(Text, Maybe (Type' Resolved))]        -- ^ read ASSUMEs (bound by name)
+  -> Map.Map Text (Expr Resolved)            -- ^ the defaults a row may take, by input
   -> [ExportedParam]                         -- ^ full schema for validation
+  -> RecordShapes                            -- ^ the records an input may hold, for validation
+  -> Map.Map Unique (Type' Resolved)         -- ^ the type synonyms, for validation
+  -> DeclaredInputs                          -- ^ what each input declares, for reading a case
   -> Int
-  -> Aeson.Value
-  -> IO (Aeson.Value, Bool)
-processRow opts evalConfig filteredSource exportFn givenParams assumeParams schema idx input
+  -> BatchRow
+  -> IO (Aeson.Value, RowOutcome)
+processRow opts _ _ _ _ _ _ _ _ _ _ _ (RefusedRow input reason)
+  -- refused while reading the file: an error in either mode
+  | opts.batchValidateOnly = pure
+      ( Aeson.object
+          [ Key.fromString "input"  Aeson..= input
+          , Key.fromString "status" Aeson..= ("invalid" :: Text)
+          , Key.fromString "errors" Aeson..= [reason]
+          ]
+      , RowFailed )
+  | otherwise = pure
+      ( Aeson.object
+          [ Key.fromString "input"       Aeson..= input
+          , Key.fromString "output"      Aeson..= Aeson.Null
+          , Key.fromString "status"      Aeson..= ("error" :: Text)
+          , Key.fromString "presumed"    Aeson..= ([] :: [Text])
+          , Key.fromString "diagnostics" Aeson..= [reason]
+          ]
+      , RowFailed )
+processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes synonyms declared idx (BatchRow source cells)
   | opts.batchValidateOnly =
-      let errs = validateRow schema input
+      let errs = validateRow opts.batchPresumption synonyms schema shapes input
           ok   = null errs
           env  = Aeson.object
             [ Key.fromString "input"  Aeson..= input
             , Key.fromString "status" Aeson..= (if ok then "valid" else "invalid" :: Text)
             , Key.fromString "errors" Aeson..= errs
             ]
-      in pure (env, not ok)
+      in pure (env, if ok then RowFine else RowFailed)
   | otherwise = do
-      let wrapperCode     = generateBatchWrapper exportFn.exportName givenParams assumeParams input
+      let wrapperCode     = generateBatchWrapper exportFn.exportName givenParams assumeParams defaults input
           combinedProgram = filteredSource <> wrapperCode
           virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
       (evalErrs, mEval) <- runOneshot evalConfig virtualPath \nfp -> do
         let uri = normalizedFilePathToUri nfp
         _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) combinedProgram
         Shake.use Rules.EvaluateLazy uri
-      let (status, outputJson, diags) = case mEval of
+      let presumed = case mEval of
+            Nothing          -> []
+            Just evalResults -> rowPresumed opts.batchPresumption schema evalResults
+          (status, outputJson, diags) = case mEval of
             Nothing ->
               -- The wrapper failed to typecheck/parse (e.g. a schema mismatch).
               ("error" :: Text, Aeson.Null, Aeson.toJSON evalErrs)
@@ -359,9 +500,17 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams sche
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
               -- declared type). Those surface as `Reduction (Left …)`.
               let excMsgs = concatMap resultExceptionMsgs evalResults
+                  undMsgs = concatMap resultUndeterminedMsgs evalResults
                   refMsgs = concatMap resultRefusalMsgs evalResults
               in if not (null excMsgs)
                    then ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                   -- An UNDETERMINED row is not a failure either: the row did
+                   -- not supply something the rule needs, and the messages
+                   -- name it. It never stops the batch, but the batch exits 1
+                   -- once every row has run (UNKNOWN-EVALUATION-SPEC §4.7.4,
+                   -- U7b, build step 3).
+                   else if not (null undMsgs)
+                   then ("undetermined", Aeson.toJSON evalResults, Aeson.toJSON undMsgs)
                    -- A REFUSED row is a determinate answer, not a failure: the
                    -- model declined to answer this input and said why. It gets
                    -- its own terminal status and, crucially, does NOT stop the
@@ -373,48 +522,128 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams sche
             [ Key.fromString "input"       Aeson..= input
             , Key.fromString "output"      Aeson..= outputJson
             , Key.fromString "status"      Aeson..= status
+            , Key.fromString "presumed"    Aeson..= presumed
             , Key.fromString "diagnostics" Aeson..= diags
             ]
-      pure (env, status == "error")
+      pure (env, case status of
+        "error"        -> RowFailed
+        "undetermined" -> RowUndetermined
+        _              -> RowFine)
+  where
+    -- the case as the export's inputs declare it: what validation, the
+    -- wrapper and the echoed @input@ all see
+    input = declareInputs declared source cells
+
+-- | The inputs whose default this row's answer rests on (T6): every default
+-- the evaluation forced that belongs to the request, as the input's name or,
+-- for a field inside an input, the path to it (@config.timeout@). The wrapper
+-- decodes the row as the request record ('requestRecordName'), so the
+-- request's own events are the ones that decode raised. The filter is the
+-- service's too ('requestPresumed').
+rowPresumed :: Presumption -> [ExportedParam] -> [EvalDirectiveResult] -> [Text]
+rowPresumed presumption schema results =
+  requestPresumed (presumption == PresumeSoft) id inputs (concatMap (.presumed) results)
+  where
+    inputs = Set.fromList [ x.paramName | x <- schema ]
 
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
 resultExceptionMsgs :: EvalDirectiveResult -> [Text]
-resultExceptionMsgs (MkEvalDirectiveResult _ res _ _ _) = case res of
+resultExceptionMsgs (MkEvalDirectiveResult _ res _ _ _ _) = case res of
   Reduction (ReducedErrored exc) -> prettyEvalException exc
   Assertion (Errored exc)        -> prettyEvalException exc
   -- A refusal is deliberately NOT counted here: it is not an exception, and
-  -- counting it would both mark the row an error and stop the batch.
-  _                              -> []
+  -- counting it would both mark the row an error and stop the batch. Nor is
+  -- an undetermined result, for the same reason ('resultUndeterminedMsgs').
+  Reduction (ReducedRefused _)      -> []
+  Assertion (Refused _)             -> []
+  Reduction (ReducedUndetermined _) -> []
+  Assertion (Undetermined _)        -> []
+  Reduction (Reduced _)             -> []
+  Assertion Holds                   -> []
+  Assertion Fails                   -> []
+  Assertion (FailsBecause _)        -> []
+
+-- | What an undetermined result waits on, as the default report says it, for
+-- any directive in the row that could not be decided. An empty list means
+-- every directive in the row was decided.
+resultUndeterminedMsgs :: EvalDirectiveResult -> [Text]
+resultUndeterminedMsgs (MkEvalDirectiveResult _ res _ _ _ _) = case res of
+  Reduction (ReducedUndetermined ns) -> prettyUndetermined ns
+  Assertion (Undetermined ns)        -> prettyUndetermined ns
+  Reduction (ReducedErrored _)       -> []
+  Assertion (Errored _)              -> []
+  Reduction (ReducedRefused _)       -> []
+  Assertion (Refused _)              -> []
+  Reduction (Reduced _)              -> []
+  Assertion Holds                    -> []
+  Assertion Fails                    -> []
+  Assertion (FailsBecause _)         -> []
 
 -- | Refusal reasons for any directive in the row that REFUSED. An empty list
 -- means nothing in the row declined to answer.
 resultRefusalMsgs :: EvalDirectiveResult -> [Text]
-resultRefusalMsgs (MkEvalDirectiveResult _ res _ _ _) = case res of
+resultRefusalMsgs (MkEvalDirectiveResult _ res _ _ _ _) = case res of
   Reduction (ReducedRefused r) -> prettyRefusal r
   Assertion (Refused r)        -> prettyRefusal r
-  _                            -> []
+  Reduction (ReducedErrored _)       -> []
+  Assertion (Errored _)              -> []
+  Reduction (ReducedUndetermined _)  -> []
+  Assertion (Undetermined _)         -> []
+  Reduction (Reduced _)              -> []
+  Assertion Holds                    -> []
+  Assertion Fails                    -> []
+  Assertion (FailsBecause _)         -> []
 
 ----------------------------------------------------------------------------
 -- Row validation (for --validate-only)
 ----------------------------------------------------------------------------
 
 -- | Best-effort validation of one input row against the export schema.
--- Checks that required (non-@MAYBE@) params are present and non-null, and
--- that primitive-typed values have the right JSON kind. Lenient on
--- compound/unknown types (never rejects what it cannot judge).
-validateRow :: [ExportedParam] -> Aeson.Value -> [Text]
-validateRow schema (Aeson.Object o) = concatMap checkParam schema
+-- Checks that required params are present, that non-@MAYBE@ params are
+-- non-null, and that primitive-typed values have the right JSON kind. Lenient
+-- on compound/unknown types (never rejects what it cannot judge).
+--
+-- \"Required\" is what evaluation will demand, so that a row validates exactly
+-- when its inputs would decode (R3): with presumption soft, an input with a
+-- default or a @MAYBE@ type may be left out; with it hard, nothing may (T4,
+-- T1b). @null@ is a value, not an omission, and never takes a default (T3), so
+-- a non-@MAYBE@ input sent as @null@ is invalid in either mode.
+--
+-- Where an input left out takes its default, a key that matches no input is
+-- refused, naming it and the nearest input, as evaluation refuses it (review
+-- M1), and likewise inside a record an input holds, where a field left out
+-- takes its default.
+validateRow :: Presumption -> Map.Map Unique (Type' Resolved) -> [ExportedParam] -> RecordShapes -> Aeson.Value -> [Text]
+validateRow presumption synonyms schema shapes (Aeson.Object o) =
+  unknownAtRoot <> concatMap checkParam schema
+    <> concat [ unknownIn presumption shapes [p.paramName] ty v
+              | p <- schema, Just ty <- [p.paramType], Just v <- [KeyMap.lookup (Key.fromText p.paramName) o] ]
   where
+    names = map (.paramName) schema
+    tookDefault = presumption == PresumeSoft &&
+      or [ True | p <- schema, isJust (honouredDefault p), not (KeyMap.member (Key.fromText p.paramName) o) ]
+    unknownAtRoot =
+      [ unrecognisedMessage "field" [ (k, nearestName k names) | k <- unknown ]
+      | tookDefault
+      , let unknown = [ Key.toText k | k <- KeyMap.keys o, Key.toText k `notElem` names ]
+      , not (null unknown) ]
+    -- a synonym for @MAYBE@ is a @MAYBE@ (@DECLARE MaybeYear IS A MAYBE NUMBER@),
+    -- as evaluation reads it, though the export's own flag does not see that
+    isOptional p = maybe False (isMaybeType . expandSynonyms synonyms) p.paramType
+    required p = p.paramRequired && not (isOptional p)
+    mustSupply p = case presumption of
+      PresumeSoft -> isRequiredInput p && not (isOptional p)
+      PresumeHard -> True
     checkParam p =
       case KeyMap.lookup (Key.fromText p.paramName) o of
         Nothing ->
           [ "Missing required field: '" <> p.paramName <> "'" <> descSuffix p
-          | p.paramRequired ]
+          | mustSupply p ]
         Just Aeson.Null ->
           [ "Field '" <> p.paramName <> "' is null but required" <> descSuffix p
-          | p.paramRequired ]
-        Just v -> case primKind p.paramType of
+          | required p ]
+        Just v -> case primKind (throughMaybe synonyms <$> p.paramType) of
           Just k | not (jsonMatchesKind k v) ->
             [ "Type mismatch for field '" <> p.paramName <> "': expected "
               <> kindName k <> ", got " <> jsonKindName v <> descSuffix p ]
@@ -422,8 +651,51 @@ validateRow schema (Aeson.Object o) = concatMap checkParam schema
     descSuffix p = case p.paramDescription of
       Just d | not (Text.null d) -> " (" <> d <> ")"
       _ -> ""
-validateRow _ other =
+validateRow _ _ _ _ other =
   [ "Input record is not a JSON object: " <> jsonKindName other ]
+
+-- | Each record type's fields, with whether each has a @TYPICALLY@, keyed by
+-- the type's 'Unique'.
+type RecordShapes = Map.Map Unique [(Text, Type' Resolved, Bool)]
+
+recordShapes :: [Declare Resolved] -> RecordShapes
+recordShapes decls = Map.fromList
+  [ (getUnique tyName, [ (rawNameToText (rawName (getActual fn)), fty, isJust d) | MkTypedName _ fn fty d _ <- fields ])
+  | MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ _ fields) <- decls ]
+
+-- | A module's imports, transitively, each once.
+allDependencies :: Rules.TypeCheckResult -> [Rules.TypeCheckResult]
+allDependencies = go Set.empty . (.dependencies)
+  where
+    go _ [] = []
+    go seen (d : ds)
+      | key `Set.member` seen = go seen ds
+      | otherwise = d : go (Set.insert key seen) (d.dependencies <> ds)
+      where key = moduleKey d.module'
+    moduleKey (MkModule _ uri _) = uri
+
+-- | The unknown-key refusals inside one value of an input, at @path@: in a
+-- record object where a field left out takes its default (with presumption
+-- soft), a key that matches no field; then the same inside its fields, and
+-- inside the elements of a list. A type it cannot see into is left alone.
+unknownIn :: Presumption -> RecordShapes -> [Text] -> Type' Resolved -> Aeson.Value -> [Text]
+unknownIn presumption shapes path ty v = case (ty, v) of
+  (TyApp _ name [inner], _) | getUnique name == maybeUnique -> unknownIn presumption shapes path inner v
+  (TyApp _ name [inner], Aeson.Array xs) | getUnique name == listUnique ->
+    concat [ unknownIn presumption shapes (path <> ["[" <> Text.pack (show i) <> "]"]) inner x
+           | (i, x) <- zip [0 :: Int ..] (Vector.toList xs) ]
+  (TyApp _ name [], Aeson.Object o)
+    | Just fields <- Map.lookup (getUnique name) shapes, not (KeyMap.null o) ->
+        let fieldNames = [ f | (f, _, _) <- fields ]
+            pathTo k   = renderPresumedPath (path <> [k])
+            took       = presumption == PresumeSoft &&
+              or [ True | (f, _, True) <- fields, not (KeyMap.member (Key.fromText f) o) ]
+            unknown    = [ Key.toText k | k <- KeyMap.keys o, Key.toText k `notElem` fieldNames ]
+        in [ unrecognisedMessage "field" [ (pathTo k, pathTo <$> nearestName k fieldNames) | k <- unknown ]
+           | took, not (null unknown) ]
+           <> concat [ unknownIn presumption shapes (path <> [f]) fty x
+                     | (f, fty, _) <- fields, Just x <- [KeyMap.lookup (Key.fromText f) o] ]
+  _ -> []
 
 data PrimKind = KNum | KBool | KStr
 
@@ -471,30 +743,290 @@ jsonKindName = \case
 -- Input parsing
 ----------------------------------------------------------------------------
 
-parseBatchInput :: Text -> BSL.ByteString -> Either String [Aeson.Value]
+-- | One case read from the input, or a CSV record refused while reading it,
+-- with the cells it had (named against the header as far as they go) and why.
+data BatchRow
+  = BatchRow RowSource Aeson.Value
+  | RefusedRow Aeson.Value Text
+
+-- | Where a case came from, which decides how much its values already say.
+data RowSource
+  = FromStructured
+    -- ^ JSON or YAML, which carry their own types: a number is a number and a
+    -- string is a string
+  | FromCsv
+    -- ^ CSV, which has none: every value is the text of its cell, and it is
+    -- the input's declared type that says what the text means ('declareInputs')
+
+parseBatchInput :: Text -> BSL.ByteString -> Either String [BatchRow]
 parseBatchInput fmt bytes = case Text.toLower fmt of
   "json" -> case Aeson.eitherDecode' bytes of
     Left err -> Left err
-    Right (Aeson.Array arr) -> Right (Vector.toList arr)
-    Right single            -> Right [single]
+    Right (Aeson.Array arr) -> Right (map (BatchRow FromStructured) (Vector.toList arr))
+    Right single            -> Right [BatchRow FromStructured single]
   "yaml" -> case Yaml.decodeEither' (BSL.toStrict bytes) of
     Left err -> Left (Yaml.prettyPrintParseException err)
     Right val -> case val of
-      Aeson.Array arr -> Right (Vector.toList arr)
-      single          -> Right [single]
-  "csv" -> case Csv.decodeByName bytes of
+      Aeson.Array arr -> Right (map (BatchRow FromStructured) (Vector.toList arr))
+      single          -> Right [BatchRow FromStructured single]
+  "csv" -> case csvRows bytes of
     Left err -> Left err
-    Right (_, rows) -> Right (map rowToJson (Vector.toList rows))
+    Right rows -> Right
+      [ case r of
+          CsvRecord record         -> BatchRow FromCsv (rowToJson Aeson.String record)
+          CsvRagged record reason  -> RefusedRow (rowToJson inferCsvCell record) reason
+      | r <- rows ]
       where
-        rowToJson :: Csv.NamedRecord -> Aeson.Value
-        rowToJson record = Aeson.Object $ KeyMap.fromList $
-          map (\(k, v) -> (Key.fromText (decodeUtf8 k), inferCsvCell v)) $
-          HashMap.toList record
+        -- A BLANK cell (empty, spaces only, or a quoted @""@) is left out of the
+        -- row, exactly as if its column were not there (T3c): the input is
+        -- absent, so with presumption soft it takes its TYPICALLY default (or,
+        -- for a MAYBE input with none, NOTHING), and with presumption hard it is
+        -- missing. CSV has no spelling of null, and a blank cell is not text;
+        -- T3c adds a spelling of null only when a user needs it.
+        --
+        -- A case that will be evaluated keeps each non-blank cell as the text
+        -- written: only the export's declared input types can say whether
+        -- @123456@ is a number or a code ('declareInputs'). A refused record
+        -- is not evaluated, and is shown with the cells typed by what they
+        -- look like.
+        rowToJson :: (Text -> Aeson.Value) -> Csv.NamedRecord -> Aeson.Value
+        rowToJson cell record = Aeson.Object $ KeyMap.fromList
+          [ (Key.fromText (decodeUtf8 k), cell (decodeUtf8 v))
+          | (k, v) <- HashMap.toList record
+          , not (Text.null (Text.strip (decodeUtf8 v)))
+          ]
   other -> Left ("Unsupported format: " ++ Text.unpack other)
 
--- | Infer a JSON value for a raw CSV cell, per the spec's rules:
+-- | A case with each value typed by what the export declares for that input.
 --
---   * empty cell            -> @null@ (decodes to @NOTHING@ for MAYBE params)
+-- A NUMBER or BOOLEAN input (a @MAYBE@ one too, or one declared through a
+-- synonym) given as text is read as the number or boolean the text spells,
+-- from any format: a spreadsheet cell is text, and so is @"25"@ in a
+-- hand-written JSON or YAML file. Text that does not read as one is left
+-- alone, so that the decode error names the value it could not read.
+--
+-- Every other declared input keeps a CSV cell as the text written (a blank
+-- cell is not text: 'parseBatchInput' leaves it out). A cell is never a number
+-- or a boolean just because it looks like one: @123456@, @1.50@ and @018956@
+-- are codes to a STRING input, @True@ is a choice of @Answer@ and @20261013@
+-- is a DATE, and a decoder that wants a string or a name must be given one.
+-- JSON and YAML already say what a string is, so a number sent for a STRING
+-- input stays the error it was.
+--
+-- Only a column that no input declares, and an input whose type the export
+-- does not give, is typed by what the cell looks like ('inferCsvCell').
+declareInputs :: DeclaredInputs -> RowSource -> Aeson.Value -> Aeson.Value
+declareInputs declared source (Aeson.Object o) = Aeson.Object (KeyMap.mapWithKey declare o)
+  where
+    declare key v = case (Map.lookup (Key.toText key) declared, v) of
+      (Just DeclaredNumber,  Aeson.String s) -> fromMaybe v (jsonNumber s)
+      (Just DeclaredBoolean, Aeson.String s) -> fromMaybe v (jsonBool s)
+      (Just DeclaredText,    _)              -> v
+      (_,                    Aeson.String s) | FromCsv <- source -> inferCsvCell s
+      _                                      -> v
+declareInputs _ _ v = v
+
+-- | What the export declares an input to be, so far as reading a case goes:
+-- the inputs by name.
+type DeclaredInputs = Map.Map Text DeclaredInput
+
+data DeclaredInput
+  = DeclaredNumber   -- ^ a NUMBER
+  | DeclaredBoolean  -- ^ a BOOLEAN
+  | DeclaredText     -- ^ any other type, whose JSON is a string, a name or a structure
+  | DeclaredUnknown  -- ^ the export gives no type for it
+
+declaredInputs :: Map.Map Unique (Type' Resolved) -> [ExportedParam] -> DeclaredInputs
+declaredInputs synonyms schema = Map.fromList
+  [ (p.paramName, maybe DeclaredUnknown declared p.paramType) | p <- schema ]
+  where
+    declared ty = case primKind (Just (throughMaybe synonyms ty)) of
+      Just KNum  -> DeclaredNumber
+      Just KBool -> DeclaredBoolean
+      _          -> DeclaredText
+
+-- | A type with its synonyms expanded at the head (@DECLARE Year IS A NUMBER@
+-- makes @Year@ a @NUMBER@). A synonym cannot name itself, but the walk does
+-- not rely on that.
+expandSynonyms :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
+expandSynonyms synonyms = go Set.empty
+  where
+    go seen ty = case ty of
+      TyApp _ name []
+        | Just expansion <- Map.lookup (getUnique name) synonyms
+        , getUnique name `Set.notMember` seen -> go (Set.insert (getUnique name) seen) expansion
+      _ -> ty
+
+-- | A type as the primitive it comes to: through @MAYBE@, and through the
+-- synonyms, at any depth (@MAYBE Year@, or a synonym for @MAYBE NUMBER@).
+throughMaybe :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
+throughMaybe synonyms ty = case expandSynonyms synonyms ty of
+  TyApp _ name [inner] | getUnique name == maybeUnique -> throughMaybe synonyms inner
+  other -> other
+
+-- | Whether a type is @MAYBE α@ itself.
+isMaybeType :: Type' Resolved -> Bool
+isMaybeType (TyApp _ name [_]) = getUnique name == maybeUnique
+isMaybeType _ = False
+
+-- | The type each synonym stands for (@DECLARE Year IS A NUMBER@), by the
+-- synonym's 'Unique'.
+typeSynonyms :: [Declare Resolved] -> Map.Map Unique (Type' Resolved)
+typeSynonyms decls = Map.fromList
+  [ (getUnique name, ty)
+  | MkDeclare _ _ (MkAppForm _ name _ _) (SynonymDecl _ ty) <- decls ]
+
+-- | The number a text spells, in JSON's grammar (so @1.50@ and @1e3@ are
+-- numbers, and @007@, @1,000@ and @+5@ are not).
+jsonNumber :: Text -> Maybe Aeson.Value
+jsonNumber s = case Aeson.decodeStrict (encodeUtf8 (Text.strip s)) of
+  Just n@(Aeson.Number _) -> Just n
+  _                       -> Nothing
+
+jsonBool :: Text -> Maybe Aeson.Value
+jsonBool s = case Text.toLower (Text.strip s) of
+  "true"  -> Just (Aeson.Bool True)
+  "false" -> Just (Aeson.Bool False)
+  _       -> Nothing
+
+-- | One record of a CSV file, named against the header the way cassava names
+-- it, or refused because its cell count is not the header's.
+data CsvRow
+  = CsvRecord Csv.NamedRecord
+  | CsvRagged Csv.NamedRecord Text
+
+-- | The records of a CSV file with a header, in file order.
+--
+-- Not 'Csv.decodeByName': cassava drops every record that parses to a single
+-- empty field (@removeBlankLines@), and a blank line and a line holding only
+-- @""@ both parse to that. Under T3c the second is a row whose one cell is
+-- empty, so absent, and it must be evaluated like any other row: dropping it
+-- turned two rows in into one row out, with exit 0.
+--
+-- A blank line is not a row, and neither is an unquoted line holding only
+-- spaces or tabs; a quoted @"   "@ is a row whose cell is absent. A record
+-- with fewer or more cells than the header is refused, naming its line: a
+-- short one used to take the defaults of its missing cells, and a long one
+-- lost its extra cells, both with status success (review M4). Both ruled by
+-- Meng on 2026-10-13 (legalese/l4-ide#653): the refusal stands, and in a
+-- one-column file a line of only spaces or tabs is a blank line and not a
+-- case; to give an empty value, write @""@, which is a row whose cell is
+-- absent.
+csvRows :: BSL.ByteString -> Either String [CsvRow]
+csvRows bytes
+  | Just opened <- unclosedQuote (dropByteOrderMark bytes) =
+      Left $ "line " <> show (1 + lineEnds (BSL.toStrict (BSL.take (fromIntegral opened) (dropByteOrderMark bytes))))
+        <> " of the CSV file is not valid CSV: a quote that opens a cell there is never closed"
+  | otherwise = case AL.parse file bytes of
+  AL.Done _ parsed -> Right parsed
+  -- Attoparsec's own message is the name of the parser that gave up
+  -- (@endOfInput@, @13: not enough input@), which says neither where nor why.
+  -- What it does know is the input left at the point it stopped, and with the
+  -- input before that we can name the line.
+  AL.Fail unconsumed _ _
+    | BSL.null (dropByteOrderMark bytes) ->
+        Left "the CSV file is empty: its first line has to name the inputs"
+    | otherwise ->
+        let consumed = BSL.take (BSL.length bytes - BSL.length unconsumed) bytes
+            line     = 1 + lineEnds (BSL.toStrict consumed)
+            near     = BSL.takeWhile (\w -> w /= 10 && w /= 13) (BSL.take 30 unconsumed)
+            excerpt  = Text.unpack (decodeUtf8With lenientDecode (BSL.toStrict near))
+        in Left $ "line " <> show line <> " of the CSV file is not valid CSV"
+             <> (if null excerpt then ", where it ends" else ", near `" <> excerpt <> "`")
+  where
+    dropByteOrderMark b
+      | BSL.take 3 b == BSL.pack [0xEF, 0xBB, 0xBF] = BSL.drop 3 b
+      | otherwise = b
+    comma = 44
+    file = do
+      -- A UTF-8 byte-order mark is not part of the first column's name. Excel's
+      -- "CSV UTF-8" export writes one, and left in place it renamed the first
+      -- input, so every row took that input's default instead of its value
+      -- (review B1).
+      _ <- optional (A.string "\xEF\xBB\xBF")
+      (hdrRaw, hdr) <- A.match (CsvParser.header comma)
+      rows hdr (1 + lineEnds hdrRaw)
+    rows hdr line = do
+      done <- A.atEnd
+      if done
+        then pure []
+        else do
+          blank <- (True <$ (A.skipWhile isBlankByte *> endOfLine)) <|> pure False
+          trailing <- if blank then pure False
+                      else (True <$ (A.takeWhile1 isBlankByte *> A.endOfInput)) <|> pure False
+          if blank || trailing
+            then rows hdr (line + 1)
+            else do
+              (raw, r) <- A.match (CsvParser.record comma <* (endOfLine <|> A.endOfInput))
+              let named = HashMap.fromList (zip (Vector.toList hdr) (Vector.toList r))
+                  width = Vector.length hdr
+                  cells = Vector.length r
+                  this
+                    | cells == width = CsvRecord named
+                    | otherwise = CsvRagged named $
+                        "Line " <> Text.pack (show line) <> " has " <> Text.pack (show cells)
+                        <> " cell" <> (if cells == 1 then "" else "s") <> ", but the header has "
+                        <> Text.pack (show width) <> ", so the row is refused: a cell missing from a"
+                        <> " short row would otherwise take its default, and a long row's extra cells"
+                        <> " would be dropped"
+              (this :) <$> rows hdr (line + max 1 (lineEnds raw))
+    endOfLine = void (A.string "\r\n") <|> void (A.word8 10) <|> void (A.word8 13)
+    isBlankByte w = w == 32 || w == 9
+    -- the line ends in some consumed input, since a quoted cell may hold one:
+    -- CRLF, LF and a lone CR count one each
+    lineEnds :: BS.ByteString -> Int
+    lineEnds = go 0 . BS.unpack
+      where
+        go :: Int -> [Word8] -> Int
+        go n (13 : 10 : rest) = go (n + 1) rest
+        go n (13 : rest)      = go (n + 1) rest
+        go n (10 : rest)      = go (n + 1) rest
+        go n (_ : rest)       = go n rest
+        go n []               = n
+
+-- | The offset of a quote that opens a cell and is never closed, in a CSV file.
+--
+-- cassava reads a quoted cell as everything to the end of the input when no
+-- closing quote follows, and then drops its last byte, taking it for the
+-- closing quote. So @"abc@ at the end of a file is the text @ab@, and a quote
+-- in the middle of a file takes every row after it into one cell, both read
+-- without complaint. This reads the file's quotes itself, ahead of the parser: a
+-- quote opens a cell where a cell begins, @""@ inside one is a quote, and any
+-- other quote closes it. A quote anywhere else is the parser's to refuse.
+unclosedQuote :: BSL.ByteString -> Maybe Int
+unclosedQuote = finish . BSL.foldl' step (0, Fresh)
+  where
+    finish (_, In opened) = Just opened
+    finish _              = Nothing
+    step :: (Int, QuoteState) -> Word8 -> (Int, QuoteState)
+    step (!i, st) w = let !st' = next st in (i + 1, st')
+      where
+        isQuote = w == 34
+        isBreak = w == 44 || w == 10 || w == 13
+        -- outside a quoted cell, after a byte that did not open one
+        outside | isBreak   = Fresh
+                | otherwise = Plain
+        next = \case
+          Fresh | isQuote   -> In i
+                | otherwise -> outside
+          Plain             -> outside
+          In opened | isQuote   -> Closing opened
+                    | otherwise -> In opened
+          -- a quote seen inside a cell: the second of @""@, or the closing one
+          Closing opened | isQuote   -> In opened
+                         | otherwise -> outside
+
+-- | Where 'unclosedQuote' is in a file.
+data QuoteState
+  = Fresh            -- ^ where a cell begins
+  | Plain            -- ^ inside a cell that is not quoted, or after a quoted one
+  | In !Int          -- ^ inside the quoted cell that opened at this offset
+  | Closing !Int     -- ^ just after a quote inside that cell
+
+-- | Infer a JSON value for the text of a non-empty CSV cell (an empty one never
+-- gets here: it is left out of the row, see 'parseBatchInput'), when no
+-- declared input type says what it is ('declareInputs'):
+--
 --   * @true@/@false@ (ci)   -> boolean
 --   * a plain integer or simple decimal literal -> number
 --   * everything else       -> string  (dates included: JSON has no date
@@ -508,19 +1040,14 @@ parseBatchInput fmt bytes = case Text.toLower fmt of
 -- grammar accepts exponent notation, which would otherwise silently turn
 -- product/lot codes like @1E5@ or @3e2@ into @100000@ / @300@. Exponent-form
 -- identifiers therefore always stay STRING.
-inferCsvCell :: BS.ByteString -> Aeson.Value
-inferCsvCell raw =
-  let rawText = decodeUtf8 raw
-      s       = Text.strip rawText
-  in if Text.null s
-       then Aeson.Null
-       else case Text.toLower s of
-         "true"  -> Aeson.Bool True
-         "false" -> Aeson.Bool False
-         _ | Text.any (\c -> c == 'e' || c == 'E') s -> Aeson.String rawText
-           | otherwise -> case Aeson.decodeStrict (encodeUtf8 s) :: Maybe Aeson.Value of
-               Just n@(Aeson.Number _) -> n
-               _                       -> Aeson.String rawText
+inferCsvCell :: Text -> Aeson.Value
+inferCsvCell rawText =
+  let s = Text.strip rawText
+  in case Text.toLower s of
+       "true"  -> Aeson.Bool True
+       "false" -> Aeson.Bool False
+       _ | Text.any (\c -> c == 'e' || c == 'E') s -> Aeson.String rawText
+         | otherwise -> fromMaybe (Aeson.String rawText) (jsonNumber s)
 
 ----------------------------------------------------------------------------
 -- Output writers (buffered formats)
@@ -569,7 +1096,7 @@ encodeCsv envs =
 -- while only emitting columns that actually appear.
 orderedEnvCols :: [Text] -> [Text]
 orderedEnvCols present =
-  let canonical = ["output", "status", "errors", "diagnostics"]
+  let canonical = ["output", "status", "presumed", "errors", "diagnostics"]
       seen c    = c `elem` present
   in filter seen canonical ++ List.sort (List.nub (filter (`notElem` canonical) present))
 
@@ -581,6 +1108,9 @@ flattenEnvelope (Aeson.Object o) =
         Just (Aeson.Object inp) -> [ (Key.toText k, cellText v) | (k, v) <- KeyMap.toList inp ]
         Just other              -> [ ("value", cellText other) ]
         Nothing                 -> []
+      -- @presumed@ is a list, so its cell is the same list as compact JSON,
+      -- @[]@ when nothing was presumed: an input's name may contain a comma or
+      -- a semicolon, so no separator could be read back.
       envFields =
         [ (Key.toText k, cellText v)
         | (k, v) <- KeyMap.toList o
@@ -613,9 +1143,10 @@ generateBatchWrapper
   :: Text
   -> [(Text, Maybe (Type' Resolved))]        -- ^ GIVEN params (call arguments)
   -> [(Text, Maybe (Type' Resolved))]        -- ^ read ASSUMEs (bound by name)
+  -> Map.Map Text (Expr Resolved)            -- ^ the defaults a row may take, by input
   -> Aeson.Value
   -> Text
-generateBatchWrapper funName givenParams assumeParams inputJson
+generateBatchWrapper funName givenParams assumeParams defaults inputJson
   | null givenParams && null assumeParams =
       Text.unlines
         [ ""
@@ -628,7 +1159,7 @@ generateBatchWrapper funName givenParams assumeParams inputJson
         [ ""
         , "-- ========== GENERATED WRAPPER =========="
         , ""
-        , generateInputRecord (givenParams <> assumeParams)
+        , generateInputRecord defaults (givenParams <> assumeParams)
         , ""
         , generateDecoder
         , ""
@@ -651,20 +1182,28 @@ generateAssumeBinding (name, _) = Text.unlines
   , "    WHEN RIGHT args THEN args's " <> quoteIdent name
   ]
 
-generateInputRecord :: [(Text, Maybe (Type' Resolved))] -> Text
-generateInputRecord params = Text.unlines $
-  ["DECLARE InputArgs HAS"] ++
-  map formatField (zip [0 :: Int ..] params)
+-- | The record each row decodes into, one field per input. An input with a
+-- default carries it as the field's TYPICALLY, which is what the decoder fills
+-- an absent field from (and, with presumption hard, does not).
+--
+-- One field per line, each indented, with no separating commas. A leading
+-- @, @ at column 1 after a field whose type is an application (@MAYBE
+-- NUMBER@) does not parse ("incorrect indentation"), so a row for an export
+-- with a @MAYBE@ input before another input used to fail every time.
+generateInputRecord :: Map.Map Text (Expr Resolved) -> [(Text, Maybe (Type' Resolved))] -> Text
+generateInputRecord defaults params = Text.unlines $
+  ["DECLARE " <> requestRecordName <> " HAS"] ++
+  map formatField params
   where
-    formatField (idx, (name, mty)) =
-      let fieldIndent = if idx == 0 then "  " else ", "
-          tyText      = maybe "A NUMBER" prettyLayout mty
-      in fieldIndent <> quoteIdent name <> " IS " <> tyText
+    formatField (name, mty) =
+      let tyText      = maybe "A NUMBER" prettyLayout mty
+          typically   = maybe "" ((" TYPICALLY " <>) . prettyLayout) (Map.lookup name defaults)
+      in "  " <> quoteIdent name <> " IS " <> tyText <> typically
 
 generateDecoder :: Text
 generateDecoder = Text.unlines
   [ "GIVEN jsn IS A STRING"
-  , "GIVETH AN EITHER STRING InputArgs"
+  , "GIVETH AN EITHER STRING " <> requestRecordName
   , "decodeArgs jsn MEANS JSONDECODE jsn"
   ]
 
@@ -674,11 +1213,20 @@ generateJsonPayload json =
 
 -- | Render a JSON value as an L4 string literal.
 --
--- Delegates to the lexer's own 'showStringLit', which emits Haskell-style
--- escapes — the exact inverse of the @Lexer.charLiteral@ the parser uses to
--- read string literals back in. A hand-rolled @"@-only replacement corrupts
--- any payload containing a backslash (e.g. a Windows path @C:\\Users@) or a
--- control character, producing a wrapper that fails to lex.
+-- Delegates to the lexer's own 'showStringLit', which emits the Haskell
+-- escapes that @Lexer.charLiteral@ reads back when the parser reads a string
+-- literal. 'showStringLit' says of itself that it "isn't truly precise", so
+-- the round trip is pinned by a test and not assumed: see "hands every payload
+-- to the rule and back unchanged" in @jl4/tests-cli/Main.hs@.
+--
+-- A hand-rolled @"@-only replacement does not survive a payload that holds a
+-- backslash, a tab or a line break. The lexer reads the backslash of each JSON
+-- escape as the start of an escape of its own, so the rule decodes JSON that
+-- is not the JSON that was sent, and the row still says success: @\\u0041@ (a
+-- backslash and the text u0041) comes back as @A@, and a Windows path, a tab
+-- or a line break comes back as null. Only a payload that holds @"@, or a
+-- control character that JSON writes as @\\u0001@, which is no Haskell
+-- escape, is loud: the wrapper fails to lex.
 escapeAsL4String :: Aeson.Value -> Text
 escapeAsL4String val =
   let jsonText = Text.Lazy.toStrict $ Text.Lazy.Encoding.decodeUtf8 $ Aeson.encode val

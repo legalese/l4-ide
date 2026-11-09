@@ -1,0 +1,3 @@
+age,income,hasViolations,lot,flag,serial
+25,50000,false,1E5,true,007
+17,30000,TRUE,123456,False,2026-10-13

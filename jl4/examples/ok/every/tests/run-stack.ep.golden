@@ -306,9 +306,10 @@ GIVETH A DEONTIC Actor Action
 -- Alice signs at 4: the join is 4, THE DEADLINE 10. The landlord's delivery
 -- is due 10 + 5 = 15 (OF THE DEADLINE); Bob's signature 4 + 3 = 7 (OF THE
 -- JOIN). Neither happens; WAIT UNTIL 20 reveals both at once. The RAND is
--- anchored at the first breach — a tie at 20, so the LEFT operand — and it
--- names BOTH failures, left first, each with the deadline its anchor
--- produced: the landlord's 15, then Bob's 7.
+-- lost at the earlier failure, Bob's at 7, whichever operand it is
+-- (EVERY-EACH-QUANTIFIER-SPEC §6.1.2), and it names BOTH failures, left
+-- first, each with the deadline its anchor produced: the landlord's 15,
+-- then Bob's 7.
 GIVETH A DEONTIC Actor Action
 `both anchored` MEANS
     PARTY alice MUST Sign alice WITHIN 10

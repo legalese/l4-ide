@@ -2,7 +2,7 @@
 
 MLIR / WebAssembly compiler backend for L4.
 
-Takes a typechecked L4 program (`Module Resolved` straight out of `jl4-core`) and lowers it through MLIR's standard dialects — `func`, `arith`, `scf`, `cf`, `memref`, `llvm` — down to a `.wasm` binary that runs in Node, browsers, or any wasm runtime. Alongside the binary it emits a `.schema.json` sidecar that is wire-compatible with [`jl4-service`](../jl4-service/)'s `FunctionSchema`, so a compiled `.wasm` can slot in anywhere the HTTP service already speaks.
+Takes a typechecked L4 program (`Module Resolved` straight out of `jl4-core`) and lowers it through MLIR's standard dialects — `func`, `arith`, `scf`, `cf`, `memref`, `llvm` — down to a `.wasm` binary that runs in Node, browsers, or any wasm runtime. Alongside the binary it emits a `.schema.json` sidecar in the shape of [`jl4-service`](../jl4-service/)'s `FunctionSchema`, so a compiled `.wasm` can slot in where the HTTP service already speaks, with the differences listed under [CLI](#cli).
 
 ```
 test.l4  ──►  MLIR (textual IR)
@@ -22,7 +22,7 @@ test.l4  ──►  MLIR (textual IR)
 
 ## Why
 
-Running rules via the HTTP evaluator is convenient but slow; on the auth-proxy `test.l4` fixture each call costs ~160 ms of Haskell CPU. Compiling the same rules to wasm drops per-call cost to tens of microseconds and lets the rules execute anywhere — edge workers, in-browser agents, embedded in other services — without Haskell on the host. See [Performance](#performance).
+Running rules via the HTTP evaluator is convenient but slow; on a 12-function `test.l4` fixture each call costs ~160 ms of Haskell CPU. Compiling the same rules to wasm drops per-call cost to tens of microseconds and lets the rules execute anywhere — edge workers, in-browser agents, embedded in other services — without Haskell on the host. See [Performance](#performance).
 
 ## Build
 
@@ -54,10 +54,19 @@ jl4-mlir wasm validation/test.l4 -o /tmp/test.wasm
 jl4-mlir list /tmp/test.wasm
 echo '{"arguments":{"years of service":5,"performance rating":4}}' \
   | jl4-mlir run /tmp/test.wasm --function is-eligible
-# {"tag":"SimpleResponse","contents":{"result":{"value":true}}}
+# {"contents":{"result":{"value":true}},"report":"default","tag":"SimpleResponse"}
 ```
 
-The input and output wire format is byte-identical to [`jl4-service`](../jl4-service/)'s `POST /deployments/<id>/functions/<fn>/evaluation` endpoint, so the same client code works against either backend.
+The request and response shapes are those of [`jl4-service`](../jl4-service/)'s `POST /deployments/<id>/functions/<fn>/evaluation` endpoint, so a client that sends every input with a value of its type gets the same answer from either backend.
+A required input left out or sent as null, a record input missing a required field, or a list input with a null element is refused, naming the first such input.
+The HTTP wrapper (`scripts/wasm-server.mjs`) answers `422` with `jl4-service`'s own body, `{"contents":{"contents":"Parameter 'y': missing required parameter","tag":"InterpreterError"},"report":"default","tag":"Error"}`; for a field or element sent as null, `jl4-service`'s message is its JSON decoder's instead (`Expected JSON boolean but got: Null`).
+`jl4-mlir run` exits 1: with `Request validation failed: Missing required parameters: p` for an input left out, and with the runtime's `MissingInputError` for one sent as null or missing inside a record or list.
+Beyond that they differ, at least in these ways (read from the source; this is not an exhaustive audit):
+
+- a successful response carries no `presumed` list, which the service's always does;
+- a `BOOLEAN` sent as `{}`, or as any other value JavaScript counts as true, such as `"no"`, reads `TRUE` (`marshalArg`), where the service takes `{}` as not known;
+- an enum value the schema does not list becomes the enum's first member, where the service refuses it;
+- a `TYPICALLY` default is not used, and `presumption` is not read: the WASM schema lists a defaulted input as required, where the service's lets a caller leave it out.
 
 ## Architecture
 
@@ -97,13 +106,14 @@ This is a working compiler, not a finished one. Out of 431 `.l4` files in this r
 Known gaps:
 
 - String operations are real, not stubs: `__l4_str_concat`, `__l4_str_len`, `__l4_to_string`, plus `TOUPPER`/`TOLOWER`/`TRIM`/`CONTAINS`/`SUBSTRING`/`REPLACE`/`INDEXOF` are implemented in `runtime/jl4-runtime.mjs` and wired through `Lower.hs`. The remaining string limitations are narrower: lengths and indices are JS UTF-16 code units (not Unicode code points), and there is no `SPLIT`.
-- DEONTIC functions are evaluated, but not as compiled wasm: the wasm body of a regulative/deontic function is an inert `0.0` placeholder ([Lower.hs:1831-1840](src/L4/MLIR/Lower.hs)), and the actual deontic interpreter (`runDeonticInternal`, M6) runs in the JS runtime, walking the schema-baked `deonticContract` tree against the request's `events` stream.
-- State graphs and reasoning traces both exist. State graphs (M3) are baked at compile time via jl4-core's `stateGraphToDot` into the `.schema.json`; reasoning traces (M5) are produced by the JS runtime when the request asks for `?trace=full`, returning a `ResponseWithReason` envelope (otherwise the envelope is `SimpleResponse`).
+- A function that returns `DEONTIC` is not compiled to wasm. Its wasm body is a placeholder that returns `0.0` ([Lower.hs](src/L4/MLIR/Lower.hs)); the JS runtime evaluates the function instead, walking the contract stored in the `.schema.json` against the request's `events`.
+- No GraphViz rendering of a trace. jl4-service answers an evaluation with `?trace=full&graphviz=true` with one, tagged `GraphVizResponse`; the WASM server ignores `graphviz`. A request with `?trace=full` gets the trace itself, tagged `TraceResponse`, with `result` and `reasoning`.
+- The WASM server answers only the evaluation route, and reads the trace level only from the `?trace=` query, not from the `X-L4-Trace` header that jl4-service also accepts. It has no state-graphs route: each state graph's GraphViz source is in the `.schema.json`, written when the program is compiled.
 - Only the Node.js wasm runtime is wired end-to-end for marshaling. `--wasmtime` / `--wasmer` flags exist but are not yet connected to the schema-driven marshaler.
 
 ## Performance
 
-Benchmark on the [auth-proxy](https://github.com/legalese/jl4-auth-proxy) `validation/test.l4` fixture — 12 exported functions, 100 calls each = 1,200 calls total. Both backends serve HTTP on loopback, accept the same `{arguments: ...}` body, and return the same `SimpleResponse` envelope.
+Benchmark on the same `test.l4` fixture (kept outside this repo) — 12 exported functions, 100 calls each = 1,200 calls total. Both backends serve HTTP on loopback, accept the same `{arguments: ...}` body, and returned the same `SimpleResponse` envelope as of the README's first commit (2026-04-12), before the service added `presumed` to its responses (2026-10-02).
 
 | Backend                                       |  Wall time | Per-call avg | Server RSS |
 | --------------------------------------------- | ---------: | -----------: | ---------: |
@@ -112,7 +122,7 @@ Benchmark on the [auth-proxy](https://github.com/legalese/jl4-auth-proxy) `valid
 
 Across non-trivial functions (anything taking a record input), the wasm path runs between 1,300× and 2,000× faster per call and uses ~40% less server memory. Tiny scalar-only functions (`is-eligible`, `calculate-bonus`) are a wash because per-request overhead dominates on both sides.
 
-Output correctness was verified on all 12 exports: 11 return JSON byte-identical to the service, 1 (`order-total`) differs by a single ULP due to floating-point accumulation order.
+Output correctness was verified on all 12 exports by then: 11 returned JSON byte-identical to the service, 1 (`order-total`) differed by a single ULP due to floating-point accumulation order.
 
 ## Scripts
 

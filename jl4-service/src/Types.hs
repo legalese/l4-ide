@@ -18,6 +18,7 @@ module Types (
   BatchResponse (..),
   InputCase (..),
   OutputCase (..),
+  CaseOutcome (..),
   OutputSummary (..),
   Outcomes (..),
   OutcomeObject (..),
@@ -31,16 +32,20 @@ module Types (
   TaskState (..),
   -- * Environment
   AppEnv (..),
+  BatchSlots (..),
+  newBatchSlots,
   AppM,
 ) where
 
-import Backend.Api (EvalBackend, FnLiteral, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
+import Backend.Api (EvalBackend, FnLiteral, LimitHit, Presumption, RunFunction, EvaluatorError, ResponseWithReason, GraphVizResponse, responseTag)
 import Backend.DecisionQueryPlan (CachedDecisionQuery)
 import L4.FunctionSchema (Parameters, Parameter)
 import Backend.Jl4 (CompiledModule, ModuleContext)
 import BundleStore (BundleStore)
 import Control.Applicative ((<|>))
+import Control.Concurrent (getNumCapabilities)
 import Control.Concurrent.Async (Async)
+import Control.Concurrent.QSem (QSem, newQSem)
 import Control.Concurrent.STM (TVar)
 import Control.Monad.Trans.Reader (ReaderT)
 import Data.Aeson as Aeson
@@ -55,6 +60,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
 import GHC.Generics (Generic)
+import Ledger.Service (LedgerService)
 import Logging (Logger)
 import Options (Options (..))
 import Servant (FromHttpApiData, Handler, ToHttpApiData)
@@ -185,11 +191,14 @@ instance FromJSON FunctionSummary where
     returnType   <- o .: "returnType"  <|> o .: "fsReturnType"
     returnSchema <- o .:? "returnSchema"
     section      <- o .:? "section"    <|> o .:? "fsSection"
-    -- isDeontic is now persisted in the metadata cache. For caches written
-    -- before this field existed, fall back to deriving it from the return
-    -- type (the same signal McpServer uses) so older deployments are still
-    -- correct without waiting for a recompile.
-    isDeontic    <- o .:? "isDeontic" .!= ("DEONTIC" `Text.isPrefixOf` returnType)
+    -- isDeontic is persisted in the metadata cache, from the function's type.
+    -- For caches written before this field existed, fall back to reading it
+    -- from the display name of the return type, so older deployments are
+    -- still right without waiting for a recompile: DEONTIC, or its deprecated
+    -- alias PROVISION OF, which is the same type. A recompile replaces the
+    -- guess with the type's own answer.
+    isDeontic    <- o .:? "isDeontic" .!=
+      (any (`Text.isPrefixOf` returnType) ["DEONTIC", "PROVISION OF"])
     sourceFile   <- o .:? "sourceFile" <|> o .:? "fsSourceFile"
     pure FunctionSummary
       { fsName         = name
@@ -228,6 +237,11 @@ data Visibility = Visibility
   { showFunctions :: !Bool
   , showFiles     :: !Bool
   , showEvaluate  :: !Bool
+  , callerParty   :: !(Maybe Text)
+  -- ^ The party the caller says it is, from the proxy-set header
+  -- @X-L4-Party@ (OPERATIONAL-LOWERING-SPEC D-O13). A claim and not an
+  -- authentication; it scopes the ledger's MCP write tools and nothing
+  -- else. 'Nothing' when the header is absent or empty.
   }
   deriving stock (Show, Eq)
 
@@ -347,18 +361,28 @@ data SimpleResponse
   | SimpleError !EvaluatorError
   deriving stock (Show, Read, Ord, Eq, Generic)
 
+-- | Every evaluation response states the report it carries
+-- (UNKNOWN-EVALUATION-SPEC §4.7.4, U7b): how a result that is not yet known
+-- is shown. Until build step 6 adds the others, it is always the default
+-- report, which shows one as the "I needed to know the value of …" error.
 instance ToJSON SimpleResponse where
   toJSON (SimpleError err) = Aeson.object
     [ "tag" .= ("Error" :: Text)
     , "contents" .= err
+    , "report" .= defaultReportName
     ]
   toJSON (SimpleResponse rwr) = Aeson.object
     [ "tag" .= tag
     , "contents" .= rwr
+    , "report" .= defaultReportName
     ]
    where
     tag :: Text
     tag = responseTag rwr
+
+-- | The name of the default report (UNKNOWN-EVALUATION-SPEC §4.7.4).
+defaultReportName :: Text
+defaultReportName = "default"
 
 instance FromJSON SimpleResponse where
   parseJSON = Aeson.withObject "SimpleResponse" $ \o -> do
@@ -376,6 +400,8 @@ type Id = Int
 data BatchRequest = BatchRequest
   { outcomes :: [Outcomes]
   , cases :: [InputCase]
+  , presumption :: Maybe Presumption
+    -- ^ T4's switch, for every case; absent means @"soft"@
   }
   deriving stock (Show, Eq, Ord)
 
@@ -410,7 +436,23 @@ data OutputCase = OutputCase
   { id :: Id
   , attributes :: Map Text FnLiteral
   , graphviz :: Maybe GraphVizResponse
+  , presumed :: [Text]
+    -- ^ the case's @presumed@ list ('Backend.Api.ResponseWithReason'), as @\@presumed@
+  , outcome :: CaseOutcome
+    -- ^ whether the case was answered; a refusal as @\@refused@, an error as
+    -- @\@error@, and an error that is a limit hit as @\@error@ and @\@limit@
   }
+  deriving stock (Show, Eq, Ord)
+
+-- | How one case of the batch endpoint ended. A refused or errored case is
+-- still returned, with its reason, rather than only counted.
+data CaseOutcome
+  = CaseAnswered
+  | CaseRefused Text
+  | CaseErrored Text
+  | CaseLimited LimitHit Text
+    -- ^ errored because a limit stopped it, which a retry with a higher
+    -- limit or on a less busy service might not repeat
   deriving stock (Show, Eq, Ord)
 
 data BatchResponse = BatchResponse
@@ -490,29 +532,51 @@ instance FromJSON BatchRequest where
     BatchRequest
       <$> o .: "outcomes"
       <*> o .: "cases"
+      <*> o .:? "presumption"
 
 instance ToJSON BatchRequest where
   toJSON br =
     Aeson.object
-      [ "outcomes" .= br.outcomes
-      , "cases" .= br.cases
-      ]
+      ( [ "outcomes" .= br.outcomes
+        , "cases" .= br.cases
+        ]
+        <> maybe [] (\p -> ["presumption" .= p]) br.presumption
+      )
 
 instance FromJSON OutputCase where
   parseJSON = Aeson.withObject "OutputCase" $ \o -> do
     caseId <- o .: "@id"
     graphvizVal <- o .:? "@graphviz"
+    presumedVal <- o .:? "@presumed" .!= []
+    refusedVal <- o .:? "@refused"
+    errorVal <- o .:? "@error"
+    limitVal <- o .:? "@limit"
     let attrs = Aeson.KeyMap.toMapText $
+          Aeson.KeyMap.delete "@limit" $
+          Aeson.KeyMap.delete "@error" $
+          Aeson.KeyMap.delete "@refused" $
+          Aeson.KeyMap.delete "@presumed" $
           Aeson.KeyMap.delete "@graphviz" $
           Aeson.KeyMap.delete "@id" (Aeson.KeyMap.map id o)
+        outcomeVal = case (refusedVal, errorVal, limitVal) of
+          (Just r, _, _)             -> CaseRefused r
+          (Nothing, Just e, Just l)  -> CaseLimited l e
+          (Nothing, Just e, Nothing) -> CaseErrored e
+          _                          -> CaseAnswered
     parsedAttrs <- traverse parseJSON attrs
-    pure $ OutputCase caseId parsedAttrs graphvizVal
+    pure $ OutputCase caseId parsedAttrs graphvizVal presumedVal outcomeVal
 
 instance ToJSON OutputCase where
   toJSON oc =
     Aeson.object $
       [ "@id" .= oc.id
+      , "@presumed" .= oc.presumed
       ] <> maybe [] (\gv -> ["@graphviz" .= gv]) oc.graphviz
+        <> case oc.outcome of
+             CaseAnswered  -> []
+             CaseRefused r -> ["@refused" .= r]
+             CaseErrored e -> ["@error" .= e]
+             CaseLimited l e -> ["@error" .= e, "@limit" .= l]
         <> [(Aeson.Key.fromText k, Aeson.toJSON v) | (k, v) <- Map.toList oc.attributes]
 
 instance FromJSON OutputSummary where
@@ -553,6 +617,7 @@ instance ToJSON BatchResponse where
     Aeson.object
       [ "cases" .= br.cases
       , "summary" .= br.summary
+      , "report" .= defaultReportName
       ]
 
 -- ----------------------------------------------------------------------------
@@ -615,7 +680,35 @@ data AppEnv = MkAppEnv
   -- naturally pin to whichever instance has that deployment loaded
   -- because the auth proxy already routes deployment-scoped MCP traffic
   -- with affinity.
+  , batchSlots         :: BatchSlots
+  -- ^ How many batch cases may run at once, across every batch in flight.
+  , ledger             :: Maybe LedgerService
+  -- ^ The instance ledger (OPERATIONAL-LOWERING-SPEC §9 WPO3), written
+  -- only by its own routes ("Ledger") and read besides only by its own MCP
+  -- tool ("Ledger.Mcp"). 'Nothing' when the service runs without one, as
+  -- most tests do: the decision routes and the decision tools never read
+  -- it.
   }
+
+-- | The batch slots: one per capability ('newBatchSlots'), shared by every
+-- batch case of every request. A case holds a slot while it runs, and its
+-- clock starts once it has one. Shared by the whole process, not made per
+-- request: with one set per request, four batches of two cases on two cores
+-- ran eight cases at once, and every case ran past a limit it met alone
+-- (2026-10-02). Single evaluations and MCP calls do not take a slot, so they
+-- never queue behind a batch.
+data BatchSlots = BatchSlots
+  { shared :: QSem
+  , count  :: Int
+    -- ^ how many units 'shared' was made with. A QSem's count cannot be read
+    -- back, and the batch handler needs it to size each request's own bound.
+  }
+
+newBatchSlots :: IO BatchSlots
+newBatchSlots = do
+  n <- getNumCapabilities
+  sem <- newQSem n
+  pure BatchSlots { shared = sem, count = n }
 
 -- | The handler monad for all Servant routes.
 type AppM = ReaderT AppEnv Handler

@@ -1,0 +1,40 @@
+-- Operands of arithmetic that are not themselves arithmetic, as `l4 nlg` reads
+-- them: a call, a rule's own sentence, an IF. Each #EVAL's comment is its value.
+-- No two lines may read the same, and each must read with the grouping it has.
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`f2` a b MEANS a TIMES b
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+@nlg %a% doubled
+`dbl` a MEANS a TIMES 2
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+@nlg twice %a%
+`twice` a MEANS a TIMES 2
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg %a% less %b%
+`less` a b MEANS a MINUS b
+
+#EVAL `f2` 2 5 MINUS 3                    -- 7
+#EVAL `f2` 2 (5 MINUS 3)                  -- 4
+#EVAL `dbl` 5 MINUS 2                     -- 8
+#EVAL `dbl` (5 MINUS 2)                   -- 6
+#EVAL 5 MINUS `dbl` 2                     -- 1
+#EVAL `twice` 5 MINUS 2                   -- 8
+#EVAL `twice` (5 MINUS 2)                 -- 6
+#EVAL (IF TRUE THEN 1 ELSE 10) MINUS 3    -- -2
+#EVAL IF TRUE THEN 1 ELSE (10 MINUS 3)    -- 1
+#EVAL `dbl` (5 PLUS 2)                    -- 14
+#EVAL 5 PLUS `dbl` 2                      -- 9
+#EVAL `f2` 2 5 PLUS 3                     -- 13
+#EVAL `f2` 2 (5 PLUS 3)                   -- 16
+#EVAL `less` 2 (3 MINUS 5)                -- 4
+#EVAL (`less` 2 3) MINUS 5                -- -6

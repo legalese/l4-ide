@@ -1,0 +1,13 @@
+-- DUMBWAITER (ruled 2026-09-21): a left double quotation mark (“, U+201C)
+-- pasted in from Word/Pages/Google Docs, standing in for the plain `"` that
+-- opens a string literal. This is deliberately IN CODE POSITION -- opening a
+-- string literal that was not there before -- not a curly quote already
+-- sitting inside an existing string body, which the lexer accepts today and
+-- must go on accepting (306 corpus lines carry curly quotes inside backtick
+-- names, 52 inside string literals, all intentional quoted prose).
+--
+-- See doc/reference/errors/README.md, "Curly quotes and dashes from a word
+-- processor".
+
+GIVETH A STRING
+`greeting` MEANS “hello"

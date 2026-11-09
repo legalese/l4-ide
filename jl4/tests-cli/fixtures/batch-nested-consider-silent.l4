@@ -1,0 +1,47 @@
+-- A CONSIDER inside an arm of another CONSIDER, with arms of the outer one
+-- after it, as in batch-nested-consider-types.l4, but both are on a Colour, so
+-- the outer's later arms type-check as arms of the inner one and nothing is
+-- reported. The outer CONSIDER then has no arm for Green or Blue, and the inner
+-- one has two for Green, so the printed rule answers differently from the rule.
+--
+-- `inner last` has the inner CONSIDER as the last arm, which was always printed
+-- right; it is the control.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN n IS A NUMBER
+GIVETH A Colour
+colourOf n MEANS
+  IF n EQUALS 0 THEN Red ELSE IF n EQUALS 1 THEN Green ELSE Blue
+
+@export An inner CONSIDER that is not the last arm, on the same type
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A BOOLEAN
+`inner on the same type` MEANS
+  CONSIDER colourOf a
+    WHEN Red THEN
+      CONSIDER colourOf b
+        WHEN Red THEN TRUE
+        WHEN Green THEN TRUE
+    WHEN Green THEN FALSE
+    WHEN Blue THEN TRUE
+
+@export An inner CONSIDER that is the last arm
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`inner last` MEANS
+  CONSIDER colourOf a
+    WHEN Red THEN 1
+    WHEN Green THEN 2
+    WHEN Blue THEN
+      CONSIDER colourOf b
+        WHEN Red THEN 3
+        WHEN Green THEN 4
+
+#EVAL `inner on the same type` 0 0
+#EVAL `inner on the same type` 0 2
+#EVAL `inner on the same type` 1 0
+#EVAL `inner on the same type` 2 0
+#EVAL `inner last` 2 1

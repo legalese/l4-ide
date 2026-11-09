@@ -1,0 +1,56 @@
+-- A program that names its own value JOIN or DEADLINE (the nouns are not
+-- reserved words) and writes THE in front of it. Before 2026-10-24 THE
+-- was an optional article there, and `WITH start IS THE JOIN` passed the
+-- program's own 100. Since the nouns are values (EVERY-EACH-QUANTIFIER-SPEC
+-- §2.6 card B1), THE JOIN is always the lifecycle position.
+--
+-- Under a HENCE that changes the answer with no error: the refund below
+-- falls due at 4 + 30 = 34 instead of 100 + 30 = 130. So the checker warns
+-- wherever THE is written before a noun the program also defines
+-- (LifecycleNounHidesName), and the warning says how to reach the value:
+-- drop the THE. JOIN is defined in this module, so renaming it is offered
+-- too; for an imported JOIN it is not. jl4-service refuses to deploy a
+-- module that draws this warning (B1a). At the top level the same
+-- spelling is also refused outright, because THE DEADLINE has no
+-- obligation to read there; the warning comes with the refusal, so the
+-- drafter learns why the spelling changed meaning. The `DEADLINE` without THE is the program's value and
+-- draws nothing.
+
+IMPORT prelude
+
+DECLARE Actor IS ONE OF
+    Tenant   HAS name IS A STRING
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Refund  HAS who IS AN Actor
+
+alice MEANS Tenant OF "Alice"
+
+JOIN MEANS 100
+DEADLINE MEANS 5
+
+GIVEN start IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`refund within 30 of` MEANS
+    PARTY alice MUST Refund alice WITHIN 30 OF start
+
+-- warned, and the run uses the join (4), not the program's JOIN (100)
+GIVETH A DEONTIC Actor Action
+`passes THE JOIN` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE `refund within 30 of` WITH start IS THE JOIN
+
+-- not warned: JOIN without THE is the program's value
+GIVETH A DEONTIC Actor Action
+`passes JOIN` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE `refund within 30 of` WITH start IS JOIN
+
+GIVEN start IS A NUMBER
+GIVETH A NUMBER
+f MEANS start PLUS 1
+
+-- refused (no obligation at the top level) and warned
+#EVAL f WITH start IS THE DEADLINE
+-- the program's value: 6
+#EVAL f WITH start IS DEADLINE

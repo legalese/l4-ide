@@ -104,6 +104,16 @@ const SUBJECTS: { decision: string; slug: string; why: string }[] = [
     why: "Oakhurst reading 2: packing-for-shipment, and distribution — two leaves",
   },
   {
+    decision: "exempt, as the drivers read it",
+    slug: "grouping-oakhurst-drivers",
+    why: "Oakhurst by grouping: distribution is where packing is for — one activity",
+  },
+  {
+    decision: "exempt, as the dairy read it",
+    slug: "grouping-oakhurst-dairy",
+    why: "Oakhurst by grouping: the same tokens, distribution its own activity",
+  },
+  {
     decision: "in force — notice binds renewals only",
     slug: "grouping-rogers-renewals",
     why: "Rogers reading 1: the termination right reaches the successive terms only",

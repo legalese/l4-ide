@@ -1,0 +1,49 @@
+-- BOOLEAN rules written as DECIDE clauses whose rows share an earlier column
+-- and differ in a later one, beside the CONSIDERs a drafter would write. The
+-- desugarer tests the earlier column again in every later clause; `l4 verify`
+-- reads each test with what the branches around it already decided, so it
+-- finds nothing in either form, where it used to report dead branches and
+-- vacuous guards in limbs no drafter wrote.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `colour rule` Red   TRUE  IS TRUE
+DECIDE `colour rule` Red   FALSE IS FALSE
+DECIDE `colour rule` Green b     IS b
+DECIDE `colour rule` Blue  b     IS NOT b
+
+GIVEN c IS A Colour
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `colour rule by hand` c b IS
+  CONSIDER c
+    WHEN Red THEN
+      CONSIDER b
+        WHEN TRUE THEN TRUE
+        WHEN FALSE THEN FALSE
+    WHEN Green THEN b
+    WHEN Blue THEN NOT b
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `either rule` TRUE TRUE IS TRUE
+DECIDE `either rule` TRUE q    IS q
+DECIDE `either rule` p    TRUE IS p
+DECIDE `either rule` p    q    IS FALSE
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `either rule by hand` p q IS
+  CONSIDER p
+    WHEN TRUE THEN
+      CONSIDER q
+        WHEN TRUE THEN TRUE
+        OTHERWISE q
+    OTHERWISE
+      CONSIDER q
+        WHEN TRUE THEN p
+        OTHERWISE FALSE

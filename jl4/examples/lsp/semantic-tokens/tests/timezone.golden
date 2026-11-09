@@ -1,0 +1,33 @@
+Phase: Lexer
+1:1-72 SemanticTokenTypes_Comment
+2:1-72 SemanticTokenTypes_Comment
+3:1-9 SemanticTokenTypes_Variable
+3:10-12 SemanticTokenTypes_Keyword
+3:13-22 SemanticTokenTypes_String
+5:1-7 SemanticTokenTypes_Keyword
+5:8-20 SemanticTokenTypes_Variable
+5:21-23 SemanticTokenTypes_Keyword
+5:24-26 SemanticTokenTypes_Number
+
+Phase: Parse
+1:1-72 SemanticTokenTypes_Comment
+2:1-72 SemanticTokenTypes_Comment
+3:1-9 SemanticTokenTypes_Variable
+3:10-12 SemanticTokenTypes_Keyword
+3:13-22 SemanticTokenTypes_String
+5:1-7 SemanticTokenTypes_Keyword
+5:8-20 SemanticTokenTypes_Variable
+5:21-23 SemanticTokenTypes_Keyword
+5:24-26 SemanticTokenTypes_Number
+
+Phase: Check
+1:1-72 SemanticTokenTypes_Comment
+2:1-72 SemanticTokenTypes_Comment
+3:1-9 SemanticTokenTypes_Variable
+3:10-12 SemanticTokenTypes_Keyword
+3:13-22 SemanticTokenTypes_String
+5:1-7 SemanticTokenTypes_Keyword
+5:8-20 SemanticTokenTypes_Variable
+5:21-23 SemanticTokenTypes_Keyword
+5:24-26 SemanticTokenTypes_Number
+

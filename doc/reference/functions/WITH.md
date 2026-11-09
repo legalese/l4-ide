@@ -144,6 +144,6 @@ Every call on this page, in one file you can run:
 - [The section `GIVEN`](../syntax/section-given.md) — declaring an input once
   for a whole section
 - [`GIVEN`](GIVEN.md) — a signature for one definition
-- [`LET`](LET.md) and [`WHERE`](WHERE.md) — local definitions, which do not
+- [`LET`](LET.md) and [`WHERE`](LET.md#where) — local definitions, which do not
   reach into the rules a definition calls
 - [`TYPICALLY`](../types/TYPICALLY.md) — a default for an input nobody supplies

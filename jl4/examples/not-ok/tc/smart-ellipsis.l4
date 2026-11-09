@@ -1,0 +1,13 @@
+-- DUMBWAITER (ruled 2026-09-21): a horizontal ellipsis (…, U+2026) standing
+-- in for the three-character `...` token (asyndetic AND). Word's AutoCorrect
+-- turns a typed `...` into the single ellipsis glyph, which the lexer does
+-- not recognise as any token at all.
+--
+-- See doc/reference/errors/README.md, "Curly quotes and dashes from a word
+-- processor".
+
+DECLARE Person
+  HAS age IS A NUMBER
+
+GIVEN p IS A Person
+DECIDE `is adult` IF p's age >= 18 … TRUE

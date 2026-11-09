@@ -1,21 +1,21 @@
-`count nodes` with `sample`
-`depth` with `sample`
-`render outline` with `body scheme` and `sample`
-`render outline` with `default scheme` and `amended`
-`render outline` with `default scheme` and `amended bumping`
-`render outline` with `default scheme` and `renumbered`
-`render outline` with `body scheme` and `definitions`
-`depth` with `item` with solo is equal to 1
-`count nodes` with `sample` is equal to 6
-`depth` with `sample` is equal to 3
-`marker for` with `UpperAlpha` and 3 is equal to C
-`marker for` with `LowerAlpha` and 1 is equal to a
-`marker for` with `LowerRoman` and 4 is equal to iv
-`marker for` with `Decimal` and 2 is equal to 2
-`roman` with 2024 is equal to MMXXIV
-`roman` with 49 is equal to XLIX
-`render outline` with `body scheme` and `sample` is equal to list of Tenant's covenants, a	pay the Rent when due, b	keep the interior in good repair, b.i	fair wear and tear excepted, b.ii	damage by insured risks excepted and c	not assign or sublet without the Landlord's consent
-`render outline` with `default scheme` and `amended` is equal to list of Clauses, 1	Payment, 2b	Late payment and 2	Delivery
-`render outline` with `default scheme` and `amended bumping` is equal to list of Clauses, 1	Payment, 2b	Late payment and 3	Delivery
-`render outline` with `default scheme` and `renumbered` is equal to list of Recitals, 1	Recital one, 2	Recital two, 7	Recital seven and 8	Recital eight
-`render outline` with `body scheme` and `definitions` is equal to list of Definitions, a	Affiliate, b	Business Day, c	Confidential Information, d	Effective Date, e	Intellectual Property and f	Territory
+the number of nodes in the example outline of a Tenant's covenants
+the number of levels in the example outline of a Tenant's covenants
+the numbered lines of the example outline of a Tenant's covenants under the numbering of paragraphs inside a clause (a, i, A)
+the numbered lines of the example outline with an entry 2b outside the count under the usual numbering of legal paragraphs (1, A, i, a)
+the numbered lines of the example outline with an entry 2b in place of the next number under the usual numbering of legal paragraphs (1, A, i, a)
+the numbered lines of the example outline of recitals 1, 2, 7 and 8 under the usual numbering of legal paragraphs (1, A, i, a)
+the numbered lines of the example outline of six defined terms under the numbering of paragraphs inside a clause (a, i, A)
+the number of levels in the numbered outline entry solo is equal to 1
+the number of nodes in the example outline of a Tenant's covenants is equal to 6
+the number of levels in the example outline of a Tenant's covenants is equal to 3
+the marker for position 3 in the style `UpperAlpha` is equal to C
+the marker for position 1 in the style `LowerAlpha` is equal to a
+the marker for position 4 in the style `LowerRoman` is equal to iv
+the marker for position 2 in the style `Decimal` is equal to 2
+2024 in capital Roman numerals is equal to MMXXIV
+49 in capital Roman numerals is equal to XLIX
+the numbered lines of the example outline of a Tenant's covenants under the numbering of paragraphs inside a clause (a, i, A) is equal to list of Tenant's covenants, a	pay the Rent when due, b	keep the interior in good repair, b.i	fair wear and tear excepted, b.ii	damage by insured risks excepted and c	not assign or sublet without the Landlord's consent
+the numbered lines of the example outline with an entry 2b outside the count under the usual numbering of legal paragraphs (1, A, i, a) is equal to list of Clauses, 1	Payment, 2b	Late payment and 2	Delivery
+the numbered lines of the example outline with an entry 2b in place of the next number under the usual numbering of legal paragraphs (1, A, i, a) is equal to list of Clauses, 1	Payment, 2b	Late payment and 3	Delivery
+the numbered lines of the example outline of recitals 1, 2, 7 and 8 under the usual numbering of legal paragraphs (1, A, i, a) is equal to list of Recitals, 1	Recital one, 2	Recital two, 7	Recital seven and 8	Recital eight
+the numbered lines of the example outline of six defined terms under the numbering of paragraphs inside a clause (a, i, A) is equal to list of Definitions, a	Affiliate, b	Business Day, c	Confidential Information, d	Effective Date, e	Intellectual Property and f	Territory

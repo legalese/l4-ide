@@ -38,6 +38,10 @@ import {
   AiConversationDelete,
   AiConversationList,
   AiConversationLoad,
+  AiDictationCancel,
+  AiDictationStart,
+  AiDictationStatus,
+  AiDictationStop,
   AiMentionSearch,
   AiToolRenderMeta,
   AiUsageSubscribe,
@@ -50,6 +54,12 @@ import {
   type FunctionParameter,
 } from 'jl4-client-rpc'
 import { AI_API_URL, authHeaders } from '$lib/auth/session.svelte'
+import {
+  BrowserRecorder,
+  DICTATION_MAX_SECONDS,
+  DictationError,
+  canRecord,
+} from './dictation'
 import {
   deleteIndexEntry,
   deriveTitle,
@@ -211,6 +221,7 @@ export class AiBridge {
   // conversation share a single round-trip per distinct rule. We store the
   // in-flight promise so concurrent rows for the same rule de-dupe too.
   private renderMeta = new Map<string, Promise<unknown>>()
+  private recorder = new BrowserRecorder()
 
   constructor(private cfg: BridgeConfig) {}
 
@@ -237,6 +248,9 @@ export class AiBridge {
         break
       case AiUsageUnsubscribe:
         this.stopUsage()
+        break
+      case AiDictationCancel:
+        this.recorder.cancel()
         break
       default:
         // AiChatInject / AiChatAnswerUser / AiChatApproveTool / AiFileOpen /
@@ -265,6 +279,12 @@ export class AiBridge {
         return {}
       case AiChatPickAttachment:
         return pickAttachmentFile()
+      case AiDictationStatus:
+        return { available: canRecord(), maxSeconds: DICTATION_MAX_SECONDS }
+      case AiDictationStart:
+        return this.startDictation()
+      case AiDictationStop:
+        return this.stopDictation()
       case AiMentionSearch:
         // No @-mentions in the standalone web chat.
         return { items: [] }
@@ -447,8 +467,54 @@ export class AiBridge {
 
   dispose(): void {
     this.stopUsage()
+    this.recorder.cancel()
     for (const ac of this.aborts.values()) ac.abort()
     this.aborts.clear()
+  }
+
+  // ── Dictation ────────────────────────────────────────────────────────
+  //
+  // The extension host records natively for its webview; here the page
+  // itself can open the microphone. Same contract either way: Start,
+  // then Stop returns the transcript from the proxy's speech-to-text
+  // endpoint (`legalese-listen-4`), metered against this deployment.
+
+  private async startDictation(): Promise<{ error?: string }> {
+    try {
+      await this.recorder.start()
+      return {}
+    } catch (err) {
+      return { error: dictationErrorMessage(err) }
+    }
+  }
+
+  private async stopDictation(): Promise<{ text?: string; error?: string }> {
+    try {
+      const wavBase64 = await this.recorder.stop()
+      const res = await fetch(
+        `${this.cfg.apiBaseUrl}/v1/audio/transcriptions`,
+        {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'legalese-listen-4',
+            input_audio: { data: wavBase64, format: 'wav' },
+          }),
+        }
+      )
+      if (!res.ok) {
+        if (res.status === 429) return { error: 'Daily limit reached.' }
+        if (res.status === 413) return { error: 'Keep it short.' }
+        if (res.status === 401 || res.status === 403) {
+          return { error: 'Sign in to use dictation.' }
+        }
+        return { error: TRANSCRIPTION_FAILED }
+      }
+      const body = (await res.json()) as { text?: unknown }
+      return { text: typeof body.text === 'string' ? body.text : '' }
+    } catch (err) {
+      return { error: dictationErrorMessage(err) }
+    }
   }
 
   // ── Turn execution ───────────────────────────────────────────────────
@@ -761,6 +827,17 @@ export class AiBridge {
       // transient — keep last known usage
     }
   }
+}
+
+const TRANSCRIPTION_FAILED = 'Couldn’t transcribe that.'
+
+/** The short line shown above the mic. Recorder errors are already
+ *  phrased for the user; the rest stay just as plain. */
+function dictationErrorMessage(err: unknown): string {
+  if (err instanceof DictationError) return err.message
+  // fetch rejects with a TypeError only when no response came back.
+  if (err instanceof TypeError) return 'Couldn’t reach the AI proxy.'
+  return TRANSCRIPTION_FAILED
 }
 
 // ── SSE parsing ──────────────────────────────────────────────────────────

@@ -1,0 +1,13 @@
+-- l4 batch re-prints the module it runs, and a decimal default reaches the
+-- evaluator exactly: 0.10000000000000000001 does not survive a round trip
+-- through a Double (review m1).
+
+§ `R`
+    GIVEN r IS A NUMBER TYPICALLY 0.10000000000000000001
+
+@export Is exact
+GIVEN u IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `is exact` IF r EQUALS 0.10000000000000000001
+
+#EVAL `is exact` TRUE

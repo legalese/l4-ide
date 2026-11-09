@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 module L4.EvaluateLazy
 ( EvalConfig(..)
+, AllocationLimit(..)
 , resolveEvalConfig
 , resolveEvalConfigWithSafeMode
 , parseFixedNow
@@ -14,10 +15,18 @@ module L4.EvaluateLazy
 , setTemporalContext
 , withEvalClauses
 , execEvalModuleWithEnv
+, execEvalModuleWithEnvAndImports
 , execEvalModuleWithDeonticLog
 , captureDeonticSteps
 , execEvalModuleWithJSON
 , execEvalExprInContextOfModule
+, execEvalExprInContextOfModuleWith
+, RootFills
+, Presumed (..)
+, PresumedOrigin (..)
+, renderPresumedPath
+, requestPresumed
+, moduleDeclares
 , prettyEvalException
 , prettyRefusal
 , Refusal(..)
@@ -26,6 +35,8 @@ module L4.EvaluateLazy
 , prettyNotes
 , prettyAssertionOutcome
 , prettyReductionOutcome
+, prettyUndetermined
+, undeterminedJson
 , postprocessTrace
 , safePostprocessTrace
 , tracePostprocessFailed
@@ -44,9 +55,11 @@ module L4.EvaluateLazy
 where
 
 import Base
-import L4.Discharge (dischargeModule)
+import L4.Discharge (dischargeModuleWith, sectionBinders, Binder (..))
 import qualified Base.DList as DList
 import qualified Base.Map as Map
+import qualified Base.Set as Set
+import qualified Data.IntMap.Strict as IntMap
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.DeonticStep (DeonticLog (..), DeonticStep, newDeonticLog)
@@ -70,7 +83,10 @@ import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext, noReads)
 import L4.TracePolicy (TracePolicy)
 
-import Control.Exception (throwIO, try, evaluate, ErrorCall)
+import Control.Exception (throwIO, try, evaluate, finally, catch, ErrorCall)
+import GHC.IO.Exception (AllocationLimitExceeded (..))
+import Data.Int (Int64)
+import GHC.Conc (setAllocationCounter, enableAllocationLimit, disableAllocationLimit)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
@@ -89,6 +105,39 @@ data EvalConfig = EvalConfig
     -- 'Just t' means use a fixed time (for tests / JL4_FIXED_NOW).
   , tracePolicy :: !TracePolicy
   , safeMode :: !Bool  -- ^ When True, HTTP operations (FETCH/POST) return errors instead of making requests
+  , requestRecord :: !(Maybe Text)
+    -- ^ The record type a wrapper decodes the request's arguments into, when
+    -- the evaluation has a request (@l4 batch@, the service's wrapper path):
+    -- 'L4.Presumption.requestRecordName'. 'Nothing' for @#EVAL@ and @l4 run@,
+    -- where every decode is the rules' own. See 'presumeDefaults'.
+  , presumeDefaults :: !Bool
+    -- ^ T4's presumption switch (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §5), on by
+    -- default. Off (\"hard\"): a @TYPICALLY@ default is not used where a
+    -- value could be supplied, so a section @GIVEN@ that nothing supplies is
+    -- an assumed term and an absent JSON field is a missing one. On
+    -- (\"soft\"): defaults apply. @null@ never takes a default either way.
+    --
+    -- The switch withdraws a default only where a request can supply its
+    -- value (T4b): a section @GIVEN@ at the root, and a field of the request's
+    -- own decode ('requestRecord'). A decode the rules make of their own
+    -- always fills its defaults.
+  , allocationLimit :: !(Maybe AllocationLimit)
+    -- ^ A cap on what one evaluation may allocate, counted on the thread that
+    -- runs it. 'Nothing' (the default) sets none. A caller that evaluates
+    -- through a build system (jl4-service's wrapper path, which runs the
+    -- module as a Shake rule) must say so here, because GHC's allocation
+    -- counter belongs to a thread and the rule runs on another one than the
+    -- caller's: a limit set on the caller never sees it.
+  }
+
+-- | A cap, in bytes, on what an evaluation may allocate.
+-- Exceeding it raises 'AllocationLimitExceeded' out of the evaluation, and
+-- sets 'exceeded' first: a build system catches the exception on its own
+-- thread and reports it as a diagnostic, so the caller reads the flag to
+-- learn that it was this limit.
+data AllocationLimit = MkAllocationLimit
+  { bytes :: !Int64
+  , exceeded :: !(IORef Bool)
   }
 
 resolveEvalConfig :: Maybe UTCTime -> TracePolicy -> IO EvalConfig
@@ -96,7 +145,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -152,9 +201,11 @@ withFreshLedger m = do
   fresh      <- liftIO (newIORef emptyStore)
   freshParty <- liftIO (newIORef Nothing)
   freshNotes <- liftIO (newIORef mempty)
+  freshPresumed <- liftIO (newIORef emptyPresumedLog)
   -- the run's notes ('tellNote') are per directive for the same reason the
-  -- ledger is: a note belongs to the directive whose value it qualifies
-  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes }) m
+  -- ledger is: a note belongs to the directive whose value it qualifies; so
+  -- does a default it forced ('EvalState.presumed')
+  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes, presumed = freshPresumed }) m
 
 -- | Apply runtime EVAL clauses for the duration of an action,
 -- restoring the previous temporal context afterwards.
@@ -202,12 +253,22 @@ captureDeonticSteps m = do
 
 runConfig :: Config -> Eval WHNF
 runConfig = \ case
+  DoneMachine whnf ->
+    pure whnf
+  config -> do
+    -- UNKNOWN-EVALUATION-SPEC §4.5: every step counts once the counter has
+    -- started, and none before
+    tickUnknownSteps
+    runConfigStep config
+
+runConfigStep :: Config -> Eval WHNF
+runConfigStep = \ case
   ForwardMachine env expr -> do
     traceEval (Enter expr)
     next <- forwardExpr env expr
     runConfig next
-  MatchBranchesMachine scrutinee env branches -> do
-    next <- matchBranches scrutinee env branches
+  MatchBranchesMachine clauses scrutinee env branches -> do
+    next <- matchBranches clauses scrutinee env branches
     runConfig next
   MatchPatternMachine r env pat -> do
     next <- matchPattern r env pat
@@ -240,6 +301,9 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- 'unwindFrame' — but a successful directive legitimately leaves its own
   -- reads in the root accumulator; spans are directive-local, so clear it.)
   _ <- swapCtxReads noReads
+  -- UNKNOWN-EVALUATION-SPEC §4.5 (C4): the step counter starts afresh, and
+  -- stopped, for every directive.
+  resetUnknownSteps
   -- Snapshot the ambient temporal context and restore it unconditionally
   -- after the directive. 'unwindFrame' already restores saved contexts
   -- frame by frame during exceptional unwinding; this directive boundary is
@@ -273,7 +337,17 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- likewise the notes the run raised while producing this value (R-X6's
   -- early act, the empty window): read before the fresh ref is discarded
   directiveNotes <- map (\ (MkNote t) -> t) . toList <$> readEvalRef (.notes)
+  -- and the defaults it forced (W8's event), for the same reason
+  directivePresumed <- presumedEvents <$> readEvalRef (.presumed)
+  reached <- reachedUnknowns
   let
+    -- What a directive that could not be decided waits on
+    -- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3): a 'Stuck' names it,
+    -- and running out of steps names every input that reached a §4.3 site.
+    stuckOnExc = \ case
+      UserEvalException (Stuck ns)    -> Just ns
+      UserEvalException RanOutOfSteps -> nonEmpty reached
+      _                               -> Nothing
     v' = case assertKind of
       NotAnAssert -> Reduction
         case v of
@@ -281,7 +355,17 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- answer, and every surface must be able to say so without calling
           -- the program broken.
           Left (RefusalException ref) -> ReducedRefused ref
+          -- Not an error either: a result not yet known, the undetermined
+          -- outcome of the default report.
+          Left exc | Just ns <- stuckOnExc exc -> ReducedUndetermined ns
           Left exc                    -> ReducedErrored exc
+          -- A result that is a bare assumed term is no value (row 52), and
+          -- neither is one that holds any term but a bare input (decided by
+          -- Claude overnight 2026-10-02, pending Meng's review; §8 step 3):
+          -- each was Stuck before the lift, and is undetermined, naming what
+          -- it waits on. One whose only terms are bare inputs below its root
+          -- prints as the value it is, @LIST n, 6@ (C4, row 60).
+          Right nfv | Just ns <- resultUnknowns nfv -> ReducedUndetermined ns
           Right nfv                   -> Reduced nfv
       AssertHolds -> Assertion
         case v of
@@ -295,15 +379,18 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- failed: the evaluator could not decide it. Collapsing the
           -- exception into 'False' made '#ASSERT P' and '#ASSERT NOT P'
           -- both report "assertion failed" whenever P raised, so a test
-          -- suite could not tell a wrong answer from an error.
+          -- suite could not tell a wrong answer from an error. One that
+          -- could not be decided for want of an input is undetermined.
+          Left exc | Just ns <- stuckOnExc exc -> Undetermined ns
           Left exc                    -> Errored exc
           Right (MkNF (ValBool True)) -> Holds
-          -- A result that is a bare assumed term did not raise, but it is
-          -- no verdict either — neither TRUE nor FALSE. Report it exactly as
-          -- the raising polarity does ('#ASSERT NOT b' forces b and raises
-          -- 'Stuck'), so both polarities of an '#ASSERT' on an assumed
-          -- BOOLEAN agree instead of one of them collapsing to "failed".
-          Right (MkNF (ValAssumed a)) -> Errored (UserEvalException (Stuck a))
+          -- A result that is an unknown did not raise, but it is no verdict
+          -- either — neither TRUE nor FALSE: a bare assumed term, or a
+          -- residual such as @x AND y@ (§4.12 rows 23, 24). Report it as the
+          -- raising polarity does ('#ASSERT NOT b' forces b and is Stuck), so
+          -- both polarities of an '#ASSERT' agree instead of one of them
+          -- collapsing to "failed".
+          Right nfv | Just ns <- resultUnknowns nfv -> Undetermined ns
           Right _                     -> Fails
       AssertRefuses mwanted -> Assertion
         case v of
@@ -315,15 +402,44 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
             | otherwise -> Holds
           -- An error is not a refusal. Conflating them would destroy exactly
           -- the distinction '#ASSERT REFUSED' exists to test.
+          Left exc | Just ns <- stuckOnExc exc -> Undetermined ns
           Left exc -> Errored exc
+          -- A value, an unknown or a residual: none of them refuses, since
+          -- an input never refuses and, before build step 5, no residual
+          -- holds a refusal (row 72; decided by Claude overnight 2026-10-02,
+          -- pending Meng's review).
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
-  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes, steps)
+  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed, steps)
   where
     captureSteps :: Eval a -> Eval (a, [DeonticStep])
     captureSteps
       | withSteps = captureDeonticSteps
       | otherwise = fmap (, [])
+
+-- | What a directive's result waits on, if it is not a value
+-- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3): a result that is itself an
+-- unknown input, or that holds any term but a bare input anywhere inside it.
+-- Then every unknown in it is named, bare inputs included, in the order they
+-- occur. A result whose only unknowns are bare inputs below its root, such as
+-- @LIST n, 6@, is a value (C4, row 60).
+resultUnknowns :: NF -> Maybe (NonEmpty Term)
+resultUnknowns = \ case
+  MkNF (ValAssumed r ty) -> Just (TInput r ty :| [])
+  nfv
+    | holdsTerm nfv -> nonEmpty (nubTerms (unknownsIn nfv))
+    | otherwise     -> Nothing
+  where
+    holdsTerm = \ case
+      MkNF (ValTerm _) -> True
+      MkNF v           -> any holdsTerm (toList v)
+      Omitted          -> False
+    unknownsIn = \ case
+      MkNF (ValTerm t)       -> termNames t
+      MkNF (ValAssumed r ty) -> [TInput r ty]
+      MkNF v                 -> concatMap unknownsIn (toList v)
+      Omitted                -> []
+    nubTerms = foldr (\ x acc -> x : filter (/= x) acc) []
 
 -- | 'postprocessTrace', guarded so it can never escape an exception: if trace
 -- post-processing throws (e.g. a malformed action sequence produced by an
@@ -379,6 +495,12 @@ data EvalDirectiveResult =
       -- nullity the run must not swallow), an explicitly anchored window a
       -- run found empty. In the order raised. Empty for almost every
       -- directive, and rendered as nothing then, so no older output moves.
+    , presumed :: ![Presumed]
+      -- ^ The @TYPICALLY@ defaults the run actually forced while producing
+      -- the value, in the order forced: W8's \"took its default\" event
+      -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8, §5 T6). Not rendered by the
+      -- printers here; @l4 batch@ and @jl4-service@ turn it into their
+      -- @presumed@ list.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -411,6 +533,9 @@ data AssertionOutcome
     -- ^ The expression REFUSED: the model declined to answer.
   | Errored !EvalException
     -- ^ The expression raised before it could be decided.
+  | Undetermined !(NonEmpty Term)
+    -- ^ The expression could not be decided for want of these inputs
+    -- (UNKNOWN-EVALUATION-SPEC §4.7.4); rendered as a 'Stuck' always was.
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -421,6 +546,11 @@ data ReductionOutcome
   = Reduced !NF
   | ReducedRefused !Refusal
   | ReducedErrored !EvalException
+  | ReducedUndetermined !(NonEmpty Term)
+    -- ^ The result is not known: it waits on these inputs, each once, in the
+    -- order evaluation reached them (UNKNOWN-EVALUATION-SPEC §4.7.4, the
+    -- default report). Rendered exactly as a 'Stuck' always was, since that
+    -- is what the default report shows; not an error.
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -440,12 +570,22 @@ prettyAssertionOutcome (Refused r)      =
   Text.unlines ("assertion refused:" : prettyRefusal r)
 prettyAssertionOutcome (Errored exc)    =
   Text.unlines ("assertion could not be evaluated:" : prettyEvalException exc)
+prettyAssertionOutcome (Undetermined ns) =
+  Text.unlines ("assertion could not be evaluated:" : prettyUndetermined ns)
+
+-- | What an undetermined result says: the default report, which is the
+-- 'Stuck' message it always was, naming every input it waits on
+-- (UNKNOWN-EVALUATION-SPEC §4.7.4).
+prettyUndetermined :: NonEmpty Term -> [Text]
+prettyUndetermined ns = prettyEvalException (UserEvalException (Stuck ns))
 
 -- | The outcomes of an @#EVAL@, as the user sees them.
 prettyReductionOutcome :: ReductionOutcome -> Text
 prettyReductionOutcome (Reduced v)          = prettyLayout v
 prettyReductionOutcome (ReducedRefused r)   = Text.unlines (prettyRefusal r)
 prettyReductionOutcome (ReducedErrored exc) = Text.unlines (prettyEvalException exc)
+prettyReductionOutcome (ReducedUndetermined ns) =
+  Text.unlines (prettyUndetermined ns)
 
 -- | STATE-AS-LEDGER M2/M4: render the per-party store a directive produced, as
 -- labelled sections. Returns the empty 'Text' when the directive wrote nothing,
@@ -518,7 +658,7 @@ renderProvenance prov =
 -- the trace if present, and the ledger section if the directive wrote anything.
 --
 prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
-prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns) =
+prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
    prettyEvalDirectiveValue res
    <> prettyNotes ns
    <> prettyLedger led
@@ -529,7 +669,7 @@ prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns) =
 -- | Like 'prettyEvalDirectiveResult' but uses named-field syntax (WITH / IS)
 -- for constructors whose field names are provided.
 prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Text
-prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns) =
+prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns _presumed) =
    prettyEvalDirectiveValueWithFields fields res
    <> prettyNotes ns
    <> prettyLedger led
@@ -547,7 +687,7 @@ prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
 -- ----------------------------------------------------------------------------
 
 instance Aeson.ToJSON EvalDirectiveResult where
-  toJSON (MkEvalDirectiveResult _range res _trace _ledger ns) = Aeson.object $
+  toJSON (MkEvalDirectiveResult _range res _trace _ledger ns _presumed) = Aeson.object $
     [ "result" Aeson..= res
     , "trace"  Aeson..= Aeson.Null
     ]
@@ -583,6 +723,14 @@ instance Aeson.ToJSON EvalDirectiveValue where
     , "value" Aeson..= Aeson.Null
     , "error" Aeson..= prettyAssertionOutcome a
     ]
+  -- Still an assertion, as in @l4 run --json@, with a null value and what it
+  -- waits on under "undetermined": not an "error", which it is not
+  -- ('undeterminedJson').
+  toJSON v@(Assertion (Undetermined _)) = Aeson.object
+    [ "type"         Aeson..= ("assertion" :: Text)
+    , "value"        Aeson..= Aeson.Null
+    , "undetermined" Aeson..= undeterminedJson v
+    ]
   toJSON (Reduction (Reduced val)) = Aeson.toJSON val
   toJSON (Reduction (ReducedRefused r)) = Aeson.object
     [ "refused" Aeson..= Aeson.object [ "reason" Aeson..= r.message ]
@@ -590,11 +738,32 @@ instance Aeson.ToJSON EvalDirectiveValue where
   toJSON (Reduction (ReducedErrored exc)) = Aeson.object
     [ "error" Aeson..= Text.unlines (prettyEvalException exc)
     ]
+  -- Under its own key, as a refusal is: neither a value nor an error.
+  toJSON v@(Reduction (ReducedUndetermined _)) = Aeson.object
+    [ "undetermined" Aeson..= undeterminedJson v
+    ]
+
+-- | What an undetermined result waits on, as every JSON surface reports it
+-- (UNKNOWN-EVALUATION-SPEC §4.7.4): @{"needs": [...], "message": "..."}@,
+-- the inputs each once, in the order evaluation reached them, and the
+-- default report's text. 'Nothing' for any other result. @l4 run --json@,
+-- the JSON above and the API's result objects all carry this one object.
+undeterminedJson :: EvalDirectiveValue -> Maybe Aeson.Value
+undeterminedJson = \ case
+  Assertion a@(Undetermined ns)        -> Just (needsAnd ns (prettyAssertionOutcome a))
+  Reduction o@(ReducedUndetermined ns) -> Just (needsAnd ns (prettyReductionOutcome o))
+  _                                    -> Nothing
+  where
+    needsAnd ns message = Aeson.object
+      [ "needs"   Aeson..= map termNeedText (toList ns)
+      , "message" Aeson..= message
+      ]
 
 prettyEvalDirectiveValueWithFields :: ConstructorFieldNames -> EvalDirectiveValue -> Text
 prettyEvalDirectiveValueWithFields _fields (Assertion a)                    = prettyAssertionOutcome a
 prettyEvalDirectiveValueWithFields _fields (Reduction (ReducedErrored exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalDirectiveValueWithFields _fields (Reduction (ReducedRefused r))   = Text.unlines (prettyRefusal r)
+prettyEvalDirectiveValueWithFields _fields (Reduction o@(ReducedUndetermined _)) = prettyReductionOutcome o
 prettyEvalDirectiveValueWithFields fields  (Reduction (Reduced v))          = prettyLayoutNF fields v
 
 -- | Evaluate WHNF to NF, with a cutoff (which possibly could be made configurable).
@@ -622,6 +791,7 @@ nfAux d (ValObligation env party act opens due followup lest) = do
   pure (MkNF (ValObligation env party' act opens' due' followup lest))
 nfAux _d (ValUnaryBuiltinFun b)      = pure (MkNF (ValUnaryBuiltinFun b))
 nfAux _d (ValBinaryBuiltinFun b)     = pure (MkNF (ValBinaryBuiltinFun b))
+nfAux _d (ValConnective c)           = pure (MkNF (ValConnective c))
 nfAux _d (ValTernaryBuiltinFun b)    = pure (MkNF (ValTernaryBuiltinFun b))
 nfAux  d (ValPartialTernary b r1)    = do
   v1 <- evalAndNF d r1
@@ -634,7 +804,8 @@ nfAux _d (ValUnappliedConstructor n) = pure (MkNF (ValUnappliedConstructor n))
 nfAux  d (ValConstructor n rs)       = do
   vs <- traverse (evalAndNF d) rs
   pure (MkNF (ValConstructor n vs))
-nfAux _d (ValAssumed n)              = pure (MkNF (ValAssumed n))
+nfAux _d (ValAssumed n ty)           = pure (MkNF (ValAssumed n ty))
+nfAux _d (ValTerm t)                 = pure (MkNF (ValTerm t))
 nfAux _d (ValEnvironment env)        = pure (MkNF (ValEnvironment env))
 nfAux d (ValBreached r')             = do
   -- Every reference inside the breach — the revealing event's party and
@@ -683,15 +854,39 @@ execEvalModuleWithDeonticLog :: EvalConfig -> EntityInfo -> Environment -> Modul
 execEvalModuleWithDeonticLog = execEvalModuleWith (nfDirectiveWith True)
 
 execEvalModuleWith :: (EvalDirective -> Eval r) -> EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [r])
-execEvalModuleWith runDirective evalConfig entityInfo env m0@(MkModule _ moduleUri _) = do
+execEvalModuleWith = execEvalModuleWithDefaults noRootFills []
+
+-- | 'execEvalModuleWithEnv', also told the @DECLARE@s of the modules @m@
+-- imports, so that the JSON decoder fills an absent field of a record
+-- declared in one of them from its @DECLARE@ (T1b), as it does for a record
+-- declared in @m@ itself. @l4 batch@ and the service's wrapper path decode
+-- their inputs this way.
+execEvalModuleWithEnvAndImports :: EvalConfig -> EntityInfo -> Environment -> [Declare Resolved] -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
+execEvalModuleWithEnvAndImports evalConfig entityInfo env imported =
+  execEvalModuleWithDefaults noRootFills imported nfDirective evalConfig entityInfo env
+
+-- | Definitions a caller filled with a @TYPICALLY@ default at the root, keyed
+-- by the 'Unique' of the 0-ary definition holding the default. Forcing one
+-- reports it ('L4.EvaluateLazy.Machine.Presumed').
+type RootFills = Map Unique Presumed
+
+noRootFills :: RootFills
+noRootFills = Map.empty
+
+execEvalModuleWithDefaults :: RootFills -> [Declare Resolved] -> (EvalDirective -> Eval r) -> EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [r])
+execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo env m0@(MkModule _ moduleUri _) = do
   -- Discharge is a property of EVALUATION, not of the checked module: the
   -- checker's job is to say the program is well formed, and this pass says what
   -- an implicit input means when it is run. Doing it here rather than in
   -- 'L4.TypeCheck' keeps the module the LSP hovers over, the printers re-emit
   -- and the backends lower exactly the module the author wrote.
-  let m = dischargeModule m0
+  --
+  -- With presumption off (T4), discharge fills no section binder's default, so
+  -- one that nothing supplies stays an assumed term.
+  let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  r <- try (runEval st0 (evalModuleAndDirectivesWith runDirective env m))
+  let st = withDefaultsKnown evalConfig rootFills m0 imported st0
+  r <- try (withAllocationLimit evalConfig.allocationLimit (runEval st (evalModuleAndDirectivesWith runDirective env m)))
   case r of
     Left exc -> do
       hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -700,6 +895,15 @@ execEvalModuleWith runDirective evalConfig entityInfo env m0@(MkModule _ moduleU
       -- force any evaluation here, and we catch exceptions for eval directives
       pure (emptyEnvironment, [])
     Right result -> pure result
+
+-- | Run an action under an allocation cap on the current thread, and switch
+-- the cap off again however the action ends.
+withAllocationLimit :: Maybe AllocationLimit -> IO a -> IO a
+withAllocationLimit Nothing act = act
+withAllocationLimit (Just limit) act =
+  (setAllocationCounter limit.bytes >> enableAllocationLimit >> act)
+    `catch` (\AllocationLimitExceeded -> writeIORef limit.exceeded True >> throwIO AllocationLimitExceeded)
+    `finally` disableAllocationLimit
 
 mkInitialEvalState :: EvalConfig -> EntityInfo -> NormalizedUri -> IO EvalState
 mkInitialEvalState evalConfig entityInfo moduleUri = do
@@ -716,7 +920,95 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   notes        <- newIORef mempty
   -- P2b: off by default (R5); 'captureDeonticSteps' installs one per directive
   let deonticLog = Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents, notes, deonticLog}
+  -- UNKNOWN-EVALUATION-SPEC §4.5: stopped until a directive's first term
+  unknownSteps   <- newIORef (-1)
+  unknownReached <- newIORef []
+  presumable <- newIORef IntMap.empty
+  presumed   <- newIORef emptyPresumedLog
+  pure MkEvalState
+    { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
+    , evalTime = actualTime, temporalContext, ctxReads
+    , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
+    , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog
+    , presume = evalConfig.presumeDefaults
+    , requestRecord = evalConfig.requestRecord
+      -- filled by 'withDefaultsKnown' for a module run
+    , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, presumed
+    }
+
+-- | Tell a run where defaults come from: the section binders of the evaluated
+-- module whose default discharge fills (when presumption is on), the caller's
+-- own root fills, and the field defaults of every record the module and the
+-- given @DECLARE@s (its imports') declare.
+withDefaultsKnown :: EvalConfig -> RootFills -> Module Resolved -> [Declare Resolved] -> EvalState -> EvalState
+withDefaultsKnown evalConfig rootFills m imported st =
+  st { presumableDefs = binderDefaults <> rootFills
+     , recordDefaults = recordFieldDefaults (moduleDeclares m <> imported)
+     }
+ where
+  binderDefaults
+    | evalConfig.presumeDefaults =
+      Map.fromList
+        [ ( u
+          , MkPresumed
+              { path       = [rawNameToText (rawName (getActual b.resolved))]
+              , declaredAt = rangeOf d
+              , origin     = FromSectionBinder
+              }
+          )
+        | (u, b) <- Map.toList (sectionBinders m)
+        , Just d <- [b.typically]
+        ]
+    | otherwise = Map.empty
+
+-- | Every @DECLARE@ in a module, in any section.
+moduleDeclares :: Module Resolved -> [Declare Resolved]
+moduleDeclares (MkModule _ _ sect) = goSection sect
+ where
+  goSection (MkSection _ _ _ _ decls) = decls >>= goDecl
+  goDecl = \ case
+    Declare _ d -> [d]
+    Section _ s -> goSection s
+    _ -> []
+
+-- | The field defaults of every record among some @DECLARE@s, keyed by the
+-- record type's 'Unique', then by field name. Only fields with a @TYPICALLY@
+-- appear.
+recordFieldDefaults :: [Declare Resolved] -> Map Unique (Map Text (Expr Resolved))
+recordFieldDefaults decls = Map.fromList
+  [ (getUnique tyName, ds)
+  | MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ _ fields) <- decls
+  , let ds = Map.fromList
+               [ (rawNameToText (rawName (getActual fn)), d)
+               | MkTypedName _ fn _ (Just d) _ <- fields ]
+  , not (Map.null ds)
+  ]
+
+-- | The @presumed@ list of a request's answer (T6), from the events its
+-- evaluation forced: each as the input's name, or the path to a field below
+-- it. Shared by @l4 batch@ and the service.
+--
+-- Only events that belong to the request count (T6b): a section binder's or a
+-- root fill's for an input the function takes, and one from the request's own
+-- decode. A decode the RULES made is not the request's, and is listed only
+-- when presumption is hard (@presume@ False): there it is a default the switch
+-- could not withdraw, because no request can supply it, and the answer rests
+-- on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
+-- naming the type the rules decoded.
+--
+-- @fieldName@ maps a wrapper's own field name back to the input's (the service
+-- suffixes them, 'Backend.CodeGen.inputFieldName').
+requestPresumed :: Bool -> (Text -> Text) -> Set Text -> [Presumed] -> [Text]
+requestPresumed presume fieldName inputs events =
+  nubOrd (mapMaybe entry events)
+ where
+  entry p = case (p.origin, p.path) of
+    (FromDecode root, path)
+      | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
+      | otherwise   -> Nothing
+    (_, n : rest)
+      | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
+    _ -> Nothing
 
 -- | Build a minimal 'EvalState' and run an 'Eval' action against it, catching
 -- evaluation exceptions at the boundary.
@@ -848,9 +1140,10 @@ execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = 
   -- the ROOT of the evaluation, so discharge and a JSON supply compose — a
   -- definition reads its binder through its own parameter, and the value that
   -- parameter is handed at the root is the one the request supplied.
-  let m = dischargeModule m0
+  let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  r <- try (runEval st0 (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
+  let st = withDefaultsKnown evalConfig noRootFills m0 [] st0
+  r <- try (runEval st (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
   case r of
     Left exc -> do
       hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -867,7 +1160,15 @@ Also, it's not clear how much caching can actually be done,
 given that we won't be re-using the result from this.
  -}
 execEvalExprInContextOfModule :: EvalConfig -> EntityInfo -> Expr Resolved -> (Environment, Module Resolved) -> IO (Maybe EvalDirectiveResult)
-execEvalExprInContextOfModule evalConfig entityInfo expr (env, m) = do
+execEvalExprInContextOfModule evalConfig entityInfo =
+  execEvalExprInContextOfModuleWith evalConfig entityInfo noRootFills []
+
+-- | 'execEvalExprInContextOfModule' with the caller's root fills (definitions
+-- it added to the module, each holding a default it filled for an input the
+-- request left out) and the modules whose record field defaults the JSON
+-- decoder should know beside the module's own.
+execEvalExprInContextOfModuleWith :: EvalConfig -> EntityInfo -> RootFills -> [Declare Resolved] -> Expr Resolved -> (Environment, Module Resolved) -> IO (Maybe EvalDirectiveResult)
+execEvalExprInContextOfModuleWith evalConfig entityInfo rootFills imported expr (env, m) = do
   let
     evalExprDirective =
       Directive emptyAnno $ LazyEval emptyAnno expr
@@ -875,7 +1176,7 @@ execEvalExprInContextOfModule evalConfig entityInfo expr (env, m) = do
     -- because making the import requires a Resolved.
     -- Filter directives recursively (including in nested sections)
     moduleWithoutDirectives = filterDirectivesFromModule m
-  (_, res) <- execEvalModuleWithEnv evalConfig entityInfo env (evalExprDirective `prependToModule` moduleWithoutDirectives)
+  (_, res) <- execEvalModuleWithDefaults rootFills imported nfDirective evalConfig entityInfo env (evalExprDirective `prependToModule` moduleWithoutDirectives)
   case res of
     [result] -> pure (Just result)
     _        -> pure Nothing

@@ -1,0 +1,279 @@
+{-# LANGUAGE OverloadedStrings #-}
+-- | The term key behind a ladder atomId ("L4.Viz.AtomKey", R3), on modules built
+-- by hand, so each case is exactly the situation it names and nothing has to
+-- type-check or resolve.
+--
+-- The rule the key must keep: two different propositions never share a key.
+-- The cases are the ways a key could be spelled alike by accident, found by
+-- adversarial review of the design (smucclaw/l4-ide#1013).
+module AtomKeySpec (spec) where
+
+import Data.Foldable (for_)
+import Data.Text (Text)
+import qualified Data.Text as Text
+import Optics (cosmosOf, gplate, lengthOf, toListOf)
+import Test.Hspec
+
+import Base (NormalizedUri, Uri (..), toNormalizedUri)
+import L4.Annotation (emptyAnno)
+import L4.Syntax
+import qualified L4.Transform as Transform
+import L4.Viz.AtomKey (fieldReads, inlinedSize, mkKeyEnv, termKey)
+
+uri :: Text -> NormalizedUri
+uri = toNormalizedUri . Uri
+
+here :: NormalizedUri
+here = uri "file:///project/main.l4"
+
+nm :: Text -> Name
+nm = MkName emptyAnno . NormalName
+
+u :: Int -> Unique
+u n = MkUnique 'c' n here
+
+var :: Resolved -> Expr Resolved
+var r = App emptyAnno r []
+
+ref :: Unique -> Text -> Resolved
+ref k t = Ref (nm t) k (nm t)
+
+-- | A rule of no result type, with the given parameters and body.
+rule :: Unique -> Text -> [Resolved] -> Expr Resolved -> TopDecl Resolved
+rule k t params body =
+  Decide emptyAnno $
+    MkDecide emptyAnno
+      (MkTypeSig emptyAnno (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno p Nothing Nothing | p <- params]) Nothing)
+      (MkAppForm emptyAnno (Def k (nm t)) [] Nothing)
+      body
+
+moduleOf :: [TopDecl Resolved] -> Module Resolved
+moduleOf decls = MkModule emptyAnno here (MkSection emptyAnno Nothing Nothing Nothing decls)
+
+-- | @Lam [binder] body@.
+lam :: Resolved -> Expr Resolved -> Expr Resolved
+lam b = Lam emptyAnno (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno b Nothing Nothing])
+
+spec :: Spec
+spec = describe "L4.Viz.AtomKey.termKey" $ do
+  it "two modules that share a file name are two modules (a vendored copy of a library)" $ do
+    -- One name, one number, one sort; only the module's URI tells them apart.
+    let embedded = MkUnique 'c' 4 (uri "jl4-embedded:/legal-persons.l4")
+        vendored = MkUnique 'c' 4 (uri "file:///home/someone/.local/share/jl4/libraries/legal-persons.l4")
+        a = var (ref embedded "full name")
+        b = var (ref vendored "full name")
+        env = mkKeyEnv (moduleOf [rule (u 1) "r" [] (And emptyAnno a b)])
+    termKey env a `shouldNotBe` termKey env b
+
+  it "a name cannot spell the ordinal that tells two same-named binders apart" $ do
+    -- Two parameters named p, so the second is p's ordinal, and a third named
+    -- `p#1`, which is what that ordinal would look like if it were spelled into
+    -- the name.
+    let p1 = Def (u 2) (nm "p")
+        p2 = Def (u 3) (nm "p")
+        p3 = Def (u 4) (nm "p#1")
+        env = mkKeyEnv (moduleOf [rule (u 1) "r" [p1, p2, p3] (var (ref (u 2) "p"))])
+        keys = [termKey env (var (ref k t)) | (k, t) <- [(u 2, "p"), (u 3, "p"), (u 4, "p#1")]]
+    length keys `shouldBe` 3
+    [(x, y) | (i, x) <- zip [0 :: Int ..] keys, (j, y) <- zip [0 ..] keys, i < j, x == y] `shouldBe` []
+
+  it "a free name cannot spell a bound variable's placeholder" $ do
+    -- A module-level rule literally named `bound#0`, against the first variable
+    -- bound inside the term, which becomes bound#0.
+    let freeName = ref (u 5) "bound#0"
+        v = Def (u 6) (nm "v")
+        env = mkKeyEnv (moduleOf [rule (u 5) "bound#0" [] (var freeName)])
+    termKey env (lam v (var (ref (u 6) "v"))) `shouldNotBe` termKey env (lam v (var freeName))
+
+  it "alpha-equivalent terms share a key; terms that differ do not" $ do
+    let v = Def (u 7) (nm "v")
+        w = Def (u 8) (nm "w")
+        x = ref (u 9) "x"
+        env = mkKeyEnv (moduleOf [rule (u 1) "r" [Def (u 9) (nm "x")] (var x)])
+    termKey env (lam v (var (ref (u 7) "v"))) `shouldBe` termKey env (lam w (var (ref (u 8) "w")))
+    termKey env (lam v (var (ref (u 7) "v"))) `shouldNotBe` termKey env (lam v (var x))
+
+  it "two copies of ONE lambda (as substitution makes them) key as two lambdas written alike" $ do
+    let v = Def (u 7) (nm "v")
+        copy = lam v (var (ref (u 7) "v"))
+        v1 = Def (u 8) (nm "v")
+        v2 = Def (u 9) (nm "v")
+        env = mkKeyEnv (moduleOf [])
+    termKey env (And emptyAnno copy copy)
+      `shouldBe` termKey env (And emptyAnno (lam v1 (var (ref (u 8) "v"))) (lam v2 (var (ref (u 9) "v"))))
+
+  it "an untyped parameter's inference variable does not reach the key" $ do
+    let inferred k = Lam emptyAnno
+          (MkGivenSig emptyAnno [MkOptionallyTypedName emptyAnno (Def (u 7) (nm "t")) (Just (InfVar emptyAnno (NormalName "t") k)) Nothing])
+          (var (ref (u 7) "t"))
+        env = mkKeyEnv (moduleOf [])
+    termKey env (inferred 10) `shouldBe` termKey env (inferred 13)
+
+  it "a call with all its arguments named keys as the positional call" $ do
+    let f = ref (u 1) "f"
+        x = var (ref (u 2) "x")
+        y = var (ref (u 3) "y")
+        named order = AppNamed emptyAnno f [MkNamedExpr emptyAnno (ref (u 11) "second") y, MkNamedExpr emptyAnno (ref (u 10) "first") x] (Just order)
+        env = mkKeyEnv (moduleOf [rule (u 1) "f" [Def (u 10) (nm "first"), Def (u 11) (nm "second")] x])
+    termKey env (named [1, 0]) `shouldBe` termKey env (App emptyAnno f [x, y])
+    -- a negative entry supplies a section binder, not a parameter: left alone
+    termKey env (named [1, -1]) `shouldNotBe` termKey env (App emptyAnno f [x, y])
+
+  it "a named call below the root keys as the positional call" $ do
+    let f = ref (u 1) "f"
+        x = var (ref (u 2) "x")
+        y = var (ref (u 3) "y")
+        z = var (ref (u 4) "z")
+        named order = AppNamed emptyAnno f [MkNamedExpr emptyAnno (ref (u 11) "second") y, MkNamedExpr emptyAnno (ref (u 10) "first") x] (Just order)
+        env = mkKeyEnv (moduleOf [rule (u 1) "f" [Def (u 10) (nm "first"), Def (u 11) (nm "second")] x])
+    termKey env (And emptyAnno z (named [1, 0])) `shouldBe` termKey env (And emptyAnno z (App emptyAnno f [x, y]))
+
+  it "renaming a lambda's variable in one place does not move a WHERE local named like it" $ do
+    -- rule r: `t AND (GIVEN t YIELD t) ...`, where the first t is a WHERE local
+    let local = LocalDecide emptyAnno $
+          MkDecide emptyAnno
+            (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+            (MkAppForm emptyAnno (Def (u 4) (nm "t")) [] Nothing)
+            (var (ref (u 2) "x"))
+        build lamName =
+          let body = And emptyAnno (var (ref (u 4) "t")) (lam (Def (u 7) (nm lamName)) (var (ref (u 7) lamName)))
+           in termKey (mkKeyEnv (moduleOf [rule (u 1) "r" [Def (u 2) (nm "x")] (Where emptyAnno body [local])])) (var (ref (u 4) "t"))
+    build "u" `shouldBe` build "t"
+
+  it "renumbering every unique of the module changes no key" $ do
+    let build off =
+          let p = Def (u (off + 2)) (nm "p")
+              body = And emptyAnno (var (ref (u (off + 2)) "p")) (var (ref (u (off + 1)) "other"))
+              m = moduleOf [rule (u (off + 1)) "other" [] (var (ref (u (off + 2)) "p")), rule (u (off + 3)) "r" [p] body]
+           in termKey (mkKeyEnv m) body
+    build 100 `shouldBe` build 0
+
+  describe "the size of a leaf with its locals put in" $ do
+    -- Hand-built, so each term is the shape it names.
+    let y = ref (u 2) "y"
+        env = mkKeyEnv (moduleOf [rule (u 1) "r" [Def (u 2) (nm "y")] (var y)])
+        key = termKey env
+
+        local k t params body =
+          LocalDecide emptyAnno $
+            MkDecide emptyAnno
+              (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+              (MkAppForm emptyAnno (Def k (nm t)) [Def pk (nm p) | (pk, p) <- params] Nothing)
+              body
+
+        -- LET a0 BE y IN LET a1 BE a0 AND y OR a0 IN ... a(n-1): each local names the
+        -- one before it twice, so what it means doubles with each, and the source
+        -- does not.
+        aRef i = ref (u (100 + i)) ("a" <> Text.pack (show i))
+        chainLet :: Int -> Expr Resolved
+        chainLet n = go 0
+          where
+            go i
+              | i == n = var (aRef (n - 1))
+              | otherwise = LetIn emptyAnno [local (u (100 + i)) ("a" <> Text.pack (show i)) [] (rhs i)] (go (i + 1))
+            rhs 0 = var y
+            rhs i = Or emptyAnno (And emptyAnno (var (aRef (i - 1))) (var y)) (var (aRef (i - 1)))
+        -- the same proposition as chainLet n, with every local written out
+        writtenOut :: Int -> Expr Resolved
+        writtenOut 0 = var y
+        writtenOut i = Or emptyAnno (And emptyAnno (writtenOut (i - 1)) (var y)) (writtenOut (i - 1))
+
+        -- the number of nodes Transform.inlineLocalBindings leaves
+        inlinedNodes :: Expr Resolved -> Int
+        inlinedNodes = lengthOf (cosmosOf (gplate @(Expr Resolved))) . Transform.inlineLocalBindings
+
+    it "is estimated at the size inlineLocalBindings leaves, for each shape of local" $ do
+      let f = ref (u 10) "f"
+          g = ref (u 11) "g"
+          z = ref (u 12) "z"
+          n = ref (u 13) "n"
+          anyOf' = ref (u 14) "any"
+          x = var (ref (u 3) "x")
+          call h args = App emptyAnno h args
+          fDecl body = local (u 10) "f" [(u 13, "n")] body
+          shapes =
+            [ ("a chain of 1", chainLet 1)
+            , ("a chain of 6", chainLet 6)
+            , ( "a local called twice"
+              , LetIn emptyAnno [fDecl (And emptyAnno (var n) (Not emptyAnno (var n)))] (And emptyAnno (call f [x]) (call f [var y]))
+              )
+            , ( "a local calling a local, each twice"
+              , LetIn
+                  emptyAnno
+                  [ fDecl (And emptyAnno (var n) (var y))
+                  , local (u 11) "g" [(u 13, "n")] (And emptyAnno (call f [var n]) (call f [var n]))
+                  ]
+                  (call g [x])
+              )
+            , ( "a local passed as a value stays"
+              , LetIn emptyAnno [fDecl (And emptyAnno (var n) (var y))] (call anyOf' [var f])
+              )
+            , ( "a local named only by a local that stays is dropped with it"
+              , LetIn
+                  emptyAnno
+                  [local (u 12) "z" [] (var y), fDecl (And emptyAnno (var n) (var z))]
+                  (call anyOf' [var f])
+              )
+            , ( "a local named by a local that stays, stays"
+              , LetIn
+                  emptyAnno
+                  [local (u 12) "z" [] (var y), fDecl (And emptyAnno (call f [var n]) (var z))]
+                  (call f [x])
+              )
+            , ( "a recursive local stays"
+              , LetIn emptyAnno [fDecl (And emptyAnno (call f [var n]) (var y))] (call f [x])
+              )
+            ]
+      mapM_ (\(label, term) -> (label :: String, inlinedSize term) `shouldBe` (label, inlinedNodes term)) shapes
+
+    it "keys a small local and the same text written out alike, doubling chains included" $ do
+      -- the control for everything below: at this size nothing has changed
+      mapM_ (\k -> key (chainLet k) `shouldBe` key (writtenOut (k - 1))) [1 .. 8]
+
+  -- Keying a leaf walks its term several times, and a term that a clause group
+  -- reads through to can be 13,500 nodes. The walk is 'cosmosExpr', not
+  -- 'cosmosOf', and an atomId depends on the order it visits in.
+  describe "cosmosExpr" $ do
+    it "visits the same expressions, in the same order, as cosmosOf over gplate" $ do
+      let a = var (ref (u 2) "a")
+          b = var (ref (u 3) "b")
+          withLet =
+            LetIn
+              emptyAnno
+              [ LocalDecide emptyAnno $
+                  MkDecide emptyAnno
+                    (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
+                    (MkAppForm emptyAnno (Def (u 5) (nm "c")) [] Nothing)
+                    a
+              ]
+              (And emptyAnno (var (ref (u 5) "c")) b)
+          terms =
+            [ a
+            , And emptyAnno a (Not emptyAnno b)
+            , Or emptyAnno (And emptyAnno a b) (Not emptyAnno (Or emptyAnno a b))
+            , lam (Def (u 4) (nm "p")) (And emptyAnno a (var (ref (u 4) "p")))
+            , withLet
+            ]
+      for_ terms \ e ->
+        toListOf cosmosExpr e `shouldBe` toListOf (cosmosOf (gplate @(Expr Resolved))) e
+
+  -- A pass over a term with nothing in it for the pass to rewrite returns the
+  -- term as it is, and the walk that finds that out is a node count, not a
+  -- rebuild of each node.
+  describe "a term with no WHERE, no LET and no selector call in it" $ do
+    let a = var (ref (u 2) "a")
+        b = var (ref (u 3) "b")
+        terms =
+          [ a
+          , And emptyAnno a (Not emptyAnno b)
+          , Or emptyAnno (And emptyAnno a b) (Not emptyAnno (Or emptyAnno a b))
+          , lam (Def (u 4) (nm "p")) (And emptyAnno a (var (ref (u 4) "p")))
+          ]
+
+    it "is returned as it is by inlineLocalBindings and by fieldReads" $
+      for_ terms \ e -> do
+        Transform.inlineLocalBindings e `shouldBe` e
+        fieldReads e `shouldBe` e
+
+    it "has an inlinedSize of its number of nodes" $
+      for_ terms \ e -> inlinedSize e `shouldBe` length (toListOf cosmosExpr e)

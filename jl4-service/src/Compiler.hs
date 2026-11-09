@@ -1,23 +1,21 @@
 module Compiler (
   compileBundle,
-  buildFromCborBundle,
   computeVersion,
   toDecl,
 ) where
 
 import qualified Backend.Jl4 as Jl4
-import Backend.Jl4 (ModuleContext, CompiledModule(..), getFunctionDefinition, buildCompiledFromShared, typecheckAndEvalBundle)
+import qualified L4.IgnoredAnnotation as IA
+import Backend.Jl4 (ModuleContext, buildCompiledFromShared, typecheckAndEvalBundle)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
-import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
-import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
+import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule, typicallyToJson)
+import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), CheckWarning (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
-import BundleStore (SerializedBundle (..), StoredMetadata (..))
 import Types
-import Control.Monad (forM, unless)
-import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad (forM, forM_, unless)
 import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
@@ -32,12 +30,56 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Data.Time (getCurrentTime)
-import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams)
+import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams, honouredDefault, isRequiredInput)
 import L4.Print (prettyTypeForDisplay)
-import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), getActual, rawName, rawNameToText)
+import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), Name, LifecyclePoint, getActual, lifecyclePointNoun, lifecyclePointWords, rawName, rawNameToText)
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import Logging (Logger, logInfo, logWarn)
 import qualified LSP.L4.Rules as Rules
-import System.FilePath (takeExtension)
+import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
+import System.FilePath (takeBaseName, takeExtension)
+
+-- | Say, at WARN, which files of a bundle have the name of a standard library
+-- module and a different text.
+--
+-- A bundle's own files are consulted before the stdlib, so an importer that can
+-- see such a file (one beside it, or at the bundle root) gets that file where
+-- the stdlib's module was meant. That is a right a bundle has, and sometimes
+-- uses on purpose, but nothing else in the service says it happened: the
+-- resolver reports a shadowing copy only when one is found on the filesystem
+-- tiers, and the bundle's files are not. A copy of the stdlib's own text is
+-- not a stand-in and is not reported.
+logStdlibStandIns :: Logger -> Text -> [(FilePath, Text)] -> IO ()
+logStdlibStandIns logger deployId l4Files =
+  forM_ l4Files $ \(path, content) ->
+    case EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack (takeBaseName path)) of
+      Just stdlib | stdlib /= content ->
+        logWarn logger "Bundle file stands in for a standard library module"
+          [ ("deploymentId", toJSON deployId)
+          , ("file", toJSON path)
+          , ("module", toJSON (takeBaseName path))
+          ]
+      _ -> pure ()
+
+-- | Say, at WARN, which IMPORTs of a bundle resolved to nothing: the importing
+-- file and the module name, under the deployment's ID.
+--
+-- A deployment resolves its IMPORTs against its own files and the stdlib built
+-- into the service, and nothing from the host, so a module that is in neither
+-- is not there for any caller. The deploy still goes through: the file
+-- typechecks, and only a call that reaches something the missing module should
+-- have defined fails, with a message about the identifier rather than the
+-- module. Until this was logged nothing in the service said so, on a compile or
+-- on a restart (ruled 2026-10-12, bench "Main Wave Rulings", card R5: a WARN
+-- now, a refusal only by a later ruling).
+logUnresolvedImports :: Logger -> Text -> [(FilePath, Text)] -> IO ()
+logUnresolvedImports logger deployId unresolved =
+  forM_ unresolved $ \(path, modName) ->
+    logWarn logger "Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name"
+      [ ("deploymentId", toJSON deployId)
+      , ("file", toJSON path)
+      , ("module", toJSON modName)
+      ]
 
 -- | Compile an in-memory source map into a deployment-ready function registry.
 --
@@ -46,13 +88,14 @@ import System.FilePath (takeExtension)
 -- results across the import graph. This avoids creating N independent IDE
 -- sessions that redundantly re-process overlapping imports.
 --
--- Returns a list of 'SerializedBundle's (one per compiled file that had exports)
--- so callers can persist CBOR caches for fast restart.
+-- A deploy and a restart both come through here: the service keeps no cache
+-- of a compiled deployment, so what it serves after a restart is what a deploy
+-- of the same sources would serve, and is refused for the same reasons.
 compileBundle
   :: Logger
   -> Text  -- ^ deployment ID for logging
   -> Map FilePath Text
-  -> IO (Either Text (Map Text ValidatedFunction, DeploymentMetadata, [SerializedBundle]))
+  -> IO (Either Text (Map Text ValidatedFunction, DeploymentMetadata))
 compileBundle logger deployId sources = do
   let l4Files = Map.toList $ Map.filterWithKey (\k _ -> takeExtension k == ".l4") sources
   if null l4Files
@@ -61,11 +104,14 @@ compileBundle logger deployId sources = do
       let moduleContext = sources
           allPaths = map fst l4Files
 
+      logStdlibStandIns logger deployId l4Files
+
       -- Phase 1: Typecheck ALL files in one Shake session.
       -- Pass all paths as needing eval environments — we'll discover which have
       -- exports from the typecheck results, then only the eval envs for those
       -- files will actually be used.
-      (_errs, tcMap, evalMap) <- typecheckAndEvalBundle moduleContext allPaths
+      (errs, tcMap, evalMap, unresolved, ignored) <- typecheckAndEvalBundle moduleContext allPaths
+      logUnresolvedImports logger deployId unresolved
 
       -- Phase 2: Process typecheck results per file
       results <- forM l4Files $ \(filepath, content) ->
@@ -73,16 +119,40 @@ compileBundle logger deployId sources = do
           Just (Just tcResult) ->
             processTypecheckedFile logger deployId filepath content moduleContext tcResult evalMap
           _ -> do
+            -- No result at all: the file did not parse, or did not get as far
+            -- as being checked. The reason is in what the session reported.
+            let why = [msg | (path, msg) <- errs, path == filepath]
             logWarn logger "Typecheck failed"
               [ ("deploymentId", toJSON deployId)
               , ("file", toJSON filepath)
+              , ("errors", toJSON why)
               ]
-            pure (filepath, Left "Typecheck failed")
+            pure (filepath, Left (Text.intercalate "\n" (("Typecheck failed: " <> Text.pack filepath) : why)))
 
-      let allFunctionsWithFile = [ (fp, fn) | (fp, Right (fns, _)) <- results, fn <- fns ]
+      -- An annotation line this version ignores is a warning in the editor and
+      -- in `l4 check`, and here a REFUSAL. The lexer lets one through so that a
+      -- file written for a newer L4 still opens in an older one; but a
+      -- deployment is what the service PUBLISHES, and a misspelt `@export` is a
+      -- rule that silently is not (the deploy was "applied" with no functions).
+      -- The service refused every such line as a lexer error until then, and
+      -- refuses the same ones still, now saying which annotation and what was
+      -- probably meant. Nothing already stored can hold one, for that reason, so
+      -- a restart, which comes through here too, refuses nothing it accepted.
+      -- Every one is logged as well.
+      forM_ ignored $ \(path, a) ->
+        logWarn logger "Ignored annotation"
+          [ ("deploymentId", toJSON deployId)
+          , ("file", toJSON path)
+          , ("message", toJSON (IA.renderIgnoredAnnotation a))
+          ]
+      let ignoredErrors =
+            [ Text.pack path <> ":" <> IA.renderIgnoredAnnotation a
+            | (path, a) <- ignored
+            ]
+
+      let allFunctionsWithFile = [ (fp, fn) | (fp, Right fns) <- results, fn <- fns ]
           allFunctions = map snd allFunctionsWithFile
-          allBundles = concatMap (either (const []) snd . snd) results
-          errors = [err | (_, Left err) <- results]
+          errors = [err | (_, Left err) <- results] <> ignoredErrors
 
       -- Any file that failed to compile (typecheck errors, unsupported
       -- @export inputs, …) fails the whole deploy. Previously this only
@@ -119,7 +189,7 @@ compileBundle logger deployId sources = do
               , ("functionCount", toJSON (length allFunctions))
               ]
 
-          pure $ Right (fnMap, meta, allBundles)
+          pure $ Right (fnMap, meta)
 
 -- | Process a single typechecked file: discover exports, build CompiledModules.
 -- The typecheck result and evaluator import environment come from the shared
@@ -132,9 +202,9 @@ processTypecheckedFile
   -> ModuleContext
   -> Rules.TypeCheckResult
   -> Map FilePath EvalEnv.Environment  -- ^ Import environments from shared session
-  -> IO (FilePath, Either Text ([ValidatedFunction], [SerializedBundle]))
+  -> IO (FilePath, Either Text [ValidatedFunction])
 processTypecheckedFile logger deployId filepath content moduleContext
-  tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors}
+  tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors, infos = tcInfos}
   evalMap = do
     let exports = enrichReturnTypes ei $ getExportedFunctions resolvedModule
         -- Both spellings of "this export's input is a rule, not a value", so
@@ -172,6 +242,20 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , severity e == SError
           , not (isOutOfScope kind)
           ]
+        -- THE JOIN / THE DEADLINE / THE ARMING written where the program has
+        -- its own value of that spelling. The editor and `l4 check` warn; the
+        -- service REFUSES (EVERY-EACH-QUANTIFIER-SPEC §2.6, B1a, ruled
+        -- 2026-10-24), as it refuses an ignored annotation above: until
+        -- 2026-10-24 that THE was an optional article, so such a module may
+        -- mean the program's value, and under a HENCE the change is a
+        -- different number with no error. A deployment stored before then that
+        -- holds one is refused when a restart recompiles it, which is the
+        -- point: its answers would have moved silently. A warning is in
+        -- 'infos', not 'errors', which carries only what blocks 'success'.
+        hidesNameErrs =
+          [ hidesNameRefusal filepath p mr defined imported
+          | MkCheckErrorWithContext{kind = CheckWarning (LifecycleNounHidesName p mr defined imported)} <- tcInfos
+          ]
     if not (null exportFnTypeErrs)
       then do
         logWarn logger "Deploy rejected: an @export input is a rule, not a value"
@@ -188,8 +272,16 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , ("errors", toJSON blockingErrs)
           ]
         pure (filepath, Left (Text.intercalate "\n" blockingErrs))
+      else if not (null hidesNameErrs)
+      then do
+        logWarn logger "Deploy rejected: THE before a noun hides a name"
+          [ ("deploymentId", toJSON deployId)
+          , ("file", toJSON filepath)
+          , ("errors", toJSON hidesNameErrs)
+          ]
+        pure (filepath, Left (Text.intercalate "\n" hidesNameErrs))
       else if null exports
-      then pure (filepath, Right ([], []))
+      then pure (filepath, Right [])
       else do
         let implicitParams = extractImplicitAssumeParams tcErrors
             allDeclares = collectAllDeclares tcResult
@@ -255,158 +347,12 @@ processTypecheckedFile logger deployId filepath content moduleContext
                 , fnDecisionQueryCache = Nothing
                 }
 
-        -- Build SerializedBundle from typecheck result for CBOR caching
-        let bundle = SerializedBundle
-              { sbModule = resolvedModule
-              , sbEnvironment = env
-              , sbEntityInfo = ei
-              , sbExports = exports
-              , sbDeclares = allDeclares
-              , sbFilePath = filepath
-              }
-
         logInfo logger "Found exports"
           [ ("deploymentId", toJSON deployId)
           , ("file", toJSON filepath)
           , ("exportCount", toJSON (length fns))
           ]
-        pure (filepath, Right (fns, [bundle]))
-
--- | Rebuild ValidatedFunctions from deserialized CBOR bundles.
---
--- This is the restart path: the 'ExportedFunction' list and the DECLARE map —
--- the parts that describe the deployment's API surface — are read straight
--- back out of @bundle.cbor@ rather than re-derived.
---
--- == Why the AST is NOT taken from CBOR
---
--- 'L4.Instances.Serialise' encodes every 'L4.Annotation.Anno_' as @()@ and
--- decodes it as 'L4.Annotation.emptyAnno', to keep bundles small. That throws
--- away the source tokens (which nothing here wants) /and/ the typechecker's
--- @resolvedInfo@ (which several things do): 'L4.Viz.Ladder.hasBooleanType'
--- reads the result type of a DECIDE's body off exactly that field, so a
--- CBOR-rehydrated 'Decide' looks like a non-boolean DECIDE and both
--- @\/query-plan@ and @\/ladder@ answered 400 for every deployment served by a
--- process that had restarted since the deploy — while @\/evaluation@, which
--- needs no type annotations, kept working. That is the sort of divergence a
--- restart-blind test suite cannot see, so this function no longer has one:
--- 'typecheckAndEvalBundle' below already runs @Rules.TypeCheck@ over every
--- bundle file (it has to, to build the evaluator import environments), so a
--- fully annotated AST is in hand at no extra cost and is simply used. The
--- module, environment, entity info and DECIDE are then all taken from one
--- typecheck result, exactly as on the fresh-compile path in
--- 'processTypecheckedFile' — never mixed across passes, since 'Unique's are
--- only meaningful within the resolution that minted them.
---
--- Uses a single Shake session for all typechecking and import environment
--- evaluation, sharing work across the import graph.
-buildFromCborBundle
-  :: Logger
-  -> Text  -- ^ deployment ID for logging
-  -> [SerializedBundle]
-  -> Map FilePath Text       -- ^ source files (for import resolution and eval)
-  -> StoredMetadata          -- ^ persisted metadata
-  -> IO (Either Text (Map Text ValidatedFunction, DeploymentMetadata))
-buildFromCborBundle logger deployId bundles sources storedMeta = do
-  let moduleContext = sources
-      -- Collect filepaths that need import environments (bundle files with sources)
-      bundleFiles = [bundle.sbFilePath | bundle <- bundles, Map.member bundle.sbFilePath sources]
-
-  -- Build all import environments in a single Shake session
-  (_errs, tcMap, evalMap) <- typecheckAndEvalBundle moduleContext bundleFiles
-
-  -- Process each bundle using the shared eval environments
-  allFnsWithFile <- fmap concat $ forM bundles $ \bundle -> do
-    let filepath = bundle.sbFilePath
-        -- All three together or none of them: see the note above.
-        (resolvedModule, env, ei) = case Map.lookup filepath tcMap of
-          Just (Just tcResult) ->
-            (tcResult.module', tcResult.environment, tcResult.entityInfo)
-          _ -> (bundle.sbModule, bundle.sbEnvironment, bundle.sbEntityInfo)
-        exports = bundle.sbExports
-
-    case Map.lookup filepath sources of
-      Nothing -> pure []
-      Just content -> do
-        let importEnv = Map.findWithDefault Jl4.emptyEvalEnvironment filepath evalMap
-
-        fns <- forM exports $ \export -> do
-          let fnDecl = exportToFunction bundle.sbDeclares [] export
-              apiDecl = toDecl fnDecl
-              funRawName = NormalName apiDecl.name
-
-          -- Validate that sanitized property names don't collide
-          let collisions = validateNoSanitizationCollisions fnDecl.name fnDecl.parameters
-          unless (null collisions) $ do
-            let collisionMsg = Text.intercalate "\n  " collisions
-            logWarn logger "Property name sanitization collision"
-              [ ("deploymentId", toJSON deployId)
-              , ("function", toJSON fnDecl.name)
-              , ("collisions", toJSON collisions)
-              ]
-            error $ Text.unpack $ "Compilation failed for function '" <> fnDecl.name
-              <> "': field name collision after sanitization (spaces and hyphens "
-              <> "become indistinguishable in API/MCP schemas):\n  " <> collisionMsg
-
-          -- Find the function definition in the deserialized AST
-          mDecide <- runExceptT $ getFunctionDefinition funRawName resolvedModule
-          case mDecide of
-            Left _err -> pure Nothing
-            Right decide -> do
-              let compiled = CompiledModule
-                    { compiledModule = resolvedModule
-                    , compiledEnvironment = env
-                    , compiledEntityInfo = ei
-                    , compiledDecide = decide
-                    , compiledImportEnv = importEnv
-                    -- `sbDeclares` is the bundle's cached map of every
-                    -- DECLARE across the entry module and its
-                    -- transitive imports — exactly what the direct-AST
-                    -- evaluator needs to resolve cross-file record
-                    -- types (see Backend.Jl4.buildModuleInfo).
-                    , compiledAllDeclares = Map.elems bundle.sbDeclares
-                    }
-
-              let runFn = Jl4.createRunFunctionFromCompiled filepath apiDecl compiled content moduleContext
-
-              pure $ Just ValidatedFunction
-                { fnImpl = fnDecl
-                , fnEvaluator = Map.fromList [(JL4, runFn)]
-                , fnCompiled = Just compiled
-                , fnSourceText = content
-                , fnModuleContext = moduleContext
-                , fnDecisionQueryCache = Nothing
-                }
-
-        pure [(filepath, fn) | Just fn <- fns]
-
-  let allFns = map snd allFnsWithFile
-  if null allFns
-    then pure $ Left "No functions rebuilt from CBOR bundles"
-    else do
-      let fnMap = Map.fromList [(fn.fnImpl.name, fn) | fn <- allFns]
-
-      now <- getCurrentTime
-      let summaries = [FunctionSummary { fsName = fn.fnImpl.name, fsDescription = fn.fnImpl.description, fsParameters = fn.fnImpl.parameters, fsReturnType = fn.fnImpl.returnType, fsReturnSchema = fn.fnImpl.returnSchema, fsSection = Nothing, fsIsDeontic = fn.fnImpl.isDeontic, fsSourceFile = Just (Text.pack fp) } | (fp, fn) <- allFnsWithFile]
-          version = storedMeta.smVersion
-          fileEntries = buildFileEntries deployId sources summaries
-          meta = DeploymentMetadata
-            { metaFunctions = summaries
-            , metaFiles = fileEntries
-            , metaVersion = version
-            , metaCreatedAt = now
-            , metaDescription = storedMeta.smDescription
-            -- Version strings are restored from StoredMetadata by the
-            -- caller (DeploymentLoader); default to "" here.
-            , metaServiceVersion = ""
-            , metaDeploymentVersion = ""
-            }
-
-      logInfo logger "Rebuilt functions from CBOR cache"
-        [ ("deploymentId", toJSON deployId)
-        , ("functionCount", toJSON (length allFns))
-        ]
-      pure $ Right (fnMap, meta)
+        pure (filepath, Right fns)
 
 -- | Convert an ExportedFunction to our Function type.
 exportToFunction :: Map Text (Declare Resolved) -> [(Text, Type' Resolved)] -> ExportedFunction -> Function
@@ -498,11 +444,17 @@ exportToFunction declares implicitParams export =
     }
 
 -- | Build Parameters from ExportedParam list.
+--
+-- An input with a default a request may leave out is not @required@, and the
+-- default is published as the JSON Schema @default@ keyword (W2 of
+-- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md; R8's schema surface). The
+-- schema describes presumption soft, the default; a @"presumption": "hard"@
+-- request must supply every input.
 parametersFromExport :: Map Text (Declare Resolved) -> [ExportedParam] -> Parameters
 parametersFromExport declares params =
   MkParameters
     { parameterMap = Map.fromList [(param.paramName, paramToParameter declares param) | param <- params]
-    , required = [param.paramName | param <- params, param.paramRequired]
+    , required = [param.paramName | param <- params, isRequiredInput param]
     }
 
 -- | Convert an ExportedParam to a Parameter.
@@ -515,6 +467,7 @@ paramToParameter declares param =
   in p0
     { parameterAlias = Nothing
     , parameterDescription = Text.strip $ maybe "" id param.paramDescription
+    , parameterDefault = typicallyToJson =<< honouredDefault param
     }
 
 -- | Convert a Function to a FunctionDeclaration for the Backend.
@@ -558,10 +511,15 @@ isOutOfScope OutOfScopeError{} = True
 isOutOfScope _                 = False
 
 -- | Collect all DECLARE entries from a TypeCheckResult and its transitive imports.
+--
+-- Each module is read once ('Rules.transitiveDependencies'), in the order the
+-- old recursion into @tc.dependencies@ first met it, so the left-biased union
+-- keeps the same entry for a name declared twice. That recursion read a module
+-- once per import path, exponentially many times in the depth of the imports
+-- (smucclaw\/l4-ide#1008).
 collectAllDeclares :: Rules.TypeCheckResult -> Map Text (Declare Resolved)
 collectAllDeclares tc =
-  declaresFromModule tc.module'
-    <> foldMap collectAllDeclares tc.dependencies
+  foldMap (declaresFromModule . (.module')) (tc : Rules.transitiveDependencies tc)
 
 -- | Display the return type of an exported function as a user-facing string.
 -- Delegates to 'prettyTypeForDisplay' so the rendering matches exactly what the
@@ -617,3 +575,29 @@ buildFileEntries deployId sources summaries =
          }
      | fp <- sortBy (comparing id) l4Paths
      ]
+
+-- | Why a module whose @THE JOIN@ (or @THE DEADLINE@, @THE ARMING@) hides a
+-- name of the program's own is not deployed ('LifecycleNounHidesName'): which
+-- name is hidden, and that dropping THE reaches it. Renaming is offered only
+-- when this module defines every such name; an imported one may be defined in
+-- a file the deployer does not own.
+hidesNameRefusal :: FilePath -> LifecyclePoint -> Maybe SrcRange -> [Name] -> [Name] -> Text
+hidesNameRefusal filepath p mr defined imported =
+  Text.pack filepath <> at <> ": " <> words' <> " here is the lifecycle position, and it hides "
+    <> Text.intercalate ", " names <> ", which this module " <> whose <> "."
+    <> " Write " <> noun <> " without THE to reach the program's own " <> firstName <> rename <> "."
+  where
+    at = maybe "" (\ r -> ":" <> Text.pack (show r.start.line) <> ":" <> Text.pack (show r.start.column)) mr
+    words' = lifecyclePointWords p
+    noun = lifecyclePointNoun p
+    names = [ "`" <> rawNameToText (rawName n) <> "`" | n <- defined <> imported ]
+    firstName = case names of
+      n : _ -> n
+      []    -> "`" <> noun <> "`"
+    whose = case (defined, imported) of
+      (_ : _, _ : _) -> "defines and imports"
+      ([], _)        -> "imports"
+      (_, [])        -> "defines"
+    rename
+      | null imported = ", or rename it to keep " <> words'
+      | otherwise     = ""

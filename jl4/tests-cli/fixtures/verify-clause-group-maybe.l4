@@ -1,0 +1,10 @@
+-- A BOOLEAN rule written as DECIDE clauses over a MAYBE input. The ladder
+-- breaks a column down into questions only when it matches an enum value or a
+-- literal; this one matches JUST TRUE, JUST FALSE and NOTHING, so the whole
+-- rule is one box. `l4 verify` says it did not analyse it, rather than that it
+-- found nothing.
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `flag is set` (JUST TRUE)  IS TRUE
+DECIDE `flag is set` (JUST FALSE) IS FALSE
+DECIDE `flag is set` NOTHING      IS FALSE

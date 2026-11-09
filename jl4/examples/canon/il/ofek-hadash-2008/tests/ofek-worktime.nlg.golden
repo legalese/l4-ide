@@ -1,6 +1,6 @@
 `the hours in a full-post month` is equal to 155.88
-`ROUND` with the product of the value of one hour on a monthly base of 10000 with 1 and 100 is equal to 6415
-`ROUND` with the product of the product of the value of one hour on a monthly base of 10000 with 1 and `the rate for a substitution hour` and 100 is equal to 8019
+`ROUND` with the product of (the value of one hour on a monthly base of 10000 with 1) and 100 is equal to 6415
+`ROUND` with the product of (the product of (the value of one hour on a monthly base of 10000 with 1) and `the rate for a substitution hour`) and 100 is equal to 8019
 the value of one hour on a monthly base of 5000 with 50% is equal to the value of one hour on a monthly base of 10000 with 1
 the pay for one extra hour where `it replaced a presence hour made up on another day` with 100 is equal to 225
 the pay for one extra hour where `it replaced a presence hour that was not made up` with 100 is equal to 125
@@ -31,7 +31,7 @@ not `the section 33 hour caps are respected` with 9, 42 and `FALSE`
 not `the section 33 hour caps are respected` with 8, 43 and `FALSE`
 `the section 33 hour caps are respected` with 5, 40 and `TRUE`
 not `the section 33 hour caps are respected` with 6, 40 and `TRUE`
-the sum of the sum of `the assembly hours allowed in a half year` and `the parent and child meeting hours allowed in a half year` and `the after-hours event hours allowed in a half year` is equal to `the school activity hours allowed in a half year`
+the sum of (the sum of `the assembly hours allowed in a half year` and `the parent and child meeting hours allowed in a half year`) and `the after-hours event hours allowed in a half year` is equal to `the school activity hours allowed in a half year`
 `the school activity caps are respected` with 4, 8 and 6
 not `the school activity caps are respected` with 5, 8 and 6
 not `the school activity caps are respected` with 4, 9 and 6

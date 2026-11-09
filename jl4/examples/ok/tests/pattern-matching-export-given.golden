@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-export-given.l4:25:1-19:
+  5
+pattern-matching-export-given.l4:26:1-33:
+  5
+pattern-matching-export-given.l4:27:1-13:
+  42

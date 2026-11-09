@@ -8,7 +8,7 @@
 > because the tree had no release document: a grep for one matched only `release-l4-skill.yml` and
 > four corpus image files.
 >
-> Nothing here changes a workflow, a branch or a tag. What it changes is `CLAUDE.md:19`, which said
+> Nothing here changes a workflow, a branch or a tag. What it changes is `CLAUDE.md` §1 (line 19 as of `1b975bc90`, since removed), which said
 > something that is not true (§D9.2).
 
 ## D9.1 — `unstable` reaches `main` through human-reviewable topic PRs, not one merge PR. RULED 2026-09-06.
@@ -34,6 +34,14 @@ no amount of reading the diffs surfaced it — and **wave 2 got no CI at all**, 
 cut against a base that fired no workflows. Whoever runs wave 3 should assume both: that the
 interlock is discovered by compiling the wave end to end, and that CI on a re-cut base must be
 verified to actually run rather than assumed from a green tick.
+
+**D9.1a — every main-bound PR is pre-reviewed by an agent before it opens and before each re-request of review, and a review point is answered as asked or the reviewer is asked first. RULED 2026-10-08 (Meng, word REHEARSAL).**
+The prompt, checklist and probes are in [`MAIN-PRE-REVIEW.md`](MAIN-PRE-REVIEW.md).
+
+**D9.1b — the size of a topic PR into `main`. RULED 2026-10-08 (Meng, word ELEPHANT).**
+A backend (an exporter, a bridge, or a jl4-service module) goes in as one module per PR, up to about 7,000 hand-written lines.
+The language core keeps the guide of about 800 hand-written lines, except where a change to the shape of the AST forces more files.
+Goldens and `.l4` files are not counted.
 
 ## D9.2 — The merge is not the release. RULED 2026-09-06.
 

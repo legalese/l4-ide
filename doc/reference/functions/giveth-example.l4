@@ -4,92 +4,92 @@
 
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
-square n MEANS n TIMES n
+`the square of` n MEANS n TIMES n
 
 GIVEN a IS A NUMBER
       b IS A NUMBER
 GIVETH A NUMBER
-maximum a b MEANS IF a > b THEN a ELSE b
+`the larger of` a b MEANS IF a > b THEN a ELSE b
 
-#EVAL square 7
-#EVAL maximum 10 25
+#EVAL `the square of` 7
+#EVAL `the larger of` 10 25
 
 -- Boolean Return Types
 
 GIVEN age IS A NUMBER
 GIVETH A BOOLEAN
-isAdult age MEANS age >= 18
+`is an adult` age MEANS age >= 18
 
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
-isEven n MEANS (n MODULO 2) EQUALS 0
+`is even` n MEANS (n MODULO 2) EQUALS 0
 
-#EVAL isAdult 21
-#EVAL isEven 4
+#EVAL `is an adult` 21
+#EVAL `is even` 4
 
 -- String Return Types
 
 GIVEN name IS A STRING
 GIVETH A STRING
-greet name MEANS CONCAT "Hello, ", name
+`greeting for` name MEANS CONCAT "Hello, ", name
 
 GIVEN num IS A NUMBER
 GIVETH A STRING
-describe num MEANS
+`description of` num MEANS
   IF num > 0 THEN "positive"
   ELSE IF num < 0 THEN "negative"
        ELSE "zero"
 
-#EVAL greet "Alice"
-#EVAL describe (-5)
+#EVAL `greeting for` "Alice"
+#EVAL `description of` (-5)
 
 -- Complex Return Types
 
 -- Returning MAYBE
 GIVEN xs IS A LIST OF NUMBER
 GIVETH A MAYBE NUMBER
-safeHead xs MEANS
+`the first of` xs MEANS
   CONSIDER xs
   WHEN EMPTY THEN NOTHING
 
   WHEN h FOLLOWED BY rest THEN JUST h
 
-#EVAL safeHead (LIST 1, 2, 3)
-#EVAL safeHead EMPTY
+#EVAL `the first of` (LIST 1, 2, 3)
+#EVAL `the first of` EMPTY
 
 -- Returning LIST
 GIVEN n IS A NUMBER
 GIVETH A LIST OF NUMBER
-countdown n MEANS
+`countdown from` n MEANS
   IF n <= 0 THEN EMPTY
-  ELSE n FOLLOWED BY countdown (n MINUS 1)
+  ELSE n FOLLOWED BY `countdown from` (n MINUS 1)
 
-#EVAL countdown 5
+#EVAL `countdown from` 5
 
 -- GIVES as Synonym
 
 GIVEN x IS A NUMBER
 GIVES A NUMBER
-triple x MEANS x TIMES 3
+`three times` x MEANS x TIMES 3
 
-#EVAL triple 7
+#EVAL `three times` 7
 
 -- Parameterized Return Types
 
 GIVEN a IS A TYPE, x IS AN a
 GIVETH A LIST OF a
-singleton x MEANS x FOLLOWED BY EMPTY
+`list holding only` x MEANS x FOLLOWED BY EMPTY
 
-#EVAL singleton 42
-#EVAL singleton "hello"
+#EVAL `list holding only` 42
+#EVAL `list holding only` "hello"
 
 -- Record Return Types
 
 DECLARE Person HAS name IS A STRING, age IS A NUMBER
 
-GIVEN personName IS A STRING
-      personAge IS A NUMBER
+GIVEN `person name` IS A STRING
+      `person age` IS A NUMBER
 GIVETH A Person
-makePerson personName personAge MEANS Person WITH name IS personName, age IS personAge
+`make a person` `person name` `person age` MEANS Person WITH name IS `person name`, age IS `person age`
 
-#EVAL makePerson "Bob" 30
+#EVAL `make a person` "Bob" 30

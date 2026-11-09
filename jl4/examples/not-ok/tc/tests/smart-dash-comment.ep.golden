@@ -1,0 +1,13 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: smart-dash-comment.l4
+  Hidden: no
+  Range: 18:1-18:2
+  Source: lexer
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This is – (En Dash, U+2013). It looks like `-`, but L4 only understands the plain one.
+
+    Word processors such as Word, Pages and Google Docs swap plain punctuation for curly lookalikes as you type, so this usually means the text was pasted in from one.
+
+    Replace it with `--` if it starts a comment, as it seems to here; if it was meant as a minus sign, use `-`.

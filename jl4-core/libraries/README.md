@@ -6,15 +6,21 @@ This directory contains the standard libraries for L4, providing common function
 
 - **prelude.l4** - Core functions and types (lists, maybe, either, basic operations)
 - **negation-as-failure.l4** - Negation-as-failure combinators (`holds` / `naf` / `presumed`) over `MAYBE BOOLEAN`
+- **math.l4** - Mathematical functions (trigonometry, logarithms, etc.)
 - **daydate.l4** - Date arithmetic and calendar functions
 - **date-compat.l4** - Backwards compatibility layer for legacy DATE syntax
+- **time.l4** - Times of day
+- **datetime.l4** - Points in time with a time zone
+- **timezone.l4** - IANA time zone constants
 - **excel-date.l4** - Excel-compatible date functions
-- **temporal-prelude.l4** - Temporal logic and time-based reasoning
 - **currency.l4** - Currency types and operations
+- **holdings.l4** - Financial holdings and ownership structures
+- **actus.l4** - ACTUS financial contract types (with its `actus-*.l4` modules)
 - **legal-persons.l4** - Legal entity types (persons, corporations, etc.)
 - **jurisdiction.l4** - Jurisdiction and legal domain modeling
-- **holdings.l4** - Financial holdings and ownership structures
-- **math.l4** - Mathematical functions (trigonometry, logarithms, etc.)
+- **llm.l4** - Calling language models from L4
+
+User documentation for each library: `doc/reference/libraries/` (published at <https://legalese.com/l4/reference/libraries>).
 
 ## How `IMPORT` finds these files (resolution order)
 
@@ -37,18 +43,43 @@ symlink can't silently shadow the stdlib the binary was built with. When
 several _differing_ copies of a module are visible at once, the resolver emits
 a warning naming all of them (symlinks dereferenced) and the one chosen. See
 `doc/reference/libraries/resolution.md` for the full dev-vs-prod guide
-(including the history that forced this design), and
+(including the history that forced this design),
+`specs/as-built/import-resolution.md` for an as-built description of the code, and
 `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` for the design analysis.
+
+## Every rule has a sentence
+
+Each rule in these files carries an `@nlg` sentence, so that a call to it reads as prose in `l4 render`, `l4 nlg` and the editor. `LibraryNlgSpec` in `jl4-core/test` fails if a rule has none, if an input has no slot, or if a sentence landed on the wrong name.
+
+When you add a rule, write its sentence on its own line directly above the head:
+
+```l4
+GIVEN date IS A DATE
+GIVETH A BOOLEAN
+@nlg %date% falls on a weekend
+`is weekend` date MEANS ...
+```
+
+- A rule that gives `BOOLEAN` reads as a clause with a subject: `%list% is empty`.
+- Any other rule reads as a noun phrase, usually starting "the": `the last day of the month containing %date%`.
+- A rule with no inputs reads as a noun phrase with no slots: `the ISO alpha-2 code for Canada`.
+- Give every input a slot, once. Write ``%`the amount`%`` for an input whose name has spaces.
+- Say what the rule means, and read the body first: the sentence has to be true of it. Leave out programmer detail such as what happens on bad input, since it would print at every call.
+- Keep words between slots, because a sentence is spliced into others without brackets.
 
 ## Editing these files? Read this first (the staleness gotcha)
 
-The embedded copy is frozen at **build** time, from whatever directory the TH
-splice resolved _then_ — usually the Cabal datadir (`~/.cabal/share/…`), not
-your checkout. Consequently:
+The embedded copy is captured at **build** time, when GHC compiles
+`L4.API.EmbeddedLibraries`. For a checkout it reads the checkout's own
+`jl4-core/libraries/`, and GHC re-embeds a library whose content changed — but
+only if Cabal calls GHC at all. Measured 2026-10-13 (GHC 9.10.3, Cabal 3.16):
 
-- Editing `jl4-core/libraries/*.l4` in a worktree does **not** re-embed on a
-  plain `cabal build`. The binary keeps serving the old stdlib and your edit
-  "mysteriously" doesn't take effect.
+- Editing `jl4-core/libraries/*.l4` and nothing else does **not** re-embed on a
+  plain `cabal build`: it prints `Up to date`, rebuilds nothing, and the binary
+  keeps serving the old stdlib, so your edit "mysteriously" doesn't take
+  effect. `touch`-ing a source file does not help (Cabal compares content).
+- A real change to any `jl4-core/src` file makes Cabal call GHC, and GHC then
+  notices the edited library and re-embeds it.
 - The reliable way to develop stdlib changes is to pin the resolver at your
   worktree:
 
@@ -58,8 +89,8 @@ your checkout. Consequently:
 
   which outranks every other source, including the (possibly stale) embed.
 
-- To actually refresh the embed, make a real content change to
-  `L4.API.EmbeddedLibraries` (or its TH module), or clean-rebuild `jl4-core`.
+- To actually refresh the embed without the pin, make a real content change to
+  a `jl4-core` source file, or clean-rebuild `jl4-core`.
 
 Note: the local test suites want `JL4_LIBRARY_PATH` set anyway (CI exports
 it), so the pin above is the normal dev configuration.

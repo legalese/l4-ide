@@ -1,64 +1,32 @@
-# L4 Courses
+# Choose a course
 
-Structured learning paths to master the L4 language, from complete beginner to advanced practitioner.
+The courses are learning paths through L4, each a sequence of modules with examples and exercises. Take them in order; each module builds on the one before.
 
-## Available Courses
+## Foundation course
 
-### 🌱 [Foundation Course](foundation/README.md)
+[The Foundation course](foundation/README.md) is for anyone new to L4, with or without programming experience. In eight modules it goes from a first legal rule to a complete model of a charity registration scheme: types for legal entities, decision logic, functions, and obligations with deadlines and consequences.
 
-**For beginners** - Start here if you're new to L4
+## Advanced course
 
-Learn the fundamentals of L4 programming through hands-on exercises and real-world examples. No prior programming experience required.
+[The Advanced course](advanced/README.md) is for those who have finished the Foundation course or already write L4. In four modules it covers encoding real regulatory schemes, patterns that recur across rules (deadlines, notices, appeals), contracts in depth, and structuring a real rulebase.
 
-**Modules:**
+## Learning paths
 
-- [Module 0: Introduction](foundation/module-0-introduction.md) - What is L4?
-- [Module 1: Your First Legal Rule](foundation/module-1-first-rule.md) - Writing your first legal rule
-- [Module 2: Legal Entities and Relationships](foundation/module-2-entities.md) - Legal entities and types
-- [Module 3: Control Flow](foundation/module-3-control-flow.md) - Conditional logic and pattern matching
-- [Module 4: Decision Logic](foundation/module-4-decision-logic.md) - Constitutive rules and DECIDE
-- [Module 5: Functions](foundation/module-5-functions.md) - Computing with functions
-- [Module 6: Regulative Rules](foundation/module-6-regulative.md) - Obligations and permissions
-- [Module 7: Capstone](foundation/module-7-capstone.md) - Putting it all together
+### For legal professionals
 
-**Prerequisites:** None
+1. The Foundation course, all modules (0 to 7)
+2. [Module A1: Real regulatory schemes](advanced/module-a1-regulatory.md): encoding real legislation
+3. [Module A2: Cross-cutting concerns](advanced/module-a2-cross-cutting.md): timing, notices and appeals
 
----
+### For developers
 
-### 🚀 [Advanced Course](advanced/README.md)
+1. Foundation modules 0 to 5 (skim Module 0; focus on types, control flow and functions)
+2. [Module 6: Regulative rules](foundation/module-6-regulative.md): the part with no equivalent in other programming languages
+3. [Module A3: Contracts in depth](advanced/module-a3-contracts.md): recursive obligations and multi-party agreements
+4. [Module A4: Production patterns](advanced/module-a4-production.md): structuring, testing and deploying a rulebase
 
-**For experienced users** - Deep dives into advanced L4 features
+### For legal engineers
 
-Build on your foundation with advanced patterns, real-world applications, and professional workflows.
-
-**Modules:**
-
-- [Module A1: Regulatory Schemes](advanced/module-a1-regulatory.md) - Real regulatory schemes
-- [Module A2: Cross-Cutting Concerns](advanced/module-a2-cross-cutting.md) - Handling cross-cutting concerns
-- [Module A3: Complex Contracts](advanced/module-a3-contracts.md) - Building complex agreements
-- [Module A4: Production Patterns](advanced/module-a4-production.md) - Production-ready patterns
-
-**Prerequisites:** Foundation course or equivalent L4 experience
-
----
-
-## Learning Paths
-
-### For Legal Professionals
-
-1. Foundation Course (complete all modules, 0-7)
-2. Advanced: [Module A1: Regulatory Schemes](advanced/module-a1-regulatory.md) - encoding real legislation
-3. Advanced: [Module A2: Cross-Cutting Concerns](advanced/module-a2-cross-cutting.md) - timing, notices, and appeals
-
-### For Developers
-
-1. Foundation: Modules 0-5 (skim Module 0; focus on types, control flow, and functions)
-2. Foundation: [Module 6: Regulative Rules](foundation/module-6-regulative.md) - the part with no programming-language equivalent
-3. Advanced: [Module A3: Complex Contracts](advanced/module-a3-contracts.md) - recursive obligations and multi-party agreements
-4. Advanced: [Module A4: Production Patterns](advanced/module-a4-production.md) - testing, debugging, and deployment
-
-### For Legal Engineers
-
-1. Complete Foundation Course
-2. Complete Advanced Course
-3. Explore [Concepts](../concepts/README.md) for deeper understanding
+1. The Foundation course
+2. The Advanced course
+3. [Concepts](../concepts/README.md), for why L4 works the way it does

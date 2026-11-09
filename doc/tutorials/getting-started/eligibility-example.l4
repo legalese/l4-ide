@@ -1,26 +1,36 @@
--- Simple eligibility example from documentation
+-- eligibility-example.l4
+-- A person is eligible if they are at least 18 years old and have valid ID.
 
-§ `Eligibility Rule`
+§ `Eligibility`
 
--- Define the Person type
 DECLARE Person
-    HAS name IS A STRING
-        age IS A NUMBER
-        hasValidID IS A BOOLEAN
+    HAS `name`         IS A STRING
+        `age`          IS A NUMBER
+        `has valid ID` IS A BOOLEAN
 
--- Define the eligibility rule
-GIVEN person IS A Person
+GIVEN `the applicant` IS A Person
 GIVETH A BOOLEAN
 DECIDE `is eligible` IF
-    person's age >= 18
-    AND person's hasValidID
+        `the applicant`'s `age` AT LEAST 18
+    AND `the applicant`'s `has valid ID`
 
--- Test data
-alice MEANS Person "Alice" 25 TRUE
-bob MEANS Person "Bob" 16 TRUE
-charlie MEANS Person "Charlie" 30 FALSE
+§§ `Examples`
 
--- Tests
-#EVAL `is eligible` alice    -- Should be TRUE
-#EVAL `is eligible` bob      -- Should be FALSE (under 18)
-#EVAL `is eligible` charlie  -- Should be FALSE (no valid ID)
+`Alice` MEANS Person WITH
+    `name`         IS "Alice"
+    `age`          IS 25
+    `has valid ID` IS TRUE
+
+`Bob` MEANS Person WITH
+    `name`         IS "Bob"
+    `age`          IS 16
+    `has valid ID` IS TRUE
+
+`Charlie` MEANS Person WITH
+    `name`         IS "Charlie"
+    `age`          IS 30
+    `has valid ID` IS FALSE
+
+#EVAL `is eligible` `Alice`
+#EVAL `is eligible` `Bob`
+#EVAL `is eligible` `Charlie`

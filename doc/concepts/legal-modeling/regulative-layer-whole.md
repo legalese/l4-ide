@@ -143,6 +143,8 @@ The rules of the clock are few and worth having in one place:
 - the deadline day itself is in time (`WITHIN 7` includes day 7);
 - time passes only through events, so ``(`WAIT UNTIL` 8)`` is how to say "day 8 came and nobody did anything";
 - an event that does not fit the obligation is passed over, but the clock still moves to its time;
+- an event whose act holds a fact the case has not supplied, at a place where the act written in the obligation's `MUST`, `MAY` or `SHANT` line names one particular kind of thing (Alice delivered goods of a kind nobody has stated, and the line says `MUST Deliver Retail`), is not passed over: the run stops and names the missing fact, because passing it over would mean deciding that she delivered the wrong kind;
+- the same holds when that missing fact is checked by a rule that uses `CONSIDER`, in the act or in a `PROVIDED` condition: an `OTHERWISE` line is not taken just because the fact is missing, so where a line before it could still match, the run stops and names it;
 - a chain's next clock starts where the previous link ended — for `HENCE`, at the act that discharged it; for `LEST`, at the deadline that was missed (for a prohibition, at the forbidden act), and not at the later event that brought the miss to light.
 
 **How an event matches an act** is the part of this question that carries the most weight, because it is where a fact from the world enters the obligation. Two ways:
@@ -174,7 +176,13 @@ GIVETH A DEONTIC Actor Action
 
 A name in the act is required the same way a literal is, whether it names a defined figure, a rule's own input, or the whole act at once — there is no longer a spelling that works for one and not the other. The blank can equally be read inside a next obligation written directly under `HENCE`; the rule above is preferred because it can be used from more than one place.
 
-The time of an event is not something an obligation can read: there is no blank for it. That is why a rule that pays a debt in instalments cannot carry a single deadline down through the instalments (Question 5).
+The time of an event can be read too.
+In a next obligation, `THE JOIN` is the time of the act that led to it, and it is a number like any other: it can be added to, handed to a rule as an input, or recorded ([The anchor words as values](../../reference/regulative/consequences.md#the-anchor-words-as-values)).
+`THE DEADLINE` and `THE ARMING` are read the same way.
+One thing to watch: inside the next obligation's own `PROVIDED`, `THE JOIN` is still the time of the act before, not of the act being tested.
+
+A deadline that is already known can be carried down a chain: give it to the rule as an input and write `WITHIN 0 OF due`, and every instalment is due by the same day.
+A deadline worked out from when an act happened is written the same way, by handing on `THE JOIN PLUS 30`: "thirty days after the first payment, for all the rest".
 
 **Built:** all of this.
 

@@ -1,0 +1,119 @@
+IMPORT prelude
+IMPORT properties
+
+-- A permission whose act carries a NUMBER: the fixture an explorer must
+-- REFUSE (REGULATIVE-LOWERING-SPEC.md section 4.2, ruled R-L4).
+--
+-- This is d3-atomic.l4 with one change: the ledger's record of Bob's
+-- purchase carries the time it was recorded, as the act's own payload,
+-- and the ledger COMMITs that time beside the status. That is the
+-- payload-time way of stamping a record with the instant of the act that
+-- made it, for an evaluator on which the instant is not yet a value of its
+-- own. The payload is a claim, not the clock: nothing checks that it
+-- equals the AT the event happened at, so the traces write the same number
+-- twice.
+--
+-- An act with a NUMBER field names infinitely many acts, one per number,
+-- and an exhaustive explorer cannot try them all. It must refuse that
+-- constructor, loudly, naming the binder (`act`, the whole action of the
+-- permission), its type (Act) and the offending constructor
+-- (`ledger records Bob's purchase`, field `recorded at`, a NUMBER), exit
+-- non-zero, and still explore the finite constructors beside it: Alice's
+-- check, her purchase answered and unanswered, the message, done. No
+-- sample of numbers is ever tried in its place.
+--
+-- Until the explorer exists this file only has to parse and run: `l4 run`
+-- evaluates the traces below, which is the evaluator reading the payload,
+-- not an explorer enumerating it.
+
+DECLARE Act IS ONE OF
+    `ledger records Bob's purchase`            -- BobBuys, carrying its time
+        HAS `recorded at` IS A NUMBER
+    `Messages delivers the message`            -- Deliver
+    `Alice checks whether dinner is bought`    -- CheckBought
+    `Alice is done`                            -- Done
+    `Alice buys dinner`                        -- BuyChecked if answered, NoAnswer if not
+        HAS `ledger answered` IS A BOOLEAN
+
+`closing` MEANS 75600
+
+§ `D3 with a time payload: the guards`
+
+GIVEN act IS AN Act
+GIVETH A BOOLEAN
+`the brief allows` MEANS
+    CONSIDER act
+    WHEN `ledger records Bob's purchase` time    THEN `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`)
+    WHEN `Messages delivers the message`         THEN (RECALL Messages's `message`) EQUALS JUST `in transit`
+    WHEN `Alice checks whether dinner is bought` THEN `where Alice is` (RECALL Alice's `plan`) EQUALS planning
+    WHEN `Alice is done`                         THEN `Alice has bought or stopped` (RECALL Alice's `plan`)
+    WHEN `Alice buys dinner` answered            THEN `where Alice is` (RECALL Alice's `plan`) EQUALS checked
+
+§ `D3 with a time payload: the arrangement`
+
+-- The arrangement opens with dinner unbought: the ledger's first record.
+GIVETH A DEONTIC Party Act
+`the arrangement` MEANS
+    COMMIT `dinner status record` IS opened
+    HENCE `the evening`
+
+GIVETH A DEONTIC Party Act
+`the evening` MEANS
+    PARTY World
+    MAY   act PROVIDED `the brief allows` act
+    WITHIN 0 OF closing
+    HENCE CONSIDER act
+          WHEN `ledger records Bob's purchase` time THEN
+              COMMIT `dinner status record` IS taken
+              HENCE COMMIT `taken at` IS time
+              HENCE RECORD Messages's `message` IS `in transit`
+              HENCE `the evening`
+          WHEN `Messages delivers the message` THEN
+              RECORD Messages's `message` IS delivered
+              HENCE RECORD Alice's `belief` IS taken
+              HENCE `Alice stops unless she has bought` (RECALL Alice's `plan`)
+          WHEN `Alice checks whether dinner is bought` THEN
+              RECORD Alice's `belief` IS `the ledger's status` (RECALL ALL OFFICIAL's `dinner status record`)
+              HENCE RECORD Alice's `plan` IS checked
+              HENCE `the evening`
+          WHEN `Alice is done` THEN `the evening`
+          WHEN `Alice buys dinner` answered THEN
+              IF NOT answered
+              THEN `the evening`
+              ELSE `the ledger answers the purchase` (RECALL ALL OFFICIAL's `dinner status record`)
+    LEST  FULFILLED
+
+-- The ledger's answer, in one step: accept and record the purchase if
+-- dinner is open at this instant, refuse it if Bob's purchase has taken it.
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A DEONTIC Party Act
+`the ledger answers the purchase` MEANS
+    IF `the ledger is open` `dinner status record`
+    THEN COMMIT `dinners bought` IS `dinner for two`
+         HENCE COMMIT `open at acceptance` IS `the ledger is open` `dinner status record`
+         HENCE RECORD Alice's `plan` IS bought
+         HENCE `the evening`
+    ELSE RECORD Alice's `belief` IS taken
+         HENCE RECORD Alice's `plan` IS stopped
+         HENCE `the evening`
+
+-- The message stops Alice if she is still on her way to buying.
+GIVEN plan IS A MAYBE Plan
+GIVETH A DEONTIC Party Act
+`Alice stops unless she has bought` MEANS
+    IF `Alice has bought or stopped` plan
+    THEN `the evening`
+    ELSE RECORD Alice's `plan` IS stopped
+         HENCE `the evening`
+
+§ `D3 with a time payload: the traces`
+
+-- Sequence A: Bob's purchase is recorded at 18:06 and says so. Official
+-- record: opened, taken, taken at 65160; the ledger refuses Alice's 18:07
+-- purchase.
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `Alice checks whether dinner is bought`  AT 65100
+    PARTY World DOES (`ledger records Bob's purchase` 65160)  AT 65160
+    PARTY World DOES (`Alice buys dinner` TRUE)               AT 65220
+    PARTY World DOES `Messages delivers the message`          AT 65280
+    (`WAIT UNTIL` 75601)

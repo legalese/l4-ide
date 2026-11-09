@@ -1,0 +1,10 @@
+-- Reading through calls ACROSS an import. Both rules live in
+-- verify-unfold-rules.l4; asking for both at once must be found unsat here.
+
+IMPORT `verify-unfold-rules`
+
+GIVEN f IS A Facts
+GIVETH A BOOLEAN
+DECIDE `the arrow is broken across an import` f IF
+        `the exception applies` f
+    AND `the offence is made out` f

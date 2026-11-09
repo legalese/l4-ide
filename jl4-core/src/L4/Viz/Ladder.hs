@@ -20,8 +20,9 @@ module L4.Viz.Ladder
   , InputRef(..)
   , getAtomDeps
   , getAtomInputRefs
+  , getLeafKeys
+  , getRefusingAtoms
     -- * Utilities (shared with LSP)
-  , generateAtomId
   , collectTypicallyDefaults
   , seamLabel
   ) where
@@ -36,25 +37,23 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Set as Set
 import qualified Data.Map as DMap
 import qualified Data.List.NonEmpty as NE
-import qualified Data.List as List
 import Optics.State.Operators ((<%=), (%=))
 import Optics
 import Control.Monad.Extra (unlessM)
-import qualified Data.Text.Encoding as TextEncoding
-
-import qualified L4.Crypto.UUID5 as UUID5
 
 import qualified L4.TypeCheck as TC
 import L4.Annotation
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos(..))
 import L4.Syntax
 import L4.Print (prettyLayout)
-import qualified L4.Transform as Transform (simplify)
+import qualified L4.Transform as Transform (simplify, positionalCall, inlineLetsForViz, writtenAsClauses, holdsGeneratedNodes, clauseGroupLadderBudget, letInliningNodeBudget)
 import L4.Desugar
 import qualified L4.Export as Export
+import qualified L4.Refusal as Refusal
 import L4.Viz.VizExpr (RenderAsLadderInfo(..), VersionedDocId(..), FunDecl(..), IRExpr, InertContext(..), ID(..), UBoolValue(..))
 import qualified L4.Viz.VizExpr as VizExpr
 import L4.Viz.GuardedRows (guardedToLadder, hasEffectfulNode, normaliseGuarded, GuardedRows (..))
+import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful, fieldReads)
 
 ------------------------------------------------------
 -- Errors
@@ -63,6 +62,12 @@ import L4.Viz.GuardedRows (guardedToLadder, hasEffectfulNode, normaliseGuarded, 
 data VizError
   = InvalidProgramNoDecidesFound
   | InvalidDecideMustHaveBoolRetType
+  | ClauseGroupTooLarge Int
+    -- ^ a rule written as DECIDE clauses whose ladder has more nodes than this
+  | ClauseGroupTooLong Int
+    -- ^ a rule written as DECIDE clauses that, written out as the CONSIDER it
+    -- stands for, has more expression nodes than this
+    -- ('L4.Transform.letInliningNodeBudget')
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -72,6 +77,10 @@ prettyPrintVizError = \case
     "The program isn't the right sort for visualization: there are no DECIDE rules that can be visualized."
   InvalidDecideMustHaveBoolRetType ->
     "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+  ClauseGroupTooLarge budget ->
+    "These clauses would draw a ladder of more than " <> Text.pack (show budget) <> " boxes, too many to show. Split the rule into smaller groups of clauses, or into named sub-rules."
+  ClauseGroupTooLong budget ->
+    "These clauses are too long to draw: written out as the CONSIDER they stand for, they come to more than " <> Text.pack (show budget) <> " parts. Split the rule into smaller groups of clauses, or into named sub-rules."
 
 ------------------------------------------------------
 -- Monad
@@ -100,6 +109,21 @@ data VizState = MkVizState
     -- deliberately excluded (a numeric default is not a probability over a
     -- derived comparison). Consumed as a per-atom prior for question ordering
     -- and as tentative-render provenance.
+  , keyEnv :: KeyEnv
+    -- ^ What names a leaf's term (R3, "L4.Viz.AtomKey"). Lazy: a pass that never
+    -- forces an atomId never walks the module.
+  , leafKeys :: IntMap Text
+    -- ^ Leaf id -> the C1 key of its term. The query plan names its atoms from
+    -- these, so the diagram and the plan cannot disagree (smucclaw/l4-ide#935).
+  , freshLeaves :: !Int
+    -- ^ How many leaves keyed apart per occurrence ('keyLeaf') so far.
+  , refusingDefs :: Refusal.AlwaysRefusing
+    -- ^ The module's definitions that always refuse ("L4.Refusal"). Lazy: a
+    -- pass that names no definition never computes it.
+  , refusingAtoms :: IntMap Text
+    -- ^ Leaf id -> the reason it refuses with, for a leaf evaluation can only
+    -- ever refuse at: a @REFUSE@, or a bare reference to a definition that
+    -- always refuses. The query plan never asks one (R7).
   }
   deriving stock (Generic)
 
@@ -121,6 +145,11 @@ mkInitialState uri mod' subst simp = MkVizState
   , atomDeps = Map.empty
   , atomInputRefs = Map.empty
   , typicallyDefaults = Map.empty
+  , keyEnv = withTypeExpander (TC.applyFinalSubstitution subst uri) (mkKeyEnv mod')
+  , leafKeys = Map.empty
+  , freshLeaves = 0
+  , refusingDefs = Refusal.alwaysRefusing mod'
+  , refusingAtoms = Map.empty
   }
 
 ------------------------------------------------------
@@ -235,6 +264,15 @@ getAtomDeps = (.atomDeps)
 getAtomInputRefs :: VizState -> IntMap (Set InputRef)
 getAtomInputRefs = (.atomInputRefs)
 
+-- | The C1 key of every leaf's term, by leaf id ('L4.Viz.AtomKey').
+getLeafKeys :: VizState -> IntMap Text
+getLeafKeys = (.leafKeys)
+
+-- | The leaves evaluation can only refuse at, by leaf id, with the reason each
+-- refuses with (see 'refusingAtoms').
+getRefusingAtoms :: VizState -> IntMap Text
+getRefusingAtoms = (.refusingAtoms)
+
 -- | Find all DECIDE rules that can be visualized.
 -- Rather than just checking types, we try to visualize each DECIDE
 -- and only include those that succeed. This matches the native LSP behavior
@@ -300,18 +338,51 @@ vizProgram :: VersionedDocId -> Decide Resolved -> Viz RenderAsLadderInfo
 vizProgram verDocId decide = MkRenderAsLadderInfo verDocId <$> translateDecide decide
 
 translateDecide :: Decide Resolved -> Viz FunDecl
-translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body) = do
-  unlessM (hasBooleanType (getAnno body)) $
+translateDecide asWritten@(MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved appArgs _) body0) = do
+  -- Asked before anything is read through: a rule that returns a number is not
+  -- too large to draw, it is not a ladder at all.
+  unlessM (hasBooleanType (getAnno body0)) $
     throwError InvalidDecideMustHaveBoolRetType
+  -- A rule written as DECIDE clauses is drawn as the CONSIDER it stands for.
+  -- Whether it was is read off the rule as written, not off its body: a rule
+  -- written by hand that has a call to a clause group unfolded into it (the
+  -- IDE's l4/inlineExprs) is still a rule written by hand.
+  let isClauseGroup = Transform.writtenAsClauses asWritten
+      -- The limits below guard the reading through, so they apply to a group
+      -- that has something to read through. One whose first clause names each
+      -- input as the GIVEN does (or is @_@) has nothing: its body is that
+      -- clause's result, and it is drawn as a rule written without clauses is,
+      -- whatever its size. A first clause that gives an input a new name is a
+      -- test the desugarer generates, so that group is read through.
+      readsThrough = isClauseGroup && Transform.holdsGeneratedNodes body0
+  body <- case Transform.inlineLetsForViz body0 of
+    Right inlined -> pure inlined
+    -- Too big to read through. Clauses are refused, for a plan of any size
+    -- they would be drawn as one leaf that asks nothing. Anything else is
+    -- drawn as written: a LET the drafter wrote is never read through.
+    Left _ | readsThrough -> throwError (ClauseGroupTooLong Transform.letInliningNodeBudget)
+           | otherwise    -> pure body0
 
   let funName = mkPrettyVizName funResolved
   assign #functionName funName.label
   assign #defsForInlining =<< collectDefsForInlining
   mod' <- use #module'
+  -- A bare reference to a name is keyed by the name's unique; every other leaf
+  -- by a fresh id from 'getFresh'. Starting the fresh ids above every unique in
+  -- the rule keeps the two ranges apart, so a fresh id cannot equal a name's
+  -- unique and merge two different propositions into one variable
+  -- (smucclaw/l4-ide#991). Mirrors 'LSP.L4.Viz.Ladder.translateDecide'.
+  assign #maxId (MkID (maximum (0 : [u.unique | u <- toListOf (gplate @Unique) body])))
   assign #typicallyDefaults (collectTypicallyDefaults givenSig mod')
   shouldSimplify <- getShouldSimplify
   vid <- getFresh
   vizBody <- translateExpr shouldSimplify (carameliseExpr body)
+  -- The ladder of a rule written as clauses can be far larger than the clauses
+  -- (see 'Transform.clauseGroupLadderBudget'), and the plan far larger still.
+  -- A rule that was not written as clauses, or whose first clause names each
+  -- input as the GIVEN does (or is @_@), is drawn as it always was.
+  when (readsThrough && VizExpr.irExceeds Transform.clauseGroupLadderBudget vizBody) $
+    throwError (ClauseGroupTooLarge Transform.clauseGroupLadderBudget)
   pure $ MkFunDecl vid funName (paramNamesFromGivens givenSig appArgs) vizBody
   where
     paramNamesFromGivens :: GivenSig Resolved -> [Resolved] -> [VizExpr.Name]
@@ -395,7 +466,7 @@ translateExpr shouldSimplify = top
         notId <- getFresh
         p' <- go p
         q' <- go q
-        pure $ VizExpr.Or orId [VizExpr.Not notId p', q']
+        pure $ VizExpr.Or orId [VizExpr.negateIR notId p', q']
 
       And {} -> do
         vid <- getFresh
@@ -420,31 +491,30 @@ translateExpr shouldSimplify = top
       -- (@REFUSE "…"@) so the picture says what it is. Explicit above the
       -- wildcard because the wildcard would first try 'normaliseGuarded' on
       -- it, and a refusal is not ladder STRUCTURE — it is a terminal.
-      Refuse{} -> leafFromExpr e
+      Refuse _ msg -> leafFromExpr e >>= refusingLeaf (Just (Refusal.refusalMessage msg))
 
       App _ resolved [] -> do
         vid <- getFresh
+        thisModule <- use (#module' % to (\(MkModule _ uri _) -> uri))
         let vname = mkPrettyVizName resolved
         case getUnique resolved of
           u | u == TC.trueUnique  -> pure $ VizExpr.TrueE vid vname
             | u == TC.falseUnique -> pure $ VizExpr.FalseE vid vname
+            -- A name from ANOTHER module cannot be keyed by its unique's Int:
+            -- every module numbers its own names from the same start, so an
+            -- imported name can share an Int with one of this module's, and the
+            -- planner would read the two as ONE variable. Such a leaf gets a fresh
+            -- id like any compound leaf. Mirrors 'LSP.L4.Viz.Ladder'.
+            | u.moduleUri /= thisModule -> leafFromExpr e
           _ -> varLeaf vid vname resolved
 
-      App appAnno _fnResolved args -> do
-        fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
-        if fnOfAppIsFnFromBooleansToBoolean
-          then do
-            vid <- getFresh
-            let uniq = vid.id
-                label = prettyLayout e
-                vname = VizExpr.MkName uniq label
-            refs <- freeInputRefsExpanded Set.empty e
-            recordAtomInputRefs uniq refs
-            functionName <- use #functionName
-            let atomId = generateAtomId functionName label refs
-            VizExpr.App vid vname <$> traverse go args <*> pure atomId
-          else
-            leafFromExpr e
+      App appAnno _fnResolved args -> call e appAnno args
+
+      -- A call with named arguments that 'Transform.positionalCall' reads is
+      -- drawn as that call, its arguments in the order written. Mirrors
+      -- 'LSP.L4.Viz.Ladder' (smucclaw/l4-ide#1033).
+      AppNamed appAnno _fnResolved nes _
+        | isJust (Transform.positionalCall e) -> call e appAnno [x | MkNamedExpr _ _ x <- nes]
 
       -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@, @BRANCH@,
       -- @CONSIDER@ -- is ladder structure, not a leaf. See "L4.Viz.GuardedRows".
@@ -457,6 +527,25 @@ translateExpr shouldSimplify = top
             , not (any (hasEffectfulNode . fst) rows.grRows) ->
                 guardedToLadder getFresh go rows
           _ -> leafFromExpr e
+
+    -- A call @e@, whose arguments in the order they are drawn are @args@: a box
+    -- over its arguments when the call and every argument are BOOLEAN, otherwise
+    -- a leaf.
+    call :: Expr Resolved -> Anno -> [Expr Resolved] -> Viz IRExpr
+    call e appAnno args = do
+        fnOfAppIsFnFromBooleansToBoolean <- and <$> traverse hasBooleanType (appAnno : map getAnno args)
+        if fnOfAppIsFnFromBooleansToBoolean
+          then do
+            vid <- getFresh
+            let uniq = vid.id
+                label = prettyLayout e
+                vname = VizExpr.MkName uniq label
+            refs <- freeInputRefsExpanded Set.empty e
+            recordAtomInputRefs uniq refs
+            atomId <- keyLeaf uniq e
+            VizExpr.App vid vname <$> traverse go args <*> pure atomId <*> pure Nothing
+          else
+            leafFromExpr e
 
 -- | How the seam is labelled in the picture (DESIGN §25e).
 --
@@ -509,11 +598,24 @@ varLeaf vid vname resolved = do
     Nothing -> pure (Set.singleton (MkInputRef vname.unique []))
     Just body -> freeInputRefsExpanded (Set.singleton vname.unique) body
   recordAtomInputRefs vname.unique refs
-  functionName <- use #functionName
-  let atomId = generateAtomId functionName vname.label refs
+  atomId <- keyLeaf vname.unique (App emptyAnno resolved [])
   defaults <- use #typicallyDefaults
   let mTypically = Map.lookup (getUnique resolved).unique defaults
-  pure $ VizExpr.UBoolVar vid vname UnknownV canInline atomId mTypically
+  -- A rule of no inputs that always refuses is not a question: evaluation takes
+  -- no answer for it, it forces the rule (R7). One that refuses on only some
+  -- paths stays a question. Mirrors 'LSP.L4.Viz.Ladder.varLeaf'.
+  refusing <- use #refusingDefs
+  refusingLeaf (DMap.lookup (getUnique resolved) refusing) $
+    VizExpr.UBoolVar vid vname UnknownV canInline atomId mTypically Nothing
+
+-- | Record a leaf as one evaluation can only refuse at, with the reason, if it
+-- has one.
+refusingLeaf :: Maybe Text -> IRExpr -> Viz IRExpr
+refusingLeaf reason leaf = do
+  case (reason, leaf) of
+    (Just r, VizExpr.UBoolVar _ nm _ _ _ _ _) -> #refusingAtoms %= Map.insert nm.unique r
+    _ -> pure ()
+  pure leaf
 
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
@@ -522,13 +624,12 @@ leafFromExpr expr = do
   let uniq = tempUniqueTODO.id
   refs <- freeInputRefsExpanded Set.empty expr
   recordAtomInputRefs uniq refs
-  functionName <- use #functionName
+  atomId <- keyLeaf uniq expr
   let label = prettyLayout expr
-      atomId = generateAtomId functionName label refs
   -- A compound leaf is not a bare boolean binder, so it carries no TYPICALLY
   -- prior (question-ordering spec §4: priors come only from boolean binders
   -- whose atom is the binder itself). Bare-var leaves go through 'varLeaf'.
-  pure $ VizExpr.UBoolVar vid (VizExpr.MkName uniq label) UnknownV False atomId Nothing
+  pure $ VizExpr.UBoolVar vid (VizExpr.MkName uniq label) UnknownV False atomId Nothing Nothing
 
 ------------------------------------------------------
 -- Name helpers
@@ -562,10 +663,16 @@ freeInputRefsExpanded visited expr = do
                 Nothing -> pure (Set.singleton r)
                 Just body -> freeInputRefsExpanded (Set.insert r.rootUnique visited) body
 
+-- | The inputs a leaf reads. A field read written as its selector applied
+-- (@adult p@, @age p > 18@) is read as the projection it stands for first
+-- ('L4.Viz.AtomKey.fieldReads'), so it names the same input as @p's adult@ does, as it
+-- is keyed alike (smucclaw/l4-ide#1033, gap 3).
 freeInputRefs :: Expr Resolved -> Set InputRef
-freeInputRefs expr =
+freeInputRefs expr0 =
   refsFromVars expr <> refsFromProjections expr
   where
+    expr = fieldReads expr0
+
     refsFromVars :: Expr Resolved -> Set InputRef
     refsFromVars =
       foldMapOf (Optics.gplate @(Expr Resolved)) $ \case
@@ -600,26 +707,28 @@ freeInputRefs expr =
 -- AtomId generation
 ------------------------------------------------------
 
-generateAtomId :: Text -> Text -> Set InputRef -> Text
-generateAtomId functionName label refs =
-  let renderInputRef :: InputRef -> Text
-      renderInputRef ref =
-        let rootTxt = Text.pack (show ref.rootUnique)
-            pathTxt = case ref.path of
-              [] -> ""
-              xs -> "." <> Text.intercalate "." xs
-        in rootTxt <> pathTxt
-
-      sortedRefs = List.sort
-        [ renderInputRef ref
-        | ref <- Set.toList refs
-        ]
-
-      canonical = Text.intercalate "|"
-        ( [functionName, label]
-          <> ["refs=" <> Text.intercalate ";" sortedRefs | not (null sortedRefs)]
-        )
-  in UUID5.toText (UUID5.generateNamed UUID5.namespaceURL (TextEncoding.encodeUtf8 canonical))
+-- | Key a leaf's term (R3, "L4.Viz.AtomKey"), remember the key under the leaf's
+-- id for the query plan, and name its atom in this decision's diagram.
+keyLeaf :: Int -> Expr Resolved -> Viz Text
+keyLeaf uniq expr = do
+  env <- use #keyEnv
+  locals <- getLocalDecls
+  let term = withLocalsInScope locals expr
+      bareReference = case expr of
+        App _ _ [] -> True
+        _ -> False
+  -- A leaf whose value depends on when it is evaluated (a ledger read, or a call
+  -- to a rule that makes one) is C1's @fresh@: each occurrence is its own atom,
+  -- numbered in drawing order so the number survives an edit elsewhere.
+  key <-
+    if not bareReference && isEffectful env term
+      then do
+        n <- #freshLeaves <%= (+ 1)
+        pure (termKey env term <> "|occurrence " <> Text.pack (show n))
+      else pure (termKey env term)
+  #leafKeys %= Map.insert uniq key
+  functionName <- use #functionName
+  pure (atomIdOfKey functionName key)
 
 ------------------------------------------------------
 -- Boolean type checking

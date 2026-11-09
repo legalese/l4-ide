@@ -1,0 +1,3 @@
+IMPORT daydate
+
+#EVAL `EVER BETWEEN` (Date 5 1 2024) (Date 7 1 2024) (GIVEN d YIELD TRUE)

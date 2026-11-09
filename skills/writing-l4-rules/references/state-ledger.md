@@ -68,6 +68,54 @@ never written). `RECALL ALL` instead folds **every** write to the cell into a `L
 
 ---
 
+## Reading under a time pin, and when a read is evaluated
+
+`EVAL UNDER VALID TIME t e` evaluates `e` as at fact time `t`, and `EVAL AS OF SYSTEM TIME t e` evaluates it against the ledger as it stood at system time `t`.
+A `RECORD` made under `EVAL UNDER VALID TIME t` carries `t` as the date from which it is in force.
+Two behaviours follow that are easy to miss, because neither gives an error: each returns an answer you may not have expected.
+Both need an `unstable` build, like the rest of this page (main 1.6.109 does not parse `RECORD … IS`).
+
+**`RECALL ALL` ignores a valid-time pin.**
+Under `EVAL UNDER VALID TIME t`, plain `RECALL` returns the write in force at `t`, but `RECALL ALL` still returns every write to the cell, including writes in force only after `t`.
+This is deliberate: `RECALL ALL` is a whole-history read (`jl4-core/src/L4/EvaluateLazy/Machine.hs:4500-4503`).
+The system-time bound does apply to it: under `EVAL AS OF SYSTEM TIME t`, a write made after `t` is left out of both reads.
+To get the value in force on a date, use plain `RECALL` under the pin.
+
+```l4
+-- `rate` is 7 from 2023 and 9 from 2024; both reads ask about 1 June 2023
+#EVAL LIST (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2023) (RECORD `rate` IS 7)),
+           (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 1 2024) (RECORD `rate` IS 9)),
+           (fromMaybe 0 (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2023) (RECALL `rate`))),
+           (sum (`EVAL UNDER VALID TIME` (DATE_FROM_DMY 1 6 2023) (RECALL ALL `rate`)))
+-- LIST 7, 9, 7, 16: RECALL gives the 2023 value; RECALL ALL sums both writes
+
+#EVAL LIST (RECORD `rate` IS 7),
+           (count (`EVAL AS OF SYSTEM TIME` (DATE_FROM_DMY 1 1 2020) (RECALL ALL `rate`)))
+-- LIST 7, 0: the write was made after 2020, so as of 2020 there is none
+```
+
+**A definition with no parameters that reads the ledger is evaluated once per temporal scope.**
+Within one directive, its first use computes the value, and a later use in the same scope is given that same value, even if the ledger was written in between.
+A use in a different scope (inside another `EVAL AS OF SYSTEM TIME` or `EVAL UNDER VALID TIME`) computes it again.
+To read the ledger afresh at every use, give the definition a parameter.
+This is the designed behaviour, locked by `jl4/examples/ok/ledger/record-thunk-once.l4:51-65`; whether a named helper should be re-served like this is open in smucclaw/l4-ide#1034.
+
+```l4
+`rate or zero` MEANS fromMaybe 0 (RECALL `rate`)
+
+#EVAL LIST `rate or zero`, (RECORD `rate` IS 7), `rate or zero`
+-- LIST 0, 7, 0: the second use is given the first use's 0
+
+GIVEN `default` IS A NUMBER
+GIVETH A NUMBER
+`rate or` MEANS fromMaybe `default` (RECALL `rate`)
+
+#EVAL LIST (`rate or` 0), (RECORD `rate` IS 7), (`rate or` 0)
+-- LIST 0, 7, 7: with a parameter, each use reads the ledger
+```
+
+---
+
 ## Recipient-qualified `RECORD` (NOTIFY)
 
 `RECORD <party>'s <cell> IS <v>` writes into **party q's own** ledger — the symmetric WRITE to the cross-party
@@ -82,9 +130,8 @@ PARTY Landlord MUST `serve notice` WITHIN 14
         HENCE PARTY Tenant MUST acknowledge WITHIN 14
 ```
 
-After this performs, `RECALL Tenant's `noticeReceived``sees a`JUST`; the acting party's own `RECALL`does not.
-**"Notify the world" is still`COMMIT`/`ATTEST`to`OFFICIAL`** (anyone can `RECALL OFFICIAL's …`it);
-recipient-qualification is a`RECORD`-only feature.
+After this performs, ``RECALL Tenant's `noticeReceived` `` sees a `JUST`; the acting party's own `RECALL` does not.
+"Notify the world" is still `COMMIT`/`ATTEST` to `OFFICIAL` (anyone can `RECALL OFFICIAL's …` it); recipient-qualification is a `RECORD`-only feature.
 
 ---
 

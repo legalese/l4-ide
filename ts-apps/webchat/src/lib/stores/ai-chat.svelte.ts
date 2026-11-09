@@ -11,6 +11,10 @@ import {
   AiConversationDelete,
   AiConversationList,
   AiConversationLoad,
+  AiDictationCancel,
+  AiDictationStart,
+  AiDictationStatus,
+  AiDictationStop,
   AiFileOpen,
   AiFileOpenDiff,
   AiGetActiveFileSelection,
@@ -361,6 +365,12 @@ export function createAiChatStore(
   let usedToday = $state<number>(0)
   let dailyLimit = $state<number>(0)
   let blockOnOverage = $state<boolean>(false)
+  // Voice dictation. `dictationAvailable` stays false until the host
+  // confirms it can record; the input renders no dictation UI before
+  // that, or ever where it can't (e.g. a remote workspace).
+  let dictationAvailable = $state<boolean>(false)
+  let dictationMaxSeconds = $state<number>(120)
+  let dictationPhase = $state<DictationPhase>('idle')
   let signedIn = $state<boolean>(false)
   // Active deployment binding ("Use in chat" from the Deployment tab).
   // Single source of truth for the deployment banner and for stamping
@@ -1785,6 +1795,82 @@ export function createAiChatStore(
     }
   }
 
+  /** Ask the host whether it can record from a microphone. */
+  async function refreshDictationStatus(): Promise<void> {
+    const m = getMessenger()
+    if (!m) return
+    try {
+      const res = await m.sendRequest(
+        AiDictationStatus,
+        HOST_EXTENSION,
+        undefined as never
+      )
+      dictationAvailable = res?.available === true
+      if (res?.maxSeconds) dictationMaxSeconds = res.maxSeconds
+    } catch {
+      dictationAvailable = false
+    }
+  }
+
+  /** Start recording. `{ ok: false, note }` carries a reason to show
+   *  the user (no microphone, permission denied, …). */
+  async function startDictation(): Promise<{ ok: boolean; note?: string }> {
+    const m = getMessenger()
+    if (!m || dictationPhase !== 'idle') return { ok: false }
+    dictationPhase = 'starting'
+    try {
+      const res = await m.sendRequest(
+        AiDictationStart,
+        HOST_EXTENSION,
+        undefined as never
+      )
+      if (res?.error) {
+        dictationPhase = 'idle'
+        return { ok: false, note: res.error }
+      }
+      dictationPhase = 'recording'
+      return { ok: true }
+    } catch (err) {
+      dictationPhase = 'idle'
+      return {
+        ok: false,
+        note: err instanceof Error ? err.message : String(err),
+      }
+    }
+  }
+
+  /** Stop recording and transcribe. Resolves with the transcript
+   *  (empty when nothing intelligible was said) or a `note` explaining
+   *  why there isn't one. No-op unless a recording is running. */
+  async function stopDictation(): Promise<{ text?: string; note?: string }> {
+    const m = getMessenger()
+    if (!m || dictationPhase !== 'recording') return {}
+    dictationPhase = 'transcribing'
+    try {
+      // A deployment-bound chat's dictation is metered against that
+      // deployment, same as its turns.
+      const res = await m.sendRequest(AiDictationStop, HOST_EXTENSION, {
+        ...(deploymentBinding
+          ? { apiBaseUrl: deploymentBinding.apiBaseUrl }
+          : {}),
+      })
+      if (res?.error) return { note: res.error }
+      return { text: res?.text ?? '' }
+    } catch (err) {
+      return { note: err instanceof Error ? err.message : String(err) }
+    } finally {
+      dictationPhase = 'idle'
+    }
+  }
+
+  /** Stop recording and discard the clip. */
+  function cancelDictation(): void {
+    if (dictationPhase !== 'recording') return
+    const m = getMessenger()
+    m?.sendNotification(AiDictationCancel, HOST_EXTENSION, undefined as never)
+    dictationPhase = 'idle'
+  }
+
   function removeAttachment(index: number): void {
     stagedAttachments = stagedAttachments.filter((_, i) => i !== index)
   }
@@ -1883,6 +1969,19 @@ export function createAiChatStore(
     pickAttachment,
     removeAttachment,
     previewAttachment,
+    get dictationAvailable() {
+      return dictationAvailable
+    },
+    get dictationMaxSeconds() {
+      return dictationMaxSeconds
+    },
+    get dictationPhase() {
+      return dictationPhase
+    },
+    refreshDictationStatus,
+    startDictation,
+    stopDictation,
+    cancelDictation,
     toggleIncludeActiveFile,
     setIncludeActiveFile,
     answerQuestion,
@@ -1929,6 +2028,10 @@ export function createAiChatStore(
   }
 }
 
+/** Where a dictation is in its life: `starting` covers the moment
+ *  between the click and the microphone going live. */
+export type DictationPhase = 'idle' | 'starting' | 'recording' | 'transcribing'
+
 export type AiChatStore = {
   readonly currentId: string | null
   readonly current: ConversationState | null
@@ -1956,6 +2059,13 @@ export type AiChatStore = {
   ) => Promise<{ ok: boolean; note?: string }>
   removeAttachment: (index: number) => void
   previewAttachment: (att: AiChatAttachment) => void
+  readonly dictationAvailable: boolean
+  readonly dictationMaxSeconds: number
+  readonly dictationPhase: DictationPhase
+  refreshDictationStatus: () => Promise<void>
+  startDictation: () => Promise<{ ok: boolean; note?: string }>
+  stopDictation: () => Promise<{ text?: string; note?: string }>
+  cancelDictation: () => void
   getPermissions: () => Promise<Record<AiPermissionCategory, AiPermissionValue>>
   setPermission: (
     category: AiPermissionCategory,

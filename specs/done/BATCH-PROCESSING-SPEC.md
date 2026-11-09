@@ -711,3 +711,13 @@ In a future version, consider:
 - [ ] Phases 1 and 2 complete (JSON batch processing with validation)
 - [ ] Basic error handling and reporting
 - [ ] At least 3 golden file tests
+
+## Rulings after delivery
+
+**RULED 2026-10-12.** Meng marked `accept`, option A on bench card R2 of "Main Wave Rulings" (<https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb>) at 23:54:08Z, with no note.
+The ruling, as printed on the card: printed string literals stay escaped (line break, tab, carriage return) on every surface.
+Conditions: FLOTILLA 14's body lists every surface as visible to clients; `jl4-service/README.md`'s Trace Output section says literals in `exampleCode` are escaped; the ruling is recorded in an owning document; the "Assumed, not ruled" test comments (`jl4-service/test/IntegrationSpec.hs`, `jl4/tests-cli/Main.hs`) cite it.
+It is recorded here because `l4 batch` re-prints a module and runs the printed text, which is why b1d718a91 (#595, smucclaw/l4-ide#1028) made the printer escape these characters in a literal, and #595 touched no spec.
+The ruling covers rule source wherever it is printed (`escapeSourceStringLiteral`, `jl4-core/src/L4/Print.hs`), `explanation` included when its result prints rule source: a `DEONTIC` contract value prints its action as source, so `MUST say "pay\nnow"` stays on one line there.
+A string VALUE printed for display (`escapeStringLiteral`) keeps its line breaks.
+Measured 2026-10-13 on unstable `f48a0ed75` through jl4-service: for a contract whose action carries `"pay\nnow"`, `explanation` is `Result: PARTY Alice MUST say "pay\nnow" WITHIN 10 HENCE FULFILLED` with a backslash and an n, as is `result.value.OBLIGATION.action`.

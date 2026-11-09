@@ -1,6 +1,6 @@
 -- Test: @ref annotations attach to arbitrary AST nodes, not only declarations.
--- Here @ref is placed in front of expression-level nodes (the bodies of the
--- DECIDEs and a sub-expression), which the addRefCommentsToAst pass attaches to
+-- Here @ref is placed in front of declarations and of expression-level nodes
+-- (the bodies of the DECIDEs), which the addRefCommentsToAst pass attaches to
 -- the immediately following AST node.
 
 @ref https://example.com/rules/section-1

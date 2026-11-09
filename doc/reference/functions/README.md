@@ -1,162 +1,49 @@
-# Functions Reference
+# Functions
 
-This section documents the keywords used to define functions and computations in L4. Functions represent individual rules.
-
-## Overview
-
-L4 functions are defined using a combination of keywords that specify parameters, return types, and the function body. The typical structure is:
-
-```l4
-GIVEN parameter IS A Type      -- Parameters (optional)
-GIVETH A ReturnType            -- Return type (optional)
-DECIDE name MEANS expression   -- Definition
-```
-
-## Keywords
-
-| Keyword                                  | Purpose                                     | Required                   |
-| ---------------------------------------- | ------------------------------------------- | -------------------------- |
-| [GIVEN](GIVEN.md)                        | Declares function parameters with types     | For functions with inputs  |
-| [GIVETH](GIVETH.md) / [GIVES](GIVETH.md) | Specifies the return type                   | Optional (can be inferred) |
-| [DECIDE](DECIDE.md)                      | Defines a named value or function           | Yes (or use bare MEANS)    |
-| [MEANS](MEANS.md)                        | Connects the function name to its body      | Yes                        |
-| [YIELD](YIELD.md)                        | Creates anonymous functions (lambdas)       | For inline functions       |
-| [WHERE](WHERE.md)                        | Adds local definitions after an expression  | Optional                   |
-| [LET](LET.md)                            | Adds local definitions before an expression | Optional                   |
-| [AKA](AKA.md)                            | Creates aliases for definitions             | Optional                   |
-| [WITH](WITH.md)                          | Supplies a call's arguments by name         | Optional                   |
-
-## Quick Examples
-
-### Simple Function
-
-```l4
-GIVEN x IS A NUMBER
-double x MEANS x TIMES 2
-```
-
-### Fully Annotated Function
-
-```l4
-GIVEN n IS A NUMBER
-GIVETH A NUMBER
-DECIDE factorial n MEANS
-  IF n EQUALS 0
-  THEN 1
-  ELSE n TIMES factorial (n MINUS 1)
-```
-
-### With Local Definitions
-
-```l4
-circleArea radius MEANS
-  pi TIMES radius TIMES radius
-  WHERE
-    pi MEANS 3.14159
-```
-
-### With Aliases
-
-```l4
-`total cost` AKA `final price` MEANS
-  basePrice PLUS tax
-```
-
-### Anonymous Functions (Lambdas)
-
-Use `GIVEN ... YIELD` for inline functions:
-
-```l4
-GIVEN numbers IS A LIST OF NUMBER
-`all positive` MEANS all (GIVEN n YIELD n > 0) numbers
-```
-
-## Function Definition Patterns
-
-### Named Constants
-
-No parameters needed:
-
-```l4
-DECIDE pi IS 3.14159
-DECIDE greeting IS "Hello, World!"
-```
-
-### Single Parameter
-
-```l4
-GIVEN x IS A NUMBER
-square x MEANS x TIMES x
-```
-
-### Multiple Parameters
-
-```l4
-GIVEN a IS A NUMBER
-      b IS A NUMBER
-add a b MEANS a PLUS b
-```
-
-### Boolean Decisions
-
-Use `DECIDE ... IF` for boolean-returning functions:
+A function takes inputs and computes a result from them. In L4 each rule is a function: `GIVEN` names and types its inputs, `GIVETH` states the type of its result, and `DECIDE` or `MEANS` gives the expression that computes it. A function without inputs is a named value.
 
 ```l4
 GIVEN age IS A NUMBER
-DECIDE `is adult` IF age >= 18
+GIVETH A BOOLEAN
+DECIDE `is an adult` age IF age >= 18
 ```
 
-## Mixfix Function Definitions
+## Pages
 
-L4 functions do not have to put the function name first. In a **mixfix** definition, the parameters declared with GIVEN are interleaved with the identifier words of the function name, so calls read like natural language:
+- [DECIDE](DECIDE.md): define a value or a function, including `DECIDE … IF` and functions written as several clauses
+- [GIVEN and GIVETH](GIVEN.md): declare the inputs and the result type
+- [MEANS](MEANS.md): define without `DECIDE`
+- [LET and WHERE](LET.md): local definitions before or after an expression
+- [YIELD](YIELD.md): functions without a name
+- [AKA](AKA.md): more than one name for the same function, value, type or section
+- [WITH](WITH.md): supply a call's arguments by name
+
+## Mixfix functions
+
+A function's name does not have to come first. In a **mixfix** function, the `GIVEN` inputs are placed between the words of the name, so a call reads like a sentence:
 
 ```l4
 GIVEN mom IS A STRING
       dad IS A STRING
       kid IS A STRING
-GIVES A STRING
+GIVETH A STRING
 mom and dad `have a baby named` kid MEANS
     CONCAT "mother: ", mom, ", father: ", dad, ", child: ", kid
-```
 
-The call site uses the same word order:
-
-```l4
 #EVAL "alice" and "bob" `have a baby named` "carol"
 ```
 
-Key points:
+- A call uses the same word order as the definition.
+- Inputs can come before, between or after the words, so a function can be infix (``applicant `is entitled to` benefit``) or postfix (`n squared`).
+- A word of the name can be a quoted identifier with spaces, such as `` `is entitled to` ``, so the words can be legal phrases.
+- The words that are not inputs act as keywords of that function. When a call mixes inputs and words, L4 finds the function by those words.
 
-- Parameters may appear before, between, or after the function's identifier words — enabling infix (`x plus y`) and postfix (`n squared`) conventions as well.
-- Backtick-quoted identifiers may contain spaces, so the "name words" can be multi-word legal phrases (`` `is entitled to` ``).
-- The words of the pattern that are not parameters act as **mixfix keywords**. The typechecker records each mixfix definition — its written pattern and checked type signature — in a **mixfix registry**, which it uses to resolve call sites where arguments and keywords are interleaved.
-- Tooling reuses the registry: the document renderer derives prose **headings** for mixfix functions from the registered pattern, rendering each parameter slot in the author's original word order (so even functions that are never called elsewhere get proper headings).
+A mixfix function cannot be written as [several clauses](DECIDE.md#several-clauses); use `CONSIDER` in its body.
 
-For when to reach for mixfix and more worked examples, see [Advanced Patterns: Mixfix Function Definitions](../patterns/README.md#mixfix-function-definitions).
+When to use mixfix, with worked examples: [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md).
 
-## Local Bindings
+## Related pages
 
-Two styles for introducing local definitions:
-
-### WHERE (definitions after)
-
-```l4
-result MEANS x PLUS y
-  WHERE
-    x MEANS 10
-    y MEANS 20
-```
-
-### LET (definitions before)
-
-```l4
-result MEANS
-  LET x IS 10, y IS 20
-  IN x PLUS y
-```
-
-## See Also
-
-- **[Types Reference](../types/README.md)** - Available types for parameters and returns
-- **[Operators Reference](../operators/README.md)** - Operators for expressions
-- **[Control Flow Reference](../control-flow/README.md)** - IF, CONSIDER, and other constructs
+- [Types](../types/README.md): types of inputs and results
+- [Operators](../operators/README.md): operators inside expressions
+- [Control flow](../control-flow/README.md): `IF`, `BRANCH` and `CONSIDER`

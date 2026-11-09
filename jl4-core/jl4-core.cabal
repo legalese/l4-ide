@@ -26,7 +26,7 @@ flag safe-mode
   manual: True
 
 flag serialise-support
-  description: Enable Serialise instances for AST types (for jl4-service CBOR caching). Disable for WASM builds where cborg doesn't compile.
+  description: Enable Serialise instances for AST types. jl4-service used them to cache checked modules and no longer does, so nothing in this repository uses them. Disable for WASM builds where cborg doesn't compile.
   default: True
   manual: True
 
@@ -150,6 +150,19 @@ library
     L4.EvaluateLazy.GraphViz2
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
+    L4.Ledger.Append
+    L4.Ledger.Offer
+    L4.Ledger.Replay
+    L4.Ledger.Row
+    L4.Ledger.Store
+    L4.Lts.Explore
+    L4.Lts.Explore.Check
+    L4.Lts.Explore.Emit
+    L4.Lts.Explore.Emit.Aut
+    L4.Lts.Explore.Emit.Model
+    L4.Lts.Explore.Emit.Pnml
+    L4.Lts.Explore.Emit.Smv
+    L4.Lts.Explore.Emit.Tla
     L4.Lts.List
     L4.Lts.Marking
     L4.Lts.WhatIf
@@ -185,11 +198,14 @@ library
     L4.Parser.ResolveAnnotation
     L4.Parser.SrcSpan
     L4.ParserCombinators
+    L4.Presumption
     L4.Print
     L4.Print.Columnar
+    L4.SmartPunctuation
     L4.Syntax
     L4.TemporalContext
     L4.TracePolicy
+    L4.Refusal
     L4.Transform
     L4.TypeCheck
     L4.TypeCheck.Annotation
@@ -198,6 +214,7 @@ library
     L4.TypeCheck.Types
     L4.TypeCheck.Unify
     L4.TypeCheck.With
+    L4.IgnoredAnnotation
     L4.Yscript.IR
     L4.Yscript.Lower
     L4.Yscript.Emit
@@ -206,6 +223,7 @@ library
     L4.Utils.Ratio
     L4.Crypto.SHA1
     L4.Crypto.UUID5
+    L4.Viz.AtomKey
     L4.Viz.GuardedRows
     L4.Viz.Ladder
     L4.Viz.VizExpr
@@ -227,34 +245,52 @@ test-suite jl4-core-test
     ImportResolutionSpec
     TemporalContextSpec
     UnifySpec
+    WarningViableForkSpec
     DeprecatedAssumeSpec
+    AtomKeyDigestSpec
+    AtomKeyFixtures
+    AtomKeySpec
+    LadderFreshIdSpec
+    LadderDoubleNegationSpec
     MixfixParserSpec
+    NestedParenParserSpec
+    MixfixRegistryMergeSpec
     EventExactPrintSpec
     FormatFidelitySpec
     PatternMatchParserSpec
     BulletParserSpec
+    PatternClausesMissingSpec
     UUID5Spec
     ExportReadSetSpec
     ExportValidationSpec
+    NonassertableSpec
     CatalaLowerSpec
+    DisambiguationWarningsSpec
     NumberLiteralSpec
     NlgLangTagSpec
     RenderLangDirSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
+    CheckDirectiveResultsSpec
     ResolutionCascadeSpec
     RefAnnotationSpec
     NlgPercentSpec
+    LibraryNlgSpec
     NlgRenderSpec
     TracePostprocessSpec
+    UnknownInputsSpec
+    UnknownAnnotationSpec
+    GraphVizStubSpec
     EdgeCrashSpec
     PrintRoundtripSpec
+    MultiClausePrintSpec
     PrettyLayoutNlgSpec
     NlgMultiplicitySpec
     NlgAttachmentSpec
     SectionGivenTdnrSpec
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
+    InterruptedForceSpec
     RecordLedgerSpec
     LedgerRenderingSpec
     M4PartyLedgerSpec
@@ -262,12 +298,16 @@ test-suite jl4-core-test
     M5DeonticSequencingSpec
     BitemporalSubstrateSpec
     BitemporalRecallSpec
+    BreachClocksSpec
     TraceOrderingSpec
     StateGraphSpec
     DeonticStepSpec
+    LtsEmitSpec
+    LtsExploreSpec
     LtsListSpec
     LtsMarkingSpec
     LtsWhatIfSpec
+    LedgerSpec
     DominatorsSpec
     RelationalSpec
     BlawxAssumeSpec
@@ -276,6 +316,10 @@ test-suite jl4-core-test
     BlawxLiftSpec
     BlawxParseSpec
     ApiStateGraphLensSpec
+    SmartPunctuationSpec
+    TimezoneTimeoutSpec
+    ConsiderScaleSpec
+    VariadicRescueScaleSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
@@ -284,10 +328,13 @@ test-suite jl4-core-test
     bytestring,
     containers,
     deepseq,
+    directory,
+    filepath,
     hspec,
     jl4-core,
     megaparsec,
     optics,
+    QuickCheck,
     text,
     time,
     vector

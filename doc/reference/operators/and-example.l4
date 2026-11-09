@@ -2,10 +2,10 @@
 
 § `AND keyword examples`
     GIVEN age IS A NUMBER
-          hasLicense IS A BOOLEAN
-          personAge IS A NUMBER
-          personIncome IS A NUMBER
-          hasCriminalRecord IS A BOOLEAN
+          `has license` IS A BOOLEAN
+          `person age` IS A NUMBER
+          `person income` IS A NUMBER
+          `has criminal record` IS A BOOLEAN
 
 -- Basic AND Operations
 
@@ -21,52 +21,52 @@
 
 -- In Conditional Logic
 
-DECIDE canDrive IS age >= 16 AND hasLicense
+DECIDE `can drive` IS age >= 16 AND `has license`
 
-#CHECK canDrive
+#CHECK `can drive`
 
 -- Chaining Multiple Conditions
 
 GIVEN a IS A BOOLEAN
       b IS A BOOLEAN
       c IS A BOOLEAN
-allTrue a b c MEANS a AND b AND c
+`all true` a b c MEANS a AND b AND c
 
-#EVAL allTrue TRUE TRUE TRUE
-#EVAL allTrue TRUE TRUE FALSE
+#EVAL `all true` TRUE TRUE TRUE
+#EVAL `all true` TRUE TRUE FALSE
 
 -- Layout-Sensitive AND (Vertical Format)
 
-DECIDE isEligible IS
-      personAge >= 18
-  AND personIncome > 30000
-  AND NOT hasCriminalRecord
+DECIDE `is eligible` IS
+      `person age` >= 18
+  AND `person income` > 30000
+  AND NOT `has criminal record`
 
-#CHECK isEligible
+#CHECK `is eligible`
 
 -- Complex Expressions with AND
 
 GIVEN x IS A NUMBER, y IS A NUMBER
-inRange x y MEANS x >= 0 AND x <= 100 AND y >= 0 AND y <= 100
+`in range` x y MEANS x >= 0 AND x <= 100 AND y >= 0 AND y <= 100
 
-#EVAL inRange 50 50
-#EVAL inRange 150 50
+#EVAL `in range` 50 50
+#EVAL `in range` 150 50
 
 -- AND with Comparisons
 
 GIVEN score IS A NUMBER
-passingGrade score MEANS score >= 60 AND score <= 100
+`passing grade` score MEANS score >= 60 AND score <= 100
 
-#EVAL passingGrade 75
-#EVAL passingGrade 55
+#EVAL `passing grade` 75
+#EVAL `passing grade` 55
 
 -- AND in IF Expressions
 
-GIVEN userAge IS A NUMBER, hasPermission IS A BOOLEAN
-accessLevel userAge hasPermission MEANS
-  IF userAge >= 18 AND hasPermission
+GIVEN `user age` IS A NUMBER, `has permission` IS A BOOLEAN
+`access level` `user age` `has permission` MEANS
+  IF `user age` >= 18 AND `has permission`
   THEN "full access"
   ELSE "restricted"
 
-#EVAL accessLevel 25 TRUE
-#EVAL accessLevel 25 FALSE
+#EVAL `access level` 25 TRUE
+#EVAL `access level` 25 FALSE

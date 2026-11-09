@@ -1,0 +1,9 @@
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+                         deliver
+
+GIVETH A DEONTIC Person Action
+cure MEANS
+  PARTY Buyer MUST pay 100 WITHIN 30
+  HENCE (PARTY Seller MUST deliver WITHIN 5 OF THE DEADLINE)
+  LEST  BREACH

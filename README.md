@@ -1,8 +1,19 @@
+![L4 Logo](doc/l4.svg)
+
 # L4 with IDE
 
-**L4** is a domain-specific programming language for law. It formalizes legal rules and contracts as executable specifications, bringing software engineering rigor to legal drafting and analysis.
+**L4** is a domain-specific programming language for law by [Legalese](https://legalese.com). It formalizes legal rules and contracts as executable specifications, bringing software engineering rigor to legal drafting and analysis.
 
 This repository contains the L4 compiler, IDE tooling (VS Code extension, LSP, REPL, web editor), and a decision service that exposes L4 rules as REST APIs and MCP tools.
+
+- [Design principles](https://legalese.com/l4/concepts/language-design/principles) — the principles behind L4's design and the style of writing that follows from them
+- [Reading like the law](https://legalese.com/l4/concepts/language-design/linguistic-syntax) — how L4 borrows from natural language so that rules read like legal text
+- [Definitions and duties](https://legalese.com/l4/concepts/legal-modeling/constitutive-vs-regulative) — constitutive and regulative rules, kept apart in the type system
+- [Exceptions and defaults](https://legalese.com/l4/concepts/legal-modeling/default-reasoning) — a general rule followed by exceptions, the law's most common shape
+- [How obligations unfold](https://legalese.com/l4/concepts/legal-modeling/regulative-rules) — who must, may or must not do what, by when, and what follows
+- [Types as legal categories](https://legalese.com/l4/concepts/type-system/algebraic-types) — why algebraic data types fit legal structure
+- [Exhaustiveness](https://legalese.com/l4/concepts/type-system/exhaustiveness) — every case of a determination handled
+- [Type theory](https://legalese.com/l4/concepts/type-system/type-theory) — the formal foundations of L4's type system
 
 ## What You Get From a Single L4 File
 
@@ -18,8 +29,9 @@ This repository contains the L4 compiler, IDE tooling (VS Code extension, LSP, R
 - **Install the VS Code extension:** [L4 Rules-as-code on the Marketplace](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode)
 - **Try the web editor:** <https://jl4.legalese.com/>
 - **Encode a law or a contract:** [Encoding an Act or a Contract From Scratch](#encoding-an-act-or-a-contract-from-scratch) — prerequisites, and where to get an `l4` binary without building one
-- **Learn L4:** [Foundation Course](doc/courses/foundation/README.md) — no prior programming experience required
-- **Full documentation:** [doc/README.md](doc/README.md)
+- **Learn L4:** [Foundation Course](https://legalese.com/l4/courses/foundation) — no prior programming experience required
+- **Deploy your L4 projects to Legalese Cloud:** [Deploy your rules](https://legalese.com/l4/tutorials/deploying-rules/exporting-rules-for-deployment) — publish rules as APIs that apps and AI agents can call
+- **Full documentation:** [legalese.com/l4](https://legalese.com/l4)
 
 ## Encoding an Act or a Contract From Scratch
 
@@ -72,13 +84,15 @@ claude
 > with test assertions for each of the worked examples in the schedule.
 ```
 
-Two skills load on a request of that shape. **`encoding-a-subject`** is the workflow around the L4: a brief that pins scope and deliverables, a coverage table listing every provision before any is encoded, the shared nouns before the rules, tests taken from the source rather than from the code, a self-check that reads diagnostics rather than exit codes (`l4 run` exits 0 on a failed `#ASSERT`), an independent test pass, and filing the result in [legalese/canon](https://github.com/legalese/canon). **`writing-l4-rules`** carries the language: the house style, the builtin libraries, eleven reference notes on recurring source patterns — definitions and scope, conditions, quantities, dates, duties and powers, presumptions, discretion, text that is not a rule — and the traps a general-purpose model gets wrong unaided.
+Two skills load on a request of that shape. **`encoding-a-subject`** is the workflow around the L4: a brief that pins scope and deliverables, a coverage table listing every provision before any is encoded, the shared nouns before the rules, tests taken from the source rather than from the code, a self-check that reads diagnostics rather than exit codes (an `l4` built before legalese/l4-ide#518 exits 0 on a failed `#ASSERT`), an independent test pass, and filing the result in [legalese/canon](https://github.com/legalese/canon). **`writing-l4-rules`** carries the language: the house style, the builtin libraries, eleven reference notes on recurring source patterns — definitions and scope, conditions, quantities, dates, duties and powers, presumptions, discretion, text that is not a rule — and the traps a general-purpose model gets wrong unaided.
 
 From there it is the ordinary loop: draft a provision, `l4 check` it, add `#EVAL` assertions for the examples the source itself gives you, run them, and move on. Encode the source's own worked examples first — they are the only tests whose expected answers you did not invent.
 
 ### When the encoding exists, the pipeline picks it up
 
-Only once there is an encoding does `etc/go/go.sh` become useful, and this is the right order: the pipeline **validates and projects an encoding**, it does not produce one. Register your body of law as a subject, and every later stage is scoped to it:
+Only once there is an encoding does `etc/go/go.sh` become useful, and this is the right order: the pipeline **validates and projects an encoding**, it does not produce one.
+The pipeline is Legalese's private repository `legalese/l4-pipeline`; with access, clone it into `etc/go/` of this checkout, which ignores that directory.
+Register your body of law as a subject, and every later stage is scoped to it:
 
 ```bash
 etc/go/go.sh new-subject sg-tax \
@@ -121,7 +135,11 @@ That phrasing is the trigger for the `running-the-l4-pipeline` skill, which disp
 | [ts-apps/jl4-web](ts-apps/jl4-web/) | Web-based editor (Svelte)                  |
 | [ts-shared](ts-shared/)             | Shared libraries (RPC client, visualizers) |
 
-**Documentation:** See [doc/](doc/) for the language reference, tutorials, courses, and concept guides.
+**Documentation:** The language reference, tutorials, courses, and concept guides are published at [legalese.com/l4](https://legalese.com/l4); their source is in [doc/](doc/).
+
+## VS Code Extension
+
+Provides syntax highlighting, type checking, inline evaluation, `@export` previews, deployment management, a built-in Legalese AI chat tab, and an automatically-registered local MCP server for any AI agent that speaks the protocol (Copilot, Claude Code, Cursor, ...). Connects to [Legalese Cloud](https://legalese.cloud) or a self-hosted `jl4-service` instance. See [ts-apps/vscode/README.md](ts-apps/vscode/README.md).
 
 ## Building From Source
 
@@ -144,10 +162,6 @@ cabal run jl4-repl -- path/to/file.l4
 
 The REPL provides live evaluation, module reloading (`:load`, `:reload`), query planning (`:decides`, `:queryplan`), and trace output (`:trace`, `:traceascii`, `:tracefile`). See [jl4-repl/README.md](jl4-repl/README.md) for the full command list.
 
-## VS Code Extension
-
-Provides syntax highlighting, type checking, inline evaluation, `@export` previews, deployment management, a built-in Legalese AI chat tab, and an automatically-registered local MCP server for any AI agent that speaks the protocol (Copilot, Claude Code, Cursor, ...). Connects to [Legalese Cloud](https://legalese.cloud) or a self-hosted `jl4-service` instance. See [ts-apps/vscode/README.md](ts-apps/vscode/README.md).
-
 ## Trace Visualization
 
 Every tool in this repo can render an L4 evaluation as a GraphViz diagram:
@@ -162,10 +176,10 @@ Install GraphViz with `brew install graphviz` or `apt-get install graphviz` to r
 
 L4 ships with foundational libraries for building legal and commercial applications:
 
-- [Jurisdiction](jl4-core/libraries/jurisdiction.l4) — ISO 3166 country codes, US states, Canadian provinces, EU
-- [Currency](jl4-core/libraries/currency.l4) — ISO 4217 currency codes with integer minor-unit storage
-- [Legal Persons](jl4-core/libraries/legal-persons.l4) — individuals, corporations, partnerships, LLCs, trusts
-- [Holdings](jl4-core/libraries/holdings.l4) — ownership structures and beneficial ownership
+- [Jurisdiction](https://legalese.com/l4/reference/libraries/jurisdiction) — ISO 3166 country codes, US states, Canadian provinces, EU
+- [Currency](https://legalese.com/l4/reference/libraries/currency) — ISO 4217 currency codes with integer minor-unit storage
+- [Legal Persons](https://legalese.com/l4/reference/libraries/legal-persons) — individuals, corporations, partnerships, LLCs, trusts
+- [Holdings](https://legalese.com/l4/reference/libraries/holdings) — ownership structures and beneficial ownership
 
 ## Real-World Impact
 

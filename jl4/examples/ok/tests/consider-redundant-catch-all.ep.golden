@@ -1,0 +1,132 @@
+-- A branch that matches anything, after a branch that already matches
+-- anything, is reported as redundant, as a branch after it with a
+-- constructor in it is. Each rule below says in its comment whether it is
+-- reported, and a rule that is not reported is not by design.
+
+DECLARE Tier IS ONE OF Basic, Gold
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+-- Reported: `v` matches every tier, so the OTHERWISE is never reached.
+GIVEN t IS A Tier
+GIVETH A NUMBER
+DECIDE afterName t IS
+  CONSIDER t
+  WHEN v THEN 1
+  OTHERWISE 2
+
+#EVAL afterName Gold   -- 1
+
+-- Reported, over a MAYBE too.
+GIVEN m IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE afterNameMaybe m IS
+  CONSIDER m
+  WHEN v THEN 1
+  OTHERWISE 2
+
+-- Reported: a wildcard matches every tier as well.
+GIVEN t IS A Tier
+GIVETH A NUMBER
+DECIDE afterWildcard t IS
+  CONSIDER t
+  WHEN `_` THEN 1
+  OTHERWISE 2
+
+-- Reported: `EXACTLY n` in `CONSIDER n` matches every number, as `OTHERWISE` does.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE afterExactlyOwn n IS
+  CONSIDER n
+  WHEN EXACTLY n THEN 1
+  OTHERWISE 2
+
+-- Reported, with a number before it.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE afterNumberAndExactlyOwn n IS
+  CONSIDER n
+  WHEN 0 THEN 1
+  WHEN EXACTLY n THEN 2
+  OTHERWISE 3
+
+#EVAL afterNumberAndExactlyOwn 5   -- 2
+
+-- Reported: the second name, and the second OTHERWISE, are never reached.
+GIVEN t IS A Tier
+GIVETH A NUMBER
+DECIDE twoNames t IS
+  CONSIDER t
+  WHEN v THEN 1
+  WHEN w THEN 2
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE twoOtherwises n IS
+  CONSIDER n
+  WHEN 0 THEN 1
+  OTHERWISE 2
+  OTHERWISE 3
+
+-- Reported: a CONSIDER written inside the body of a clause is checked like
+-- any other, whatever the CONSIDERs the clauses compile to are.
+GIVEN n IS A NUMBER
+      t IS A Tier
+GIVETH A NUMBER
+DECIDE inBody 0 t IS
+  CONSIDER t
+  WHEN v THEN 1
+  OTHERWISE 2
+DECIDE inBody n t IS n
+
+-- Not reported: Red is not the only colour.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE notCovered c IS
+  CONSIDER c
+  WHEN Red THEN 1
+  OTHERWISE 2
+
+-- Not reported: a number is not the only number.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE notCoveredNumber n IS
+  CONSIDER n
+  WHEN 0 THEN 1
+  OTHERWISE 2
+
+-- Not reported, deliberately: a trailing OTHERWISE after branches that name
+-- every constructor is a defensive catch-all, and is allowed.
+GIVEN t IS A Tier
+GIVETH A NUMBER
+DECIDE defensive t IS
+  CONSIDER t
+  WHEN Basic THEN 1
+  WHEN Gold THEN 2
+  OTHERWISE 3
+
+GIVEN m IS A MAYBE NUMBER
+GIVETH A NUMBER
+DECIDE defensiveMaybe m IS
+  CONSIDER m
+  WHEN NOTHING THEN 0
+  WHEN JUST v THEN v
+  OTHERWISE 9
+
+-- Not reported: the clauses compile to a CONSIDER with an OTHERWISE after
+-- `other`, which matches nothing, and nobody wrote that OTHERWISE. The one
+-- warning is the clause that is never used, in the clauses' terms.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE size 0     IS 1
+DECIDE size other IS 2
+DECIDE size 1     IS 3
+
+#EVAL size 1   -- 2
+
+-- Not reported: the same, in a rule with two inputs.
+GIVEN t IS A Tier
+      n IS A NUMBER
+GIVETH A NUMBER
+DECIDE price Basic n IS 1
+DECIDE price rest  n IS 2
+DECIDE price Gold  n IS 3

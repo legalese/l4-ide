@@ -1,7 +1,9 @@
 # Example: a real brief
 
 This is the brief behind the 2026-09-21 comparison described in `SKILL.md` — four independent encodings of an Israeli licensing Law and its fee regulations, all from this text and the sources it names.
-Paths are generalised; nothing else is changed.
+Paths are generalised; nothing else in the brief is changed.
+Its rule "Cite the section or regulation on every rule (`@ref` or a comment)" is left as the encoders were given it, because this page is a record of what they were told.
+A brief written today follows [`source-locators.md`](source-locators.md) for citations.
 
 Things worth copying from it:
 
@@ -52,9 +54,9 @@ example beneath it), transcribed and run.
 
 ## Deliverables, all under your `DEPOSIT` directory (given in your task)
 
-1. `.l4` modules with ASCII filenames. Decompose as you see fit. Every module starts with
-   `@lang en`. Source language is English; identifiers are English backtick names that read
-   like the statute. `@nlg:he` Hebrew heralds are welcome but optional.
+1. `.l4` modules with ASCII filenames. Decompose as you see fit. The encoding is in English,
+   so no module carries a `@lang` line: a module that declares nothing is English. Identifiers
+   are English backtick names that read like the statute. `@nlg:he` Hebrew heralds are welcome but optional.
 2. A tests module that (a) transcribes the SimpLEX table's rows as `#ASSERT`s against the
    DRAFT, in the table's own outcome words, and (b) runs the same scenarios against the
    other two vintages, asserting what each vintage actually answers.
@@ -75,8 +77,8 @@ example beneath it), transcribed and run.
   plausible default. A gap is a finding, not a bug.
 - **An assertion that fails is a finding.** Never edit an expected value to match what the
   code computed. Report it.
-- **Read the DIAGNOSTICS, not the exit code.** `l4 run` exits 0 when an `#ASSERT` fails; the
-  failure is a `DiagnosticSeverity_Error` line. Never report `checked: true` for a green you
+- **Read the DIAGNOSTICS, not the exit code.** An `l4` built before legalese/l4-ide#518 exits 0 when an
+  `#ASSERT` fails, and no exit code says which one; the failure is a `DiagnosticSeverity_Error` line. Never report `checked: true` for a green you
   did not see in the output.
 - **Dates** need `IMPORT daydate` (`YMD y m d`, `add months`, `add years`, `DATE_YEAR`).
   Arithmetic on dates without it produces an ambiguous-operator error, not a date.

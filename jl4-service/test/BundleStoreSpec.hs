@@ -5,10 +5,16 @@ module BundleStoreSpec (spec) where
 import Test.Hspec
 
 import BundleStore
+import Control.Concurrent.Async (concurrently, forConcurrently)
+import Control.Exception (SomeException, try)
+import Data.Aeson (Value, eitherDecodeFileStrict', encode, object, (.=))
+import Data.List (isSuffixOf)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import System.Directory (removeDirectoryRecursive, doesDirectoryExist, createDirectoryIfMissing)
+import System.Directory (doesDirectoryExist, createDirectoryIfMissing, listDirectory)
 import System.FilePath ((</>))
+
+import TestStoreDir (withStoreDir)
 
 spec :: Spec
 spec = describe "BundleStore" do
@@ -100,6 +106,35 @@ spec = describe "BundleStore" do
         files <- listSourceFiles store deployId
         files `shouldNotContain` ["src/l4/find-cross-defaults.l4"]
 
+    describe "overlapping saves for one deployment" do
+      -- The two single-file saves used to write a temp file with a FIXED name
+      -- (@metadata.json.tmp@, @metadata-cache.json.tmp@), and the cache save
+      -- also removed the target before renaming. Two saves for one deployment
+      -- that overlapped therefore shared one temp file, and the second rename
+      -- found it already gone. The cause is inferred from one such failure
+      -- under load, not reproduced. Each save now writes a temp file of its
+      -- own and renames it over the target.
+      it "50 concurrent saves of each file all succeed and leave whole JSON" \store -> do
+        let meta0 = StoredMetadata "v1" "2025-01-01T00:00:00Z" Nothing Nothing Nothing
+            dir = store.storePath </> "contended"
+            -- Payloads of different sizes, so that one write over another's
+            -- would leave a tail and not decode.
+            pad n = Text.replicate (n * 400) "x"
+        saveBundle store "contended" (Map.singleton "main.l4" "DECIDE f IS TRUE") meta0
+        (metaResults, cacheResults) <- concurrently
+          (forConcurrently [1 .. 50 :: Int] \n -> try @SomeException $
+            saveStoredMetadata store "contended" meta0 { smDescription = Just (pad n) })
+          (forConcurrently [1 .. 50 :: Int] \n -> try @SomeException $
+            saveMetadataCache store "contended" (encode (object ["worker" .= n, "pad" .= pad n])))
+        [show e | Left e <- metaResults ++ cacheResults] `shouldBe` []
+        metaDecoded <- eitherDecodeFileStrict' @StoredMetadata (dir </> "metadata.json")
+        either (const Nothing) (Just . (.smVersion)) metaDecoded `shouldBe` Just "v1"
+        cacheDecoded <- eitherDecodeFileStrict' @Value (dir </> "metadata-cache.json")
+        cacheDecoded `shouldSatisfy` either (const False) (const True)
+        -- No temp file is left behind.
+        entries <- listDirectory dir
+        filter (".tmp" `isSuffixOf`) entries `shouldBe` []
+
     describe "listDeployments" do
       it "lists saved deployments" \store -> do
         let meta = StoredMetadata "v1" "2025-01-01T00:00:00Z" Nothing Nothing Nothing
@@ -130,12 +165,6 @@ spec = describe "BundleStore" do
 
 -- | Create a temp store, run the test, then clean up.
 withTempStore :: (BundleStore -> IO ()) -> IO ()
-withTempStore action = do
-  let tmpPath = "/tmp/jl4-service-test-store"
-  -- Clean up any previous test run
-  exists <- doesDirectoryExist tmpPath
-  if exists then removeDirectoryRecursive tmpPath else pure ()
+withTempStore action = withStoreDir "store" \tmpPath -> do
   store <- initStore tmpPath
   action store
-  -- Clean up after test
-  removeDirectoryRecursive tmpPath

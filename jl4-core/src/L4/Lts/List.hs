@@ -76,6 +76,7 @@ import L4.EvaluateLazy
   , EvalDirectiveValue (..)
   , ReductionOutcome (..)
   , prettyEvalException
+  , prettyReductionOutcome
   , prettyRefusal
   )
 import L4.EvaluateLazy.DeonticStep
@@ -185,6 +186,8 @@ standingOf res = case res.result of
   Reduction (Reduced Omitted)    -> NotEvaluated "the result was omitted"
   Reduction (ReducedRefused ref) -> NotEvaluated (Text.unlines (prettyRefusal ref))
   Reduction (ReducedErrored exc) -> NotEvaluated (Text.unlines (prettyEvalException exc))
+  -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+  Reduction o@(ReducedUndetermined _) -> NotEvaluated (prettyReductionOutcome o)
   Assertion _                    -> NotEvaluated "not a #TRACE"
 
 -- | A @#TRACE name AT 0 WITH@ — no events — for a top-level rule the file

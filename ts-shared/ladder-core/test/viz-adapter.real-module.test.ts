@@ -22,6 +22,12 @@
  * contract end to end. Node ids below are the LSP's own: capacity=3, of-age=5,
  * parental=7, spousal=8.
  *
+ * Its four `atomId`s were restamped, not recaptured, when an atomId became the
+ * hash of the leaf's term rather than its printed label (R3,
+ * smucclaw/l4-ide#1013): each was replaced by the id the same render path now
+ * gives that leaf, and jl4-service's `QueryPlanSpec` pins the new four. Nothing
+ * else in the capture changed.
+ *
  * The `typically` field the LSP actually emitted (verified in the golden):
  *   - `person has capacity`  → true   (ASSUME, boolean TYPICALLY TRUE)
  *   - `has parental approval`→ false  (GIVEN,  boolean TYPICALLY FALSE)

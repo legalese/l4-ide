@@ -1,0 +1,18 @@
+DECLARE Case HAS measure IS A STRING
+DECLARE Person IS ONE OF Official
+DECLARE Action IS ONE OF Take HAS who IS A Person, what IS A STRING
+
+GIVEN c IS A Case
+GIVETH A DEONTIC Person Action
+rule c MEANS
+    PARTY Official
+    MAY Take Official m PROVIDED m EQUALS c's measure
+    WITHIN 5
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE rule (Case "fine") AT 0 WITH
+  PARTY Official DOES Take Official "fine" AT 2
+
+#TRACE rule (Case "fine") AT 0 WITH
+  PARTY Official DOES Take Official "other" AT 2

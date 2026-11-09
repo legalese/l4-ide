@@ -1,0 +1,11 @@
+-- The mixfix rule comes from another file; the rule below has an input named
+-- like its word, and is left alone there too.
+IMPORT `mixfix-input-named-like-word-def`
+
+GIVEN plus IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+total plus y MEANS plus * y
+
+#EVAL 3 `plus` 4    -- 7
+#EVAL total 3 4     -- 12

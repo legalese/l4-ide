@@ -1,6 +1,4 @@
-# Module 3: Control Flow
-
-**Prerequisites:** Modules 1–2
+# Module 3: Control flow
 
 In this module, you'll learn how to handle conditional logic, work with lists, and use boolean operators in L4.
 
@@ -44,7 +42,7 @@ When you need to choose between multiple alternatives based on conditions, use `
 Nested IF/THEN/ELSE can lead to indentation problems and is harder to read:
 
 ```l4
--- ❌ Avoid: Nested IF/THEN/ELSE (fragile indentation)
+-- Avoid: Nested IF/THEN/ELSE (fragile indentation)
 `grade` MEANS
     IF score >= 90 THEN "A"
     ELSE IF score >= 80 THEN "B"
@@ -56,7 +54,7 @@ Nested IF/THEN/ELSE can lead to indentation problems and is harder to read:
 BRANCH provides a cleaner, more readable alternative:
 
 ```l4
--- ✅ Better: BRANCH (clear, flat structure)
+-- Better: BRANCH (clear, flat structure)
 GIVEN score IS A NUMBER
 GIVETH A STRING
 `grade` MEANS
@@ -215,7 +213,7 @@ Two habits keep you out of trouble:
 - Put `NOT` at the **end** of a line whenever you can — `a AND NOT b` is fine, because there is nothing left for the `NOT` to swallow.
 - Otherwise, **bracket the `NOT`**, not the thing it negates.
 
-The full rule, including what happens when a rule runs over several lines, is in the [NOT reference page](../../reference/operators/NOT.md#how-far-does-not-reach).
+The full rule, including what happens when a rule runs over several lines, is in the [NOT reference page](../../reference/operators/logical.md#how-far-does-not-reach).
 
 ---
 
@@ -280,17 +278,17 @@ all (GIVEN n YIELD n > 0) numbers
 any (GIVEN n YIELD n < 0) numbers
 ```
 
-The `GIVEN ... YIELD` creates an anonymous function (lambda).
+`GIVEN n YIELD n > 0` is a function without a name (a lambda): read it as "given a number n, is n greater than 0?". `all` asks that question of every item. [Module 5](module-5-functions.md#higher-order-functions) covers these functions in full; for now, copy the pattern.
 
 ### Important: Parentheses with Field Access
 
 When passing field access to functions, use parentheses:
 
 ```l4
--- ❌ Wrong: Parser confusion
+-- Wrong: Parser confusion
 any (GIVEN c YIELD NOT c's `the conviction is spent`) person's `the person's convictions`
 
--- ✅ Right: Parentheses around the list argument
+-- Right: Parentheses around the list argument
 any (GIVEN c YIELD NOT c's `the conviction is spent`) (person's `the person's convictions`)
 ```
 
@@ -408,30 +406,30 @@ DECIDE `the person may purchase alcohol` IF
 ### 1. Missing ELSE
 
 ```l4
--- ❌ Wrong: No ELSE branch
+-- Wrong: No ELSE branch
 result MEANS IF condition THEN "yes"
 
--- ✅ Right: Both branches required
+-- Right: Both branches required
 result MEANS IF condition THEN "yes" ELSE "no"
 ```
 
 ### 2. Precedence Confusion
 
 ```l4
--- ❌ Confusing: What does this mean?
+-- Confusing: What does this mean?
 a OR b AND c IMPLIES d
 
--- ✅ Clear: Use parentheses
+-- Clear: Use parentheses
 (a OR (b AND c)) IMPLIES d
 ```
 
 ### 3. Forgetting Parentheses with Functions
 
 ```l4
--- ❌ Wrong: Parser error
+-- Wrong: Parser error
 length person's items > 0
 
--- ✅ Right: Parentheses around field access
+-- Right: Parentheses around field access
 length (person's items) > 0
 ```
 
@@ -458,6 +456,4 @@ Functions like `all`, `any`, `filter`, `map` require `IMPORT prelude`.
 
 ---
 
-## What's Next?
-
-In [Module 4: Decision Logic](module-4-decision-logic.md), you'll learn how to express constitutive rules for legal decision-making using DECIDE and MEANS, break down complex calculations with WHERE, and build legal determinations that read like natural language.
+Next, [Module 4: Decision logic](module-4-decision-logic.md) uses `DECIDE` and `MEANS` to write legal determinations, and `WHERE` to break them down.

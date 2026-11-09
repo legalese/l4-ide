@@ -176,7 +176,7 @@ data ImportResolutionError
 -- @A -> {B, C} -> D@, once B has resolved D, C must still receive D's exported
 -- environment. Returning @[]@ here (the old, name-set behaviour) type-checked C
 -- against an empty dependency environment, silently degrading the types and
--- entities of the second sibling that A then consumed. See issue #904.
+-- entities of the second sibling that A then consumed. See smucclaw/l4-ide#904.
 resolveImports
   :: forall m. Monad m
   => ModuleLookup m                      -- ^ How to find module sources
@@ -205,7 +205,7 @@ resolveImports lookupModule inProgress resolved (modName : rest)
           -- Parse the module
           case execProgramParserWithHintPass uri source of
             Left parseErrors ->
-              pure $ Left $ ParseError modName $ map (\(PError msg _ _) -> msg) (toList parseErrors)
+              pure $ Left $ ParseError modName $ map (\(PError msg _ _ _) -> msg) (toList parseErrors)
             
             Right (parsed, _hints, _warnings) -> do
               -- Extract and resolve transitive imports first
@@ -298,7 +298,7 @@ typecheckWithDependencies lookupModule uri source = do
   -- Parse the main module
   case execProgramParserWithHintPass uri source of
     Left parseErrors ->
-      pure $ Left $ map (\(PError msg _ _) -> msg) (toList parseErrors)
+      pure $ Left $ map (\(PError msg _ _ _) -> msg) (toList parseErrors)
     
     Right (parsed, _hints, _warnings) -> do
       -- Extract and resolve imports
@@ -371,6 +371,9 @@ combineResolvedImports uri imports =
         , TypeCheck.constBodies = finalState.constBodies
         , TypeCheck.sectionPaths = finalState.sectionPaths
         , TypeCheck.deferredChoices = 0
+        , TypeCheck.plural = False
+        , TypeCheck.bindLog = []
+        , TypeCheck.bindLogLen = 0
         }
     , finalEnv
     )
@@ -405,6 +408,9 @@ combineResolvedImports uri imports =
                -- imported 'Unique' is still never ranked (spec §5.5, FIX C).
              , TypeCheck.sectionPaths = Map.union accState.sectionPaths r.sectionPaths
              , TypeCheck.deferredChoices = 0
+             , TypeCheck.plural = False
+             , TypeCheck.bindLog = []
+             , TypeCheck.bindLogLen = 0
              }
          , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders
          )

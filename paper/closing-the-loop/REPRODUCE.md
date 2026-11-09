@@ -20,9 +20,9 @@ its own embedded prelude — pointing an older binary at this tree's libraries p
 bogus `could not find a definition` errors caused by prelude annotations its parser cannot read.
 The two rigs are not interchangeable.
 
-**`l4 run` exits 0 on a failing `#ASSERT`.** It prints `assertion failed` at
+**An `l4` built before legalese/l4-ide#518 exits 0 on a failing `#ASSERT`.** It prints `assertion failed` at
 `DiagnosticSeverity_Error` and carries on. The gate is therefore
-`grep DiagnosticSeverity_Error`, never `&&`. `reproduce.sh` does it that way.
+`grep DiagnosticSeverity_Error`, never `&&`, which is right on every binary. `reproduce.sh` does it that way.
 
 ## Claim → command
 

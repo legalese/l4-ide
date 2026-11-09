@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+unknown-annotation-ditto.l4:10:1-13:
+  assertion satisfied
+unknown-annotation-ditto.l4:11:1-13:
+  assertion satisfied
+unknown-annotation-ditto.l4:12:1-14:
+  assertion satisfied

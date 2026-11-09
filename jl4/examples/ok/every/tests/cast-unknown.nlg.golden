@@ -1,0 +1,7 @@
+executing contract `roll with unknown` at 0 with the following events: party `alice` did `Sign` with `alice` at 1
+executing contract `roll with bob` at 0 with the following events: party `alice` did `Sign` with `alice` at 1
+executing contract `roll uncast` at 0 with the following events: party `alice` did `Sign` with `alice` at 1
+executing contract `roll with landlord` at 0 with the following events: party `alice` did `Sign` with `alice` at 1
+executing contract `landlords with unknown` at 0 with the following events: party `theLandlord` did `Sign` with `theLandlord` at 1
+executing contract `unknown roll` at 0 with the following events: party `alice` did `Sign` with `alice` at 1
+executing contract `unknown rest of roll` at 0 with the following events: party `alice` did `Sign` with `alice` at 1

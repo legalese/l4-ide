@@ -1,0 +1,138 @@
+-- What evaluation does with an input nobody supplied, once it can carry
+-- one along instead of stopping at it (UNKNOWN-EVALUATION-SPEC §8 step 3).
+--
+-- Every input in the section below is unsupplied. A connective whose known
+-- operand decides it answers whatever the unknown is (`x AND FALSE` is
+-- `FALSE`); a comparison, an arithmetic operation, a field of an unknown
+-- record and a call to an assumed function become terms that name the input;
+-- and a directive whose answer still depends on an input is undetermined,
+-- which prints "I needed to know the value of …" and names every input it
+-- waits on, not only the first. The row numbers below are §4.12's.
+--
+-- `l4 run` EXITS 1 ON THIS FILE, BY DESIGN: an undetermined directive fails
+-- the run, as a stuck one always has (§4.7.4).
+
+IMPORT prelude
+
+DECLARE Person HAS age IS A NUMBER
+
+ASSUME g IS A FUNCTION FROM NUMBER TO BOOLEAN
+
+GIVEN k IS A NUMBER
+GIVETH A BOOLEAN
+older k MEANS age GREATER THAN k
+
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+`true or` b MEANS TRUE OR b
+
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+`or true` b MEANS b OR TRUE
+
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+`and an error` b MEANS b AND (1 DIVIDED BY 0 GREATER THAN 0)
+
+DECIDE total IS 1 PLUS 2 PLUS 3
+
+-- About 540,000 machine steps: more than the step limit (250,000) allows once
+-- the counter has started. Called afresh in each directive, never cached.
+GIVEN i IS A NUMBER
+GIVETH A NUMBER
+`count up from` i MEANS IF i AT LEAST 20000 THEN i ELSE `count up from` (i PLUS 1)
+
+§ `Unknown inputs`
+    GIVEN x IS A BOOLEAN
+          y IS A BOOLEAN
+          n IS A NUMBER
+          age IS A NUMBER
+          d IS A Person
+          m IS A MAYBE NUMBER
+
+-- A known operand that decides the connective decides it (rows 1 to 3, 5).
+#EVAL x AND FALSE
+#EVAL x OR TRUE
+#EVAL x UNLESS TRUE
+#EVAL and (LIST TRUE, x, FALSE)
+
+-- One that does not leaves the unknown, and the directive is undetermined,
+-- naming it (rows 4 and 6; `IMPLIES` keeps its node whatever its right
+-- operand is, so even `x IMPLIES TRUE` waits on `x` until build step 4).
+#EVAL x IMPLIES TRUE
+#EVALTRACE NOT x
+#EVAL TRUE AND (x IMPLIES TRUE)
+#EVAL (x IMPLIES TRUE) AND (y IMPLIES TRUE)
+
+-- Two unknowns: the answer names both (rows 23 and 24).
+#EVAL x AND y
+#ASSERT x AND y
+#ASSERT NOT (x AND y)
+
+-- An unknown equals itself (rows 10, 42, 66), and an equality over BOOLEANs
+-- is the biconditional, so `x EQUALS TRUE` is `x`.
+#EVAL x EQUALS x
+#EVAL n PLUS 1 EQUALS n PLUS 1
+#EVAL d's age EQUALS d's age
+#EVAL x EQUALS TRUE
+
+-- Comparisons are atoms, keyed by their term, and so is arithmetic over an
+-- unknown (rows 11, 12, 13, 15, 44, 46). The traces print the residual.
+#EVALTRACE n EQUALS 3
+#EVALTRACE 3 EQUALS n
+#EVALTRACE older 18 AND NOT older 65
+#EVAL age AT LEAST 18 OR age LESS THAN 18
+#EVAL n PLUS 1
+#EVALTRACE elem n (LIST 1, 2)
+
+-- A field of an unknown record names the field path (rows 35, 37).
+#EVAL d's age
+#EVAL d's age AT LEAST 18
+
+-- An assumed function applied (rows 39, 40, 45).
+#EVAL g 3 AND NOT g 4
+#EVAL FALSE AND g 3
+#EVAL elem g (LIST g)
+
+-- Lists and calls whose body decides anyway (rows 47 to 50, 69).
+#EVAL elem 3 (LIST 3, n)
+#EVAL elem 3 (LIST n, 3)
+#EVAL `true or` x
+#EVAL `or true` x
+#EVAL FALSE AND `and an error` TRUE
+
+-- Unchanged: a known left operand behaves as it always did (rows 17, 18).
+#EVAL FALSE AND (1 DIVIDED BY 0 GREATER THAN 0)
+#EVAL (1 DIVIDED BY 0 GREATER THAN 0) AND FALSE
+
+-- A refusal (rows 75 to 77): reached under no unknown it is an answer;
+-- reached only under an unknown left operand it is undetermined, naming the
+-- unknown, and never a refusal, until build step 5 builds guarded leaves.
+#EVAL TBD AND x
+#EVAL FALSE AND TBD
+#EVAL x AND TBD
+-- An error there is the same (U11's interim).
+#EVAL x AND (1 DIVIDED BY 0 GREATER THAN 0)
+-- And so is running out of steps there (§4.5): with no limit this would be
+-- `x OR TRUE`, which is TRUE; past the limit it gives up, naming `x`.
+#EVAL x OR (`count up from` 0 EQUALS 20000)
+
+-- A CONSIDER, IF, coercion or JSONENCODE on an unknown is undetermined,
+-- naming what it waits on, and never takes a catch-all (rows 34, 70, 83,
+-- 84, 85).
+#EVAL CONSIDER (x AND y) WHEN TRUE THEN 1, OTHERWISE 2
+#EVAL CONSIDER m WHEN NOTHING THEN 1, WHEN JUST z THEN 2
+#EVAL CONSIDER m WHEN JUST z THEN 2, OTHERWISE 1
+#EVAL IF n GREATER THAN 3 THEN 1 ELSE 2
+#EVAL n AS STRING
+#EVAL JSONENCODE n
+
+-- A result whose only unknowns are bare inputs is the value it is (rows 60
+-- and 67); one that holds any other term is undetermined. The second is
+-- longer than the step limit, and still prints its value: nothing here
+-- reached a site with a term, so the counter never started (C4).
+#EVAL LIST n, total
+#EVAL LIST n, `count up from` 0
+#EVAL LIST x, (y OR TRUE)
+#EVAL LIST n, (n PLUS 1)
+#EVAL JUST (x AND y)

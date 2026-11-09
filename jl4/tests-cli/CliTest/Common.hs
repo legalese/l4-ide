@@ -8,7 +8,8 @@ module CliTest.Common where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import Control.Monad (unless, when)
+import Control.Exception (IOException, throwIO, try)
+import Control.Monad (unless, void, when)
 import Data.List (findIndex, isInfixOf, isPrefixOf)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
@@ -20,6 +21,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
   ( createDirectoryIfMissing
+  , createFileLink
   , doesFileExist
   , getTemporaryDirectory
   , makeAbsolute
@@ -28,15 +30,40 @@ import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath ((</>))
 import System.IO (hClose, hSetBinaryMode)
+import System.IO.Error (isPermissionError)
 import System.Process
   ( CreateProcess(..)
   , StdStream(..)
   , createProcess
   , proc
   , readCreateProcessWithExitCode
+  , terminateProcess
   , waitForProcess
   )
+import System.Timeout (timeout)
 import Test.Hspec
+
+----------------------------------------------------------------------------
+-- Symbolic links
+----------------------------------------------------------------------------
+
+-- | Try to create a symbolic link; 'Left' says why it could not be made. On
+-- Windows an account without the symlink privilege gets "permission denied".
+-- Any other failure is a real one and is rethrown.
+tryLink :: FilePath -> FilePath -> IO (Either String ())
+tryLink target link = do
+  r <- try (createFileLink target link) :: IO (Either IOException ())
+  case r of
+    Right () -> pure (Right ())
+    Left e
+      | isPermissionError e -> pure (Left ("cannot create a symbolic link here (" <> show e <> ")"))
+      | otherwise -> throwIO e
+
+-- | Create a symbolic link, or mark the example pending where this account may
+-- not: the example is about what @l4@ does with a link, not about whether the
+-- platform lets a test make one.
+linkOrPending :: FilePath -> FilePath -> IO ()
+linkOrPending target link = tryLink target link >>= either pendingWith pure
 
 ----------------------------------------------------------------------------
 -- Locating the l4 binary
@@ -165,6 +192,34 @@ runL4In mCwd mEnv bin args = do
     , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
     , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
     }
+
+-- | Like 'runL4', but give up after the given number of seconds: the child is
+-- killed and the result is 'Nothing'. For a test of something that, when it
+-- regresses, never answers at all; an in-process test of that would hang the
+-- suite instead of failing it.
+runL4Within :: Int -> FilePath -> [String] -> IO (Maybe Output)
+runL4Within seconds bin args = do
+  let cp = (proc bin args)
+        { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe }
+  (Just hin, Just hout, Just herr, ph) <- createProcess cp
+  hClose hin
+  hSetBinaryMode hout True
+  hSetBinaryMode herr True
+  soutVar <- newEmptyMVar
+  serrVar <- newEmptyMVar
+  _ <- forkIO (BS.hGetContents herr >>= putMVar serrVar)
+  _ <- forkIO (BS.hGetContents hout >>= putMVar soutVar)
+  finished <- timeout (seconds * 1000000) (waitForProcess ph)
+  case finished of
+    Nothing -> terminateProcess ph >> void (waitForProcess ph) >> pure Nothing
+    Just code -> do
+      soutBytes <- takeMVar soutVar
+      serrBytes <- takeMVar serrVar
+      pure (Just Output
+        { outExit   = code
+        , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
+        , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
+        })
 
 -- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
 -- @JL4_LIBRARY_PATH@ dropped (so 'resolveLibrary' reports

@@ -1,0 +1,7 @@
+-- Declares `@lang en`, which a module that declares nothing already is.
+-- `l4 check` hints that the line can go; it is only a hint, so the file still checks.
+@lang en
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE echo x IS x

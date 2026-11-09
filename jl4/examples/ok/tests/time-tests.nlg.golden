@@ -5,27 +5,27 @@
 `evening time`
 `midnight via am`
 `noon via pm`
-`the hour of` with `morning time`
-`the minute of` with `morning time`
-`the second of` with `morning time`
-`_ Time to serial` with `Time` with 12, 0 and 0
-`_ Serial to time` with 0.5
-`_ is morning` with `morning time`
-`_ is afternoon` with `afternoon time`
-`_ is evening` with `Time` with 20, 0 and 0
-`_ is before noon` with `morning time`
-`_ is after noon` with `afternoon time`
-`_ plus hours _` with `morning time` and 2
-`_ plus minutes _` with `morning time` and 30
-`_ minus hours _` with `morning time` and 1
+the hour of `morning time` on the 24-hour clock
+the minute of `morning time`
+the second of `morning time`
+the fraction of a day elapsed at the time 12 hours, 0 minutes and 0 seconds
+the time at which the fraction 0.5 of a day has elapsed
+`morning time` is in the morning (before noon)
+`afternoon time` is in the afternoon (from noon until 6 pm)
+the time 20 hours, 0 minutes and 0 seconds is in the evening (from 6 pm until midnight)
+`morning time` is before noon
+`afternoon time` is at or after noon
+the time 2 hours after `morning time` (wrapping past midnight)
+the time 30 minutes after `morning time` (wrapping past midnight)
+the time 1 hour before `morning time` (wrapping past midnight)
 `morning before afternoon`
 `afternoon after morning`
-`the earlier of` with `morning time` and `afternoon time`
-`the later of` with `morning time` and `afternoon time`
+the earlier of `morning time` and `afternoon time`
+the later of `morning time` and `afternoon time`
 `leq check`
 `geq check`
 `lt check`
 `gt check`
 `is before check`
 `is after check`
-the difference between `morning time` and `afternoon time`
+the number of seconds from `morning time` to `afternoon time`

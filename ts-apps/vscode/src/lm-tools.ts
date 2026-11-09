@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { l4Evaluate, type L4EvaluateArgs } from './ai/tools/l4-evaluate.js'
+import type { BuiltinTools, L4EvaluateArgs } from '@repo/legalese-agent'
 
 /**
  * Language model tools contributed to the editor's own AI (Copilot
@@ -25,10 +25,13 @@ import { l4Evaluate, type L4EvaluateArgs } from './ai/tools/l4-evaluate.js'
 export const LM_TOOL_NAMES: ReadonlySet<string> = new Set(['l4_evaluate'])
 
 export function registerLanguageModelTools(
-  outputChannel: vscode.OutputChannel
+  outputChannel: vscode.OutputChannel,
+  /** The LM tools' own built-in tool session (directive snapshots
+   *  independent of the sidebar chat's and the participant's). */
+  tools: BuiltinTools
 ): vscode.Disposable {
-  // `vscode.lm.registerTool` landed in 1.95 (our engines floor), but
-  // forks built on older bases may still lack it — degrade silently.
+  // `vscode.lm.registerTool` landed in 1.95 (below our 1.106 engines
+  // floor), but forks may still lack it — degrade silently.
   if (typeof vscode.lm?.registerTool !== 'function') {
     outputChannel.appendLine(
       '[lm-tools] Language model tools API unavailable on this host — skipping'
@@ -43,7 +46,7 @@ export function registerLanguageModelTools(
     invoke: async (options) => {
       let text: string
       try {
-        text = await l4Evaluate(options.input)
+        text = await tools.evaluate(options.input)
       } catch (err) {
         // Return errors as content instead of throwing: the model can
         // act on "file not in workspace" / "failed to open"; a thrown

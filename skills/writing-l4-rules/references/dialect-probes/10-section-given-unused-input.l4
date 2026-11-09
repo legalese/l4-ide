@@ -1,0 +1,8 @@
+§ `Example`
+    GIVEN age IS A NUMBER
+          name IS A STRING
+
+GIVETH A NUMBER
+`age next year` MEANS age PLUS 1
+
+#EVAL `age next year` WITH age IS 41

@@ -1,7 +1,6 @@
 module BundleStore (
   BundleStore (..),
   StoredMetadata (..),
-  SerializedBundle (..),
   initStore,
   cleanupStore,
   saveBundle,
@@ -9,17 +8,13 @@ module BundleStore (
   loadBundle,
   listDeployments,
   deleteBundle,
-  saveBundleCbor,
-  loadBundleCbor,
-  deleteBundleCbor,
   saveMetadataCache,
   loadMetadataCache,
   loadSingleFile,
   listSourceFiles,
 ) where
 
-import Codec.Serialise (Serialise, deserialiseOrFail, serialise)
-import Control.Exception (IOException, catch)
+import Control.Exception (IOException, catch, onException)
 import Data.Aeson (FromJSON, ToJSON, eitherDecodeFileStrict', encodeFile, toJSON)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -28,10 +23,9 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
+import qualified Data.UUID as UUID
+import Data.UUID.V4 (nextRandom)
 import GHC.Generics (Generic)
-import L4.Export (ExportedFunction)
-import L4.Syntax (Module, Resolved, Declare)
-import L4.TypeCheck.Types (Environment, EntityInfo)
 import Data.List (isSuffixOf)
 import Logging (Logger, logInfo, logWarn)
 import System.Directory
@@ -72,20 +66,6 @@ data StoredMetadata = StoredMetadata
   }
   deriving stock (Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
-
--- | Cached typechecked state for a deployment.
--- Stores the expensive-to-recompute outputs of typechecking so restarts
--- can skip parsing and typechecking entirely.
-data SerializedBundle = SerializedBundle
-  { sbModule      :: !(Module Resolved)
-  , sbEnvironment :: !Environment     -- ^ Map RawName [Unique]
-  , sbEntityInfo  :: !EntityInfo      -- ^ Map Unique (Name, CheckEntity)
-  , sbExports     :: ![ExportedFunction]  -- ^ Exported functions (annotations are stripped in CBOR, so these are stored explicitly)
-  , sbDeclares    :: !(Map Text (Declare Resolved))  -- ^ All type declares (transitive imports included) for schema resolution
-  , sbFilePath    :: !FilePath        -- ^ Source file this bundle was compiled from
-  }
-  deriving stock (Generic)
-  deriving anyclass (Serialise)
 
 -- | Initialize the bundle store, creating the root directory if absent.
 initStore :: FilePath -> IO BundleStore
@@ -160,15 +140,13 @@ saveBundle (BundleStore root) deployId sources meta = do
       renameDirectory tmpDir targetDir
 
 -- | Atomically overwrite just the @metadata.json@ of an existing deployment
--- (sources + CBOR untouched). Used to persist late-computed fields — e.g. the
+-- (sources untouched). Used to persist late-computed fields — e.g. the
 -- backfilled deployment version — without rewriting the whole bundle.
 saveStoredMetadata :: BundleStore -> Text -> StoredMetadata -> IO ()
 saveStoredMetadata (BundleStore root) deployId meta = do
   let targetDir = root </> Text.unpack deployId
       metaFile = targetDir </> "metadata.json"
-      tmpFile = targetDir </> "metadata.json.tmp"
-  encodeFile tmpFile meta
-  renameFile tmpFile metaFile
+  atomicWriteFile metaFile (\tmpFile -> encodeFile tmpFile meta)
 
 -- | Load sources and metadata from a stored deployment.
 loadBundle
@@ -191,43 +169,6 @@ loadBundle (BundleStore root) deployId = do
     Right m -> pure m
 
   pure (sources, meta)
-
--- | Save all CBOR-serialized compiled bundles for a deployment.
--- Writes the full list atomically using a temp file + rename for crash safety.
-saveBundleCbor :: BundleStore -> Text -> [SerializedBundle] -> IO ()
-saveBundleCbor (BundleStore root) deployId bundles = do
-  let did = Text.unpack deployId
-      cborFile = root </> did </> "bundle.cbor"
-      tmpFile = cborFile <> ".tmp"
-  LBS.writeFile tmpFile (serialise bundles)
-  -- Atomic swap: remove old file if it exists, then rename
-  exists <- doesFileExist cborFile
-  if exists
-    then do
-      removeFile cborFile
-      renameFile tmpFile cborFile
-    else
-      renameFile tmpFile cborFile
-
--- | Try to load CBOR-serialized compiled bundles for a deployment.
--- Returns 'Nothing' if the file is absent or fails to parse
--- (safe fallback to source recompilation).
-loadBundleCbor :: Logger -> BundleStore -> Text -> IO (Maybe [SerializedBundle])
-loadBundleCbor logger (BundleStore root) deployId = do
-  let cborFile = root </> Text.unpack deployId </> "bundle.cbor"
-  exists <- doesFileExist cborFile
-  if not exists
-    then pure Nothing
-    else do
-      -- Read strictly to ensure the file handle is closed immediately.
-      -- Lazy readFile leaks the fd when the deserialized data is kept alive.
-      bytes <- LBS.fromStrict <$> BS.readFile cborFile
-      case deserialiseOrFail bytes of
-        Left _err -> do
-          logWarn logger "Corrupt bundle.cbor, will recompile"
-            [("deploymentId", toJSON deployId)]
-          pure Nothing
-        Right bundles -> pure (Just bundles)
 
 -- | Recursively load all .l4 files from a directory.
 loadSourcesRecursive :: FilePath -> FilePath -> IO (Map FilePath Text)
@@ -279,29 +220,29 @@ deleteBundle (BundleStore root) deployId = do
     `catch` \(_ :: IOException) -> pure False
   else pure True
 
--- | Delete only the CBOR cache for a deployment, keeping sources intact.
-deleteBundleCbor :: BundleStore -> Text -> IO ()
-deleteBundleCbor (BundleStore root) deployId = do
-  let cborFile = root </> Text.unpack deployId </> "bundle.cbor"
-  exists <- doesFileExist cborFile
-  if exists
-    then removeFile cborFile
-    else pure ()
-
 -- | Save the full DeploymentMetadata as a JSON cache after successful compilation.
 -- This allows serving metadata for pending/lazy-loaded deployments without recompilation.
 saveMetadataCache :: BundleStore -> Text -> LBS.ByteString -> IO ()
 saveMetadataCache (BundleStore root) deployId metaJson = do
   let cacheFile = root </> Text.unpack deployId </> "metadata-cache.json"
-      tmpFile = cacheFile <> ".tmp"
-  LBS.writeFile tmpFile metaJson
-  exists <- doesFileExist cacheFile
-  if exists
-    then do
-      removeFile cacheFile
-      renameFile tmpFile cacheFile
-    else
-      renameFile tmpFile cacheFile
+  atomicWriteFile cacheFile (\tmpFile -> LBS.writeFile tmpFile metaJson)
+
+-- | Replace @target@ with a file written by @write@, in one step.
+--
+-- @write@ is given the path of a temp file in the same directory as @target@
+-- (so the rename stays on one filesystem) with a name no other call shares, so
+-- two saves for one deployment that overlap each write their own file instead
+-- of one file. The temp file is then renamed over @target@, which on POSIX
+-- replaces it atomically: a reader sees the old file or the new one, never a
+-- partial one, and nothing is removed before the rename. If @write@ or the
+-- rename throws, the temp file is removed and the original exception is
+-- rethrown.
+atomicWriteFile :: FilePath -> (FilePath -> IO ()) -> IO ()
+atomicWriteFile target write = do
+  suffix <- UUID.toString <$> nextRandom
+  let tmpFile = target <> "." <> suffix <> ".tmp"
+  (write tmpFile >> renameFile tmpFile target)
+    `onException` (removeFile tmpFile `catch` \(_ :: IOException) -> pure ())
 
 -- | Try to load the cached DeploymentMetadata for a deployment.
 -- Returns the raw JSON ByteString (caller decodes as DeploymentMetadata).

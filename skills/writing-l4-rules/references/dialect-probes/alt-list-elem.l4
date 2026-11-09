@@ -1,0 +1,3 @@
+IMPORT prelude
+
+b MEANS elem "a" (LIST "a", "b")

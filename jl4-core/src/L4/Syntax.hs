@@ -35,6 +35,8 @@ data RawName =
   -- ^ contains the actual name and a list of qualifiers, e.g.
   -- foo.bar becomes @'QualifiedName' bar [foo]@
   | PreDef Text
+  -- ^ a name the compiler made up, which no source can write: the parser
+  -- never produces it ('L4.Parser.generatedName', 'isGeneratedName')
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -96,6 +98,39 @@ rawNameToText (QualifiedName qs n) = Text.intercalate "." (NE.toList qs <> [n])
 
 nameToText :: Name -> Text
 nameToText = rawNameToText . rawName
+
+-- | Is this pattern /distinguishable/, i.e. clearly a pattern rather than a
+-- plain parameter name? True for literals, applied constructors (@JUST x@),
+-- cons (@x FOLLOWED BY xs@) and EXACTLY expressions. False for a bare
+-- @PatApp n []@, which at parse time (before scope-checking) is ambiguous
+-- between a variable binder and a nullary constructor such as @EMPTY@ / @TRUE@.
+-- Grouping into a pattern match is only triggered when a clause carries at
+-- least one distinguishable pattern ('L4.Parser.decidePatternMatch').
+isDistinguishablePat :: Pattern Name -> Bool
+isDistinguishablePat = \ case
+  PatLit {}     -> True
+  PatCons {}    -> True
+  PatExpr {}    -> True
+  PatApp _ _ ps -> not (null ps)
+  PatVar {}     -> False
+
+-- | Does this pattern of a multi-clause group always match its scrutinee
+-- /without introducing a new binding/? True for the anonymous wildcard @_@ and
+-- for a variable pattern that reuses the scrutinee's own name (so the binding
+-- is already in scope). Named wildcards (@_foo@) and differently-named
+-- variables still bind, via a WHEN ('L4.Parser.matchClauses').
+patAlwaysMatchesAs :: Name -> Pattern Name -> Bool
+patAlwaysMatchesAs s (PatApp _ n []) =
+  nameToText n == "_" || rawName n == rawName s
+patAlwaysMatchesAs _ _ = False
+
+-- | Is this a name the compiler made up ('PreDef')? Such a name has no
+-- source of its own, so nothing that offers names to a drafter (completion,
+-- the outline) or prints source should show it.
+isGeneratedName :: RawName -> Bool
+isGeneratedName = \ case
+  PreDef _ -> True
+  _        -> False
 
 -- | As 'rawNameToText', but dropping any section qualification.
 --
@@ -377,8 +412,67 @@ data Expr n =
     -- is deliberately wildcard-free) and keeps a per-reason static analysis
     -- possible.
   | Inert      Anno Text InertContext  -- ... "inert text" - grammatical scaffolding with context-aware evaluation
+  | Lifecycle  Anno LifecyclePoint
+    -- ^ @THE JOIN@, @THE DEADLINE@ or @THE ARMING@ as a VALUE: a NUMBER, the
+    -- instant that position had in the life of the nearest enclosing
+    -- obligation (EVERY-EACH-QUANTIFIER-SPEC §2.6 card B1, RULED 2026-09-21;
+    -- built 2026-10-24, in part — the 'Anchor' slot keeps its own three
+    -- constructors, see there). Scope is lexical: the noun reads the
+    -- bindings of the environment it is evaluated in, which a hand-off made
+    -- ('L4.EvaluateLazy.Machine.bindLifecycle'), so a @WHERE@ alias over a
+    -- noun captures that hand-off's instant and carries it inward, while a
+    -- noun written inside an obligation VALUE reads the hand-off it is
+    -- attached to. The checker applies the anchor's position refusals to it
+    -- ('L4.TypeCheck.checkLifecycle'). The point carries no tokens: @THE@ and
+    -- the noun are tokens of this node's own 'Anno', and the point's field
+    -- is a placeholder hole, the way 'ReadCell'\'s 'RecallMode' is.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | Which lifecycle position a 'Lifecycle' expression names. The same three
+-- an 'Anchor' names after @OF@; 'lifecyclePointOfAnchor' maps one onto the
+-- other.
+data LifecyclePoint
+  = LifecycleJoin      -- ^ @THE JOIN@
+  | LifecycleDeadline  -- ^ @THE DEADLINE@
+  | LifecycleArming    -- ^ @THE ARMING@
+  deriving stock (GHC.Generic, Eq, Ord, Show, Enum, Bounded)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The lifecycle position an anchor names, if it names one: a bare noun
+-- (@OF THE JOIN@), or a lifecycle value that is the WHOLE anchor
+-- (@OF (THE JOIN)@, §2.6 B1). The two spellings are two trees with one
+-- meaning, and every consumer that asks "which noun is this anchor?" asks
+-- here, so they cannot drift apart: until 2026-10-24 the check-time
+-- empty-window refusal matched the bare constructors only and let
+-- @AFTER 30 WITHIN 5 OF (THE JOIN)@ through
+-- (@not-ok/tc/after-empty-window-value.l4@). An anchor that does
+-- arithmetic on a noun (@OF (THE JOIN PLUS 5)@) names an instant, not the
+-- position, and is 'Nothing'.
+lifecyclePointOfAnchor :: Anchor n -> Maybe LifecyclePoint
+lifecyclePointOfAnchor = \ case
+  AnchorJoin _     -> Just LifecycleJoin
+  AnchorDeadline _ -> Just LifecycleDeadline
+  AnchorArming _   -> Just LifecycleArming
+  AnchorAt _ (Lifecycle _ p) -> Just p
+  AnchorAt _ _     -> Nothing
+
+-- | The words a drafter writes for a lifecycle position, in ONE place: the
+-- printer, the diagnostics and the run-time refusals read this.
+lifecyclePointWords :: LifecyclePoint -> Text
+lifecyclePointWords = \ case
+  LifecycleJoin     -> "THE JOIN"
+  LifecycleDeadline -> "THE DEADLINE"
+  LifecycleArming   -> "THE ARMING"
+
+-- | The noun alone, as the identifier it is spelled like (@JOIN@,
+-- @DEADLINE@, @ARMING@): the nouns are not reserved words, so a program may
+-- bind one of these names.
+lifecyclePointNoun :: LifecyclePoint -> Text
+lifecyclePointNoun = \ case
+  LifecycleJoin     -> "JOIN"
+  LifecycleDeadline -> "DEADLINE"
+  LifecycleArming   -> "ARMING"
 
 -- | Context for inert element evaluation.
 -- Inert elements evaluate to the identity for their containing boolean operator.
@@ -657,9 +751,11 @@ data Opening n
 -- the continuation of:
 --
 --   * @THE JOIN@ — the instant its join fired: a plain @PARTY@ obligation's
---     completion, a barrier's last completion. Under @HENCE@ this is the
---     default, so naming it is emphasis; under @LEST@ the join did not fire,
---     and the checker refuses it.
+--     completion, a kept @SHANT@'s deadline, a barrier's last completion.
+--     Under @HENCE@ this is the default, so naming it is emphasis; under a
+--     @SHANT@'s @LEST@ it is the violating act, also the default; under any
+--     other @LEST@ the join did not fire, and the checker refuses it (§2.6
+--     card A3).
 --   * @THE DEADLINE@ — its deadline: the act's @WITHIN@, or under a barrier
 --     the @ONCE@ line's when one is written. Under @HENCE@ this is /the cure
 --     period runs from when performance fell due/; under @LEST@ it is the
@@ -671,9 +767,17 @@ data Opening n
 --     is the obligation's own arming, i.e. the default.
 --
 -- @THE@ is a keyword; @JOIN@, @DEADLINE@ and @ARMING@ are matched by
--- SPELLING in this one position and are not reserved — the move @UPON EACH@
--- makes for @EACH@ — so each constructor's 'Anno' carries its own words and
--- a program may still name a value @DEADLINE@.
+-- SPELLING after it and are not reserved — the move @UPON EACH@ makes for
+-- @EACH@ — so each constructor's 'Anno' carries its own words and a program
+-- may still name a value @DEADLINE@.
+--
+-- Since 2026-10-24 the three nouns are also VALUES anywhere an expression
+-- goes ('Lifecycle', §2.6 card B1), so @OF (THE JOIN PLUS 5)@ and
+-- @OF (fromMaybe THE ARMING (RECALL …))@ are the fourth form, an expression,
+-- and a bare @OF THE JOIN@ is still the first: two trees with one meaning.
+-- Collapsing this type to @Maybe (Expr n)@, which B1 also rules, is not
+-- built. A bare noun followed on its own line by an arithmetic operator
+-- (@OF THE JOIN PLUS 5@) is read as the expression ('L4.Parser.anchor').
 --
 -- The fourth form is an expression whose value is an instant: a NUMBER on the
 -- trace's own scale (@WITHIN 5 OF closingDate@, a ledger read), or a DATE,
@@ -812,6 +916,23 @@ foldDecides
   :: forall n m. (Monoid m) => (Decide n -> m) -> Decide n -> m
 foldDecides = Optics.foldMapOf $ Optics.cosmosOf (Optics.gplate @(Decide n))
 
+-- | Every sub-expression of an expression, the expression itself first and the
+-- children in order: the same expressions in the same order as
+-- @Optics.cosmosOf (Optics.gplate \@(Expr Resolved))@, found by a walk that takes
+-- one level of 'Optics.gplate' at a time.
+--
+-- Use it where the expression can be large. Counting the nodes of a 13,500-node
+-- expression took 1.8 s through 'Optics.cosmosOf' and 0.03 s through this
+-- (measured on a 4-core Linux host, 2026-10-19; through 'Optics.cosmosOf' it was
+-- 130 microseconds a node at 1,512 nodes and at 13,500, so the cost grows with
+-- the size and does not blow up). The passes that key a leaf ("L4.Viz.AtomKey")
+-- each walk the whole of its term, and a clause group that takes apart optional
+-- inputs reads through to a term that size.
+cosmosExpr :: Optics.Fold (Expr Resolved) (Expr Resolved)
+cosmosExpr = Optics.folding (\ e -> universe e [])
+  where
+    universe e rest = e : foldr universe rest (Optics.toListOf (Optics.gplate @(Expr Resolved)) e)
+
 overImports :: forall nodeType n. (Optics.GPlate (Import n) (nodeType n)) => (Import n -> Import n) -> nodeType n -> nodeType n
 overImports = Optics.over Optics.gplate
 
@@ -849,8 +970,13 @@ moduleTopDecls = lens
 -- ----------------------------------------------------------------------------
 
 -- | One clause of a multi-clause pattern-matching group, as parsed: the
--- clause head name's source range (the warning anchor) and the argument
--- patterns, one per column.
+-- clause head name's source range (the warning anchor), the argument
+-- patterns, one per column, and what belongs to this clause alone: its head
+-- name as written, its @AKA@, and the @\@desc@ (or @\@export@) written
+-- above it. A run that the checker turns back into separate definitions
+-- ('L4.TypeCheck.separateOverloads') gives each definition its own clause's
+-- head, @AKA@ and annotations; a group keeps those of its first clause, and
+-- warns about any above a later one ('L4.TypeCheck.checkClauseMatrix').
 --
 -- DELIBERATELY not 'GHC.Generic' (and hence invisible to @gplate@-based
 -- generic traversals): the stored patterns transitively contain @Expr Name@
@@ -863,14 +989,32 @@ moduleTopDecls = lens
 data PmMatrixClause = MkPmMatrixClause
   { headRange :: Maybe SrcRange
   , patterns  :: [Pattern Name]
+  , clauseHead :: Name
+    -- ^ the clause's head name, as parsed; an @\@nlg@ written above a later
+    -- clause is attached to it ('L4.Parser.ResolveAnnotation')
+  , clauseAka :: Maybe (Aka Name)
+  , clauseDescs :: [Desc]
+    -- ^ every @\@desc@ and @\@export@ written between the clause above and a
+    -- later clause, in source order ('L4.Parser.ResolveAnnotation'); a
+    -- separated overload keeps one of them, as a definition does
+    -- ('L4.Parser.ResolveAnnotation.pickDesc'). The first clause's are the
+    -- group's own, as a plain definition's are.
+  , clauseNlgs :: [Nlg]
+    -- ^ every @\@nlg@ written between the clause above and a later clause, in
+    -- source order; the one a separated overload uses is on @clauseHead@
+  , bodyRange :: Maybe SrcRange
+    -- ^ the range of the clause's body, with a @WHERE@'s definitions and
+    -- anything written inside them; an annotation after it and before the next
+    -- clause's head is written between the two clauses
+    -- ('L4.Parser.ResolveAnnotation')
   }
   deriving stock (Eq, Ord, Show)
 
 instance NFData PmMatrixClause where
-  rnf (MkPmMatrixClause r ps) = rnf r `seq` rnf ps
+  rnf (MkPmMatrixClause r ps h a d n b) = rnf r `seq` rnf ps `seq` rnf h `seq` rnf a `seq` rnf d `seq` rnf n `seq` rnf b
 
 instance ToExpr PmMatrixClause where
-  toExpr (MkPmMatrixClause r ps) = toExpr (r, ps)
+  toExpr (MkPmMatrixClause r ps h a d n b) = toExpr (r, ps, h, a, (d, n, b))
 
 -- | The source clause matrix of a multi-clause pattern-matching group,
 -- attached by the parser to the fused Decide's annotation BEFORE
@@ -883,23 +1027,61 @@ instance ToExpr PmMatrixClause where
 -- (quietly) against the GIVEN column types. Not 'GHC.Generic' — see
 -- 'PmMatrixClause'.
 data PmMatrix = MkPmMatrix
-  { scrutinees :: [Name]          -- ^ column scrutinee names (GIVEN or @_pm_arg_i@)
+  { scrutinees :: [Name]          -- ^ column scrutinee names (GIVEN or @input i@)
+  , synthesizedScrutinees :: Bool
+    -- ^ the group has no GIVEN naming one input per pattern, so 'scrutinees'
+    -- are names the desugarer made up ('L4.Parser.generatedName'), which no
+    -- source can write, so no suggested clause may use them
   , clauses    :: [PmMatrixClause]
+  , catchAll   :: Maybe Int
+    -- ^ index of the first clause every one of whose patterns matches
+    -- anything ('L4.Syntax.patAlwaysMatchesAs'); the clauses after it are
+    -- never tried
   }
   deriving stock (Eq, Ord, Show)
 
 instance NFData PmMatrix where
-  rnf (MkPmMatrix s cs) = rnf s `seq` rnf cs
+  rnf (MkPmMatrix s syn cs ca) = rnf s `seq` rnf syn `seq` rnf cs `seq` rnf ca
 
 instance ToExpr PmMatrix where
-  toExpr (MkPmMatrix s cs) = toExpr (s, cs)
+  toExpr (MkPmMatrix s syn cs ca) = toExpr (s, syn, cs, ca)
 
--- NOTE on serialisation: adding 'pmMatrix' below changes the CBOR shape of
--- 'Extension' — jl4-service's AST-cache blobs from before the change will
--- fail to deserialise and the cache re-fills; that is the cache's normal
--- versioning behaviour. If a @SERIALISE_ENABLED@ build breaks on a missing
--- instance here, the fix is to add the instance (see the CPP block at the
--- bottom of this module), not to remove the field.
+-- | The multi-clause group a generated node belongs to, as the drafter
+-- wrote it: the name its clauses define, and how many clauses there are.
+data PmGroup = MkPmGroup
+  { groupHead   :: RawName
+  , clauseCount :: Int
+  }
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | Marks a node that 'L4.Parser.matchClauses' generated while lowering a
+-- multi-clause group, as opposed to one the drafter wrote. The checker and
+-- the evaluator read it so that what they report is about the clauses the
+-- drafter wrote, not about the CONSIDERs and local definitions they were
+-- compiled to. The mark is on the node itself, never inferred from a name: a
+-- drafter can spell any name, and a CONSIDER the drafter wrote inside a
+-- clause's body sits in the same generated definition as the ones around it.
+data PmSynthetic
+  = PmConsider PmGroup Int Bool
+    -- ^ a CONSIDER testing one input of the group: its 1-based position, and
+    -- whether the group's GIVEN declares that input's type
+  | PmFallthrough PmGroup
+    -- ^ the local definition holding the clauses not yet tried
+  | PmUnreachable PmGroup
+    -- ^ the same, after a clause that matches every input, so never used.
+    -- Bound only so that its clauses are type-checked; the checker drops it
+    -- from what it returns, so nothing downstream ever sees it.
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- NOTE on serialisation: jl4-service used to cache the checked module in
+-- @bundle.cbor@, writing an annotation through 'Serialise Anno' at the bottom
+-- of this module, which keeps 'pmSynthetic' and none of the other fields below.
+-- It no longer does, and nothing else in this repository uses these instances.
+-- If a @SERIALISE_ENABLED@ build breaks on a missing instance here, the fix is
+-- to add the instance (see the CPP block at the bottom of this module), not to
+-- remove the field.
 data Extension = Extension
   { resolvedInfo :: Maybe Info
   , nlg          :: Maybe Nlg
@@ -907,22 +1089,51 @@ data Extension = Extension
   , nlgAlts      :: [Nlg]
     -- ^ Further renderings of the same node in OTHER languages. See 'annNlgAlts'.
   , desc         :: Maybe Desc
-  , ref          :: Maybe Ref
+  , ref          :: Refs
+    -- ^ Every @\@ref@ written before this node and after the node before it,
+    -- in source order. See 'annRefs'.
   , fixityAnn    :: Maybe Fixity
+  , nonassertable :: Maybe Nonassertable
+    -- ^ The @\@nonassertable@ annotation above a definition. See 'annNonassertable'.
+  , nonassertableOnInputs :: [Nonassertable]
+    -- ^ Marks found on a definition's GIVEN lines, each an error the
+    -- typechecker raises naming the input; none of them closes the definition.
   , pmMatrix     :: Maybe PmMatrix
   , mixfixCanonical :: Maybe RawName
     -- ^ The CANONICAL mixfix pattern of the name this node applies, e.g.
     -- @the will _ is duly executed without _@. See 'annMixfixCanonical'.
+  , pmSynthetic  :: Maybe PmSynthetic
+    -- ^ Set on the nodes a multi-clause group is compiled to. See 'PmSynthetic'.
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | The refs a node holds; 'annRefs' reads them as a list.
+--
+-- A newtype only so that 'show' of an EMPTY one is @Nothing@, as it was when
+-- the field was a @Maybe Ref@. An atomId is the hash of 'show' of a term with
+-- its annotations emptied (L4.Viz.AtomKey), and 'show' of an 'Extension' lists
+-- every field, so @ref = []@ where there was @ref = Nothing@ would move every
+-- atomId a deployed service has handed out, though no leaf changed. A key only
+-- ever sees the empty case, because the annotations are emptied first; a
+-- non-empty one shows as the list it is.
+newtype Refs = MkRefs [Ref]
+  deriving stock (GHC.Generic, Eq, Ord)
+  deriving newtype (Semigroup, Monoid, NFData)
+
+instance Show Refs where
+  showsPrec _ (MkRefs []) = showString "Nothing"
+  showsPrec d (MkRefs rs) = showsPrec d rs
+
+instance ToExpr Refs where
+  toExpr (MkRefs rs) = toExpr rs
+
 instance Semigroup Extension where
-  Extension i1 nlg1 alts1 desc ref1 fix1 pm1 mx1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 pm2 mx2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2) (mx1 <|> mx2)
+  Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 pm2 mx2 syn2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -932,7 +1143,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -981,11 +1192,36 @@ nlgFor want@(Just _) a =
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc
 
-annRef :: Lens' Anno (Maybe Ref)
-annRef = #extra % #ref
+-- | The @\@ref@ citations held by a node: every one written on a line of its
+-- own after the node before it and before this one, in source order.
+--
+-- See 'L4.Parser.ResolveAnnotation.addRefCommentsToAst' for which node holds a
+-- ref. Not kept in a bundle: 'Serialise Anno' writes only 'annPmSynthetic'.
+annRefs :: Lens' Anno [Ref]
+annRefs = #extra % #ref % iso (\(MkRefs rs) -> rs) MkRefs
+
+-- | The ref nearest the node: the last of those it holds, the one written
+-- closest above it. What every reader that shows ONE citation per node reads,
+-- so a stack of refs shows its bottom one (ruled 2026-10-12, bench "Main Wave
+-- Rulings" card R1: in a stack the exporters show the nearest).
+annRef :: Getter Anno (Maybe Ref)
+annRef = annRefs % to (listToMaybe . reverse)
 
 annFixity :: Lens' Anno (Maybe Fixity)
 annFixity = #extra % #fixityAnn
+
+-- | The @\@nonassertable@ annotation written above a definition: a request
+-- may not assert this node, its truth must come from its derivation
+-- (specs/todo/presumption-assertion/CONTRACT.md §6). Attached by position
+-- ('L4.Parser.ResolveAnnotation.addNonassertableCommentsToAst') to the nearest
+-- following top-level or section-level construct; the typechecker rejects it on
+-- anything that is not a definition.
+annNonassertable :: Lens' Anno (Maybe Nonassertable)
+annNonassertable = #extra % #nonassertable
+
+-- | The marks found on a definition's GIVEN lines (see 'Extension').
+annNonassertableOnInputs :: Lens' Anno [Nonassertable]
+annNonassertableOnInputs = #extra % #nonassertableOnInputs
 
 annPmMatrix :: Lens' Anno (Maybe PmMatrix)
 annPmMatrix = #extra % #pmMatrix
@@ -1016,14 +1252,27 @@ setNlgs n alts a = a & annNlg ?~ n & annNlgAlts .~ alts
 setDesc :: Desc -> Anno -> Anno
 setDesc d a = a & annDesc ?~ d
 
-setRef :: Ref -> Anno -> Anno
-setRef r a = a & annRef ?~ r
+-- | Hold further refs on a node, after any it already has.
+addRefs :: [Ref] -> Anno -> Anno
+addRefs rs a = a & annRefs %~ (<> rs)
 
 setFixity :: Fixity -> Anno -> Anno
 setFixity f a = a & annFixity ?~ f
 
+setNonassertable :: Nonassertable -> Anno -> Anno
+setNonassertable n a = a & annNonassertable ?~ n
+
+addNonassertableOnInputs :: [Nonassertable] -> Anno -> Anno
+addNonassertableOnInputs ns a = a & annNonassertableOnInputs %~ (<> ns)
+
 setPmMatrix :: PmMatrix -> Anno -> Anno
 setPmMatrix m a = a & annPmMatrix ?~ m
+
+annPmSynthetic :: Lens' Anno (Maybe PmSynthetic)
+annPmSynthetic = #extra % #pmSynthetic
+
+setPmSynthetic :: PmSynthetic -> Anno -> Anno
+setPmSynthetic m a = a & annPmSynthetic ?~ m
 
 data TermKind =
     Computable -- ^ a variable with known definition (let or global)
@@ -1346,6 +1595,22 @@ data Ref = MkRef Anno Text
 getRef :: Ref -> Text
 getRef (MkRef _ t) = t
 
+-- | The citation itself, without the herald or the angle brackets it was
+-- written with and without the spaces and carriage return the lexer keeps.
+--
+-- For a message that quotes the citation. 'getRef' is not that: it hands back
+-- the token as written, @\"\@ref X  \"@ or @\"\<\<X\>\>\"@, because the exact
+-- printer reprints it byte for byte. Each exporter that reads a citation
+-- strips what it needs from 'getRef' for itself, and not all of them strip
+-- the same things, so the stored text stays as it is.
+refCitation :: Ref -> Text
+refCitation r =
+  let stripped = Text.strip (getRef r)
+      afterHerald = Text.strip (fromMaybe stripped (Text.stripPrefix "@ref" stripped))
+  in case Text.stripPrefix "<<" afterHerald of
+       Just inner -> Text.strip (fromMaybe inner (Text.stripSuffix ">>" inner))
+       Nothing    -> afterHerald
+
 data Desc = MkDesc Anno Text
   deriving stock (Show, Eq, Ord, GHC.Generic)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
@@ -1378,6 +1643,14 @@ getFixityDirection (MkFixity _ dir _) = dir
 getFixityPayload :: Fixity -> Text
 getFixityPayload (MkFixity _ _ t) = t
 
+-- | The @\@nonassertable@ mark. It carries nothing but its position: the
+-- herald takes no words ('L4.Lexer.nonassertableAnnotation'). Where it
+-- landed is which 'Extension' field holds it: 'nonassertable' above a
+-- definition, 'nonassertableOnInputs' on one of its GIVEN lines.
+data Nonassertable = MkNonassertable Anno
+  deriving stock (Show, Eq, Ord, GHC.Generic)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
 deriving via L4Syntax Nlg
   instance HasAnno Nlg
 deriving via L4Syntax (NlgFragment n)
@@ -1390,6 +1663,8 @@ deriving via L4Syntax Desc
   instance HasAnno Desc
 deriving via L4Syntax Fixity
   instance HasAnno Fixity
+deriving via L4Syntax Nonassertable
+  instance HasAnno Nonassertable
 
 instance ToConcreteNodes PosToken Comment where
   toNodes (MkComment ann _) = flattenConcreteNodes ann []
@@ -1441,6 +1716,16 @@ instance ToConcreteNodes PosToken InertContext where
 -- surrounding Anno of the RECALL expression, like Record's isOfficial flag)
 instance ToConcreteNodes PosToken RecallMode where
   toNodes _ = pure []
+
+-- LifecyclePoint has no concrete syntax nodes: THE and the noun are tokens of
+-- the surrounding 'Lifecycle' node's Anno, like RecallMode's ALL.
+instance ToConcreteNodes PosToken LifecyclePoint where
+  toNodes _ = pure []
+
+-- Its field still occupies one holeFit slot ('L4.Parser.lifecycleExpr'
+-- emits the placeholder), so the hole needs a range hint: none.
+instance HasSrcRange LifecyclePoint where
+  rangeOf _ = Nothing
 
 -- The empty-surface payload fields (Bool isOfficial, RecallMode mode) still
 -- occupy one holeFit slot in the generic exactprint traversal, so the parser
@@ -1519,6 +1804,7 @@ deriving anyclass instance HasSrcRange Name
 deriving anyclass instance HasSrcRange Nlg
 deriving anyclass instance HasSrcRange Desc
 deriving anyclass instance HasSrcRange Fixity
+deriving anyclass instance HasSrcRange Nonassertable
 deriving anyclass instance HasSrcRange (NlgFragment n)
 deriving anyclass instance HasSrcRange Comment
 deriving anyclass instance HasSrcRange Ref
@@ -1550,7 +1836,8 @@ app :: n -> [Type' n] -> Type' n
 app = TyApp emptyAnno
 
 -- ----------------------------------------------------------------------------
--- Serialise instances (CBOR) for AST caching in jl4-service
+-- Serialise instances (CBOR) for the AST. jl4-service used them for its cache,
+-- @bundle.cbor@, and no longer does.
 -- ----------------------------------------------------------------------------
 
 #if defined(SERIALISE_ENABLED)
@@ -1578,6 +1865,7 @@ deriving anyclass instance Serialise n => Serialise (ConDecl n)
 deriving anyclass instance Serialise n => Serialise (Expr n)
 deriving anyclass instance Serialise InertContext
 deriving anyclass instance Serialise RecallMode
+deriving anyclass instance Serialise LifecyclePoint
 deriving anyclass instance Serialise n => Serialise (GuardedExpr n)
 deriving anyclass instance Serialise n => Serialise (Deonton n)
 deriving anyclass instance Serialise n => Serialise (Subject n)
@@ -1604,11 +1892,26 @@ deriving anyclass instance Serialise SrcRange
 -- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
 -- definitions), so their instances are written by hand, via tuples.
 instance Serialise PmMatrixClause where
-  encode (MkPmMatrixClause r ps) = encode (r, ps)
-  decode = (\ (r, ps) -> MkPmMatrixClause r ps) <$> decode
+  encode (MkPmMatrixClause r ps h a d n b) = encode (r, ps, h, a, (d, n, b))
+  decode = (\ (r, ps, h, a, (d, n, b)) -> MkPmMatrixClause r ps h a d n b) <$> decode
 instance Serialise PmMatrix where
-  encode (MkPmMatrix s cs) = encode (s, cs)
-  decode = (\ (s, cs) -> MkPmMatrix s cs) <$> decode
+  encode (MkPmMatrix s syn cs ca) = encode (s, syn, cs, ca)
+  decode = (\ (s, syn, cs, ca) -> MkPmMatrix s syn cs ca) <$> decode
+deriving anyclass instance Serialise PmGroup
+deriving anyclass instance Serialise PmSynthetic
+-- | An annotation holds the concrete tokens, the source range and what the
+-- checker found, which the IDE needs and an evaluator does not, so this
+-- encoding keeps only 'pmSynthetic', the mark on the nodes a multi-clause group
+-- is compiled to. The evaluator reads that mark to say which rule has no clause
+-- for an input ("No clause of `price` matches these inputs";
+-- 'L4.EvaluateLazy.Machine.consideredClauses'). A module read back from
+-- jl4-service's @bundle.cbor@ without the mark reported a CONSIDER that the
+-- drafter never wrote; jl4-service no longer writes that file. An unmarked
+-- node still costs one byte, as the @()@ that used to stand for every
+-- annotation did.
+instance Serialise Anno where
+  encode = encode . view annPmSynthetic
+  decode = (\ m -> emptyAnno & annPmSynthetic .~ m) <$> decode
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
@@ -1617,8 +1920,10 @@ deriving anyclass instance Serialise Nlg
 deriving anyclass instance Serialise n => Serialise (NlgFragment n)
 deriving anyclass instance Serialise Comment
 deriving anyclass instance Serialise Ref
+deriving anyclass instance Serialise Refs
 deriving anyclass instance Serialise Desc
 deriving anyclass instance Serialise Fixity
+deriving anyclass instance Serialise Nonassertable
 deriving anyclass instance Serialise FixityDirection
 #endif
 

@@ -1,0 +1,10 @@
+-- l4 batch over an export whose only input has a default. A CSV row whose
+-- one cell is "" (T3c: empty, so absent) is still a row and takes the
+-- default; so does a JSON row {} that supplies nothing.
+
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export Capacity check
+GIVETH A BOOLEAN
+`capacity check` MEANS `has capacity`

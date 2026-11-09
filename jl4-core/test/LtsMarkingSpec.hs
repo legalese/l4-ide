@@ -303,7 +303,9 @@ spec = describe "LTS-VISUALISER §4.2a: markingOf" $ do
 
   it "F3. both operands breached does not survive: one Violated, no Lapsed" $ do
     rs <- runMarked rorSrc
-    map view (markingAt 2 rs) `shouldBe` [PViolated (Just "Bob") (Just 2)]
+    -- the ROR is lost at the LATER failure, Alice's 10, whichever side it is
+    -- on (SEESAW, EVERY-EACH-QUANTIFIER-SPEC §6.1.2); one event at 12 reveals both
+    map view (markingAt 2 rs) `shouldBe` [PViolated (Just "Alice") (Just 10)]
 
   it "6 / F4. an unentered operand is Created, from the runtime's own Left" $ do
     rs <- runMarked rorSrc

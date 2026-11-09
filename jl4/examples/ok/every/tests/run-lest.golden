@@ -446,28 +446,28 @@ run-lest.l4:444:1-446:37:
     BREACH
     BY Tenant OF "Alice"
     BECAUSE "all three chances missed"
-run-lest.l4:459:27-32:
+run-lest.l4:461:27-32:
   I found a problem while checking the definition of `arming under lest`:
     In this action, `alice` refers to
     
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:461:42-53:
+run-lest.l4:463:42-53:
   I found a problem while checking the definition of `arming under lest`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:462:42-45:
+run-lest.l4:464:42-45:
   I found a problem while checking the definition of `arming under lest`:
     In this action, `bob` refers to
     
       bob (at run-lest.l4:47:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:464:1-467:20:
+run-lest.l4:466:1-469:20:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -481,28 +481,31 @@ run-lest.l4:464:1-467:20:
       MUST Approve bob
     before their deadline, which was at
       13
-run-lest.l4:473:27-32:
+    but was only entered at, and so failed at
+      16
+  NOTE: An obligation, MUST Approve bob, was entered at 16, after its own deadline of 13, so it could never be met in time: it fails at 16, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+run-lest.l4:475:27-32:
   I found a problem while checking the definition of `arming under hence`:
     In this action, `alice` refers to
     
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:474:42-53:
+run-lest.l4:476:42-53:
   I found a problem while checking the definition of `arming under hence`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:475:42-45:
+run-lest.l4:477:42-45:
   I found a problem while checking the definition of `arming under hence`:
     In this action, `bob` refers to
     
       bob (at run-lest.l4:47:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:477:1-480:19:
+run-lest.l4:479:1-482:19:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -516,85 +519,95 @@ run-lest.l4:477:1-480:19:
       MUST Approve bob
     before their deadline, which was at
       7
-run-lest.l4:501:27-32:
+run-lest.l4:505:27-32:
   I found a problem while checking the definition of `stuck in the middle`:
     In this action, `alice` refers to
     
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:503:34-39:
+run-lest.l4:507:34-39:
   I found a problem while checking the definition of `stuck in the middle`:
     In this action, `alice` refers to
     
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:505:49-60:
+run-lest.l4:509:49-60:
   I found a problem while checking the definition of `stuck in the middle`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:507:1-508:50:
+run-lest.l4:511:1-512:50:
   FULFILLED
-run-lest.l4:510:1-512:50:
+  NOTE: An obligation, MUST Sign alice, was entered at 10, after its own deadline of 5, so it could never be met in time: it fails at 10, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+run-lest.l4:514:1-516:50:
   FULFILLED
-run-lest.l4:514:1-515:50:
+  NOTE: An obligation, MUST Sign alice, was entered at 10, after its own deadline of 5, so it could never be met in time: it fails at 10, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+run-lest.l4:518:1-519:50:
+  FULFILLED
+  NOTE: An obligation, MUST Sign alice, was entered at 10, after its own deadline of 5, so it could never be met in time: it fails at 10, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+run-lest.l4:521:1-523:50:
+  FULFILLED
+  NOTE: An obligation, MUST Sign alice, was entered at 10, after its own deadline of 5, so it could never be met in time: it fails at 10, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+run-lest.l4:525:1-526:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
     who did action
       Refund OF (Landlord OF "Ms Ng")
     at
-      20
+      21
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
       MUST Refund theLandlord
     before their deadline, which was at
-      15
-run-lest.l4:517:1-519:50:
+      20
+  NOTE: An obligation, MUST Sign alice, was entered at 10, after its own deadline of 5, so it could never be met in time: it fails at 10, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+run-lest.l4:528:1-530:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
     who did action
       Refund OF (Landlord OF "Ms Ng")
     at
-      20
+      21
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
       MUST Refund theLandlord
     before their deadline, which was at
-      15
-run-lest.l4:526:27-32:
+      20
+  NOTE: An obligation, MUST Sign alice, was entered at 10, after its own deadline of 5, so it could never be met in time: it fails at 10, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+run-lest.l4:537:27-32:
   I found a problem while checking the definition of `forthwith`:
     In this action, `alice` refers to
     
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:528:34-39:
+run-lest.l4:539:34-39:
   I found a problem while checking the definition of `forthwith`:
     In this action, `alice` refers to
     
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:530:49-60:
+run-lest.l4:541:49-60:
   I found a problem while checking the definition of `forthwith`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:532:1-533:50:
+run-lest.l4:543:1-544:50:
   FULFILLED
-run-lest.l4:535:1-537:50:
+run-lest.l4:546:1-548:50:
   FULFILLED
-run-lest.l4:539:1-540:50:
+run-lest.l4:550:1-551:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -608,12 +621,12 @@ run-lest.l4:539:1-540:50:
       MUST Refund theLandlord
     before their deadline, which was at
       15
-run-lest.l4:554:27-32:
+run-lest.l4:565:27-32:
   I found a problem while checking the definition of `forthwith, forever`:
     In this action, `alice` refers to
     
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:558:1-559:50:
+run-lest.l4:569:1-570:50:
   A chain of HENCE or LEST continuations has stalled: the event at 50 has been handed on 1000 times in a row to continuations whose deadlines never advanced past 0, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, a LEST's WITHIN 0, or an anchored deadline no later than the one just missed - is such a chain. Give it a positive WITHIN, anchor it later than the missed deadline, or end the chain with BREACH. (EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)

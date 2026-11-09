@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+daydate-month-before.l4:6:1-66:
+  assertion satisfied
+daydate-month-before.l4:7:1-65:
+  assertion satisfied
+daydate-month-before.l4:8:1-65:
+  assertion satisfied
+daydate-month-before.l4:9:1-67:
+  assertion satisfied
+daydate-month-before.l4:10:1-65:
+  assertion satisfied
+daydate-month-before.l4:11:1-64:
+  assertion satisfied
+daydate-month-before.l4:13:1-42:
+  DATE OF 1, 12, 2025

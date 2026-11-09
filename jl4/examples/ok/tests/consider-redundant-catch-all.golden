@@ -1,0 +1,67 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+consider-redundant-catch-all.l4:13:3-15:14:
+  I found a problem while checking the definition of `afterName`:
+    The following CONSIDER branch is redundant: 
+    
+      OTHERWISE 2
+    
+consider-redundant-catch-all.l4:17:1-21:
+  1
+consider-redundant-catch-all.l4:23:3-25:14:
+  I found a problem while checking the definition of `afterNameMaybe`:
+    The following CONSIDER branch is redundant: 
+    
+      OTHERWISE 2
+    
+consider-redundant-catch-all.l4:31:3-33:14:
+  I found a problem while checking the definition of `afterWildcard`:
+    The following CONSIDER branch is redundant: 
+    
+      OTHERWISE 2
+    
+consider-redundant-catch-all.l4:39:3-41:14:
+  I found a problem while checking the definition of `afterExactlyOwn`:
+    The following CONSIDER branch is redundant: 
+    
+      OTHERWISE 2
+    
+consider-redundant-catch-all.l4:47:3-50:14:
+  I found a problem while checking the definition of `afterNumberAndExactlyOwn`:
+    The following CONSIDER branch is redundant: 
+    
+      OTHERWISE 3
+    
+consider-redundant-catch-all.l4:52:1-33:
+  2
+consider-redundant-catch-all.l4:58:3-60:16:
+  I found a problem while checking the definition of `twoNames`:
+    The following CONSIDER branch is redundant: 
+    
+      WHEN w THEN 2
+    
+consider-redundant-catch-all.l4:65:3-68:14:
+  I found a problem while checking the definition of `twoOtherwises`:
+    The following CONSIDER branch is redundant: 
+    
+      OTHERWISE 3
+    
+consider-redundant-catch-all.l4:76:3-78:14:
+  I found a problem while checking the definition of `inBody`:
+    The following CONSIDER branch is redundant: 
+    
+      OTHERWISE 2
+    
+consider-redundant-catch-all.l4:122:8-12:
+  I found a problem while checking the definition of `size`:
+    This clause of `size` is never used, because the clause above it with the new name `other` matches every input.
+    `other` is not a value of its input's type, so it is a new name, and a new name matches anything.
+    If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
+consider-redundant-catch-all.l4:124:1-13:
+  2
+consider-redundant-catch-all.l4:132:8-13:
+  I found a problem while checking the definition of `price`:
+    This clause of `price` is never used, because the clause above it with the new name `rest` matches every input.
+    `rest` is not a value of its input's type, so it is a new name, and a new name matches anything.
+    If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.

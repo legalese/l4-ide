@@ -1,0 +1,13 @@
+-- A string that spans lines in a clause body (probe q/str). Printed back as
+-- source for `l4 batch`, its line break is written as an escape, so its second
+-- line keeps the source's own indentation (six spaces), as `l4 run` gives it.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export default lbl
+GIVEN c IS A Colour
+GIVETH A STRING
+    DECIDE lbl Red   IS "a
+      b"
+    DECIDE lbl c     IS "z"
+

@@ -10,7 +10,7 @@ It sits between two other things:
 
 - **[`writing-l4-rules`](../writing-l4-rules/SKILL.md)** teaches the language: syntax, `IS` / `MEANS` / `IF`, regulative rules, dates, and the drafting idioms for statutory text (`references/drafting-patterns.md` and `references/source-patterns/` there).
   Everything in this skill that says "encode" means "encode the way that skill says".
-- **The `go` pipeline** in the `legalese/l4-ide` repository (the `go.sh` driver under `etc/go/`, and the `running-the-l4-pipeline` skill that lives only there) takes a _finished_ encoding and checks it, projects it to DMN, BPMN, a web wizard and so on, and writes a conversion report.
+- **The `go` pipeline** — Legalese's private repository `legalese/l4-pipeline`, run from `etc/go/` of an l4-ide checkout, with its own `running-the-l4-pipeline` skill — takes a _finished_ encoding and checks it, projects it to DMN, BPMN, a web wizard and so on, and writes a conversion report.
   It does not write L4.
   You do not need it to produce a good encoding, and nothing in this skill depends on it.
 
@@ -27,10 +27,11 @@ Most of the quality comes from the brief.
 
 ### 0. Before you start
 
+- **Know the target, and do not confuse it with the binary.** The brief names the target compiler, `main` or `unstable`: the one that has to read the deposit. The `l4` you run is a different question. Commons wants encodings a `main` build can read, so the target is `main` unless the brief says `unstable`, and running an `unstable` binary does not license `unstable` syntax. Write inside what `writing-l4-rules/references/dialects.md` says `main` reads, and let `check.sh` (step 7) confirm it with a main build.
 - **Get a current `l4`.** Install it with this plugin's `scripts/install-l4.sh`, which fetches the release it was built against and checks its digest, or download an archive from [`legalese/prereleases`](https://github.com/legalese/prereleases/releases) — each carries a `BUILD-INFO.txt` naming the commit it was built from.
-  `l4` has no `--version` flag, so that file is how you know what you are running.
+  `l4 --version` prints the build, as a release line or as `dev` for a build from a working tree; the `BUILD-INFO.txt` of an archive is the record for a binary old enough not to answer it (the flag landed on `unstable` on 2026-10-14 and on `main` the next day).
   The authoring skill documents the language as it is on `unstable`; **a binary older than the skill rejects constructs the skill tells you exist**, and the symptom is a parse error that reads like your mistake.
-  Measured: `@lang en`, which the authoring skill documents, is a parse error at line 1 on the 7 September 2026 prerelease.
+  Measured: `@lang en`, a spelling of the `@lang` declaration the authoring skill documents, is a parse error at line 1 on the 7 September 2026 prerelease.
   Note that `install-l4.sh` links `~/.local/bin/l4`, replacing whatever was there.
 - **Leave `JL4_LIBRARY_PATH` unset.** The standard library is compiled into the binary and always matches it; pointing the variable at a newer library produces a cascade of `could not find a definition` errors.
 - **Use the strongest model available, at high effort.** The comparison above ran every arm on Opus at high effort.
@@ -56,6 +57,8 @@ Copy [`assets/brief-template.md`](assets/brief-template.md) and fill in every �
 The brief pins **scope** (which provisions, by number), **deliverables**, and **the rules that matter**.
 Write it even when you are the encoder: it is what a reviewer reads to learn what you were trying to do, and what the independent test author in step 8 works from.
 If you find yourself wanting to tell the encoder something that is not in the brief, put it in the brief.
+The brief names the **target compiler** (default `main`, from build 98).
+The encoder reads that line, and reads [`writing-l4-rules/references/dialects.md`](../writing-l4-rules/references/dialects.md) before writing when it says `main`.
 
 ### 3. Enumerate before you encode
 
@@ -81,13 +84,26 @@ Now encode, a section or a unit at a time, moving each coverage row as you go.
 How to write each construct is [`writing-l4-rules`](../writing-l4-rules/SKILL.md)'s job; read its `references/drafting-patterns.md` and the `references/source-patterns/` pages before you start, not when you get stuck.
 The rules that decide whether a reviewer can trust the result:
 
-- **Isomorphic.** Someone holding the source beside your module can check it provision by provision. One source provision → one recognisable place in the L4, with the source's numbering and a citation (`@ref` or a comment) on every rule.
+- **Isomorphic.** Someone holding the source beside your module can check it provision by provision.
+  One source provision → one recognisable place in the L4, with the source's numbering and an `@ref` citation on every rule.
+  If you keep the source as a text file, quote it and put source locators on the `@ref`, so that a script can check the quotation and the citation against the file: [`references/source-locators.md`](references/source-locators.md).
 - **Vintages are inputs, never merged.** Where the law exists in two versions, use the rule-version (rule-effective-time) mechanism in `writing-l4-rules` (`references/source-patterns/04-dates-and-periods.md`), or take the vintage as an explicit input. A vintage that is silent on something answers with silence — never with a number borrowed from another vintage.
-- **`REFUSE "…"` where the sources do not answer** — never `FALSE`, `0` or a plausible default. `MAYBE` / `NOTHING` where the source itself names an absent case. See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
+- **`REFUSE "…"` where the sources do not answer** (target `unstable`; `main` has no `REFUSE`, so for target `main` return `NOTHING` from a `MAYBE`, as `dialects.md` says) — never `FALSE`, `0` or a plausible default. `MAYBE` / `NOTHING` where the source itself names an absent case. See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
   Do not invent your own three-valued logic (`Established` / `Rejected` / `Unresolved` enums threaded through every rule): the language already has these, and a home-made version is one more thing a reviewer must learn before they can read a single rule.
 - **Inputs as `GIVEN`**, threading a record where there are many facts. `ASSUME` is deprecated for inputs.
 - **`BRANCH IF … IF … OTHERWISE`, not chains of `ELSE IF`.**
 - **Several modules, not one.** A 2,000-line single file cannot be reviewed section by section. Split along the source's own structure: the domain module, then one module per Part or topic, then the tests.
+- **Another law's encoding is copied in, never referenced.**
+  When a provision depends on another law that has its own encoding (an Interpretation Act's rules for counting time are the usual case), copy that encoding's module into your encoding folder and `IMPORT` it by name.
+  Do not reach into the other encoding's folder, by a relative path or through `JL4_LIBRARY_PATH`: it is a different bundle, maintained on its own schedule, so when it changes your answers change with it, unreviewed, and when it moves your encoding stops loading.
+  The reviewer who asked for this put it as "Copy dependencies, don't live reference them if they belong to a different bundle" (serrynaimo, 2026-11-05); it is how `npm` treats a package, and why a deployment packs the libraries it uses.
+  The rules for the copy:
+  - **Byte for byte.** Never edit a copied module, not even to add a comment, so that anyone can check it against its source with one `diff`. If it needs a fix, fix it in its own encoding first, then copy it again.
+  - **Its imports come too.** Copy every module it imports, other than the libraries that ship with `l4` (`prelude`, `daydate` and the rest).
+  - **It must check under your target.** A module written for `unstable` (one that uses `REFUSE`, say) will not load in an encoding for `main`. Then do not copy it: take its effect as a named input, and say so in the fork register.
+  - **If it does not answer your question, do not bend it.** Write what you need in your own module, and say in the fork register why the copy was not enough.
+  - **Record where it came from** in `NOTES.md` (step 9): the source folder, the commit you copied it at, and its `sha256`. List it in `encoding.json`'s `modules` like any other module.
+  - **Refresh it on purpose.** A newer version of the source is not picked up by itself. Copying it again is a change to your encoding: re-run `check.sh`, and record the new commit and `sha256` in `NOTES.md`.
 
 ### 6. Tests: from the source, never from the code
 
@@ -99,15 +115,32 @@ Write a tests module whose expected values come **from the source**: worked exam
 
 ### 7. The self-check loop — read the diagnostics
 
-**`l4 run` exits 0 when an `#ASSERT` fails.** The failure is a `DiagnosticSeverity_Error` line whose message is `assertion failed`. A run that "passed" by exit code can be carrying failed assertions.
+**Read the diagnostics, not only the exit code.**
+`l4 run` exits 1 when an `#ASSERT` fails, but it exits 0 when one refuses, an `l4` built before legalese/l4-ide#518 exits 0 when one fails too, and no exit code says which assertion failed or how many ran.
+The outcome is printed in one of three shapes, and only the first is on the `Message:` line itself:
 
-Copy [`assets/check.sh`](assets/check.sh) into the encoding directory. It runs every module and prints, per module, errors, assertions satisfied, and assertions failed, and exits non-zero on any error or failed assertion:
+- `Message:  assertion failed`, at `DiagnosticSeverity_Error`;
+- `Message:`, then on the next line `assertion failed: expected a refusal, but the expression produced a value`, also at Error, from an `#ASSERT REFUSED` whose expression answered;
+- `Message:`, then on the next line `assertion refused: …`, at **Warning**, from an `#ASSERT` whose expression refused. It is never an error, so a check that counts errors passes it.
+
+Copy [`assets/check.sh`](assets/check.sh) into the encoding directory. It runs every module and prints, per module, errors, assertions satisfied, failed and refused, reading the line after every `Message:` so that all three shapes are counted. It exits non-zero on any error that is not an expected failed assertion, on any refused assertion, and when a module's failures differ from the count its `expected_failed` table gives (zero, unless you list a module that is meant to fail):
 
 ```bash
 L4=/path/to/l4 ./check.sh
 ```
 
 Run it after every unit you land. Report the numbers it prints, never "it's green".
+
+**It also makes the target check.**
+Unless you set `L4_TARGET=unstable`, `check.sh` runs every module with a main build as well as with your `l4`, and compares the four counts.
+Copy [`assets/fetch-main-l4.sh`](assets/fetch-main-l4.sh) beside it: `check.sh` calls that to get the newest main build, and caches it.
+A line that ends `reads differently on main` is a module `main` cannot read as it stands; `writing-l4-rules/references/dialects.md` says what to write instead.
+Every module is run twice, once with each build, with your environment (a module that fetches over the network or reads `ENV` does that twice), and the comparison is of counts, not of which assertion fails; the header of `check.sh` says what to do about both.
+Exit status 2 means the main step did not run (no main build for your platform, no network, no `fetch-main-l4.sh`), and that is not a pass.
+A module `main` does not finish within `L4_MAIN_TIMEOUT` seconds (300 unless you set it) is red as well: `main` is the compiler that has to read it, and some modules that run in a second on `unstable` take minutes on `main`.
+The check counts error diagnostics and assertion lines and nothing else.
+It sees a module `main` rejects, and a difference that changes an `#ASSERT`'s outcome.
+It does not see a different `#TRACE` outcome, because a trace prints no assertion line: for the rows `dialects.md` marks as degrading, run the file with both builds and compare the traces yourself.
 
 ### 8. The independent test pass (recommended)
 
@@ -121,11 +154,19 @@ A reviewer reads this first. It carries:
 
 1. **What is encoded and what is not**, in a paragraph — the scope, stated as provisions.
 2. **The coverage table** from step 3, with no row left `deferred` (or with the reason if some are).
-3. **The fork register**: every ambiguity you met — the readings you saw, the one you took, and why, with the text that licenses each reading.
+3. **The fork register**: every ambiguity you met — the readings you saw, the one you took, and why, with the text that licenses each reading.[^judgment-calls]
    A fork resolved by a court or the regulator says who settled it. "No ambiguities found" is a claim a reviewer will not believe; if you found none, say where you looked.
 4. **An answer table** where the subject has one — the fee for each service in each vintage, the threshold for each grade — with the provision cited per cell.
-5. **What `check.sh` prints**, and which failing assertions are expected, and why.
+5. **What `check.sh` prints**, main columns included, and the main build it compared with, and which failing assertions are expected, and why.
+   Also the **target** the encoding was written for, `main` or `unstable`.
 6. **Open questions** for a domain expert.
+7. **Copied modules**, if any (step 5): for each module copied from another encoding, the folder it came from, the commit it was copied at, and its `sha256`.
+
+[^judgment-calls]:
+    Why every reading, and not only the one taken: an ambiguity is a judgment call, and people working with an agent tend to take the reading it argues for.
+    In a randomised study, 50 analysts doing a causal-inference task with Claude Code went with the agent's lean on 86% of four such choices, where about 50% would mean the lean made no difference; 77% later repeated the agent's arguments, and 15% credited it (Herdağdelen, Joren and Tamkin, ["How AI agents shape experts' judgment calls"](https://www.anthropic.com/research/agents-judgment-calls), Anthropic, 27 October 2026).
+    The authors note that such deferral is hard to catch, because "the work can look sound whichever option is chosen", and suggest that agents make the best case for each option.
+    The study is of one statistics task, with one model and leans the authors strengthened on purpose, not of law; the register is where a reviewer can see the reading you did not take, and choose it.
 
 ### 10. Deposit it in canon
 
@@ -141,14 +182,15 @@ The review that turns `draft` into `reviewed` is a human who knows the law readi
 
 Each of these is a way for an encoding to look finished and not be:
 
-| failure                                                      | what prevents it                                         |
-| ------------------------------------------------------------ | -------------------------------------------------------- |
-| a fifth of the Act encoded, every check green                | the coverage table (step 3)                              |
-| the same person declared three ways in three chapters        | nouns first (step 4)                                     |
-| one 2,000-line module nobody can review against the source   | split along the source's structure (step 5)              |
-| a home-made `Unresolved` value instead of `REFUSE` / `MAYBE` | step 5, and `writing-l4-rules`' page 11                  |
-| a number from the amended text answering for the original    | vintages as inputs (step 5)                              |
-| tests that restate the code, so they cannot fail             | tests from the source; the independent pass (steps 6, 8) |
-| an expected value edited until the test passed               | a failing assertion is a finding (step 6)                |
-| "all green" over a run with failed assertions                | `check.sh`, not the exit code (step 7)                   |
-| valid-looking syntax rejected by an old binary               | a current `l4` (step 0)                                  |
+| failure                                                          | what prevents it                                         |
+| ---------------------------------------------------------------- | -------------------------------------------------------- |
+| a fifth of the Act encoded, every check green                    | the coverage table (step 3)                              |
+| the same person declared three ways in three chapters            | nouns first (step 4)                                     |
+| one 2,000-line module nobody can review against the source       | split along the source's structure (step 5)              |
+| a home-made `Unresolved` value instead of `REFUSE` / `MAYBE`     | step 5, and `writing-l4-rules`' page 11                  |
+| a number from the amended text answering for the original        | vintages as inputs (step 5)                              |
+| tests that restate the code, so they cannot fail                 | tests from the source; the independent pass (steps 6, 8) |
+| an expected value edited until the test passed                   | a failing assertion is a finding (step 6)                |
+| "all green" over a run with failed or refused assertions         | `check.sh`, not the exit code (step 7)                   |
+| valid-looking syntax rejected by an old binary                   | a current `l4` (step 0)                                  |
+| an encoding only an `unstable` binary can read, filed for `main` | the target check in `check.sh` (step 7)                  |

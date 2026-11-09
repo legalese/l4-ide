@@ -1,0 +1,5 @@
+-- Typechecks cleanly; the #EVAL's result is a bare unsupplied BOOLEAN, which
+-- is no value. It used to print `x` as though it were the answer, with exit 0.
+§ `A bare unknown result`
+    GIVEN x IS A BOOLEAN
+#EVAL x

@@ -190,6 +190,7 @@ DECIDE `qualifying territory` p IF
     AND NOT p's `English name` = "Sovereign Base Areas of Akrotiri and Dhekelia"
 
 -- The charity test
+@ref url https://www.jerseylaw.je/laws/current/l_41_2014#_Toc181797832
 §§ `section 5, charity test`
     GIVEN `is ancillary` IS A FUNCTION FROM Purpose TO BOOLEAN
           `is analogous to charitable purpose` IS A FUNCTION FROM Purpose TO BOOLEAN
@@ -200,7 +201,6 @@ DECIDE `qualifying territory` p IF
           `disclosure to authorized person` IS A FUNCTION FROM Information TO BOOLEAN
           `for investigation of offense` IS A FUNCTION FROM Information TO BOOLEAN
           `for legal proceedings` IS A FUNCTION FROM Information TO BOOLEAN
-@ref url https://www.jerseylaw.je/laws/current/l_41_2014#_Toc181797832
 
 -- 5        The charity test
 --  (1)     An entity meets the charity test if –

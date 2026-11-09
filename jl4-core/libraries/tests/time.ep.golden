@@ -5,14 +5,21 @@
 
 §§ `Constants`
 
+@nlg the number of seconds in a minute
 `Seconds in a minute` MEANS 60
+@nlg the number of minutes in an hour
 `Minutes in an hour`  MEANS 60
+@nlg the number of hours in a day
 `Hours in a day`      MEANS 24
+@nlg the number of seconds in an hour
 `Seconds in an hour`  MEANS 3600
+@nlg the number of seconds in a day
 `Seconds in a day`    MEANS 86400
 
+@nlg midnight at the start of the day
 DECIDE Midnight IS TIME_FROM_HMS 0 0 0
 
+@nlg noon
 DECIDE Noon IS TIME_FROM_HMS 12 0 0
 
 
@@ -27,6 +34,7 @@ GIVEN h IS A NUMBER
       m IS A NUMBER
       s IS A NUMBER
 GIVETH A TIME
+@nlg the time %h% hours, %m% minutes and %s% seconds
 `Time` MEANS
     TIME_FROM_HMS h m s
 
@@ -34,28 +42,33 @@ GIVETH A TIME
 GIVEN h IS A NUMBER
       m IS A NUMBER
 GIVETH A TIME
+@nlg the time %h% hours and %m% minutes
 `Time` MEANS
     TIME_FROM_HMS h m 0
 
 -- Time h  (1 NUMBER -> TIME, minutes=0, seconds=0)
 GIVEN h IS A NUMBER
 GIVETH A TIME
+@nlg the time %h% hours
 `Time` MEANS
     TIME_FROM_HMS h 0 0
 
 -- Time t  (identity: 1 TIME -> TIME)
 GIVEN t IS A TIME
 GIVETH A TIME
+@nlg %t%
 `Time` MEANS t
 
 -- Time str  -> parse time string (HH:MM:SS, HH:MM)
 GIVEN str IS A STRING
 GIVETH A MAYBE TIME
+@nlg the time in %str%, if it can be read
 `Time` MEANS TOTIME str
 
 -- Time dt  -> extract time from DATETIME (ignores date and timezone)
 GIVEN dt IS A DATETIME
 GIVETH A TIME
+@nlg the time of %dt% in its own time zone
 `Time` MEANS DATETIME_TIME dt
 
 -- Time h m s am/pm  (3 NUMBERs + Meridiem Indicator -> TIME)
@@ -64,6 +77,7 @@ GIVEN h  IS A NUMBER
       s  IS A NUMBER
       ap IS A `Meridiem Indicator`
 GIVETH A TIME
+@nlg the time %m% minutes and %s% seconds past %h% o'clock %ap%
 `Time` MEANS
     IF ap EQUALS am
     THEN TIME_FROM_HMS (IF h EQUALS 12 THEN 0 ELSE h) m s
@@ -74,6 +88,7 @@ GIVEN h  IS A NUMBER
       m  IS A NUMBER
       ap IS A `Meridiem Indicator`
 GIVETH A TIME
+@nlg the time %m% minutes past %h% o'clock %ap%
 `Time` MEANS
     Time h m 0 ap
 
@@ -81,6 +96,7 @@ GIVETH A TIME
 GIVEN h  IS A NUMBER
       ap IS A `Meridiem Indicator`
 GIVETH A TIME
+@nlg the time %h% o'clock %ap%
 `Time` MEANS
     Time h 0 0 ap
 
@@ -89,14 +105,17 @@ GIVETH A TIME
 
 GIVEN t IS A TIME
 GIVETH A NUMBER
+@nlg the hour of %t% on the 24-hour clock
 `the hour of` t MEANS TIME_HOUR t
 
 GIVEN t IS A TIME
 GIVETH A NUMBER
+@nlg the minute of %t%
 `the minute of` t MEANS TIME_MINUTE t
 
 GIVEN t IS A TIME
 GIVETH A NUMBER
+@nlg the second of %t%
 `the second of` t MEANS TIME_SECOND t
 
 
@@ -105,10 +124,12 @@ GIVETH A NUMBER
 -- Serial is fraction of day (0.0 = midnight, 0.5 = noon, 1.0 = next midnight)
 GIVEN t IS A TIME
 GIVETH A NUMBER
+@nlg the fraction of a day elapsed at %t%
 t `Time to serial` MEANS TIME_SERIAL t
 
 GIVEN serial IS A NUMBER
 GIVETH A TIME
+@nlg the time at which the fraction %serial% of a day has elapsed
 serial `Serial to time` MEANS TIME_FROM_SERIAL serial
 
 
@@ -117,6 +138,7 @@ serial `Serial to time` MEANS TIME_FROM_SERIAL serial
 GIVEN t IS A TIME
       n IS A NUMBER
 GIVETH A TIME
+@nlg the time %n% hours after %t% (wrapping past midnight)
 t `plus hours` n MEANS
     LET serial BE TIME_SERIAL t PLUS (n DIVIDED BY `Hours in a day`)
     IN TIME_FROM_SERIAL (serial MINUS FLOOR serial)
@@ -124,6 +146,7 @@ t `plus hours` n MEANS
 GIVEN t IS A TIME
       n IS A NUMBER
 GIVETH A TIME
+@nlg the time %n% minutes after %t% (wrapping past midnight)
 t `plus minutes` n MEANS
     LET serial BE TIME_SERIAL t PLUS (n DIVIDED BY `Seconds in a day` TIMES `Seconds in a minute`)
     IN TIME_FROM_SERIAL (serial MINUS FLOOR serial)
@@ -131,6 +154,7 @@ t `plus minutes` n MEANS
 GIVEN t IS A TIME
       n IS A NUMBER
 GIVETH A TIME
+@nlg the time %n% seconds after %t% (wrapping past midnight)
 t `plus seconds` n MEANS
     LET serial BE TIME_SERIAL t PLUS (n DIVIDED BY `Seconds in a day`)
     IN TIME_FROM_SERIAL (serial MINUS FLOOR serial)
@@ -138,16 +162,19 @@ t `plus seconds` n MEANS
 GIVEN t IS A TIME
       n IS A NUMBER
 GIVETH A TIME
+@nlg the time %n% hours before %t% (wrapping past midnight)
 t `minus hours` n MEANS t `plus hours` (0 MINUS n)
 
 GIVEN t IS A TIME
       n IS A NUMBER
 GIVETH A TIME
+@nlg the time %n% minutes before %t% (wrapping past midnight)
 t `minus minutes` n MEANS t `plus minutes` (0 MINUS n)
 
 GIVEN t IS A TIME
       n IS A NUMBER
 GIVETH A TIME
+@nlg the time %n% seconds before %t% (wrapping past midnight)
 t `minus seconds` n MEANS t `plus seconds` (0 MINUS n)
 
 
@@ -155,22 +182,27 @@ t `minus seconds` n MEANS t `plus seconds` (0 MINUS n)
 
 GIVEN t IS A TIME
 GIVETH A BOOLEAN
+@nlg %t% is before noon
 t `is before noon` MEANS TIME_HOUR t LESS THAN 12
 
 GIVEN t IS A TIME
 GIVETH A BOOLEAN
+@nlg %t% is at or after noon
 t `is after noon` MEANS TIME_HOUR t AT LEAST 12
 
 GIVEN t IS A TIME
 GIVETH A BOOLEAN
+@nlg %t% is in the morning (before noon)
 t `is morning` MEANS TIME_HOUR t LESS THAN 12
 
 GIVEN t IS A TIME
 GIVETH A BOOLEAN
+@nlg %t% is in the afternoon (from noon until 6 pm)
 t `is afternoon` MEANS TIME_HOUR t AT LEAST 12 AND TIME_HOUR t LESS THAN 18
 
 GIVEN t IS A TIME
 GIVETH A BOOLEAN
+@nlg %t% is in the evening (from 6 pm until midnight)
 t `is evening` MEANS TIME_HOUR t AT LEAST 18
 
 
@@ -179,12 +211,14 @@ t `is evening` MEANS TIME_HOUR t AT LEAST 18
 GIVEN t1 IS A TIME
       t2 IS A TIME
 GIVETH A TIME
+@nlg the earlier of %t1% and %t2%
 `the earlier of` t1 t2 MEANS
     IF TIME_SERIAL t1 AT MOST TIME_SERIAL t2 THEN t1 ELSE t2
 
 GIVEN t1 IS A TIME
       t2 IS A TIME
 GIVETH A TIME
+@nlg the later of %t1% and %t2%
 `the later of` t1 t2 MEANS
     IF TIME_SERIAL t1 AT LEAST TIME_SERIAL t2 THEN t1 ELSE t2
 
@@ -194,39 +228,46 @@ GIVETH A TIME
 GIVEN a IS A TIME
       b IS A TIME
 GIVETH A BOOLEAN
+@nlg %a% is at or after %b%
 `__GEQ__` MEANS
     TIME_SERIAL a AT LEAST TIME_SERIAL b
 
 GIVEN a IS A TIME
       b IS A TIME
 GIVETH A BOOLEAN
+@nlg %a% is at or before %b%
 `__LEQ__` MEANS
     TIME_SERIAL a AT MOST TIME_SERIAL b
 
 GIVEN a IS A TIME
       b IS A TIME
 GIVETH A BOOLEAN
+@nlg %a% is after %b%
 `__GT__` MEANS
     TIME_SERIAL a GREATER THAN TIME_SERIAL b
 
 GIVEN a IS A TIME
       b IS A TIME
 GIVETH A BOOLEAN
+@nlg %a% is before %b%
 `__LT__` MEANS
     TIME_SERIAL a LESS THAN TIME_SERIAL b
 
 GIVEN a IS A TIME
       b IS A TIME
 GIVETH A BOOLEAN
+@nlg %a% is before %b%
 a `is before` b MEANS a LESS THAN b
 
 GIVEN a IS A TIME
       b IS A TIME
 GIVETH A BOOLEAN
+@nlg %a% is after %b%
 a `is after` b MEANS a GREATER THAN b
 
 GIVEN a IS A TIME
       b IS A TIME
 GIVETH A NUMBER
+@nlg the number of seconds from %b% to %a%
 `__MINUS__` MEANS
     (TIME_SERIAL a MINUS TIME_SERIAL b) TIMES `Seconds in a day`

@@ -3,19 +3,19 @@
 
 citizen MEANS TRUE
 over18 MEANS TRUE
-hasID MEANS TRUE
+`has ID` MEANS TRUE
 
 approved MEANS TRUE
 pending MEANS FALSE
 review MEANS FALSE
 
 -- Ellipsis (...) = implicit AND
-eligible1 MEANS citizen ... over18 ... hasID
--- Equivalent to: (citizen AND over18 AND hasID)
+eligible1 MEANS citizen ... over18 ... `has ID`
+-- Equivalent to: (citizen AND over18 AND has ID)
 
 -- Double dot (..) = implicit OR
-inProgress MEANS approved .. pending .. review
+`in progress` MEANS approved .. pending .. review
 -- Equivalent to: (approved OR pending OR review)
 
 #EVAL eligible1
-#EVAL inProgress
+#EVAL `in progress`

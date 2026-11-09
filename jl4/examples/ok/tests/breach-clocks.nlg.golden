@@ -1,0 +1,23 @@
+executing contract `or, then and` at 0 with the following events: `WAIT UNTIL` with 11
+executing contract `and, then or` at 0 with the following events: `WAIT UNTIL` with 11
+executing contract `or, then and` at 0 with the following events: `WAIT UNTIL` with 2 `WAIT UNTIL` with 6 `WAIT UNTIL` with 11
+executing contract `and, then or` at 0 with the following events: `WAIT UNTIL` with 2 `WAIT UNTIL` with 6 `WAIT UNTIL` with 11
+executing contract `both due at 5` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `both due at 5, swapped` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `miss and declared` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `declared and miss` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `late arming and q` at 0 with the following events: `WAIT UNTIL` with 3.8 party `P` did `x` at 4 `WAIT UNTIL` with 5
+executing contract `q and late arming` at 0 with the following events: `WAIT UNTIL` with 3.8 party `P` did `x` at 4 `WAIT UNTIL` with 5
+executing contract `kept, then R` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `kept, then R` at 0 with the following events: `WAIT UNTIL` with 6 `WAIT UNTIL` with 10
+executing contract `kept breach and q` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `q and kept breach` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `kept breach and q` at 0 with the following events: `WAIT UNTIL` with 6 `WAIT UNTIL` with 10
+executing contract `may or q` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `q or may` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `may and q` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `q and may` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `whole` at 0 with the following events: `WAIT UNTIL` with 200
+executing contract `everyone` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `the pair` at 0 with the following events: `WAIT UNTIL` with 10
+executing contract `broken, then fined` at 0 with the following events: party `P` did `x` at 3 `WAIT UNTIL` with 6

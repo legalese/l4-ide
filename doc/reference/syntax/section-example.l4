@@ -1,18 +1,20 @@
--- Example: Section markers (§)
--- Demonstrates organizing code into sections
+-- Sections (§) group definitions, like the parts of a statute
 
 § `Eligibility Rules`
 
-age MEANS 21
-citizen MEANS TRUE
+`the minimum age` MEANS 18
 
 §§ `Age Requirements`
 
-ageEligible MEANS age >= 18
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+`is old enough` age MEANS age >= `the minimum age`
 
 §§ `Citizenship Requirements`
 
-citizenshipEligible MEANS citizen EQUALS TRUE
+GIVEN `is a citizen` IS A BOOLEAN
+GIVETH A BOOLEAN
+`meets citizenship requirement` `is a citizen` MEANS `is a citizen`
 
-#EVAL ageEligible
-#EVAL citizenshipEligible
+#EVAL `is old enough` 21
+#EVAL `meets citizenship requirement` TRUE

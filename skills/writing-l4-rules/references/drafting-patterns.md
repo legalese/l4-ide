@@ -828,13 +828,13 @@ list that an active node references only by cross-reference (Reg CF Rule 204(b)(
 definition carrier whose node is literally `TRUE` (Rule 204(e)). Those are not shadows; they are the only
 place the words live.
 
-**The lint.** `etc/go/phases/p3-check.sh` reads the surviving label-only strings within each rule and warns
-when a run is out of order. It is **warning level and never affects status**, because — Meng again — "real
-legislation goes wobbly": a consolidated Act quotes repealed limbs by omitting them, so `(a) (c) (d)` is
-normal and **gaps are counted as information, not as a warning**. The scheme reader
-(`etc/go/lib/label-order.mjs`) handles `(1)(2)`, inserted `(1A)`, `(a)(b)` and roman `(i)(ii)(iv)`, and calls
-a run disordered only when no scheme orders it — `(i)` is both a letter and a roman one, and guessing wrong
-would cry wolf.
+**The lint.** `node etc/label-order.mjs FILE…` reads the surviving label-only strings within each rule
+and warns when a run is out of order; the `go` pipeline runs it at its P3 check. It is **warning level
+and never affects status**, because — Meng again — "real legislation goes wobbly": a consolidated Act
+quotes repealed limbs by omitting them, so `(a) (c) (d)` is normal and **gaps are counted as information,
+not as a warning**. The scheme reader handles `(1)(2)`, inserted `(1A)`, `(a)(b)` and roman
+`(i)(ii)(iv)`, and calls a run disordered only when no scheme orders it — `(i)` is both a letter and a
+roman one, and guessing wrong would cry wolf.
 
 ### Provenance — pin every inert string; resolve amendments to the in-force reading
 

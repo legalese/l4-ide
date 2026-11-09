@@ -382,4 +382,4 @@ L4 makes this check wherever it can read from the text who the performer is: a n
 - [Several Parties](several-parties.md) — three flatmates and one rent
 - [The Regulative Layer, Whole](../../concepts/legal-modeling/regulative-layer-whole.md) — how the five separate ideas fit together, and which are still proposed
 - [Regulative Rules](../../concepts/legal-modeling/regulative-rules.md) — the reference-style account of everything on this page
-- [`DEONTIC`](../../reference/regulative/DEONTIC.md), [`PARTY`](../../reference/regulative/PARTY.md), [`MUST`](../../reference/regulative/MUST.md), [`MAY`](../../reference/regulative/MAY.md), [`SHANT`](../../reference/regulative/SHANT.md) — the keyword reference pages
+- [`DEONTIC`](../../reference/regulative/DEONTIC.md), [`PARTY`, `MUST`, `MAY`, `SHANT`](../../reference/regulative/PARTY.md) — the keyword reference pages

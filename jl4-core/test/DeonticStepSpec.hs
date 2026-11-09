@@ -17,8 +17,8 @@
 --   2. an expiry routed to LEST, with the revealing event re-offered;
 --   3. a MAY that expires — routed to LEST, defaulting to FULFILLED;
 --   4. a party mismatch and then a match;
---   5. an OR join where both sides breach at the same instant — the CSL
---      tie-break;
+--   5. an OR join where both sides breach at the same instant — both decide
+--      (SEESAW: no tie is broken by position);
 --   6. a barrier where member 1 satisfies its arm and is NOT released, and
 --      member 2 releases the join;
 --   7. a fork where each member's continuation runs on its own;
@@ -228,8 +228,9 @@ mismatchSrc = Text.unlines $ prologue <>
   , "  PARTY Alice DOES deliver AT 2"
   ]
 
--- 5. an OR whose two sides both breach at the same instant: CSL's tie-break
---    picks the RIGHT operand for OR
+-- 5. an OR whose two sides both breach at the same instant: both decide the
+--    compound's instant, and neither side is picked by position (SEESAW,
+--    EVERY-EACH-QUANTIFIER-SPEC §6.1.2)
 orSrc :: Text.Text
 orSrc = Text.unlines $ prologue <>
   [ "GIVETH DEONTIC Person Action"
@@ -626,7 +627,7 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
     -- the mismatching event's party is reported
     map (\s -> (.ekParty) =<< s.dsEvent) (stepsOf 0 rs) `shouldBe` [Just "Bob", Just "Alice"]
 
-  it "5. an OR whose sides breach at the same instant is Joined by the CSL tie-break (right for OR)" $ do
+  it "5. an OR whose sides breach at the same instant is Joined with both sides deciding" $ do
     rs <- runLogged orSrc
     let ss = stepsOf 0 rs
     -- With no LEST there is no continuation to force the party in, so the
@@ -639,13 +640,15 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row Nothing 0 Nothing
           (Joined ValROr MkJoinNote
             { jnResult   = JoinBreached MkBreachSummary
-                { bsBlame = Just "Bob", bsBlameName = Just "Bob", bsStamp = Just 5, bsDeadline = Just 3
-                -- R-T3: the compound names BOTH failures, left operand first,
-                -- anchored at Bob's (the right, by ROR's tie-break)
+                { bsBlame = Just "Alice", bsBlameName = Just "Alice", bsStamp = Just 5, bsDeadline = Just 3
+                -- R-T3: the compound names BOTH failures, left operand first;
+                -- both missed 3, so both are decisive and the anchor is the
+                -- first of them (SEESAW: a tie on kind, instant and
+                -- observation falls to order, and decides nothing)
                 , bsFailures = [MissedSummary (Just "Alice") "MUST deliver" 3, MissedSummary (Just "Bob") "MUST pay 50" 3]
-                , bsAnchor = 1 }
-            , jnWinner   = Just RightSide
-            , jnTieBreak = True })
+                , bsAnchor = 0 }
+            , jnWinner   = Just BothSides
+            , jnTieBreak = False })
           NoEvent Nothing Nothing Nothing
       ]
     -- the two expiries are two different sites, one activation each

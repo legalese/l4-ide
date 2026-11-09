@@ -1,14 +1,16 @@
 # Multilingual L4 — language-tagged `@nlg`, and the trilingual Penal Law
 
 _Status: **§§3–4 are IMPLEMENTED AND MERGED; §5 and the pilot are still proposals.**
-Updated 2026-09-19. §4 (the `%` and `]` escapes) merged as PR #415, §4.1(a)'s `\>` escape for
+Updated 2026-10-02. §4 (the `%` and `]` escapes) merged as PR #415, §4.1(a)'s `\>` escape for
 `@ref` as PR #418, this spec's own revisions as #416, the `#962` schema-golden fix as #419, and
 the language tag itself as **#423** — verified in `unstable` by feature presence
 (`MkLangTag`, `NlgLangTagSpec`), not by report. Multiplicity, selection and
 `prettyLayout`'s annotation loss are on `fix/prettylayout-nlg` and `lang/nlg-multiplicity`.
 **A bilingual document set is producible today**: two `@nlg:xx` renderings on one name, and
 `l4 nlg --lang he` / `--lang en` over one encoding. §8a records what was built, what was
-deliberately not, and the one live defect found on the way._ Every measurement in §2 was executed on 2026-09-17 against `unstable` @
+deliberately not, and the one live defect found on the way._
+§8a.1 also records a second placement ruling, for `GIVEN` lists (RULED 2026-10-02 (Meng), and implemented).
+Every measurement in §2 was executed on 2026-09-17 against `unstable` @
 `cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Eight measurement errors in earlier drafts
 of this file have been corrected in place, each re-measured rather than taken on report —
 §2.3's gap count (twice: 76 → 52 → 59, the last on 2026-09-21), §2.4's annotation census and its bare-inline count, a line citation, three
@@ -683,16 +685,16 @@ carries `lang="en"`).
 
 ## 6. Rulings
 
-| #        | question                                                                                        | state                                                                                                                                                                                                                                                                                                                                                   |
-| -------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **R-M1** | `@nlg:he` vs `@nlg he "…"` vs a separate `@lang` block — which surface syntax?                  | **ANSWERED 2026-09-17 (Meng)**, §3: **`@nlg:he`** on the heralded form; the bare `[…]` form stays **untaggable**, its `[@he …]` spelling **pre-approved** for when a need appears. `@nlg he "…"` rejected on measurement — a `"` is ordinary prose and two `doc/reference/syntax/` annotations already open with one                                    |
-| **R-M2** | How does a module declare its default language for untagged `@nlg`?                             | **ANSWERED 2026-09-17 (Meng)**, §3: absent declaration means **`en`**, and a module-level `@lang` is **required** in any module that uses a tag. Backward-compatible for all 131 existing annotations, and forces explicitness exactly where ambiguity can arise                                                                                        |
-| **R-M3** | Escape convention for a literal `%` and `]`?                                                    | **ANSWERED 2026-09-17**, §4: **backslash** (`\%`, `\]`, `\\`). Doubling does not generalise to `]`, and L4 string literals already use Haskell escapes. Measured 0 corpus uses of either convention, so both were free to take                                                                                                                          |
-| **R-M4** | One canonical encoding + `@nlg` (B), not parallel per-language encodings (A), for the Penal Law | **ANSWERED 2026-09-17**, §1. Driven by: 651 sections under active amendment (the row read 644 when ruled; corrected per §2.3 note (iii), and the argument is unchanged); Amendment 155 reached Wikisource in 7 days; and the legal-status argument in §1, point 3                                                                                       |
-| **R-M5** | Which language is canonical for `il/penal-law-1977`?                                            | **ANSWERED 2026-09-17**: **Hebrew.** It is the enacted and binding text, it is the only one on Wikisource, and it is the only one current to Amendment 155                                                                                                                                                                                              |
-| **R-M6** | Is the ICJ English text usable for `@nlg:en`?                                                   | **ANSWERED 2026-09-17 (Meng).** _Depositing_ it in canon: **NO.** Link to it and use it internally as a working alignment document; it does not enter `canon`. _Consulting_ it: **yes**, and it is the better use — see §6.1. Nothing in the pilot depends on the deposit, so declining costs nothing and removes the licence question                  |
-| **R-M7** | Confirm the Hebrew-binds / Arabic-special-status claim against primary sources                  | **ANSWERED 2026-09-17**, §1 point 3: Interpretation Law 5741-1981 §24 and Basic Law: Nation-State §4, both read in the primary text. The rule is language-of-enactment rather than "Hebrew always"; it reaches Hebrew here by application. Verified by the `nlg-locale` session                                                                         |
-| **R-M8** | Where do Arabic renderings come from, given no Arabic statute text exists?                      | **ANSWERED 2026-09-17 (Meng): drop the Arabic output.** Basic Law §4(b) makes Arabic a reader aid, so nothing operational depends on it, and there is no Arabic reviewer — note the Hebrew encoding has had no Hebrew-language review either, only mechanical verification. Pilot ships `he` canonical + `@nlg:en`; revisit `ar` when a reviewer exists |
+| #        | question                                                                                        | state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **R-M1** | `@nlg:he` vs `@nlg he "…"` vs a separate `@lang` block — which surface syntax?                  | **ANSWERED 2026-09-17 (Meng)**, §3: **`@nlg:he`** on the heralded form; the bare `[…]` form stays **untaggable**, its `[@he …]` spelling **pre-approved** for when a need appears. `@nlg he "…"` rejected on measurement — a `"` is ordinary prose and two `doc/reference/syntax/` annotations already open with one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **R-M2** | How does a module declare its default language for untagged `@nlg`?                             | **ANSWERED 2026-09-17 (Meng)**, §3: absent declaration means **`en`**, ~~and a module-level `@lang` is **required** in any module that uses a tag~~. Backward-compatible for all 131 existing annotations~~, and forces explicitness exactly where ambiguity can arise~~. **AMENDED 2026-10-13 (Meng):** the "required in any module that uses a tag" clause is retired (it was never built): declare `@lang` only for a module not written in English, and never write `@lang en`. Meng: "Even then shouldn't we have an implicit English default?" Measured on unstable that day: a module with untagged English `@nlg` and `@nlg:he` and no `@lang` checks clean; untagged Hebrew plus `@nlg:en` and no `@lang` warns "More than one NLG annotation in language `en`", which catches the mislabelling the clause guarded against |
+| **R-M3** | Escape convention for a literal `%` and `]`?                                                    | **ANSWERED 2026-09-17**, §4: **backslash** (`\%`, `\]`, `\\`). Doubling does not generalise to `]`, and L4 string literals already use Haskell escapes. Measured 0 corpus uses of either convention, so both were free to take                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **R-M4** | One canonical encoding + `@nlg` (B), not parallel per-language encodings (A), for the Penal Law | **ANSWERED 2026-09-17**, §1. Driven by: 651 sections under active amendment (the row read 644 when ruled; corrected per §2.3 note (iii), and the argument is unchanged); Amendment 155 reached Wikisource in 7 days; and the legal-status argument in §1, point 3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **R-M5** | Which language is canonical for `il/penal-law-1977`?                                            | **ANSWERED 2026-09-17**: **Hebrew.** It is the enacted and binding text, it is the only one on Wikisource, and it is the only one current to Amendment 155                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **R-M6** | Is the ICJ English text usable for `@nlg:en`?                                                   | **ANSWERED 2026-09-17 (Meng).** _Depositing_ it in canon: **NO.** Link to it and use it internally as a working alignment document; it does not enter `canon`. _Consulting_ it: **yes**, and it is the better use — see §6.1. Nothing in the pilot depends on the deposit, so declining costs nothing and removes the licence question                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **R-M7** | Confirm the Hebrew-binds / Arabic-special-status claim against primary sources                  | **ANSWERED 2026-09-17**, §1 point 3: Interpretation Law 5741-1981 §24 and Basic Law: Nation-State §4, both read in the primary text. The rule is language-of-enactment rather than "Hebrew always"; it reaches Hebrew here by application. Verified by the `nlg-locale` session                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **R-M8** | Where do Arabic renderings come from, given no Arabic statute text exists?                      | **ANSWERED 2026-09-17 (Meng): drop the Arabic output.** Basic Law §4(b) makes Arabic a reader aid, so nothing operational depends on it, and there is no Arabic reviewer — note the Hebrew encoding has had no Hebrew-language review either, only mechanical verification. Pilot ships `he` canonical + `@nlg:en`; revisit `ar` when a reviewer exists                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 #### 6.2 Implementation status of R-M1 and R-M2, recorded 2026-09-19
 
@@ -957,20 +959,83 @@ its annotations.** The file that exists to test `@nlg` renders none of its own. 
 sampled files, 11 of 116 annotations sit on a builtin type name; `prelude.l4` has 0 of 67, so
 the idiomatic style avoids it by habit rather than by construction.
 
-**RULED 2026-09-19 (Meng), and implemented.** Trailing a line, an annotation describes what is
-on that line; starting a line of its own, it describes what follows — with ONE exception, ruled
-separately the same day: inside a record-field list, an annotation on its own line describes the
-field ABOVE it. A field list is a column of things rather than a sequence of declarations, and
-the evidence is that authors write it that way: across three independently generated Hebrew
-encodings, field and parameter heralds are the largest single category — 100 of 334 — and every
-one is written below its field (measured by the `ofek` session; our own corpus contains
-essentially none of that shape, so no golden of ours would ever have raised the question).
+**RULED 2026-09-19 (Meng), and implemented.**
+Trailing a line, an annotation describes what is on that line; starting a line of its own, it describes what follows — with two exceptions, both lists that are columns: inside a record-field list (ruled separately the same day) and inside a `GIVEN` list (**RULED 2026-10-02 (Meng)**, below), an annotation on its own line describes the field or input ABOVE it.
+A field list is a column of things rather than a sequence of declarations, and the evidence is that authors write it that way: across three independently generated Hebrew encodings, field and parameter heralds are the largest single category — 100 of 334 — and every one is written below its field (measured by the `ofek` session; our own corpus contains essentially none of that shape, so no golden of ours would ever have raised the question).
 
 The field name therefore claims two disjoint regions: everything before its type, which is its
 own trailing gloss, and everything on a later line. What falls between — trailing the TYPE on
 the field's own line — stays with the type, which is what keeps `ok/nlg_declare1.l4`'s
 deliberate `head [Get First Element] IS AN a [Start Element]` working. Giving the name the whole
 line instead makes those two collide and loses both; that was measured before it was narrowed.
+
+**The `GIVEN` list — RULED 2026-10-02 (Meng), and implemented.**
+A `GIVEN` list is a column too, so the field-list rule extends to it: an annotation on its own line under an input describes that input, the LAST input included.
+The last input is where the two conventions meet, because with no `GIVETH` between the list and the rule the line under the last input is also the line above the rule.
+The tie-break is the annotation's starting column against the `GIVEN` keyword's: indented further than the keyword, it describes the last input; at the keyword's column or left of it, it describes what follows, exactly as before.
+The keyword's column rather than column 1, so a `GIVEN` indented under a section heading or inside a `WHERE` reads the same way.
+
+**Measured 2026-10-02**, before at `6ed297629` and after at `e0366fd7f`, the commit that completes this change's code.
+Rows two to six of the table are rows 15 to 19 of `ok/nlg-head-placement.l4`; the first row was probed separately and is pinned by `NlgAttachmentSpec`.
+
+| placement                                                      | before (`6ed297629`)                             | after (`e0366fd7f`) |
+| -------------------------------------------------------------- | ------------------------------------------------ | ------------------- |
+| under an input that has another after it                       | that input                                       | that input          |
+| under the last input, indented, `GIVETH` next (row 15)         | dropped, "Not attached to any valid syntax node" | that input          |
+| under the last input, indented, no `GIVETH` (row 16)           | the rule's sentence, silently                    | that input          |
+| under the last input, at the `GIVEN` keyword's column (row 17) | the rule's sentence                              | the rule's sentence |
+| under an earlier input carrying a `TYPICALLY` default (row 18) | the NEXT input, or a default that is a name      | that input          |
+| under a section `GIVEN`'s last input, indented (row 19)        | dropped, "Not attached to any valid syntax node" | that input          |
+
+The `TYPICALLY` row is the same rule rather than a second one: the input's name was cut off at the start of its default, so the line below fell past the input.
+It fell to the next input when the default was a number or a string, and to the default itself when that was a name such as `FALSE`, `EMPTY` or `NOTHING`, silently either way.
+`L4.Parser.ResolveAnnotation.addNlgInput` lets the name reach past the default, as a record field's name reaches past its type.
+The same cut sent a gloss TRAILING a number or string default past its input, and that is fixed with it: a literal claims nothing, so the name now takes the rest of its own line.
+_Changed (smucclaw/l4-ide#994):_ a gloss trailing a default that is a name, such as `FALSE`, `EMPTY` or `NOTHING`, used to land on that name, silently, because the default was clamped to its own line but still claimed.
+A `TYPICALLY` default now takes no annotation at all: nothing reads a gloss on it, so it is not traversed, advertises no span and claims nothing, and the input behaves as if the default were not there.
+The test is metamorphic and does not depend on the shape of the default: adding or removing a `TYPICALLY` clause must not change where any annotation lands, or what is reported (`NlgAttachmentSpec`, "a TYPICALLY default takes no annotation").
+One shape is an exception, and is reported rather than read: a gloss at the `GIVEN` keyword's column written between an input's type and a `TYPICALLY` on the next line is inside the input, so it warns "Not attached" where, with no default, it would be the rule's.
+An input's "below" is measured from its name and type, not from its default, so the input does not take it silently.
+
+_Changed (assumed, not ruled):_ the last field of a field list takes a herald from a later line only when it is indented past where the declaration starts (its `GIVEN`, when a type-parameter signature comes first), the column test the last input of a `GIVEN` list has had since the 2026-10-02 ruling.
+A field at the margin, or on the `DECLARE`'s own line, therefore takes no herald from below: nothing marks one as the field's except indenting it past the column of the declaration.
+It is the same for the last field of the last constructor of an enum.
+Until now a record's last field took an `@nlg` between it and the next declaration, at any column, whenever no `GIVEN` or `GIVETH` sat between them — including a herald written above the rule's own `GIVEN`, which is the record case of smucclaw/l4-ide#976 and is now reported ("Not attached").
+A last field with a literal `TYPICALLY` default was spared only by accident, because its default cut its name off (one whose default was a name had its herald taken by that name), so making a default claim nothing exposed the shape; an adversarial review found it, and the column test closes it for fields with and without a default.
+The field's type is held to the field's own line, because it runs second and would otherwise take what the name declined; nothing renders an annotation on a type.
+Issue #976 stays open for what ends in something other than a record: a herald above a rule, or its `GIVEN`, that follows an `IMPORT`, an enum, a type synonym, an opaque type or a rule whose body ends in a name is still taken silently by the last name before it, and after a rule whose body ends in a literal it warns "Not attached".
+_Changed (smucclaw/l4-ide#997):_ a field with a `TYPICALLY` default used to pass its gloss to the next field, both an own-line gloss under it and one trailing a number default, and a default that was a name took it silently.
+The default was a sibling of the field's name, so its span cut the name off from the line below.
+It is no longer traversed (see the `TYPICALLY` row above), so an own-line gloss under such a field describes the field, and one trailing the line reaches the field's type, exactly as for a field with no default.
+The same holds for a field of a constructor (`Disc HAS …`).
+An `ASSUME` has the column test too (assumed, not ruled): an `@nlg` indented under it, or trailing it or its default, is its own, and one at the margin is the next declaration's, as it is below a `DECIDE`.
+Its default takes no annotation: `ASSUME x IS A BOOLEAN TYPICALLY FALSE @nlg …` used to lose its gloss to `FALSE`, silently.
+An `ASSUME` with no default used to take a herald at the margin below it; behind a literal default that herald went to the rule below, and behind a name it went to the name.
+
+The rule applies to every `GIVEN` list the attachment pass reaches — a rule's, an `ASSUME`'s, a `DECLARE`'s type parameters, a section's and a lambda's — and the list ends at the declaration's own keyword.
+A `DECIDE`, `ASSUME`, `DECLARE` or `YIELD` written on a line of its own is a token of the declaration rather than a node with a span, so `signatureBeforeKeyword` bounds the signature there; without it the last input would reach past such a keyword to an annotation written under it.
+It does not reach a rule whose head has a pattern argument (`DECIDE fib 0 IS 0`; one clause is enough): no `@nlg` attaches anywhere on such a rule — in its `GIVEN`, on its head or above it — before or after this change, and each one warns "Not attached" (smucclaw/l4-ide#996).
+
+The column is all the tie-break reads, which has three silent consequences.
+A rule's sentence indented even one space past `GIVEN`, under the last input, becomes that input's gloss, and every projection changes with it: `l4 nlg`, `l4 render`, and the Blawx export, where the review measured `#pred bearded(X) :: '@(X) is bearded'` becoming `'@(X) bearded'` once the first herald of `jl4/examples/blawx/beard.l4` was moved there.
+A rule whose `DECIDE` is indented past its own `GIVEN`, with its herald lined up above it, gives that herald to the last input.
+And when the head repeats its inputs, a gloss on the `GIVEN` name is rendered nowhere (the syntax reference says so under "Where the sentence goes when you write it in the `GIVEN` instead").
+That was already true of a trailing gloss and of a gloss under an earlier input; this change extends it to an annotation indented under the last input, which before warned "Not attached" (`GIVETH` next) or became the rule's sentence (no `GIVETH`), and now attaches and is lost.
+So rows 15 and 16 of the table hold for a head that does not repeat its inputs; for one that does, the "after" is "lost, silently".
+That is a limit of the gloss lookup rather than of this ruling, filed as smucclaw/l4-ide#995.
+None of the three layouts occurs in this repository, and the attachment differential below covers canon and pc-encode as well.
+
+**Corpus exposure.**
+Three own-line annotations in this repository sit under a `GIVEN` list's last input, all at the margin and so all unchanged: `doc/reference/syntax/directive-example.l4:7`, and an `@nlg:he` / `@nlg:en` pair in a fenced example of `skills/writing-l4-rules/references/gotchas.md` (lines 487–488 at `6ed297629`).
+The owner of every `@nlg` across 214 files is the same at `6ed297629` and at `e0366fd7f`, except in the fixture.
+The 214 are the 31 tracked `.l4` files that carry `@nlg`, the 146 tracked `.l4` files without one that contain a `[` (a possible inline gloss), 33 files from a canon checkout and 4 from pc-encode.
+`NlgAttachmentSpec` pins each placement, and each of these mutations fails at least one of its cases: measuring the column from 1, or from the input's own column; no column test; the default traversed; no lower clamp at the keyword; no bound at each of the four keywords; and a column test on inputs before the last.
+
+**What review changed.**
+A third adversarial review, of the `TYPICALLY` change (smucclaw/l4-ide#994, #997), found that making a default claim nothing exposed a defaulted last field to the capture in the paragraph above, and that `ASSUME` still had #994; the column test and the `ASSUME` column test are its repairs.
+Its second round found that a first repair for `ASSUME`, a bound at the end of its line, moved an indented herald to the next declaration and broke the metamorphic property for a default on a line of its own.
+Two adversarial reviews of this change found the keyword overreach, which `signatureBeforeKeyword` closes, the trailing-literal case, and the limits stated above.
+Do not drop the keyword bound as redundant: removing it from any one of the four declarations fails `NlgAttachmentSpec`'s "stops at a DECIDE, ASSUME, DECLARE or YIELD written on a line of its own".
 
 There is precedent for the fix inside the same pass: a **leading `@ref` already attaches
 FORWARD**, to the declaration that follows it, and `RefAnnotationSpec` pins that specifically
@@ -1041,10 +1106,98 @@ All 35 `%slot%` markers in the mirror are in that state, and 8 of the 39 in the 
 `l4 render` has always printed those raw markers (`the salary table%the teacher% is placed in`); making the sentence reach `l4 nlg` is what makes it a second witness.
 So the canon-side follow-up is a re-bless AND a backticking sweep, in that order of discovery and the reverse order of fixing.
 
-**Still owed: the cross-module case.**
-`promoteHeadInputNlg` folds over the module it is given, so a call to a heralded rule defined in an IMPORTED module still prints the bare name — the prelude's 67 among them.
-`l4 render` handles that, and it needs a different key to do it: `L4.Export.Document.nlgFnInfo` is keyed by `(name, arity)` rather than by `Unique` precisely because each module is resolved independently and a call site does not share a `Unique` with its definition.
-Extending the promotion across imports therefore means a second mechanism, and it would move goldens wherever a directive calls a prelude function — measured as zero of the 10 changed goldens above, because every heralded rule the corpus reaches is defined in the module that calls it.
+**LSP hover: ANSWERED 2026-09-26 (Meng, MIRROR): hover shows output meaning** (smucclaw/l4-ide#979).
+Hover read the type checker's `nlgMap`, which records a herald at the node it is attached to, so it showed a head-input herald as the input's gloss while `l4 nlg` and `l4 render` printed it as the rule's sentence.
+The alternative was to keep showing attachment with a note, and it was declined: the editor should say what the tools print.
+`LSP.L4.Rules.outputNlgMap` runs `promoteHeadInputNlg` over the checked module and restamps the map at every defining name whose herald the promotion changed, so hover follows the same decision rather than a copy of it.
+A herald in the `GIVEN` is untouched, because the promotion leaves it alone.
+Measured on `jl4/examples/lsp/hover/nlg-site-hover.l4`, with the issue's own example, before and after:
+
+| hovered                        | before                                             | after                                 |
+| ------------------------------ | -------------------------------------------------- | ------------------------------------- |
+| the rule name `row five`       | type only                                          | type, then ``row five saw `amount` `` |
+| the input `amount` in the head | type, then ``row five saw row five saw `amount` `` | type only                             |
+| `total`, heralded in `GIVEN`   | type, then `the sum of money`                      | unchanged                             |
+
+The doubled "row five saw" in the old input hover was the herald's `%amount%` slot linearizing through `amount`'s own annotation, which carried the same herald (`L4.Nlg`'s `Linearize Resolved` instance reads the binding's herald at an unannotated reference); it goes once the input no longer holds it.
+Hover changes only at the definition, and that matches every other placement: the type checker stamps the map only where a herald is written (`setAnnNlg`), never at a reference, so a call site shows its type alone whether the herald was written above the head, after the head name or after an input.
+The same golden pins all three, with the head-name and declaration placements as controls that #979 does not move.
+One residue it also pins, not a #979 defect: hovering a `GIVEN` type variable prints `TYPE VAR` and drops its herald, because `LSP.L4.Actions.infoToHover` reads the nlg only in its `TypeInfo` branch; the gloss appears instead inside the rule's type, as `FOR ALL a [the kind of thing]`.
+
+**The cross-module case.**
+`promoteHeadInputNlg` folds over the module it is given.
+A positional call to a heralded rule defined in an imported module reads that rule's sentence all the same: `L4.Nlg.nlgFnInfo` builds one table of sentences over the module and its dependencies, keyed by the `Unique` of each definition's head (§8a.4), and `l4 nlg` (`linearizeDirectivesIn`) and `l4 render` (`L4.Export.Document.allUnits`) both read it.
+Measured on `jl4/tests-cli/fixtures/nlg-mixfix-import.l4`: across the `IMPORT`, `` `the greater` 3 4 `` reads "the greater of 3 and 4" and `` `the gap` 840 160 ``, a rule with its herald after its last input, reads "the gap between 840 and 160".
+
+### 8a.4 A mixfix definition's herald at its call sites (draft PR #791, not landed)
+
+A mixfix call resolves to the operator's canonical pattern name (`the lower of _ and _`), while the definition's head keeps only its first keyword (`the lower of`).
+`nlgFnInfo` was keyed on the head alone, so an interleaved call never found its herald.
+Measured on `unstable` at `bcbec1419`: at a call in the same module `l4 nlg` printed the pattern with the arguments after it (`` `the lower of _ and _` with 840 and 160 ``) or, where the herald followed the last input, the herald with its slots unfilled (``the amount by which `a` exceeds `b` with 840 and 160``); across an `IMPORT` it printed the pattern in every case.
+The `OF` spelling and a `WITH` call resolve to the head keyword, and read the herald already.
+
+The table of heralds is keyed by the `Unique` of the definition's head, which is what a call resolved to.
+A mixfix call's canonical name is registered by the type checker as an alias of the definition with the head's `Unique` (`defAka`), so the interleaved spelling, the `OF` spelling, a `WITH` call and a call through an `AKA` name all find the same entry.
+A call's head carries the dependency's `Unique` across an `IMPORT`, for a prefix and a mixfix rule alike; the import rows of the CLI tests fail if it does not.
+The slots are filled by position: the call's arguments are the definition's inputs in the order the pattern lists them.
+
+The table was keyed by a name's text and its number of arguments, and a call read the sentence of any definition with that name.
+That gave the wrong sentence in four ways, all with exit 0 (`jl4/tests-cli/fixtures/nlg-owner-*.l4`, `nlg-bare-reference.l4`):
+
+- A rule of the drafter's own with no herald, named like one that has one, read the other's sentence: `` `LESS` `` and `` `is in` `` on numbers read the prelude's set sentences ("the elements of 100 not in 20"), and a one-input `` `sum` `` read "the sum of 5".
+- A rule of the drafter's own lost its herald to an imported one of the same name and shape, and two overloads in one module read the later one's sentence.
+  `jl4/examples/ok/tests/pattern-matching-overloads-own-annotations.nlg.golden` had `shown 3` read "3 is shown", the sentence of the BOOLEAN overload, when the NUMBER overload it resolves to has none; it reads `` `shown` with 3 `` now, and is the one golden of the suite that moved for this.
+- A record literal of a record named like a heralded rule rendered as that rule's sentence (`decideRendering` read a `WITH` body as a call when the head's text was in the set): `range WITH low IS n, high IS 100` with the prelude's `range` imported read "the whole numbers from low to high ...".
+  A body is a call now when its head's `Unique` is the head of a rule with a herald.
+- A rule named but not called read as its sentence with the slots unbound: `filter even xs` read "for which x is even holds".
+  A bare reference to a rule with at least one input, and a projection's selector (`startDate's day`), read as the rule's name.
+  A rule with no inputs has no slots and keeps its herald.
+
+A positional call was taken for building a record whenever its head had the text of a record's name, which is a fifth way and the same mistake: `normalizePositionalRecords` looked the head up by that text (`recordCtorFields` was keyed by name), so a function named like a record was read as constructing it (`jl4/tests-cli/fixtures/nlg-positional-main.l4`).
+A record `Pt` beside an imported function `Pt` with no herald read "is a Pt with:" for a call that returns a number.
+A record `range` with fields `start` and `finish` beside the prelude's `range` read "the whole numbers from low to high where start is 1 and finish is n" for `range 1 n`.
+`recordCtorFields` is keyed by the `Unique` of the record's constructor, the one the type checker stores in the `RecordDecl`, as `L4.Dmn.Lower` already does; the call reads "Pt with n and 100" and "the whole numbers from 1 to n", and a positional call to the record's own constructor still reads as building it.
+Rendering the 909 files with the binary before and after this one change moves none of them, because no file in the corpus has a record named like a function it also calls.
+
+Measured over the whole `jl4-test` suite on `lhs`, 2026-10-30: 4830 examples, 5 failures, all of them `.nlg.golden` files under `jl4/examples/ok/tests/`, none in the canon mirror.
+The five are the prelude's own set operators (`is in`, `set equals`, `is subset of`, `UNION`, `INTERSECT`, `LESS`, `WITHOUT`), which carry heralds (`jl4-core/libraries/prelude.l4:1209` for `is in`) that had never reached a call in `l4 nlg`.
+The changes are of two kinds: a call to an operator that has a herald now reads as that herald (`` `_ is in _` with 3 and `SET` ... `` becomes ``3 is one of `SET` ...``), and an operator with no herald (`LOCALOP` in `infix-under-connective-imported.l4`) reads as it did.
+
+ANSWERED 2026-10-30 (Meng, as relayed by the explore-verify lead: "Yes render should use `@nlg` unless you recommend otherwise."): `l4 render` reads the `@nlg` herald at call sites.
+`L4.Export.Document.allUnits` builds the table over the module and its dependencies and expands every call with it.
+Measured by rendering every `.l4` under `jl4/examples`, `doc` and `jl4-core/libraries` (908 files) before and after: four renders move, none under `jl4/examples/canon/`.
+Two have only wording changes: `prelude.l4` (three lines, for example `p UNION q` becomes "the union of p and q") and `doc/reference/syntax/nlg-mixfix-example.l4`.
+Two also gain a provision (`doc/reference/libraries/sets-example.l4` and `jl4/examples/ok/set-operators-overloads.l4` now show `eligible`, and in the first `new yorkers`).
+That follows from `isInstanceValueUnit`, which takes a no-input rule whose body is a call to be a fixture and drops it when only directives use it; a body that has become a herald is no longer a call.
+A heralded PREFIX call already behaved so: with the 2026-10-28 `l4`, `x MEANS max 3 4` renders and `x MEANS plain 3 4`, with no herald, is dropped.
+No page under `doc/` quotes a render that moves.
+
+A `WITH` call across an `IMPORT` to a rule whose herald follows its last input printed that herald a second time, as the label of the last input (``the amount by which `a` exceeds `b` where `a` is 840 and the amount by which `a` exceeds `b` is 160``).
+A prefix function did the same, so it was not about mixfix.
+`promoteHeadInputNlg` decides from the rules of the module it is given, and the importing module holds a copy of the imported input taken before any promotion, so nothing cleared the herald from it.
+`promoteHeadInputNlgWith` decides from the dependencies' rules as well, and `prepareModules` (which `linearizeDirectivesIn` uses) applies it to every module, so a dependency's own calls to a module below it are read right too.
+It matches by `Unique`: the input names of an imported rule keep the dependency's `Unique`s in the importing module, which this change relies on and which the import fixture tests.
+With it, the full `jl4-test` suite gives 4830 examples and 0 failures against the five goldens above, so no other golden moves.
+
+`l4 render` had the same fault, in one file as well as across an `IMPORT`: a `WITH` call in the body of another rule printed the herald a second time (`the gap between a and b where a is n and the gap between a and b is 100`), because render never moved a herald onto the rule.
+It now prepares its modules with `prepareModules`, as `l4 nlg` does, and so do the LSP's document and plan handlers.
+A rule imported through two levels (`top` imports `mid` imports `deep`, `mid` calls `deep` with `WITH`) is shown in `top`'s document from `mid`'s own copy, so `prepareModules` gives each dependency the others' rules as well as the module being rendered; the three-module CLI fixture pins it.
+A `WITH` call that is the whole body of a rule rendered as "is a the gap with" and a field list, as though it built a record; `decideRendering` now reads it as the herald with its arguments in a `where` clause, as `l4 nlg` prints it.
+A named-argument call to a rule WITHOUT a herald still reads as a construction; that is not owed here.
+Measured by rendering every `.l4` under `jl4/examples`, `doc` and `jl4-core/libraries` (909 files) before and after the whole of this round: the only render that moves relative to the head the audit read (`981e1b880`) is `jl4-core/libraries/prelude.l4`, `MapPairs means fmap.`, which that head had as "f applied to each item of list" and which reads `fmap` again.
+Rendering the same 909 files with the binary built from the base of this PR and with the binary built from this branch (2026-10-31), five renders move, none under `jl4/examples/canon/`, and no exit code or stderr differs: the four listed above, and the hover fixture `jl4/examples/lsp/hover/nlg-site-hover-import.l4` (added here), which the base prints as a record construction (`is a absNumber with:`) and this branch prints as the herald (`Size of loss means the absolute value of value where value is 5.`).
+At the same head the full `jl4-test` suite gives 4832 examples and 0 failures on `nye`, with six `.nlg.golden` files moved relative to the base (the five measured on `lhs` above and `pattern-matching-overloads-own-annotations`) and none in the canon mirror.
+
+Hover does not repeat the fault.
+`outputNlgMap` (`jl4-lsp/src/LSP/L4/Rules.hs`) also promotes per module, but hover reads the herald from the module's own range map, which is stamped at the definitions only, so a call site in another module shows the type and no sentence, on the rule's name and on the label of its last input.
+`jl4/examples/lsp/hover/nlg-site-hover-import.l4` pins it; it is a control, and passed the first time it was read.
+
+**Known limit: a sentence is spliced in without brackets.**
+Two different groupings of nested calls can read as the same words.
+With `the lower of` carrying "the smaller of %a% and %b%" and `plus` carrying "%a% and %b% together", both ``(`the lower of` 1 `and` 5) `plus` 10`` (11) and `` `the lower of` 1 `and` (5 `plus` 10) `` (1) read "the smaller of 1 and 5 and 10 together", in `l4 nlg` and in `l4 render` (rules `r1` and `r2` of the audit's `ambig.l4`).
+A prefix function's herald does the same; it was true before this section.
+It is not fixed here: bracketing the arguments of a splice would change every golden that nests heralded calls, and which brackets to print is a drafting decision.
+`doc/reference/syntax/README.md` states the limit.
 
 ## 9. Reproducing the measurements
 

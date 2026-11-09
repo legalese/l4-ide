@@ -1,0 +1,32 @@
+-- BRANCH examples
+
+-- The conditions are tried from top to bottom; the first that holds gives the result.
+
+DECLARE Category IS ONE OF Standard, Premium, Enterprise
+
+GIVEN category IS A Category
+GIVETH A NUMBER
+`monthly price for` category MEANS
+  BRANCH IF category EQUALS Standard   THEN 10
+         IF category EQUALS Premium    THEN 25
+         IF category EQUALS Enterprise THEN 100
+         OTHERWISE 0
+
+#EVAL `monthly price for` Premium
+
+-- The IF lines can also start on the line below BRANCH,
+-- indented further than BRANCH itself.
+
+GIVEN `annual income` IS A NUMBER
+GIVETH A NUMBER
+`tax rate for` `annual income` MEANS
+  BRANCH
+    IF `annual income` > 120000 THEN 0.4
+    IF `annual income` > 50000  THEN 0.3
+    IF `annual income` > 20000  THEN 0.2
+    OTHERWISE 0
+
+-- 150000 is above 50000 too, but the first condition that holds wins.
+#EVAL `tax rate for` 150000
+#EVAL `tax rate for` 60000
+#EVAL `tax rate for` 10000

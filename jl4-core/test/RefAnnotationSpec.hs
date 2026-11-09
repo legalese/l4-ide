@@ -5,19 +5,30 @@ module RefAnnotationSpec (spec) where
 import qualified Data.Text as Text
 
 import Base
-import L4.Annotation (getAnno)
+import L4.Annotation (getAnno, rangeOf)
 import L4.Parser (execProgramParserWithHintPass)
+import L4.Parser.ResolveAnnotation (refWarningMessage)
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
-  ( Decide (..)
+  ( Anno
+  , Decide (..)
   , Expr (..)
   , Module (..)
   , Name
   , Section (..)
   , TopDecl (..)
+  , annPmSynthetic
   , annRef
+  , annRefs
   , getRef
+  , refCitation
   )
+import Optics (gplate, toListOf)
 import Test.Hspec
+
+-- | The text of the ref nearest a node, if it holds any: what an exporter shows.
+nearestRef :: Anno -> Maybe Text
+nearestRef anno = getRef <$> view annRef anno
 
 -- | Parse a source snippet and return the @\@ref@ text (if any) attached to
 -- the 'Module' node and to the first top-level declaration ('TopDecl').
@@ -29,13 +40,75 @@ moduleAndFirstDeclRefs src = do
       expectationFailure $ "Parser failed: " <> show errs
       error "unreachable"
     Right (m@(MkModule _ _ (MkSection _ _ _ _ decls)), _, _) -> do
-      let moduleRef = fmap getRef (view annRef (getAnno m))
+      let moduleRef = nearestRef (getAnno m)
       firstDeclRef <- case decls of
-        (d : _) -> pure $ fmap getRef (view annRef (getAnno d))
+        (d : _) -> pure $ nearestRef (getAnno d)
         []      -> do
           expectationFailure "Expected at least one top-level declaration"
           error "unreachable"
       pure (moduleRef, firstDeclRef)
+
+-- | Where each ref lands: the line and column at which the node that holds it
+-- starts, with the citation's last path segment, in the order the traversal
+-- meets them. A ref that lands where the author put the node after it starts
+-- at the position of that node's first token.
+refPlacements :: Text -> IO [((Int, Int), Text)]
+refPlacements src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-placements")
+      segment = Text.takeWhileEnd (/= '/') . Text.strip . getRef
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m, _, _) ->
+      pure
+        [ ((r.start.line, r.start.column), segment ref)
+        | a <- toListOf (gplate @Anno) m
+        , ref <- view annRefs a
+        , Just r <- [rangeOf a]
+        ]
+
+-- | For every @\@ref@ and the node that holds it: the line of that node (0 if
+-- it has no range), whether the parser generated the node while compiling a
+-- group of clauses ('annPmSynthetic'), and the last segment of the citation.
+-- Sorted, because a traversal of the tree meets a clause group's parts in the
+-- order of its fields and not of the source.
+refHolderMarks :: Text -> IO [(Int, Bool, Text)]
+refHolderMarks src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-marks")
+      -- 'refCitation', not 'getRef': an inline @\<\<…\>\>@ keeps its delimiters in the latter.
+      segment = Text.takeWhileEnd (/= '/') . refCitation
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m, _, _) ->
+      pure $ sort
+        [ (maybe 0 (\ r -> r.start.line) (rangeOf a), isJust (view annPmSynthetic a), segment ref)
+        | a <- toListOf (gplate @Anno) m
+        , ref <- view annRefs a
+        ]
+
+-- | The source range of every node that holds a ref, and the source range of
+-- the body of the last top-level @DECIDE@: whether a ref is held by that
+-- body's own node.
+refHoldersAndBody :: Text -> IO ([Maybe SrcRange], Maybe SrcRange)
+refHoldersAndBody src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-holders")
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m@(MkModule _ _ (MkSection _ _ _ _ decls)), _, _) ->
+      case reverse [ body | Decide _ (MkDecide _ _ _ body) <- decls ] of
+        (body : _) ->
+          pure
+            ( [ rangeOf a | a <- toListOf (gplate @Anno) m, not (null (view annRefs a)) ]
+            , rangeOf (getAnno body)
+            )
+        [] -> do
+          expectationFailure "Expected a DECIDE"
+          error "unreachable"
 
 -- | Parse a source snippet and return the bodies of every top-level @DECIDE@,
 -- paired with the raw text of any @\@ref@ annotation attached to that body
@@ -52,9 +125,51 @@ decideBodyRefs' uriStr src = do
       error "unreachable"
     Right (MkModule _ _ (MkSection _ _ _ _ decls), _, _) ->
       pure
-        [ (body, fmap getRef (view annRef (getAnno body)))
+        [ (body, nearestRef (getAnno body))
         | Decide _ (MkDecide _ _ _ body) <- decls
         ]
+
+-- | Parse a source snippet and return, for each top-level declaration, the last
+-- path segment of every @\@ref@ attached to it, in the order they are held;
+-- and the message of every warning about where a @\@ref@ sits, in the order
+-- reported.
+declRefsAndMessages :: Text -> IO ([[Text]], [Text])
+declRefsAndMessages src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-messages")
+      segment = Text.takeWhileEnd (/= '/') . Text.strip . getRef
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), _, warnings) ->
+      pure
+        ( [ fmap segment (view annRefs (getAnno d)) | d <- decls ]
+        , mapMaybe refWarningMessage warnings
+        )
+
+-- | The citation (as written) of every ref held by ANY node of the module, in
+-- the order the traversal meets them.
+heldRefs :: Text -> IO [Text]
+heldRefs src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-held")
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (m, _, _) -> pure [ getRef r | a <- toListOf (gplate @Anno) m, r <- view annRefs a ]
+
+-- | Parse a source snippet and return the last path segment of the ref NEAREST
+-- each top-level declaration, if it holds any.
+declNearestRefs :: Text -> IO [Maybe Text]
+declNearestRefs src = do
+  let uri = toNormalizedUri (Uri "file:///ref-annotation-spec-nearest")
+      segment = Text.takeWhileEnd (/= '/') . Text.strip
+  case execProgramParserWithHintPass uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (MkModule _ _ (MkSection _ _ _ _ decls), _, _) ->
+      pure [ segment <$> nearestRef (getAnno d) | d <- decls ]
 
 spec :: Spec
 spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
@@ -113,6 +228,197 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       Just t  -> t `shouldSatisfy` Text.isInfixOf "section-leading"
       Nothing ->
         expectationFailure "Expected the leading @ref to attach to the first declaration"
+
+  -- Every @ref that precedes a node is held by that node, in source order.
+  -- (A node used to hold one, the nearest, and every other was reported as
+  -- unattached, which was false: it had been outranked, not left without a
+  -- node.) The pending refs are kept in the order they end, and each
+  -- node claims those that precede it from the front of that list, so a
+  -- mistake in keeping the order would show here: as a ref on the wrong node,
+  -- or one reported that should have attached.
+  it "keeps every @ref before a node, in source order, and reports only the one with nothing after it" $ do
+    (attached, messages) <-
+      declRefsAndMessages $
+        Text.unlines
+          [ "@ref https://example.com/one"
+          , "@ref https://example.com/two"
+          , "DECIDE a IS 1"
+          , "@ref https://example.com/three"
+          , "DECIDE b IS 2"
+          , "@ref https://example.com/four"
+          ]
+    attached `shouldBe` [["one", "two"], ["three"]]
+    messages `shouldBe` [endOfFile "https://example.com/four"]
+
+  -- What a reader that shows one citation per node reads is the NEAREST ref,
+  -- the one written last (card R1: in a stack the exporters show the nearest).
+  it "gives a node's nearest ref as the last of those it holds" $ do
+    nearest <-
+      declNearestRefs $
+        Text.unlines
+          [ "@ref https://example.com/one"
+          , "@ref https://example.com/two"
+          , "DECIDE a IS 1"
+          , "DECIDE b IS 2"
+          ]
+    nearest `shouldBe` [Just "two", Nothing]
+
+  describe "a @ref with nothing after it" $ do
+    it "says so, naming the citation" $ do
+      (attached, messages) <-
+        declRefsAndMessages "DECIDE a IS 1\n@ref https://example.com/last\n"
+      attached `shouldBe` [[]]
+      messages `shouldBe` [endOfFile "https://example.com/last"]
+
+    it "names the citation without its herald, its trailing spaces or a carriage return" $ do
+      (_, messages) <-
+        declRefsAndMessages "DECIDE a IS 1\r\n@ref https://example.com/crlf   \r\n"
+      messages `shouldBe` [endOfFile "https://example.com/crlf"]
+      any (Text.any (== '\r')) messages `shouldBe` False
+
+    it "names an inline citation without its angle brackets" $ do
+      (_, messages) <- declRefsAndMessages "DECIDE a IS 1\n<<s.5 (1)>>\n"
+      messages `shouldBe` [endOfFile "s.5 (1)"]
+
+  describe "a @ref that follows code on its line" $ do
+    -- A ref refers to what FOLLOWS it, so one written after code cannot cite
+    -- that code; nor is it handed to the next construct, whose citation it
+    -- would then silently become. It is attached to nothing (card R1, option A).
+    it "warns, and is attached to nothing" $ do
+      (attached, messages) <-
+        declRefsAndMessages "DECIDE a IS 1 @ref https://example.com/cite\nDECIDE b IS 2\n"
+      attached `shouldBe` [[], []]
+      messages `shouldBe` [afterCode "https://example.com/cite" "DECIDE a IS 1"]
+      heldRefs "DECIDE a IS 1 @ref https://example.com/cite\nDECIDE b IS 2\n" `shouldReturn` []
+
+    it "warns once, and not also as having nothing after it, at the end of the file" $ do
+      (_, messages) <-
+        declRefsAndMessages "DECIDE a IS 1 @ref https://example.com/cite\n"
+      messages `shouldBe` [afterCode "https://example.com/cite" "DECIDE a IS 1"]
+
+    it "warns about an inline <<...>> at the end of a code line" $ do
+      (_, messages) <-
+        declRefsAndMessages "GIVEN x IS A BOOLEAN\nDECIDE p IF x <<s.5>>\n  AND TRUE\n"
+      messages `shouldBe` [afterCode "s.5" "DECIDE p IF x"]
+      heldRefs "GIVEN x IS A BOOLEAN\nDECIDE p IF x <<s.5>>\n  AND TRUE\n" `shouldReturn` []
+
+    it "does not warn about an inline <<...>> in the middle of a line, which binds to the next word" $ do
+      (_, messages) <-
+        declRefsAndMessages "GIVEN x IS A BOOLEAN\nDECIDE p IF x AND <<s.5>> TRUE\n"
+      messages `shouldBe` []
+      heldRefs "GIVEN x IS A BOOLEAN\nDECIDE p IF x AND <<s.5>> TRUE\n" `shouldReturn` ["<<s.5>>"]
+
+  describe "a @ref on a line of its own" $ do
+    it "binds to the construct below it and draws no warning" $ do
+      (attached, messages) <-
+        declRefsAndMessages "@ref https://example.com/own\nDECIDE a IS 1\n\n-- a comment\nDECIDE b IS 2\n"
+      attached `shouldBe` [["own"], []]
+      messages `shouldBe` []
+
+    it "still binds to the construct below it across a blank line and a comment" $ do
+      (attached, messages) <-
+        declRefsAndMessages "DECIDE a IS 1\n@ref https://example.com/far\n\n-- a comment\n\nDECIDE b IS 2\n"
+      attached `shouldBe` [[], ["far"]]
+      messages `shouldBe` []
+
+    it "is held by the section heading below it, together with every other @ref above the heading" $ do
+      (attached, messages) <-
+        declRefsAndMessages $
+          Text.unlines
+            [ "@ref https://example.com/act"
+            , "@ref https://example.com/part"
+            , "§ `Part 1`"
+            , "DECIDE a IS 1"
+            ]
+      attached `shouldBe` [["act", "part"]]
+      messages `shouldBe` []
+
+  -- The node a ref lands on is the one that starts at the first token after
+  -- it, whatever kind of node that is. Each case puts a ref on the line above
+  -- a different kind of construct and reads where the node that holds it starts.
+  describe "the node a @ref lands on" $ do
+    it "is the operand after it, when the ref sits inside an expression" $ do
+      refPlacements "DECIDE r IS 1 +\n  @ref https://example.com/operand\n  2\n"
+        `shouldReturn` [((3, 3), "operand")]
+
+    it "is the operand after it, inside the LEFT operand of an infix call" $ do
+      -- The range of an infix call is its keyword and no more, so the call
+      -- starts after its left operand, and used to claim the ref in it.
+      refPlacements
+        (Text.unlines
+          [ "GIVEN a IS A NUMBER, b IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "a `plus` b MEANS a + b"
+          , ""
+          , "DECIDE r IS (1 +"
+          , "  @ref https://example.com/two"
+          , "  2) `plus` 3"
+          ])
+        `shouldReturn` [((7, 3), "two")]
+
+    it "is the whole infix call, when the ref sits above the call" $ do
+      -- The call's own range is its keyword, but the call starts where its
+      -- left operand does, so a ref above the whole call is the call's, and
+      -- not its left operand's.
+      (holders, bodyRange) <-
+        refHoldersAndBody
+          (Text.unlines
+            [ "GIVEN a IS A NUMBER, b IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "a `plus` b MEANS a + b"
+            , ""
+            , "DECIDE s IS"
+            , "  @ref https://example.com/whole"
+            , "  (1 + 2) `plus` 3"
+            ])
+      holders `shouldBe` [bodyRange]
+
+    it "is the type after it" $ do
+      refPlacements "GIVEN x IS A\n  @ref https://example.com/type\n  NUMBER\nDECIDE r IS x\n"
+        `shouldReturn` [((3, 3), "type")]
+
+    it "is the field after it" $ do
+      refPlacements "DECLARE Person HAS\n  @ref https://example.com/field\n  name IS A STRING\n"
+        `shouldReturn` [((3, 3), "field")]
+
+    it "is the branch after it, in a CONSIDER" $ do
+      refPlacements
+        (Text.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE f n IS"
+          , "  CONSIDER n"
+          , "  @ref https://example.com/branch"
+          , "  WHEN 0 THEN 1"
+          , "  OTHERWISE 2"
+          ])
+        `shouldReturn` [((6, 3), "branch")]
+
+  -- A group of clauses is compiled to one definition: a CONSIDER on the first
+  -- clause, and a local definition, with a range of its own, that holds the
+  -- clauses after it and is written after the first clause's body. A ref
+  -- inside the first clause, or above a later one, is held by the first node
+  -- the drafter wrote after it, and never by that generated definition.
+  describe "a @ref in a rule written as clauses" $ do
+    it "is held by a node the drafter wrote" $ do
+      holders <-
+        refHolderMarks
+          (Text.unlines
+            [ "GIVEN n IS A NUMBER"
+            , "GIVETH A STRING"
+            , "@ref https://example.com/above-group"
+            , "DECIDE `how many` 0 IS <<in-clause-1>> \"none\""
+            , "@ref https://example.com/above-clause-2"
+            , "DECIDE `how many` 1 IS \"one\""
+            , "@ref https://example.com/above-clause-3"
+            , "DECIDE `how many` other IS \"many\""
+            ])
+      holders
+        `shouldBe` [ (4, False, "above-group")
+                   , (4, False, "in-clause-1")
+                   , (6, False, "above-clause-2")
+                   , (8, False, "above-clause-3")
+                   ]
 
   -- The inline `<<…>>` form shares its lexer with `@nlg`'s `[…]` form only in
   -- the sense that both are "an annotation between heralds". They must NOT
@@ -187,3 +493,14 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       case bodies of
         [(_, Just t)] -> t `shouldSatisfy` Text.isInfixOf "s.5 > onward"
         _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)
+
+-- | The message for a @\@ref@ with nothing after it. Quoted in
+-- @doc/reference/syntax/README.md@, which is the page to change with it.
+endOfFile :: Text -> Text
+endOfFile citation =
+  "This @ref (`" <> citation <> "`) is at the end of the file, so there is nothing after it to attach to."
+
+-- | The message for a @\@ref@ that follows the given code on its line.
+afterCode :: Text -> Text -> Text
+afterCode citation code =
+  "This @ref (`" <> citation <> "`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `" <> code <> "`."

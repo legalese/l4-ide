@@ -1,0 +1,12 @@
+-- An unknown annotation between the rows of a ditto table is ignored as a
+-- comment is, so the marks still copy from the row above it.
+eligible MEANS TRUE
+
+john  MEANS eligible
+mary  ^     ^
+@future-annotation between the rows
+alice ^     ^
+
+#ASSERT john
+#ASSERT mary
+#ASSERT alice

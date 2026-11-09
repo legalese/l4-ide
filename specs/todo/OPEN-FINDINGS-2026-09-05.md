@@ -6,6 +6,9 @@
 > only in a scratchpad and in one session's messages. Each entry carries a **witness** you can run
 > and a **mechanism** you can read, so that acting on it needs no archaeology.
 >
+> **OF-13 onward were added later, from other work.** Each says where it came from and which tree it
+> was measured on.
+>
 > **Scope.** Findings only. The rulings themselves are in their own documents:
 > `IMPLICIT-PROPS-DESIGN.md` §11, `SUBJECT-TO-NOTWITHSTANDING-SPEC.md` §12,
 > `SET-OPERATORS-SPEC.md` §18, `TEMPORAL-RULE-VERSION-DESIGN.md` §1.4.3.
@@ -520,6 +523,11 @@ reproduced, replace this paragraph with the file and the two outputs.
 
 **Severity: low. Already scheduled, recorded so it is not forgotten between now and then.**
 
+**DISCHARGED.** The term role was repointed on 2026-09-06 (`e7531ba72`): an out-of-scope term now gets a section `GIVEN`, or the enclosing rule's `GIVEN`.
+The type role followed on 2026-10-07 (branch `fix/lsp-unknown-type-declare`): an out-of-scope type now gets a bodiless `DECLARE T`, per `IMPLICIT-PROPS-DESIGN.md` §11.1.1.
+Neither offers an `ASSUME`, and the handler is now `outOfScopeDeclarationQuickFix`; see `IMPLICIT-PROPS-DESIGN.md` §11.1.3.
+The text below is the finding as recorded on 2026-09-05; its line numbers are no longer current.
+
 `outOfScopeAssumeQuickFix` (`jl4-lsp/app/LSP/L4/Handlers.hs:1010`, offered at `:336`) resolves an
 out-of-scope name by offering to insert an `ASSUME`. R0 (`IMPLICIT-PROPS-DESIGN.md` §11.1)
 deprecates `ASSUME`, so the editor's own quick fix will be generating the deprecated spelling for as
@@ -572,9 +580,92 @@ machine-checkable. It would also catch OF-11's re-wording before it reached a pa
 
 ---
 
+## OF-13 — jl4-service cuts a list answer longer than 200 elements short, with `null`s and a 200
+
+**Severity: a silent wrong answer. Filed as smucclaw/l4-ide#1005; unowned.**
+
+Found while fixing smucclaw/l4-ide#1003 (legalese/l4-ide#562), and measured 2026-10-06 on that branch, `eba40d689`.
+A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
+`l4 run` cuts the same list in the same place but prints `...`.
+
+**Witness:** `DECIDE many IS range 1 n` with `IMPORT prelude`, called with `{"n":201,"pad":1}`, returns 202 elements ending `200, null, null`.
+The issue has the six-row table.
+
+**Mechanism:** normal-form evaluation stops at depth 200 (`maximumStackSize`, `jl4-core/src/L4/EvaluateLazy/Exceptions.hs:152`) and returns `Omitted` below it; each list cell is one level deeper; the service encodes `Omitted` as `null`.
+The wrapper's `JUST` uses one level, hence 199.
+
+---
+
+## OF-14 — on jl4-service's wrapper path, a `LIST OF NUMBER` input fails with a type error
+
+**Severity: a request that cannot be served, loudly. Filed as smucclaw/l4-ide#1006; unowned.**
+
+Found and measured as OF-13 was.
+`{"xs":[1,2,3],"pad":1}` to `GIVEN xs IS A LIST OF NUMBER` answers `200 6`; `{"xs":[1,2,3],"pad":{}}` is a 422 whose message says the function's first input "is expected to be of type LIST OF NUMBER but is here of type LIST OF (MAYBE OF NUMBER)".
+A `DEONTIC` function always takes the wrapper, so, reading the code, one with such an input cannot be called at all; that part is not measured.
+
+**Mechanism:** `liftTypeText` lifts `LIST OF a` to `MAYBE (LIST OF (lift a))` (`jl4-service/src/Backend/MaybeLift.hs:90` at `eba40d689`), and the wrapper unwraps the outer `MAYBE` but not the elements.
+
+---
+
+## OF-15 — on jl4-service's direct path, a string sent for a `NUMBER` or `DATE` input reaches the rule as a `STRING`
+
+**Severity: a silent wrong answer in one shape, an unhelpful error in the other. Filed as smucclaw/l4-ide#1007; unowned.**
+
+Found and measured as OF-13 was.
+A rule that returns a `DATE` input unchanged, sent `"d":"not a date"`, answers `200 "not a date"`.
+A rule that doubles a `NUMBER` input, sent `"n":"abc"`, stops on "Internal error: I encountered a type error during evaluation", which does not name the input; main and unstable answer the same (measured 2026-10-03).
+On that branch the wrapper path refuses both: the date with `Parameter 'd': could not read "not a date" as a DATE`, and the number with JSONDECODE's `Expected JSON number but got: String "abc"`, which does not name the input either.
+
+**Mechanism:** `nonMaybeValue` (`jl4-service/src/Backend/Jl4.hs:490` at `eba40d689`) makes a `STRING` literal of any string it cannot read as an enum variant or a date or time, whatever the declared type, and nothing checks it afterwards.
+
+---
+
+## OF-16 — on `main`, the CONSIDER exhaustiveness warning omits nested cases
+
+**Severity: silent at check time; a CONSIDER completed as the warning asks checks clean, then fails at run time. `main` only. Filed as smucclaw/l4-ide#1030. FIXED on `main` by legalese/l4-ide#545 (merged 2026-10-14, `c6532c1d7`); #1030 closed.**
+
+Re-measured at `c6532c1d7`: `main`'s `ok/tests/empty.golden` now lists all eight missing cases of `xx`, as four lines (`faz bar _`, `faz baz _`, `faz qux bar`, `faz qux baz`), where it listed six.
+
+Found by the main pre-review of legalese/l4-ide#544 on 2026-10-08, and measured on `main` at `71ebf5ca1`; `jl4-core/src/L4/TypeCheck.hs` is unchanged from there to `134cf9f86`.
+With `foo` = `bar | baz | qux` and `foz` = `fab | faz HAS bla IS A foo, blup IS A foo`, the `xx` of `jl4/examples/ok/empty.l4` (branches `fab` and `faz qux qux`) draws a warning that lists six missing cases, where eight are missing: it omits `faz bar qux` and `faz baz qux`.
+**Witness:** `xx` with the six listed branches added, plus `#EVAL xx OF (faz OF bar, qux)`: `l4 check` says `Check succeeded.` (exit 0, no warning), and `l4 run` exits 1 with "reached a CONSIDER that has no branch for it … The typechecker's exhaustiveness warning lists all missing branches"; the REPL agrees.
+`unstable` is right: its checker, from #182, lists all eight (`unstable`'s `ok/tests/empty.golden`).
+On `main`, #544 moved `empty.l4` into `ok/`, so `main`'s `ok/tests/empty.golden` pins the six-case answer; fixing the checker changes that golden, and the change is the fix.
+
+**Mechanism:** not yet read.
+In this one example, the omitted cases are exactly those that agree with the written `faz` branch in the second field and differ in the first.
+The fix is either `unstable`'s checker carried to `main`, or a targeted repair of `main`'s `checkConsider`.
+
+---
+
+## OF-17 — an `@export` or `@desc` that a rule cannot use is given to the next rule
+
+**Severity: a silent wrong answer: the wrong rule is published, and the rule the drafter meant is not. Filed as smucclaw/l4-ide#1041; unowned.**
+
+First seen on 2026-10-10 in clause-group annotation probes, and re-measured on 2026-10-13 on `main` `00298eb60`, `unstable` `0cfcf6960` and the head of legalese/l4-ide#545, `a55036989`.
+A note written between a rule's `GIVETH` and its `DECIDE`, or above a definition in its `WHERE`, is claimed by no node, and the next rule in the file takes it.
+`l4 check` says `Check succeeded.` and prints no warning.
+
+**Witness:** `GIVEN n IS A NUMBER`, `GIVETH A NUMBER`, `@export what one does`, `DECIDE one n IS n + 1`, then a second rule `two` with no note.
+Deployed to jl4-service, `GET /deployments/p/functions` returns `two` described as "what one does", and `one` is not published; `main`, `unstable` and #545 answer the same.
+The same file with `@desc` gives `two` the description when it has none of its own.
+An `@export` that has leaked also replaces the `@desc` that `two` carries itself; a leaked plain `@desc` does not.
+With the note above a `WHERE` definition of `one` instead, `main` and #545 publish the next rule under it, and `unstable` gives it to the definition.
+The probes and the table are in the issue.
+
+**Mechanism:** all in `jl4-core/src/L4/Parser/ResolveAnnotation.hs`, line numbers at `main` `99484f2cf`.
+A rule claims a note only if the note ends before the rule starts (`descPrecedesNode`, `:738-740`), and a rule's range starts at its `GIVEN`, so a note under the `GIVETH` is inside the rule.
+`instance HasDesc (Expr n)` is `addDesc = pure` on `main` and in #545 (`:673-674`), so a `WHERE` definition is never offered its note; `unstable` descends into `WHERE` and `LET` since 721e91d23 (legalese/l4-ide#267), which is why it is right for `WHERE` and wrong for the `GIVETH` gap.
+A note nobody claimed stays in the pool, and the next rule takes any whose start is at most 8 columns to the right of its own (`topLevelColumnSlack = 8`, `:741-742`, `:754-755`); written 11 columns in, the same note is taken by nobody.
+Among several candidates `pickLeadingDesc` prefers one that begins with `export` or `default` (`:713-717`), which is how a leaked `@export` beats the next rule's own `@desc`.
+For a group of clauses (#545 and `unstable`; `main` does not parse one) the note does not reach the next rule, but a group whose `@export` is written between the `GIVETH` and the first clause is not published either, and nothing says so.
+
+---
+
 ## Owed upstream
 
-Filed by whoever holds GitHub write authority; **nothing here has been posted**.
+Filed by whoever holds GitHub write authority. **Nothing here has been posted except the rows marked FILED.**
 
 | finding    | what to file                                                                                                                                                                                        |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -587,5 +678,10 @@ Filed by whoever holds GitHub write authority; **nothing here has been posted**.
 | OF-11      | Nothing — a wording change plus a grep, not an issue.                                                                                                                                               |
 | OF-12      | Nothing until it is costed; an issue asking for an unscoped tool is not a request anyone can act on.                                                                                                |
 | OF-9       | Nothing until it is reproduced. It is recorded on report and says so.                                                                                                                               |
-| OF-10      | Nothing — scheduled behind discharge.                                                                                                                                                               |
+| OF-10      | Nothing — discharged (term role 2026-09-06, type role 2026-10-07); see OF-10.                                                                                                                       |
 | OF-1, OF-2 | Nothing new — they live in `IMPLICIT-PROPS-DESIGN.md` §11.15, on `unstable` since #338.                                                                                                             |
+| OF-13      | **FILED** 2026-10-06 as smucclaw/l4-ide#1005.                                                                                                                                                       |
+| OF-14      | **FILED** 2026-10-06 as smucclaw/l4-ide#1006. **FIXED** by legalese/l4-ide#549 (35d7b63b3) on `unstable`, re-measured 2026-10-08 (wrapper path `200 6`); #1006 closed. Not on `main`.               |
+| OF-15      | **FILED** 2026-10-06 as smucclaw/l4-ide#1007.                                                                                                                                                       |
+| OF-16      | **FILED** 2026-10-09 as smucclaw/l4-ide#1030. **FIXED** on `main` by legalese/l4-ide#545 (merged 2026-10-14, `c6532c1d7`); #1030 closed.                                                            |
+| OF-17      | **FILED** 2026-10-13 as smucclaw/l4-ide#1041. The `GIVETH` gap is live on `main` and `unstable`; the `WHERE` half on `main` only (#545 merged into `main` on 2026-10-14 with it).                   |

@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+mixfix-input-named-like-word.l4:16:1-26:
+  TRUE
+mixfix-input-named-like-word.l4:17:1-20:
+  "yes"
+mixfix-input-named-like-word.l4:18:1-21:
+  "no"

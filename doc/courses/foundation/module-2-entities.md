@@ -1,6 +1,4 @@
-# Module 2: Legal Entities and Relationships
-
-**Prerequisites:** Modules 0–1
+# Module 2: Legal entities and relationships
 
 In this module, you'll learn how to model structured legal entities using L4's type system.
 
@@ -228,32 +226,24 @@ For a complete charity registration system with types, see [module-7-examples.l4
 ### 1. Inconsistent Indentation
 
 ```l4
--- ❌ Wrong: Fields not aligned
+-- Wrong: Fields not aligned
 DECLARE Person
     HAS name IS A STRING
       age IS A NUMBER
 
--- ✅ Right: All fields aligned
+-- Right: All fields aligned
 DECLARE Person
     HAS name IS A STRING
         age IS A NUMBER
 ```
 
-### 2. Circular Type References
+### 2. Missing Field Values
 
 ```l4
--- ❌ Problematic: A refers to B before B is defined
-DECLARE A HAS b IS A B
-DECLARE B HAS a IS A A
-```
-
-### 3. Missing Field Values
-
-```l4
--- ❌ Wrong: Missing age field
+-- Wrong: Missing age field
 alice MEANS Person "Alice" TRUE
 
--- ✅ Right: Provide all fields
+-- Right: Provide all fields
 alice MEANS Person "Alice" 30 TRUE
 ```
 
@@ -337,6 +327,4 @@ GIVETH A STRING
 
 ---
 
-## What's Next?
-
-In [Module 3: Control Flow](module-3-control-flow.md), you'll learn how to handle conditional logic, work with lists, and use boolean operators effectively.
+Next, [Module 3: Control flow](module-3-control-flow.md) covers conditional logic, lists and boolean operators.

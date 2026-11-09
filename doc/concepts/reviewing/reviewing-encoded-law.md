@@ -20,7 +20,7 @@ measurement, the text says so.
 
 ## 1 · Your seat: HG1, the human in the loop
 
-The pipeline runs almost entirely by machine: it ingests a regulation, encodes it, tests it, projects it into industry-standard artifacts, and writes a report on itself. But it was designed around a rule that no machine may cross: **whether an encoding faithfully says what the law says is a judgement, and only a named human expert may make it.** That judgement is called **HG1** — human gate one — and it blocks everything downstream of it: no projection ships as “reviewed” without it.
+The pipeline runs almost entirely by machine: it ingests a regulation, encodes it, tests it, projects it into industry-standard artifacts, and writes a report on itself. But it was designed around a rule that no machine may cross: **whether an encoding faithfully says what the law says is a judgement, and only a named human expert may make it.** That judgement is called **HG1** — human gate one — and no projection ships as “reviewed” without it. The machine does not wait for it: a run with no review on record carries on under a provisional grant, its outputs marked unreviewed, so the evidence your review reads is ready before you start.
 
 Concretely, HG1 is not a checkbox. It is a **detached SSH signature over a digest of the files you reviewed**. Anyone in the world can verify your signature against the published corpus; no agent, however clever, can manufacture it — the design maxim is _agents can verify signatures and cannot make them_. If anyone edits the encoding after you sign, your signature visibly stops verifying: sign-off binds to content, not to a moment.
 
@@ -64,7 +64,9 @@ Five things to notice, because they organise everything else:
 
 ## 3 · The “⟨law⟩: go” pipeline
 
-One instruction — _“SEC Regulation Crowdfunding: go”_, _“British Nationality Act: go”_ — names a body of law, and the pipeline takes it from source text to every artifact we can honestly produce:
+One instruction — _“SEC Regulation Crowdfunding: go”_, _“British Nationality Act: go”_ — names a body of law, and the pipeline takes it from source text to every artifact we can honestly produce.
+The pipeline is Legalese's own tooling and lives in a private repository, `legalese/l4-pipeline`; the language, the exporters and the corpus it runs over are all in this public one.
+Its stages:
 
 ```mermaid
 flowchart LR
@@ -88,7 +90,9 @@ The pipeline’s output lands in [**legalese/canon**](https://github.com/legales
 
 `l4 verify FILE` compiles each boolean rule through the ladder into a decision diagram and reports four families of defect: an **unsatisfiable** conjunction, a **dead branch** that can never be taken where it sits, a **vacuous guard** that its siblings already entail, and an **unreachable outcome** — a verdict the rule can never deliver. If OPA’s rule-completeness warnings are your reference point, this is the same instinct with a stricter engine behind it.
 
-What it is _not_, stated plainly because the tool says so itself: the analysis is propositional. Every leaf is opaque, so `x > 5 AND x < 3` is invisible to it — no numeric, date or string contradiction is in range — and each rule is read on its own without unfolding the rules it calls. **Findings are sound; silence is not a consistency proof.** On the Reg CF corpus it reports zero findings, and three numbers bound what that is worth: 25 of 42 analysed rules have exactly one condition, 111 of 154 are outside the analysis entirely for not returning a boolean, and 7 more are nested where the analysis does not reach. Those are counted and named on the receipt rather than folded into the word “clean”. You will meet this style everywhere here — a green result that tells you what it did not look at.
+A rule that calls another rule is read through to what that rule means, in the same file or an imported one. So if an encoding writes an exception as its own rule and the offence calls it as a defeater, asking for both at once is reported as a contradiction, not passed over. Findings are still reported at the sites of the rule you are looking at; the called rule has its own entry. A call whose meaning is too large to draw stays opaque, and the report names it.
+
+What it is _not_, stated plainly because the tool says so itself: the analysis is propositional. Every other leaf is opaque, so `x > 5 AND x < 3` is invisible to it — no numeric, date or string contradiction is in range. **Findings are sound; silence is not a consistency proof.** On the Reg CF corpus it reports zero findings, and three numbers bound what that is worth (measured 2026-09-29): 25 of 43 analysed rules have exactly one condition (for 11 of them that condition is a call, now read through), 66 of 109 are outside the analysis entirely for not returning a boolean, and 5 more are nested where the analysis does not reach. Those are counted and named on the receipt rather than folded into the word “clean”. You will meet this style everywhere here — a green result that tells you what it did not look at.
 
 `l4 nlg FILE` regenerates legislative prose from the encoding. Useful in review: read the generated prose beside the source section and the difference in emphasis often shows you where the encoding has quietly changed the subject. Where an encoding carries renderings in more than one language, `l4 nlg --lang he FILE` asks for one of them; a rule with no rendering in that language falls back to its default, so a partial translation still reviews as a whole document.
 
@@ -286,6 +290,9 @@ There are two ways to get the third, and **only one of them involves Haskell**. 
 git clone https://github.com/legalese/l4-ide.git
 cd l4-ide
 git checkout unstable
+
+# the pipeline itself: a private Legalese repository, which runs from here
+git clone git@github.com:legalese/l4-pipeline.git etc/go
 ```
 
 **Route one — download it.** Pick your platform from the prerelease shelf, [legalese/prereleases](https://github.com/legalese/prereleases/releases). The archives are named `l4-unstable-<date>-<commit>-<platform>.tar.gz`, one each for `darwin-arm64`, `linux-x64` and `win32-x64`:
@@ -325,15 +332,15 @@ claude
 > SEC Regulation Crowdfunding: go
 ```
 
-That phrasing is the trigger, not decoration. A skill in the repository (`.claude/skills/running-the-l4-pipeline`) matches on it and dispatches `etc/go/go.sh`, then supplies the judgements the script cannot make for itself. Any subject named the same way counts — the pipeline is subject-generic, and what is specific to one body of law lives in a sidecar under `etc/go/subjects/<subject>/`.
+That phrasing is the trigger, not decoration. A skill that ships with the pipeline, `running-the-l4-pipeline`, matches on it and dispatches `etc/go/go.sh`, then supplies the judgements the script cannot make for itself. Any subject named the same way counts — the pipeline is subject-generic, and what is specific to one body of law lives in a sidecar under `etc/go/subjects/<subject>/`.
 
 If you would rather see the machinery than talk to it, the driver is usable directly, and `plan` is the honest first command — it prints which stages will run and which are scaffolded entry points that refuse:
 
 ```bash
 # $L4 is already set, from whichever of the two routes above you took;
 # go.sh refuses outright if it does not point at something executable
-etc/go/go.sh plan --subject regcf --encoding primary
-etc/go/go.sh run  --subject regcf --encoding primary
+etc/go/go.sh plan --subject regcf --encoding legalese
+etc/go/go.sh run  --subject regcf --encoding legalese
 ```
 
 ### If your machine is not set up for Haskell — four routes
@@ -355,12 +362,12 @@ Only route two above needs GHC, and on Windows a native GHC install is the least
 
 ### Where you come in, and how to get past yourself
 
-The run will stop at **HG1** and ask for your signature, because everything from P6 onward is gated on it. That is the whole design and not an obstacle to route around.
+The run does not stop at **HG1**. With no review on record it proceeds on a provisional grant: everything from P6 onward runs, and the report marks it unreviewed, because those stages produce the evidence your review will read. Your signature is what turns that output into reviewed output.
 
-But while you are still finding your feet, stopping at a gate every time is friction with no review value, so the gate is _waivable_ — on the record, never silently:
+If you want the record to say why a run went ahead unsigned, waive the gate instead — on the record, never silently:
 
 ```bash
-etc/go/go.sh run --subject regcf --encoding primary \
+etc/go/go.sh run --subject regcf --encoding legalese \
   --waive HG1="learning the pipeline; not a review of the encoding"
 ```
 

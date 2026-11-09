@@ -70,6 +70,21 @@ GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND eats AND drinks
 ```
 
+## Libraries and `IMPORT`
+
+A deployment resolves an `IMPORT` against the files of its own bundle and the standard library built into the service, and against nothing else.
+The service does not read `JL4_LIBRARY_PATH`, its working directory or the per-user library folder.
+A library that is not part of the standard library has to be in the bundle, beside the file that imports it.
+A bundle file named like a standard library module, such as `prelude.l4`, is used for the bundle's own imports in place of the built-in one.
+
+The service logs three `WARN` lines about this:
+
+- `JL4_LIBRARY_PATH is set and ignored`, at start-up, with the path, when the variable is set.
+- `Bundle file stands in for a standard library module`, each time a bundle is compiled that ships a file named like a standard library module with different text. It names the deployment, the file and the module.
+- `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422.
+
+[Library Resolution](../doc/reference/libraries/resolution.md) has the whole order for the `l4` command and the editor.
+
 ## API Reference
 
 ### Health
@@ -109,6 +124,16 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 
 `POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. Terminal jobs are retained for 10 minutes, then pruned.
 
+While the [instance ledger](#instance-ledger) holds instances of a deployment, `DELETE` and an overwriting `POST` are refused with `409`, naming the instances, and with `503` when the ledger's store cannot say whether it holds any.
+A `POST` of the same bytes is no overwrite and is still answered `ready`.
+`PUT` is not refused: it changes the rule the instances replay against, which is open (OPERATIONAL-LOWERING-SPEC D-O9).
+
+**An annotation line the compiler ignores is a compile failure here.** `l4 check` and the editor lex an `@name` that is none of the annotations L4 knows as a comment and warn about it, so that a file written for a newer L4 still opens. A deployment is what this service publishes, and a misspelt `@export` is a rule that silently is not, so a deploy (`POST` or `PUT`) of a bundle that holds one is `rejected`, with the file, the line and the column, and the warning's own text, which names the annotation and suggests the known one. The same goes for a known annotation without the form it needs, such as a bare `@lang`. A service older than the file it is given therefore refuses an annotation it cannot honour, and names it. This is what the service always did with such a line, as a lexer error, now with a better message; nothing already stored can hold one, so a restart refuses nothing it accepted before. Each ignored line is also logged at warn level (`Ignored annotation`, with the deployment and the file).
+
+A name that merely begins with a known annotation's is not an ignored line: `@exports` is `@export` followed by the text `s`, and `@descr` is `@desc` followed by `r`, as they always were. The service accepts them, as it did, and does not warn about them; an `@exports` does not publish a function (a bundle whose only `@export` is spelt that way is `applied` with `functions: []`). `l4 check` does not warn about them either.
+
+The API shows a failed deployment's reason only when the service runs with `--debug`, and says `Compilation failed` otherwise (an existing choice, not changed here); the reason is always in the server log.
+
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
 
 **Validation rules:**
@@ -116,7 +141,8 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 - Deployment IDs: max 128 characters, `[a-zA-Z0-9_-]` only, must not start with a dot, no `..` sequences, and not one of the reserved words `health` / `deployments` / `openapi.json`
 - Zip uploads: max 2 MB (configurable), max 5096 files (configurable), no path traversal
 - If the `id` field is omitted, a UUID is generated automatically
-- Duplicate detection: if the uploaded sources match an existing deployment (by content hash), the existing deployment is returned instead of recompiling
+- Duplicate detection: if the uploaded sources match the deployment already registered under the requested id (by content hash), that deployment is returned, as `ready` with no `updateId`, instead of recompiling
+- **An upload without an `id` always compiles and takes a deployment slot.** It is given a new id, so it never matches an existing deployment, however identical its sources. A client that redeploys in a loop without an `id` therefore gains one deployment per upload, until the service reaches `--max-deployments` (default 1024) and refuses every new one with `400` `Maximum deployment limit reached`. To replace a deployment rather than add one, send the same `id` each time, or `PUT /deployments/{id}`. Until legalese/l4-ide#162 (2026-07-28), an upload whose sources matched any ready deployment got that deployment back, whatever id it asked for, and nothing was created
 
 ### Data Plane
 
@@ -137,6 +163,25 @@ Evaluate functions within a deployment. All routes are available in both short f
 | `GET`  | `/deployments/{id}/files/{path}.l4`                    | `/{id}/{path}.l4`                |
 
 Function names with spaces can use hyphens or URL-encoding in the path (e.g., `check-person` or `check%20person` for `check person`).
+
+### Instance Ledger
+
+A deployment whose contract is a regulative rule can run instances of it: an instance is the event history of one `#TRACE` of the contract, kept in the instance ledger's store, and acts are proposed to it one at a time (`specs/proposals/OPERATIONAL-LOWERING-SPEC.md`).
+Long routes only.
+
+| Method | Endpoint                                          | Body                                                                                             | Answer                                                                         |
+| ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `POST` | `/deployments/{id}/instances`                     | `instance`, `contract`                                                                           | `201` and row 1; `409` if the instance exists                                  |
+| `POST` | `/deployments/{id}/instances/{instance}/events`   | `party`, `action`, `idempotencyKey`; optionally `decidedAgainst`, `strict`, `cells`, `claimedAt` | `200` and the row; `409` for a strict proposal whose cell moved; `422` refused |
+| `GET`  | `/deployments/{id}/instances/{instance}/position` |                                                                                                  | `200`: the head, the enabled set in the words of `l4 lts`, the next deadline   |
+
+Every reply is JSON and says whether it `applied` anything.
+`404` is an instance the ledger does not hold: an append or a read never creates one.
+`503` applied nothing: the evaluator could not decide, a limit stopped the request, every one of the ledger's slots was taken, or the store could not be opened.
+A retry with the same `idempotencyKey` is always safe; if the row was written before the reply was lost, the retry reads it back.
+The contract's source is the one `.l4` file of the deployment that no other `.l4` file imports, and a deployment with two such files is refused with `422`.
+The ledger clock is whole seconds since the Unix epoch, and what one unit of a contract's time is against wall time is not decided (D-O8), so a contract written against another unit or epoch runs with every deadline shifted, and nothing says so.
+Each request runs under `--eval-timeout` and the ledger's own allocation limit, `--ledger-max-eval-memory-mb`.
 
 ### File Browsing
 
@@ -163,6 +208,103 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
 
+#### Answers
+
+The direct path and the wrapper path described below encode an answer the same way.
+A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
+A list is a JSON array, even when it has one element.
+An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
+A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
+A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
+
+The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
+
+#### Missing and uncertain inputs
+
+An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` ("uncertain") is treated exactly like `null`, whatever its type, a record's included.
+The two are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an absent input can take a default, and a `null` one never does.
+
+**Defaults.** An input with a `TYPICALLY` default — on the exported function's own `GIVEN`, on a section `GIVEN` it reads, or on a field of a record it takes — may be left out, and then takes its default.
+The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
+Every response says which defaults the answer rests on, in `presumed`, beside `result`: the names of inputs that were left out, took their default, and were actually read by the evaluation (a record field by its path, `cfg.timeout`).
+A `MAYBE` input with no default, left out, is `NOTHING`, and is listed the same way.
+A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer too, and carries the defaults it rests on in its own `presumed`, beside the reason: `{"contents":{"contents":"cannot decide for a non-resident","presumed":["is resident"],"tag":"EvaluatorRefused"},"tag":"Error"}`.
+Any other error response has no `presumed`, since it carries no answer.
+An input the rule never reached is not listed, even if it was left out.
+**A misspelled name is refused where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is refused, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored, as before.
+`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation` refuses it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`); MCP and batch take it to the wrapper path instead (below). A type that is a synonym for a `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
+The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
+For this rule:
+
+```l4
+§ `Capacity`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+@export
+GIVEN `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may contract` MEANS `is adult` AND `has capacity`
+```
+
+```bash
+curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/evaluation \
+  -H "Content-Type: application/json" \
+  -d '{"arguments":{"is adult": true}}'
+# {"contents":{"presumed":["has capacity"],"result":{"value":true}},"tag":"SimpleResponse"}
+```
+
+**`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
+
+**Absent with no default, or `null`.**
+Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
+
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every request to a `DEONTIC` function, whether to `/evaluation`, over MCP or as a batch case; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type (smucclaw/l4-ide#1021); on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
+On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
+A rule that reads it where the other facts decide anyway, as in `walks OR TRUE`, still answers.
+If the answer does depend on it, evaluation stops and names it, and every other input the answer is waiting for:
+
+```
+I could not continue evaluating, because I needed to know the value of
+  `walks (not supplied)`
+but it is an assumed term.
+```
+
+It stops however the rule reads the input, including through a `CONSIDER` with an `OTHERWISE` branch: before UNKNOWN-EVALUATION-SPEC §8 step 1 the `OTHERWISE` took the missing input, and the request answered `200` with that branch's value, where it now answers `422` and names the input.
+
+Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
+
+A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`; when more than one does, the message names them all, without quoting.
+
+A synonym for a record, an enum or a `LIST` is read as the type it stands for on this path, and so is a synonym below the head of a type, as in `MAYBE Hue`: the decoder expands it.
+
+Every evaluation and batch response says which report it carries, as `"report": "default"`.
+The default report is the only one so far: it shows an answer that is still waiting for an input as the `422` above (UNKNOWN-EVALUATION-SPEC §4.7.4).
+
+Limits, measured 2026-10-02:
+
+- On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, or, for a `DATE`, `TIME` or `DATETIME`, which the wrapper reads as a string and converts, `Parameter 'unused': missing required parameter`.
+- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused by `/evaluation`, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. MCP and batch take a top-level `null` to the wrapper path whatever else the request holds, so there a `BOOLEAN` sent as `null` is refused only if the rule reads it, even with no `{}` beside it (smucclaw/l4-ide#1021). This extends the early/late split above; it did not create it.
+- On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Before UNKNOWN-EVALUATION-SPEC §8 step 1, a rule that read such an input through `CONSIDER` with an `OTHERWISE` answered `200` with the `OTHERWISE` value instead, which the direct path does not give. Inputs declared with a section `GIVEN` are delivered.
+- A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
+- The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
+
+Measured 2026-10-06:
+
+- A list answer of more than 200 elements on the direct path, or more than 199 on the wrapper path, comes back cut short and ending in two `null`s, with status 200.
+  A list inside another value is cut sooner: a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s on the direct path, and one of 199 as 198 and two `null`s on the wrapper path (measured 2026-10-07).
+
+Measured 2026-10-15, on `unstable` at `6930bccf6`:
+
+- On the wrapper path, an input declared through a synonym for a `BOOLEAN` is decoded as its own type, where a `BOOLEAN` written out is lifted to `MAYBE` (above).
+  Left out, it is refused with `Missing required field 'b' in JSON object`, even when the rule never reads it; a `BOOLEAN` written out and left out is refused only if the rule reads it, and then names `b (not supplied)`.
+  A `null` for it in a batch case or an MCP call is refused with `Field 'b' is null, which means the value is not known: supply a value`, where a `BOOLEAN` written out is treated as left out.
+  A value, and a string that is not a boolean, are treated the same: the string is refused in both, with `Expected JSON boolean for field 'b' but got: String "maybe"`.
+- On the wrapper path, an input declared through a synonym for a `DATE`, `TIME` or `DATETIME` is decoded as its own type, where the type written out is read from a string and converted (above).
+  Left out, it is refused with `Missing required field 'd' in JSON object`; a string that does not parse, with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD` (`Could not parse time string …` for a `TIME`, `Could not parse datetime string …` for a `DATETIME`); a `null` in a batch case or an MCP call, with `Field 'd' is null, which means the value is not known: supply a value`.
+  The type written out gives `Parameter 'd': missing required parameter` and `Parameter 'd': could not read "garbage" as a DATE`.
+  A value that parses is answered the same.
+
 #### Trace Output
 
 Include execution traces with `?trace=full` or the `X-L4-Trace: full` header. Add `?graphviz=true` to include DOT source in the response (requires `trace=full`).
@@ -172,6 +314,12 @@ curl -X POST 'http://localhost:8080/deployments/my-rules/functions/compute_quali
   -H "Content-Type: application/json" \
   -d '{"arguments":{"walks": true, "drinks": true, "eats": true}}'
 ```
+
+Each node of the response's `reasoning` tree has `exampleCode`, `explanation` and `children`.
+`exampleCode` is the step as L4 source, and `explanation` is its result.
+Wherever the answer prints rule source, a string literal in it is escaped the way the source spells it: a line break is `\n`, a tab `\t` and a carriage return `\r`.
+So `"line\nnext"` in `exampleCode` stays on one line, and so does the literal in the `explanation` of a `DEONTIC` contract (`MUST say "pay\nnow"`), which prints the contract's rule.
+A string that is itself the result, such as the answer of an ordinary function, keeps its line breaks in `explanation`.
 
 #### Deontic (Contract) Evaluation
 
@@ -193,9 +341,34 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 - `startTime` — start time for contract simulation (required for DEONTIC)
 - `events` — list of trace events, each with `party`, `action`, and `at` timestamp (required for DEONTIC)
 
+The same trace goes to a `DEONTIC` function over MCP and in a batch, and the answer is the same as `/evaluation`'s.
+Over MCP, `startTime` and `events` go beside `arguments`, as above (see [MCP Schema Design](#mcp-schema-design)).
+`tools/list` also lists them inside `arguments`, among the function's parameters, so a call may put them there; when both places have one, the one beside `arguments` is used, and a `null` is a field left out.
+In a batch, each case carries its own `startTime` and `events` among its attributes, beside the function's inputs: `{"@id": 1, "startTime": 0, "events": [...], "<input>": ...}`.
+A call or a case with no `startTime`, or no `events`, is refused with the message `/evaluation` gives: `startTime is required for functions returning DEONTIC`, or `events is required for functions returning DEONTIC`.
+Over MCP the refusal is an error result (`isError`) whose text is the body of `/evaluation`'s 400, `{"error": "..."}`; in a batch it is an `@error` on that case, and the cases beside it are still answered.
+That refusal is **assumed, not ruled**: MCP and batch used to answer such a call with the contract's initial obligation, whatever trace the call carried and with no error, and the refusal turns that answer into the error `/evaluation` already gives.
+The field names inside an event's party or action are read as sent on `/evaluation` and in a batch.
+Over MCP they are read as `tools/list` spells them, as an input's are: a field the rule calls `full name` is `full-name` in the schema, and is mapped back to the rule's name, and a name that is not a sanitized one is read as it was sent.
+That is **assumed, not ruled**: the rulings of 2026-10-26 do not cover it.
+A time is a number and may be written with a decimal point: `0.0`, `0.05` and `12345678.5` are read as written.
+A function whose return type is written `PROVISION OF …`, the deprecated alias of `DEONTIC`, is a `DEONTIC` function on every surface: it takes a trace, and `tools/list`, the explorer and the WebMCP page show it as one.
+Whether a function is `DEONTIC` is read from its return type, not from the names of its inputs.
+A `startTime` or `events` sent to a function that is not `DEONTIC` is refused on all three surfaces with `startTime and events are only valid for functions returning DEONTIC`: `/evaluation` answers `400`, MCP returns an error result, and a batch case is an `@error` while the cases beside it are answered.
+A `null` is a field left out.
+A function that is not `DEONTIC` and has inputs called `startTime` or `events` reads them as inputs; `/evaluation` used to take such a function for a `DEONTIC` one, because the compiler gives a `DEONTIC` function parameters of those names, and asked it for a trace.
+
+In the structured fields of the answer, a party and an action are spelled as an enum answer is (above): the name, without backticks.
+An `OBLIGATION` names them in `party` and `action`, and so does each operand of a `RAND` or `ROR` that is an `OBLIGATION`.
+A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligatedParty` and `obligationAction` (the obligation that was missed), and in the `party` and `action` of each entry of `failures`.
+So a client can ask whether the party who acted is the party who was obliged by comparing two strings: for a party the rule writes as `` `the seller` ``, both are `the seller`.
+The name is the identifier the rule uses, not the party it stands for: a party written as a `GIVEN` input or as a `MEANS` definition answers with that identifier until an event has been compared with it, so the comparison is still false there.
+Rule source stays L4, backticks included: an action that carries a value, such as `say "pay\nnow"`, an action given by a `GIVEN` input, the reasoning tree of a trace, the graphviz source, the state graph, and a `RAND` or `ROR` operand the evaluation has not reached yet.
+Escapes in that source are the ones the Trace Output section describes.
+
 ### Batch Evaluation
 
-Evaluate a function across many input cases in parallel:
+Evaluate a function across many input cases:
 
 ```bash
 curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualifies/evaluation/batch \
@@ -210,6 +383,82 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
   }'
 ```
 
+The response has one entry per case, in the order the cases were sent, each under its `@id`:
+
+```json
+{
+  "cases": [
+    { "@id": 1, "@presumed": [], "value": true },
+    { "@id": 2, "@presumed": [], "value": false },
+    { "@id": 3, "@presumed": [], "value": false }
+  ],
+  "summary": {
+    "casesIgnored": 0,
+    "casesProcessed": 3,
+    "casesRead": 3,
+    "processorCasesPerSec": 0,
+    "processorDurationSec": 0,
+    "processorQueuedSec": 0
+  }
+}
+```
+
+An answered case carries the function's result under `value`.
+`outcomes` is required, but the service does not use it yet: every answered case carries the whole result.
+Every case carries its own `@presumed`, the inputs it left out whose defaults its answer or refusal used (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
+A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
+That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
+Neither has a `value`.
+A case whose evaluation fails on the service's own fault, and not on a limit or on what the case said, is an `@error` too: it says the case could not be evaluated, the details are in the service log, and the cases beside it are answered.
+That wording and that treatment are **assumed, not ruled**.
+A case for a `DEONTIC` function carries its own `startTime` and `events`, and its `value` is the contract after them; a case without them is an `@error` (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)).
+The three `processor…` fields of `summary` are not measured, and are always `0`.
+The deployment's OpenAPI document, `GET /deployments/{id}/openapi.json`, describes this response key by key.
+
+#### When a case reaches a limit
+
+Each case is evaluated under its own [limits](#resource-limits), `--eval-timeout` and `--max-eval-memory-mb`, as a single evaluation is, with what is still outside them listed under [What the limits do not cover yet](#what-the-limits-do-not-cover-yet).
+A case that reaches one fails on its own: the other cases keep their answers, and the batch is still a `200`.
+It carries `@error`, and `@limit` beside it:
+
+```json
+{
+  "@error": "Evaluation resource limit exceeded: this case did not finish within the time limit of 3 s (--eval-timeout)",
+  "@id": 4,
+  "@limit": "time",
+  "@presumed": []
+}
+```
+
+`@limit` is `"time"` when the case did not finish within `--eval-timeout`, and `"memory"` when it allocated more than `--max-eval-memory-mb`.
+No other case has a `@limit` key.
+
+**How to read it.**
+`@limit` marks a case the service stopped before it finished, and sending it again may give an answer: to a service with a higher limit, or, for `"time"`, when the service is less busy, since the time limit is wall-clock (see below).
+Neither `@limit` nor its absence promises what the next attempt will do, because a case's outcome can depend on values the deployment has already worked out.
+A value defined at the top level of an imported module is computed once and then kept, across requests, so the first case that needs it pays its time, memory and recursion depth, and later cases find it ready.
+Measured on 2026-10-03: at `+RTS -N1`, four identical cases under a 64 MB limit came back as `"memory"` and then three answers; and a case stopped by the evaluator's recursion-depth limit answered, unchanged, once another case had worked out the value it needed.
+That recursion-depth limit is the evaluator's own, fixed at 1,000,000 levels, and it arrives as a plain `@error`, a message that begins `Stack overflow:`, with no `@limit`.
+
+#### How the cases share the cores
+
+The cases run concurrently, but no more batch cases run at once, counting every batch in flight, than the service has cores (its capabilities, `+RTS -N`; see [CLI Options](#cli-options)).
+A case's clock starts when the case starts running, not when its batch arrives, so waiting behind other cases, of its own batch or another, does not count against it.
+So neither the size of a batch nor the number of batches sent at once decides whether a case meets the time limit, though the other work listed below can.
+Each request has at most as many cases waiting for a slot as there are slots, and a freed slot goes to the case that has waited longest, so the requests take turns.
+A small batch sent behind a big one therefore waits about one case-time for each request ahead of it, not for the whole of the big batch, and `--max-concurrent-requests` bounds how many requests can be ahead: measured on 2026-10-03 at `+RTS -N2`, a one-case batch sent 0.5 s after a batch of twelve 2-second cases answered in 1.5 s.
+Only batch cases take slots.
+Everything else the service does runs beside them on the same cores: single evaluations and MCP calls, compiling deployments, query plans, rendering ladder diagrams and state graphs, and encoding responses, a batch's own included.
+On one core the whole batch takes as long as its cases take together, and more cores shorten it: measured on 2026-10-02 on a machine busy with other work, 100 cases of 0.19 s each took 15.7 s on one core and 4.0 to 5.5 s on ten.
+
+#### What a batch can cost
+
+A batch whose cases all run to the time limit takes about ⌈cases ÷ cores⌉ × `--eval-timeout`, and longer while other batches are in flight, since the requests take turns at the same slots.
+A case's time includes finishing its answer: a number the evaluator leaves unfinished is computed inside the case's clock, while it holds its slot.
+Measured on 2026-10-07 on an M-series Mac, on single evaluations under a 1-second limit: a number that takes 3.1 s to finish (an exponent of 20,000) and one that takes 12.2 s (40,000) both came back as the limit at 1.0 s, where before they answered after 3.1 s and 12.2 s.
+The service sets no limit on the number of cases in a batch.
+It also goes on working through a batch after the client has disconnected: measured on 2026-10-02 at `+RTS -N4`, 24 cases that each ran to a 2-second limit kept more than three cores busy for about 12 s, although the client gave up after 6 s.
+
 ### Query Planning
 
 Build interactive questionnaires by asking only the questions that still matter:
@@ -221,6 +470,12 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 ```
 
 Returns which inputs are still needed, ranked by impact on the outcome.
+
+A rule that cannot be planned is answered with `400` and `{"error": "…"}`.
+There are three such answers.
+A rule that does not return a boolean gets "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+A rule written as `DECIDE` clauses that comes to more than 20000 parts when written out as the `CONSIDER` it stands for gets "These clauses are too long to draw: …".
+A rule written as `DECIDE` clauses whose simplified ladder is more than 300 boxes gets "These clauses would draw a ladder of more than 300 boxes, too many to show. …".
 
 ### Ladder Diagrams
 
@@ -258,13 +513,49 @@ diagram calls its leaves.
 > apart from a `unique` binding key. `QueryPlanSpec`'s
 > `atom identity, across shapes` group pins both the containment and its exception.
 
-> **An atomId names a QUESTION, not a node.** It is a UUID5 over
-> `"function | label | refs"`, so two occurrences of one condition — which a
-> ladder in AND/OR normal form produces routinely, since reaching that form
+> **An atomId names a QUESTION, not a node.** It is a UUID5 over the function
+> name and the **term** the leaf stands for, so two occurrences of one condition —
+> which a ladder in AND/OR normal form produces routinely, since reaching that form
 > distributes OR over AND — carry the **same** `atomId` and different `unique`s.
 > That is intended: binding the atomId binds every occurrence at once, which is
 > what "the user answered that question" means. If you need to address a single
 > occurrence, bind its `unique` (as a decimal string) instead.
+>
+> Two leaves get one `atomId` exactly when they are the same term: the same
+> structure, naming the same things (WHERE-INLINING-SPEC §10.1, ruling R3). Two
+> leaves that merely **print** alike — two mixfix operators sharing a head keyword,
+> or an input and a rule of the same name — get two. A name counts by what it
+> refers to, never by its spelling or its position in the file.
+>
+> **A `label` is the leaf printed as rule source**, in `asks[].atoms[]`, in
+> `ranked` and on a ladder leaf, so a string literal in it is escaped the way the
+> source spells it: a line break is `\n`, a tab `\t` and a carriage return `\r`
+> (`note EQUALS "a\nb"`). The `atomId` does not depend on how a label prints: it
+> is a hash of the term, read from the syntax tree and never from the printed
+> text, so the escaping moves no `atomId`.
+>
+> **How long an `atomId` lasts.** It survives a redeploy of the same source, and
+> an edit elsewhere in the module: adding or moving other rules, and renaming or
+> inserting section headings, do not change it. It changes when what the leaf
+> says changes, including a `WHERE` definition the leaf reads, since a leaf is
+> keyed by what it means and not by the name of a local it uses. It can also
+> change when a binder with the same name is added above one it names (the later
+> of the two is then told apart by its sections), when an imported module it
+> names changes, or on an L4 release that changes how terms are represented. A
+> `unique`, by contrast, changes whenever anything above it in the file does, so
+> store `atomId`s, not `unique`s.
+>
+> **One exception: a leaf whose value depends on when it is evaluated** — it
+> reads the ledger (`RECALL`), records to it, fetches or posts, or calls a rule
+> that does. Two occurrences of such a leaf can disagree in one evaluation, so
+> each gets its own `atomId`, numbered in drawing order within its decision. Such
+> an id moves when a leaf of that kind is added or removed earlier in the same
+> decision.
+>
+> **Every `atomId` changed once** (upstream `smucclaw/l4-ide#1013`), when it
+> stopped being a hash of the leaf's printed label and became the hash of its
+> term. An id saved from a build without that change names nothing in a build
+> with it; fetch the diagram again.
 >
 > This was broken until 2026-08-03 (upstream `smucclaw/l4-ide#935`): the two
 > surfaces minted ids in different namespaces, so a binding keyed by a ladder
@@ -285,6 +576,13 @@ The service exposes an [MCP](https://modelcontextprotocol.io/) JSON-RPC 2.0 endp
 | `POST` | `/deployments/{id}/.mcp`    | Deployment-scoped MCP endpoint (canonical route)              |
 
 The org-wide endpoint (`/.mcp`) exposes tools from all deployments. The scoped endpoints (`/{id}/.mcp`) restrict tool visibility to a single deployment.
+
+Beside the decision tools, every endpoint lists one tool of the [instance ledger](#instance-ledger), `what-may-I-do-now`, to callers that may evaluate.
+Given an `instance` (and on the org-wide endpoint its `deployment`), it answers with the instance's position, the same answer as `GET .../position`, and, given a `party` and an `action`, what the ledger would do with that act were it proposed now.
+It never appends: to act, an agent proposes the act on the instance's events route, naming the head the tool reported as `decidedAgainst`, and the ledger decides there against the head current when the act arrives.
+On a service started with `--ledger-mcp-write` a deployment's own endpoint also lists a write tool, `act-…`, for each act the caller's party may perform; the party is the `X-L4-Party` request header and is a claim, not an authentication.
+See [Write tools over MCP](../doc/reference/regulative/ledger.md#write-tools-over-mcp).
+The tool is registered in front of the MCP handler, so the decision tools are answered as before, and still answered when the ledger's store cannot be opened.
 
 #### Field Name Sanitization
 
@@ -334,8 +632,8 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
 
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
-- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`.
-- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`.
+- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`. A `startTime` or `events` that is not one of the function's inputs is an error result. An `arguments` that is not one of the function's inputs is left out, and one that is, is read as an input.
+- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`, and the contract is replayed against that trace as it is on `/evaluation`. A call without a trace is an error result, not the contract's initial obligation (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)). A function with an input of its own called `arguments` takes its inputs nested as the schema lists them, `{"arguments": {"arguments": ...}}`; a call that sends them flat loses that input (a known limit, read from the code and not run).
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
 
@@ -405,23 +703,38 @@ The proxy injects these headers to control what jl4-service includes in response
 
 All options can also be set via environment variables. CLI arguments take precedence over environment variables.
 
-| Option                      | Env Var                       | Description                                                                                                                                                                              | Default          |
-| --------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `--port`, `-p`              | `JL4_PORT`                    | HTTP port                                                                                                                                                                                | `8080`           |
-| `--store-path`              | `JL4_STORE_PATH`              | Directory for persisting deployment bundles                                                                                                                                              | `/tmp/jl4-store` |
-| `--server-name`, `-s`       | `JL4_SERVER_NAME`             | Server URL for OpenAPI metadata                                                                                                                                                          | -                |
-| `--lazy-load`               | `JL4_LAZY_LOAD`               | Register deployments as pending on startup; compile on first evaluation/function access (optimistic 2s timeout, returns 202 if still compiling). File browsing always works immediately. | `false`          |
-| `--debug`                   | `JL4_DEBUG`                   | Enable debug mode (verbose errors, debug-level logs)                                                                                                                                     | `false`          |
-| `--max-zip-size`            | `JL4_MAX_ZIP_SIZE`            | Maximum zip upload size in bytes                                                                                                                                                         | `2097152` (2 MB) |
-| `--max-file-count`          | `JL4_MAX_FILE_COUNT`          | Maximum number of files per zip upload                                                                                                                                                   | `5096`           |
-| `--max-deployments`         | `JL4_MAX_DEPLOYMENTS`         | Maximum number of concurrent deployments                                                                                                                                                 | `1024`           |
-| `--max-concurrent-requests` | `JL4_MAX_CONCURRENT_REQUESTS` | Maximum concurrent requests (503 when exceeded)                                                                                                                                          | `20`             |
-| `--max-eval-memory-mb`      | `JL4_MAX_EVAL_MEMORY_MB`      | Per-evaluation allocation limit in MB                                                                                                                                                    | `256`            |
-| `--eval-timeout`            | `JL4_EVAL_TIMEOUT`            | Evaluation timeout in seconds                                                                                                                                                            | `60`             |
-| `--compile-timeout`         | `JL4_COMPILE_TIMEOUT`         | Compilation timeout in seconds                                                                                                                                                           | `60`             |
-| `--max-ladder-nodes`        | `JL4_MAX_LADDER_NODES`        | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                         | `10000`          |
+| Option                        | Env Var                         | Description                                                                                                                                                                                                                                   | Default          |
+| ----------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `--port`, `-p`                | `JL4_PORT`                      | HTTP port                                                                                                                                                                                                                                     | `8080`           |
+| `--store-path`                | `JL4_STORE_PATH`                | Directory for persisting deployment bundles                                                                                                                                                                                                   | `/tmp/jl4-store` |
+| `--server-name`, `-s`         | `JL4_SERVER_NAME`               | Server URL for OpenAPI metadata                                                                                                                                                                                                               | -                |
+| `--lazy-load`                 | `JL4_LAZY_LOAD`                 | Register deployments as pending on startup; compile on first evaluation/function access (optimistic 2s timeout, returns 202 if still compiling). File browsing always works immediately.                                                      | `false`          |
+| `--debug`                     | `JL4_DEBUG`                     | Enable debug mode (verbose errors, debug-level logs)                                                                                                                                                                                          | `false`          |
+| `--max-zip-size`              | `JL4_MAX_ZIP_SIZE`              | Maximum zip upload size in bytes                                                                                                                                                                                                              | `2097152` (2 MB) |
+| `--max-file-count`            | `JL4_MAX_FILE_COUNT`            | Maximum number of files per zip upload                                                                                                                                                                                                        | `5096`           |
+| `--max-deployments`           | `JL4_MAX_DEPLOYMENTS`           | Maximum number of concurrent deployments                                                                                                                                                                                                      | `1024`           |
+| `--max-concurrent-requests`   | `JL4_MAX_CONCURRENT_REQUESTS`   | Maximum concurrent requests (503 when exceeded)                                                                                                                                                                                               | `20`             |
+| `--max-eval-memory-mb`        | `JL4_MAX_EVAL_MEMORY_MB`        | Per-evaluation allocation limit in MB                                                                                                                                                                                                         | `256`            |
+| `--eval-timeout`              | `JL4_EVAL_TIMEOUT`              | Evaluation timeout in seconds                                                                                                                                                                                                                 | `60`             |
+| `--compile-timeout`           | `JL4_COMPILE_TIMEOUT`           | Compilation timeout in seconds                                                                                                                                                                                                                | `60`             |
+| `--max-ladder-nodes`          | `JL4_MAX_LADDER_NODES`          | Maximum ladder-diagram size, in IR nodes, that `query-plan` and `ladder` will build or serve (400 when exceeded)                                                                                                                              | `10000`          |
+| `--ledger-store`              | `JL4_LEDGER_STORE`              | Instance-ledger store: `sqlite` (`ledger.sqlite3` under the store path, one process), `postgres` (several processes), `memory` (tests only). Checked at startup; opened on first use                                                          | `sqlite`         |
+| `--ledger-postgres-url`       | `JL4_LEDGER_POSTGRES_URL`       | Connection string for `--ledger-store postgres`; needs a binary built with `cabal build -f postgres jl4-service`, and libpq                                                                                                                   | -                |
+| `--ledger-allow-nondurable`   | `JL4_LEDGER_ALLOW_NONDURABLE`   | Allow `--ledger-store memory`, which loses every instance on restart                                                                                                                                                                          | `false`          |
+| `--ledger-max-eval-memory-mb` | `JL4_LEDGER_MAX_EVAL_MEMORY_MB` | Allocation limit in MB of one instance-ledger request, in place of `--max-eval-memory-mb`: one append re-typechecks its contract and allocated about 2.1 GB on the dinner fixture                                                             | `8192`           |
+| `--ledger-mcp-write`          | `JL4_LEDGER_MCP_WRITE`          | Let an agent append over MCP: one `act-…` write tool per act the caller's party (the `X-L4-Party` header, a claim and not an authentication) may perform, listed on a deployment's own endpoint; off until who the caller is has been decided | `false`          |
+| `--check-store`               | -                               | Do not serve: compile every deployment stored in the given directory, report, and exit (see [Checking a store before a rollout](#checking-a-store-before-a-rollout))                                                                          | -                |
+| `--json`                      | -                               | With `--check-store`, print the report as one JSON document                                                                                                                                                                                   | `false`          |
 
 Boolean env vars accept `1`, `true`, or `yes` (case-insensitive).
+
+The service runs GHC's threaded runtime on every core of the machine (`-N`), and runs as many batch cases at once, across all batches, as there are cores.
+To use fewer, pass runtime options on the command line, `jl4-service +RTS -N2 -RTS`, or in the environment, `GHCRTS=-N2`.
+
+In a container, `-N` may count the host's cores rather than the container's CPU quota (`docker run --cpus`, a Kubernetes CPU limit); this is reasoned, not measured.
+If it does, the service runs more batch cases at once than it has CPU for, and each case's clock counts the others' work again.
+In a container with a CPU quota, set `+RTS -N<cpus> -RTS` or `GHCRTS=-N<cpus>` to the quota.
+Each capability also costs memory: measured on 2026-10-02, the idle service used 106 MB at `-N10` and 59 MB at `-N1`, the same as on the non-threaded runtime the service used before.
 
 ## Logging
 
@@ -443,13 +756,70 @@ By default, error responses return generic messages (e.g., `"Deployment compilat
 The service enforces several resource limits to protect against abuse:
 
 - **Concurrency**: Returns `503 Service at capacity` when `--max-concurrent-requests` is exceeded. The `/health` endpoint is exempt.
-- **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`. Returns `500` on limit exceeded.
-- **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout.
-- **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds.
+- **Evaluation memory**: Each evaluation is limited to `--max-eval-memory-mb` of GHC heap allocations via `setAllocationCounter`, on the thread that evaluates: the calling thread on the direct path, and on the wrapper path the thread the evaluator runs on for the module and for each module it imports (see [What the limits do not cover yet](#what-the-limits-do-not-cover-yet)). The limit covers finishing the answer as well as evaluating it, so a trace counts: a traced single evaluation allocates the trace as well, and a call that fits without `?trace=full` can pass the limit with it (a 1,000-step recursion allocated 6.7 MB untraced and 79 MB traced, measured on 2026-10-07). A batch does not write the reasoning tree, so its cases are not charged for building it; but a traced batch case still pays for recording the trace, and without `graphviz=true` the batch writes nothing from it (measured on 2026-10-07: a 1,000-step case was answered at 40 MB and stopped at 38 MB with `?trace=full`, and needs about 7 MB without it). That waste was there before the limits forced the response. Returns `500` on limit exceeded; in a batch, the case that exceeds it carries `@error` and `"@limit": "memory"` instead, and the batch is still a `200` (see [When a case reaches a limit](#when-a-case-reaches-a-limit)). The counter belongs to the evaluation's own thread, so nothing else running at the same time counts against it.
+- **Evaluation timeout**: Each evaluation is limited to `--eval-timeout` seconds. Returns `500` on timeout; in a batch, the case that times out carries `@error` and `"@limit": "time"` instead. The limit is on wall-clock time, so it counts any other work sharing the evaluation's core. Batch cases, counting every batch in flight, never run more at once than there are cores, so batch cases do not slow each other down by sharing a core. A batch case's clock still counts the garbage collector's pauses, which every running evaluation shares, and any of the work that takes no slot (single evaluations, MCP calls, compiles, query plans, ladder and state-graph rendering, response encoding) that is sharing its core at the time.
+- **Query plan timeout**: Computing a query plan is held to `--eval-timeout` as well, and answers `500` with `Query plan timed out` when it runs out.
+  When the decision structure it reads has not been built yet, building it is held to the same limit and answers `500` with its own message, so such a request can take up to twice the limit.
+  A plan has no memory limit.
+- **Compilation timeout**: Bundle compilation is limited to `--compile-timeout` seconds, whether it is a deploy or a deployment being loaded from the store at startup. The limit is on wall-clock time.
+- **Compilation memory**: `--max-compile-memory-mb` sets a GHC allocation counter on the thread that compiles. Measured with 8 MB and with 2048 MB, at deploy (a large example file) and at restart (a store of 110 deployments), and again on a store of 105 deployments with values from 8 MB to 2 GB, at deploy and at restart, it stopped no compile: every deployment still compiled. Do not rely on it to stop a large compile.
 - **Zip size**: Upload rejected with `400` if larger than `--max-zip-size`.
 - **File count**: Upload rejected with `400` if zip contains more than `--max-file-count` entries.
 - **Deployment count**: New deployment rejected with `400` if `--max-deployments` is reached.
-- **Ladder size**: `query-plan` and `ladder` return `400` if the decision's ladder diagram exceeds `--max-ladder-nodes`. This bounds a _response_, not a runtime, which is why no timeout covers it: a ladder is drawn in AND/OR normal form, and reaching that form distributes OR over AND, so `(a AND b) OR (c AND d) OR …` over 2n variables becomes 2^n clauses. Eight variables serialize to 12 KB, sixteen to 366 KB, thirty-two to tens of megabytes. The default is far above any diagram a person could read and far below the pathological cases; raise it if a legitimate model meets it. The check short-circuits, so an oversized decision is refused in milliseconds rather than measured at length.
+- **Ladder size**: `query-plan` and `ladder` return `400` if the decision's ladder diagram exceeds `--max-ladder-nodes`. This bounds a _response_, not a runtime, which is why no timeout covers it on `ladder`: a ladder is drawn in AND/OR normal form, and reaching that form distributes OR over AND, so `(a AND b) OR (c AND d) OR …` over 2n variables becomes 2^n clauses. Eight variables serialize to 12 KB, sixteen to 366 KB, thirty-two to tens of megabytes. The default is far above any diagram a person could read and far below the pathological cases; raise it if a legitimate model meets it. The check short-circuits, so an oversized decision is refused in milliseconds rather than measured at length.
+
+### What the limits do not cover yet
+
+Three gaps listed here until 2026-10-07 are closed: the memory limit on the wrapper path (smucclaw/l4-ide#1018), arithmetic left unfinished by the evaluator (#1019), and a limit hit inside an imported value (#1020).
+What is still outside the limits:
+
+- **On the wrapper path the memory limit applies to each module separately.** The evaluator runs the module you call, and each module it imports, as separate build tasks on separate threads, and each thread gets the whole `--max-eval-memory-mb`. A call that imports modules can therefore allocate up to that limit once per module before it is stopped. The time limit is not split this way: it covers the whole call. The direct path has one thread and so one limit.
+- **`X-Eval-Alloc-Bytes` counts the calling thread only.** On the wrapper path that is not where the evaluating happens, so the header understates what the call allocated: measured on 2026-10-07, a wrapper-path call that spent 1.2 s evaluating reported 29,520 bytes.
+- **Turning the answer into JSON text is outside both limits.** The answer is fully computed inside them, but writing it out happens after. That work grows with the size of the answer, not with how it was reached; it has not been measured separately, but the largest answer tried, 400 KB of digits, came back whole in 0.76 s end to end under a 1-second limit.
+- **A limit that stops a very deep recursion answers a little late.** Before it answers, the evaluator makes the values it was part-way through usable again, and that cannot be cut short. It costs about 0.2 µs for each frame of the evaluator's own stack, and the evaluator stops at 1,000,000 frames. A frame is not a level of recursion: a non-tail recursion such as `sum to` takes about 2.2 frames a level (measured on 2026-10-07, `sum to 400000` answers and `sum to 500000` is refused for exceeding 1,000,000). So the cost is at most about a quarter of a second, and only for a recursion some 450,000 levels deep. Measured with a 1-second limit and a call of `sum to 900000`, which the limit stops before it finishes, the answer came back after 1.12 to 1.27 s, where before it came back after 1.00 to 1.09 s.
+
+## Checking a store before a rollout
+
+A restart compiles every stored deployment with the binary that is starting (see [Persistence](#persistence)). A new binary can therefore refuse a deployment that the old one served: its sources type-check differently under the new compiler, a library it imports has changed, or it no longer fits the compile limits. That is found only once the new binary is serving, as a deployment that is `failed`.
+
+`jl4-service --check-store DIR` runs that compile first, with the new binary and the store it is about to serve.
+It compiles every deployment in `DIR` the way a restart does, under the same `--compile-timeout` and `--max-compile-memory-mb`, and no more at once than a restart compiles (one per capability).
+It prints one line for each deployment and a summary, and exits.
+It starts no server, and it writes nothing to `DIR`: it does not create the directory, clean up a stale `<id>.tmp` directory, backfill a `metadata.json`, or save a metadata cache.
+The log goes to stderr, so stdout holds the report alone. `--store-path` is not read in this mode: the directory is the argument.
+
+```
+$ jl4-service --check-store /var/lib/jl4-service/store --compile-timeout 120
+sales-rules	ok	3 functions
+claims-pilot	failed	Compilation timed out or exceeded memory limit
+travel-policy	failed	I found a problem while checking the definition of `is big`: There are multiple definitions for the identifier `__GT__` and I do not have sufficient information to make a choice between them. The options are: ...
+3 deployments: 1 ok, 2 failed
+```
+
+Each line is the deployment's id, `ok` or `failed`, and then the number of functions it publishes or the error, separated by tabs. An error that spans lines is joined onto one. A deployment is `failed` for the reasons a restart would register it as failed: its sources do not parse or type-check, the compiler raises an error (inputs whose names collide once sanitised), its `metadata.json` does not decode, or it does not compile within the limits.
+With `--json` the report is one JSON document instead, with each error as it is:
+
+```json
+{
+  "store": "/var/lib/jl4-service/store",
+  "deployments": [
+    {
+      "id": "sales-rules",
+      "status": "ok",
+      "functions": 3,
+      "error": null,
+      "bundleCbor": { "present": false, "writtenBy": null }
+    }
+  ],
+  "summary": { "total": 1, "ok": 1, "failed": 0 }
+}
+```
+
+The exit status is `0` when every deployment compiles (a store with none is `0 deployments`), `1` when any does not, and `2` when the check could not be made: the directory is not there or cannot be read, or the command line is wrong. A script can therefore stop a rollout on anything but `0`, and tell a failed deployment from a failed check.
+
+A `bundle.cbor` that an older build left beside a deployment's sources is not read, and the check does not touch it. The report says `bundle.cbor present, written by an unknown build` for such a deployment, because nothing in the file says which build wrote it.
+
+The check compiles; it does not evaluate. A deployment that compiles can still answer a call differently under a new binary.
 
 ## Persistence
 
@@ -462,13 +832,17 @@ Deployments are stored on disk at `{store-path}/{deployment-id}/`:
       main.l4
       helper.l4
     metadata.json
+    metadata-cache.json
   other-deploy/
     sources/
       rules.l4
     metadata.json
+    metadata-cache.json
 ```
 
-On startup, the service scans the store directory and recompiles all deployments. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
+`metadata-cache.json` is a cache, written after a successful compile; the sources and `metadata.json` are what a deployment is.
+
+On startup, the service scans the store directory and compiles every deployment from its stored sources, the way a deploy compiles them and under the same limits (see Resource Limits), as many at once as it has capabilities (one per core unless `+RTS -N` says otherwise). A timeout counts wall-clock time, and a compile starts only when one of those places is free, so a deployment is not failed for waiting its turn. Unless `--lazy-load` is set, the service opens its port only after every deployment has loaded, so a store of k deployments that each time out delays the port by about k times `--compile-timeout`, divided by the number that compile at once. A deployment that does not finish in `--compile-timeout` stays `failed` until it is redeployed or the service restarts (a PUT to a failed deployment is not checked for compatibility, as before). Nothing is kept from the compile that made the deployment, so a restart serves exactly what a deploy of those sources would serve. A deployment whose stored sources no longer parse or type-check (a file was edited on disk, or the service's checks changed) is `failed`, with the errors a deploy of them would be rejected with; the log has a warning that names the file and prints the errors, and the other deployments load as usual. A `bundle.cbor` that an earlier version of the service left beside the sources is not read and not touched; it is safe to delete. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
 
 ## Testing
 
@@ -487,9 +861,9 @@ Test coverage:
 - **BundleStoreSpec** -- Filesystem persistence round-trips
 - **CodeGenSpec** -- Input field name collision avoidance
 - **DecisionQueryCacheKeySpec** -- Cache key determinism
-- **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping
+- **IntegrationSpec** -- Full deployment lifecycle, evaluation, batch, control plane HTTP, field name remapping, answers after a restart
+- **LoggingSpec** -- Log lines stay whole when many threads log at once
 - **SanitizationSpec** -- Property name sanitization, reverse mapping, collision detection
-- **SerialisationSpec** -- CBOR serialisation round-trips and cache rebuild
 - **SchemaSpec** -- QuickCheck property tests for API type serialization
 
 ## Architecture
@@ -508,6 +882,10 @@ jl4-service/
     ControlPlane.hs         -- POST/GET/PUT/DELETE /deployments + async deploy/update jobs
     DataPlane.hs            -- /deployments/{id}/functions/... evaluation handlers + short routes
     DeploymentLoader.hs     -- Shared compilation logic (eager startup, lazy compile-on-access)
+    Ledger.hs               -- Instance-ledger routes: /deployments/{id}/instances/...
+    Ledger/Mcp.hs           -- The ledger's MCP tools (what-may-I-do-now; the act-* write tools when on), registered in front of McpServer
+    Ledger/Service.hs       -- The ledger as the service holds it: store opened on first use, clock, limits, slots
+    Ledger/Store/           -- The ledger's stores: sqlite (the default), Postgres, in-memory (tests)
     ExplorerPage.hs         -- Landing page HTML (deployment explorer, API docs)
     McpServer.hs            -- MCP JSON-RPC 2.0 handler (tools/list, tools/call)
     Schema.hs               -- OpenAPI spec generation

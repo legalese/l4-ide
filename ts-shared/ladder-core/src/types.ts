@@ -87,6 +87,20 @@ export interface And {
   readonly id: NodeId;
   readonly args: readonly IRExpr[];
   readonly label?: string;
+  /**
+   * This group is a CALL drawn expanded in place (a "call panel"): its one arg is the called
+   * rule's body with the call's actual arguments substituted, and `label` is the call's wire
+   * label prefix-normalised by `callLabel` (`is creditworthy a`), not the call as the drafter
+   * wrote it. Its `id` is the call leaf's own id, so folding it shows the
+   * call as the one box it was. Only the adapter's expand mode sets it
+   * (`fromVizFunDecl(…, { calls: "expand" })` or `fromVizExpr(…, { calls: "expand" })`);
+   * absent everywhere else, which is every tree that existed before it.
+   *
+   * A value on a call panel (a `valuation` entry under its id) is an override that holds
+   * only while the panel is FOLDED: `layout` sets it aside while the panel is open, so an
+   * open panel always conducts by what is drawn inside it.
+   */
+  readonly call?: boolean;
 }
 
 export interface Or {
@@ -403,6 +417,30 @@ export type ScenePrim =
        *  side is already softened this way, and a break is just closure with the sign
        *  flipped. Without this, a presumed-false contact reports as firmly as a tested one. */
       tentative?: boolean;
+      /** For `inverter` only: the NOT's OUTPUT value, so the bubble can be filled with it —
+       *  green when the negand is false (the NOT conducts), the mild red when the negand is
+       *  true, plain when unknown (Meng, 2026-10-05). Read from the honest three-valued
+       *  evaluation, like box ink, never from a grounding assumption. Absent ⇒ unknown, so
+       *  a scene with no answers is byte-for-byte what it was. */
+      value?: UBoolValue;
+    }
+  /**
+   * A CALL PANEL: a call drawn expanded in place (`And.call`), the called rule's body inside
+   * a filled, rounded box named after the call as written. `at` is its top-left corner.
+   * `depth` is the number of EXPANDED panels around it (0 = outermost), and the renderer
+   * shades it against `Scene.panelDepth`. Its name is a separate `text` prim tagged `panel`,
+   * carrying the fold act; `label` is here for renderers that want the name with the shape
+   * (an accessible title, a FLIP key). Emitted BEFORE everything inside it, so an outer
+   * panel always precedes the panels it contains.
+   */
+  | {
+      kind: "panel";
+      id: NodeId;
+      at: Pt;
+      w: number;
+      h: number;
+      depth: number;
+      label: string;
     }
   /** A SINK (DESIGN §25.4). The right-hand half of a rung, which our diagrams have
    *  never drawn: an implication routes its verdict to one of two lamps. `lit` is the
@@ -441,7 +479,8 @@ export type ScenePrim =
          *  and the reader has chosen an epistemics for it. Distinct from `typically`,
          *  which is a presumption the SOURCE supplied; this one is the reader's. */
         | "assumed"
-        | "seam"; // §25 — the MUST / ⇒ connective between scope and requirement
+        | "seam" // §25 — the MUST / ⇒ connective between scope and requirement
+        | "panel"; // a call panel's name, top left inside the panel; clicking it folds the panel
       size?: number;
       /** node id this text belongs to (heading -> its group; label -> its box) —
        *  used by renderers for click targets and FLIP matching. */
@@ -474,6 +513,16 @@ export interface Scene {
    * have no way to know. Renderers should soften the made-circuit signal when set.
    */
   provisional?: boolean;
+  /**
+   * How many levels of call panels the WHOLE decision has (`And.call`), counting panels
+   * inside folded ones: 1 when there are panels but none inside another. Absent when there
+   * are none, so every scene drawn before call panels is unchanged.
+   *
+   * It is the scale a renderer shades panels against (`depth` 0 is the darkest panel, depth
+   * `panelDepth - 1` the lightest), and it ignores folds on purpose: folding a panel must not
+   * change the shade of any other (Meng, 2026-10-05).
+   */
+  panelDepth?: number;
 }
 
 /* -------------------------------------------------------------- TextMetrics */

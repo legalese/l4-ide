@@ -1,4 +1,4 @@
--- Regression fixture for LIBRARY-RESOLUTION-SHADOW-SPEC (Option B′).
+-- Regression fixture for Option B′ (specs/as-built/import-resolution.md).
 --
 -- This file lives alone in its directory: no project-root or sibling copy of
 -- `prelude` exists, so with JL4_LIBRARY_PATH unset the import must fall

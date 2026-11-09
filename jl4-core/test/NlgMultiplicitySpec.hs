@@ -18,10 +18,11 @@ module NlgMultiplicitySpec (spec) where
 import Base
 
 import L4.Annotation (getAnno)
-import L4.Lexer (LangTag (..))
+import L4.Lexer (LangTag (..), PosToken, execLexer)
 import L4.Nlg (simpleLinearizer)
-import L4.Parser (execProgramParserWithHintPass)
+import L4.Parser (execProgramParserWithHintPass, redundantLangEnRanges)
 import L4.Parser.ResolveAnnotation (Warning (..))
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
   ( Module
   , Name
@@ -64,6 +65,16 @@ parsed src = do
       expectationFailure ("fixture source failed to parse: " <> show errs)
       error "unreachable"
     Right (m, _hints, ws) -> pure (m, ws)
+
+-- | The tokens of a source text, which is what the `@lang en` hint reads.
+lexed :: Text -> IO [PosToken]
+lexed src = do
+  let uri = toNormalizedUri (Uri "file:///nlg-multiplicity-spec")
+  case execLexer uri src of
+    Left errs -> do
+      expectationFailure ("fixture source failed to lex: " <> show errs)
+      error "unreachable"
+    Right ts -> pure ts
 
 ambiguities :: [Warning] -> [Maybe Text]
 ambiguities ws = [ fmap (\ (MkLangTag t) -> t) mtag | Ambiguous _ mtag _ <- ws ]
@@ -286,3 +297,47 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
         \  IF amount GREATER THAN 100\n"
       renderingsOf "is large" m `shouldBe` []
       ambiguities ws `shouldBe` [Just "he"]
+
+  ----------------------------------------------------------------------------
+  -- The `@lang en` hint: a module that declares nothing is English, so the
+  -- line can go. These pin WHICH lines are told that, because the sentence
+  -- is only true of some of them.
+  ----------------------------------------------------------------------------
+  describe "redundantLangEnRanges (the `@lang en` hint)" $ do
+    let hintedLines :: Text -> IO [Int]
+        hintedLines src = do
+          ts <- lexed src
+          pure [ r.start.line | r <- redundantLangEnRanges ts ]
+        body = "GIVEN x IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE echo x IS x\n"
+
+    it "flags a lone `@lang en`, wherever it sits" $ do
+      hintedLines ("@lang en\n" <> body) `shouldReturn` [1]
+      hintedLines ("-- a comment first\n\n@lang en\n" <> body) `shouldReturn` [3]
+      hintedLines (body <> "@lang en\n") `shouldReturn` [4]
+
+    it "flags every line when every declaration is `en`" $
+      hintedLines ("@lang en\n@lang en\n" <> body) `shouldReturn` [1, 2]
+
+    it "says nothing to a module that declares nothing" $
+      hintedLines body `shouldReturn` []
+
+    it "says nothing to another language, which is the point of declaring it" $
+      hintedLines ("@lang he\n" <> body) `shouldReturn` []
+
+    it "says nothing on either line when another language is also declared" $ do
+      -- Last declaration wins, so `en` first is overridden and `en` last is
+      -- the one that counts: neither is "this line can go".
+      hintedLines ("@lang en\n@lang he\n" <> body) `shouldReturn` []
+      hintedLines ("@lang he\n@lang en\n" <> body) `shouldReturn` []
+
+    it "compares the tag exactly: `EN` and `en-GB` are not the default language" $ do
+      -- The lexer does not fold case and 'MkLangTag' is compared as written,
+      -- so neither is 'defaultModuleLang' (`en`) as far as the pipeline goes.
+      hintedLines ("@lang EN\n" <> body) `shouldReturn` []
+      hintedLines ("@lang en-GB\n" <> body) `shouldReturn` []
+
+    it "covers the whole line, a trailing comment included" $ do
+      ts <- lexed ("@lang en  -- English\n" <> body)
+      case redundantLangEnRanges ts of
+        [r] -> (r.start.line, r.start.column, r.end.line) `shouldBe` (1, 1, 1)
+        other -> expectationFailure ("expected one range, got " <> show other)

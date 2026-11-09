@@ -1,0 +1,4 @@
+IMPORT prelude
+IMPORT daydate
+
+#EVAL `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `x` IS TRUE)

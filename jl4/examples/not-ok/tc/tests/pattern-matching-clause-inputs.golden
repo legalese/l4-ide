@@ -1,0 +1,103 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: pattern-matching-clause-inputs.l4
+  Hidden: no
+  Range: 16:8-16:27
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Each clause of `too many patterns` has 2 patterns, but its GIVEN names 1 input.
+    A clause needs one pattern for each input the GIVEN names, in the same order.
+
+File: pattern-matching-clause-inputs.l4
+  Hidden: no
+  Range: 23:8-23:26
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Each clause of `too few patterns` has 1 pattern, but its GIVEN names 2 inputs.
+    A clause needs one pattern for each input the GIVEN names, in the same order.
+
+File: pattern-matching-clause-inputs.l4
+  Hidden: no
+  Range: 35:31-35:32
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      c
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      c (defined at pattern-matching-clause-inputs.l4:35:21-22) of type Colour
+      c (defined at pattern-matching-clause-inputs.l4:33:7-8) of type Colour
+
+File: pattern-matching-clause-inputs.l4
+  Hidden: no
+  Range: 43:8-43:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Each clause of `type only` has 1 pattern, but its GIVEN names no inputs.
+    A clause needs one pattern for each input the GIVEN names, in the same order.
+
+File: pattern-matching-clause-inputs.l4
+  Hidden: no
+  Range: 50:8-50:25
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Each clause of `reads the given` has 2 patterns, but its GIVEN names 1 input.
+    A clause needs one pattern for each input the GIVEN names, in the same order.
+
+File: pattern-matching-clause-inputs.l4
+  Hidden: no
+  Range: 59:8-59:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Each clause of `misreads the given` has 2 patterns, but its GIVEN names 1 input.
+    A clause needs one pattern for each input the GIVEN names, in the same order.
+
+File: pattern-matching-clause-inputs.l4
+  Hidden: no
+  Range: 59:42-59:45
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The first input of function 
+
+      `__PLUS__` (predefined)
+
+    is expected to be of type
+
+      NUMBER
+
+    but is here of type
+
+      Colour
+
+File: pattern-matching-clause-inputs.l4
+  Hidden: no
+  Range: 60:45-60:46
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The condition in IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs is expected to be of type
+
+      BOOLEAN
+
+    but is here of type
+
+      Colour

@@ -225,6 +225,18 @@ path** (`Paths_jl4_core.getDataDir </> "libraries"`, resolved by the TH splice a
 This is a documentation/known-gotcha item, not a code change. Any option below that
 leans on the embedded copy must state this caveat where devs will read it.
 
+> **Corrected 2026-10-13 (measured; the mechanism above was drifted).** For a
+> checkout built with `cabal build` (GHC 9.10.3, Cabal 3.16) the datadir the
+> splice resolves **is the checkout**: GHC records
+> `<checkout>/jl4-core/libraries/<name>.l4` with a content hash, and recompiles
+> `L4.API.EmbeddedLibraries` when one changes. The bullet "unless that worktree's
+> datadir is the one `getDataDir` resolves to" therefore describes the normal case,
+> not an exception. The staleness is real but sits one step earlier: after an edit
+> to `libraries/*.l4` alone, `cabal build` prints `Up to date` and never calls GHC.
+> Any real change to a `jl4-core` source file does, and the embed then refreshes;
+> `touch` does not. Measurement and wording:
+> `doc/reference/libraries/resolution.md`, "The embed-staleness gotcha".
+
 ---
 
 ## 4. Options
@@ -422,3 +434,27 @@ ambient tier is one path or two.
 - **Two-resolver parity:** a fixture using cross-module **mixfix** _and_ a normal
   typecheck dependency on the same imported module; assert both resolvers log the
   same real path (guards §3.3).
+
+---
+
+## 10. Rulings recorded from a bench
+
+The service's shorter ladder (`LibraryScope` / `EmbeddedStdlibOnly`, `jl4-service`'s
+`bundleScope`; `doc/reference/libraries/resolution.md`, "the resolution order") was
+built before it was ruled, and is now ruled.
+
+- **R5 = A**, bench "Main Wave Rulings", no note, 2026-10-12,
+  https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb. A deployment resolves its own files and
+  the built-in stdlib, nothing from the host. Conditions: (1) a `WARN` naming the
+  deployment and the module whenever a compile or a restart meets an unresolved `IMPORT`
+  (a warning now, a refusal only by a later ruling; the deploy API is unchanged);
+  (2) `resolution.md` says the service reads neither `JL4_LIBRARY_PATH`, the working
+  directory nor the XDG store; (3) an operator note in the main PR's Operators section,
+  no code: before a host is upgraded, its operator checks `/var/lib/jl4-service/.env` and
+  the XDG store for libraries a deployment needs.
+- **R3 = A**, bench "Main Wave Rulings", no note, 2026-10-12,
+  https://claude.ai/artifact/Lpj7TuD6CMHQ5v63yxSGnb. Deployments run on the service's
+  built-in stdlib; `ts-apps/vscode/src/sidebar-provider.ts` keeps skipping `jl4-embedded:`
+  imports when it zips a deployment. Condition: a later, non-blocking PR has the extension
+  warn at deploy time when its stdlib differs from the service's, the service reporting a
+  stdlib hash. Recorded only; that warning is not built.

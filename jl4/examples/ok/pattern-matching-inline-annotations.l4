@@ -1,0 +1,29 @@
+-- An annotation written on the line where a clause ends, after its body, stays
+-- with that clause, as it does after a rule written as one definition. It was
+-- taken by the next clause, which published the second of two overloads under
+-- an @export written on the first's line, and drew the first overload's @nlg
+-- when the second was called (refutation of legalese/l4-ide#545's review,
+-- round 4).
+
+-- Two overloads, told apart by their types. Neither is published, and neither
+-- takes the @nlg: calls to both render as calls to `g`.
+DECIDE f n IS n + 1 @export inline on the first overload's line
+DECIDE f b IS b AND TRUE
+
+DECIDE g n IS n + 1 @nlg inline on the first overload's line
+DECIDE g b IS b AND TRUE
+
+-- A group, with an @desc, an @nlg and an @export after the bodies of its first
+-- three clauses: none is "above the second clause", or the third.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE grouped 0 IS 1 @desc inline after the first body
+DECIDE grouped 1 IS 2 @nlg inline after the second body
+DECIDE grouped 2 IS 3 @export inline after the third body
+DECIDE grouped other IS 4
+
+#EVAL f 3
+#EVAL f TRUE
+#EVAL g 3
+#EVAL g TRUE
+#EVAL grouped 1

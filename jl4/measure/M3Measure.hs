@@ -434,7 +434,7 @@ ladderNodeCount budget root = go 0 [root]
       VizExpr.Or _ xs -> xs
       VizExpr.Not _ x -> [x]
       VizExpr.Implies _ s r _ -> [s, r]
-      VizExpr.App _ _ args _ -> args
+      VizExpr.App _ _ args _ _ -> args
       VizExpr.UBoolVar{} -> []
       VizExpr.TrueE{} -> []
       VizExpr.FalseE{} -> []
@@ -463,6 +463,7 @@ mapVars f = \case
   BDQ.BTrue -> BDQ.BTrue
   BDQ.BFalse -> BDQ.BFalse
   BDQ.BVar v -> BDQ.BVar (f v)
+  BDQ.BRefuse v -> BDQ.BRefuse (f v)
   BDQ.BNot e -> BDQ.BNot (mapVars f e)
   BDQ.BAnd es -> BDQ.BAnd (fmap (mapVars f) es)
   BDQ.BOr es -> BDQ.BOr (fmap (mapVars f) es)
@@ -473,6 +474,7 @@ varsOf = \case
   BDQ.BTrue -> []
   BDQ.BFalse -> []
   BDQ.BVar v -> [v]
+  BDQ.BRefuse v -> [v]
   BDQ.BNot e -> varsOf e
   BDQ.BAnd es -> concatMap varsOf es
   BDQ.BOr es -> concatMap varsOf es
@@ -533,6 +535,8 @@ lazyEval binds = \case
   BDQ.BTrue -> LVal True
   BDQ.BFalse -> LVal False
   BDQ.BVar v -> maybe (LNeed v) LVal (Map.lookup v binds)
+  -- Never built here: 'vizExprToBoolExpr' makes no refusing leaf.
+  BDQ.BRefuse v -> LNeed v
   BDQ.BNot e -> case lazyEval binds e of
     LVal x -> LVal (not x)
     need -> need
@@ -698,7 +702,7 @@ runMeasurement opts ladderInfo vizState =
     (boolExpr, labels, order) = VizQP.vizExprToBoolExpr body
     cache = VizQP.buildQueryPlanCache ladderInfo vizState
     paramsBy = VizQP.buildParamsByUnique ladderInfo
-    atomIds = QP.atomIdByUnique ladderInfo.funDecl.fnName.label paramsBy cache
+    atomIds = QP.atomIdByUnique ladderInfo.funDecl.fnName.label cache
     (expr', labels', order', rep) = coalesceByAtomId atomIds boolExpr labels order
     nClasses = length order'
 

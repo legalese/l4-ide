@@ -21,6 +21,7 @@ import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
 import L4.Print (prettyLayout, prettyTypeForDisplay, ConstructorFieldNames)
 import L4.Annotation (Anno_(..))
 import L4.Syntax (getActual, Declare, Decide(..), AppForm(..), Resolved)
+import L4.TypeCheck.Environment (isContractType)
 
 import qualified L4.Export as Export
 import qualified L4.FunctionSchema as FSchema
@@ -138,7 +139,7 @@ evalDirectiveToResult
   -> SrcRange
   -> EL.EvalDirectiveResult
   -> DirectiveResult
-evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _range res _mtrace _led _notes) =
+evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _range res _mtrace _led _notes _) =
   DirectiveResult
     { directiveType = dirType
     , prettyText = EL.prettyEvalDirectiveResultWithFields fields evalRes
@@ -152,16 +153,21 @@ evalDirectiveToResult fields dirType rng evalRes@(EL.MkEvalDirectiveResult _rang
         -- declined to give.
         EL.Assertion (EL.Refused _)        -> Nothing
         EL.Assertion (EL.Errored _)        -> Just False
+        -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        EL.Assertion (EL.Undetermined _)   -> Just False
         EL.Reduction (EL.Reduced _)        -> Just True
         EL.Reduction (EL.ReducedRefused _) -> Nothing
         EL.Reduction (EL.ReducedErrored _) -> Just False
+        EL.Reduction (EL.ReducedUndetermined _) -> Just False
     , structuredValue = case res of
         EL.Assertion EL.Holds              -> Just (Aeson.toJSON True)
         EL.Assertion EL.Fails              -> Just (Aeson.toJSON False)
         EL.Assertion (EL.FailsBecause _)   -> Just (Aeson.toJSON False)
         EL.Assertion (EL.Refused _)        -> Nothing
         EL.Assertion (EL.Errored _)        -> Nothing
+        EL.Assertion (EL.Undetermined _)   -> Nothing
         EL.Reduction (EL.ReducedErrored _) -> Nothing
+        EL.Reduction (EL.ReducedUndetermined _) -> Nothing
         EL.Reduction (EL.ReducedRefused _) -> Nothing
         EL.Reduction (EL.Reduced nf)       -> Just (nfToJson nf)
     , range = rng
@@ -196,12 +202,16 @@ valueToJson = \case
         _       -> Aeson.String name
       _  -> Aeson.object [Aeson.fromText name .= Aeson.toJSON (map nfToJson args)]
   Val.ValUnappliedConstructor resolved -> Aeson.String (prettyLayout (getActual resolved))
-  Val.ValAssumed resolved -> Aeson.object ["$assumed" .= prettyLayout (getActual resolved)]
+  Val.ValAssumed resolved _ -> Aeson.object ["$assumed" .= prettyLayout (getActual resolved)]
+  -- a result that holds a term is undetermined, not a value, so this is
+  -- only for completeness
+  Val.ValTerm t -> Aeson.object ["$unknown" .= prettyLayout t]
   -- Closures and builtins cannot be meaningfully serialized
   Val.ValClosure{} -> Aeson.String "<function>"
   Val.ValNullaryBuiltinFun{} -> Aeson.String "<builtin>"
   Val.ValUnaryBuiltinFun{} -> Aeson.String "<builtin>"
   Val.ValBinaryBuiltinFun{} -> Aeson.String "<builtin>"
+  Val.ValConnective{} -> Aeson.String "<function>"
   Val.ValTernaryBuiltinFun{} -> Aeson.String "<builtin>"
   Val.ValPartialTernary{} -> Aeson.String "<partial>"
   Val.ValPartialTernary2{} -> Aeson.String "<partial>"
@@ -285,7 +295,7 @@ evalDirectiveToUpdateItem
   -> (Int -> Int -> Text)   -- ^ slice raw source lines, inclusive 1-indexed [startLine, endLine]
   -> EL.EvalDirectiveResult
   -> Maybe DirectiveUpdateItem
-evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res _mtrace _led _notes) =
+evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _)) res _mtrace _led _notes _) =
   Just DirectiveUpdateItem
     { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
     , prettyText  = EL.prettyEvalDirectiveResultWithFields fields evalRes
@@ -296,9 +306,12 @@ evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Jus
         -- See 'evalDirectiveToResult': a refusal is not a FALSE verdict.
         EL.Assertion (EL.Refused _)        -> Nothing
         EL.Assertion (EL.Errored _)        -> Just False
+        -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        EL.Assertion (EL.Undetermined _)   -> Just False
         EL.Reduction (EL.Reduced _)        -> Just True
         EL.Reduction (EL.ReducedRefused _) -> Nothing
         EL.Reduction (EL.ReducedErrored _) -> Just False
+        EL.Reduction (EL.ReducedUndetermined _) -> Just False
     , body        = getLines startLine endLine
     }
 evalDirectiveToUpdateItem _ _ _ = Nothing
@@ -407,7 +420,12 @@ exportedFunctionToSummary declares ef =
           desc = case ep.paramDescription of
             Just d  -> d
             Nothing -> base.parameterDescription
-      in (ep.paramName, base { FSchema.parameterDescription = desc })
+      in ( ep.paramName
+         , base
+             { FSchema.parameterDescription = desc
+             , FSchema.parameterDefault = FSchema.typicallyToJson =<< Export.honouredDefault ep
+             }
+         )
 
     paramPairs = map mkParam ef.exportParams
     params = FSchema.MkParameters
@@ -417,7 +435,8 @@ exportedFunctionToSummary declares ef =
       -- made the deploy sidebar's breaking-change diff report optional
       -- params (e.g. MAYBE-typed object inputs) as "now required" on
       -- every redeploy, since the deployed schema correctly omits them.
-      , required = [ep.paramName | ep <- ef.exportParams, ep.paramRequired]
+      -- A defaulted input is optional there too (W2), and carries its default.
+      , required = [ep.paramName | ep <- ef.exportParams, Export.isRequiredInput ep]
       }
 
     -- Use prettyTypeForDisplay (not plain prettyLayout) so residual inference
@@ -427,8 +446,13 @@ exportedFunctionToSummary declares ef =
       Nothing -> "unknown"
       Just ty -> prettyTypeForDisplay ty
 
-    -- Deontic detection: check if return type pretty-prints as containing "DEONTIC"
-    isDeontic' = "DEONTIC" `Text.isInfixOf` Text.toUpper retType
+    -- Deontic detection reads the type, as jl4-service does when it exports the
+    -- function: a rule that returns @PROVISION OF P, A@, the deprecated alias of
+    -- @DEONTIC P A@, has the same type and is deontic, but its display name does
+    -- not contain "DEONTIC", and this used to be a search for that word in it.
+    -- The deploy sidebar reads this to strip the simulation envelope before it
+    -- diffs the local interface against the deployed one.
+    isDeontic' = maybe False isContractType ef.exportReturnType
 
     -- Structured return schema, mirroring jl4-service's Compiler: only for
     -- non-DEONTIC functions (DEONTIC surfaces the simulation envelope).

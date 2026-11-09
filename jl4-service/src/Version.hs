@@ -3,12 +3,15 @@
 -- | The jl4-service build version, baked into the binary at compile time.
 --
 -- The release workflow (@.github/workflows/main-tag.yml@) computes
--- @1.5.<run_number>@ and exports it as the @JL4_SERVICE_VERSION@ environment
--- variable for the @cabal build exe:jl4-service@ step. A Template Haskell
--- splice captures that value into the binary, so the running service can
--- self-report its version (on @\/health@) and derive its major component for
--- per-deployment versioning. Local builds with the variable unset fall back to
--- @"0.0.0-dev"@ (major 0).
+-- @<major>.<minor>.<run_number>@ and exports it as the @JL4_SERVICE_VERSION@
+-- environment variable before any step compiles jl4-service. A Template
+-- Haskell splice captures that value into the binary, so the running service
+-- can self-report its version (on @\/health@) and derive its major component
+-- for per-deployment versioning. Local builds with the variable unset fall back
+-- to @"0.0.0-dev"@ (major 0).
+--
+-- Neither GHC nor cabal knows the splice reads the variable: a module compiled
+-- without it is not rebuilt when it is set later, so it must be set first.
 module Version
   ( serviceVersion
   , serviceMajor

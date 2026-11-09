@@ -16,10 +16,21 @@ import L4.MLIR.Dialect.Arith
 import L4.MLIR.Dialect.SCF
 import L4.MLIR.Runtime.Builtins (builtinDeclarations)
 import L4.MLIR.Lower (lowerProgramWithInfo, lowerProgramWithDiagnostics)
-import L4.MLIR.Schema (bundleExports, applyDiagnostics, encodeBundle)
+import L4.MLIR.Schema (bundleExports, applyDiagnostics, encodeBundle, FunctionExport)
+
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as Aeson.Key
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text.Encoding as TE
+import qualified Control.Exception as E
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.Text.IO as TIO
+
+import qualified L4.Lexer as Lexer
+import qualified L4.Print as Print
 
 import L4.API.VirtualFS (checkWithImports, checkWithImportsAndUri, emptyVFS, vfsFromList)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..), ResolvedImport(..))
@@ -37,6 +48,203 @@ substitutedEntityInfo :: TypeCheckWithDepsResult -> EntityInfo
 substitutedEntityInfo r =
   applyFinalSubstitution r.tcdSubstitution r.tcdUri r.tcdEntityInfo
 
+-- | A party and an action whose names need backticks in L4 source are baked
+-- into the schema as their PLAIN names, as bare strings a runtime that predates
+-- the tag reads correctly, with @partyKind@ \/ @actionKind@ = @"name"@ beside
+-- them so the new runtime can backtick them again in the trace's source text.
+-- jl4-service spells them plain in an answer (@Backend.Jl4.partyText@ \/
+-- @actionText@). Until 2026-10-13 the action was baked as source, backticks
+-- included, because the reference printed it that way. An action that carries
+-- a value stays rule source, with no kind key.
+testDeonticNamesPlain :: IO Bool
+testDeonticNamesPlain = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `the seller`"
+        , "DECLARE Action IS ONE OF `deliver the goods`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `the seller`"
+        , "    MUST `deliver the goods`"
+        , "    WITHIN 10"
+        , "    HENCE FULFILLED"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("party is a plain string",  T.isInfixOf "\"party\":\"the seller\"" json)
+            , ("action is a plain string", T.isInfixOf "\"action\":\"deliver the goods\"" json)
+            , ("party is tagged a name",   T.isInfixOf "\"partyKind\":\"name\"" json)
+            , ("action is tagged a name",  T.isInfixOf "\"actionKind\":\"name\"" json)
+            ]
+      let failures = [name | (name, ok) <- checks, not ok]
+      case failures of
+        [] -> pure True
+        _  -> do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    json: " <> T.unpack (T.take 600 json)
+          pure False
+
+-- | The party of an explicit @BREACH BY@ is baked as its PLAIN name, as
+-- jl4-service answers it, not as rule source with backticks: @lest.by@ is
+-- @the borrower@, and the BECAUSE text stays the rule source it is.
+testDeonticBreachByPlain :: IO Bool
+testDeonticBreachByPlain = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `the borrower`"
+        , "DECLARE Action IS ONE OF `repay loan`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `the borrower`"
+        , "    MUST `repay loan`"
+        , "    WITHIN 30"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH BY `the borrower` BECAUSE \"not repaid\""
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let checks :: [(String, Bool)]
+          checks =
+            [ ("by is a plain name",    T.isInfixOf "\"by\":\"the borrower\"" json)
+            , ("by is tagged a name",   T.isInfixOf "\"byKind\":\"name\"" json)
+            , ("because is rule source", T.isInfixOf "\"because\":\"\\\"not repaid\\\"\"" json)
+            ]
+      let failures = [name | (name, ok) <- checks, not ok]
+      case failures of
+        [] -> pure True
+        _  -> do
+          putStrLn $ "\n    failing checks: " <> show failures
+          putStrLn $ "    json: " <> T.unpack (T.take 600 json)
+          pure False
+
+-- | The tag of a @BREACH BY@ party survives a read and a write of the bundle,
+-- and a bundle without it (compiled before the key existed) reads as it always
+-- did: the party is source, and is written back without the key.
+testDeonticBreachByRoundTrip :: IO Bool
+testDeonticBreachByRoundTrip = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF `the borrower`"
+        , "DECLARE Action IS ONE OF `repay loan`"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY `the borrower`"
+        , "    MUST `repay loan`"
+        , "    WITHIN 30"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH BY `the borrower` BECAUSE \"not repaid\""
+        ]
+      stripKey k v = case v of
+        Aeson.Object o -> Aeson.Object (Aeson.KeyMap.map (stripKey k) (Aeson.KeyMap.delete (Aeson.Key.fromText k) o))
+        Aeson.Array a  -> Aeson.Array (fmap (stripKey k) a)
+        other          -> other
+      rewrite :: Aeson.Value -> Either String T.Text
+      rewrite v = do
+        fe <- case v of
+          Aeson.Object o | Just (Aeson.Object fns) <- Aeson.KeyMap.lookup "functions" o
+                         , Just f <- Aeson.KeyMap.lookup "demo" fns -> Right f
+          _ -> Left "no function demo in the bundle"
+        fx <- either (Left . ("decode: " <>)) Right (decodeExport (Aeson.encode fe))
+        pure (TE.decodeUtf8 (LBS.toStrict (Aeson.encode fx)))
+      decodeExport :: LBS.ByteString -> Either String FunctionExport
+      decodeExport = Aeson.eitherDecode
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json ->
+      case Aeson.eitherDecode (LBS.fromStrict (TE.encodeUtf8 json)) of
+        Left err -> putStrLn ("\n    bundle is not JSON: " <> err) >> pure False
+        Right v -> case (rewrite v, rewrite (stripKey "byKind" v)) of
+          (Right kept, Right older) -> do
+            let checks :: [(String, Bool)]
+                checks =
+                  [ ("the tag survives a round trip",      T.isInfixOf "\"byKind\":\"name\"" kept)
+                  , ("the party is still the plain name",  T.isInfixOf "\"by\":\"the borrower\"" kept)
+                  , ("an older bundle reads without it",   T.isInfixOf "\"by\":\"the borrower\"" older)
+                  , ("and is written back without it",     not (T.isInfixOf "byKind" older))
+                  ]
+                failures = [name | (name, ok) <- checks, not ok]
+            if null failures then pure True else do
+              putStrLn $ "\n    failing checks: " <> show failures
+              pure False
+          (a, b) -> putStrLn ("\n    " <> show (either id (const "ok") a, either id (const "ok") b)) >> pure False
+
+-- | An action that carries a value is not a name: it is baked as the rule
+-- source it is, as @Backend.Jl4.actionText@ prints it, with no @actionKind@;
+-- only a bare name is baked plain and tagged.
+testDeonticValueActionIsSource :: IO Bool
+testDeonticValueActionIsSource = do
+  let src = T.unlines
+        [ "DECLARE Party IS ONE OF Alice"
+        , "DECLARE Action IS ONE OF say HAS text IS A STRING"
+        , ""
+        , "@export Demo obligation"
+        , "GIVETH A DEONTIC OF Party, Action"
+        , "`demo` MEANS"
+        , "    PARTY Alice"
+        , "    MUST say \"pay\""
+        , "    WITHIN 10"
+        , "    HENCE FULFILLED"
+        ]
+  case schemaWithDiagnostics src of
+    Left errs -> do
+      putStrLn $ "\n    typecheck failed: " <> show errs
+      pure False
+    Right json -> do
+      let want = "\"action\":\"say \\\"pay\\\"\""
+      if T.isInfixOf want json && not (T.isInfixOf "\"actionKind\"" json)
+        then pure True
+        else do
+          putStrLn $ "\n    expected " <> T.unpack want
+          putStrLn $ "    json: " <> T.unpack (T.take 600 json)
+          pure False
+
+-- | The WASM runtime backticks a name in its trace's source text the way
+-- L4's printer does ('Print.quoteIfNeeded'), and for that it carries its own copy
+-- of the reserved words: the lexer's keywords, except those the grammar also
+-- accepts as a name ('Print.keywordsUsableAsNames'). Read the copy out of the
+-- runtime and compare it with the lexer's set, so a keyword added to the lexer
+-- fails here until it is added to the runtime.
+testReservedWordsInSync :: IO Bool
+testReservedWordsInSync = do
+  let paths = ["runtime/jl4-runtime.mjs", "jl4-mlir/runtime/jl4-runtime.mjs"]
+      firstReadable [] = pure Nothing
+      firstReadable (p : ps) = do
+        r <- E.try (TIO.readFile p) :: IO (Either E.IOException T.Text)
+        either (const (firstReadable ps)) (pure . Just) r
+  mJs <- firstReadable paths
+  case mJs of
+    Nothing -> do
+      putStrLn $ "\n    cannot read the runtime from " <> show paths
+      pure False
+    Just js -> do
+      let between a b t = fst (T.breakOn b (snd (T.breakOn a t)))
+          section = between "BEGIN L4_RESERVED_WORDS" "END L4_RESERVED_WORDS" js
+          -- the words are the odd-numbered pieces between double quotes
+          quoted t = [w | (i, w) <- zip [0 :: Int ..] (T.splitOn "\"" t), odd i]
+          inRuntime = Set.fromList (quoted section)
+          inLexer =
+            Set.fromList (Map.keys Lexer.keywords)
+              `Set.difference` Set.fromList Print.keywordsUsableAsNames
+      if not (Set.null inRuntime) && inRuntime == inLexer
+        then pure True
+        else do
+          putStrLn $ "\n    in the lexer, not the runtime: " <> show (Set.toList (inLexer `Set.difference` inRuntime))
+          putStrLn $ "    in the runtime, not the lexer: " <> show (Set.toList (inRuntime `Set.difference` inLexer))
+          pure False
+
 main :: IO ()
 main = do
   results <- sequence
@@ -50,13 +258,18 @@ main = do
     , test "helper-read ASSUME threads through" testHelperReadAssumeThreaded
     , test "schema picks up imported DECLAREs" testSchemaUsesImportedDeclares
     , test "deontic contract baked into schema" testDeonticSchemaBaked
+    , test "deontic party/action names are plain, tagged" testDeonticNamesPlain
+    , test "deontic value-carrying action stays source" testDeonticValueActionIsSource
+    , test "WASM trace reserved words match the lexer" testReservedWordsInSync
+    , test "deontic BREACH BY party is plain" testDeonticBreachByPlain
+    , test "deontic BREACH BY tag round-trips" testDeonticBreachByRoundTrip
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "state graph baked into schema"     testStateGraphBaked
     , test "no state graph for plain fn"       testNoStateGraphForPlainFn
     , test "traceMeta pretty-print baked"      testTraceMetaBaked
     , test "<fn>$trace symbol emitted"         testTraceSymbolEmitted
     , test "traceMeta nodes populated"         testTraceMetaNodes
-    , test "AND/OR/NOT marked special"         testTraceSpecialMarkers
+    , test "AND/OR/IMPLIES marked special"     testTraceSpecialMarkers
     , test "fnValue node + enter_fn/exit_fn"   testTraceFnValueAndContext
     , test "NOT-range disambiguation"          testTraceNotRangeDisambiguation
     , test "returnType enriched from EntityInfo" testReturnTypeEnrichedFromEntityInfo
@@ -563,10 +776,10 @@ testTraceSymbolEmitted = do
           && T.isInfixOf "@__l4_trace_enter" mlir
           && T.isInfixOf "@__l4_trace_exit"  mlir
 
--- | M5 slice 4A: AND/OR (and direct App "__AND__"/"__OR__") nodes get
--- a @"special"@ marker in the schema so the runtime knows to append a
--- synthetic IF sub-tree and apply short-circuit filtering. This is the
--- mechanism that flips `is-eligible` to byte-identical.
+-- | M5 slice 4A: AND/OR/IMPLIES (and direct App "__AND__" and so on)
+-- nodes get a @"special"@ marker in the schema so the runtime knows to
+-- apply short-circuit filtering. This is the mechanism that keeps
+-- `is-eligible` byte-identical.
 testTraceSpecialMarkers :: IO Bool
 testTraceSpecialMarkers = do
   let src = T.unlines
@@ -574,6 +787,16 @@ testTraceSpecialMarkers = do
         , "GIVEN `age` IS A NUMBER"
         , "GIVETH A BOOLEAN"
         , "DECIDE `ok` IS `age` >= 18 AND `age` <= 65"
+        , ""
+        , "@export Either"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `young or old` IS `age` < 18 OR `age` > 65"
+        , ""
+        , "@export Implication"
+        , "GIVEN `age` IS A NUMBER"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `adult if over 18` IS `age` > 18 IMPLIES `age` >= 18"
         ]
   case schemaWithDiagnostics src of
     Left errs -> do
@@ -581,6 +804,8 @@ testTraceSpecialMarkers = do
       pure False
     Right json ->
       pure $ T.isInfixOf "\"special\":\"AND\"" json
+          && T.isInfixOf "\"special\":\"OR\"" json
+          && T.isInfixOf "\"special\":\"IMPLIES\"" json
 
 -- | An @MEANS@ / @DECIDE … IS@ binding without an explicit @GIVETH@
 -- must still surface a concrete 'returnType' in the schema; otherwise
@@ -609,8 +834,8 @@ testReturnTypeEnrichedFromEntityInfo = do
 -- into the same 'SrcRange' at parse time. The rangeMap is now keyed by
 -- '(SrcRange, exprDisambiguator)', so both get distinct trace nodes
 -- and the wrapper can look up each by its own AST shape. Verify the
--- schema has BOTH a NOT-tagged node AND a separate PROJ-tagged node
--- for an expression like @NOT req's flag@.
+-- schema has BOTH a NOT node AND a separate PROJ-tagged node for an
+-- expression like @NOT req's flag@.
 testTraceNotRangeDisambiguation :: IO Bool
 testTraceNotRangeDisambiguation = do
   let src = T.unlines
@@ -630,7 +855,10 @@ testTraceNotRangeDisambiguation = do
       -- The NOT subtree must exist as one node; the inner PROJ subtree
       -- as another. If the rangeMap collapsed them, the PROJ node would
       -- be missing from the schema (its 'tnSpecial' would be absent).
-      pure $ T.isInfixOf "\"special\":\"NOT\"" json
+      -- The NOT node is identified by its source text: it carries no
+      -- @special@ marker since the connectives stopped needing a
+      -- synthetic IF sub-tree (UNKNOWN-EVALUATION-SPEC §8 step 2).
+      pure $ T.isInfixOf "\"exampleCode\":\"NOT req's flag\"" json
           && T.isInfixOf "\"special\":\"PROJ\"" json
 
 -- | M5 slice 4A: every `<fn>$trace` clone calls @__l4_trace_enter_fn@

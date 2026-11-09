@@ -1,0 +1,16 @@
+executing contract `must deliver` at 0 with the following events: party `alice` did `Deliver` with `k` at 1
+executing contract `must deliver` at 0 with the following events: party `alice` did `Deliver` with `Retail` at 1
+executing contract `must deliver` at 0 with the following events: party `alice` did `Ship` with `k` at 1
+executing contract `must send none` at 0 with the following events: party `alice` did `Send` with `k` and 5 at 1
+executing contract `must send none` at 0 with the following events: party `alice` did `Send` with `k` and 0 at 1
+executing contract `must not deliver` at 0 with the following events: party `alice` did `Deliver` with `k` at 1
+executing contract `may deliver` at 0 with the following events: party `alice` did `Deliver` with `k` at 1
+executing contract `must deliver` at 0 with the following events: party `alice` did `act` at 1
+executing contract `must send two retail` at 0 with the following events: party `alice` did `Send2` with `k` and `Wholesale` at 1
+executing contract `must wrap two retail` at 0 with the following events: party `alice` did `Wrap` with `P` with `k` and `Wholesale` at 1
+executing contract `must order nothing` at 0 with the following events: party `alice` did `Order` with `ks` at 1
+executing contract `must deliver` at 0 with the following events: party `alice` did `Deliver` with `pick` with `k` at 1
+executing contract `must send3` at 0 with the following events: party `alice` did `Send3` with `k`, `tbd` and `Wholesale` at 1
+executing contract `must send3` at 0 with the following events: party `alice` did `Send3` with `k`, 7 and `Wholesale` at 1
+executing contract `must sendU` at 0 with the following events: party `alice` did `SendU` with `u`, `tbd` and `Wholesale` at 1
+executing contract `must sendP` at 0 with the following events: party `alice` did `SendP` with `d`, `tbd` and `Wholesale` at 1

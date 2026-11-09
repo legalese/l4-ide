@@ -57,3 +57,37 @@ spec = describe "MaybeLift" $ do
 
     it "keeps MAYBE (LIST OF NUMBER) without double-lifting inner elements" $ do
       liftTypeText "MAYBE (LIST OF NUMBER)" `shouldBe` "MAYBE (LIST OF NUMBER)"
+
+    -- prettyLayout prints every type application as `T OF p1, p2`, so this is the
+    -- spelling liftTypeToMaybe actually receives. The output must never keep the
+    -- OF: in the wrapper's record it would read the next field as an argument.
+    it "reads prettyLayout's MAYBE OF NUMBER" $ do
+      liftTypeText "MAYBE OF NUMBER" `shouldBe` "MAYBE NUMBER"
+
+    it "converts prettyLayout's MAYBE OF DATE to MAYBE STRING" $ do
+      liftTypeText "MAYBE OF DATE" `shouldBe` "MAYBE STRING"
+
+    it "reads prettyLayout's MAYBE OF a record type" $ do
+      liftTypeText "MAYBE OF Person" `shouldBe` "MAYBE Person"
+
+    it "reads prettyLayout's MAYBE OF (LIST OF NUMBER)" $ do
+      liftTypeText "MAYBE OF (LIST OF NUMBER)" `shouldBe` "MAYBE (LIST OF NUMBER)"
+
+    it "lifts prettyLayout's LIST OF (MAYBE OF NUMBER) without a double MAYBE" $ do
+      liftTypeText "LIST OF (MAYBE OF NUMBER)" `shouldBe` "MAYBE (LIST OF (MAYBE NUMBER))"
+
+    -- TIME and DATETIME arrive as JSON strings too, parsed by TOTIME and TODATETIME
+    it "lifts TIME to MAYBE STRING" $ do
+      liftTypeText "TIME" `shouldBe` "MAYBE STRING"
+
+    it "lifts DATETIME to MAYBE STRING" $ do
+      liftTypeText "DATETIME" `shouldBe` "MAYBE STRING"
+
+    it "converts prettyLayout's MAYBE OF TIME to MAYBE STRING" $ do
+      liftTypeText "MAYBE OF TIME" `shouldBe` "MAYBE STRING"
+
+    it "converts prettyLayout's MAYBE OF DATETIME to MAYBE STRING" $ do
+      liftTypeText "MAYBE OF DATETIME" `shouldBe` "MAYBE STRING"
+
+    it "brackets a type application with more than one argument" $ do
+      liftTypeText "EITHER OF STRING, NUMBER" `shouldBe` "MAYBE (EITHER OF STRING, NUMBER)"

@@ -38,6 +38,7 @@
     type SidebarDeploymentInfo,
     type SidebarImportedFile,
     type RemoteFunctionSchema,
+    takesDeonticEnvelope,
     type AiChatAttachment,
     type Harness,
   } from 'jl4-client-rpc'
@@ -1180,9 +1181,7 @@
       // the LSP-derived local schema does not. Strip them on both sides
       // before diffing so the envelope's presence/absence doesn't show up
       // as a spurious "parameter removed" breaking change.
-      const isDeontic =
-        (remote.returnType ?? '').startsWith('DEONTIC') ||
-        (local.returnType ?? '').startsWith('DEONTIC')
+      const isDeontic = takesDeonticEnvelope(remote, local)
       const remoteParams = stripDeonticEnvelope(
         remote.parameters as unknown as SchemaNode,
         isDeontic
@@ -1538,7 +1537,7 @@
   // claude.ai accepts (it only adds marketplaces from a GitHub repo).
   const MARKETPLACE_URL = 'https://github.com/legalese/cloud-rules'
   const MARKETPLACE_DOC =
-    'https://legalese.com/l4/tutorials/legalese-cloud/agent-marketplace.md'
+    'https://legalese.com/l4/tutorials/legalese-cloud/ai-agents.md#install-all-your-rules-skills-marketplace'
 
   function installMarketplace(harness: Harness) {
     messenger?.sendNotification(RequestInstallMarketplace, HOST_EXTENSION, {

@@ -1,0 +1,18 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: pattern-matching-mixfix-form-group.l4
+  Hidden: no
+  Range: 11:1-11:2
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+       |
+    11 | c `costs` 0 MEANS 0
+       | ^
+    This clause begins with c, an input of the GIVEN, and then the word `costs`. That is how a rule with a word between its inputs is written:
+
+      c `costs` ...
+
+    A rule written that way is one definition, so it cannot be split into clauses.
+    Write it once and tell the cases apart inside it with CONSIDER, or write the clauses with a name of their own first, one pattern for each input, as in DECIDE price Red 0 IS ...
+

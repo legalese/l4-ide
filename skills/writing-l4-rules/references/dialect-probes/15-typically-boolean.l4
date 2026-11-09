@@ -1,0 +1,2 @@
+DECLARE Person HAS
+    capable IS A BOOLEAN TYPICALLY TRUE

@@ -81,7 +81,7 @@ import L4.StateGraph.Dot (stateGraphToDot, defaultStateGraphOptions)
 import L4.FunctionSchema
   ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter
   )
-import L4.TypeCheck.Environment (contractUnique)
+import L4.TypeCheck.Environment (andUnique, falseUnique, impliesUnique, isContractType, notUnique, orUnique, trueUnique)
 
 -- ---------------------------------------------------------------------------
 -- Bundle types
@@ -146,7 +146,9 @@ data DeonticContract
       }
   | DCFulfilled
   | DCBreach
-      { dcBreachBy      :: !(Maybe Text)
+      { dcBreachBy      :: !(Maybe DeonticExpr)
+        -- ^ the party of @BREACH BY@: a bare name ('DEName') or rule source
+        -- ('DELiteral'), told apart as an obligation's party is
       , dcBreachBecause :: !(Maybe Text)
       }
   | DCIfThenElse
@@ -156,13 +158,25 @@ data DeonticContract
       }
   deriving stock (Eq, Show)
 
--- | Either a pre-rendered literal expression ('DELiteral' \"`the seller`\")
--- or a reference to a GIVEN parameter ('DEParam' \"driver\"). The JS
--- runtime resolves DEParam against the request's @arguments@ bag at
--- evaluation time, giving record-typed parties their actual value
--- (which the wire envelope then tags with the record type name).
+-- | A party or an action in the contract tree: a bare name ('DEName' \"the
+-- seller\"), pre-rendered rule source ('DELiteral' \"say \\\"pay\\\"\"), or a
+-- reference to a GIVEN parameter ('DEParam' \"driver\"). The JS runtime
+-- resolves DEParam against the request's @arguments@ bag at evaluation time,
+-- giving record-typed parties their actual value (which the wire envelope then
+-- tags with the record type name).
+--
+-- The name and the source are told apart so that the runtime can print the
+-- trace's source text as L4: a name with a space is backticked there, source
+-- text is printed as given. On the wire both are the same bare string, so a
+-- runtime that does not know the difference reads a bundle correctly; the
+-- difference travels in a sibling key of the obligation, @partyKind@ \/
+-- @actionKind@ = @"name"@, which such a runtime ignores. A bundle compiled
+-- before the key existed has none, and the runtime prints its literals as
+-- given. The party of an explicit @BREACH BY@ is told the same way, in the
+-- breach's @byKind@.
 data DeonticExpr
-  = DELiteral !Text
+  = DEName    !Text
+  | DELiteral !Text
   | DEParam   !Text
   deriving stock (Eq, Show)
 
@@ -222,15 +236,16 @@ data TraceNode = TraceNode
   , tnExampleCode :: !Text
   , tnResultKind  :: !Int
   , tnSpecial     :: !(Maybe Text)
-    -- ^ M5 slice 4A — flags that ask the runtime to inject a synthetic
-    -- desugar-shaped sub-tree to match jl4-service's @traceToReasoning@.
+    -- ^ M5 slice 4A — flags that ask the runtime to reshape a node's
+    -- sub-tree to match jl4-service's @traceToReasoning@.
     --
-    --   * @\"AND\"@ — @__AND__ a b@ desugars to @IF a THEN b ELSE FALSE@;
-    --     the runtime appends an IF sub-tree and applies short-circuit
-    --     filtering (drops the rhs child when lhs is FALSE).
-    --   * @\"OR\"@ — @__OR__ a b@ desugars to @IF a THEN TRUE ELSE b@;
-    --     symmetric — drops rhs when lhs is TRUE.
-    --   * @\"NOT\"@ — @__NOT__ a@ desugars to @IF a THEN FALSE ELSE TRUE@.
+    --   * @\"AND\"@, @\"OR\"@, @\"IMPLIES\"@ — the built-in connectives.
+    --     jl4-core evaluates their right operand only when the left does
+    --     not decide (UNKNOWN-EVALUATION-SPEC §4.4), while the eager wasm
+    --     codegen may emit both operand frames, so the runtime drops the
+    --     rhs child when the lhs decided: FALSE for AND and IMPLIES, TRUE
+    --     for OR. The connectives are frames, not closures, so there is no
+    --     @IF@ sub-tree to synthesise.
     --   * @\"FN_VALUE\"@ — synthetic fn-value frame emitted at the
     --     start of every @<fn>$trace@; renders as @Result: \<function\>@.
     --   * @\"PROJ\"@ (M5 slice 4G) — property selector @record's
@@ -877,7 +892,7 @@ exprToContract :: Expr Resolved -> Maybe DeonticContract
 exprToContract = \case
   Regulative _ deonton -> deontonToContract deonton
   Breach _ mBy mBec ->
-    Just (DCBreach (partyLiteralText <$> mBy) (Print.prettyLayout <$> mBec))
+    Just (DCBreach (partyDeonticExpr <$> mBy) (Print.prettyLayout <$> mBec))
   App _ headRes []
     | rawNameToText (rawName (getActual headRes)) `elem` ["Fulfilled", "FULFILLED"] ->
         Just DCFulfilled
@@ -953,42 +968,51 @@ deontonToContract deonton = do
 -- runtime can resolve it against the request's @arguments@ bag) or a literal
 -- name.
 --
--- A literal party is rendered with its PLAIN name, not 'Print.prettyLayout'.
+-- A bare party name ('DEName') is rendered with its PLAIN name, not 'Print.prettyLayout'.
 -- prettyLayout emits L4 /source/, so a multi-word party comes back
--- backtick-quoted; jl4-service evaluates the party to a constructor VALUE and
--- renders it through @Backend.Jl4.constructorText@
--- (@rawNameToText . rawName . getActual@), which carries no backticks. Emitting
--- @\`the seller\`@ where the reference says @the seller@ is a wrong answer at
--- @supported: true@, and it is the shape a caller compares against the
--- @enum@ the service declares in its own @returnSchema@.
+-- backtick-quoted; jl4-service renders a party as a constructor name through
+-- @Backend.Jl4.constructorText@ (@rawNameToText . rawName . getActual@), which
+-- carries no backticks, whether the party is an evaluated value
+-- (@eventParty@, @obligatedParty@) or the unevaluated expression of an
+-- OBLIGATION (@Backend.Jl4.partyText@). Emitting @\`the seller\`@ where the
+-- reference says @the seller@ is a wrong answer at @supported: true@, and it
+-- is the shape a caller compares against the @enum@ the service declares in
+-- its own @returnSchema@.
 --
--- The ACTION is deliberately NOT treated this way: the reference prints it
--- with 'Print.prettyLayout' of an unevaluated Name (@ValueLazyJSON@'s
--- @obligationAction .= prettyLayout action@), backticks included. Party and
--- action genuinely disagree on the wire, and this asymmetry is measured:
--- deontic-sale's residual OBLIGATION is @{"party":"the seller",
--- "action":"\`deliver the goods\`"}@ on both sides.
+-- The ACTION is spelled the same way ('patternToDeonticExpr'). Until
+-- 2026-10-13 it was not: jl4-service printed the action with prettyLayout,
+-- backticks included, beside a plain party, and this backend copied that
+-- asymmetry because the parity harness measured it. A client comparing
+-- @eventParty@ with @party@ got a false mismatch for a name with a space in
+-- it, so jl4-service now spells both plain and this backend follows it.
 exprToDeonticParty :: Expr Resolved -> DeonticExpr
 exprToDeonticParty e = case e of
   App _ headRes [] ->
     let nm = rawNameToText (rawName (getActual headRes))
-    in if isLikelyParam nm then DEParam nm else DELiteral nm
+    in if isLikelyParam nm then DEParam nm else DEName nm
   _ -> DELiteral (Print.prettyLayout e)
 
--- | The plain-name rendering of a party expression. See 'exprToDeonticParty'
--- for why this is not 'Print.prettyLayout'.
-partyLiteralText :: Expr Resolved -> Text
-partyLiteralText e = case e of
-  App _ headRes [] -> rawNameToText (rawName (getActual headRes))
-  _                -> Print.prettyLayout e
+-- | The party of an explicit @BREACH BY@: jl4-service answers it as the
+-- constructor name (@Backend.Jl4.constructorText@), without backticks, not as
+-- the rule source 'Print.prettyLayout' emits, so a bare name is baked plain
+-- ('DEName') and the runtime backticks it again where it prints source text.
+-- An expression that is more than a name stays rule source ('DELiteral'). See
+-- 'exprToDeonticParty' for why this is not 'Print.prettyLayout'.
+partyDeonticExpr :: Expr Resolved -> DeonticExpr
+partyDeonticExpr e = case e of
+  App _ headRes [] -> DEName (rawNameToText (rawName (getActual headRes)))
+  _                -> DELiteral (Print.prettyLayout e)
 
--- | Pattern variant: 'PatVar' is the param-ref shape; everything
--- else collapses to its pretty-printed form.
+-- | Pattern variant: 'PatVar' is the param-ref shape; a bare action name is
+-- its PLAIN name, as @Backend.Jl4.actionText@ spells it; everything else (an
+-- action that carries a value, @say "pay"@) collapses to its pretty-printed
+-- rule source.
 patternToDeonticExpr :: Pattern Resolved -> DeonticExpr
 patternToDeonticExpr p = case p of
   PatVar _ n ->
     let nm = rawNameToText (rawName (getActual n))
-    in if isLikelyParam nm then DEParam nm else DELiteral nm
+    in if isLikelyParam nm then DEParam nm else DEName nm
+  PatApp _ n [] -> DEName (rawNameToText (rawName (getActual n)))
   _ -> DELiteral (Print.prettyLayout p)
 
 -- | Heuristic: a bare lowercase identifier without surrounding
@@ -1284,6 +1308,7 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
           "__GEQ__"    -> 1
           "__AND__"    -> 1
           "__OR__"     -> 1
+          "__IMPLIES__" -> 1
           "__NOT__"    -> 1
           -- Try the per-fn return-type map FIRST. The typechecker
           -- sometimes attaches an unresolved polymorphic-instance
@@ -1384,19 +1409,19 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
                 Nothing  -> rmap
           in foldExprChildren goE (next + 1) acc' rmap' e
 
-    -- | Recognise the few prelude-desugared shapes whose trace nodes
-    -- need extra synthetic children to match @traceToReasoning@.
+    -- | Recognise the few shapes whose trace nodes the runtime must
+    -- reshape to match @traceToReasoning@.
     specialOf :: Expr Resolved -> Maybe Text
     specialOf (And _ _ _) = Just "AND"
     specialOf (Or _ _ _)  = Just "OR"
-    specialOf (Not _ _)   = Just "NOT"
+    specialOf (Implies _ _ _) = Just "IMPLIES"
     specialOf (Proj _ _ _) = Just "PROJ"
     specialOf (App _ headRes _) =
       case rawNameToText (rawName (getActual headRes)) of
-        "__AND__" -> Just "AND"
-        "__OR__"  -> Just "OR"
-        "__NOT__" -> Just "NOT"
-        _         -> Nothing
+        "__AND__"     -> Just "AND"
+        "__OR__"      -> Just "OR"
+        "__IMPLIES__" -> Just "IMPLIES"
+        _             -> Nothing
     specialOf _ = Nothing
 
     -- | M5 slice 4G — for @Proj record fieldRes@ expressions, bake
@@ -1496,13 +1521,13 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       -> Expr Resolved
       -> ([TraceNode], Map TraceRangeKey (Int, Int), Int)
     foldExprChildren k n a r expr = case expr of
-      And        _ a' b   -> chain2 k n a r a' b
-      Or         _ a' b   -> chain2 k n a r a' b
+      And        _ a' b   -> connective2 k n a r a' b
+      Or         _ a' b   -> connective2 k n a r a' b
       RAnd       _ a' b   -> chain2 k n a r a' b
       ROr        _ a' b   -> chain2 k n a r a' b
-      Implies    _ a' b   -> chain2 k n a r a' b
+      Implies    _ a' b   -> connective2 k n a r a' b
       Equals     _ a' b   -> chain2 k n a r a' b
-      Not        _ x      -> k False n a r x
+      Not        _ x      -> k (isVariable x) n a r x
       Plus       _ a' b   -> chain2 k n a r a' b
       Minus      _ a' b   -> chain2 k n a r a' b
       Times      _ a' b   -> chain2 k n a r a' b
@@ -1515,6 +1540,12 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       Gt         _ a' b   -> chain2 k n a r a' b
       Proj       _ x _    -> k False n a r x
       Lam        _ _ body -> k False n a r body
+      App        _ f [a', b]
+        | getUnique f `elem` [andUnique, orUnique, impliesUnique]
+                          -> connective2 k n a r a' b
+      App        _ f [x]
+        | getUnique f == notUnique
+                          -> k (isVariable x) n a r x
       App        _ _ xs   -> chainList k n a r xs
       AppNamed   _ _ ns _ -> chainList k n a r [e' | MkNamedExpr _ _ e' <- ns]
       -- M5 slice 4A: IF branches are *force*-traceable — jl4-core's
@@ -1564,6 +1595,7 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       -- A refusal has no trace children: it stops evaluation.
       Refuse{}               -> (a, r, n)
       Inert{}                -> (a, r, n)
+      Lifecycle{}            -> (a, r, n)
 
     -- M5 — force-trace a CONSIDER branch body when it's a 'Lit' or
     -- a bare @Var@ ('App' with no args). The Lit case gives the
@@ -1587,6 +1619,21 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
     chain2 k n a r x y =
       let (a1, r1, n1) = k False n  a  r  x
       in              k False n1 a1 r1 y
+
+    -- UNKNOWN-EVALUATION-SPEC §8 step 2 — jl4-core evaluates a built-in
+    -- connective's left operand as a child of the connective, so a
+    -- variable shows in its trace while a TRUE or FALSE constructor is
+    -- pruned as trivial, and its right operand, when it is needed, in
+    -- tail position, as a step of its own that is never pruned. Force-
+    -- trace the operands the same way.
+    connective2 k n a r x y =
+      let (a1, r1, n1) = k (isVariable x) n a r x
+      in              k True n1 a1 r1 y
+
+    -- A bare name that is not the TRUE or FALSE constructor.
+    isVariable :: Expr Resolved -> Bool
+    isVariable (App _ v []) = getUnique v `notElem` [trueUnique, falseUnique]
+    isVariable _            = False
     chainList _ n a r []     = (a, r, n)
     chainList k n a r (x:xs) =
       let (a1, r1, n1) = k False n a r x
@@ -1766,6 +1813,18 @@ exprDisambiguator = \case
   Gt{}         -> Just "Gt"
   Proj{}       -> Just "Proj"
   Lam{}        -> Just "Lam"
+  -- The built-in connectives as calls, which is how type checking leaves
+  -- them, get the surface forms' tags: @NOT p@ shares its 'SrcRange' with
+  -- @p@ when @p@ is a name, and with @p AND q@ in @NOT (p AND q)@, so under
+  -- one "App" tag the operand's entry overwrote the connective's and its
+  -- trace frame opened under the operand's node. A NOT's tag also carries
+  -- its operand's, because in @NOT (NOT p)@ all three share one range.
+  App _ f [x]
+    | getUnique f == notUnique                    -> Just ("Not(" <> fromMaybe "" (exprDisambiguator x) <> ")")
+  App _ f [_, _]
+    | getUnique f == andUnique                    -> Just "And"
+    | getUnique f == orUnique                     -> Just "Or"
+    | getUnique f == impliesUnique                -> Just "Implies"
   App{}        -> Just "App"
   AppNamed{}   -> Just "AppNamed"
   IfThenElse{} -> Just "IfThenElse"
@@ -1919,8 +1978,7 @@ emptyParam t = Parameter
 
 -- | Is this a DEONTIC (contract) return type?
 isDeonticType :: Type' Resolved -> Bool
-isDeonticType (TyApp _ name [_, _]) = getUnique name == contractUnique
-isDeonticType _ = False
+isDeonticType = isContractType
 
 -- | For DEONTIC-returning functions, the HTTP API injects two extra
 -- parameters: @startTime@ (number) and @events@ (array of
@@ -2078,16 +2136,19 @@ instance Aeson.FromJSON FunctionExport where
 --     "hence": <DeonticContract|null>, "lest": <DeonticContract|null> }
 --   { "kind": "FULFILLED" }
 --   { "kind": "BREACH", "by": <string|null>, "because": <string|null> }
+--   (plus "byKind": "name" beside a "by" that is a bare name, as an obligation's
+--   "partyKind" does)
 --   { "kind": "IF", "cond": <DeonticGuard>,
 --     "then": <DeonticContract>, "else": <DeonticContract> }
 instance Aeson.ToJSON DeonticContract where
   toJSON DCFulfilled = Aeson.object ["kind" .= ("FULFILLED" :: Text)]
-  toJSON (DCBreach mBy mBec) = Aeson.object
+  toJSON (DCBreach mBy mBec) = Aeson.object $
     [ "kind"    .= ("BREACH" :: Text)
     , "by"      .= mBy
     , "because" .= mBec
     ]
-  toJSON o@DCObligation{} = Aeson.object
+    <> [ "byKind" .= ("name" :: Text) | Just DEName{} <- [mBy] ]
+  toJSON o@DCObligation{} = Aeson.object $
     [ "kind"     .= ("OBLIGATION" :: Text)
     , "party"    .= o.dcParty
     , "action"   .= o.dcAction
@@ -2096,6 +2157,8 @@ instance Aeson.ToJSON DeonticContract where
     , "hence"    .= o.dcHence
     , "lest"     .= o.dcLest
     ]
+    <> [ "partyKind"  .= ("name" :: Text) | DEName{} <- [o.dcParty] ]
+    <> [ "actionKind" .= ("name" :: Text) | DEName{} <- [o.dcAction] ]
   toJSON o@DCIfThenElse{} = Aeson.object
     [ "kind" .= ("IF" :: Text)
     , "cond" .= o.dcCond
@@ -2108,10 +2171,12 @@ instance Aeson.FromJSON DeonticContract where
     kind <- o .: "kind"
     case (kind :: Text) of
       "FULFILLED" -> pure DCFulfilled
-      "BREACH"    -> DCBreach <$> o .:? "by" <*> o .:? "because"
+      "BREACH"    -> DCBreach
+        <$> (fmap . tagName <$> o .:? "byKind" <*> o .:? "by")
+        <*> o .:? "because"
       "OBLIGATION" -> DCObligation
-        <$> o .: "party"
-        <*> o .: "action"
+        <$> (tagName <$> o .:? "partyKind" <*> o .: "party")
+        <*> (tagName <$> o .:? "actionKind" <*> o .: "action")
         <*> o .: "modal"
         <*> o .:? "deadline"
         <*> o .:? "hence"
@@ -2122,9 +2187,11 @@ instance Aeson.FromJSON DeonticContract where
         <*> o .: "else"
       _ -> fail ("unknown DeonticContract kind: " ++ Text.unpack kind)
 
--- | DeonticExpr ⇄ JSON: literal as a bare string, param ref as
--- '{"param": "<name>"}'. The runtime branches on @typeof@.
+-- | DeonticExpr ⇄ JSON: a name or source as a bare string, a param ref as
+-- '{"param": "<name>"}'. The runtime branches on @typeof@. A name is the same
+-- string as source; 'DeonticContract' says which in a sibling key.
 instance Aeson.ToJSON DeonticExpr where
+  toJSON (DEName    t) = Aeson.toJSON t
   toJSON (DELiteral t) = Aeson.toJSON t
   toJSON (DEParam   t) = Aeson.object ["param" .= t]
 
@@ -2133,6 +2200,12 @@ instance Aeson.FromJSON DeonticExpr where
     Aeson.String t -> pure (DELiteral t)
     Aeson.Object o -> DEParam <$> o .: "param"
     _ -> fail "DeonticExpr: expected string (literal) or {param: name}"
+
+-- | Apply a sibling @partyKind@ \/ @actionKind@ key to the expression it
+-- describes: @"name"@ makes a literal a bare name.
+tagName :: Maybe Text -> DeonticExpr -> DeonticExpr
+tagName (Just "name") (DELiteral t) = DEName t
+tagName _             e             = e
 
 -- | DeonticGuard ⇄ JSON: tagged-record form, mirroring DeonticContract.
 instance Aeson.ToJSON DeonticGuard where

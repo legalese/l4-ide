@@ -1,0 +1,19 @@
+-- l4 batch over a rule that decodes JSON of its own (review M3). The
+-- presumption switch reaches only the request's decode: here the rule's
+-- `Settings` takes its `limit` default in both modes, because no row can
+-- supply it, and under --presumption hard the answer says it rests on it.
+
+DECLARE Settings HAS
+  limit IS A NUMBER TYPICALLY 10
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Settings
+parseSettings s MEANS JSONDECODE s
+
+@export default within limit
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `within limit` amount IF
+  CONSIDER parseSettings "{}"
+    WHEN RIGHT st THEN amount <= st's limit
+    WHEN LEFT e THEN FALSE

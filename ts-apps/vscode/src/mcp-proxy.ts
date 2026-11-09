@@ -683,11 +683,11 @@ export class McpProxy implements vscode.Disposable {
 /*
  * MCP server definition provider (VS Code >= 1.101).
  *
- * Our pinned @types/vscode (^1.95, matching the engines floor we keep
- * for fork compatibility) predates this API, so the shapes below are
- * minimal structural stand-ins and everything is feature-detected at
- * runtime. Once the engines floor moves past 1.101 these can be
- * replaced with the real `vscode.*` types.
+ * These shapes were written when the engines floor was 1.95, before
+ * this API existed, so they are minimal structural stand-ins and
+ * everything is feature-detected at runtime (forks may still lack it).
+ * The floor is now 1.106, so they can be replaced with the real
+ * `vscode.*` types in a later cleanup.
  */
 
 interface McpHttpServerDefinitionLike {

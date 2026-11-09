@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte'
+  import { onDestroy, tick } from 'svelte'
   import type { AiChatStore } from '$lib/stores/ai-chat.svelte'
   import type { AiMentionCandidate } from 'jl4-client-rpc'
   import UsageLine from './usage-line.svelte'
@@ -124,6 +124,11 @@
   }
 
   function onKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Escape' && store.dictationPhase === 'recording') {
+      e.preventDefault()
+      cancelDictation()
+      return
+    }
     if (mentionState) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -189,6 +194,121 @@
   // the extension's size/type validation.
   let attachBusy = $state(false)
   let attachNote = $state<string | null>(null)
+
+  // Voice dictation: click the mic to start, click again to stop and
+  // have the transcript dropped in at the cursor (never auto-sent);
+  // Escape throws the recording away. The whole affordance is absent
+  // when the host can't record, e.g. in a remote workspace.
+  let dictationElapsed = $state(0)
+  let dictationTimer: ReturnType<typeof setInterval> | undefined
+
+  // Dictation failures show as a small bubble above the mic, pointing
+  // at it. It fades out by itself after a few seconds, or right away
+  // when it — or the mic — is clicked.
+  const DICTATION_ERROR_VISIBLE_MS = 6000
+  // Keep in step with the `mic-error-out` animation below.
+  const DICTATION_ERROR_FADE_MS = 250
+  let dictationError = $state<string | null>(null)
+  let dictationErrorLeaving = $state(false)
+  let dictationErrorTimer: ReturnType<typeof setTimeout> | undefined
+
+  function showDictationError(message: string): void {
+    clearTimeout(dictationErrorTimer)
+    dictationError = message
+    dictationErrorLeaving = false
+    dictationErrorTimer = setTimeout(
+      dismissDictationError,
+      DICTATION_ERROR_VISIBLE_MS
+    )
+  }
+
+  function dismissDictationError(): void {
+    if (dictationError === null || dictationErrorLeaving) return
+    clearTimeout(dictationErrorTimer)
+    dictationErrorLeaving = true
+    dictationErrorTimer = setTimeout(() => {
+      dictationError = null
+      dictationErrorLeaving = false
+    }, DICTATION_ERROR_FADE_MS)
+  }
+
+  function stopDictationTimer(): void {
+    if (dictationTimer) clearInterval(dictationTimer)
+    dictationTimer = undefined
+  }
+
+  async function toggleDictation(): Promise<void> {
+    dismissDictationError()
+    if (store.dictationPhase === 'recording') {
+      await finishDictation()
+      return
+    }
+    if (store.dictationPhase !== 'idle') return
+    const res = await store.startDictation()
+    if (!res.ok) {
+      if (res.note) showDictationError(res.note)
+      return
+    }
+    const startedAt = Date.now()
+    dictationElapsed = 0
+    dictationTimer = setInterval(() => {
+      dictationElapsed = Math.floor((Date.now() - startedAt) / 1000)
+      if (dictationElapsed >= store.dictationMaxSeconds) void finishDictation()
+    }, 250)
+  }
+
+  async function finishDictation(): Promise<void> {
+    stopDictationTimer()
+    const res = await store.stopDictation()
+    if (res.note) {
+      showDictationError(res.note)
+    } else if (res.text !== undefined) {
+      const transcript = res.text.trim()
+      if (transcript) insertAtCursor(transcript)
+      else showDictationError('Didn’t catch that.')
+    }
+  }
+
+  function cancelDictation(): void {
+    stopDictationTimer()
+    store.cancelDictation()
+  }
+
+  function formatElapsed(seconds: number): string {
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  }
+
+  /** Splice `insert` into the draft at the caret (replacing any
+   *  selection), padding with a space where it would otherwise butt up
+   *  against a neighbouring word. */
+  function insertAtCursor(insert: string): void {
+    const start = textarea?.selectionStart ?? text.length
+    const end = textarea?.selectionEnd ?? text.length
+    const before = text.slice(0, start)
+    const after = text.slice(end)
+    const lead = before && !/\s$/.test(before) ? ' ' : ''
+    const trail = after && !/^\s/.test(after) ? ' ' : ''
+    text = `${before}${lead}${insert}${trail}${after}`
+    store.setDraft(text)
+    const cursor = before.length + lead.length + insert.length
+    void tick().then(() => {
+      if (!textarea) return
+      textarea.focus()
+      textarea.setSelectionRange(cursor, cursor)
+      autoresize()
+    })
+  }
+
+  // The recording can also end from outside this component (the chat
+  // being hidden, the store resetting) — don't leave the clock running.
+  $effect(() => {
+    if (store.dictationPhase !== 'recording') stopDictationTimer()
+  })
+
+  onDestroy(() => {
+    cancelDictation()
+    clearTimeout(dictationErrorTimer)
+  })
 
   async function pickAttachment(): Promise<void> {
     if (attachBusy) return
@@ -291,20 +411,106 @@
     </div>
   {/if}
 
-  <textarea
-    class="chat-textarea"
-    bind:this={textarea}
-    bind:value={text}
-    oninput={onInput}
-    onkeydown={onKeydown}
-    placeholder={store.pendingQuestion
-      ? 'Answer the question above…'
-      : store.deploymentBinding
-        ? 'Ask anything about your rules…'
-        : 'Ask anything about your rules or L4…'}
-    rows="1"
-    {disabled}
-  ></textarea>
+  <div class="textarea-row">
+    <textarea
+      class="chat-textarea"
+      class:has-mic={store.dictationAvailable}
+      class:mic-recording={store.dictationPhase === 'recording'}
+      bind:this={textarea}
+      bind:value={text}
+      oninput={onInput}
+      onkeydown={onKeydown}
+      placeholder={store.dictationPhase === 'recording'
+        ? 'Listening…'
+        : store.dictationPhase === 'transcribing'
+          ? 'Transcribing…'
+          : store.pendingQuestion
+            ? 'Answer the question above…'
+            : store.deploymentBinding
+              ? 'Ask anything about your rules…'
+              : 'Ask anything about your rules or L4…'}
+      rows="1"
+      {disabled}
+    ></textarea>
+    {#if store.dictationAvailable}
+      <!-- Sits on the placeholder line, in the same column as the
+           send button below it. -->
+      <div class="mic-slot">
+        {#if dictationError}
+          <div class="mic-error-anchor" role="alert">
+            <button
+              type="button"
+              class="mic-error"
+              class:leaving={dictationErrorLeaving}
+              title="Dismiss"
+              onclick={dismissDictationError}>{dictationError}</button
+            >
+          </div>
+        {/if}
+        {#if store.dictationPhase === 'recording'}
+          <span class="mic-elapsed" aria-hidden="true"
+            >{formatElapsed(dictationElapsed)}</span
+          >
+        {/if}
+        <button
+          type="button"
+          class="icon-btn mic-btn"
+          class:recording={store.dictationPhase === 'recording'}
+          title={store.dictationPhase === 'recording'
+            ? 'Stop and transcribe (Esc to cancel)'
+            : store.dictationPhase === 'transcribing'
+              ? 'Transcribing…'
+              : 'Dictate'}
+          aria-label={store.dictationPhase === 'recording'
+            ? 'Stop dictation'
+            : 'Dictate'}
+          aria-pressed={store.dictationPhase === 'recording'}
+          disabled={disabled ||
+            store.dictationPhase === 'starting' ||
+            store.dictationPhase === 'transcribing'}
+          onclick={toggleDictation}
+          onkeydown={onKeydown}
+        >
+          {#if store.dictationPhase === 'recording'}
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <rect
+                x="4.5"
+                y="4.5"
+                width="7"
+                height="7"
+                rx="1.5"
+                fill="currentColor"
+              />
+            </svg>
+          {:else if store.dictationPhase === 'transcribing'}
+            <svg class="mic-spinner" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M8 2.5a5.5 5.5 0 1 1-5.5 5.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                fill="none"
+                stroke-linecap="round"
+              />
+            </svg>
+          {:else}
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="6" y="2" width="4" height="7.5" rx="2" />
+              <path d="M3.5 7.5a4.5 4.5 0 0 0 9 0" />
+              <path d="M8 12v2" />
+            </svg>
+          {/if}
+        </button>
+      </div>
+    {/if}
+  </div>
 
   <UsageLine used={store.usedToday} limit={store.dailyLimit} />
 
@@ -535,6 +741,133 @@
   .chat-textarea:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  /* Keep typed text clear of the mic button (and, while recording, the
+     elapsed-time readout beside it). */
+  .chat-textarea.has-mic {
+    padding-right: 40px;
+  }
+  .chat-textarea.has-mic.mic-recording {
+    padding-right: 72px;
+  }
+  .textarea-row {
+    position: relative;
+    display: flex;
+  }
+  /* Right inset matches the action bar's, so the mic lines up with the
+     send button; top centres it on the textarea's first line. */
+  .mic-slot {
+    position: absolute;
+    top: 5px;
+    right: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .mic-elapsed {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--vscode-descriptionForeground);
+  }
+  /* Error bubble: floats above the mic, right edges aligned, with a
+     tail pointing down at the button's centre. Uses the theme's input
+     validation colours — VSCode's own idiom for an error attached to
+     an input. */
+  .mic-error-anchor {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 9px);
+    z-index: 10;
+  }
+  .mic-error {
+    position: relative;
+    display: block;
+    width: max-content;
+    max-width: min(260px, calc(100vw - 40px));
+    padding: 6px 9px;
+    border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+    border-radius: 6px;
+    background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+    color: var(
+      --vscode-inputValidation-errorForeground,
+      var(--vscode-foreground)
+    );
+    font-family: var(--vscode-font-family, inherit);
+    font-size: 12px;
+    line-height: 1.4;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    animation: mic-error-in 0.15s ease-out;
+  }
+  /* The tail: a rotated square showing its bottom-right corner, 14px in
+     from the right — the middle of the 28px mic button. */
+  .mic-error::after {
+    content: '';
+    position: absolute;
+    right: 10px;
+    bottom: -5px;
+    width: 8px;
+    height: 8px;
+    background: inherit;
+    border: inherit;
+    border-top: none;
+    border-left: none;
+    border-radius: 0 0 2px 0;
+    transform: rotate(45deg);
+  }
+  .mic-error.leaving {
+    animation: mic-error-out 0.25s ease-in forwards;
+  }
+  @keyframes mic-error-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @keyframes mic-error-out {
+    to {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  .mic-btn:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+  .mic-btn.recording {
+    color: var(--vscode-errorForeground, #f14c4c);
+    animation: mic-pulse 1.6s ease-in-out infinite;
+  }
+  .mic-btn.recording:hover:not(:disabled) {
+    color: var(--vscode-errorForeground, #f14c4c);
+  }
+  .mic-spinner {
+    animation: mic-spin 0.9s linear infinite;
+  }
+  @keyframes mic-pulse {
+    0%,
+    100% {
+      background: rgba(241, 76, 76, 0.12);
+    }
+    50% {
+      background: rgba(241, 76, 76, 0.28);
+    }
+  }
+  @keyframes mic-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mic-btn.recording {
+      animation: none;
+      background: rgba(241, 76, 76, 0.2);
+    }
+    .mic-error,
+    .mic-error.leaving {
+      animation: none;
+    }
   }
   .action-bar {
     display: flex;

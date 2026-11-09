@@ -1,0 +1,67 @@
+-- governor-disqualification-example.l4
+-- A reviewed AI draft of Article 19(1) of the Charities (Jersey) Law 2014.
+
+IMPORT prelude
+
+§ `Article 19 - Disqualification of governors`
+
+{-
+(1) A person is disqualified from acting as a governor of a charity if -
+    (a) the person is an undischarged bankrupt;
+    (b) the person has an unspent conviction for an offence involving
+        dishonesty or deception;
+    (c) the person is disqualified from acting as a company director; or
+    (d) the person is subject to a disqualification order under Article 23.
+-}
+
+DECLARE Conviction
+    HAS `offence`                               IS A STRING
+        `is spent`                              IS A BOOLEAN
+        `involves dishonesty or deception`      IS A BOOLEAN
+
+DECLARE Person
+    HAS `name`                                  IS A STRING
+        `is an undischarged bankrupt`           IS A BOOLEAN
+        `convictions`                           IS A LIST OF Conviction
+        `is disqualified as a company director` IS A BOOLEAN
+        `disqualification orders`               IS A LIST OF STRING
+
+-- Article 19(1)(b)
+GIVEN `the person` IS A Person
+GIVETH A BOOLEAN
+`has an unspent conviction for dishonesty` MEANS
+    any (GIVEN `the conviction` YIELD
+                `the conviction`'s `involves dishonesty or deception`
+            AND NOT `the conviction`'s `is spent`)
+        (`the person`'s `convictions`)
+
+-- Article 19(1)
+GIVEN `the person` IS A Person
+GIVETH A BOOLEAN
+DECIDE `is disqualified from acting as a governor` IF
+        `the person`'s `is an undischarged bankrupt`              -- (a)
+    OR  `has an unspent conviction for dishonesty` `the person`   -- (b)
+    OR  `the person`'s `is disqualified as a company director`    -- (c)
+    OR  NOT null (`the person`'s `disqualification orders`)       -- (d)
+
+§§ `Tests`
+
+`Dana` MEANS Person WITH
+    `name`                                  IS "Dana"
+    `is an undischarged bankrupt`           IS FALSE
+    `convictions`                           IS LIST Conviction "theft" FALSE TRUE
+    `is disqualified as a company director` IS FALSE
+    `disqualification orders`               IS EMPTY
+
+`Eli` MEANS Person WITH
+    `name`                                  IS "Eli"
+    `is an undischarged bankrupt`           IS FALSE
+    `convictions`                           IS LIST Conviction "theft" TRUE TRUE
+    `is disqualified as a company director` IS FALSE
+    `disqualification orders`               IS EMPTY
+
+-- (b): an unspent conviction for theft disqualifies.
+#ASSERT `is disqualified from acting as a governor` `Dana`
+
+-- A spent conviction does not.
+#ASSERT NOT `is disqualified from acting as a governor` `Eli`

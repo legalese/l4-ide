@@ -1,15 +1,14 @@
-# DateTime Library
+# datetime
 
-Absolute points in time combining date, time, and timezone for legal deadlines and cross-timezone comparisons. Stored internally as UTC; extractors return local values in the stored timezone.
-Can be imported into L4 files with `IMPORT datetime`. Automatically imports `daydate` for date operations.
+Absolute points in time: a date, a time of day and a time zone together, for deadlines that fall at a particular moment and for comparisons across time zones. Import it with `IMPORT datetime`. Import `daydate` and `time` as well if you also build `DATE` or `TIME` values with `Date` and `Time`.
 
-### Location
+A DATETIME is stored as a moment in UTC together with its IANA time zone name. The functions that read it give local values in that time zone.
 
-[jl4-core/libraries/datetime.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/datetime.l4)
+**Example:** [datetime-example.l4](datetime-example.l4)
 
-### Prerequisites
+## The document time zone
 
-Requires a `TIMEZONE IS` declaration in the document when using constructors without an explicit timezone parameter. Use with the [timezone](timezone.md) library for convenient timezone constants.
+The forms of `Datetime` without a time zone use the document's time zone, so the file needs a `TIMEZONE IS` line. The [timezone](timezone.md) library has constants for common zones:
 
 ```l4
 IMPORT datetime
@@ -18,77 +17,55 @@ IMPORT timezone
 TIMEZONE IS SGT
 ```
 
-### Features
+## Building a DATETIME
 
-- DateTime construction with flexible overloads (date + time, numbers in DMY order, or ISO-8601 strings)
-- Automatic use of document `TIMEZONE IS` declaration
-- Explicit timezone override per value using IANA timezone strings
-- Date, time, and timezone extraction from DateTime values
-- Time-of-day predicates (morning, afternoon, evening)
-- Cross-timezone comparison (UTC-based equality)
-- Relative datetime operations (at midnight, at noon, at specific time)
-- ISO-8601 string parsing for JSON interoperability
+Every form below also takes a time zone as a last input, an IANA name such as `"Europe/Paris"`, to use instead of the document's.
 
-### Key Functions
+| Function                | Gives          | What it does                                         |
+| ----------------------- | -------------- | ---------------------------------------------------- |
+| `Datetime` date time    | DATETIME       | A DATE and a TIME                                    |
+| `Datetime` date h m s   | DATETIME       | A DATE and the hour, minute and second               |
+| `Datetime` date         | DATETIME       | Midnight at the start of the date                    |
+| `Datetime` d m y h mn s | DATETIME       | Day, month, year, hour, minute and second            |
+| `Datetime` d m y h mn   | DATETIME       | Seconds are 0                                        |
+| `Datetime` d m y h      | DATETIME       | Minutes and seconds are 0                            |
+| `Datetime` d m y        | DATETIME       | Midnight on that day                                 |
+| `Datetime` m y          | DATETIME       | Midnight on the 1st of the month                     |
+| `Datetime` y            | DATETIME       | Midnight on 1 January                                |
+| `Datetime` text         | MAYBE DATETIME | Reads ISO 8601 text such as `"2024-06-15T10:30:00Z"` |
+| `Datetime` text tz      | MAYBE DATETIME | The same, shown in the time zone `tz`                |
 
-**DateTime Construction (from DATE/TIME):**
+The number forms take the day before the month, as in `Datetime 15 6 2024 10 30 0`.
 
-- `Datetime date time` - Date + time in document timezone
-- `Datetime date time tz` - Date + time in explicit IANA timezone
-- `Datetime date h m s` - Date + hours/minutes/seconds in document timezone
-- `Datetime date h m s tz` - Date + hours/minutes/seconds in explicit timezone
-- `Datetime date` - Date at midnight in document timezone
-- `Datetime date tz` - Date at midnight in explicit timezone
+## Reading a DATETIME
 
-**DateTime Construction (from numbers, DMY order):**
+| Function                                                        | Gives   | What it does                                                |
+| --------------------------------------------------------------- | ------- | ----------------------------------------------------------- |
+| `Date of` dt                                                    | DATE    | The local date                                              |
+| `Time of` dt                                                    | TIME    | The local time of day                                       |
+| `Timezone of` dt                                                | STRING  | The IANA time zone name                                     |
+| `the hour of` dt                                                | NUMBER  | Local hour, 0 to 23                                         |
+| `the minute of` dt                                              | NUMBER  | Local minute                                                |
+| `the second of` dt                                              | NUMBER  | Local second                                                |
+| `the day of` dt                                                 | NUMBER  | Local day of the month                                      |
+| `the month of` dt                                               | NUMBER  | Local month                                                 |
+| `the year of` dt                                                | NUMBER  | Local year                                                  |
+| dt `` `Datetime to serial` ``                                   | NUMBER  | A serial number counted in UTC                              |
+| dt `` `is morning` ``, `` `is afternoon` ``, `` `is evening` `` | BOOLEAN | Before 12:00; 12:00 to 17:59; 18:00 or later, in local time |
+| dt `` `is before noon` ``, `` `is after noon` ``                | BOOLEAN | Before 12:00; 12:00 or later                                |
 
-- `Datetime d m y h mn s` - Day, month, year, hour, minute, second in document timezone
-- `Datetime d m y h mn s tz` - Same with explicit timezone
-- `Datetime d m y h mn` - Seconds default to 0
-- `Datetime d m y h` - Minutes and seconds default to 0
-- `Datetime d m y` - Midnight in document timezone
-- `Datetime m y` - 1st of month, midnight
-- `Datetime y` - January 1st, midnight
+## Moving a DATETIME
 
-All number-based constructors accept an optional trailing `tz` (STRING) for explicit timezone.
+| Function           | Gives    | What it does                                  |
+| ------------------ | -------- | --------------------------------------------- |
+| `at midnight` dt   | DATETIME | The same date at 00:00, in the same time zone |
+| `at noon` dt       | DATETIME | The same date at 12:00                        |
+| dt `` `at` `` time | DATETIME | The same date at another time of day          |
 
-**DateTime Construction (from strings, returns MAYBE DATETIME):**
+## Comparing DATETIME values
 
-- `Datetime str` - Parse ISO-8601 string (e.g. `"2024-06-15T10:30:00Z"`)
-- `Datetime str tz` - Parse ISO-8601 string with explicit display timezone
+Comparisons use the moment in UTC, so 09:00 in Singapore is before 09:00 in London on the same day.
 
-**DateTime Extractors:**
-
-- `Date of` dt - Get the date component
-- `Time of` dt - Get the time component (local)
-- `Timezone of` dt - Get the IANA timezone name
-- `the hour of` dt, `the minute of` dt, `the second of` dt
-- `the day of` dt, `the month of` dt, `the year of` dt
-
-**DateTime Serial:**
-
-- dt `Datetime to serial` - UTC-based serial number
-
-**Predicates:**
-
-- `is morning`, `is afternoon`, `is evening`
-- `is before noon`, `is after noon`
-
-**Relative Operations:**
-
-- `at midnight` dt - Same date, midnight
-- `at noon` dt - Same date, noon
-- dt `at` time - Same date, different time
-
-**Comparators:**
-
-- `the earlier of` dt1 dt2
-- `the later of` dt1 dt2
-- dt1 `is before` dt2, dt1 `is after` dt2
-- Standard comparison operators: LESS THAN, GREATER THAN, AT MOST, AT LEAST
-
-### Example: DateTime Operations
-
-[datetime-example.l4](datetime-example.l4)
-
-**See [datetime.l4](https://github.com/legalese/l4-ide/blob/main/jl4-core/libraries/datetime.l4) source for all functions.**
+- `=`, `<`, `<=`, `>`, `>=` and their word forms compare two DATETIME values.
+- dt1 `` `is before` `` dt2 and dt1 `` `is after` `` dt2 read as sentences.
+- `` `the earlier of` `` dt1 dt2 and `` `the later of` `` dt1 dt2 pick one of two values.
