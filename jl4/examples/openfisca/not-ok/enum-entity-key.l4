@@ -1,0 +1,19 @@
+-- An enum named `citizen`, and a record `Citizen`, whose entity key is also
+-- `citizen`. Inside a formula `citizen` is the entity argument, so the enum
+-- could not be read there. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE citizen IS ONE OF single, married
+
+DECLARE Citizen HAS status IS A citizen
+
+@export Allowance
+GIVEN c      IS A Citizen
+      period IS A STRING
+GIVETH A NUMBER
+`allowance` c period MEANS
+    CONSIDER c's status
+    WHEN single THEN 10
+    OTHERWISE 20
+
+#ASSERT (`allowance` OF (Citizen WITH status IS married), "2026-01") EQUALS 20

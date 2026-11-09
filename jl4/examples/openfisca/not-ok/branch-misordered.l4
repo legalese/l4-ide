@@ -21,3 +21,7 @@ GIVETH A NUMBER
         IF `period reaches` OF period, 2015, 1 THEN 10
         IF `period reaches` OF period, 2017, 1 THEN 20
         OTHERWISE 0
+
+-- L4 takes the first arm that holds, so from 2017 on it still answers 10;
+-- OpenFisca would pick the latest dated formula and answer 20.
+#ASSERT (`thing` OF (Person WITH salary IS 0), (Period WITH year IS 2018, month IS 1)) EQUALS 10

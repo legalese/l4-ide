@@ -1,0 +1,22 @@
+-- Two @desc parameters at the same path. They would overwrite each other in
+-- the emitted parameter tree, so one decision would read the other's value.
+-- The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@desc parameter taxes.rate
+GIVETH A NUMBER
+`low rate` MEANS 10
+
+@desc parameter taxes.rate
+GIVETH A NUMBER
+`high rate` MEANS 20
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`tax` p period MEANS `low rate` PLUS `high rate`
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), "2026-01") EQUALS 30

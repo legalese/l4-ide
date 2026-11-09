@@ -1,0 +1,17 @@
+-- A decision input (a GIVEN other than the subject and the period) whose type
+-- is a record. It would become an OpenFisca input variable, which has no
+-- value type for a record, even though this body never reads it. The export
+-- must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Rates HAS rate IS A NUMBER
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A STRING
+      r      IS A Rates
+GIVETH A NUMBER
+`tax` p period r MEANS p's salary TIMES 0.1
+
+#ASSERT (`tax` OF (Person WITH salary IS 1000), "2026-01", (Rates WITH rate IS 0.5)) EQUALS 100

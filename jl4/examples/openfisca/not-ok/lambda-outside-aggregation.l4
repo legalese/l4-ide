@@ -1,0 +1,14 @@
+-- A lambda over a list that is not a group's members. The export compiles a
+-- lambda only as the per-member function of sum, any or all over a group
+-- entity's members, and must REFUSE any other.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export Whether every listed amount is positive
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A BOOLEAN
+`all positive` p period MEANS all (GIVEN x YIELD x GREATER THAN 0) (LIST (p's salary), 3)
+
+#ASSERT (`all positive` OF (Person WITH salary IS 4), "2026-01") EQUALS TRUE

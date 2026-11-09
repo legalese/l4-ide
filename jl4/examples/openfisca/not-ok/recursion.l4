@@ -1,0 +1,14 @@
+-- A decision that calls itself. L4 stops at the base case; OpenFisca
+-- evaluates both branches of np.where, so the formula always fails with
+-- CycleError. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export F
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`f` p period MEANS IF p's salary GREATER THAN 100 THEN 1 ELSE `f` OF p, period
+
+#ASSERT (`f` OF (Person WITH salary IS 500), "2026-01") EQUALS 1

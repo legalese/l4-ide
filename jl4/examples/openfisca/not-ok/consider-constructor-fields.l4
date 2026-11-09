@@ -1,0 +1,22 @@
+-- CONSIDER over an enum whose constructor carries a field (`Employed w`).
+-- An OpenFisca Enum cannot carry fields, and the arm that binds one used to
+-- be dropped, so OpenFisca returned the OTHERWISE value. The export must
+-- REFUSE it.
+IMPORT prelude
+
+DECLARE Status IS ONE OF
+    Unemployed
+    Employed HAS wage IS A NUMBER
+
+DECLARE Person HAS status IS A Status
+
+@export Allowance
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`allowance` p period MEANS
+    CONSIDER p's status
+    WHEN Employed w THEN 100
+    OTHERWISE 0
+
+#ASSERT (`allowance` OF (Person WITH status IS Employed OF 5), "2026-01") EQUALS 100

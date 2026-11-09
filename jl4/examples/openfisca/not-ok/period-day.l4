@@ -1,0 +1,16 @@
+-- A read of a period field other than `year` and `month`. The export lowers
+-- `period's year` to period.start.year and `period's month` to
+-- period.start.month; any other field has no OpenFisca meaning. The export
+-- must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER, day IS A NUMBER
+
+@export Day of the period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`day` p period MEANS period's day
+
+#ASSERT (`day` OF (Person WITH salary IS 0), (Period WITH year IS 2026, month IS 1, day IS 15)) EQUALS 15

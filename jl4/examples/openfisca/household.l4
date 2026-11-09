@@ -23,7 +23,8 @@ GIVETH A NUMBER
 `household income` h period MEANS
   sum (map (GIVEN m YIELD m's salary) (h's members))
 
-#EVAL `household income`
-        (Household WITH members IS LIST (Person WITH name IS "A", salary IS 1000),
-                                        (Person WITH name IS "B", salary IS 1500))
-        "2026-01"   -- expect 2500
+`two earners` MEANS
+    Household WITH members IS LIST (Person WITH name IS "A", salary IS 1000),
+                                   (Person WITH name IS "B", salary IS 1500)
+
+#ASSERT (`household income` OF `two earners`, "2026-01") EQUALS 2500

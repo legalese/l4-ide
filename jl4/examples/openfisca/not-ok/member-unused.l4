@@ -1,0 +1,15 @@
+-- An aggregation whose per-member expression never reads the member.
+-- OpenFisca aggregates a per-member array; a constant there is not one. The
+-- export must REFUSE it (count the members with `count` instead).
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Household HAS members IS A LIST OF Person
+
+@export One per member
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`headcount` h period MEANS sum (map (GIVEN m YIELD 1) (h's members))
+
+#ASSERT (`headcount` OF (Household WITH members IS (LIST (Person WITH salary IS 1), (Person WITH salary IS 2))), "2026-01") EQUALS 2

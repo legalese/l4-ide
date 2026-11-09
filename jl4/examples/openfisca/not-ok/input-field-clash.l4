@@ -1,0 +1,16 @@
+-- A decision input with the same name as a field of the subject. Both would
+-- become the one OpenFisca input variable `salary`, so no situation could
+-- give them the different values L4 gives them (100 and 5 here). The export
+-- must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export Salary plus a bonus input that is also called salary
+GIVEN p      IS A Person
+      salary IS A NUMBER
+      period IS A STRING
+GIVETH A NUMBER
+`total` p salary period MEANS salary PLUS (p's salary TIMES 2)
+
+#ASSERT (`total` OF (Person WITH salary IS 100), 5, "2026-01") EQUALS 205

@@ -1,0 +1,20 @@
+-- A @desc parameter path that is Python code. The path is spliced into the
+-- emitted formula as parameters(period).<path>, so this used to run a shell
+-- command when OpenFisca computed `tax`. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@desc parameter __class__(__import__('os').system('echo${IFS}INJECTED'))
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`flat amount` MEANS IF y AT LEAST 2015 THEN 200 ELSE 100
+
+@export Tax for a period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`tax` p period MEANS `flat amount` OF period's year
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), (Period WITH year IS 2016, month IS 1)) EQUALS 200

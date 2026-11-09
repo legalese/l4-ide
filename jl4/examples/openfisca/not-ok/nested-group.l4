@@ -1,0 +1,16 @@
+-- A group whose member record is itself a group (a Household of Families of
+-- Persons). OpenFisca entities are one level deep: a group's members are
+-- persons. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Family HAS parents IS A LIST OF Person
+DECLARE Household HAS families IS A LIST OF Family
+
+@export Number of families
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`number of families` h period MEANS count (h's families)
+
+#ASSERT (`number of families` OF (Household WITH families IS (LIST (Family WITH parents IS (LIST (Person WITH salary IS 1))))), "2026-01") EQUALS 1

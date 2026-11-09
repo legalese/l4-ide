@@ -1,0 +1,21 @@
+-- A parameter guard written with GREATER THAN. For whole years,
+-- y GREATER THAN 2015 is y AT LEAST 2016, so the 200 value must be dated
+-- 2016-01-01 (it used to be dated 2015, a year early).
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@desc parameter taxes.flat
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`flat amount` MEANS IF y GREATER THAN 2015 THEN 200 ELSE 100
+
+@export Tax for a period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`tax` p period MEANS `flat amount` OF period's year
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), (Period WITH year IS 2015, month IS 6)) EQUALS 100
+#ASSERT (`tax` OF (Person WITH salary IS 0), (Period WITH year IS 2016, month IS 6)) EQUALS 200
