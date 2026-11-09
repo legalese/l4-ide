@@ -33,6 +33,16 @@ prettyLayout a = docText $ printWithLayout a
 docText :: Doc ann -> Text
 docText = renderStrict . layoutPretty (LayoutOptions Unbounded)
 
+-- | A name as 'prettyLayout' spells it, with no @\@nlg@ annotation after it.
+--
+-- For a caller that shows a name as a LABEL, or compares it with a name a
+-- client sent, rather than writing it back as source: a ladder diagram's node,
+-- the function a visualisation is looked up by, a value in the inspector. Those
+-- printed through 'prettyLayout' until it began re-emitting annotations, and
+-- this keeps what they print unchanged. See 'inlineNlgOf'.
+prettyBareName :: (LayoutPrinter a, HasName a) => a -> Text
+prettyBareName = docText . bareName
+
 -- | A map from constructor 'Unique' to its field names (in order).
 -- Used for pretty-printing constructor values with named fields.
 type ConstructorFieldNames = Map Unique [Text]

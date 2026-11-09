@@ -44,7 +44,7 @@ import qualified L4.TypeCheck as TC
 import L4.Viz.Ladder (InputRef(..), generateAtomId)
 import L4.Annotation
 import L4.Syntax
-import L4.Print (prettyLayout)
+import L4.Print (prettyBareName, prettyLayout)
 import qualified L4.Transform as Transform (simplify, inlineLetsForViz, letInliningNodeBudget, clauseGroupLadderBudget, holdsGeneratedNodes, writtenAsClauses)
 import LSP.L4.Viz.VizExpr
   ( ID (..), IRExpr,
@@ -489,7 +489,7 @@ leafFromExpr expr = do
 ------------------------------------------------------
 
 mkPrettyVizName :: Resolved -> V.Name
-mkPrettyVizName = mkVizNameWith prettyLayout
+mkPrettyVizName = mkVizNameWith prettyBareName
 
 -- It's not obvious to me that we want to be using
 -- getOriginal (as getUniqueName does), instead of getActual,

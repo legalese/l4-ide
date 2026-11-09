@@ -18,7 +18,7 @@ import Data.Ratio (numerator, denominator)
 import GHC.TypeLits (Symbol)
 import Language.LSP.Protocol.Types as LSP
 import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
-import L4.Print (prettyLayout, prettyTypeForDisplay, ConstructorFieldNames)
+import L4.Print (prettyBareName, prettyTypeForDisplay, ConstructorFieldNames)
 import L4.Annotation (Anno_(..))
 import L4.Syntax (getActual, Declare, Decide(..), AppForm(..), Resolved)
 
@@ -177,15 +177,15 @@ valueToJson = \case
   Val.ValNil -> Aeson.toJSON ([] :: [Aeson.Value])
   Val.ValCons hd tl -> Aeson.toJSON (consToList hd tl)
   Val.ValConstructor resolved args ->
-    let name = prettyLayout (getActual resolved)
+    let name = prettyBareName (getActual resolved)
     in case args of
       [] -> case Text.toUpper name of
         "TRUE"  -> Aeson.toJSON True
         "FALSE" -> Aeson.toJSON False
         _       -> Aeson.String name
       _  -> Aeson.object [Aeson.fromText name .= Aeson.toJSON (map nfToJson args)]
-  Val.ValUnappliedConstructor resolved -> Aeson.String (prettyLayout (getActual resolved))
-  Val.ValAssumed resolved -> Aeson.object ["$assumed" .= prettyLayout (getActual resolved)]
+  Val.ValUnappliedConstructor resolved -> Aeson.String (prettyBareName (getActual resolved))
+  Val.ValAssumed resolved -> Aeson.object ["$assumed" .= prettyBareName (getActual resolved)]
   -- Closures and builtins cannot be meaningfully serialized
   Val.ValClosure{} -> Aeson.String "<function>"
   Val.ValNullaryBuiltinFun{} -> Aeson.String "<builtin>"

@@ -21,6 +21,7 @@ module PrettyLayoutNlgSpec (spec) where
 import Base
 import qualified Data.Text as T
 
+import L4.API (l4CodeLenses, l4VisualizeByName)
 import L4.Annotation (getAnno)
 import L4.Nlg (simpleLinearizer)
 import L4.Parser (execProgramParserWithHintPass)
@@ -162,3 +163,31 @@ spec = describe "prettyLayout re-emits @nlg annotations (#966)" $ do
     "GIVEN r IS A NUMBER\n\
     \GIVETH A NUMBER\n\
     \`note on` r [see s.3\\q here] MEANS r TIMES 1\n"
+
+  -- The other side of the same change. A name is also printed where it is a
+  -- LABEL, or a key a client looks something up by, and there the annotation
+  -- is noise: a ladder diagram's nodes, and the function a visualisation is
+  -- found by, print through 'L4.Print.prettyBareName' and say what they said
+  -- before the printer re-emitted annotations. Measured before that: the code
+  -- lens named this rule "`may proceed` [the claim for %amount% may proceed]",
+  -- the inputs read "amount [the amount claimed]", and asking for
+  -- "`may proceed`" answered "not found".
+  describe "a name shown as a label carries no @nlg" $ do
+    let src =
+          "GIVEN amount [the amount claimed] IS A NUMBER\n\
+          \      urgent @nlg the matter is urgent\n\
+          \             IS A BOOLEAN\n\
+          \GIVETH A BOOLEAN\n\
+          \DECIDE `may proceed` @nlg the claim for %amount% may proceed\n\
+          \  IF amount GREATER THAN 100 AND urgent\n"
+    it "names the rule in its code lens without its wording" $ do
+      let lenses = l4CodeLenses src "file:///pretty-layout-nlg-spec" 0
+      lenses `shouldSatisfy` T.isInfixOf "\"`may proceed`\""
+      lenses `shouldNotSatisfy` T.isInfixOf "the claim for"
+    it "finds the rule by that name, and labels its inputs without their wording" $ do
+      let viz = l4VisualizeByName src "file:///pretty-layout-nlg-spec" 0 "`may proceed`" False
+      viz `shouldNotSatisfy` T.isInfixOf "notFound"
+      viz `shouldSatisfy` T.isInfixOf "\"label\":\"amount\""
+      viz `shouldSatisfy` T.isInfixOf "\"label\":\"urgent\""
+      viz `shouldNotSatisfy` T.isInfixOf "the amount claimed"
+      viz `shouldNotSatisfy` T.isInfixOf "the matter is urgent"
