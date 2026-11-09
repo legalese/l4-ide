@@ -4,7 +4,7 @@
 `SQRT` with 4
 `EXPONENT` with 2 and 10
 `EXPONENT` with 10 and 309
-`EXPONENT` with 2 and 1023
+`EXPONENT` with 2 and 1023 is greater than the product of 8 and `EXPONENT` with 10 and 307
 `DATE_FROM_SERIAL` with -0.5
 `DATE_FROM_SERIAL` with -1
 `EXPONENT` with -8 and the result of dividing 1 by 3
