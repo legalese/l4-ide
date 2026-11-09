@@ -4306,19 +4306,19 @@ spec bin = do
         `shouldReturn` Number 2
 
   -- `l4 batch` prints the checked module back and checks it again beside a
-  -- generated record with a field for each input. An annotation that names an
-  -- input (`%a%`) would then have two candidates and no expected type to choose
-  -- between them, and `main`'s checker refuses that ("multiple definitions").
-  -- `prettyLayout` writes no annotation back, so the row runs; this pins it.
+  -- generated record with a field for each input. `prettyLayout` writes the
+  -- annotation back, `%a%` included, which could give `%a%` two candidates,
+  -- the input and the field; measured, the row still runs, and this pins it.
   describe "l4 batch runs an export whose annotation names its input" $
     it "answers instead of refusing the printed module" $
       batchAnswer bin (fixtureDir </> "batch-nlg-input-slot.l4") (fixtureDir </> "batch-nlg-input-slot.json") "is large"
         `shouldReturn` Bool True
 
   -- An `@nlg` annotation is wording for the reader of a rule, not part of what
-  -- the rule evaluates to. `prettyLayout` prints evaluation results, and it
-  -- writes no annotation back; a printer that did would put `[a red colour]`
-  -- inside `Shape OF Red [a red colour], 3`.
+  -- the rule evaluates to. `prettyLayout` writes annotations back when it
+  -- prints source, and prints an evaluation result without them; a value
+  -- printer that kept them would put `[a red colour]` inside
+  -- `Shape OF Red [a red colour], 3`.
   describe "l4 run prints a value without its annotations" $ do
     let runOut = do
           Output code sout0 _ <- runL4 bin ["run", fixtureDir </> "annotated-values.l4"]
