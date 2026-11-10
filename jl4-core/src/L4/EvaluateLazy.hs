@@ -51,7 +51,6 @@ import Control.Exception (try, evaluate, ErrorCall)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
-import Text.Read (readMaybe)
 import qualified Data.Aeson as Aeson
 
 -----------------------------------------------------------------------------
@@ -559,10 +558,15 @@ readMaxFrameDepthEnv = do
   menv <- lookupEnv "JL4_MAX_FRAME_DEPTH"
   pure $ fromMaybe maximumFrameDepth (menv >>= parseMaxFrameDepth)
 
--- | Read as an 'Integer' first: read as an 'Int', 2^64 + 1 wraps to 1.
+-- | Only ASCII decimal digits, with no leading zero, from 1 to the largest
+-- 'Int'. 'readMaybe' alone reads Haskell syntax (@0x12C@, @(300)@, @ 300@),
+-- and read as an 'Int', 2^64 + 1 wraps to 1, so the digits are checked first
+-- and the number is read as an 'Integer'.
 parseMaxFrameDepth :: String -> Maybe Int
-parseMaxFrameDepth s = case readMaybe s :: Maybe Integer of
-  Just n | n >= 1, n <= toInteger (maxBound :: Int) -> Just (fromInteger n)
+parseMaxFrameDepth s = case s of
+  c : _ | c /= '0', all (\d -> d >= '0' && d <= '9') s
+        , n <- read s :: Integer
+        , n <= toInteger (maxBound :: Int) -> Just (fromInteger n)
   _ -> Nothing
 
 -- TODO: This currently allocates the initial environment once per module.
