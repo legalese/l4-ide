@@ -15,7 +15,11 @@
 `EXPONENT` with the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200 and 0.5
 `EXPONENT` with the result of dividing 1 by (the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200) and (0 minus 0.5)
 `EXPONENT` with 1.5 and the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200
-`EXPONENT` with the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200 and (0 minus 0.5)
 `SQRT` with the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200
 `SIN` with the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200
 `LN` with the result of dividing 1 by (the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200)
+`ATAN` with the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200 is greater than 1.57
+`EXPONENT` with the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200 and 0
+`EXPONENT` with 1 and the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200
+`EXPONENT` with 0 and the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200
+`EXPONENT` with the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200 and (0 minus 0.5)

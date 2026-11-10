@@ -24,10 +24,13 @@
 #EVAL EXPONENT (EXPONENT 10 200 * EXPONENT 10 200) 0.5                -- caught: the base is past the range
 #EVAL EXPONENT (1 / (EXPONENT 10 200 * EXPONENT 10 200)) (0 - 0.5)    -- caught: the base is too close to 0
 #EVAL EXPONENT 1.5 (EXPONENT 10 200 * EXPONENT 10 200)                -- caught: the power is past the range
--- An input past the range raises even where the double's answer is finite,
--- because that answer means nothing, and so does a function computed on a
--- double whose answer is not finite.
-#EVAL EXPONENT (EXPONENT 10 200 * EXPONENT 10 200) (0 - 0.5)          -- caught: as a double the answer is 0, not 10^-200
-#EVAL SQRT (EXPONENT 10 200 * EXPONENT 10 200)                        -- caught: as a double the answer is 2^1024
+-- Only a double answer that is not finite raises. A finite one is returned as
+-- before, even where an input is past the range, because it is often right.
+#EVAL SQRT (EXPONENT 10 200 * EXPONENT 10 200)                        -- caught: as a double the answer is Infinity
 #EVAL SIN (EXPONENT 10 200 * EXPONENT 10 200)                         -- caught: as a double the answer is NaN
 #EVAL LN (1 / (EXPONENT 10 200 * EXPONENT 10 200))                    -- caught: as a double the answer is -Infinity
+#EVAL ATAN (EXPONENT 10 200 * EXPONENT 10 200) > 1.57                 -- TRUE: pi/2, finite
+#EVAL EXPONENT (EXPONENT 10 200 * EXPONENT 10 200) 0                  -- 1
+#EVAL EXPONENT 1 (EXPONENT 10 200 * EXPONENT 10 200)                  -- 1
+#EVAL EXPONENT 0 (EXPONENT 10 200 * EXPONENT 10 200)                  -- 0: the base is exactly 0
+#EVAL EXPONENT (EXPONENT 10 200 * EXPONENT 10 200) (0 - 0.5)          -- 0, not 10^-200: finite as a double, so returned; see Limits

@@ -1929,18 +1929,22 @@ runBuiltin es op mTy = do
       val :: Rational <- expectNumber es
       let valDouble :: Double
           valDouble = fromRational val
-          -- The functions computed on a double. A number past the range of a
-          -- double is infinite as one, and a result that is not finite, such as
-          -- the log of a number too close to 0 to be a double, would reach
-          -- 'toRational' as a meaningless 309-digit number.
+          -- The functions computed on a double. An answer that is not finite
+          -- would reach 'toRational' as a meaningless 309-digit number, so it
+          -- raises, naming the input when the input is what did not fit. A
+          -- finite answer is returned, even for an input past the range: ATAN
+          -- of 10^400 is pi/2 to the last digit.
           viaDouble :: Text -> (Double -> Double) -> Machine Config
           viaDouble name f
-            | isInfinite valDouble =
-                userException $ UserError (name <> " cannot compute this: the number is past the range of numbers it handles (about 1.8E308 either side of 0)")
             | isNaN r || isInfinite r =
-                userException $ UserError (name <> " cannot compute this: the number is too close to 0 for the numbers it handles (about 4.9E-324)")
+                userException $ UserError (name <> " cannot compute this: " <> why)
             | otherwise = continueBackward $ ValNumber (toRational r)
-            where r = f valDouble
+            where
+              r = f valDouble
+              why
+                | isInfinite valDouble = "the number is past the range of numbers it handles (about 1.8E308 either side of 0)"
+                | valDouble == 0 && val /= 0 = "the number is too close to 0 for the numbers it handles (about 4.9E-324)"
+                | otherwise = "the result is too large (it handles results up to about 1.8E308)"
       case op of
         UnaryLn ->
           if val <= 0
@@ -2055,18 +2059,19 @@ runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)
       let base' = fromRational base :: Double
           exp' = fromRational exp_ :: Double
           result = base' ** exp'
-      -- An input past the range is infinite as a double, and then even a
-      -- finite result means nothing: (10^400) to the power -0.5 is 0.
-      in if isInfinite base' || isInfinite exp' || isNaN result || isInfinite result
+      -- Only an answer that is not finite raises; a finite one is returned,
+      -- even for an input past the range: 10^400 to the power 0 is 1.
+      in if isNaN result || isInfinite result
            then userException $ UserError (exponentNotFinite base' exp')
            else continueBackward $ ValNumber (toRational result)
   where
     -- A result that is not finite is not always too large: an input that is
     -- past the range of a double is already infinite, or 0, before the power is
-    -- taken, and then the true result may well fit.
+    -- taken, and then the true result may well fit. Only when every input fits
+    -- is the result said to be too large.
     exponentNotFinite base' exp'
       | isInfinite base' = "EXPONENT cannot compute this: the base is past the range of numbers it handles (about 1.8E308 either side of 0)"
-      | base' == 0 = "EXPONENT cannot compute this: the base is too close to 0 for the numbers it handles (about 4.9E-324)"
+      | base' == 0 && base /= 0 = "EXPONENT cannot compute this: the base is too close to 0 for the numbers it handles (about 4.9E-324)"
       | isInfinite exp' = "EXPONENT cannot compute this: the power is past the range of numbers it handles (about 1.8E308 either side of 0)"
       | otherwise = "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
 runBinOp BinOpTrunc (ValNumber value) (ValNumber digits) =
