@@ -2759,6 +2759,27 @@ spec bin = do
       sout `shouldSatisfy` ("label=\"x\\n" `isInfixOf`)
       sout `shouldSatisfy` ("<error>" `isInfixOf`)
 
+    -- No known input makes a trace fail to build, so the test seam makes it
+    -- fail. A graph of one node must not pass for a trace with exit 0.
+    it "exits 1 with its error line when a trace cannot be built" $ do
+      parent <- getEnvironment
+      Output code sout serr <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", "1") : parent)) bin ["trace", evalTraceFixture]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("Error: a trace could not be built" `isInfixOf`)
+      sout `shouldSatisfy` ("trace unavailable" `isInfixOf`)
+
+    it "exits 1 with its error line when a trace written to --output-dir cannot be built" $ do
+      parent <- getEnvironment
+      tmp <- getTemporaryDirectory
+      let outDir = tmp </> "l4-trace-unavailable-out"
+      removePathForcibly outDir
+      Output code _ serr <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", "1") : parent)) bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
+      wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
+      removePathForcibly outDir
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("Error: a trace could not be built" `isInfixOf`)
+      wrote `shouldBe` True
+
     it "refuses --format png without --output-dir" $ do
       Output code _ serr <- runL4 bin ["trace", cleanFixture, "--format", "png"]
       code `shouldSatisfy` (/= ExitSuccess)

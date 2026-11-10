@@ -225,9 +225,17 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
 -- an ErrorCall abort the surrounding evaluation and discard the already-computed
 -- #EVAL result. Catches 'ErrorCall' specifically — not 'SomeException'
 -- — so asynchronous exceptions (request cancellation, timeouts) still propagate.
+--
+-- A test seam: no known input makes post-processing fail any more, so with
+-- @JL4_TEST_FAIL_TRACE_POSTPROCESS@ set it fails here, and a test can follow
+-- the fallback out through a surface such as @l4 trace@.
 safePostprocessTrace :: [EvalTraceAction] -> IO EvalTrace
 safePostprocessTrace actions = do
-  r <- try (evaluate (force (postprocessTrace actions)))
+  injected <- lookupEnv "JL4_TEST_FAIL_TRACE_POSTPROCESS"
+  let traced = case injected of
+        Just _  -> error "postprocessTrace: failure injected by JL4_TEST_FAIL_TRACE_POSTPROCESS"
+        Nothing -> postprocessTrace actions
+  r <- try (evaluate (force traced))
   pure $ case r of
     Right t               -> t
     Left (_ :: ErrorCall) -> tracePostprocessFailed
