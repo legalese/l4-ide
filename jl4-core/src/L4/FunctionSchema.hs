@@ -21,7 +21,7 @@ import qualified Data.Text as Text
 import L4.Export (extractAssumeParamTypes, extractImplicitAssumeParams)
 import L4.Syntax
 import L4.TypeCheck.Environment
-  ( booleanUnique, dateUnique, datetimeUnique, maybeUnique
+  ( booleanUnique, dateUnique, datetimeUnique, listUnique, maybeUnique
   , numberUnique, stringUnique, timeUnique
   )
 import L4.TypeCheck.Types (CheckErrorWithContext)
@@ -131,18 +131,17 @@ typeToParameter declares visited ty =
     Type _ -> emptyParam "object"
     TyApp _ name [] ->
       typeNameToParameter name
-    TyApp _ name [inner] ->
-      let lowered = Text.toLower (resolvedNameText name)
-       in
-        if lowered `elem` ["list", "listof"]
-          then
-            (emptyParam "array")
-              { parameterItems = Just (typeToParameter declares visited inner)
-              }
-          else
-            if lowered `elem` ["maybe", "optional"]
-              then typeToParameter declares visited inner
-              else typeNameToParameter name
+    -- By the resolved type, as 'primitiveJsonType' does: a module's own
+    -- one-argument @List@ or @Optional@ is that declared type.
+    TyApp _ name [inner]
+      | getUnique name == listUnique ->
+          (emptyParam "array")
+            { parameterItems = Just (typeToParameter declares visited inner)
+            }
+      | getUnique name == maybeUnique ->
+          typeToParameter declares visited inner
+      | otherwise ->
+          typeNameToParameter name
     TyApp _ name _ ->
       typeNameToParameter name
     Fun{} -> emptyParam "object"
@@ -308,11 +307,10 @@ isMaybeType :: Maybe (Type' Resolved) -> Bool
 isMaybeType (Just (TyApp _ name [_inner])) = getUnique name == maybeUnique
 isMaybeType _ = False
 
--- | Check if a field type is MAYBE or Optional (for record field required tracking).
+-- | Is a record field's type the builtin MAYBE (for record field required
+-- tracking)? By the resolved type, like 'isMaybeType'.
 isMaybeFieldType :: Type' Resolved -> Bool
-isMaybeFieldType (TyApp _ name [_]) =
-  let lowered = Text.toLower (resolvedNameText name)
-   in lowered `elem` ["maybe", "optional"]
+isMaybeFieldType (TyApp _ name [_]) = getUnique name == maybeUnique
 isMaybeFieldType _ = False
 
 resolvedNameText :: Resolved -> Text

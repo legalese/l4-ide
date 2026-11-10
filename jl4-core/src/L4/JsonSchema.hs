@@ -310,12 +310,13 @@ enumWithPayloads ctx' desc constructors =
             SNull -> SNull
      in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType fieldTy)) : acc, newDefs)
 
--- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema.
--- Lower-cased for the same reason: the resolved builtin name is ALL-CAPS "MAYBE",
--- so the old case-sensitive match never fired and MAYBE-typed record fields were
--- wrongly emitted as required.
+-- | Is this the builtin MAYBE, the one type 'typeToJsonSchema' makes nullable?
+-- Decided from the resolved type for the same reason as there: a type a module
+-- declares and calls @Optional@ or @Maybe@ is a @$ref@ to that type, which
+-- cannot be null, so leaving it out of @required@ would describe an input that
+-- may be omitted but not be null.
 isMaybeOrOptionalType :: Type' Resolved -> Bool
-isMaybeOrOptionalType (TyApp _ name [_]) = Text.toLower (resolvedToText name) `elem` ["maybe", "optional"]
+isMaybeOrOptionalType (TyApp _ name [_]) = getUnique name == maybeUnique
 isMaybeOrOptionalType _ = False
 
 resolvedToText :: Resolved -> Text

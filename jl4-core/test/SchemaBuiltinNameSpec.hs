@@ -58,6 +58,23 @@ declaring = Text.unlines
   , "f t da tm n s b d ti dt MEANS t's body"
   ]
 
+-- | Record fields typed with a module's own one-argument @Optional@ and
+-- @maybe@, and with the prelude's @MAYBE@. Only the last is the builtin.
+optionals :: Text
+optionals = Text.unlines
+  [ "DECLARE Optional a IS ONE OF Absent, Present HAS value IS A a"
+  , "DECLARE maybe a HAS v IS A a"
+  , "DECLARE Holder HAS"
+  , "  o IS AN Optional NUMBER"
+  , "  m IS A MAYBE NUMBER"
+  , "  w IS A maybe NUMBER"
+  , ""
+  , "@export default reads a holder"
+  , "GIVEN h IS A Holder"
+  , "GIVETH A NUMBER"
+  , "f h MEANS 1"
+  ]
+
 checked :: [(Text, Text)] -> Text -> TypeCheckWithDepsResult
 checked files source =
   case checkWithImports (if null files then emptyVFS else vfsFromList files) source of
@@ -89,6 +106,25 @@ jsonProperty r name =
     other -> error ("no property " <> show name <> " in " <> show other)
  where
   schemaContext = emptyContext { ctxDeclares = declaresFromModule r.tcdModule }
+
+-- | What @jl4-schema@ writes for a definition in @$defs@.
+jsonDefinition :: TypeCheckWithDepsResult -> Text -> Aeson.Object
+jsonDefinition r name =
+  case Aeson.toJSON (generateJsonSchema schemaContext (export r)) of
+    Aeson.Object top
+      | Just (Aeson.Object defs) <- KeyMap.lookup "$defs" top
+      , Just (Aeson.Object d) <- KeyMap.lookup (Key.fromText name) defs -> d
+    other -> error ("no definition " <> show name <> " in " <> show other)
+ where
+  schemaContext = emptyContext { ctxDeclares = declaresFromModule r.tcdModule }
+
+-- | Can a value that this schema describes be null?
+nullable :: Aeson.Value -> Bool
+nullable = \ case
+  Aeson.Object o
+    | Just (Aeson.Array opts) <- KeyMap.lookup "anyOf" o -> any nullable opts
+    | Just (Aeson.String "null") <- KeyMap.lookup "type" o -> True
+  _ -> False
 
 jsonType :: Text -> [(Aeson.Key, Aeson.Value)]
 jsonType t = [("type", Aeson.String t)]
@@ -155,3 +191,30 @@ spec = describe "a type named like a builtin" $ do
       jsonProperty r "d"  `shouldBe` withFormat "date"
       jsonProperty r "ti" `shouldBe` withFormat "time"
       jsonProperty r "dt" `shouldBe` withFormat "date-time"
+
+  describe "a one-argument type named Optional or maybe is required unless it is MAYBE" $ do
+    it "jl4-schema: required holds exactly the fields that cannot be null" $ do
+      let d = jsonDefinition (checked [] optionals) "Holder"
+          props = case KeyMap.lookup "properties" d of
+            Just (Aeson.Object ps) -> ps
+            _ -> error "no properties"
+          required = case KeyMap.lookup "required" d of
+            Just (Aeson.Array rs) -> [ t | Aeson.String t <- foldr (:) [] rs ]
+            _ -> []
+          field n = case KeyMap.lookup (Key.fromText n) props of
+            Just v -> v
+            Nothing -> error ("no field " <> show n)
+      required `shouldBe` ["o", "w"]
+      field "o" `shouldBe` Aeson.object [("$ref", "#/$defs/Optional")]
+      field "w" `shouldBe` Aeson.object [("$ref", "#/$defs/maybe")]
+      field "m" `shouldBe` Aeson.object [("anyOf", Aeson.toJSON [Aeson.object (jsonType "number"), Aeson.object (jsonType "null")])]
+      [ n | n <- ["o", "m", "w"], not (nullable (field n)) ] `shouldBe` required
+
+    it "the service: required holds the same fields, and each is its declared type" $ do
+      let p = parameter (checked [] optionals) "h"
+          props = maybe (error "no properties") id p.parameterProperties
+          field n = maybe (error ("no field " <> show n)) id (Map.lookup n props)
+      p.parameterRequired `shouldBe` Just ["o", "w"]
+      (field "o").parameterEnum `shouldBe` ["Absent", "Present"]
+      fmap Map.keys (field "w").parameterProperties `shouldBe` Just ["v"]
+      (field "m").parameterType `shouldBe` "number"
