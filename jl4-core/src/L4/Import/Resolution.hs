@@ -386,6 +386,9 @@ combineResolvedImports uri imports =
         , TypeCheck.nlgMap = finalState.nlgMap
         , TypeCheck.scopeMap = finalState.scopeMap
         , TypeCheck.descMap = finalState.descMap
+        , TypeCheck.plural = False
+        , TypeCheck.bindLog = []
+        , TypeCheck.bindLogLen = 0
         }
     , finalEnv
     )
@@ -410,6 +413,9 @@ combineResolvedImports uri imports =
              , TypeCheck.nlgMap = IV.empty
              , TypeCheck.scopeMap = IV.empty
              , TypeCheck.descMap = IV.empty
+             , TypeCheck.plural = False
+             , TypeCheck.bindLog = []
+             , TypeCheck.bindLogLen = 0
              }
          , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry
          )

@@ -217,6 +217,7 @@ test-suite jl4-core-test
     TracePostprocessSpec
     SchemaBuiltinNameSpec
     MaxFrameDepthSpec
+    WarningViableForkSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
