@@ -932,8 +932,10 @@ getNameInfo st contextFile nameText = do
       in case ce of
         KnownType _kind _params _mty ->
           nText <> " :: TYPE" <> location
+        -- An inferred polymorphic type carries the checker's labels (@z5@);
+        -- show @a@, @b@, … as #CHECK and :type do.
         KnownTerm ty _termKind ->
-          nText <> " :: " <> Print.prettyLayout ty <> location
+          nText <> " :: " <> Print.prettyTypeForDisplay ty <> location
         KnownSection _sec ->
           nText <> " :: SECTION" <> location
         KnownTypeVariable ->
@@ -988,7 +990,7 @@ listEnvironment st contextFile = do
 
     formatShortInfo _n ce = case ce of
       KnownType _ _ _ -> "TYPE"
-      KnownTerm ty _ -> Print.prettyLayout ty
+      KnownTerm ty _ -> Print.prettyTypeForDisplay ty
       KnownSection _ -> "SECTION"
       KnownTypeVariable -> "TYPE_VAR"
 
