@@ -1,0 +1,24 @@
+-- A made-up Licensing Act.
+--
+--   s 3  A licensee shall not trade within 100 metres of a school.
+--   s 5  Subject to section 3, a licensee may trade between 8am and 10pm.
+--
+-- This encoding says "Subject to section 3" in section 5's own words, and then
+-- never asks section 3 anything: the permission answers TRUE at noon whatever
+-- the distance to a school.
+
+GIVEN metres IS A NUMBER
+GIVETH A BOOLEAN
+`s 3 — the premises are within 100 metres of a school` metres MEANS
+    metres LESS THAN 100
+
+@ref Licensing Act s 5 — "Subject to section 3, a licensee may trade between 8am and 10pm."
+GIVEN hour IS A NUMBER, metres IS A NUMBER
+GIVETH A BOOLEAN
+`s 5 — a licensee may trade` hour metres MEANS
+        "Subject to section 3,"
+    ... "a licensee may trade between 8am and 10pm."
+    ... hour AT LEAST 8 AND hour AT MOST 22
+
+-- Noon, 50 metres from a school. Section 3 forbids this; section 5 says yes.
+#EVAL `s 5 — a licensee may trade` 12 50

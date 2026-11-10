@@ -1,0 +1,12 @@
+-- l4 lint fixture: "subject to" and "despite" with no provision behind them are
+-- English, not overrides. Nothing is reported, not even as set aside.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`the person is subject to tax in the territory it comes from` n MEANS
+        "unless the person is subject to the process of the court,"
+    ... n GREATER THAN 1
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`my employer cannot find me a suitable vacancy despite reasonable attempts` n MEANS
+    n GREATER THAN 2

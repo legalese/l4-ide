@@ -2,12 +2,13 @@
 
 The reference describes exactly what each part of L4 is and does. To learn the language step by step, take a [course](../courses/README.md); to get a particular job done, see the [tutorials](../tutorials/README.md).
 
-| Go to                              | If you want to…                                                   |
-| ---------------------------------- | ----------------------------------------------------------------- |
-| [Glossary](GLOSSARY.md)            | Look up a single keyword or symbol                                |
-| [Cheat sheet](cheat-sheet.md)      | Find the L4 version of code you know                              |
-| [Error messages](errors/README.md) | Understand an error or warning                                    |
-| [Library](#library)                | Find a function for dates, money or lists (further down the page) |
+| Go to                                 | If you want to…                                                        |
+| ------------------------------------- | ---------------------------------------------------------------------- |
+| [Glossary](GLOSSARY.md)               | Look up a single keyword or symbol                                     |
+| [Cheat sheet](cheat-sheet.md)         | Find the L4 version of code you know                                   |
+| [Error messages](errors/README.md)    | Understand an error or warning                                         |
+| [Override phrases](lint/overrides.md) | Check that "subject to" and "notwithstanding" are kept by the encoding |
+| [Library](#library)                   | Find a function for dates, money or lists (further down the page)      |
 
 ## Language
 

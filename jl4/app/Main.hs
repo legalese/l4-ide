@@ -56,6 +56,7 @@ import L4.Cli.Explore (ExploreCliOptions, exploreCmd, exploreOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
+import L4.Cli.Lint (LintOptions, lintCmd, lintOptionsParser)
 import L4.Cli.Lts (LtsOptions, ltsCmd, ltsOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
@@ -94,6 +95,7 @@ data Command
   | CmdUndeploy   UndeployOptions
   | CmdDeployments DeploymentsOptions
   | CmdInstall    InstallOptions
+  | CmdLint       LintOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -175,6 +177,9 @@ commandParser =
       <> command "install"
            (info (helper <*> (CmdInstall <$> installOptionsParser))
              (progDesc "Install a companion tool: `l4 install legalese` (the Legalese Cloud CLI)"))
+      <> command "lint"
+           (info (helper <*> (CmdLint <$> lintOptionsParser))
+             (progDesc "Check that the \"subject to\" and \"notwithstanding\" phrases a decision cites are honoured by the decisions it calls (advisory)"))
 
     -- One subcommand per foreign notation (CLI-SURFACE-SPEC C1). Each was a
     -- top-level verb, or a `--to` value on `l4 export`, until 2026-09-24.
@@ -294,6 +299,7 @@ main = do
     CmdUndeploy   opts -> undeployCmd   opts
     CmdDeployments opts -> deploymentsCmd opts
     CmdInstall    opts -> installCmd    opts
+    CmdLint       opts -> lintCmd       opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.

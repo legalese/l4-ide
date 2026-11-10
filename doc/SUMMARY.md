@@ -23,6 +23,7 @@
 - [Libraries](reference/libraries/README.md)
 - [Patterns](tutorials/getting-started/common-patterns.md)
 - [Errors and Troubleshooting](reference/errors/README.md)
+- [Does the encoding keep its "subject to"? `l4 lint`](reference/lint/overrides.md)
 
 ## Exports
 
