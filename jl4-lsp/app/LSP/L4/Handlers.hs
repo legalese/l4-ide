@@ -617,9 +617,7 @@ handlers evalConfig recorder =
                       retTy = case resolved of
                         Fun _ _ ret -> ret
                         other       -> other
-                  -- An inferred polymorphic result carries the checker's
-                  -- labels (@x11@); show @a@, @b@, … as hover does.
-                  in Just (prettyTypeForDisplay retTy)
+                  in Just (prettyLayout retTy)
                 _ -> Nothing
 
             mkSymbol :: Text -> Maybe Text -> SymbolKind -> LSP.Range -> LSP.Range -> DocumentSymbol
