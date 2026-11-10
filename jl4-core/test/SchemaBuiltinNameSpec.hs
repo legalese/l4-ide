@@ -75,6 +75,28 @@ optionals = Text.unlines
   , "f h MEANS 1"
   ]
 
+-- | Synonyms for MAYBE, with and without an argument, and for LIST, as a
+-- record field and as an input. The decoder expands each
+-- ('L4.EvaluateLazy.Machine.expandTypeSynonyms'): `ok/schema-synonym-shapes.l4`
+-- pins that it accepts null and omission for the first two.
+synonyms :: Text
+synonyms = Text.unlines
+  [ "DECLARE Optional OF a IS A MAYBE a"
+  , "DECLARE List OF a IS A LIST OF a"
+  , "DECLARE OptNum IS A MAYBE NUMBER"
+  , "DECLARE Holder HAS"
+  , "  o IS AN Optional NUMBER"
+  , "  p IS AN OptNum"
+  , "  xs IS A List NUMBER"
+  , "  n IS A NUMBER"
+  , ""
+  , "@export default reads a holder"
+  , "GIVEN h IS A Holder"
+  , "      extra IS AN Optional NUMBER"
+  , "GIVETH A NUMBER"
+  , "total h extra MEANS h's n"
+  ]
+
 checked :: [(Text, Text)] -> Text -> TypeCheckWithDepsResult
 checked files source =
   case checkWithImports (if null files then emptyVFS else vfsFromList files) source of
@@ -118,13 +140,31 @@ jsonDefinition r name =
  where
   schemaContext = emptyContext { ctxDeclares = declaresFromModule r.tcdModule }
 
--- | Can a value that this schema describes be null?
-nullable :: Aeson.Value -> Bool
-nullable = \ case
+-- | Can a value that this schema describes be null? A reference is followed
+-- into the definitions of the schema it is in.
+nullable :: TypeCheckWithDepsResult -> Aeson.Value -> Bool
+nullable r = \ case
   Aeson.Object o
-    | Just (Aeson.Array opts) <- KeyMap.lookup "anyOf" o -> any nullable opts
+    | Just (Aeson.Array opts) <- KeyMap.lookup "anyOf" o -> any (nullable r) opts
     | Just (Aeson.String "null") <- KeyMap.lookup "type" o -> True
+    | Just (Aeson.String ref) <- KeyMap.lookup "$ref" o
+    , Just name <- Text.stripPrefix "#/$defs/" ref -> nullable r (Aeson.Object (jsonDefinition r name))
   _ -> False
+
+-- | The required fields of a definition, and the field schemas.
+requiredAndFields :: TypeCheckWithDepsResult -> Text -> ([Text], Text -> Aeson.Value)
+requiredAndFields r name =
+  let d = jsonDefinition r name
+      props = case KeyMap.lookup "properties" d of
+        Just (Aeson.Object ps) -> ps
+        _ -> error "no properties"
+      required = case KeyMap.lookup "required" d of
+        Just (Aeson.Array rs) -> [ t | Aeson.String t <- foldr (:) [] rs ]
+        _ -> []
+      field n = case KeyMap.lookup (Key.fromText n) props of
+        Just v -> v
+        Nothing -> error ("no field " <> show n)
+   in (required, field)
 
 jsonType :: Text -> [(Aeson.Key, Aeson.Value)]
 jsonType t = [("type", Aeson.String t)]
@@ -208,7 +248,7 @@ spec = describe "a type named like a builtin" $ do
       field "o" `shouldBe` Aeson.object [("$ref", "#/$defs/Optional")]
       field "w" `shouldBe` Aeson.object [("$ref", "#/$defs/maybe")]
       field "m" `shouldBe` Aeson.object [("anyOf", Aeson.toJSON [Aeson.object (jsonType "number"), Aeson.object (jsonType "null")])]
-      [ n | n <- ["o", "m", "w"], not (nullable (field n)) ] `shouldBe` required
+      [ n | n <- ["o", "m", "w"], not (nullable (checked [] optionals) (field n)) ] `shouldBe` required
 
     it "the service: required holds the same fields, and each is its declared type" $ do
       let p = parameter (checked [] optionals) "h"
@@ -218,3 +258,31 @@ spec = describe "a type named like a builtin" $ do
       (field "o").parameterEnum `shouldBe` ["Absent", "Present"]
       fmap Map.keys (field "w").parameterProperties `shouldBe` Just ["v"]
       (field "m").parameterType `shouldBe` "number"
+
+  describe "a synonym is decided by what it stands for, as the decoder does" $ do
+    it "jl4-schema: a synonym for MAYBE is nullable and not required, and one for LIST is an array of its element" $ do
+      let r = checked [] synonyms
+          (required, field) = requiredAndFields r "Holder"
+          number = Aeson.object (jsonType "number")
+      required `shouldBe` ["xs", "n"]
+      field "o" `shouldBe` Aeson.object [("anyOf", Aeson.toJSON [number, Aeson.object (jsonType "null")])]
+      field "p" `shouldBe` Aeson.object [("$ref", "#/$defs/OptNum")]
+      field "xs" `shouldBe` Aeson.object [("items", number), ("type", "array")]
+      [ n | n <- ["o", "p", "xs", "n"], not (nullable r (field n)) ] `shouldBe` required
+      jsonProperty r "extra" `shouldBe` Aeson.object [("anyOf", Aeson.toJSON [number, Aeson.object (jsonType "null")])]
+
+    it "the service: the same fields are required, a synonym for MAYBE is its element, and one for LIST an array" $ do
+      let r = checked [] synonyms
+          p = parameter r "h"
+          props = maybe (error "no properties") id p.parameterProperties
+          field n = maybe (error ("no field " <> show n)) id (Map.lookup n props)
+      p.parameterRequired `shouldBe` Just ["xs", "n"]
+      (field "o").parameterType `shouldBe` "number"
+      (field "p").parameterType `shouldBe` "number"
+      (field "xs").parameterType `shouldBe` "array"
+      fmap (.parameterType) (field "xs").parameterItems `shouldBe` Just "number"
+
+    -- The service's `required` for its inputs, and jl4-schema's, come from here.
+    it "an input typed with a synonym for MAYBE is not required" $ do
+      [ (q.paramName, q.paramRequired) | q <- (export (checked [] synonyms)).exportParams ]
+        `shouldBe` [("h", True), ("extra", False)]

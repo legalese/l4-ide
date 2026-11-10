@@ -130,6 +130,7 @@ library
     L4.FindDefinition
     L4.FindReferences
     L4.JsonSchema
+    L4.TypeSynonym
     L4.Lexer
     L4.Lint.AndOrDepth
     L4.Mixfix

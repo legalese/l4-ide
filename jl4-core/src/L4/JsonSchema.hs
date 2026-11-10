@@ -16,6 +16,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
 
 import L4.Export (ExportedFunction (..), ExportedParam (..))
+import L4.TypeSynonym (expandSynonyms)
 import L4.Syntax
 import L4.TypeCheck.Environment
   ( booleanUnique, dateUnique, datetimeUnique, listUnique, maybeUnique
@@ -177,7 +178,17 @@ buildParamsSchema ctx params =
     SNull -> SNull
 
 typeToJsonSchema :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text SchemaType)
-typeToJsonSchema ctx = \case
+typeToJsonSchema ctx = typeToJsonSchema' ctx . expandApplied
+ where
+  -- A synonym with arguments is decided by what it stands for, as the decoder
+  -- does: its definition would hold the bare parameter. One without is kept
+  -- as a reference to its definition, which holds what it stands for.
+  expandApplied ty = case ty of
+    TyApp _ _ (_ : _) -> expandSynonyms ctx.ctxDeclares ty
+    _ -> ty
+
+typeToJsonSchema' :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text SchemaType)
+typeToJsonSchema' ctx = \case
   Type _ -> (SString Nothing, ctx.ctxCollectedDefs)
   TyApp _ name args ->
     -- Decide from the resolved type, not from its name. A name says nothing: a
@@ -239,7 +250,7 @@ declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx'{ctxCollectedDefs = defs} fieldTy
         schemaWithDesc = addDescToSchema fieldSchema fieldDesc
-        isRequired = not (isMaybeOrOptionalType fieldTy)
+        isRequired = not (isMaybeOrOptionalType ctx'.ctxDeclares fieldTy)
      in ((fieldNameText, schemaWithDesc, isRequired) : acc, newDefs)
 
   addDescToSchema :: SchemaType -> Maybe Text -> SchemaType
@@ -308,16 +319,18 @@ enumWithPayloads ctx' desc constructors =
             SAnyOf opts _ -> SAnyOf opts (Just d)
             SStringFormat fmt _ -> SStringFormat fmt (Just d)
             SNull -> SNull
-     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType fieldTy)) : acc, newDefs)
+     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType ctx''.ctxDeclares fieldTy)) : acc, newDefs)
 
--- | Is this the builtin MAYBE, the one type 'typeToJsonSchema' makes nullable?
--- Decided from the resolved type for the same reason as there: a type a module
--- declares and calls @Optional@ or @Maybe@ is a @$ref@ to that type, which
--- cannot be null, so leaving it out of @required@ would describe an input that
--- may be omitted but not be null.
-isMaybeOrOptionalType :: Type' Resolved -> Bool
-isMaybeOrOptionalType (TyApp _ name [_]) = getUnique name == maybeUnique
-isMaybeOrOptionalType _ = False
+-- | Is this the builtin MAYBE, or a synonym for it, the types whose schema can
+-- be null? Decided from the resolved, synonym-expanded type, as the decoder
+-- decides whether a field may be left out: a type a module declares and calls
+-- @Optional@ or @Maybe@ is a @$ref@ to that type, which cannot be null, so
+-- leaving it out of @required@ would describe an input that may be omitted but
+-- not be null.
+isMaybeOrOptionalType :: Map Text (Declare Resolved) -> Type' Resolved -> Bool
+isMaybeOrOptionalType declares ty = case expandSynonyms declares ty of
+  TyApp _ name [_] -> getUnique name == maybeUnique
+  _ -> False
 
 resolvedToText :: Resolved -> Text
 resolvedToText =

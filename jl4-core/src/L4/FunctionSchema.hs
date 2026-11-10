@@ -19,6 +19,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamTypes, extractImplicitAssumeParams)
+import L4.TypeSynonym (declaresFromModule, expandSynonyms)
 import L4.Syntax
 import L4.TypeCheck.Environment
   ( booleanUnique, dateUnique, datetimeUnique, listUnique, maybeUnique
@@ -106,28 +107,15 @@ instance FromJSON Parameter where
       <*> p .:? "required"
       <*> p .:? "x-l4-type"
 
-declaresFromModule :: Module Resolved -> Map Text (Declare Resolved)
-declaresFromModule (MkModule _ _ section) =
-  Map.fromList (collectSection section)
- where
-  collectSection (MkSection _ _ _ decls) =
-    decls >>= collectDecl
-
-  collectDecl = \case
-    Declare _ decl@(MkDeclare _ _ (MkAppForm _ name _ _) _) ->
-      [(resolvedNameText name, decl)]
-    Section _ sub ->
-      collectSection sub
-    _ ->
-      []
-
 typeToParameter ::
   Map Text (Declare Resolved) ->
   Set.Set Text ->
   Type' Resolved ->
   Parameter
 typeToParameter declares visited ty =
-  case ty of
+  -- A synonym is decided by what it stands for, as the decoder does: a
+  -- synonym for MAYBE is a MAYBE, one for LIST an array of its element.
+  case expandSynonyms declares ty of
     Type _ -> emptyParam "object"
     TyApp _ name [] ->
       typeNameToParameter name
@@ -211,7 +199,7 @@ typeToParameter declares visited ty =
               requiredFields =
                 [ resolvedNameText fieldName
                 | MkTypedName _ fieldName fieldTy _ <- fields
-                , not (isMaybeFieldType fieldTy)
+                , not (isMaybeFieldType (expandSynonyms declares fieldTy))
                 ]
              in
               (emptyParam "object")
@@ -274,7 +262,7 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
     requiredGivenParams =
       [ resolvedNameText resolved
       | MkOptionallyTypedName _ resolved mType <- names
-      , not (isMaybeType mType)
+      , not (isMaybeType (expandSynonyms declares <$> mType))
       ]
     assumeParamList = map mkAssumeParam assumeParams
     implicitParamList = map mkAssumeParam implicitParams

@@ -86,6 +86,7 @@ import L4.TypeCheck.Types (EntityInfo)
 import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.Exceptions
 import L4.EvaluateLazy.Trace (EvalTrace, EvalTraceAction (..))
+import L4.TypeSynonym (substituteTypeParams)
 import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
 import L4.Utils.Ratio
@@ -1476,18 +1477,6 @@ expandTypeSynonyms = go (16 :: Int)
               go (n - 1) (substituteTypeParams (Map.fromList (zip (map getUnique params) args)) body)
         _ -> pure ty
     go _ ty = pure ty
-
-substituteTypeParams :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
-substituteTypeParams sub = \ case
-  TyApp ann r []
-    | Just t <- Map.lookup (getUnique r) sub -> t
-    | otherwise -> TyApp ann r []
-  TyApp ann r ts -> TyApp ann r (map (substituteTypeParams sub) ts)
-  Fun ann args res ->
-    Fun ann [ MkOptionallyNamedType a n (substituteTypeParams sub t) | MkOptionallyNamedType a n t <- args ]
-      (substituteTypeParams sub res)
-  Forall ann vs t -> Forall ann vs (substituteTypeParams sub t)
-  other -> other
 
 -- | Check if a type is MAYBE α (used for optional record field handling)
 isMaybeFieldTy :: Type' Resolved -> Bool
