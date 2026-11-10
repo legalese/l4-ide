@@ -28,6 +28,7 @@ module L4.EvaluateLazy
 , safePostprocessTrace
 , tracePostprocessFailed
 , traceUnavailable
+, parseMaxFrameDepth
 )
 where
 
@@ -550,14 +551,18 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   maxFrameDepth <- readMaxFrameDepthEnv
   pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth}
 
--- | @JL4_MAX_FRAME_DEPTH@, a positive whole number, replaces
--- 'maximumFrameDepth'. Anything else leaves the default.
+-- | @JL4_MAX_FRAME_DEPTH@, a whole number from 1 to the largest 'Int',
+-- replaces 'maximumFrameDepth'. Anything else leaves the default.
 readMaxFrameDepthEnv :: IO Int
 readMaxFrameDepthEnv = do
   menv <- lookupEnv "JL4_MAX_FRAME_DEPTH"
-  pure $ case menv >>= readMaybe of
-    Just n | n > 0 -> n
-    _ -> maximumFrameDepth
+  pure $ fromMaybe maximumFrameDepth (menv >>= parseMaxFrameDepth)
+
+-- | Read as an 'Integer' first: read as an 'Int', 2^64 + 1 wraps to 1.
+parseMaxFrameDepth :: String -> Maybe Int
+parseMaxFrameDepth s = case readMaybe s :: Maybe Integer of
+  Just n | n >= 1, n <= toInteger (maxBound :: Int) -> Just (fromInteger n)
+  _ -> Nothing
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,

@@ -215,6 +215,7 @@ test-suite jl4-core-test
     ResolutionCascadeSpec
     TracePostprocessSpec
     SchemaBuiltinNameSpec
+    MaxFrameDepthSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
