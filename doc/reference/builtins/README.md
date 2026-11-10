@@ -26,6 +26,7 @@ The [math](../libraries/math.md) library has lowercase versions (`ln`, `sqrt`, `
 `EXPONENT`, `SQRT`, `LN`, `LOG10`, `SIN`, `COS`, `TAN`, `ASIN`, `ACOS` and `ATAN` compute on a 64-bit floating-point number, which holds about 15 significant digits and reaches about 1.8E308 either side of 0.
 Each stops with an error when that computation has no finite answer, naming the input when it is the input that does not fit, and saying the result is too large only when every input fits.
 A finite answer is returned, even for an input past the range: `ATAN` of 10^400 is about 1.5708, and `EXPONENT` of 10^400 to the power 0 is 1.
+That finite answer can be wrong when an input does not fit a floating-point number, past its range or too close to 0 to be held, and earlier versions of L4 give the same answers: `EXPONENT` of 10^400 to the power -1/10^300 gives 0 where the answer is about 1, `SQRT` of 1/10^400 gives 0 where the answer is 10^-200, and `EXPONENT` of -1 to the power 10^400 + 1 gives 1 where the answer is -1.
 An answer too small for a floating-point number is 0, with no error.
 
 ## Text
