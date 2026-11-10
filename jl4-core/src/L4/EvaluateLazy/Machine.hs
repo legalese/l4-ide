@@ -2038,10 +2038,21 @@ runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)
   | base < 0 && denominator exp_ /= 1 =
       userException $ UserError "EXPONENT does not compute a negative number to a fractional power"
   | otherwise =
-      let result = (fromRational base :: Double) ** (fromRational exp_ :: Double)
+      let base' = fromRational base :: Double
+          exp' = fromRational exp_ :: Double
+          result = base' ** exp'
       in if isNaN result || isInfinite result
-           then userException $ UserError "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
+           then userException $ UserError (exponentNotFinite base' exp')
            else continueBackward $ ValNumber (toRational result)
+  where
+    -- A result that is not finite is not always too large: an input that is
+    -- past the range of a double is already infinite, or 0, before the power is
+    -- taken, and then the true result may well fit.
+    exponentNotFinite base' exp'
+      | isInfinite base' = "EXPONENT cannot compute this: the base is past the range of numbers it handles (about 1.8E308 either side of 0)"
+      | base' == 0 = "EXPONENT cannot compute this: the base is too close to 0 for the numbers it handles (about 4.9E-324)"
+      | isInfinite exp' = "EXPONENT cannot compute this: the power is past the range of numbers it handles (about 1.8E308 either side of 0)"
+      | otherwise = "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
 runBinOp BinOpTrunc (ValNumber value) (ValNumber digits) =
   let digitsInt = round digits :: Integer
       scale k = (10 :: Rational) ^^ k

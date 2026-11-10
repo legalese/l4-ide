@@ -29,3 +29,9 @@ numeric-domain-errors.l4:19:1-64:
   EXPONENT does not compute a negative number to a fractional power
 numeric-domain-errors.l4:20:1-47:
   EXPONENT does not compute a negative number to a fractional power
+numeric-domain-errors.l4:24:1-55:
+  EXPONENT cannot compute this: the base is past the range of numbers it handles (about 1.8E308 either side of 0)
+numeric-domain-errors.l4:25:1-67:
+  EXPONENT cannot compute this: the base is too close to 0 for the numbers it handles (about 4.9E-324)
+numeric-domain-errors.l4:26:1-55:
+  EXPONENT cannot compute this: the power is past the range of numbers it handles (about 1.8E308 either side of 0)

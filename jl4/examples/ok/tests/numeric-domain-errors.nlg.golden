@@ -12,3 +12,6 @@
 `EXPONENT` with (0 minus (the product of (`EXPONENT` with 10 and 308) and `EXPONENT` with 10 and 92)) and 0.5
 `EXPONENT` with (0 minus (the product of (`EXPONENT` with 10 and 308) and `EXPONENT` with 10 and 92)) and (0 minus 0.5)
 `EXPONENT` with -2 and the sum of 3 and (the result of dividing 1 by `EXPONENT` with 10 and 49)
+`EXPONENT` with the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200 and 0.5
+`EXPONENT` with the result of dividing 1 by (the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200) and (0 minus 0.5)
+`EXPONENT` with 1.5 and the product of (`EXPONENT` with 10 and 200) and `EXPONENT` with 10 and 200

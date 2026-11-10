@@ -18,3 +18,9 @@
 #EVAL EXPONENT (0 - EXPONENT 10 308 * EXPONENT 10 92) 0.5        -- caught: as a double the base is -Infinity
 #EVAL EXPONENT (0 - EXPONENT 10 308 * EXPONENT 10 92) (0 - 0.5)  -- caught: as doubles this would be 0
 #EVAL EXPONENT (-2) (3 + 1 / (EXPONENT 10 49))                   -- caught: as a double the power is 3
+-- An input past the range of a double is named, not the result. The first two
+-- answers are 10^200, which a double holds; the third is past the range too,
+-- but its power is past it before the power is taken.
+#EVAL EXPONENT (EXPONENT 10 200 * EXPONENT 10 200) 0.5                -- caught: the base is past the range
+#EVAL EXPONENT (1 / (EXPONENT 10 200 * EXPONENT 10 200)) (0 - 0.5)    -- caught: the base is too close to 0
+#EVAL EXPONENT 1.5 (EXPONENT 10 200 * EXPONENT 10 200)                -- caught: the power is past the range
