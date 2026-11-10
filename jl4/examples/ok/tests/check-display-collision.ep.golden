@@ -1,7 +1,9 @@
 -- The display names `a`, `b`, … for a `#CHECK` over a polymorphic term skip
--- any name that is already a type: here the declared type `a`. Otherwise the
--- first line would print `FUNCTION FROM a TO a`, the same text as the third,
--- whose input is the declared `a`, and as the identity function.
+-- any name that is already a type in the printed type: here the declared type
+-- `a`. Otherwise the first line would print `FUNCTION FROM a TO a`, the same
+-- text as the third, whose input is the declared `a`. The last line still
+-- prints that text: `a` is not in its type, and a name merely in scope is not
+-- skipped, so that a printed type depends only on the type.
 
 DECLARE a IS ONE OF approved, rejected
 

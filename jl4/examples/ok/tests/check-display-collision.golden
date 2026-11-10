@@ -1,10 +1,10 @@
 Parsing successful
 Typechecking successful
-check-display-collision.l4:8:1-46:
+check-display-collision.l4:10:1-46:
   FUNCTION FROM b TO a
-check-display-collision.l4:9:1-33:
+check-display-collision.l4:11:1-33:
   FUNCTION FROM b AND c TO a
-check-display-collision.l4:10:1-28:
+check-display-collision.l4:12:1-28:
   FUNCTION FROM a TO a
-check-display-collision.l4:11:1-23:
+check-display-collision.l4:13:1-23:
   FUNCTION FROM a TO a
