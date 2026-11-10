@@ -23,6 +23,9 @@ Operators (`+`, `AND`, `EQUALS`, `UNLESS`, `FOLLOWED BY` and the rest) are descr
 
 The [math](../libraries/math.md) library has lowercase versions (`ln`, `sqrt`, `asin`, ...) that give `NOTHING` instead of an error.
 
+`EXPONENT`, `SQRT`, `LN`, `LOG10`, `SIN`, `COS`, `TAN`, `ASIN`, `ACOS` and `ATAN` compute on a 64-bit floating-point number, which holds about 15 significant digits and reaches about 1.8E308 either side of 0.
+Each stops with an error for an input past that range, and `LN` and `LOG10` for an input too close to 0 to be held at all (about 4.9E-324).
+
 ## Text
 
 Positions in a STRING count from 0.

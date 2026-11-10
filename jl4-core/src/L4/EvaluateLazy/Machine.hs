@@ -1927,31 +1927,43 @@ runBuiltin es op mTy = do
       val :: Rational <- expectNumber es
       let valDouble :: Double
           valDouble = fromRational val
+          -- The functions computed on a double. A number past the range of a
+          -- double is infinite as one, and a result that is not finite, such as
+          -- the log of a number too close to 0 to be a double, would reach
+          -- 'toRational' as a meaningless 309-digit number.
+          viaDouble :: Text -> (Double -> Double) -> Machine Config
+          viaDouble name f
+            | isInfinite valDouble =
+                userException $ UserError (name <> " cannot compute this: the number is past the range of numbers it handles (about 1.8E308 either side of 0)")
+            | isNaN r || isInfinite r =
+                userException $ UserError (name <> " cannot compute this: the number is too close to 0 for the numbers it handles (about 4.9E-324)")
+            | otherwise = continueBackward $ ValNumber (toRational r)
+            where r = f valDouble
       case op of
         UnaryLn ->
           if val <= 0
             then userException $ UserError "LN expects input greater than 0"
-            else continueBackward $ ValNumber (toRational (log valDouble))
+            else viaDouble "LN" log
         UnaryLog10 ->
           if val <= 0
             then userException $ UserError "LOG10 expects input greater than 0"
-            else continueBackward $ ValNumber (toRational (logBase 10 valDouble))
+            else viaDouble "LOG10" (logBase 10)
         UnarySin ->
-          continueBackward $ ValNumber (toRational (sin valDouble))
+          viaDouble "SIN" sin
         UnaryCos ->
-          continueBackward $ ValNumber (toRational (cos valDouble))
+          viaDouble "COS" cos
         UnaryTan ->
-          continueBackward $ ValNumber (toRational (tan valDouble))
+          viaDouble "TAN" tan
         UnaryAsin ->
           if val < (-1) || val > 1
             then userException $ UserError "ASIN expects input between -1 and 1"
-            else continueBackward $ ValNumber (toRational (asin valDouble))
+            else viaDouble "ASIN" asin
         UnaryAcos ->
           if val < (-1) || val > 1
             then userException $ UserError "ACOS expects input between -1 and 1"
-            else continueBackward $ ValNumber (toRational (acos valDouble))
+            else viaDouble "ACOS" acos
         UnaryAtan ->
-          continueBackward $ ValNumber (toRational (atan valDouble))
+          viaDouble "ATAN" atan
         UnaryIsInteger -> continueBackward $ valBool $ isJust $ isInteger val
         UnaryRound -> continueBackward $ valInt $ round val
         UnaryCeiling -> continueBackward $ valInt $ ceiling val
@@ -1960,7 +1972,7 @@ runBuiltin es op mTy = do
         UnarySqrt ->
           if val < 0
             then userException $ UserError "SQRT expects input greater than or equal to 0"
-            else continueBackward $ ValNumber (toRational (sqrt valDouble))
+            else viaDouble "SQRT" sqrt
   where
     valInt :: Integer -> WHNF
     valInt = ValNumber . toRational
@@ -2041,7 +2053,9 @@ runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)
       let base' = fromRational base :: Double
           exp' = fromRational exp_ :: Double
           result = base' ** exp'
-      in if isNaN result || isInfinite result
+      -- An input past the range is infinite as a double, and then even a
+      -- finite result means nothing: (10^400) to the power -0.5 is 0.
+      in if isInfinite base' || isInfinite exp' || isNaN result || isInfinite result
            then userException $ UserError (exponentNotFinite base' exp')
            else continueBackward $ ValNumber (toRational result)
   where

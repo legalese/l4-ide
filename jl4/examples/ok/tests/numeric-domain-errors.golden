@@ -35,3 +35,11 @@ numeric-domain-errors.l4:25:1-67:
   EXPONENT cannot compute this: the base is too close to 0 for the numbers it handles (about 4.9E-324)
 numeric-domain-errors.l4:26:1-55:
   EXPONENT cannot compute this: the power is past the range of numbers it handles (about 1.8E308 either side of 0)
+numeric-domain-errors.l4:30:1-61:
+  EXPONENT cannot compute this: the base is past the range of numbers it handles (about 1.8E308 either side of 0)
+numeric-domain-errors.l4:31:1-47:
+  SQRT cannot compute this: the number is past the range of numbers it handles (about 1.8E308 either side of 0)
+numeric-domain-errors.l4:32:1-46:
+  SIN cannot compute this: the number is past the range of numbers it handles (about 1.8E308 either side of 0)
+numeric-domain-errors.l4:33:1-51:
+  LN cannot compute this: the number is too close to 0 for the numbers it handles (about 4.9E-324)
