@@ -1,0 +1,4 @@
+given `the application` then `approved`
+given `x` and `y` then `approved`
+given `x` then `x`
+given `x` then `x`

@@ -1767,6 +1767,50 @@ spec bin = do
               "// Result: False (assertion failed: expected a refusal, but the expression produced a value)"
           other -> expectationFailure ("Expected one Result line in each of three traces, got " ++ show other)
 
+  -- The REPL's :type names the inference variables of a polymorphic type `a`,
+  -- `b`, ... by order of first appearance, as #CHECK does, and not by the
+  -- checker's internal labels (`x5`), which change whenever the file does.
+  describe "the REPL's :type" $ do
+    mRepl <- runIO locateReplBinary
+    let withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+        replies repl file queries = withSystemTempDirectory "l4-repl-type" \work ->
+          replRepliesFor work repl (fixtureDir </> file) queries
+
+    it "names inference variables a, b, ... and not by the checker's labels" $ withRepl \repl -> do
+      rs <- replies repl "repl-type.l4"
+        [ ":type GIVEN x, y YIELD x"
+        , ":t GIVEN x YIELD granted"
+        ]
+      rs `shouldBe`
+        [ "FUNCTION FROM a AND b TO a"
+        , "FUNCTION FROM a TO decision"
+        ]
+
+    -- Naming the input `a` too would print the text of the identity function.
+    it "skips a name that is a type in the printed type" $ withRepl \repl -> do
+      rs <- replies repl "repl-type-collision.l4" [":type GIVEN `the application` YIELD approved"]
+      rs `shouldBe` ["FUNCTION FROM b TO a"]
+
+  -- The REPL's :info and :env print an inferred polymorphic type as #CHECK
+  -- does, with `a`, `b`, ..., and not with the checker's internal labels (`z5`).
+  describe "the REPL's :info and :env" $ do
+    mRepl <- runIO locateReplBinary
+    let infoFile = fixtureDir </> "repl-info.l4"
+        withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+
+    it "names the type variables in :info and :env a, b, ..." $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-info" \work -> do
+        rs <- replRepliesFor work repl infoFile [":info pick", ":info same", ":env"]
+        case rs of
+          [pick, same, env] -> do
+            T.takeWhile (/= '\n') pick `shouldBe` "pick :: FUNCTION FROM a TO a"
+            T.takeWhile (/= '\n') same `shouldBe` "same :: FUNCTION FROM NUMBER TO FUNCTION FROM a TO a"
+            filter (\l -> any (`T.isPrefixOf` l) ["pick: ", "same: "]) (T.lines env) `shouldBe`
+              [ "pick: FUNCTION FROM a TO a"
+              , "same: FUNCTION FROM NUMBER TO FUNCTION FROM a TO a"
+              ]
+          other -> expectationFailure ("Expected 3 replies, got " ++ show other)
+
   -- A rule that may refuse to answer gets no query plan, from the REPL or from
   -- the language server: each says why in the one sentence core gives, which
   -- names the rule and every reason it may refuse with, read from the rule and

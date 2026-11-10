@@ -95,7 +95,7 @@ import L4.Annotation
 import L4.Names
 import L4.Parser.ResolveAnnotation (pickDesc)
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
-import L4.Print (clauseBodies, prettyLayout, quotedName)
+import L4.Print (clauseBodies, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
@@ -5059,7 +5059,11 @@ prettyCheckError (IncompleteAppNamed r onts)               =
   , "you forgot to supply the following arguments:"
   , ""
   ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
-prettyCheckError (CheckInfo t _)                           = [prettyLayout t]
+-- A '#CHECK' over a polymorphic term carries residual inference variables,
+-- and the raw layout prints them as the checker's gensyms (@a24@) — not a name
+-- in any scope, and different after every edit. Render for display instead:
+-- stable @a@, @b@, … by order of first appearance, exactly as hover does.
+prettyCheckError (CheckInfo t _)                           = [prettyTypeForDisplay t]
 prettyCheckError (IllegalTypeInKindSignature t)            =
   [ "In a signature of a type declaration, all parameters must be of type"
   , ""

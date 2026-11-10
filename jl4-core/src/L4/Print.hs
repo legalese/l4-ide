@@ -2,6 +2,7 @@ module L4.Print where
 
 import Base
 import qualified Base.Map as Map
+import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.Evaluate.ValueLazy as Lazy
 import L4.Syntax
@@ -114,18 +115,33 @@ instance LayoutPrinterWithName a => LayoutPrinter (Type' a) where
 -- schema's @returnType@ non-deterministic across compiles, which trips the
 -- deploy breaking-change check. Here we normalise every inference variable to a
 -- stable type-variable name (@a@, @b@, @c@, …) by order of first appearance.
+-- A name that already prints as a type in the same type is skipped, so that a
+-- function from any type to a declared type @a@ prints as
+-- @FUNCTION FROM b TO a@, not as the identity function's @FUNCTION FROM a TO a@.
 -- The plain 'prettyLayout' instance keeps the raw id, which is what we want for
 -- internal debugging.
 prettyTypeForDisplay :: Type' Resolved -> Text
 prettyTypeForDisplay ty = docText (goDisplayTy naming ty)
   where
-    naming = Map.fromList (zip (collectInfVarUniques ty) displayTypeVarNames)
+    taken = Set.fromList (collectTypeNameTexts ty)
+    naming = Map.fromList (zip (collectInfVarUniques ty) (filter (`Set.notMember` taken) displayTypeVarNames))
+
+-- | The text of every type name and @FOR ALL@ binder in a type, as
+-- 'printWithLayout' prints it.
+collectTypeNameTexts :: Type' Resolved -> [Text]
+collectTypeNameTexts = \ case
+  Type _          -> []
+  TyApp _ n ps    -> docText (printWithLayout n) : concatMap collectTypeNameTexts ps
+  Fun _ args ty'  -> concatMap (collectTypeNameTexts . ontType) args <> collectTypeNameTexts ty'
+  Forall _ vs ty' -> map (docText . printWithLayout) vs <> collectTypeNameTexts ty'
+  InfVar {}       -> []
+  where
+    ontType (MkOptionallyNamedType _ _ t) = t
 
 -- | Distinct inference-variable uniques, in order of first appearance.
 collectInfVarUniques :: Type' Resolved -> [Int]
-collectInfVarUniques = ordNub . go
+collectInfVarUniques = nubOrd . go
   where
-    ordNub = foldr (\x xs -> x : filter (/= x) xs) []
     go = \ case
       Type _          -> []
       TyApp _ _ ps     -> concatMap go ps
