@@ -85,7 +85,7 @@ import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.Exceptions
-import L4.EvaluateLazy.Trace (EvalTraceAction (..))
+import L4.EvaluateLazy.Trace (EvalTrace, EvalTraceAction (..))
 import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
 import L4.Utils.Ratio
@@ -161,6 +161,7 @@ data EvalState =
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
     , answerInJust :: !Bool        -- see 'L4.EvaluateLazy.EvalConfig'
     , maxFrameDepth :: !Int        -- see 'maximumFrameDepth'
+    , tracePostprocessor :: [EvalTraceAction] -> EvalTrace  -- see 'L4.EvaluateLazy.EvalConfig'
     }
 
 data Stack =

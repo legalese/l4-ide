@@ -74,6 +74,10 @@ data EvalConfig = EvalConfig
     -- @l4 batch@ and jl4-service's generated wrapper do, sets it, so that it
     -- reaches the same depth of the answer as a directive that asks for
     -- @f args@, and gives the same verdict.
+  , tracePostprocessor :: [EvalTraceAction] -> EvalTrace
+    -- ^ How a directive's trace is built from what the evaluation recorded:
+    -- 'postprocessTrace'. A test replaces it with one that fails, to follow
+    -- the fallback 'tracePostprocessFailed' out through a surface.
   }
 
 resolveEvalConfig :: Maybe UTCTime -> TracePolicy -> IO EvalConfig
@@ -81,7 +85,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe False)
+  pure (EvalConfig mTime tracePolicy safe False postprocessTrace)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -153,7 +157,9 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
         nfAnswer whnf
   postprocessed <- case mt of
     Nothing      -> pure Nothing
-    Just actions -> Just <$> liftIO (safePostprocessTrace actions)
+    Just actions -> do
+      postprocess <- asks (.tracePostprocessor)
+      Just <$> liftIO (safePostprocessTrace postprocess actions)
   let
     -- The root of the trace carries the outcome of the directive's expression.
     -- The trace records the reduction to weak head normal form, so an
@@ -227,16 +233,11 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
 -- #EVAL result. Catches 'ErrorCall' specifically — not 'SomeException'
 -- — so asynchronous exceptions (request cancellation, timeouts) still propagate.
 --
--- A test seam: no known input makes post-processing fail any more, so with
--- @JL4_TEST_FAIL_TRACE_POSTPROCESS@ set it fails here, and a test can follow
--- the fallback out through a surface such as @l4 trace@.
-safePostprocessTrace :: [EvalTraceAction] -> IO EvalTrace
-safePostprocessTrace actions = do
-  injected <- lookupEnv "JL4_TEST_FAIL_TRACE_POSTPROCESS"
-  let traced = case injected of
-        Just _  -> error "postprocessTrace: failure injected by JL4_TEST_FAIL_TRACE_POSTPROCESS"
-        Nothing -> postprocessTrace actions
-  r <- try (evaluate (force traced))
+-- It takes the post-processing to run, normally 'postprocessTrace': no known
+-- input makes that fail any more, so a test passes one that does.
+safePostprocessTrace :: ([EvalTraceAction] -> EvalTrace) -> [EvalTraceAction] -> IO EvalTrace
+safePostprocessTrace postprocess actions = do
+  r <- try (evaluate (force (postprocess actions)))
   pure $ case r of
     Right t               -> t
     Left (_ :: ErrorCall) -> tracePostprocessFailed
@@ -549,7 +550,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   temporalContext <- newIORef temporalCtx
   let evalTrace = Nothing
   maxFrameDepth <- readMaxFrameDepthEnv
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth}
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth, tracePostprocessor = evalConfig.tracePostprocessor}
 
 -- | @JL4_MAX_FRAME_DEPTH@, a whole number from 1 to the largest 'Int',
 -- replaces 'maximumFrameDepth'. Anything else leaves the default.

@@ -2760,13 +2760,23 @@ spec bin = do
       sout `shouldSatisfy` ("<error>" `isInfixOf`)
 
     -- No known input makes a trace fail to build, so the test seam makes it
-    -- fail. A graph of one node must not pass for a trace with exit 0.
+    -- fail: `l4 trace`, and nothing else, reads JL4_TEST_FAIL_TRACE_POSTPROCESS,
+    -- and only the value 1. A graph of one node must not pass for a trace with
+    -- exit 0.
     it "exits 1 with its error line when a trace cannot be built" $ do
       parent <- getEnvironment
       Output code sout serr <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", "1") : parent)) bin ["trace", evalTraceFixture]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("Error: a trace could not be built" `isInfixOf`)
       sout `shouldSatisfy` ("trace unavailable" `isInfixOf`)
+
+    -- The seam takes exactly "1": any other value is no seam.
+    it "builds traces as usual when the test seam is set to anything but 1" $ do
+      parent <- getEnvironment
+      forM_ ["0", "", "true"] $ \v -> do
+        Output code sout _ <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", v) : parent)) bin ["trace", evalTraceFixture]
+        code `shouldBe` ExitSuccess
+        sout `shouldNotSatisfy` ("trace unavailable" `isInfixOf`)
 
     it "exits 1 with its error line when a trace written to --output-dir cannot be built" $ do
       parent <- getEnvironment
