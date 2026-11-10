@@ -214,6 +214,7 @@ test-suite jl4-core-test
     ImportErrorRangeSpec
     ResolutionCascadeSpec
     HoverApiSpec
+    WarningViableForkSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
