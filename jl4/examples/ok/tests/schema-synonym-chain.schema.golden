@@ -1,0 +1,120 @@
+{
+    "$defs": {
+        "Holder": {
+            "properties": {
+                "n": {
+                    "type": "number"
+                },
+                "s": {
+                    "$ref": "#/$defs/S1"
+                },
+                "t": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "n"
+            ],
+            "type": "object"
+        },
+        "S1": {
+            "$ref": "#/$defs/S2"
+        },
+        "S10": {
+            "$ref": "#/$defs/S11"
+        },
+        "S11": {
+            "$ref": "#/$defs/S12"
+        },
+        "S12": {
+            "$ref": "#/$defs/S13"
+        },
+        "S13": {
+            "$ref": "#/$defs/S14"
+        },
+        "S14": {
+            "$ref": "#/$defs/S15"
+        },
+        "S15": {
+            "$ref": "#/$defs/S16"
+        },
+        "S16": {
+            "$ref": "#/$defs/S17"
+        },
+        "S17": {
+            "$ref": "#/$defs/S18"
+        },
+        "S18": {
+            "$ref": "#/$defs/S19"
+        },
+        "S19": {
+            "$ref": "#/$defs/S20"
+        },
+        "S2": {
+            "$ref": "#/$defs/S3"
+        },
+        "S20": {
+            "anyOf": [
+                {
+                    "type": "number"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "S3": {
+            "$ref": "#/$defs/S4"
+        },
+        "S4": {
+            "$ref": "#/$defs/S5"
+        },
+        "S5": {
+            "$ref": "#/$defs/S6"
+        },
+        "S6": {
+            "$ref": "#/$defs/S7"
+        },
+        "S7": {
+            "$ref": "#/$defs/S8"
+        },
+        "S8": {
+            "$ref": "#/$defs/S9"
+        },
+        "S9": {
+            "$ref": "#/$defs/S10"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "reads a holder",
+    "properties": {
+        "h": {
+            "$ref": "#/$defs/Holder"
+        },
+        "x": {
+            "anyOf": [
+                {
+                    "type": "number"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "y": {
+            "$ref": "#/$defs/S1"
+        }
+    },
+    "required": [
+        "h"
+    ],
+    "title": "f",
+    "type": "object"
+}

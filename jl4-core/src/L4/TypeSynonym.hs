@@ -13,6 +13,7 @@ import Base
 import qualified Data.Map.Strict as Map
 
 import L4.Syntax
+import L4.TypeCheck.Unify (synonymExpansionFuel)
 
 -- | The module's own declarations, by name.
 declaresFromModule :: Module Resolved -> Map Text (Declare Resolved)
@@ -30,11 +31,15 @@ declaresFromModule (MkModule _ _ section) =
     _ ->
       []
 
--- | Expand the synonyms at the head of a type. A declaration is used only when
--- it is the very type referred to, by unique, not one that shares its name;
--- and, as in the decoder, for at most 16 steps.
+-- | Expand the synonyms at the head of a type, to the end of the chain. A
+-- declaration is used only when it is the very type referred to, by unique,
+-- not one that shares its name. The checker refuses a cycle of synonyms
+-- (check/cyclic-type-synonyms), and stops following a chain after
+-- 'synonymExpansionFuel' steps (check/type-synonym-chain-too-long). That is
+-- the bound used here, and by the decoder and the service's wrapper, so all
+-- of them follow a chain exactly as far as the checker does.
 expandSynonyms :: Map Text (Declare Resolved) -> Type' Resolved -> Type' Resolved
-expandSynonyms declares = go (16 :: Int)
+expandSynonyms declares = go synonymExpansionFuel
  where
   go 0 ty = ty
   go n ty@(TyApp _ ref args) =

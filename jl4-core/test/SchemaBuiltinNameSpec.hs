@@ -97,6 +97,28 @@ synonyms = Text.unlines
   , "total h extra MEANS h's n"
   ]
 
+-- | Synonyms for MAYBE twenty deep, without an argument and with one.
+chain :: Text
+chain = Text.unlines $
+  [ "DECLARE S" <> n k <> " IS AN S" <> n (k + 1) | k <- [1 .. 19 :: Int] ]
+  <> [ "DECLARE S20 IS A MAYBE NUMBER" ]
+  <> [ "DECLARE A" <> n k <> " OF a IS AN A" <> n (k + 1) <> " a" | k <- [1 .. 19 :: Int] ]
+  <> [ "DECLARE A20 OF a IS A MAYBE a"
+     , "DECLARE Holder HAS"
+     , "  s IS AN S1"
+     , "  t IS AN A1 NUMBER"
+     , "  n IS A NUMBER"
+     , ""
+     , "@export default reads a holder"
+     , "GIVEN h IS A Holder"
+     , "      x IS AN A1 NUMBER"
+     , "      y IS AN S1"
+     , "GIVETH A NUMBER"
+     , "f h x y MEANS h's n"
+     ]
+ where
+  n = Text.pack . show
+
 checked :: [(Text, Text)] -> Text -> TypeCheckWithDepsResult
 checked files source =
   case checkWithImports (if null files then emptyVFS else vfsFromList files) source of
@@ -286,3 +308,17 @@ spec = describe "a type named like a builtin" $ do
     it "an input typed with a synonym for MAYBE is not required" $ do
       [ (q.paramName, q.paramRequired) | q <- (export (checked [] synonyms)).exportParams ]
         `shouldBe` [("h", True), ("extra", False)]
+
+    -- They used to stop after 16 steps.
+    it "follows a chain of twenty synonyms to its end, in both generators and for inputs" $ do
+      let r = checked [] chain
+          (required, field) = requiredAndFields r "Holder"
+          p = parameter r "h"
+          props = maybe (error "no properties") id p.parameterProperties
+          svc k = maybe (error ("no field " <> show k)) id (Map.lookup k props)
+      required `shouldBe` ["n"]
+      [ k | k <- ["s", "t", "n"], not (nullable r (field k)) ] `shouldBe` required
+      p.parameterRequired `shouldBe` Just ["n"]
+      ((svc "s").parameterType, (svc "t").parameterType) `shouldBe` ("number", "number")
+      [ (q.paramName, q.paramRequired) | q <- (export r).exportParams ]
+        `shouldBe` [("h", True), ("x", False), ("y", False)]

@@ -259,6 +259,35 @@ spec = describe "integration" do
           answer [ "y" Aeson..= Aeson.Null ]    >>= (`shouldBe` (200, Just (FnLitInt 0)))
           answer []                             >>= (`shouldBe` (200, Just (FnLitInt 0)))
 
+    -- A synonym for a MAYBE twenty deep is a MAYBE too. The service's wrapper
+    -- and the decoder followed a chain for 16 steps, so past that a null for the
+    -- input was refused although JSONDECODE accepted one for a field.
+    it "reads a synonym for a MAYBE twenty deep as a MAYBE: a value, a null and an omitted one" do
+      let chain = Text.unlines $
+            [ "DECLARE S" <> tshow k <> " IS AN S" <> tshow (k + 1) | k <- [1 .. 19 :: Int] ]
+            <> [ "DECLARE S20 IS A MAYBE NUMBER"
+               , ""
+               , "@export a number that may be left out, through twenty synonyms"
+               , "GIVEN y IS AN S1"
+               , "GIVETH A NUMBER"
+               , "`deep maybe` y MEANS"
+               , "  CONSIDER y"
+               , "    WHEN JUST n THEN n PLUS 1"
+               , "    WHEN NOTHING THEN 0"
+               ]
+          tshow = Text.pack . show
+      withServiceFromSources "maybe-synonym-chain" [("chain.l4", chain)] \baseUrl mgr -> do
+        let answer args = do
+              resp <- evalFunction baseUrl mgr "maybe-synonym-chain" "deep maybe"
+                (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+              pure ( statusCode' resp
+                   , case Aeson.decode (responseBody resp) of
+                       Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                       _ -> Nothing )
+        answer [ "y" Aeson..= (2020 :: Int) ] >>= (`shouldBe` (200, Just (FnLitInt 2021)))
+        answer [ "y" Aeson..= Aeson.Null ]    >>= (`shouldBe` (200, Just (FnLitInt 0)))
+        answer []                             >>= (`shouldBe` (200, Just (FnLitInt 0)))
+
     -- Three kinds of request go through the generated wrapper and not the direct
     -- path: an input whose value is `{}`, a batch case with a `null`, and an MCP
     -- call with a `null`. The wrapper read the head of an input's type only, so

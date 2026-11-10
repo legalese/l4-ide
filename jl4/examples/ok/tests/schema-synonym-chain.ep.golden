@@ -1,0 +1,67 @@
+-- A synonym for MAYBE twenty deep, with and without an argument, is a MAYBE
+-- to the JSON decoder and to both schema generators: each follows the chain as
+-- far as the checker does. They used to stop after 16 steps, which left a
+-- nullable field required in jl4-schema and the decoder refusing a null.
+-- The schema golden is jl4-schema's; each JSONDECODE is what the decoder
+-- accepts.
+
+DECLARE S1 IS AN S2
+DECLARE S2 IS AN S3
+DECLARE S3 IS AN S4
+DECLARE S4 IS AN S5
+DECLARE S5 IS AN S6
+DECLARE S6 IS AN S7
+DECLARE S7 IS AN S8
+DECLARE S8 IS AN S9
+DECLARE S9 IS AN S10
+DECLARE S10 IS AN S11
+DECLARE S11 IS AN S12
+DECLARE S12 IS AN S13
+DECLARE S13 IS AN S14
+DECLARE S14 IS AN S15
+DECLARE S15 IS AN S16
+DECLARE S16 IS AN S17
+DECLARE S17 IS AN S18
+DECLARE S18 IS AN S19
+DECLARE S19 IS AN S20
+DECLARE S20 IS A MAYBE NUMBER
+DECLARE A1 OF a IS AN A2 a
+DECLARE A2 OF a IS AN A3 a
+DECLARE A3 OF a IS AN A4 a
+DECLARE A4 OF a IS AN A5 a
+DECLARE A5 OF a IS AN A6 a
+DECLARE A6 OF a IS AN A7 a
+DECLARE A7 OF a IS AN A8 a
+DECLARE A8 OF a IS AN A9 a
+DECLARE A9 OF a IS AN A10 a
+DECLARE A10 OF a IS AN A11 a
+DECLARE A11 OF a IS AN A12 a
+DECLARE A12 OF a IS AN A13 a
+DECLARE A13 OF a IS AN A14 a
+DECLARE A14 OF a IS AN A15 a
+DECLARE A15 OF a IS AN A16 a
+DECLARE A16 OF a IS AN A17 a
+DECLARE A17 OF a IS AN A18 a
+DECLARE A18 OF a IS AN A19 a
+DECLARE A19 OF a IS AN A20 a
+DECLARE A20 OF a IS A MAYBE a
+
+DECLARE Holder HAS
+  s IS AN S1
+  t IS AN A1 NUMBER
+  n IS A NUMBER
+
+@export default reads a holder
+GIVEN h IS A Holder
+      x IS AN A1 NUMBER
+      y IS AN S1
+GIVETH A NUMBER
+f h x y MEANS h's n
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Holder
+decode s MEANS JSONDECODE s
+
+#EVAL decode "{\"s\": 2, \"t\": 3, \"n\": 1}"
+#EVAL decode "{\"s\": null, \"t\": null, \"n\": 1}"
+#EVAL decode "{\"n\": 1}"

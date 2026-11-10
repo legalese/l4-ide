@@ -87,6 +87,7 @@ import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.Exceptions
 import L4.EvaluateLazy.Trace (EvalTrace, EvalTraceAction (..))
 import L4.TypeSynonym (substituteTypeParams)
+import L4.TypeCheck.Unify (synonymExpansionFuel)
 import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
 import L4.Utils.Ratio
@@ -1466,7 +1467,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
 -- string for a @Year@ is accepted as it stands instead of refused as it is for
 -- a @NUMBER@.
 expandTypeSynonyms :: Type' Resolved -> Machine (Type' Resolved)
-expandTypeSynonyms = go (16 :: Int)
+expandTypeSynonyms = go synonymExpansionFuel
   where
     go 0 ty = pure ty
     go n ty@(TyApp _ tyRef args) = do
