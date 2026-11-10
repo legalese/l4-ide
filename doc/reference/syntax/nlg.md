@@ -108,17 +108,44 @@ The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](
 - **A unit of time after a slot agrees with the number:** "%n% months" reads "1 month" for 1.
 - **`l4 nlg` writes literal dates as dates:** `YMD 2025 7 16` and `Date 16 7 2025` read `16 July 2025`. A date that does not exist, such as `Date 31 2 2025`, stays a call.
 
+## When a slot gets brackets
+
+A sentence's own words can read as part of what fills its slot.
+So a slot gets brackets when two things hold: the sentence goes on after the slot, and what fills it has no word to close it.
+
+The sentence goes on after a slot when its words or another of its slots come after it.
+With `@nlg %a%, %b%` on `comma`, `` `comma` (NOT (`fb` p)) q `` reads "(it is not the case that fb for p), [q]".
+A slot at the end of a sentence has nothing after it, so it gets no brackets.
+With `@nlg %a% is told %b%` on `told`, and `@nlg %p% is shown` on `shown`, `` `told` p (NOT (`shown` q)) `` reads "[p] is told it is not the case that [q] is shown".
+
+These have no closing word. Each example is in `l4 render`, where `shown` and `told` have the sentences above and `fb` has none.
+
+| What fills the slot                                 | You write                               | It reads                                                  |
+| --------------------------------------------------- | --------------------------------------- | --------------------------------------------------------- |
+| An `OR` or an `AND`                                 | `` `shown` (p OR q) ``                  | "(p or q) is shown"                                       |
+| A denial                                            | `` `shown` (NOT (`fb` p)) ``            | "(it is not the case that fb for p) is shown"             |
+| An `IMPLIES`                                        | `` `shown` (p IMPLIES q) ``             | "(p implies q) is shown"                                  |
+| A call with no sentence that ends with one of these | `` `shown` (`fb` (p AND q)) ``          | "(fb for p and q) is shown"                               |
+| A call with a sentence whose last slot holds one    | `` `shown` (`told` p (NOT (`fb` q))) `` | "([p] is told it is not the case that fb for q) is shown" |
+
+`l4 nlg` brackets the same slots, with names in backticks: `` `shown` (TRUE OR FALSE) `` reads "(`TRUE` or `FALSE`) is shown".
+It also brackets an `IF`: `` `shown` (IF TRUE THEN FALSE ELSE TRUE) `` reads "(if `TRUE` then `FALSE` else `TRUE`) is shown".
+`l4 render` moves a call into the branches of an `IF` instead.
+
+Wording can still read two ways in these cases:
+
+- **A denial of one condition in `l4 render`** reads "p is false" and gets no brackets, so `` `shown` (NOT p) `` reads "p is false is shown".
+- **The slot at the end of a sentence** can run on into what follows the sentence: ``((`told` p (NOT (`fb` q))) OR r) IMPLIES r`` reads "[p] is told it is not the case that fb for q or r implies r".
+- **A sentence that ends with its slot, in `l4 nlg`:** with `@nlg it is shown that %x%` on `shown that`, ``(`shown that` TRUE) AND FALSE`` and `` `shown that` (TRUE AND FALSE) `` both read "it is shown that `TRUE` and `FALSE`".
+- **A condition given to a call with no sentence** gets no brackets: ``NOT (p OR (`fb` (q AND r)))`` reads "neither p nor fb for q and r".
+
+If a rule reads two ways because of one of these, give the condition a rule of its own, with a sentence, and call that.
+
 ## Limits
 
 - **An `ASSUME`d function has no named inputs,** so it has no slots, and a call reads as its name and arguments. Use a `BOOLEAN` field or a rule instead.
 - **A function passed on, or named without being called,** reads as its name. In `filter even xs`, `even` reads `even`.
-- **A sentence inside another call is spliced in without brackets,** so nested calls can read alike: with `@nlg %a% doubled` on `dbl`, `` `f2` 2 (`dbl` 3) `` and `` `dbl` (`f2` 2 3) `` both read "`f2` with 2 and 3 doubled". Set slots off with words that cannot be part of an argument, and read the output of nested calls. A sentence that ends with a condition is the exception, in the next point. Arithmetic is bracketed, and so is anything beside it that does not say where it ends: "10 minus (5 minus 2)", "(5 doubled) minus 2", "twice (5 minus 2)", "(f2 for 2 and x) − 3".
-- **A condition or an IF that fills a slot is bracketed when the sentence goes on after the slot,** so the rest of the sentence cannot read as part of it: with `@nlg %p% is shown` on `shown`, ``NOT (`shown` (`fb` TRUE))`` reads "not `fb` with `TRUE` is shown" and `` `shown` (NOT (`fb` TRUE)) `` reads "(not `fb` with `TRUE`) is shown"; `` `shown` (TRUE OR FALSE) AND FALSE `` reads "(`TRUE` or `FALSE`) is shown and `FALSE`"; and with `dbl` as above, `` `dbl` (IF FALSE THEN 1 ELSE 10 MINUS 3) `` reads "(if `FALSE` then 1 else 10 minus 3) doubled". So is a call that ends with such a condition: `` `shown` (`fb` (TRUE AND FALSE)) `` reads "(`fb` with `TRUE` and `FALSE`) is shown", and `l4 render` reads `` `shown` (`fb` (p AND q)) `` as "(fb for p and q) is shown". So is a call with a sentence of its own whose slot at the end holds such a condition: with `@nlg %a% is told %b%` on `told`, `` `shown` (`told` TRUE (NOT FALSE)) `` reads "(`TRUE` is told not `FALSE`) is shown", and `` `told` TRUE (NOT (`shown` FALSE)) `` reads "`TRUE` is told not `FALSE` is shown"; `l4 render` reads `` `shown` (`told` p (NOT (`fb` q))) `` as "([p] is told it is not the case that fb for q) is shown". Which slots is decided by where the slot is, not by the words: the sentence goes on after a slot when its words or another of its slots come after it, so with `@nlg %a%, %b%` on `comma`, `` `comma` (NOT (`fb` TRUE)) FALSE `` reads "(not `fb` with `TRUE`), `FALSE`". A condition in the slot at the end of the sentence is not bracketed, because nothing of the sentence follows it.
-  What is left: in `l4 render` a denial of a single condition reads "p is false", which says where it ends, and is not bracketed: `` `shown` (NOT p) `` renders "p is false is shown".
-  The slot at the end of a sentence can still run on past it, whatever fills it: ``((`told` p (NOT (`fb` q))) OR r) IMPLIES r`` renders "[p] is told it is not the case that fb for q or r implies r".
-  In `l4 nlg`, with `@nlg it is shown that %x%` on `shown that`, ``(`shown that` TRUE) AND FALSE`` and `` `shown that` (TRUE AND FALSE) `` both read "it is shown that `TRUE` and `FALSE`", and so they read alike again in another sentence's slot.
-  And a condition given to a call with no sentence is not bracketed: ``NOT (p OR (`fb` (q AND r)))`` renders "neither p nor fb for q and r".
-  Give the condition a rule of its own, with a sentence, and call that.
+- **A sentence inside another call is spliced in without brackets,** so nested calls can read alike: with `@nlg %a% doubled` on `dbl`, `` `f2` 2 (`dbl` 3) `` and `` `dbl` (`f2` 2 3) `` both read "`f2` with 2 and 3 doubled". Set slots off with words that cannot be part of an argument, and read the output of nested calls. A sentence that ends with a condition is the exception: see [When a slot gets brackets](#when-a-slot-gets-brackets). Arithmetic is bracketed, and so is anything beside it that does not say where it ends: "10 minus (5 minus 2)", "(5 doubled) minus 2", "twice (5 minus 2)", "(f2 for 2 and x) − 3".
 - **A function with no sentence** reads as its pattern: `` `_ LESS _` with 100 and 20 ``.
 - **In `l4 render`, a mixfix call's hole is bracketed, first, middle or last,** unless it holds a literal, a name, a field of one, a date written as numbers, or a call with one argument.
   So ``(a `reduced by` b) `reduced by` c`` and ``a `reduced by` (b `reduced by` c)`` read apart, and so do a `NOT`, an `IF`, a list or a `FOLLOWED BY` in a hole: ``yes `as well as` (NOT no)`` reads "yes as well as (no is false)".
