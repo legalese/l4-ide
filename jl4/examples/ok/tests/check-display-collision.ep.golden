@@ -1,0 +1,11 @@
+-- The display names `a`, `b`, … for a `#CHECK` over a polymorphic term skip
+-- any name that is already a type: here the declared type `a`. Otherwise the
+-- first line would print `FUNCTION FROM a TO a`, the same text as the third,
+-- whose input is the declared `a`, and as the identity function.
+
+DECLARE a IS ONE OF approved, rejected
+
+#CHECK GIVEN `the application` YIELD approved
+#CHECK GIVEN x, y YIELD approved
+#CHECK GIVEN x IS a YIELD x
+#CHECK GIVEN x YIELD x
