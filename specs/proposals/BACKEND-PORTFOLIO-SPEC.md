@@ -370,10 +370,11 @@ sign-off from both sides' specs in their next revision.
 
 - **Docs-only spec PRs are parallel-safe** and should stay docs-only (the three bridge specs and
   this document all are).
-- **Implementation hotspots:** `jl4/app/Main.hs` (verb table), `jl4.cabal`/`jl4-core.cabal`
+- **Implementation hotspots:** `jl4/app/L4/Cli/Main.hs` (verb table; it was `jl4/app/Main.hs` before the CLI extension hook), `jl4.cabal`/`jl4-core.cabal`
   (module lists), shared golden directories. The footprint is named precisely (per the
   DocAssemble M1 measurement, 2026-08-16): the **OpenFisca five-edit shape** — Main.hs import,
-  `Command` constructor, subparser entry, dispatch arm, `jl4.cabal` other-modules — plus three
+  `Command` constructor, subparser entry, dispatch arm, `jl4.cabal` other-modules (now the
+  `exposed-modules` of `library l4-cli`) — plus three
   `exposed-modules` lines in `jl4-core.cabal`. Every bridge touches the same lines; conflicts are
   trivial and named in advance, and the second and third implementers should expect exactly these
   on rebase. First two implementation PRs: sequence through the

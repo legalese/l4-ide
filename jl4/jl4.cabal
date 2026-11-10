@@ -24,8 +24,17 @@ common defaults
   build-depends:
     base
 
-executable l4
+-- The command line of `l4`, as a library, so that another package can build a
+-- command line that is `l4` plus commands of its own (L4.Cli.Extensions).
+-- `executable l4` below is this library with nothing added.
+--
+-- `l4`'s own `Main` is in `l4/` and not in `app/`: an executable whose source
+-- path holds the library's modules compiles them again into itself instead of
+-- using the library. `jl4-schema` still has `app` on its path and is safe only
+-- because Schema.hs imports nothing from L4.Cli.
+library l4-cli
   import: defaults
+  visibility: public
   hs-source-dirs: app
   build-depends:
     jl4-core,
@@ -57,8 +66,7 @@ executable l4
     zip-archive,
   if !os(windows)
     build-depends: unix
-  main-is: Main.hs
-  other-modules:
+  exposed-modules:
     L4.Cli.Ast
     L4.Cli.Batch
     L4.Cli.Blawx
@@ -70,9 +78,11 @@ executable l4
     L4.Cli.Docassemble
     L4.Cli.Explore
     L4.Cli.Export
+    L4.Cli.Extensions
     L4.Cli.Format
     L4.Cli.Install
     L4.Cli.Lts
+    L4.Cli.Main
     L4.Cli.Nlg
     L4.Cli.OpenFisca
     L4.Cli.Render
@@ -82,29 +92,33 @@ executable l4
     L4.Cli.Verify
     L4.Cli.Yscript
 
+executable l4
+  import: defaults
+  hs-source-dirs: l4
+  build-depends:
+    jl4:l4-cli,
+  main-is: Main.hs
+
 -- The M3 gate measurement: does information-gain question ordering ask fewer
 -- questions than L4 declaration order? Its own executable rather than a mode on
 -- `l4`, because it is not a user-facing operation on a document -- it is an
 -- experiment over a corpus, it takes a seed and a sampling budget, and bolting
 -- that onto a CLI verb would put an experiment's knobs in a user's --help.
--- It shares `app` only for L4.Cli.Common's oneshot pipeline loader.
+-- It takes L4.Cli.Common's oneshot pipeline loader from the l4-cli library.
 executable m3-measure
   import: defaults
-  hs-source-dirs: measure app
+  hs-source-dirs: measure
   build-depends:
+    jl4:l4-cli,
     jl4-core,
     jl4-lsp,
     jl4-query-plan,
     aeson,
     bytestring,
     containers,
-    hls-graph,
     lsp-types,
     optparse-applicative,
-    time,
   main-is: M3Measure.hs
-  other-modules:
-    L4.Cli.Common
 
 executable jl4-schema
   import: defaults
@@ -176,6 +190,7 @@ test-suite l4-cli-test
     CliTest.Docassemble
     CliTest.Ledger
     CliTest.Explore
+    CliTest.Extensions
     CliTest.OpenFisca
     CliTest.Yscript
     Paths_jl4
@@ -186,12 +201,14 @@ test-suite l4-cli-test
     jl4-lsp:jl4-lsp,
     jl4-repl:jl4-repl
   build-depends:
+    jl4:l4-cli,
     aeson,
     bytestring,
     directory,
     filepath,
     hspec,
     jl4-core,
+    optparse-applicative,
     process,
     temporary,
     text,

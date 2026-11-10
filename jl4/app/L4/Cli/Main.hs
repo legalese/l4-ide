@@ -1,15 +1,22 @@
--- | Entry point for the @l4@ CLI.
+-- | The command line of @l4@, as a function of the 'Extensions' added to it.
 --
 -- Dispatches on a subcommand; if the first positional argument is a bare
 -- filepath instead of a known subcommand name, falls through to @l4 run@
 -- so legacy invocations like @l4 foo.l4@ (and @jl4-cli foo.l4@ from older
 -- scripts) keep working.
-module Main where
+--
+-- The executable @l4@ is @mainWith noExtensions@ (@jl4/l4/Main.hs@). Another
+-- package can build an executable that is @l4@ plus its own commands, export
+-- formats and @explore --emit@ targets; see "L4.Cli.Extensions".
+module L4.Cli.Main (mainWith) where
 
 import Control.Applicative ((<|>))
+import Control.Exception (evaluate)
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
 import Options.Applicative
-  ( Parser
+  ( CommandFields
+  , Mod
+  , Parser
   , ParserInfo
   , command
   , commandGroup
@@ -26,8 +33,12 @@ import Options.Applicative
   , showHelpOnEmpty
   , subparser
   )
+import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Options.Applicative as Options
+-- An internal module; the same signature of 'mkCommand' is exported by
+-- optparse-applicative 0.18.1.0 and 0.19.0.0 (read in both, 2026-10-30).
+import Options.Applicative.Builder.Internal (mkCommand)
 import qualified Options.Applicative.Help.Pretty as Pretty
 import System.IO (hSetEncoding, stdin, stdout, stderr)
 
@@ -54,6 +65,7 @@ import L4.Cli.Deploy
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
 import L4.Cli.Explore (ExploreCliOptions, exploreCmd, exploreOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
+import L4.Cli.Extensions (ExtCommand (..), Extensions (..), checkExtensions, extensionLabel)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
 import L4.Cli.Lts (LtsOptions, ltsCmd, ltsOptionsParser)
@@ -94,14 +106,20 @@ data Command
   | CmdUndeploy   UndeployOptions
   | CmdDeployments DeploymentsOptions
   | CmdInstall    InstallOptions
+  | CmdExtension  (IO ())
 
-commandParser :: Parser Command
-commandParser =
-      subparser subcommandSet
+commandParser :: Extensions -> Parser Command
+commandParser exts =
+  -- Forcing `checked` forces the name checks of both lists. The export formats
+  -- are otherwise read only by `l4 export`, and a clash among them would stop
+  -- only that.
+  checked `seq`
+      (checked
   -- Backward-compat fallthrough: `l4 foo.l4 [--flags]` = `l4 run foo.l4 [--flags]`.
   -- Must come after `subparser` so a well-typed subcommand name wins.
-  <|> (CmdRun <$> runOptionsParser)
+  <|> (CmdRun <$> runOptionsParser))
   where
+    checked = exportFormats `seq` checkedSubparser (extensionLabel exts) "command" subcommandSet
     subcommandSet =
          command "run"
            (info (helper <*> (CmdRun <$> runOptionsParser))
@@ -138,18 +156,14 @@ commandParser =
            (info (helper <*> (CmdLts <$> ltsOptionsParser))
              (progDesc "List, for every #TRACE, what is owed now, what would discharge it, what would breach it, and the next deadline"))
       <> command "explore"
-           (info (helper <*> (CmdExplore <$> exploreOptionsParser))
+           (info (helper <*> (CmdExplore <$> exploreOptionsParser exts.extEmitTargets))
              ( progDesc "Every position a contract can reach, as an explicit labelled transition system, ending in a coverage line"
              <> footer "Exit status: 0 complete, and every property named holds; 1 the file or an option failed, or an emitted file could not be written; 2 an act was refused (a variable whose type has no finite set of values) or a candidate could not be tried; 3 the depth or state bound stopped it; 4 a property is violated; 5 a property's verdict is unknown (every liveness property: run the emitted model). No sample is ever tried in a refused act's place."
              ))
-      -- `helper` here, and not on the older subcommands, is deliberate rather
-      -- than inconsistent-by-accident: `l4 <cmd> --help` answers
-      -- `Invalid option '--help'` for every subcommand that predates these two,
-      -- and this command's honesty about its own limits is delivered through
-      -- `footer`. A caveat nobody can reach is not a caveat. Extending `helper`
-      -- to the rest is a good idea and a separate change: the orchestrator's
-      -- p0-preflight pins CLI enumerations, and moving nine help surfaces at
-      -- once is not something to do inside a footing PR.
+      -- Every subcommand carries `helper` (measured 2026-10-30: `l4 <cmd> --help`
+      -- exits 0 for all nineteen), so `explore` and `verify` can deliver their
+      -- honesty about their own limits through `footer`. A caveat nobody can
+      -- reach is not a caveat.
       <> command "verify"
            (info (helper <*> (CmdVerify <$> verifyOptionsParser))
              (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
@@ -175,13 +189,15 @@ commandParser =
       <> command "install"
            (info (helper <*> (CmdInstall <$> installOptionsParser))
              (progDesc "Install a companion tool: `l4 install legalese` (the Legalese Cloud CLI)"))
+      -- Added by an extension, after the built-in ones (empty in the community build).
+      <> foldMap extensionCommand exts.extCommands
 
     -- One subcommand per foreign notation (CLI-SURFACE-SPEC C1). Each was a
     -- top-level verb, or a `--to` value on `l4 export`, until 2026-09-24.
     -- Adding a backend adds one entry here, and `l4 export --help` is the
     -- catalogue of every notation L4 can write.
     exportFormats =
-      subparser
+      checkedSubparser (extensionLabel exts) "export format"
         (  metavar "FORMAT"
         <> commandGroup "Formats:"
         <> command "dmn"
@@ -208,6 +224,7 @@ commandParser =
         <> command "yscript"
              (info (helper <*> (CmdYscript <$> yscriptOptionsParser))
                (progDesc "AustLII DataLex yscript for the pure-propositional-logic subset (one-way, no fidelity report)"))
+        <> foldMap extensionCommand exts.extExports
         )
 
     importFormats =
@@ -230,8 +247,26 @@ commandParser =
 verbatim :: String -> Pretty.Doc
 verbatim = Pretty.vsep . fmap Pretty.pretty . lines
 
-commandInfo :: ParserInfo Command
-commandInfo = info (helper <*> versionOption <*> commandParser)
+-- | An extension's subcommand, as a built-in one is declared.
+extensionCommand :: ExtCommand -> Mod CommandFields Command
+extensionCommand c = command c.ecName (CmdExtension <$> c.ecInfo)
+
+-- | 'subparser', except that a name given twice is an error. With optparse-
+-- applicative's own rule, the first of two commands of one name wins and the
+-- other is unreachable without a word, which is how an extension would lose
+-- to a built-in. The error is raised when the parser is first read, which
+-- 'mainWith' does before it reads an argument. @who@ names the extension and
+-- @what@ the kind of thing, for the message.
+checkedSubparser :: String -> String -> Mod CommandFields a -> Parser a
+checkedSubparser who what m = case [ n | n <- names, length (filter (== n) names) > 1 ] of
+  [] -> subparser m
+  n : _ -> errorWithoutStackTrace
+    ("two " <> what <> "s are named `" <> n <> "`: a name added by " <> who <> " cannot be one that a built-in or another extension already has")
+  where
+    names = map fst (snd (mkCommand m))
+
+commandInfo :: Extensions -> ParserInfo Command
+commandInfo exts = info (helper <*> versionOption exts <*> commandParser exts)
   ( fullDesc
   <> header "l4 — the L4 computational-law CLI"
   <> progDesc "Typecheck, evaluate, format, visualize and deploy .l4 files, and export them to (or import them from) other notations. Run `l4 <command> --help` for per-command options."
@@ -241,14 +276,16 @@ commandInfo = info (helper <*> versionOption <*> commandParser)
 -- | @l4 --version@: one line naming the build, @dev@ for a local build
 -- ("LSP.L4.BuildInfo"). It is an option of @l4@ itself and not a subcommand,
 -- because @l4 version@ already means the file called @version@ (the
--- fall-through to @l4 run@ above).
-versionOption :: Parser (a -> a)
-versionOption =
-  Options.infoOption (Text.unpack buildInfoLine)
+-- fall-through to @l4 run@ above). An extension's edition follows the line,
+-- as in @dev (enterprise edition)@, so that its executable says which it is.
+versionOption :: Extensions -> Parser (a -> a)
+versionOption exts =
+  Options.infoOption (Text.unpack buildInfoLine <> maybe "" (\ e -> " (" <> e <> " edition)") exts.extEdition)
     (Options.long "version" <> Options.help "Print the version of this build and exit")
 
-main :: IO ()
-main = do
+-- | Run the command line: the built-in commands, and the 'Extensions' added to them.
+mainWith :: Extensions -> IO ()
+mainWith exts = do
   -- Force UTF-8 everywhere. On Windows, GHC's default locale encoding is
   -- whatever the user codepage happens to be (CP1252 / CP437 / CP850 …),
   -- which means two independent disasters:
@@ -269,7 +306,15 @@ main = do
   hSetEncoding stdout utf8
   hSetEncoding stderr utf8
 
-  cmd <- customExecParser (prefs showHelpOnEmpty) commandInfo
+  -- The faults of the extensions stop the program before an argument is read,
+  -- so that `--version` and `--help` stop too (L4.Cli.Extensions). The second
+  -- reads the parser, which holds the check against the built-in names.
+  case checkExtensions exts of
+    [] -> pure ()
+    problems -> errorWithoutStackTrace (List.intercalate "\n" problems)
+  _ <- evaluate (commandParser exts)
+
+  cmd <- customExecParser (prefs showHelpOnEmpty) (commandInfo exts)
   case cmd of
     CmdRun        opts -> runCmd        opts
     CmdCheck      opts -> checkCmd      opts
@@ -286,7 +331,7 @@ main = do
     CmdDocassemble opts -> docassembleCmd opts
     CmdNlg        opts -> nlgCmd        opts
     CmdLts        opts -> ltsCmd        opts
-    CmdExplore    opts -> exploreCmd    opts
+    CmdExplore    opts -> exploreCmd    exts.extEmitTargets opts
     CmdVerify     opts -> verifyCmd     opts
     CmdYscript    opts -> yscriptCmd    opts
     CmdDeploy     opts -> deployCmd     opts
@@ -294,6 +339,7 @@ main = do
     CmdUndeploy   opts -> undeployCmd   opts
     CmdDeployments opts -> deploymentsCmd opts
     CmdInstall    opts -> installCmd    opts
+    CmdExtension  act  -> act
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.
