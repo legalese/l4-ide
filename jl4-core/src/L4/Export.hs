@@ -7,6 +7,7 @@ module L4.Export (
   TypeDescMap,
   parseDescText,
   getExportedFunctions,
+  expandRequired,
   getDefaultFunction,
   enrichReturnTypes,
   buildTypeDescMap,
@@ -357,6 +358,11 @@ assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType) =
       , paramRequired = not (isMaybeType mType)
       }
 
+-- | Decide whether an input is required from its type with synonyms expanded
+-- from these declarations. 'getExportedFunctions' has the module's own; a
+-- caller that has the imported modules' too, as jl4-service does, applies it
+-- again with all of them, so that an input and a record field typed with the
+-- same imported synonym are decided alike.
 expandRequired :: Map.Map Text (Declare Resolved) -> ExportedParam -> ExportedParam
 expandRequired declares p = case p.paramType of
   Just ty -> p { paramRequired = not (isMaybeType (Just (expandSynonyms declares ty))) }
