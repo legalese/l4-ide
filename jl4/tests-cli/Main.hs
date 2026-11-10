@@ -2741,8 +2741,13 @@ spec bin = do
     -- Both of these raise while forcing an address, before a frame for it is
     -- pushed. Post-processing used to fail on that, and the fallback gave a graph
     -- of one empty node with exit 0.
+    -- A limit of 300 frames instead of a million, which took 12 s and 5.6 GB
+    -- to trace. Which frame the limit falls on depends on the limit: at 300, as
+    -- at a million, it is the update frame of `count up`, and the test fails
+    -- without the split's fix for it; at 301 it is another frame, and it passes.
     it "traces a real stack overflow at an update frame, naming the call" $ do
-      Output code sout _ <- runL4 bin ["trace", traceOverflowFixture]
+      parent <- getEnvironment
+      Output code sout _ <- runL4WithEnv (Just (("JL4_MAX_FRAME_DEPTH", "300") : filter ((/= "JL4_MAX_FRAME_DEPTH") . fst) parent)) bin ["trace", traceOverflowFixture]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("count up` OF 1" `isInfixOf`)
       sout `shouldSatisfy` ("<error>" `isInfixOf`)

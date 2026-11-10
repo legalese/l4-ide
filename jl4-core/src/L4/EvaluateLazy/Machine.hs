@@ -160,6 +160,7 @@ data EvalState =
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
     , answerInJust :: !Bool        -- see 'L4.EvaluateLazy.EvalConfig'
+    , maxFrameDepth :: !Int        -- see 'maximumFrameDepth'
     }
 
 data Stack =
@@ -275,9 +276,10 @@ refuseWith = raiseException . RefusalException
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
   stackRef <- asks (.stack)
+  limit <- asks (.maxFrameDepth)
   s <- liftIO (readIORef stackRef)
-  if s.size >= maximumFrameDepth
-    then userException StackOverflow
+  if s.size >= limit
+    then userException (StackOverflow limit)
     else do
       -- Emit the trace `Push` only once the frame is actually pushed. If we
       -- recorded it before the overflow check, a StackOverflow would leave a

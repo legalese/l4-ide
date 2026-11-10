@@ -50,6 +50,7 @@ import Control.Exception (try, evaluate, ErrorCall)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
+import Text.Read (readMaybe)
 import qualified Data.Aeson as Aeson
 
 -----------------------------------------------------------------------------
@@ -538,7 +539,17 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   let temporalCtx = initialTemporalContext actualTime
   temporalContext <- newIORef temporalCtx
   let evalTrace = Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust}
+  maxFrameDepth <- readMaxFrameDepthEnv
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth}
+
+-- | @JL4_MAX_FRAME_DEPTH@, a positive whole number, replaces
+-- 'maximumFrameDepth'. Anything else leaves the default.
+readMaxFrameDepthEnv :: IO Int
+readMaxFrameDepthEnv = do
+  menv <- lookupEnv "JL4_MAX_FRAME_DEPTH"
+  pure $ case menv >>= readMaybe of
+    Just n | n > 0 -> n
+    _ -> maximumFrameDepth
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,
