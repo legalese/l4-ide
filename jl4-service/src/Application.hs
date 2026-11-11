@@ -45,7 +45,7 @@ import Options.Applicative (execParser)
 import Servant
 
 import ExplorerPage (renderExplorerPageBS)
-import WebMCPPage (RawJs, JavaScript, renderOrgWebMCPScript)
+import WebMCPPage (RawJs, JavaScript, OriginTrialToken, mkOriginTrialToken, renderOrgWebMCPScript)
 
 -- | Combined service API.
 type ServiceApi = HealthApi :<|> WellKnownApi :<|> McpDiscoveryApi :<|> McpManifestApi :<|> OrgOpenApiRoute :<|> WebMCPApi :<|> McpApi :<|> McpScopedApi :<|> McpScopedLongApi :<|> ControlPlaneApi :<|> FileBrowseApi :<|> DataPlaneApi :<|> ShortRoutes
@@ -239,16 +239,17 @@ contentLengthMiddleware baseApp req sendResp =
 app :: AppEnv -> Application
 app env req sendResp = do
   let vis = extractVisibility req
+      originTrialToken = extractOriginTrialToken req
       -- Override serverName with X-L4-Origin header if present (set by a reverse proxy).
       -- This allows the OpenAPI spec to reflect the org's external URL.
       reqEnv = case lookup "X-L4-Origin" (requestHeaders req) of
         Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks
         Nothing     -> env
-  serve (Proxy @ServiceApi) (serverT reqEnv vis) req sendResp
+  serve (Proxy @ServiceApi) (serverT reqEnv vis originTrialToken) req sendResp
 
-serverT :: AppEnv -> Visibility -> Server ServiceApi
-serverT env vis =
-  hoistServer (Proxy @ServiceApi) (nt env) (healthHandler :<|> wellKnownHandler :<|> mcpDiscoveryHandler :<|> mcpManifestHandler :<|> orgOpenApiHandler vis :<|> webmcpHandler :<|> mcpRootHandler vis :<|> mcpScopedHandler vis :<|> mcpScopedLongHandler vis :<|> controlPlaneHandler vis :<|> fileBrowseHandler :<|> dataPlaneHandler vis :<|> shortRoutesHandler vis)
+serverT :: AppEnv -> Visibility -> Maybe OriginTrialToken -> Server ServiceApi
+serverT env vis originTrialToken =
+  hoistServer (Proxy @ServiceApi) (nt env) (healthHandler :<|> wellKnownHandler :<|> mcpDiscoveryHandler :<|> mcpManifestHandler :<|> orgOpenApiHandler vis :<|> webmcpHandler originTrialToken :<|> mcpRootHandler vis :<|> mcpScopedHandler vis :<|> mcpScopedLongHandler vis :<|> controlPlaneHandler vis :<|> fileBrowseHandler :<|> dataPlaneHandler vis :<|> shortRoutesHandler vis)
  where
   nt :: AppEnv -> AppM a -> Handler a
   nt s x = runReaderT x s
@@ -268,6 +269,13 @@ extractVisibility req =
         Just "false" -> False
         _ -> True
   in Visibility { showFunctions = includeFunctions, showFiles = includeFiles, showEvaluate = includeEvaluate }
+
+-- | Read the origin-trial token a reverse proxy may pass for the WebMCP script.
+-- When the header is absent or its value is not a well-formed token, there is
+-- no token and the script adds none.
+extractOriginTrialToken :: Request -> Maybe OriginTrialToken
+extractOriginTrialToken req =
+  lookup "X-Origin-Trial-Token" (requestHeaders req) >>= mkOriginTrialToken
 
 -- | GET /health — health check handler.
 healthHandler :: ServerT HealthApi AppM
@@ -324,11 +332,11 @@ orgOpenApiHandler vis = do
   pure $ buildOpenApiDoc serverUrl vis deployments
 
 -- | GET /.webmcp/embed.js — org-wide WebMCP script.
-webmcpHandler :: ServerT WebMCPApi AppM
-webmcpHandler = do
+webmcpHandler :: Maybe OriginTrialToken -> ServerT WebMCPApi AppM
+webmcpHandler originTrialToken = do
   env <- ask
   liftIO $ logInfo env.logger "WebMCP script served" []
-  pure renderOrgWebMCPScript
+  pure (renderOrgWebMCPScript originTrialToken)
 
 -- | GET /.well-known/mcp — MCP discovery endpoint.
 -- Returns server metadata, capabilities, and endpoint information per MCP spec.
