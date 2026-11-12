@@ -27,9 +27,26 @@
 --     breached at that instant when more events follow.
 --   * L5 — nothing is observed before it took effect.
 --
+--   * C1 — Hvitved's composition, with the ledger in use: the same trees,
+--     each leaf now reading a record made before the tree (in its
+--     @PROVIDED@) and making and reading records of its own (in its
+--     @HENCE@), report exactly what the trees without the ledger report, the
+--     sibling-read check never fires, and L0 and L1 still hold of them.
+--     These are the operands that do not read each other's records, for
+--     which smucclaw/l4-ide#1069's check must change nothing: a CSL conjunct
+--     is a function of the trace alone (Hvitved's thesis, Def. 2.2.7, p. 35),
+--     and so is a leaf whose only ledger reads are of its own records and of
+--     records made before the compound started. L0's oracle is Hvitved's
+--     verdict composition: the earlier breach of a @RAND@ (Def. 2.2.6, p. 35)
+--     with the union of the parties on a tie, and the later breach of an
+--     @ROR@ (Def. 2.2.10, p. 37). On an @ROR@ tie it also takes the union:
+--     that is L4's @BothDecide@ (SEESAW), not CSL, which defines disjunction
+--     only where blame is unique (Def. 2.2.11, p. 37).
+--
 -- What the laws do NOT cover, by design: operands that read one another's
--- records, and an @ROR@'s right operand after the left is fulfilled (§6.1.2,
--- "What it does not promise").
+-- records (those are refused, smucclaw/l4-ide#1069, and pinned in
+-- "SiblingReadsSpec"), and an @ROR@'s right operand after the left is
+-- fulfilled (§6.1.2, "What it does not promise").
 module BreachClocksSpec (spec) where
 
 import Data.Foldable (for_)
@@ -91,6 +108,23 @@ render = \ case
     tshow :: Show x => x -> Text.Text
     tshow = Text.pack . show
 
+-- | C1's leaves: the same obligation, now reading OFFICIAL's @before@ (made
+-- before the tree) in its @PROVIDED@, and making a record of its own and
+-- reading it back in its @HENCE@. No leaf reads a cell another leaf writes.
+renderLedger :: Tree -> Text.Text
+renderLedger = \ case
+  Leaf i d ->
+    "(PARTY P" <> tshow i <> " MUST a" <> tshow i
+      <> " PROVIDED (RECALL OFFICIAL's `before`) EQUALS JUST TRUE"
+      <> " WITHIN " <> tshow d
+      <> " HENCE RECORD `mine " <> tshow i <> "` IS " <> tshow i
+      <> " HENCE COMMIT `done " <> tshow i <> "` IS ((RECALL `mine " <> tshow i <> "`) EQUALS JUST " <> tshow i <> ")"
+      <> " HENCE FULFILLED)"
+  Node op l r -> "(" <> renderLedger l <> (if op == ValRAnd then " RAND " else " ROR ") <> renderLedger r <> ")"
+  where
+    tshow :: Show x => x -> Text.Text
+    tshow = Text.pack . show
+
 traceLines :: [Ev] -> [Text.Text]
 traceLines = map \ case
   Tick t  -> "  (`WAIT UNTIL` " <> Text.pack (show t) <> ")"
@@ -98,13 +132,20 @@ traceLines = map \ case
 
 -- | A module with one rule per tree and one #TRACE per (tree, trace) pair.
 moduleFor :: [(Tree, [Ev])] -> Text.Text
-moduleFor cs = Text.unlines $
+moduleFor = moduleWith render
+
+-- | C1's module: each rule makes OFFICIAL's @before@, then runs the tree.
+moduleForLedger :: [(Tree, [Ev])] -> Text.Text
+moduleForLedger = moduleWith (\ t -> "COMMIT `before` IS TRUE HENCE " <> renderLedger t)
+
+moduleWith :: (Tree -> Text.Text) -> [(Tree, [Ev])] -> Text.Text
+moduleWith render' cs = Text.unlines $
   [ "DECLARE Actor IS ONE OF P0, P1, P2, P3, P4, P5, P6, P7"
   , "DECLARE Action IS ONE OF a0, a1, a2, a3, a4, a5, a6, a7"
   , "" ]
   <> concat
     [ [ "GIVETH A DEONTIC Actor Action"
-      , "`c" <> Text.pack (show n) <> "` MEANS " <> render t
+      , "`c" <> Text.pack (show n) <> "` MEANS " <> render' t
       , ""
       , "#TRACE `c" <> Text.pack (show n) <> "` AT 0 WITH" ]
       <> (if null evs then ["  (`WAIT UNTIL` 0)"] else traceLines evs)
@@ -139,6 +180,7 @@ verdictOf res = case res.result of
       }
   Reduction (Reduced (MkNF ValFulfilled)) -> Fulfilled
   Reduction (Reduced nf) -> Other (prettyLayout nf)
+  Reduction (ReducedErrored e) -> Other ("error: " <> Text.unlines (prettyEvalException e))
   other -> Other (Text.pack (show other))
   where
     entryKey = \ case
@@ -149,9 +191,15 @@ fixedNow :: UTCTime
 fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
 
 runCases :: [(Tree, [Ev])] -> IO [Verdict]
-runCases cs = do
+runCases = runModule . moduleFor
+
+runLedgerCases :: [(Tree, [Ev])] -> IO [Verdict]
+runLedgerCases = runModule . moduleForLedger
+
+runModule :: Text.Text -> IO [Verdict]
+runModule src = do
   cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
-  case checkWithImports (vfsFromList []) (moduleFor cs) of
+  case checkWithImports (vfsFromList []) src of
     Left errs -> do
       expectationFailure ("typecheck failed: " <> show errs)
       pure []
@@ -266,6 +314,32 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
       Breached {} -> (n, withoutObservation b) `shouldBe` (n, withoutObservation a)
       _           -> pure ()
 
+  describe "C1: leaves that use the ledger but do not read each other's records (smucclaw/l4-ide#1069)" do
+    it "report exactly what the same trees without the ledger report, and none is refused" do
+      plain <- runCases cs
+      withLedger <- runLedgerCases cs
+      length withLedger `shouldBe` length cs
+      for_ (zip3 [0 :: Int ..] plain withLedger) \ (n, a, b) -> do
+        (n, refused b) `shouldBe` (n, False)
+        (n, settled b) `shouldBe` (n, settled a)
+
+    it "L0: with nobody acting, Hvitved's composition decides the instant and the blamed parties" do
+      let quiet = [ (t, [Tick 100]) | (t, _) <- take 120 cs ]
+      vs <- runLedgerCases quiet
+      for_ (zip3 [0 :: Int ..] quiet vs) \ (n, (t, _), v) -> do
+        let (e, dec) = oracle t
+        case v of
+          Breached {vEffective, vDecisive} -> do
+            (n, vEffective) `shouldBe` (n, Just (fromInteger e))
+            (n, vDecisive) `shouldBe` (n, sort [ ("P" <> Text.pack (show i), fromInteger d) | (i, d) <- dec ])
+          other -> expectationFailure ("case " <> show n <> ": expected a breach, got " <> show other)
+
+    it "L1: the order of the operands decides nothing" do
+      let paired = concat [ [(t, evs), (mirror t, evs)] | (t, evs) <- cs ]
+      vs <- runLedgerCases paired
+      for_ (zip [0 :: Int ..] (pairs vs)) \ (n, (a, b)) ->
+        (n, settled a) `shouldBe` (n, settled b)
+
   it "L5: nothing is observed before it took effect" do
     vs <- runCases cs
     for_ (zip [0 :: Int ..] vs) \ (n, v) -> case v of
@@ -277,8 +351,12 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
     -- a compound still waiting keeps its operands in the drafter's order,
     -- so two residuals are compared only as residuals
     settled = \ case
+      Other t | "error: " `Text.isPrefixOf` t -> Other t
       Other _ -> Other "still waiting"
       v       -> v
+    refused = \ case
+      Other t -> "error: " `Text.isPrefixOf` t
+      _       -> False
     withoutObservation = \ case
       v@Breached {} -> v {vObserved = Nothing}
       v             -> v

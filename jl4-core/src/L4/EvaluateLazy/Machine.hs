@@ -135,6 +135,7 @@ import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
+import L4.EvaluateLazy.SiblingReads
 import L4.EvaluateLazy.Trace (EvalTraceAction (..))
 import L4.Presumption
 import L4.TracePolicy (TracePolicy)
@@ -176,9 +177,12 @@ data Frame =
   -- 'Nothing' is M1 expression use (the write returns its value); @Just k@ makes
   -- the write an event-free deontic step (after 'tellEvent', forward
   -- @[time, events]@ to @k@). The 'Maybe Text' is the NOTIFY recipient key.
-  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
-  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text)
-  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text)
+  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe SrcRange)
+  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text) (Maybe SrcRange)
+  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text) (Maybe SrcRange)
+  -- (The trailing 'Maybe SrcRange' on the three Record and the two ReadCell
+  -- frames is the site, for the sibling-read check's messages,
+  -- 'L4.EvaluateLazy.SiblingReads'.)
   -- STATE-AS-LEDGER M1.5 / M4.5: RECALL. 'ReadCell1' waits for the CELL to
   -- evaluate to a 'WHNF'; it carries the optional party-qualifier expr (still
   -- unevaluated), the isOfficial flag, and the env to evaluate the qualifier in.
@@ -191,13 +195,13 @@ data Frame =
   -- The 'RecallMode' (last-write-wins vs collect-all, approach B) is carried
   -- through to 'finishRead' so the read folds the chosen ledger into either a
   -- MAYBE (last) or a LIST (all).
-  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment
+  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment (Maybe SrcRange)
   -- 'ReadCell2' waits for the PARTY qualifier to evaluate; it carries the
   -- already-evaluated cell WHNF and the 'RecallMode' so 'finishRead' can complete
   -- the read against the named party's own ledger. The mode MUST be threaded here
   -- too: the cross-party branch pushes 'ReadCell2' before reaching 'finishRead',
   -- so without it @RECALL ALL <party>'s@ would silently fall back to last-write-wins.
-  | ReadCell2 WHNF RecallMode {- -}
+  | ReadCell2 WHNF RecallMode {- -} (Maybe SrcRange)
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -212,6 +216,11 @@ data Frame =
   -- and the frame then touches the log not at all; with the log off it is
   -- always 'False'. No extra frame, so the stack is the same in both modes.
   | RestoreCurrentParty (Maybe Text) Bool
+  -- smucclaw/l4-ide#1069: restore the sibling-read check's operand path and
+  -- clock once a compound (and the frames it pushed) has evaluated. Pushed
+  -- beneath the compound's 'RBinOp1', so it runs after the 'RBinOp2' or the
+  -- @ROR@ short-circuit has combined the operands.
+  | RestoreSibling OperandPath Clock
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConnectiveLeft Connective (Maybe ConnRight) {- -}
@@ -320,6 +329,16 @@ data EvalState =
                                      -- that party's own ledger. 'Nothing' = no enclosing
                                      -- party (a top-level RECORD), routed to the anonymous
                                      -- own ledger. Set/restored around 'continueWithFollowup'.
+    , siblings :: !(IORef SiblingState)
+                                     -- ^ smucclaw/l4-ide#1069: the sibling-read check's
+                                     -- state (the compound operand the evaluation is in,
+                                     -- the contract clock, and every read and write made
+                                     -- inside an operand), per directive like the ledger.
+                                     -- See 'L4.EvaluateLazy.SiblingReads'.
+    , siblingStarts :: !(IORef (IntMap Reference))
+                                     -- ^ the time of each compound that started while
+                                     -- its time was still a thunk, by scope, until it is
+                                     -- found evaluated ('siblingCheck')
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
@@ -1063,6 +1082,7 @@ unwindFrame = \ case
   RestoreCurrentParty mOriginal scoped   -> do
     putCurrentParty mOriginal
     when scoped leaveRelookScope
+  RestoreSibling path clock              -> restoreSibling path clock
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
     -- reads made before the abort soundly over-approximate the enclosing
@@ -1454,6 +1474,120 @@ putCurrentParty :: Maybe Text -> Eval ()
 putCurrentParty = writeEvalRef (.currentParty)
 
 -- ----------------------------------------------------------------------------
+-- The sibling-read check (smucclaw/l4-ide#1069; 'L4.EvaluateLazy.SiblingReads').
+--
+-- The machine keeps, beside the ledger, which compound operand the evaluation
+-- is in and the contract instant it is at, and asks the check at every ledger
+-- read and write made inside an operand. Outside every compound nothing is
+-- logged and nothing is compared.
+
+-- | One step of the check: refuse on a 'Left', else keep the new state.
+siblingCheck :: (SiblingState -> Either Text SiblingState) -> Eval ()
+siblingCheck stepIt = do
+  sref <- asks (.siblings)
+  st0 <- liftIO (readIORef sref)
+  when (inCompound st0) do
+    -- a compound time that was a thunk may have been evaluated since, by an
+    -- event the operands scanned: read it now, so that what was logged at the
+    -- compound's start gets its instant
+    tref <- asks (.siblingStarts)
+    pending <- liftIO (readIORef tref)
+    known <- for (IntMap.toList pending) \ (s, t) -> fmap (s,) <$> peekClock t
+    let found = catMaybes known
+        st = foldl' (\ acc (s, c) -> startKnown s c acc) st0 found
+    unless (null found) $
+      liftIO (writeIORef tref (foldl' (flip IntMap.delete) pending (map fst found)))
+    case stepIt st of
+      Left msg  -> userException (UserError msg)
+      Right st' -> liftIO (writeIORef sref st')
+
+-- | The contract instant the evaluation is now at, when it is inside a
+-- compound's operand: an event's stamp, a hand-off's clock, or the time an
+-- obligation was armed at. A clock that is still a thunk is left as it was:
+-- the check never forces anything here.
+noteClock :: Reference -> Eval ()
+noteClock t = do
+  sref <- asks (.siblings)
+  st <- liftIO (readIORef sref)
+  when (inCompound st) do
+    mclock <- peekClock t
+    for_ mclock \ c -> liftIO (writeIORef sref st {ssClock = At c})
+
+-- | 'noteClock' for a clock already forced.
+noteClockWHNF :: WHNF -> Eval ()
+noteClockWHNF = \ case
+  ValNumber c -> do
+    sref <- asks (.siblings)
+    liftIO (modifyIORef' sref \ st -> if inCompound st then st {ssClock = At c} else st)
+  _ -> pure ()
+
+-- | Back to the operand path and clock a compound was applied under.
+restoreSibling :: OperandPath -> Clock -> Eval ()
+restoreSibling path clock = do
+  sref <- asks (.siblings)
+  liftIO (modifyIORef' sref \ st -> st {ssPath = path, ssClock = clock})
+
+-- | How a message names one operand of a compound: the rule it names, the
+-- line it is written on, or, for an @EVERY@'s member, the member.
+operandLabel :: Text -> MaybeEvaluated -> Text
+operandLabel side = \ case
+  Left (App _ r []) -> backquoted (prettyLayout r)
+  Left (Var _ r)    -> backquoted (prettyLayout r)
+  Left e | Just rng <- rangeOf e -> "the " <> side <> " side (line " <> Text.textShow (lineOf rng) <> ")"
+  Right (ValObligation _ (Right p) _ _ _ _ _) -> partyKeyWHNF p <> "'s obligation"
+  _ -> "the " <> side <> " side"
+  where
+    -- a rule's name as written, always quoted, so it never starts a sentence bare
+    backquoted t = if "`" `Text.isPrefixOf` t then t else "`" <> t <> "`"
+
+-- | A compound ('ValROp') meets its @[time, events]@: open a scope for the
+-- sibling-read check at the compound's own time, then run the left operand
+-- over the events; 'RBinOp1' runs the right one over the same events, and
+-- 'RestoreSibling' closes the scope once 'RBinOp2' has combined them.
+--
+-- The time is read, never forced: forcing it here changed what @l4 explore@
+-- could see of a compound whose time nothing else forces (measured on
+-- @jl4/examples/ok/every/run-after.l4@), and the check must change nothing
+-- for operands that do not read each other's records. While the time is
+-- still a thunk, an access at the compound's start is logged against the
+-- start ('StartOf'), and 'siblingCheck' fills in the instant once something
+-- else has evaluated the time; an access whose instant is never known counts
+-- as simultaneous with every other, so the check errs towards refusing.
+startCompound :: Environment -> RBinOp -> MaybeEvaluated -> MaybeEvaluated -> [Reference] -> Maybe (Type' Resolved) -> Machine Config
+startCompound env op rexpr1 rexpr2 rs appType = do
+  clock <- case rs of
+    t : _ -> peekClock t
+    []    -> pure Nothing
+  let opText = case op of
+        ValRAnd -> "RAND"
+        ValROr  -> "ROR"
+  sref <- asks (.siblings)
+  outer <- liftIO (readIORef sref)
+  let fork = case rexpr1 of
+        Right ValObligation {} -> True
+        _                      -> False
+      (scope, opened) = openScope (MkScope opText (operandLabel "left" rexpr1) (operandLabel "right" rexpr2) fork) clock outer
+      outerPath = outer.ssPath
+  liftIO (writeIORef sref opened)
+  case (clock, rs) of
+    (Nothing, t : _) -> do
+      tref <- asks (.siblingStarts)
+      liftIO (modifyIORef' tref (IntMap.insert scope t))
+    _ -> pure ()
+  pushFrame (RestoreSibling outerPath outer.ssClock)
+  -- make sure to reassemble the operation after returning
+  pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
+  -- apply the arguments of the left hand expression to the
+  -- expression
+  pushFrame (App1 rs appType)
+  -- R-Q7B: the operand is handed off here, exactly as a HENCE's
+  -- value is, so a continuation that arrives as a VALUE inside a
+  -- compound anchors to the obligation the compound is attached
+  -- to ('operandHandoff').
+  operandHandoff env rexpr1
+  maybeEvaluate env rexpr1 -- TODO: build application
+
+-- ----------------------------------------------------------------------------
 -- Per-force context-read tracking (T6).
 --
 -- Value-affecting reads of the temporal context MUST go through the readTc*
@@ -1808,7 +1942,7 @@ forwardExpr env = \ case
   Post _ann e1 e2 e3 -> do
     pushFrame (Post1 e2 e3 env)
     continueExpr env e1
-  Record _ann mParty cell val isOfficial mHence -> do
+  Record ann mParty cell val isOfficial mHence -> do
     -- STATE-AS-LEDGER M1 (+ NOTIFY-v1): evaluate the cell to a String path, then
     -- the value to WHNF, append an Assign event to the ledger. M5: if a HENCE
     -- continuation is present, forward [time, events] to it (event-free deontic
@@ -1822,18 +1956,18 @@ forwardExpr env = \ case
     -- the acting party's own ledger exactly as before.
     case mParty of
       Just partyExpr -> do
-        pushFrame (Record0 cell val env isOfficial mHence)
+        pushFrame (Record0 cell val env isOfficial mHence (rangeOf ann))
         continueExpr env partyExpr
       Nothing -> do
-        pushFrame (Record1 val env isOfficial mHence Nothing)
+        pushFrame (Record1 val env isOfficial mHence Nothing (rangeOf ann))
         continueExpr env cell
-  ReadCell _ann mParty isOfficial mode cell -> do
+  ReadCell ann mParty isOfficial mode cell -> do
     -- STATE-AS-LEDGER M1.5 / M4.5: evaluate the cell to a String path first,
     -- carrying the optional party qualifier (still unevaluated), the isOfficial
     -- flag, the 'RecallMode' (approach B), and the env. The 'ReadCell1' frame then
     -- routes to the right ledger (own / cross-party / official) and reads it,
     -- yielding MAYBE (RecallLast) or a LIST (RecallAll).
-    pushFrame (ReadCell1 mParty isOfficial mode env)
+    pushFrame (ReadCell1 mParty isOfficial mode env (rangeOf ann))
     continueExpr env cell
   Concat _ann [] ->
     continueBackward (ValString "")
@@ -1908,27 +2042,27 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     continueExpr env e3
   Just (Post3 val1 val2) -> do
     runPost val1 val2 val
-  Just (Record0 cell valExpr env isOfficial mHence) -> do
+  Just (Record0 cell valExpr env isOfficial mHence site) -> do
     -- NOTIFY v1: the recipient party qualifier has evaluated to 'val' (a WHNF);
     -- key it the SAME way a cross-party RECALL read does ('partyKeyWHNF'), so the
     -- write-key matches the recipient's read-key by construction. Carry that key
     -- through to 'Record1'/'Record2'/'runRecord', then proceed to evaluate the
     -- cell exactly as a bare RECORD does.
     let recipientKey = partyKeyWHNF val
-    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey))
+    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey) site)
     continueExpr env cell
-  Just (Record1 valExpr env isOfficial mHence mRecipientKey) -> do
+  Just (Record1 valExpr env isOfficial mHence mRecipientKey site) -> do
     -- the cell has evaluated to 'val'; now evaluate the value expression. Carry
     -- the env, the M5 HENCE, and the NOTIFY recipient key so 'runRecord' can
     -- route the write and forward to the continuation.
-    pushFrame (Record2 val isOfficial env mHence mRecipientKey)
+    pushFrame (Record2 val isOfficial env mHence mRecipientKey site)
     continueExpr env valExpr
-  Just (Record2 cellVal isOfficial env mHence mRecipientKey) -> do
+  Just (Record2 cellVal isOfficial env mHence mRecipientKey site) -> do
     -- both the cell ('cellVal') and the value ('val') are evaluated: append the
     -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
     -- continuation (forward [time, events] to it); without, return the value (M1).
-    runRecord cellVal val isOfficial env mHence mRecipientKey
-  Just (ReadCell1 mParty isOfficial mode env) -> do
+    runRecord cellVal val isOfficial env mHence mRecipientKey site
+  Just (ReadCell1 mParty isOfficial mode env site) -> do
     -- the cell has evaluated to 'val' (a String path). Route to the right
     -- ledger and finish (M1.5 / M4.5), carrying the 'RecallMode' (approach B):
     --   * isOfficial   -> read the shared OFFICIAL record.
@@ -1939,21 +2073,25 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     if isOfficial
       then do
         ledger <- officialLedgerEval
-        finishRead mode val ledger
+        finishRead mode val OfficialKey site ledger
       else case mParty of
         Just partyExpr -> do
-          pushFrame (ReadCell2 val mode)
+          pushFrame (ReadCell2 val mode site)
           continueExpr env partyExpr
         Nothing -> do
           ledger <- currentLedgerEval
-          finishRead mode val ledger
-  Just (ReadCell2 cellVal mode) -> do
+          party <- fromMaybe anonymousParty <$> getCurrentParty
+          finishRead mode val (OwnKey party) site ledger
+  Just (ReadCell2 cellVal mode site) -> do
     -- the party qualifier has evaluated to 'val' (a WHNF): key it the SAME way
     -- a RECORD write does ('partyKeyWHNF'), so a cross-party read matches a
     -- write, then read that party's own ledger and finish (M4.5), in 'mode'.
     let key = partyKeyWHNF val
     ledger <- partyLedgerEval key
-    finishRead mode cellVal ledger
+    finishRead mode cellVal (OwnKey key) site ledger
+  Just (RestoreSibling path clock) -> do
+    restoreSibling path clock
+    continueBackward val
   Just (RestoreCurrentParty mOriginal scoped) -> do
     -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
     -- restore the enclosing acting party and pass the value on unchanged (M4).
@@ -1981,6 +2119,9 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- P2b: this is the ENTRY into the obligation's site — the activation
         -- the step log's key counts. Lazy when the log is off.
         norm <- armNormKey party act
+        -- smucclaw/l4-ide#1069: the sibling-read check's clock is the arming
+        -- time until an event is taken
+        noteClock time
         -- this is the arming point: the clock now is what THE ARMING will
         -- name in this obligation's continuation (R-Q7B), so keep it —
         -- 'time' itself advances with every scrutinised event; no event has
@@ -1995,18 +2136,8 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
         startRollCall env deonton time events
-      ValROp env op rexpr1 rexpr2 -> do
-        -- make sure to reassemble the operation after returning
-        pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
-        -- apply the arguments of the left hand expression to the
-        -- expression
-        pushFrame f
-        -- R-Q7B: the operand is handed off here, exactly as a HENCE's
-        -- value is, so a continuation that arrives as a VALUE inside a
-        -- compound anchors to the obligation the compound is attached
-        -- to ('operandHandoff').
-        operandHandoff env rexpr1
-        maybeEvaluate env rexpr1 -- TODO: build application
+      ValROp env op rexpr1 rexpr2 ->
+        startCompound env op rexpr1 rexpr2 rs mTy
       ValConnective conn ->
         case (conn, rs) of
           (ConnNot, [r]) -> do
@@ -2842,6 +2973,9 @@ backwardContractFrame val = \ case
   Contract9 ScrutinizeEnvironment {..} ->
     case val of
       ValEnvironment henceEnv -> do
+        -- smucclaw/l4-ide#1069: a RECALL in the PROVIDED is read at the
+        -- event's stamp
+        noteClockWHNF time
         pushCFrame $ Contract10 ScrutinizeActions {..}
         continueExpr (env `Map.union` henceEnv) (fromMaybe trueExpr act.provided)
       _ -> internalException $ RuntimeTypeError $
@@ -3221,6 +3355,13 @@ backwardContractFrame val = \ case
       continueBackward ValFulfilled
 
   RBinOp1 MkRBinOp1 {..} -> do
+    -- smucclaw/l4-ide#1069: the right operand runs on side 1 of the
+    -- compound's scope, from the compound's own time, which the left operand
+    -- has usually forced by now if it was still a thunk when the compound began
+    clock' <- case (clock, args) of
+      (Nothing, t : _) -> peekClock t
+      _                -> pure clock
+    restoreSibling ((scope, 1) : outerPath) (maybe (StartOf scope) At clock')
 
     -- push a frame for when the evaluation of the
     -- second argument has completed
@@ -3476,6 +3617,10 @@ backwardContractFrame val = \ case
     continueWithFollowup mParty lifecycle env followup events time seen = do
       mOriginal <- getCurrentParty
       putCurrentParty mParty
+      -- smucclaw/l4-ide#1069: a RECORD or RECALL in the continuation is made
+      -- at the hand-off's clock (the act's stamp under HENCE, the missed
+      -- deadline under LEST)
+      noteClock time
       pushFrame (RestoreCurrentParty mOriginal False)
       args <- case followup of
         App _ r [] | isSentinel r -> do
@@ -4095,6 +4240,7 @@ fireBarrierHence ctx deadlineRef timeRef eventsRef = do
     logStep l (plainStep clock Nothing NoEvent ctx.norm JoinReleased)
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
+  noteClock timeRef -- smucclaw/l4-ide#1069: the join's clock
   pushFrame (RestoreCurrentParty mOriginal False)
   pushFrame (App1 [timeRef, eventsRef] Nothing)
   let lifecycle = MkLifecycle {join = Just timeRef, deadline = deadlineRef, armed = ctx.time}
@@ -4139,6 +4285,7 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
       logStep l (plainStep clock Nothing NoEvent ctx.norm (JoinFailed ToLest))
     mOriginal <- getCurrentParty
     putCurrentParty Nothing
+    noteClock timeRef -- smucclaw/l4-ide#1069: the failure's clock
     pushFrame (RestoreCurrentParty mOriginal False)
     pushFrame (App1 [timeRef, eventsRef] Nothing)
     let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineRef, armed = ctx.time}
@@ -4198,6 +4345,7 @@ barrierStateLest :: QuantCtx -> RExpr -> Reference -> Reference -> Machine Confi
 barrierStateLest ctx lestExpr tRef cellRef = do
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
+  noteClock tRef -- smucclaw/l4-ide#1069: the state deadline's clock
   scoped <- enterRelookScope (joinSiteOf ctx.deonton)
   pushFrame (RestoreCurrentParty mOriginal scoped)
   pushFrame (App1 [tRef, cellRef] Nothing)
@@ -4443,8 +4591,8 @@ emptyBreachByRefusal clause = Text.unwords
 --     'continueWithFollowup' already pushed is still on the stack, so once
 --     @hence@ reduces to a 'ValObligation' that 'App1' applies it to
 --     @[time, events]@ — the next step scrutinizes the SAME event stream.
-runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Machine Config
-runRecord cellVal val isOfficial env mHence mRecipientKey = do
+runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Maybe SrcRange -> Machine Config
+runRecord cellVal val isOfficial env mHence mRecipientKey site = do
   cell <- expectString cellVal
   -- Bitemporal stamps (smucclaw/l4-ide#914 §2A). Transaction time is the
   -- ROOT eval clock ('getEvalTime'): a plain EvalState field that
@@ -4474,6 +4622,13 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
       route = if isOfficial
               then RouteOfficial
               else maybe RouteOwn RouteNotify mRecipientKey
+      -- the ledger the write lands in, keyed as 'tellEventRouted' keys it
+      key = case route of
+        RouteOfficial  -> OfficialKey
+        RouteOwn       -> OwnKey (fromMaybe anonymousParty mParty)
+        RouteNotify rk -> OwnKey rk
+  -- smucclaw/l4-ide#1069: rule 2 of the sibling-read check, before the write
+  siblingCheck (checkWrite key cell prov.source site)
   tellEventRouted route (Assign [cell] val prov)
   case mHence of
     Nothing    -> continueBackward val          -- M1: terminal / expression use
@@ -4503,9 +4658,12 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
 --     'readCellAllBitemporal' (oldest->newest, append order), building it
 --     right-to-left as 'ValCons'\/'ValNil'. Result @[]@ (ValNil) when no
 --     visible entry exists — NOT @NOTHING@.
-finishRead :: RecallMode -> WHNF -> Ledger -> Machine Config
-finishRead mode cellVal ledger = do
+finishRead :: RecallMode -> WHNF -> LedgerKey -> Maybe SrcRange -> Ledger -> Machine Config
+finishRead mode cellVal key site ledger = do
   cell <- expectString cellVal
+  -- smucclaw/l4-ide#1069: rules 1 and 3 of the sibling-read check. The
+  -- @key@ is the ledger the caller chose, keyed as a write to it is.
+  siblingCheck (checkRead key cell (mode == RecallAll) site)
   -- Bitemporal read bounds (smucclaw/l4-ide#914 §2B): RECALL reads THROUGH
   -- the ambient temporal context. @EVAL AS OF SYSTEM TIME t@ hides entries
   -- appended after t (tx > t); @EVAL UNDER VALID TIME t@ selects, among

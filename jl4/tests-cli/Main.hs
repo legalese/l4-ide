@@ -57,6 +57,7 @@ import qualified CliTest.Catala as Catala
 import qualified CliTest.DmnBpmn as DmnBpmn
 import qualified CliTest.Ledger as Ledger
 import qualified CliTest.Explore as Explore
+import qualified CliTest.SiblingReads as SiblingReads
 import qualified CliTest.Docassemble as Docassemble
 import qualified CliTest.OpenFisca as OpenFisca
 import qualified CliTest.Yscript as Yscript
@@ -698,6 +699,7 @@ main = do
          , Docassemble.fixtures
          , Catala.fixtures
          , Explore.fixtures
+         , SiblingReads.fixtures
          , BuildIdentity.fixtures
          , Ledger.fixtures
          ]) \fp -> do
@@ -5082,6 +5084,7 @@ spec bin = do
   Docassemble.spec bin
   Catala.spec bin
   Explore.spec bin
+  SiblingReads.spec bin
   BuildVersion.spec bin
   BuildIdentity.spec
   Ledger.spec bin

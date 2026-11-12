@@ -144,6 +144,7 @@ library
     L4.Evaluate.Ledger
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
+    L4.EvaluateLazy.SiblingReads
     L4.EvaluateLazy.ContractFrame
     L4.EvaluateLazy.DeonticStep
     L4.EvaluateLazy.Exceptions
@@ -182,6 +183,7 @@ library
     L4.Lexer
     L4.Lint.AndOrDepth
     L4.Lint.NotReach
+    L4.Lint.SiblingReads
     L4.Mixfix
     L4.Names
     L4.Nlg
@@ -299,6 +301,7 @@ test-suite jl4-core-test
     BitemporalSubstrateSpec
     BitemporalRecallSpec
     BreachClocksSpec
+    SiblingReadsSpec
     TraceOrderingSpec
     StateGraphSpec
     DeonticStepSpec

@@ -176,6 +176,7 @@ test-suite l4-cli-test
     CliTest.Docassemble
     CliTest.Ledger
     CliTest.Explore
+    CliTest.SiblingReads
     CliTest.OpenFisca
     CliTest.Yscript
     Paths_jl4

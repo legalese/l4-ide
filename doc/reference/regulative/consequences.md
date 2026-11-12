@@ -493,8 +493,20 @@ That is `(PARTY P MUST x WITHIN 5) RAND (PARTY Q MUST y WITHIN 5)` with one even
 
 What this does **not** promise:
 
-- **That the verdict never depends on the order of the operands.** It does not, for operands that only make and miss deadlines. But each operand is run over the whole trace before the next one starts, so an operand that reads a fact the other one records (`RECALL` of a `RECORD` made in the sibling's `HENCE`) can see it or not depending on which is written first. Do not write a `RAND` or `ROR` whose operands read each other's records; the design spec has the open question.
+- **An answer for operands that read each other's records.**
+  The verdict does not depend on the order of the operands when they only make and miss deadlines, or when the only records they read are ones made before the `RAND` started or on their own side.
+  But L4 runs each operand over the whole trace before it starts the next, against one shared ledger, so an operand that reads a record the other one makes (a `RECALL` of a `RECORD` or `COMMIT` made in the other operand's `HENCE`) could see a record from its future, or miss one from its past.
+  When that happens, evaluation stops with an error instead of answering, and the error names the record, both operands and the two instants.
+  The members of an `EVERY`, with `UPON EACH` or without, are run the same way, as the operands of a `RAND`, and are refused the same way.
+  A read and a record made at the same instant are refused whichever operand comes first, because nothing says which of the two happened first.
+  `l4 explore` does not say a property holds over a step that was refused (see [`l4 explore`](explore.md)).
+  `l4 check` warns beforehand where two operands can reach a read and a write of one record through rules defined in the same file; it does not follow rules imported from another file, which only the error at run time catches.
+  The warning cannot see time, so it also appears on a file whose left operand makes the record earlier than the right operand reads it, and that file runs: L4 runs the left operand first.
+  To write such a rule, make the record before the `RAND` starts, or make it on the side that reads it.
+  One case is not caught: a rule with no inputs that reads a record is worked out at its first use, and every later use gets the same answer even after the record has changed, inside a compound or not, so the later use makes no read for the check to see.
+  Write the `RECALL` where the record is needed, and pass what it reads to the rule as an input, as `` `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`) `` does in the [explorer's example](explore.md).
 - **That an `ROR`'s operands both run.** Once one alternative is fulfilled, the other is not run further, so a `RECORD` it would have made is not made.
+  For the same reason, a record the unrun alternative would have made is never compared with what the fulfilled one read: `l4 check`'s warning is the only notice of that case.
 - **The decision service's answer.** `jl4-service` reports the same breach without the new `effective`, `observed` and `decisive` fields: `l4 batch` carries them, and `l4 run` prints the decisive failures.
 
 ## Related pages

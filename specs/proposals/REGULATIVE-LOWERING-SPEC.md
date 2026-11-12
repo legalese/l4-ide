@@ -208,7 +208,9 @@ GIVETH A DEONTIC Party Act
 
 composed with Alice's contract by `RAND`, with a sibling `` `record opening` `` act of the same shape (without it every purchase is blocked), and read by the rules through `` RECALL ALL OFFICIAL's `dinner status record` ``.
 This is **option A**, and on the current evaluator it does not work (§1 finding 10): a `RAND` runs each operand over the whole trace before the next (consequences.md:417, Machine.hs:3223-3229), so a cross-operand `RECALL` reads either nothing or the future, in neither order the record as it stood; and `(THE JOIN)` as a value needs card B1 (`lang/lifecycle-values`), not on `unstable`.
-Option A therefore waits on NORM-LOG-SPEC N10's goal A, lockstep operands (ruled 2026-10-11, METRONOME; §1 finding 10), with N10's own conditions; D-L8 points at it rather than registering anything new; until then the explorer and the ledger **refuse** a `RAND` whose operands read each other's records, loudly, which is N10's option B extended to black ink (N12, open).
+Option A therefore waits on NORM-LOG-SPEC N10's goal A, lockstep operands (ruled 2026-10-11, METRONOME; §1 finding 10), with N10's own conditions; D-L8 points at it rather than registering anything new.
+Until then the evaluator **refuses**, loudly, a `RAND`, `ROR` or `EVERY … UPON EACH` whose operands read each other's records out of time order, and so do the explorer and the ledger, which replay on it: a run-time check on black ink, extending N10's option B (smucclaw/l4-ide#1069, `jl4-core/src/L4/EvaluateLazy/SiblingReads.hs`; whether it is recorded under N10 or waits on N12, which proposes that extension and is open, is not ruled).
+On option A's composition the explorer therefore lists the refused steps as untried and gives no verdict over them, where before it said a safety property held.
 **Option C**, which runs today, is one chain and one party whose closed action type names the actor inside the act.
 The snippet below is a sketch with elisions, not a fixture; buy-blocker ran a probe of this shape (buy-blocker's option C probe, in that session's scratchpad), not this text:
 

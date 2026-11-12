@@ -1,0 +1,32 @@
+-- A landlord gives notice, and later seeks possession, which needs the notice.
+-- The two are the sides of a RAND, and the side that makes the record (the
+-- notice) is on the left, earlier in time than the right side reads it, so the
+-- order L4 runs the sides in does not change the answer: this file runs.
+-- reader-first.l4 is the same file with the sides swapped, and is refused.
+-- (smucclaw/l4-ide#1069)
+
+DECLARE Party IS ONE OF Landlord
+DECLARE Act IS ONE OF `gives notice`, `seeks possession`
+
+GIVETH A DEONTIC Party Act
+`notice` MEANS
+    PARTY Landlord
+    MAY `gives notice`
+    WITHIN 100
+    HENCE COMMIT `notice given` IS TRUE HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`possession` MEANS
+    PARTY Landlord
+    MAY `seeks possession` PROVIDED (RECALL OFFICIAL's `notice given`) EQUALS JUST TRUE
+    WITHIN 1000
+    HENCE COMMIT `possession sought` IS TRUE HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`the tenancy` MEANS `notice` RAND `possession`
+
+#TRACE `the tenancy` AT 0 WITH
+    PARTY Landlord DOES `gives notice` AT 10
+    PARTY Landlord DOES `seeks possession` AT 400

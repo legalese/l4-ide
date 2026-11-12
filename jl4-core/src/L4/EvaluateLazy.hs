@@ -62,6 +62,7 @@ import qualified Base.Set as Set
 import qualified Data.IntMap.Strict as IntMap
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
+import L4.EvaluateLazy.SiblingReads (emptySiblingState)
 import L4.EvaluateLazy.DeonticStep (DeonticLog (..), DeonticStep, newDeonticLog)
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.Ledger
@@ -202,10 +203,13 @@ withFreshLedger m = do
   freshParty <- liftIO (newIORef Nothing)
   freshNotes <- liftIO (newIORef mempty)
   freshPresumed <- liftIO (newIORef emptyPresumedLog)
+  freshSiblings <- liftIO (newIORef emptySiblingState)
+  freshStarts <- liftIO (newIORef IntMap.empty)
   -- the run's notes ('tellNote') are per directive for the same reason the
   -- ledger is: a note belongs to the directive whose value it qualifies; so
-  -- does a default it forced ('EvalState.presumed')
-  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes, presumed = freshPresumed }) m
+  -- does a default it forced ('EvalState.presumed'), and so does what the
+  -- sibling-read check has logged of the ledger's reads and writes
+  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes, presumed = freshPresumed, siblings = freshSiblings, siblingStarts = freshStarts }) m
 
 -- | Apply runtime EVAL clauses for the duration of an action,
 -- restoring the previous temporal context afterwards.
@@ -917,6 +921,8 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   reofferedEvents <- newIORef mempty
   envLedger    <- newIORef emptyStore
   currentParty <- newIORef Nothing
+  siblings     <- newIORef emptySiblingState
+  siblingStarts <- newIORef IntMap.empty
   notes        <- newIORef mempty
   -- P2b: off by default (R5); 'captureDeonticSteps' installs one per directive
   let deonticLog = Nothing
@@ -926,7 +932,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
   pure MkEvalState
-    { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
+    { moduleUri, stack, supply, evalTrace, envLedger, currentParty, siblings, siblingStarts, entityInfo
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
     , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog

@@ -292,6 +292,8 @@ These are sorted by which signal carries them.
   A `BEFORE` date in a contract explored from `AT 0` gave `UNTRIED 2` (measured 2026-10-26), because 0 is not a date serial.
   The run had 1 state and 0 transitions, and the same line says `frontier exhausted`.
   Nothing beyond the outset was explored.
+  A move whose run stopped because the two sides of a `RAND` read each other's records is untried too, and the reason in brackets is that error, naming the record and both sides ([Deadlines and consequences](consequences.md)).
+  On `jl4/tests-cli/fixtures/sibling-reads/dinner-ab.l4`, Alice and Bob as the two sides of a `RAND`, `--until 100 --always "every dinner was accepted while open"` gave 15 states, `UNTRIED 20` and `unknown` instead of `holds`, and exited 2.
 - **A bound stopped it (exit 3).** `frontier NOT exhausted`, with the number of states left.
   `--max-states 5` on `jl4/examples/explore/brief/d1-naive.l4`, a 10-state graph, printed `frontier NOT exhausted: 9 new states past the state bound 5 not added` and exited 3.
 - **A property is violated (exit 4)**, or **unknown (exit 5)**: every liveness property, and any path that fails its replay.
