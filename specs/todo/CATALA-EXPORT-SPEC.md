@@ -1029,7 +1029,7 @@ The decision is covered at rung level instead, exactly as before, with the reaso
 Every witness input of the rung-level gate is a witness input of the leaf-level one, because the candidates and the eight-per-bucket cap are unchanged, and a bucket of the cross is a refinement of a bucket of the rungs.
 The search is backend-neutral and lives in `L4.Cli.Coverage`; `L4.Cli.CatalaWitness` is the Catala adapter over it, and asks the engine to give way to the rungs whenever a leaf bucket is undecided, since the lowering needs every combination decided.
 
-**A standalone report: `l4 coverage` (2026-11-12; the verb, the layout, the flags and the exit statuses are assumed, not ruled).**
+**A standalone report: `l4 coverage` (2026-11-12; ruled, TALLYSTICK, except the two additions named at the end of this paragraph).**
 The search above needs no Catala, so `l4 coverage FILE` prints it for any file: per decision, the cover points with their source spans, a table of the buckets (a `T`/`F` per cover point), the first input that realises each witnessed bucket and L4's answer there, the buckets the solver proved impossible, and the buckets neither reached nor proved, each with its reason.
 It ends with a coverage line in the style of `l4 explore`, which says in capitals what was not done (`UNDECIDED`, `AT RUNG LEVEL`, `NOT COVERED`, `NOTHING COVERED`), and the limits are in `--help` and in `doc/concepts/reviewing/coverage.md`.
 The decisions are every top-level `DECIDE` of the file that branches on a condition, or those named with `--decision`: the rungs of an `UNLESS` chain or of a `BRANCH`, an `IF` or a literal `CONSIDER`, else the body of a BOOLEAN decision as one rung (`L4.Coverage.Rungs`, which the Catala lowering reads its ladder shape from too).
@@ -1038,6 +1038,17 @@ Exit statuses: 0 every decision at leaf level with every bucket witnessed or pro
 `--json` writes the same report to standard output and the coverage line to standard error; `--all` lists every witness and every impossible bucket, which the text report otherwise caps at sixteen.
 A decision that reads an `ASSUME` is not covered, since an input cannot supply one, and a body wrapped in `WHERE` or `LET` is covered only if it is BOOLEAN.
 `jl4/tests-cli/CliTest/Coverage.hs` pins the two reports that matter as goldens (`jl4/examples/coverage-report/expected/`) and each exit status.
+
+TALLYSTICK, ruled 2026-11-12 by Meng (typed "BANNETON TALLYSTICK" in session GM): the six choices above, as printed in the example run of 2026-11-12.
+
+1. The verb: `l4 coverage FILE`.
+2. The flags: `--decision NAME` (repeatable), `--all`, `--json`, `--timeout SECONDS` (default 10) and the fixed-clock flag `--fixed-now`.
+3. The exit statuses 0, 1, 2 and 3 as above, with precedence 1 over 2 over 3.
+4. The text layout: the cover points with their spans, a `T`/`F` table of the buckets, the first witness of each and L4's answer there, and the impossible buckets capped at sixteen unless `--all`.
+5. The closing coverage line, in the style of `l4 explore`.
+6. The limits in the `--help` footer, as that footer was printed in the example run.
+
+Assumed, not ruled, and added after that run, so not covered by the ruling: the row for a bucket whose inputs give different answers, and the line that names the inputs no condition reads, with its paragraph in the `--help` footer and its `inputsNoConditionReads` key in the JSON report.
 
 **Addendum: (b)'s `catala proof` pass is now run — partially, and the partiality is the point.**
 `etc/validate-catala.mjs` gained it as layer 2 of three. What it buys is `NoOverlappingExceptions`:
