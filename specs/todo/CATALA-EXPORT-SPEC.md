@@ -1029,6 +1029,16 @@ The decision is covered at rung level instead, exactly as before, with the reaso
 Every witness input of the rung-level gate is a witness input of the leaf-level one, because the candidates and the eight-per-bucket cap are unchanged, and a bucket of the cross is a refinement of a bucket of the rungs.
 The search is backend-neutral and lives in `L4.Cli.Coverage`; `L4.Cli.CatalaWitness` is the Catala adapter over it, and asks the engine to give way to the rungs whenever a leaf bucket is undecided, since the lowering needs every combination decided.
 
+**A standalone report: `l4 coverage` (2026-11-12; the verb, the layout, the flags and the exit statuses are assumed, not ruled).**
+The search above needs no Catala, so `l4 coverage FILE` prints it for any file: per decision, the cover points with their source spans, a table of the buckets (a `T`/`F` per cover point), the first input that realises each witnessed bucket and L4's answer there, the buckets the solver proved impossible, and the buckets neither reached nor proved, each with its reason.
+It ends with a coverage line in the style of `l4 explore`, which says in capitals what was not done (`UNDECIDED`, `AT RUNG LEVEL`, `NOT COVERED`, `NOTHING COVERED`), and the limits are in `--help` and in `doc/concepts/reviewing/coverage.md`.
+The decisions are every top-level `DECIDE` of the file that branches on a condition, or those named with `--decision`: the rungs of an `UNLESS` chain or of a `BRANCH`, an `IF` or a literal `CONSIDER`, else the body of a BOOLEAN decision as one rung (`L4.Coverage.Rungs`, which the Catala lowering reads its ladder shape from too).
+A bucket whose inputs give different answers says so and shows an input for each answer; an input that no condition reads is tried at one value, and the report names it.
+Exit statuses: 0 every decision at leaf level with every bucket witnessed or proved impossible; 1 the file does not check or `--decision` names nothing; 2 some bucket undecided; 3 none undecided but some decision at rung level or not covered, or nothing covered at all, so that a run over a file with no conditions is not read as complete.
+`--json` writes the same report to standard output and the coverage line to standard error; `--all` lists every witness and every impossible bucket, which the text report otherwise caps at sixteen.
+A decision that reads an `ASSUME` is not covered, since an input cannot supply one, and a body wrapped in `WHERE` or `LET` is covered only if it is BOOLEAN.
+`jl4/tests-cli/CliTest/Coverage.hs` pins the two reports that matter as goldens (`jl4/examples/coverage-report/expected/`) and each exit status.
+
 **Addendum: (b)'s `catala proof` pass is now run — partially, and the partiality is the point.**
 `etc/validate-catala.mjs` gained it as layer 2 of three. What it buys is `NoOverlappingExceptions`:
 the ladders are built as a **linear** chain precisely so two rungs can never both win, and this is

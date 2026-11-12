@@ -54,6 +54,7 @@ import qualified CliTest.Blawx as Blawx
 import qualified CliTest.BuildIdentity as BuildIdentity
 import qualified CliTest.BuildVersion as BuildVersion
 import qualified CliTest.Catala as Catala
+import qualified CliTest.Coverage as Coverage
 import qualified CliTest.DmnBpmn as DmnBpmn
 import qualified CliTest.Ledger as Ledger
 import qualified CliTest.Explore as Explore
@@ -698,6 +699,7 @@ main = do
          , Blawx.fixtures
          , Docassemble.fixtures
          , Catala.fixtures
+         , Coverage.fixtures
          , Explore.fixtures
          , Prove.fixtures
          , BuildIdentity.fixtures
@@ -5083,6 +5085,7 @@ spec bin = do
   Blawx.spec bin
   Docassemble.spec bin
   Catala.spec bin
+  Coverage.spec bin
   Explore.spec bin
   Prove.spec bin
   BuildVersion.spec bin

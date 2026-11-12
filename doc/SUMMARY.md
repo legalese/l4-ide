@@ -24,6 +24,7 @@
 - [Patterns](tutorials/getting-started/common-patterns.md)
 - [Errors and Troubleshooting](reference/errors/README.md)
 - [Proving an assertion: `l4 prove`](concepts/reviewing/proving-assertions.md)
+- [Which combinations a rule has been tried on: `l4 coverage`](concepts/reviewing/coverage.md)
 
 ## Exports
 

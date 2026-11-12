@@ -68,6 +68,7 @@ executable l4
     L4.Cli.Cloud
     L4.Cli.Common
     L4.Cli.Coverage
+    L4.Cli.CoverageReport
     L4.Cli.Deploy
     L4.Cli.Docassemble
     L4.Cli.Explore
@@ -175,6 +176,7 @@ test-suite l4-cli-test
     CliTest.BuildVersion
     CliTest.Catala
     CliTest.Common
+    CliTest.Coverage
     CliTest.DmnBpmn
     CliTest.Docassemble
     CliTest.Ledger

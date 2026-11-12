@@ -63,6 +63,9 @@ high-fidelity — and unusually useful as a cross-check.
   witness when no candidate produces a combination; the file says so when it does. Unless a
   witness had to come from the solver, the emitted file does not depend on which solver is
   installed.
+  `l4 coverage FILE` prints the same combinations, the inputs found for them and the ones proved
+  impossible, for any rule, without Catala: see [Which combinations a rule has been tried
+  on](../concepts/reviewing/coverage.md).
 
 ## The command
 
