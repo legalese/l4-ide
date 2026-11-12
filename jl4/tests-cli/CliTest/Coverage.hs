@@ -1,7 +1,8 @@
 -- | Black-box tests for @l4 coverage@ (CATALA-EXPORT-SPEC §8.4, "A standalone
 -- report"). The verb, the flags, the layout and the exit statuses were ruled
 -- on 2026-11-12 (TALLYSTICK); the rows for answers that differ inside a bucket
--- and for inputs no condition reads came after, and are assumed, not ruled.
+-- and for inputs no condition reads came after, and were ruled later the same
+-- day (CROSSWORD).
 module CliTest.Coverage (spec, fixtures) where
 
 import qualified Data.Aeson as Aeson
@@ -84,7 +85,7 @@ spec bin = describe "l4 coverage" $ do
 
   -- Every income that is not above 1000 lands in one bucket and has its own
   -- allowance, so the bucket has three answers, and the row must not read as
-  -- if it had one. (Assumed, not ruled.)
+  -- if it had one.
   it "says when the answers inside one bucket differ" $ do
     Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/varies.l4"]
     code `shouldBe` ExitSuccess
@@ -96,7 +97,6 @@ spec bin = describe "l4 coverage" $ do
 
   -- An input no condition reads is tried at one value, and the report says
   -- which, because the answers it prints are only as varied as its inputs.
-  -- (Assumed, not ruled.)
   it "names the inputs that no condition reads" $ do
     Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/unread.l4"]
     code `shouldBe` ExitSuccess

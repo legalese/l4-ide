@@ -83,7 +83,7 @@ import L4.Cli.Prove (Solver (..), samplePointsUpTo)
 
 -- | More cover points than this is 2^n buckets too many to decide one by one.
 -- Counted in leaves; a decision past it is covered at rung level, and past it
--- there too it is not covered at all. (Assumed, not ruled.)
+-- there too it is not covered at all. (Ruled, CATALA-EXPORT-SPEC §8.4.)
 atomLimit :: Int
 atomLimit = 12
 

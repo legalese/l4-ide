@@ -7,10 +7,11 @@
 -- coverage line and the limits in its @--help@ footer were ruled by Meng on
 -- 2026-11-12 (TALLYSTICK; CATALA-EXPORT-SPEC §8.4, "A standalone report"),
 -- as they were printed in the example run he ruled on.
--- Two things came after that run and are assumed, not ruled: the row for a
--- bucket whose inputs give different answers, and the line that names the
--- inputs no condition reads, with its paragraph in the footer and its
--- @inputsNoConditionReads@ key in the JSON.
+-- Two things came after that run and were ruled separately, later the same
+-- day (CROSSWORD; the same section): the row for a bucket whose inputs give
+-- different answers, and the line that names the inputs no condition reads,
+-- with its paragraph in the footer and its @inputsNoConditionReads@ key in
+-- the JSON.
 --
 -- A decision's cover points are the leaves of the conditions it branches on,
 -- and a bucket is one combination of their truth values ("L4.Cli.Coverage",
@@ -94,7 +95,7 @@ coverageBound =
     , "  counted as covered."
     , ""
     -- The next paragraph came after the example run that was ruled on, and
-    -- is assumed, not ruled.
+    -- was ruled separately (CROSSWORD).
     , "  An input that no condition reads is tried at one value only (zero, for"
     , "  a number), so a bucket whose answer varies with such an input shows"
     , "  one answer; the report names those inputs. When the inputs that"
@@ -217,7 +218,7 @@ coverageCmd opts = do
       exitWith status
 
 -- | The inputs of a target that none of a cover's points mentions.
--- Naming them in the report is assumed, not ruled (CATALA-EXPORT-SPEC §8.4).
+-- Naming them in the report is ruled (CROSSWORD; CATALA-EXPORT-SPEC §8.4).
 unreadBy :: CoverTarget -> Cover Text -> [Text]
 unreadBy t c =
   [ nameToText (getOriginal n) | (n, _) <- t.ctParams, not (Set.member (getUnique n) mentioned) ]
@@ -430,7 +431,7 @@ bucketLines opts params b = case b.bkStatus of
     answers ->
       -- the answer varies inside the bucket (it depends on more than the
       -- conditions decide), so it is not one value: say so, and show an input
-      -- for each value (all of them with --all). Assumed, not ruled.
+      -- for each value (all of them with --all).
       (row <> "   witnessed by " <> count (length rows) "input" <> "; L4's answer DIFFERS across them: "
          <> count (length answers) "different value" <> " (" <> Text.intercalate ", " (take 3 answers)
          <> (if length answers > 3 then ", ..." else "") <> ")")
