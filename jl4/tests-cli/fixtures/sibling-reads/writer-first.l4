@@ -1,8 +1,8 @@
 -- A landlord gives notice, and later seeks possession, which needs the notice.
--- The two are the sides of a RAND, and the side that makes the record (the
--- notice) is on the left, earlier in time than the right side reads it, so the
--- order L4 runs the sides in does not change the answer: this file runs.
--- reader-first.l4 is the same file with the sides swapped, and is refused.
+-- The two are the sides of a RAND, with the side that makes the record (the
+-- notice) on the left. The sides take the trace's events in step, so the read
+-- at 400 sees the notice recorded at 10: this file runs, and so does
+-- reader-first.l4, the same file with the sides swapped.
 -- (smucclaw/l4-ide#1069)
 
 DECLARE Party IS ONE OF Landlord

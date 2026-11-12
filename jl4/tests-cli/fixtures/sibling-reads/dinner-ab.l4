@@ -4,10 +4,12 @@
 -- purchase, two dinners are bought. The file is wrong on purpose.
 --
 -- Alice and Bob are the two sides of a RAND, and Alice's side reads the
--- record Bob's side makes. L4 runs one side over the whole trace before the
--- other, so before smucclaw/l4-ide#1069 `l4 explore` said the property held
+-- record Bob's side makes. Before smucclaw/l4-ide#1069 L4 ran one side over
+-- the whole trace before the other, so `l4 explore` said the property held
 -- (it does not: Alice checks at 10, Bob buys at 11, Alice buys at 12). Now
--- `l4 check` warns, and `l4 run` and `l4 explore` stop with an error.
+-- the two sides take the trace's events in step, so Alice's purchase at 12
+-- sees Bob's at 11, `l4 run` records `open at acceptance` IS FALSE, and
+-- `l4 explore` finds the race.
 
 IMPORT prelude
 

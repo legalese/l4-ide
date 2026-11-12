@@ -437,6 +437,46 @@
         "scrutiny": "consumed"
       },
       {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF \"Bob\""
+        },
+        "outcome": {
+          "what": "partyMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF \"Carol\""
+        },
+        "outcome": {
+          "what": "partyMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
         "clock": 2,
         "event": {
           "action": "Receipt OF …, …, …",
@@ -456,12 +496,12 @@
         "scrutiny": "consumed"
       },
       {
-        "clock": 1,
+        "clock": 2,
         "event": {
-          "action": "Pay OF …, …, …",
-          "at": 1,
+          "action": "Receipt OF …, …, …",
+          "at": 2,
           "kind": "act",
-          "party": "Tenant OF \"Alice\""
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 2,
@@ -484,11 +524,11 @@
           "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
-          "activation": 2,
-          "member": 2,
+          "activation": 3,
+          "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF \"Bob\""
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -522,65 +562,6 @@
         "scrutiny": "consumed"
       },
       {
-        "clock": 4,
-        "event": {
-          "action": "Receipt OF …, …, …",
-          "at": 4,
-          "kind": "act",
-          "party": "Landlord OF \"Ms Ng\""
-        },
-        "norm": {
-          "activation": 2,
-          "modal": "MUST",
-          "party": "Landlord OF \"Ms Ng\""
-        },
-        "outcome": {
-          "then": "hence",
-          "what": "matched"
-        },
-        "scrutiny": "consumed"
-      },
-      {
-        "clock": 1,
-        "event": {
-          "action": "Pay OF …, …, …",
-          "at": 1,
-          "kind": "act",
-          "party": "Tenant OF \"Alice\""
-        },
-        "norm": {
-          "activation": 3,
-          "member": 3,
-          "modal": "MUST",
-          "of": 3,
-          "party": "Tenant OF \"Carol\""
-        },
-        "outcome": {
-          "what": "partyMismatch"
-        },
-        "scrutiny": "witnessedOnly"
-      },
-      {
-        "clock": 2,
-        "event": {
-          "action": "Receipt OF …, …, …",
-          "at": 2,
-          "kind": "act",
-          "party": "Landlord OF \"Ms Ng\""
-        },
-        "norm": {
-          "activation": 3,
-          "member": 3,
-          "modal": "MUST",
-          "of": 3,
-          "party": "Tenant OF \"Carol\""
-        },
-        "outcome": {
-          "what": "partyMismatch"
-        },
-        "scrutiny": "witnessedOnly"
-      },
-      {
         "clock": 3,
         "event": {
           "action": "Pay OF …, …, …",
@@ -599,6 +580,25 @@
           "what": "partyMismatch"
         },
         "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 4,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 4,
+          "kind": "act",
+          "party": "Landlord OF \"Ms Ng\""
+        },
+        "norm": {
+          "activation": 2,
+          "modal": "MUST",
+          "party": "Landlord OF \"Ms Ng\""
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
       },
       {
         "clock": 4,
@@ -749,6 +749,46 @@
         "scrutiny": "consumed"
       },
       {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "norm": {
+          "activation": 2,
+          "member": 2,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF \"Bob\""
+        },
+        "outcome": {
+          "what": "partyMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 1,
+          "kind": "act",
+          "party": "Tenant OF \"Alice\""
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF \"Carol\""
+        },
+        "outcome": {
+          "what": "partyMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
         "clock": 2,
         "event": {
           "action": "Receipt OF …, …, …",
@@ -768,12 +808,12 @@
         "scrutiny": "consumed"
       },
       {
-        "clock": 1,
+        "clock": 2,
         "event": {
-          "action": "Pay OF …, …, …",
-          "at": 1,
+          "action": "Receipt OF …, …, …",
+          "at": 2,
           "kind": "act",
-          "party": "Tenant OF \"Alice\""
+          "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
           "activation": 2,
@@ -796,11 +836,11 @@
           "party": "Landlord OF \"Ms Ng\""
         },
         "norm": {
-          "activation": 2,
-          "member": 2,
+          "activation": 3,
+          "member": 3,
           "modal": "MUST",
           "of": 3,
-          "party": "Tenant OF \"Bob\""
+          "party": "Tenant OF \"Carol\""
         },
         "outcome": {
           "what": "partyMismatch"
@@ -828,6 +868,32 @@
         "scrutiny": "witnessedOnly"
       },
       {
+        "clock": 5,
+        "event": {
+          "action": "Pay OF …, …, …",
+          "at": 5,
+          "kind": "act",
+          "party": "Tenant OF \"Carol\""
+        },
+        "join": {
+          "kind": "fork",
+          "member": 3,
+          "total": 3
+        },
+        "norm": {
+          "activation": 3,
+          "member": 3,
+          "modal": "MUST",
+          "of": 3,
+          "party": "Tenant OF \"Carol\""
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
         "clock": 6,
         "event": {
           "action": null,
@@ -846,6 +912,25 @@
           "what": "partyMismatch"
         },
         "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 6,
+        "event": {
+          "action": "Receipt OF …, …, …",
+          "at": 6,
+          "kind": "act",
+          "party": "Landlord OF \"Ms Ng\""
+        },
+        "norm": {
+          "activation": 2,
+          "modal": "MUST",
+          "party": "Landlord OF \"Ms Ng\""
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
       },
       {
         "clock": 6,
@@ -889,91 +974,6 @@
           "what": "breached"
         },
         "scrutiny": "noEvent"
-      },
-      {
-        "clock": 1,
-        "event": {
-          "action": "Pay OF …, …, …",
-          "at": 1,
-          "kind": "act",
-          "party": "Tenant OF \"Alice\""
-        },
-        "norm": {
-          "activation": 3,
-          "member": 3,
-          "modal": "MUST",
-          "of": 3,
-          "party": "Tenant OF \"Carol\""
-        },
-        "outcome": {
-          "what": "partyMismatch"
-        },
-        "scrutiny": "witnessedOnly"
-      },
-      {
-        "clock": 2,
-        "event": {
-          "action": "Receipt OF …, …, …",
-          "at": 2,
-          "kind": "act",
-          "party": "Landlord OF \"Ms Ng\""
-        },
-        "norm": {
-          "activation": 3,
-          "member": 3,
-          "modal": "MUST",
-          "of": 3,
-          "party": "Tenant OF \"Carol\""
-        },
-        "outcome": {
-          "what": "partyMismatch"
-        },
-        "scrutiny": "witnessedOnly"
-      },
-      {
-        "clock": 5,
-        "event": {
-          "action": "Pay OF …, …, …",
-          "at": 5,
-          "kind": "act",
-          "party": "Tenant OF \"Carol\""
-        },
-        "join": {
-          "kind": "fork",
-          "member": 3,
-          "total": 3
-        },
-        "norm": {
-          "activation": 3,
-          "member": 3,
-          "modal": "MUST",
-          "of": 3,
-          "party": "Tenant OF \"Carol\""
-        },
-        "outcome": {
-          "then": "hence",
-          "what": "matched"
-        },
-        "scrutiny": "consumed"
-      },
-      {
-        "clock": 6,
-        "event": {
-          "action": "Receipt OF …, …, …",
-          "at": 6,
-          "kind": "act",
-          "party": "Landlord OF \"Ms Ng\""
-        },
-        "norm": {
-          "activation": 2,
-          "modal": "MUST",
-          "party": "Landlord OF \"Ms Ng\""
-        },
-        "outcome": {
-          "then": "hence",
-          "what": "matched"
-        },
-        "scrutiny": "consumed"
       },
       {
         "clock": null,

@@ -1,20 +1,26 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
--- | smucclaw/l4-ide#1069: a compound whose operands read each other's records
--- is refused, at run time, naming the record and both operands; and the
--- checker warns, beforehand, where a compound's operands can reach a read and
--- a write of one cell.
+-- | smucclaw/l4-ide#1069: operands that read each other's records.
 --
--- Every refusal case is written both ways round. The machine runs the left
--- operand over the whole trace before the right one, so one of the two orders
--- gave the time-ordered answer by luck, and the other gave a wrong one with no
--- error. The check refuses the wrong one, and lets the lucky one run only when
--- no read in it could have depended on the order. A file in which a read and
--- a sibling's write fall at the same instant is refused either way round
--- (assumed, not ruled: the check has no event identity to order them by).
+-- A @RAND@, and an @EVERY@ whose members are folded into one, runs its
+-- operands in step (NORM-LOG-SPEC N10's option A; Note [Operands in step] in
+-- "L4.EvaluateLazy.Machine"): every operand takes event n of the trace before
+-- any takes event n+1, so a read on one side sees the other side's records
+-- from earlier events, and none from later ones. Every case below is written
+-- both ways round, and both orders must give the same, time-ordered answer.
+--
+-- What in step cannot order is still refused, by the run-time check
+-- ("L4.EvaluateLazy.SiblingReads"): a read and a record made while the two
+-- sides take the SAME event, where the left side's turn comes before the
+-- right's and that is not the order of their instants, or at one instant,
+-- where the trace gives them no order (assumed, not ruled). An @ROR@ still
+-- runs its operands one after the other, so it is still refused where a read
+-- depended on that order, and it is the only compound the checker still
+-- warns about.
 --
 -- The operands that do NOT read each other's records, for which nothing may
--- change, are "BreachClocksSpec"'s C1.
+-- change, are "BreachClocksSpec"'s C1, which also runs each tree in step and
+-- one operand after the other and compares the two.
 module SiblingReadsSpec (spec) where
 
 import Data.Foldable (for_)
@@ -32,14 +38,25 @@ import L4.TracePolicy (apiDefaultPolicy)
 import L4.TypeCheck (prettyCheckError)
 import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), CheckWarning (..))
 
--- | What one directive did: refused (the message), or ran (its value, printed).
-data Outcome = Stopped Text.Text | Ran Text.Text
+-- | What one directive did: refused (the message), or ran (its value and its
+-- ledgers, printed).
+data Outcome = Stopped Text.Text | Ran Text.Text Text.Text
   deriving stock (Eq, Show)
 
 isRefused :: Outcome -> Bool
 isRefused = \ case
   Stopped _ -> True
-  Ran _     -> False
+  Ran _ _   -> False
+
+-- | The ledgers of a directive that ran, as @l4 run@ prints them.
+ledgerOf :: Outcome -> Text.Text
+ledgerOf = \ case
+  Ran _ l   -> l
+  Stopped m -> "refused: " <> m
+
+-- | The lines of a directive's ledgers that mention a cell, in order.
+entriesOf :: Text.Text -> Outcome -> [Text.Text]
+entriesOf cell o = [ Text.strip l | l <- Text.lines (ledgerOf o), ("`" <> cell <> "`") `Text.isInfixOf` l ]
 
 fixedNow :: UTCTime
 fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
@@ -58,8 +75,8 @@ run src = do
   where
     outcomeOf res = case res.result of
       Reduction (ReducedErrored e) -> Stopped (Text.unwords (Text.words (Text.unlines (prettyEvalException e))))
-      Reduction (Reduced nf)       -> Ran (prettyLayout nf)
-      other                        -> Ran (Text.pack (show other))
+      Reduction (Reduced nf)       -> Ran (prettyLayout nf) (prettyLedger res.ledger)
+      other                        -> Ran (Text.pack (show other)) (prettyLedger res.ledger)
 
 warnings :: Text.Text -> IO [SiblingRead]
 warnings src = do
@@ -74,7 +91,7 @@ warningTexts src = do
 shouldMention :: Outcome -> [Text.Text] -> Expectation
 shouldMention o ws = case o of
   Stopped msg -> for_ ws \ w -> (w, w `Text.isInfixOf` msg, msg) `shouldBe` (w, True, msg)
-  Ran v       -> expectationFailure ("expected a refusal, but it ran: " <> Text.unpack v)
+  Ran v _     -> expectationFailure ("expected a refusal, but it ran: " <> Text.unpack v)
 
 -- ---------------------------------------------------------------------------
 -- Alice and Bob, the issue's own file
@@ -318,100 +335,155 @@ ownLedgers = Text.unlines
   , "    PARTY Q DOES go AT 1"
   ]
 
+-- ---------------------------------------------------------------------------
+-- Two sides that take ONE event: one makes a record at the event's stamp,
+-- the other reads it at the same stamp. The trace gives no order between
+-- them, so neither order of the operands may answer.
+
+oneEvent :: Text.Text -> Text.Text
+oneEvent compound = Text.unlines
+  [ "DECLARE Party IS ONE OF P"
+  , "DECLARE Act IS ONE OF go"
+  , "GIVETH A DEONTIC Party Act"
+  , "`writer` MEANS PARTY P MAY go WITHIN 10 HENCE COMMIT `x` IS TRUE HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`reader` MEANS PARTY P MAY go PROVIDED (RECALL OFFICIAL's `x`) EQUALS NOTHING WITHIN 10 HENCE COMMIT `first` IS TRUE HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`both` MEANS " <> compound
+  , "#TRACE `both` AT 0 WITH"
+  , "    PARTY P DOES go AT 1"
+  ]
+
+-- ---------------------------------------------------------------------------
+-- One event, two instants: the event at 9 reveals that P missed a deadline
+-- at 5, and P's LEST records the lapse at 5; Q's act at 9 relies on the lapse.
+-- In time order Q sees it. With the lapse on the left, the left side takes
+-- the event first and Q does see it; with it on the right, Q has read before
+-- the lapse was recorded, and that order is refused, not answered.
+
+lapse :: Text.Text -> Text.Text
+lapse compound = Text.unlines
+  [ "DECLARE Party IS ONE OF P, Q"
+  , "DECLARE Act IS ONE OF a, b"
+  , "GIVETH A DEONTIC Party Act"
+  , "`lapse` MEANS PARTY P MUST a WITHIN 5 HENCE FULFILLED LEST COMMIT `lapsed` IS TRUE HENCE FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`relies` MEANS PARTY Q MAY b PROVIDED (RECALL OFFICIAL's `lapsed`) EQUALS JUST TRUE WITHIN 100 HENCE COMMIT `relied` IS TRUE HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`both` MEANS " <> compound
+  , "#TRACE `both` AT 0 WITH"
+  , "    PARTY Q DOES b AT 9"
+  ]
+
 spec :: Spec
 spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)" do
-  describe "the run-time refusal" do
-    it "refuses the issue's file, naming the record, both operands and both instants" do
-      outs <- run (dinner "`Alice's evening` RAND `Bob's evening`")
-      case outs of
-        [o] -> o `shouldMention`
-          [ "read each other's records", "OFFICIAL's `dinner status record`"
-          , "`Alice's evening`", "`Bob's evening`", "at 12", "at 11", "a RAND" ]
-        _ -> expectationFailure ("expected one directive, got " <> show outs)
+  describe "a RAND's operands in step" do
+    it "answers the issue's file in time order: Bob's purchase at 11 is seen by Alice at 12" do
+      for_ ["`Alice's evening` RAND `Bob's evening`", "`Bob's evening` RAND `Alice's evening`"] \ compound -> do
+        outs <- run (dinner compound)
+        case outs of
+          [o] -> do
+            (compound, isRefused o) `shouldBe` (compound, False)
+            (compound, entriesOf "open at acceptance" o) `shouldBe` (compound, ["COMMIT `open at acceptance` IS FALSE   [party=Alice, source=COMMIT, at=2026-01-01T00:00:00Z]"])
+          _ -> expectationFailure ("expected one directive, got " <> show outs)
 
-    it "refuses it the other way round too, where the read saw a record from its future" do
-      outs <- run (dinner "`Bob's evening` RAND `Alice's evening`")
-      case outs of
-        [o] -> o `shouldMention` ["read each other's records", "at 10", "at 11", "future"]
-        _ -> expectationFailure ("expected one directive, got " <> show outs)
+    it "keeps the official record in the order of the events, whichever side is written first" do
+      [ab] <- run (dinner "`Alice's evening` RAND `Bob's evening`")
+      [ba] <- run (dinner "`Bob's evening` RAND `Alice's evening`")
+      ledgerOf ab `shouldBe` ledgerOf ba
+      map (Text.takeWhile (/= '[')) (entriesOf "dinner status record" ab <> entriesOf "dinners bought" ab)
+        `shouldBe` [ "COMMIT `dinner status record` IS opened   ", "COMMIT `dinner status record` IS taken   ", "COMMIT `dinners bought` IS `dinner for two`   " ]
 
-    it "lets a record made on the left, earlier than the right side reads it, run (N10: writer before reader)" do
-      outs <- run (notice "RAND" "`notice` OP `possession`" noticeThenClaim)
-      outs `shouldSatisfy` (not . any isRefused)
+    it "lets a record made on either side be read on the other from the next event on (N10: writer before reader)" do
+      for_ ["`notice` OP `possession`", "`possession` OP `notice`"] \ order -> do
+        outs <- run (notice "RAND" order noticeThenClaim)
+        (order, map isRefused outs) `shouldBe` (order, [False])
+        (order, concatMap (entriesOf "possession sought") outs) `shouldBe` (order, ["COMMIT `possession sought` IS TRUE   [party=Landlord, source=COMMIT, at=2026-01-01T00:00:00Z]"])
 
-    it "refuses the reader-first order of the same file, where the read missed a record from its past" do
-      outs <- run (notice "RAND" "`possession` OP `notice`" noticeThenClaim)
-      case outs of
-        [o] -> o `shouldMention` ["read each other's records", "`possession` read", "but `notice`, on the other side", "at 400", "at 10", "should have seen"]
-        _ -> expectationFailure ("expected one directive, got " <> show outs)
+    it "orders a read and a sibling's record at one instant by the trace's order of their two events" do
+      let noticeFirst = [ "PARTY Landlord DOES `gives notice` AT 10", "PARTY Landlord DOES `seeks possession` AT 10" ]
+          claimFirst  = [ "PARTY Landlord DOES `seeks possession` AT 10", "PARTY Landlord DOES `gives notice` AT 10" ]
+      for_ ["`notice` OP `possession`", "`possession` OP `notice`"] \ order -> do
+        seen <- run (notice "RAND" order noticeFirst)
+        unseen <- run (notice "RAND" order claimFirst)
+        (order, map isRefused (seen <> unseen)) `shouldBe` (order, [False, False])
+        (order, length (concatMap (entriesOf "possession sought") seen)) `shouldBe` (order, 1)
+        (order, concatMap (entriesOf "possession sought") unseen) `shouldBe` (order, [])
 
-    it "refuses a read and a sibling's write at the same instant, either way round (assumed, not ruled)" do
-      let sameInstant = [ "PARTY Landlord DOES `gives notice` AT 10", "PARTY Landlord DOES `seeks possession` AT 10" ]
-      left <- run (notice "RAND" "`notice` OP `possession`" sameInstant)
-      right <- run (notice "RAND" "`possession` OP `notice`" sameInstant)
-      left `shouldSatisfy` all isRefused
-      right `shouldSatisfy` all isRefused
+    it "refuses a read and a sibling's record made at one instant while both sides take the same event, either way round (assumed, not ruled)" do
+      left <- run (oneEvent "`writer` RAND `reader`")
+      right <- run (oneEvent "`reader` RAND `writer`")
+      case (left, right) of
+        ([l], [r]) -> do
+          l `shouldMention` ["read each other's records", "OFFICIAL's `x`", "at 1", "own instant", "in step"]
+          r `shouldMention` ["read each other's records", "OFFICIAL's `x`", "at 1", "at the same instant", "in step"]
+        _ -> expectationFailure ("expected one directive each, got " <> show (left, right))
 
-    it "refuses an ROR whose left side read a record its right side makes earlier" do
-      outs <- run (notice "ROR" "`possession` OP `notice`" noticeThenClaim)
-      case outs of
-        [o] -> o `shouldMention` ["read each other's records", "an ROR"]
-        _ -> expectationFailure ("expected one directive, got " <> show outs)
+    it "within one event, answers when the left side's record is the earlier, and refuses the other order" do
+      seen <- run (lapse "`lapse` RAND `relies`")
+      refused <- run (lapse "`relies` RAND `lapse`")
+      case (seen, refused) of
+        ([s'], [r]) -> do
+          entriesOf "relied" s' `shouldBe` ["COMMIT `relied` IS TRUE   [party=Q, source=COMMIT, at=2026-01-01T00:00:00Z]"]
+          r `shouldMention` ["read each other's records", "`relies` read", "at 9", "at 5", "should have seen", "in step"]
+        _ -> expectationFailure ("expected one directive each, got " <> show (seen, refused))
 
-    it "refuses an EVERY … UPON EACH whose members read each other's records, only where the order mattered" do
+    it "runs an EVERY … UPON EACH in step: each member's read sees the purchases made before it, in either roll order" do
       ab <- run (fork "Alice, Bob")
       ba <- run (fork "Bob, Alice")
-      -- X0 nobody buys; X1 Bob buys after Alice's only read; X2 and X4 a
-      -- purchase between two reads; X3 one diner alone
-      (map isRefused ab, ab) `shouldBe` ([False, False, True, False, True], ab)
-      (map isRefused ba, ba) `shouldBe` ([False, True, True, False, True], ba)
+      (map isRefused ab, map isRefused ba) `shouldBe` (replicate 5 False, replicate 5 False)
+      -- X2: Alice reads at 65100, Bob buys at 65160, Alice reads at 65220
+      for_ [("Alice, Bob" :: Text.Text, ab), ("Bob, Alice", ba)] \ (roll, outs) ->
+        (roll, map (Text.takeWhile (/= '[')) (entriesOf "entries read" (outs !! 2)))
+          `shouldBe` (roll, ["RECORD `entries read` IS 1   ", "RECORD `entries read` IS 2   "])
+      map ledgerOf ab `shouldBe` map ledgerOf ba
 
-    it "refuses the distributive EVERY (no UPON EACH line) the same way, since it folds its members the same way" do
+    it "runs the distributive EVERY (no UPON EACH line) the same way, since it folds its members the same way" do
       ab <- run (distributive "Alice, Bob")
-      (map isRefused ab, ab) `shouldBe` ([False, False, True, False, True], ab)
+      ba <- run (distributive "Bob, Alice")
+      (map isRefused ab, map isRefused ba) `shouldBe` (replicate 5 False, replicate 5 False)
+      map (Text.takeWhile (/= '[')) (entriesOf "entries read" (ab !! 2))
+        `shouldBe` ["RECORD `entries read` IS 1   ", "RECORD `entries read` IS 2   "]
+      map ledgerOf ab `shouldBe` map ledgerOf ba
 
-    it "refuses records seen out of order (N12's probe), and runs the order in which the latest write is last" do
-      wrong <- run (lastWrite "`a` RAND `b` RAND `c`")
-      right <- run (lastWrite "`b` RAND `a` RAND `c`")
-      case wrong of
-        [o] -> o `shouldMention` ["read each other's records", "not the order they were made in"]
-        _ -> expectationFailure ("expected one directive, got " <> show wrong)
-      right `shouldSatisfy` (not . any isRefused)
+    it "reads the latest of two records made out of operand order (N12's probe), in either order" do
+      for_ ["`a` RAND `b` RAND `c`", "`b` RAND `a` RAND `c`", "`c` RAND `b` RAND `a`"] \ compound -> do
+        outs <- run (lastWrite compound)
+        (compound, concatMap (entriesOf "saw 1") outs) `shouldBe` (compound, ["COMMIT `saw 1` IS TRUE   [party=R, source=COMMIT, at=2026-01-01T00:00:00Z]"])
 
-    it "refuses SEESAW's example where it was FULFILLED by a record from the future, and keeps BREACHED the other way round" do
-      wrong <- run (waiver "`a` RAND `b`")
-      right <- run (waiver "`b` RAND `a`")
-      case wrong of
-        [o] -> o `shouldMention` ["read each other's records", "P's `waived`", "at 0", "at 4"]
-        _ -> expectationFailure ("expected one directive, got " <> show wrong)
-      case right of
-        [Ran v] -> v `shouldSatisfy` ("BREACH" `Text.isInfixOf`) . Text.toUpper
-        _ -> expectationFailure ("expected one breached directive, got " <> show right)
+    it "keeps SEESAW's example BREACHED either way round: the waiver at 4 comes after the read at 0" do
+      for_ ["`a` RAND `b`", "`b` RAND `a`"] \ compound -> do
+        outs <- run (waiver compound)
+        case outs of
+          [Ran v _] -> (compound, "BREACH" `Text.isInfixOf` Text.toUpper v) `shouldBe` (compound, True)
+          _ -> expectationFailure ("expected one breached directive, got " <> show outs)
 
     it "lets operands with no shared cell, and fork members with their own ledgers, run" do
       a <- run noShared
       b <- run ownLedgers
       (a <> b) `shouldSatisfy` (not . any isRefused)
 
+  describe "an ROR, still run one operand after the other" do
+    it "refuses an ROR whose left side read a record its right side makes earlier" do
+      outs <- run (notice "ROR" "`possession` OP `notice`" noticeThenClaim)
+      case outs of
+        [o] -> o `shouldMention` ["read each other's records", "an ROR", "over the whole trace"]
+        _ -> expectationFailure ("expected one directive, got " <> show outs)
+
   describe "the check-time warning" do
-    it "warns on the issue's file, naming the cell and both operands" do
-      ws <- warnings (dinner "`Alice's evening` RAND `Bob's evening`")
-      [ (w.cell, w.official, prettyLayout <$> w.readerSide.rule, prettyLayout <$> w.writerSide.rule) | w <- ws ]
-        `shouldBe` [("dinner status record", True, Just "`Alice's evening`", Just "`Bob's evening`")]
-      ts <- warningTexts (dinner "`Alice's evening` RAND `Bob's evening`")
+    it "warns on an ROR whose operands can reach a read and a write of one cell" do
+      ws <- warnings (notice "ROR" "`possession` OP `notice`" noticeThenClaim)
+      [ (w.op, w.cell, prettyLayout <$> w.readerSide.rule, prettyLayout <$> w.writerSide.rule) | w <- ws ]
+        `shouldBe` [("ROR", "notice given", Just "possession", Just "notice")]
+      ts <- warningTexts (notice "ROR" "`possession` OP `notice`" noticeThenClaim)
       ts `shouldSatisfy` all ("may read each other's records" `Text.isInfixOf`)
 
-    it "warns on a fork whose members read and write one official cell" do
-      ws <- warnings (fork "Alice, Bob")
-      [ (w.op, w.cell) | w <- ws ] `shouldBe` [("EVERY", "dinner status record")]
-
-    it "warns on a distributive EVERY too" do
-      ws <- warnings (distributive "Alice, Bob")
-      [ (w.op, w.cell) | w <- ws ] `shouldBe` [("EVERY", "dinner status record")]
-
-    it "warns on a writer-before-reader file too, since reachability cannot see time (a warning, never an error)" do
-      ws <- warnings (notice "RAND" "`notice` OP `possession`" noticeThenClaim)
-      [ w.cell | w <- ws ] `shouldBe` ["notice given"]
+    it "no longer warns on a RAND or an EVERY, whose operands run in step" do
+      a <- warnings (dinner "`Alice's evening` RAND `Bob's evening`")
+      b <- warnings (fork "Alice, Bob")
+      c <- warnings (distributive "Alice, Bob")
+      d <- warnings (notice "RAND" "`notice` OP `possession`" noticeThenClaim)
+      (a <> b <> c <> d) `shouldBe` []
 
     it "does not warn where no operand reads what another writes" do
       a <- warnings noShared

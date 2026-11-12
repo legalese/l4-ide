@@ -1,32 +1,49 @@
--- | The run-time refusal of a compound whose operands read each other's
--- records (smucclaw/l4-ide#1069; NORM-LOG-SPEC card N10, "a run-time check
--- now, lockstep operands as the goal", extended here to black ink).
+-- | The run-time check on compounds whose operands read each other's records
+-- (smucclaw/l4-ide#1069; NORM-LOG-SPEC card N10, "a run-time check now,
+-- lockstep operands as the goal", extended here to black ink).
 --
--- The machine runs a @RAND@ or @ROR@ operand-major: the left operand over the
--- whole @#TRACE@, then the right operand over the same trace
--- ('L4.EvaluateLazy.Machine', the @ValROp@ arm of @App1@ and the @RBinOp1@
--- frame). An @EVERY … UPON EACH@ and the distributive @EVERY@ fold their
--- members into the same right-nested @RAND@. Both operands share one ledger,
--- whose entries carry no contract instant. So an operand that @RECALL@s a cell
--- its sibling @RECORD@s or @COMMIT@s sees every write the earlier-run sibling
--- will ever make, including writes from the read's future, and none of the
--- later-run sibling's writes, including writes from the read's past.
+-- A @RAND@ runs its operands in step (N10's goal, option A; Note [Operands in
+-- step] in 'L4.EvaluateLazy.Machine'): event n of the @#TRACE@ is handed to
+-- the left operand and then to the right before event n+1 is handed to
+-- either. An @EVERY … UPON EACH@ and the distributive @EVERY@ fold their
+-- members into the same right-nested @RAND@, so their members run in step
+-- too. An @ROR@ still runs operand-major, the left operand over the whole
+-- trace and then the right, and so does a @RAND@ evaluated under an
+-- evaluation trace (@#EVALTRACE@, or every directive under the REPL's
+-- policy), whose trace builder needs each operand's frames nested whole.
+-- All operands share one ledger, whose entries carry no contract instant.
 --
 -- In Hvitved's contract specification language, which L4's contract evaluator
 -- follows (@jl4/README.md@), a conjunct is a function of the trace alone
 -- (thesis Def. 2.2.7, p. 35; Fig. 2.8, p. 49): CSL has no shared state, so an
--- operand reading its sibling's record is outside CSL, and refusing the
--- compound keeps L4 inside it. For operands that do not read each other's
--- records the check observes and never fires, so verdicts, breach instants
--- and blamed parties are exactly what they were.
+-- operand reading its sibling's record is outside CSL. In step, a read sees
+-- the sibling's records from earlier events and none from later ones, which
+-- is the reading the shared ledger has when the trace is taken one event at a
+-- time; what in step cannot order, this module refuses, and refusing keeps L4
+-- inside CSL. For operands that do not read each other's records the check
+-- observes and never fires, so verdicts, breach instants and blamed parties
+-- are exactly what they were.
 --
--- This module holds the check's state and its three rules; the machine calls
+-- This module holds the check's state and its rules; the machine calls
 -- 'checkRead' at every @RECALL@ and 'checkWrite' at every @RECORD@, @COMMIT@,
 -- @ATTEST@ and @NOTIFY@ made inside a compound's operand, and turns a 'Left'
--- into an evaluation error. The check changes no read, stores nothing in the
--- ledger, and forces nothing: a compound's time that is still a thunk is
+-- into an evaluation error. Two accesses are ordered by their contract
+-- instants and, at one instant, by the number of events the compound where
+-- their operands part had taken when each was made ('setTaken'; 'earlier'):
+-- in step, that number is the event's position in the trace. The check
+-- refuses a read that saw a sibling's record not 'earlier' than it, a read
+-- that missed one 'earlier' than it, and a @RECALL ALL@ that saw sibling
+-- records out of that order. The check changes no read, stores nothing in
+-- the ledger, and forces nothing: a compound's time that is still a thunk is
 -- logged as the compound's start ('StartOf') and filled in once the machine
 -- has evaluated it for its own reasons.
+--
+-- What is refused in step, by design (assumed, not ruled): a read and a
+-- sibling's record made while the two operands take the SAME event, when the
+-- left operand's turn (which comes first) is not the earlier instant, as when
+-- one event reveals a deadline missed some time before it and the right
+-- operand's @LEST@ records the miss at that deadline; and any two such
+-- accesses at the same instant, which the trace gives no order.
 --
 -- What it does not see, sorted by how it fails:
 --
@@ -35,22 +52,21 @@
 --   the left operand read. The check-time warning
 --   ('L4.Lint.SiblingReads') names such a pair; the run-time check does not.
 -- * Silent: two operands that write one cell with no read of it inside the
---   compound leave the ledger in operand order. No read depended on that
---   order, so there is nothing to refuse.
+--   compound leave the ledger in the order the writes were made (in step,
+--   event by event, left before right at one event). No read depended on
+--   that order, so there is nothing to refuse.
 -- * Silent: a read whose evaluation is deferred (a @RECALL@ inside a value
 --   that is stored unevaluated and forced later) is checked where it is
 --   forced, not where it is written; and a top-level rule with no inputs that
 --   reads the ledger is forced once and its answer shared, so a second
 --   operand that uses it makes no read of its own (a defect outside compounds
 --   too: a later use in the same chain gets the stale answer).
--- * Over-refusal, by design (assumed, not ruled): a read and a sibling's write
---   at the SAME instant are refused, since the check has no event identity to
---   order them by; @EVAL AS OF SYSTEM TIME@ and @EVAL UNDER VALID TIME@ bounds
---   are not applied, so a write such a bound would hide is still compared; and
---   a @RECALL ALL@ that sees two sibling entries out of instant order is
---   refused even when what the rule does with the list would come out the
---   same; and an access whose instant is never known counts as simultaneous
---   with every other.
+-- * Over-refusal, by design (assumed, not ruled): @EVAL AS OF SYSTEM TIME@
+--   and @EVAL UNDER VALID TIME@ bounds are not applied, so a write such a
+--   bound would hide is still compared; a @RECALL ALL@ that sees two sibling
+--   entries out of order is refused even when what the rule does with the
+--   list would come out the same; and an access whose instant is never known
+--   counts as simultaneous with every other.
 module L4.EvaluateLazy.SiblingReads
   ( LedgerKey (..)
   , OperandPath
@@ -63,6 +79,7 @@ module L4.EvaluateLazy.SiblingReads
   , inCompound
   , openScope
   , startKnown
+  , setTaken
   , checkRead
   , checkWrite
   , siblingReadMarker
@@ -103,6 +120,10 @@ data Scope = MkScope
     -- ^ the compound looks like the members of an @EVERY@, folded into a
     -- @RAND@ (its left operand is an obligation value, not source); it
     -- only adds a sentence to the message, so a wrong guess costs nothing
+  , scLockstep :: !Bool
+    -- ^ the machine runs this compound's operands in step, one event at a
+    -- time (a @RAND@, 'L4.EvaluateLazy.Machine'\'s @Lockstep@ frame), so the
+    -- events its operands have taken order two of its accesses at one instant
   }
   deriving stock Show
 
@@ -130,6 +151,9 @@ data Access = MkAccess
   , acVerb    :: !Text
     -- ^ @RECORD@, @COMMIT@ or @NOTIFY@ for a write; @RECALL@ or
     -- @RECALL ALL@ for a read
+  , acTaken   :: !(IntMap Int)
+    -- ^ for each in-step compound on 'acPath', how many events it had handed
+    -- its operands when the access was made ('ssTaken')
   }
   deriving stock Show
 
@@ -152,11 +176,24 @@ data SiblingState = MkSiblingState
   , ssNext   :: !Int
     -- ^ the next scope number. Kept here rather than drawn from the
     -- machine's supply, so that the check moves no address or unique.
+  , ssTaken  :: !(IntMap Int)
+    -- ^ for each compound whose operands run in step, by scope, how many
+    -- events of its stream it has handed them so far: the event they are
+    -- all taking now. Two accesses made while taking different events are
+    -- ordered by them even at one instant, as the trace orders the events.
   }
   deriving stock Show
 
 emptySiblingState :: SiblingState
-emptySiblingState = MkSiblingState [] Unclocked IntMap.empty IntMap.empty Map.empty 0
+emptySiblingState = MkSiblingState [] Unclocked IntMap.empty IntMap.empty Map.empty 0 IntMap.empty
+
+-- | The in-step compound with this scope has handed its operands @n@ events.
+setTaken :: Int -> Int -> SiblingState -> SiblingState
+setTaken s n st = st {ssTaken = IntMap.insert s n st.ssTaken}
+
+-- | What 'acTaken' records for an access made now on @path@.
+takenOn :: OperandPath -> SiblingState -> IntMap Int
+takenOn path st = IntMap.fromList [ (s, n) | (s, _) <- path, Just n <- [IntMap.lookup s st.ssTaken] ]
 
 -- | A compound meets its events at @clock@ ('Nothing' while its time is a
 -- thunk): a fresh scope, and the left operand's path into it.
@@ -205,10 +242,22 @@ siblingReadMarker = "read each other's records"
 isSiblingReadRefusal :: Text -> Bool
 isSiblingReadRefusal = Text.isInfixOf siblingReadMarker
 
--- | At or after: an unknown instant compares as equal, so it refuses.
-atOrAfter :: Maybe Rational -> Maybe Rational -> Bool
-atOrAfter (Just a) (Just b) = a >= b
-atOrAfter _ _               = True
+-- | Whether access @a@ happened strictly before access @b@ in the trace's
+-- time, as far as the compound with scope @s@, where the two diverge, can
+-- tell: at an earlier instant; or, at one instant, while the compound's
+-- operands were taking an earlier event of its stream, which only an in-step
+-- compound knows ('acTaken'), since the trace orders two events with one
+-- stamp as they were written. An unknown instant is never earlier, so a
+-- comparison involving one refuses.
+earlier :: Int -> Access -> Access -> Bool
+earlier s a b = case (a.acInstant, b.acInstant) of
+  (Just x, Just y)
+    | x < y     -> True
+    | x > y     -> False
+    | otherwise -> case (IntMap.lookup s a.acTaken, IntMap.lookup s b.acTaken) of
+        (Just m, Just n) -> m < n
+        _                -> False
+  _ -> False
 
 -- | A @RECALL@ of @cell@ in @key@'s ledger, made now. Rules 1 and 3; the read
 -- is logged when nothing refuses.
@@ -230,33 +279,26 @@ checkRead key cell readAll site st
   where
     cl = resolved st (Map.findWithDefault (MkCellLog Seq.empty []) (key, cell) st.ssCells)
     writes = toList cl.clWrites
-    theRead = MkAccess (instantOf st st.ssClock) st.ssClock st.ssPath site (if readAll then "RECALL ALL" else "RECALL")
+    theRead = MkAccess (instantOf st st.ssClock) st.ssClock st.ssPath site (if readAll then "RECALL ALL" else "RECALL") (takenOn st.ssPath st)
     future = listToMaybe
       [ refusal st key cell (FutureSeen w) theRead w s
       | w <- writes, Just s <- [divergence theRead.acPath w.acPath]
-      , atOrAfter w.acInstant theRead.acInstant ]
+      , not (earlier s w theRead) ]
     outOfOrder
       | readAll = listToMaybe
           [ refusal st key cell (OutOfOrder a) theRead b s
           | (i, a) <- zip [0 :: Int ..] writes, (j, b) <- zip [0 ..] writes, i < j
           , Just s <- [divergence a.acPath b.acPath]
-          , atOrAfter a.acInstant b.acInstant ]
-      | otherwise = case (reverse writes, mapMaybe (.acInstant) writes) of
-          (lastW : _, instants@(_ : _)) ->
-            -- the entry the trace's order would give: the latest instant, and
-            -- among entries at that instant the last in the ledger, when the
-            -- ledger's order between them means something
-            let latest = maximum instants
-                atLatest = [ w | w <- writes, w.acInstant == Just latest ]
-            in listToMaybe $
-                 [ refusal st key cell (OutOfOrder w) theRead lastW s
-                 | w <- atLatest, lastW.acInstant /= Just latest
-                 , Just s <- [divergence w.acPath lastW.acPath] ]
-                 <>
-                 [ refusal st key cell (OutOfOrder a) theRead b s
-                 | (i, a) <- zip [0 :: Int ..] atLatest, (j, b) <- zip [0 ..] atLatest, i < j
-                 , Just s <- [divergence a.acPath b.acPath] ]
-          _ -> Nothing
+          , not (earlier s a b) ]
+      | otherwise = case reverse writes of
+          -- the entry the read returns is the last in the ledger; the trace's
+          -- order gives the same one only when it is later than every entry a
+          -- sibling of it made, or the two have an order the trace knows
+          lastW : _ -> listToMaybe
+            [ refusal st key cell (OutOfOrder w) theRead lastW s
+            | w <- writes, Just s <- [divergence w.acPath lastW.acPath]
+            , not (earlier s w lastW) ]
+          [] -> Nothing
 
 -- | A @RECORD@, @COMMIT@, @ATTEST@ or @NOTIFY@ of @cell@ into @key@'s ledger,
 -- made now. Rule 2; the write is logged when nothing refuses.
@@ -272,11 +314,11 @@ checkWrite key cell verb site st
         Nothing  -> Right st {ssCells = Map.insert (key, cell) cl {clWrites = cl.clWrites |> theWrite} st.ssCells}
   where
     cl = resolved st (Map.findWithDefault (MkCellLog Seq.empty []) (key, cell) st.ssCells)
-    theWrite = MkAccess (instantOf st st.ssClock) st.ssClock st.ssPath site verb
+    theWrite = MkAccess (instantOf st st.ssClock) st.ssClock st.ssPath site verb (takenOn st.ssPath st)
     missed = listToMaybe
       [ refusal st key cell PastMissed r theWrite s
       | r <- reverse cl.clReads, Just s <- [divergence r.acPath theWrite.acPath]
-      , atOrAfter r.acInstant theWrite.acInstant ]
+      , not (earlier s r theWrite) ]
 
 data Rule = FutureSeen Access | PastMissed | OutOfOrder Access
 
@@ -289,9 +331,23 @@ refusal st key cell rule r w s = Text.unwords $
   ]
   <> capitalised middle
   <>
-  [ "L4 runs one side of " <> opName <> " over the whole trace before it starts the other,"
-  , "so a record made on one side is not in step with a read on the other."
-  ]
+  ( if lockstep
+      then
+        [ "L4 runs the sides of " <> opName <> " in step, one event of the trace at a time,"
+        , "each event first on the left side and then on the right,"
+        , "so a read and a record made while the sides take the same event come in that order,"
+        , "which need not be the order of their instants; at one instant the trace gives them no order at all."
+        ]
+      else if op == "RAND"
+        then
+          [ "While it keeps an evaluation trace (#EVALTRACE), L4 runs one side of a RAND over the whole trace before it starts the other,"
+          , "so a record made on one side is not in step with a read on the other;"
+          , "without the evaluation trace the sides run in step, one event at a time."
+          ]
+        else
+          [ "L4 runs one side of " <> opName <> " over the whole trace before it starts the other,"
+          , "so a record made on one side is not in step with a read on the other."
+          ] )
   <> [ "An EVERY runs its members as the sides of a RAND, so this holds between its members too." | fork ]
   <>
   [ "Rewrite the rule so that the side that reads the record also makes it,"
@@ -302,6 +358,7 @@ refusal st key cell rule r w s = Text.unwords $
     scope = IntMap.lookup s st.ssScopes
     op = maybe "RAND" (.scOp) scope
     fork = maybe False (.scFork) scope
+    lockstep = maybe False (.scLockstep) scope
     -- only our own words are capitalised: a rule's name is always quoted, and
     -- a party's name is printed as it was declared
     capitalised = \ case

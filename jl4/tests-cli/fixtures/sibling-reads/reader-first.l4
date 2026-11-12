@@ -1,8 +1,8 @@
--- writer-first.l4 with the sides of the RAND swapped. L4 runs the left side
--- (possession) over the whole trace first, so its read at 400 cannot see the
--- notice the right side records at 10, and the answer would be wrong:
--- evaluation stops with an error naming the record and both sides.
--- (smucclaw/l4-ide#1069)
+-- writer-first.l4 with the sides of the RAND swapped. Before
+-- smucclaw/l4-ide#1069 L4 ran the left side (possession) over the whole trace
+-- first, so its read at 400 could not see the notice the right side records at
+-- 10. The sides now take the trace's events in step, so the read sees the
+-- notice and this file gives writer-first.l4's answer.
 
 DECLARE Party IS ONE OF Landlord
 DECLARE Act IS ONE OF `gives notice`, `seeks possession`

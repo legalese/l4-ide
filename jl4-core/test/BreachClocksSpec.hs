@@ -31,7 +31,10 @@
 --     each leaf now reading a record made before the tree (in its
 --     @PROVIDED@) and making and reading records of its own (in its
 --     @HENCE@), report exactly what the trees without the ledger report, the
---     sibling-read check never fires, and L0 and L1 still hold of them.
+--     sibling-read check never fires, and L0 and L1 still hold of them. And
+--     a @RAND@ run in step (every operand takes an event before any takes
+--     the next) reports exactly what it reported run one operand after the
+--     other, as every @RAND@ ran before.
 --     These are the operands that do not read each other's records, for
 --     which smucclaw/l4-ide#1069's check must change nothing: a CSL conjunct
 --     is a function of the trace alone (Hvitved's thesis, Def. 2.2.7, p. 35),
@@ -44,9 +47,10 @@
 --     only where blame is unique (Def. 2.2.11, p. 37).
 --
 -- What the laws do NOT cover, by design: operands that read one another's
--- records (those are refused, smucclaw/l4-ide#1069, and pinned in
--- "SiblingReadsSpec"), and an @ROR@'s right operand after the left is
--- fulfilled (§6.1.2, "What it does not promise").
+-- records (a @RAND@ runs them in step and an @ROR@ is refused where the order
+-- mattered, smucclaw/l4-ide#1069, pinned in "SiblingReadsSpec"), and an
+-- @ROR@'s right operand after the left is fulfilled (§6.1.2, "What it does
+-- not promise").
 module BreachClocksSpec (spec) where
 
 import Data.Foldable (for_)
@@ -62,7 +66,8 @@ import L4.EvaluateLazy
 import L4.EvaluateLazy.Machine (emptyEnvironment, pattern ValFulfilled)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Print (prettyLayout)
-import L4.TracePolicy (apiDefaultPolicy)
+import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
+import L4.TracePolicy (TracePolicy, apiDefaultPolicy, replDefaultPolicy)
 
 -- | An obligation tree: a leaf is party/action @i@ due at @d@.
 data Tree = Leaf Int Integer | Node RBinOp Tree Tree
@@ -197,8 +202,15 @@ runLedgerCases :: [(Tree, [Ev])] -> IO [Verdict]
 runLedgerCases = runModule . moduleForLedger
 
 runModule :: Text.Text -> IO [Verdict]
-runModule src = do
-  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+runModule = runModuleWith apiDefaultPolicy
+
+-- | 'runModule' under a trace policy. With every @#EVAL@ (and so every
+-- @#TRACE@) traced, a @RAND@ runs its operands one after the other, as every
+-- @RAND@ did before smucclaw/l4-ide#1069's option A (Note [Operands in step]
+-- in "L4.EvaluateLazy.Machine"): that is C1's baseline.
+runModuleWith :: TracePolicy -> Text.Text -> IO [Verdict]
+runModuleWith policy src = do
+  cfg <- resolveEvalConfig (Just fixedNow) policy
   case checkWithImports (vfsFromList []) src of
     Left errs -> do
       expectationFailure ("typecheck failed: " <> show errs)
@@ -323,6 +335,35 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
         (n, refused b) `shouldBe` (n, False)
         (n, settled b) `shouldBe` (n, settled a)
 
+    it "report the same, residuals included, run in step as run one operand after the other, with the ledger and without" do
+      for_ [("with the ledger" :: Text.Text, moduleForLedger cs), ("without", moduleFor cs)] \ (label, src) -> do
+        inStep <- runModule src
+        oneAfterOther <- runModuleWith oneAfterOtherPolicy src
+        (label, length inStep, length oneAfterOther) `shouldBe` (label, length cs, length cs)
+        for_ (zip3 [0 :: Int ..] inStep oneAfterOther) \ (n, a, b) ->
+          (label, n, a) `shouldBe` (label, n, b)
+
+    it "(the comparison's control: under that policy a RAND really runs one operand after the other)" do
+      -- the reader on the left reads at 400 a record the right side makes at
+      -- 10: in step it answers; one operand after the other it is refused
+      let src = Text.unlines
+            [ "DECLARE Party IS ONE OF L"
+            , "DECLARE Act IS ONE OF notice, possession"
+            , "GIVETH A DEONTIC Party Act"
+            , "`n` MEANS PARTY L MAY notice WITHIN 100 HENCE COMMIT `given` IS TRUE HENCE FULFILLED LEST FULFILLED"
+            , "GIVETH A DEONTIC Party Act"
+            , "`p` MEANS PARTY L MAY possession PROVIDED (RECALL OFFICIAL's `given`) EQUALS JUST TRUE WITHIN 1000 HENCE FULFILLED LEST FULFILLED"
+            , "GIVETH A DEONTIC Party Act"
+            , "`both` MEANS `p` RAND `n`"
+            , "#TRACE `both` AT 0 WITH"
+            , "  PARTY L DOES notice AT 10"
+            , "  PARTY L DOES possession AT 400"
+            ]
+      inStep <- runModule src
+      oneAfterOther <- runModuleWith oneAfterOtherPolicy src
+      inStep `shouldBe` [Fulfilled]
+      map refused oneAfterOther `shouldBe` [True]
+
     it "L0: with nobody acting, Hvitved's composition decides the instant and the blamed parties" do
       let quiet = [ (t, [Tick 100]) | (t, _) <- take 120 cs ]
       vs <- runLedgerCases quiet
@@ -346,6 +387,7 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
       Breached {vEffective = Just e, vObserved = Just o} -> (n, e <= o) `shouldBe` (n, True)
       _ -> pure ()
   where
+    oneAfterOtherPolicy = replDefaultPolicy defaultGraphVizOptions
     pairs (a : b : rest) = (a, b) : pairs rest
     pairs _              = []
     -- a compound still waiting keeps its operands in the drafter's order,

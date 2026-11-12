@@ -221,6 +221,12 @@ data Frame =
   -- beneath the compound's 'RBinOp1', so it runs after the 'RBinOp2' or the
   -- @ROR@ short-circuit has combined the operands.
   | RestoreSibling OperandPath Clock
+  -- smucclaw/l4-ide#1069, NORM-LOG-SPEC N10's option A: a @RAND@ whose
+  -- operands take the trace one event at a time. It sits on the stack beneath
+  -- the operand that is running, or beneath the force of the compound's own
+  -- stream, and holds the operands that are waiting for the next event. See
+  -- 'startLockstep'.
+  | Lockstep LockstepFrame
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConnectiveLeft Connective (Maybe ConnRight) {- -}
@@ -299,6 +305,78 @@ data Frame =
   | JsonEncodeListFrame [Text] {- -} Reference Bool -- accumulated JSON strings, tail reference, expecting_tail (True = next value is tail, False = next value is element)
   | JsonEncodeNestedFrame [Text] {- -} Reference -- accumulated JSON strings, tail reference (waiting for element encoding to complete)
   | JsonEncodeConstructorFrame [(Text, Text)] Text [(Text, Reference)] -- accumulated (fieldName, encodedJson) pairs, current field name, remaining (fieldName, fieldRef) pairs to encode
+  deriving stock Show
+
+-- | A @RAND@ whose operands run in step (smucclaw/l4-ide#1069; NORM-LOG-SPEC
+-- N10's option A): every operand takes event n of the compound's stream
+-- before any operand takes event n+1, as Hvitved's reduction semantics
+-- reduces both conjuncts of @c1 and c2@ on one event (thesis Fig. 2.8,
+-- p. 49) and his monitor feeds a specification one event at a time (§2.3.6,
+-- p. 52). See 'startLockstep'.
+data LockstepFrame = MkLockstepFrame
+  { lsGate    :: !Int
+    -- ^ the number every gate of this compound carries ('mintGate'), so a
+    -- forced gate finds this frame on the stack
+  , lsScope   :: !Int
+    -- ^ the sibling-read check's scope for this application of the compound
+  , lsOp      :: RBinOp
+  , lsEnv     :: Environment
+  , lsTime    :: Reference
+    -- ^ the compound's own time, every operand's first clock
+  , lsType    :: Maybe (Type' Resolved)
+  , lsStream  :: Reference
+    -- ^ the part of the compound's stream no operand has been handed yet
+  , lsSlots   :: [OperandSlot]
+    -- ^ the operands, left first
+  , lsRunning :: Maybe Int
+    -- ^ the operand running above this frame; 'Nothing' while the frame is
+    -- forcing 'lsStream'
+  , lsRound   :: [Int]
+    -- ^ the operands still to be started, or still to be handed the current
+    -- cell, in order
+  , lsCell    :: Maybe (Maybe Reference)
+    -- ^ the cell this round hands out: 'Nothing' before the first event,
+    -- @Just (Just e)@ the event @e@, @Just Nothing@ the end of the stream
+  , lsTaken   :: !Int
+    -- ^ how many events have been handed out
+  , lsBase    :: DynState
+    -- ^ the dynamic state the compound was applied under
+  }
+  deriving stock Show
+
+-- | One operand of a 'LockstepFrame'.
+data OperandSlot
+  = SlotPending MaybeEvaluated
+    -- ^ not started yet
+  | SlotRunning
+    -- ^ running above the frame
+  | SlotPaused PausedOperand
+    -- ^ waiting for the next cell of the stream
+  | SlotDone WHNF
+    -- ^ finished: a verdict, or the residual it left when its stream ended
+  deriving stock Show
+
+-- | An operand that forced its gate: the frames it had pushed above the
+-- compound's frame, top first, the gate it is waiting on, and the dynamic
+-- state it had.
+data PausedOperand = MkPausedOperand
+  { poFrames :: [Frame]
+  , poGate   :: Reference
+  , poDyn    :: DynState
+  }
+  deriving stock Show
+
+-- | The machine's dynamic state that frames save and restore around a
+-- stretch of evaluation, and so that an operand paused between events takes
+-- with it: the acting party, the temporal context, the deontic log's
+-- re-look scope, and the sibling-read check's operand path and clock.
+data DynState = MkDynState
+  { dyParty    :: Maybe Text
+  , dyTemporal :: TemporalContext
+  , dyRelook   :: Maybe [Maybe SrcRange]
+  , dyPath     :: OperandPath
+  , dyClock    :: Clock
+  }
   deriving stock Show
 
 -- ----------------------------------------------------------------------------
@@ -1083,6 +1161,7 @@ unwindFrame = \ case
     putCurrentParty mOriginal
     when scoped leaveRelookScope
   RestoreSibling path clock              -> restoreSibling path clock
+  Lockstep ls                            -> unwindLockstep ls
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
     -- reads made before the abort soundly over-approximate the enclosing
@@ -1553,20 +1632,30 @@ operandLabel side = \ case
 -- start ('StartOf'), and 'siblingCheck' fills in the instant once something
 -- else has evaluated the time; an access whose instant is never known counts
 -- as simultaneous with every other, so the check errs towards refusing.
+--
+-- A @RAND@ applied to a time and a stream runs its operands in step
+-- ('startLockstep'); an @ROR@ still runs them one after the other, until a
+-- ruling says what becomes of the losing alternative's records (N10's
+-- condition on option A), and so does a @RAND@ under an evaluation trace,
+-- whose builder reads the frame pushes and pops as one nested tree.
 startCompound :: Environment -> RBinOp -> MaybeEvaluated -> MaybeEvaluated -> [Reference] -> Maybe (Type' Resolved) -> Machine Config
 startCompound env op rexpr1 rexpr2 rs appType = do
   clock <- case rs of
     t : _ -> peekClock t
     []    -> pure Nothing
+  tracing <- asks (isJust . (.evalTrace))
   let opText = case op of
         ValRAnd -> "RAND"
         ValROr  -> "ROR"
+      inStep = case (op, rs) of
+        (ValRAnd, [_, _]) -> not tracing
+        _                 -> False
   sref <- asks (.siblings)
   outer <- liftIO (readIORef sref)
   let fork = case rexpr1 of
         Right ValObligation {} -> True
         _                      -> False
-      (scope, opened) = openScope (MkScope opText (operandLabel "left" rexpr1) (operandLabel "right" rexpr2) fork) clock outer
+      (scope, opened) = openScope (MkScope opText (operandLabel "left" rexpr1) (operandLabel "right" rexpr2) fork inStep) clock outer
       outerPath = outer.ssPath
   liftIO (writeIORef sref opened)
   case (clock, rs) of
@@ -1575,17 +1664,221 @@ startCompound env op rexpr1 rexpr2 rs appType = do
       liftIO (modifyIORef' tref (IntMap.insert scope t))
     _ -> pure ()
   pushFrame (RestoreSibling outerPath outer.ssClock)
-  -- make sure to reassemble the operation after returning
-  pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
-  -- apply the arguments of the left hand expression to the
-  -- expression
-  pushFrame (App1 rs appType)
-  -- R-Q7B: the operand is handed off here, exactly as a HENCE's
-  -- value is, so a continuation that arrives as a VALUE inside a
-  -- compound anchors to the obligation the compound is attached
-  -- to ('operandHandoff').
-  operandHandoff env rexpr1
-  maybeEvaluate env rexpr1 -- TODO: build application
+  case rs of
+    [time, events] | inStep -> do
+      liftIO (modifyIORef' sref (setTaken scope 0))
+      dyn0 <- captureDyn
+      lockstepNext MkLockstepFrame
+        { lsGate = scope, lsScope = scope, lsOp = op, lsEnv = env, lsTime = time, lsType = appType
+        , lsStream = events, lsSlots = [SlotPending rexpr1, SlotPending rexpr2]
+        , lsRunning = Nothing, lsRound = [0, 1], lsCell = Nothing, lsTaken = 0
+        , lsBase = dyn0 {dyPath = outerPath, dyClock = outer.ssClock} }
+    _ -> do
+      -- make sure to reassemble the operation after returning
+      pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
+      -- apply the arguments of the left hand expression to the
+      -- expression
+      pushFrame (App1 rs appType)
+      -- R-Q7B: the operand is handed off here, exactly as a HENCE's
+      -- value is, so a continuation that arrives as a VALUE inside a
+      -- compound anchors to the obligation the compound is attached
+      -- to ('operandHandoff').
+      operandHandoff env rexpr1
+      maybeEvaluate env rexpr1 -- TODO: build application
+
+-- ----------------------------------------------------------------------------
+-- Operands in step (smucclaw/l4-ide#1069; NORM-LOG-SPEC N10, option A).
+--
+-- Note [Operands in step]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- A @RAND@ used to run its left operand over the whole stream, then its right
+-- operand over the same stream. Each operand shares one ledger with the
+-- other, so a @RECALL@ on one side saw every record the other side would ever
+-- make, or none of them, whatever their instants (smucclaw/l4-ide#1069). In
+-- Hvitved's CSL, which the contract evaluator follows, @c1 and c2@ reduces
+-- BOTH conjuncts on each event and combines the residues (thesis Fig. 2.8,
+-- p. 49), and the monitor feeds the specification one event at a time
+-- (§2.3.6, p. 52). That is what the machine now does, without changing what a
+-- residual is: each operand is a suspended stretch of the machine's stack.
+--
+-- * Each operand is applied, not to the compound's stream, but to a GATE: a
+--   thunk whose expression is a variable no environment binds, minted by
+--   'mintGate' with a unique of sort @g@ that carries the compound's number.
+-- * When the operand forces its gate (it wants the next event), 'forwardExpr'
+--   meets that variable and calls 'lockstepPause', which cuts the stack at the
+--   compound's 'Lockstep' frame, stores the frames above it and the dynamic
+--   state frames would otherwise restore ('DynState'), and goes on with the
+--   next operand ('lockstepNext').
+-- * When every operand is paused or finished, the frame forces the next cell
+--   of the real stream and hands it to each paused operand in turn, left
+--   first, as @e@ consed onto a fresh gate (or the end of the stream),
+--   writing the cell into the operand's old gate so that its stream becomes
+--   an ordinary list, and putting its frames back.
+-- * When every operand has finished, the two values are combined by the same
+--   'RBinOp2' arms as before.
+--
+-- So every operand takes event n before any takes event n+1. A record made on
+-- one side while it takes an event is in the ledger for every read the other
+-- side makes from the next event on; within one event the left side runs
+-- first. The sibling-read check stays as the backstop for what that cannot
+-- order (two accesses while the sides take the same event, in an order other
+-- than their instants', or at one instant), and it now knows which event each
+-- access was made at ('setTaken'), so two events with one stamp are ordered
+-- as the trace orders them.
+--
+-- Not in step, and so left to the check ('startCompound'): an @ROR@, whose
+-- losing alternative's records are not ruled (N10's own condition on A), and
+-- a @RAND@ evaluated while the machine keeps an evaluation trace, whose
+-- builder records each operand's frames as one nested push and pop. A
+-- barrier's members run in its own loop ('barrierNext'), and make no records.
+--
+-- Nothing about an operand that does not read the other's records depends on
+-- the schedule: its run is a function of the trace and of the ledger as it
+-- was when the compound was applied, so its verdict, its breach instant and
+-- its blamed parties are what they were, and 'RBinOp2' combines them as
+-- before (Hvitved's Corollary 2.3.7, p. 52). What moves is the order of the
+-- ledger's entries, of notes and of the deontic step log, now the order of
+-- the events.
+--
+-- What a paused operand must not hold: an 'UpdateThunk' for a thunk another
+-- operand can force, which would read as a loop there. Its gate's own
+-- 'UpdateThunk' is dropped when it pauses, and the gate is written when it
+-- resumes; any other thunk still being forced when the gate is reached has a
+-- value that depends on the gate, which only this operand can reach, so it
+-- is this operand's own.
+
+-- | A gate for an operand of the compound numbered @g@ ('lsGate').
+mintGate :: Int -> Machine Reference
+mintGate g = do
+  uri <- getModuleUri
+  let gate = Def (MkUnique 'g' g uri) (MkName emptyAnno (NormalName "the next event"))
+  fst <$> allocateRecursive (Var emptyAnno gate) (const emptyEnvironment)
+
+-- | Is this the variable of a gate ('mintGate')?
+isGate :: Resolved -> Bool
+isGate r = (getUnique r).sort == 'g'
+
+-- | The dynamic state as it is now.
+captureDyn :: Eval DynState
+captureDyn = do
+  party <- getCurrentParty
+  tc <- getTemporalContext
+  relook <- asks (.deonticLog) >>= traverse \ l -> liftIO (readIORef l.dlRelookScope)
+  st <- readEvalRef (.siblings)
+  pure (MkDynState party tc relook st.ssPath st.ssClock)
+
+-- | Put a dynamic state back.
+setDyn :: DynState -> Eval ()
+setDyn d = do
+  putCurrentParty d.dyParty
+  putTemporalContext d.dyTemporal
+  asks (.deonticLog) >>= traverse_ \ l -> for_ d.dyRelook (liftIO . writeIORef l.dlRelookScope)
+  restoreSibling d.dyPath d.dyClock
+
+-- | The next step of an in-step compound: start or resume the next operand
+-- of the round; when the round is over, take the next cell of the stream if
+-- an operand is waiting for one; when none is, combine the operands' values.
+lockstepNext :: LockstepFrame -> Machine Config
+lockstepNext ls = case ls.lsRound of
+  i : is -> do
+    let running = ls {lsRound = is, lsRunning = Just i, lsSlots = setSlot i SlotRunning ls.lsSlots}
+    case drop i ls.lsSlots of
+      SlotPending rexpr : _ -> do
+        gate <- mintGate ls.lsGate
+        -- the compound's own time is the operand's first clock, as it was for
+        -- the right operand before ('RBinOp1'); an earlier operand may have
+        -- forced it by now
+        clock <- peekClock ls.lsTime
+        let start = ls.lsBase
+        setDyn start {dyPath = (ls.lsScope, i) : start.dyPath, dyClock = maybe (StartOf ls.lsScope) At clock}
+        pushFrame (Lockstep running)
+        pushFrame (App1 [ls.lsTime, gate] ls.lsType)
+        -- R-Q7B: the operand is handed off here, exactly as a HENCE's value
+        -- is ('operandHandoff')
+        operandHandoff ls.lsEnv rexpr
+        maybeEvaluate ls.lsEnv rexpr
+      SlotPaused po : _ -> do
+        cell <- case ls.lsCell of
+          Just (Just e) -> ValCons e <$> mintGate ls.lsGate
+          _             -> pure ValNil
+        updateThunkToWHNF po.poGate cell
+        pushFrame (Lockstep running)
+        traverse_ pushFrame (reverse po.poFrames)
+        setDyn po.poDyn
+        continueBackward cell
+      _ -> lockstepNext ls {lsRound = is}
+  []
+    | not (null (pausedSlots ls.lsSlots)) -> do
+        setDyn ls.lsBase
+        pushFrame (Lockstep ls {lsRunning = Nothing})
+        continueRef ls.lsStream
+    | [SlotDone v1, SlotDone v2] <- ls.lsSlots -> do
+        setDyn ls.lsBase
+        pushFrame (ContractFrame (RBinOp2 MkRBinOp2 {op = ls.lsOp, rval1 = v1, env = ls.lsEnv}))
+        continueBackward v2
+    | otherwise -> internalException $ RuntimeTypeError
+        "an in-step compound ended its round with an operand neither waiting nor finished"
+
+-- | The frame of an in-step compound gets a value: the operand that was
+-- running has finished, or the next cell of the stream has arrived.
+lockstepReturn :: LockstepFrame -> WHNF -> Machine Config
+lockstepReturn ls val = case ls.lsRunning of
+  Just i -> lockstepNext ls {lsRunning = Nothing, lsSlots = setSlot i (SlotDone val) ls.lsSlots}
+  Nothing -> case val of
+    ValCons e rest -> do
+      let n = ls.lsTaken + 1
+      sref <- asks (.siblings)
+      liftIO (modifyIORef' sref (setTaken ls.lsScope n))
+      lockstepNext ls {lsStream = rest, lsCell = Just (Just e), lsTaken = n, lsRound = pausedSlots ls.lsSlots}
+    ValNil ->
+      lockstepNext ls {lsCell = Just Nothing, lsRound = pausedSlots ls.lsSlots}
+    _ -> internalException $ RuntimeTypeError $
+      "expected a list of events but found: " <> prettyLayout val
+
+-- | An operand forced the gate of the compound numbered @g@: store it, with
+-- the frames it pushed above the compound's frame, and go on.
+lockstepPause :: Int -> Machine Config
+lockstepPause g = do
+  stackRef <- asks (.stack)
+  s <- liftIO (readIORef stackRef)
+  case s.frames of
+    UpdateThunk gateRef saved _ : framesAbove ->
+      case break owner framesAbove of
+        (segment, Lockstep ls : framesBelow) | Just i <- ls.lsRunning -> do
+          -- the gate's force is not finished: its read span closes as an
+          -- unforced thunk's does, and the gate is written when it resumes
+          void (swapCtxReads saved)
+          liftIO (writeIORef stackRef (MkStack (s.size - 2 - length segment) framesBelow))
+          dyn <- captureDyn
+          lockstepNext ls
+            { lsRunning = Nothing
+            , lsSlots = setSlot i (SlotPaused MkPausedOperand {poFrames = segment, poGate = gateRef, poDyn = dyn}) ls.lsSlots }
+        _ -> internalException $ RuntimeTypeError
+          "an operand asked for the next event of a compound that is not waiting for it"
+    _ -> internalException $ RuntimeTypeError
+      "the next event of an in-step compound was asked for outside a thunk"
+  where
+    owner = \ case
+      Lockstep ls -> ls.lsGate == g
+      _           -> False
+
+-- | Unwinding through an in-step compound: the paused operands are unwound as
+-- if they were on the stack, and their gates are made forcible again.
+unwindLockstep :: LockstepFrame -> Eval ()
+unwindLockstep ls = do
+  for_ ls.lsSlots \ case
+    SlotPaused po -> do
+      traverse_ unwindFrame po.poFrames
+      restoreThunkOnUnwind po.poGate Nothing
+    _ -> pure ()
+  setDyn ls.lsBase
+
+setSlot :: Int -> OperandSlot -> [OperandSlot] -> [OperandSlot]
+setSlot i x xs = [ if j == i then x else y | (j, y) <- zip [0 ..] xs ]
+
+pausedSlots :: [OperandSlot] -> [Int]
+pausedSlots xs = [ i | (i, SlotPaused _) <- zip [0 ..] xs ]
 
 -- ----------------------------------------------------------------------------
 -- Per-force context-read tracking (T6).
@@ -1802,6 +2095,8 @@ forwardExpr env = \ case
     continueExpr env e1
   Proj _ann e l ->
     continueExpr env (App emptyAnno l [e]) -- we desugar projection to plain function application
+  -- an operand of an in-step compound wants the next event (Note [Operands in step])
+  Var _ann n | isGate n -> lockstepPause (getUnique n).unique
   Var _ann n -> do -- still problematic: similarity / overlap between this and App with no args
     -- Auto-apply a discharged import only in VALUE position. The App case above
     -- fetches the function it is about to apply by re-entering here, and
@@ -2092,6 +2387,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
   Just (RestoreSibling path clock) -> do
     restoreSibling path clock
     continueBackward val
+  Just (Lockstep ls) -> lockstepReturn ls val
   Just (RestoreCurrentParty mOriginal scoped) -> do
     -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
     -- restore the enclosing acting party and pass the value on unchanged (M4).
@@ -4873,6 +5169,11 @@ patternMatchFailure = withPoppedFrame $ \ case
     newTime <- allocateValue time
     pushFrame $ ContractFrame $ Contract1 ScrutinizeEvents {party = Right party, time = newTime, ..}
     continueRef events
+  -- an in-step compound's paused operands are dropped with it, so their
+  -- blackholed thunks must be made forcible again
+  Just (Lockstep ls) -> do
+    unwindLockstep ls
+    patternMatchFailure
   Just _ ->
     patternMatchFailure
 
