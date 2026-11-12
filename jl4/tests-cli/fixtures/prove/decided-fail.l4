@@ -1,0 +1,4 @@
+-- Assertions the evaluator decides against: a FALSE and a raise. Neither is
+-- an obligation, but `l4 prove f && deploy` must not pass this file.
+#ASSERT 1 EQUALS 2
+#ASSERT (1 DIVIDED BY 0) EQUALS 1

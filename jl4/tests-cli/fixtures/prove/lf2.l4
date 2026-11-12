@@ -1,0 +1,16 @@
+-- L4 evaluates only the fields it reads, so a record with a field that would
+-- raise is fine as long as nothing reads that field. Before per-field
+-- definedness this true assertion came back ENCODING DEFECT (STARGAZY audit
+-- of #784).
+DECLARE R HAS
+  a IS A NUMBER
+  b IS A NUMBER
+
+GIVEN x IS A NUMBER
+GIVETH A BOOLEAN
+`check` x MEANS IF x GREATER THAN 3 THEN (R x (1 DIVIDED BY 0))'s a EQUALS x ELSE TRUE
+
+§ `lazy`
+  GIVEN y IS A NUMBER
+
+#ASSERT `check` y

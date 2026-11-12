@@ -1,0 +1,12 @@
+-- Two parameter names that a lossy sanitiser maps to one SMT-LIB symbol
+-- (`a|b` and `a_b`). The audit of #784 found this proved; it is false at any
+-- x that is not whole, as `l4 run` confirms at x = 0.5.
+GIVEN `a|b` IS A NUMBER
+      `a_b` IS A NUMBER
+GIVETH A NUMBER
+`d1` `a|b` `a_b` MEANS `a|b` MINUS `a_b`
+
+§ `Wrong proved`
+    GIVEN x IS A NUMBER
+
+#ASSERT `IS INTEGER` x OR (`d1` x 0 EQUALS 0)
