@@ -1,0 +1,24 @@
+-- smucclaw/l4-ide#1068, the issue's repro verbatim. Before the fix its last LEST
+-- was taken by the innermost rule, with exit 0 everywhere.
+
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  delivery
+  payment HAS amount IS A NUMBER
+
+saleContract MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  HENCE
+    PARTY Buyer
+    MUST payment EXACTLY 100
+    WITHIN 7
+    LEST
+      PARTY Buyer
+      MUST payment EXACTLY 120
+      WITHIN 14
+  LEST BREACH BY Seller
+
+#TRACE saleContract AT 0 WITH
+  PARTY Seller DOES delivery AT 2
