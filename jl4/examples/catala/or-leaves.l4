@@ -1,0 +1,23 @@
+-- An illustrative rule, not a statute: a filing is required of every kind of
+-- body except the residual one, unless the body is licensed, dormant or
+-- publicly funded.
+--
+-- The exception is one rung of the ladder and three conditions.
+-- The twelve kinds make the first eight inputs that realise "the exception
+-- applies" all share one combination of the three, which is what a gate that
+-- cares only about the rung can be satisfied by.
+DECLARE Category IS ONE OF
+  Individual, Partnership, Company, Trust, Charity, Cooperative,
+  Estate, Club, Society, Fund, Syndicate, Other
+
+@export default Whether a filing is required of a body
+GIVEN category IS A Category
+      `holds a licence` IS A BOOLEAN
+      `is dormant` IS A BOOLEAN
+      `is publicly funded` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `filing is required` IF
+      NOT (category EQUALS Other)
+  UNLESS `holds a licence`
+      OR `is dormant`
+      OR `is publicly funded`

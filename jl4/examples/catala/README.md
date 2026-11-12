@@ -1,9 +1,9 @@
 # `l4 export catala` exhibits
 
-Twelve L4 sources and the literate Catala they compile to, plus the
+Fourteen L4 sources and the literate Catala they compile to, plus the
 `--boolean-only` rendering of one of them. The goldens under `expected/` are
 byte-for-byte what `l4 export catala <file>.l4` prints, and `jl4/tests-cli/Main.hs`
-pins them. A twelfth source, `imported-domain.l4`, is never compiled on its
+pins them. A fifteenth source, `imported-domain.l4`, is never compiled on its
 own — it is what `imports.l4` imports, and `l4 export catala` refuses it correctly for
 carrying no exported decision. `not-ok/` holds eight sources that `l4 export catala`
 **refuses**, each because emitting it would have made the Catala say something
@@ -28,7 +28,7 @@ structures and reports false positives (see the header of the harness, and
 scope and compares the ` ```catala-test-cli ` blocks, whose expected values were
 computed by **L4's** evaluator, along with each exception ladder's witness
 gate (R4, §8.4): test scopes that call the emitted scope itself at up to
-eight inputs per realisable combination of the ladder's conditions. A green `clerk test` is therefore evidence that the two
+eight inputs per realisable combination of the ladder's leaf conditions (`a OR b` is two). A green `clerk test` is therefore evidence that the two
 languages agree on those points — the middle tier of the OpenFisca doc's
 three-tier claim ladder (golden / executed round-trip / law-validated), never
 the third.
@@ -47,6 +47,8 @@ the third.
 | `imports.l4` | the import closure: an imported record, an imported enumeration reached only through that record's field, and an imported helper lowered to a toplevel (R1) |
 | `all-string-record.l4` | a record every field of which is a `STRING`, so R11 elides the structure itself and the field that carried it (§8.11 addendum) |
 | `fixtures.l4` | directives that test against NAMED fixtures — nullary, unary, and a helper wrapping an exported call — each reached only from a directive (§8.1.3); its last two directives are skipped on purpose, so the golden also pins their numbering |
+| `or-leaves.l4` | an exception `a OR b OR c` beside a twelve-constructor enum: the gate's conditions are the leaves, so dropping `b` or `c` from the shipped rule fails `clerk test` (§8.4) |
+| `guarded-leaf.l4` | a leaf that raises (`10 / instalments` at zero) where its rung is decided by the first leaf: the gate stays at rung level, says why, and still tests zero (§8.4) |
 
 The two ports compile **unchanged** from their OpenFisca originals — the same
 L4 file feeds both backends, and what makes it Catala-clean is R11 rather than
