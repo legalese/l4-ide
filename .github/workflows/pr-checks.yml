@@ -70,6 +70,12 @@ jobs:
               - 'cabal.project'
               - 'cabal.project.local'
               - 'jl4-core/libraries/**'
+              # The OpenFisca goldens, refusal fixtures and #ASSERT checks run
+              # in l4-cli-test, and these files are in no jl4-test glob, so an
+              # edit to an example, a golden or the round-trip script alone
+              # would otherwise reach no job and break the next PR instead.
+              - 'jl4/examples/openfisca/**'
+              - 'jl4/tests-cli/fixtures/**'
               - '.github/workflows/pr-checks.yml'
             typescript:
               - '**/*.ts'

@@ -1,0 +1,20 @@
+-- Two constructors that convert to one Python name, `self_employed`. The
+-- emitted Enum would not load. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Status IS ONE OF
+    `self employed`
+    self_employed
+
+DECLARE Person HAS status IS A Status
+
+@export Price by status
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`price` p period MEANS
+    CONSIDER p's status
+    WHEN `self employed` THEN 10
+    OTHERWISE 20
+
+#ASSERT (`price` OF (Person WITH status IS self_employed), "2026-01") EQUALS 20

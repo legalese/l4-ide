@@ -660,7 +660,7 @@ DECLARE IntermediaryProfile HAS
 @ref 17 CFR 227.300(c)(2)
 GIVEN intermediary IS AN IntermediaryProfile
 GIVETH A BOOLEAN
-DECIDE `the intermediary is a funding portal` intermediary IF
+DECIDE `the intermediary is a funding portal` IF
         intermediary's `a broker acting as an intermediary in a section 4(a)(6) transaction`
     AND NOT "(i)"   ... intermediary's `offers investment advice or recommendations`
     AND NOT "(ii)"  ... intermediary's `solicits purchases, sales or offers to buy the securities displayed on its platform`
@@ -758,7 +758,7 @@ DECIDE `section 3 — a “child” within the meaning of this Act` IF
 @ref Probate and Administration Act 1934 s 18(4)(a); Intestate Succession Act 1967 s 3
 GIVEN c IS A Child
 GIVETH A BOOLEAN
-`a “child” within the meaning of section 3 of the Intestate Succession Act 1967` c MEANS
+`a “child” within the meaning of section 3 of the Intestate Succession Act 1967` MEANS
         c's `a legitimate child of the person whose child he is`
     OR  c's `adopted by that person by virtue of an order of court`
 
@@ -863,7 +863,7 @@ GIVETH A LIST OF `Scheduled item`
 @ref Civil Law Act 1909 s 36(1)(a)
 GIVEN p IS A Proceeding
 GIVETH A BOOLEAN
-`s 36(1)(a) — a legal proceeding or action specified in the Schedule` p MEANS
+`s 36(1)(a) — a legal proceeding or action specified in the Schedule` MEANS
     any `the item is this proceeding` `the Schedule`
     WHERE
         `the item is this proceeding` i MEANS i's `the proceeding` EQUALS p
@@ -1074,7 +1074,7 @@ then the directives that use them:
 -- The operative test carries its own rule GIVEN, so a directive can exercise it.
 GIVEN m IS A `Month of the engagement`
 GIVETH A NUMBER
-`the fee for the month` m MEANS
+`the fee for the month` MEANS
     IF   m's `hours worked` AT MOST 40
     THEN m's `hours worked` TIMES 120
     ELSE (40 TIMES 120) PLUS ((m's `hours worked` MINUS 40) TIMES 150)

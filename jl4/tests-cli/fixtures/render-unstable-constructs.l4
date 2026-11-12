@@ -1,0 +1,67 @@
+-- The constructs that unstable has and main does not, as l4 render reads them.
+--
+-- The prose pass of legalese/l4-ide#802 was written on main, so it had no words
+-- for a ledger write or read, a lifecycle noun used as a value, or a refusal
+-- outside a consequence. They fell to the linearizer, which echoes keywords
+-- ("record balance is 100"). L4.Export.Document now says each one; the
+-- l4-cli-test block "l4 render of the constructs main does not have" reads every
+-- row below as a whole line.
+--
+-- #ASSERT REFUSED is a directive, and l4 render prints no directive, as with
+-- #ASSERT; l4 nlg reads it ("the following must refuse: …").
+
+IMPORT prelude
+
+DECLARE Party IS ONE OF tenant, landlord
+
+DECLARE Action IS ONE OF
+    pay
+    deliver
+
+GIVETH A NUMBER
+`the old fee` MEANS
+    REFUSE "this schedule is not encoded for years before 2000"
+
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`the fee in year` y MEANS
+    IF y AT LEAST 2000
+    THEN 100
+    ELSE REFUSE "years before 2000 are not encoded"
+
+GIVETH A NUMBER
+`store the balance` MEANS RECORD `balance` IS 100
+
+GIVETH A NUMBER
+`commit the balance` MEANS COMMIT `balance` IS 100
+
+GIVETH A NUMBER
+`tell the landlord` MEANS RECORD landlord's `balance` IS 100
+
+GIVETH A MAYBE NUMBER
+`the stored balance` MEANS RECALL `balance`
+
+GIVETH A MAYBE NUMBER
+`the landlord's balance` MEANS RECALL landlord's `balance`
+
+GIVETH A LIST OF NUMBER
+`every stored balance` MEANS RECALL ALL `balance`
+
+GIVETH A MAYBE NUMBER
+`the official balance` MEANS RECALL OFFICIAL's `balance`
+
+GIVETH A DEONTIC Party Action
+`deliver after the join` MEANS
+    PARTY tenant MUST pay WITHIN 30
+    HENCE (PARTY landlord MUST deliver WITHIN 0 OF (THE JOIN PLUS 5))
+    LEST  BREACH
+
+GIVETH A DEONTIC Party Action
+`pay then record` MEANS
+    PARTY tenant MUST pay WITHIN 10
+    HENCE RECORD `paid` IS TRUE
+    HENCE PARTY landlord MUST deliver WITHIN 20
+
+#ASSERT REFUSED `the fee in year` 1999
+#ASSERT REFUSED `the fee in year` 1999 BECAUSE "years before 2000 are not encoded"
+#ASSERT `the fee in year` 2001 EQUALS 100

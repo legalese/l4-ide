@@ -561,8 +561,10 @@ Verified 2026-09-08 against the compiler at the head of this branch; the blame s
 
 - A rule with no roll (above) refuses, naming what to write. The message names `IN`, and mentions the older `WHO elem` spelling only to say that it is the deprecated one.
 
-- The prose export (`l4 render`) writes the subject as "every Tenant t in tenants who …" and drops the join line
-  — except when the `EVERY` is an operand of `RAND` or `ROR`, where the whole rule falls back to the layout printer and the join line is re-emitted verbatim into the prose.
+- The prose export (`l4 render`) writes the subject as "every Tenant t in tenants who …" and drops the join line.
+  So a barrier (`ONCE ALL HAVE`) and a fork (`UPON EACH`) read the same: "Once that is done, …" says nothing about whether what follows runs once for the group or once for each member.
+  An `EVERY` that is an operand of `RAND` or `ROR` is laid out like any other operand, as a lettered list with "; and" or "; or" before its last entry, and its join line is dropped there too.
+  (Before 2026-11-01 such a rule fell back to the layout printer, which re-emitted the join line's keywords into the prose.)
 
 **Runs, but not yet as the design says.** These are the places where a run gives an answer and the answer is coarser than the design calls for. Most are a detail of the verdict rather than the verdict itself; the one exception is the same-instant case, marked below, which can make an act count twice.
 

@@ -278,6 +278,7 @@ test-suite jl4-core-test
     ResolutionCascadeSpec
     RefAnnotationSpec
     NlgPercentSpec
+    LibraryNlgSpec
     NlgRenderSpec
     TracePostprocessSpec
     UnknownInputsSpec

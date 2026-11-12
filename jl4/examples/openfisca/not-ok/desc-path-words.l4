@@ -1,0 +1,19 @@
+-- A @desc parameter annotation with several words after the keyword. The
+-- export used to join them with dots into a path (`taxes.flat.rate`), so a
+-- description sentence became a parameter path. It must be ONE dotted path;
+-- anything else is REFUSED.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@desc parameter taxes flat rate
+GIVETH A NUMBER
+`flat amount` MEANS 100
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`tax` p period MEANS `flat amount`
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), "2026-01") EQUALS 100

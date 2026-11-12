@@ -1,0 +1,21 @@
+-- A call to another @export decision at a different period. L4 evaluates
+-- `base` at January 2000; an OpenFisca variable read is always at the
+-- formula's own period. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@export The year of the period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`base` p period MEANS period's year
+
+@export Base, always read at January 2000
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`pinned` p period MEANS `base` p (Period WITH year IS 2000, month IS 1)
+
+#ASSERT (`pinned` OF (Person WITH salary IS 0), (Period WITH year IS 2026, month IS 1)) EQUALS 2000

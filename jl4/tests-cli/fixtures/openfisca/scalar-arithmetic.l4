@@ -1,0 +1,58 @@
+-- Arithmetic that reads no variable, which Python evaluates on plain numbers
+-- rather than numpy arrays. Two shapes used to crash in OpenFisca:
+--   * `scale tax` over a constant income: `.calc` needs an array, not an int.
+--   * a division by zero in an IF branch the guard excludes: np.where
+--     evaluates both branches, and Python's `/` raises on plain numbers
+--     where numpy's only warns.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+DECLARE Bracket HAS
+    threshold IS A NUMBER
+    rate      IS A NUMBER
+
+GIVEN t IS A NUMBER
+      r IS A NUMBER
+GIVETH A Bracket
+`band` MEANS Bracket WITH threshold IS t, rate IS r
+
+GIVEN income   IS A NUMBER
+      brackets IS A LIST OF Bracket
+GIVETH A NUMBER
+`scale tax` MEANS
+    CONSIDER brackets
+    WHEN EMPTY THEN 0
+    WHEN b FOLLOWED BY rest THEN
+        CONSIDER rest
+        WHEN EMPTY THEN
+            b's rate TIMES (max 0 (income MINUS b's threshold))
+        WHEN nextB FOLLOWED BY anything THEN
+              (b's rate TIMES (max 0 ((min income (nextB's threshold)) MINUS b's threshold)))
+            PLUS (`scale tax` OF income, rest)
+
+@desc scale taxes.flat
+`brackets` MEANS LIST (`band` OF 1000, 0.1), (`band` OF 5000, 0.2)
+
+@export Tax on a fixed notional income
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`notional tax` p period MEANS `scale tax` OF 8000, `brackets`
+
+@export A share that only exists after 2030
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`guarded share` p period MEANS
+    IF period's year GREATER THAN 2030
+    THEN 1000 DIVIDED BY (period's year MINUS 2026)
+    ELSE p's salary
+
+`y2026` MEANS Period WITH year IS 2026, month IS 1
+`y2031` MEANS Period WITH year IS 2031, month IS 1
+`someone` MEANS Person WITH salary IS 7
+
+#ASSERT (`notional tax` OF `someone`, `y2026`) EQUALS 1000
+#ASSERT (`guarded share` OF `someone`, `y2026`) EQUALS 7
+#ASSERT (`guarded share` OF `someone`, `y2031`) EQUALS 200

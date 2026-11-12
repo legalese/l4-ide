@@ -1,0 +1,166 @@
+Promissory Note
+===============
+
+
+§ 1  Promissory Note
+
+
+1.1  Basic Definitions
+
+1. Note Date means 4 February 2024.
+
+2. Principal Amount means USD 25,000.
+
+3. Interest Rate Per Annum means 15%.
+
+4. Security Collateral means NO COLLATERAL.
+
+5. Monthly Installments means 12.
+
+6. Default After Days Not Paid Beyond Due means 30.
+
+7. Late Payment Penalty is a Penalty with:
+    - Interest Rate — 5%
+    - Grace Period Days — 10
+
+8. Governing Law means The laws of The Republic of Singapore.
+
+
+1.2  Parties
+
+1. The Borrower means Commercial Borrower with Company where Name is Jane Dough Pte Ltd, Address is 42 Jane Doe Rd #04-20, Singapore 420000, Jurisdiction is Singapore, Company Number is UEN 200424242N and Account is Bank Account where Bank Name is DBS Bank Ltd, Account Name is Jane Dough Pte Ltd, Account Number is 242-242424-9 and SWIFT is DBSSSGSG.
+
+2. The Lender means Individual Lender with Natural Person where Name is John Doe, Address is 42 The Lender Rd, Singapore 424242, Jurisdiction is Singapore, ID Number is G5301960D and Account is Bank Account where Bank Name is DBS Bank Ltd, Account Name is The Lender, Account Number is 120-643240-1 and SWIFT is DBSSSGSG.
+
+
+1.3  Repayment Terms
+
+1. Monthly Interest Rate equals Interest Rate Per Annum ÷ the number of months in a year.
+
+2. Monthly Installment Amount is a Money with:
+    - Currency — Principal Amount's Currency
+    - Value — Principal Amount's Value × Monthly Interest Rate × Compound Factor ÷ (Compound Factor − 1)
+    where:
+    - Compound Factor means Base to the power of (1 + Monthly Interest Rate) and Monthly Installments.
+
+3. Total Repayment Amount is a Money with:
+    - Currency — Principal Amount's Currency
+    - Value — Monthly Installment Amount's Value × Monthly Installments
+
+4. Total Interest Amount is a Money with:
+    - Currency — Principal Amount's Currency
+    - Value — Total Repayment Amount's Value − Principal Amount's Value
+
+5. Payment Obligations is:
+    (a) If the Outstanding Payment Amount's Value is more than 0: The Borrower must pay monthly installment to (The Lender and Amount Transferred) within Next Payment Due Date, provided that is money at least equal within error for Amount Transferred and Next Payment Due's Amount:
+        (i) Once that is done, Payment Obligations of Money where Currency is Monthly Installment Amount's Currency and Value is the Outstanding Payment Amount's Value minus Amount Transferred's Value.
+        (ii) Failing that, The Borrower must pay monthly installment to (The Lender and Amount Transferred) within Default After Days Beyond Commencement, provided that is money at least equal within error for Amount Transferred and Next Payment Due Amount With Penalty. Failing that, The Borrower must pay monthly installment to (The Lender and Amount Transferred), provided that is money at least equal within error for Amount Transferred and All Outstanding Debts.
+    (b) Otherwise: FULFILLED.
+    where:
+    - Installments Covered Since Commencement equals (Total Repayment Amount's Value − the Outstanding Payment Amount's Value) ÷ Monthly Installment Amount's Value.
+    - Next Payment Due is a Payment with:
+        - Amount — Money where Currency is Monthly Installment Amount's Currency and Value is The lesser of Monthly Installment Amount's Value and the Outstanding Payment Amount's Value
+        - Days Beyond Commencement — (Installments Covered Since Commencement + 1) × the average number of days in a Gregorian month
+    - Next Payment Due Date equals (CEILING with Next Payment Due's Days Beyond Commencement) + Late Payment Penalty's Grace Period Days.
+    - Next Payment Due Amount With Penalty is a Money with:
+        - Currency — Next Payment Due's Amount's Currency
+        - Value — Next Payment Due's Amount's Value + Next Payment Due's Amount's Value × Late Payment Penalty's Interest Rate
+    - Default After Days Beyond Commencement equals (CEILING with Next Payment Due's Days Beyond Commencement) + Default After Days Not Paid Beyond Due.
+    - All Outstanding Debts is a Money with:
+        - Currency — Next Payment Due's Amount's Currency
+        - Value — the Outstanding Payment Amount's Value + Next Payment Due Amount With Penalty's Value − Next Payment Due's Amount's Value
+
+
+§ 2  Promissory Appendix
+
+
+2.1  Type Definitions
+
+Definitions:
+
+1. Money consists of:
+    - Currency — text
+    - Value — number
+
+2. Bank Account consists of:
+    - Bank Name — text
+    - Account Name — text
+    - Account Number — text
+    - SWIFT — text
+
+3. Penalty consists of:
+    - Interest Rate — number
+    - Grace Period Days — number
+
+4. Company consists of:
+    - Name — text
+    - Address — text
+    - Jurisdiction — text
+    - Company Number — text
+    - Account — Bank Account
+
+5. Natural Person consists of:
+    - Name — text
+    - Address — text
+    - Jurisdiction — text
+    - ID Number — text
+    - Account — Bank Account
+
+6. Payment consists of:
+    - Amount — Money
+    - Days Beyond Commencement — number
+
+7. Borrower means one of Individual Borrower or Commercial Borrower.
+
+8. Lender means one of Individual Lender or Commercial Lender.
+
+9. Pay monthly installment to consists of:
+    - Recipient — Lender
+    - Amount — Money
+
+Assumptions:
+
+The following are taken as given:
+
+1. Na N.
+
+2. NO COLLATERAL.
+
+
+2.2  Useful Functions
+
+1. The lesser of [a] and [b] is:
+    (a) If a is more than b: b;
+    (b) Otherwise: a.
+
+2. The greater of [a] and [b] is:
+    (a) If a is more than b: a;
+    (b) Otherwise: b.
+
+3. Base to the power of [base] and [exp] is:
+    (a) If exp is 0: 1;
+    (b) Otherwise, if base is 0:
+        (i) If exp is less than 0: Na N;
+        (ii) Otherwise: 0;
+    (c) Otherwise, if exp is 1: base;
+    (d) Otherwise, if exp is more than 0: base × (Base to the power of base and (exp − 1));
+    (e) Otherwise: 1 ÷ (Base to the power of base and (0 − exp)).
+
+4. Is money at least equal within error if:
+    (a) the money a's Currency is the money b's Currency; and
+    (b) the money a's Value is at least the money b's Value − 0.05.
+
+5. USD is a Money with:
+    - Currency — USD
+    - Value — a
+
+6. EUR is a Money with:
+    - Currency — EUR
+    - Value — a
+
+7. SGD is a Money with:
+    - Currency — SGD
+    - Value — a
+
+
+Coverage

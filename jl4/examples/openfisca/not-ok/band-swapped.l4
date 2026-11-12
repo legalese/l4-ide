@@ -1,0 +1,43 @@
+-- A bracket builder that puts its first input in `rate` and its second in
+-- `threshold`, the reverse of the canonical `band`. The export reads
+-- `band OF a, b` as (threshold a, rate b), so OpenFisca would swap every
+-- threshold and rate. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+DECLARE Bracket HAS
+    threshold IS A NUMBER
+    rate      IS A NUMBER
+
+GIVEN t IS A NUMBER
+      r IS A NUMBER
+GIVETH A Bracket
+`band` MEANS Bracket WITH threshold IS r, rate IS t
+
+GIVEN income   IS A NUMBER
+      brackets IS A LIST OF Bracket
+GIVETH A NUMBER
+`scale tax` MEANS
+    CONSIDER brackets
+    WHEN EMPTY THEN 0
+    WHEN b FOLLOWED BY rest THEN
+        CONSIDER rest
+        WHEN EMPTY THEN
+            b's rate TIMES (max 0 (income MINUS b's threshold))
+        WHEN nextB FOLLOWED BY anything THEN
+              (b's rate TIMES (max 0 ((min income (nextB's threshold)) MINUS b's threshold)))
+            PLUS (`scale tax` OF income, rest)
+
+@desc scale taxes.contribution
+GIVETH A LIST OF Bracket
+`brackets` MEANS LIST (`band` OF 0.1, 0)
+
+@export Contribution
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`contribution` p period MEANS `scale tax` OF (p's salary), `brackets`
+
+#ASSERT (`contribution` OF (Person WITH salary IS 2000), (Period WITH year IS 2026, month IS 1)) EQUALS 200

@@ -321,7 +321,7 @@ that limb rather than becoming a limb of its own.
 @ref Charitable Fundraising Act s 7(2) and note
 GIVEN ap IS AN Appeal
 GIVETH A BOOLEAN
-DECIDE `the appeal is a regional appeal` ap IF
+DECIDE `the appeal is a regional appeal` IF
         ap's `conducted wholly within one Region`
     AND "(2)" ... "Note: approval is given by the Regional Office." ... ap's `the Region has given approval`
 ```
@@ -362,13 +362,13 @@ as its own rule; the two coexist, which is exactly what the phrase asserts.
 @ref Charitable Fundraising Act s 18(1)
 GIVEN r IS A Registration
 GIVETH A BOOLEAN
-DECIDE `the Registrar may cancel under section 18` r IF
+DECIDE `the Registrar may cancel under section 18` IF
         "Without prejudice to section 12," ... r's `the appeal has ceased`
 
 @ref Charitable Fundraising Act s 12(1)
 GIVEN r IS A Registration
 GIVETH A BOOLEAN
-DECIDE `the Registrar may cancel under section 12` r IF
+DECIDE `the Registrar may cancel under section 12` IF
     r's `the registration was obtained by deception`
 
 #ASSERT NOT `the Registrar may cancel under section 18` `the deceptive registration`

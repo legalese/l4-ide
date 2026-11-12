@@ -1,0 +1,25 @@
+-- A decision BRANCH that mixes a `period reaches` arm with an ordinary
+-- condition. Dated formulas need every arm to be a `period reaches` guard;
+-- a mixed BRANCH has no OpenFisca form. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+GIVEN `the period` IS A Period, y IS A NUMBER, m IS A NUMBER
+GIVETH A BOOLEAN
+`period reaches` MEANS
+    (`the period`'s year GREATER THAN y)
+    OR (`the period`'s year EQUALS y AND `the period`'s month AT LEAST m)
+
+@export Allowance
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`allowance` p period MEANS
+    BRANCH
+        IF `period reaches` OF period, 2020, 1 THEN 300
+        IF p's salary GREATER THAN 1000 THEN 0
+        OTHERWISE 100
+
+#ASSERT (`allowance` OF (Person WITH salary IS 2000), (Period WITH year IS 2019, month IS 6)) EQUALS 0

@@ -1,0 +1,17 @@
+-- Two LIST OF fields whose role keys coincide: `adult` and `adults` both
+-- become the role key `adult`. OpenFisca would see one role twice. The
+-- export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Household HAS
+    adult  IS A LIST OF Person
+    adults IS A LIST OF Person
+
+@export Number of adults
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`number of adults` h period MEANS count (h's adults)
+
+#ASSERT (`number of adults` OF (Household WITH adult IS (LIST (Person WITH salary IS 1)), adults IS (LIST (Person WITH salary IS 2))), "2026-01") EQUALS 1

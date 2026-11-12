@@ -13,4 +13,4 @@ GIVEN p      IS A Person
 GIVETH A NUMBER
 `flat tax on salary` p period MEANS (p's salary) * 0.25
 
-#EVAL `flat tax on salary` (Person WITH salary IS 2000) "2026-01"  -- expect 500.0
+#ASSERT `flat tax on salary` (Person WITH salary IS 2000) "2026-01" EQUALS 500

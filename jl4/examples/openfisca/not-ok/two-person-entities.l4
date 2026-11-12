@@ -1,0 +1,22 @@
+-- Two subject records, neither a group. OpenFisca allows exactly one person
+-- entity, and failed with KeyError: 'company' when given two. The export must
+-- REFUSE it.
+IMPORT prelude
+
+DECLARE Person  HAS salary  IS A NUMBER
+DECLARE Company HAS revenue IS A NUMBER
+
+@export Personal tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`personal tax` p period MEANS p's salary TIMES 0.1
+
+@export Company tax
+GIVEN c      IS A Company
+      period IS A STRING
+GIVETH A NUMBER
+`company tax` c period MEANS c's revenue TIMES 0.2
+
+#ASSERT (`personal tax` OF (Person WITH salary IS 1000), "2026-01") EQUALS 100
+#ASSERT (`company tax` OF (Company WITH revenue IS 1000), "2026-01") EQUALS 200

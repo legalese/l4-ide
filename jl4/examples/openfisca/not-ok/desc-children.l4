@@ -1,0 +1,20 @@
+-- A @desc parameter path segment `children`, which overwrites the parameter
+-- node's own `children` table, so reading the parameter fails. The export
+-- must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@desc parameter taxes.children
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`rate` MEANS IF y AT LEAST 2015 THEN 0.5 ELSE 0.25
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`tax` p period MEANS p's salary TIMES (`rate` OF period's year)
+
+#ASSERT (`tax` OF (Person WITH salary IS 100), (Period WITH year IS 2026, month IS 1)) EQUALS 50

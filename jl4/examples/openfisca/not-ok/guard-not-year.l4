@@ -1,0 +1,20 @@
+-- A parameter guard whose left operand is not the year input. L4 switches to
+-- 200 when y MINUS 10 reaches 2015, i.e. in 2025; reading the guard as the
+-- date 2015 would switch ten years early. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@desc parameter taxes.flat
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`flat amount` MEANS IF (y MINUS 10) AT LEAST 2015 THEN 200 ELSE 100
+
+@export Tax for a period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`tax` p period MEANS `flat amount` OF period's year
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), (Period WITH year IS 2020, month IS 6)) EQUALS 100

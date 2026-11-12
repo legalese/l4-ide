@@ -1,0 +1,20 @@
+-- A legislation parameter called with a year other than the period's.
+-- L4 reads the year-2000 value (100); OpenFisca's parameters(period) would
+-- read the current period's (200). The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+@desc parameter taxes.flat
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`flat amount` MEANS IF y AT LEAST 2015 THEN 200 ELSE 100
+
+@export Tax fixed at the year-2000 rate
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`tax` p period MEANS `flat amount` OF 2000
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), (Period WITH year IS 2026, month IS 1)) EQUALS 100
