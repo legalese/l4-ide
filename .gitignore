@@ -12,7 +12,7 @@ build
 cabal.project.local
 cabal.project.local~
 *.code-workspace
-coverage
+/coverage/
 # Debug
 # Dependencies
 .direnv
