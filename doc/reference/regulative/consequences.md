@@ -501,6 +501,7 @@ What this does **not** promise:
   Two cases are still refused: evaluation stops with an error instead of answering, and the error names the record, both sides and the two instants.
   The first is a read and a record made while the two sides take one event, when the left side's turn, which comes first, is not the earlier instant: one event can reveal a deadline missed some time before it, and a `LEST` that records the miss records it at that deadline.
   The second is a read and a record made at one instant while the two sides take one event, because nothing says which of the two happened first.
+  An `ROR`, or an `EVERY … ONCE ALL HAVE`, on one side of a `RAND` goes over events the other side has already taken (the `ROR`'s right side, and the group's members after the first), so a read and a record between it and the other side are ordered by their instants alone, and refused at one instant.
   An `ROR` still runs its left side over the whole trace before it starts the right one, so there a read could see a record from its future or miss one from its past, and evaluation stops with the same error when that happens.
   A `RAND` run under `#EVALTRACE` is run the same way as an `ROR`, so a file that answers under `l4 run` can stop with that error when its evaluation is traced.
   `l4 explore` does not say a property holds over a step that was refused (see [`l4 explore`](explore.md)).

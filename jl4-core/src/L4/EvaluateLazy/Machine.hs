@@ -221,11 +221,15 @@ data Frame =
   -- beneath the compound's 'RBinOp1', so it runs after the 'RBinOp2' or the
   -- @ROR@ short-circuit has combined the operands.
   | RestoreSibling OperandPath Clock
+  -- smucclaw/l4-ide#1069: restore the sibling-read check's 'ssBehind' once a
+  -- barrier, which takes again events the compounds around it have taken,
+  -- has evaluated. Pushed beneath the barrier's frames ('startBarrier').
+  | RestoreBehind Int
   -- smucclaw/l4-ide#1069, NORM-LOG-SPEC N10's option A: a @RAND@ whose
   -- operands take the trace one event at a time. It sits on the stack beneath
   -- the operand that is running, or beneath the force of the compound's own
   -- stream, and holds the operands that are waiting for the next event. See
-  -- 'startLockstep'.
+  -- Note [Operands in step] and 'startCompound'.
   | Lockstep LockstepFrame
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
@@ -376,6 +380,7 @@ data DynState = MkDynState
   , dyRelook   :: Maybe [Maybe SrcRange]
   , dyPath     :: OperandPath
   , dyClock    :: Clock
+  , dyBehind   :: Int
   }
   deriving stock Show
 
@@ -1161,6 +1166,7 @@ unwindFrame = \ case
     putCurrentParty mOriginal
     when scoped leaveRelookScope
   RestoreSibling path clock              -> restoreSibling path clock
+  RestoreBehind n                        -> restoreBehind n
   Lockstep ls                            -> unwindLockstep ls
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
@@ -1606,6 +1612,12 @@ restoreSibling path clock = do
   sref <- asks (.siblings)
   liftIO (modifyIORef' sref \ st -> st {ssPath = path, ssClock = clock})
 
+-- | Put back the sibling-read check's 'ssBehind' ('RestoreBehind').
+restoreBehind :: Int -> Eval ()
+restoreBehind n = do
+  sref <- asks (.siblings)
+  liftIO (modifyIORef' sref \ st -> st {ssBehind = n})
+
 -- | How a message names one operand of a compound: the rule it names, the
 -- line it is written on, or, for an @EVERY@'s member, the member.
 operandLabel :: Text -> MaybeEvaluated -> Text
@@ -1732,6 +1744,9 @@ startCompound env op rexpr1 rexpr2 rs appType = do
 -- a @RAND@ evaluated while the machine keeps an evaluation trace, whose
 -- builder records each operand's frames as one nested push and pop. A
 -- barrier's members run in its own loop ('barrierNext'), and make no records.
+-- An @ROR@'s right operand and a barrier's later members and join go over
+-- events an in-step compound around them has already taken, so their
+-- accesses carry no count for that compound ('takenOn', 'RestoreBehind').
 --
 -- Nothing about an operand that does not read the other's records depends on
 -- the schedule: its run is a function of the trace and of the ledger as it
@@ -1766,7 +1781,7 @@ captureDyn = do
   tc <- getTemporalContext
   relook <- asks (.deonticLog) >>= traverse \ l -> liftIO (readIORef l.dlRelookScope)
   st <- readEvalRef (.siblings)
-  pure (MkDynState party tc relook st.ssPath st.ssClock)
+  pure (MkDynState party tc relook st.ssPath st.ssClock st.ssBehind)
 
 -- | Put a dynamic state back.
 setDyn :: DynState -> Eval ()
@@ -1775,6 +1790,7 @@ setDyn d = do
   putTemporalContext d.dyTemporal
   asks (.deonticLog) >>= traverse_ \ l -> for_ d.dyRelook (liftIO . writeIORef l.dlRelookScope)
   restoreSibling d.dyPath d.dyClock
+  restoreBehind d.dyBehind
 
 -- | The next step of an in-step compound: start or resume the next operand
 -- of the round; when the round is over, take the next cell of the stream if
@@ -2386,6 +2402,9 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     finishRead mode cellVal (OwnKey key) site ledger
   Just (RestoreSibling path clock) -> do
     restoreSibling path clock
+    continueBackward val
+  Just (RestoreBehind n) -> do
+    restoreBehind n
     continueBackward val
   Just (Lockstep ls) -> lockstepReturn ls val
   Just (RestoreCurrentParty mOriginal scoped) -> do
@@ -4322,6 +4341,14 @@ joinFailpointName  = "the join fails"
 -- vacuously true.
 startBarrier :: QuantCtx -> [CastMember] -> MemberDue -> Machine Config
 startBarrier ctx members mdue = do
+  -- smucclaw/l4-ide#1069: the members after the first, and the join, take
+  -- events again that the compounds the barrier sits in have already taken,
+  -- so an access in here must not be ordered by those compounds' event
+  -- counts ('takenOn'); the barrier's own compounds are counted as usual
+  sref <- asks (.siblings)
+  outer <- liftIO (readIORef sref)
+  pushFrame (RestoreBehind outer.ssBehind)
+  liftIO (writeIORef sref outer {ssBehind = max outer.ssBehind (length outer.ssPath)})
   -- Both names are user-visible: a member that has not yet acted when the
   -- event stream runs out is printed as a residual obligation carrying these
   -- sentinels in its HENCE and LEST, so they have to read as English there.
@@ -5173,6 +5200,9 @@ patternMatchFailure = withPoppedFrame $ \ case
   -- blackholed thunks must be made forcible again
   Just (Lockstep ls) -> do
     unwindLockstep ls
+    patternMatchFailure
+  Just (RestoreBehind n) -> do
+    restoreBehind n
     patternMatchFailure
   Just _ ->
     patternMatchFailure

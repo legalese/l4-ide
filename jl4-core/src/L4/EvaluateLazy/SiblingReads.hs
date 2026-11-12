@@ -43,7 +43,12 @@
 -- left operand's turn (which comes first) is not the earlier instant, as when
 -- one event reveals a deadline missed some time before it and the right
 -- operand's @LEST@ records the miss at that deadline; and any two such
--- accesses at the same instant, which the trace gives no order.
+-- accesses at the same instant, which the trace gives no order. An @ROR@ or a
+-- barrier (@EVERY … ONCE ALL HAVE@) inside an operand goes over events the
+-- compound has already taken (the @ROR@'s right operand, the barrier's later
+-- members and its join), so an access inside one carries no event count for
+-- the compounds outside it ('takenOn'), and is ordered against their other
+-- operands by instant alone.
 --
 -- What it does not see, sorted by how it fails:
 --
@@ -181,19 +186,37 @@ data SiblingState = MkSiblingState
     -- events of its stream it has handed them so far: the event they are
     -- all taking now. Two accesses made while taking different events are
     -- ordered by them even at one instant, as the trace orders the events.
+  , ssBehind :: !Int
+    -- ^ how many of the outermost entries of 'ssPath' belong to compounds
+    -- whose events are being taken again: inside a barrier ('startBarrier'
+    -- in "L4.EvaluateLazy.Machine"), the members after the first and the
+    -- join take events the compounds around it have already taken, so an
+    -- access in there is not ordered by those compounds' counts. 0 outside.
   }
   deriving stock Show
 
 emptySiblingState :: SiblingState
-emptySiblingState = MkSiblingState [] Unclocked IntMap.empty IntMap.empty Map.empty 0 IntMap.empty
+emptySiblingState = MkSiblingState [] Unclocked IntMap.empty IntMap.empty Map.empty 0 IntMap.empty 0
 
 -- | The in-step compound with this scope has handed its operands @n@ events.
 setTaken :: Int -> Int -> SiblingState -> SiblingState
 setTaken s n st = st {ssTaken = IntMap.insert s n st.ssTaken}
 
--- | What 'acTaken' records for an access made now on @path@.
+-- | What 'acTaken' records for an access made now on @path@: the counts of
+-- the in-step compounds the access is taking its event from at the head of
+-- their streams. Walking out from the innermost compound, that stops at the
+-- first compound that is not in step (an @ROR@, whose right operand takes
+-- again the events its left one took) and at the compounds a barrier is
+-- taking events again from ('ssBehind'). An access with no count for the
+-- compound where it parts from another is ordered by instant alone, and at
+-- one instant not at all ('earlier').
 takenOn :: OperandPath -> SiblingState -> IntMap Int
-takenOn path st = IntMap.fromList [ (s, n) | (s, _) <- path, Just n <- [IntMap.lookup s st.ssTaken] ]
+takenOn path st = IntMap.fromList
+  [ (s, n)
+  | (s, _) <- takeWhile inStep (take (length path - st.ssBehind) path)
+  , Just n <- [IntMap.lookup s st.ssTaken] ]
+  where
+    inStep (s, _) = maybe False (.scLockstep) (IntMap.lookup s st.ssScopes)
 
 -- | A compound meets its events at @clock@ ('Nothing' while its time is a
 -- thunk): a fresh scope, and the left operand's path into it.
@@ -335,8 +358,9 @@ refusal st key cell rule r w s = Text.unwords $
       then
         [ "L4 runs the sides of " <> opName <> " in step, one event of the trace at a time,"
         , "each event first on the left side and then on the right,"
-        , "so a read and a record made while the sides take the same event come in that order,"
-        , "which need not be the order of their instants; at one instant the trace gives them no order at all."
+        , "so a read and a record made while the sides take the same event,"
+        , "or inside an ROR or an EVERY … ONCE ALL HAVE on one side, which go over events already taken,"
+        , "come in an order that need not be the order of their instants; at one instant the trace gives them no order at all."
         ]
       else if op == "RAND"
         then

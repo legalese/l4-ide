@@ -375,6 +375,67 @@ lapse compound = Text.unlines
   , "    PARTY Q DOES b AT 9"
   ]
 
+-- ---------------------------------------------------------------------------
+-- An operand that goes over events its compound has already taken: a barrier
+-- (its second member and its join) or an ROR (its right operand) inside one
+-- side of a RAND. Bob signs at 1, then W records x at 1, then Alice signs at
+-- 1: in time order Bob's PROVIDED holds and Alice's does not. The barrier
+-- runs Alice's member first, over all three events, and then Bob's, over the
+-- same events again, after W has recorded x; so Bob's read at 1 must not be
+-- ordered after W's record by the count of events taken. Refused, not
+-- answered; with W's record at 0 instead, the instants order it.
+
+barrierRescan :: Text.Text -> Text.Text -> Text.Text
+barrierRescan compound writerAt = Text.unlines
+  [ "DECLARE Actor IS ONE OF"
+  , "    Writer HAS name IS A STRING"
+  , "    Tenant HAS name IS A STRING"
+  , "DECLARE Action IS ONE OF"
+  , "    Sign HAS signer IS AN Actor"
+  , "    Go   HAS who    IS AN Actor"
+  , "w MEANS Writer OF \"W\""
+  , "alice MEANS Tenant OF \"Alice\""
+  , "bob MEANS Tenant OF \"Bob\""
+  , "tenants MEANS LIST alice, bob"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`signing` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign t PROVIDED (RECALL OFFICIAL's `x`) EQUALS NOTHING"
+  , "        WITHIN 10"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  (COMMIT `all signed` IS TRUE HENCE FULFILLED)"
+  , "        LEST   FULFILLED"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`writer` MEANS PARTY w MAY Go w WITHIN 10 HENCE COMMIT `x` IS TRUE HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`both` MEANS " <> compound
+  , "#TRACE `both` AT 0 WITH"
+  , "  PARTY bob   DOES Sign bob   AT 1"
+  , "  PARTY w     DOES Go w       AT " <> writerAt
+  , "  PARTY alice DOES Sign alice AT 1"
+  ]
+
+-- The same with an ROR whose left operand never finishes, so its right
+-- operand goes over the events again; W acts twice, so the compound has taken
+-- more events than it had at W's record by the time the right operand reads.
+rorRescan :: Text.Text -> Text.Text
+rorRescan compound = Text.unlines
+  [ "DECLARE Party IS ONE OF P, Q, W"
+  , "DECLARE Act IS ONE OF a, q, go"
+  , "GIVETH A DEONTIC Party Act"
+  , "`left` MEANS PARTY P MUST a WITHIN 10 HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`right` MEANS PARTY Q MAY q PROVIDED (RECALL OFFICIAL's `x`) EQUALS NOTHING WITHIN 10 HENCE COMMIT `q accepted` IS TRUE HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`writer` MEANS PARTY W MAY go WITHIN 10 HENCE COMMIT `x` IS TRUE HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`all` MEANS " <> compound
+  , "#TRACE `all` AT 0 WITH"
+  , "    PARTY Q DOES q AT 1"
+  , "    PARTY W DOES go AT 1"
+  , "    PARTY W DOES go AT 1"
+  ]
+
 spec :: Spec
 spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)" do
   describe "a RAND's operands in step" do
@@ -462,6 +523,22 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
       a <- run noShared
       b <- run ownLedgers
       (a <> b) `shouldSatisfy` (not . any isRefused)
+
+    it "does not order by the count of events an access inside a barrier that goes over events again (refused at one instant, either way round)" do
+      for_ ["`signing` RAND `writer`", "`writer` RAND `signing`"] \ compound -> do
+        outs <- run (barrierRescan compound "1")
+        case outs of
+          [o] -> o `shouldMention` ["read each other's records", "OFFICIAL's `x`", "at 1", "ONCE ALL HAVE"]
+          _ -> expectationFailure ("expected one directive, got " <> show outs)
+        early <- run (barrierRescan compound "0")
+        (compound, map isRefused early) `shouldBe` (compound, [False])
+
+    it "does not order by the count of events an access inside an ROR's right operand (refused at one instant, either way round)" do
+      for_ ["(`left` ROR `right`) RAND `writer`", "`writer` RAND (`left` ROR `right`)"] \ compound -> do
+        outs <- run (rorRescan compound)
+        case outs of
+          [o] -> o `shouldMention` ["read each other's records", "OFFICIAL's `x`", "at 1"]
+          _ -> expectationFailure ("expected one directive, got " <> show outs)
 
   describe "an ROR, still run one operand after the other" do
     it "refuses an ROR whose left side read a record its right side makes earlier" do
