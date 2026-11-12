@@ -19,16 +19,17 @@ import CliTest.Common
 dir :: FilePath
 dir = "tests-cli" </> "fixtures" </> "sibling-reads"
 
-dinnerAB, writerFirst, readerFirst, rorReaderFirst, dinnerOne :: FilePath
+dinnerAB, writerFirst, readerFirst, rorReaderFirst, oneEvent, dinnerOne :: FilePath
 dinnerAB = dir </> "dinner-ab.l4"
 writerFirst = dir </> "writer-first.l4"
 readerFirst = dir </> "reader-first.l4"
 rorReaderFirst = dir </> "ror-reader-first.l4"
+oneEvent = dir </> "one-event.l4"
 -- the single-party original, which has no RAND and must not change
 dinnerOne = ".." </> "doc" </> "reference" </> "regulative" </> "explore-example.l4"
 
 fixtures :: [FilePath]
-fixtures = [dinnerAB, writerFirst, readerFirst, rorReaderFirst, dinnerOne]
+fixtures = [dinnerAB, writerFirst, readerFirst, rorReaderFirst, oneEvent, dinnerOne]
 
 property :: [String]
 property = ["--until", "100", "--always", "every dinner was accepted while open"]
@@ -80,6 +81,13 @@ spec bin = describe "operands that read each other's records (smucclaw/l4-ide#10
     (wcode, rcode) `shouldBe` (ExitSuccess, ExitSuccess)
     officialRecord wout `shouldBe` ["COMMIT `notice given` IS TRUE", "COMMIT `possession sought` IS TRUE"]
     officialRecord rout `shouldBe` officialRecord wout
+
+  it "l4 explore lists as untried, exit 2, a move whose two sides record and read at one instant" $ do
+    Output code sout serr <- runL4 bin ["explore", oneEvent, "--until", "20"]
+    code `shouldBe` ExitFailure 2
+    let out = sout <> serr
+    out `shouldSatisfy` ("UNTRIED" `isInfixOf`)
+    out `shouldSatisfy` ("read each other's records" `isInfixOf`)
 
   it "l4 run refuses an ROR whose left side reads a record its right side makes earlier, and l4 check warns" $ do
     Output code sout serr <- runL4 bin ["run", rorReaderFirst]
