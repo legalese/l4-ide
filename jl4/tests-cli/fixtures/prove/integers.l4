@@ -1,0 +1,10 @@
+-- A NUMBER is always declared Real, never Int, whatever guards an assertion
+-- carries: a guard is a hypothesis of that one obligation, not a sort.
+§ `Whole numbers`
+    GIVEN x IS A NUMBER
+
+-- refuted: x need not be whole, and FLOOR moves a fraction
+#ASSERT x EQUALS FLOOR x
+
+-- proved: under the guard, and only there
+#ASSERT `IS INTEGER` x IMPLIES x EQUALS FLOOR x

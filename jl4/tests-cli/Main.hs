@@ -60,6 +60,7 @@ import qualified CliTest.Explore as Explore
 import qualified CliTest.SiblingReads as SiblingReads
 import qualified CliTest.Docassemble as Docassemble
 import qualified CliTest.OpenFisca as OpenFisca
+import qualified CliTest.Prove as Prove
 import qualified CliTest.Yscript as Yscript
 
 ----------------------------------------------------------------------------
@@ -700,6 +701,7 @@ main = do
          , Catala.fixtures
          , Explore.fixtures
          , SiblingReads.fixtures
+         , Prove.fixtures
          , BuildIdentity.fixtures
          , Ledger.fixtures
          ]) \fp -> do
@@ -5085,6 +5087,7 @@ spec bin = do
   Catala.spec bin
   Explore.spec bin
   SiblingReads.spec bin
+  Prove.spec bin
   BuildVersion.spec bin
   BuildIdentity.spec
   Ledger.spec bin

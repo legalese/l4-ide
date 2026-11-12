@@ -1,0 +1,15 @@
+-- Three section GIVENs whose symbols a naive scheme could merge: two named
+-- `x` in different sections (the second gets a numbering suffix) and one
+-- whose own name is `x#2`. Each must keep its own symbol.
+§ `Inner`
+    GIVEN x IS A NUMBER
+
+GIVETH A NUMBER
+`inner x` MEANS x
+
+§ `Outer`
+    GIVEN x IS A NUMBER
+          `x#2` IS A NUMBER
+
+-- refuted: three independent numbers
+#ASSERT x PLUS `inner x` EQUALS `x#2`
