@@ -1,0 +1,15 @@
+-- An illustrative rule, not a statute: a payment of ten is split into a number
+-- of equal instalments, and an instalment is large when it exceeds two, unless
+-- there are more than a hundred of them.
+--
+-- The first condition guards the second, because dividing by zero instalments
+-- has no answer: `10 / instalments` raises when `instalments` is zero.
+-- That input is decided by the first condition alone, so it still has to be
+-- tested, and a cover point for each condition would lose it.
+@export default Whether each instalment is large
+GIVEN instalments IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `instalment is large` IF
+      NOT (instalments EQUALS 0)
+  AND 10 / instalments GREATER THAN 2
+  UNLESS instalments GREATER THAN 100

@@ -1,0 +1,9 @@
+-- A rule whose answer is not the same everywhere inside one bucket: the
+-- allowance is a tenth of the income above 1000 and a twentieth of it
+-- otherwise, so every income that is not above 1000 lands in one bucket and
+-- gets its own answer. The report has to say so, not print one answer as if
+-- it were the answer of the whole bucket.
+GIVEN income IS A NUMBER
+GIVETH A NUMBER
+DECIDE `allowance` IS
+  IF income GREATER THAN 1000 THEN income TIMES 0.1 ELSE income TIMES 0.05

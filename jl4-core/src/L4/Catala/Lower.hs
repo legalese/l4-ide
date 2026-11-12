@@ -63,6 +63,7 @@ import L4.API.EmbeddedLibraries (embeddedLibraryNames)
 import L4.Catala.Emit (renderCatType)
 import L4.Catala.Equivalence (EqvUnit (..), equivalenceUnit)
 import L4.Catala.IR
+import L4.Coverage.Rungs (cascadeArms, ladderAtoms, litConsiderArms, peelProvisos, plainName)
 import L4.Export
   ( ExportedFunction (..), ParsedDesc (..), getExportedFunctions
   , isNonexhaustiveDecide, parseDescText )
@@ -299,7 +300,11 @@ data WitnessGate = WitnessGate
   { wgRows      :: ![WitnessRow]
   , wgImpossible :: ![[Bool]]
   , wgAtomText  :: ![Text]
-    -- ^ each atom as L4 source, in the ladder's own order, for the prose
+    -- ^ each condition as L4 source, for the prose: the leaves of the ladder's
+    -- rungs in drawing order, or the rungs themselves when 'wgRungNote' is set
+  , wgRungNote  :: !(Maybe Text)
+    -- ^ 'Just' why the gate is at rung level, not leaf level: a rung that is
+    -- @a OR b@ is then one condition, and the prose says so
   }
   deriving stock (Eq, Show)
 
@@ -329,6 +334,8 @@ data LadderTarget = LadderTarget
   , ltAppArgs :: ![Resolved]
   , ltAtoms  :: ![Expr Resolved]
   , ltReadsAssumes :: !Bool
+  , ltDecl   :: !(Decide Resolved)
+    -- ^ the exported declaration itself, for a caller that draws its rungs
   }
 
 -- | Every exported decision of this module whose body 'modeBClauses' would
@@ -342,6 +349,7 @@ ladderTargets imports mod' =
       , ltAppArgs = di.diAppArgs
       , ltAtoms  = atoms
       , ltReadsAssumes = not (null (Map.findWithDefault [] di.diUnique assumeUse))
+      , ltDecl   = ef.exportDecide
       }
   | ef <- getExportedFunctions mod'
   , Just di <- [Map.lookup (getUnique (decideName ef.exportDecide)) decides]
@@ -357,13 +365,6 @@ ladderTargets imports mod' =
   isBoolean = \case
     Just (TyApp _ r []) -> getUnique r == TC.booleanUnique
     _ -> False
-
--- | The L4 atoms of the ladder 'modeBClauses' derives from a body, in its order.
-ladderAtoms :: Bool -> Expr Resolved -> Maybe [Expr Resolved]
-ladderAtoms isCondition body
-  | isCondition, Just (base, provisos) <- peelProvisos body = Just (base : provisos)
-  | Just (arms, _) <- cascadeArms body = Just (map fst arms)
-  | otherwise = Nothing
 
 lowerModule :: Module Resolved -> Either [LowerError] CatModule
 lowerModule = lowerModuleWith defaultLowerOptions []
@@ -1100,7 +1101,12 @@ witnessBlockOf ctx ls = case ls.lsGate of
        , "including one exactly at a number a condition compares with, fails `clerk test`"
        , "(R4, §8.4)."
        , ""
-       , "The atoms, as L4 writes them:"
+       ]
+    <> [ l | Just why <- [g.wgRungNote]
+           , l <- [ "The conditions below are the rungs of the ladder as L4 writes them, not the separate"
+                  , "conditions inside a rung: " <> why <> "."
+                  , "" ] ]
+    <> [ "The atoms, as L4 writes them:"
        , ""
        ]
     <> [ "- `p_" <> tshow i <> "` is " <> code a | (i, a) <- zip [0 :: Int ..] g.wgAtomText ]
@@ -1758,62 +1764,6 @@ modeBClauses ctx var shape body = case shape of
   boolOf = \case
     ELit (LBool b) -> Just b
     _              -> Nothing
-
--- | @c AND NOT d1 AND NOT d2 …@ → @(c, [d1, d2, …])@, or 'Nothing' when there is
--- no trailing negated conjunct to make a proviso out of.
-peelProvisos :: Expr Resolved -> Maybe (Expr Resolved, [Expr Resolved])
-peelProvisos e0 = case go e0 of
-  (_, []) -> Nothing
-  r       -> Just r
- where
-  go x = case asAnd x of
-    Just (a, b) | Just d <- asNot b -> let (base, ds) = go a in (base, ds <> [d])
-    _ -> (x, [])
-
-asAnd :: Expr Resolved -> Maybe (Expr Resolved, Expr Resolved)
-asAnd = \case
-  And _ a b                              -> Just (a, b)
-  App _ r [a, b] | isBuiltinNamed r "__AND__" -> Just (a, b)
-  _                                      -> Nothing
-
-asNot :: Expr Resolved -> Maybe (Expr Resolved)
-asNot = \case
-  Not _ a                             -> Just a
-  App _ r [a] | isBuiltinNamed r "__NOT__" -> Just a
-  _                                   -> Nothing
-
-isBuiltinNamed :: Resolved -> Text -> Bool
-isBuiltinNamed r nm = plainName r == nm || unqualifiedNameToText (getActual r) == nm
-
--- | The first-match arms of a @BRANCH@, an @IF@, or a literal @CONSIDER@.
-cascadeArms :: Expr Resolved -> Maybe ([(Expr Resolved, Expr Resolved)], Expr Resolved)
-cascadeArms = \case
-  MultiWayIf _ guards oth -> Just ([ (c, b) | MkGuardedExpr _ c b <- guards ], oth)
-  IfThenElse _ c t e      -> Just ([(c, t)], e)
-  e@(Consider {})         -> litConsiderArms e
-  _                       -> Nothing
-
--- | A @CONSIDER@ whose patterns are all literals is an equality cascade; Catala
--- patterns are constructor-only, so this is the shape §4.3 sends to @if@/@else@.
---
--- The @OTHERWISE@ must be the /last/ branch. L4's @CONSIDER@ is first-match, so
--- an @OTHERWISE@ written before a @WHEN@ shadows it and the whole cascade
--- collapses to that one value; an if\/else chain assembled arms-then-default
--- would answer with the shadowed arm instead. That is a change of denotation
--- rather than of shape, so this returns 'Nothing' and 'lowerConsider' rejects
--- with §4.3's message. (Nothing else catches it: @l4 check@ reports the
--- literal case as clean.)
-litConsiderArms :: Expr Resolved -> Maybe ([(Expr Resolved, Expr Resolved)], Expr Resolved)
-litConsiderArms (Consider ann scrut branches)
-  | (initial, [MkBranch _ (Otherwise _) oth]) <- splitAt (length branches - 1) branches
-  , not (null initial)
-  , Just whens <- traverse litBranch initial =
-      Just ([ (Equals ann scrut (Lit ann l), b) | (l, b) <- whens ], oth)
- where
-  litBranch = \case
-    MkBranch _ (When _ (PatLit _ l)) b -> Just (l, b)
-    _                                  -> Nothing
-litConsiderArms _ = Nothing
 
 -- ---------------------------------------------------------------------------
 -- Types (R2, R11)
@@ -2775,12 +2725,6 @@ resolvedToText = rawNameToText . rawName . getActual
 -- | The /defining/ name, stable across @AKA@ aliases.
 canonText :: Resolved -> Text
 canonText = rawNameToText . rawName . getOriginal
-
--- | The defining name with any section qualification dropped: this is what the
--- builtin, prelude-combinator and date recognisers match against, because a
--- prelude function reaches us as @Prelude.Numeric Aggregates.sum@.
-plainName :: Resolved -> Text
-plainName = unqualifiedRawNameToText . rawName . getOriginal
 
 dropExt :: Text -> Text
 dropExt t = case Text.breakOnEnd "." t of
