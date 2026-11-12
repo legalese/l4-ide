@@ -7,11 +7,10 @@
 -- the left operand and then to the right before event n+1 is handed to
 -- either. An @EVERY … UPON EACH@ and the distributive @EVERY@ fold their
 -- members into the same right-nested @RAND@, so their members run in step
--- too. An @ROR@ still runs operand-major, the left operand over the whole
--- trace and then the right, and so does a @RAND@ evaluated under an
--- evaluation trace (@#EVALTRACE@, or every directive under the REPL's
--- policy), whose trace builder needs each operand's frames nested whole.
--- All operands share one ledger, whose entries carry no contract instant.
+-- too, with or without an evaluation trace (@#EVALTRACE@, the REPL). An
+-- @ROR@ still runs operand-major, the left operand over the whole trace and
+-- then the right. All operands share one ledger, whose entries carry no
+-- contract instant.
 --
 -- In Hvitved's contract specification language, which L4's contract evaluator
 -- follows (@jl4/README.md@), a conjunct is a function of the trace alone
@@ -50,16 +49,31 @@
 -- the compounds outside it ('takenOn'), and is ordered against their other
 -- operands by instant alone.
 --
+-- An @ROR@ whose left operand is @FULFILLED@ never runs its right one, so a
+-- record the right one would have made is never in the ledger. Written the
+-- other way round, the same alternative would have run first and could have
+-- made it, so a read that misses it depends on how the alternatives are
+-- written. At that short cut the machine hands 'registerUnrun' every record
+-- the unrun alternative can reach (the @RECORD@s, @COMMIT@s and @NOTIFY@s in
+-- its expressions and in the definitions they use, followed through the
+-- heap without forcing anything), and the check refuses a read of such a
+-- cell on another side of a compound, made before or after, unless it is
+-- strictly earlier than the @ROR@'s start, from which the alternative's
+-- records would date. This is the one rule that guesses: the alternative
+-- might never have made the record (assumed, not ruled; what becomes of a
+-- losing @ROR@ alternative is N10's own unruled condition).
+--
 -- What it does not see, sorted by how it fails:
 --
--- * Silent: when an @ROR@'s left operand is @FULFILLED@ the right operand is
---   never run, so a record it would have made is never compared with what
---   the left operand read. The check-time warning
---   ('L4.Lint.SiblingReads') names such a pair; the run-time check does not.
 -- * Silent: two operands that write one cell with no read of it inside the
---   compound leave the ledger in the order the writes were made (in step,
---   event by event, left before right at one event). No read depended on
---   that order, so there is nothing to refuse.
+--   compound leave the ledger in the order the writes were made: in step,
+--   event by event, and within one event left before right, whatever the
+--   writes' instants. No read inside the compound depended on that order, so
+--   there is nothing to refuse; but what reads the ledger after the compound
+--   does: @l4 run@'s listing, and an @l4 explore@ property, which is handed
+--   the cell's latest entry. Refusing such writes would change the answer for
+--   operands that do not read each other's records, which
+--   smucclaw/l4-ide#1069's first requirement forbids.
 -- * Silent: a read whose evaluation is deferred (a @RECALL@ inside a value
 --   that is stored unevaluated and forced later) is checked where it is
 --   forced, not where it is written; and a top-level rule with no inputs that
@@ -80,6 +94,8 @@ module L4.EvaluateLazy.SiblingReads
   , Access (..)
   , CellLog (..)
   , SiblingState (..)
+  , PossibleWrite (..)
+  , Unrun (..)
   , emptySiblingState
   , inCompound
   , openScope
@@ -87,6 +103,7 @@ module L4.EvaluateLazy.SiblingReads
   , setTaken
   , checkRead
   , checkWrite
+  , registerUnrun
   , siblingReadMarker
   , isSiblingReadRefusal
   , lineOf
@@ -192,11 +209,38 @@ data SiblingState = MkSiblingState
     -- in "L4.EvaluateLazy.Machine"), the members after the first and the
     -- join take events the compounds around it have already taken, so an
     -- access in there is not ordered by those compounds' counts. 0 outside.
+  , ssUnrun  :: ![Unrun]
+    -- ^ the @ROR@ alternatives the machine did not run, with the records
+    -- each could have made ('registerUnrun')
+  }
+  deriving stock Show
+
+-- | A record an alternative of an @ROR@ can make: in the ledger kind its
+-- verb names, of the cell named ('Nothing' when the name is computed, which
+-- matches every cell of that kind), at a site.
+data PossibleWrite = MkPossibleWrite
+  { pwOfficial :: !Bool
+  , pwCell     :: !(Maybe Text)
+  , pwSite     :: !(Maybe SrcRange)
+  , pwVerb     :: !Text
+  }
+  deriving stock (Eq, Ord, Show)
+
+-- | The right alternative of an @ROR@ whose left one was fulfilled, so that
+-- the machine never ran it.
+data Unrun = MkUnrun
+  { unScope  :: !Int
+    -- ^ the @ROR@'s scope; the alternative is its side 1
+  , unPath   :: !OperandPath
+    -- ^ the path the alternative would have run on
+  , unClock  :: !Clock
+    -- ^ the @ROR@'s start: the alternative's records would date from then on
+  , unWrites :: ![PossibleWrite]
   }
   deriving stock Show
 
 emptySiblingState :: SiblingState
-emptySiblingState = MkSiblingState [] Unclocked IntMap.empty IntMap.empty Map.empty 0 IntMap.empty 0
+emptySiblingState = MkSiblingState [] Unclocked IntMap.empty IntMap.empty Map.empty 0 IntMap.empty 0 []
 
 -- | The in-step compound with this scope has handed its operands @n@ events.
 setTaken :: Int -> Int -> SiblingState -> SiblingState
@@ -296,7 +340,7 @@ checkRead :: LedgerKey -> Text -> Bool -> Maybe SrcRange -> SiblingState -> Eith
 checkRead key cell readAll site st
   | not (inCompound st) = Right st
   | otherwise =
-      case future <|> outOfOrder of
+      case future <|> outOfOrder <|> unrunMissed st key cell theRead of
         Just msg -> Left msg
         Nothing  -> Right st {ssCells = Map.insert (key, cell) cl {clReads = theRead : cl.clReads} st.ssCells}
   where
@@ -322,6 +366,48 @@ checkRead key cell readAll site st
             | w <- writes, Just s <- [divergence w.acPath lastW.acPath]
             , not (earlier s w lastW) ]
           [] -> Nothing
+
+-- | A read that an alternative the machine did not run could have answered
+-- differently: one on another side of a compound from an unrun alternative
+-- that can make a record of the cell, unless the read is strictly earlier
+-- than the @ROR@'s start.
+unrunMissed :: SiblingState -> LedgerKey -> Text -> Access -> Maybe Text
+unrunMissed st key cell r = listToMaybe
+  [ unrunRefusal st key cell r un pw s
+  | un <- st.ssUnrun, pw <- un.unWrites, possiblyWrites pw key cell
+  , Just s <- [divergence r.acPath un.unPath]
+  , not (beforeStart st r un) ]
+
+-- | Could this possible write land in @key@'s ledger under @cell@?
+possiblyWrites :: PossibleWrite -> LedgerKey -> Text -> Bool
+possiblyWrites pw key cell =
+  pw.pwOfficial == (key == OfficialKey) && maybe True (== cell) pw.pwCell
+
+-- | Was the read made strictly before the unrun alternative could have
+-- started making records? An unknown instant is never before.
+beforeStart :: SiblingState -> Access -> Unrun -> Bool
+beforeStart st r un = case (r.acInstant, instantOf st un.unClock) of
+  (Just x, Just y) -> x < y
+  _                -> False
+
+-- | The right alternative of the @ROR@ with this scope was not run, because
+-- its left alternative was fulfilled, and it can make these records: refuse
+-- if a read already made on another side could have seen one of them, and
+-- otherwise remember them for the reads still to come ('unrunMissed').
+registerUnrun :: Int -> OperandPath -> Clock -> [PossibleWrite] -> SiblingState -> Either Text SiblingState
+registerUnrun scope outer clock writes st
+  | null writes = Right st
+  | otherwise = case listToMaybe missed of
+      Just msg -> Left msg
+      Nothing  -> Right st {ssUnrun = un : st.ssUnrun}
+  where
+    un = MkUnrun scope ((scope, 1) : outer) clock writes
+    missed =
+      [ msg
+      | ((key, cell), cl0) <- Map.toList st.ssCells
+      , let cl = resolved st cl0
+      , r <- reverse cl.clReads
+      , Just msg <- [unrunMissed st {ssUnrun = [un]} key cell r] ]
 
 -- | A @RECORD@, @COMMIT@, @ATTEST@ or @NOTIFY@ of @cell@ into @key@'s ledger,
 -- made now. Rule 2; the write is logged when nothing refuses.
@@ -350,7 +436,8 @@ data Rule = FutureSeen Access | PastMissed | OutOfOrder Access
 refusal :: SiblingState -> LedgerKey -> Text -> Rule -> Access -> Access -> Int -> Text
 refusal st key cell rule r w s = Text.unwords $
   [ "The two sides of " <> opName <> " " <> siblingReadMarker <> ","
-  , "so the answer would depend on which side L4 runs first, and evaluation stops here."
+  , "so what the read saw depends on which side L4 runs first, not on when the record was made,"
+  , "and evaluation stops here."
   ]
   <> capitalised middle
   <>
@@ -362,16 +449,12 @@ refusal st key cell rule r w s = Text.unwords $
         , "or inside an ROR or an EVERY … ONCE ALL HAVE on one side, which go over events already taken,"
         , "come in an order that need not be the order of their instants; at one instant the trace gives them no order at all."
         ]
-      else if op == "RAND"
-        then
-          [ "While it keeps an evaluation trace (#EVALTRACE), L4 runs one side of a RAND over the whole trace before it starts the other,"
-          , "so a record made on one side is not in step with a read on the other;"
-          , "without the evaluation trace the sides run in step, one event at a time."
-          ]
-        else
-          [ "L4 runs one side of " <> opName <> " over the whole trace before it starts the other,"
-          , "so a record made on one side is not in step with a read on the other."
-          ] )
+      else
+        [ "L4 runs one side of " <> opName <> " over the whole trace before it starts the other,"
+        , "so a record made on one side is not in step with a read on the other."
+        ]
+        <> [ "Whether this changes the ROR's answer depends on what becomes of an alternative once the other is fulfilled, which is not settled, so L4 refuses the read rather than answer from it."
+           | op == "ROR" ] )
   <> [ "An EVERY runs its members as the sides of a RAND, so this holds between its members too." | fork ]
   <>
   [ "Rewrite the rule so that the side that reads the record also makes it,"
@@ -417,7 +500,7 @@ refusal st key cell rule r w s = Text.unwords $
         [ whoAt r <> " read " <> record <> at r <> site r <> ","
         , "but " <> whoAt w <> ", on the other side of the " <> op <> ","
         , "makes that record" <> at w <> site w <> ","
-        , "which the read " <> (if w.acInstant == r.acInstant then "may or may not have been meant to see, at the same instant." else "should have seen and did not.")
+        , "which the read " <> (if w.acInstant == r.acInstant then "may or may not have been meant to see, at the same instant." else if op == "ROR" then "did not see, although it is from the read's past." else "should have seen and did not.")
         ]
       OutOfOrder a ->
         [ whoAt r <> " read " <> record <> at r <> site r <> ","
@@ -431,6 +514,45 @@ refusal st key cell rule r w s = Text.unwords $
       Just rng -> " (" <> a.acVerb <> ", line " <> Text.pack (show (lineOf rng)) <> ")"
       Nothing  -> " (" <> a.acVerb <> ")"
     ledgerName = \ case
+      OfficialKey -> "OFFICIAL's"
+      OwnKey ""   -> "the anonymous ledger's"
+      OwnKey p    -> p <> "'s"
+
+-- | The message for a read that an unrun @ROR@ alternative could have
+-- answered differently ('unrunMissed'). @s@ is the compound where the read
+-- and the alternative part.
+unrunRefusal :: SiblingState -> LedgerKey -> Text -> Access -> Unrun -> PossibleWrite -> Int -> Text
+unrunRefusal st key cell r un pw s = Text.unwords
+  [ "The sides of " <> opName <> " " <> siblingReadMarker <> ","
+  , "so what the read saw depends on how the alternatives of an ROR are written, not on when records are made,"
+  , "and evaluation stops here."
+  , readerName <> " read " <> record <> maybe "" (\ t -> " at " <> prettyRatio t) r.acInstant <> siteOf r.acVerb r.acSite <> ","
+  , "but " <> unrunName <> ", an alternative of an ROR, can make that record" <> siteOf pw.pwVerb pw.pwSite <> ","
+  , "and L4 never ran it: it runs no more of an ROR once an earlier alternative, " <> winnerName <> ", is fulfilled."
+  , "Written the other way round, " <> unrunName <> " would have run first and could have made the record" <> start <> "."
+  , "Rewrite the rule so that the side that reads the record also makes it, or make the record before the ROR starts."
+  , "(smucclaw/l4-ide#1069.)"
+  ]
+  where
+    sc = IntMap.lookup s st.ssScopes
+    op = maybe "RAND" (.scOp) sc
+    opName = (if op == "ROR" then "an " else "a ") <> op
+    ror = IntMap.lookup un.unScope st.ssScopes
+    unrunName = maybe "the second alternative" (.scRight) ror
+    winnerName = maybe "the first" (.scLeft) ror
+    -- the reader: the operand closest to the read
+    readerName = case r.acPath of
+      (s', side) : _ | Just sc' <- IntMap.lookup s' st.ssScopes -> if side == 0 then sc'.scLeft else sc'.scRight
+      _ -> "A read"
+    start = case instantOf st un.unClock of
+      Just t | Just x <- r.acInstant, x == t -> " at " <> prettyRatio t <> ", the instant of the read"
+      Just t  -> " at any instant from " <> prettyRatio t <> ", when the ROR started"
+      Nothing -> ""
+    record = keyName key <> " `" <> cell <> "`"
+    siteOf verb = \ case
+      Just rng -> " (" <> verb <> ", line " <> Text.pack (show (lineOf rng)) <> ")"
+      Nothing  -> " (" <> verb <> ")"
+    keyName = \ case
       OfficialKey -> "OFFICIAL's"
       OwnKey ""   -> "the anonymous ledger's"
       OwnKey p    -> p <> "'s"

@@ -1,7 +1,15 @@
 -- reader-first.l4 with ROR in place of RAND. An ROR still runs its left side
 -- (possession) over the whole trace before its right side (notice), so the
--- read at 400 cannot see the notice the right side records at 10, and the
--- answer would be wrong: evaluation stops with an error naming the record and
+-- read at 400 does not see the notice the right side records at 10: what the
+-- read saw depends on which side L4 runs first, not on when the notice was
+-- given. Here the ROR's answer would come out the same either way, FULFILLED
+-- by the notice at 10 with only the notice recorded (written `notice` ROR
+-- `possession`, L4 never runs possession at all); it would not if possession
+-- went on to the record its read allows, which is what an alternative does
+-- if it is kept running once the other is fulfilled, as Hvitved's CSL
+-- reduces a disjunction. What becomes of that alternative is not ruled
+-- (NORM-LOG-SPEC N10's condition on lockstep), so L4 refuses the read rather
+-- than answer from it: evaluation stops with an error naming the record and
 -- both sides. (smucclaw/l4-ide#1069)
 
 DECLARE Party IS ONE OF Landlord

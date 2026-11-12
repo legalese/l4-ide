@@ -202,15 +202,16 @@ runLedgerCases :: [(Tree, [Ev])] -> IO [Verdict]
 runLedgerCases = runModule . moduleForLedger
 
 runModule :: Text.Text -> IO [Verdict]
-runModule = runModuleWith apiDefaultPolicy
+runModule = runModuleWith True apiDefaultPolicy
 
--- | 'runModule' under a trace policy. With every @#EVAL@ (and so every
--- @#TRACE@) traced, a @RAND@ runs its operands one after the other, as every
--- @RAND@ did before smucclaw/l4-ide#1069's option A (Note [Operands in step]
--- in "L4.EvaluateLazy.Machine"): that is C1's baseline.
-runModuleWith :: TracePolicy -> Text.Text -> IO [Verdict]
-runModuleWith policy src = do
-  cfg <- resolveEvalConfig (Just fixedNow) policy
+-- | 'runModule' under a trace policy, with a @RAND@'s operands in step or,
+-- with 'False', one after the other, as every @RAND@ ran before
+-- smucclaw/l4-ide#1069's option A (Note [Operands in step] in
+-- "L4.EvaluateLazy.Machine"): that is C1's baseline.
+runModuleWith :: Bool -> TracePolicy -> Text.Text -> IO [Verdict]
+runModuleWith inStep policy src = do
+  cfg0 <- resolveEvalConfig (Just fixedNow) policy
+  let cfg = cfg0 {operandsInStep = inStep}
   case checkWithImports (vfsFromList []) src of
     Left errs -> do
       expectationFailure ("typecheck failed: " <> show errs)
@@ -338,12 +339,20 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
     it "report the same, residuals included, run in step as run one operand after the other, with the ledger and without" do
       for_ [("with the ledger" :: Text.Text, moduleForLedger cs), ("without", moduleFor cs)] \ (label, src) -> do
         inStep <- runModule src
-        oneAfterOther <- runModuleWith oneAfterOtherPolicy src
+        oneAfterOther <- runModuleWith False apiDefaultPolicy src
         (label, length inStep, length oneAfterOther) `shouldBe` (label, length cs, length cs)
         for_ (zip3 [0 :: Int ..] inStep oneAfterOther) \ (n, a, b) ->
           (label, n, a) `shouldBe` (label, n, b)
 
-    it "(the comparison's control: under that policy a RAND really runs one operand after the other)" do
+    it "report the same traced as untraced (every directive traced, as the REPL traces them)" do
+      for_ [("with the ledger" :: Text.Text, moduleForLedger cs), ("without", moduleFor cs)] \ (label, src) -> do
+        untraced <- runModule src
+        traced <- runModuleWith True tracedPolicy src
+        (label, length traced) `shouldBe` (label, length cs)
+        for_ (zip3 [0 :: Int ..] untraced traced) \ (n, a, b) ->
+          (label, n, a) `shouldBe` (label, n, b)
+
+    it "(the comparison's control: with operandsInStep off a RAND really runs one operand after the other, and traced it runs in step)" do
       -- the reader on the left reads at 400 a record the right side makes at
       -- 10: in step it answers; one operand after the other it is refused
       let src = Text.unlines
@@ -360,9 +369,11 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
             , "  PARTY L DOES possession AT 400"
             ]
       inStep <- runModule src
-      oneAfterOther <- runModuleWith oneAfterOtherPolicy src
+      oneAfterOther <- runModuleWith False apiDefaultPolicy src
+      traced <- runModuleWith True tracedPolicy src
       inStep `shouldBe` [Fulfilled]
       map refused oneAfterOther `shouldBe` [True]
+      traced `shouldBe` [Fulfilled]
 
     it "L0: with nobody acting, Hvitved's composition decides the instant and the blamed parties" do
       let quiet = [ (t, [Tick 100]) | (t, _) <- take 120 cs ]
@@ -387,7 +398,8 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
       Breached {vEffective = Just e, vObserved = Just o} -> (n, e <= o) `shouldBe` (n, True)
       _ -> pure ()
   where
-    oneAfterOtherPolicy = replDefaultPolicy defaultGraphVizOptions
+    -- the REPL's policy traces every directive
+    tracedPolicy = replDefaultPolicy defaultGraphVizOptions
     pairs (a : b : rest) = (a, b) : pairs rest
     pairs _              = []
     -- a compound still waiting keeps its operands in the drafter's order,

@@ -8615,7 +8615,20 @@ prettyCheckWarning = \ case
       , "Rename one of the two, so the name means only one thing where you"
       , "write it, and then the keyword can go."
       ]
-  SiblingLedgerRead w ->
+  SiblingLedgerRead w
+    | Just rorSite <- w.unrunRor ->
+    [ opening
+    , ""
+    , "  " <> side w.readerSide <> " reads " <> ledger <> " `" <> w.cell <> "`" <> at w.readVerb w.readSite <> ","
+    , "  and " <> side w.writerSide <> " makes that record" <> at w.writeVerb w.writeSite
+        <> " in a later alternative of the ROR" <> maybe "" (\ rng -> " on line " <> Text.pack (show rng.start.line)) rorSite <> "."
+    , ""
+    , "L4 runs no more of an ROR once an earlier alternative is fulfilled,"
+    , "so a record a later alternative would have made can be missing, whichever side runs first."
+    , "If a read could have seen such a record when the rule runs, evaluation stops with an error."
+    , safe
+    ]
+    | otherwise ->
     [ opening
     , ""
     , "  " <> side w.readerSide <> " reads " <> ledger <> " `" <> w.cell <> "`" <> at w.readVerb w.readSite <> ","

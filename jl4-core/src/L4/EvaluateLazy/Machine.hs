@@ -136,6 +136,7 @@ import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
 import L4.EvaluateLazy.SiblingReads
+import qualified L4.Lint.SiblingReads as Lint
 import L4.EvaluateLazy.Trace (EvalTraceAction (..))
 import L4.Presumption
 import L4.TracePolicy (TracePolicy)
@@ -343,6 +344,9 @@ data LockstepFrame = MkLockstepFrame
     -- @Just (Just e)@ the event @e@, @Just Nothing@ the end of the stream
   , lsTaken   :: !Int
     -- ^ how many events have been handed out
+  , lsHead    :: Maybe (Reference, Reference)
+    -- ^ under an evaluation trace, the event and the rest of the stream while
+    -- the frame forces the event, outside every operand ('lockstepReturn')
   , lsBase    :: DynState
     -- ^ the dynamic state the compound was applied under
   }
@@ -381,6 +385,8 @@ data DynState = MkDynState
   , dyPath     :: OperandPath
   , dyClock    :: Clock
   , dyBehind   :: Int
+  , dyMuted    :: Int
+    -- ^ 'traceMuted': one more than the compound's own while an operand runs
   }
   deriving stock Show
 
@@ -422,6 +428,18 @@ data EvalState =
                                      -- ^ the time of each compound that started while
                                      -- its time was still a thunk, by scope, until it is
                                      -- found evaluated ('siblingCheck')
+    , operandsInStep :: !Bool
+                                     -- ^ smucclaw/l4-ide#1069: run a @RAND@'s operands in
+                                     -- step (Note [Operands in step]). 'False' only to
+                                     -- compare with the order every @RAND@ had before,
+                                     -- one operand over the whole stream and then the
+                                     -- other ('L4.EvaluateLazy.EvalConfig').
+    , traceMuted :: !(IORef Int)
+                                     -- ^ while above 0, 'traceEval' records nothing: an
+                                     -- operand of an in-step compound is running, whose
+                                     -- frames the trace builder cannot nest (Note
+                                     -- [Operands in step]). Saved and restored with the
+                                     -- rest of the dynamic state ('DynState').
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
@@ -710,7 +728,11 @@ traceEval ta = do
   mtr <- asks (.evalTrace)
   case mtr of
     Nothing -> pure ()
-    Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
+    Just tr -> do
+      mref <- asks (.traceMuted)
+      liftIO do
+        muted <- readIORef mref
+        when (muted == 0) (modifyIORef' tr (`DList.snoc` ta))
 
 -----------------------------------------------------------------------------
 -- The deontic step log (LTS-VISUALISER §4.3, amended by §4.9; P2b).
@@ -1606,6 +1628,44 @@ noteClockWHNF = \ case
     liftIO (modifyIORef' sref \ st -> if inCompound st then st {ssClock = At c} else st)
   _ -> pure ()
 
+-- | Every record an @ROR@ alternative the machine did not run could have
+-- made: the @RECORD@s, @COMMIT@s and @NOTIFY@s in its expression or residual,
+-- and in every definition, closure, continuation and argument reachable from
+-- it through the heap, found without forcing anything (an unforced thunk is
+-- read as its expression). Over-approximates, as reachability does: a
+-- record behind a branch the alternative would never take still counts.
+possibleWrites :: Environment -> MaybeEvaluated -> Eval [PossibleWrite]
+possibleWrites env0 alt = do
+  seen <- liftIO (newIORef Set.empty)
+  found <- liftIO (newIORef Set.empty)
+  let goExpr env e = do
+        liftIO $ modifyIORef' found (Set.union (Set.fromList
+          [ MkPossibleWrite official cell site verb | (official, cell, site, verb) <- Lint.writeSitesIn e ]))
+        for_ (Lint.namesIn e) \ u -> for_ (Map.lookup u env) goRef
+      goRef rf = do
+        visited <- liftIO (readIORef seen)
+        unless (Set.member rf.address visited) do
+          liftIO (writeIORef seen (Set.insert rf.address visited))
+          liftIO (readIORef rf.pointer) >>= \ case
+            Unevaluated _ e env  -> goExpr env e
+            WHNFWhen _ v e env   -> goExpr env e >> goVal v
+            WHNF v               -> goVal v
+      goVal v = do
+        case v of
+          ValClosure _ body env -> goExpr env body
+          ValObligation env _ act _ _ followup lest -> do
+            traverse_ (goExpr env) (Lint.actionExprs act)
+            goExpr env followup
+            traverse_ (goExpr env) lest
+          ValROp env _ l r -> for_ [l, r] (either (goExpr env) goVal)
+          ValQuantified env d -> traverse_ (goExpr env) (Lint.deontonExprs d)
+          _ -> pure ()
+        -- the references a value holds (list cells, constructor fields,
+        -- partial applications, an obligation's evaluated parts)
+        traverse_ goRef (toList v)
+  either (goExpr env0) goVal alt
+  Set.toList <$> liftIO (readIORef found)
+
 -- | Back to the operand path and clock a compound was applied under.
 restoreSibling :: OperandPath -> Clock -> Eval ()
 restoreSibling path clock = do
@@ -1646,21 +1706,20 @@ operandLabel side = \ case
 -- as simultaneous with every other, so the check errs towards refusing.
 --
 -- A @RAND@ applied to a time and a stream runs its operands in step
--- ('startLockstep'); an @ROR@ still runs them one after the other, until a
--- ruling says what becomes of the losing alternative's records (N10's
--- condition on option A), and so does a @RAND@ under an evaluation trace,
--- whose builder reads the frame pushes and pops as one nested tree.
+-- ('lockstepNext'), with or without an evaluation trace; an @ROR@ still runs
+-- them one after the other, until a ruling says what becomes of the losing
+-- alternative's records (N10's condition on option A).
 startCompound :: Environment -> RBinOp -> MaybeEvaluated -> MaybeEvaluated -> [Reference] -> Maybe (Type' Resolved) -> Machine Config
 startCompound env op rexpr1 rexpr2 rs appType = do
   clock <- case rs of
     t : _ -> peekClock t
     []    -> pure Nothing
-  tracing <- asks (isJust . (.evalTrace))
+  stepOn <- asks (.operandsInStep)
   let opText = case op of
         ValRAnd -> "RAND"
         ValROr  -> "ROR"
       inStep = case (op, rs) of
-        (ValRAnd, [_, _]) -> not tracing
+        (ValRAnd, [_, _]) -> stepOn
         _                 -> False
   sref <- asks (.siblings)
   outer <- liftIO (readIORef sref)
@@ -1683,7 +1742,7 @@ startCompound env op rexpr1 rexpr2 rs appType = do
       lockstepNext MkLockstepFrame
         { lsGate = scope, lsScope = scope, lsOp = op, lsEnv = env, lsTime = time, lsType = appType
         , lsStream = events, lsSlots = [SlotPending rexpr1, SlotPending rexpr2]
-        , lsRunning = Nothing, lsRound = [0, 1], lsCell = Nothing, lsTaken = 0
+        , lsRunning = Nothing, lsRound = [0, 1], lsCell = Nothing, lsTaken = 0, lsHead = Nothing
         , lsBase = dyn0 {dyPath = outerPath, dyClock = outer.ssClock} }
     _ -> do
       -- make sure to reassemble the operation after returning
@@ -1740,10 +1799,18 @@ startCompound env op rexpr1 rexpr2 rs appType = do
 -- as the trace orders them.
 --
 -- Not in step, and so left to the check ('startCompound'): an @ROR@, whose
--- losing alternative's records are not ruled (N10's own condition on A), and
--- a @RAND@ evaluated while the machine keeps an evaluation trace, whose
--- builder records each operand's frames as one nested push and pop. A
+-- losing alternative's records are not ruled (N10's own condition on A). A
 -- barrier's members run in its own loop ('barrierNext'), and make no records.
+--
+-- Under an evaluation trace (@#EVALTRACE@, the REPL, a service request for
+-- a full trace) a @RAND@ runs in step too, so every surface gives one
+-- answer. The trace builder ("L4.EvaluateLazy.Trace") reads the frame pushes
+-- and pops as one nested tree, and a paused operand's frames leave and come
+-- back unpopped, so the trace records nothing while an operand runs
+-- ('traceMuted', saved in 'DynState'): the compound appears in the trace with
+-- its stream and its value, and without its operands' steps. Before
+-- 2026-11-13 a traced @RAND@ ran one operand after the other, which the
+-- sibling-read check refused where in step answers.
 -- An @ROR@'s right operand and a barrier's later members and join go over
 -- events an in-step compound around them has already taken, so their
 -- accesses carry no count for that compound ('takenOn', 'RestoreBehind').
@@ -1781,7 +1848,8 @@ captureDyn = do
   tc <- getTemporalContext
   relook <- asks (.deonticLog) >>= traverse \ l -> liftIO (readIORef l.dlRelookScope)
   st <- readEvalRef (.siblings)
-  pure (MkDynState party tc relook st.ssPath st.ssClock st.ssBehind)
+  muted <- readEvalRef (.traceMuted)
+  pure (MkDynState party tc relook st.ssPath st.ssClock st.ssBehind muted)
 
 -- | Put a dynamic state back.
 setDyn :: DynState -> Eval ()
@@ -1791,6 +1859,8 @@ setDyn d = do
   asks (.deonticLog) >>= traverse_ \ l -> for_ d.dyRelook (liftIO . writeIORef l.dlRelookScope)
   restoreSibling d.dyPath d.dyClock
   restoreBehind d.dyBehind
+  mref <- asks (.traceMuted)
+  liftIO (writeIORef mref d.dyMuted)
 
 -- | The next step of an in-step compound: start or resume the next operand
 -- of the round; when the round is over, take the next cell of the stream if
@@ -1801,13 +1871,15 @@ lockstepNext ls = case ls.lsRound of
     let running = ls {lsRound = is, lsRunning = Just i, lsSlots = setSlot i SlotRunning ls.lsSlots}
     case drop i ls.lsSlots of
       SlotPending rexpr : _ -> do
-        gate <- mintGate ls.lsGate
         -- the compound's own time is the operand's first clock, as it was for
         -- the right operand before ('RBinOp1'); an earlier operand may have
         -- forced it by now
         clock <- peekClock ls.lsTime
         let start = ls.lsBase
-        setDyn start {dyPath = (ls.lsScope, i) : start.dyPath, dyClock = maybe (StartOf ls.lsScope) At clock}
+        -- the operand's dynamic state goes in first, so that the trace is
+        -- muted for everything the operand does, its gate and frames included
+        setDyn start {dyPath = (ls.lsScope, i) : start.dyPath, dyClock = maybe (StartOf ls.lsScope) At clock, dyMuted = start.dyMuted + 1}
+        gate <- mintGate ls.lsGate
         pushFrame (Lockstep running)
         pushFrame (App1 [ls.lsTime, gate] ls.lsType)
         -- R-Q7B: the operand is handed off here, exactly as a HENCE's value
@@ -1815,13 +1887,13 @@ lockstepNext ls = case ls.lsRound of
         operandHandoff ls.lsEnv rexpr
         maybeEvaluate ls.lsEnv rexpr
       SlotPaused po : _ -> do
+        setDyn po.poDyn
         cell <- case ls.lsCell of
           Just (Just e) -> ValCons e <$> mintGate ls.lsGate
           _             -> pure ValNil
         updateThunkToWHNF po.poGate cell
         pushFrame (Lockstep running)
         traverse_ pushFrame (reverse po.poFrames)
-        setDyn po.poDyn
         continueBackward cell
       _ -> lockstepNext ls {lsRound = is}
   []
@@ -1841,16 +1913,29 @@ lockstepNext ls = case ls.lsRound of
 lockstepReturn :: LockstepFrame -> WHNF -> Machine Config
 lockstepReturn ls val = case ls.lsRunning of
   Just i -> lockstepNext ls {lsRunning = Nothing, lsSlots = setSlot i (SlotDone val) ls.lsSlots}
+  Nothing | Just (e, rest) <- ls.lsHead -> handOut e rest
   Nothing -> case val of
     ValCons e rest -> do
-      let n = ls.lsTaken + 1
-      sref <- asks (.siblings)
-      liftIO (modifyIORef' sref (setTaken ls.lsScope n))
-      lockstepNext ls {lsStream = rest, lsCell = Just (Just e), lsTaken = n, lsRound = pausedSlots ls.lsSlots}
+      tracing <- asks (isJust . (.evalTrace))
+      if tracing
+        then do
+          -- the operands run with the trace muted (Note [Operands in step]),
+          -- so the event is forced here, where the trace records it beside
+          -- the stream it came from; an operand forces it anyway when it
+          -- takes it, so this moves the force and adds none
+          pushFrame (Lockstep ls {lsHead = Just (e, rest)})
+          continueRef e
+        else handOut e rest
     ValNil ->
       lockstepNext ls {lsCell = Just Nothing, lsRound = pausedSlots ls.lsSlots}
     _ -> internalException $ RuntimeTypeError $
       "expected a list of events but found: " <> prettyLayout val
+  where
+    handOut e rest = do
+      let n = ls.lsTaken + 1
+      sref <- asks (.siblings)
+      liftIO (modifyIORef' sref (setTaken ls.lsScope n))
+      lockstepNext ls {lsHead = Nothing, lsStream = rest, lsCell = Just (Just e), lsTaken = n, lsRound = pausedSlots ls.lsSlots}
 
 -- | An operand forced the gate of the compound numbered @g@: store it, with
 -- the frames it pushed above the compound's frame, and go on.
@@ -3667,6 +3752,16 @@ backwardContractFrame val = \ case
       -- fulfilled LEFT operand is unreachable because of this short-circuit,
       -- so the step is logged here.
       joinedStep op JoinFulfilled (Just LeftSide) False
+      -- smucclaw/l4-ide#1069: the right alternative is never run, so a
+      -- record it would have made is never compared with a read; written the
+      -- other way round it would have run first. Hand the check what it can
+      -- make, from the ROR's start on ('registerUnrun').
+      clock' <- case (clock, args) of
+        (Nothing, t : _) -> peekClock t
+        _                -> pure clock
+      writes <- possibleWrites env rexpr2
+      unless (null writes) $
+        siblingCheck (registerUnrun scope outerPath (maybe (StartOf scope) At clock') writes)
       continueBackward ValFulfilled
 
   RBinOp1 MkRBinOp1 {..} -> do

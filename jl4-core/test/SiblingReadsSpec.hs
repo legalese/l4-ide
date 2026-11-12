@@ -14,9 +14,12 @@
 -- sides take the SAME event, where the left side's turn comes before the
 -- right's and that is not the order of their instants, or at one instant,
 -- where the trace gives them no order (assumed, not ruled). An @ROR@ still
--- runs its operands one after the other, so it is still refused where a read
--- depended on that order, and it is the only compound the checker still
--- warns about.
+-- runs its operands one after the other, so it is still refused where what a
+-- read saw depended on that order; and it never runs its right operand once
+-- the left is fulfilled, so a read on another side that the unrun
+-- alternative's record could have answered is refused too. The checker warns
+-- about an @ROR@'s operands, and about a @RAND@ or @EVERY@ one side of which
+-- makes a record in such an alternative that another side reads.
 --
 -- The operands that do NOT read each other's records, for which nothing may
 -- change, are "BreachClocksSpec"'s C1, which also runs each tree in step and
@@ -24,6 +27,7 @@
 module SiblingReadsSpec (spec) where
 
 import Data.Foldable (for_)
+import Data.Maybe (isJust)
 import qualified Data.Text as Text
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import Test.Hspec
@@ -34,7 +38,8 @@ import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Lint.SiblingReads (SiblingOperand (..), SiblingRead (..))
 import L4.Print (prettyLayout)
-import L4.TracePolicy (apiDefaultPolicy)
+import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
+import L4.TracePolicy (TracePolicy, apiDefaultPolicy, replDefaultPolicy)
 import L4.TypeCheck (prettyCheckError)
 import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), CheckWarning (..))
 
@@ -67,9 +72,13 @@ checked src = case checkWithImports (vfsFromList []) src of
   Right r   -> pure r
 
 run :: Text.Text -> IO [Outcome]
-run src = do
+run = runWith apiDefaultPolicy
+
+-- | 'run' under a trace policy: the REPL's traces every directive.
+runWith :: TracePolicy -> Text.Text -> IO [Outcome]
+runWith policy src = do
   r <- checked src
-  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  cfg <- resolveEvalConfig (Just fixedNow) policy
   (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
   pure (map outcomeOf results)
   where
@@ -436,6 +445,84 @@ rorRescan compound = Text.unlines
   , "    PARTY W DOES go AT 1"
   ]
 
+-- | An ROR inside a RAND. @b@ records @x@ at 10; @a@ is fulfilled at 20; @c@
+-- reads @x@ at 30. Run @a ROR b@, L4 never runs @b@, so @c@ cannot see the
+-- record; run @b ROR a@, it does. (A review probe of 2026-11-13.)
+rorInRand :: Text.Text -> Text.Text
+rorInRand compound = Text.unlines
+  [ "DECLARE Party IS ONE OF P, Q, R"
+  , "DECLARE Act IS ONE OF actA, actB, actZ, actR"
+  , "GIVETH A DEONTIC Party Act"
+  , "`a` MEANS PARTY P MUST actA WITHIN 100"
+  , "GIVETH A DEONTIC Party Act"
+  , "`b` MEANS PARTY Q MAY actB WITHIN 100 HENCE COMMIT `x` IS TRUE HENCE `z` LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`z` MEANS PARTY Q MUST actZ WITHIN 100"
+  , "GIVETH A DEONTIC Party Act"
+  , "`c` MEANS PARTY R MUST actR PROVIDED (RECALL OFFICIAL's `x`) EQUALS JUST TRUE WITHIN 40 HENCE COMMIT `c saw x` IS TRUE HENCE FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`whole` MEANS " <> compound
+  , "#TRACE `whole` AT 0 WITH"
+  , "    PARTY Q DOES actB AT 10"
+  , "    PARTY P DOES actA AT 20"
+  , "    PARTY R DOES actR AT 30"
+  , "    PARTY P DOES actA AT 50"
+  ]
+
+-- | An ROR whose first alternative reads a cell its second can record: @reads@
+-- reads @x@ at 10 and is fulfilled; @writes@ would record @x@ at 5.
+rorSelf :: Text.Text -> Text.Text
+rorSelf compound = Text.unlines
+  [ "DECLARE Party IS ONE OF P, Q"
+  , "DECLARE Act IS ONE OF go, w"
+  , "GIVETH A DEONTIC Party Act"
+  , "`reads` MEANS PARTY P MUST go PROVIDED (RECALL OFFICIAL's `x`) EQUALS NOTHING WITHIN 100"
+  , "GIVETH A DEONTIC Party Act"
+  , "`writes` MEANS PARTY Q MAY w WITHIN 100 HENCE COMMIT `x` IS TRUE HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`whole` MEANS " <> compound
+  , "#TRACE `whole` AT 0 WITH"
+  , "    PARTY Q DOES w AT 5"
+  , "    PARTY P DOES go AT 10"
+  ]
+
+-- | An ROR armed at 20, after the other side of the RAND read the cell at 5.
+rorLate :: Text.Text -> Text.Text
+rorLate compound = Text.unlines
+  [ "DECLARE Party IS ONE OF P, Q, R"
+  , "DECLARE Act IS ONE OF go, actA, actB, actR"
+  , "GIVETH A DEONTIC Party Act"
+  , "`c` MEANS PARTY R MUST actR PROVIDED (RECALL OFFICIAL's `x`) EQUALS NOTHING WITHIN 100"
+  , "GIVETH A DEONTIC Party Act"
+  , "`a` MEANS PARTY P MUST actA WITHIN 100"
+  , "GIVETH A DEONTIC Party Act"
+  , "`b` MEANS PARTY Q MAY actB WITHIN 100 HENCE COMMIT `x` IS TRUE HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`armer` MEANS PARTY P MUST go WITHIN 100 HENCE (`a` ROR `b`)"
+  , "GIVETH A DEONTIC Party Act"
+  , "`whole` MEANS " <> compound
+  , "#TRACE `whole` AT 0 WITH"
+  , "    PARTY R DOES actR AT 5"
+  , "    PARTY P DOES go AT 20"
+  , "    PARTY P DOES actA AT 30"
+  ]
+
+-- | Two sides of a RAND record one cell while taking one event, and nothing
+-- inside the RAND reads it.
+twoWriters :: Text.Text -> Text.Text
+twoWriters compound = Text.unlines
+  [ "DECLARE Party IS ONE OF P"
+  , "DECLARE Act IS ONE OF go"
+  , "GIVETH A DEONTIC Party Act"
+  , "`w1` MEANS PARTY P MAY go WITHIN 100 HENCE COMMIT `x` IS 1 HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`w2` MEANS PARTY P MAY go WITHIN 100 HENCE COMMIT `x` IS 2 HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`whole` MEANS " <> compound
+  , "#TRACE `whole` AT 0 WITH"
+  , "    PARTY P DOES go AT 10"
+  ]
+
 spec :: Spec
 spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)" do
   describe "a RAND's operands in step" do
@@ -540,12 +627,56 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
           [o] -> o `shouldMention` ["read each other's records", "OFFICIAL's `x`", "at 1"]
           _ -> expectationFailure ("expected one directive, got " <> show outs)
 
+    it "runs in step under an evaluation trace too, so a traced run gives the untraced answer" do
+      for_ ["`notice` OP `possession`", "`possession` OP `notice`"] \ order -> do
+        traced <- runWith (replDefaultPolicy defaultGraphVizOptions) (notice "RAND" order noticeThenClaim)
+        untraced <- run (notice "RAND" order noticeThenClaim)
+        (order, map isRefused traced) `shouldBe` (order, [False])
+        (order, map ledgerOf traced) `shouldBe` (order, map ledgerOf untraced)
+        (order, concatMap (entriesOf "possession sought") traced) `shouldBe` (order, ["COMMIT `possession sought` IS TRUE   [party=Landlord, source=COMMIT, at=2026-01-01T00:00:00Z]"])
+
+    it "leaves two sides' records of one cell, made at one event, in the order the sides are written (not refused; not promised)" do
+      ab <- run (twoWriters "`w1` RAND `w2`")
+      ba <- run (twoWriters "`w2` RAND `w1`")
+      (map isRefused ab, map isRefused ba) `shouldBe` ([False], [False])
+      map (Text.takeWhile (/= '[')) (concatMap (entriesOf "x") ab) `shouldBe` ["COMMIT `x` IS 1   ", "COMMIT `x` IS 2   "]
+      map (Text.takeWhile (/= '[')) (concatMap (entriesOf "x") ba) `shouldBe` ["COMMIT `x` IS 2   ", "COMMIT `x` IS 1   "]
+
   describe "an ROR, still run one operand after the other" do
     it "refuses an ROR whose left side read a record its right side makes earlier" do
       outs <- run (notice "ROR" "`possession` OP `notice`" noticeThenClaim)
       case outs of
-        [o] -> o `shouldMention` ["read each other's records", "an ROR", "over the whole trace"]
+        [o] -> o `shouldMention` ["read each other's records", "an ROR", "over the whole trace", "what the read saw depends on which side L4 runs first", "not settled"]
         _ -> expectationFailure ("expected one directive, got " <> show outs)
+
+    it "refuses a read on the other side of a RAND that the ROR's unrun alternative could have answered, and answers the order that runs it" do
+      refused <- run (rorInRand "(`a` ROR `b`) RAND `c`")
+      answered <- run (rorInRand "(`b` ROR `a`) RAND `c`")
+      case (refused, answered) of
+        ([r], [a']) -> do
+          r `shouldMention` ["read each other's records", "`c` read OFFICIAL's `x` at 30", "`b`", "never ran", "`a`", "COMMIT, line 6"]
+          isRefused a' `shouldBe` False
+          map (Text.takeWhile (/= '[')) (entriesOf "x" a' <> entriesOf "c saw x" a') `shouldBe` ["COMMIT `x` IS TRUE   ", "COMMIT `c saw x` IS TRUE   "]
+        _ -> expectationFailure ("expected one directive each, got " <> show (refused, answered))
+      -- the reader on the left of the RAND, the ROR on the right
+      swapped <- run (rorInRand "`c` RAND (`a` ROR `b`)")
+      map isRefused swapped `shouldBe` [True]
+
+    it "refuses a read in the fulfilled alternative that the unrun one could have answered" do
+      refused <- run (rorSelf "`reads` ROR `writes`")
+      answered <- run (rorSelf "`writes` ROR `reads`")
+      case (refused, answered) of
+        ([r], [a']) -> do
+          r `shouldMention` ["read each other's records", "`reads` read OFFICIAL's `x` at 10", "`writes`", "never ran"]
+          map (Text.takeWhile (/= '[')) (entriesOf "x" a') `shouldBe` ["COMMIT `x` IS TRUE   "]
+        _ -> expectationFailure ("expected one directive each, got " <> show (refused, answered))
+
+    it "does not refuse a read made before the ROR started, nor an unrun alternative whose record nobody reads" do
+      for_ ["`c` RAND `armer`", "`armer` RAND `c`"] \ compound -> do
+        outs <- run (rorLate compound)
+        (compound, map isRefused outs) `shouldBe` (compound, [False])
+      outs <- run (notice "ROR" "`notice` OP `possession`" noticeThenClaim)
+      map isRefused outs `shouldBe` [False]
 
   describe "the check-time warning" do
     it "warns on an ROR whose operands can reach a read and a write of one cell" do
@@ -555,7 +686,17 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
       ts <- warningTexts (notice "ROR" "`possession` OP `notice`" noticeThenClaim)
       ts `shouldSatisfy` all ("may read each other's records" `Text.isInfixOf`)
 
-    it "no longer warns on a RAND or an EVERY, whose operands run in step" do
+    it "warns on a RAND one side of which makes, in an ROR's later alternative, a record the other side reads" do
+      ws <- warnings (rorInRand "(`a` ROR `b`) RAND `c`")
+      [ (w.op, w.cell, prettyLayout <$> w.readerSide.rule, isJust w.unrunRor) | w <- ws ]
+        `shouldBe` [("RAND", "x", Just "c", True)]
+      ts <- warningTexts (rorInRand "(`a` ROR `b`) RAND `c`")
+      ts `shouldSatisfy` all ("later alternative of the ROR" `Text.isInfixOf`)
+      -- the alternative that makes the record comes first, so it always runs
+      none <- warnings (rorInRand "(`b` ROR `a`) RAND `c`")
+      none `shouldBe` []
+
+    it "does not warn on a plain RAND or EVERY, whose operands run in step" do
       a <- warnings (dinner "`Alice's evening` RAND `Bob's evening`")
       b <- warnings (fork "Alice, Bob")
       c <- warnings (distributive "Alice, Bob")
