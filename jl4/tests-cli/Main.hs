@@ -600,10 +600,11 @@ renderLedgerWriteOperand :: FilePath
 renderLedgerWriteOperand = fixtureDir </> "render-ledger-write-operand.l4"
 
 -- Which rule a HENCE or LEST belongs to (smucclaw/l4-ide#1068).
-lestLayoutRepro, lestLayoutFixture, lestLayoutHanging :: FilePath
+lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest :: FilePath
 lestLayoutRepro = fixtureDir </> "lest-layout-1068.l4"
 lestLayoutFixture = fixtureDir </> "lest-layout.l4"
 lestLayoutHanging = fixtureDir </> "lest-layout-hanging.l4"
+lestLayoutHenceAfterLest = fixtureDir </> "lest-layout-hence-after-lest.l4"
 
 -- Library sentences at a call site, and library aliases used at two types.
 nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting :: FilePath
@@ -772,7 +773,7 @@ coreFixtures =
   , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
   , nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
   , slotScope, slotScopeSentence, renderHoleAndClause, renderLedgerWriteOperand
-  , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging
+  , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest
   , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
@@ -4739,6 +4740,12 @@ spec bin = do
       code `shouldBe` ExitSuccess
       unwords (words (filter (/= '\r') sout)) `shouldSatisfy`
         ("surpassed the deadline of party Seller who had to do obligatory action MUST delivery" `isInfixOf`)
+
+    it "refuses a HENCE at the outer rule's clauses after its LEST, naming the rule" $ do
+      Output code _ serr <- runL4 bin ["check", lestLayoutHenceAfterLest]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This HENCE lines up with the clauses of the rule that starts with PARTY at line 8, column 3. It comes after that rule's LEST. Write HENCE before LEST." `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

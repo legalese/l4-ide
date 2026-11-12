@@ -13,6 +13,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Layout and syntax**
 
 - [Incorrect indentation](#incorrect-indentation)
+- [A HENCE or LEST for a rule that already has one](#a-hence-or-lest-for-a-rule-that-already-has-one)
 - [IF without ELSE](#if-without-else)
 - [Arguments on the lines below a function](#arguments-on-the-lines-below-a-function)
 - [Field access as an argument](#field-access-as-an-argument)
@@ -130,6 +131,46 @@ result a b c MEANS
 ```
 
 BRANCH takes the first condition that is TRUE, and OTHERWISE covers the rest. See [BRANCH](../control-flow/BRANCH.md).
+
+---
+
+### A HENCE or LEST for a rule that already has one
+
+**Error:** `This LEST lines up with the clauses of the rule that starts with PARTY at line 12, column 5. That rule already has a LEST, and a rule has one.`
+
+Which rule a `HENCE` or `LEST` belongs to is decided by its column (see [Which rule a HENCE or LEST belongs to](../regulative/consequences.md#which-rule-a-hence-or-lest-belongs-to)).
+When that rule already has one, L4 refuses it rather than give it to another rule.
+The message names the rule and says why the keyword is that rule's: it lines up with the rule's clauses, or it is right of the clauses of the rule that one is nested in.
+
+```l4
+DECLARE Party IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  deliver
+  pay HAS amount IS A NUMBER
+
+GIVETH A DEONTIC Party Action
+`sale` MEANS
+  PARTY Seller
+  MUST deliver
+  WITHIN 3
+  HENCE
+    PARTY Buyer
+    MUST pay 100
+    WITHIN 7
+    LEST BREACH BY Buyer
+    LEST BREACH BY Seller
+```
+
+The second `LEST` lines up with the Buyer's clauses, and the Buyer's rule already has a `LEST`.
+The message goes on: `To give it to the rule that one is nested in, write it at column 3, in line with that rule's clauses.`
+If it is the Seller's, do that:
+
+```l4
+    LEST BREACH BY Buyer
+  LEST BREACH BY Seller
+```
+
+A second `HENCE` is refused the same way, and so is a `HENCE` written after the rule's `LEST`, with `It comes after that rule's LEST. Write HENCE before LEST.`
 
 ---
 

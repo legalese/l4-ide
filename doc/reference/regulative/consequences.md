@@ -396,6 +396,9 @@ Rule 1 comes first, so when the nested rule's clauses are at the same column as 
 To give it to the outer rule, put the nested rule in brackets.
 Brackets end a rule outright, as in `HENCE (PARTY Buyer MUST pay 100 WITHIN 7)`, and a rule inside brackets competes only with the rules inside the same brackets.
 
+**What is refused.** A `HENCE` or `LEST` that belongs to a rule by the steps above, when that rule already has one (a second `LEST`, a second `HENCE`, or a `HENCE` after the `LEST`), is refused with an error that names the rule, rather than given to another rule.
+`HENCE` comes before `LEST`.
+
 **What is not placed this way.** Only the clauses of the rule a nested rule is written under count, not those of rules further out.
 In a layout where a rule two levels out has its clauses right of the rule one level out, a `HENCE` or `LEST` that lines up with the rule two levels out can stay with the innermost rule, with no error; brackets settle it.
 A rule's `AFTER`, `WITHIN` and `BEFORE` come before its `HENCE`.
@@ -406,6 +409,8 @@ When rules are combined with `RAND` or `ROR` under a `HENCE` or `LEST`, put each
 Earlier versions of L4 gave a `HENCE` or `LEST` written after a nested rule to the innermost rule still open that had that slot free, whatever the keyword's column, as long as the word after it sat further right than that rule's `PARTY` ([smucclaw/l4-ide#1068](https://github.com/smucclaw/l4-ide/issues/1068)).
 So a `LEST` written at the outer rule's clauses could become the nested rule's, with no error, and a `HENCE` written there after the outer rule's `LEST` became the nested rule's `HENCE`.
 A contract written that way now reads as its layout shows.
+Some layouts that earlier versions accepted are now refused, by the paragraph above: a second `LEST` or `HENCE`, or a `HENCE` after a `LEST`, written where the column points at a rule that already has one.
+Earlier versions gave such a keyword to another rule, with no error.
 
 ### When the next clock starts
 
