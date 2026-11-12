@@ -503,6 +503,7 @@ or it is not discharged.
 **Built 2026-10-30 in legalese/l4-ide#784 (draft, not merged), as a design: the gate now calls the real emitted scope; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`).**
 `l4 export catala` replaces the grid of each ladder with `#[test]` scopes that call the emitted scope at witness inputs (up to eight per realisable combination of its atoms) and expect L4's value there; z3 only proves the other combinations impossible, or finds a witness the fixed candidates miss.
 The grid's cap of 8 does not bind a gated ladder. The measurements (all goldens pass; a flipped consequence that the grid passes now fails; a nine-atom ladder gated) are in CATALA-EXPORT-SPEC §8.4's discharge note, which is the record.
+The conditions the gate enumerates are the leaves of the ladder's rungs, so `a OR b` is two; that criterion, its limits and its fallback to rung level are in the same section of CATALA-EXPORT-SPEC.
 
 ## Deferred obligations
 

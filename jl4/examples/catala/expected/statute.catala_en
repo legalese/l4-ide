@@ -29,72 +29,100 @@ declaration scope Allowance:
   input h content Household
   output allowance content decimal
 
-#[description = "Witness 1 for `qualifies`: p_0 FALSE, p_1 FALSE."]
+#[description = "Witness 1 for `qualifies`: p_0 FALSE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness1:
   output result content boolean
 
-#[description = "Witness 2 for `qualifies`: p_0 FALSE, p_1 FALSE."]
+#[description = "Witness 2 for `qualifies`: p_0 FALSE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness2:
   output result content boolean
 
-#[description = "Witness 3 for `qualifies`: p_0 FALSE, p_1 FALSE."]
+#[description = "Witness 3 for `qualifies`: p_0 FALSE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness3:
   output result content boolean
 
-#[description = "Witness 4 for `qualifies`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 4 for `qualifies`: p_0 TRUE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness4:
   output result content boolean
 
-#[description = "Witness 5 for `qualifies`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 5 for `qualifies`: p_0 TRUE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness5:
   output result content boolean
 
-#[description = "Witness 6 for `qualifies`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 6 for `qualifies`: p_0 TRUE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness6:
   output result content boolean
 
-#[description = "Witness 7 for `qualifies`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 7 for `qualifies`: p_0 TRUE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness7:
   output result content boolean
 
-#[description = "Witness 8 for `qualifies`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 8 for `qualifies`: p_0 TRUE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness8:
   output result content boolean
 
-#[description = "Witness 9 for `qualifies`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 9 for `qualifies`: p_0 TRUE, p_1 FALSE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness9:
   output result content boolean
 
-#[description = "Witness 10 for `qualifies`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 10 for `qualifies`: p_0 FALSE, p_1 TRUE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness10:
   output result content boolean
 
-#[description = "Witness 11 for `qualifies`: p_0 TRUE, p_1 FALSE."]
+#[description = "Witness 11 for `qualifies`: p_0 FALSE, p_1 TRUE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness11:
   output result content boolean
 
-#[description = "Witness 12 for `qualifies`: p_0 FALSE, p_1 TRUE."]
+#[description = "Witness 12 for `qualifies`: p_0 FALSE, p_1 TRUE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness12:
   output result content boolean
 
-#[description = "Witness 13 for `qualifies`: p_0 TRUE, p_1 TRUE."]
+#[description = "Witness 13 for `qualifies`: p_0 TRUE, p_1 TRUE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness13:
   output result content boolean
 
-#[description = "Witness 14 for `qualifies`: p_0 TRUE, p_1 TRUE."]
+#[description = "Witness 14 for `qualifies`: p_0 TRUE, p_1 TRUE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness14:
   output result content boolean
 
-#[description = "Witness 15 for `qualifies`: p_0 TRUE, p_1 TRUE."]
+#[description = "Witness 15 for `qualifies`: p_0 TRUE, p_1 TRUE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness15:
   output result content boolean
 
-#[description = "Witness 16 for `qualifies`: p_0 TRUE, p_1 TRUE."]
+#[description = "Witness 16 for `qualifies`: p_0 TRUE, p_1 TRUE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness16:
   output result content boolean
 
-#[description = "Witness 17 for `qualifies`: p_0 TRUE, p_1 TRUE."]
+#[description = "Witness 17 for `qualifies`: p_0 TRUE, p_1 TRUE, p_2 FALSE."]
 #[test] declaration scope QualifiesWitness17:
+  output result content boolean
+
+#[description = "Witness 18 for `qualifies`: p_0 TRUE, p_1 TRUE, p_2 FALSE."]
+#[test] declaration scope QualifiesWitness18:
+  output result content boolean
+
+#[description = "Witness 19 for `qualifies`: p_0 FALSE, p_1 FALSE, p_2 TRUE."]
+#[test] declaration scope QualifiesWitness19:
+  output result content boolean
+
+#[description = "Witness 20 for `qualifies`: p_0 TRUE, p_1 FALSE, p_2 TRUE."]
+#[test] declaration scope QualifiesWitness20:
+  output result content boolean
+
+#[description = "Witness 21 for `qualifies`: p_0 TRUE, p_1 FALSE, p_2 TRUE."]
+#[test] declaration scope QualifiesWitness21:
+  output result content boolean
+
+#[description = "Witness 22 for `qualifies`: p_0 FALSE, p_1 TRUE, p_2 TRUE."]
+#[test] declaration scope QualifiesWitness22:
+  output result content boolean
+
+#[description = "Witness 23 for `qualifies`: p_0 TRUE, p_1 TRUE, p_2 TRUE."]
+#[test] declaration scope QualifiesWitness23:
+  output result content boolean
+
+#[description = "Witness 24 for `qualifies`: p_0 TRUE, p_1 TRUE, p_2 TRUE."]
+#[test] declaration scope QualifiesWitness24:
   output result content boolean
 
 #[description = "Witness 1 for `allowance`: p_0 FALSE, p_1 FALSE."]
@@ -157,23 +185,23 @@ declaration scope Allowance:
 #[test] declaration scope AllowanceWitness15:
   output result content decimal
 
-#[description = "Witness 16 for `allowance`: p_0 FALSE, p_1 TRUE."]
+#[description = "Witness 16 for `allowance`: p_0 TRUE, p_1 TRUE."]
 #[test] declaration scope AllowanceWitness16:
   output result content decimal
 
-#[description = "Witness 17 for `allowance`: p_0 FALSE, p_1 TRUE."]
+#[description = "Witness 17 for `allowance`: p_0 TRUE, p_1 TRUE."]
 #[test] declaration scope AllowanceWitness17:
   output result content decimal
 
-#[description = "Witness 18 for `allowance`: p_0 FALSE, p_1 TRUE."]
+#[description = "Witness 18 for `allowance`: p_0 TRUE, p_1 TRUE."]
 #[test] declaration scope AllowanceWitness18:
   output result content decimal
 
-#[description = "Witness 19 for `allowance`: p_0 FALSE, p_1 TRUE."]
+#[description = "Witness 19 for `allowance`: p_0 TRUE, p_1 TRUE."]
 #[test] declaration scope AllowanceWitness19:
   output result content decimal
 
-#[description = "Witness 20 for `allowance`: p_0 FALSE, p_1 TRUE."]
+#[description = "Witness 20 for `allowance`: p_0 TRUE, p_1 TRUE."]
 #[test] declaration scope AllowanceWitness20:
   output result content decimal
 
@@ -266,7 +294,7 @@ scope Allowance:
 
 The rule of `qualifies` is emitted as an exception ladder (Mode B). Each test scope below
 calls that scope, not a copy of it, at one concrete input, and expects the value
-L4's own evaluator computed there. The inputs are witnesses: each makes the 2
+L4's own evaluator computed there. The inputs are witnesses: each makes the 3
 atomic conditions of the ladder take one combination of truth values. They are drawn
 from a fixed candidate set (each number the conditions mention, one either side
 of it, zero, both truth values, every constructor), and every combination some
@@ -277,26 +305,34 @@ including one exactly at a number a condition compares with, fails `clerk test`
 
 The atoms, as L4 writes them:
 
-- `p_0` is `` "Subject to subsection (2), a household qualifies for the allowance if" AND ((`is a priority household` OF h) OR h's hasDependants) ``
-- `p_1` is `(h's weeklyIncome) GREATER THAN 400`
+- `p_0` is `` `is a priority household` OF h ``
+- `p_1` is `h's hasDependants`
+- `p_2` is `(h's weeklyIncome) GREATER THAN 400`
 
-- Witness 1 (FF): `Household OF other, 0, FALSE`; L4 computes `FALSE`.
-- Witness 2 (FF): `Household OF other, 400, FALSE`; L4 computes `FALSE`.
-- Witness 3 (FF): `Household OF other, 399, FALSE`; L4 computes `FALSE`.
-- Witness 4 (TF): `Household OF pensioner, 0, TRUE`; L4 computes `TRUE`.
-- Witness 5 (TF): `Household OF pensioner, 0, FALSE`; L4 computes `TRUE`.
-- Witness 6 (TF): `Household OF pensioner, 400, TRUE`; L4 computes `TRUE`.
-- Witness 7 (TF): `Household OF pensioner, 400, FALSE`; L4 computes `TRUE`.
-- Witness 8 (TF): `Household OF pensioner, 399, TRUE`; L4 computes `TRUE`.
-- Witness 9 (TF): `Household OF pensioner, 399, FALSE`; L4 computes `TRUE`.
-- Witness 10 (TF): `Household OF carer, 0, TRUE`; L4 computes `TRUE`.
-- Witness 11 (TF): `Household OF carer, 0, FALSE`; L4 computes `TRUE`.
-- Witness 12 (FT): `Household OF other, 401, FALSE`; L4 computes `FALSE`.
-- Witness 13 (TT): `Household OF pensioner, 401, TRUE`; L4 computes `FALSE`.
-- Witness 14 (TT): `Household OF pensioner, 401, FALSE`; L4 computes `FALSE`.
-- Witness 15 (TT): `Household OF carer, 401, TRUE`; L4 computes `FALSE`.
-- Witness 16 (TT): `Household OF carer, 401, FALSE`; L4 computes `FALSE`.
-- Witness 17 (TT): `Household OF other, 401, TRUE`; L4 computes `FALSE`.
+- Witness 1 (FFF): `Household OF other, 0, FALSE`; L4 computes `FALSE`.
+- Witness 2 (FFF): `Household OF other, 400, FALSE`; L4 computes `FALSE`.
+- Witness 3 (FFF): `Household OF other, 399, FALSE`; L4 computes `FALSE`.
+- Witness 4 (TFF): `Household OF pensioner, 0, FALSE`; L4 computes `TRUE`.
+- Witness 5 (TFF): `Household OF pensioner, 400, FALSE`; L4 computes `TRUE`.
+- Witness 6 (TFF): `Household OF pensioner, 399, FALSE`; L4 computes `TRUE`.
+- Witness 7 (TFF): `Household OF carer, 0, FALSE`; L4 computes `TRUE`.
+- Witness 8 (TFF): `Household OF carer, 400, FALSE`; L4 computes `TRUE`.
+- Witness 9 (TFF): `Household OF carer, 399, FALSE`; L4 computes `TRUE`.
+- Witness 10 (FTF): `Household OF other, 0, TRUE`; L4 computes `TRUE`.
+- Witness 11 (FTF): `Household OF other, 400, TRUE`; L4 computes `TRUE`.
+- Witness 12 (FTF): `Household OF other, 399, TRUE`; L4 computes `TRUE`.
+- Witness 13 (TTF): `Household OF pensioner, 0, TRUE`; L4 computes `TRUE`.
+- Witness 14 (TTF): `Household OF pensioner, 400, TRUE`; L4 computes `TRUE`.
+- Witness 15 (TTF): `Household OF pensioner, 399, TRUE`; L4 computes `TRUE`.
+- Witness 16 (TTF): `Household OF carer, 0, TRUE`; L4 computes `TRUE`.
+- Witness 17 (TTF): `Household OF carer, 400, TRUE`; L4 computes `TRUE`.
+- Witness 18 (TTF): `Household OF carer, 399, TRUE`; L4 computes `TRUE`.
+- Witness 19 (FFT): `Household OF other, 401, FALSE`; L4 computes `FALSE`.
+- Witness 20 (TFT): `Household OF pensioner, 401, FALSE`; L4 computes `FALSE`.
+- Witness 21 (TFT): `Household OF carer, 401, FALSE`; L4 computes `FALSE`.
+- Witness 22 (FTT): `Household OF other, 401, TRUE`; L4 computes `FALSE`.
+- Witness 23 (TTT): `Household OF pensioner, 401, TRUE`; L4 computes `FALSE`.
+- Witness 24 (TTT): `Household OF carer, 401, TRUE`; L4 computes `FALSE`.
 
 **What this does and does not establish.** It checks the emitted rule's own text
 against L4 at the inputs listed above. An edit that changes the answer only at
@@ -343,7 +379,7 @@ $ catala test-scope QualifiesWitness3 --disable-warnings -F json
 scope QualifiesWitness4:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 0.0 -- has_dependants: true } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 0.0 -- has_dependants: false } }).qualifies
 ```
 
 ```catala-test-cli
@@ -355,7 +391,7 @@ $ catala test-scope QualifiesWitness4 --disable-warnings -F json
 scope QualifiesWitness5:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 0.0 -- has_dependants: false } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 400.0 -- has_dependants: false } }).qualifies
 ```
 
 ```catala-test-cli
@@ -367,7 +403,7 @@ $ catala test-scope QualifiesWitness5 --disable-warnings -F json
 scope QualifiesWitness6:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 400.0 -- has_dependants: true } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 399.0 -- has_dependants: false } }).qualifies
 ```
 
 ```catala-test-cli
@@ -379,7 +415,7 @@ $ catala test-scope QualifiesWitness6 --disable-warnings -F json
 scope QualifiesWitness7:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 400.0 -- has_dependants: false } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 0.0 -- has_dependants: false } }).qualifies
 ```
 
 ```catala-test-cli
@@ -391,7 +427,7 @@ $ catala test-scope QualifiesWitness7 --disable-warnings -F json
 scope QualifiesWitness8:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 399.0 -- has_dependants: true } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 400.0 -- has_dependants: false } }).qualifies
 ```
 
 ```catala-test-cli
@@ -403,7 +439,7 @@ $ catala test-scope QualifiesWitness8 --disable-warnings -F json
 scope QualifiesWitness9:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 399.0 -- has_dependants: false } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 399.0 -- has_dependants: false } }).qualifies
 ```
 
 ```catala-test-cli
@@ -415,7 +451,7 @@ $ catala test-scope QualifiesWitness9 --disable-warnings -F json
 scope QualifiesWitness10:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 0.0 -- has_dependants: true } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Other -- weekly_income: 0.0 -- has_dependants: true } }).qualifies
 ```
 
 ```catala-test-cli
@@ -427,7 +463,7 @@ $ catala test-scope QualifiesWitness10 --disable-warnings -F json
 scope QualifiesWitness11:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 0.0 -- has_dependants: false } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Other -- weekly_income: 400.0 -- has_dependants: true } }).qualifies
 ```
 
 ```catala-test-cli
@@ -439,71 +475,155 @@ $ catala test-scope QualifiesWitness11 --disable-warnings -F json
 scope QualifiesWitness12:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Other -- weekly_income: 401.0 -- has_dependants: false } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Other -- weekly_income: 399.0 -- has_dependants: true } }).qualifies
 ```
 
 ```catala-test-cli
 $ catala test-scope QualifiesWitness12 --disable-warnings -F json
-{"result":false}
+{"result":true}
 ```
 
 ```catala
 scope QualifiesWitness13:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 401.0 -- has_dependants: true } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 0.0 -- has_dependants: true } }).qualifies
 ```
 
 ```catala-test-cli
 $ catala test-scope QualifiesWitness13 --disable-warnings -F json
-{"result":false}
+{"result":true}
 ```
 
 ```catala
 scope QualifiesWitness14:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 401.0 -- has_dependants: false } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 400.0 -- has_dependants: true } }).qualifies
 ```
 
 ```catala-test-cli
 $ catala test-scope QualifiesWitness14 --disable-warnings -F json
-{"result":false}
+{"result":true}
 ```
 
 ```catala
 scope QualifiesWitness15:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 401.0 -- has_dependants: true } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 399.0 -- has_dependants: true } }).qualifies
 ```
 
 ```catala-test-cli
 $ catala test-scope QualifiesWitness15 --disable-warnings -F json
-{"result":false}
+{"result":true}
 ```
 
 ```catala
 scope QualifiesWitness16:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 401.0 -- has_dependants: false } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 0.0 -- has_dependants: true } }).qualifies
 ```
 
 ```catala-test-cli
 $ catala test-scope QualifiesWitness16 --disable-warnings -F json
-{"result":false}
+{"result":true}
 ```
 
 ```catala
 scope QualifiesWitness17:
   definition result
     equals
-      (output of Qualifies with { -- h: Household { -- status: Other -- weekly_income: 401.0 -- has_dependants: true } }).qualifies
+      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 400.0 -- has_dependants: true } }).qualifies
 ```
 
 ```catala-test-cli
 $ catala test-scope QualifiesWitness17 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope QualifiesWitness18:
+  definition result
+    equals
+      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 399.0 -- has_dependants: true } }).qualifies
+```
+
+```catala-test-cli
+$ catala test-scope QualifiesWitness18 --disable-warnings -F json
+{"result":true}
+```
+
+```catala
+scope QualifiesWitness19:
+  definition result
+    equals
+      (output of Qualifies with { -- h: Household { -- status: Other -- weekly_income: 401.0 -- has_dependants: false } }).qualifies
+```
+
+```catala-test-cli
+$ catala test-scope QualifiesWitness19 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope QualifiesWitness20:
+  definition result
+    equals
+      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 401.0 -- has_dependants: false } }).qualifies
+```
+
+```catala-test-cli
+$ catala test-scope QualifiesWitness20 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope QualifiesWitness21:
+  definition result
+    equals
+      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 401.0 -- has_dependants: false } }).qualifies
+```
+
+```catala-test-cli
+$ catala test-scope QualifiesWitness21 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope QualifiesWitness22:
+  definition result
+    equals
+      (output of Qualifies with { -- h: Household { -- status: Other -- weekly_income: 401.0 -- has_dependants: true } }).qualifies
+```
+
+```catala-test-cli
+$ catala test-scope QualifiesWitness22 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope QualifiesWitness23:
+  definition result
+    equals
+      (output of Qualifies with { -- h: Household { -- status: Pensioner -- weekly_income: 401.0 -- has_dependants: true } }).qualifies
+```
+
+```catala-test-cli
+$ catala test-scope QualifiesWitness23 --disable-warnings -F json
+{"result":false}
+```
+
+```catala
+scope QualifiesWitness24:
+  definition result
+    equals
+      (output of Qualifies with { -- h: Household { -- status: Carer -- weekly_income: 401.0 -- has_dependants: true } }).qualifies
+```
+
+```catala-test-cli
+$ catala test-scope QualifiesWitness24 --disable-warnings -F json
 {"result":false}
 ```
 
@@ -522,32 +642,32 @@ including one exactly at a number a condition compares with, fails `clerk test`
 
 The atoms, as L4 writes them:
 
-- `p_0` is `NOT (qualifies OF h)`
+- `p_0` is `qualifies OF h`
 - `p_1` is `h's hasDependants`
 
-- Witness 1 (FF): `Household OF pensioner, 0, FALSE`; L4 computes `200`.
-- Witness 2 (FF): `Household OF pensioner, 400, FALSE`; L4 computes `200`.
-- Witness 3 (FF): `Household OF pensioner, 399, FALSE`; L4 computes `200`.
-- Witness 4 (FF): `Household OF carer, 0, FALSE`; L4 computes `200`.
-- Witness 5 (FF): `Household OF carer, 400, FALSE`; L4 computes `200`.
-- Witness 6 (FF): `Household OF carer, 399, FALSE`; L4 computes `200`.
-- Witness 7 (TF): `Household OF pensioner, 401, FALSE`; L4 computes `0`.
-- Witness 8 (TF): `Household OF carer, 401, FALSE`; L4 computes `0`.
-- Witness 9 (TF): `Household OF other, 0, FALSE`; L4 computes `0`.
-- Witness 10 (TF): `Household OF other, 400, FALSE`; L4 computes `0`.
-- Witness 11 (TF): `Household OF other, 399, FALSE`; L4 computes `0`.
-- Witness 12 (TF): `Household OF other, 401, FALSE`; L4 computes `0`.
-- Witness 13 (FT): `Household OF pensioner, 0, TRUE`; L4 computes `300`.
-- Witness 14 (FT): `Household OF pensioner, 400, TRUE`; L4 computes `300`.
-- Witness 15 (FT): `Household OF pensioner, 399, TRUE`; L4 computes `300`.
-- Witness 16 (FT): `Household OF carer, 0, TRUE`; L4 computes `300`.
-- Witness 17 (FT): `Household OF carer, 400, TRUE`; L4 computes `300`.
-- Witness 18 (FT): `Household OF carer, 399, TRUE`; L4 computes `300`.
-- Witness 19 (FT): `Household OF other, 0, TRUE`; L4 computes `300`.
-- Witness 20 (FT): `Household OF other, 400, TRUE`; L4 computes `300`.
-- Witness 21 (TT): `Household OF pensioner, 401, TRUE`; L4 computes `0`.
-- Witness 22 (TT): `Household OF carer, 401, TRUE`; L4 computes `0`.
-- Witness 23 (TT): `Household OF other, 401, TRUE`; L4 computes `0`.
+- Witness 1 (FF): `Household OF pensioner, 401, FALSE`; L4 computes `0`.
+- Witness 2 (FF): `Household OF carer, 401, FALSE`; L4 computes `0`.
+- Witness 3 (FF): `Household OF other, 0, FALSE`; L4 computes `0`.
+- Witness 4 (FF): `Household OF other, 400, FALSE`; L4 computes `0`.
+- Witness 5 (FF): `Household OF other, 399, FALSE`; L4 computes `0`.
+- Witness 6 (FF): `Household OF other, 401, FALSE`; L4 computes `0`.
+- Witness 7 (TF): `Household OF pensioner, 0, FALSE`; L4 computes `200`.
+- Witness 8 (TF): `Household OF pensioner, 400, FALSE`; L4 computes `200`.
+- Witness 9 (TF): `Household OF pensioner, 399, FALSE`; L4 computes `200`.
+- Witness 10 (TF): `Household OF carer, 0, FALSE`; L4 computes `200`.
+- Witness 11 (TF): `Household OF carer, 400, FALSE`; L4 computes `200`.
+- Witness 12 (TF): `Household OF carer, 399, FALSE`; L4 computes `200`.
+- Witness 13 (FT): `Household OF pensioner, 401, TRUE`; L4 computes `0`.
+- Witness 14 (FT): `Household OF carer, 401, TRUE`; L4 computes `0`.
+- Witness 15 (FT): `Household OF other, 401, TRUE`; L4 computes `0`.
+- Witness 16 (TT): `Household OF pensioner, 0, TRUE`; L4 computes `300`.
+- Witness 17 (TT): `Household OF pensioner, 400, TRUE`; L4 computes `300`.
+- Witness 18 (TT): `Household OF pensioner, 399, TRUE`; L4 computes `300`.
+- Witness 19 (TT): `Household OF carer, 0, TRUE`; L4 computes `300`.
+- Witness 20 (TT): `Household OF carer, 400, TRUE`; L4 computes `300`.
+- Witness 21 (TT): `Household OF carer, 399, TRUE`; L4 computes `300`.
+- Witness 22 (TT): `Household OF other, 0, TRUE`; L4 computes `300`.
+- Witness 23 (TT): `Household OF other, 400, TRUE`; L4 computes `300`.
 
 **What this does and does not establish.** It checks the emitted rule's own text
 against L4 at the inputs listed above. An edit that changes the answer only at
@@ -558,187 +678,187 @@ not tested.
 scope AllowanceWitness1:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 0.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 401.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness1 --disable-warnings -F json
-{"result":"200"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness2:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 400.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 401.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness2 --disable-warnings -F json
-{"result":"200"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness3:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 399.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 0.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness3 --disable-warnings -F json
-{"result":"200"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness4:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 0.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 400.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness4 --disable-warnings -F json
-{"result":"200"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness5:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 400.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 399.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness5 --disable-warnings -F json
-{"result":"200"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness6:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 399.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 401.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness6 --disable-warnings -F json
-{"result":"200"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness7:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 401.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 0.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness7 --disable-warnings -F json
-{"result":"0"}
+{"result":"200"}
 ```
 
 ```catala
 scope AllowanceWitness8:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 401.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 400.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness8 --disable-warnings -F json
-{"result":"0"}
+{"result":"200"}
 ```
 
 ```catala
 scope AllowanceWitness9:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 0.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 399.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness9 --disable-warnings -F json
-{"result":"0"}
+{"result":"200"}
 ```
 
 ```catala
 scope AllowanceWitness10:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 400.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 0.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness10 --disable-warnings -F json
-{"result":"0"}
+{"result":"200"}
 ```
 
 ```catala
 scope AllowanceWitness11:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 399.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 400.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness11 --disable-warnings -F json
-{"result":"0"}
+{"result":"200"}
 ```
 
 ```catala
 scope AllowanceWitness12:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 401.0 -- has_dependants: false } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 399.0 -- has_dependants: false } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness12 --disable-warnings -F json
-{"result":"0"}
+{"result":"200"}
 ```
 
 ```catala
 scope AllowanceWitness13:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 0.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 401.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness13 --disable-warnings -F json
-{"result":"300"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness14:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 400.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 401.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness14 --disable-warnings -F json
-{"result":"300"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness15:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 399.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 401.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness15 --disable-warnings -F json
-{"result":"300"}
+{"result":"0"}
 ```
 
 ```catala
 scope AllowanceWitness16:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 0.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 0.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
@@ -750,7 +870,7 @@ $ catala test-scope AllowanceWitness16 --disable-warnings -F json
 scope AllowanceWitness17:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 400.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 400.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
@@ -762,7 +882,7 @@ $ catala test-scope AllowanceWitness17 --disable-warnings -F json
 scope AllowanceWitness18:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 399.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 399.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
@@ -774,7 +894,7 @@ $ catala test-scope AllowanceWitness18 --disable-warnings -F json
 scope AllowanceWitness19:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 0.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 0.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
@@ -786,7 +906,7 @@ $ catala test-scope AllowanceWitness19 --disable-warnings -F json
 scope AllowanceWitness20:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 400.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 400.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
@@ -798,36 +918,36 @@ $ catala test-scope AllowanceWitness20 --disable-warnings -F json
 scope AllowanceWitness21:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Pensioner -- weekly_income: 401.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 399.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness21 --disable-warnings -F json
-{"result":"0"}
+{"result":"300"}
 ```
 
 ```catala
 scope AllowanceWitness22:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Carer -- weekly_income: 401.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 0.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness22 --disable-warnings -F json
-{"result":"0"}
+{"result":"300"}
 ```
 
 ```catala
 scope AllowanceWitness23:
   definition result
     equals
-      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 401.0 -- has_dependants: true } }).allowance
+      (output of Allowance with { -- h: Household { -- status: Other -- weekly_income: 400.0 -- has_dependants: true } }).allowance
 ```
 
 ```catala-test-cli
 $ catala test-scope AllowanceWitness23 --disable-warnings -F json
-{"result":"0"}
+{"result":"300"}
 ```
 
 ## Tests
