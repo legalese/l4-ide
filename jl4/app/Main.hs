@@ -59,6 +59,7 @@ import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
 import L4.Cli.Lts (LtsOptions, ltsCmd, ltsOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
+import L4.Cli.CoverageReport (CoverageOptions, coverageBound, coverageCmd, coverageOptionsParser)
 import L4.Cli.Prove (ProveOptions, proveBound, proveCmd, proveOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
@@ -90,6 +91,7 @@ data Command
   | CmdExplore    ExploreCliOptions
   | CmdVerify     VerifyOptions
   | CmdProve      ProveOptions
+  | CmdCoverage   CoverageOptions
   | CmdYscript    YscriptOptions
   | CmdDeploy     DeployOptions
   | CmdRedeploy   DeployOptions
@@ -160,6 +162,10 @@ commandParser =
            (info (helper <*> (CmdProve <$> proveOptionsParser))
              (progDesc "Prove or refute, with an SMT solver (z3), each #ASSERT the evaluator cannot decide because it reads a section GIVEN"
                <> footerDoc (Just (verbatim proveBound))))
+      <> command "coverage"
+           (info (helper <*> (CmdCoverage <$> coverageOptionsParser))
+             (progDesc "List the buckets of every decision of a file (each combination of its separate conditions), with an input that realises each one and L4's answer there, and the buckets nothing can realise"
+               <> footerDoc (Just (verbatim coverageBound))))
       <> command "export"
            (info (helper <*> exportFormats)
              (progDesc "Write an L4 module out in another notation: an interchange document, a runnable program, or an interview. Run `l4 export --help` for the formats, `l4 export FORMAT --help` for each one's options"))
@@ -295,6 +301,7 @@ main = do
     CmdExplore    opts -> exploreCmd    opts
     CmdVerify     opts -> verifyCmd     opts
     CmdProve      opts -> proveCmd      opts
+    CmdCoverage   opts -> coverageCmd   opts
     CmdYscript    opts -> yscriptCmd    opts
     CmdDeploy     opts -> deployCmd     opts
     CmdRedeploy   opts -> redeployCmd   opts

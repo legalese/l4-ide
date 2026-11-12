@@ -1,0 +1,19 @@
+l4 coverage: examples/catala/bands.l4
+
+Decision `rate band`  (bands.l4:12:1-18:49)
+  Inputs: f
+  Cover points (2):
+    c0  (f's income) GREATER THAN 100000  bands.l4:16:8-38
+    c1  (f's income) GREATER THAN 50000   bands.l4:17:8-38
+
+  Buckets (4 combinations: 3 witnessed, 1 proved impossible, none undecided):
+    c0 c1   status
+    F  F    witnessed by 6 inputs; L4 answers 0.1
+          f = Filer OF 0, TRUE gives 0.1
+    F  T    witnessed by 6 inputs; L4 answers 0.25
+          f = Filer OF 50001, TRUE gives 0.25
+    T  F    proved impossible: no input makes these conditions hold together
+    T  T    witnessed by 2 inputs; L4 answers 0.4
+          f = Filer OF 100001, TRUE gives 0.4
+
+Coverage: 1 decision covered (2 cover points, 4 buckets); 3 witnessed by 14 inputs, at most 8 per bucket; 1 proved impossible by Z3 version $Z3_VERSION, whose claim it is alone; nothing undecided; every decision at leaf level; nothing skipped; 1 decision with no condition to branch on not listed; a call to another rule is one cover point, and conditions inside an arm's result are not cover points.

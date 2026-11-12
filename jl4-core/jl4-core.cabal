@@ -223,6 +223,7 @@ library
     L4.Utils.IntervalMap
     L4.Utils.RevList
     L4.Utils.Ratio
+    L4.Coverage.Rungs
     L4.Crypto.SHA1
     L4.Crypto.UUID5
     L4.Viz.AtomKey
