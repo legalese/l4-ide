@@ -1,6 +1,11 @@
 -- | The run-time check on compounds whose operands read each other's records
 -- (smucclaw/l4-ide#1069; NORM-LOG-SPEC card N10, "a run-time check now,
--- lockstep operands as the goal", extended here to black ink).
+-- lockstep operands as the goal", extended here to black ink, which N10's
+-- option B does not cover: N12 proposes that extension, and N12's ruling of
+-- 2026-10-26 holds it until goal A lands, so that reach is not ruled).
+-- N20 amends N10: once goal A is built as N20 says, the check is unruled for
+-- streams whose stamps never go backwards. It is not built as N20 says
+-- (below), so the check is still N10's option B here.
 --
 -- A @RAND@ runs its operands in step (N10's goal, option A; Note [Operands in
 -- step] in 'L4.EvaluateLazy.Machine'): event n of the @#TRACE@ is handed to
@@ -37,12 +42,18 @@
 -- logged as the compound's start ('StartOf') and filled in once the machine
 -- has evaluated it for its own reasons.
 --
--- What is refused in step, by design (assumed, not ruled): a read and a
--- sibling's record made while the two operands take the SAME event, when the
--- left operand's turn (which comes first) is not the earlier instant, as when
--- one event reveals a deadline missed some time before it and the right
--- operand's @LEST@ records the miss at that deadline; and any two such
--- accesses at the same instant, which the trace gives no order. An @ROR@ or a
+-- What is refused in step, where the rulings give an answer this build does
+-- not compute: a read and a sibling's record made while the two operands take
+-- the SAME event, when the left operand's turn (which comes first) is not the
+-- earlier instant, as when one event reveals a deadline missed some time
+-- before it and the right operand's @LEST@ records the miss at that deadline;
+-- and any two such accesses at the same instant. N20 (2026-10-26) rules the
+-- first: every deadline is settled before any operand matches the event. N19
+-- rules the second: a match does not see what a sibling records while
+-- matching the same event. Neither is built (no per-event snapshot, no
+-- settle-first round), so the check refuses both rather than answer in
+-- operand order; that is N10's option B, which N20 unrules only once goal A
+-- is built as it says. An @ROR@ or a
 -- barrier (@EVERY … ONCE ALL HAVE@) inside an operand goes over events the
 -- compound has already taken (the @ROR@'s right operand, the barrier's later
 -- members and its join), so an access inside one carries no event count for
@@ -60,26 +71,28 @@
 -- cell on another side of a compound, made before or after, unless it is
 -- strictly earlier than the @ROR@'s start, from which the alternative's
 -- records would date. This is the one rule that guesses: the alternative
--- might never have made the record (assumed, not ruled; what becomes of a
--- losing @ROR@ alternative is N10's own unruled condition).
+-- might never have made the record (assumed, not ruled). N17 and N18
+-- (2026-10-26) rule what goal A does instead: every alternative steps on every
+-- event, and a losing alternative's entries are kept, tagged, and skipped by
+-- reads made after the choice settles; that is not built.
 --
 -- What it does not see, sorted by how it fails:
 --
--- * Silent: two operands that write one cell with no read of it inside the
---   compound leave the ledger in the order the writes were made: in step,
---   event by event, and within one event left before right, whatever the
---   writes' instants. No read inside the compound depended on that order, so
---   there is nothing to refuse; but what reads the ledger after the compound
---   does: @l4 run@'s listing, and an @l4 explore@ property, which is handed
---   the cell's latest entry. Refusing such writes would change the answer for
---   operands that do not read each other's records, which
---   smucclaw/l4-ide#1069's first requirement forbids.
+-- * Not silent any more, since NORM-LOG-SPEC N19 (2026-10-26): two operands
+--   that write one cell, with no read of it inside the compound, are checked
+--   against each other too ('checkWrite', rules 4 and 5), because what reads
+--   the ledger after the compound (@l4 run@'s listing, an @l4 explore@
+--   property) gets the cell's last entry. Different values at one event stop
+--   the run, as N19 rules; a record that lands after a sibling's record from
+--   a later instant is refused, as N10's option B. Equal values pass both.
 -- * Silent: a read whose evaluation is deferred (a @RECALL@ inside a value
 --   that is stored unevaluated and forced later) is checked where it is
 --   forced, not where it is written; and a top-level rule with no inputs that
 --   reads the ledger is forced once and its answer shared, so a second
---   operand that uses it makes no read of its own (a defect outside compounds
---   too: a later use in the same chain gets the stale answer).
+--   operand that uses it makes no read of its own (outside compounds too: a
+--   later use in the same chain gets the stale answer; smucclaw/l4-ide#1034,
+--   which N12's option D, ruled 2026-10-26, answers by keying the read cache
+--   on the ledger's version, not built).
 -- * Over-refusal, by design (assumed, not ruled): @EVAL AS OF SYSTEM TIME@
 --   and @EVAL UNDER VALID TIME@ bounds are not applied, so a write such a
 --   bound would hide is still compared; a @RECALL ALL@ that sees two sibling
@@ -176,6 +189,10 @@ data Access = MkAccess
   , acTaken   :: !(IntMap Int)
     -- ^ for each in-step compound on 'acPath', how many events it had handed
     -- its operands when the access was made ('ssTaken')
+  , acValue   :: !(Maybe Text)
+    -- ^ for a write, the value written, printed, when every part of it was
+    -- already evaluated (the check forces nothing); 'Nothing' for a read, or
+    -- when part of the value is still a thunk
   }
   deriving stock Show
 
@@ -307,7 +324,7 @@ siblingReadMarker :: Text
 siblingReadMarker = "read each other's records"
 
 isSiblingReadRefusal :: Text -> Bool
-isSiblingReadRefusal = Text.isInfixOf siblingReadMarker
+isSiblingReadRefusal t = siblingReadMarker `Text.isInfixOf` t || siblingWriteMarker `Text.isInfixOf` t
 
 -- | Whether access @a@ happened strictly before access @b@ in the trace's
 -- time, as far as the compound with scope @s@, where the two diverge, can
@@ -346,7 +363,7 @@ checkRead key cell readAll site st
   where
     cl = resolved st (Map.findWithDefault (MkCellLog Seq.empty []) (key, cell) st.ssCells)
     writes = toList cl.clWrites
-    theRead = MkAccess (instantOf st st.ssClock) st.ssClock st.ssPath site (if readAll then "RECALL ALL" else "RECALL") (takenOn st.ssPath st)
+    theRead = MkAccess (instantOf st st.ssClock) st.ssClock st.ssPath site (if readAll then "RECALL ALL" else "RECALL") (takenOn st.ssPath st) Nothing
     future = listToMaybe
       [ refusal st key cell (FutureSeen w) theRead w s
       | w <- writes, Just s <- [divergence theRead.acPath w.acPath]
@@ -410,26 +427,123 @@ registerUnrun scope outer clock writes st
       , Just msg <- [unrunMissed st {ssUnrun = [un]} key cell r] ]
 
 -- | A @RECORD@, @COMMIT@, @ATTEST@ or @NOTIFY@ of @cell@ into @key@'s ledger,
--- made now. Rule 2; the write is logged when nothing refuses.
+-- with @value@ ('acValue'), made now. Rules 2, 4 and 5; the write is logged
+-- when nothing refuses.
 --
 -- 2. A record the read missed: a sibling read of the cell, already made, at an
 --    instant at or after this write's, could not see it.
-checkWrite :: LedgerKey -> Text -> Text -> Maybe SrcRange -> SiblingState -> Either Text SiblingState
-checkWrite key cell verb site st
+-- 4. Two values at one event (NORM-LOG-SPEC N19, ruled 2026-10-26): a sibling
+--    already wrote the cell at this write's instant, while the two took the
+--    same event (or with no event count to tell them apart), and the two
+--    values are not known to be equal. "When two siblings write different
+--    values to one cell at one event, the run stops with an error naming the
+--    cell and both writers. Equal values are not an error." A value that is
+--    not yet fully evaluated is not known to be equal (assumed, not ruled).
+-- 5. A record out of time order: a sibling already wrote the cell at a later
+--    instant. Under N10's goal A as N20 rules it, every deadline is settled
+--    before an event is matched, so on a stream whose stamps never go
+--    backwards the ledger is in time order; in step, the left side takes the
+--    whole event before the right side settles, so a right side's record for
+--    a deadline it settles can land after the left side's record for the
+--    event, and the last entry of the cell is then not the latest. Nothing
+--    inside the compound need read the cell for that to matter: what reads
+--    the ledger after it, @l4 run@'s listing and an @l4 explore@ property,
+--    gets the wrong last entry. So it is refused, as N10's option B refuses
+--    what goal A is not yet built to order. Equal values are not refused: the
+--    last entry has the same value either way.
+checkWrite :: LedgerKey -> Text -> Text -> Maybe Text -> Maybe SrcRange -> SiblingState -> Either Text SiblingState
+checkWrite key cell verb value site st
   | not (inCompound st) = Right st
   | otherwise =
-      case missed of
+      case missed <|> clash of
         Just msg -> Left msg
         Nothing  -> Right st {ssCells = Map.insert (key, cell) cl {clWrites = cl.clWrites |> theWrite} st.ssCells}
   where
     cl = resolved st (Map.findWithDefault (MkCellLog Seq.empty []) (key, cell) st.ssCells)
-    theWrite = MkAccess (instantOf st st.ssClock) st.ssClock st.ssPath site verb (takenOn st.ssPath st)
+    theWrite = MkAccess (instantOf st st.ssClock) st.ssClock st.ssPath site verb (takenOn st.ssPath st) value
     missed = listToMaybe
       [ refusal st key cell PastMissed r theWrite s
       | r <- reverse cl.clReads, Just s <- [divergence r.acPath theWrite.acPath]
       , not (earlier s r theWrite) ]
+    clash = listToMaybe
+      [ writeRefusal st key cell (if simultaneous s p theWrite then TwoValues else LateRecord) p theWrite s
+      | p <- toList cl.clWrites, Just s <- [divergence p.acPath theWrite.acPath]
+      , not (knownEqual p theWrite)
+      , simultaneous s p theWrite || not (earlier s p theWrite) ]
+    knownEqual a b = isJust a.acValue && a.acValue == b.acValue
+
+-- | Whether two accesses on two sides of the compound with scope @s@ were made
+-- at one instant while its operands took one event: both instants known and
+-- equal, and the compound's event counts equal, or unknown for either (inside
+-- an @ROR@ or a barrier, where nothing tells two events at one instant apart).
+simultaneous :: Int -> Access -> Access -> Bool
+simultaneous s a b = case (a.acInstant, b.acInstant) of
+  (Just x, Just y) | x == y -> case (IntMap.lookup s a.acTaken, IntMap.lookup s b.acTaken) of
+    (Just m, Just n) -> m == n
+    _                -> True
+  _ -> False
 
 data Rule = FutureSeen Access | PastMissed | OutOfOrder Access
+
+-- | What rule 4 or rule 5 of 'checkWrite' found.
+data WriteRule = TwoValues | LateRecord
+
+-- | The words every write refusal contains ('isSiblingReadRefusal').
+siblingWriteMarker :: Text
+siblingWriteMarker = "record one cell"
+
+-- | The message for two sides' records of one cell ('checkWrite', rules 4
+-- and 5): @p@ was made first, @w@ now; @s@ is where their operands part.
+writeRefusal :: SiblingState -> LedgerKey -> Text -> WriteRule -> Access -> Access -> Int -> Text
+writeRefusal st key cell rule p w s = Text.unwords $ case rule of
+  TwoValues ->
+    [ "The two sides of " <> opName <> " " <> siblingWriteMarker <> " with different values at one event, and evaluation stops here."
+    , who p <> " records " <> record <> valueOf p <> at p <> site p <> ","
+    , "and " <> who w <> ", on the other side of the " <> op <> ", records it" <> valueOf w <> at w <> site w <> ","
+    , "while the two sides take the same event."
+    , "Nothing in the trace orders the two records, so the cell would hold whichever L4 happened to write last."
+    ]
+    <> [ "One value is not fully worked out yet, so L4 cannot tell whether the two are the same." | isNothing p.acValue || isNothing w.acValue ]
+    <>
+    [ "Record the cell on one side only, or record the same value on both."
+    , "(smucclaw/l4-ide#1069.)"
+    ]
+  LateRecord ->
+    [ "The two sides of " <> opName <> " " <> siblingWriteMarker <> " out of time order, and evaluation stops here."
+    , who w <> " records " <> record <> valueOf w <> at w <> site w <> ","
+    , "after " <> who p <> ", on the other side of the " <> op <> ", recorded it" <> valueOf p <> at p <> site p <> "."
+    ]
+    <>
+    ( if lockstep && lookup s w.acPath == Just 1
+        then
+          [ "L4 runs the sides of " <> opName <> " in step, one event of the trace at a time, each event first on the left side and then on the right,"
+          , "so a record the right side makes for a deadline that the event shows has passed can land after a record the left side made for the event itself."
+          ]
+        else
+          [ "Here L4 did not make the two records in the order of their instants." ] )
+    <>
+    [ "The last entry of the cell would then be the older one, and whatever reads the cell after the " <> op <> " would read it."
+    , "Record the cell on one side only, or before the " <> op <> " starts."
+    , "(smucclaw/l4-ide#1069.)"
+    ]
+  where
+    scope = IntMap.lookup s st.ssScopes
+    op = maybe "RAND" (.scOp) scope
+    lockstep = maybe False (.scLockstep) scope
+    opName = (if op == "ROR" then "an " else "a ") <> op
+    record = keyName key <> " `" <> cell <> "`"
+    who a = case a.acPath of
+      (s', side) : _ | Just sc <- IntMap.lookup s' st.ssScopes -> if side == 0 then sc.scLeft else sc.scRight
+      _ -> "One side"
+    valueOf a = maybe "" (" as " <>) a.acValue
+    at a = maybe "" (\ t -> " at " <> prettyRatio t) a.acInstant
+    site a = case a.acSite of
+      Just rng -> " (" <> a.acVerb <> ", line " <> Text.pack (show (lineOf rng)) <> ")"
+      Nothing  -> " (" <> a.acVerb <> ")"
+    keyName = \ case
+      OfficialKey -> "OFFICIAL's"
+      OwnKey ""   -> "the anonymous ledger's"
+      OwnKey p'   -> p' <> "'s"
 
 -- | The message: what stopped, the two places, the
 -- instants, why it matters, and what to do.
@@ -453,7 +567,7 @@ refusal st key cell rule r w s = Text.unwords $
         [ "L4 runs one side of " <> opName <> " over the whole trace before it starts the other,"
         , "so a record made on one side is not in step with a read on the other."
         ]
-        <> [ "Whether this changes the ROR's answer depends on what becomes of an alternative once the other is fulfilled, which is not settled, so L4 refuses the read rather than answer from it."
+        <> [ "To know whether this changes the ROR's answer, L4 would have to keep running the other alternative too, which it does not do yet, so it refuses the read rather than answer from it."
            | op == "ROR" ] )
   <> [ "An EVERY runs its members as the sides of a RAND, so this holds between its members too." | fork ]
   <>

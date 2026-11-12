@@ -501,10 +501,13 @@ What this does **not** promise:
   Two cases are still refused: evaluation stops with an error instead of answering, and the error names the record, both sides and the two instants.
   The first is a read and a record made while the two sides take one event, when the left side's turn, which comes first, is not the earlier instant: one event can reveal a deadline missed some time before it, and a `LEST` that records the miss records it at that deadline.
   The second is a read and a record made at one instant while the two sides take one event, because nothing says which of the two happened first.
+  Two records of one cell are stopped the same way, even when nothing inside the `RAND` reads the cell, because `l4 run`'s listing and an `l4 explore` property read the cell's last entry afterwards.
+  One is two sides recording different values while they take one event; the same value on both sides is fine.
+  The other is a side recording a cell for an earlier instant after the other side recorded it for a later one, which is what a `LEST` on the right side does when the event that the left side acts on also shows that the right side's deadline had passed.
   An `ROR`, or an `EVERY … ONCE ALL HAVE`, on one side of a `RAND` goes over events the other side has already taken (the `ROR`'s right side, and the group's members after the first), so a read and a record between it and the other side are ordered by their instants alone, and refused at one instant.
   A `RAND` is run in step under `#EVALTRACE`, in the REPL and in a decision-service request for a full trace too, so they give the answers `l4 run` gives; the trace then shows the `RAND`'s stream and its value but not its sides' own steps, and a part of an event that only the sides looked at prints as `(...)`.
   An `ROR` still runs its left side over the whole trace before it starts the right one, so a read on one side could see a record from its future or miss one from its past; evaluation stops with the same error when what a read saw depended on that order.
-  It stops even where the `ROR`'s answer would have come out the same, as when the right side is fulfilled before the left side's read, because what becomes of an alternative once the other is fulfilled is not settled.
+  It stops even where the `ROR`'s answer would have come out the same, as when the right side is fulfilled before the left side's read, because L4 would have to keep running the other alternative to know, and it does not do that yet.
   Once an `ROR`'s left side is fulfilled, L4 does not run the right side at all, so a record the right side would have made is never made; written the other way round, that side would run first and could make it.
   So when a read on another side, in the left side itself or on the other side of a `RAND` around the `ROR`, could have seen such a record, evaluation stops with the same error, naming the side L4 did not run.
   That is a guess: L4 counts every record the unrun side could reach through the rules it uses, even one behind a branch it would never have taken, so it can stop a rule whose answer would have been the same; a read made before the `ROR` started is never stopped this way.
@@ -515,10 +518,6 @@ What this does **not** promise:
   Write the `RECALL` where the record is needed, and pass what it reads to the rule as an input, as `` `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`) `` does in the [explorer's example](explore.md).
 - **That an `ROR`'s operands both run.** Once one alternative is fulfilled, the other is not run further, so a `RECORD` it would have made is not made.
   A read inside the rule that could have seen such a record stops evaluation (above), but what reads the ledger after the rule has run does not: `l4 run`'s listing and an `l4 explore` property see no such record, although with the alternatives written the other way round they might.
-- **That the ledger is in time order after a compound.** When two sides both record one cell while they take one event, the records are kept in the order the sides are written, left side first, whatever their instants, and nothing stops this when nothing inside the compound reads the cell.
-  `l4 run` lists them in that order, and an `l4 explore` property that reads the cell is handed the last one listed, so a property can hold with the sides written one way round and fail the other way.
-  Measured: a `RAND` of two sides that `COMMIT` `` `x` `` as 1 and as 2 on the same event, explored with `--always "x is never 1"`, holds when the side that records 1 is written first, and is violated after 1 event when it is written second.
-  To avoid it, record such a cell on one side only.
 - **The decision service's answer.** `jl4-service` reports the same breach without the new `effective`, `observed` and `decisive` fields: `l4 batch` carries them, and `l4 run` prints the decisive failures.
 
 ## Related pages

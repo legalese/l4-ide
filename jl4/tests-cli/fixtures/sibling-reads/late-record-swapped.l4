@@ -1,0 +1,28 @@
+-- smucclaw/l4-ide#1069: one event at 10. Taking it, `settler` finds that its
+-- deadline of 2 has passed and records `x` = 1 at 2; `matcher` takes the act
+-- and records `x` = 2 at 10. Nothing inside the RAND reads `x`. In time the
+-- record is 1 then 2 (NORM-LOG-SPEC N20, ruled 2026-10-26: every deadline an
+-- event reveals is settled before the event is matched).
+-- Here the side that settles goes first, so the records are made in time order and the run answers, with `x` = 1 then 2.
+IMPORT prelude
+DECLARE Party IS ONE OF P
+DECLARE Act IS ONE OF go, stay
+
+GIVETH A DEONTIC Party Act
+`matcher` MEANS
+    PARTY P
+    MAY go
+    WITHIN 100
+    HENCE COMMIT `x` IS 2 HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`settler` MEANS
+    PARTY P
+    MUST stay
+    WITHIN 2
+    HENCE FULFILLED
+    LEST (COMMIT `x` IS 1 HENCE FULFILLED)
+
+#TRACE `settler` RAND `matcher` AT 0 WITH
+    PARTY P DOES go AT 10

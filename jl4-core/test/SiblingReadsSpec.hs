@@ -13,7 +13,13 @@
 -- ("L4.EvaluateLazy.SiblingReads"): a read and a record made while the two
 -- sides take the SAME event, where the left side's turn comes before the
 -- right's and that is not the order of their instants, or at one instant,
--- where the trace gives them no order (assumed, not ruled). An @ROR@ still
+-- where the trace gives them no order. NORM-LOG-SPEC rules an answer for both
+-- (2026-10-26: N20 settles every deadline before the event is matched, N19
+-- hides a sibling's records made while matching the same event), which this
+-- build does not compute, so it refuses instead (N10's option B). Two sides
+-- recording one cell are checked too: different values at one event stop the
+-- run (N19), and a record landing after a sibling's from a later instant is
+-- refused. An @ROR@ still
 -- runs its operands one after the other, so it is still refused where what a
 -- read saw depended on that order; and it never runs its right operand once
 -- the left is fulfilled, so a read on another side that the unrun
@@ -47,6 +53,14 @@ import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), CheckWar
 -- ledgers, printed).
 data Outcome = Stopped Text.Text | Ran Text.Text Text.Text
   deriving stock (Eq, Show)
+
+-- | The phrase a refusal's message contains, of the two the write rules use.
+stoppedWith :: Outcome -> Maybe Text.Text
+stoppedWith = \ case
+  Stopped m -> case filter (`Text.isInfixOf` m) ["record one cell with different values at one event", "record one cell out of time order"] of
+    p : _ -> Just p
+    []    -> Just m
+  Ran _ _   -> Nothing
 
 isRefused :: Outcome -> Bool
 isRefused = \ case
@@ -508,7 +522,7 @@ rorLate compound = Text.unlines
   ]
 
 -- | Two sides of a RAND record one cell while taking one event, and nothing
--- inside the RAND reads it.
+-- inside the RAND reads it. @w1@ and @w3@ record the same value, @w2@ another.
 twoWriters :: Text.Text -> Text.Text
 twoWriters compound = Text.unlines
   [ "DECLARE Party IS ONE OF P"
@@ -517,6 +531,27 @@ twoWriters compound = Text.unlines
   , "`w1` MEANS PARTY P MAY go WITHIN 100 HENCE COMMIT `x` IS 1 HENCE FULFILLED LEST FULFILLED"
   , "GIVETH A DEONTIC Party Act"
   , "`w2` MEANS PARTY P MAY go WITHIN 100 HENCE COMMIT `x` IS 2 HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`w3` MEANS PARTY P MAY go WITHIN 100 HENCE COMMIT `x` IS 1 HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`whole` MEANS " <> compound
+  , "#TRACE `whole` AT 0 WITH"
+  , "    PARTY P DOES go AT 10"
+  ]
+
+-- | One event at 10, and nothing inside the RAND reads @x@. Taking it,
+-- @settler@ finds its deadline of 2 has passed and records @x@ = 1 at 2;
+-- @matcher@ takes the act and records @x@ = 2 at 10. In time, 1 then 2, so
+-- the last entry is 2 (NORM-LOG-SPEC N20: every deadline is settled before
+-- the event is matched).
+lateRecord :: Text.Text -> Text.Text
+lateRecord compound = Text.unlines
+  [ "DECLARE Party IS ONE OF P"
+  , "DECLARE Act IS ONE OF go, stay"
+  , "GIVETH A DEONTIC Party Act"
+  , "`matcher` MEANS PARTY P MAY go WITHIN 100 HENCE COMMIT `x` IS 2 HENCE FULFILLED LEST FULFILLED"
+  , "GIVETH A DEONTIC Party Act"
+  , "`settler` MEANS PARTY P MUST stay WITHIN 2 HENCE FULFILLED LEST (COMMIT `x` IS 1 HENCE FULFILLED)"
   , "GIVETH A DEONTIC Party Act"
   , "`whole` MEANS " <> compound
   , "#TRACE `whole` AT 0 WITH"
@@ -558,7 +593,7 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
         (order, length (concatMap (entriesOf "possession sought") seen)) `shouldBe` (order, 1)
         (order, concatMap (entriesOf "possession sought") unseen) `shouldBe` (order, [])
 
-    it "refuses a read and a sibling's record made at one instant while both sides take the same event, either way round (assumed, not ruled)" do
+    it "refuses a read and a sibling's record made at one instant while both sides take the same event, either way round (N19 rules an answer; refused until it is built)" do
       left <- run (oneEvent "`writer` RAND `reader`")
       right <- run (oneEvent "`reader` RAND `writer`")
       case (left, right) of
@@ -567,7 +602,7 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
           r `shouldMention` ["read each other's records", "OFFICIAL's `x`", "at 1", "at the same instant", "in step"]
         _ -> expectationFailure ("expected one directive each, got " <> show (left, right))
 
-    it "within one event, answers when the left side's record is the earlier, and refuses the other order" do
+    it "within one event, answers when the left side's record is the earlier, and refuses the other order (N20 rules an answer for it; refused until it is built)" do
       seen <- run (lapse "`lapse` RAND `relies`")
       refused <- run (lapse "`relies` RAND `lapse`")
       case (seen, refused) of
@@ -635,18 +670,28 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
         (order, map ledgerOf traced) `shouldBe` (order, map ledgerOf untraced)
         (order, concatMap (entriesOf "possession sought") traced) `shouldBe` (order, ["COMMIT `possession sought` IS TRUE   [party=Landlord, source=COMMIT, at=2026-01-01T00:00:00Z]"])
 
-    it "leaves two sides' records of one cell, made at one event, in the order the sides are written (not refused; not promised)" do
-      ab <- run (twoWriters "`w1` RAND `w2`")
-      ba <- run (twoWriters "`w2` RAND `w1`")
-      (map isRefused ab, map isRefused ba) `shouldBe` ([False], [False])
-      map (Text.takeWhile (/= '[')) (concatMap (entriesOf "x") ab) `shouldBe` ["COMMIT `x` IS 1   ", "COMMIT `x` IS 2   "]
-      map (Text.takeWhile (/= '[')) (concatMap (entriesOf "x") ba) `shouldBe` ["COMMIT `x` IS 2   ", "COMMIT `x` IS 1   "]
+    it "stops when two sides record different values of one cell at one event, either way round (N19)" do
+      for_ ["`w1` RAND `w2`", "`w2` RAND `w1`"] \ compound -> do
+        outs <- run (twoWriters compound)
+        (compound, map stoppedWith outs) `shouldBe` (compound, [Just "record one cell with different values at one event"])
+
+    it "lets two sides record the same value of one cell at one event (N19: equal values are not an error)" do
+      outs <- run (twoWriters "`w1` RAND `w3`")
+      map isRefused outs `shouldBe` [False]
+      map (Text.takeWhile (/= '[')) (concatMap (entriesOf "x") outs) `shouldBe` ["COMMIT `x` IS 1   ", "COMMIT `x` IS 1   "]
+
+    it "refuses a record that lands after a sibling's record from a later instant, and answers the order that makes them in time (N10's option B, until N20's settle-first is built)" do
+      ms <- run (lateRecord "`matcher` RAND `settler`")
+      sm <- run (lateRecord "`settler` RAND `matcher`")
+      map stoppedWith ms `shouldBe` [Just "record one cell out of time order"]
+      map isRefused sm `shouldBe` [False]
+      map (Text.takeWhile (/= '[')) (concatMap (entriesOf "x") sm) `shouldBe` ["COMMIT `x` IS 1   ", "COMMIT `x` IS 2   "]
 
   describe "an ROR, still run one operand after the other" do
     it "refuses an ROR whose left side read a record its right side makes earlier" do
       outs <- run (notice "ROR" "`possession` OP `notice`" noticeThenClaim)
       case outs of
-        [o] -> o `shouldMention` ["read each other's records", "an ROR", "over the whole trace", "what the read saw depends on which side L4 runs first", "not settled"]
+        [o] -> o `shouldMention` ["read each other's records", "an ROR", "over the whole trace", "what the read saw depends on which side L4 runs first", "does not do yet"]
         _ -> expectationFailure ("expected one directive, got " <> show outs)
 
     it "refuses a read on the other side of a RAND that the ROR's unrun alternative could have answered, and answers the order that runs it" do

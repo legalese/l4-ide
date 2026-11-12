@@ -1707,8 +1707,8 @@ operandLabel side = \ case
 --
 -- A @RAND@ applied to a time and a stream runs its operands in step
 -- ('lockstepNext'), with or without an evaluation trace; an @ROR@ still runs
--- them one after the other, until a ruling says what becomes of the losing
--- alternative's records (N10's condition on option A).
+-- them one after the other: NORM-LOG-SPEC N17 and N18 rule how an @ROR@ runs
+-- under goal A, and that is not built.
 startCompound :: Environment -> RBinOp -> MaybeEvaluated -> MaybeEvaluated -> [Reference] -> Maybe (Type' Resolved) -> Machine Config
 startCompound env op rexpr1 rexpr2 rs appType = do
   clock <- case rs of
@@ -1792,14 +1792,21 @@ startCompound env op rexpr1 rexpr2 rs appType = do
 -- So every operand takes event n before any takes event n+1. A record made on
 -- one side while it takes an event is in the ledger for every read the other
 -- side makes from the next event on; within one event the left side runs
--- first. The sibling-read check stays as the backstop for what that cannot
+-- first. That is not yet goal A as NORM-LOG-SPEC rules it (2026-10-26): N20
+-- settles every deadline an event reveals, in every operand, before any
+-- operand matches the event, and N19 has a match not see what a sibling
+-- records while matching the same event; this frame does neither, since an
+-- operand settles and matches in one turn. The sibling-read check stays as
+-- the backstop for what that cannot
 -- order (two accesses while the sides take the same event, in an order other
 -- than their instants', or at one instant), and it now knows which event each
 -- access was made at ('setTaken'), so two events with one stamp are ordered
 -- as the trace orders them.
 --
--- Not in step, and so left to the check ('startCompound'): an @ROR@, whose
--- losing alternative's records are not ruled (N10's own condition on A). A
+-- Not in step, and so left to the check ('startCompound'): an @ROR@. N17 and
+-- N18 (2026-10-26) rule it, every alternative stepping on every event and a
+-- losing alternative's entries kept, tagged and skipped by later reads; that
+-- is not built. A
 -- barrier's members run in its own loop ('barrierNext'), and make no records.
 --
 -- Under an evaluation trace (@#EVALTRACE@, the REPL, a service request for
@@ -5045,8 +5052,11 @@ runRecord cellVal val isOfficial env mHence mRecipientKey site = do
         RouteOfficial  -> OfficialKey
         RouteOwn       -> OwnKey (fromMaybe anonymousParty mParty)
         RouteNotify rk -> OwnKey rk
-  -- smucclaw/l4-ide#1069: rule 2 of the sibling-read check, before the write
-  siblingCheck (checkWrite key cell prov.source site)
+  -- smucclaw/l4-ide#1069: rules 2, 4 and 5 of the sibling-read check, before
+  -- the write. The value is printed only if it is already evaluated through
+  -- and through ('peekName'): the check forces nothing.
+  shown <- peekName val
+  siblingCheck (checkWrite key cell prov.source shown site)
   tellEventRouted route (Assign [cell] val prov)
   case mHence of
     Nothing    -> continueBackward val          -- M1: terminal / expression use
