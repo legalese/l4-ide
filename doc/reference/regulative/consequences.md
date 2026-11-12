@@ -493,16 +493,19 @@ That is `(PARTY P MUST x WITHIN 5) RAND (PARTY Q MUST y WITHIN 5)` with one even
 
 What this does **not** promise:
 
-- **An answer for operands that read each other's records.**
+- **An answer for every rule whose operands read each other's records.**
   The verdict does not depend on the order of the operands when they only make and miss deadlines, or when the only records they read are ones made before the `RAND` started or on their own side.
-  But L4 runs each operand over the whole trace before it starts the next, against one shared ledger, so an operand that reads a record the other one makes (a `RECALL` of a `RECORD` or `COMMIT` made in the other operand's `HENCE`) could see a record from its future, or miss one from its past.
-  When that happens, evaluation stops with an error instead of answering, and the error names the record, both operands and the two instants.
-  The members of an `EVERY`, with `UPON EACH` or without, are run the same way, as the operands of a `RAND`, and are refused the same way.
-  A read and a record made at the same instant are refused whichever operand comes first, because nothing says which of the two happened first.
+  When one side of a `RAND` reads a record the other side makes (a `RECALL` of a `RECORD` or `COMMIT` made in the other side's `HENCE`), L4 runs the two sides in step, against one shared ledger: each event of the trace is offered to the left side and then to the right before the next event is offered to either.
+  So a read sees every record the other side made at an earlier event, and none it made at a later one, whichever side is written first.
+  The members of an `EVERY` with `UPON EACH`, or with no join line, are run the same way, as the sides of a `RAND`.
+  Two cases are still refused: evaluation stops with an error instead of answering, and the error names the record, both sides and the two instants.
+  The first is a read and a record made while the two sides take one event, when the left side's turn, which comes first, is not the earlier instant: one event can reveal a deadline missed some time before it, and a `LEST` that records the miss records it at that deadline.
+  The second is a read and a record made at one instant while the two sides take one event, because nothing says which of the two happened first.
+  An `ROR` still runs its left side over the whole trace before it starts the right one, so there a read could see a record from its future or miss one from its past, and evaluation stops with the same error when that happens.
+  A `RAND` run under `#EVALTRACE` is run the same way as an `ROR`, so a file that answers under `l4 run` can stop with that error when its evaluation is traced.
   `l4 explore` does not say a property holds over a step that was refused (see [`l4 explore`](explore.md)).
-  `l4 check` warns beforehand where two operands can reach a read and a write of one record through rules defined in the same file; it does not follow rules imported from another file, which only the error at run time catches.
-  The warning cannot see time, so it also appears on a file whose left operand makes the record earlier than the right operand reads it, and that file runs: L4 runs the left operand first.
-  To write such a rule, make the record before the `RAND` starts, or make it on the side that reads it.
+  `l4 check` warns beforehand where the two sides of an `ROR` can reach a read and a write of one record through rules defined in the same file; it does not follow rules imported from another file, which only the error at run time catches, and it no longer warns about a `RAND` or an `EVERY`.
+  To write such a rule, make the record before the compound starts, or make it on the side that reads it.
   One case is not caught: a rule with no inputs that reads a record is worked out at its first use, and every later use gets the same answer even after the record has changed, inside a compound or not, so the later use makes no read for the check to see.
   Write the `RECALL` where the record is needed, and pass what it reads to the rule as an input, as `` `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`) `` does in the [explorer's example](explore.md).
 - **That an `ROR`'s operands both run.** Once one alternative is fulfilled, the other is not run further, so a `RECORD` it would have made is not made.
