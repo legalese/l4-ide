@@ -30,23 +30,34 @@ high-fidelity — and unusually useful as a cross-check.
   formalisation sit side by side on the page.
 - **Provisos stay provisos.** An L4 `UNLESS` becomes a Catala exception ladder rather than being
   compiled away, so the structure a drafter would recognise survives into the target.
-- **You get machine-checked agreement between two independent implementations.** This is the real
+- **You get machine-checked agreement between two separately written evaluators.** This is the real
   prize. The generated module carries test scopes whose expected values were computed by **L4's**
   evaluator; running Catala's own `clerk test` then checks Catala's answers against them. Two
-  languages with separately written evaluators agreeing on the same rules is far stronger evidence
-  than either being self-consistent.
+  evaluators written separately agreeing on the same rules is stronger evidence than either being
+  self-consistent. The limits: Catala evaluates the module _we_ generate, so a bug in the
+  generation shows up, and so does a bug in either evaluator, but a misreading of your L4 shared by
+  the generator and L4's own evaluator would not. And nothing runs it for you: Catala is not
+  installed on the CI runners, so that job skips, and the check is `node etc/validate-catala.mjs`
+  on a machine that has Catala.
 - **Catala's prover can inspect the ladder.** `catala proof` verifies that no two rungs of an
   exception ladder can fire simultaneously.
 - **Every exception ladder is checked against L4 on the scope you ship.** Rewriting an `UNLESS`
   or a `BRANCH` as a ladder is a change of shape, so each ladder carries a _witness gate_: test
   scopes that call the emitted scope at concrete inputs and expect the value L4 computed there.
   The inputs come from a fixed set of candidates: each number the conditions mention, one either
-  side of it, zero, both truth values, and every option of a choice. Every combination of the
-  ladder's conditions that some candidate produces is tested at up to eight of the candidates that
-  produce it, so an inequality is tested exactly at its threshold as well as either side of it.
+  side of it, zero, both truth values, and every option of a choice. The conditions are the
+  separate yes-or-no questions inside the ladder's rungs, so `a OR b` is two of them, not one, and a
+  question that appears in two rungs counts once; a call to another rule counts as one question
+  and its body is not read. Every combination of those questions that some candidate produces is
+  tested at up to eight of the candidates that produce it, so an inequality is tested exactly at
+  its threshold as well as either side of it, and an edit that drops `b` from `a OR b` changes a
+  tested answer.
   An edit to the shipped rule that changes its answer at any of those inputs fails `clerk test`;
   that includes changing `>` to `>=` on a threshold the rule compares with. An edit that changes the
   answer only at inputs outside the candidate set is not caught.
+  Beyond twelve such questions, or where a question raises an error at an input that an earlier
+  question of its rung already decides (`x ≠ 0 AND 10 / x > 2` at zero), the gate takes each rung
+  as one question instead, and the emitted file says so and says why.
   An SMT solver, [z3](https://github.com/Z3Prover/z3), is used only to show that the remaining
   combinations are impossible (a higher income band without the lower one, say), and to find a
   witness when no candidate produces a combination; the file says so when it does. Unless a

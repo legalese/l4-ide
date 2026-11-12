@@ -299,7 +299,11 @@ data WitnessGate = WitnessGate
   { wgRows      :: ![WitnessRow]
   , wgImpossible :: ![[Bool]]
   , wgAtomText  :: ![Text]
-    -- ^ each atom as L4 source, in the ladder's own order, for the prose
+    -- ^ each condition as L4 source, for the prose: the leaves of the ladder's
+    -- rungs in drawing order, or the rungs themselves when 'wgRungNote' is set
+  , wgRungNote  :: !(Maybe Text)
+    -- ^ 'Just' why the gate is at rung level, not leaf level: a rung that is
+    -- @a OR b@ is then one condition, and the prose says so
   }
   deriving stock (Eq, Show)
 
@@ -329,6 +333,8 @@ data LadderTarget = LadderTarget
   , ltAppArgs :: ![Resolved]
   , ltAtoms  :: ![Expr Resolved]
   , ltReadsAssumes :: !Bool
+  , ltDecl   :: !(Decide Resolved)
+    -- ^ the exported declaration itself, for a caller that draws its rungs
   }
 
 -- | Every exported decision of this module whose body 'modeBClauses' would
@@ -342,6 +348,7 @@ ladderTargets imports mod' =
       , ltAppArgs = di.diAppArgs
       , ltAtoms  = atoms
       , ltReadsAssumes = not (null (Map.findWithDefault [] di.diUnique assumeUse))
+      , ltDecl   = ef.exportDecide
       }
   | ef <- getExportedFunctions mod'
   , Just di <- [Map.lookup (getUnique (decideName ef.exportDecide)) decides]
@@ -1100,7 +1107,12 @@ witnessBlockOf ctx ls = case ls.lsGate of
        , "including one exactly at a number a condition compares with, fails `clerk test`"
        , "(R4, §8.4)."
        , ""
-       , "The atoms, as L4 writes them:"
+       ]
+    <> [ l | Just why <- [g.wgRungNote]
+           , l <- [ "The conditions below are the rungs of the ladder as L4 writes them, not the separate"
+                  , "conditions inside a rung: " <> why <> "."
+                  , "" ] ]
+    <> [ "The atoms, as L4 writes them:"
        , ""
        ]
     <> [ "- `p_" <> tshow i <> "` is " <> code a | (i, a) <- zip [0 :: Int ..] g.wgAtomText ]
