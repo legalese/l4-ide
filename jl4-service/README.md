@@ -459,6 +459,13 @@ A reverse proxy can set these headers to control what jl4-service includes in re
 | `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP        | `l4:read`     |
 | `X-Include-Evaluate`  | Evaluation/batch/query-plan paths in OpenAPI, evaluation tools in MCP  | `l4:evaluate` |
 
+#### Origin-Trial Token
+
+While WebMCP is a Chrome origin trial, Chrome offers the API to a page only if the page carries a trial token or the user has turned the feature on. A reverse proxy can pass a token in the `X-Origin-Trial-Token` request header on `GET /.webmcp/embed.js`; the script then adds it to the embedding page as an `origin-trial` meta tag.
+
+- Without the header, or with a value that is not base64, the script adds no token.
+- Register the token for the origin that serves the script, with third-party matching enabled.
+
 > **Note:** The legacy path `/webmcp.js` is redirected to `/.webmcp/embed.js` with a 301. Update existing embeds when convenient.
 
 #### Embedding on Third-Party Websites

@@ -19,6 +19,7 @@ import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
 import Types
+import WebMCPPage (mkOriginTrialToken)
 import L4.FunctionSchema (Parameter (..), Parameters (..))
 
 import Control.Monad (forM, forM_, guard, unless, when)
@@ -2798,6 +2799,38 @@ spec = describe "integration" do
                 in hasFileTool `shouldBe` False
               _ -> expectationFailure "Expected tools array"
           _ -> expectationFailure "Expected result object"
+
+  describe "WebMCP embed script origin-trial token" do
+    let fetchEmbedScript baseUrl mgr headers = do
+          req <- parseRequest (baseUrl <> "/.webmcp/embed.js")
+          resp <- httpLbs req { requestHeaders = headers } mgr
+          statusCode' resp `shouldBe` 200
+          pure (Text.Encoding.decodeUtf8 (LBS.toStrict (responseBody resp)))
+        token = "AbCd0123+/EfGh4567==" :: BS.ByteString
+
+    it "adds no token when the request carries none" do
+      withServiceFromSources "ot-none" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr []
+        script `shouldSatisfy` (not . Text.isInfixOf "origin-trial")
+        script `shouldSatisfy` Text.isInfixOf "modelContext"
+
+    it "adds the token passed in X-Origin-Trial-Token" do
+      withServiceFromSources "ot-some" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr [("X-Origin-Trial-Token", token)]
+        script `shouldSatisfy` Text.isInfixOf "otMeta.httpEquiv = 'origin-trial';"
+        script `shouldSatisfy` Text.isInfixOf ("otMeta.content = '" <> Text.Encoding.decodeUtf8 token <> "';")
+
+    it "adds no token when the value is not base64" do
+      withServiceFromSources "ot-bad" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr [("X-Origin-Trial-Token", "x';alert(1);//")]
+        script `shouldSatisfy` (not . Text.isInfixOf "origin-trial")
+        script `shouldSatisfy` (not . Text.isInfixOf "alert(1)")
+
+    it "accepts only non-empty base64 of bounded length" do
+      Maybe.isJust (mkOriginTrialToken token) `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken "") `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken "abc def") `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken (BS8.replicate 4097 'A')) `shouldBe` True
 
   describe "deployments query params" do
     it "?functions=full includes parameters in listing" do
