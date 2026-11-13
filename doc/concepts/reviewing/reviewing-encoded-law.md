@@ -96,6 +96,8 @@ What it is _not_, stated plainly because the tool says so itself: the analysis i
 
 Where `l4 verify` stops at the boolean skeleton, [`l4 prove FILE`](proving-assertions.md) goes into the arithmetic: it takes each `#ASSERT` that reads a section `GIVEN`, which `l4 run` cannot decide, and asks an SMT solver whether any input makes it false. It answers `proved`, `refuted` with a counterexample the evaluator has confirmed, or `unknown` with the reason, and it ends with a coverage line of the same kind.
 
+To see every combination of a rule's conditions, with an input that produces it and the answer L4 gives there, and the combinations that cannot happen, run [`l4 coverage FILE`](coverage.md).
+
 `l4 nlg FILE` regenerates legislative prose from the encoding. Useful in review: read the generated prose beside the source section and the difference in emphasis often shows you where the encoding has quietly changed the subject. Where an encoding carries renderings in more than one language, `l4 nlg --lang he FILE` asks for one of them; a rule with no rendering in that language falls back to its default, so a partial translation still reviews as a whole document.
 
 ## 4 · Your two jobs: interpretation & isomorphism

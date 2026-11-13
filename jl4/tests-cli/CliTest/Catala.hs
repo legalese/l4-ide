@@ -50,6 +50,38 @@ spec bin = do
       sout `shouldSatisfy` ("-- e: Earner { -- income: 500000.0 } }" `isInfixOf`)
       sout `shouldNotSatisfy` ("EqvGrid" `isInfixOf`)
 
+    -- Gap 2 of the coverage work: the cover points are the leaves of the
+    -- rungs, so `a OR b OR c` is three of them and its seven realisable
+    -- combinations are each tested. Twelve constructors make the first eight
+    -- inputs that realise "the exception applies" share one combination, so
+    -- a gate that counted the rung once could pass a shipped rule that
+    -- silently dropped `b` or `c`; measured with catala 1.2.1, that edit
+    -- passes the rung-level golden and fails this one in 8 tests.
+    it "gates the leaves of a rung, not the rung (a OR b OR c is three cover points)" $ withZ3 $ do
+      expectGolden bin ["export", "catala", "examples/catala/or-leaves.l4"]
+                       "examples/catala/expected/or-leaves.catala_en"
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/or-leaves.l4"]
+      code `shouldBe` ExitSuccess
+      for_ [ "`holds a licence`", "`is dormant`", "`is publicly funded`" ] \leaf ->
+        sout `shouldSatisfy` (("is `` " <> leaf <> " ``") `isInfixOf`)
+      sout `shouldSatisfy` ("category EQUALS Other" `isInfixOf`)
+      sout `shouldNotSatisfy` ("not the separate" `isInfixOf`)
+
+    -- A leaf that raises where its rung is decided without reaching it
+    -- (`10 / instalments` at zero) would land that input in no combination of
+    -- the leaves, so the decision is covered by its rungs instead, the prose
+    -- says so and says why, and the input at zero is still a witness.
+    it "covers the rungs, and says why, where a leaf raises behind its guard" $ withZ3 $ do
+      expectGolden bin ["export", "catala", "examples/catala/guarded-leaf.l4"]
+                       "examples/catala/expected/guarded-leaf.catala_en"
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/guarded-leaf.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("not the separate" `isInfixOf`)
+      sout `shouldSatisfy` ("raises at an input where an earlier condition of the rung already decides it" `isInfixOf`)
+      sout `shouldSatisfy` ("-- instalments: 0.0 })" `isInfixOf`)
+      -- the combination no input realises is the solver's to rule out, and it does
+      sout `shouldSatisfy` ("proved impossible by an SMT solver" `isInfixOf`)
+
     -- The golden fixtures' witnesses come from the fixed candidate set alone,
     -- so the emitted text does not depend on which solver (or version) runs.
     it "ships no golden whose witnesses needed a solver to find" $ do

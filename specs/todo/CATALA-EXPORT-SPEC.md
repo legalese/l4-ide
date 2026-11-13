@@ -1002,19 +1002,58 @@ fulfilled` to `consequence fulfilled`, which inverts a proviso — and the grid 
    built; saying so is the interim.)
 
 **DISCHARGED as a design, 2026-10-30 (legalese/l4-ide#784; VERIFICATION-BACKEND-LOWERING-SPEC R-V10): the gate now calls the real emitted scope; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`).**
-For each exported decision whose rule is emitted as a ladder, `l4 export catala` looks for inputs that realise each combination of truth values of the ladder's atoms (`L4.Cli.CatalaWitness`), and emits, in place of the grid, `#[test]` scopes that call the emitted scope at those inputs and expect the value L4's evaluator computes there (`witnessBlockOf`, `L4.Catala.Lower`).
+For each exported decision whose rule is emitted as a ladder, `l4 export catala` looks for inputs that realise each combination of truth values of the ladder's cover points (`L4.Cli.Coverage`, called from `L4.Cli.CatalaWitness`), and emits, in place of the grid, `#[test]` scopes that call the emitted scope at those inputs and expect the value L4's evaluator computes there (`witnessBlockOf`, `L4.Catala.Lower`).
 The inputs come from a fixed candidate set (each literal the atoms reach, one either side of it, zero, both Booleans, every constructor); the evaluator decides which combination each candidate realises, and each realised combination is tested at up to eight of its candidates, so a threshold is tested at its literal as well as either side.
 z3 is used only to prove a combination impossible, and to find a witness when no candidate realises one, which the emitted prose then says.
 A gate is used only when every combination is witnessed or proved impossible; otherwise, and always without a solver when some combination needs one, the ladder keeps the grid above (or Mode A past its cap), and the reason goes to stderr.
-A gated ladder is not bound by the grid's cap of 8 atoms (gate limit: 12, assumed, not ruled).
+A gated ladder is not bound by the grid's cap of 8 atoms (gate limit: 12 cover points, counted in leaves; ruled, CROSSWORD, see "A standalone report" below).
 The witness gates are emitted after every scope, under their own heading: a `catala-test-cli` block runs against the document up to the block, so a witness placed beside its rule called later-defined scopes as if they had no rules (measured: `statute`'s `QualifiesWitness5` answered false there and true at the end of the file).
-Measured on nye with catala 1.2.1, z3 4.16.0, after the audit of #784:
-(a) the four goldens the grid covered (`benefit`, `bands`, `fixtures`, `statute`) are gated, and `node etc/validate-catala.mjs` passes 13 files, 309 tests, 0 failed (on `unstable`: 12 files, 83 tests);
-(b) flipping `consequence not fulfilled` to `consequence fulfilled` in `benefit`'s shipped rule passes `clerk test` on the grid golden (4 tests, 0 failed) and fails it on the gated golden (54 tests, 10 failed);
+Measured on nye with catala 1.2.1 and z3 4.16.0, on 2026-11-12, from `feat/l4-prove` at 891821034 plus the leaf-level change below (the figures of (a), (b) and (d) are from that build):
+(a) the four goldens the grid covered (`benefit`, `bands`, `fixtures`, `statute`) are gated, and `node etc/validate-catala.mjs` passes 15 files, 529 tests, 0 failed;
+(b) flipping `consequence not fulfilled` to `consequence fulfilled` in `benefit`'s shipped rule passes `clerk test` on the grid golden (4 tests, 0 failed) and fails it on the gated golden (94 tests, 14 failed);
 (c) `many-bands.l4`, nine atoms, is gated at the ten combinations an income realises (28 witnesses), z3 proving the other 502 impossible, where before it fell back to Mode A;
 (d) the audit's boundary mutant, `(e.income > 500000.0)` to `>=` in `many-bands`'s shipped rule, passed the one-witness-per-combination gate (22 tests, 0 failed) and fails this one (58 tests, 1 failed).
 An edit that changes the answer only at inputs outside the candidate set is still not caught, and limit 1 above narrows rather than vanishes: the atoms are now evaluated, not lifted, but a witness is required to make every atom defined, so a raising atom is still not tested here.
 The grid remains as the fallback.
+
+**Cover points are the leaves of the rungs (2026-11-12; ruled, CROSSWORD, see "A standalone report" below).**
+A cover point is a leaf of a rung: a condition that is not itself made of `AND`, `OR` or `NOT`, found by the ladder diagram and keyed as `l4 verify` and the wizard key it (`L4.Viz.AtomKey`).
+So `a OR b OR c` is three cover points, a condition used in two rungs is one, an inert string in a conjunction is none, and a call to another rule (`qualifies OF h`) is one, whose body is not read.
+A bucket is one combination of truth values of all the leaves, the full cross, and each is witnessed, proved impossible by the solver, or undecided with its reason.
+This is a cross, not MC/DC: a pair of buckets that differ in one leaf and in the answer is in the table whenever both are realisable, but nothing here checks that such a pair exists.
+Why leaves: a gate that counts a rung once tests an `a OR b OR c` exception at up to eight inputs in candidate order, and where one combination of the three owns the first eight inputs, a shipped rule that drops `b` or `c` passes.
+Measured on `jl4/examples/catala/or-leaves.l4` (twelve constructors in front of an exception `a OR b OR c`) with catala 1.2.1: dropping `is publicly funded`, or `is dormant`, from the shipped rule passes the rung-level golden (48 tests, 0 failed) and fails the leaf-level one (144 tests, 8 failed).
+The cross is `2ⁿ` in the leaves, which is why the limit of 12 counts them.
+The decision is covered at rung level instead, exactly as before, with the reason in the emitted prose, when (a) the ladder diagram cannot break a rung down, (b) there are more than 12 leaves, (c) a leaf raises at an input where its rung is decided without reaching it, or (d) a bucket of the leaf cross is left undecided.
+(c) is the one that needs a fixture: `NOT (x EQUALS 0) AND 10 / x GREATER THAN 2` is decided at zero by its first leaf, but the second raises there, so a leaf cross would put a reachable input in no bucket (`jl4/examples/catala/guarded-leaf.l4`: the decision stays at rung level and zero is still a witness).
+Every witness input of the rung-level gate is a witness input of the leaf-level one, because the candidates and the eight-per-bucket cap are unchanged, and a bucket of the cross is a refinement of a bucket of the rungs.
+The search is backend-neutral and lives in `L4.Cli.Coverage`; `L4.Cli.CatalaWitness` is the Catala adapter over it, and asks the engine to give way to the rungs whenever a leaf bucket is undecided, since the lowering needs every combination decided.
+
+**A standalone report: `l4 coverage` (2026-11-12; ruled, TALLYSTICK and CROSSWORD).**
+The search above needs no Catala, so `l4 coverage FILE` prints it for any file: per decision, the cover points with their source spans, a table of the buckets (a `T`/`F` per cover point), the first input that realises each witnessed bucket and L4's answer there, the buckets the solver proved impossible, and the buckets neither reached nor proved, each with its reason.
+It ends with a coverage line in the style of `l4 explore`, which says in capitals what was not done (`UNDECIDED`, `AT RUNG LEVEL`, `NOT COVERED`, `NOTHING COVERED`), and the limits are in `--help` and in `doc/concepts/reviewing/coverage.md`.
+The decisions are every top-level `DECIDE` of the file that branches on a condition, or those named with `--decision`: the rungs of an `UNLESS` chain or of a `BRANCH`, an `IF` or a literal `CONSIDER`, else the body of a BOOLEAN decision as one rung (`L4.Coverage.Rungs`, which the Catala lowering reads its ladder shape from too).
+A bucket whose inputs give different answers says so and shows an input for each answer; an input that no condition reads is tried at one value, and the report names it.
+Exit statuses: 0 every decision at leaf level with every bucket witnessed or proved impossible; 1 the file does not check or `--decision` names nothing; 2 some bucket undecided; 3 none undecided but some decision at rung level or not covered, or nothing covered at all, so that a run over a file with no conditions is not read as complete.
+`--json` writes the same report to standard output and the coverage line to standard error; `--all` lists every witness and every impossible bucket, which the text report otherwise caps at sixteen.
+A decision that reads an `ASSUME` is not covered, since an input cannot supply one, and a body wrapped in `WHERE` or `LET` is covered only if it is BOOLEAN.
+`jl4/tests-cli/CliTest/Coverage.hs` pins the two reports that matter as goldens (`jl4/examples/coverage-report/expected/`) and each exit status.
+
+TALLYSTICK, ruled 2026-11-12 by Meng (typed "BANNETON TALLYSTICK" in session GM): the six choices above, as printed in the example run of 2026-11-12.
+
+1. The verb: `l4 coverage FILE`.
+2. The flags: `--decision NAME` (repeatable), `--all`, `--json`, `--timeout SECONDS` (default 10) and the fixed-clock flag `--fixed-now`.
+3. The exit statuses 0, 1, 2 and 3 as above, with precedence 1 over 2 over 3.
+4. The text layout: the cover points with their spans, a `T`/`F` table of the buckets, the first witness of each and L4's answer there, and the impossible buckets capped at sixteen unless `--all`.
+5. The closing coverage line, in the style of `l4 explore`.
+6. The limits in the `--help` footer, as that footer was printed in the example run.
+
+CROSSWORD, ruled 2026-11-12 (21:59Z) by Meng, who typed the word in session GM in one message with other sessions' words: the four items that stood as assumed after TALLYSTICK, as built.
+
+1. The cover points of a decision are the leaves of its rungs, keyed by `L4.Viz.AtomKey`, and a bucket is one combination of all the leaves, the full cross, not MC/DC.
+2. The limit of 12 counts leaves.
+3. The decision is covered at rung level instead when (a) the ladder diagram cannot break a rung down, (b) there are more than 12 leaves, (c) a leaf raises at an input where its rung is decided without reaching it, or (d) any bucket of the leaf cross is left undecided.
+4. The row for a bucket whose inputs give different answers, and the line that names the inputs no condition reads, with its paragraph in the `--help` footer and its `inputsNoConditionReads` key in the JSON report.
 
 **Addendum: (b)'s `catala proof` pass is now run — partially, and the partiality is the point.**
 `etc/validate-catala.mjs` gained it as layer 2 of three. What it buys is `NoOverlappingExceptions`:

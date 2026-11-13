@@ -32,3 +32,4 @@
 
 - [Reviewing Encoded Law](reviewing/reviewing-encoded-law.md)
 - [Proving an assertion: `l4 prove`](reviewing/proving-assertions.md)
+- [Which combinations a rule has been tried on: `l4 coverage`](reviewing/coverage.md)
