@@ -154,11 +154,11 @@ The six `actus-*` files are the parts `actus` is assembled from; import `actus` 
 piece on its own.
 
 **Filenames with a hyphen must be backtick-quoted in the `IMPORT` line**, as the table shows. A
-custom library goes by file path:
-
-```l4
-IMPORT "my-custom-lib.l4"
-```
+custom library is a file of your own: put `my-custom-lib.l4` beside the file that imports it and
+write ``IMPORT `my-custom-lib` ``. From another folder, write the path in backticks, relative to the
+importing file and without `.l4`: ``IMPORT `../libs/my-custom-lib` ``. A name without a slash is
+looked up by name; a name with a slash is one file, and no search decides it. The quoted form,
+`IMPORT "my-custom-lib.l4"`, is a parse error.
 
 Reference: <https://legalese.com/l4/reference/libraries.md>
 

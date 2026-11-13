@@ -1,0 +1,6 @@
+IMPORT `./חוק`
+IMPORT `./core`
+
+both MEANS hokmarker + coremarker
+
+#EVAL both

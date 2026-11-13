@@ -1,0 +1,5 @@
+IMPORT foo.l4
+
+extvalue MEANS foomarker + 1
+
+#EVAL extvalue
