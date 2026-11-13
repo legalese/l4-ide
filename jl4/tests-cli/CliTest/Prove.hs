@@ -12,6 +12,7 @@
 -- "goldens over the emitted SMT-LIB2 run with no solver installed").
 module CliTest.Prove (spec, fixtures) where
 
+import Data.Foldable (for_)
 import Data.List (isInfixOf, isPrefixOf, sort)
 import System.Directory (listDirectory)
 import System.Exit (ExitCode (..))
@@ -22,7 +23,8 @@ import Test.Hspec
 import CliTest.Common
 
 numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture,
-  collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture, lazyFieldFixture :: FilePath
+  collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture, lazyFieldFixture,
+  rebateBuggyFixture, rebateFixedFixture, rebateNoFloorFixture :: FilePath
 numbersFixture       = fixtureDir </> "prove" </> "numbers.l4"
 recordsFixture       = fixtureDir </> "prove" </> "records.l4"
 outOfFragmentFixture = fixtureDir </> "prove" </> "out-of-fragment.l4"
@@ -36,10 +38,14 @@ hashNameFixture      = fixtureDir </> "prove" </> "hash-name.l4"
 lazyFieldFixture     = fixtureDir </> "prove" </> "lf2.l4"
 sameLineFixture      = fixtureDir </> "prove" </> "same-line.l4"
 assumedFixture       = fixtureDir </> "assert-assumed.l4"
+rebateBuggyFixture   = fixtureDir </> "prove" </> "rates-rebate-buggy.l4"
+rebateFixedFixture   = fixtureDir </> "prove" </> "rates-rebate-fixed.l4"
+rebateNoFloorFixture = fixtureDir </> "prove" </> "rates-rebate-no-floor.l4"
 
 fixtures :: [FilePath]
 fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture
-           , collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture, lazyFieldFixture]
+           , collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture, lazyFieldFixture
+           , rebateBuggyFixture, rebateFixedFixture, rebateNoFloorFixture]
 
 -- | The lines of a run's report that belong to the @#ASSERT@ on this line of
 -- the fixture: its verdict line, and the indented lines under it.
@@ -55,6 +61,18 @@ verdictOf :: Int -> String -> String
 verdictOf n sout = case rowFor n sout of
   (r : _) -> takeWhile (/= ' ') (dropWhile (== ' ') r)
   [] -> "<no row for line " <> show n <> ">"
+
+-- | The value a counterexample gives to a name: @x = 0.5@ gives @0.5@.
+valueOf :: String -> [String] -> Maybe String
+valueOf name = go . words . unwords
+ where
+  go (n : "=" : v : _) | n == name = Just (filter (/= ',') v)
+  go (_ : rest) = go rest
+  go [] = Nothing
+
+-- | A value printed as a decimal or a ratio is not a whole number.
+isFraction :: String -> Bool
+isFraction v = '.' `elem` v || '/' `elem` v
 
 spec :: FilePath -> Spec
 spec bin = describe "l4 prove" $ do
@@ -116,6 +134,72 @@ spec bin = describe "l4 prove" $ do
     verdictOf 7 sout `shouldBe` "refuted"
     unwords (rowFor 7 sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
     verdictOf 10 sout `shouldBe` "proved"
+
+  -- The guards a drafter has for "whole" or "bounded" are hypotheses of the
+  -- one obligation they sit in. A refutation at a fraction must survive
+  -- outside the guard (lines 7 and 19) and inside a bound that does not imply
+  -- wholeness (line 25); the guarded twins are proved (lines 10, 16, 22).
+  it "admits an IS INTEGER, FLOOR or bound guard only as a hypothesis, so a fraction still refutes" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", integersFixture]
+    code `shouldBe` ExitFailure 2
+    for_ [10, 16, 22] \n -> verdictOf n sout `shouldBe` "proved"
+    for_ [7, 19, 25] \n -> do
+      verdictOf n sout `shouldBe` "refuted"
+      unwords (rowFor n sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
+      fmap isFraction (valueOf "x" (rowFor n sout)) `shouldBe` Just True
+    sout `shouldSatisfy` ("coverage: 6 #ASSERT: 0 decided by evaluation, not re-proved; 6 obligations: 3 proved, 3 refuted, 0 unknown" `isInfixOf`)
+
+  -- The same property, stated where no solver is needed: no declaration is an
+  -- Int, and the IS INTEGER guard is the antecedent of the goal.
+  it "declares every NUMBER Real in the emitted SMT-LIB2, with a guard as the antecedent of the goal" $
+    withSystemTempDirectory "l4-prove-smt" \dir -> do
+      Output code _ _ <- runL4 bin ["prove", integersFixture, "--emit-smt", dir]
+      code `shouldBe` ExitSuccess
+      files <- sort <$> listDirectory dir
+      length files `shouldBe` 6
+      for_ files \f -> do
+        script <- readFile (dir </> f)
+        script `shouldSatisfy` ("(declare-const |l4_x| Real)" `isInfixOf`)
+        filter ("(declare" `isPrefixOf`) (lines script) `shouldSatisfy` all (not . ("Int" `isInfixOf`))
+      guarded <- readFile (dir </> "integers-10-1.smt2")
+      guarded `shouldSatisfy` ("(=> (is_int |l4_x|)" `isInfixOf`)
+
+  -- The New Zealand rates rebate (the deck "20190514 Multilateral Isomorphism
+  -- in L4"): the buggy form takes a bare MINUS for the income excess.
+  it "finds the rates-rebate bug: the rebate over its ceiling is refuted, with a counterexample the evaluator replays" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", rebateBuggyFixture]
+    -- 2, not 4: the replay agrees, so no ENCODING DEFECT
+    code `shouldBe` ExitFailure 2
+    -- the deck's worked number, decided by the evaluator and not the solver
+    verdictOf 62 sout `shouldBe` "decided"
+    unwords (rowFor 62 sout) `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+    verdictOf 66 sout `shouldBe` "decided"
+    for_ [76, 80] \n -> do
+      verdictOf n sout `shouldBe` "refuted"
+      unwords (rowFor n sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
+    sout `shouldSatisfy` ("coverage: 4 #ASSERT: 2 decided by evaluation, not re-proved; 2 obligations: 0 proved, 2 refuted, 0 unknown" `isInfixOf`)
+
+  it "proves the same assertions on the clamped rates-rebate rule, monotonicity in income among them" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", rebateFixedFixture]
+    code `shouldBe` ExitSuccess
+    -- the deck's worked number again: 560 where the buggy form pays 630
+    verdictOf 60 sout `shouldBe` "decided"
+    unwords (rowFor 60 sout) `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+    for_ [75, 79, 85] \n -> verdictOf n sout `shouldBe` "proved"
+    sout `shouldSatisfy` ("coverage: 5 #ASSERT: 2 decided by evaluation, not re-proved; 3 obligations: 3 proved, 0 refuted, 0 unknown" `isInfixOf`)
+
+  -- Monotonicity cannot tell the two forms apart, because the bug is in the
+  -- size of the rebate and not in its direction: with the FLOOR out of the
+  -- income excess it is proved of both, and only the ceiling is refuted.
+  it "proves monotonicity of both rates-rebate forms, so only the ceiling finds the bug" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["prove", rebateNoFloorFixture]
+    code `shouldBe` ExitFailure 2
+    verdictOf 73 sout `shouldBe` "proved"
+    verdictOf 76 sout `shouldBe` "proved"
+    verdictOf 79 sout `shouldBe` "refuted"
+    unwords (rowFor 79 sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
+    verdictOf 82 sout `shouldBe` "proved"
+    sout `shouldSatisfy` ("coverage: 4 #ASSERT: 0 decided by evaluation, not re-proved; 4 obligations: 3 proved, 1 refuted, 0 unknown" `isInfixOf`)
 
   it "fails with a named reason when Z3_EXE names a file that does not exist" $ do
     Output code _ serr <- runL4WithEnvExtra [("Z3_EXE", "/nonexistent/z3")] bin ["prove", assumedFixture]
