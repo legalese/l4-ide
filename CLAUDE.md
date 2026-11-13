@@ -352,9 +352,11 @@ change).
 
 - **A `.l4` file cannot `IMPORT` a library sharing its own basename.** The failure is a silent
   `GraphException`, not a "not found" error.
-- **Library resolution order** is `JL4_LIBRARY_PATH → root → importer-relative → embedded → XDG →
-bundle`. The embedded stdlib is seeded into the VFS under the `jl4-embedded` URI scheme
-  specifically so it cannot collide with a real file path.
+- **Library resolution order** is `JL4_LIBRARY_PATH → root → importer-relative → embedded → XDG → bundle`, and the first copy found wins.
+  **Setting `JL4_LIBRARY_PATH` removes the embedded tier; it does not merely add a tier above it** (`jl4-lsp/src/LSP/L4/Rules.hs:497`; `specs/as-built/import-resolution.md:102`).
+  A module the directory does not hold, `prelude` included, then resolves from the root, the importer's directory, XDG or the bundle, whatever version is there, or not at all, with the warning `Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped)`.
+  So a directory you point it at must hold every library the code imports (checked 2026-11-12 with an empty directory: `IMPORT prelude` failed on a dev build and on 1.6.110).
+  The embedded stdlib is seeded into the VFS under the `jl4-embedded` URI scheme specifically so it cannot collide with a real file path.
 - **`ASSUME` is uninterpreted** — modules in that style typecheck but do not evaluate. Idiomatic L4
   threads a record as one `GIVEN` parameter instead.
 
