@@ -38,8 +38,8 @@ import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Evaluate.Ledger
   ( Ledger
-  , LedgerEvent (..)
-  , LedgerStore (..)
+  , LedgerEvent' (..)
+  , LedgerStore' (..)
   , Provenance (..)
   , anonymousParty
   )

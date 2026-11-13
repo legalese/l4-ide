@@ -3544,11 +3544,14 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               -- unknown input, and never reported: the directive boundary
               -- rewrites it into 'Stuck' (UNKNOWN-EVALUATION-SPEC §4.5)
               RanOutOfSteps               -> "TERMINATES (a resource bound on an unknown; reported as Stuck)"
-            constructorCount = 9 :: Int
+              -- raised only inside the ledger display pass, after the
+              -- directive's verdict, and caught per row there (LED)
+              DisplayBudgetExhausted      -> "TERMINATES (a resource bound on showing a ledger row; never reaches a result)"
+            constructorCount = 10 :: Int
         -- the case above is TOTAL; -Werror's incomplete-pattern warning fires
-        -- on a tenth constructor before this assertion ever runs
+        -- on an eleventh constructor before this assertion ever runs
         coveredBy StackOverflow `shouldSatisfy` (not . Text.null)
-        constructorCount `shouldBe` 9
+        constructorCount `shouldBe` 10
 
   -- smucclaw/l4-ide#936. Two gaps, one issue, and the tests are written in that
   -- order deliberately: the FEEL lowering alone would have removed a loud

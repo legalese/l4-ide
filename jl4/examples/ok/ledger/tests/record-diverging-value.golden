@@ -1,0 +1,12 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+record-diverging-value.l4:31:1-32:38:
+  FULFILLED
+  Ledger (Agent):
+    RECORD `basket` IS <could not be evaluated: showing this value took more than 1000000 steps>   [party=Agent, source=RECORD, at=2025-01-31T15:45:30Z]
+record-diverging-value.l4:42:1-43:38:
+  FULFILLED
+  Ledger (Agent):
+    RECORD `basket` IS <could not be evaluated: showing this value took more than 1000000 steps>   [party=Agent, source=RECORD, at=2025-01-31T15:45:30Z]
+    RECORD `receipt` IS Item OF "paid", 3   [party=Agent, source=RECORD, at=2025-01-31T15:45:30Z]

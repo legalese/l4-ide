@@ -30,8 +30,8 @@ import qualified Data.Text as Text
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Evaluate.Ledger
-  ( LedgerEvent (..)
-  , LedgerStore (..)
+  ( LedgerEvent' (..)
+  , LedgerStore, LedgerStore' (..)
   )
 import L4.EvaluateLazy
   ( EvalDirectiveResult (..)

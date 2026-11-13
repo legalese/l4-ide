@@ -42,7 +42,7 @@ import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import qualified Data.Map.Strict as Map
 
-import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..), Provenance (..))
+import L4.Evaluate.Ledger (LedgerEvent' (..), LedgerStore' (..), Provenance (..))
 import L4.EvaluateLazy
   ( EvalDirectiveResult (..)
   , execEvalModuleWithEnv
