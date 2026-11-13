@@ -335,7 +335,8 @@ GIVETH A DEONTIC Actor Action
         LEST   BREACH BY t
 ```
 
-The inner obligation is in parentheses, as every nested obligation is: it has no closing token, so its own optional `HENCE`/`LEST` would otherwise swallow the outer `LEST`. This is the same rule as for a `PARTY` rule nested in a `HENCE` (see [HENCE](consequences.md#hence-and-lest)).
+The inner obligation is in parentheses, which shows the reader where it ends.
+The outer `LEST` would be the outer rule's without them too, because it lines up with the outer rule's clauses; see [Which rule a HENCE or LEST belongs to](consequences.md#which-rule-a-hence-or-lest-belongs-to).
 
 ### Seen as a diagram
 

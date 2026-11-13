@@ -152,6 +152,7 @@ It runs the build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `jl4-service-test
 `check-corpus-goldens`, `check-canon-citations`, the canon-mirror check (`sync-canon.mjs --check`),
 `doc/test-docs.sh` and prettier, pins `JL4_LIBRARY_PATH` for you, and exits non-zero on any failure.
 `--quick` skips `jl4-test`, which is the ~12-minute one.
+The docs check type-checks every `.l4` file under `doc/` with a copy of the worktree's own `l4`, put first on `PATH`, so an older installed `l4` (§3.1) cannot decide it; with no build to copy it falls back to `--no-l4`, which checks links and orphans only, and the summary says so.
 
 **The worktree is an argument, not a `cd`, and it must be absolute.** That is the point of the
 script rather than an inconvenience: the working directory of a shell command is not stable between
@@ -231,6 +232,7 @@ The direction of safety is not symmetric and is easy to invert: a binary NEWER t
 Leaving `JL4_LIBRARY_PATH` unset lets the binary fall back to its own **embedded** prelude, which matches it by construction (resolution order: §5), so the trap is pinning `JL4_LIBRARY_PATH` at a tree newer than the binary; pinned-path and embedded-prelude runs can resolve different prelude versions.
 Rebuild, or drop the pin.
 `doc/test-docs.sh` is the usual route in, because it prefers any `l4` on `PATH` over the one you built (`doc/test-docs.sh:329`), so an `l4` installed there weeks ago is the one it finds: put your worktree's binary first on `PATH`, or run with no `l4` on it at all.
+`etc/verify-branch.sh` does that for you (§3.0); the trap is running `doc/test-docs.sh` by hand.
 `git diff <binary's commit> HEAD -- jl4-core/libraries/` is a cheap check for the prelude, but **read the diff rather than its exit code**: deleted comment lines are safe, an added annotation is not.
 How many errors a stale binary invents depends on both the binary and the corpus, so treat the count as a symptom to read, never a constant to memorise.
 

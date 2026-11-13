@@ -601,6 +601,13 @@ renderHoleAndClause = fixtureDir </> "render-hole-and-clause.l4"
 renderLedgerWriteOperand :: FilePath
 renderLedgerWriteOperand = fixtureDir </> "render-ledger-write-operand.l4"
 
+-- Which rule a HENCE or LEST belongs to (smucclaw/l4-ide#1068).
+lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest :: FilePath
+lestLayoutRepro = fixtureDir </> "lest-layout-1068.l4"
+lestLayoutFixture = fixtureDir </> "lest-layout.l4"
+lestLayoutHanging = fixtureDir </> "lest-layout-hanging.l4"
+lestLayoutHenceAfterLest = fixtureDir </> "lest-layout-hence-after-lest.l4"
+
 -- Library sentences at a call site, and library aliases used at two types.
 nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting :: FilePath
 nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
@@ -770,6 +777,7 @@ coreFixtures =
   , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
   , nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
   , slotScope, slotScopeSentence, renderHoleAndClause, renderLedgerWriteOperand
+  , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest
   , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
@@ -4702,6 +4710,46 @@ spec bin = do
       hasRow "Abs of a record means abs(4, recorded as balance)."
       hasRow "must Pay (3, recorded as balance) within 14."
       renderRows >>= (`shouldSatisfy` all (not . ("((" `isInfixOf`)))
+
+  -- smucclaw/l4-ide#1068: clause columns decide which rule a HENCE or LEST
+  -- belongs to. A nested rule keeps one written at its own clauses, and ends
+  -- at one written at the clauses of the rule it is nested in. Before, the
+  -- innermost open rule took it, with exit 0 everywhere, and the residual
+  -- `l4 explore` prints was the only place the wrong reading showed; so each
+  -- case pins that line whole, and the hanging case pins the verdict too.
+  describe "HENCE and LEST belong to the rule whose clauses they line up with" $ do
+    let r0Of args = do
+          Output code sout _ <- runL4 bin ("explore" : args)
+          code `shouldBe` ExitSuccess
+          pure [ l | l <- map (dropWhile (== ' ') . filter (/= '\r')) (lines sout), "r0 " `isPrefixOf` l ]
+
+    it "gives the issue's outer LEST to the Seller, and the Buyer's own LEST to the Buyer" $
+      r0Of [lestLayoutRepro] >>= (`shouldBe`
+        [ "r0  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment (EXACTLY 100) WITHIN 7 LEST (PARTY Buyer MUST payment (EXACTLY 120) WITHIN 14)) LEST (BREACH BY Seller)" ])
+
+    it "gives the LEST after a rule written on its HENCE's line to the outer rule" $
+      r0Of [lestLayoutFixture, "--contract", "sameLine"] >>= (`shouldBe`
+        [ "r0  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7) LEST (BREACH BY Seller)" ])
+
+    it "chains a HENCE written at the nested rule's own clauses after that rule" $
+      r0Of [lestLayoutFixture, "--contract", "henceChain"] >>= (`shouldBe`
+        [ "r0  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 HENCE (PARTY Seller MUST delivery WITHIN 9)) LEST (BREACH BY Seller)" ])
+
+    it "keeps a nested rule's LEST at its own clauses when the outer rule's clauses hang right of them" $
+      r0Of [lestLayoutHanging, "--contract", "hanging"] >>= (`shouldBe`
+        [ "r0  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment WITHIN 7 LEST (BREACH BY Buyer))" ])
+
+    it "so a missed delivery in that layout is the Seller's breach, not the Buyer's" $ do
+      Output code sout _ <- runL4 bin ["run", lestLayoutHanging]
+      code `shouldBe` ExitSuccess
+      unwords (words (filter (/= '\r') sout)) `shouldSatisfy`
+        ("surpassed the deadline of party Seller who had to do obligatory action MUST delivery" `isInfixOf`)
+
+    it "refuses a HENCE at the outer rule's clauses after its LEST, naming the rule" $ do
+      Output code _ serr <- runL4 bin ["check", lestLayoutHenceAfterLest]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This HENCE lines up with the clauses of the rule that starts with PARTY at line 8, column 3. It comes after that rule's LEST. Write HENCE before LEST." `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

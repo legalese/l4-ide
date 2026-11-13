@@ -1391,12 +1391,14 @@ instance LayoutPrinterWithName n => LayoutPrinter (Subject n) where
 
 -- | @WITHIN@/@HENCE@/@LEST@ bodies are bracketed via 'parensIfNeeded'.
 --
--- A nested obligation in a HENCE slot has no closing token, so its own optional
--- HENCE/LEST clauses swallow the OUTER obligation's: printing
--- @HENCE PARTY Bob MUST deliver WITHIN 10@ followed by the outer @LEST@ makes
--- the inner obligation consume that LEST and then fail on its indentation. The
--- corpus writes these parenthesised for the same reason
--- (@HENCE (PARTY Bob MUST deliver WITHIN 10)@). Atoms — @FULFILLED@, a
+-- A nested obligation in a HENCE slot has no closing token. The parser places
+-- a later HENCE/LEST by the column of each open rule's clauses
+-- ('L4.Parser.obligation', smucclaw/l4-ide#1068), but on ONE line every later
+-- HENCE/LEST belongs to the rule on that line, and 'prettyObligation' prints a
+-- rule on one line whenever it fits: @HENCE PARTY Bob MUST deliver WITHIN 10
+-- LEST …@ on one line gives the outer LEST to Bob. The brackets
+-- (@HENCE (PARTY Bob MUST deliver WITHIN 10)@) make the printed reading
+-- independent of where the printer breaks lines. Atoms — @FULFILLED@, a
 -- deadline literal — are left bare by 'parensIfNeeded'.
 mprint :: (Foldable t, LayoutPrinter a) => Doc ann -> t a -> [Doc ann]
 mprint kw = foldMap \x -> [kw <+> parensIfNeeded x]
