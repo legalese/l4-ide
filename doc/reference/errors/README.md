@@ -821,9 +821,8 @@ x MEANS x + 1
 To find `x`, L4 needs `x + 1`, which needs `x` again. L4 notices this for a value defined in terms of itself and stops with this error.
 
 A function that calls itself with new inputs, and never reaches a case that stops, is not caught as a loop.
-If each call waits for the next one's answer, as `1 + f (n + 1)` does, L4 stops when the evaluation is a million steps deep, with `Stack overflow: Recursion depth of 1000000 exceeded.`; the environment variable `JL4_MAX_FRAME_DEPTH` sets a different depth.
-It takes a whole number from 1 to 9223372036854775807 written in the digits 0 to 9 alone, with no leading zero, sign, space or other character. Any other value, such as `0`, `0300`, `0x12C`, ` 300`, a negative number or a larger one, is ignored, and the depth stays a million.
-If the call is the last thing the function does, as in `f n MEANS f (n + 1)`, its `#EVAL` keeps running and never answers.
+If each call waits for the next one's answer, as in `1 + f (n + 1)`, L4 stops a million calls deep with `Stack overflow: Recursion depth of 1000000 exceeded.` (set `JL4_MAX_FRAME_DEPTH` to change the limit).
+If the call is the last thing the function does, as in `f n MEANS f (n + 1)`, its `#EVAL` never answers.
 
 **How to fix it:** If you meant recursion, give it a case that stops:
 

@@ -451,7 +451,7 @@ A cases file or a rules file that does not exist ends the command with the opera
 ### `l4 trace` and `l4 state-graph` — visualization
 
 - `l4 trace myfile.l4` renders every `#EVALTRACE` in the file as GraphViz DOT (`--format dot|png|svg`, `-o DIR` for image output; PNG/SVG need GraphViz installed).
-  If a trace cannot be built, which is an internal error and no known file causes, its graph is a single node saying `trace unavailable`, and the command still writes every graph, then prints `Error: a trace could not be built …` on standard error and exits with status 1, so a script can tell that graph from the trace of something trivial.
+  If a trace cannot be built (an internal error), its graph says `trace unavailable` and the command exits with status 1.
 - `l4 state-graph myfile.l4` extracts the state transition graph of regulative rules (`PARTY ... MUST ...`) as GraphViz DOT.
 
 ### `l4 ast` — the parsed syntax tree

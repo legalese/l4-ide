@@ -3,8 +3,7 @@
 Exponentials, logarithms, square roots and trigonometry. Import it with `IMPORT math`.
 
 The functions are lowercase wrappers around the [built-in](../builtins/README.md#numbers) `LN`, `SQRT`, `ASIN` and so on. Where the built-in stops with an error on bad input, the wrapper gives `NOTHING`, so the result is a `MAYBE NUMBER`.
-`exp` is the exception: it gives a plain `NUMBER`, and stops with the built-in's error when the result is too large.
-Every function here but `absNumber` stops with the built-in's error, not with `NOTHING`, when the built-in's floating-point computation has no finite answer, as for `sqrt` or `ln` of 10^400, or `ln` of 1/10^400.
+`exp` gives a plain `NUMBER`. In every function here but `absNumber`, an answer that comes out infinite is an error, not `NOTHING`.
 
 **Example:** [math-example.l4](math-example.l4)
 
