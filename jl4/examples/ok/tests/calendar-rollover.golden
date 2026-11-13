@@ -1,0 +1,141 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+calendar-rollover.l4:75:1-50:
+  assertion satisfied
+calendar-rollover.l4:90:1-92:38:
+  FULFILLED
+calendar-rollover.l4:95:1-97:38:
+  DEONTIC BREACHED:
+    party
+      Buyer
+    who did action
+      pay
+    at
+      740287
+    surpassed the deadline of party
+      Buyer
+    who had to do obligatory action
+      MUST pay
+    before their deadline, which was at
+      740286
+calendar-rollover.l4:100:1-102:38:
+  FULFILLED
+calendar-rollover.l4:105:1-107:38:
+  DEONTIC BREACHED:
+    party
+      Buyer
+    who did action
+      pay
+    at
+      740288
+    surpassed the deadline of party
+      Buyer
+    who had to do obligatory action
+      MUST pay
+    before their deadline, which was at
+      740287
+calendar-rollover.l4:121:1-123:55:
+  FULFILLED
+calendar-rollover.l4:126:1-128:29:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      740290
+    surpassed the deadline of party
+      Landlord
+    who had to do obligatory action
+      MUST serve d PROVIDED (`is a business day` OF `weekdays only`, d)
+    before their deadline, which was at
+      740289
+calendar-rollover.l4:134:1-136:55:
+  DEONTIC BREACHED:
+    party
+      Landlord
+    who did action
+      serve OF 740286
+    at
+      740286
+    surpassed the deadline of party
+      Landlord
+    who had to do obligatory action
+      MUST serve d PROVIDED (`is a business day` OF `weekdays only`, d)
+    before their deadline, which was at
+      740284
+calendar-rollover.l4:150:1-152:55:
+  FULFILLED
+calendar-rollover.l4:159:1-160:56:
+  FULFILLED
+calendar-rollover.l4:172:1-174:30:
+  FULFILLED
+calendar-rollover.l4:176:1-177:57:
+  DEONTIC BREACHED:
+    party
+      Seller
+    who did action
+      deliver OF 740284
+    at
+      740284
+    surpassed the deadline of party
+      Seller
+    who had to do obligatory action
+      MUST NOT deliver d PROVIDED (NOT (`is a business day` OF `weekdays only`, d))
+    before their deadline, which was at
+      740284
+calendar-rollover.l4:197:1-199:53:
+  FULFILLED
+calendar-rollover.l4:202:1-204:30:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      740300
+    surpassed the deadline of party
+      Seller
+    who had to do obligatory action
+      MUST lodge d PROVIDED (NOT (`is one of the public holidays` OF holidays, d))
+    before their deadline, which was at
+      740293
+calendar-rollover.l4:207:1-208:53:
+  FULFILLED
+calendar-rollover.l4:211:1-212:55:
+  FULFILLED
+calendar-rollover.l4:227:1-229:38:
+  FULFILLED
+calendar-rollover.l4:232:1-234:38:
+  DEONTIC BREACHED:
+    party
+      Buyer
+    who did action
+      pay
+    at
+      740287
+    surpassed the deadline of party
+      Buyer
+    who had to do obligatory action
+      MUST pay
+    before their deadline, which was at
+      740286
+calendar-rollover.l4:249:1-251:43:
+  FULFILLED
+calendar-rollover.l4:253:1-255:43:
+  DEONTIC BREACHED:
+    party
+      Landlord
+    who did action
+      reply
+    at
+      740290
+    surpassed the deadline of party
+      Landlord
+    who had to do obligatory action
+      MUST reply
+    before their deadline, which was at
+      740289
+calendar-rollover.l4:258:1-260:43:
+  FULFILLED

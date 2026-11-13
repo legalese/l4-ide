@@ -1,0 +1,63 @@
+-- Calendar example: business days, public holidays and deadlines that roll
+IMPORT prelude
+IMPORT daydate
+IMPORT calendar
+
+-- A day is a number: the count of days from 1 January 0000, which
+-- DATE_SERIAL (YMD ...) works out. Sat 31 Oct 2026 is a Saturday; Mon 2 Nov
+-- 2026 is treated as a public holiday below.
+DECIDE `Mon 26 Oct` IS DATE_SERIAL (YMD 2026 10 26)
+DECIDE `Fri 30 Oct` IS DATE_SERIAL (YMD 2026 10 30)
+DECIDE `Sat 31 Oct` IS DATE_SERIAL (YMD 2026 10 31)
+DECIDE `Mon 2 Nov`  IS DATE_SERIAL (YMD 2026 11 2)
+DECIDE `Tue 3 Nov`  IS DATE_SERIAL (YMD 2026 11 3)
+
+-- A calendar on which Mon 2 Nov 2026 is a holiday
+DECIDE `this year's calendar` IS `weekdays except the dates` (LIST YMD 2026 11 2)
+
+-- The day itself if it is a business day, else the next one
+#ASSERT `next business day on or after` `weekdays only` `Sat 31 Oct` EQUALS `Mon 2 Nov`
+#ASSERT `next business day on or after` `weekdays only` `Mon 2 Nov` EQUALS `Mon 2 Nov`
+#ASSERT `next business day on or after` `this year's calendar` `Sat 31 Oct` EQUALS `Tue 3 Nov`
+
+-- Strictly after, even from a business day: one business day later
+#ASSERT `add business days` `weekdays only` 1 `Fri 30 Oct` EQUALS `Mon 2 Nov`
+
+-- Back to the Friday
+#ASSERT `previous business day on or before` `weekdays only` `Sat 31 Oct` EQUALS `Fri 30 Oct`
+
+-- Modified Following: rolling forward would leave October, so roll back
+#ASSERT `modified following business day` `weekdays only` `Sat 31 Oct` EQUALS `Fri 30 Oct`
+
+-- Two business days after Friday, skipping the weekend and the holiday
+#ASSERT `add business days` `this year's calendar` 2 `Fri 30 Oct` EQUALS DATE_SERIAL (YMD 2026 11 4)
+
+-- The DATE forms give back a DATE
+#EVAL `next business day on or after` `weekdays only` (YMD 2026 10 31)
+
+-- `weekdays only` takes Saturday and Sunday as the weekend. For a country
+-- whose weekend is Friday and Saturday, write the calendar out:
+GIVEN d IS A NUMBER
+GIVETH A BOOLEAN
+`Sunday to Thursday` d MEANS
+    NOT (`Weekday of` d EQUALS Friday OR `Weekday of` d EQUALS Saturday)
+
+-- Fri 30 Oct is not a business day there; Sun 1 Nov is
+#ASSERT `next business day on or after` `Sunday to Thursday` `Fri 30 Oct` EQUALS DATE_SERIAL (YMD 2026 11 1)
+
+-- A deadline that rolls: pay five days after the notice, or on the next
+-- business day if the fifth day is not one
+DECLARE Party  IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+    notify HAS day IS A NUMBER
+    pay
+
+GIVETH A DEONTIC Party Action
+`pay within five days of notice` MEANS
+    PARTY Seller MUST notify d WITHIN 10
+    HENCE PARTY Buyer MUST pay WITHIN 0 OF (`next business day on or after` `this year's calendar` (d PLUS 5))
+
+-- the fifth day, Sat 31 Oct, rolls past the weekend and the holiday to Tue 3 Nov
+#TRACE `pay within five days of notice` AT `Mon 26 Oct` WITH
+  PARTY Seller DOES notify `Mon 26 Oct` AT `Mon 26 Oct`
+  PARTY Buyer DOES pay AT `Tue 3 Nov`

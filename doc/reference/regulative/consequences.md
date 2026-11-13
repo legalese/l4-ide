@@ -239,7 +239,7 @@ Read as days, that boundary is the counting rule most statutes use: **the day yo
 Two neighbours of that rule are yours to write, not the language's:
 
 - **"Beginning with" the anchor day** (§ 187(2) BGB, and some contracts) counts the first day too, so fourteen days beginning with day 10 end on day 23: write `WITHIN 13 OF 10`.
-- **Months, month-ends, business days and public holidays** are calendar questions, and the calendar belongs to a library rather than to `WITHIN`: compute the day with the date library and anchor on it (`WITHIN 0 OF <that day>`, or `BEFORE <that date>`). Numbers on their own are just days on the trace's clock.
+- **Months, month-ends, business days and public holidays** are calendar questions, and the calendar belongs to a library rather than to `WITHIN`: compute the day with the date library and anchor on it (`WITHIN 0 OF <that day>`, or `BEFORE <that date>`). Numbers on their own are just days on the trace's clock. For business days and holiday lists, the [calendar](../libraries/calendar.md) library does the computing.
 
 (Ruled 21 September 2026, EVERY bench card B6.)
 
