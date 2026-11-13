@@ -1,0 +1,37 @@
+-- NORM-LOG N10 goal A: the IL-hvac menu redrafted as one chain per party (NORM-LOG-SPEC §7 N10).
+-- Pass: FULFILLED on all three traces, and the official record in time order:
+-- 1, 2, 1 (I1 P2 I3 T5); 2, 1 (P1 I2 T5); 1, 2, 1, 2 (I1 P2 I3 P4 T5). Before A it was member-major.
+IMPORT prelude
+DECLARE Who IS ONE OF I, P, T
+DECLARE Act IS ONE OF a, b, done
+
+-- The IL-hvac menu redrafted: one chain per party, so a matched act re-enters
+-- only its own party's chain, and T's `done` closes the whole menu.
+GIVEN d IS A Who
+      act IS AN Act
+GIVETH DEONTIC Who Act
+`after` MEANS
+    CONSIDER d
+    WHEN I THEN COMMIT `seen` IS 1 HENCE `chain of` d
+    OTHERWISE   COMMIT `seen` IS 2 HENCE `chain of` d
+
+GIVEN d IS A Who
+GIVETH DEONTIC Who Act
+`chain of` MEANS
+    PARTY d
+    MAY    act
+    WITHIN 100
+    HENCE  `after` d act
+
+GIVETH DEONTIC Who Act
+menu MEANS
+       (EVERY d IN LIST I, P
+            MAY    act
+            WITHIN 100
+            UPON   EACH
+            HENCE  `after` d act)
+  ROR  (PARTY T MAY done WITHIN 100)
+
+#TRACE menu AT 0 WITH  PARTY I DOES a AT 1   PARTY P DOES b AT 2   PARTY I DOES a AT 3   PARTY T DOES done AT 5
+#TRACE menu AT 0 WITH  PARTY P DOES b AT 1   PARTY I DOES a AT 2   PARTY T DOES done AT 5
+#TRACE menu AT 0 WITH  PARTY I DOES a AT 1   PARTY P DOES b AT 2   PARTY I DOES a AT 3   PARTY P DOES b AT 4  PARTY T DOES done AT 5

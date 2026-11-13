@@ -1,0 +1,2 @@
+executing contract `a` and `b` at 0 with the following events: party `P` did `x` at 4
+executing contract `b` and `a` at 0 with the following events: party `P` did `x` at 4

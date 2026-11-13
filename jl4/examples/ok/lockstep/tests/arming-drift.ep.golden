@@ -1,0 +1,28 @@
+-- NORM-LOG N10 goal A: THE ARMING survives resumption (skeptic-list R4; ok/breach-clocks.l4 §4).
+-- Pass: in both orders R is due at 3 and the A2 note fires (entered at 4, after its own deadline of 3);
+-- the breach names R and Q. The last trace is the control: what a reset arming would look like.
+IMPORT prelude
+DECLARE Actor IS ONE OF P, Q, R
+DECLARE Action IS ONE OF x, y, z, w
+GIVETH A DEONTIC Actor Action
+`late arming` MEANS
+    PARTY P MUST x WITHIN 10
+    HENCE (PARTY R MUST z WITHIN 3 OF THE ARMING)
+GIVETH A DEONTIC Actor Action
+`q by 3.5` MEANS PARTY Q MUST y WITHIN 3.5
+GIVETH A DEONTIC Actor Action
+`late arming and q` MEANS `late arming` RAND `q by 3.5`
+GIVETH A DEONTIC Actor Action
+`q and late arming` MEANS `q by 3.5` RAND `late arming`
+#TRACE `late arming and q` AT 0 WITH
+  (`WAIT UNTIL` 3.8)
+  PARTY P DOES x AT 4
+  (`WAIT UNTIL` 5)
+#TRACE `q and late arming` AT 0 WITH
+  (`WAIT UNTIL` 3.8)
+  PARTY P DOES x AT 4
+  (`WAIT UNTIL` 5)
+-- the shape a lockstep driver would produce if `armed` reset at re-entry 3.8
+GIVETH A DEONTIC Actor Action
+`rearmed` MEANS PARTY R MUST z WITHIN 3
+#TRACE `rearmed` AT 3.8 WITH (`WAIT UNTIL` 5)

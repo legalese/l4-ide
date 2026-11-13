@@ -1,0 +1,3 @@
+executing contract `menu` at 0 with the following events: party `I` did `a` at 1 party `P` did `b` at 2 party `I` did `a` at 3 party `T` did `done` at 5
+executing contract `menu` at 0 with the following events: party `P` did `b` at 1 party `I` did `a` at 2 party `T` did `done` at 5
+executing contract `menu` at 0 with the following events: party `I` did `a` at 1 party `P` did `b` at 2 party `I` did `a` at 3 party `P` did `b` at 4 party `T` did `done` at 5
