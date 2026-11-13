@@ -96,7 +96,7 @@ Libraries you load with [`IMPORT`](libraries/README.md#import):
 
 | Group                     | Libraries                                                                                                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core                      | [prelude](libraries/prelude.md) (lists, MAYBE, EITHER, pairs), [math](libraries/math.md)                                                                                |
+| Core                      | [prelude](libraries/prelude.md) (lists, MAYBE, EITHER, pairs), [math](libraries/math.md), [negation-as-failure](libraries/negation-as-failure.md)                       |
 | Dates and time            | [daydate](libraries/daydate.md), [time](libraries/time.md), [datetime](libraries/datetime.md), [timezone](libraries/timezone.md), [excel-date](libraries/excel-date.md) |
 | Money and finance         | [currency](libraries/currency.md), [holdings](libraries/holdings.md), [actus](libraries/actus.md)                                                                       |
 | Legal entities and places | [legal-persons](libraries/legal-persons.md), [jurisdiction](libraries/jurisdiction.md)                                                                                  |
