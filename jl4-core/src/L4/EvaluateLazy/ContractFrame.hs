@@ -451,6 +451,14 @@ data RBinOp1 = MkRBinOp1
   , rexpr2 :: MaybeEvaluated
   , args :: [Reference] -- ^ the arguments to the remaining contract expr
   , env :: Environment
+  , scope :: Int
+    -- ^ the sibling-read check's scope for this application of the compound
+    -- ('L4.EvaluateLazy.SiblingReads'): the right operand runs on side 1 of it
+  , outerPath :: [(Int, Int)]
+    -- ^ the operand path the compound itself was applied under
+  , clock :: Maybe Rational
+    -- ^ the compound's own time, which is the right operand's clock as it
+    -- starts, when it was already evaluated as the compound started
   }
   deriving stock Show
 

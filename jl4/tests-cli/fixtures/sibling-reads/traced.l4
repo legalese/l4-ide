@@ -1,0 +1,31 @@
+-- reader-first.l4's RAND, evaluated twice: once by #EVAL and once by
+-- #EVALTRACE, which also prints how it was evaluated. The sides of a RAND
+-- take the trace's events in step either way, so `possession`'s read at 400
+-- sees the notice recorded at 10 and both give the same answer. Before
+-- smucclaw/l4-ide#1069 both gave an answer that missed the notice; on the
+-- first build of the fix the traced one stopped with an error instead.
+
+DECLARE Party IS ONE OF Landlord
+DECLARE Act IS ONE OF `gives notice`, `seeks possession`
+
+GIVETH A DEONTIC Party Act
+`notice` MEANS
+    PARTY Landlord
+    MAY `gives notice`
+    WITHIN 100
+    HENCE COMMIT `notice given` IS TRUE HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`possession` MEANS
+    PARTY Landlord
+    MAY `seeks possession` PROVIDED (RECALL OFFICIAL's `notice given`) EQUALS JUST TRUE
+    WITHIN 1000
+    HENCE COMMIT `possession sought` IS TRUE HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`the tenancy` MEANS `possession` RAND `notice`
+
+#EVAL EVALTRACE `the tenancy` 0 (LIST EVENT Landlord `gives notice` 10, EVENT Landlord `seeks possession` 400)
+#EVALTRACE EVALTRACE `the tenancy` 0 (LIST EVENT Landlord `gives notice` 10, EVENT Landlord `seeks possession` 400)

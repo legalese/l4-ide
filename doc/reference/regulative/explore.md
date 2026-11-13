@@ -292,6 +292,9 @@ These are sorted by which signal carries them.
   A `BEFORE` date in a contract explored from `AT 0` gave `UNTRIED 2` (measured 2026-10-26), because 0 is not a date serial.
   The run had 1 state and 0 transitions, and the same line says `frontier exhausted`.
   Nothing beyond the outset was explored.
+  A move whose run stopped because the two sides of a compound read each other's records in an order L4 cannot settle is untried too, and the reason in brackets is that error, naming the record and both sides ([Deadlines and consequences](consequences.md)).
+  On `jl4/tests-cli/fixtures/sibling-reads/one-event.l4`, a `RAND` whose two sides take one event, one side making a record and the other reading it at the same instant, `--until 20` gave 2 states, `UNTRIED 3` (three `PARTY P DOES go` moves) and exited 2 (measured 2026-11-13).
+  The two sides of a `RAND` that read each other's records at different events are run in step and explored like any other contract: on `jl4/tests-cli/fixtures/sibling-reads/dinner-ab.l4`, Alice and Bob as the two sides of a `RAND`, `--until 100 --always "every dinner was accepted while open"` gave 18 states, `violated after 3 events` with Alice checking, Bob buying and Alice buying, and exited 4 (measured 2026-11-13).
 - **A bound stopped it (exit 3).** `frontier NOT exhausted`, with the number of states left.
   `--max-states 5` on `jl4/examples/explore/brief/d1-naive.l4`, a 10-state graph, printed `frontier NOT exhausted: 9 new states past the state bound 5 not added` and exited 3.
 - **A property is violated (exit 4)**, or **unknown (exit 5)**: every liveness property, and any path that fails its replay.

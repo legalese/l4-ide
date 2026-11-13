@@ -62,6 +62,7 @@ import qualified Base.Set as Set
 import qualified Data.IntMap.Strict as IntMap
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
+import L4.EvaluateLazy.SiblingReads (emptySiblingState)
 import L4.EvaluateLazy.DeonticStep (DeonticLog (..), DeonticStep, newDeonticLog)
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.Ledger
@@ -128,6 +129,13 @@ data EvalConfig = EvalConfig
     -- module as a Shake rule) must say so here, because GHC's allocation
     -- counter belongs to a thread and the rule runs on another one than the
     -- caller's: a limit set on the caller never sees it.
+  , operandsInStep :: !Bool
+    -- ^ smucclaw/l4-ide#1069: run a @RAND@'s operands in step, one event at a
+    -- time (Note [Operands in step] in "L4.EvaluateLazy.Machine"); on by
+    -- default, under every trace policy. 'False' runs every @RAND@ as all of
+    -- them ran before, one operand over the whole stream and then the other,
+    -- where the sibling-read check refuses what that order gets wrong; it is
+    -- there only so that tests can compare the two orders.
   }
 
 -- | A cap, in bytes, on what an evaluation may allocate.
@@ -145,7 +153,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -202,10 +210,14 @@ withFreshLedger m = do
   freshParty <- liftIO (newIORef Nothing)
   freshNotes <- liftIO (newIORef mempty)
   freshPresumed <- liftIO (newIORef emptyPresumedLog)
+  freshSiblings <- liftIO (newIORef emptySiblingState)
+  freshStarts <- liftIO (newIORef IntMap.empty)
+  freshMuted <- liftIO (newIORef 0)
   -- the run's notes ('tellNote') are per directive for the same reason the
   -- ledger is: a note belongs to the directive whose value it qualifies; so
-  -- does a default it forced ('EvalState.presumed')
-  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes, presumed = freshPresumed }) m
+  -- does a default it forced ('EvalState.presumed'), and so does what the
+  -- sibling-read check has logged of the ledger's reads and writes
+  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes, presumed = freshPresumed, siblings = freshSiblings, siblingStarts = freshStarts, traceMuted = freshMuted }) m
 
 -- | Apply runtime EVAL clauses for the duration of an action,
 -- restoring the previous temporal context afterwards.
@@ -917,6 +929,9 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   reofferedEvents <- newIORef mempty
   envLedger    <- newIORef emptyStore
   currentParty <- newIORef Nothing
+  siblings     <- newIORef emptySiblingState
+  siblingStarts <- newIORef IntMap.empty
+  traceMuted   <- newIORef 0
   notes        <- newIORef mempty
   -- P2b: off by default (R5); 'captureDeonticSteps' installs one per directive
   let deonticLog = Nothing
@@ -926,7 +941,8 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
   pure MkEvalState
-    { moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo
+    { moduleUri, stack, supply, evalTrace, envLedger, currentParty, siblings, siblingStarts, traceMuted, entityInfo
+    , operandsInStep = evalConfig.operandsInStep
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
     , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog

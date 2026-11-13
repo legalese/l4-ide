@@ -1,0 +1,44 @@
+-- ror-in-rand.l4 with the ROR's alternatives the other way round. L4 runs
+-- `b` first: it records `x` at 10, and the ROR is fulfilled when `a` is, at
+-- 20. Taken one event at a time, the record is made before `c` reads `x` at
+-- 30, so `c` sees it, and the whole is FULFILLED. (smucclaw/l4-ide#1069)
+
+DECLARE Party IS ONE OF P, Q, R
+DECLARE Act IS ONE OF actA, actB, actZ, actR
+
+GIVETH A DEONTIC Party Act
+`a` MEANS
+    PARTY P
+    MUST actA
+    WITHIN 100
+
+GIVETH A DEONTIC Party Act
+`b` MEANS
+    PARTY Q
+    MAY actB
+    WITHIN 100
+    HENCE COMMIT `x` IS TRUE
+          HENCE `z`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`z` MEANS
+    PARTY Q
+    MUST actZ
+    WITHIN 100
+
+GIVETH A DEONTIC Party Act
+`c` MEANS
+    PARTY R
+    MUST actR PROVIDED (RECALL OFFICIAL's `x`) EQUALS JUST TRUE
+    WITHIN 40
+    HENCE COMMIT `c saw x` IS TRUE HENCE FULFILLED
+
+GIVETH A DEONTIC Party Act
+`whole` MEANS (`b` ROR `a`) RAND `c`
+
+#TRACE `whole` AT 0 WITH
+    PARTY Q DOES actB AT 10
+    PARTY P DOES actA AT 20
+    PARTY R DOES actR AT 30
+    PARTY P DOES actA AT 50

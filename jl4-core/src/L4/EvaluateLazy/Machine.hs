@@ -135,6 +135,8 @@ import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
+import L4.EvaluateLazy.SiblingReads
+import qualified L4.Lint.SiblingReads as Lint
 import L4.EvaluateLazy.Trace (EvalTraceAction (..))
 import L4.Presumption
 import L4.TracePolicy (TracePolicy)
@@ -176,9 +178,12 @@ data Frame =
   -- 'Nothing' is M1 expression use (the write returns its value); @Just k@ makes
   -- the write an event-free deontic step (after 'tellEvent', forward
   -- @[time, events]@ to @k@). The 'Maybe Text' is the NOTIFY recipient key.
-  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
-  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text)
-  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text)
+  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe SrcRange)
+  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text) (Maybe SrcRange)
+  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text) (Maybe SrcRange)
+  -- (The trailing 'Maybe SrcRange' on the three Record and the two ReadCell
+  -- frames is the site, for the sibling-read check's messages,
+  -- 'L4.EvaluateLazy.SiblingReads'.)
   -- STATE-AS-LEDGER M1.5 / M4.5: RECALL. 'ReadCell1' waits for the CELL to
   -- evaluate to a 'WHNF'; it carries the optional party-qualifier expr (still
   -- unevaluated), the isOfficial flag, and the env to evaluate the qualifier in.
@@ -191,13 +196,13 @@ data Frame =
   -- The 'RecallMode' (last-write-wins vs collect-all, approach B) is carried
   -- through to 'finishRead' so the read folds the chosen ledger into either a
   -- MAYBE (last) or a LIST (all).
-  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment
+  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment (Maybe SrcRange)
   -- 'ReadCell2' waits for the PARTY qualifier to evaluate; it carries the
   -- already-evaluated cell WHNF and the 'RecallMode' so 'finishRead' can complete
   -- the read against the named party's own ledger. The mode MUST be threaded here
   -- too: the cross-party branch pushes 'ReadCell2' before reaching 'finishRead',
   -- so without it @RECALL ALL <party>'s@ would silently fall back to last-write-wins.
-  | ReadCell2 WHNF RecallMode {- -}
+  | ReadCell2 WHNF RecallMode {- -} (Maybe SrcRange)
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -212,6 +217,21 @@ data Frame =
   -- and the frame then touches the log not at all; with the log off it is
   -- always 'False'. No extra frame, so the stack is the same in both modes.
   | RestoreCurrentParty (Maybe Text) Bool
+  -- smucclaw/l4-ide#1069: restore the sibling-read check's operand path and
+  -- clock once a compound (and the frames it pushed) has evaluated. Pushed
+  -- beneath the compound's 'RBinOp1', so it runs after the 'RBinOp2' or the
+  -- @ROR@ short-circuit has combined the operands.
+  | RestoreSibling OperandPath Clock
+  -- smucclaw/l4-ide#1069: restore the sibling-read check's 'ssBehind' once a
+  -- barrier, which takes again events the compounds around it have taken,
+  -- has evaluated. Pushed beneath the barrier's frames ('startBarrier').
+  | RestoreBehind Int
+  -- smucclaw/l4-ide#1069, NORM-LOG-SPEC N10's option A: a @RAND@ whose
+  -- operands take the trace one event at a time. It sits on the stack beneath
+  -- the operand that is running, or beneath the force of the compound's own
+  -- stream, and holds the operands that are waiting for the next event. See
+  -- Note [Operands in step] and 'startCompound'.
+  | Lockstep LockstepFrame
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConnectiveLeft Connective (Maybe ConnRight) {- -}
@@ -292,6 +312,84 @@ data Frame =
   | JsonEncodeConstructorFrame [(Text, Text)] Text [(Text, Reference)] -- accumulated (fieldName, encodedJson) pairs, current field name, remaining (fieldName, fieldRef) pairs to encode
   deriving stock Show
 
+-- | A @RAND@ whose operands run in step (smucclaw/l4-ide#1069; NORM-LOG-SPEC
+-- N10's option A): every operand takes event n of the compound's stream
+-- before any operand takes event n+1, as Hvitved's reduction semantics
+-- reduces both conjuncts of @c1 and c2@ on one event (thesis Fig. 2.8,
+-- p. 49) and his monitor feeds a specification one event at a time (§2.3.6,
+-- p. 52). See 'startLockstep'.
+data LockstepFrame = MkLockstepFrame
+  { lsGate    :: !Int
+    -- ^ the number every gate of this compound carries ('mintGate'), so a
+    -- forced gate finds this frame on the stack
+  , lsScope   :: !Int
+    -- ^ the sibling-read check's scope for this application of the compound
+  , lsOp      :: RBinOp
+  , lsEnv     :: Environment
+  , lsTime    :: Reference
+    -- ^ the compound's own time, every operand's first clock
+  , lsType    :: Maybe (Type' Resolved)
+  , lsStream  :: Reference
+    -- ^ the part of the compound's stream no operand has been handed yet
+  , lsSlots   :: [OperandSlot]
+    -- ^ the operands, left first
+  , lsRunning :: Maybe Int
+    -- ^ the operand running above this frame; 'Nothing' while the frame is
+    -- forcing 'lsStream'
+  , lsRound   :: [Int]
+    -- ^ the operands still to be started, or still to be handed the current
+    -- cell, in order
+  , lsCell    :: Maybe (Maybe Reference)
+    -- ^ the cell this round hands out: 'Nothing' before the first event,
+    -- @Just (Just e)@ the event @e@, @Just Nothing@ the end of the stream
+  , lsTaken   :: !Int
+    -- ^ how many events have been handed out
+  , lsHead    :: Maybe (Reference, Reference)
+    -- ^ under an evaluation trace, the event and the rest of the stream while
+    -- the frame forces the event, outside every operand ('lockstepReturn')
+  , lsBase    :: DynState
+    -- ^ the dynamic state the compound was applied under
+  }
+  deriving stock Show
+
+-- | One operand of a 'LockstepFrame'.
+data OperandSlot
+  = SlotPending MaybeEvaluated
+    -- ^ not started yet
+  | SlotRunning
+    -- ^ running above the frame
+  | SlotPaused PausedOperand
+    -- ^ waiting for the next cell of the stream
+  | SlotDone WHNF
+    -- ^ finished: a verdict, or the residual it left when its stream ended
+  deriving stock Show
+
+-- | An operand that forced its gate: the frames it had pushed above the
+-- compound's frame, top first, the gate it is waiting on, and the dynamic
+-- state it had.
+data PausedOperand = MkPausedOperand
+  { poFrames :: [Frame]
+  , poGate   :: Reference
+  , poDyn    :: DynState
+  }
+  deriving stock Show
+
+-- | The machine's dynamic state that frames save and restore around a
+-- stretch of evaluation, and so that an operand paused between events takes
+-- with it: the acting party, the temporal context, the deontic log's
+-- re-look scope, and the sibling-read check's operand path and clock.
+data DynState = MkDynState
+  { dyParty    :: Maybe Text
+  , dyTemporal :: TemporalContext
+  , dyRelook   :: Maybe [Maybe SrcRange]
+  , dyPath     :: OperandPath
+  , dyClock    :: Clock
+  , dyBehind   :: Int
+  , dyMuted    :: Int
+    -- ^ 'traceMuted': one more than the compound's own while an operand runs
+  }
+  deriving stock Show
+
 -- ----------------------------------------------------------------------------
 -- The evaluation monad.
 --
@@ -320,6 +418,28 @@ data EvalState =
                                      -- that party's own ledger. 'Nothing' = no enclosing
                                      -- party (a top-level RECORD), routed to the anonymous
                                      -- own ledger. Set/restored around 'continueWithFollowup'.
+    , siblings :: !(IORef SiblingState)
+                                     -- ^ smucclaw/l4-ide#1069: the sibling-read check's
+                                     -- state (the compound operand the evaluation is in,
+                                     -- the contract clock, and every read and write made
+                                     -- inside an operand), per directive like the ledger.
+                                     -- See 'L4.EvaluateLazy.SiblingReads'.
+    , siblingStarts :: !(IORef (IntMap Reference))
+                                     -- ^ the time of each compound that started while
+                                     -- its time was still a thunk, by scope, until it is
+                                     -- found evaluated ('siblingCheck')
+    , operandsInStep :: !Bool
+                                     -- ^ smucclaw/l4-ide#1069: run a @RAND@'s operands in
+                                     -- step (Note [Operands in step]). 'False' only to
+                                     -- compare with the order every @RAND@ had before,
+                                     -- one operand over the whole stream and then the
+                                     -- other ('L4.EvaluateLazy.EvalConfig').
+    , traceMuted :: !(IORef Int)
+                                     -- ^ while above 0, 'traceEval' records nothing: an
+                                     -- operand of an in-step compound is running, whose
+                                     -- frames the trace builder cannot nest (Note
+                                     -- [Operands in step]). Saved and restored with the
+                                     -- rest of the dynamic state ('DynState').
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
@@ -608,7 +728,11 @@ traceEval ta = do
   mtr <- asks (.evalTrace)
   case mtr of
     Nothing -> pure ()
-    Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
+    Just tr -> do
+      mref <- asks (.traceMuted)
+      liftIO do
+        muted <- readIORef mref
+        when (muted == 0) (modifyIORef' tr (`DList.snoc` ta))
 
 -----------------------------------------------------------------------------
 -- The deontic step log (LTS-VISUALISER §4.3, amended by §4.9; P2b).
@@ -1063,6 +1187,9 @@ unwindFrame = \ case
   RestoreCurrentParty mOriginal scoped   -> do
     putCurrentParty mOriginal
     when scoped leaveRelookScope
+  RestoreSibling path clock              -> restoreSibling path clock
+  RestoreBehind n                        -> restoreBehind n
+  Lockstep ls                            -> unwindLockstep ls
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
     -- reads made before the abort soundly over-approximate the enclosing
@@ -1454,6 +1581,414 @@ putCurrentParty :: Maybe Text -> Eval ()
 putCurrentParty = writeEvalRef (.currentParty)
 
 -- ----------------------------------------------------------------------------
+-- The sibling-read check (smucclaw/l4-ide#1069; 'L4.EvaluateLazy.SiblingReads').
+--
+-- The machine keeps, beside the ledger, which compound operand the evaluation
+-- is in and the contract instant it is at, and asks the check at every ledger
+-- read and write made inside an operand. Outside every compound nothing is
+-- logged and nothing is compared.
+
+-- | One step of the check: refuse on a 'Left', else keep the new state.
+siblingCheck :: (SiblingState -> Either Text SiblingState) -> Eval ()
+siblingCheck stepIt = do
+  sref <- asks (.siblings)
+  st0 <- liftIO (readIORef sref)
+  when (inCompound st0) do
+    -- a compound time that was a thunk may have been evaluated since, by an
+    -- event the operands scanned: read it now, so that what was logged at the
+    -- compound's start gets its instant
+    tref <- asks (.siblingStarts)
+    pending <- liftIO (readIORef tref)
+    known <- for (IntMap.toList pending) \ (s, t) -> fmap (s,) <$> peekClock t
+    let found = catMaybes known
+        st = foldl' (\ acc (s, c) -> startKnown s c acc) st0 found
+    unless (null found) $
+      liftIO (writeIORef tref (foldl' (flip IntMap.delete) pending (map fst found)))
+    case stepIt st of
+      Left msg  -> userException (UserError msg)
+      Right st' -> liftIO (writeIORef sref st')
+
+-- | The contract instant the evaluation is now at, when it is inside a
+-- compound's operand: an event's stamp, a hand-off's clock, or the time an
+-- obligation was armed at. A clock that is still a thunk is left as it was:
+-- the check never forces anything here.
+noteClock :: Reference -> Eval ()
+noteClock t = do
+  sref <- asks (.siblings)
+  st <- liftIO (readIORef sref)
+  when (inCompound st) do
+    mclock <- peekClock t
+    for_ mclock \ c -> liftIO (writeIORef sref st {ssClock = At c})
+
+-- | 'noteClock' for a clock already forced.
+noteClockWHNF :: WHNF -> Eval ()
+noteClockWHNF = \ case
+  ValNumber c -> do
+    sref <- asks (.siblings)
+    liftIO (modifyIORef' sref \ st -> if inCompound st then st {ssClock = At c} else st)
+  _ -> pure ()
+
+-- | Every record an @ROR@ alternative the machine did not run could have
+-- made: the @RECORD@s, @COMMIT@s and @NOTIFY@s in its expression or residual,
+-- and in every definition, closure, continuation and argument reachable from
+-- it through the heap, found without forcing anything (an unforced thunk is
+-- read as its expression). Over-approximates, as reachability does: a
+-- record behind a branch the alternative would never take still counts.
+possibleWrites :: Environment -> MaybeEvaluated -> Eval [PossibleWrite]
+possibleWrites env0 alt = do
+  seen <- liftIO (newIORef Set.empty)
+  found <- liftIO (newIORef Set.empty)
+  let goExpr env e = do
+        liftIO $ modifyIORef' found (Set.union (Set.fromList
+          [ MkPossibleWrite official cell site verb | (official, cell, site, verb) <- Lint.writeSitesIn e ]))
+        for_ (Lint.namesIn e) \ u -> for_ (Map.lookup u env) goRef
+      goRef rf = do
+        visited <- liftIO (readIORef seen)
+        unless (Set.member rf.address visited) do
+          liftIO (writeIORef seen (Set.insert rf.address visited))
+          liftIO (readIORef rf.pointer) >>= \ case
+            Unevaluated _ e env  -> goExpr env e
+            WHNFWhen _ v e env   -> goExpr env e >> goVal v
+            WHNF v               -> goVal v
+      goVal v = do
+        case v of
+          ValClosure _ body env -> goExpr env body
+          ValObligation env _ act _ _ followup lest -> do
+            traverse_ (goExpr env) (Lint.actionExprs act)
+            goExpr env followup
+            traverse_ (goExpr env) lest
+          ValROp env _ l r -> for_ [l, r] (either (goExpr env) goVal)
+          ValQuantified env d -> traverse_ (goExpr env) (Lint.deontonExprs d)
+          _ -> pure ()
+        -- the references a value holds (list cells, constructor fields,
+        -- partial applications, an obligation's evaluated parts)
+        traverse_ goRef (toList v)
+  either (goExpr env0) goVal alt
+  Set.toList <$> liftIO (readIORef found)
+
+-- | Back to the operand path and clock a compound was applied under.
+restoreSibling :: OperandPath -> Clock -> Eval ()
+restoreSibling path clock = do
+  sref <- asks (.siblings)
+  liftIO (modifyIORef' sref \ st -> st {ssPath = path, ssClock = clock})
+
+-- | Put back the sibling-read check's 'ssBehind' ('RestoreBehind').
+restoreBehind :: Int -> Eval ()
+restoreBehind n = do
+  sref <- asks (.siblings)
+  liftIO (modifyIORef' sref \ st -> st {ssBehind = n})
+
+-- | How a message names one operand of a compound: the rule it names, the
+-- line it is written on, or, for an @EVERY@'s member, the member.
+operandLabel :: Text -> MaybeEvaluated -> Text
+operandLabel side = \ case
+  Left (App _ r []) -> backquoted (prettyLayout r)
+  Left (Var _ r)    -> backquoted (prettyLayout r)
+  Left e | Just rng <- rangeOf e -> "the " <> side <> " side (line " <> Text.textShow (lineOf rng) <> ")"
+  Right (ValObligation _ (Right p) _ _ _ _ _) -> partyKeyWHNF p <> "'s obligation"
+  _ -> "the " <> side <> " side"
+  where
+    -- a rule's name as written, always quoted, so it never starts a sentence bare
+    backquoted t = if "`" `Text.isPrefixOf` t then t else "`" <> t <> "`"
+
+-- | A compound ('ValROp') meets its @[time, events]@: open a scope for the
+-- sibling-read check at the compound's own time, then run the left operand
+-- over the events; 'RBinOp1' runs the right one over the same events, and
+-- 'RestoreSibling' closes the scope once 'RBinOp2' has combined them.
+--
+-- The time is read, never forced: forcing it here changed what @l4 explore@
+-- could see of a compound whose time nothing else forces (measured on
+-- @jl4/examples/ok/every/run-after.l4@), and the check must change nothing
+-- for operands that do not read each other's records. While the time is
+-- still a thunk, an access at the compound's start is logged against the
+-- start ('StartOf'), and 'siblingCheck' fills in the instant once something
+-- else has evaluated the time; an access whose instant is never known counts
+-- as simultaneous with every other, so the check errs towards refusing.
+--
+-- A @RAND@ applied to a time and a stream runs its operands in step
+-- ('lockstepNext'), with or without an evaluation trace; an @ROR@ still runs
+-- them one after the other: NORM-LOG-SPEC N17 and N18 rule how an @ROR@ runs
+-- under goal A, and that is not built.
+startCompound :: Environment -> RBinOp -> MaybeEvaluated -> MaybeEvaluated -> [Reference] -> Maybe (Type' Resolved) -> Machine Config
+startCompound env op rexpr1 rexpr2 rs appType = do
+  clock <- case rs of
+    t : _ -> peekClock t
+    []    -> pure Nothing
+  stepOn <- asks (.operandsInStep)
+  let opText = case op of
+        ValRAnd -> "RAND"
+        ValROr  -> "ROR"
+      inStep = case (op, rs) of
+        (ValRAnd, [_, _]) -> stepOn
+        _                 -> False
+  sref <- asks (.siblings)
+  outer <- liftIO (readIORef sref)
+  let fork = case rexpr1 of
+        Right ValObligation {} -> True
+        _                      -> False
+      (scope, opened) = openScope (MkScope opText (operandLabel "left" rexpr1) (operandLabel "right" rexpr2) fork inStep) clock outer
+      outerPath = outer.ssPath
+  liftIO (writeIORef sref opened)
+  case (clock, rs) of
+    (Nothing, t : _) -> do
+      tref <- asks (.siblingStarts)
+      liftIO (modifyIORef' tref (IntMap.insert scope t))
+    _ -> pure ()
+  pushFrame (RestoreSibling outerPath outer.ssClock)
+  case rs of
+    [time, events] | inStep -> do
+      liftIO (modifyIORef' sref (setTaken scope 0))
+      dyn0 <- captureDyn
+      lockstepNext MkLockstepFrame
+        { lsGate = scope, lsScope = scope, lsOp = op, lsEnv = env, lsTime = time, lsType = appType
+        , lsStream = events, lsSlots = [SlotPending rexpr1, SlotPending rexpr2]
+        , lsRunning = Nothing, lsRound = [0, 1], lsCell = Nothing, lsTaken = 0, lsHead = Nothing
+        , lsBase = dyn0 {dyPath = outerPath, dyClock = outer.ssClock} }
+    _ -> do
+      -- make sure to reassemble the operation after returning
+      pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
+      -- apply the arguments of the left hand expression to the
+      -- expression
+      pushFrame (App1 rs appType)
+      -- R-Q7B: the operand is handed off here, exactly as a HENCE's
+      -- value is, so a continuation that arrives as a VALUE inside a
+      -- compound anchors to the obligation the compound is attached
+      -- to ('operandHandoff').
+      operandHandoff env rexpr1
+      maybeEvaluate env rexpr1 -- TODO: build application
+
+-- ----------------------------------------------------------------------------
+-- Operands in step (smucclaw/l4-ide#1069; NORM-LOG-SPEC N10, option A).
+--
+-- Note [Operands in step]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- A @RAND@ used to run its left operand over the whole stream, then its right
+-- operand over the same stream. Each operand shares one ledger with the
+-- other, so a @RECALL@ on one side saw every record the other side would ever
+-- make, or none of them, whatever their instants (smucclaw/l4-ide#1069). In
+-- Hvitved's CSL, which the contract evaluator follows, @c1 and c2@ reduces
+-- BOTH conjuncts on each event and combines the residues (thesis Fig. 2.8,
+-- p. 49), and the monitor feeds the specification one event at a time
+-- (§2.3.6, p. 52). That is what the machine now does, without changing what a
+-- residual is: each operand is a suspended stretch of the machine's stack.
+--
+-- * Each operand is applied, not to the compound's stream, but to a GATE: a
+--   thunk whose expression is a variable no environment binds, minted by
+--   'mintGate' with a unique of sort @g@ that carries the compound's number.
+-- * When the operand forces its gate (it wants the next event), 'forwardExpr'
+--   meets that variable and calls 'lockstepPause', which cuts the stack at the
+--   compound's 'Lockstep' frame, stores the frames above it and the dynamic
+--   state frames would otherwise restore ('DynState'), and goes on with the
+--   next operand ('lockstepNext').
+-- * When every operand is paused or finished, the frame forces the next cell
+--   of the real stream and hands it to each paused operand in turn, left
+--   first, as @e@ consed onto a fresh gate (or the end of the stream),
+--   writing the cell into the operand's old gate so that its stream becomes
+--   an ordinary list, and putting its frames back.
+-- * When every operand has finished, the two values are combined by the same
+--   'RBinOp2' arms as before.
+--
+-- So every operand takes event n before any takes event n+1. A record made on
+-- one side while it takes an event is in the ledger for every read the other
+-- side makes from the next event on; within one event the left side runs
+-- first. That is not yet goal A as NORM-LOG-SPEC rules it (2026-10-26): N20
+-- settles every deadline an event reveals, in every operand, before any
+-- operand matches the event, and N19 has a match not see what a sibling
+-- records while matching the same event; this frame does neither, since an
+-- operand settles and matches in one turn. The sibling-read check stays as
+-- the backstop for what that cannot
+-- order (two accesses while the sides take the same event, in an order other
+-- than their instants', or at one instant), and it now knows which event each
+-- access was made at ('setTaken'), so two events with one stamp are ordered
+-- as the trace orders them.
+--
+-- Not in step, and so left to the check ('startCompound'): an @ROR@. N17 and
+-- N18 (2026-10-26) rule it, every alternative stepping on every event and a
+-- losing alternative's entries kept, tagged and skipped by later reads; that
+-- is not built. A
+-- barrier's members run in its own loop ('barrierNext'), and make no records.
+--
+-- Under an evaluation trace (@#EVALTRACE@, the REPL, a service request for
+-- a full trace) a @RAND@ runs in step too, so every surface gives one
+-- answer. The trace builder ("L4.EvaluateLazy.Trace") reads the frame pushes
+-- and pops as one nested tree, and a paused operand's frames leave and come
+-- back unpopped, so the trace records nothing while an operand runs
+-- ('traceMuted', saved in 'DynState'): the compound appears in the trace with
+-- its stream and its value, and without its operands' steps. Before
+-- 2026-11-13 a traced @RAND@ ran one operand after the other, which the
+-- sibling-read check refused where in step answers.
+-- An @ROR@'s right operand and a barrier's later members and join go over
+-- events an in-step compound around them has already taken, so their
+-- accesses carry no count for that compound ('takenOn', 'RestoreBehind').
+--
+-- Nothing about an operand that does not read the other's records depends on
+-- the schedule: its run is a function of the trace and of the ledger as it
+-- was when the compound was applied, so its verdict, its breach instant and
+-- its blamed parties are what they were, and 'RBinOp2' combines them as
+-- before (Hvitved's Corollary 2.3.7, p. 52). What moves is the order of the
+-- ledger's entries, of notes and of the deontic step log, now the order of
+-- the events.
+--
+-- What a paused operand must not hold: an 'UpdateThunk' for a thunk another
+-- operand can force, which would read as a loop there. Its gate's own
+-- 'UpdateThunk' is dropped when it pauses, and the gate is written when it
+-- resumes; any other thunk still being forced when the gate is reached has a
+-- value that depends on the gate, which only this operand can reach, so it
+-- is this operand's own.
+
+-- | A gate for an operand of the compound numbered @g@ ('lsGate').
+mintGate :: Int -> Machine Reference
+mintGate g = do
+  uri <- getModuleUri
+  let gate = Def (MkUnique 'g' g uri) (MkName emptyAnno (NormalName "the next event"))
+  fst <$> allocateRecursive (Var emptyAnno gate) (const emptyEnvironment)
+
+-- | Is this the variable of a gate ('mintGate')?
+isGate :: Resolved -> Bool
+isGate r = (getUnique r).sort == 'g'
+
+-- | The dynamic state as it is now.
+captureDyn :: Eval DynState
+captureDyn = do
+  party <- getCurrentParty
+  tc <- getTemporalContext
+  relook <- asks (.deonticLog) >>= traverse \ l -> liftIO (readIORef l.dlRelookScope)
+  st <- readEvalRef (.siblings)
+  muted <- readEvalRef (.traceMuted)
+  pure (MkDynState party tc relook st.ssPath st.ssClock st.ssBehind muted)
+
+-- | Put a dynamic state back.
+setDyn :: DynState -> Eval ()
+setDyn d = do
+  putCurrentParty d.dyParty
+  putTemporalContext d.dyTemporal
+  asks (.deonticLog) >>= traverse_ \ l -> for_ d.dyRelook (liftIO . writeIORef l.dlRelookScope)
+  restoreSibling d.dyPath d.dyClock
+  restoreBehind d.dyBehind
+  mref <- asks (.traceMuted)
+  liftIO (writeIORef mref d.dyMuted)
+
+-- | The next step of an in-step compound: start or resume the next operand
+-- of the round; when the round is over, take the next cell of the stream if
+-- an operand is waiting for one; when none is, combine the operands' values.
+lockstepNext :: LockstepFrame -> Machine Config
+lockstepNext ls = case ls.lsRound of
+  i : is -> do
+    let running = ls {lsRound = is, lsRunning = Just i, lsSlots = setSlot i SlotRunning ls.lsSlots}
+    case drop i ls.lsSlots of
+      SlotPending rexpr : _ -> do
+        -- the compound's own time is the operand's first clock, as it was for
+        -- the right operand before ('RBinOp1'); an earlier operand may have
+        -- forced it by now
+        clock <- peekClock ls.lsTime
+        let start = ls.lsBase
+        -- the operand's dynamic state goes in first, so that the trace is
+        -- muted for everything the operand does, its gate and frames included
+        setDyn start {dyPath = (ls.lsScope, i) : start.dyPath, dyClock = maybe (StartOf ls.lsScope) At clock, dyMuted = start.dyMuted + 1}
+        gate <- mintGate ls.lsGate
+        pushFrame (Lockstep running)
+        pushFrame (App1 [ls.lsTime, gate] ls.lsType)
+        -- R-Q7B: the operand is handed off here, exactly as a HENCE's value
+        -- is ('operandHandoff')
+        operandHandoff ls.lsEnv rexpr
+        maybeEvaluate ls.lsEnv rexpr
+      SlotPaused po : _ -> do
+        setDyn po.poDyn
+        cell <- case ls.lsCell of
+          Just (Just e) -> ValCons e <$> mintGate ls.lsGate
+          _             -> pure ValNil
+        updateThunkToWHNF po.poGate cell
+        pushFrame (Lockstep running)
+        traverse_ pushFrame (reverse po.poFrames)
+        continueBackward cell
+      _ -> lockstepNext ls {lsRound = is}
+  []
+    | not (null (pausedSlots ls.lsSlots)) -> do
+        setDyn ls.lsBase
+        pushFrame (Lockstep ls {lsRunning = Nothing})
+        continueRef ls.lsStream
+    | [SlotDone v1, SlotDone v2] <- ls.lsSlots -> do
+        setDyn ls.lsBase
+        pushFrame (ContractFrame (RBinOp2 MkRBinOp2 {op = ls.lsOp, rval1 = v1, env = ls.lsEnv}))
+        continueBackward v2
+    | otherwise -> internalException $ RuntimeTypeError
+        "an in-step compound ended its round with an operand neither waiting nor finished"
+
+-- | The frame of an in-step compound gets a value: the operand that was
+-- running has finished, or the next cell of the stream has arrived.
+lockstepReturn :: LockstepFrame -> WHNF -> Machine Config
+lockstepReturn ls val = case ls.lsRunning of
+  Just i -> lockstepNext ls {lsRunning = Nothing, lsSlots = setSlot i (SlotDone val) ls.lsSlots}
+  Nothing | Just (e, rest) <- ls.lsHead -> handOut e rest
+  Nothing -> case val of
+    ValCons e rest -> do
+      tracing <- asks (isJust . (.evalTrace))
+      if tracing
+        then do
+          -- the operands run with the trace muted (Note [Operands in step]),
+          -- so the event is forced here, where the trace records it beside
+          -- the stream it came from; an operand forces it anyway when it
+          -- takes it, so this moves the force and adds none
+          pushFrame (Lockstep ls {lsHead = Just (e, rest)})
+          continueRef e
+        else handOut e rest
+    ValNil ->
+      lockstepNext ls {lsCell = Just Nothing, lsRound = pausedSlots ls.lsSlots}
+    _ -> internalException $ RuntimeTypeError $
+      "expected a list of events but found: " <> prettyLayout val
+  where
+    handOut e rest = do
+      let n = ls.lsTaken + 1
+      sref <- asks (.siblings)
+      liftIO (modifyIORef' sref (setTaken ls.lsScope n))
+      lockstepNext ls {lsHead = Nothing, lsStream = rest, lsCell = Just (Just e), lsTaken = n, lsRound = pausedSlots ls.lsSlots}
+
+-- | An operand forced the gate of the compound numbered @g@: store it, with
+-- the frames it pushed above the compound's frame, and go on.
+lockstepPause :: Int -> Machine Config
+lockstepPause g = do
+  stackRef <- asks (.stack)
+  s <- liftIO (readIORef stackRef)
+  case s.frames of
+    UpdateThunk gateRef saved _ : framesAbove ->
+      case break owner framesAbove of
+        (segment, Lockstep ls : framesBelow) | Just i <- ls.lsRunning -> do
+          -- the gate's force is not finished: its read span closes as an
+          -- unforced thunk's does, and the gate is written when it resumes
+          void (swapCtxReads saved)
+          liftIO (writeIORef stackRef (MkStack (s.size - 2 - length segment) framesBelow))
+          dyn <- captureDyn
+          lockstepNext ls
+            { lsRunning = Nothing
+            , lsSlots = setSlot i (SlotPaused MkPausedOperand {poFrames = segment, poGate = gateRef, poDyn = dyn}) ls.lsSlots }
+        _ -> internalException $ RuntimeTypeError
+          "an operand asked for the next event of a compound that is not waiting for it"
+    _ -> internalException $ RuntimeTypeError
+      "the next event of an in-step compound was asked for outside a thunk"
+  where
+    owner = \ case
+      Lockstep ls -> ls.lsGate == g
+      _           -> False
+
+-- | Unwinding through an in-step compound: the paused operands are unwound as
+-- if they were on the stack, and their gates are made forcible again.
+unwindLockstep :: LockstepFrame -> Eval ()
+unwindLockstep ls = do
+  for_ ls.lsSlots \ case
+    SlotPaused po -> do
+      traverse_ unwindFrame po.poFrames
+      restoreThunkOnUnwind po.poGate Nothing
+    _ -> pure ()
+  setDyn ls.lsBase
+
+setSlot :: Int -> OperandSlot -> [OperandSlot] -> [OperandSlot]
+setSlot i x xs = [ if j == i then x else y | (j, y) <- zip [0 ..] xs ]
+
+pausedSlots :: [OperandSlot] -> [Int]
+pausedSlots xs = [ i | (i, SlotPaused _) <- zip [0 ..] xs ]
+
+-- ----------------------------------------------------------------------------
 -- Per-force context-read tracking (T6).
 --
 -- Value-affecting reads of the temporal context MUST go through the readTc*
@@ -1668,6 +2203,8 @@ forwardExpr env = \ case
     continueExpr env e1
   Proj _ann e l ->
     continueExpr env (App emptyAnno l [e]) -- we desugar projection to plain function application
+  -- an operand of an in-step compound wants the next event (Note [Operands in step])
+  Var _ann n | isGate n -> lockstepPause (getUnique n).unique
   Var _ann n -> do -- still problematic: similarity / overlap between this and App with no args
     -- Auto-apply a discharged import only in VALUE position. The App case above
     -- fetches the function it is about to apply by re-entering here, and
@@ -1808,7 +2345,7 @@ forwardExpr env = \ case
   Post _ann e1 e2 e3 -> do
     pushFrame (Post1 e2 e3 env)
     continueExpr env e1
-  Record _ann mParty cell val isOfficial mHence -> do
+  Record ann mParty cell val isOfficial mHence -> do
     -- STATE-AS-LEDGER M1 (+ NOTIFY-v1): evaluate the cell to a String path, then
     -- the value to WHNF, append an Assign event to the ledger. M5: if a HENCE
     -- continuation is present, forward [time, events] to it (event-free deontic
@@ -1822,18 +2359,18 @@ forwardExpr env = \ case
     -- the acting party's own ledger exactly as before.
     case mParty of
       Just partyExpr -> do
-        pushFrame (Record0 cell val env isOfficial mHence)
+        pushFrame (Record0 cell val env isOfficial mHence (rangeOf ann))
         continueExpr env partyExpr
       Nothing -> do
-        pushFrame (Record1 val env isOfficial mHence Nothing)
+        pushFrame (Record1 val env isOfficial mHence Nothing (rangeOf ann))
         continueExpr env cell
-  ReadCell _ann mParty isOfficial mode cell -> do
+  ReadCell ann mParty isOfficial mode cell -> do
     -- STATE-AS-LEDGER M1.5 / M4.5: evaluate the cell to a String path first,
     -- carrying the optional party qualifier (still unevaluated), the isOfficial
     -- flag, the 'RecallMode' (approach B), and the env. The 'ReadCell1' frame then
     -- routes to the right ledger (own / cross-party / official) and reads it,
     -- yielding MAYBE (RecallLast) or a LIST (RecallAll).
-    pushFrame (ReadCell1 mParty isOfficial mode env)
+    pushFrame (ReadCell1 mParty isOfficial mode env (rangeOf ann))
     continueExpr env cell
   Concat _ann [] ->
     continueBackward (ValString "")
@@ -1908,27 +2445,27 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     continueExpr env e3
   Just (Post3 val1 val2) -> do
     runPost val1 val2 val
-  Just (Record0 cell valExpr env isOfficial mHence) -> do
+  Just (Record0 cell valExpr env isOfficial mHence site) -> do
     -- NOTIFY v1: the recipient party qualifier has evaluated to 'val' (a WHNF);
     -- key it the SAME way a cross-party RECALL read does ('partyKeyWHNF'), so the
     -- write-key matches the recipient's read-key by construction. Carry that key
     -- through to 'Record1'/'Record2'/'runRecord', then proceed to evaluate the
     -- cell exactly as a bare RECORD does.
     let recipientKey = partyKeyWHNF val
-    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey))
+    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey) site)
     continueExpr env cell
-  Just (Record1 valExpr env isOfficial mHence mRecipientKey) -> do
+  Just (Record1 valExpr env isOfficial mHence mRecipientKey site) -> do
     -- the cell has evaluated to 'val'; now evaluate the value expression. Carry
     -- the env, the M5 HENCE, and the NOTIFY recipient key so 'runRecord' can
     -- route the write and forward to the continuation.
-    pushFrame (Record2 val isOfficial env mHence mRecipientKey)
+    pushFrame (Record2 val isOfficial env mHence mRecipientKey site)
     continueExpr env valExpr
-  Just (Record2 cellVal isOfficial env mHence mRecipientKey) -> do
+  Just (Record2 cellVal isOfficial env mHence mRecipientKey site) -> do
     -- both the cell ('cellVal') and the value ('val') are evaluated: append the
     -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
     -- continuation (forward [time, events] to it); without, return the value (M1).
-    runRecord cellVal val isOfficial env mHence mRecipientKey
-  Just (ReadCell1 mParty isOfficial mode env) -> do
+    runRecord cellVal val isOfficial env mHence mRecipientKey site
+  Just (ReadCell1 mParty isOfficial mode env site) -> do
     -- the cell has evaluated to 'val' (a String path). Route to the right
     -- ledger and finish (M1.5 / M4.5), carrying the 'RecallMode' (approach B):
     --   * isOfficial   -> read the shared OFFICIAL record.
@@ -1939,21 +2476,29 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     if isOfficial
       then do
         ledger <- officialLedgerEval
-        finishRead mode val ledger
+        finishRead mode val OfficialKey site ledger
       else case mParty of
         Just partyExpr -> do
-          pushFrame (ReadCell2 val mode)
+          pushFrame (ReadCell2 val mode site)
           continueExpr env partyExpr
         Nothing -> do
           ledger <- currentLedgerEval
-          finishRead mode val ledger
-  Just (ReadCell2 cellVal mode) -> do
+          party <- fromMaybe anonymousParty <$> getCurrentParty
+          finishRead mode val (OwnKey party) site ledger
+  Just (ReadCell2 cellVal mode site) -> do
     -- the party qualifier has evaluated to 'val' (a WHNF): key it the SAME way
     -- a RECORD write does ('partyKeyWHNF'), so a cross-party read matches a
     -- write, then read that party's own ledger and finish (M4.5), in 'mode'.
     let key = partyKeyWHNF val
     ledger <- partyLedgerEval key
-    finishRead mode cellVal ledger
+    finishRead mode cellVal (OwnKey key) site ledger
+  Just (RestoreSibling path clock) -> do
+    restoreSibling path clock
+    continueBackward val
+  Just (RestoreBehind n) -> do
+    restoreBehind n
+    continueBackward val
+  Just (Lockstep ls) -> lockstepReturn ls val
   Just (RestoreCurrentParty mOriginal scoped) -> do
     -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
     -- restore the enclosing acting party and pass the value on unchanged (M4).
@@ -1981,6 +2526,9 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- P2b: this is the ENTRY into the obligation's site — the activation
         -- the step log's key counts. Lazy when the log is off.
         norm <- armNormKey party act
+        -- smucclaw/l4-ide#1069: the sibling-read check's clock is the arming
+        -- time until an event is taken
+        noteClock time
         -- this is the arming point: the clock now is what THE ARMING will
         -- name in this obligation's continuation (R-Q7B), so keep it —
         -- 'time' itself advances with every scrutinised event; no event has
@@ -1995,18 +2543,8 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
         startRollCall env deonton time events
-      ValROp env op rexpr1 rexpr2 -> do
-        -- make sure to reassemble the operation after returning
-        pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
-        -- apply the arguments of the left hand expression to the
-        -- expression
-        pushFrame f
-        -- R-Q7B: the operand is handed off here, exactly as a HENCE's
-        -- value is, so a continuation that arrives as a VALUE inside a
-        -- compound anchors to the obligation the compound is attached
-        -- to ('operandHandoff').
-        operandHandoff env rexpr1
-        maybeEvaluate env rexpr1 -- TODO: build application
+      ValROp env op rexpr1 rexpr2 ->
+        startCompound env op rexpr1 rexpr2 rs mTy
       ValConnective conn ->
         case (conn, rs) of
           (ConnNot, [r]) -> do
@@ -2842,6 +3380,9 @@ backwardContractFrame val = \ case
   Contract9 ScrutinizeEnvironment {..} ->
     case val of
       ValEnvironment henceEnv -> do
+        -- smucclaw/l4-ide#1069: a RECALL in the PROVIDED is read at the
+        -- event's stamp
+        noteClockWHNF time
         pushCFrame $ Contract10 ScrutinizeActions {..}
         continueExpr (env `Map.union` henceEnv) (fromMaybe trueExpr act.provided)
       _ -> internalException $ RuntimeTypeError $
@@ -3218,9 +3759,26 @@ backwardContractFrame val = \ case
       -- fulfilled LEFT operand is unreachable because of this short-circuit,
       -- so the step is logged here.
       joinedStep op JoinFulfilled (Just LeftSide) False
+      -- smucclaw/l4-ide#1069: the right alternative is never run, so a
+      -- record it would have made is never compared with a read; written the
+      -- other way round it would have run first. Hand the check what it can
+      -- make, from the ROR's start on ('registerUnrun').
+      clock' <- case (clock, args) of
+        (Nothing, t : _) -> peekClock t
+        _                -> pure clock
+      writes <- possibleWrites env rexpr2
+      unless (null writes) $
+        siblingCheck (registerUnrun scope outerPath (maybe (StartOf scope) At clock') writes)
       continueBackward ValFulfilled
 
   RBinOp1 MkRBinOp1 {..} -> do
+    -- smucclaw/l4-ide#1069: the right operand runs on side 1 of the
+    -- compound's scope, from the compound's own time, which the left operand
+    -- has usually forced by now if it was still a thunk when the compound began
+    clock' <- case (clock, args) of
+      (Nothing, t : _) -> peekClock t
+      _                -> pure clock
+    restoreSibling ((scope, 1) : outerPath) (maybe (StartOf scope) At clock')
 
     -- push a frame for when the evaluation of the
     -- second argument has completed
@@ -3476,6 +4034,10 @@ backwardContractFrame val = \ case
     continueWithFollowup mParty lifecycle env followup events time seen = do
       mOriginal <- getCurrentParty
       putCurrentParty mParty
+      -- smucclaw/l4-ide#1069: a RECORD or RECALL in the continuation is made
+      -- at the hand-off's clock (the act's stamp under HENCE, the missed
+      -- deadline under LEST)
+      noteClock time
       pushFrame (RestoreCurrentParty mOriginal False)
       args <- case followup of
         App _ r [] | isSentinel r -> do
@@ -3881,6 +4443,14 @@ joinFailpointName  = "the join fails"
 -- vacuously true.
 startBarrier :: QuantCtx -> [CastMember] -> MemberDue -> Machine Config
 startBarrier ctx members mdue = do
+  -- smucclaw/l4-ide#1069: the members after the first, and the join, take
+  -- events again that the compounds the barrier sits in have already taken,
+  -- so an access in here must not be ordered by those compounds' event
+  -- counts ('takenOn'); the barrier's own compounds are counted as usual
+  sref <- asks (.siblings)
+  outer <- liftIO (readIORef sref)
+  pushFrame (RestoreBehind outer.ssBehind)
+  liftIO (writeIORef sref outer {ssBehind = max outer.ssBehind (length outer.ssPath)})
   -- Both names are user-visible: a member that has not yet acted when the
   -- event stream runs out is printed as a residual obligation carrying these
   -- sentinels in its HENCE and LEST, so they have to read as English there.
@@ -4095,6 +4665,7 @@ fireBarrierHence ctx deadlineRef timeRef eventsRef = do
     logStep l (plainStep clock Nothing NoEvent ctx.norm JoinReleased)
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
+  noteClock timeRef -- smucclaw/l4-ide#1069: the join's clock
   pushFrame (RestoreCurrentParty mOriginal False)
   pushFrame (App1 [timeRef, eventsRef] Nothing)
   let lifecycle = MkLifecycle {join = Just timeRef, deadline = deadlineRef, armed = ctx.time}
@@ -4139,6 +4710,7 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
       logStep l (plainStep clock Nothing NoEvent ctx.norm (JoinFailed ToLest))
     mOriginal <- getCurrentParty
     putCurrentParty Nothing
+    noteClock timeRef -- smucclaw/l4-ide#1069: the failure's clock
     pushFrame (RestoreCurrentParty mOriginal False)
     pushFrame (App1 [timeRef, eventsRef] Nothing)
     let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineRef, armed = ctx.time}
@@ -4198,6 +4770,7 @@ barrierStateLest :: QuantCtx -> RExpr -> Reference -> Reference -> Machine Confi
 barrierStateLest ctx lestExpr tRef cellRef = do
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
+  noteClock tRef -- smucclaw/l4-ide#1069: the state deadline's clock
   scoped <- enterRelookScope (joinSiteOf ctx.deonton)
   pushFrame (RestoreCurrentParty mOriginal scoped)
   pushFrame (App1 [tRef, cellRef] Nothing)
@@ -4443,8 +5016,8 @@ emptyBreachByRefusal clause = Text.unwords
 --     'continueWithFollowup' already pushed is still on the stack, so once
 --     @hence@ reduces to a 'ValObligation' that 'App1' applies it to
 --     @[time, events]@ — the next step scrutinizes the SAME event stream.
-runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Machine Config
-runRecord cellVal val isOfficial env mHence mRecipientKey = do
+runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Maybe SrcRange -> Machine Config
+runRecord cellVal val isOfficial env mHence mRecipientKey site = do
   cell <- expectString cellVal
   -- Bitemporal stamps (smucclaw/l4-ide#914 §2A). Transaction time is the
   -- ROOT eval clock ('getEvalTime'): a plain EvalState field that
@@ -4474,6 +5047,16 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
       route = if isOfficial
               then RouteOfficial
               else maybe RouteOwn RouteNotify mRecipientKey
+      -- the ledger the write lands in, keyed as 'tellEventRouted' keys it
+      key = case route of
+        RouteOfficial  -> OfficialKey
+        RouteOwn       -> OwnKey (fromMaybe anonymousParty mParty)
+        RouteNotify rk -> OwnKey rk
+  -- smucclaw/l4-ide#1069: rules 2, 4 and 5 of the sibling-read check, before
+  -- the write. The value is printed only if it is already evaluated through
+  -- and through ('peekName'): the check forces nothing.
+  shown <- peekName val
+  siblingCheck (checkWrite key cell prov.source shown site)
   tellEventRouted route (Assign [cell] val prov)
   case mHence of
     Nothing    -> continueBackward val          -- M1: terminal / expression use
@@ -4503,9 +5086,12 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
 --     'readCellAllBitemporal' (oldest->newest, append order), building it
 --     right-to-left as 'ValCons'\/'ValNil'. Result @[]@ (ValNil) when no
 --     visible entry exists — NOT @NOTHING@.
-finishRead :: RecallMode -> WHNF -> Ledger -> Machine Config
-finishRead mode cellVal ledger = do
+finishRead :: RecallMode -> WHNF -> LedgerKey -> Maybe SrcRange -> Ledger -> Machine Config
+finishRead mode cellVal key site ledger = do
   cell <- expectString cellVal
+  -- smucclaw/l4-ide#1069: rules 1 and 3 of the sibling-read check. The
+  -- @key@ is the ledger the caller chose, keyed as a write to it is.
+  siblingCheck (checkRead key cell (mode == RecallAll) site)
   -- Bitemporal read bounds (smucclaw/l4-ide#914 §2B): RECALL reads THROUGH
   -- the ambient temporal context. @EVAL AS OF SYSTEM TIME t@ hides entries
   -- appended after t (tx > t); @EVAL UNDER VALID TIME t@ selects, among
@@ -4715,6 +5301,14 @@ patternMatchFailure = withPoppedFrame $ \ case
     newTime <- allocateValue time
     pushFrame $ ContractFrame $ Contract1 ScrutinizeEvents {party = Right party, time = newTime, ..}
     continueRef events
+  -- an in-step compound's paused operands are dropped with it, so their
+  -- blackholed thunks must be made forcible again
+  Just (Lockstep ls) -> do
+    unwindLockstep ls
+    patternMatchFailure
+  Just (RestoreBehind n) -> do
+    restoreBehind n
+    patternMatchFailure
   Just _ ->
     patternMatchFailure
 

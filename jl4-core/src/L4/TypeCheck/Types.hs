@@ -11,6 +11,7 @@ import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
 import L4.Lexer (PosToken, FixityDirection)
 import L4.Lint.NotReach (NotReachSite (..))
+import L4.Lint.SiblingReads (SiblingRead (..))
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
 import L4.Syntax
 import L4.TypeCheck.With
@@ -492,6 +493,12 @@ data CheckWarning
     -- the elaborations 'L4.Desugar.desugarSectionGivens' prepends for a
     -- section @GIVEN@ reach the same code and never draw it
     -- ('L4.Names.isSectionBinderElaboration').
+  | SiblingLedgerRead SiblingRead
+    -- ^ smucclaw/l4-ide#1069: two operands of a @RAND@, @ROR@ or
+    -- @EVERY … UPON EACH@ can reach a read and a write of one ledger cell
+    -- ('L4.Lint.SiblingReads'). A warning, as NORM-LOG-SPEC N10 requires of
+    -- a static check: the run-time check is the refusal, and a
+    -- writer-before-reader order is legitimate.
   | DeprecatedExactly DeprecatedExactlyInfo
     -- ^ An @EXACTLY@ written in a regulative action pattern. Since R1 of
     -- @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@ a bare name there already
@@ -926,6 +933,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
+  rangeOf (CheckWarning (SiblingLedgerRead w)) = w.compound
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (SuspiciousClausePattern _ _ b _) = rangeOf b

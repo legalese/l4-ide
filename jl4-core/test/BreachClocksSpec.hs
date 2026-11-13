@@ -27,9 +27,30 @@
 --     breached at that instant when more events follow.
 --   * L5 — nothing is observed before it took effect.
 --
+--   * C1 — Hvitved's composition, with the ledger in use: the same trees,
+--     each leaf now reading a record made before the tree (in its
+--     @PROVIDED@) and making and reading records of its own (in its
+--     @HENCE@), report exactly what the trees without the ledger report, the
+--     sibling-read check never fires, and L0 and L1 still hold of them. And
+--     a @RAND@ run in step (every operand takes an event before any takes
+--     the next) reports exactly what it reported run one operand after the
+--     other, as every @RAND@ ran before.
+--     These are the operands that do not read each other's records, for
+--     which smucclaw/l4-ide#1069's check must change nothing: a CSL conjunct
+--     is a function of the trace alone (Hvitved's thesis, Def. 2.2.7, p. 35),
+--     and so is a leaf whose only ledger reads are of its own records and of
+--     records made before the compound started. L0's oracle is Hvitved's
+--     verdict composition: the earlier breach of a @RAND@ (Def. 2.2.6, p. 35)
+--     with the union of the parties on a tie, and the later breach of an
+--     @ROR@ (Def. 2.2.10, p. 37). On an @ROR@ tie it also takes the union:
+--     that is L4's @BothDecide@ (SEESAW), not CSL, which defines disjunction
+--     only where blame is unique (Def. 2.2.11, p. 37).
+--
 -- What the laws do NOT cover, by design: operands that read one another's
--- records, and an @ROR@'s right operand after the left is fulfilled (§6.1.2,
--- "What it does not promise").
+-- records (a @RAND@ runs them in step and an @ROR@ is refused where the order
+-- mattered, smucclaw/l4-ide#1069, pinned in "SiblingReadsSpec"), and an
+-- @ROR@'s right operand after the left is fulfilled (§6.1.2, "What it does
+-- not promise").
 module BreachClocksSpec (spec) where
 
 import Data.Foldable (for_)
@@ -45,7 +66,8 @@ import L4.EvaluateLazy
 import L4.EvaluateLazy.Machine (emptyEnvironment, pattern ValFulfilled)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Print (prettyLayout)
-import L4.TracePolicy (apiDefaultPolicy)
+import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
+import L4.TracePolicy (TracePolicy, apiDefaultPolicy, replDefaultPolicy)
 
 -- | An obligation tree: a leaf is party/action @i@ due at @d@.
 data Tree = Leaf Int Integer | Node RBinOp Tree Tree
@@ -91,6 +113,23 @@ render = \ case
     tshow :: Show x => x -> Text.Text
     tshow = Text.pack . show
 
+-- | C1's leaves: the same obligation, now reading OFFICIAL's @before@ (made
+-- before the tree) in its @PROVIDED@, and making a record of its own and
+-- reading it back in its @HENCE@. No leaf reads a cell another leaf writes.
+renderLedger :: Tree -> Text.Text
+renderLedger = \ case
+  Leaf i d ->
+    "(PARTY P" <> tshow i <> " MUST a" <> tshow i
+      <> " PROVIDED (RECALL OFFICIAL's `before`) EQUALS JUST TRUE"
+      <> " WITHIN " <> tshow d
+      <> " HENCE RECORD `mine " <> tshow i <> "` IS " <> tshow i
+      <> " HENCE COMMIT `done " <> tshow i <> "` IS ((RECALL `mine " <> tshow i <> "`) EQUALS JUST " <> tshow i <> ")"
+      <> " HENCE FULFILLED)"
+  Node op l r -> "(" <> renderLedger l <> (if op == ValRAnd then " RAND " else " ROR ") <> renderLedger r <> ")"
+  where
+    tshow :: Show x => x -> Text.Text
+    tshow = Text.pack . show
+
 traceLines :: [Ev] -> [Text.Text]
 traceLines = map \ case
   Tick t  -> "  (`WAIT UNTIL` " <> Text.pack (show t) <> ")"
@@ -98,13 +137,20 @@ traceLines = map \ case
 
 -- | A module with one rule per tree and one #TRACE per (tree, trace) pair.
 moduleFor :: [(Tree, [Ev])] -> Text.Text
-moduleFor cs = Text.unlines $
+moduleFor = moduleWith render
+
+-- | C1's module: each rule makes OFFICIAL's @before@, then runs the tree.
+moduleForLedger :: [(Tree, [Ev])] -> Text.Text
+moduleForLedger = moduleWith (\ t -> "COMMIT `before` IS TRUE HENCE " <> renderLedger t)
+
+moduleWith :: (Tree -> Text.Text) -> [(Tree, [Ev])] -> Text.Text
+moduleWith render' cs = Text.unlines $
   [ "DECLARE Actor IS ONE OF P0, P1, P2, P3, P4, P5, P6, P7"
   , "DECLARE Action IS ONE OF a0, a1, a2, a3, a4, a5, a6, a7"
   , "" ]
   <> concat
     [ [ "GIVETH A DEONTIC Actor Action"
-      , "`c" <> Text.pack (show n) <> "` MEANS " <> render t
+      , "`c" <> Text.pack (show n) <> "` MEANS " <> render' t
       , ""
       , "#TRACE `c" <> Text.pack (show n) <> "` AT 0 WITH" ]
       <> (if null evs then ["  (`WAIT UNTIL` 0)"] else traceLines evs)
@@ -139,6 +185,7 @@ verdictOf res = case res.result of
       }
   Reduction (Reduced (MkNF ValFulfilled)) -> Fulfilled
   Reduction (Reduced nf) -> Other (prettyLayout nf)
+  Reduction (ReducedErrored e) -> Other ("error: " <> Text.unlines (prettyEvalException e))
   other -> Other (Text.pack (show other))
   where
     entryKey = \ case
@@ -149,9 +196,23 @@ fixedNow :: UTCTime
 fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
 
 runCases :: [(Tree, [Ev])] -> IO [Verdict]
-runCases cs = do
-  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
-  case checkWithImports (vfsFromList []) (moduleFor cs) of
+runCases = runModule . moduleFor
+
+runLedgerCases :: [(Tree, [Ev])] -> IO [Verdict]
+runLedgerCases = runModule . moduleForLedger
+
+runModule :: Text.Text -> IO [Verdict]
+runModule = runModuleWith True apiDefaultPolicy
+
+-- | 'runModule' under a trace policy, with a @RAND@'s operands in step or,
+-- with 'False', one after the other, as every @RAND@ ran before
+-- smucclaw/l4-ide#1069's option A (Note [Operands in step] in
+-- "L4.EvaluateLazy.Machine"): that is C1's baseline.
+runModuleWith :: Bool -> TracePolicy -> Text.Text -> IO [Verdict]
+runModuleWith inStep policy src = do
+  cfg0 <- resolveEvalConfig (Just fixedNow) policy
+  let cfg = cfg0 {operandsInStep = inStep}
+  case checkWithImports (vfsFromList []) src of
     Left errs -> do
       expectationFailure ("typecheck failed: " <> show errs)
       pure []
@@ -266,19 +327,90 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
       Breached {} -> (n, withoutObservation b) `shouldBe` (n, withoutObservation a)
       _           -> pure ()
 
+  describe "C1: leaves that use the ledger but do not read each other's records (smucclaw/l4-ide#1069)" do
+    it "report exactly what the same trees without the ledger report, and none is refused" do
+      plain <- runCases cs
+      withLedger <- runLedgerCases cs
+      length withLedger `shouldBe` length cs
+      for_ (zip3 [0 :: Int ..] plain withLedger) \ (n, a, b) -> do
+        (n, refused b) `shouldBe` (n, False)
+        (n, settled b) `shouldBe` (n, settled a)
+
+    it "report the same, residuals included, run in step as run one operand after the other, with the ledger and without" do
+      for_ [("with the ledger" :: Text.Text, moduleForLedger cs), ("without", moduleFor cs)] \ (label, src) -> do
+        inStep <- runModule src
+        oneAfterOther <- runModuleWith False apiDefaultPolicy src
+        (label, length inStep, length oneAfterOther) `shouldBe` (label, length cs, length cs)
+        for_ (zip3 [0 :: Int ..] inStep oneAfterOther) \ (n, a, b) ->
+          (label, n, a) `shouldBe` (label, n, b)
+
+    it "report the same traced as untraced (every directive traced, as the REPL traces them)" do
+      for_ [("with the ledger" :: Text.Text, moduleForLedger cs), ("without", moduleFor cs)] \ (label, src) -> do
+        untraced <- runModule src
+        traced <- runModuleWith True tracedPolicy src
+        (label, length traced) `shouldBe` (label, length cs)
+        for_ (zip3 [0 :: Int ..] untraced traced) \ (n, a, b) ->
+          (label, n, a) `shouldBe` (label, n, b)
+
+    it "(the comparison's control: with operandsInStep off a RAND really runs one operand after the other, and traced it runs in step)" do
+      -- the reader on the left reads at 400 a record the right side makes at
+      -- 10: in step it answers; one operand after the other it is refused
+      let src = Text.unlines
+            [ "DECLARE Party IS ONE OF L"
+            , "DECLARE Act IS ONE OF notice, possession"
+            , "GIVETH A DEONTIC Party Act"
+            , "`n` MEANS PARTY L MAY notice WITHIN 100 HENCE COMMIT `given` IS TRUE HENCE FULFILLED LEST FULFILLED"
+            , "GIVETH A DEONTIC Party Act"
+            , "`p` MEANS PARTY L MAY possession PROVIDED (RECALL OFFICIAL's `given`) EQUALS JUST TRUE WITHIN 1000 HENCE FULFILLED LEST FULFILLED"
+            , "GIVETH A DEONTIC Party Act"
+            , "`both` MEANS `p` RAND `n`"
+            , "#TRACE `both` AT 0 WITH"
+            , "  PARTY L DOES notice AT 10"
+            , "  PARTY L DOES possession AT 400"
+            ]
+      inStep <- runModule src
+      oneAfterOther <- runModuleWith False apiDefaultPolicy src
+      traced <- runModuleWith True tracedPolicy src
+      inStep `shouldBe` [Fulfilled]
+      map refused oneAfterOther `shouldBe` [True]
+      traced `shouldBe` [Fulfilled]
+
+    it "L0: with nobody acting, Hvitved's composition decides the instant and the blamed parties" do
+      let quiet = [ (t, [Tick 100]) | (t, _) <- take 120 cs ]
+      vs <- runLedgerCases quiet
+      for_ (zip3 [0 :: Int ..] quiet vs) \ (n, (t, _), v) -> do
+        let (e, dec) = oracle t
+        case v of
+          Breached {vEffective, vDecisive} -> do
+            (n, vEffective) `shouldBe` (n, Just (fromInteger e))
+            (n, vDecisive) `shouldBe` (n, sort [ ("P" <> Text.pack (show i), fromInteger d) | (i, d) <- dec ])
+          other -> expectationFailure ("case " <> show n <> ": expected a breach, got " <> show other)
+
+    it "L1: the order of the operands decides nothing" do
+      let paired = concat [ [(t, evs), (mirror t, evs)] | (t, evs) <- cs ]
+      vs <- runLedgerCases paired
+      for_ (zip [0 :: Int ..] (pairs vs)) \ (n, (a, b)) ->
+        (n, settled a) `shouldBe` (n, settled b)
+
   it "L5: nothing is observed before it took effect" do
     vs <- runCases cs
     for_ (zip [0 :: Int ..] vs) \ (n, v) -> case v of
       Breached {vEffective = Just e, vObserved = Just o} -> (n, e <= o) `shouldBe` (n, True)
       _ -> pure ()
   where
+    -- the REPL's policy traces every directive
+    tracedPolicy = replDefaultPolicy defaultGraphVizOptions
     pairs (a : b : rest) = (a, b) : pairs rest
     pairs _              = []
     -- a compound still waiting keeps its operands in the drafter's order,
     -- so two residuals are compared only as residuals
     settled = \ case
+      Other t | "error: " `Text.isPrefixOf` t -> Other t
       Other _ -> Other "still waiting"
       v       -> v
+    refused = \ case
+      Other t -> "error: " `Text.isPrefixOf` t
+      _       -> False
     withoutObservation = \ case
       v@Breached {} -> v {vObserved = Nothing}
       v             -> v

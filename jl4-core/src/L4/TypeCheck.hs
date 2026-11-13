@@ -133,6 +133,7 @@ import Data.Char (isPrint)
 import Text.Read (readMaybe)
 import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
+import L4.Lint.SiblingReads (SiblingOperand (..), SiblingRead (..), siblingReads)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -332,11 +333,18 @@ doCheckProgramWithDependencies checkState checkEnv program =
                       None
                   | (root, bs@(b0 : _)) <- Discharge.ambiguousRootBinders rprog
                   ]
+                -- smucclaw/l4-ide#1069: compound operands that can reach a
+                -- read and a write of one ledger cell. Over the resolved
+                -- module, because it follows the names an operand uses.
+                siblingWarns =
+                  [ MkCheckErrorWithContext (CheckWarning (SiblingLedgerRead sr)) None
+                  | sr <- siblingReads rprog
+                  ]
             in MkCheckResult
               { program = rprog
               , implicitReaders =
                   Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
-              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs)
+              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns)
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -8607,6 +8615,52 @@ prettyCheckWarning = \ case
       , "Rename one of the two, so the name means only one thing where you"
       , "write it, and then the keyword can go."
       ]
+  SiblingLedgerRead w
+    | Just rorSite <- w.unrunRor ->
+    [ opening
+    , ""
+    , "  " <> side w.readerSide <> " reads " <> ledger <> " `" <> w.cell <> "`" <> at w.readVerb w.readSite <> ","
+    , "  and " <> side w.writerSide <> " makes that record" <> at w.writeVerb w.writeSite
+        <> " in a later alternative of the ROR" <> maybe "" (\ rng -> " on line " <> Text.pack (show rng.start.line)) rorSite <> "."
+    , ""
+    , "L4 runs no more of an ROR once an earlier alternative is fulfilled,"
+    , "so a record a later alternative would have made can be missing, whichever side runs first."
+    , "If a read could have seen such a record when the rule runs, evaluation stops with an error."
+    , safe
+    ]
+    | otherwise ->
+    [ opening
+    , ""
+    , "  " <> side w.readerSide <> " reads " <> ledger <> " `" <> w.cell <> "`" <> at w.readVerb w.readSite <> ","
+    , "  and " <> side w.writerSide <> " makes that record" <> at w.writeVerb w.writeSite <> "."
+    , ""
+    , runs
+    , "so such a read can see a record from its future, or miss one from its past."
+    , "If that happens when the rule runs, evaluation stops with an error."
+    , safe
+    ]
+    where
+      isEvery = w.op == "EVERY"
+      opening
+        | isEvery   = "The members of this EVERY may read each other's records:"
+        | otherwise = "The two sides of this " <> w.op <> " may read each other's records:"
+      runs
+        | isEvery   = "L4 runs the members of an EVERY one after another, each over the whole trace,"
+        | otherwise = "L4 runs one side of " <> article <> " " <> w.op <> " over the whole trace before it starts the other,"
+      article = if w.op == "ROR" then "an" else "a"
+      safe
+        | isEvery   = "A record made before the EVERY starts, or kept in each member's own ledger, is safe."
+        | otherwise = "A record made before the " <> w.op <> " starts, or read only on the side that makes it, is safe."
+      ledger = if w.official then "OFFICIAL's" else "a party's own"
+      side o
+        | isEvery = "each member"
+        | otherwise = case (o.rule, o.range) of
+            (Just r, _)    -> let t = prettyLayout r in if "`" `Text.isPrefixOf` t then t else "`" <> t <> "`"
+            (_, Just rng)  -> "the side on line " <> Text.pack (show rng.start.line)
+            _              -> "one side"
+      at verb = \ case
+        Just rng -> " (" <> verb <> ", line " <> Text.pack (show rng.start.line) <> ")"
+        Nothing  -> " (" <> verb <> ")"
   OpenedFieldShadowsDefinition s ->
     [ "This name is read as a field of " <> prettyLayout s.binder.binderName
         <> ", not as the " <> what <> " of the same name:"

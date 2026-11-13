@@ -596,8 +596,31 @@ That is `(PARTY P MUST x WITHIN 5) RAND (PARTY Q MUST y WITHIN 5)` with one even
 
 What this does **not** promise:
 
-- **That the verdict never depends on the order of the operands.** It does not, for operands that only make and miss deadlines. But each operand is run over the whole trace before the next one starts, so an operand that reads a fact the other one records (`RECALL` of a `RECORD` made in the sibling's `HENCE`) can see it or not depending on which is written first. Do not write a `RAND` or `ROR` whose operands read each other's records; the design spec has the open question.
+- **An answer for every rule whose operands read each other's records.**
+  The verdict does not depend on the order of the operands when they only make and miss deadlines, or when the only records they read are ones made before the `RAND` started or on their own side.
+  When one side of a `RAND` reads a record the other side makes (a `RECALL` of a `RECORD` or `COMMIT` made in the other side's `HENCE`), L4 runs the two sides in step, against one shared ledger: each event of the trace is offered to the left side and then to the right before the next event is offered to either.
+  So a read sees every record the other side made at an earlier event, and none it made at a later one, whichever side is written first.
+  The members of an `EVERY` with `UPON EACH`, or with no join line, are run the same way, as the sides of a `RAND`.
+  Two cases are still refused: evaluation stops with an error instead of answering, and the error names the record, both sides and the two instants.
+  The first is a read and a record made while the two sides take one event, when the left side's turn, which comes first, is not the earlier instant: one event can reveal a deadline missed some time before it, and a `LEST` that records the miss records it at that deadline.
+  The second is a read and a record made at one instant while the two sides take one event, because nothing says which of the two happened first.
+  Two records of one cell are stopped the same way, even when nothing inside the `RAND` reads the cell, because `l4 run`'s listing and an `l4 explore` property read the cell's last entry afterwards.
+  One is two sides recording different values while they take one event; the same value on both sides is fine.
+  The other is a side recording a cell for an earlier instant after the other side recorded it for a later one, which is what a `LEST` on the right side does when the event that the left side acts on also shows that the right side's deadline had passed.
+  An `ROR`, or an `EVERY … ONCE ALL HAVE`, on one side of a `RAND` goes over events the other side has already taken (the `ROR`'s right side, and the group's members after the first), so a read and a record between it and the other side are ordered by their instants alone, and refused at one instant.
+  A `RAND` is run in step under `#EVALTRACE`, in the REPL and in a decision-service request for a full trace too, so they give the answers `l4 run` gives; the trace then shows the `RAND`'s stream and its value but not its sides' own steps, and a part of an event that only the sides looked at prints as `(...)`.
+  An `ROR` still runs its left side over the whole trace before it starts the right one, so a read on one side could see a record from its future or miss one from its past; evaluation stops with the same error when what a read saw depended on that order.
+  It stops even where the `ROR`'s answer would have come out the same, as when the right side is fulfilled before the left side's read, because L4 would have to keep running the other alternative to know, and it does not do that yet.
+  Once an `ROR`'s left side is fulfilled, L4 does not run the right side at all, so a record the right side would have made is never made; written the other way round, that side would run first and could make it.
+  So when a read on another side, in the left side itself or on the other side of a `RAND` around the `ROR`, could have seen such a record, evaluation stops with the same error, naming the side L4 did not run.
+  That is a guess: L4 counts every record the unrun side could reach through the rules it uses, even one behind a branch it would never have taken, so it can stop a rule whose answer would have been the same; a read made before the `ROR` started is never stopped this way.
+  `l4 explore` does not say a property holds over a step that was refused (see [`l4 explore`](explore.md)).
+  `l4 check` warns beforehand where the two sides of an `ROR` can reach a read and a write of one record, and where one side of a `RAND` or an `EVERY` reads a record that the other side makes in an `ROR`'s right side, through rules defined in the same file; it does not follow rules imported from another file, which only the error at run time catches, and it does not warn about a `RAND` or an `EVERY` otherwise.
+  To write such a rule, make the record before the compound starts, or make it on the side that reads it.
+  One case is not caught: a rule with no inputs that reads a record is worked out at its first use, and every later use gets the same answer even after the record has changed, inside a compound or not, so the later use makes no read for the check to see.
+  Write the `RECALL` where the record is needed, and pass what it reads to the rule as an input, as `` `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`) `` does in the [explorer's example](explore.md).
 - **That an `ROR`'s operands both run.** Once one alternative is fulfilled, the other is not run further, so a `RECORD` it would have made is not made.
+  A read inside the rule that could have seen such a record stops evaluation (above), but what reads the ledger after the rule has run does not: `l4 run`'s listing and an `l4 explore` property see no such record, although with the alternatives written the other way round they might.
 - **The decision service's answer.** `jl4-service` reports the same breach without the new `effective`, `observed` and `decisive` fields: `l4 batch` carries them, and `l4 run` prints the decisive failures.
 
 ## Related pages
