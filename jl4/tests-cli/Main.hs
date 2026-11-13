@@ -481,10 +481,11 @@ libraryAliasTwoTypes = fixtureDir </> "library-alias-two-types.l4"
 renderDeepNesting = fixtureDir </> "render-deep-nesting.l4"
 
 -- Which rule a HENCE or LEST belongs to (smucclaw/l4-ide#1068).
-lestLayoutRepro, lestLayoutFixture, lestLayoutHanging :: FilePath
+lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest :: FilePath
 lestLayoutRepro = fixtureDir </> "lest-layout-1068.l4"
 lestLayoutFixture = fixtureDir </> "lest-layout.l4"
 lestLayoutHanging = fixtureDir </> "lest-layout-hanging.l4"
+lestLayoutHenceAfterLest = fixtureDir </> "lest-layout-hence-after-lest.l4"
 
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
@@ -759,7 +760,7 @@ main = do
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
        , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
        , slotScope, slotScopeSentence, nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
-       , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging
+       , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest
        , nlgPositionalMain, nlgPositionalLib
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
@@ -3735,6 +3736,12 @@ spec bin = do
       code `shouldBe` ExitSuccess
       unwords (words (filter (/= '\r') sout)) `shouldSatisfy`
         ("surpassed the deadline of party Seller who had to do obligatory action MUST delivery" `isInfixOf`)
+
+    it "refuses a HENCE at the outer rule's clauses after its LEST, naming the rule" $ do
+      Output code _ serr <- runL4 bin ["check", lestLayoutHenceAfterLest]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This HENCE lines up with the clauses of the rule that starts with PARTY at line 8, column 3. It comes after that rule's LEST. Write HENCE before LEST." `isInfixOf`)
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do

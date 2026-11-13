@@ -31,6 +31,7 @@ import Base
 import qualified Data.Text as T
 import L4.ExactPrint (exactprint)
 import L4.Parser (PError (..), execProgramParserWithHintPass, execProgramParserWithHintPassUnmemoised)
+import L4.Parser.SrcSpan (SrcPos (..), SrcSpan (..))
 import L4.Syntax (clearAnno)
 import Test.Hspec
 
@@ -282,10 +283,158 @@ spec = do
         , "  HENCE (PARTY Buyer MUST payment 100 WITHIN 7 LEST BREACH BY Buyer)"
         ]
 
+  describe "a HENCE or LEST that is a rule's by its column, but whose slot is used, is refused by name" $ do
+    it "a second LEST at the middle rule's clauses" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  WITHIN 3"
+        , "  HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "    WITHIN 7"
+        , "    LEST"
+        , "      PARTY Buyer"
+        , "      MUST payment 120"
+        , "      WITHIN 14"
+        , "    LEST BREACH BY Seller"
+        ]
+        (bodyLine 12, 5)
+        ("This LEST lines up with the clauses of " <> ruleAt 5 5 <> ". \
+         \That rule already has a LEST, and a rule has one. \
+         \To give it to the rule that one is nested in, write it at column 3, in line with that rule's clauses.\n")
+
+    it "a second LEST between the outer and the middle rule's clauses (once silently the innermost rule's)" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  WITHIN 3"
+        , "  HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "    WITHIN 7"
+        , "    LEST"
+        , "      PARTY Buyer"
+        , "      MUST payment 120"
+        , "      WITHIN 14"
+        , "   LEST BREACH BY Seller"
+        ]
+        (bodyLine 12, 4)
+        ("This LEST is part of " <> ruleAt 5 5 <> ", \
+         \because it is right of the clauses of the rule that one is nested in (column 3). \
+         \That rule already has a LEST, and a rule has one. \
+         \To give it to the rule that one is nested in, write it at column 3, in line with that rule's clauses.\n")
+
+    it "a second LEST far right of a top-level rule's clauses: no rule to move it to" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  WITHIN 3"
+        , "  LEST BREACH BY Seller"
+        , "        LEST BREACH BY Buyer"
+        ]
+        (bodyLine 5, 9)
+        ("This LEST is part of " <> ruleAt 1 3 <> ". That rule already has a LEST, and a rule has one.\n")
+
+    it "a second LEST right of a nested rule's own clauses, left of the outer rule's hanging ones" $
+      failsWith
+        [ "  PARTY Seller"
+        , "      MUST delivery"
+        , "      WITHIN 3"
+        , "      HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "    LEST BREACH BY Buyer"
+        , "     LEST BREACH BY Seller"
+        ]
+        (bodyLine 8, 6)
+        ("This LEST is part of " <> ruleAt 5 5 <> ", because it is right of that rule's clauses. \
+         \That rule already has a LEST, and a rule has one. \
+         \To give it to the rule that one is nested in, write it at column 7, in line with that rule's clauses.\n")
+
+    it "a second LEST where both rules' clauses are at one column: brackets say which" $
+      failsWith
+        [ "  PARTY Seller"
+        , "    MUST delivery"
+        , "    HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "    LEST BREACH BY Buyer"
+        , "    LEST BREACH BY Seller"
+        ]
+        (bodyLine 7, 5)
+        ("This LEST lines up with the clauses of " <> ruleAt 4 5 <> ". \
+         \That rule already has a LEST, and a rule has one. \
+         \To give it to the rule that one is nested in, put the nested rule in brackets: \
+         \their clauses are at the same column.\n")
+
+    it "a second HENCE at the outer rule's clauses" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  WITHIN 3"
+        , "  HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "  HENCE FULFILLED"
+        ]
+        (bodyLine 7, 3)
+        ("This HENCE lines up with the clauses of " <> ruleAt 1 3 <> ". \
+         \That rule already has a HENCE, and a rule has one. \
+         \To make it follow the rule in that one's HENCE, write it inside that rule, in line with its clauses.\n")
+
+    it "a HENCE at the outer rule's clauses after its LEST (once silently the nested rule's)" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  WITHIN 3"
+        , "  LEST"
+        , "    PARTY Seller"
+        , "    MUST delivery"
+        , "    WITHIN 5"
+        , "  HENCE FULFILLED"
+        ]
+        (bodyLine 8, 3)
+        afterLest
+
+    it "LEST written before HENCE (once a bare \"unexpected HENCE\")" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  WITHIN 3"
+        , "  LEST BREACH BY Seller"
+        , "  HENCE PARTY Buyer MUST payment 100 WITHIN 7"
+        ]
+        (bodyLine 5, 3)
+        afterLest
+
+    -- 'L4.Parser.cont' wraps an operator's right operand in @try@, so the
+    -- named refusal inside it is backtracked and the parse fails further out,
+    -- at the operator. Pinned so that a change to either is seen.
+    it "inside an unbracketed right operand of ROR, the refusal surfaces as the operator" $
+      failsWith
+        [ "  (PARTY Seller MUST delivery WITHIN 3)"
+        , "  ROR"
+        , "  PARTY Buyer"
+        , "    MUST payment 100"
+        , "    WITHIN 7"
+        , "    LEST BREACH BY Buyer"
+        , "    LEST BREACH BY Seller"
+        ]
+        (bodyLine 2, 3)
+        "unexpected ROR\nexpecting %, ;, WHERE, end of input, or space token\n"
+
   describe "the parser's memo changes nothing on these layouts" $
     for_ memoCases \ (name, body) ->
       it name $ memoChangesNothing (rule body)
   where
+    afterLest =
+      "This HENCE lines up with the clauses of " <> ruleAt 1 3 <> ". \
+      \It comes after that rule's LEST. Write HENCE before LEST.\n"
+    -- How a refusal names the rule whose head is on line @n@ of the body.
+    ruleAt :: Int -> Int -> Text
+    ruleAt n col =
+      "the rule that starts with PARTY at line " <> T.pack (show (bodyLine n)) <> ", column " <> T.pack (show col)
     memoCases =
       [ ("the repro", ["  PARTY Seller", "  MUST delivery", "  HENCE", "    PARTY Buyer", "    MUST payment 100", "    LEST", "      PARTY Buyer", "      MUST payment 120", "  LEST BREACH BY Seller"])
       , ("the repro with the inner rule in brackets", ["  PARTY Seller", "  MUST delivery", "  HENCE", "    (PARTY Buyer", "     MUST payment 100", "     LEST", "       PARTY Buyer", "       MUST payment 120)", "  LEST BREACH BY Seller"])
@@ -307,6 +456,10 @@ prologue =
   , "c MEANS"
   ]
 
+-- | The line number, in the whole module, of line @n@ (from 1) of a body.
+bodyLine :: Int -> Int
+bodyLine n = length prologue + n
+
 rule :: [Text] -> Text
 rule body = T.unlines (prologue <> body)
 
@@ -326,8 +479,18 @@ sameTree unbracketed bracketed =
         Right printed -> printed `shouldBe` rule unbracketed
       clearAnno m1 `shouldBe` clearAnno m2
 
--- | Parse with the memo on and off ('L4.Parser.clauseThreshold' says why the
--- memo need not key on the threshold); both must give the same answer.
+-- | Exactly one error, starting at @(line, column)@ (both from 1), whose
+-- message ends with @expected@. (The message starts with the source line.)
+failsWith :: [Text] -> (Int, Int) -> Text -> Expectation
+failsWith body at expected =
+  case execProgramParserWithHintPass uri (rule body) of
+    Right _ -> expectationFailure "parsed, but should have failed"
+    Left errs -> do
+      [(e.range.start.line, e.range.start.column) | e <- toList errs] `shouldBe` [at]
+      [T.takeEnd (T.length expected) e.message | e <- toList errs] `shouldBe` [expected]
+
+-- | Parse with the memo on and off ('L4.Parser.clauseCtx' says why the memo
+-- need not key on it); both must give the same answer.
 memoChangesNothing :: Text -> Expectation
 memoChangesNothing src =
   (execProgramParserWithHintPass uri src == execProgramParserWithHintPassUnmemoised uri src) `shouldBe` True
