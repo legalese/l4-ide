@@ -1,0 +1,32 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: export-event-type.l4
+  Hidden: no
+  Range: 12:1-12:18
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `who acted` is published with @export, but its input `e` has a type that is or contains an EVENT.
+    @export does not support an EVENT as an input yet.
+
+File: export-event-type.l4
+  Hidden: no
+  Range: 19:1-19:24
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `how many events` is published with @export, but its input `es` has a type that is or contains an EVENT.
+    @export does not support an EVENT as an input yet.
+
+File: export-event-type.l4
+  Hidden: no
+  Range: 24:1-24:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `make event` is published with @export, but its result has a type that is or contains an EVENT.
+    @export does not support an EVENT as a result yet.

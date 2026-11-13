@@ -1,0 +1,32 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: same-name-types-by-constructor.l4
+  Hidden: no
+  Range: 26:33-26:38
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the type of this definition must be
+
+      Verdict (Verdict defined at same-name-types-by-constructor.l4:21:9-16)
+
+    but is here of type
+
+      Verdict (Verdict defined at same-name-types-by-constructor.l4:23:9-16)
+
+File: same-name-types-by-constructor.l4
+  Hidden: no
+  Range: 30:9-30:14
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    From looking at the context, I have inferred that the first input of `score` is of type
+
+      Verdict (Verdict defined at same-name-types-by-constructor.l4:21:9-16)
+
+    but the pattern written for it here is of type
+
+      Verdict (Verdict defined at same-name-types-by-constructor.l4:23:9-16)

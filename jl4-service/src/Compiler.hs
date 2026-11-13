@@ -228,9 +228,11 @@ processTypecheckedFile logger deployId filepath content moduleContext
               <> " input(s) of its own"
           _ -> Nothing
         -- Genuine type errors that must block the deploy. We deliberately
-        -- tolerate OutOfScopeError: it's repurposed by extractImplicitAssumeParams
-        -- to derive implicit ASSUME parameters, so a clean model with implicit
-        -- ASSUMEs legitimately carries those. Anything else at SError severity
+        -- tolerate OutOfScopeError for a name an expression reads: it's
+        -- repurposed by extractImplicitAssumeParams to derive implicit ASSUME
+        -- parameters, so a clean model with implicit ASSUMEs legitimately
+        -- carries those. An undeclared TYPE name (the same error, with the type
+        -- TYPE) is never that, and blocks. Anything else at SError severity
         -- (e.g. AmbiguousTermError, IncorrectArgsNumberApp) means the module
         -- didn't typecheck — compiling it anyway yields a garbage schema with
         -- unresolved inference variables (e.g. a return type of "res184"), which
@@ -503,12 +505,16 @@ extractDeonticTypeNames _ = Nothing
 resolvedText :: Resolved -> Text
 resolvedText = rawNameToText . rawName . getActual
 
--- | OutOfScopeError is not a deploy-blocking error: it's how the type checker
--- reports references the compiler turns into implicit ASSUME parameters (see
--- 'extractImplicitAssumeParams'). Every other SError-severity kind is genuine.
+-- | An OutOfScopeError for a name that an expression reads is not a
+-- deploy-blocking error: it's how the type checker reports references the
+-- compiler turns into implicit ASSUME parameters (see
+-- 'extractImplicitAssumeParams'). One whose type is TYPE is a type name that
+-- nothing declares, which is genuine and blocks, as does every other
+-- SError-severity kind.
 isOutOfScope :: CheckError -> Bool
-isOutOfScope OutOfScopeError{} = True
-isOutOfScope _                 = False
+isOutOfScope (OutOfScopeError _ Type{}) = False
+isOutOfScope OutOfScopeError{}          = True
+isOutOfScope _                          = False
 
 -- | Collect all DECLARE entries from a TypeCheckResult and its transitive imports.
 --
