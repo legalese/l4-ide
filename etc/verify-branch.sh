@@ -113,17 +113,8 @@ if pgrep -f "$WT.*cabal|cabal.*$WT" >/dev/null 2>&1; then
   exit 3
 fi
 
-# A stale ~/.local/bin/l4 shadows the worktree build and fails doc examples that
-# are perfectly valid. Warn rather than fail: it only matters for test-docs.
-if command -v l4 >/dev/null 2>&1; then
-  WHICH_L4=$(command -v l4)
-  case "$WHICH_L4" in
-    "$WT"/*) ;;
-    *) echo "WARNING: 'l4' on PATH is $WHICH_L4, not this worktree's build."
-       echo "         doc/test-docs.sh may fail on valid examples. Symlink the"
-       echo "         cabal binary first on PATH if you need the L4 half." ;;
-  esac
-fi
+# An `l4` already on PATH does not matter to this script: the docs step below
+# puts a copy of this worktree's own build first on PATH.
 
 # `*.evaldiff.l4` sit inside the corpus globs and would be goldened if committed.
 STRAY=$(find "$WT/jl4" "$WT/jl4-core" -name '*.evaldiff.l4' 2>/dev/null | head -5)
@@ -260,7 +251,22 @@ case $? in
   *) RESULTS+=("FAIL  sync-canon --check (mirror = canon at the pin)"); FAILED=1 ;;
 esac
 
-step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6; exit \${PIPESTATUS[0]}"
+# doc/test-docs.sh type-checks every .l4 file under doc/ with the first `l4` on
+# PATH (doc/test-docs.sh:329). An installed one can be older than this tree and
+# reject syntax the tree has just added, which reads as a broken doc example
+# (CLAUDE.md §3.1). So this step runs a COPY of this worktree's build, first on
+# PATH, as CI's Haskell job runs the tree's own build (pr-checks.yml). With no
+# build to copy it falls back to --no-l4, which checks links and orphans only,
+# and the summary says so.
+DOCS_BIN="$PROBEDIR/docs-bin"
+if mkdir -p "$DOCS_BIN" && DOCS_L4=$(cd "$WT" && cabal list-bin exe:l4 2>/dev/null) \
+   && [ -x "$DOCS_L4" ] && cp "$DOCS_L4" "$DOCS_BIN/l4"; then
+  step "doc/test-docs.sh (this worktree's l4)" \
+    bash -c "cd '$WT' && PATH='$DOCS_BIN':\"\$PATH\" ./doc/test-docs.sh 2>&1 | tail -6; exit \${PIPESTATUS[0]}"
+else
+  step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6; exit \${PIPESTATUS[0]}"
+  note "no built l4 to copy, so no .l4 file under doc/ was type-checked"
+fi
 
 # Prettier over the WHOLE repo trips on a missing workspace package in a fresh
 # worktree (`@repo/prettier-config` under ts-apps), which is an install gap and
