@@ -1,0 +1,8 @@
+-- For the REPL's :info and :env, which print an inferred polymorphic type
+-- with `a`, `b`, ... and not with the checker's internal labels (`z5`).
+
+GIVEN z
+DECIDE `pick` z IS z
+
+GIVEN n IS A NUMBER
+`same` n MEANS GIVEN x YIELD x

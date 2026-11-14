@@ -19,7 +19,8 @@ import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
 import Types
-import L4.FunctionSchema (Parameters (..))
+import WebMCPPage (mkOriginTrialToken)
+import L4.FunctionSchema (Parameter (..), Parameters (..))
 
 import Control.Monad (forM, forM_, guard, unless, when)
 import Control.Concurrent (threadDelay)
@@ -258,6 +259,35 @@ spec = describe "integration" do
           answer [ "y" Aeson..= (2020 :: Int) ] >>= (`shouldBe` (200, Just (FnLitInt 2021)))
           answer [ "y" Aeson..= Aeson.Null ]    >>= (`shouldBe` (200, Just (FnLitInt 0)))
           answer []                             >>= (`shouldBe` (200, Just (FnLitInt 0)))
+
+    -- A synonym for a MAYBE twenty deep is a MAYBE too. The service's wrapper
+    -- and the decoder followed a chain for 16 steps, so past that a null for the
+    -- input was refused although JSONDECODE accepted one for a field.
+    it "reads a synonym for a MAYBE twenty deep as a MAYBE: a value, a null and an omitted one" do
+      let chain = Text.unlines $
+            [ "DECLARE S" <> tshow k <> " IS AN S" <> tshow (k + 1) | k <- [1 .. 19 :: Int] ]
+            <> [ "DECLARE S20 IS A MAYBE NUMBER"
+               , ""
+               , "@export a number that may be left out, through twenty synonyms"
+               , "GIVEN y IS AN S1"
+               , "GIVETH A NUMBER"
+               , "`deep maybe` y MEANS"
+               , "  CONSIDER y"
+               , "    WHEN JUST n THEN n PLUS 1"
+               , "    WHEN NOTHING THEN 0"
+               ]
+          tshow = Text.pack . show
+      withServiceFromSources "maybe-synonym-chain" [("chain.l4", chain)] \baseUrl mgr -> do
+        let answer args = do
+              resp <- evalFunction baseUrl mgr "maybe-synonym-chain" "deep maybe"
+                (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+              pure ( statusCode' resp
+                   , case Aeson.decode (responseBody resp) of
+                       Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                       _ -> Nothing )
+        answer [ "y" Aeson..= (2020 :: Int) ] >>= (`shouldBe` (200, Just (FnLitInt 2021)))
+        answer [ "y" Aeson..= Aeson.Null ]    >>= (`shouldBe` (200, Just (FnLitInt 0)))
+        answer []                             >>= (`shouldBe` (200, Just (FnLitInt 0)))
 
     -- Three kinds of request go through the generated wrapper and not the direct
     -- path: an input whose value is `{}`, a batch case with a `null`, and an MCP
@@ -2835,6 +2865,38 @@ spec = describe "integration" do
               _ -> expectationFailure "Expected tools array"
           _ -> expectationFailure "Expected result object"
 
+  describe "WebMCP embed script origin-trial token" do
+    let fetchEmbedScript baseUrl mgr headers = do
+          req <- parseRequest (baseUrl <> "/.webmcp/embed.js")
+          resp <- httpLbs req { requestHeaders = headers } mgr
+          statusCode' resp `shouldBe` 200
+          pure (Text.Encoding.decodeUtf8 (LBS.toStrict (responseBody resp)))
+        token = "AbCd0123+/EfGh4567==" :: BS.ByteString
+
+    it "adds no token when the request carries none" do
+      withServiceFromSources "ot-none" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr []
+        script `shouldSatisfy` (not . Text.isInfixOf "origin-trial")
+        script `shouldSatisfy` Text.isInfixOf "modelContext"
+
+    it "adds the token passed in X-Origin-Trial-Token" do
+      withServiceFromSources "ot-some" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr [("X-Origin-Trial-Token", token)]
+        script `shouldSatisfy` Text.isInfixOf "otMeta.httpEquiv = 'origin-trial';"
+        script `shouldSatisfy` Text.isInfixOf ("otMeta.content = '" <> Text.Encoding.decodeUtf8 token <> "';")
+
+    it "adds no token when the value is not base64" do
+      withServiceFromSources "ot-bad" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr [("X-Origin-Trial-Token", "x';alert(1);//")]
+        script `shouldSatisfy` (not . Text.isInfixOf "origin-trial")
+        script `shouldSatisfy` (not . Text.isInfixOf "alert(1)")
+
+    it "accepts only non-empty base64 of bounded length" do
+      Maybe.isJust (mkOriginTrialToken token) `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken "") `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken "abc def") `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken (BS8.replicate 4097 'A')) `shouldBe` True
+
   describe "deployments query params" do
     it "?functions=full includes parameters in listing" do
       withServiceFromSources "qp-full" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -3312,6 +3374,40 @@ spec = describe "integration" do
           err `shouldSatisfy` ("unexpected (" `Text.isInfixOf`)
         Right _ -> expectationFailure "A source that does not parse was compiled"
       errorsLoggedFor "test" "broken.l4" logLines `shouldSatisfy` any ("unexpected (" `Text.isInfixOf`)
+
+    -- An input and a record field typed with the same imported synonym for a
+    -- MAYBE are both optional. The field was read with every module's
+    -- declarations, the input with the importing module's alone, so the input
+    -- was required.
+    it "reads an imported synonym for a MAYBE alike for an input and for a field" do
+      logger <- newLogger False
+      let lib = Text.unlines
+            [ "DECLARE Optional OF a IS A MAYBE a"
+            , "DECLARE OptNum IS A MAYBE NUMBER"
+            ]
+          entry = Text.unlines
+            [ "IMPORT optlib"
+            , ""
+            , "DECLARE Holder HAS"
+            , "  o IS AN Optional NUMBER"
+            , "  p IS AN OptNum"
+            , "  n IS A NUMBER"
+            , ""
+            , "@export default reads a holder"
+            , "GIVEN h IS A Holder"
+            , "      x IS AN Optional NUMBER"
+            , "      y IS AN OptNum"
+            , "GIVETH A NUMBER"
+            , "f h x y MEANS h's n"
+            ]
+      result <- compileBundle logger "test" (Map.fromList [("main.l4", entry), ("optlib.l4", lib)])
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_, meta) -> case [ fs | fs <- meta.metaFunctions, fs.fsName == "f" ] of
+          [fs] -> do
+            fs.fsParameters.required `shouldBe` ["h"]
+            fmap (.parameterRequired) (Map.lookup "h" fs.fsParameters.parameterMap) `shouldBe` Just (Just ["n"])
+          other -> expectationFailure ("expected one function f, got " <> show (length other))
 
     it "rejects empty bundles" do
       logger <- newLogger False

@@ -1555,12 +1555,48 @@ itemText e
 -- | An operand of a connective. "it is not the case that" reaches as far as the
 -- sentence does, so in "it is not the case that a or b" a reader takes the denial
 -- to cover both. Brackets say that it covers one.
+--
+-- A denied OR is open in the same way, though it does not start with those
+-- words: "neither a nor b and c" reads as denying @b AND c@, and "n is not one of
+-- 1 or 2 or b" as @b@ being one of the values, because only the start of each is
+-- marked. It is told by its shape, a NOT over an OR, and not by its words.
+--
+-- So is an IMPLIES, an IF or a CONSIDER, which no word closes: "neither p nor q
+-- implies r" also reads as @(NOT (p OR q)) IMPLIES r@, and "neither if q then r
+-- else s nor p" puts the "nor" in the ELSE.
+--
+-- The same holds where such a condition fills a slot that a sentence's words
+-- come after ('slotRunsOn').
 boundedCond :: Expr Resolved -> Text
 boundedCond e
-  | "it is not the case that" `Text.isPrefixOf` stripFrameMarks t = "(" <> t <> ")"
-  | otherwise = t
+  | runsOn e t = "(" <> t <> ")"
+  | otherwise  = t
  where
   t = condText e
+
+-- | Whether a condition, printed as @t@, has no word to close it: what
+-- 'boundedCond' brackets.
+runsOn :: Expr Resolved -> Text -> Bool
+runsOn e t = "it is not the case that" `Text.isPrefixOf` stripFrameMarks t || deniedOr || unclosed
+ where
+  deniedOr = isNothing (nlgOf e) && case carameliseNode e of
+    Not _ inner -> isOrNode (carameliseNode inner)
+    _           -> False
+  unclosed = isNothing (nlgOf e) && case carameliseNode e of
+    Implies{}    -> True
+    IfThenElse{} -> True
+    MultiWayIf{} -> True
+    Consider{}   -> True
+    _            -> False
+
+-- | Whether a condition, printed as @t@, would take in the words of a sentence
+-- that go on after the slot it fills ('rewriteWith', 'interleaveMixfix'). What
+-- 'runsOn' says, and an AND or an OR as well: "p or q is shown" is also how
+-- @p OR (`shown` q)@ reads. Beside a connective an AND or an OR is set off in
+-- words ('joinCond'); in a slot nothing sets it off. Told by the condition's
+-- shape, and by where the slot is, not by what any word says.
+slotRunsOn :: Expr Resolved -> Text -> Bool
+slotRunsOn e t = runsOn e t || (isNothing (nlgOf e) && isCompound e)
 
 -- | The negation of an AND, which denies only that all of it holds.
 notAllText :: [Expr Resolved] -> Text
@@ -1697,11 +1733,26 @@ arithChainClause e = case carameliseNode e of
         let uniform = all ((== firstOp) . fst) terms
             lead    = if uniform then uniformLead else "the following"
             line i (op, t)
-              | i == (0 :: Int) || uniform = leafText t
-              | otherwise                  = word op <> " " <> leafText t
+              | i == (0 :: Int) || uniform = term t
+              | otherwise                  = word op <> " " <> term t
         in Just (CChain lead (zipWith line [0 ..] terms))
+  -- A line holds one operand, and says where it ends, so the brackets an operand
+  -- is given inside a formula ('rewriteWith') are not needed on it.
+  term = unbracketed . leafText
   addWord o = if o == "-" then "minus" else "plus"
   mulWord o = if o == "÷" then "divided by" else "times"
+
+-- | Text without the brackets round the whole of it, if it has them.
+unbracketed :: Text -> Text
+unbracketed t = case Text.uncons t of
+  Just ('(', rest)
+    | Just (inner, ')') <- Text.unsnoc rest, balanced (0 :: Int) (Text.unpack inner) -> inner
+  _ -> t
+ where
+  balanced d []         = d == 0
+  balanced d ('(' : cs) = balanced (d + 1) cs
+  balanced d (')' : cs) = d > 0 && balanced (d - 1) cs
+  balanced d (_ : cs)   = balanced d cs
 
 -- | Walk the left spine of an operator chain into @(operator, operand)@ pairs,
 -- leftmost first (its operator is the chain's identity, "+" or "×"). Right
@@ -1748,9 +1799,9 @@ formulaText e
   go expr = case carameliseNode expr of
     Plus _ a b      -> bin 1 " + " a b
     Minus _ a b     -> binRight 1 " − " a b
-    Times _ a b     -> bin 2 " × " a b
-    DividedBy _ a b -> binRight 2 " ÷ " a b
-    Modulo _ a b    -> binRight 2 " mod " a b
+    Times _ a b     -> multiplicative False 2 " × " False a b
+    DividedBy _ a b -> multiplicative False 2 " ÷ " True a b
+    Modulo _ a b    -> multiplicative True 2 " mod " True a b
     Lit _ (NumericLit _ r) -> Just (4, numText r)
     Percent _ x     -> do (_, t) <- go x; Just (4, t <> "%")
     App _ n []      -> Just (4, resolvedText n)
@@ -1767,14 +1818,39 @@ formulaText e
   bin p op a b = do
     (pa, ta) <- go a
     (pb, tb) <- go b
-    Just (p, wrap p pa ta <> op <> wrap p pb tb)
+    Just (p, besideSum a (wrap p pa ta) <> op <> besideSum b (wrap p pb tb))
   -- The right operand of a subtraction or a division keeps its brackets at equal
   -- precedence too: a − (b − c) is not a − b − c, and a ÷ (b × c) is not a ÷ b × c.
   binRight p op a b = do
     (pa, ta) <- go a
     (pb, tb) <- go b
-    Just (p, wrap p pa ta <> op <> wrap (p + 1) pb tb)
+    Just (p, besideSum a (wrap p pa ta) <> op <> besideSum b (wrap (p + 1) pb tb))
+  -- 'bin' and 'binRight' print only + and −. A mod binds tighter than either, so
+  -- "a − b mod c" is a − (b mod c) by the formula's own rules; but "mod" is a word,
+  -- and a reader can take it to cover "a − b". So a mod beside + or − is
+  -- bracketed. Decided by the operator alone.
+  besideSum x t = case carameliseNode x of
+    Modulo{} -> "(" <> t <> ")"
+    _        -> t
   wrap parentP childP t = if childP < parentP then "(" <> t <> ")" else t
+  -- mod shares a level with × and ÷ but does not reassociate with either:
+  -- a × (b mod c), (a × b) mod c and (a mod b) × c are three formulas, and flat
+  -- "a × b mod c" can be read as more than one of them. So a mod that is an
+  -- operand of × or ÷, and a × or ÷ that is an operand of mod, is bracketed on
+  -- either side. Decided by the operators alone.
+  multiplicative isMod p op strictRight a b = do
+    (pa, ta) <- go a
+    (pb, tb) <- go b
+    let side x px tx q
+          | mixesMod x = "(" <> tx <> ")"
+          | otherwise  = wrap q px tx
+    Just (p, side a pa ta p <> op <> side b pb tb (if strictRight then p + 1 else p))
+   where
+    mixesMod x = case carameliseNode x of
+      Modulo{}    -> not isMod
+      Times{}     -> isMod
+      DividedBy{} -> isMod
+      _           -> False
 
 numText :: Rational -> Text
 numText r = fromMaybe (prettyRatio r) (groupedInt r)
@@ -1801,15 +1877,41 @@ nlgOf e = (normalizeWs . simpleLinearizer) <$> (e ^. annoOf % annNlg)
 rewriteExpr :: Expr Resolved -> Expr Resolved
 rewriteExpr = rewriteWith noReading
 
+-- | One expression as 'rewriteWith' leaves it, with what a call around it needs
+-- to know: 'callOpen', that it is a call ending in a condition with no closing
+-- word, and 'open', that it has no closing word at all.
+data Phrased = Phrased
+  { phrased  :: Expr Resolved
+  , callOpen :: Bool
+  , open     :: Bool
+  }
+
 -- | 'rewriteExpr' with what the document knows. Bottom-up, so a call's arguments
 -- are already phrased when the call is, and a herald is spliced here and not
 -- beforehand: spliced first, its arguments would miss every rewrite below and
 -- print raw, in the middle of an otherwise readable sentence.
 rewriteWith :: Reading -> Expr Resolved -> Expr Resolved
-rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
+rewriteWith rd = go
  where
+  -- 'transformOf', except that an arithmetic node also sees its operands as
+  -- they were before they were rewritten ('groupOperands').
+  go = (.phrased) . step
+  -- One node, rewritten once. A call's arguments keep what its brackets ask of
+  -- them, so asking rewrites nothing again: a call that rewrote an argument to
+  -- ask about it took twice as long with each level of nesting.
+  step e = Phrased{phrased, callOpen, open = callOpen || slotRunsOn phrased (leafText phrased)}
+   where
+    args = case e of
+      App _ _ as -> map step as
+      _          -> []
+    opens = map (.callOpen) args
+    kids = case e of
+      App ann n _ -> App ann n (map (.phrased) args)
+      _           -> over (gplate @(Expr Resolved)) go e
+    phrased = rw opens (herald opens (groupOperands e kids))
+    callOpen = callEndsOpen e args
   inert ann t = Inert ann t InertCtxNone
-  herald = \case
+  herald opens = \case
     -- A date given as literals reads as the date, whatever its rule's sentence.
     App ann n args | Just (d, m, y) <- daydateLiteral n args -> inert ann (Text.unwords [d, m, y])
     App ann n args | nameIs "Date" n, Just t <- dateFromArgs args -> inert ann t
@@ -1818,12 +1920,117 @@ rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
     -- Joined lists read as one list, so a long chain of them can be laid out.
     App ann n [a, b] | resolvedText n == "append", fromPrelude n -> Cons ann a b
     App ann n args
-      | Just (_, inputs) <- Map.lookup (getUnique n) rd.rdHeralds, length inputs == length args ->
-          substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (slotText rd)) args))
-      | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
+      | Just followed <- heraldSlots n args ->
+          substituteNlgCallMarked rd.rdHeralds
+            (App ann n (zipWith3 (\f o a -> asText (filler f o) a) followed (argsEndOpen opens args) args))
+      | readsAsFunction n args -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText leafText) args))
+      | otherwise -> substituteNlgCallMarked rd.rdHeralds (App ann n (map (asText (argument leafText)) args))
     e -> substituteNlgCallMarked rd.rdHeralds e
   asText f a = Inert (a ^. annoOf) (f a) InertCtxNone
-  rw = \case
+  -- An arithmetic argument is bracketed: printed as a formula it has no end, and
+  -- "f2 for 2 and x − 3" also reads as @`f2` 2 x MINUS 3@. So does a sentence's
+  -- slot: "twice (x − 3)". A maths function brackets its argument itself
+  -- ("sqrt(x)"), and a present value reads as the value.
+  argument f a
+    | isArithmetic (carameliseNode a), isNothing (nlgOf a) = "(" <> f a <> ")"
+    | otherwise = f a
+  -- A sentence's slot. A condition with no closing word, in a slot the
+  -- sentence's own words come after, is bracketed ('slotRunsOn'): "it is not
+  -- the case that X is disclosed" is also how @NOT (`disclosed` X)@ reads. Told
+  -- by where the slot is in the sentence, not by what its words say; in the last
+  -- slot nothing follows it.
+  --
+  -- So is a call that ends with such a condition ('callEndsOpen'): with no
+  -- brackets of its own, "fb for p and (q implies r) is shown" is also how
+  -- @`fb` (p AND (`shown` (q IMPLIES r)))@ reads.
+  filler followed open a
+    | followed, slotRunsOn a t || open = "(" <> t <> ")"
+    | otherwise                         = t
+   where
+    t = argument (slotText rd) a
+  -- 'callEndsOpen' for each argument of a call, read from the call as it was
+  -- before its arguments were rewritten.
+  argsEndOpen opens args
+    | length opens == length args = opens
+    | otherwise                   = map (const False) args
+  -- Whether a call, printed, ends with an argument that has no closing word, so
+  -- that the call has none either and runs on into whatever follows it. A call
+  -- that reads as f(x), or as a date, closes itself; a call with a sentence ends
+  -- where the sentence does, unless its last slot holds such an argument; any
+  -- other call ends with its last argument. Read from the shape of the call and
+  -- of its sentence, not from any word. An argument has no closing word when it
+  -- is such a call, or a condition that 'slotRunsOn' as it reads once rewritten
+  -- ('step').
+  callEndsOpen o args = isNothing (nlgOf o) && case carameliseNode o of
+    App _ m margs@(_ : _)
+      | isJust (daydateLiteral m margs) -> False
+      | nameIs "Date" m, isJust (dateFromArgs margs) -> False
+      | isJust (monthDateFromArgs m margs) -> False
+      | [f, xs] <- margs, isJust (quantified m f xs) -> False
+      | Just (nlg, inputs) <- Map.lookup (getUnique m) rd.rdHeralds, length inputs == length margs ->
+          let bound = zip inputs args
+              refs  = Nlg.nlgRefs nlg
+          in case [ a | (i, a) <- bound, i `notElem` refs ] of
+               []       -> or [ a.open | (i, a) <- bound, not (i `Set.member` Nlg.refsFollowedByWords nlg) ]
+               leftover -> (last leftover).open
+      | readsAsFunction m margs -> False
+      | Just toks <- mixfixTokens m margs -> last toks == "_" && (last args).open
+      | otherwise -> (last args).open
+    _ -> False
+  -- For each argument of a call whose sentence fits it, whether the sentence's
+  -- words come after its slot.
+  heraldSlots n args = case Map.lookup (getUnique n) rd.rdHeralds of
+    Just (nlg, inputs)
+      | length inputs == length args ->
+          Just (map (`Set.member` Nlg.refsFollowedByWords nlg) inputs)
+    _ -> Nothing
+  -- A call that the f(x) clause in 'rw' prints, with its argument in brackets
+  -- already: exactly one argument, a name in 'mathUnaryFns', and no sentence that
+  -- the clause above would splice in first. The same conditions as that clause,
+  -- so a rule that only shares the name ("round" with two inputs, or a "floor"
+  -- or the library's "exp" with a sentence) is bracketed like any other call.
+  -- JUST is a constructor, and reads as its value.
+  readsAsFunction n args
+    | nameIs "JUST" n = True
+    | [_] <- args     = Map.member (nameToText (getActual n)) mathUnaryFns && not (heraldFits n args)
+    | otherwise       = False
+  heraldFits n args = case Map.lookup (getUnique n) rd.rdHeralds of
+    Just (_, inputs) -> length inputs == length args
+    Nothing          -> False
+  -- An operand that is a call, a rule's sentence or an IF is printed as prose,
+  -- and prose has no end: "f2 for 2 and x − 3" is also how @`f2` 2 (x MINUS 3)@
+  -- would read, and "if c then 1 else 10 − x" how the IF with a subtraction in
+  -- its ELSE would. So such an operand of an arithmetic operator is bracketed.
+  -- It is told by the shape it had before it was rewritten, since rewritten it is
+  -- 'Inert' text like any other leaf; a date written as literals, or a maths
+  -- function, says where it ends and is not bracketed. No word of a name or a
+  -- sentence is read.
+  groupOperands orig new = case (carameliseNode orig, new) of
+    (Plus _ a b,      Plus ann a' b')      -> Plus ann (operand a a') (operand b b')
+    (Minus _ a b,     Minus ann a' b')     -> Minus ann (operand a a') (operand b b')
+    (Times _ a b,     Times ann a' b')     -> Times ann (operand a a') (operand b b')
+    (DividedBy _ a b, DividedBy ann a' b') -> DividedBy ann (operand a a') (operand b b')
+    (Modulo _ a b,    Modulo ann a' b')    -> Modulo ann (operand a a') (operand b b')
+    _ -> new
+  operand o o'
+    | opensAtEnd (carameliseNode o) =
+        Inert (o' ^. annoOf) ("(" <> normalizeWs (simpleLinearizer o') <> ")") InertCtxNone
+    | otherwise = o'
+  opensAtEnd = \case
+    App _ n args@(_ : _) ->
+      isNothing (daydateLiteral n args)
+        && not (nameIs "Date" n && isJust (dateFromArgs args))
+        && isNothing (monthDateFromArgs n args)
+        && not (readsAsFunction n args)
+    AppNamed{}   -> True
+    IfThenElse{} -> True
+    MultiWayIf{} -> True
+    Consider{}   -> True
+    _            -> False
+  isArithmetic = \case
+    Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
+    _ -> False
+  rw opens = \case
     -- Drop WHERE / LET … IN binding wrappers; the body still reads.
     Where _ e _ -> e
     LetIn _ _ e -> e
@@ -1838,7 +2045,7 @@ rewriteWith rd = transformOf (gplate @(Expr Resolved)) (rw . herald)
     App ann n [x] | Just phrase <- Map.lookup (nameToText (getActual n)) builtinUnaryOf ->
       inert ann ("the " <> phrase <> " of " <> leafText x)
     -- Mixfix: interleave the arguments into the @_@ holes.
-    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd n args -> inert ann txt
+    App ann n args@(_ : _) | Just txt <- interleaveMixfix rd (argsEndOpen opens args) n args -> inert ann txt
     -- A function whose name ends in a preposition reads "minimum of x and y",
     -- not the linearizer's "minimum of with x and y".
     App ann n args@(_ : _) | endsInPreposition n ->
@@ -1930,20 +2137,34 @@ scalarInputs (MkTypeSig _ (MkGivenSig _ names) _) = Set.fromList
   [ spaceCamel (cleanParam (resolvedText r))
   | MkOptionallyTypedName _ r mty _ <- names, isNothing (mty >>= userTypeName) ]
 
-interleaveMixfix :: Reading -> Resolved -> [Expr Resolved] -> Maybe Text
-interleaveMixfix rd n args =
+-- | A call whose name is a mixfix pattern with a hole for each argument: the
+-- pattern's words.
+mixfixTokens :: Resolved -> [Expr Resolved] -> Maybe [Text]
+mixfixTokens n args =
   let toks  = Text.words (nameToText (getActual n))
       holes = length (filter (== "_") toks)
-  in if holes >= 1 && holes == length args
-       then Just (Text.unwords (fill toks args))
-       else Nothing
+  in if holes >= 1 && holes == length args then Just toks else Nothing
+
+-- | The arguments in a mixfix pattern's holes. Each comes with whether it is a
+-- call that ends with a condition that has no closing word ('rewriteWith').
+interleaveMixfix :: Reading -> [Bool] -> Resolved -> [Expr Resolved] -> Maybe Text
+interleaveMixfix rd opens n args = do
+  toks <- mixfixTokens n args
+  Just (Text.unwords (fill toks (zip opens args)))
  where
   fill [] _ = []
   fill (t : ts) as
     | t == "_" = case as of
-        (a : rest) -> slotText rd a : fill ts rest
+        (a : rest) -> hole (any (/= "_") ts) a : fill ts rest
         []         -> t : fill ts as
     | otherwise = t : fill ts as
+  -- A hole that the pattern's own words come after, as a sentence's slot is
+  -- ('slotRunsOn').
+  hole followed (open, a)
+    | followed, slotRunsOn a s || open = "(" <> s <> ")"
+    | otherwise                         = s
+   where
+    s = slotText rd a
 
 
 -- | An argument in a slot among an author's words: a pattern's, or a sentence's.

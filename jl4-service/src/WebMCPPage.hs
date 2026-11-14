@@ -5,11 +5,16 @@ module WebMCPPage (
   RawJs (..),
   HTML,
   JavaScript,
+  OriginTrialToken,
+  mkOriginTrialToken,
   renderOrgWebMCPScript,
 ) where
 
+import qualified Data.ByteString.Char8 as BS8
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Media ((//), (/:))
@@ -39,24 +44,40 @@ newtype RawJs = RawJs { unRawJs :: ByteString }
 instance MimeRender JavaScript RawJs where
   mimeRender _ (RawJs bs) = bs
 
+-- | A Chrome origin-trial token that is safe to write into the script.
+newtype OriginTrialToken = OriginTrialToken Text
+
+-- | Accept a token only if it is non-empty, no longer than
+-- 'maxOriginTrialTokenLength', and made of base64 characters. The token is
+-- written into a quoted JavaScript string, so anything else is refused
+-- rather than escaped.
+mkOriginTrialToken :: BS8.ByteString -> Maybe OriginTrialToken
+mkOriginTrialToken raw
+  | BS8.null raw = Nothing
+  | BS8.length raw > maxOriginTrialTokenLength = Nothing
+  | BS8.all isBase64Char raw = Just (OriginTrialToken (Text.Encoding.decodeLatin1 raw))
+  | otherwise = Nothing
+ where
+  isBase64Char c = isAsciiUpper c || isAsciiLower c || isDigit c || c == '+' || c == '/' || c == '='
+
+-- | Far above the size of a real token, which is a few hundred characters.
+maxOriginTrialTokenLength :: Int
+maxOriginTrialTokenLength = 4096
+
 -- | Render the org-wide WebMCP JavaScript.
 -- Fetches all deployments, applies scope filtering, registers tools.
 -- Visibility flags control which tool categories are registered.
-renderOrgWebMCPScript :: RawJs
-renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text.unlines
+-- Given an origin-trial token, the script adds it to the embedding page;
+-- given none, it adds no token.
+renderOrgWebMCPScript :: Maybe OriginTrialToken -> RawJs
+renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text.unlines $
   [ "(function() {"
   , "  'use strict';"
   , ""
-  , "  // Inject the WebMCP origin-trial token so the modelContext API is available"
-  , "  // on third-party origins where this script is embedded."
-  , "  try {"
-  , "    var otMeta = document.createElement('meta');"
-  , "    otMeta.httpEquiv = 'origin-trial';"
-  , "    otMeta.content = 'A0e5+EqX/z+LG2Y3IU+Unetiy0UAUMwZ1w/WFZL7L69Z9N7XH7FR0i3kSjP2CMLTL1jR6R2yOMDGloIQeR5JxA8AAAB1eyJvcmlnaW4iOiJodHRwczovL2xlZ2FsZXNlLmNsb3VkOjQ0MyIsImZlYXR1cmUiOiJXZWJNQ1AiLCJleHBpcnkiOjE3OTQ4NzM2MDAsImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9';"
-  , "    (document.head || document.documentElement).appendChild(otMeta);"
-  , "  } catch (e) {}"
-  , ""
-  , "  var scriptTag = document.currentScript || document.querySelector('script[src*=\"embed.js\"]');"
+  ]
+  <> maybe [] originTrialLines originTrialToken
+  <>
+  [ "  var scriptTag = document.currentScript || document.querySelector('script[src*=\"embed.js\"]');"
   , "  var apiKey = scriptTag && scriptTag.getAttribute('data-api-key');"
   , "  var scope = scriptTag && scriptTag.getAttribute('data-scope');"
   , "  // data-tools: comma-separated list of tool categories to register."
@@ -481,4 +502,20 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "    });"
   , "  }"
   , "})();"
+  ]
+
+-- | The part of the script that adds an origin-trial token to the embedding
+-- page, so that the browser offers the modelContext API there while WebMCP
+-- is an origin trial.
+originTrialLines :: OriginTrialToken -> [Text]
+originTrialLines (OriginTrialToken token) =
+  [ "  // Add the WebMCP origin-trial token so the modelContext API is available"
+  , "  // on the page this script is embedded in."
+  , "  try {"
+  , "    var otMeta = document.createElement('meta');"
+  , "    otMeta.httpEquiv = 'origin-trial';"
+  , "    otMeta.content = '" <> token <> "';"
+  , "    (document.head || document.documentElement).appendChild(otMeta);"
+  , "  } catch (e) {}"
+  , ""
   ]

@@ -28,6 +28,7 @@ module L4.Nlg (
   substituteNlgCall,
   substituteNlgCallMarked,
   nlgRefs,
+  refsFollowedByWords,
   daydateLiteral,
   substituteNlgCallsIn,
   substituteNlgDirective,
@@ -53,7 +54,7 @@ import Optics
 import Data.Ratio (denominator, numerator)
 import Data.Time (fromGregorianValid)
 import qualified Data.Time.Format as TimeFormat
-import Data.Char (isLetter)
+import Data.Char (isAlphaNum, isLetter)
 
 -- | Convert a deontic modal to its text representation for NLG
 deonticModalText :: DeonticModal -> Text
@@ -673,12 +674,12 @@ instance Linearize (Expr Resolved) where
       [ frame "the"
       , frame "sum"
       , frame "of"
-      , groupedUnder isArithNode e1
+      , leftOperand e1
       , frame "and"
       , groupedUnder isArithNode e2
       ]
     Minus _ e1 e2 -> hcat
-      [ groupedUnder isArithNode e1
+      [ leftOperand e1
       , frame "minus"
       , groupedUnder isArithNode e2
       ]
@@ -686,7 +687,7 @@ instance Linearize (Expr Resolved) where
       [ frame "the"
       , frame "product"
       , frame "of"
-      , groupedUnder isArithNode e1
+      , leftOperand e1
       , frame "and"
       , groupedUnder isArithNode e2
       ]
@@ -695,7 +696,7 @@ instance Linearize (Expr Resolved) where
       , frame "result"
       , frame "of"
       , frame "dividing"
-      , groupedUnder isArithNode e1
+      , leftOperand e1
       , frame "by"
       , groupedUnder isArithNode e2
       ]
@@ -703,7 +704,7 @@ instance Linearize (Expr Resolved) where
       [ frame "the"
       , frame "result"
       , frame "of"
-      , groupedUnder isArithNode e1
+      , leftOperand e1
       , frame "modulo"
       , groupedUnder isArithNode e2
       ]
@@ -759,7 +760,7 @@ instance Linearize (Expr Resolved) where
       ]
       <> ifNonEmpty es
             [ frame "with"
-            , enumerate (punctuate ",") (spaced $ frame "and") (fmap lin es)
+            , enumerate (punctuate ",") (spaced $ frame "and") (fmap callArgument es)
             ]
     AppNamed _ n es _order -> hcat
       [ linearize n
@@ -851,6 +852,33 @@ isOrNode  = \ case Or{} -> True; ROr{} -> True; _ -> False
 isArithNode = \ case
   Plus{} -> True; Minus{} -> True; Times{} -> True; DividedBy{} -> True; Modulo{} -> True
   _ -> False
+
+-- | The left operand of an arithmetic phrase. Arithmetic is bracketed on either
+-- side ('groupedUnder' 'isArithNode'); on the LEFT, an operand whose words have
+-- no end is bracketed too, because the rest of the phrase follows it and would
+-- read as part of it: a call's arguments ("(`f2` with 2 and 5) minus 3", not
+-- the words of @`f2` 2 (5 MINUS 3)@), an IF's ELSE, a CONSIDER. A rule's own
+-- sentence is bracketed where it is spliced in ('substituteNlgCallsIn'), since
+-- by then it is 'Inert' text. Read from the shape of the expression only.
+leftOperand :: Expr Resolved -> LinTree
+leftOperand = groupedUnder (\ n -> isArithNode n || opensAtEnd n)
+
+-- | An expression whose phrase has no closing word: a call with arguments (not
+-- a date written as literals, which reads as the date), an IF, a CONSIDER.
+opensAtEnd :: Expr Resolved -> Bool
+opensAtEnd = \ case
+  App _ n es@(_ : _) -> isNothing (daydateLiteral n es)
+  AppNamed{}   -> True
+  IfThenElse{} -> True
+  MultiWayIf{} -> True
+  Consider{}   -> True
+  _ -> False
+
+-- | An argument of a call. An infix "minus" in the last argument runs on as if
+-- it applied to the call, so @`f2` 2 (5 MINUS 3)@ reads "`f2` with 2 and (5
+-- minus 3)". A phrase that opens with "the" says where it starts.
+callArgument :: Expr Resolved -> LinTree
+callArgument = groupedUnder (\ case Minus{} -> True; _ -> False)
 
 instance Linearize (Event Resolved) where
   linearize (MkEvent _ p a t _) = hcat
@@ -1195,8 +1223,70 @@ substituteNlgCalls = substituteNlgCallsIn Nothing
 -- | 'substituteNlgCalls' with the arguments, and the "with" and "and" of any
 -- appended ones, rendered with a language's frame words. The herald's own
 -- text is the author's and is never touched.
+--
+-- __A sentence spliced in as an operand of arithmetic is bracketed.__ It may
+-- end, or open, with a slot, so "5 doubled minus 2" and "5 minus 2 doubled"
+-- read alike whichever way they are grouped; as "(5 doubled) minus 2" and "5
+-- minus (2 doubled)" they do not. It is told by the call it replaced, since
+-- once spliced it is 'Inert' text. A call to a rule that is itself the
+-- operator (a date less some days) is not an operand, and reads as before.
 substituteNlgCallsIn :: Maybe LangTag -> NlgFnInfo -> Expr Resolved -> Expr Resolved
-substituteNlgCallsIn mlang info = transformOf (gplate @(Expr Resolved)) (substituteNlgCall mlang info)
+substituteNlgCallsIn mlang info = go
+ where
+  -- 'transformOf', except that an arithmetic node sees its operands as they
+  -- were before they were spliced.
+  go e = substituteNlgCall mlang info (groupSentences e (over (gplate @(Expr Resolved)) go e))
+  groupSentences orig new = case (orig, new) of
+    (Plus _ a b,      Plus ann a' b')      -> Plus ann (operand a a') (operand b b')
+    (Minus _ a b,     Minus ann a' b')     -> Minus ann (operand a a') (operand b b')
+    (Times _ a b,     Times ann a' b')     -> Times ann (operand a a') (operand b b')
+    (DividedBy _ a b, DividedBy ann a' b') -> DividedBy ann (operand a a') (operand b b')
+    (Modulo _ a b,    Modulo ann a' b')    -> Modulo ann (operand a a') (operand b b')
+    (App _ _ [a, b],  App ann n [a', b'])
+      | isArithNode (carameliseNode new), not (heralded new) -> App ann n [operand a a', operand b b']
+    -- A slot that the sentence goes on after, filled by an argument with no
+    -- closing word ('endsOpen'), is bracketed. Told by the argument as it was
+    -- written, because a call with a sentence of its own is 'Inert' text once
+    -- spliced, and the slot at the end of that sentence may hold a condition:
+    -- "it is shown that p or (q and r) is shown" is also how
+    -- @`tail` (p OR (`shown` (q AND r)))@ reads.
+    (App _ _ oargs, App ann n args)
+      | Just (nlg, params) <- Map.lookup (getUnique n) info
+      , length params == length args, length oargs == length args
+      , isNothing (daydateLiteral n args) ->
+          let followed = refsFollowedByWords nlg
+          in App ann n
+               [ if p `Set.member` followed && endsOpen o then closed a else a
+               | (p, o, a) <- zip3 params oargs args ]
+    _ -> new
+  operand o o' = case o' of
+    Inert ann t ctx | heralded o -> Inert ann ("(" <> t <> ")") ctx
+    _                            -> o'
+  closed a = Inert (a ^. annoOf) ("(" <> fst (simpleLinearizerIn mlang a) <> ")") InertCtxNone
+  -- Whether an argument, as written, ends with no closing word: a condition of
+  -- these shapes, a call with no sentence whose last argument is one, or a call
+  -- with a sentence whose slot at the end holds one (or, if the sentence leaves
+  -- arguments out, whose last such argument does, since "with …" follows it).
+  -- Read from the shape of the call and of its sentence, not from any word.
+  endsOpen a = isNothing (a ^. annoOf % annNlg) && case carameliseNode a of
+    Not{} -> True; Implies{} -> True; IfThenElse{} -> True; MultiWayIf{} -> True; Consider{} -> True
+    And{} -> True; Or{} -> True; RAnd{} -> True; ROr{} -> True
+    App _ m es@(_ : _)
+      | isJust (daydateLiteral m es) -> False
+      | Just (nlg, params) <- Map.lookup (getUnique m) info, length params == length es ->
+          let bound = zip params es
+          in case [ x | (p, x) <- bound, p `notElem` nlgRefs nlg ] of
+               []       -> or [ endsOpen x | (p, x) <- bound, not (p `Set.member` refsFollowedByWords nlg) ]
+               leftover -> endsOpen (last leftover)
+      | otherwise -> endsOpen (last es)
+    _ -> False
+  -- A rule with no inputs has a phrase, not a sentence with slots, and is left.
+  heralded = \ case
+    App _ n args@(_ : _)
+      | Just (_, params) <- Map.lookup (getUnique n) info
+      , length params == length args
+      , isNothing (daydateLiteral n args) -> True
+    _ -> False
 
 -- | One step of 'substituteNlgCallsIn', for the one call at the top of an
 -- expression. @l4 render@ walks the tree itself, because it phrases a call's
@@ -1282,6 +1372,28 @@ nlgRefs = \case
   MkResolvedNlg _ _ frags -> [ getUnique r | MkNlgRef _ r <- frags ]
   _                       -> []
 
+-- | The parameters with a slot that the sentence goes on after, with its own
+-- words or another slot: in "%a% is told %b%", @a@ and not @b@. What fills such
+-- a slot is followed by more of the sentence, so a filler with no closing word
+-- of its own would take it in. Read from where the slot is, not from what the
+-- words say.
+refsFollowedByWords :: Nlg -> Set.Set Unique
+refsFollowedByWords = \case
+  MkResolvedNlg _ _ frags -> go frags
+  _                       -> Set.empty
+ where
+  go = \case
+    MkNlgRef _ r : rest
+      | any following rest -> Set.insert (getUnique r) (go rest)
+    _ : rest -> go rest
+    [] -> Set.empty
+  -- A word, or another slot: in "%a% %b%", "%a%, %b%" and "%a% (%b%)" the
+  -- sentence goes on after @a@. Punctuation alone, such as a closing full stop,
+  -- does not.
+  following = \case
+    MkNlgText _ t -> Text.any isAlphaNum t
+    MkNlgRef{}    -> True
+
 -- | Render an @\@nlg@ annotation, substituting each parameter reference with the
 -- corresponding call argument.
 renderNlgWith :: Map.Map Unique (Expr Resolved) -> Nlg -> Text
@@ -1289,17 +1401,17 @@ renderNlgWith = renderNlgWithIn Nothing
 
 renderNlgWithIn :: Maybe LangTag -> Map.Map Unique (Expr Resolved) -> Nlg -> Text
 renderNlgWithIn mlang argMap = \case
-  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (agreeing frags))
+  nlg@(MkResolvedNlg _ _ frags) -> normalizeWs (Text.concat (agreeing (refsFollowedByWords nlg) frags))
   other                 -> simpleLinearizer other
  where
   -- The parser keeps one text fragment per token, so the words after a slot are
   -- gathered before 'singularUnit' looks at them.
-  agreeing = \case
+  agreeing followed = \case
     r@(MkNlgRef{}) : rest
-      | frag r == "1"
+      | frag followed r == "1"
       , (words', others) <- span isWords rest ->
-          frag r : singularUnit (foldMap frag words') : agreeing others
-    f : rest -> frag f : agreeing rest
+          frag followed r : singularUnit (foldMap (frag followed) words') : agreeing followed others
+    f : rest -> frag followed f : agreeing followed rest
     [] -> []
   isWords = \case
     MkNlgText{} -> True
@@ -1308,14 +1420,36 @@ renderNlgWithIn mlang argMap = \case
   -- @\%@ / @\]@ verbatim so exactprint can re-emit it. Without this call
   -- @10\%and\%20@ reaches text, html, json, akn and the LSP webview with the
   -- backslash still in it.
-  frag (MkNlgText _ t) = unescapeNlgText t
+  frag _ (MkNlgText _ t) = unescapeNlgText t
   -- An unsubstituted reference (definition view, or a name with no matching
   -- argument) renders as the bare parameter name — NOT via 'simpleLinearizer',
   -- which would re-expand that parameter's own @\@nlg@ and recurse when the
   -- annotation is attached to a parameter it also references.
-  frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
-    Just a  -> fst (simpleLinearizerIn mlang a)
+  -- An arithmetic filler is bracketed: the sentence goes on after the slot, and
+  -- @%a% doubled@ filled with @5 MINUS 2@ would read "5 minus 2 doubled", as
+  -- @5 MINUS `dbl` 2@ does. Decided by the filler's shape, not the sentence's
+  -- words; a filler with a sentence of its own is left as it is.
+  -- So is a denial, an IMPLIES, an IF, an AND or an OR in a slot that the
+  -- sentence's words come after: "not X is disclosed" is also how
+  -- @NOT (`disclosed` X)@ reads, because "not" reaches as far as the words go,
+  -- and "p or (q implies r) is shown" how @p OR (`shown` (q IMPLIES r))@ does.
+  -- In the last slot nothing follows it. A call ends with its last argument,
+  -- so a call whose last argument is such a condition is bracketed too.
+  frag followed (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
+    Just a
+      | isNothing (a ^. annoOf % annNlg), isArithNode (carameliseNode a) ->
+          "(" <> fst (simpleLinearizerIn mlang a) <> ")"
+      | getUnique r `Set.member` followed, endsOpen a ->
+          "(" <> fst (simpleLinearizerIn mlang a) <> ")"
+      | otherwise -> fst (simpleLinearizerIn mlang a)
     Nothing -> resolvedText r
+  -- A call with a sentence has been spliced in by now ('Inert'), and is not
+  -- looked into.
+  endsOpen a = isNothing (a ^. annoOf % annNlg) && case carameliseNode a of
+    Not{} -> True; Implies{} -> True; IfThenElse{} -> True; MultiWayIf{} -> True; Consider{} -> True
+    And{} -> True; Or{} -> True; RAnd{} -> True; ROr{} -> True
+    App _ n es@(_ : _) | isNothing (daydateLiteral n es) -> endsOpen (last es)
+    _ -> False
 
 -- | The words after a slot that held the number 1: a sentence written for any
 -- count says "%n% months", and "1 months" is never what its author meant. Only a

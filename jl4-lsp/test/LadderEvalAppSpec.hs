@@ -40,7 +40,7 @@ spec = describe "the ladder's evaluation of an application" do
       `shouldBe` Just (Just notModelled)
 
   it "answers an evaluation that raises with an error response that carries no data" do
-    dataOf (errorResponse (ladderEvalAppResult (EL.Reduction (EL.ReducedErrored (UserEvalException StackOverflow)))))
+    dataOf (errorResponse (ladderEvalAppResult (EL.Reduction (EL.ReducedErrored (UserEvalException (StackOverflow 1000000))))))
       `shouldBe` Just Nothing
 
   it "answers a satisfied assertion with TRUE" do

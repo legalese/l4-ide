@@ -1,6 +1,6 @@
 the following must refuse: `not modelled`
 the following must refuse: `not modelled`
-the following must refuse: `unmodelled when negative` with 0 minus 1
+the following must refuse: `unmodelled when negative` with (0 minus 1)
 the following must refuse: `modelled`
 the following must refuse: `unmodelled when negative` with 3
 the following must refuse: `not modelled`

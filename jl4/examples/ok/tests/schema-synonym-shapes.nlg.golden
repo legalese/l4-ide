@@ -1,0 +1,3 @@
+`decode` with {"o": 5, "p": 6, "xs": [1, 2], "n": 1}
+`decode` with {"o": null, "p": null, "xs": [], "n": 1}
+`decode` with {"xs": [], "n": 1}

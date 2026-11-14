@@ -164,6 +164,12 @@ splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty
         m' = insertIfMissing (Just r.address) (Left v) m
       in
         go d1 ((d2, ma, casf `DList.snoc` a) : stack) m' as
+    go d1 ((d2, ma, casf) : stack) m (a@(SetRef _) : as@(Exit (Left _) : _)) =
+      -- If a 'SetRef' is immediately followed by an exception, then forcing that
+      -- address raised before any frame was pushed for it: a stack overflow at its
+      -- update frame, or a blackhole. The depth will never reach the threshold a
+      -- new address frame would wait for, so we must not create one.
+      go d1 ((d2, ma, casf `DList.snoc` a) : stack) m as
     go d1 ((d2, ma, casf) : stack) m (a@(SetRef r) : as) =
       -- The normal situation if we encounter a 'SetRef' is to create a new frame on
       -- our address stack with an empty action list.
@@ -310,7 +316,7 @@ printUserEvalExceptionShort (BlackholeForced _)             = "loop detected"
 printUserEvalExceptionShort (EqualityOnUnsupportedType _ _) = "called equality on unsupported type"
 printUserEvalExceptionShort (NonExhaustivePatterns Nothing _)  = "non-exhaustive patterns"
 printUserEvalExceptionShort (NonExhaustivePatterns (Just g) _) = "no clause of " <> pretty (quotedName (MkName emptyAnno g.groupHead)) <> " matches"
-printUserEvalExceptionShort StackOverflow                   = "stack overflow"
+printUserEvalExceptionShort (StackOverflow _)               = "stack overflow"
 printUserEvalExceptionShort (DivisionByZero _)              = "division by zero"
 printUserEvalExceptionShort (NotAnInteger _ _)              = "not an integer"
 printUserEvalExceptionShort (Stuck _)                       = "stuck"

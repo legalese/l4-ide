@@ -21,8 +21,12 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamsWithDefaults, extractImplicitAssumeParams)
+import L4.TypeSynonym (declaresFromModule, expandSynonyms)
 import L4.Syntax
-import L4.TypeCheck.Environment (falseUnique, maybeUnique, trueUnique)
+import L4.TypeCheck.Environment
+  ( booleanUnique, dateUnique, datetimeUnique, falseUnique, listUnique, maybeUnique
+  , numberUnique, stringUnique, timeUnique, trueUnique
+  )
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -110,43 +114,29 @@ instance FromJSON Parameter where
       <*> p .:? "x-l4-type"
       <*> p .:? "default"
 
-declaresFromModule :: Module Resolved -> Map Text (Declare Resolved)
-declaresFromModule (MkModule _ _ section) =
-  Map.fromList (collectSection section)
- where
-  collectSection (MkSection _ _ _ decls) =
-    decls >>= collectDecl
-
-  collectDecl = \case
-    Declare _ decl@(MkDeclare _ _ (MkAppForm _ name _ _) _) ->
-      [(resolvedNameText name, decl)]
-    Section _ sub ->
-      collectSection sub
-    _ ->
-      []
-
 typeToParameter ::
   Map Text (Declare Resolved) ->
   Set.Set Text ->
   Type' Resolved ->
   Parameter
 typeToParameter declares visited ty =
-  case ty of
+  -- A synonym is decided by what it stands for, as the decoder does: a
+  -- synonym for MAYBE is a MAYBE, one for LIST an array of its element.
+  case expandSynonyms declares ty of
     Type _ -> emptyParam "object"
     TyApp _ name [] ->
       typeNameToParameter name
-    TyApp _ name [inner] ->
-      let lowered = Text.toLower (resolvedNameText name)
-       in
-        if lowered `elem` ["list", "listof"]
-          then
-            (emptyParam "array")
-              { parameterItems = Just (typeToParameter declares visited inner)
-              }
-          else
-            if lowered `elem` ["maybe", "optional"]
-              then typeToParameter declares visited inner
-              else typeNameToParameter name
+    -- By the resolved type, as 'primitiveJsonType' does: a module's own
+    -- one-argument @List@ or @Optional@ is that declared type.
+    TyApp _ name [inner]
+      | getUnique name == listUnique ->
+          (emptyParam "array")
+            { parameterItems = Just (typeToParameter declares visited inner)
+            }
+      | getUnique name == maybeUnique ->
+          typeToParameter declares visited inner
+      | otherwise ->
+          typeNameToParameter name
     TyApp _ name _ ->
       typeNameToParameter name
     Fun{} -> emptyParam "object"
@@ -178,23 +168,21 @@ typeToParameter declares visited ty =
           Nothing -> emptyParam "object"
           Just decl -> declareToParameter (resolvedNameText name) decl
 
-  -- | Map L4 primitive type names to JSON Schema type and optional format.
+  -- | Map L4's builtin types to JSON Schema type and optional format. This goes
+  -- by the resolved type, not its name: a `DECLARE Text HAS ...` or an imported
+  -- enum `Time` is that record or enum, and reading its name would publish a
+  -- schema for a JSON string that the service then refuses.
   primitiveJsonType :: Resolved -> Maybe (Text, Maybe Text)
-  primitiveJsonType name =
-    case Text.toLower (resolvedNameText name) of
-      "number" -> Just ("number", Nothing)
-      "int" -> Just ("number", Nothing)
-      "integer" -> Just ("number", Nothing)
-      "float" -> Just ("number", Nothing)
-      "double" -> Just ("number", Nothing)
-      "boolean" -> Just ("boolean", Nothing)
-      "bool" -> Just ("boolean", Nothing)
-      "string" -> Just ("string", Nothing)
-      "text" -> Just ("string", Nothing)
-      "date" -> Just ("string", Just "date")
-      "time" -> Just ("string", Just "time")
-      "datetime" -> Just ("string", Just "date-time")
-      _ -> Nothing
+  primitiveJsonType name
+    | unique == numberUnique = Just ("number", Nothing)
+    | unique == booleanUnique = Just ("boolean", Nothing)
+    | unique == stringUnique = Just ("string", Nothing)
+    | unique == dateUnique = Just ("string", Just "date")
+    | unique == timeUnique = Just ("string", Just "time")
+    | unique == datetimeUnique = Just ("string", Just "date-time")
+    | otherwise = Nothing
+   where
+    unique = getUnique name
 
   declareToParameter :: Text -> Declare Resolved -> Parameter
   declareToParameter typeName (MkDeclare declAnn _ _ typeDecl)
@@ -219,7 +207,7 @@ typeToParameter declares visited ty =
               requiredFields =
                 [ resolvedNameText fieldName
                 | MkTypedName _ fieldName fieldTy _ _ <- fields
-                , not (isMaybeFieldType fieldTy)
+                , not (isMaybeFieldType (expandSynonyms declares fieldTy))
                 ]
              in
               (emptyParam "object")
@@ -287,7 +275,7 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
     requiredGivenParams =
       [ resolvedNameText resolved
       | MkOptionallyTypedName _ resolved mType _ <- names
-      , not (isMaybeType mType)
+      , not (isMaybeType (expandSynonyms declares <$> mType))
       ]
     assumeParamList = map mkAssumeParam assumeParams
     implicitParamList = map (\ (n, ty) -> mkAssumeParam (n, ty, Nothing)) implicitParams
@@ -336,11 +324,10 @@ isMaybeType :: Maybe (Type' Resolved) -> Bool
 isMaybeType (Just (TyApp _ name [_inner])) = getUnique name == maybeUnique
 isMaybeType _ = False
 
--- | Check if a field type is MAYBE or Optional (for record field required tracking).
+-- | Is a record field's type the builtin MAYBE (for record field required
+-- tracking)? By the resolved type, like 'isMaybeType'.
 isMaybeFieldType :: Type' Resolved -> Bool
-isMaybeFieldType (TyApp _ name [_]) =
-  let lowered = Text.toLower (resolvedNameText name)
-   in lowered `elem` ["maybe", "optional"]
+isMaybeFieldType (TyApp _ name [_]) = getUnique name == maybeUnique
 isMaybeFieldType _ = False
 
 resolvedNameText :: Resolved -> Text

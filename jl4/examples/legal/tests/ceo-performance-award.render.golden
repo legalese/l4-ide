@@ -108,7 +108,7 @@
 
 1. Required Market Cap For Tranche is:
     (a) If tranche number is 1: Trillion 2;
-    (b) Otherwise, if tranche number is at least 2 and tranche number is at most 10: Trillion 2 + (tranche number − 1) × Billion 500;
+    (b) Otherwise, if tranche number is at least 2 and tranche number is at most 10: (Trillion 2) + (tranche number − 1) × (Billion 500);
     (c) Otherwise, if tranche number is 11: Trillion 7.5;
     (d) Otherwise, if tranche number is 12: Trillion 8.5;
     (e) Otherwise: 0.
@@ -272,20 +272,20 @@
 2. Eligible Service Requirement is:
     (a) If Forfeiture Applies for the CEO award state: Elon Musk must forfeit unvested shares (Forfeiture Reason of the CEO award state);
     (b) Otherwise, if Immediate Vesting Applies for the CEO award state: Elon Musk may vest immediately (Immediate Vesting Reason for the CEO award state);
-    (c) Otherwise: Elon Musk must maintain eligible service status (Service Status) within the day numbered Performance End Date − the CEO award state's Current Date:
+    (c) Otherwise: Elon Musk must maintain eligible service status (Service Status) within the day numbered (Performance End Date − the CEO award state's Current Date):
         (i) Provided that any of the following:
             (1) Service Status is Chief Executive Officer; or
             (2) Service Status is Executive Officer Product Development.
         (ii) Failing that, Elon Musk must forfeit unvested shares (Cessation of Eligible Service).
 
 3. Milestone Achievement Requirement is:
-    (a) If Tranche Can Be Earned for tranche and the CEO award state: Elon Musk may achieve market cap milestone (tranche no and mkt cap) within the day numbered Performance End Date − the CEO award state's Current Date:
+    (a) If Tranche Can Be Earned for tranche and the CEO award state: Elon Musk may achieve market cap milestone (tranche no and mkt cap) within the day numbered (Performance End Date − the CEO award state's Current Date):
         (i) Provided that all of the following:
             (1) mkt cap is more than Required Market Cap For Tranche for tranche no; and
             (2) any of the following:
                 (A) Market Cap Milestone Met for tranche no and the CEO award state's Performance Metrics; or
                 (B) Market Cap Milestone Met For Change In Control for tranche no and the CEO award state's Performance Metrics.
-        (ii) Whether or not that is done, Elon Musk may achieve operational milestone (tranche n and Milestone Type) within the day numbered Performance End Date − the CEO award state's Current Date:
+        (ii) Whether or not that is done, Elon Musk may achieve operational milestone (tranche n and Milestone Type) within the day numbered (Performance End Date − the CEO award state's Current Date):
             (1) Provided that any of the following:
                 (A) Operational Milestone Met for tranche n and the CEO award state's Performance Metrics; or
                 (B) Deemed Achievement Applies for tranche n and the CEO award state.
@@ -296,7 +296,7 @@
         (i) Provided that all of the following:
             (1) tranche no is tranche; and
             (2) date is at least vesting date.
-        (ii) Once that is done, Elon Musk must pay offset amount (Offset Amount For Tranche for tranche) within 30. Once that is done, Elon Musk must hold shares for period (5) within the day numbered holding period end − the CEO award state's Current Date.
+        (ii) Once that is done, Elon Musk must pay offset amount (Offset Amount For Tranche for tranche) within 30. Once that is done, Elon Musk must hold shares for period (5) within the day numbered (holding period end − the CEO award state's Current Date).
     (b) Otherwise: FULFILLED.
     where:
     - Earn date means Get Earn Date For Tranche for tranche and the CEO award state.
@@ -314,28 +314,28 @@
     (a) If tranche list is empty: 0;
     (b) If tranche list starts with head, followed by tail:
         (i) If tranche is head: index;
-        (ii) Otherwise: Get Index Of Tranche for tranche, tail, and index + 1.
+        (ii) Otherwise: Get Index Of Tranche for tranche, tail, and (index + 1).
 
 4. Get Date At Index depends on date list:
     (a) If date list is empty: Grant Date;
     (b) If date list starts with head, followed by tail:
         (i) If index is 0: head;
-        (ii) Otherwise: Get Date At Index for index − 1 and tail.
+        (ii) Otherwise: Get Date At Index for (index − 1) and tail.
 
 
 § 14  Helper Functions
 
 1. Million equals a × 1,000,000.
 
-2. Billion equals Million a × 1000.
+2. Billion equals (Million a) × 1000.
 
-3. Trillion equals Billion a × 1000.
+3. Trillion equals (Billion a) × 1000.
 
 4. Years after [n] and [d] means the date new day/new month/new year.
     where:
-    - New year equals the year of d + FLOOR with n.
-    - Fractional days equals the number of days in new year × (n − FLOOR with n).
-    - New day equals the day of d + FLOOR with fractional days.
+    - New year equals (the year of d) + (FLOOR with n).
+    - Fractional days equals (the number of days in new year) × (n − (FLOOR with n)).
+    - New day equals (the day of d) + (FLOOR with fractional days).
     - New month means the month of d.
 
 5. Number In List, depending on list:

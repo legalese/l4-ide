@@ -32,10 +32,12 @@ import Language.LSP.Protocol.Types
 import L4.Annotation (emptyAnno)
 import L4.Syntax
   ( Info (TypeInfo)
+  , Name (MkName)
   , OptionallyNamedType (MkOptionallyNamedType)
   , RawName (NormalName)
-  , Resolved
-  , Type' (Fun, InfVar)
+  , Resolved (Def)
+  , Type' (Forall, Fun, InfVar, TyApp)
+  , Unique (MkUnique)
   )
 import LSP.L4.Actions (infoToHover)
 
@@ -52,6 +54,32 @@ lambdaIdentityType =
   where
     infX = InfVar emptyAnno (NormalName "x") 10
 
+-- | A name the type of which prints as itself, here @a@.
+namedA :: Resolved
+namedA =
+  Def
+    (MkUnique 't' 1 (toNormalizedUri (Uri "file:///hover-display-spec")))
+    (MkName emptyAnno (NormalName "a"))
+
+-- | The type of @GIVEN `the application` YIELD approved@ in a module that
+-- declares a type @a@ with the constructor @approved@: from any type to @a@.
+toDeclaredAType :: Type' Resolved
+toDeclaredAType =
+  Fun emptyAnno [MkOptionallyNamedType emptyAnno Nothing (InfVar emptyAnno (NormalName "the application") 4)]
+    (TyApp emptyAnno namedA [])
+
+-- | The hover markdown for a type, with no substitution, NLG or description.
+hoverOf :: Type' Resolved -> T.Text
+hoverOf ty =
+  hoverMarkdown $
+    infoToHover
+      (toNormalizedUri (Uri "file:///hover-display-spec"))
+      mempty
+      (Range (Position 0 0) (Position 0 0))
+      (TypeInfo ty Nothing)
+      Nothing
+      Nothing
+
 -- | The markdown body of a hover whose contents are 'MarkupContent'.
 hoverMarkdown :: Hover -> T.Text
 hoverMarkdown (Hover contents _range) = case contents of
@@ -60,7 +88,13 @@ hoverMarkdown (Hover contents _range) = case contents of
 
 spec :: Spec
 spec =
-  describe "LSP hover normalises inference variables (smucclaw/l4-ide#313)" $
+  describe "LSP hover normalises inference variables (smucclaw/l4-ide#313)" $ do
+    -- Naming the input `a` as well would print `FUNCTION FROM a TO a`, the
+    -- text of the identity function, for a function into the declared `a`.
+    it "skips a display name that is already a type in the hovered type" $ do
+      hoverOf toDeclaredAType `shouldSatisfy` T.isInfixOf "FUNCTION FROM b TO a"
+      hoverOf (Forall emptyAnno [namedA] toDeclaredAType)
+        `shouldSatisfy` T.isInfixOf "FOR ALL a FUNCTION FROM b TO a"
     it "renders an un-annotated lambda type as 'a', never 'x10'" $ do
       let hov =
             infoToHover
