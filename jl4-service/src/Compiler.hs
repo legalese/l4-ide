@@ -10,7 +10,7 @@ import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
-import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
+import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule, typicallyToJson)
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import Types
@@ -397,7 +397,8 @@ parametersFromExport declares params =
     , required = [param.paramName | param <- map (expandRequired declares) params, param.paramRequired]
     }
 
--- | Convert an ExportedParam to a Parameter.
+-- | Convert an ExportedParam to a Parameter. The TYPICALLY value is published
+-- as @default@, as jl4-schema does ('L4.JsonSchema.generateJsonSchema').
 paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
 paramToParameter declares param =
   let p0 = maybe
@@ -407,6 +408,7 @@ paramToParameter declares param =
   in p0
     { parameterAlias = Nothing
     , parameterDescription = Text.strip $ maybe "" id param.paramDescription
+    , parameterDefault = typicallyToJson =<< param.paramDefault
     }
 
 -- | Convert a Function to a FunctionDeclaration for the Backend.

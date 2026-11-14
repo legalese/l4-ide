@@ -9,6 +9,7 @@ module CompatibilitySpec (spec) where
 
 import Test.Hspec
 
+import qualified Data.Aeson as Aeson
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
@@ -106,6 +107,13 @@ spec = describe "Compatibility.detectBreakingChanges" do
       let old = fn "f" (ps [("d", prim "string")] ["d"]) "BOOLEAN" Nothing
           new = fn "f" (ps [("d", (prim "string") { parameterFormat = Just "date" })] ["d"]) "BOOLEAN" Nothing
       changes [old] [new] `shouldSatisfy` mentions "format changed"
+
+    it "a parameter gaining or losing a TYPICALLY default is compatible" do
+      -- A bundle deployed before the service published top-level defaults has
+      -- none in its cached metadata; redeploying it unchanged adds them.
+      let withDefault = fn "f" (ps [("age", (prim "number") { parameterDefault = Just (Aeson.Number 18) })] ["age"]) "BOOLEAN" Nothing
+      shouldBeCompatible [base] [withDefault]
+      shouldBeCompatible [withDefault] [base]
 
     it "tightening an optional parameter to required is breaking" do
       let old = fn "f" (ps [("age", prim "number")] []) "BOOLEAN" Nothing

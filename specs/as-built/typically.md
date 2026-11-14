@@ -21,7 +21,7 @@ Differences from the source spec:
 The value is a rebuttable presumption: it is parsed, resolved, type-checked against the declared type and kept in the syntax tree.
 It does not change what any rule evaluates to, and nothing fills a left-out input with it.
 The JSON Schema generated for an exported function publishes it as the JSON Schema `default` keyword where the value has a JSON form.
-`jl4-service`'s deployed-function schema carries it only on the fields of a record input (see Limits).
+`jl4-service`'s deployed-function schema carries the same `default`, on a top-level input and an `ASSUME` (`jl4-service/test/DefaultsAgreeSpec.hs`) as on a field of a record input.
 
 ## Where it lives
 
@@ -104,7 +104,5 @@ Wording as it stands in `prettyCheckError` and `prettyTypeMismatch` (`jl4-core/s
   The refusal above therefore covers record fields only, because its message that the value comes from the MEANS would be false here; the dropped MEANS is a defect of its own, not addressed here.
 - The "must be a literal" error on a DECLARE field is reported at the record type's name, not at the value (`not-ok/tc/tests/typically-non-literal.golden`, range 4:9-4:14 on `Flags`).
 - `NOTHING` and enum-constructor defaults never reach a schema (measured with `jl4-schema`).
-- `jl4-service`'s deployed-function schema drops top-level GIVEN and ASSUME defaults: `paramToParameter` in `jl4-service/src/Compiler.hs` never reads `paramDefault`.
-  Measured: a deployed rule with `age IS A NUMBER TYPICALLY 18` publishes `{"type":"number"}` for `age`, and a record input publishes `default` on its number, string and Boolean fields but not on an enum field.
 - Cosmetic: `HasRef (TypedName)` binds field 4 as `mExpr` and field 5 as `typically`, the reverse of their meaning (`jl4-core/src/L4/Parser/ResolveAnnotation.hs`); both are traversed and rebuilt in place, so it is harmless.
 - Not built here, and not claimed: filling a left-out input from its default (the design is in the source spec), the query planner reading a default as a prior (nothing in `jl4-query-plan/`, `ts-shared/boolean-analysis/`, `jl4-service/src/Backend/DecisionQueryPlan.hs` or `jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs` mentions TYPICALLY), and the section `GIVEN` of unstable (an input shared by every rule of a § section), whose code, `L4.Discharge`, is not in this tree.

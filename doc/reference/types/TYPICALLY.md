@@ -104,8 +104,8 @@ If the rule reads it, the evaluation stops with a message such as "I needed to k
 
 - **The JSON Schema of an exported function** (what `jl4-schema` writes) shows a number, a string, `TRUE` or `FALSE` default as the JSON Schema `default` keyword, on an input and on a field of a record input.
   A `NOTHING` default and a default that is a value of an enumeration are kept but left out of the schema.
-- **`jl4-service`** publishes a default only on the fields of a record input, as the same keyword, and not on a top-level input or `ASSUME`.
-  Whatever the schema says about a default, the input stays in the schema's `required` list.
+- **`jl4-service`** publishes the same `default` in a deployed function's schema.
+  Either way, an input with a default stays in the schema's `required` list.
 - **`l4 format`** keeps the clause where it was written.
 - **The syntax tree** carries it for any tool that reads the tree.
 
