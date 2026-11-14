@@ -1,0 +1,22 @@
+-- smucclaw/l4-ide#1068: a HENCE or LEST written at the column of a rule's
+-- clauses belongs to that rule. The issue's repro is lest-layout-1068.l4.
+
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  delivery
+  payment HAS amount IS A NUMBER
+
+-- The rule on the same line as its HENCE: before the fix, an indentation error.
+sameLine MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  HENCE PARTY Buyer MUST payment 100 WITHIN 7
+  LEST BREACH BY Seller
+
+-- A HENCE at the nested rule's own clauses chains after it.
+henceChain MEANS
+  PARTY Seller MUST delivery WITHIN 3
+  HENCE PARTY Buyer MUST payment 100 WITHIN 7
+        HENCE PARTY Seller MUST delivery WITHIN 9
+  LEST BREACH BY Seller

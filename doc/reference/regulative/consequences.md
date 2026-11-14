@@ -78,7 +78,110 @@ Which branch is taken, and what is used when it is left out, depends on the moda
 
 For a prohibition the polarity flips: the deadline passing quietly is the good outcome. `HENCE` always names the outcome the rule wants, and `LEST` the one it does not.
 
-A rule written on the same line as its `HENCE` needs parentheses when a `LEST` follows on the next line: `HENCE (PARTY Seller MUST deliver WITHIN 5)`. Without them, that `LEST` is an indentation error. A rule on lines of its own, as above, needs none.
+### Which rule a HENCE or LEST belongs to
+
+A rule has no closing word, so a rule written under another rule's `HENCE` or `LEST` is still open when the next `HENCE` or `LEST` comes.
+The columns of the two rules' clauses decide which rule it belongs to.
+A rule's clauses are its `MUST`, `WITHIN`, `HENCE`, `LEST` and the like, and its clause column is the column of the leftmost of them on a line below its `PARTY`.
+A rule written on one line has its `PARTY`'s column as its clause column.
+**A `HENCE` or `LEST` on a line of its own, written at the column of the outer rule's clauses and not at the nested rule's own, belongs to the outer rule and ends the rule nested inside it.**
+
+```l4
+DECLARE Party IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  deliver
+  pay HAS amount IS A NUMBER
+
+GIVETH A DEONTIC Party Action
+`sale with a late fee` MEANS
+  PARTY Seller
+  MUST deliver
+  WITHIN 3
+  HENCE
+    PARTY Buyer
+    MUST pay 100
+    WITHIN 7
+    LEST
+      PARTY Buyer
+      MUST pay 120
+      WITHIN 14
+  LEST BREACH BY Seller
+```
+
+The last `LEST` lines up with the Seller's `MUST`, `WITHIN` and `HENCE`, so it is the Seller's: a Seller who does not deliver within 3 days is in breach.
+The `LEST` indented under the Buyer's rule lines up with the Buyer's clauses, so it is the Buyer's: a Buyer who has not paid 100 within 7 days owes 120.
+
+The same holds when the inner rule is written on its `HENCE`'s line:
+
+```l4
+DECLARE Party IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  deliver
+  pay HAS amount IS A NUMBER
+
+GIVETH A DEONTIC Party Action
+`sale` MEANS
+  PARTY Seller
+  MUST deliver
+  WITHIN 3
+  HENCE PARTY Buyer MUST pay 100 WITHIN 7
+  LEST BREACH BY Seller
+```
+
+The `LEST` on the last line lines up with the Seller's clauses, so it is the Seller's.
+On one line, though, a later `LEST` belongs to the rule on that line: in `HENCE PARTY Buyer MUST pay 100 WITHIN 7 LEST BREACH BY Buyer`, the `LEST` is the Buyer's.
+
+A rule's clauses can sit further right than its `PARTY`, and then a rule nested inside can be written further left than them:
+
+```l4
+DECLARE Party IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  deliver
+  pay HAS amount IS A NUMBER
+
+GIVETH A DEONTIC Party Action
+`sale with clauses indented` MEANS
+  PARTY Seller
+      MUST deliver
+      WITHIN 3
+      HENCE
+    PARTY Buyer
+    MUST pay 100
+    WITHIN 7
+    LEST BREACH BY Buyer
+      LEST BREACH BY Seller
+```
+
+The first `LEST` lines up with the Buyer's clauses, so it is the Buyer's, although it is left of the Seller's.
+The second lines up with the Seller's clauses, so it is the Seller's.
+
+The whole rule, for a `HENCE` or `LEST` on a line of its own after a nested rule, taken in this order:
+
+1. At the column of the nested rule's own clauses, it is the nested rule's.
+2. Otherwise, at the column of the outer rule's clauses, it is the outer rule's, and the nested rule ends.
+3. Otherwise, if it is right of either rule's clauses, it is the nested rule's, even at a column that lines up with nothing.
+4. Otherwise, left of both, it is the outer rule's.
+
+With rules nested deeper, this is applied one level at a time, from the innermost rule out.
+Rule 1 comes first, so when the nested rule's clauses are at the same column as the outer rule's, a `HENCE` or `LEST` at that column is the nested rule's.
+To give it to the outer rule, put the nested rule in brackets.
+Brackets end a rule outright, as in `HENCE (PARTY Buyer MUST pay 100 WITHIN 7)`, and a rule inside brackets competes only with the rules inside the same brackets.
+
+**What is refused.** A `HENCE` or `LEST` that belongs to a rule by the steps above, when that rule already has one (a second `LEST`, a second `HENCE`, or a `HENCE` after the `LEST`), is refused with an error that names the rule, rather than given to another rule.
+`HENCE` comes before `LEST`.
+
+**What is not placed this way.** Only the clauses of the rule a nested rule is written under count, not those of rules further out.
+In a layout where a rule two levels out has its clauses right of the rule one level out, a `HENCE` or `LEST` that lines up with the rule two levels out can stay with the innermost rule, with no error; brackets settle it.
+A rule's `WITHIN` comes before its `HENCE`.
+One written after a nested rule is read as the nested rule's, whatever its column, and nothing says so.
+If the nested rule already has one, it is an error (`unexpected WITHIN`).
+When rules are combined with `RAND` or `ROR` under a `HENCE` or `LEST`, put each one in brackets, as in [RAND and ROR](#rand-and-ror).
+
+Earlier versions of L4 gave a `HENCE` or `LEST` written after a nested rule to the innermost rule still open that had that slot free, whatever the keyword's column, as long as the word after it sat further right than that rule's `PARTY` ([smucclaw/l4-ide#1068](https://github.com/smucclaw/l4-ide/issues/1068)).
+So a `LEST` written at the outer rule's clauses could become the nested rule's, with no error, and a `HENCE` written there after the outer rule's `LEST` became the nested rule's `HENCE`.
+A contract written that way now reads as its layout shows.
+Some layouts that earlier versions accepted are now refused, by the paragraph above: a second `LEST` or `HENCE`, or a `HENCE` after a `LEST`, written where the column points at a rule that already has one.
+Earlier versions gave such a keyword to another rule, with no error.
 
 ## FULFILLED and BREACH
 
