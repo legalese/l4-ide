@@ -24,6 +24,7 @@ import qualified L4.Print as Print
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo, Environment)
+import L4.TypeCheck.Unify (synonymExpansionFuel)
 import L4.Utils.Ratio
 import qualified LSP.Core.Shake as Shake
 import LSP.Core.Types.Diagnostics (FileDiagnostic (..), prettyDiagnostic)
@@ -491,7 +492,7 @@ stripList _ = Nothing
 -- for a record or an enum is found. A synonym that takes parameters is expanded
 -- when every parameter is given.
 expandSyn :: ModuleInfo -> Type' Resolved -> Type' Resolved
-expandSyn mi = go (16 :: Int)
+expandSyn mi = go synonymExpansionFuel
   where
     go 0 ty = ty
     go n ty@(TyApp _ name args)

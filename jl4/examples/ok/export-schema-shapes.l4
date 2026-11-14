@@ -1,0 +1,28 @@
+-- What `jl4-schema` writes for each builtin type and for the shapes of a declared
+-- type: a record with a MAYBE field, an enum, and a ONE OF whose arms have fields.
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Shape IS ONE OF
+  Circle HAS radius IS A NUMBER
+  Square HAS side IS A NUMBER, label IS A MAYBE STRING
+
+DECLARE Order HAS
+  placed IS A DATETIME
+  note IS A MAYBE STRING
+  colours IS A LIST OF Colour
+
+@export default shows every builtin type and declared shape
+GIVEN n IS A NUMBER
+      s IS A STRING
+      b IS A BOOLEAN
+      d IS A DATE
+      t IS A TIME
+      dt IS A DATETIME
+      m IS A MAYBE NUMBER
+      l IS A LIST OF NUMBER
+      c IS A Colour
+      sh IS A Shape
+      o IS A Order
+GIVETH A NUMBER
+f n s b d t dt m l c sh o MEANS n

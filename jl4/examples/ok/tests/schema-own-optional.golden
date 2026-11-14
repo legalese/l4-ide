@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+schema-own-optional.l4:20:1-45:
+  RIGHT OF (Holder OF "Absent", 1)
+schema-own-optional.l4:21:1-26:
+  Missing required field 'o' in JSON object

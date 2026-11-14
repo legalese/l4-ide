@@ -85,7 +85,9 @@ import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.Exceptions
-import L4.EvaluateLazy.Trace (EvalTraceAction (..))
+import L4.EvaluateLazy.Trace (EvalTrace, EvalTraceAction (..))
+import L4.TypeSynonym (substituteTypeParams)
+import L4.TypeCheck.Unify (synonymExpansionFuel)
 import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
 import L4.Utils.Ratio
@@ -160,6 +162,8 @@ data EvalState =
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
     , answerInJust :: !Bool        -- see 'L4.EvaluateLazy.EvalConfig'
+    , maxFrameDepth :: !Int        -- see 'maximumFrameDepth'
+    , tracePostprocessor :: [EvalTraceAction] -> EvalTrace  -- see 'L4.EvaluateLazy.EvalConfig'
     , reofferedEvents :: !(IORef (Map Address Reoffered))
       -- ^ the EVENT copies an expiring obligation has re-offered to its
       -- HENCE/LEST continuation, each keyed by its store address and
@@ -283,12 +287,18 @@ refuseWith = raiseException . RefusalException
 
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
-  traceEval Push
   stackRef <- asks (.stack)
+  limit <- asks (.maxFrameDepth)
   s <- liftIO (readIORef stackRef)
-  if s.size >= maximumFrameDepth
-    then userException StackOverflow
-    else liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
+  if s.size >= limit
+    then userException (StackOverflow limit)
+    else do
+      -- Emit the trace `Push` only once the frame is actually pushed. If we
+      -- recorded it before the overflow check, a StackOverflow would leave a
+      -- dangling Push (M Pushes / M+1 Pops) that later unbalances trace
+      -- post-processing and crashes it.
+      traceEval Push
+      liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
 
 -- | Pops a stack frame (if any are left) and calls the continuation on it.
 withPoppedFrame :: (Maybe Frame -> Eval a) -> Eval a
@@ -1587,7 +1597,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
 -- string for a @Year@ is accepted as it stands instead of refused as it is for
 -- a @NUMBER@.
 expandTypeSynonyms :: Type' Resolved -> Machine (Type' Resolved)
-expandTypeSynonyms = go (16 :: Int)
+expandTypeSynonyms = go synonymExpansionFuel
   where
     go 0 ty = pure ty
     go n ty@(TyApp _ tyRef args) = do
@@ -1598,18 +1608,6 @@ expandTypeSynonyms = go (16 :: Int)
               go (n - 1) (substituteTypeParams (Map.fromList (zip (map getUnique params) args)) body)
         _ -> pure ty
     go _ ty = pure ty
-
-substituteTypeParams :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
-substituteTypeParams sub = \ case
-  TyApp ann r []
-    | Just t <- Map.lookup (getUnique r) sub -> t
-    | otherwise -> TyApp ann r []
-  TyApp ann r ts -> TyApp ann r (map (substituteTypeParams sub) ts)
-  Fun ann args res ->
-    Fun ann [ MkOptionallyNamedType a n (substituteTypeParams sub t) | MkOptionallyNamedType a n t <- args ]
-      (substituteTypeParams sub res)
-  Forall ann vs t -> Forall ann vs (substituteTypeParams sub t)
-  other -> other
 
 -- | Check if a type is MAYBE α (used for optional record field handling)
 isMaybeFieldTy :: Type' Resolved -> Bool
@@ -2052,37 +2050,56 @@ runBuiltin es op mTy = do
       val :: Rational <- expectNumber es
       let valDouble :: Double
           valDouble = fromRational val
+          -- The functions computed on a double. An answer that is not finite
+          -- would reach 'toRational' as a meaningless 309-digit number, so it
+          -- raises, naming the input when the input is what did not fit. A
+          -- finite answer is returned, even for an input past the range: ATAN
+          -- of 10^400 is pi/2 to the last digit.
+          viaDouble :: Text -> (Double -> Double) -> Machine Config
+          viaDouble name f
+            | isNaN r || isInfinite r =
+                userException $ UserError (name <> " cannot compute this: " <> why)
+            | otherwise = continueBackward $ ValNumber (toRational r)
+            where
+              r = f valDouble
+              why
+                | isInfinite valDouble = "the number is past the range of numbers it handles (about 1.8E308 either side of 0)"
+                | valDouble == 0 && val /= 0 = "the number is too close to 0 for the numbers it handles (about 4.9E-324)"
+                | otherwise = "the result is too large (it handles results up to about 1.8E308)"
       case op of
         UnaryLn ->
           if val <= 0
             then userException $ UserError "LN expects input greater than 0"
-            else continueBackward $ ValNumber (toRational (log valDouble))
+            else viaDouble "LN" log
         UnaryLog10 ->
           if val <= 0
             then userException $ UserError "LOG10 expects input greater than 0"
-            else continueBackward $ ValNumber (toRational (logBase 10 valDouble))
+            else viaDouble "LOG10" (logBase 10)
         UnarySin ->
-          continueBackward $ ValNumber (toRational (sin valDouble))
+          viaDouble "SIN" sin
         UnaryCos ->
-          continueBackward $ ValNumber (toRational (cos valDouble))
+          viaDouble "COS" cos
         UnaryTan ->
-          continueBackward $ ValNumber (toRational (tan valDouble))
+          viaDouble "TAN" tan
         UnaryAsin ->
           if val < (-1) || val > 1
             then userException $ UserError "ASIN expects input between -1 and 1"
-            else continueBackward $ ValNumber (toRational (asin valDouble))
+            else viaDouble "ASIN" asin
         UnaryAcos ->
           if val < (-1) || val > 1
             then userException $ UserError "ACOS expects input between -1 and 1"
-            else continueBackward $ ValNumber (toRational (acos valDouble))
+            else viaDouble "ACOS" acos
         UnaryAtan ->
-          continueBackward $ ValNumber (toRational (atan valDouble))
+          viaDouble "ATAN" atan
         UnaryIsInteger -> continueBackward $ valBool $ isJust $ isInteger val
         UnaryRound -> continueBackward $ valInt $ round val
         UnaryCeiling -> continueBackward $ valInt $ ceiling val
         UnaryFloor -> continueBackward $ valInt $ floor val
         UnaryPercent -> continueBackward $ ValNumber (val / 100)
-        UnarySqrt -> continueBackward $ ValNumber (toRational (sqrt valDouble))
+        UnarySqrt ->
+          if val < 0
+            then userException $ UserError "SQRT expects input greater than or equal to 0"
+            else viaDouble "SQRT" sqrt
   where
     valInt :: Integer -> WHNF
     valInt = ValNumber . toRational
@@ -2152,7 +2169,32 @@ runBinOp BinOpModulo    (ValNumber num1) (ValNumber num2)      = do
   if n2 /= 0
     then continueBackward $ ValNumber (toRational $ n1 `mod` n2)
     else userException (DivisionByZero BinOpModulo)
-runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)   = continueBackward $ ValNumber (toRational ((fromRational base :: Double) ** (fromRational exp_ :: Double)))
+runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)
+  -- Checked on the exact values: as doubles, a huge negative base is -Infinity,
+  -- and a power that is nearly whole rounds to whole, and then no NaN says so.
+  | base == 0 && exp_ < 0 =
+      userException $ UserError "EXPONENT of 0 to a negative power has no result"
+  | base < 0 && denominator exp_ /= 1 =
+      userException $ UserError "EXPONENT does not compute a negative number to a fractional power"
+  | otherwise =
+      let base' = fromRational base :: Double
+          exp' = fromRational exp_ :: Double
+          result = base' ** exp'
+      -- Only an answer that is not finite raises; a finite one is returned,
+      -- even for an input past the range: 10^400 to the power 0 is 1.
+      in if isNaN result || isInfinite result
+           then userException $ UserError (exponentNotFinite base' exp')
+           else continueBackward $ ValNumber (toRational result)
+  where
+    -- A result that is not finite is not always too large: an input that is
+    -- past the range of a double is already infinite, or 0, before the power is
+    -- taken, and then the true result may well fit. Only when every input fits
+    -- is the result said to be too large.
+    exponentNotFinite base' exp'
+      | isInfinite base' = "EXPONENT cannot compute this: the base is past the range of numbers it handles (about 1.8E308 either side of 0)"
+      | base' == 0 && base /= 0 = "EXPONENT cannot compute this: the base is too close to 0 for the numbers it handles (about 4.9E-324)"
+      | isInfinite exp' = "EXPONENT cannot compute this: the power is past the range of numbers it handles (about 1.8E308 either side of 0)"
+      | otherwise = "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
 runBinOp BinOpTrunc (ValNumber value) (ValNumber digits) =
   let digitsInt = round digits :: Integer
       scale k = (10 :: Rational) ^^ k
@@ -2966,7 +3008,13 @@ secondsPerDay = 86400
 
 serialToUTCTime :: Rational -> Time.UTCTime
 serialToUTCTime serial =
-  let (wholeDays, fraction) = properFraction serial :: (Integer, Rational)
+  -- `floor` (not `properFraction`/`truncate`) so the fractional part is always
+  -- in [0,1): `properFraction` truncates toward zero, which for a negative
+  -- serial yields a negative `fraction`, hence a negative DiffTime and an
+  -- invalid UTCTime. `floor` == `truncate` for all non-negative serials, so
+  -- this is behaviour-preserving on every real (all non-negative) input.
+  let wholeDays = floor serial :: Integer
+      fraction  = serial - fromInteger wholeDays
       day = Time.addDays (wholeDays + 1) l4EpochDay
       seconds :: Pico
       seconds = realToFrac (fraction * secondsPerDay)

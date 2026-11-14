@@ -22,6 +22,7 @@ import Options.Applicative
 import System.Directory (createDirectoryIfMissing)
 import System.Exit (ExitCode(..), exitFailure, exitSuccess)
 import System.FilePath (takeBaseName, (</>))
+import System.Environment (lookupEnv)
 import System.IO (hPutStrLn, stderr, withBinaryFile, IOMode(WriteMode))
 import System.Process (CreateProcess(..), StdStream(..), createProcess, proc, waitForProcess)
 
@@ -29,7 +30,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalConfig, readFixedNowEnv, resolveEvalConfig)
+import L4.EvaluateLazy (EvalDirectiveResult(..), EvalConfig(..), readFixedNowEnv, resolveEvalConfig, traceUnavailable)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz2
 
 import L4.Cli.Common
@@ -115,7 +116,7 @@ traceCmd opts = do
             case result.trace of
               Just tr -> TIO.putStrLn (GraphViz2.traceToGraphViz gvOpts mModule tr)
               Nothing -> pure ()
-          exitSuccess
+          finish evalResults
 
         -- Auto-split into a directory for any format.
         (Just outDir, fmt) -> do
@@ -142,10 +143,18 @@ traceCmd opts = do
                       then hPutStrLn stderr ("Generated: " <> dotFile <> " and " <> svgFile)
                       else exitFailure
               Nothing -> pure ()
-          exitSuccess
+          finish evalResults
 
         -- (Nothing, PngFormat | SvgFormat) was rejected up top already.
         (Nothing, _) -> exitFailure
+  where
+    -- A trace that could not be built is a graph of one node. Exit 0 would pass
+    -- it off as the trace of something trivial.
+    finish evalResults
+      | any (maybe False traceUnavailable . (.trace)) evalResults = do
+          hPutStrLn stderr "Error: a trace could not be built (internal error during trace post-processing); its graph has one node saying so"
+          exitFailure
+      | otherwise = exitSuccess
 
 -- | Render a @.dot@ file to @outFile@ via Graphviz's @dot@, capturing its
 -- stdout into the file directly.
@@ -179,11 +188,21 @@ renderWithDot formatFlag dotFile outFile = do
     dotArg = case dotFile of { '-' : _ -> "." </> dotFile; _ -> dotFile }
 
 -- `l4 trace` uses its own EvalConfig with tracing switched on.
+--
+-- For l4-cli-test only: with @JL4_TEST_FAIL_TRACE_POSTPROCESS@ set to exactly
+-- @1@, every trace's post-processing fails, so the test can check that a trace
+-- that cannot be built exits 1. No known input makes it fail any more, and the
+-- exit is decided here, in the binary. Only @l4 trace@ reads the variable; the
+-- language server and the service do not.
 makeTraceEvalConfig :: TraceOptions -> IO EvalConfig
 makeTraceEvalConfig opts = do
   envFixed <- readFixedNowEnv
+  failTrace <- lookupEnv "JL4_TEST_FAIL_TRACE_POSTPROCESS"
   let tp = makeTracePolicyForTrace opts.traceFormat opts.traceOutputDir
-  resolveEvalConfig (opts.traceFixedNow.unFixedNow <|> envFixed) tp
+  cfg <- resolveEvalConfig (opts.traceFixedNow.unFixedNow <|> envFixed) tp
+  pure $ if failTrace == Just "1"
+    then cfg { tracePostprocessor = const (error "postprocessTrace: failure injected by JL4_TEST_FAIL_TRACE_POSTPROCESS=1") }
+    else cfg
 
 -- Silence `unused-top-binds` nag for Text.pack re-export via Base.Text.
 _unusedText :: ()

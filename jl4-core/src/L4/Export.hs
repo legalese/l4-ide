@@ -7,6 +7,7 @@ module L4.Export (
   TypeDescMap,
   parseDescText,
   getExportedFunctions,
+  expandRequired,
   getDefaultFunction,
   enrichReturnTypes,
   buildTypeDescMap,
@@ -33,6 +34,7 @@ import qualified Data.Set as Set
 import L4.Annotation (getAnno, rangeOf)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
+import L4.TypeSynonym (declaresFromModule, expandSynonyms)
 import L4.TypeCheck.Environment (eventUnique, maybeUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
 import Optics
@@ -115,7 +117,12 @@ getExportedFunctions :: Module Resolved -> [ExportedFunction]
 getExportedFunctions mod'@(MkModule _ _ section) =
   let typeDescMap = buildTypeDescMap mod'
       assumes = assumesFromModule mod'
-      explicitExports = collectSection typeDescMap assumes section
+      declares = declaresFromModule mod'
+      -- An input typed with a synonym for MAYBE may be left out, as the
+      -- service's wrapper and the decoder treat it ('maybeSynonymHeads' in
+      -- jl4-service), so it is not required.
+      expanded ef = ef { exportParams = map (expandRequired declares) ef.exportParams }
+      explicitExports = map expanded (collectSection typeDescMap assumes section)
   in case explicitExports of
     -- No explicit exports: return nothing (only explicit @export annotations count)
     [] -> []
@@ -350,6 +357,16 @@ assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType) =
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
       }
+
+-- | Decide whether an input is required from its type with synonyms expanded
+-- from these declarations. 'getExportedFunctions' has the module's own; a
+-- caller that has the imported modules' too, as jl4-service does, applies it
+-- again with all of them, so that an input and a record field typed with the
+-- same imported synonym are decided alike.
+expandRequired :: Map.Map Text (Declare Resolved) -> ExportedParam -> ExportedParam
+expandRequired declares p = case p.paramType of
+  Just ty -> p { paramRequired = not (isMaybeType (Just (expandSynonyms declares ty))) }
+  Nothing -> p
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool

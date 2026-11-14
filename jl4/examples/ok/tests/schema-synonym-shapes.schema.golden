@@ -1,0 +1,67 @@
+{
+    "$defs": {
+        "Holder": {
+            "properties": {
+                "n": {
+                    "type": "number"
+                },
+                "o": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "p": {
+                    "$ref": "#/$defs/OptNum"
+                },
+                "xs": {
+                    "items": {
+                        "type": "number"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "xs",
+                "n"
+            ],
+            "type": "object"
+        },
+        "OptNum": {
+            "anyOf": [
+                {
+                    "type": "number"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "reads a holder",
+    "properties": {
+        "extra": {
+            "anyOf": [
+                {
+                    "type": "number"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "h": {
+            "$ref": "#/$defs/Holder"
+        }
+    },
+    "required": [
+        "h"
+    ],
+    "title": "total",
+    "type": "object"
+}

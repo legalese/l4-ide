@@ -532,6 +532,10 @@ langEnThenHeFixture = fixtureDir </> "lang-en-then-he.l4"
 langTagCaseFixture :: FilePath
 langTagCaseFixture = fixtureDir </> "lang-tag-case.l4"
 
+traceOverflowFixture, traceLoopFixture :: FilePath
+traceOverflowFixture = fixtureDir </> "trace-overflow.l4"
+traceLoopFixture     = fixtureDir </> "trace-loop.l4"
+
 evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
@@ -742,7 +746,7 @@ main = do
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
        , breachTraceFixture, breachInputsFixture, batchRuleOperandsFixture
        , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson, batchEscapeCellsCsv
-       , evalTraceFixture, refTrailingFixture
+       , evalTraceFixture, traceOverflowFixture, traceLoopFixture, refTrailingFixture
        , langEnHintFixture, langEnThenHeFixture, langTagCaseFixture
        , bilingualFixture, bilingualFramesFixture
        , batchClauses, batchClausesCapture, batchClausesCatchAll, batchClausesDitto
@@ -2786,6 +2790,58 @@ spec bin = do
         inRepl (whereFile n) whereQueries whereWant
 
   describe "l4 trace" $ do
+    -- Both of these raise while forcing an address, before a frame for it is
+    -- pushed. Post-processing used to fail on that, and the fallback gave a graph
+    -- of one empty node with exit 0.
+    -- A limit of 300 frames instead of a million, which took 12 s and 5.6 GB
+    -- to trace. Which frame the limit falls on depends on the limit: at 300, as
+    -- at a million, it is the update frame of `count up`, and the test fails
+    -- without the split's fix for it; at 301 it is another frame, and it passes.
+    it "traces a real stack overflow at an update frame, naming the call" $ do
+      parent <- getEnvironment
+      Output code sout _ <- runL4WithEnv (Just (("JL4_MAX_FRAME_DEPTH", "300") : filter ((/= "JL4_MAX_FRAME_DEPTH") . fst) parent)) bin ["trace", traceOverflowFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("count up` OF 1" `isInfixOf`)
+      sout `shouldSatisfy` ("<error>" `isInfixOf`)
+      sout `shouldNotSatisfy` ("trace unavailable" `isInfixOf`)
+
+    it "traces a definition that needs itself, naming it" $ do
+      Output code sout _ <- runL4 bin ["trace", traceLoopFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("label=\"x\\n" `isInfixOf`)
+      sout `shouldSatisfy` ("<error>" `isInfixOf`)
+
+    -- No known input makes a trace fail to build, so the test seam makes it
+    -- fail: `l4 trace`, and nothing else, reads JL4_TEST_FAIL_TRACE_POSTPROCESS,
+    -- and only the value 1. A graph of one node must not pass for a trace with
+    -- exit 0.
+    it "exits 1 with its error line when a trace cannot be built" $ do
+      parent <- getEnvironment
+      Output code sout serr <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", "1") : parent)) bin ["trace", evalTraceFixture]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("Error: a trace could not be built" `isInfixOf`)
+      sout `shouldSatisfy` ("trace unavailable" `isInfixOf`)
+
+    -- The seam takes exactly "1": any other value is no seam.
+    it "builds traces as usual when the test seam is set to anything but 1" $ do
+      parent <- getEnvironment
+      forM_ ["0", "", "true"] $ \v -> do
+        Output code sout _ <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", v) : parent)) bin ["trace", evalTraceFixture]
+        code `shouldBe` ExitSuccess
+        sout `shouldNotSatisfy` ("trace unavailable" `isInfixOf`)
+
+    it "exits 1 with its error line when a trace written to --output-dir cannot be built" $ do
+      parent <- getEnvironment
+      tmp <- getTemporaryDirectory
+      let outDir = tmp </> "l4-trace-unavailable-out"
+      removePathForcibly outDir
+      Output code _ serr <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", "1") : parent)) bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
+      wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
+      removePathForcibly outDir
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("Error: a trace could not be built" `isInfixOf`)
+      wrote `shouldBe` True
+
     it "refuses --format png without --output-dir" $ do
       Output code _ serr <- runL4 bin ["trace", cleanFixture, "--format", "png"]
       code `shouldSatisfy` (/= ExitSuccess)

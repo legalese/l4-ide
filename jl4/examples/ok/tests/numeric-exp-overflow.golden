@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+numeric-exp-overflow.l4:10:1-62:
+  TRUE
+numeric-exp-overflow.l4:11:1-14:
+  EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)

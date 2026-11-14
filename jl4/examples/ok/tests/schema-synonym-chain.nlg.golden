@@ -1,0 +1,3 @@
+`decode` with {"s": 2, "t": 3, "n": 1}
+`decode` with {"s": null, "t": null, "n": 1}
+`decode` with {"n": 1}
