@@ -488,6 +488,28 @@ DECIDE ...
 
 **Rule:** The innermost (most specific) TYPICALLY wins. Here, the GIVEN's TYPICALLY 21 overrides the DECLARE's TYPICALLY 30 for this function.
 
+### 6. Usual values as odds in the query planner (proposed, not built)
+
+Moved here from the user pages under `doc/reference/query-planning/` (review of #809), because it is design, not behaviour.
+
+What is built: the planner ranks the inputs a decision still needs by `[-determinableCount, level]` (`rankedVars` in `jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs`), that is, first the inputs one of whose answers settles the outcome, ties broken by the input's level in the diagram.
+That treats every input as equally likely to be `TRUE` or `FALSE`.
+Checked 2026-11-15 with `grep -rli typically` over `jl4-query-plan/`, `ts-shared/boolean-analysis/`, `jl4-service/src/Backend/DecisionQueryPlan.hs` and `jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs`: no match, so nothing in the planner reads a default.
+
+The proposal is an information-gain policy.
+Weighted model counting over the decision's ROBDD gives the probability that the outcome is `TRUE`, and each candidate input is scored by the uncertainty its answer is expected to remove:
+
+```
+gain(X) = H(before) − [ w_X · H(after X = TRUE) + (1 − w_X) · H(after X = FALSE) ]
+```
+
+where `H` is Boolean entropy and `w_X` is the probability that input `X` is `TRUE`.
+The weights would come from TYPICALLY: `IS A BOOLEAN TYPICALLY TRUE` would supply a `w_X` close to 1.
+A strongly presumed input then carries little expected information and sinks to the end of the order, which gives "do not ask; let the user override the presumption" without a special case.
+
+The ROBDD exists twice, kept in step by hand and with no external BDD library: `ts-shared/boolean-analysis/src/robdd.ts` (ranked by `decision-query.ts`) and `jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs` (wrapped by `QueryPlan.hs`, which `jl4-service` and the language server call).
+Model counting, which the policy needs, is in neither today.
+
 ## Migration Path
 
 ### Backward Compatibility

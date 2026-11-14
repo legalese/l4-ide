@@ -85,8 +85,7 @@ How an L4 file is written, on one page:
 
 Turning a Boolean decision into an interactive question-and-answer session:
 
-- **[Query Planner](query-planning/README.md):** determinability, question ordering, and the proposal to order questions by information gain with usual values as odds
-- **[Binary Decision Diagrams (ROBDD)](query-planning/robdd.md):** the canonical Boolean-function substrate the planner is built on
+- **[Query Planner](query-planning/README.md):** whether the outcome is settled yet, and which input to ask next
 
 ## Library
 
