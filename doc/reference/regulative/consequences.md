@@ -147,10 +147,9 @@ GIVETH A DEONTIC Party Action
 
 `EXACTLY` can also come before the whole action: `MUST EXACTLY payment price`.
 
-When the action has several arguments, `EXACTLY` on one of them comes with two limits:
-
-- Put it in parentheses. `EXACTLY` takes everything to its right, so `MUST transfer EXACTLY 100 recipient` reads as one expression and does not type-check; write `MUST transfer (EXACTLY 100) recipient`. An action with one argument needs no parentheses: `MUST pay EXACTLY 100`.
-- Put it before any name the action binds. `MUST transfer amount (EXACTLY Bob)` stops with an internal error when the rule is evaluated, saying `Bob` is not in scope; `MUST transfer (EXACTLY 100) recipient`, which checks the amount and binds the recipient, works.
+When the action has several arguments, put an `EXACTLY` on one of them in parentheses.
+`EXACTLY` takes everything to its right, so `MUST transfer EXACTLY 100 recipient` reads as one expression and does not type-check; write `MUST transfer (EXACTLY 100) recipient`.
+An action with one argument needs no parentheses: `MUST pay EXACTLY 100`.
 
 ## RAND and ROR
 
