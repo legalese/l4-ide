@@ -80,7 +80,7 @@ import L4.EvaluateLazy
   , prettyRefusal
   )
 import L4.Lexer (showStringLit)
-import L4.Print (prettyLayout)
+import L4.Print (prettyLayout, prettyLayoutWithNlg)
 import L4.Syntax
   ( AppForm(..), Declare(..), Module(..), Resolved, Section(..), TopDecl(Declare, Section)
   , Type'(..), TypeDecl(..), Unique, getUnique
@@ -219,7 +219,8 @@ batchCmd opts = do
       TIO.putStrLn $ "Error: " <> err
       exitFailure
   let filteredModule = filterIdeDirectives tcRes.module'
-      filteredSource = prettyLayout filteredModule
+      -- with its @nlg annotations, since this text is checked again
+      filteredSource = prettyLayoutWithNlg filteredModule
       params         = extractParamsFromExport exportFn
       schema         = exportFn.exportParams
       -- what each input declares, for reading a case against it; a synonym

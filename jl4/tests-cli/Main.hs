@@ -4406,19 +4406,25 @@ spec bin = do
         `shouldReturn` Number 2
 
   -- `l4 batch` prints the checked module back and checks it again beside a
-  -- generated record with a field for each input. An annotation that names an
-  -- input (`%a%`) would then have two candidates and no expected type to choose
-  -- between them, and `main`'s checker refuses that ("multiple definitions").
-  -- `prettyLayout` writes no annotation back, so the row runs; this pins it.
+  -- generated record with a field for each input. It prints through
+  -- `prettyLayoutWithNlg`, which writes the annotation back, `%a%` included,
+  -- so `%a%` could have two candidates, the input and the field; measured, the
+  -- row still runs, and this pins it.
   describe "l4 batch runs an export whose annotation names its input" $
     it "answers instead of refusing the printed module" $
       batchAnswer bin (fixtureDir </> "batch-nlg-input-slot.l4") (fixtureDir </> "batch-nlg-input-slot.json") "is large"
         `shouldReturn` Bool True
 
+  describe "l4 batch runs an export whose wording runs over two lines" $
+    it "answers instead of failing to parse the printed module" $
+      batchAnswer bin (fixtureDir </> "batch-nlg-two-lines.l4") (fixtureDir </> "batch-nlg-two-lines.json") "the f"
+        `shouldReturn` Number 6
+
   -- An `@nlg` annotation is wording for the reader of a rule, not part of what
   -- the rule evaluates to. `prettyLayout` prints evaluation results, and it
-  -- writes no annotation back; a printer that did would put `[a red colour]`
-  -- inside `Shape OF Red [a red colour], 3`.
+  -- writes no annotation back (only `prettyLayoutWithNlg`, which `l4 batch`
+  -- re-emits a module through, does); a printer that did would put
+  -- `[a red colour]` inside `Shape OF Red [a red colour], 3`.
   describe "l4 run prints a value without its annotations" $ do
     let runOut = do
           Output code sout0 _ <- runL4 bin ["run", fixtureDir </> "annotated-values.l4"]
@@ -4436,6 +4442,17 @@ spec bin = do
       sout `shouldSatisfy` ("MUST `pay the price`" `isInfixOf`)
       sout `shouldNotSatisfy` ("the payer" `isInfixOf`)
       sout `shouldNotSatisfy` ("paying" `isInfixOf`)
+
+  -- A state graph's edge is a label, not source, so it is drawn without the
+  -- rule's annotations too: when every `prettyLayout` wrote them back, the
+  -- edge read "Alice [the payer] MUST pay the price [30]".
+  describe "l4 state-graph labels an edge without its annotations" $
+    it "leaves an annotation off the party of an obligation" $ do
+      Output code sout0 _ <- runL4 bin ["state-graph", fixtureDir </> "annotated-values.l4"]
+      code `shouldBe` ExitSuccess
+      let sout = filter (/= '\r') sout0
+      sout `shouldSatisfy` ("Alice MUST pay the price" `isInfixOf`)
+      sout `shouldNotSatisfy` ("the payer" `isInfixOf`)
 
   -- Regression test for smucclaw/l4-ide#906: a diamond import over the
   -- embedded-library fallback used to starve the second sibling of the shared
