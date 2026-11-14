@@ -252,15 +252,15 @@ main = do
     , test "a MAYBE of a DEONTIC result is refused, having no contract path" $
         testExportRefused
           ["GIVETH A MAYBE (DEONTIC Party Act)", "`refused` MEANS NOTHING"]
-          "its result is a DEONTIC"
+          "its result is a MAYBE whose value is a DEONTIC"
     , test "a LIST of a DEONTIC result is refused, having no contract path" $
         testExportRefused
           ["GIVETH A LIST OF (DEONTIC Party Act)", "`refused` MEANS LIST (PARTY alice MUST ping WITHIN 3)"]
-          "its result is a DEONTIC"
+          "its result is a list whose elements are each a DEONTIC"
     , test "an EITHER with a DEONTIC result is refused, having no contract path" $
         testExportRefused
           ["GIVETH AN EITHER NUMBER (DEONTIC Party Act)", "`refused` MEANS LEFT 1"]
-          "its result is a DEONTIC"
+          "its result is an EITHER one of whose sides is a DEONTIC"
     , test "a synonym for a DEONTIC result is refused, having no contract path" $
         testExportRefused
           ["GIVETH A `Duty`", "`refused` MEANS PARTY alice MUST ping WITHIN 3"]

@@ -1006,6 +1006,7 @@ functionInputs errs = [e | e@(ExportUnsendable _ _ (ExportInput _) why) <- errs,
     UFunction -> True
     UInField _ _ why -> holdsFunction why
     UInArgument _ why -> holdsFunction why
+    UInBuiltin _ why -> holdsFunction why
     _ -> False
 
 extractParamsFromExport :: ExportedFunction -> [(Text, Maybe (Type' Resolved))]

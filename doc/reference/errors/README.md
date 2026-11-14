@@ -1076,8 +1076,11 @@ It does not work yet for these, so an `@export` of a rule that takes or returns 
 | a result with no `GIVETH`, whose type L4 cannot work out | `of a type that L4 could not work out from the rule`   |
 | any other built-in type that has no JSON form yet        | ``of the type `...` ``                                 |
 | a record with a field of one of those types              | ``of a record type `...` whose field `...` is ...``    |
+| a `LIST OF` one of those types                           | `a list whose elements are each ...`                   |
+| a `MAYBE` of one of those types                          | `a MAYBE whose value is ...`                           |
+| an `EITHER` with one of those types on one side          | `an EITHER one of whose sides is ...`                  |
 
-The same goes for an `EVENT` or a function inside a `LIST OF` or a `MAYBE OF`, or named through a type that you declared as another name for it.
+The same goes for one of those types named through a type that you declared as another name for it.
 A type that you declare to take a type (`DECLARE Box a HAS ...`) has no JSON form when what it is given has none, whether or not it uses it: `Box OF (FUNCTION FROM NUMBER TO NUMBER)` is refused, and the error says ``of the type `Box`, given a function``.
 A rule that builds or reads an `EVENT` inside its body, and does not name one in its inputs or its result, is published as usual.
 

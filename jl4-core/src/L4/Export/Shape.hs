@@ -42,6 +42,7 @@ module L4.Export.Shape (
   JsonField (..),
   ShapeName (..),
   Unsendable (..),
+  Holder (..),
   isUnresolved,
   ShapeEnv (..),
   moduleDeclares,
@@ -135,12 +136,19 @@ data Unsendable
     UInField Text Text Unsendable
   | -- | The type that takes a type, and why what it was given has no shape.
     UInArgument Text Unsendable
+  | -- | The built-in type that holds it, and why what it holds has no shape.
+    UInBuiltin Holder Unsendable
   | -- | A result L4 could not work out a type for, from a rule with no GIVETH.
     UNotWorkedOut
   | -- | A type whose name did not resolve, or that was given the wrong number of
     -- arguments, by name. The cause has its own error (of the type check, here or
     -- in an import), so this one is not reported: see 'isUnresolved'.
     UUnresolved Text
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | A built-in type that holds others.
+data Holder = InList | InMaybe | InEither
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
@@ -267,9 +275,9 @@ firstUnsendable env ty =
       | otherwise -> case typeHead env name args of
           HasShape _ -> pure ()
           HasNoShape why -> throwError why
-          ArrayOf a -> walk reading a
-          OptionalOf a -> walk reading a
-          EitherOf a b -> walk reading a *> walk reading b
+          ArrayOf a -> walk reading a `catchError` (throwError . UInBuiltin InList)
+          OptionalOf a -> walk reading a `catchError` (throwError . UInBuiltin InMaybe)
+          EitherOf a b -> (walk reading a *> walk reading b) `catchError` (throwError . UInBuiltin InEither)
           Declared typeName sub body _ -> do
             declaration (getUnique name) typeName (map fst sub) body
             for_ sub \(_, arg) ->
@@ -361,6 +369,7 @@ isUnresolved = \case
   UUnresolved _ -> True
   UInField _ _ why -> isUnresolved why
   UInArgument _ why -> isUnresolved why
+  UInBuiltin _ why -> isUnresolved why
   _ -> False
 
 -- | What is not supported, in a few words, for the error to say "its input
@@ -375,6 +384,9 @@ unsendableWhat = \case
   UUnknownType t -> "of the type `" <> t <> "`"
   UInField r f why -> "of a record type `" <> r <> "` whose field `" <> f <> "` is " <> unsendableWhat why
   UInArgument t why -> "of the type `" <> t <> "`, given " <> dropOf (unsendableWhat why)
+  UInBuiltin InList why -> "a list whose elements are each " <> unsendableWhat why
+  UInBuiltin InMaybe why -> "a MAYBE whose value is " <> unsendableWhat why
+  UInBuiltin InEither why -> "an EITHER one of whose sides is " <> unsendableWhat why
   UNotWorkedOut -> "of a type that L4 could not work out from the rule"
   UUnresolved t -> "of the type `" <> t <> "`, which has an error of its own"
  where
@@ -391,6 +403,7 @@ unsendableHint = \case
   UUnknownType _ -> "Use a NUMBER, BOOLEAN, STRING, DATE, TIME, DATETIME, a LIST or MAYBE of those, or a record or enumeration of them."
   UInField _ _ why -> unsendableHint why
   UInArgument _ why -> unsendableHint why
+  UInBuiltin _ why -> unsendableHint why
   UNotWorkedOut -> "Write its type in the GIVEN and GIVETH."
   UUnresolved _ -> "Fix the error about that type."
  where

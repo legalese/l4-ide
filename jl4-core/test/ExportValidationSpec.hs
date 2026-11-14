@@ -250,7 +250,7 @@ spec = do
             , "GIVETH A BOOLEAN"
             , "DECIDE `fn_maybe_test` IF TRUE"
             ]
-      problems src `shouldBe` Right [(Just 3, "fn_maybe_test", Just "cb", "a function")]
+      problems src `shouldBe` Right [(Just 3, "fn_maybe_test", Just "cb", "a MAYBE whose value is a function")]
 
     it "refuses a function named through a type synonym" $ do
       let src = Text.unlines
@@ -326,8 +326,8 @@ spec = do
               , "  CONSIDER e"
               , "  WHEN EVENT p a n THEN p"
               ]
-        problems listed `shouldBe` Right [(Just 4, "how many", Just "es", "an EVENT")]
-        problems maybed `shouldBe` Right [(Just 6, "maybe time", Just "m", "an EVENT")]
+        problems listed `shouldBe` Right [(Just 4, "how many", Just "es", "a list whose elements are each an EVENT")]
+        problems maybed `shouldBe` Right [(Just 6, "maybe time", Just "m", "a MAYBE whose value is an EVENT")]
         problems synonym `shouldBe` Right [(Just 6, "who acted", Just "e", "an EVENT")]
         problems assumed `shouldBe` Right [(Just 6, "who acted", Just "e", "an EVENT")]
 
@@ -474,7 +474,7 @@ spec = do
               , "GIVETH A BOOLEAN"
               , "pick MEANS TRUE"
               ]
-        problems src `shouldBe` Right [(Just 1, "pick", Just "e", "a function")]
+        problems src `shouldBe` Right [(Just 1, "pick", Just "e", "an EITHER one of whose sides is a function")]
 
       it "warns about a GIVEN with no written type, and does not refuse it" $ do
         let src = Text.unlines
@@ -673,7 +673,7 @@ spec = do
             , "`holds` MEANS 1"
             ]
       problems src `shouldBe` Right
-        [(Just 5, "holds", Just "x", "of a record type `Node` whose field `next` is of the type `Node`, given a function")]
+        [(Just 5, "holds", Just "x", "of a record type `Node` whose field `next` is a MAYBE whose value is of the type `Node`, given a function")]
 
     it "looks through a synonym that takes a type" $ do
       let src = Text.unlines
@@ -743,7 +743,7 @@ spec = do
             ]
       problems src `shouldBe` Right
         [ (Just 3, "count", Just "a", "a type, so the rule is generic")
-        , (Just 3, "count", Just "xs", "of the type variable `a`, so the rule is generic")
+        , (Just 3, "count", Just "xs", "a list whose elements are each of the type variable `a`, so the rule is generic")
         , (Just 3, "count", Just "y", "of the type `Box`, given the type variable `a`, so the rule is generic")
         ]
 
@@ -789,7 +789,7 @@ spec = do
             , "`empty` MEANS EMPTY"
             ]
       problems src `shouldBe` Right
-        [(Just 1, "empty", Nothing, "of a type that L4 could not work out from the rule")]
+        [(Just 1, "empty", Nothing, "a list whose elements are each of a type that L4 could not work out from the rule")]
 
     it "does not call a rule generic for a record field that is a type" $ do
       let src = Text.unlines

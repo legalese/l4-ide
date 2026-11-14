@@ -496,6 +496,7 @@ exportErrorCode = \case
   unsendableCode site = \case
     UInField _ _ why -> unsendableCode site why
     UInArgument _ why -> unsendableCode site why
+    UInBuiltin _ why -> unsendableCode site why
     UNotWorkedOut -> "check/export-unsupported-type"
     UUnresolved _ -> "check/export-unsupported-type"
     UEvent -> "check/export-event-type"
