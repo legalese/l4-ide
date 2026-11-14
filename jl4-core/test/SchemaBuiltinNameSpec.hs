@@ -356,12 +356,25 @@ spec = describe "a type named like a builtin" $ do
 
   describe "both generators render the shape the export check gives a type" $ do
     -- jl4-schema wrote "$ref": "#/$defs/EITHER" with no $defs, and the service
-    -- an object. How an EITHER is written is not decided, so both say only that
-    -- it is an object (assumed, not ruled).
-    it "an EITHER is an object, with no dangling reference" $ do
+    -- an object with nothing in it. Both now describe the form the encoder
+    -- writes, {"LEFT":[v]} or {"RIGHT":[v]} (wire-form bench, card J3, option B,
+    -- ruled 2026-10-15). A Parameter has no oneOf, so the service's says both
+    -- keys may be there, and requires neither.
+    it "an EITHER is LEFT or RIGHT, each an array of one side, with no dangling reference" $ do
       let r = checked [] shapes
-      jsonProperty r "e" `shouldBe` Aeson.object [("properties", Aeson.object []), ("type", "object")]
-      (parameter r "e").parameterType `shouldBe` "object"
+          side key ty = Aeson.object
+            [ ("properties", Aeson.object [(key, Aeson.object [("items", Aeson.object [("type", ty)]), ("type", "array")])])
+            , ("required", Aeson.toJSON [key])
+            , ("type", "object")
+            ]
+      jsonProperty r "e" `shouldBe` Aeson.object [("oneOf", Aeson.toJSON [side "LEFT" "string", side "RIGHT" "number"])]
+      let p = parameter r "e"
+          sideOf k = p.parameterProperties >>= Map.lookup k
+      p.parameterType `shouldBe` "object"
+      p.parameterRequired `shouldBe` Nothing
+      fmap (.parameterType) (sideOf "LEFT") `shouldBe` Just "array"
+      fmap (.parameterType) (sideOf "LEFT" >>= (.parameterItems)) `shouldBe` Just "string"
+      fmap (.parameterType) (sideOf "RIGHT" >>= (.parameterItems)) `shouldBe` Just "number"
 
     it "a type with parameters has the fields of the type it is given, once for each" $ do
       let r = checked [] shapes

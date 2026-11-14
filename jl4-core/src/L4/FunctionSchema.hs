@@ -154,16 +154,26 @@ shapeToParameter = \case
   JRecursive named -> (emptyParam "object") {parameterL4Type = Just named.shapeTypeName}
   JArray inner -> (emptyParam "array") {parameterItems = Just (shapeToParameter inner)}
   JOptional inner -> shapeToParameter inner
-  JEither _ _ -> eitherParameter
+  JEither left right -> eitherParameter (shapeToParameter left) (shapeToParameter right)
  where
   addDesc :: Maybe Text -> Parameter -> Parameter
   addDesc Nothing p = p
   addDesc (Just d) p = p {parameterDescription = d}
 
--- | An EITHER, as the service has published it: an object, with nothing said of
--- its two sides. How an EITHER is written is not decided (assumed, not ruled).
-eitherParameter :: Parameter
-eitherParameter = emptyParam "object"
+-- | An EITHER, in the form the encoder writes it: @{"LEFT": [v]}@ or
+-- @{"RIGHT": [v]}@, the value in an array of one (the wire-form bench, card J3,
+-- option B, ruled by Meng on 2026-10-15). A 'Parameter' has no @oneOf@, and
+-- adding one would change the format of the schemas the service stores, so this
+-- is an object with both keys, neither required: that it holds exactly one of
+-- them is not said.
+eitherParameter :: Parameter -> Parameter -> Parameter
+eitherParameter left right =
+  (emptyParam "object")
+    { parameterProperties = Just (Map.fromList [("LEFT", side left), ("RIGHT", side right)])
+    , parameterPropertyOrder = Just ["LEFT", "RIGHT"]
+    }
+ where
+  side p = (emptyParam "array") {parameterItems = Just p}
 
 emptyParam :: Text -> Parameter
 emptyParam t =

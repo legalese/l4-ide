@@ -32,8 +32,8 @@
 -- > FUNCTION FROM a TO b           no shape yet: UFunction
 -- > a type variable                no shape: UPolymorphic
 -- > TYPE, in GIVEN a IS A TYPE      no shape: UTypeAsInput
--- > EITHER a b                     JEither (shape a) (shape b) (the service writes it as it does today; the
--- >                                                          form is open)
+-- > EITHER a b                     JEither (shape a) (shape b) ({"LEFT":[a]} or {"RIGHT":[b]}, as the
+-- >                                                          encoder writes it: wire-form card J3, option B)
 -- > any built-in type not listed above, or a type not found
 -- >                                no shape yet: UUnknownType
 --
@@ -92,7 +92,9 @@ data JsonShape
     JRecursive ShapeName
   | JArray JsonShape
   | JOptional JsonShape
-  | -- | The shapes of the two sides. How an EITHER is written is not decided.
+  | -- | The shapes of the two sides. An EITHER is written @{"LEFT": [v]}@ or
+    -- @{"RIGHT": [v]}@ (the wire-form bench, card J3, option B, ruled by Meng
+    -- on 2026-10-15).
     JEither JsonShape JsonShape
   deriving stock (Eq, Show)
 

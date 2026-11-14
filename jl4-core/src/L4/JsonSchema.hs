@@ -161,7 +161,7 @@ shapeToJsonSchema = \case
   JDateTime -> pure (SStringFormat "date-time" Nothing)
   JArray inner -> (`SArray` Nothing) <$> shapeToJsonSchema inner
   JOptional inner -> (\s -> SAnyOf [s, SNull] Nothing) <$> shapeToJsonSchema inner
-  JEither _ _ -> pure eitherSchema
+  JEither left right -> eitherSchema <$> shapeToJsonSchema left <*> shapeToJsonSchema right
   JEnum named constructors -> define named (pure (SEnum constructors named.shapeTypeDescription))
   JRecord named fields ->
     define named do
@@ -189,10 +189,16 @@ shapeToJsonSchema = \case
       modify' (Map.insert key schema)
     pure (SRef key Nothing)
 
--- | An EITHER, as the service has published it: an object, with nothing said of
--- its two sides. How an EITHER is written is not decided (assumed, not ruled).
-eitherSchema :: SchemaType
-eitherSchema = SObject [] Nothing
+-- | An EITHER, in the form the encoder writes it: one of @{"LEFT": [v]}@ and
+-- @{"RIGHT": [v]}@, the value in an array of one (the wire-form bench, card J3,
+-- option B, ruled by Meng on 2026-10-15).
+eitherSchema :: SchemaType -> SchemaType -> SchemaType
+eitherSchema left right =
+  SOneOf
+    [ SObject [("LEFT", SArray left Nothing, True)] Nothing
+    , SObject [("RIGHT", SArray right Nothing, True)] Nothing
+    ]
+    Nothing
 
 -- | The name a declared type has under @$defs@: its own, and for a type with
 -- parameters the types it is given, as L4 writes them (@Box OF NUMBER@), since
