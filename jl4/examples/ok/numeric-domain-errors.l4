@@ -1,0 +1,36 @@
+-- Regression fixture: SQRT and EXPONENT must raise
+-- a caught domain error rather than silently producing a garbage/NaN Rational
+-- (Double NaN/Infinity fed through toRational). The last two directives pin the
+-- valid cases so the guard cannot over-reject. No directive prints a number
+-- that a platform's floating-point library could round differently.
+
+#EVAL SQRT (-1)          -- caught: SQRT expects input >= 0
+#EVAL EXPONENT 0 (-1)    -- caught: non-finite (0 to a negative power)
+#EVAL EXPONENT (-1) 0.5  -- caught: non-finite (negative base, fractional exp)
+#EVAL SQRT 4             -- 2
+#EVAL EXPONENT 2 10      -- 1024
+#EVAL EXPONENT 10 309    -- caught: overflow
+#EVAL EXPONENT 2 1023 > 8 * EXPONENT 10 307  -- TRUE: the largest power of 2 that fits, compared, not printed
+#EVAL DATE_FROM_SERIAL (-0.5)  -- the day of serial -1, not of serial 0
+#EVAL DATE_FROM_SERIAL (-1)
+#EVAL EXPONENT (-8) (1/3)   -- caught: it has a real result, -2, but L4 does not compute it
+#EVAL EXPONENT (-2) 3       -- -8: a whole power of a negative base is computed
+#EVAL EXPONENT (0 - EXPONENT 10 308 * EXPONENT 10 92) 0.5        -- caught: as a double the base is -Infinity
+#EVAL EXPONENT (0 - EXPONENT 10 308 * EXPONENT 10 92) (0 - 0.5)  -- caught: as doubles this would be 0
+#EVAL EXPONENT (-2) (3 + 1 / (EXPONENT 10 49))                   -- caught: as a double the power is 3
+-- An input past the range of a double is named, not the result. The first two
+-- answers are 10^200, which a double holds; the third is past the range too,
+-- but its power is past it before the power is taken.
+#EVAL EXPONENT (EXPONENT 10 200 * EXPONENT 10 200) 0.5                -- caught: the base is past the range
+#EVAL EXPONENT (1 / (EXPONENT 10 200 * EXPONENT 10 200)) (0 - 0.5)    -- caught: the base is too close to 0
+#EVAL EXPONENT 1.5 (EXPONENT 10 200 * EXPONENT 10 200)                -- caught: the power is past the range
+-- Only a double answer that is not finite raises. A finite one is returned as
+-- before, even where an input is past the range, because it is often right.
+#EVAL SQRT (EXPONENT 10 200 * EXPONENT 10 200)                        -- caught: as a double the answer is Infinity
+#EVAL SIN (EXPONENT 10 200 * EXPONENT 10 200)                         -- caught: as a double the answer is NaN
+#EVAL LN (1 / (EXPONENT 10 200 * EXPONENT 10 200))                    -- caught: as a double the answer is -Infinity
+#EVAL ATAN (EXPONENT 10 200 * EXPONENT 10 200) > 1.57                 -- TRUE: pi/2, finite
+#EVAL EXPONENT (EXPONENT 10 200 * EXPONENT 10 200) 0                  -- 1
+#EVAL EXPONENT 1 (EXPONENT 10 200 * EXPONENT 10 200)                  -- 1
+#EVAL EXPONENT 0 (EXPONENT 10 200 * EXPONENT 10 200)                  -- 0: the base is exactly 0
+#EVAL EXPONENT (EXPONENT 10 200 * EXPONENT 10 200) (0 - 0.5)          -- 0, not 10^-200: finite as a double, so returned; see Limits

@@ -130,6 +130,7 @@ library
     L4.FindDefinition
     L4.FindReferences
     L4.JsonSchema
+    L4.TypeSynonym
     L4.Lexer
     L4.Lint.AndOrDepth
     L4.Mixfix
@@ -213,6 +214,9 @@ test-suite jl4-core-test
     NlgSilentReadingSpec
     ImportErrorRangeSpec
     ResolutionCascadeSpec
+    TracePostprocessSpec
+    SchemaBuiltinNameSpec
+    MaxFrameDepthSpec
     HoverApiSpec
     WarningViableForkSpec
   build-tool-depends:

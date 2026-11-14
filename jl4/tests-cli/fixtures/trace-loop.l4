@@ -1,0 +1,6 @@
+-- Fixture for `l4 trace`: a definition that needs itself. The force of `x`
+-- finds it already being forced and raises before pushing a frame for it.
+
+x MEANS x + 1
+
+#EVALTRACE x

@@ -3,8 +3,8 @@
     "description": "Calculate the square of a number",
     "properties": {
         "x": {
-            "$ref": "#/$defs/NUMBER",
-            "description": " The input number"
+            "description": " The input number",
+            "type": "number"
         }
     },
     "required": [
