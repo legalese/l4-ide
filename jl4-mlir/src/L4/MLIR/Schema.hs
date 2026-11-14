@@ -80,8 +80,9 @@ import L4.StateGraph
   , StateGraph(..)
   )
 import L4.FunctionSchema
-  ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter
+  ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter, uncheckedParameter
   )
+import L4.Export.Shape (shapeEnvFromDeclares)
 import L4.TypeCheck.Environment (contractUnique)
 
 -- ---------------------------------------------------------------------------
@@ -1749,7 +1750,10 @@ paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
 paramToParameter declares p =
   let base = case p.paramType of
         Nothing -> emptyParam "object"
-        Just ty -> typeToParameter declares Set.empty ty
+        -- The pipeline refuses an input the export check refuses
+        -- ('L4.MLIR.Pipeline.typecheckL4File'), so every input here has a shape.
+        Just ty -> either (const uncheckedParameter) id
+          (typeToParameter (shapeEnvFromDeclares (Map.elems declares) Map.empty) ty)
   in base
        { parameterAlias       = Nothing
        , parameterDescription = maybe "" Text.strip p.paramDescription

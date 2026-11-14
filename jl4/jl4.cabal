@@ -79,7 +79,6 @@ executable jl4-schema
     jl4-lsp,
     aeson-pretty,
     bytestring,
-    containers,
     directory,
     lsp-types,
     optparse-applicative,

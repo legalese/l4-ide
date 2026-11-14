@@ -6,7 +6,7 @@
                     "type": "number"
                 },
                 "o": {
-                    "$ref": "#/$defs/Optional"
+                    "$ref": "#/$defs/Optional OF NUMBER"
                 }
             },
             "required": [
@@ -15,35 +15,12 @@
             ],
             "type": "object"
         },
-        "Optional": {
-            "oneOf": [
-                {
-                    "properties": {
-                        "tag": {
-                            "const": "Absent"
-                        }
-                    },
-                    "required": [
-                        "tag"
-                    ],
-                    "type": "object"
-                },
-                {
-                    "properties": {
-                        "tag": {
-                            "const": "Present"
-                        },
-                        "value": {
-                            "$ref": "#/$defs/a"
-                        }
-                    },
-                    "required": [
-                        "tag",
-                        "value"
-                    ],
-                    "type": "object"
-                }
-            ]
+        "Optional OF NUMBER": {
+            "enum": [
+                "Absent",
+                "Present"
+            ],
+            "type": "string"
         }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",

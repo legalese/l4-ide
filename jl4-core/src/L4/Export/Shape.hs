@@ -40,6 +40,7 @@
 module L4.Export.Shape (
   JsonShape (..),
   JsonField (..),
+  ShapeName (..),
   Unsendable (..),
   isUnresolved,
   ShapeEnv (..),
@@ -54,7 +55,9 @@ import Base
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Optics ((^.))
 
+import L4.Print (prettyLayout)
 import L4.Syntax
 import L4.TypeCheck.Environment (
   booleanUnique,
@@ -79,12 +82,12 @@ data JsonShape
   | JDate
   | JTime
   | JDateTime
-  | -- | The type's name and its constructors' names.
-    JEnum Text [Text]
-  | -- | The type's name and its fields.
-    JRecord Text [JsonField]
-  | -- | A record that is being expanded already: its name only.
-    JRecursive Text
+  | -- | The type and its constructors' names.
+    JEnum ShapeName [Text]
+  | -- | The type and its fields.
+    JRecord ShapeName [JsonField]
+  | -- | A record that is being expanded already: the type only.
+    JRecursive ShapeName
   | JArray JsonShape
   | JOptional JsonShape
   | -- | The shapes of the two sides. How an EITHER is written is not decided.
@@ -95,8 +98,27 @@ data JsonField = JsonField
   { fieldName :: !Text
   , fieldShape :: !JsonShape
   , fieldRequired :: !Bool
+  , fieldDescription :: !(Maybe Text)
+  -- ^ The field's @\@desc@.
   }
   deriving stock (Eq, Show)
+
+-- | A declared type, as a shape names it: what a schema calls it and says of it.
+data ShapeName = MkShapeName
+  { shapeTypeName :: !Text
+  -- ^ The name it is declared with.
+  , shapeTypeArgs :: ![Text]
+  -- ^ The types it is given, printed, for a type with parameters: @Box OF
+  -- NUMBER@ and @Box OF STRING@ have different fields, so a schema that names
+  -- its types once must tell them apart.
+  , shapeTypeDescription :: !(Maybe Text)
+  -- ^ Its declaration's @\@desc@.
+  }
+  deriving stock (Eq, Show)
+
+-- | A type with no parameters and no @\@desc@, by its name.
+instance IsString ShapeName where
+  fromString n = MkShapeName (Text.pack n) [] Nothing
 
 -- | Why a type has no shape.
 data Unsendable
@@ -160,8 +182,10 @@ shapeEnvFromDeclares decls ei =
 -- shape itself is a tree with a declared type written out, with its arguments
 -- filled in, on every path to it, which can be far larger than that (a record
 -- whose two fields share a record type, nested, doubles at each level), so it is
--- built only as far as it is looked at. Walking all of it costs its size, and
--- only a test looks at any of it today.
+-- built only as far as it is looked at. Walking all of it costs its size. The
+-- service's schema ('L4.FunctionSchema.typeToParameter') walks all of it;
+-- jl4-schema's ('L4.JsonSchema.generateJsonSchema') writes each declared type,
+-- with its arguments, once.
 jsonShape :: ShapeEnv -> Type' Resolved -> Either Unsendable JsonShape
 jsonShape env ty = case firstUnsendable env ty of
   Just why -> Left why
@@ -175,9 +199,9 @@ data TypeHead t
   | ArrayOf t
   | OptionalOf t
   | EitherOf t t
-  | -- | Its name, each of its parameters with the argument it is used with, and
-    -- what it is declared to be.
-    Declared Text [(Unique, t)] (TypeDecl Resolved)
+  | -- | Its name, each of its parameters with the argument it is used with, what
+    -- it is declared to be, and its @\@desc@.
+    Declared Text [(Unique, t)] (TypeDecl Resolved) (Maybe Text)
 
 typeHead :: ShapeEnv -> Resolved -> [t] -> TypeHead t
 typeHead env name args
@@ -192,9 +216,9 @@ typeHead env name args
   | u == eitherUnique, [a, b] <- args = EitherOf a b
   | u == contractUnique = HasNoShape UDeontic
   | u == eventUnique = HasNoShape UEvent
-  | Just (MkDeclare _ _ (MkAppForm _ declared params _) body) <- Map.lookup u env.declared =
+  | Just (MkDeclare ann _ (MkAppForm _ declared params _) body) <- Map.lookup u env.declared =
       if length params == length args
-        then Declared (nameText declared) (zip (map getUnique params) args) body
+        then Declared (nameText declared) (zip (map getUnique params) args) body (getDesc <$> ann ^. annDesc)
         else HasNoShape (UUnresolved (nameText declared))
   | OutOfScope{} <- name = HasNoShape (UUnresolved text)
   | u `Set.member` env.typeVariables = HasNoShape (UPolymorphic text)
@@ -246,7 +270,7 @@ firstUnsendable env ty =
           ArrayOf a -> walk reading a
           OptionalOf a -> walk reading a
           EitherOf a b -> walk reading a *> walk reading b
-          Declared typeName sub body -> do
+          Declared typeName sub body _ -> do
             declaration (getUnique name) typeName (map fst sub) body
             for_ sub \(_, arg) ->
               walk reading arg `catchError` (throwError . UInArgument typeName)
@@ -281,8 +305,8 @@ expand env = go Set.empty
       ArrayOf a -> JArray (go seen a)
       OptionalOf a -> JOptional (go seen a)
       EitherOf a b -> JEither (go seen a) (go seen b)
-      Declared typeName sub body
-        | getUnique name `Set.member` seen -> JRecursive typeName
+      Declared typeName sub body desc
+        | getUnique name `Set.member` seen -> JRecursive named
         | otherwise ->
             let
               seen' = Set.insert (getUnique name) seen
@@ -293,17 +317,20 @@ expand env = go Set.empty
                 -- A constructor that carries fields is shaped by its name alone, as
                 -- the schema has published it until now; how its fields are
                 -- written is open (the wire form of sums), so not refused here.
-                EnumDecl _ cons -> JEnum typeName [nameText c | MkConDecl _ c _ <- cons]
-                RecordDecl _ _ fields -> JRecord typeName (map (field inner) fields)
+                EnumDecl _ cons -> JEnum named [nameText c | MkConDecl _ c _ <- cons]
+                RecordDecl _ _ fields -> JRecord named (map (field inner) fields)
+       where
+        named = MkShapeName typeName (map (prettyLayout . snd) sub) desc
       HasNoShape _ -> checked
     _ -> checked
 
-  field inner (MkTypedName _ fieldName ty _) =
+  field inner (MkTypedName ann fieldName ty _) =
     let shape = inner ty
      in JsonField
           { fieldName = nameText fieldName
           , fieldShape = shape
           , fieldRequired = case shape of JOptional _ -> False; _ -> True
+          , fieldDescription = getDesc <$> ann ^. annDesc
           }
 
   checked = error "jsonShape: firstUnsendable has looked at everything this reaches"

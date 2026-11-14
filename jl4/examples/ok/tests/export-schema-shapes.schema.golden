@@ -37,48 +37,11 @@
             "type": "object"
         },
         "Shape": {
-            "oneOf": [
-                {
-                    "properties": {
-                        "radius": {
-                            "type": "number"
-                        },
-                        "tag": {
-                            "const": "Circle"
-                        }
-                    },
-                    "required": [
-                        "tag",
-                        "radius"
-                    ],
-                    "type": "object"
-                },
-                {
-                    "properties": {
-                        "label": {
-                            "anyOf": [
-                                {
-                                    "type": "string"
-                                },
-                                {
-                                    "type": "null"
-                                }
-                            ]
-                        },
-                        "side": {
-                            "type": "number"
-                        },
-                        "tag": {
-                            "const": "Square"
-                        }
-                    },
-                    "required": [
-                        "tag",
-                        "side"
-                    ],
-                    "type": "object"
-                }
-            ]
+            "enum": [
+                "Circle",
+                "Square"
+            ],
+            "type": "string"
         }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",

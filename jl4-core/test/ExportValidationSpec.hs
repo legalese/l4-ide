@@ -408,11 +408,11 @@ spec = do
         inputShapes src `shouldBe` Right
           [ ( "b"
             , Right $ JRecord "Bill"
-                [ JsonField "amount" JNumber True
-                , JsonField "due" JDate True
-                , JsonField "payer" (JEnum "Party" ["alice", "bob"]) True
-                , JsonField "notes" (JArray JString) True
-                , JsonField "ref" (JOptional JString) False
+                [ JsonField "amount" JNumber True Nothing
+                , JsonField "due" JDate True Nothing
+                , JsonField "payer" (JEnum "Party" ["alice", "bob"]) True Nothing
+                , JsonField "notes" (JArray JString) True Nothing
+                , JsonField "ref" (JOptional JString) False Nothing
                 ]
             )
           ]
@@ -430,7 +430,7 @@ spec = do
               ]
         problems src `shouldBe` Right []
         inputShapes src `shouldBe` Right
-          [ ("t", Right (JRecord "Tree" [JsonField "label" JString True, JsonField "kids" (JArray (JRecursive "Tree")) True])) ]
+          [ ("t", Right (JRecord "Tree" [JsonField "label" JString True Nothing, JsonField "kids" (JArray (JRecursive "Tree")) True Nothing])) ]
 
       it "refuses a record with a function among its fields, and says which" $ do
         let src = Text.unlines
@@ -504,7 +504,7 @@ spec = do
       r <- problemsWithin 30 src
       r `shouldBe` Right []
       case inputShapes src of
-        Right [("x", Right (JRecord "L64" (JsonField "a" (JRecord "L63" _) True : _)))] -> pure ()
+        Right [("x", Right (JRecord "L64" (JsonField "a" (JRecord "L63" _) True _ : _)))] -> pure ()
         other -> expectationFailure (show (fmap (map fst) other))
 
     it "finds a function in the field after the shared types, 64 levels down" $ do
@@ -570,7 +570,7 @@ spec = do
             , "GIVETH A NUMBER"
             , "`from the top` MEANS 1"
             ]
-          field n s = JsonField n s True
+          field n s = JsonField n s True Nothing
       problems src `shouldBe` Right []
       inputShapes src `shouldBe` Right
         [ ( "x"

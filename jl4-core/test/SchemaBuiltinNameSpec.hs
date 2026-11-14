@@ -1,13 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 -- | Both schema generators decide from the resolved type, not from its name: a
--- type named like a builtin, declared here or imported, is that type.
+-- type named like a builtin, declared here or imported, is that type. Both
+-- render the shape the export check gives it ('L4.Export.Shape.jsonShape').
 module SchemaBuiltinNameSpec (spec) where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Aeson.Key as Key
@@ -15,9 +15,10 @@ import Test.Hspec
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS, vfsFromList)
 import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions)
-import L4.FunctionSchema (Parameter(..), declaresFromModule, typeToParameter)
+import L4.Export.Shape (ShapeEnv, moduleDeclares, shapeEnvFromDeclares)
+import L4.FunctionSchema (Parameter(..), typeToParameter)
 import L4.Import.Resolution (ResolvedImport(..), TypeCheckWithDepsResult(..))
-import L4.JsonSchema (SchemaContext(..), emptyContext, generateJsonSchema)
+import L4.JsonSchema (JsonSchema, generateJsonSchema)
 import L4.TypeCheck.Types (CheckResult(..))
 
 library :: Text
@@ -97,6 +98,26 @@ synonyms = Text.unlines
   , "total h extra MEANS h's n"
   ]
 
+-- | Types the export check accepts that the generators used to describe on
+-- their own: an EITHER, a type with parameters used at two types, and a
+-- constructor that carries fields.
+shapes :: Text
+shapes = Text.unlines
+  [ "DECLARE Box a HAS"
+  , "  @desc What is in the box"
+  , "  contents IS AN a"
+  , "@desc A shape that carries its size"
+  , "DECLARE Figure IS ONE OF Dot, Circle HAS radius IS A NUMBER"
+  , ""
+  , "@export default takes what the check accepts"
+  , "GIVEN e IS AN EITHER STRING NUMBER"
+  , "      nb IS A Box NUMBER"
+  , "      sb IS A Box STRING"
+  , "      f IS A Figure"
+  , "GIVETH A NUMBER"
+  , "g e nb sb f MEANS 1"
+  ]
+
 -- | Synonyms for MAYBE twenty deep, without an argument and with one.
 chain :: Text
 chain = Text.unlines $
@@ -130,37 +151,41 @@ export r = case getExportedFunctions r.tcdModule of
   e : _ -> e
   [] -> error "no @export"
 
--- | What the service does: it looks declarations up across the module and the
--- modules it imports (jl4-service Compiler.hs).
+-- | What the export check reads types from: the declarations of the module and
+-- of the modules it imports. Both generators render the shape it gives.
+shapeEnv :: TypeCheckWithDepsResult -> ShapeEnv
+shapeEnv r =
+  shapeEnvFromDeclares
+    (foldMap moduleDeclares (r.tcdModule : map (\i -> i.riTypeChecked.program) r.tcdResolvedImports))
+    r.tcdEntityInfo
+
+-- | What the service publishes for one input (jl4-service Compiler.hs).
 parameter :: TypeCheckWithDepsResult -> Text -> Parameter
 parameter r name =
   case [ p.paramType | p <- (export r).exportParams, p.paramName == name ] of
-    Just ty : _ -> typeToParameter declares Set.empty ty
+    Just ty : _ -> either (error . show) id (typeToParameter (shapeEnv r) ty)
     _ -> error ("no typed parameter " <> show name)
- where
-  declares = Map.unions (declaresFromModule r.tcdModule : map (\i -> declaresFromModule i.riTypeChecked.program) r.tcdResolvedImports)
+
+schema :: TypeCheckWithDepsResult -> JsonSchema
+schema r = either (error . show) id (generateJsonSchema (shapeEnv r) (export r))
 
 -- | What @jl4-schema@ writes for one input of the export.
 jsonProperty :: TypeCheckWithDepsResult -> Text -> Aeson.Value
 jsonProperty r name =
-  case Aeson.toJSON (generateJsonSchema schemaContext (export r)) of
+  case Aeson.toJSON (schema r) of
     Aeson.Object top
       | Just (Aeson.Object props) <- KeyMap.lookup "properties" top
       , Just v <- KeyMap.lookup (Key.fromText name) props -> v
     other -> error ("no property " <> show name <> " in " <> show other)
- where
-  schemaContext = emptyContext { ctxDeclares = declaresFromModule r.tcdModule }
 
 -- | What @jl4-schema@ writes for a definition in @$defs@.
 jsonDefinition :: TypeCheckWithDepsResult -> Text -> Aeson.Object
 jsonDefinition r name =
-  case Aeson.toJSON (generateJsonSchema schemaContext (export r)) of
+  case Aeson.toJSON (schema r) of
     Aeson.Object top
       | Just (Aeson.Object defs) <- KeyMap.lookup "$defs" top
       , Just (Aeson.Object d) <- KeyMap.lookup (Key.fromText name) defs -> d
     other -> error ("no definition " <> show name <> " in " <> show other)
- where
-  schemaContext = emptyContext { ctxDeclares = declaresFromModule r.tcdModule }
 
 -- | Can a value that this schema describes be null? A reference is followed
 -- into the definitions of the schema it is in.
@@ -237,12 +262,14 @@ spec = describe "a type named like a builtin" $ do
       jsonProperty r "da" `shouldBe` Aeson.object [("$ref", "#/$defs/Date")]
       jsonProperty r "tm" `shouldBe` Aeson.object [("$ref", "#/$defs/Time")]
 
-    -- A dangling reference, because jl4-schema's context holds only the module's
-    -- own declarations. That is a known limit; a false primitive would be worse.
-    it "an imported type is a reference, never a primitive" $ do
+    -- It used to be a dangling reference: jl4-schema read only the module's own
+    -- declarations, where the export check reads the imported ones too.
+    it "an imported type is a reference to its definition, never a primitive" $ do
       let r = checked [("lib", library)] importing
       jsonProperty r "t"  `shouldBe` Aeson.object [("$ref", "#/$defs/Text")]
       jsonProperty r "tm" `shouldBe` Aeson.object [("$ref", "#/$defs/Time")]
+      KeyMap.lookup "properties" (jsonDefinition r "Text") `shouldBe` Just (Aeson.object [("body", Aeson.object (jsonType "number"))])
+      KeyMap.lookup "enum" (jsonDefinition r "Time") `shouldBe` Just (Aeson.toJSON ["Morning", "Evening" :: Text])
 
     it "the builtins are still JSON primitives" $ do
       let r = checked [] declaring
@@ -267,8 +294,11 @@ spec = describe "a type named like a builtin" $ do
             Just v -> v
             Nothing -> error ("no field " <> show n)
       required `shouldBe` ["o", "w"]
-      field "o" `shouldBe` Aeson.object [("$ref", "#/$defs/Optional")]
-      field "w" `shouldBe` Aeson.object [("$ref", "#/$defs/maybe")]
+      -- A type with parameters is named with what it is given: its fields are
+      -- those of that type.
+      field "o" `shouldBe` Aeson.object [("$ref", "#/$defs/Optional OF NUMBER")]
+      field "w" `shouldBe` Aeson.object [("$ref", "#/$defs/maybe OF NUMBER")]
+      KeyMap.lookup "properties" (jsonDefinition (checked [] optionals) "maybe OF NUMBER") `shouldBe` Just (Aeson.object [("v", Aeson.object (jsonType "number"))])
       field "m" `shouldBe` Aeson.object [("anyOf", Aeson.toJSON [Aeson.object (jsonType "number"), Aeson.object (jsonType "null")])]
       [ n | n <- ["o", "m", "w"], not (nullable (checked [] optionals) (field n)) ] `shouldBe` required
 
@@ -288,7 +318,8 @@ spec = describe "a type named like a builtin" $ do
           number = Aeson.object (jsonType "number")
       required `shouldBe` ["xs", "n"]
       field "o" `shouldBe` Aeson.object [("anyOf", Aeson.toJSON [number, Aeson.object (jsonType "null")])]
-      field "p" `shouldBe` Aeson.object [("$ref", "#/$defs/OptNum")]
+      -- A synonym is written as what it stands for, as the check sees it.
+      field "p" `shouldBe` Aeson.object [("anyOf", Aeson.toJSON [number, Aeson.object (jsonType "null")])]
       field "xs" `shouldBe` Aeson.object [("items", number), ("type", "array")]
       [ n | n <- ["o", "p", "xs", "n"], not (nullable r (field n)) ] `shouldBe` required
       jsonProperty r "extra" `shouldBe` Aeson.object [("anyOf", Aeson.toJSON [number, Aeson.object (jsonType "null")])]
@@ -322,3 +353,36 @@ spec = describe "a type named like a builtin" $ do
       ((svc "s").parameterType, (svc "t").parameterType) `shouldBe` ("number", "number")
       [ (q.paramName, q.paramRequired) | q <- (export r).exportParams ]
         `shouldBe` [("h", True), ("x", False), ("y", False)]
+
+  describe "both generators render the shape the export check gives a type" $ do
+    -- jl4-schema wrote "$ref": "#/$defs/EITHER" with no $defs, and the service
+    -- an object. How an EITHER is written is not decided, so both say only that
+    -- it is an object (assumed, not ruled).
+    it "an EITHER is an object, with no dangling reference" $ do
+      let r = checked [] shapes
+      jsonProperty r "e" `shouldBe` Aeson.object [("properties", Aeson.object []), ("type", "object")]
+      (parameter r "e").parameterType `shouldBe` "object"
+
+    it "a type with parameters has the fields of the type it is given, once for each" $ do
+      let r = checked [] shapes
+      jsonProperty r "nb" `shouldBe` Aeson.object [("$ref", "#/$defs/Box OF NUMBER")]
+      jsonProperty r "sb" `shouldBe` Aeson.object [("$ref", "#/$defs/Box OF STRING")]
+      KeyMap.lookup "properties" (jsonDefinition r "Box OF NUMBER")
+        `shouldBe` Just (Aeson.object [("contents", Aeson.object [("description", " What is in the box"), ("type", "number")])])
+      KeyMap.lookup "properties" (jsonDefinition r "Box OF STRING")
+        `shouldBe` Just (Aeson.object [("contents", Aeson.object [("description", " What is in the box"), ("type", "string")])])
+      let contents n = (parameter r n).parameterProperties >>= Map.lookup "contents"
+      fmap (.parameterType) (contents "nb") `shouldBe` Just "number"
+      fmap (.parameterType) (contents "sb") `shouldBe` Just "string"
+      (parameter r "nb").parameterL4Type `shouldBe` Just "Box"
+
+    -- The service has published the names; jl4-schema wrote a "tag" form that
+    -- no decoder reads. How the fields are written is not decided. A @desc is
+    -- carried as written, with the space after the keyword.
+    it "a constructor that carries fields is one of the constructors' names" $ do
+      let r = checked [] shapes
+          d = jsonDefinition r "Figure"
+      KeyMap.lookup "enum" d `shouldBe` Just (Aeson.toJSON ["Dot", "Circle" :: Text])
+      KeyMap.lookup "description" d `shouldBe` Just " A shape that carries its size"
+      (parameter r "f").parameterEnum `shouldBe` ["Dot", "Circle"]
+      (parameter r "f").parameterDescription `shouldBe` " A shape that carries its size"

@@ -6,7 +6,7 @@ The shape of the change is the second part of the review of legalese/l4-ide#738 
 This page describes what the branch has.
 Reading the inputs of an exported rule from its signature, with a record of which assumptions each definition reaches (the review's section 4), is not in this change: it is proposed, not landed, and is listed under "Not here".
 
-Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the editor's rule `ExportCheck` (`jl4-lsp/src/LSP/L4/Rules.hs`), the commands `l4 check`, `l4 deploy` and `l4 batch`, `jl4-schema`, `jl4-mlir`, `l4_check` and the web editor's transport, the sidebar's list of exports, and the deploy gate in `jl4-service/src/Compiler.hs`.
+Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the two schema generators (`jl4-core/src/L4/FunctionSchema.hs`, `jl4-core/src/L4/JsonSchema.hs`), the editor's rule `ExportCheck` (`jl4-lsp/src/LSP/L4/Rules.hs`), the commands `l4 check`, `l4 deploy` and `l4 batch`, `jl4-schema`, `jl4-mlir`, `l4_check` and the web editor's transport, the sidebar's list of exports, and the deploy gate in `jl4-service/src/Compiler.hs`.
 
 ## What it does
 
@@ -34,6 +34,12 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   - `jl4-mlir wasm` refuses on them with the same words (`typecheckL4File`, `jl4-mlir/src/L4/MLIR/Pipeline.hs`), except a result that is itself a `DEONTIC` (`isDeonticType`; a `MAYBE`, `LIST`, `EITHER` or synonym of one is refused, having no contract path): its JS runtime evaluates a contract from the schema, which `jl4-mlir/README.md` documents, so it is kept while the service's refusal is provisional (assumed, not ruled);
   - the web editor's WebAssembly build gets them from `l4_check` (`L4.API.l4Check`, `exportErrorsOf`), with the source `export`, and only for a file that type-checks, as in the language server, and its transport (`wasm-message-transports.ts`) still evaluates the file beside them;
   - `jl4-service` builds the same errors in its deploy gate (`jl4-service/src/Compiler.hs:194`) and refuses the bundle, with the same words, once the module has no type errors: as in the editor, a module that does not type-check is not asked what its exports take and give back.
+- Both schema generators render the shape the check gives a type, so an `@export` that the check accepts is described as the check sees it:
+  - `typeToParameter` (`jl4-core/src/L4/FunctionSchema.hs`) writes the schema that `jl4-service` publishes, that the editor's sidebar lists and that `jl4-mlir` writes for an input; `shapeToParameter` writes a shape out.
+  - `generateJsonSchema` (`jl4-core/src/L4/JsonSchema.hs`) writes `jl4-schema`'s, with each declared type once under `$defs`; a type with parameters is named there with what it is given (`Box OF NUMBER`), since each of those has fields of its own.
+  - Each reads the declarations the check reads, the module's and every module it imports, so an imported type has its definition (it was a `$ref` to a definition not in the file in 7,272 of the 33,904 exports of `legalese/commons`); a synonym is written as the type it stands for; a constructor that carries fields is one of the constructors' names in both, which is what the service has published (`jl4-schema` wrote a `oneOf` of objects with a `tag`, which no decoder reads); and the `@desc` of a declaration or a field is carried as before.
+  - A type with no shape has no schema: `typeToParameter` and `generateJsonSchema` say why (`Left`). `jl4-schema` then exits 1 and names the input. The service, the sidebar and `jl4-mlir` publish `{"type": "object"}` for it (`uncheckedParameter`), which they reach only for an input the check did not look at: one read from a name the module never declared, or a type that did not resolve, whose own error stops the deploy.
+  - An `EITHER` is `{"type": "object"}` in both, as the service has published it, with nothing said of its two sides (`eitherParameter`, `eitherSchema`; assumed, not ruled): how an `EITHER` is written is the wire-form bench's card J3, open.
 - The two checks of the previous change, the function-typed input and the `EVENT`, are gone from the type check (`ExportFunctionTypeInput`, `ExportEventType`) and are cases of the one check.
   So a function-typed input no longer stops the file from checking either.
 
@@ -42,7 +48,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 - `jl4-core/src/L4/Export/Shape.hs`: `JsonShape`, `Unsendable`, `ShapeEnv`, `jsonShape`, and the two functions that word a reason, `unsendableWhat` and `unsendableHint`.
   Types are looked up in the declarations of the module and of everything it imports (`moduleDeclares`), and a record that contains itself stops at `JRecursive`.
   Whether a type has a shape is worked out by reading each declaration once, with its parameters taken as fine, and each type argument where it is written, whether or not the parameter is used (`firstUnsendable`). No type is instantiated, so the cost is that of reading the source.
-  The shape itself (`expand`) is a tree that writes a declared type out, with its arguments filled in, on every path to it, so it is built only as far as something looks at it; only a test looks at it, and the check discards it.
+  The shape itself (`expand`) is a tree that writes a declared type out, with its arguments filled in, on every path to it, so it is built only as far as something looks at it: the check discards it, `typeToParameter` walks all of it, and `generateJsonSchema` stops at a declared type, with its arguments, that it has written already.
 - `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite` (`:443`, `:434`), `checkExports`, `checkOneExport` (`:579`), `withoutRefused` (`:529`), `refusalsOf`, `prettyExportError` (`:493`); `inferredReturnType` (`:167`) gives the result of a definition without a `GIVETH`.
 - `jl4-service/src/Compiler.hs`, `jl4-lsp/src/LSP/L4/Rules.hs` (the key `ExportCheck`, `:192`) and the two commands use it; none of them has a check of its own.
 
@@ -52,6 +58,8 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   It refuses a function-typed `GIVEN`, an `ASSUME` of function type that the body reads, and a function inside `MAYBE OF` or behind a synonym; an `EVENT` input, a written and an inferred `EVENT` result, an `EVENT` in `LIST OF`, `MAYBE OF`, behind a synonym or in an `ASSUME` that the body reads; a `DEONTIC` result (and the file still type-checks) and a `DEONTIC` input; a record with a function among its fields (and says which); and an `EITHER` with a function on one side.
   It accepts value-typed inputs, a record, an enumeration, a `LIST OF`, a `MAYBE OF` and a `DATE`, a record that contains itself, an `EVENT` that the body builds but the signature does not name, an `EVENT` in a rule that is not `@export`, a type of the user's own called `EVENT`, an enumeration whose constructors carry fields, an `EITHER` of two types that have shapes, and a function-typed `ASSUME` that no export reads.
   It warns about a `GIVEN` with no written type, and does not refuse it.
+- `jl4-core/test/SchemaBuiltinNameSpec.hs`, "both generators render the shape the export check gives a type": an `EITHER STRING NUMBER` input is an object in both, with no dangling `$ref`; `Box OF NUMBER` and `Box OF STRING` are two definitions with the fields of each, and the field's `@desc`; a constructor that carries fields is the constructors' names, with the declaration's `@desc`. The same file pins that an imported type has its definition, and that a module's own `Optional NUMBER` is a `$ref` to `Optional OF NUMBER`.
+- Four `.schema.golden` files changed with the generators: `ok/export-schema-shapes` and `ok/schema-own-optional` (a constructor that carries fields is the constructors' names), and `ok/schema-synonym-chain` and `ok/schema-synonym-shapes` (a synonym is written as what it stands for, not as a `$ref` to a definition of it).
 - `jl4/examples/not-ok/export-unsendable-types.l4` and its goldens: one error for each rule that cannot be sent (an `EVENT` input, an `EVENT` result, a `DEONTIC` result, a function input), one warning for the `GIVEN` with no written type, and nothing for the rule that publishes and the rule that only builds an `EVENT` in its body.
   The golden harness (`jl4/tests/Main.hs`) prints the export errors after the type-check errors, with the prefix `[export error]` or `[export warning]`, and the `#EVAL` at the end of the file still has its result there.
 - `jl4/examples/ok/tests/desc.golden` and `pattern-matching-overloads-own-annotations.golden` gained the warning for a `GIVEN` with no written type.
@@ -80,6 +88,13 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 - Not measured: stored deployments, which this session cannot count.
   Meng gave the count of those that export a `DEONTIC` result as 0 on 2026-10-30.
 
+The schemas, measured on 2026-11-14 with a build of `6fe8598ae` against one of this change, over every file with an `@export` in this repository (99 files, 163 exports) and in `legalese/commons` at `bdc8fc5b9` (1,378 files, 33,904 exports), comparing what `jl4-service` publishes for each input and result and what `jl4-schema` writes, export by export:
+
+- The service's schema changes for 49 exports, in 11 `legalese/commons` files whose imported modules have errors of their own (`je/charities-2014` g6 and g7, which import `g6-interpretation` and `g7-interpretation`; `il/hvac-work-licensing-2025` `int-sanction`, which imports `g1-adverse-action`). An input whose record has a field of a type with such an error is now `{"type": "object"}`, where it was the record written out; a bundle with those imports in it is refused at deploy, for their errors. Nothing else the service publishes changes, in either corpus.
+- `jl4-schema` changes for 7,298 exports: 7,214 gain the definitions of the imported types they referred to, and no longer refer to a definition that is not in the file; 26 write a constructor that carries fields as the constructors' names (9 of them gain imported definitions too); 9 write a synonym as what it stands for, and are the same once every `$ref` is followed; and 49 are the 49 above, for which it now names the input and writes no schema.
+- With every `$ref` followed, `jl4-schema` and the service now describe the inputs of every export alike, except three whose input has no written type, which `jl4-schema` calls a string and the service an object. Before, they differed for 7,292 exports.
+- `EITHER` is the input of no export in either corpus, and the result of 7.
+
 Types that nest, against `main`, measured on 2026-11-04: `l4 check` and `jl4-schema` are within 0.15 s of `main` on every size tried, from 0.03 s (a type that passes two different types on, `LIST OF a` and `MAYBE a`, 24 levels) to 1.3 s (records with two fields of the next one down, 4,000 levels).
 
 ## Revisit
@@ -98,10 +113,12 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
 
 ## Limits
 
-- The schema is still produced by `typeToParameter` (`jl4-core/src/L4/FunctionSchema.hs`), which falls back to `object` for a type it has no declaration for; it does not render a `JsonShape`.
-  So `jsonShape` and the schema can disagree for a type that `typeToParameter` handles differently.
-  `jl4-schema` does refuse an export that the check refuses (`refusalsOf`, `jl4/app/Schema.hs`): it prints the reason on stderr, writes no schema and exits 1.
-  Making the schema render the shape, and the service's decoder follow it, is not done.
+- The schema renders the shape, and the service's decoder and encoder do not follow it: they decide on their own, by reading the type, how a value is read and written (`jsonValueToWHNFTyped`, `jl4-core/src/L4/EvaluateLazy/Machine.hs:1301`; `fnLiteralToExprTyped` and `valueToFnLiteral`, `jl4-service/src/Backend/Jl4.hs`). Where they differ from the schema, read from the code and not measured:
+  - No decoder reads an `EITHER`: `JSONDECODE` has no case for one, so an object decodes to `NOTHING` and a scalar is passed through as it is, and the direct path refuses an object that is not a record. The answer is written `{"RIGHT": [v]}` or `{"LEFT": [v]}`.
+  - A record answer is written with its constructor's name around it (`{"Pair": {...}}`, `jl4-service/README.md`), which `returnSchema` does not say; that is the bench's card J2, open (smucclaw/l4-ide#1010).
+  - A constructor that carries fields is read only by its name, with no fields, and answered as `{"Circle": {"radius": 2}}`; the schema lists the names. That is card J1, open.
+  - A record that takes a type (`Box OF NUMBER`) is not read as a record by `JSONDECODE`, which looks only at a type with no arguments, so an object for one decodes to `NOTHING`.
+- The schema `jl4-schema` writes for a type with parameters has one definition for each type it is given. A type that passes two different types on (`T OF (LIST OF a)` and `T OF (MAYBE a)` in each declaration) has twice as many at each level: measured on 2026-11-14, 220 KB at 8 levels, 4 MB at 12 and 75 MB in 3.4 s at 16, where `6fe8598ae` wrote 6 KB that referred to a definition, `a`, that is not in the file. The service's schema of that type doubled already (below).
 - A constructor that carries fields has the shape of an enumeration of the constructors' names, which is what the schema publishes today, and is not refused.
   The review asked for it to be decided: a tagged shape or a refusal.
   It is not refused because `jl4-service-test` deploys a function whose result is such a type (smucclaw/l4-ide#1003, `wireProbeJL4`), and the wire-form bench (`l4-wire-form-1015`, card J1, open) counts 8 to 11 of 3,006 exports that take one.
@@ -125,5 +142,5 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
 
 - The record of which assumptions each definition reaches, and the error that says "via helper reads ASSUME X through Y; pass it in as a GIVEN".
 - A written type on every exported `GIVEN` as an error: it is a warning, until the count of stored deployments with an untyped exported `GIVEN` is taken (review, section 8).
-- The schema generator and the decoder rendering a `JsonShape`.
+- The decoder and the encoder following a `JsonShape`.
 - The specification of exports of contract rules on stream infrastructure (the review's section 5), which extends `specs/todo/STATEFUL-CONTRACT-DEPLOYMENT.md` and is written after this change.

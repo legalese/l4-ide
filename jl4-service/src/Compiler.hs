@@ -10,7 +10,7 @@ import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
-import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
+import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, uncheckedParameter, declaresFromModule)
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import Types
@@ -24,7 +24,6 @@ import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Ord (comparing)
-import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
@@ -189,9 +188,10 @@ processTypecheckedFile logger deployId filepath content moduleContext
         -- What cannot cross the boundary of an @export, and the exports that
         -- the editor refuses with the same words ('Export.checkExports'). A
         -- missing type is a warning, which does not block the deploy.
+        shapeEnv = Shape.shapeEnvFromDeclares declaredTypes ei
         exportErrs =
           [ e
-          | e <- Export.checkExports (Shape.shapeEnvFromDeclares declaredTypes ei) resolvedModule
+          | e <- Export.checkExports shapeEnv resolvedModule
           , Export.exportErrorSeverity e == SError
           ]
         declaredTypes = foldMap (Shape.moduleDeclares . (.module')) (tcResult : Rules.transitiveDependencies tcResult)
@@ -261,7 +261,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
               }
 
         fns <- forM exports $ \export -> do
-          let fnDecl = exportToFunction allDeclares implicitParams export
+          let fnDecl = exportToFunction shapeEnv allDeclares implicitParams export
               apiDecl = toDecl fnDecl
 
           let collisions = validateNoSanitizationCollisions fnDecl.name fnDecl.parameters
@@ -309,12 +309,17 @@ processTypecheckedFile logger deployId filepath content moduleContext
         pure (filepath, Right fns)
 
 -- | Convert an ExportedFunction to our Function type.
-exportToFunction :: Map Text (Declare Resolved) -> [(Text, Type' Resolved)] -> ExportedFunction -> Function
-exportToFunction declares implicitParams export =
-  let baseParams = parametersFromExport declares export.exportParams
-      -- Merge implicit params, avoiding duplicates
+-- | What a deployment publishes for an @export: the schema of each input and
+-- of the result is the shape the export check gives its type ('typeToParameter').
+-- The deploy has refused an @export the check refuses, so each of those has one.
+exportToFunction :: Shape.ShapeEnv -> Map Text (Declare Resolved) -> [(Text, Type' Resolved)] -> ExportedFunction -> Function
+exportToFunction env declares implicitParams export =
+  let schemaOf ty = either (const uncheckedParameter) id (typeToParameter env ty)
+      baseParams = parametersFromExport env declares export.exportParams
+      -- Merge implicit params, avoiding duplicates. These are read from names
+      -- the module never declared, so the export check did not look at them.
       implicitParamMap = Map.fromList
-        [ (pname, (typeToParameter declares Set.empty ty) {parameterDescription = "", parameterAlias = Nothing})
+        [ (pname, (schemaOf ty) {parameterDescription = "", parameterAlias = Nothing})
         | (pname, ty) <- implicitParams
         , pname `Map.notMember` baseParams.parameterMap
         ]
@@ -334,8 +339,8 @@ exportToFunction declares implicitParams export =
       -- Build typed event schema using actual party/action types
       (partyParam, actionParam) = case export.exportReturnType of
         Just (TyApp _ _ [partyTy, actionTy]) ->
-          ( (typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" }
-          , (typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" }
+          ( (schemaOf partyTy) { parameterDescription = "The party performing the action" }
+          , (schemaOf actionTy) { parameterDescription = "The action performed" }
           )
         _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing
              , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing
@@ -379,7 +384,7 @@ exportToFunction declares implicitParams export =
       -- For DEONTIC functions the surface return shape is the simulation envelope,
       -- not the user's record type, so we leave the structured schema unset there.
       mReturnSchema = case export.exportReturnType of
-        Just retTy | not isDeontic -> Just (typeToParameter declares Set.empty retTy)
+        Just retTy | not isDeontic -> either (const Nothing) Just (typeToParameter env retTy)
         _ -> Nothing
   in Function
     { name = export.exportName
@@ -396,21 +401,21 @@ exportToFunction declares implicitParams export =
     }
 
 -- | Build Parameters from ExportedParam list.
-parametersFromExport :: Map Text (Declare Resolved) -> [ExportedParam] -> Parameters
-parametersFromExport declares params =
+parametersFromExport :: Shape.ShapeEnv -> Map Text (Declare Resolved) -> [ExportedParam] -> Parameters
+parametersFromExport env declares params =
   MkParameters
-    { parameterMap = Map.fromList [(param.paramName, paramToParameter declares param) | param <- params]
+    { parameterMap = Map.fromList [(param.paramName, paramToParameter env param) | param <- params]
     -- With every module's declarations, as for the record fields below, so
     -- that an input typed with an imported synonym for a MAYBE is optional.
     , required = [param.paramName | param <- map (expandRequired declares) params, param.paramRequired]
     }
 
 -- | Convert an ExportedParam to a Parameter.
-paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
-paramToParameter declares param =
+paramToParameter :: Shape.ShapeEnv -> ExportedParam -> Parameter
+paramToParameter env param =
   let p0 = maybe
-              (Parameter "object" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing)
-              (typeToParameter declares Set.empty)
+              uncheckedParameter
+              (either (const uncheckedParameter) id . typeToParameter env)
               param.paramType
   in p0
     { parameterAlias = Nothing

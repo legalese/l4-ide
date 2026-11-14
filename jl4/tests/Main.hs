@@ -7,7 +7,6 @@ import qualified Data.Aeson.Encode.Pretty as AP
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text.Encoding as TE
 import qualified Data.List as List
-import qualified Data.Map.Strict as Map
 import qualified L4.Annotation as JL4
 import qualified L4.EvaluateLazy as JL4Lazy
 import L4.TracePolicy (lspDefaultPolicy)
@@ -16,12 +15,11 @@ import L4.Export (ExportedFunction (..))
 import qualified L4.Export as Export
 import qualified L4.Export.Document as Doc
 import qualified L4.Export.Render as Render
-import L4.JsonSchema (SchemaContext (..))
+import qualified L4.Export.Shape as Shape
 import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
 import L4.Parser (PError (..), execProgramParserWithHintPass, execProgramParserWithHintPassUnmemoised)
 import qualified L4.Parser.SrcSpan as JL4
-import L4.Syntax
 import qualified L4.TypeCheck as JL4
 
 import qualified Paths_jl4
@@ -338,8 +336,10 @@ jl4JsonSchemaGolden evalConfig dir inputFile = do
           in case defaultExport of
                Nothing -> "No @export annotations found in file\n"
                Just export ->
-                 let ctx = buildSchemaContext checkResult.module'
-                     schema = JsonSchema.generateJsonSchema ctx export
+                 case JsonSchema.generateJsonSchema (schemaShapeEnv checkResult) export of
+                  Left (input, why) ->
+                    "No schema: the input `" <> Text.unpack input <> "` is " <> Text.unpack (Shape.unsendableWhat why) <> "\n"
+                  Right schema ->
                  -- NOT 'BL.unpack'. 'Data.ByteString.Lazy.Char8.unpack' maps
                  -- each BYTE to a 'Char', and 'AP.encodePretty' returns UTF-8
                  -- bytes — so every non-ASCII character arrived here as its
@@ -354,7 +354,7 @@ jl4JsonSchemaGolden evalConfig dir inputFile = do
                  -- beside it, written from 'Text', held the same source text
                  -- correctly — which is the control that makes this visible.
                  -- smucclaw/l4-ide#962.
-                 in Text.unpack (TE.decodeUtf8 (BL.toStrict (AP.encodePretty schema))) ++ "\n"
+                    Text.unpack (TE.decodeUtf8 (BL.toStrict (AP.encodePretty schema))) ++ "\n"
   pure
     Golden
       { output
@@ -372,22 +372,13 @@ selectDefaultExport exports =
     Just e -> Just e
     Nothing -> listToMaybe exports
 
-buildSchemaContext :: Module Resolved -> SchemaContext
-buildSchemaContext (MkModule _ _ section) =
-  JsonSchema.emptyContext{ctxDeclares = collectDeclares section}
- where
-  collectDeclares :: Section Resolved -> Map.Map Text (Declare Resolved)
-  collectDeclares (MkSection _ _ _ decls) =
-    Map.fromList $ concatMap collectDecl decls
-
-  collectDecl :: TopDecl Resolved -> [(Text, Declare Resolved)]
-  collectDecl = \case
-    Declare _ decl@(MkDeclare _ _ appForm _) ->
-      [(getDeclName appForm, decl)]
-    Section _ sub -> Map.toList $ collectDeclares sub
-    _ -> []
-
-  getDeclName (MkAppForm _ name _ _) = rawNameToText (rawName (getActual name))
+-- | What the export check reads types from, as jl4-schema builds it: the
+-- declarations of the module and of every module it imports.
+schemaShapeEnv :: Rules.TypeCheckResult -> Shape.ShapeEnv
+schemaShapeEnv tc =
+  Shape.shapeEnvFromDeclares
+    (foldMap (Shape.moduleDeclares . (.module')) (tc : Rules.transitiveDependencies tc))
+    tc.entityInfo
 
 -- ----------------------------------------------------------------------------
 -- Test helpers

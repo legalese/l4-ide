@@ -20,12 +20,12 @@ import Language.LSP.Protocol.Types as LSP
 import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
 import L4.Print (prettyLayout, prettyTypeForDisplay, ConstructorFieldNames)
 import L4.Annotation (Anno_(..))
-import L4.Syntax (getActual, Declare, Decide(..), AppForm(..), Resolved)
+import L4.Syntax (getActual, Decide(..), AppForm(..))
 
 import qualified L4.Export as Export
+import qualified L4.Export.Shape as Shape
 import qualified L4.FunctionSchema as FSchema
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 
 import qualified L4.EvaluateLazy as EL
 import L4.Diagnostic (evalResultSuccess)
@@ -425,10 +425,10 @@ instance ToJSON GetExportedFunctionsResponse where
 -- | Convert an 'Export.ExportedFunction' to an 'ExportedFunctionSummary'
 -- using the shared FunctionSchema logic from jl4-core.
 exportedFunctionToSummary
-  :: Map.Map Text (Declare Resolved)
+  :: Shape.ShapeEnv
   -> Export.ExportedFunction
   -> ExportedFunctionSummary
-exportedFunctionToSummary declares ef =
+exportedFunctionToSummary env ef =
   let
     mkParam :: Export.ExportedParam -> (Text, FSchema.Parameter)
     mkParam ep =
@@ -445,7 +445,9 @@ exportedFunctionToSummary declares ef =
               , parameterRequired = Nothing
               , parameterL4Type = Nothing
               }
-            Just ty -> FSchema.typeToParameter declares Set.empty ty
+            -- The caller leaves out what the export check refuses, so every
+            -- input here has a shape.
+            Just ty -> either (const FSchema.uncheckedParameter) id (FSchema.typeToParameter env ty)
           desc = case ep.paramDescription of
             Just d  -> d
             Nothing -> base.parameterDescription
@@ -477,7 +479,7 @@ exportedFunctionToSummary declares ef =
     -- Structured return schema, mirroring jl4-service's Compiler: only for
     -- non-DEONTIC functions (DEONTIC surfaces the simulation envelope).
     mReturnSchema = case ef.exportReturnType of
-      Just retTy | not isDeontic' -> Just (FSchema.typeToParameter declares Set.empty retTy)
+      Just retTy | not isDeontic' -> either (const Nothing) Just (FSchema.typeToParameter env retTy)
       _ -> Nothing
 
     -- Extract line number from the function name's AppForm annotation

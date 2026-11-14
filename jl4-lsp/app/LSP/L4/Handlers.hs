@@ -75,7 +75,6 @@ import qualified L4.Export.Shape as Shape
 import qualified L4.Export.Document as ExportDoc
 import qualified L4.Export.Render as ExportRender
 import qualified L4.Nlg as Nlg
-import qualified L4.FunctionSchema as FSchema
 
 data ReactorMessage
   = ReactorNotification (IO ())
@@ -945,8 +944,6 @@ handlers evalConfig recorder =
                                 List.foldl' visitDep (seen0, []) tc.dependencies
                           in (seenN, tc : deps)
                     uniqueTcs = snd (flatten Set.empty tcResult)
-                    allDeclares =
-                      foldMap (FSchema.declaresFromModule . (.module')) uniqueTcs
                     -- An @export that cannot be published ("L4.Export".'Export.checkExports',
                     -- the same check as the editor's diagnostics with the source
                     -- "export") is left out of the list.
@@ -954,8 +951,9 @@ handlers evalConfig recorder =
                     summaries =
                       concatMap
                         (\tc ->
-                          let exportErrs = Export.checkExports (Shape.shapeEnvFromDeclares shapeDeclares tc.entityInfo) tc.module'
-                          in map (Inspector.exportedFunctionToSummary allDeclares)
+                          let env = Shape.shapeEnvFromDeclares shapeDeclares tc.entityInfo
+                              exportErrs = Export.checkExports env tc.module'
+                          in map (Inspector.exportedFunctionToSummary env)
                                ( Export.withoutRefused exportErrs
                                $ Export.enrichReturnTypes tc.entityInfo
                                $ Export.getExportedFunctions tc.module' ))

@@ -18,7 +18,7 @@ import qualified Data.Text as Text
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
 import qualified L4.Export as Export
-import L4.FunctionSchema (declaresFromModule)
+import qualified L4.Export.Shape as Shape
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.TypeCheck (prettyCheckError)
 import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..))
@@ -46,7 +46,7 @@ spec = describe "#CHECK, the inspector and the deployed returnType" do
         -- as l4/getExportedFunctions composes it (jl4-lsp/app/LSP/L4/Handlers.hs)
         inspected =
           [ s.returnType
-          | s <- map (Inspector.exportedFunctionToSummary (declaresFromModule r.tcdModule))
+          | s <- map (Inspector.exportedFunctionToSummary (Shape.shapeEnvFromDeclares (Shape.moduleDeclares r.tcdModule) r.tcdEntityInfo))
                    (Export.enrichReturnTypes r.tcdEntityInfo (Export.getExportedFunctions r.tcdModule))
           ]
     compiled <- withLog \logger -> compileBundle logger "display-names" (Map.singleton "approve.l4" source)
