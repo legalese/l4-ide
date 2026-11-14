@@ -3,3 +3,8 @@
 -- ERROR: not a literal (a compound expression)
 DECLARE Flags HAS
   x IS A BOOLEAN TYPICALLY (TRUE AND FALSE)
+
+-- ERROR: not a literal, on a rule's GIVEN
+GIVEN n IS A NUMBER TYPICALLY (1 + 2)
+GIVETH A NUMBER
+`same number` n MEANS n

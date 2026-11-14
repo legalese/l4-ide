@@ -102,7 +102,6 @@ Wording as it stands in `prettyCheckError` and `prettyTypeMismatch` (`jl4-core/s
 - **A MEANS on a field of a `ONE OF` constructor is dropped without a check, and a TYPICALLY beside it is checked as on a stored field.**
   Measured 2026-11-04: on `Circle HAS r IS A NUMBER, d IS A NUMBER TYPICALLY 3 MEANS` an undefined name, the file checks, `Circle` still takes `d` as an argument, and `(Circle 1 5)'s d` is 5.
   The refusal above therefore covers record fields only, because its message that the value comes from the MEANS would be false here; the dropped MEANS is a defect of its own, not addressed here.
-- The "must be a literal" error on a DECLARE field is reported at the record type's name, not at the value (`not-ok/tc/tests/typically-non-literal.golden`, range 4:9-4:14 on `Flags`).
 - `NOTHING` and enum-constructor defaults never reach a schema (measured with `jl4-schema`).
 - Cosmetic: `HasRef (TypedName)` binds field 4 as `mExpr` and field 5 as `typically`, the reverse of their meaning (`jl4-core/src/L4/Parser/ResolveAnnotation.hs`); both are traversed and rebuilt in place, so it is harmless.
 - Not built here, and not claimed: filling a left-out input from its default (the design is in the source spec), the query planner reading a default as a prior (nothing in `jl4-query-plan/`, `ts-shared/boolean-analysis/`, `jl4-service/src/Backend/DecisionQueryPlan.hs` or `jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs` mentions TYPICALLY), and the section `GIVEN` of unstable (an input shared by every rule of a § section), whose code, `L4.Discharge`, is not in this tree.

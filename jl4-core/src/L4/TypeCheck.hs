@@ -1916,7 +1916,7 @@ checkTypically :: Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (E
 checkTypically n ty = traverse $ \ e -> do
   re <- checkExpr (ExpectTypicallyValueContext n) e ty
   literal <- isTypicallyLiteral re
-  unless literal $ addError (TypicallyValueNotALiteral n)
+  unless literal $ addError (TypicallyValueNotALiteral (rangeOf e) n)
   pure re
 
 -- | TYPICALLY values must be literals (compile-time constants): number or
@@ -1939,10 +1939,10 @@ isTypicallyLiteral = \ case
 -- disconnected from the binder's real (later-inferred) type.
 checkTypicallyOpt :: Name -> Maybe (Type' Resolved) -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
 checkTypicallyOpt _ _ Nothing = pure Nothing
-checkTypicallyOpt n mty mTypically =
+checkTypicallyOpt n mty mTypically@(Just e) =
   case mty of
     Just ty | not (isKindMarker ty) -> checkTypically n ty mTypically
-    _ -> Nothing <$ addError (TypicallyRequiresType n)
+    _ -> Nothing <$ addError (TypicallyRequiresType (rangeOf e) n)
   where
     isKindMarker (Type _) = True
     isKindMarker _        = False
@@ -5218,11 +5218,11 @@ prettyCheckError (SuppliedComputedField fieldName) =
   , "Computed fields are automatically derived from their MEANS expression."
   , "Remove this field from the constructor."
   ]
-prettyCheckError (TypicallyValueNotALiteral n) =
+prettyCheckError (TypicallyValueNotALiteral _ n) =
   [ "The TYPICALLY value for " <> quotedName n <> " must be a literal:"
   , "a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING."
   ]
-prettyCheckError (TypicallyRequiresType n) =
+prettyCheckError (TypicallyRequiresType _ n) =
   [ quotedName n <> " has a TYPICALLY default but no explicit type."
   , "Add a type annotation (for example IS A NUMBER) so the default can be type-checked."
   ]

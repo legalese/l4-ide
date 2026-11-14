@@ -113,7 +113,6 @@ If the rule reads it, the evaluation stops with a message such as "I needed to k
 
 - **Nothing applies it.** Supply every input. Filling in a left-out input from its usual value is the design in `specs/todo/TYPICALLY-DEFAULTS-SPEC.md`; it is proposed, not built.
 - **Literals only.** A number, a string, or a constructor that takes no arguments.
-- **The error for a value that is not a literal points at the record's name,** not at the value, when the field belongs to a `DECLARE`.
 - **An `@nlg` written after a default does not attach to the default.** It describes the field or the input, as it would without the default.
 - **The query planner does not read it.** The planner that decides which question to ask next orders questions by the structure of the rule alone; using the usual values as odds is proposed, not built.
 

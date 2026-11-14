@@ -136,12 +136,14 @@ data CheckError =
     -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
     -- the exported function's name, and the input's name (Nothing when it is
     -- the result).
-  | TypicallyValueNotALiteral Name
+  | TypicallyValueNotALiteral (Maybe SrcRange) Name
     -- ^ The TYPICALLY default value must be a literal (a compile-time
     -- constant): a number or string literal, or a nullary constructor.
-  | TypicallyRequiresType Name
+    -- Arguments: the range of the value, and the binder's name.
+  | TypicallyRequiresType (Maybe SrcRange) Name
     -- ^ A TYPICALLY default was written on a binder with no explicit type, so
     -- the default cannot be type-checked. Require an explicit type annotation.
+    -- Arguments: the range of the value, and the binder's name.
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
@@ -448,6 +450,8 @@ instance HasSrcRange CheckError where
   rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (ExportEventType r _ _)           = r
   rangeOf (TypicallyOnComputedField r _)    = r
+  rangeOf (TypicallyValueNotALiteral r _)   = r
+  rangeOf (TypicallyRequiresType r _)       = r
   rangeOf (CheckInfo _ mr)                  = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
