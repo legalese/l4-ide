@@ -328,9 +328,10 @@ those, or a record or enumeration of those. A `FUNCTION FROM … TO …`, an
 yet, so an `@export` of a rule with one is an error at the `@export`, and
 `jl4-service` refuses to deploy it. The error says "its input `x` is a
 function, and @export does not support that yet" (or "its result", or "an
-EVENT", or "a DEONTIC, a contract rule"). The file still type-checks, so the
-rule still evaluates in the editor with its `#EVAL` and `#EVALTRACE`: remove
-the `@export`, or pass the parts of an event as separate inputs and build it
+EVENT", or "a DEONTIC, a contract rule"), and `l4 check` fails. The error
+does not stop the rest of the file: it is still type-checked, and the rule
+still evaluates in the editor with its `#EVAL` and `#EVALTRACE`. Remove the
+`@export`, or pass the parts of an event as separate inputs and build it
 inside the rule. Function-typed ASSUMEs also stay uninterpreted at runtime
 (any call fails with a stuck "assumed term" error).
 
