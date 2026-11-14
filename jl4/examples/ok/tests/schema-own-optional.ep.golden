@@ -1,0 +1,21 @@
+-- A type the module declares and calls Optional is that type, not MAYBE: in
+-- both schema generators it is a required field, and the JSON decoder refuses
+-- the field when it is left out. The schema golden is jl4-schema's.
+
+DECLARE Optional a IS ONE OF Absent, Present HAS value IS A a
+
+DECLARE Holder HAS
+  o IS AN Optional NUMBER
+  n IS A NUMBER
+
+@export default reads a holder
+GIVEN h IS A Holder
+GIVETH A NUMBER
+f h MEANS h's n
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Holder
+decode s MEANS JSONDECODE s
+
+#EVAL decode "{\"o\": \"Absent\", \"n\": 1}"
+#EVAL decode "{\"n\": 1}"

@@ -29,7 +29,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Data.Time (getCurrentTime)
-import L4.Export (ExportedFunction (..), ExportedParam (..), getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams)
+import L4.Export (ExportedFunction (..), ExportedParam (..), expandRequired, getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams)
 import qualified L4.Export as Export
 import qualified L4.Export.Shape as Shape
 import L4.Print (prettyTypeForDisplay)
@@ -400,7 +400,9 @@ parametersFromExport :: Map Text (Declare Resolved) -> [ExportedParam] -> Parame
 parametersFromExport declares params =
   MkParameters
     { parameterMap = Map.fromList [(param.paramName, paramToParameter declares param) | param <- params]
-    , required = [param.paramName | param <- params, param.paramRequired]
+    -- With every module's declarations, as for the record fields below, so
+    -- that an input typed with an imported synonym for a MAYBE is optional.
+    , required = [param.paramName | param <- map (expandRequired declares) params, param.paramRequired]
     }
 
 -- | Convert an ExportedParam to a Parameter.

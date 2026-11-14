@@ -14,8 +14,16 @@ module L4.TypeCheck
   , isQuantifier
   , prettyCheckError
   , prettyCheckErrorWithContext
+  -- what the merge of 'checkExpr' tells values apart by; exported to be tested
+  , headKey
   -- 'severity' is re-exported via @module X@ (it lives in
   -- L4.TypeCheck.Types now, next to candidate viability)
+  --
+  -- The combinators that put a whole 'CheckState' back, which a plural outcome
+  -- ('CheckState.plural') has to survive; exported to be tested.
+  , quietly
+  , settleOneClause
+  , speculatively
   )
   where
 
@@ -87,7 +95,7 @@ import L4.Annotation
 import L4.Names
 import L4.Parser.ResolveAnnotation (pickDesc)
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
-import L4.Print (clauseBodies, prettyLayout, quotedName)
+import L4.Print (clauseBodies, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
@@ -126,6 +134,9 @@ mkInitialCheckState substitution =
     , nlgMap       = IV.empty
     , scopeMap     = IV.empty
     , descMap      = IV.empty
+    , plural       = False
+    , bindLog      = []
+    , bindLogLen   = 0
     }
 
 mkInitialCheckEnv :: NormalizedUri -> Environment -> EntityInfo -> CheckEnv
@@ -931,7 +942,7 @@ checkClausesLet ec ann ds e t
 -- mention prints as what was inferred, not as a bare inference variable.
 speculatively :: Check a -> Check ()
 speculatively m = MkCheck \ e s ->
-  [ (foldr With (Plain ()) diags', s { supply = s''.supply })
+  [ (foldr With (Plain ()) diags', s { supply = s''.supply, plural = s'.plural })
   | (w, s') <- runCheck m e s
   , let (diags, _) = runWith w
   , (w', s'') <- take 1 (runCheck (traverse applySubst diags) e s')
@@ -2047,17 +2058,85 @@ ensureDistinct ndc ns = do
   unless (null dups) $
     addError (NonDistinctError ndc dups)
 
+-- | 'softprune' for the check of an expression against a type: the outcomes
+-- that nothing after it can tell apart are merged ('softpruneAlike').
+--
+-- What the callers of 'checkExpr' do with the expression it returns is to
+-- embed it in a larger one, and that is all the merge allows for: it compares
+-- only what 'headKey' reads off it.
+--
+-- * The callers that, on unstable, read the head of it (the party of
+--   'checkDeonton', 'inferEvent'; unstable also has 'checkTypically') call
+--   'checkExprExact', whose outcomes are never merged. Main reads no head
+--   there; they are kept exact so that the merge does what it does on
+--   unstable (legalese/l4-ide#683) and no more.
+softpruneExpr :: Check (Expr Resolved) -> Check (Expr Resolved)
+softpruneExpr = softpruneAlike headKey
+
+-- | How unstable's reader of the body of a nullary definition looks into an
+-- expression (legalese/l4-ide#683), the one way it does: the arguments of an
+-- application, whose heads it looks at, or a bare name, whose own body it then
+-- reads in turn. Main has no such reader; 'headKey' is made of this so that two
+-- values it would tell apart are never merged.
+data BodyRead
+  = ReadsArgs [Expr Resolved]
+  | ReadsName Resolved
+  | ReadsNothing
+
+bodyRead :: Expr Resolved -> BodyRead
+bodyRead = \ case
+  App _ _ args@(_ : _) -> ReadsArgs args                           -- applied / positional record
+  AppNamed _ _ nes _   -> ReadsArgs [ a | MkNamedExpr _ _ a <- nes ]
+  App _ f []           -> ReadsName f                              -- a bare name
+  _                    -> ReadsNothing
+
+-- | What anything that reads the value a 'checkExpr' returns could tell it
+-- apart by, other than by embedding it in a larger expression: the key of
+-- 'softpruneAlike'. It is what 'bodyRead' reads, down to the 'Unique' of the
+-- name, or of the head of each argument ('exprHeadConstructor'); and whether
+-- the value is a literal.
+headKey :: Expr Resolved -> ExprHead
+headKey e = case bodyRead e of
+  ReadsName f    -> HeadName (getUnique f)
+  ReadsArgs args -> HeadApplied (map (fmap getUnique . exprHeadConstructor) args)
+  ReadsNothing   -> case e of
+    Lit {} -> HeadLiteral
+    _      -> HeadOther
+
+-- | What 'headKey' tells expressions apart by.
+data ExprHead
+  = HeadLiteral
+  | HeadName Unique
+  | HeadApplied [Maybe Unique]
+  | HeadOther
+  deriving stock (Eq, Ord, Show)
+
+-- | The name an expression is, if it is a bare name.
+exprHeadConstructor :: Expr Resolved -> Maybe Resolved
+exprHeadConstructor (App _ n []) = Just n
+exprHeadConstructor _            = Nothing
+
 checkExpr :: ExpectationContext -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
-checkExpr ec (IfThenElse ann e1 e2 e3) t = softprune $ do
+checkExpr = checkExprWith softpruneExpr
+
+-- | 'checkExpr' for a caller that reads the expression it returns: where two
+-- meanings of a name both check, both outcomes are kept, as 'softprune' keeps them.
+checkExprExact :: ExpectationContext -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
+checkExprExact = checkExprWith softprune
+
+checkExprWith
+  :: (Check (Expr Resolved) -> Check (Expr Resolved))
+  -> ExpectationContext -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
+checkExprWith pr ec (IfThenElse ann e1 e2 e3) t = pr $ do
   re <- checkIfThenElse ec ann e1 e2 e3 t
   setAnnResolvedType t Nothing re
-checkExpr ec c@(Consider ann e branches) t = softprune $ errorContext (WhileCheckingExpression c) $ do
+checkExprWith pr ec c@(Consider ann e branches) t = pr $ errorContext (WhileCheckingExpression c) $ do
   re <- checkConsider ec ann e branches t
   setAnnResolvedType t Nothing re
 -- checkExpr (ParenExpr ann e) t = do
 --   re <- checkExpr e t
 --   pure (ParenExpr ann re)
-checkExpr ec (Where ann e ds) t = softprune $ do
+checkExprWith pr ec (Where ann e ds) t = pr $ do
   let
     preScanDecl = mapMaybeM scanTyDeclLocalDecl
     scanDecl = mapMaybeM inferTyDeclLocalDecl
@@ -2075,9 +2154,9 @@ checkExpr ec (Where ann e ds) t = softprune $ do
       nlgExpr re
     pure re
   setAnnResolvedType t Nothing (Where ann re rds)
-checkExpr ec (LetIn ann ds e) t
-  | any isClausesBinding ds = softprune $ checkClausesLet ec ann ds e t
-checkExpr ec (LetIn ann ds e) t = softprune $ do
+checkExprWith pr ec (LetIn ann ds e) t
+  | any isClausesBinding ds = pr $ checkClausesLet ec ann ds e t
+checkExprWith pr ec (LetIn ann ds e) t = pr $ do
   let
     preScanDecl = mapMaybeM scanTyDeclLocalDecl
     scanDecl = mapMaybeM inferTyDeclLocalDecl
@@ -2091,7 +2170,7 @@ checkExpr ec (LetIn ann ds e) t = softprune $ do
       re <- checkExpr ec e t
       nlgExpr re
   setAnnResolvedType t Nothing (LetIn ann rds re)
-checkExpr ec e t = softprune $ errorContext (WhileCheckingExpression e) do
+checkExprWith pr ec e t = pr $ errorContext (WhileCheckingExpression e) do
   (re, rt) <- inferExpr e
   expect ec t rt
   -- Store the expected type in the annotation so it's available during evaluation
@@ -2118,7 +2197,7 @@ checkDeonton
   -> Maybe (Expr Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
   -> Type' Resolved -> Type' Resolved -> Check (Deonton Resolved)
 checkDeonton ann party action due hence lest partyT actionT = do
-  partyR <- checkExpr ExpectRegulativePartyContext party partyT
+  partyR <- checkExprExact ExpectRegulativePartyContext party partyT
   (actionR, boundByPattern) <- checkAction action actionT
   let rTy = contract partyT actionT
   dueR <- traverse (\e -> checkExpr ExpectRegulativeDeadlineContext e number) due
@@ -2705,8 +2784,8 @@ inferEvent :: Event Name -> Check (Event Resolved, Type' Resolved)
 inferEvent (MkEvent ann party action timestamp atFirst) = do
   partyT <- fresh (NormalName "party")
   actionT <- fresh (NormalName "action")
-  party' <- checkExpr ExpectRegulativePartyContext party partyT
-  action' <- checkExpr ExpectRegulativeActionContext action actionT
+  party' <- checkExprExact ExpectRegulativePartyContext party partyT
+  action' <- checkExprExact ExpectRegulativeActionContext action actionT
   timestamp' <- checkExpr ExpectRegulativeTimestampContext timestamp number
   pure (MkEvent ann party' action' timestamp' atFirst, event partyT actionT)
 
@@ -3609,7 +3688,7 @@ matchFunTy  argContext r t0 args =
                 argts <- traverse (const (fresh (NormalName "arg"))) args
                 rt <- fresh (NormalName "res")
                 let tf = fun_ argts rt
-                assign #substitution (Map.insert i tf subst)
+                bindInfVar i tf
 
                 rargs <- traverse (\ (j, e, t') -> checkExpr (argContext j) e t') (zip3 [1 ..] args argts)
                 pure (rargs, rt)
@@ -3662,7 +3741,7 @@ matchPatFunTy  r t args =
           argts <- traverse (const (fresh (NormalName "arg"))) args
           rt <- fresh (NormalName "res")
           let tf = fun_ argts rt
-          assign #substitution (Map.insert i tf subst)
+          bindInfVar i tf
 
           (rargs, extends) <- unzip <$> traverse (\ (j, e, t') -> checkPattern (ExpectAppArgContext False r j) e t') (zip3 [1 ..] args argts)
           pure (rargs, rt, concat extends)
@@ -4974,7 +5053,11 @@ prettyCheckError (IncompleteAppNamed r onts)               =
   , "you forgot to supply the following arguments:"
   , ""
   ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
-prettyCheckError (CheckInfo t _)                           = [prettyLayout t]
+-- A '#CHECK' over a polymorphic term carries residual inference variables,
+-- and the raw layout prints them as the checker's gensyms (@a24@) — not a name
+-- in any scope, and different after every edit. Render for display instead:
+-- stable @a@, @b@, … by order of first appearance, exactly as hover does.
+prettyCheckError (CheckInfo t _)                           = [prettyTypeForDisplay t]
 prettyCheckError (IllegalTypeInKindSignature t)            =
   [ "In a signature of a type declaration, all parameters must be of type"
   , ""

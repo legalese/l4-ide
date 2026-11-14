@@ -43,7 +43,7 @@ import L4.Parser.AnnotationWarning (annotationWarningMessage, annotationWarningS
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.TypeCheck (severity, prettyCheckErrorWithContext, applyFinalSubstitution)
 import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext(..), Severity(..), Substitution)
-import L4.Print (prettyLayout, prettyLayoutNF, ConstructorFieldNames, extractConstructorFieldNames)
+import L4.Print (prettyLayout, prettyLayoutNF, prettyTypeForDisplay, ConstructorFieldNames, extractConstructorFieldNames)
 import L4.Syntax (Info(..), Type'(..), Resolved, OptionallyNamedType(..), TopDecl(..), Module(..), Section(..), directiveLabel)
 import L4.Diagnostic (evalResultSeverity, evalResultSuccess)
 import qualified L4.Diagnostic as Diagnostic
@@ -564,11 +564,13 @@ infoToHover nuri subst srcRange info = Aeson.object
   , "range" .= rangeToJson srcRange
   ]
 
--- | Convert Info to display text.
+-- | Convert Info to display text. A type is rendered with
+-- 'prettyTypeForDisplay', as the VS Code hover and @#CHECK@ render it, so a
+-- residual inference variable prints as @a@, not as the checker's @x4@.
 infoToText :: NormalizedUri -> Substitution -> Info -> Text
 infoToText nuri subst = \case
   TypeInfo ty _mTermKind ->
-    prettyLayout (applyFinalSubstitution subst nuri ty)
+    prettyTypeForDisplay (applyFinalSubstitution subst nuri ty)
   KindInfo kind ->
     prettyLayout (typeFunction kind)
   TypeVariable ->

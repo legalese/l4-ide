@@ -99,7 +99,9 @@ data UserEvalException =
     -- ('PmConsider'), so that the message is about the clauses the drafter
     -- wrote. 'Right' the forced scrutinee value when available, 'Left' the
     -- raw reference otherwise.
-  | StackOverflow
+  | StackOverflow Int
+    -- ^ The frame limit that was reached: 'maximumFrameDepth', unless
+    -- @JL4_MAX_FRAME_DEPTH@ set another.
   | DivisionByZero BinOp
   | NotAnInteger BinOp Rational
   | Stuck Resolved -- ^ stores the term we got stuck on
@@ -126,7 +128,7 @@ evalExceptionCode = \ case
     BlackholeForced {}           -> "eval/infinite-loop"
     EqualityOnUnsupportedType {} -> "eval/unsupported-equality"
     NonExhaustivePatterns {}     -> "eval/non-exhaustive-patterns"
-    StackOverflow                -> "eval/stack-overflow"
+    StackOverflow _              -> "eval/stack-overflow"
     DivisionByZero {}            -> "eval/division-by-zero"
     NotAnInteger {}              -> "eval/not-an-integer"
     Stuck {}                     -> "eval/stuck"
@@ -198,9 +200,9 @@ prettyUserEvalException = \ case
         <> [ "Add a clause for this case, or end the clauses with one that matches every input." ]
     where
       h = quotedName (MkName emptyAnno g.groupHead)
-  StackOverflow ->
+  StackOverflow depth ->
     [ "Stack overflow: "
-    , "Recursion depth of " <> Text.textShow maximumFrameDepth
+    , "Recursion depth of " <> Text.textShow depth
     , "exceeded." ]
   DivisionByZero op ->
     [ "Division by zero in the operation:"
@@ -230,6 +232,7 @@ maximumStackSize = 200
 -- against runaway recursion. (The historical 200-frame limit was never
 -- actually enforced due to an accounting bug, so legitimate deeply-recursive
 -- programs relied on an effectively unbounded stack; this bound is therefore
--- deliberately generous.)
+-- deliberately generous.) The environment variable @JL4_MAX_FRAME_DEPTH@
+-- sets another, so that a test can reach the limit without a million frames.
 maximumFrameDepth :: Int
 maximumFrameDepth = 1_000_000

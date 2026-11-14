@@ -1142,6 +1142,9 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
           , nlgMap = IV.empty
           , scopeMap = IV.empty
           , descMap = IV.empty
+          , plural = False
+          , bindLog = []
+          , bindLogLen = 0
           }
         -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
         -- applied when the TypeCheckResult is built below), as

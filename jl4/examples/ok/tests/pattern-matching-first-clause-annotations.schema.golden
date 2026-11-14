@@ -3,7 +3,7 @@
     "description": "the steps of a number",
     "properties": {
         "n": {
-            "$ref": "#/$defs/NUMBER"
+            "type": "number"
         }
     },
     "required": [

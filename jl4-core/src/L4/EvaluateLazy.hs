@@ -24,6 +24,11 @@ module L4.EvaluateLazy
 , prettyEvalDirectiveResultWithFields
 , prettyAssertionOutcome
 , prettyReductionOutcome
+, postprocessTrace
+, safePostprocessTrace
+, tracePostprocessFailed
+, traceUnavailable
+, parseMaxFrameDepth
 )
 where
 
@@ -42,7 +47,7 @@ import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (initialTemporalContext)
 import L4.TracePolicy (TracePolicy)
 
-import Control.Exception (try)
+import Control.Exception (try, evaluate, ErrorCall)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import System.Environment (lookupEnv)
@@ -68,6 +73,10 @@ data EvalConfig = EvalConfig
     -- @l4 batch@ and jl4-service's generated wrapper do, sets it, so that it
     -- reaches the same depth of the answer as a directive that asks for
     -- @f args@, and gives the same verdict.
+  , tracePostprocessor :: [EvalTraceAction] -> EvalTrace
+    -- ^ How a directive's trace is built from what the evaluation recorded:
+    -- 'postprocessTrace'. A test replaces it with one that fails, to follow
+    -- the fallback 'tracePostprocessFailed' out through a surface.
   }
 
 resolveEvalConfig :: Maybe UTCTime -> TracePolicy -> IO EvalConfig
@@ -75,7 +84,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe False)
+  pure (EvalConfig mTime tracePolicy safe False postprocessTrace)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -145,14 +154,23 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
         nfAnswer whnf
+  postprocessed <- case mt of
+    Nothing      -> pure Nothing
+    Just actions -> do
+      postprocess <- asks (.tracePostprocessor)
+      Just <$> liftIO (safePostprocessTrace postprocess actions)
   let
     -- The root of the trace carries the outcome of the directive's expression.
     -- The trace records the reduction to weak head normal form, so an
     -- exception met only while the answer is read to normal form (a refusal
     -- inside a JUST, or at the end of a list) is not in it, and its root would
     -- show the answer's head as though it were the answer.
-    finalTrace = rootCarriesOutcome v . postprocessTrace <$> mt
-    rootCarriesOutcome (Left exc) (Trace l steps (Right _)) = Trace l steps (Left exc)
+    finalTrace = rootCarriesOutcome v <$> postprocessed
+    -- ... except the fallback for a trace that could not be built, whose only
+    -- content is that it could not be: rewriting it leaves a node with no label
+    -- and no reason, which reads as a trace of nothing.
+    rootCarriesOutcome (Left exc) t@(Trace l steps (Right _))
+      | not (traceUnavailable t) = Trace l steps (Left exc)
     rootCarriesOutcome _ t = t
     v' = case assertKind of
       NotAnAssert -> Reduction
@@ -206,6 +224,38 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = do
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
   pure (MkEvalDirectiveResult r v' finalTrace)
+
+-- | 'postprocessTrace', guarded so it can never escape an exception: if trace
+-- post-processing throws (e.g. a malformed action sequence produced by an
+-- unbalanced push/pop), degrade to a one-node fallback trace instead of letting
+-- an ErrorCall abort the surrounding evaluation and discard the already-computed
+-- #EVAL result. Catches 'ErrorCall' specifically — not 'SomeException'
+-- — so asynchronous exceptions (request cancellation, timeouts) still propagate.
+--
+-- It takes the post-processing to run, normally 'postprocessTrace': no known
+-- input makes that fail any more, so a test passes one that does.
+safePostprocessTrace :: ([EvalTraceAction] -> EvalTrace) -> [EvalTraceAction] -> IO EvalTrace
+safePostprocessTrace postprocess actions = do
+  r <- try (evaluate (force (postprocess actions)))
+  pure $ case r of
+    Right t               -> t
+    Left (_ :: ErrorCall) -> tracePostprocessFailed
+
+-- | Fallback substituted for a trace when post-processing it fails. Keeps the
+-- directive's result intact and degrades only the trace to a single marker
+-- node, instead of letting the failure abort the surrounding evaluation.
+tracePostprocessFailed :: EvalTrace
+tracePostprocessFailed = Trace Nothing [] (Right (MkNF (ValString traceUnavailableMessage)))
+
+traceUnavailableMessage :: Text
+traceUnavailableMessage = "trace unavailable (internal error during trace post-processing)"
+
+-- | Is this the fallback, rather than a trace? A surface that hands the trace to
+-- a person has to say so: the fallback is a graph with one node.
+traceUnavailable :: EvalTrace -> Bool
+traceUnavailable = \ case
+  Trace Nothing [] (Right (MkNF (ValString s))) -> s == traceUnavailableMessage
+  _ -> False
 
 postprocessTrace :: [EvalTraceAction] -> EvalTrace
 postprocessTrace actions =
@@ -498,7 +548,26 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   let temporalCtx = initialTemporalContext actualTime
   temporalContext <- newIORef temporalCtx
   let evalTrace = Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust}
+  maxFrameDepth <- readMaxFrameDepthEnv
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth, tracePostprocessor = evalConfig.tracePostprocessor}
+
+-- | @JL4_MAX_FRAME_DEPTH@, a whole number from 1 to the largest 'Int',
+-- replaces 'maximumFrameDepth'. Anything else leaves the default.
+readMaxFrameDepthEnv :: IO Int
+readMaxFrameDepthEnv = do
+  menv <- lookupEnv "JL4_MAX_FRAME_DEPTH"
+  pure $ fromMaybe maximumFrameDepth (menv >>= parseMaxFrameDepth)
+
+-- | Only ASCII decimal digits, with no leading zero, from 1 to the largest
+-- 'Int'. 'readMaybe' alone reads Haskell syntax (@0x12C@, @(300)@, @ 300@),
+-- and read as an 'Int', 2^64 + 1 wraps to 1, so the digits are checked first
+-- and the number is read as an 'Integer'.
+parseMaxFrameDepth :: String -> Maybe Int
+parseMaxFrameDepth s = case s of
+  c : _ | c /= '0', all (\d -> d >= '0' && d <= '9') s
+        , n <- read s :: Integer
+        , n <= toInteger (maxBound :: Int) -> Just (fromInteger n)
+  _ -> Nothing
 
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,

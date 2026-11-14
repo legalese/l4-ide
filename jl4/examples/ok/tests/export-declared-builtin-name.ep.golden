@@ -1,0 +1,12 @@
+-- A type the file declares keeps its own schema even when its name is also a
+-- spelling of a builtin. `Text` here is a record, so the input must be an
+-- object with a `body`, not a JSON string.
+
+DECLARE Text HAS `body` IS A NUMBER
+
+@export default the body of a text
+GIVEN t IS A Text
+GIVETH A NUMBER
+`body of` t MEANS t's `body`
+
+#EVAL `body of` (Text OF 3)
