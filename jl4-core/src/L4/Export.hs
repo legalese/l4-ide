@@ -17,6 +17,7 @@ module L4.Export (
   extractImplicitAssumeParams,
   hasTypeInferenceVars,
   checkExports,
+  isContractResult,
   ExportError (..),
   ExportSite (..),
   exportErrorRange,
@@ -44,7 +45,7 @@ import L4.Annotation (getAnno, rangeOf)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
 import L4.TypeSynonym (declaresFromModule, expandSynonyms)
-import L4.TypeCheck.Environment (maybeUnique)
+import L4.TypeCheck.Environment (contractUnique, maybeUnique)
 import L4.Export.Shape (ShapeEnv (..), Unsendable (..), isUnresolved, jsonShape, unsendableHint, unsendableWhat)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), EntityInfo, Severity (..))
 import Optics
@@ -524,12 +525,27 @@ prettyExportError = \case
     ExportInput n -> "input " <> quoted n
     ExportResult -> "result"
 
+-- | Is this the result of a contract rule: a DEONTIC itself (or PROVISION,
+-- which is the same type), and not inside a MAYBE, a LIST, an EITHER or a
+-- synonym? A rule that returns one is published, and the service evaluates it
+-- with a startTime and the events so far (Meng, 2026-11-14, ROCKINGCHAIR:
+-- "an \@export whose result is a bare DEONTIC is accepted on every surface ...
+-- a MAYBE/LIST/EITHER/synonym of a DEONTIC stays refused"). This is the test
+-- the service uses to decide that a function is a contract, so that what the
+-- check accepts is what the service evaluates as one.
+isContractResult :: Type' Resolved -> Bool
+isContractResult = \case
+  TyApp _ name [_, _] -> getUnique name == contractUnique
+  _ -> False
+
 -- | Check every @\@export@ of a module against what can cross the boundary:
 -- each of its inputs (a GIVEN, or an ASSUME of the module that the body reads)
 -- and its result must have a JSON form ('jsonShape'). A function, an EVENT, a
 -- DEONTIC (a contract rule), a type variable and a type with no shape yet do
--- not, so an @\@export@ of a rule with one is refused, at the @\@export@. A
--- GIVEN with no written type is a warning.
+-- not, so an @\@export@ of a rule with one is refused, at the @\@export@. The
+-- one exception is a result that is a DEONTIC itself ('isContractResult'),
+-- which the service evaluates as a contract. A GIVEN with no written type is a
+-- warning.
 --
 -- This is its own pass, not a part of type checking: the errors of a type check
 -- stop the file from evaluating, and a refused @\@export@ is no reason to stop
@@ -614,6 +630,7 @@ checkOneExport env assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ n
   ++ concat
     [ unsendable ExportResult ty
     | Just ty <- [extractReturnType tySig <|> inferredReturnType env.entities fnName]
+    , not (isContractResult ty)
     ]
  where
   exportAt = getAnno decide ^. annDesc >>= rangeOf

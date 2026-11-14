@@ -26,7 +26,8 @@
 -- >                                an argument has none, whether or not the parameter is used:
 -- >                                UInArgument
 -- > a record that contains itself  JRecursive               (expansion stops there)
--- > DEONTIC party action           no shape yet: UDeontic
+-- > DEONTIC party action           no shape yet: UDeontic (a result that is a DEONTIC itself is
+-- >                                published all the same, as a contract: 'L4.Export.isContractResult')
 -- > EVENT party action             no shape yet: UEvent
 -- > FUNCTION FROM a TO b           no shape yet: UFunction
 -- > a type variable                no shape: UPolymorphic
@@ -396,7 +397,7 @@ unsendableWhat = \case
 unsendableHint :: Unsendable -> Text
 unsendableHint = \case
   UFunction -> "Pass the values the function would work on, and apply the function inside the rule."
-  UDeontic -> "A contract can't be an @export input or result yet. Remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE."
+  UDeontic -> "An @export can return a DEONTIC itself, but it can't take one as an input or return one inside another type yet. Return the DEONTIC itself, or remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE."
   UEvent -> "Take the party, the action and the time as separate inputs, and build the event inside the rule."
   UPolymorphic _ -> genericHint
   UTypeAsInput -> genericHint

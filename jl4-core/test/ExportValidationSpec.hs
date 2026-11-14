@@ -367,18 +367,54 @@ spec = do
         problems src `shouldBe` Right []
 
     describe "DEONTIC" $ do
-      -- Meng, 2026-10-30: contract rules are not exported for now, and the
-      -- editor still evaluates them. The refusal is meant to be revisited.
-      it "refuses a result that is a DEONTIC, and the file still type-checks" $ do
+      -- Meng, 2026-11-14 (ROCKINGCHAIR): an @export whose result is a DEONTIC
+      -- itself is accepted, as the service evaluates it as a contract; a MAYBE,
+      -- LIST, EITHER or synonym of a DEONTIC stays refused, and so does a
+      -- DEONTIC input.
+      it "accepts a result that is a DEONTIC, written or inferred, or a PROVISION" $ do
         let src = Text.unlines $ types ++
               [ "@export Duty"
               , "GIVETH A DEONTIC Party Act"
               , "`duty` MEANS PARTY alice MUST ping WITHIN 3"
               , ""
+              , "@export Old name"
+              , "GIVETH A PROVISION OF Party, Act"
+              , "`old name` MEANS PARTY bob MUST pong WITHIN 3"
+              , ""
+              , "@export Inferred"
+              , "`inferred` MEANS PARTY alice MUST ping WITHIN 3"
+              , ""
               , "#EVAL `duty`"
               ]
-        problems src `shouldBe` Right [(Just 4, "duty", Nothing, "a DEONTIC, a contract rule")]
+        problems src `shouldBe` Right []
         noTypeError src
+
+      it "refuses a MAYBE, a LIST, an EITHER or a synonym of a DEONTIC result" $ do
+        let src = Text.unlines $ types ++
+              [ "DECLARE Duty IS A DEONTIC Party Act"
+              , ""
+              , "@export Maybe"
+              , "GIVETH A MAYBE (DEONTIC Party Act)"
+              , "`maybe` MEANS NOTHING"
+              , ""
+              , "@export Listed"
+              , "GIVETH A LIST OF (DEONTIC Party Act)"
+              , "`listed` MEANS LIST (PARTY alice MUST ping WITHIN 3)"
+              , ""
+              , "@export Either"
+              , "GIVETH AN EITHER NUMBER (DEONTIC Party Act)"
+              , "`either` MEANS LEFT 1"
+              , ""
+              , "@export Named"
+              , "GIVETH A Duty"
+              , "`named` MEANS PARTY alice MUST ping WITHIN 3"
+              ]
+        problems src `shouldBe` Right
+          [ (Just 6, "maybe", Nothing, "a MAYBE whose value is a DEONTIC, a contract rule")
+          , (Just 10, "listed", Nothing, "a list whose elements are each a DEONTIC, a contract rule")
+          , (Just 14, "either", Nothing, "an EITHER one of whose sides is a DEONTIC, a contract rule")
+          , (Just 18, "named", Nothing, "a DEONTIC, a contract rule")
+          ]
 
       it "refuses a DEONTIC input" $ do
         let src = Text.unlines $ types ++
@@ -856,9 +892,11 @@ spec = do
     it "reports a function input as l4 check does" $
       l4CheckDiagnostics (refused ["GIVEN test IS A FUNCTION FROM NUMBER TO BOOLEAN", "GIVETH A NUMBER"] "`refused` MEANS 1")
         `shouldBe` [("export", 1, "`refused` is published with @export, but its input `test` is a function, and @export does not support that yet.\nPass the values the function would work on, and apply the function inside the rule.")]
-    it "reports a DEONTIC result as l4 check does" $
-      l4CheckDiagnostics (refused ["GIVETH A DEONTIC Party Act"] "`refused` MEANS PARTY alice MUST ping WITHIN 3")
-        `shouldBe` [("export", 1, "`refused` is published with @export, but its result is a DEONTIC, a contract rule, and @export does not support that yet.\nA contract can't be an @export input or result yet. Remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE.")]
+    it "reports a MAYBE of a DEONTIC result as l4 check does" $
+      l4CheckDiagnostics (refused ["GIVETH A MAYBE (DEONTIC Party Act)"] "`refused` MEANS NOTHING")
+        `shouldBe` [("export", 1, "`refused` is published with @export, but its result is a MAYBE whose value is a DEONTIC, a contract rule, and @export does not support that yet.\nAn @export can return a DEONTIC itself, but it can't take one as an input or return one inside another type yet. Return the DEONTIC itself, or remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE.")]
+    it "has nothing to say of a DEONTIC result" $
+      l4CheckDiagnostics (refused ["GIVETH A DEONTIC Party Act"] "`refused` MEANS PARTY alice MUST ping WITHIN 3") `shouldBe` []
     it "reports a GIVEN with no written type as a warning" $
       l4CheckDiagnostics (refused ["GIVEN n", "GIVETH A BOOLEAN"] "`refused` MEANS n > 0")
         `shouldBe` [("export", 2, "`refused` is published with @export, but its input `n` has no written type.\nWrite one in the GIVEN, so that the schema says what to send.")]

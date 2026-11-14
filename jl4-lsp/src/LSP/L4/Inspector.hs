@@ -471,10 +471,11 @@ exportedFunctionToSummary env ef =
       Nothing -> "unknown"
       Just ty -> prettyTypeForDisplay ty
 
-    -- A rule that returns a DEONTIC is not exported: 'Export.checkExports'
-    -- refuses it, and the caller leaves refused rules out of the summaries
-    -- (so none reaches here). The field stays for the sidebar's sake.
-    isDeontic' = False
+    -- A contract rule: one whose result is a DEONTIC itself, by the test the
+    -- export check and the service use ('Export.isContractResult'). A DEONTIC
+    -- anywhere else in the result is refused, and the caller leaves refused
+    -- rules out of the summaries.
+    isDeontic' = maybe False Export.isContractResult ef.exportReturnType
 
     -- Structured return schema, mirroring jl4-service's Compiler: only for
     -- non-DEONTIC functions (DEONTIC surfaces the simulation envelope).

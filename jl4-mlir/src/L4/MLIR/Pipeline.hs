@@ -31,12 +31,11 @@ import L4.MLIR.IR (MLIRModule(..))
 import L4.MLIR.Emit (renderMLIR)
 import L4.MLIR.Lower (lowerProgramWithDiagnostics, dedupAndSynthExterns)
 import L4.MLIR.Runtime.Builtins (builtinDeclarations)
-import L4.MLIR.Schema (WasmBundle, bundleExports, applyDiagnostics, isDeonticType, writeBundleFile)
+import L4.MLIR.Schema (WasmBundle, bundleExports, applyDiagnostics, writeBundleFile)
 
-import L4.Syntax (AppForm (..), Decide (..), Module, Resolved, getUnique)
+import L4.Syntax (Module, Resolved)
 import L4.TypeCheck.Types (InfoMap, Severity (..))
 import qualified L4.Export as Export
-import qualified L4.Export.Shape as Shape
 
 import Data.Map.Strict (Map)
 
@@ -50,7 +49,6 @@ import L4.TracePolicy (cliDefaultPolicy)
 
 import Control.Monad (unless, when)
 import Data.Maybe (fromMaybe)
-import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
@@ -106,32 +104,17 @@ typecheckL4File filepath = do
     exportErrs <- Shake.use Rules.ExportCheck uri
     pure (mTc, fromMaybe [] exportErrs)
 
+  -- The schema this writes is meant to be read as jl4-service's is, so what the
+  -- service refuses is refused here, in its words. A rule whose result is a
+  -- DEONTIC itself is accepted by both ('Export.isContractResult'); the JS
+  -- runtime evaluates it from the contract in the schema.
   case checked of
     (Just tc, exportErrs)
-      | tc.success -> case filter (refusedHere (contractRules tc)) exportErrs of
+      | tc.success -> case filter ((== SError) . Export.exportErrorSeverity) exportErrs of
           [] -> pure $ Right (tc, tc.dependencies)
           refused -> pure $ Left (map (Text.unwords . Export.prettyExportError) refused)
       | otherwise -> pure $ Left (errs ++ ["Typecheck completed with errors"])
     (Nothing, _) -> pure $ Left (if null errs then ["Typecheck failed"] else errs)
- where
-  -- The schema this writes is meant to be read as jl4-service's is, so what the
-  -- service refuses is refused here, in its words, with one exception: a rule
-  -- whose result is a DEONTIC itself ('isDeonticType'), which the service refuses
-  -- to deploy and the JS runtime evaluates, from the contract in the schema. A
-  -- DEONTIC anywhere else in a result has no contract path, and compiles to
-  -- garbage.
-  refusedHere contracts = \case
-    Export.ExportUnsendable _ fn Export.ExportResult Shape.UDeontic
-      | getUnique fn `Set.member` contracts -> False
-    e -> Export.exportErrorSeverity e == SError
-
-  contractRules tc =
-    Set.fromList
-      [ getUnique name
-      | ef <- Export.enrichReturnTypes tc.entityInfo (Export.getExportedFunctions tc.module')
-      , Just True == (isDeonticType <$> ef.exportReturnType)
-      , MkDecide _ _ (MkAppForm _ name _ _) _ <- [ef.exportDecide]
-      ]
 
 -- ---------------------------------------------------------------------------
 -- Step 2-3: Lower to MLIR and emit

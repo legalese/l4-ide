@@ -1,12 +1,14 @@
 -- An @export whose input or result has no JSON form yet is an error at the
 -- @export, reported by the export check ("L4.Export"), not by the type check:
 -- the file still type-checks, so the #EVAL at the end still runs, and the
--- contract rule is still evaluated in the editor.
+-- refused contract rule is still evaluated in the editor.
 --
 -- The golden holds one error for each rule below that cannot be sent (an EVENT
--- input, an EVENT result, a DEONTIC result, a function input), one warning for
--- the GIVEN with no written type, and nothing for `how much is owed` or for
--- `who acts first`, which builds an EVENT inside its body and does not name one.
+-- input, an EVENT result, a MAYBE of a DEONTIC result, a function input), one
+-- warning for the GIVEN with no written type, and nothing for `how much is
+-- owed`, for `the duty`, whose result is a DEONTIC itself and which the service
+-- evaluates as a contract, or for `who acts first`, which builds an EVENT inside
+-- its body and does not name one.
 -- `how much is owed` comes first because it is the export the schema golden is
 -- about: the rule that can be published. jl4-schema refuses to write a schema for
 -- the others, which l4-cli-test pins.
@@ -38,6 +40,10 @@ GIVETH AN EVENT Party Act
 GIVETH A DEONTIC Party Act
 `the duty` MEANS PARTY alice MUST ping WITHIN 3
 
+@export Maybe a duty
+GIVETH A MAYBE (DEONTIC Party Act)
+`maybe a duty` MEANS JUST `the duty`
+
 @export Apply the test
 GIVEN test IS A FUNCTION FROM NUMBER TO BOOLEAN
 GIVETH A BOOLEAN
@@ -55,5 +61,5 @@ GIVETH A Party
   CONSIDER EVENT p ping 0
   WHEN EVENT q a n THEN q
 
-#EVAL `the duty`
+#EVAL `maybe a duty`
 #EVAL `how much is owed` (Bill 5 alice)

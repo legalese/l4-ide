@@ -265,7 +265,7 @@ main = do
         testExportRefused
           ["GIVETH A `Duty`", "`refused` MEANS PARTY alice MUST ping WITHIN 3"]
           "its result is a DEONTIC"
-    , test "a DEONTIC result is compiled, which the service refuses" testDeonticResultCompiled
+    , test "a DEONTIC result is compiled, as the service deploys it" testDeonticResultCompiled
     , test "a rule the check has nothing to say about is compiled" testPlainExportCompiled
     , test "deontic REFUSE after HENCE is unsupported" $
         testDeonticRefuse False ["MUST `pay`", "WITHIN 10", "HENCE REFUSE \"after payment\""]

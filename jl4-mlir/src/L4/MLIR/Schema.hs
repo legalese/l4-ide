@@ -66,13 +66,13 @@ import L4.Syntax
   , Pattern(..), BranchLhs(..)
   , Deonton(..), RAction(..), DeonticModal(..)
   , Lit(..)
-  , rawName, rawNameToText, getActual, getUnique
+  , rawName, rawNameToText, getActual
   )
 import L4.Annotation (HasSrcRange, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
 import L4.TypeCheck.Types (InfoMap, EntityInfo)
 import qualified L4.Utils.IntervalMap as IV
-import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes)
+import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, isContractResult)
 import L4.Refusal (refusalReasons)
 import qualified L4.Print as Print
 import L4.StateGraph
@@ -83,7 +83,6 @@ import L4.FunctionSchema
   ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter, uncheckedParameter
   )
 import L4.Export.Shape (shapeEnvFromDeclares)
-import L4.TypeCheck.Environment (contractUnique)
 
 -- ---------------------------------------------------------------------------
 -- Bundle types
@@ -1778,10 +1777,10 @@ emptyParam t = Parameter
 -- DEONTIC parameter injection — mirrors jl4-service/src/Compiler.hs
 -- ---------------------------------------------------------------------------
 
--- | Is this a DEONTIC (contract) return type?
+-- | Is this a DEONTIC (contract) return type? The same test as the export
+-- check's and the service's ('isContractResult').
 isDeonticType :: Type' Resolved -> Bool
-isDeonticType (TyApp _ name [_, _]) = getUnique name == contractUnique
-isDeonticType _ = False
+isDeonticType = isContractResult
 
 -- | For DEONTIC-returning functions, the HTTP API injects two extra
 -- parameters: @startTime@ (number) and @events@ (array of
