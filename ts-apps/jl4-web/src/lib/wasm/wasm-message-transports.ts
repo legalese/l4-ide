@@ -724,9 +724,13 @@ export class WasmLspHandler {
     this.checkInfoCache.set(uri, { version: version ?? 0, infos: checkInfos })
 
     // Also run evaluation to get #EVAL results as diagnostics
-    // Only if there are no errors (matching real LSP behavior)
+    // Only if the file parses and type-checks (matching real LSP behavior): a
+    // refused @export (source 'export') is an error beside the results, and the
+    // rule still evaluates.
     let evalDiagnostics: Diagnostic[] = []
-    const hasErrors = checkDiagnostics.some((d) => d.severity === 1)
+    const hasErrors = checkDiagnostics.some(
+      (d) => d.severity === 1 && d.source !== 'export'
+    )
     if (!hasErrors) {
       try {
         const evalResult = await this.bridge.evaluate(content)

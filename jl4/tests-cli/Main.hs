@@ -984,6 +984,143 @@ spec bin = do
             code `shouldBe` ExitFailure 1
             length serr `shouldSatisfy` (> 65536)
 
+  describe "l4 batch and what the export check refuses" $ do
+    let withRule rule rows act = withSystemTempDirectory "l4-batch-refused" \dir -> do
+          writeFile (dir </> "rule.l4") (unlines rule)
+          writeFile (dir </> "rows.json") rows
+          act (dir </> "rule.l4") (dir </> "rows.json")
+
+    it "refuses an input that is a function, in the words of the check" $
+      withRule
+        [ "@export default r"
+        , "GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER"
+        , "      n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`r` MEANS f n"
+        ]
+        "[{\"n\":1,\"f\":1}]"
+        \file rows -> do
+          Output code sout serr <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitFailure 1
+          (sout <> serr) `shouldSatisfy` ("its input `f` is a function" `isInfixOf`)
+          (sout <> serr) `shouldSatisfy` (not . ("Internal error" `isInfixOf`))
+
+    it "refuses a record with a function among its fields" $
+      withRule
+        [ "DECLARE Rule HAS test IS A FUNCTION FROM NUMBER TO NUMBER"
+        , "@export default r"
+        , "GIVEN x IS A Rule"
+        , "GIVETH A NUMBER"
+        , "`r` MEANS 1"
+        ]
+        "[{\"x\":{\"test\":1}}]"
+        \file rows -> do
+          Output code sout serr <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitFailure 1
+          (sout <> serr) `shouldSatisfy` ("whose field `test` is a function" `isInfixOf`)
+
+    it "refuses only the rule it is calling" $
+      withRule
+        [ "@export default The one it calls"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`same` MEANS n"
+        , ""
+        , "@export Another"
+        , "GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER"
+        , "GIVETH A NUMBER"
+        , "`other` MEANS f 1"
+        ]
+        "[{\"n\":1}]"
+        \file rows -> do
+          Output code sout _ <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+
+    it "still runs a rule that returns a DEONTIC" $
+      withRule
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , "@export default r"
+        , "GIVETH A DEONTIC Party Act"
+        , "`r` MEANS PARTY alice MUST ping WITHIN 3"
+        ]
+        "[{}]"
+        \file rows -> do
+          Output code sout _ <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+
+    it "still runs a rule with an EVENT input that a row can hold" $
+      withRule
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "@export default r"
+        , "GIVEN e IS AN EVENT Party Party"
+        , "GIVETH A NUMBER"
+        , "`r` MEANS 7"
+        ]
+        "[{\"e\":{\"party\":\"alice\",\"action\":\"alice\",\"at\":0}}]"
+        \file rows -> do
+          Output code sout _ <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("\"result\":7" `isInfixOf`)
+
+  describe "jl4-schema and what the export check refuses" $ do
+    let withExports act = withSystemTempDirectory "l4-schema-refused" \dir -> do
+          writeFile (dir </> "exports.l4") $ unlines
+            [ "@export default A rule that cannot be published"
+            , "GIVEN test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "`apply the test` MEANS test 1"
+            , ""
+            , "@export A rule that can"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`same number` MEANS n"
+            ]
+          act (dir </> "exports.l4")
+        schemaGenerator =
+          findExecutable "jl4-schema" >>= maybe (fail "jl4-schema is not on the PATH: run this with cabal test") pure
+
+    it "writes no schema for an export the check refuses, and says why" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code sout serr <- runL4 schema [file]
+        code `shouldBe` ExitFailure 1
+        sout `shouldBe` ""
+        serr `shouldSatisfy` ("its input `test` is a function" `isInfixOf`)
+
+    it "refuses it by name too" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code _ serr <- runL4 schema [file, "--function", "apply the test"]
+        code `shouldBe` ExitFailure 1
+        serr `shouldSatisfy` ("its input `test` is a function" `isInfixOf`)
+
+    it "writes the schema of another export of that file" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code sout _ <- runL4 schema [file, "--function", "same number"]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("\"n\"" `isInfixOf`)
+
+  describe "an export whose type comes through a broken import" $
+    it "is told about the import, and not that the type cannot be sent" $
+      withSystemTempDirectory "l4-export-broken-import" \dir -> do
+        writeFile (dir </> "a.l4") $ unlines
+          [ "IMPORT b"
+          , "@export r"
+          , "GIVEN x IS A Mid"
+          , "GIVETH A BOOLEAN"
+          , "`r` MEANS TRUE"
+          ]
+        writeFile (dir </> "b.l4") "IMPORT c\nDECLARE Mid HAS\n  d IS A Deep\n"
+        writeFile (dir </> "c.l4") "DECLARE Deep HAS\n  n IS A NUMBER\nthis does not parse (\n"
+        Output code sout serr <- runL4 bin ["check", dir </> "a.l4"]
+        code `shouldBe` ExitFailure 1
+        (sout <> serr) `shouldSatisfy` ("has errors" `isInfixOf`)
+        (sout <> serr) `shouldSatisfy` (not . ("is published with @export" `isInfixOf`))
+
   describe "l4 import cycles" $ do
     forM_ ["check", "run"] \cmd -> do
       it ("fails " <> cmd <> " on a 3-module import ring") $

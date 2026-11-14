@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | One type, one text: @#CHECK@, the inspector the deploy sidebar reads
--- (@l4/getExportedFunctions@) and the deployed schema's @returnType@ name the
--- inference variables of a polymorphic type alike, skipping a name that is
--- already a type in the printed type.
+-- | One type, one text: @#CHECK@ and the inspector the deploy sidebar reads
+-- (@l4/getExportedFunctions@) name the inference variables of a polymorphic
+-- type alike, skipping a name that is already a type in the printed type. The
+-- deploy refuses that @export, because its result is a function, so no
+-- deployed @returnType@ prints it.
 module DisplayNamesAgreeSpec (spec) where
 
 import Test.Hspec
@@ -39,7 +40,7 @@ source = Text.unlines
 
 spec :: Spec
 spec = describe "#CHECK, the inspector and the deployed returnType" do
-  it "print a polymorphic result alike, skipping a type named in it" do
+  it "print a polymorphic result alike, skipping a type named in it; the deploy refuses it" do
     r <- either (fail . Text.unpack . Text.unlines) pure (checkWithImports emptyVFS source)
     let checked = [ t | MkCheckErrorWithContext k@CheckInfo {} _ <- r.tcdErrors, t <- prettyCheckError k ]
         -- as l4/getExportedFunctions composes it (jl4-lsp/app/LSP/L4/Handlers.hs)
@@ -49,8 +50,8 @@ spec = describe "#CHECK, the inspector and the deployed returnType" do
                    (Export.enrichReturnTypes r.tcdEntityInfo (Export.getExportedFunctions r.tcdModule))
           ]
     compiled <- withLog \logger -> compileBundle logger "display-names" (Map.singleton "approve.l4" source)
-    deployed <- case fst compiled of
-      Left why -> fail (Text.unpack why)
-      Right (_, meta) -> pure [ f.fsReturnType | f <- meta.metaFunctions ]
-    (checked, inspected, deployed) `shouldBe`
-      (["FUNCTION FROM b TO a"], ["FUNCTION FROM b TO a"], ["FUNCTION FROM b TO a"])
+    refusal <- case fst compiled of
+      Left why -> pure why
+      Right (_, meta) -> fail ("deployed: " <> show [ f.fsReturnType | f <- meta.metaFunctions ])
+    (checked, inspected) `shouldBe` (["FUNCTION FROM b TO a"], ["FUNCTION FROM b TO a"])
+    refusal `shouldSatisfy` Text.isInfixOf "its result is a function"

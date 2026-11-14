@@ -346,6 +346,7 @@ kick = do
     void $ uses GetLexTokens files
         <* uses GetParsedAst files
         <* uses TypeCheck files
+        <* uses ExportCheck files
         <* uses EvaluateLazy files
     liftIO $ progressUpdate progress ProgressCompleted
 

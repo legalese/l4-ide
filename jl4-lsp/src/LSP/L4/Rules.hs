@@ -11,6 +11,8 @@ import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
 import qualified L4.Diagnostic as Diagnostic
 import qualified L4.ExactPrint as ExactPrint
+import qualified L4.Export as Export
+import qualified L4.Export.Shape as Shape
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
 import qualified L4.Lexer as Lexer
@@ -177,6 +179,17 @@ data CheckModule = CheckModule
 
 type instance RuleResult SuccessfulTypeCheck = TypeCheckResult
 data SuccessfulTypeCheck = SuccessfulTypeCheck
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
+
+-- | The problems with the @\@export@s of a file ("L4.Export".'Export.checkExports'),
+-- published as diagnostics with the source @\"export\"@. This is not part of
+-- 'TypeCheck': an error of the type check stops the file from evaluating, and a
+-- refused @\@export@ is no reason to stop evaluating the contract rules next to
+-- it. The editor's Deploy button is blocked by these all the same
+-- ("LSP.L4.BlockingErrors"). A file that does not type-check has none.
+type instance RuleResult ExportCheck = [Export.ExportError]
+data ExportCheck = ExportCheck
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
@@ -1202,6 +1215,15 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
       then pure ([], Just typeCheckResult)
       else pure ([], Nothing)
 
+  define shakeRecorder $ \ExportCheck f -> do
+    mTc <- use SuccessfulTypeCheck f
+    case mTc of
+      Nothing -> pure ([], Just [])
+      Just tcRes -> do
+        let declares = foldMap (Shape.moduleDeclares . (.module')) (tcRes : transitiveDependencies tcRes)
+            errs = Export.checkExports (Shape.shapeEnvFromDeclares declares tcRes.entityInfo) tcRes.module'
+        pure (map (mkSimpleFileDiagnostic f . exportErrorToDiagnostic) errs, Just errs)
+
   -- Callers build this key with a call stack ('EvaluateLazy' below, @l4 lts@,
   -- the service, the LSP's visualiser); it is ignored, and the work is done
   -- once per file by 'GetLazyEvaluationDependenciesFile'.
@@ -1415,6 +1437,22 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         }
       where
         code = EvaluateLazy.evalDirectiveCode res
+
+    exportErrorToDiagnostic :: Export.ExportError -> Diagnostic
+    exportErrorToDiagnostic err =
+      Diagnostic
+        { _range = srcRangeToLspRange (Export.exportErrorRange err)
+        , _severity = Just (translateSeverity (Export.exportErrorSeverity err))
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
+        , _source = Just "export"
+        , _message = Text.unlines (Export.prettyExportError err)
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+      where
+        code = Export.exportErrorCode err
 
     checkErrorToDiagnostic :: CheckErrorWithContext -> Diagnostic
     checkErrorToDiagnostic checkError =

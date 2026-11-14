@@ -283,6 +283,7 @@ bundle fp = do
   evalConfig <- makeEvalConfig (FixedNowOpt Nothing)
   (errs, diags, mTc) <- runOneshotWithDiagnostics evalConfig absFp \nfp -> do
     _ <- Shake.addVirtualFileFromFS nfp
+    _ <- Shake.use Rules.ExportCheck (normalizedFilePathToUri nfp)
     Shake.use Rules.SuccessfulTypeCheck (normalizedFilePathToUri nfp)
   -- The rule of @l4 check@: the file typechecks and no blocking Error was
   -- published anywhere in its import closure. The entry file's own result can

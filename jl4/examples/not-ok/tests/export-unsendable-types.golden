@@ -1,0 +1,25 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+export-unsendable-types.l4:25:1-18:
+  [export error] `who acted` is published with @export, but its input `e` is an EVENT, and @export does not support that yet.
+  Take the party, the action and the time as separate inputs, and build the event inside the rule.
+export-unsendable-types.l4:32:1-22:
+  [export error] `make event` is published with @export, but its result is an EVENT, and @export does not support that yet.
+  Take the party, the action and the time as separate inputs, and build the event inside the rule.
+export-unsendable-types.l4:37:1-17:
+  [export error] `the duty` is published with @export, but its result is a DEONTIC, a contract rule, and @export does not support that yet.
+  A contract can't be an @export input or result yet. Remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE.
+export-unsendable-types.l4:41:1-23:
+  [export error] `apply the test` is published with @export, but its input `test` is a function, and @export does not support that yet.
+  Pass the values the function would work on, and apply the function inside the rule.
+export-unsendable-types.l4:46:1-23:
+  [export warning] `is it positive` is published with @export, but its input `n` has no written type.
+  Write one in the GIVEN, so that the schema says what to send.
+export-unsendable-types.l4:58:1-17:
+  PARTY alice
+  MUST ping
+  WITHIN 3
+  HENCE FULFILLED
+export-unsendable-types.l4:59:1-40:
+  5

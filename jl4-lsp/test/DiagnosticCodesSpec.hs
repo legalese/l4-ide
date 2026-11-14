@@ -11,13 +11,20 @@ import Data.Maybe (mapMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import System.FilePath ((<.>), (</>))
 
-import Language.LSP.Protocol.Types (CodeDescription (..), Diagnostic (..), Uri (..), type (|?) (..))
+import Language.LSP.Protocol.Types (CodeDescription (..), Diagnostic (..), Uri (..), normalizedFilePathToUri, type (|?) (..))
 
+import L4.EvaluateLazy (resolveEvalConfig)
+import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.Lexer (TokenType (..), keywords, tokenKindSlug)
+import L4.TracePolicy (lspDefaultPolicy)
 import LSP.Core.Types.Diagnostics (FileDiagnostic (..))
+import qualified LSP.Core.Shake as Shake
+import LSP.L4.Oneshot (oneshotL4ActionAndDiagnostics)
+import LSP.L4.Rules (ExportCheck (..))
 
-import ImportOnceSpec (Mode (..), fun, runTree)
+import ImportOnceSpec (Mode (..), fun, runTree, withTree)
 
 import Test.Hspec
 
@@ -31,6 +38,72 @@ codeOf d = case d._code of
 
 codesOf :: T.Text -> IO [T.Text]
 codesOf source = mapMaybe codeOf <$> diagnosticsOf [("entry", source)] "entry"
+
+-- | The diagnostics of the export check alone, over one file.
+exportDiagnosticsOf :: T.Text -> IO [Diagnostic]
+exportDiagnosticsOf source = withTree "export-codes" [("entry", source)] \dir -> do
+  evalConfig <- resolveEvalConfig Nothing (lspDefaultPolicy defaultGraphVizOptions)
+  (_logs, diags, _) <- oneshotL4ActionAndDiagnostics evalConfig (dir </> "entry" <.> "l4") \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use ExportCheck uri
+  pure (map (.fdLspDiagnostic) diags)
+
+-- | One @\@export@ for each kind of finding the export check has.
+exportSource :: T.Text
+exportSource = T.unlines
+  [ "DECLARE Party IS ONE OF alice, bob"
+  , "DECLARE Act IS ONE OF ping, pong"
+  , "DECLARE Rule HAS"
+  , "  name IS A STRING"
+  , "  test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+  , ""
+  , "@export Who acted"
+  , "GIVEN e IS AN EVENT Party Act"
+  , "GIVETH A Party"
+  , "`who acted` MEANS"
+  , "  CONSIDER e"
+  , "  WHEN EVENT p a n THEN p"
+  , ""
+  , "@export How many events"
+  , "GIVEN es IS A LIST OF EVENT Party Act"
+  , "GIVETH A NUMBER"
+  , "`how many events` MEANS 0"
+  , ""
+  , "@export Make an event"
+  , "GIVEN p IS A Party"
+  , "GIVETH AN EVENT Party Act"
+  , "`make event` MEANS EVENT p ping 0"
+  , ""
+  , "@export The duty"
+  , "GIVETH A DEONTIC Party Act"
+  , "`the duty` MEANS PARTY alice MUST ping WITHIN 3"
+  , ""
+  , "@export Apply the test"
+  , "GIVEN test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`apply the test` MEANS test 1"
+  , ""
+  , "@export Name of the rule"
+  , "GIVEN r IS A Rule"
+  , "GIVETH A STRING"
+  , "`name of the rule` MEANS r's name"
+  , ""
+  , "@export Is it positive"
+  , "GIVEN n"
+  , "GIVETH A BOOLEAN"
+  , "`is it positive` MEANS n > 0"
+  ]
+
+-- | A code that is a slug, with the link one formula gives.
+hasCodeAndLink :: Diagnostic -> Expectation
+hasCodeAndLink d = case codeOf d of
+  Nothing -> expectationFailure ("no code on: " <> show d)
+  Just code -> do
+    code `shouldSatisfy` isSlug
+    d._codeDescription `shouldBe`
+      Just CodeDescription
+        { _href = Uri ("https://legalese.com/l4/reference/errors#" <> T.replace "/" "-" code) }
 
 -- | @area/what-happened@, with nothing in it that could have been typed in a
 -- document: the rest is letters and hyphens, and the examples below check that
@@ -63,6 +136,7 @@ codeSources :: [FilePath]
 codeSources =
   [ "../jl4-core/src/L4/EvaluateLazy.hs"
   , "../jl4-core/src/L4/EvaluateLazy/Exceptions.hs"
+  , "../jl4-core/src/L4/Export.hs"
   , "../jl4-core/src/L4/Lexer.hs"
   , "../jl4-core/src/L4/Parser/AnnotationWarning.hs"
   , "../jl4-core/src/L4/TypeCheck/Types.hs"
@@ -162,6 +236,21 @@ spec = describe "diagnostic codes" do
       codes <- codesOf "IMPORT entry\n\nDECIDE x IS 1\n"
       codes `shouldContain` ["import/self-import"]
 
+  describe "exports" do
+    it "name what an @export cannot send, and the one input that has no written type" do
+      diags <- exportDiagnosticsOf exportSource
+      forM_ diags \d -> d._source `shouldBe` Just "export"
+      forM_ diags hasCodeAndLink
+      sort (mapMaybe codeOf diags) `shouldBe` sort
+        [ "check/export-event-type"
+        , "check/export-event-type"
+        , "check/export-event-type"
+        , "check/export-deontic-type"
+        , "check/export-function-input"
+        , "check/export-function-input"
+        , "lint/export-untyped-given"
+        ]
+
   describe "every code" do
     let examples =
           [ "DECLARE Foo HAS\n  x WITH\n"
@@ -175,13 +264,7 @@ spec = describe "diagnostic codes" do
       forM_ examples \source -> do
         diags <- diagnosticsOf [("entry", source)] "entry"
         diags `shouldNotBe` []
-        forM_ diags \d -> case codeOf d of
-          Nothing -> expectationFailure ("no code on: " <> show d)
-          Just code -> do
-            code `shouldSatisfy` isSlug
-            d._codeDescription `shouldBe`
-              Just CodeDescription
-                { _href = Uri ("https://legalese.com/l4/reference/errors#" <> T.replace "/" "-" code) }
+        forM_ diags hasCodeAndLink
 
     it "never contains what the user wrote" do
       forM_ userText \(source, expected) -> do

@@ -202,7 +202,7 @@ A synonym at the head of an input's type is read as the type it stands for.
 An input declared through a synonym for `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
 The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 
-Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; and every batch case or MCP call with a `null` in it.
 On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is rejected with the direct path's message.
 On both paths, an input declared through a synonym for a `MAYBE` is a `MAYBE`: it may be left out, or sent as `null` or `{}`.
 An input declared through any other synonym takes the values of the type the synonym stands for: a record's fields, one of an enum's names, a list, or a date, a time or a date and time as a string. So does a synonym below the head of a type, as in `MAYBE Hue`.
@@ -236,38 +236,19 @@ curl -X POST 'http://localhost:8080/deployments/my-rules/functions/compute_quali
 Each node of the response's `reasoning` tree has `exampleCode`, `explanation` and `children`.
 `exampleCode` is the step as L4 source, and `explanation` is its result.
 Wherever the answer prints rule source, a string literal in it is escaped the way the source spells it: a line break is `\n`, a tab `\t` and a carriage return `\r`.
-So `"line\nnext"` in `exampleCode` stays on one line, and so does the literal in the `explanation` of a `DEONTIC` contract (`MUST say "pay\nnow"`), which prints the contract's rule.
+So `"line\nnext"` in `exampleCode` stays on one line.
 A string that is itself the result, such as the answer of an ordinary function, keeps its line breaks in `explanation`.
 
-#### Deontic (Contract) Evaluation
+#### A contract rule cannot be deployed
 
-Functions returning `DEONTIC` model contract obligations and require additional parameters for simulation:
+A function that returns a `DEONTIC` cannot be deployed yet.
+A bundle with an `@export` on one is refused at deploy, with the words `l4 check` uses for it: `` `the duty` is published with @export, but its result is a DEONTIC, a contract rule, and @export does not support that yet. ``
+The same goes for any other input or result with no JSON form: an `EVENT`, a function, a type variable, or a record with a field of one of those.
+Remove the `@export` from the rule, and the rest of the bundle deploys.
+The rule still evaluates where it is written, with its `#EVAL` and `#EVALTRACE`, and [the errors reference](../doc/reference/errors/README.md) says what to do instead.
 
-```bash
-curl -X POST http://localhost:8080/deployments/my-contract/functions/service-requirement/evaluation \
-  -H "Content-Type: application/json" \
-  -d '{
-    "arguments": {"state": {"status": "Active", "metrics": {"revenue": 1000000}}},
-    "startTime": 0,
-    "events": [
-      {"party": {"Name": "Alice"}, "action": "maintain eligible service", "at": 1}
-    ]
-  }'
-```
-
-- `arguments` — the function's GIVEN parameters (same as non-deontic)
-- `startTime` — start time for contract simulation (required for DEONTIC)
-- `events` — list of trace events, each with `party`, `action`, and `at` timestamp (required for DEONTIC)
-
-In the structured fields of the answer, a party and an action are spelled as an enum answer is (above): the name, without backticks.
-An `OBLIGATION` names them in `party` and `action`, and so does each operand of a `RAND` or `ROR` that is an `OBLIGATION`.
-A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligationAction` (the obligation that was missed), and, for a breach the rule states with `BREACH BY`, in `party`.
-So a client can ask whether the party who acted is the party who was obliged by comparing two strings: for a party the rule writes as `` `the seller` ``, both are `the seller`.
-A name taken from an answer can also be sent back unchanged as the `party` or `action` of an event in the next request's `events`, when the rule's file defines that name at the top level, as an enum constructor, a `MEANS` definition or a record constant, or when a file that it imports declares that name as an enum constructor: an answer that says `party` is `the seller` and `action` is `deliver the goods` is met by the event `{"party": "the seller", "action": "deliver the goods", "at": 5}`.
-The name is the identifier the rule uses, not the party it stands for: a party written as a `GIVEN` input or as a `MEANS` definition answers with that identifier until an event has been compared with it, so the comparison is still false there.
-A name that exists only inside the rule cannot be sent back: a party that is a `GIVEN` input, or an action the rule never declares, makes the evaluation fail with "I could not find a definition for the identifier" and the name.
-Name the value instead: the value you gave for the input, or a declared action.
-Rule source stays L4, backticks included: an action that carries a value, such as `say "pay now"`, and the reasoning tree and the graphviz source of a trace.
+No function a deployment publishes takes `startTime` or `events`: the service's code for those is still there, and no deployed function reaches it.
+The one way a contract still shows in an answer is through a constructor that carries fields, whose fields are not looked at: a function whose result type has a constructor with a `DEONTIC` field deploys, and answers with the contract as it stands, as in `{"Duty":{"d":{"OBLIGATION":{"action":"ping","deadline":"3","modal":"MUST","party":"alice"}}}}`.
 
 ### Batch Evaluation
 
@@ -419,8 +400,7 @@ A client that asks for a task while the deployment is still compiling gets that 
 
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
-- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`.
-- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`.
+Parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`.
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
 

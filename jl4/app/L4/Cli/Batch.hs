@@ -68,7 +68,8 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
 
-import L4.Export (ExportedFunction(..), ExportedParam(..), getDefaultFunction, getExportedFunctions)
+import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), getDefaultFunction, getExportedFunctions, prettyExportError, refusalsOf)
+import L4.Export.Shape (Unsendable (..))
 import L4.DirectiveFilter (filterIdeDirectives)
 import L4.EvaluateLazy
   ( EvalConfig(..)
@@ -206,9 +207,11 @@ batchCmd opts = do
   (initErrs, mTc) <- runOneshot evalConfig opts.batchFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
-  tcRes <- case mTc of
-    Just tc | tc.success -> pure tc
+    tc <- Shake.use Rules.SuccessfulTypeCheck uri
+    exportErrs <- Shake.use Rules.ExportCheck uri
+    pure ((,) <$> tc <*> exportErrs)
+  (tcRes, exportErrs) <- case mTc of
+    Just (tc, errs) | tc.success -> pure (tc, errs)
     _ -> do
       putDiagnostics initErrs
       TIO.putStrLn "Error: type checking failed"
@@ -217,6 +220,14 @@ batchCmd opts = do
     Right ef -> pure ef
     Left err -> do
       TIO.putStrLn $ "Error: " <> err
+      exitFailure
+  -- A row can hold no function, so a rule with an input that is one has nothing to
+  -- run on. This is all that batch asks of the export check: it runs the rest of
+  -- what the check refuses, a contract rule among them.
+  case concatMap prettyExportError (functionInputs (refusalsOf exportErrs exportFn)) of
+    [] -> pure ()
+    says -> do
+      mapM_ (TIO.putStrLn . ("Error: " <>)) says
       exitFailure
   let filteredModule = filterIdeDirectives tcRes.module'
       filteredSource = prettyLayout filteredModule
@@ -986,6 +997,16 @@ quoteIdent name
     isPlain = case Text.uncons name of
       Just (c, _) -> isAlpha c && Text.all (\x -> isAlphaNum x || x == '_') name
       Nothing     -> False
+
+-- | The refusals that are about an input with a function in it.
+functionInputs :: [ExportError] -> [ExportError]
+functionInputs errs = [e | e@(ExportUnsendable _ _ (ExportInput _) why) <- errs, holdsFunction why]
+ where
+  holdsFunction = \case
+    UFunction -> True
+    UInField _ _ why -> holdsFunction why
+    UInArgument _ why -> holdsFunction why
+    _ -> False
 
 extractParamsFromExport :: ExportedFunction -> [(Text, Maybe (Type' Resolved))]
 extractParamsFromExport ef =

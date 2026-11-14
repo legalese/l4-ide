@@ -57,7 +57,8 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Export**
 
 - [An @export of clauses with no GIVEN](#an-export-of-clauses-with-no-given)
-- [An @export that takes or returns an EVENT](#an-export-that-takes-or-returns-an-event)
+- [An @export with an input or result that cannot be sent yet](#an-export-with-an-input-or-result-that-cannot-be-sent-yet)
+- [An @export with an input that has no written type](#an-export-with-an-input-that-has-no-written-type)
 
 ---
 
@@ -1027,16 +1028,25 @@ Or remove the `@export`, if the rule is not meant to be published.
 
 <a id="check-export-event-type"></a>
 
-### An @export that takes or returns an EVENT
+<a id="check-export-function-input"></a>
+
+<a id="check-export-function-result"></a>
+
+<a id="check-export-deontic-type"></a>
+
+<a id="check-export-unsupported-type"></a>
+
+### An @export with an input or result that cannot be sent yet
 
 **Error:**
 
 ```
-`who acted` is published with @export, but its input `e` has a type that is or contains an EVENT.
-@export does not support an EVENT as an input yet.
+`who acted` is published with @export, but its input `e` is an EVENT, and @export does not support that yet.
+Take the party, the action and the time as separate inputs, and build the event inside the rule.
 ```
 
-For a result, the second line reads `@export does not support an EVENT as a result yet.`
+The first line names the input, or says "its result", and says what the type is.
+The second line says what to do about it, and is different for each kind of type.
 
 **What you wrote:**
 
@@ -1052,13 +1062,31 @@ GIVETH A Party
   WHEN EVENT p a n THEN p
 ```
 
-**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input as a value written in JSON.
-L4 has no JSON form for an [EVENT](../regulative/EVENT.md), so the input would be published as a bare `object`, and no request could give the rule an event.
-The same goes for a result, and for an `EVENT` inside a `LIST OF` or a `MAYBE OF`, or named through a type that you declared as another name for it.
-So an `@export` of such a rule is an error, reported at the `@export` line.
-The error stops the whole file from checking: `l4 run` and `l4 batch` refuse the file, the `#EVAL`s of its other rules included, and jl4-service will not deploy it, until you remove the `@export` or the `EVENT`.
+**What went wrong:** `@export` publishes a rule as a web endpoint, and a request to it supplies each input as a value written in JSON, and the answer comes back as a value written in JSON.
+That works for a `NUMBER`, a `BOOLEAN`, a `STRING`, a `DATE`, a `TIME`, a `DATETIME`, a `LIST OF` or a `MAYBE` of those, and a type that you declare as a record or as an enumeration of those.
+It does not work yet for these, so an `@export` of a rule that takes or returns one is an error, reported at the `@export` line:
+
+| the input or result is...                                | the error says                                         |
+| -------------------------------------------------------- | ------------------------------------------------------ |
+| an [EVENT](../regulative/EVENT.md)                       | `an EVENT`                                             |
+| a `DEONTIC`, which is what a contract rule gives back    | `a DEONTIC, a contract rule`                           |
+| a `FUNCTION FROM ... TO ...`                             | `a function`                                           |
+| a type variable, in a rule that works for any type       | ``of the type variable `...`, so the rule is generic`` |
+| a type itself, as in `GIVEN a IS A TYPE`                 | `a type, so the rule is generic`                       |
+| a result with no `GIVETH`, whose type L4 cannot work out | `of a type that L4 could not work out from the rule`   |
+| any other built-in type that has no JSON form yet        | ``of the type `...` ``                                 |
+| a record with a field of one of those types              | ``of a record type `...` whose field `...` is ...``    |
+
+The same goes for an `EVENT` or a function inside a `LIST OF` or a `MAYBE OF`, or named through a type that you declared as another name for it.
+A type that you declare to take a type (`DECLARE Box a HAS ...`) has no JSON form when what it is given has none, whether or not it uses it: `Box OF (FUNCTION FROM NUMBER TO NUMBER)` is refused, and the error says ``of the type `Box`, given a function``.
 A rule that builds or reads an `EVENT` inside its body, and does not name one in its inputs or its result, is published as usual.
-A record that you declare with an `EVENT` among its fields is not looked into, so a rule that takes such a record is not refused.
+
+A rule that gives back a `DEONTIC` is a contract: it says who must do what by when.
+It cannot be published yet, and a contract rule is still evaluated where you write it, so its `#EVAL` and `#EVALTRACE` results still show.
+
+The error is reported by its own check, and not by the type check, so the file still checks: `l4 run` still runs it, the `#EVAL`s of its other rules included.
+`l4 check` reports the error, the editor shows it as an error from `export`, and deploying is refused until you remove the `@export` or change the type.
+`@export default` is refused the same way.
 
 **How to fix it:** Take the parts of the event as separate inputs, and build the event inside the rule if it needs one.
 A helper that is not published can still take an `EVENT`:
@@ -1081,4 +1109,41 @@ GIVETH A NUMBER
 `when it happened` MEANS `event time` (EVENT who what time)
 ```
 
-Or remove the `@export`, if the rule is not meant to be published.
+For a function, pass the values it would work on, and apply the function inside the rule.
+For a contract rule, remove the `@export`.
+For a generic rule, one written with `GIVEN a IS A TYPE`, write the type it is used at in its `GIVEN` and `GIVETH`, or publish a small rule that calls it at that type.
+
+---
+
+<a id="lint-export-untyped-given"></a>
+
+### An @export with an input that has no written type
+
+**Warning:**
+
+```
+`is it positive` is published with @export, but its input `n` has no written type.
+Write one in the GIVEN, so that the schema says what to send.
+```
+
+**What you wrote:**
+
+```l4
+@export Is it positive
+GIVEN n
+GIVETH A BOOLEAN
+`is it positive` MEANS n > 0
+```
+
+**What went wrong:** `@export` publishes a rule as a web endpoint, and the schema of that endpoint tells a caller what to send for each input.
+A `GIVEN` with no `IS A` has no written type, so the schema is not told what to send for it.
+This is a warning, not an error: the rule is still published, and the file still checks.
+
+**How to fix it:** Write the type in the `GIVEN`:
+
+```l4
+@export Is it positive
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`is it positive` MEANS n > 0
+```

@@ -350,7 +350,7 @@ GIVETH A BOOLEAN
                     `Name` IS "Elon Reeve Musk"
                     `Birthdate` IS Date 28 6 1971
 
-@export Check what service requiremends apply
+-- @export Check what service requiremends apply   (not exported: a rule that returns a DEONTIC cannot be an @export result yet; see the errors reference, "An @export with an input or result that cannot be sent yet")
 GIVEN `award state` IS A `CEO Award State`
 GIVETH A DEONTIC OF `Award Participant`, `Award Action`
 `Eligible Service Requirement` MEANS
