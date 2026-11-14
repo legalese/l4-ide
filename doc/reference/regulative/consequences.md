@@ -47,7 +47,8 @@ GIVETH A DEONTIC Party Action
   An event exactly at the deadline is in time.
 - The event that shows a deadline has passed is not used up by the rule that missed it. It is offered to the rule that follows, so a late payment that is the first thing recorded can still discharge the `LEST` reparation it was written for, if it falls inside that reparation's own window.
 - When one event is past several windows in a chain, a first chance, a second, a third, it is offered to each in turn until it reaches the first whose window is still open, and that is the rule it performs or fails.
-- A rule that names itself under `LEST` with a window that is never open, `WITHIN 0` or a negative `WITHIN`, cannot end this way: L4 stops with an error naming the chain after 1,000 hand-offs in a row.
+- A rule that names itself after `LEST`, or a prohibition that names itself after `HENCE`, with a window that is never open, `WITHIN 0` or a negative `WITHIN`, never reaches an open window.
+  L4 stops it with an error that begins "A chain of HENCE or LEST continuations has stalled" and gives the time of the event, not the name of the rule.
 - A rule whose `WITHIN` computes below zero was past its deadline when it became active. It fails at that moment, not before it existed, and the rule that follows counts from there.
 
 ## HENCE and LEST
