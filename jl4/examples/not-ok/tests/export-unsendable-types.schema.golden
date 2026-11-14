@@ -3,7 +3,7 @@
         "Bill": {
             "properties": {
                 "amount": {
-                    "$ref": "#/$defs/NUMBER"
+                    "type": "number"
                 },
                 "payer": {
                     "$ref": "#/$defs/Party"
