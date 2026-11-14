@@ -63,7 +63,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/cyclic-type-synonyms`         | Type synonyms refer to each other in a ring.                       |
 | `check/duplicate-name`               | A name occurs twice where names must be distinct.                  |
 | `check/export-clauses-without-given` | An `@export` of clauses with no GIVEN.                             |
-| `check/export-deontic-type`          | An `@export` takes or returns a DEONTIC, a contract rule.          |
+| `check/export-deontic-type`          | An `@export` takes a DEONTIC, or returns one inside another type.  |
 | `check/export-event-type`            | An `@export` takes or returns an EVENT.                            |
 | `check/export-function-input`        | An `@export` has an input of a function type.                      |
 | `check/export-function-result`       | An `@export` returns a function.                                   |

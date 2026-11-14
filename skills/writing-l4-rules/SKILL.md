@@ -323,9 +323,13 @@ any exported function remain internal assumptions.
 **Only a type with a JSON form can cross the `@export` boundary.** Every
 input (a `GIVEN`, or a referenced `ASSUME`) and the result must be a `NUMBER`,
 `BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, a `LIST OF` or `MAYBE` of
-those, or a record or enumeration of those. A `FUNCTION FROM … TO …`, an
-`EVENT`, a `DEONTIC` (a contract rule) and a type variable have no JSON form
-yet, so an `@export` of a rule with one is an error at the `@export`, and
+those, or a record or enumeration of those. The one exception is a result
+that is a `DEONTIC` itself (a contract rule): it is published, and
+`jl4-service` evaluates it against a `startTime` and the `events` so far, on
+`/evaluation` only (MCP `tools/call` and batch ignore them). A
+`FUNCTION FROM … TO …`, an `EVENT`, a type variable, and a `DEONTIC` anywhere
+else (an input, or inside a `MAYBE`, `LIST` or `EITHER` result) have no JSON
+form yet, so an `@export` of a rule with one is an error at the `@export`, and
 `jl4-service` refuses to deploy it. The error says "its input `x` is a
 function, and @export does not support that yet" (or "its result", or "an
 EVENT", or "a DEONTIC, a contract rule"), and `l4 check` fails. The error
@@ -404,7 +408,7 @@ Other useful well-known paths on a Legalese Cloud org:
 - `/openapi.json` — org-wide OpenAPI 3.0 spec
 - `/deployments?functions=full` — cached metadata for all deployments
 
-For the full service reference (CLI flags, resource limits), see the `jl4-service` README bundled with the running server.
+For the full service reference (CLI flags, resource limits, deontic evaluation shapes), see the `jl4-service` README bundled with the running server.
 
 ---
 

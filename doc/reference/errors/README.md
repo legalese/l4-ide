@@ -1069,7 +1069,7 @@ It does not work yet for these, so an `@export` of a rule that takes or returns 
 | the input or result is...                                | the error says                                         |
 | -------------------------------------------------------- | ------------------------------------------------------ |
 | an [EVENT](../regulative/EVENT.md)                       | `an EVENT`                                             |
-| a `DEONTIC`, which is what a contract rule gives back    | `a DEONTIC, a contract rule`                           |
+| a `DEONTIC` as an input (see below for a result)         | `a DEONTIC, a contract rule`                           |
 | a `FUNCTION FROM ... TO ...`                             | `a function`                                           |
 | a type variable, in a rule that works for any type       | ``of the type variable `...`, so the rule is generic`` |
 | a type itself, as in `GIVEN a IS A TYPE`                 | `a type, so the rule is generic`                       |
@@ -1085,7 +1085,9 @@ A type that you declare to take a type (`DECLARE Box a HAS ...`) has no JSON for
 A rule that builds or reads an `EVENT` inside its body, and does not name one in its inputs or its result, is published as usual.
 
 A rule that gives back a `DEONTIC` is a contract: it says who must do what by when.
-It cannot be published yet, and a contract rule is still evaluated where you write it, so its `#EVAL` and `#EVALTRACE` results still show.
+When its result is the `DEONTIC` itself, it is published as usual, and a request to it sends the events so far and gets back where the contract stands.
+A result that holds a `DEONTIC` inside a `LIST`, a `MAYBE` or an `EITHER`, or names it through a type that you declared as another name for it, cannot be sent yet.
+A contract rule that is refused is still evaluated where you write it, so its `#EVAL` and `#EVALTRACE` results still show.
 
 `l4 check` reports the error and fails, with exit status 1, and deploying is refused until you remove the `@export` or change the type.
 The editor shows it as an error from `export`.
@@ -1114,7 +1116,7 @@ GIVETH A NUMBER
 ```
 
 For a function, pass the values it would work on, and apply the function inside the rule.
-For a contract rule, remove the `@export`.
+For a contract rule, give back the `DEONTIC` itself, or remove the `@export`.
 For a generic rule, one written with `GIVEN a IS A TYPE`, write the type it is used at in its `GIVEN` and `GIVETH`, or publish a small rule that calls it at that type.
 
 ---
