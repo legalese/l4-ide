@@ -206,7 +206,7 @@ The service does not fill a missing input from its `TYPICALLY` value, on either 
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
 On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is rejected with the direct path's message.
-A missing `BOOLEAN` costs nothing unless the rule reads it, and is never read as `FALSE`.
+A missing `BOOLEAN` costs nothing unless the rule reads it.
 If the rule reads it, evaluation stops and names it:
 
 ```

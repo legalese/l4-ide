@@ -4,7 +4,7 @@
 A person is usually of full capacity, a deal is usually at arm's length, a resident is usually an adult.
 Such a usual value is a _rebuttable presumption_: it holds unless something shows otherwise.
 
-## What L4 does with it today
+## What L4 does with it
 
 L4 reads the usual value, checks that it fits the type, keeps it with the declaration, and shows it to other tools (see [Who sees the value](#who-sees-the-value)).
 
@@ -85,7 +85,7 @@ ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
 
 ## When an input is left out
 
-Measured on 2026-10-30, and checked again on 2026-11-01, with the `l4` and `jl4-service` built from this tree, for the rule above (`age` and `married`, both with a usual value):
+For the rule above, where `age` and `married` both have a usual value:
 
 | Where the rule runs                                             | What a left-out input does                                                                                                                                           |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -97,8 +97,7 @@ Measured on 2026-10-30, and checked again on 2026-11-01, with the `l4` and `jl4-
 | `jl4-service`, a request with `{}` ("uncertain") anywhere in it | A left-out BOOLEAN costs nothing unless the rule reads it, and then evaluation stops and names it; a left-out input of any other type is refused as missing.         |
 | An `ASSUME` that the rule needs, with a `TYPICALLY` value       | Evaluation stops: "I needed to know the value of `applicable law` but it is an assumed term."                                                                        |
 
-A request with `{}` in it is evaluated through a generated wrapper, and there a left-out BOOLEAN is not read as `FALSE`.
-If the rule reads it, the evaluation stops with a message such as "I needed to know the value of `married (not supplied)`".
+With `{}` in the request, a left-out BOOLEAN that the rule reads is named in the message: "I needed to know the value of `married (not supplied)`".
 
 ## Who sees the value
 
@@ -111,14 +110,14 @@ If the rule reads it, the evaluation stops with a message such as "I needed to k
 
 ## Limits
 
-- **Nothing applies it.** Supply every input. Filling in a left-out input from its usual value is the design in `specs/todo/TYPICALLY-DEFAULTS-SPEC.md`; it is proposed, not built.
+- **Nothing applies it.** Supply every input.
 - **Literals only.** A number, a string, or a constructor that takes no arguments.
 - **An `@nlg` written after a default does not attach to the default.** It describes the field or the input, as it would without the default.
-- **The query planner does not read it.** The planner that decides which question to ask next orders questions by the structure of the rule alone; using the usual values as odds is proposed, not built.
+- **The [query planner](../query-planning/README.md) does not read it.** It orders questions by the rule alone.
 
 ## See Also
 
 - [ASSUME](ASSUME.md): declaring assumed values
 - [DECLARE](DECLARE.md): declaring record types
 - [GIVEN](../functions/GIVEN.md): function inputs
-- [Query Planning](../query-planning/README.md): the planner that decides which question to ask next, and the proposal to read usual values as odds
+- [Query Planning](../query-planning/README.md): the planner that decides which question to ask next
