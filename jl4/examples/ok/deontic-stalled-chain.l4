@@ -1,7 +1,7 @@
 -- A rule that names itself with a window never open cannot end: every incarnation
 -- is already past its deadline when it is entered, and the deadline never moves
--- past one the event has already shown expired. The machine refuses it by name
--- after 1,000 hand-offs in a row rather than walking it forever.
+-- past the moment the chain began. The machine refuses it after 1,000 hand-offs
+-- in a row rather than walking it forever.
 
 DECLARE Person IS ONE OF Alice, Bob
 DECLARE Action IS ONE OF

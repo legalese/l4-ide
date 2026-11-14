@@ -5,13 +5,18 @@
 -- A rule after LEST counts from the deadline that was missed, so an event many
 -- windows late is handed down one layer per window it is past
 -- ('L4.EvaluateLazy.Machine', the Contract5 expiry NOTE). Two things made that
--- walk expensive; this pins the first with a time limit.
+-- walk expensive, and both are pinned here with a time limit.
 --
 -- A rule that names itself on both sides of a RAND or ROR, @x RAND x@, doubled
 -- at every layer: 2^30 copies of x at the last layer of the first case below,
 -- where @main@, which started the LEST at the late event, answered in 0.02 s.
 -- Both operands read the same events from the same moment, so the machine now
 -- evaluates such an operand once ('L4.EvaluateLazy.Machine.sameRule').
+--
+-- And every layer of the walk left a mark behind that lived until the
+-- evaluation ended: 203 MB for one event a million windows late, against
+-- 46 MB on @main@. Only a stalled hand-off is marked now, and a mark goes when
+-- its event copy does. Memory is not asserted here; the time limit is.
 module LateEventScaleSpec (spec) where
 
 import Control.DeepSeq (force)
@@ -72,3 +77,7 @@ spec = describe "a #TRACE whose event is many windows late" $ do
     out `shouldSatisfy` Text.isInfixOf "\"success\":true"
     Text.count "MAY tick" out `shouldBe` 1
 
+  it "walks a million windows to the one the event is in" $ do
+    out <- evalWithin $ traced "PARTY Alice MUST tick WITHIN 1 LEST `x`"
+      [tick "1000000.5"]
+    out `shouldSatisfy` Text.isInfixOf "FULFILLED"

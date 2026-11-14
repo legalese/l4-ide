@@ -166,10 +166,11 @@ data EvalState =
     , tracePostprocessor :: [EvalTraceAction] -> EvalTrace  -- see 'L4.EvaluateLazy.EvalConfig'
     , reofferedEvents :: !(IORef (Map Address Reoffered))
       -- ^ the EVENT copies an expiring obligation has re-offered to its
-      -- HENCE/LEST continuation, each keyed by its store address and
-      -- carrying its 'Reoffered' mark: the latest deadline it has revealed
-      -- the expiry of, and how many hand-offs in a row failed to pass it
-      -- (see the Contract5 expiry NOTE in 'backwardContractFrame'). The
+      -- HENCE/LEST continuation in a STALLED hand-off, each keyed by its
+      -- store address and carrying its 'Reoffered' mark: the deadline no
+      -- continuation since has passed, and how many hand-offs in a row failed
+      -- to pass it (see the Contract5 expiry NOTE in 'backwardContractFrame').
+      -- An entry goes when its copy can no longer be read ('markReoffered'). The
       -- mark never withholds an event from a layer; it only lets the
       -- machine refuse a chain whose deadlines have stopped advancing,
       -- loudly, instead of walking it forever.
@@ -342,12 +343,20 @@ putTemporalContext ctx = do
   liftIO (writeIORef r ctx)
 
 -- | Record that an EVENT value (identified by its store address) has been
--- re-offered to a HENCE/LEST continuation, with its 'Reoffered' mark. See
--- the Contract5 expiry NOTE in 'backwardContractFrame'.
+-- re-offered to a HENCE/LEST continuation in a stalled hand-off, with its
+-- 'Reoffered' mark. See the Contract5 expiry NOTE in 'backwardContractFrame'.
+--
+-- The mark is dropped when the copy can no longer be read, so a long walk keeps
+-- only the marks of copies still in use. It is not dropped when a layer reads
+-- it: both operands of a RAND or ROR read the same copy, and the right one,
+-- reading after the left, would then restart its count at every layer.
 markReoffered :: Reference -> Reoffered -> Eval ()
 markReoffered rf mark = do
   r <- asks (.reofferedEvents)
-  liftIO (modifyIORef' r (Map.insert rf.address mark))
+  let address = rf.address
+  liftIO do
+    atomicModifyIORef' r (\ m -> (Map.insert address mark m, ()))
+    void (mkWeakIORef rf.pointer (atomicModifyIORef' r (\ m -> (Map.delete address m, ()))))
 
 -- | Is this EVENT value a re-offered copy, and if so what is its mark?
 -- (see 'markReoffered')
@@ -373,12 +382,11 @@ stalledChainRefusal :: Rational -> Rational -> Text
 stalledChainRefusal highWater stamp = Text.unwords
   [ "A chain of HENCE or LEST continuations has stalled: the event at " <> prettyRatio stamp
   , "has been handed on " <> Text.textShow maximumStalledReoffers <> " times in a row to"
-  , "continuations whose deadlines never advanced past " <> prettyRatio highWater <> ","
-  , "a deadline it had already revealed the expiry of, so no continuation this"
-  , "chain reaches can ever be open to it. A continuation that names itself and"
-  , "is already past its deadline when it is entered - a negative WITHIN, or a"
-  , "LEST's WITHIN 0 - is such a chain. Give it a positive WITHIN, or end the"
-  , "chain with BREACH."
+  , "continuations already past their deadlines, none of them later than " <> prettyRatio highWater <> ","
+  , "so no continuation this chain reaches can ever be open to it. A continuation"
+  , "that names itself and is already past its deadline when it is entered - a"
+  , "negative WITHIN, or a WITHIN 0 - is such a chain. Give it a positive WITHIN,"
+  , "or end the chain with BREACH."
   ]
 
 -- | Atomically inspect-and-update a thunk. The update function additionally
@@ -1013,23 +1021,30 @@ backwardContractFrame val = \ case
       -- DISTINCT layers is finite by its syntax. The only chain that does not
       -- end is one that reaches ITSELF without the deadline advancing, a
       -- self-naming rule with a non-positive WITHIN. That is an ill-founded
-      -- contract, and the machine refuses it by name: the copy carries a
-      -- 'Reoffered' mark with the latest deadline it has revealed the expiry
-      -- of and the number of hand-offs in a row that failed to pass that mark,
-      -- and past 'maximumStalledReoffers' of those the walk stops with
-      -- 'stalledChainRefusal'.
+      -- contract, and the machine refuses it: a copy handed on without the
+      -- deadline advancing carries a 'Reoffered' mark with the deadline the
+      -- chain has failed to pass and the number of hand-offs in a row that
+      -- failed to pass it, and past 'maximumStalledReoffers' of those the walk
+      -- stops with 'stalledChainRefusal'.
+      --
+      -- Only a STALLED hand-off is marked. An unmarked event takes this layer's
+      -- clock as its high-water mark: for a copy handed on by a layer whose
+      -- deadline advanced, that clock is the deadline it revealed, or later.
+      -- So a walk whose deadlines keep advancing, however long, records nothing.
       then do
         let reoffer followup' = do
-              mark <- case ev'reoffered of
-                Nothing -> pure MkReoffered {highWater = deadline, stalled = 0}
-                Just m
-                  | deadline > m.highWater -> pure MkReoffered {highWater = deadline, stalled = 0}
-                  | m.stalled >= maximumStalledReoffers -> userException (UserError (stalledChainRefusal m.highWater stamp))
-                  | otherwise -> pure m {stalled = m.stalled + 1}
+              let highWater = maybe time' (.highWater) ev'reoffered
+                  stalled = maybe 0 (.stalled) ev'reoffered
+              mark <-
+                if deadline > highWater
+                  then pure Nothing
+                  else if stalled >= maximumStalledReoffers
+                    then userException (UserError (stalledChainRefusal highWater stamp))
+                    else pure (Just MkReoffered {highWater, stalled = stalled + 1})
               clock <- allocateValue (ValNumber (max deadline time'))
               ev'timeR <- allocateValue ev'time
               evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
-              markReoffered evR mark
+              traverse_ (markReoffered evR) mark
               eventsR <- allocateValue (ValCons evR events)
               continueWithFollowup env followup' eventsR clock
         case act.modal of
