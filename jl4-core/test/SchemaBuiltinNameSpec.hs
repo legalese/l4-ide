@@ -376,6 +376,27 @@ spec = describe "a type named like a builtin" $ do
       fmap (.parameterType) (contents "sb") `shouldBe` Just "string"
       (parameter r "nb").parameterL4Type `shouldBe` Just "Box"
 
+    it "a type that contains itself refers to its definition, and to none that is not there" $ do
+      let r = checked [] (Text.unlines
+            [ "DECLARE Tree HAS kids IS A LIST OF Tree"
+            , "DECLARE Grows a HAS"
+            , "  v IS AN a"
+            , "  next IS A MAYBE (Grows OF (LIST OF a))"
+            , ""
+            , "@export default holds both"
+            , "GIVEN t IS A Tree"
+            , "      g IS A Grows OF NUMBER"
+            , "GIVETH A NUMBER"
+            , "f t g MEANS 1"
+            ])
+      KeyMap.lookup "properties" (jsonDefinition r "Tree")
+        `shouldBe` Just (Aeson.object [("kids", Aeson.object [("items", Aeson.object [("$ref", "#/$defs/Tree")]), ("type", "array")])])
+      KeyMap.lookup "properties" (jsonDefinition r "Grows OF NUMBER")
+        `shouldBe` Just (Aeson.object
+          [ ("v", Aeson.object (jsonType "number"))
+          , ("next", Aeson.object [("anyOf", Aeson.toJSON [Aeson.object [("properties", Aeson.object []), ("type", "object")], Aeson.object (jsonType "null")])])
+          ])
+
     -- The service has published the names; jl4-schema wrote a "tag" form that
     -- no decoder reads. How the fields are written is not decided. A @desc is
     -- carried as written, with the space after the keyword.

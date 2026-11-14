@@ -169,7 +169,14 @@ shapeToJsonSchema = \case
         schema <- shapeToJsonSchema f.fieldShape
         pure (f.fieldName, withDescription f.fieldDescription schema, f.fieldRequired)
       pure (SObject props named.shapeTypeDescription)
-  JRecursive named -> pure (SRef (defName named) Nothing)
+  -- A record that contains itself refers to its definition. One that contains
+  -- itself given a larger type (@Grows OF (LIST OF a)@ in @Grows a@) has a
+  -- definition for each size, and no finite schema: past the first, it is an
+  -- object, as the service writes it.
+  JRecursive named -> do
+    let key = defName named
+    known <- gets (Map.member key)
+    pure (if known then SRef key Nothing else SObject [] Nothing)
  where
   -- Each declared type is written once. The name is taken before its body is
   -- written, so a type that contains itself refers to itself.
