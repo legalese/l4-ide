@@ -1,0 +1,18 @@
+-- A TYPICALLY number is published in the schema exactly as written:
+-- neither a 20-digit integer nor a decimal with 19 places goes through
+-- a floating-point number on the way.
+
+DECLARE Account HAS
+  balance IS A NUMBER TYPICALLY 12345678901234567891
+  rate    IS A NUMBER TYPICALLY 1.0000000000000000001
+
+@export default The balance of an account, or a fallback
+GIVEN
+  account  IS AN Account
+  fallback IS A NUMBER TYPICALLY 12345678901234567891
+  factor   IS A NUMBER TYPICALLY 1.0000000000000000001
+GIVETH A NUMBER
+`balance or fallback` MEANS
+  IF account's balance > 0
+  THEN account's balance
+  ELSE fallback * factor

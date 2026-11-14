@@ -16,6 +16,7 @@ import Data.Aeson (FromJSON, ToJSON, (.:), (.:?), (.=), (.!=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import Data.Ratio (denominator)
 import qualified Data.Scientific as Scientific
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -307,9 +308,10 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
 -- | Convert a TYPICALLY default value to a JSON value for the function schema.
 -- Only simple literals (numbers, strings) and the TRUE/FALSE constructors are
 -- representable; anything else yields Nothing (no "default" key emitted).
+-- A number is published exactly as written, so it never goes through Double.
 typicallyToJson :: Expr Resolved -> Maybe Aeson.Value
 typicallyToJson = \case
-  Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
+  Lit _ (NumericLit _ r) -> Aeson.Number <$> exactDecimal r
   Lit _ (StringLit _ t) -> Just (Aeson.String t)
   App _ r [] -> nullaryToJson r
   _ -> Nothing
@@ -318,6 +320,23 @@ typicallyToJson = \case
     | getUnique r == trueUnique = Just (Aeson.Bool True)
     | getUnique r == falseUnique = Just (Aeson.Bool False)
     | otherwise = Nothing
+
+-- | A rational as an exact decimal, or Nothing when its decimal expansion does
+-- not terminate (its denominator has a prime factor other than 2 and 5). A
+-- written literal always terminates; the check keeps the conversion total, and
+-- a value that cannot be written exactly is left out rather than rounded.
+exactDecimal :: Rational -> Maybe Scientific.Scientific
+exactDecimal r
+  | terminates (denominator r) =
+      case Scientific.fromRationalRepetend Nothing r of
+        Right (s, Nothing) -> Just s
+        _ -> Nothing
+  | otherwise = Nothing
+ where
+  terminates d = strip 5 (strip 2 d) == 1
+  strip p n
+    | n /= 0, n `mod` p == 0 = strip p (n `div` p)
+    | otherwise = n
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool

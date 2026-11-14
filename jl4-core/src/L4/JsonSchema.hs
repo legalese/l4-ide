@@ -5,6 +5,7 @@ module L4.JsonSchema (
   SchemaType (..),
   SchemaContext (..),
   emptyContext,
+  schemaNumber,
 ) where
 
 import Base
@@ -14,6 +15,9 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
+import qualified Data.Scientific as Scientific
+import qualified Data.Aeson.Text as AesonText
+import qualified Data.Text.Lazy.Builder as Builder
 
 import L4.Export (ExportedFunction (..), ExportedParam (..))
 import L4.FunctionSchema (typicallyToJson)
@@ -24,6 +28,13 @@ import L4.TypeCheck.Environment
   , numberUnique, stringUnique, timeUnique
   )
 import Optics
+
+-- | How a number in a schema is written: as 'Aeson.encode' writes it, so an
+-- integer keeps all its digits. Pass it to aeson-pretty as
+-- @confNumFormat = Custom schemaNumber@; aeson-pretty's own default writes an
+-- integer above 1e19 with an exponent.
+schemaNumber :: Scientific.Scientific -> Builder.Builder
+schemaNumber = AesonText.encodeToTextBuilder . Aeson.Number
 
 data JsonSchema = JsonSchema
   { schemaVersion :: !Text

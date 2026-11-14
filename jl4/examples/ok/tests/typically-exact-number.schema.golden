@@ -1,0 +1,43 @@
+{
+    "$defs": {
+        "Account": {
+            "properties": {
+                "balance": {
+                    "default": 12345678901234567891,
+                    "type": "number"
+                },
+                "rate": {
+                    "default": 1.0000000000000000001,
+                    "type": "number"
+                }
+            },
+            "required": [
+                "balance",
+                "rate"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The balance of an account, or a fallback",
+    "properties": {
+        "account": {
+            "$ref": "#/$defs/Account"
+        },
+        "factor": {
+            "default": 1.0000000000000000001,
+            "type": "number"
+        },
+        "fallback": {
+            "default": 12345678901234567891,
+            "type": "number"
+        }
+    },
+    "required": [
+        "account",
+        "fallback",
+        "factor"
+    ],
+    "title": "balance or fallback",
+    "type": "object"
+}

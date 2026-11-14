@@ -139,6 +139,7 @@ test-suite jl4-service-test
     SanitizationSpec
     StdlibResolutionSpec
     TestData
+    TypicallyPublishedSpec
     UnresolvedImportSpec
 
   hs-source-dirs:

@@ -62,7 +62,7 @@ The JSON Schema generated for an exported function publishes it as the JSON Sche
 - A default on a record field with a MEANS is an error at the value, whether or not the value fits the type (`check/typically-on-computed-field`, `not-ok/tc/typically-on-computed-field.l4`).
   The refusal is an assumption of this branch, not a ruling: the alternative was to check the value's type and then ignore it.
 - A DECLARE field may default to an enum constructor (`checkFieldDefaults`); a constructor of another enum is a type mismatch (`not-ok/tc/typically-enum-field.l4`).
-- JSON form (`typicallyToJson`): a number becomes a JSON number, a string a JSON string, `TRUE`/`FALSE` a JSON Boolean.
+- JSON form (`typicallyToJson`): a number becomes a JSON number with every digit as written (`ok/typically-exact-number.l4`), a string a JSON string, `TRUE`/`FALSE` a JSON Boolean.
   Anything else, including `NOTHING` and enum constructors, yields no `default` key.
   Measured with `jl4-schema`: numbers, strings and Booleans on inputs and on record fields appear as `default`; a `NOTHING`, an enum constructor and a `MAYBE` default do not.
 - A defaulted input is still listed under `required`: `required` is derived from MAYBE-ness only (pinned by `ok/tests/typically-basic.schema.golden`).
