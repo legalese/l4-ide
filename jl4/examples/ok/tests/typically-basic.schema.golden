@@ -3,16 +3,16 @@
     "description": "Decide whether a person can vote",
     "properties": {
         "age": {
-            "$ref": "#/$defs/NUMBER",
-            "default": 18
+            "default": 18,
+            "type": "number"
         },
         "bonus": {
-            "$ref": "#/$defs/NUMBER",
-            "default": 5
+            "default": 5,
+            "type": "number"
         },
         "married": {
-            "$ref": "#/$defs/BOOLEAN",
-            "default": false
+            "default": false,
+            "type": "boolean"
         }
     },
     "required": [
