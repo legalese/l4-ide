@@ -104,13 +104,17 @@ Compared each time: each deployment's metadata (with `functions=full`), its func
 Nothing differs but `createdAt`, the server's URL, and, after the `PUT`, the deployment version, from `0.0.0` to `0.0.1`: every `PUT` was applied, and counted as not breaking.
 Of the 34 evaluations, 32 answer and 2 fail alike on both: a missing input that the test expects, and the `ceo-performance-award` rule given made-up events, which fails with a type error in the generated code.
 
+What stays refused does not come back after a restart, measured the same day the same way: `main` deploys an `@export` whose result is a `MAYBE`, a `LIST` or a declared synonym of a `DEONTIC`, as a function that is not a contract (no `startTime` or `events`, `isDeontic` false, a `returnSchema` of `{"type": "object"}` or an array of objects), and answers it with the contract as it stands.
+This change, started on a copy of that store, registers each of the three as `failed`, "Compilation failed".
+So a stored deployment of that kind would stop answering after a restart; whether either of the 2 the reviewer found is one is not known here.
+
 The schemas, measured on 2026-11-14 with a build of `6fe8598ae` against one of this change, over every file with an `@export` in this repository (99 files, 163 exports) and in `legalese/commons` at `bdc8fc5b9` (1,378 files, 33,904 exports), comparing what `jl4-service` publishes for each input and result and what `jl4-schema` writes, export by export:
 
 - The service's schema changes for 49 exports, in 11 `legalese/commons` files whose imported modules have errors of their own (`je/charities-2014` g6 and g7, which import `g6-interpretation` and `g7-interpretation`; `il/hvac-work-licensing-2025` `int-sanction`, which imports `g1-adverse-action`). An input whose record has a field of a type with such an error is now `{"type": "object"}`, where it was the record written out; a bundle with those imports in it is refused at deploy, for their errors. Nothing else the service publishes changes, in either corpus.
 - `jl4-schema` changes for 7,298 exports: 7,214 gain the definitions of the imported types they referred to, and no longer refer to a definition that is not in the file; 26 write a constructor that carries fields as the constructors' names (9 of them gain imported definitions too); 9 write a synonym as what it stands for, and are the same once every `$ref` is followed; and 49 are the 49 above, for which it now names the input and writes no schema.
 - With every `$ref` followed, `jl4-schema` and the service now describe the inputs of every export alike, except three whose input has no written type, which `jl4-schema` calls a string and the service an object. Before, they differed for 7,292 exports.
 - `EITHER` is the input of no export in either corpus, and the result of 7.
-  These schemas were measured before card J3's form of an `EITHER` was built (`761ca37ff`), which changes the service's `returnSchema` of those 7 exports, and was not re-measured over the corpora.
+  These schemas were measured before card J3's form of an `EITHER` was built (`761ca37ff`), which changes the service's `returnSchema` of those 7 exports, and before ROCKINGCHAIR: the comparison skipped the exports that the check refused then, the contract rules among them, and was not re-run over the corpora; the contract rules' schemas are compared with `main` in the service measurement above, over its 10 bundles.
 
 Types that nest, against `main`, measured on 2026-11-04: `l4 check` and `jl4-schema` are within 0.15 s of `main` on every size tried, from 0.03 s (a type that passes two different types on, `LIST OF a` and `MAYBE a`, 24 levels) to 1.3 s (records with two fields of the next one down, 4,000 levels).
 
@@ -164,6 +168,7 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
   ROCKINGCHAIR keeps that a limit, not fixed here (the 10-26 report; legalese/l4-ide#766 was closed on 2026-10-30 on the count of 0).
 - `EITHER` has the shapes of its two sides and is not refused.
   The schema writes it as the service answers it (card J3, option B), and no decoder reads one (above).
+  `jl4-mlir` answers an `EITHER` input wrongly and fails on an `EITHER` result, with the schema of this change and with the one before it alike (measured on 2026-11-14 with `jl4-mlir run` of a build of this change, the earlier schema written into the `.schema.json` by hand): a rule that answers `n` for `RIGHT n` answers `0` for `{"RIGHT": [5]}` and for `5`, and a rule that returns `RIGHT n` stops with "unresolved runtime symbol 'RIGHT'".
   Refusing it was measured to break two files that check today: `subjects/il/hvac-work-licensing-2025/encodings/legalese-full-sonnet-5.5/g1-register.l4` in `legalese/commons` and `jl4/experiments/thailand-cosmetics/orchestrator.l4` in this repository.
 - An `ASSUME` is looked at only when the body of the exported rule reads it itself; an `ASSUME` that the body reaches through a helper or an import is not looked at.
   That is the review's section 4, and it is not here.
