@@ -467,11 +467,34 @@ continueDone :: WHNF -> Machine Config
 continueDone whnf = pure (DoneMachine whnf)
 {-# INLINE continueDone #-}
 
+-- | Are the two operands of a RAND or ROR the same rule: the same name, applied
+-- to the same names and literals? Both operands read the same events from the
+-- same moment, so the same rule on both sides reaches the same outcome on both,
+-- and @A RAND A@ and @A ROR A@ each behave as @A@ (when both are breached, the
+-- tie-break picks one of two identical breaches). Evaluating such an operand
+-- once matters for a rule that names itself on both sides, @x RAND x@: there,
+-- each window an event is past would otherwise double the work. Any other pair
+-- compares unequal, so two operands that could differ are never merged.
+sameRule :: Expr Resolved -> Expr Resolved -> Bool
+sameRule (App _ n1 args1) (App _ n2 args2) =
+  getUnique n1 == getUnique n2
+    && length args1 == length args2
+    && and (zipWith sameArg args1 args2)
+  where
+    sameArg (Lit _ (NumericLit _ a)) (Lit _ (NumericLit _ b)) = a == b
+    sameArg (Lit _ (StringLit _ a)) (Lit _ (StringLit _ b)) = a == b
+    sameArg a b = sameRule a b
+sameRule _ _ = False
+
 
 forwardExpr :: Environment -> Expr Resolved -> Machine Config
 forwardExpr env = \ case
-  RAnd _ann e1 e2 -> continueBackward (ValROp env ValRAnd (Left e1) (Left e2))
-  ROr  _ann e1 e2 -> continueBackward (ValROp env ValROr (Left e1) (Left e2))
+  RAnd _ann e1 e2
+    | sameRule e1 e2 -> continueExpr env e1
+    | otherwise -> continueBackward (ValROp env ValRAnd (Left e1) (Left e2))
+  ROr  _ann e1 e2
+    | sameRule e1 e2 -> continueExpr env e1
+    | otherwise -> continueBackward (ValROp env ValROr (Left e1) (Left e2))
   And  _ann e1 e2 ->
     continueExpr env (IfThenElse emptyAnno e1 e2 falseExpr)
   Or   _ann e1 e2 ->
