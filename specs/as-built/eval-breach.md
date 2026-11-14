@@ -44,13 +44,13 @@ Three binaries, the unstable one being `unstable-20261104-68498bc`:
 
 ## Behaviour and rules (read in code, and pinned by `ok/deontic-breach-semantics.l4`)
 
-- Expiry is strict: an event exactly at the deadline is in time (`jl4-core/src/L4/EvaluateLazy/Machine.hs:946`).
-- On expiry, `reoffer` (`Machine.hs:989`) copies the event, marks the copy in `reofferedEvents`, puts it back on the event list and hands the list to the continuation, whose clock starts at the missed deadline, or at the rule's arming if that is later.
-- A re-offered event is handed on to every layer it is past, until the first whose window is open. The mark holds the latest deadline it has revealed and how many hand-offs in a row failed to pass it; past `maximumStalledReoffers`, 1,000 (`Machine.hs:355`), the run stops with an error, which is what ends a rule that names itself with a window never open.
-- Routing at expiry: `SHANT` to `HENCE`; `MAY` to `LEST`, default `FULFILLED` (`Machine.hs:1011`); `MUST` and `DO` to `LEST`, or a `DeadlineMissed` breach when there is none. All of them count from the missed deadline, including the `HENCE` of a kept `SHANT`.
-- A violated `SHANT` with no `LEST` breaches with its deadline equal to the event's time, a sentinel that reaches the wire (`Machine.hs:1070`). Its `LEST` counts from that act.
-- Both operands breached (`Machine.hs:1110`): a breach is dated at the event that revealed it, not at its deadline. If separate events revealed the two, `RAND` reports the earlier and `ROR` the later. If one event revealed both, the usual case, they tie, and a tie, or a pair with a `LEST BREACH` (`ExplicitBreach`, which records no time), reports the left operand for `RAND` and the right for `ROR`, whichever deadline came first.
-- A rule inside an expression prints on one line, with a rule under its `HENCE` or `LEST` in brackets (`jl4-core/src/L4/Print.hs:544`), and `#TRACE` prints with `AT`, `WITH` and one event to a line (`Print.hs:410`). `WITH`, `WHERE`, `BRANCH`, `LET` and an event use hard breaks, so such an operand keeps its lines, indented under `PARTY`. A rule's own value, as a residual, keeps its clause lines.
+- Expiry is strict: an event exactly at the deadline is in time (`jl4-core/src/L4/EvaluateLazy/Machine.hs:987`).
+- On expiry, `reoffer` (`Machine.hs:1035`) copies the event, puts it back on the event list and hands the list to the continuation, whose clock starts at the missed deadline, or at the rule's arming if that is later.
+- A re-offered event is handed on to every layer it is past, until the first whose window is open. A hand-off whose deadline does not pass the clock where the stall began marks its copy in `reofferedEvents` with that time and how many hand-offs in a row failed to pass it; an unmarked event counts from the clock of the layer reading it, so a walk whose deadlines keep advancing marks nothing, and a mark goes when its copy can no longer be read. Past `maximumStalledReoffers`, 1,000 (`Machine.hs:374`), the run stops with an error, which is what ends a rule that names itself with a window never open.
+- Routing at expiry: `SHANT` to `HENCE`; `MAY` to `LEST`, default `FULFILLED` (`Machine.hs:1059`); `MUST` and `DO` to `LEST`, or a `DeadlineMissed` breach when there is none. All of them count from the missed deadline, including the `HENCE` of a kept `SHANT`.
+- A violated `SHANT` with no `LEST` breaches with its deadline equal to the event's time, a sentinel that reaches the wire (`Machine.hs:1127`). Its `LEST` counts from that act.
+- Both operands breached (`Machine.hs:1158`): a breach is dated at the event that revealed it, not at its deadline. If separate events revealed the two, `RAND` reports the earlier and `ROR` the later. If one event revealed both, the usual case, they tie, and a tie, or a pair with a `LEST BREACH` (`ExplicitBreach`, which records no time), reports the left operand for `RAND` and the right for `ROR`, whichever deadline came first.
+- A rule inside an expression prints on one line, with a rule under its `HENCE` or `LEST` in brackets (`jl4-core/src/L4/Print.hs:559`), and `#TRACE` prints with `AT`, `WITH` and one event to a line (`Print.hs:426`). `WITH`, `WHERE`, `BRANCH`, `LET` and an event use hard breaks, so such an operand keeps its lines, indented under `PARTY`. A rule's own value, as a residual, keeps its clause lines.
 - The `ToJSON` instances of `NF`, `Value` and `ReasonForBreach` moved to the orphan module `L4.Evaluate.ValueLazyJSON`, because the breach renders its action with `prettyLayout` and `L4.Print` imports `L4.Evaluate.ValueLazy`.
 - A `deadline_missed` object carries `eventParty`, `eventAction`, `timestamp`, `obligatedParty`, `obligationAction` and `deadline`. The old labels `deadline`, `now`, `elapsed`, `action` and `limit` named the wrong slots, and `action` was a derived `Show` of the AST.
 
@@ -100,19 +100,21 @@ Of the 11 that do not, 3 are in this repository: `legal/promissory-note.l4` and 
 ## Limits and known defects
 
 - A both-breached `ROR` names only one party until #411 reaches `main`. `qda-cases-buyer.l4` [81], `BREACH BY the transferee ... OR BREACH BY another party to the transaction`, now says only `another party to the transaction`.
-- A branching rule can cost far more, here and on `unstable` alike, because a late event now walks every layer it is past. These are the rule's own branches, at events 10 apart, with `WITHIN 100` both are as fast as `main`:
+- A `RAND` or `ROR` with the same rule on both sides, `x RAND x`, is evaluated once (`sameRule`, `Machine.hs:486`): both operands read the same events from the same moment, so they reach the same outcome. Without that, each window a late event is past doubled the work. Assumed, not ruled: the printed residual of `x RAND x` is one `x`.
+- A `RAND` or `ROR` of two different rules that name each other still doubles at each window an event is past, because each missed window starts both again: with `x` and `y` each `WITHIN 1 LEST (x RAND y)`, a `WAITUNTIL 12` leaves 2,048 obligations here, in 0.22 s, and 2 on `main`. That is the size of the answer, not of the walk: `main` doubles the same way for events in time, and only avoided it for late ones by starting the `LEST` at the late event.
 
-  | Rule                                                        | `main` | this PR         | `unstable`                                            |
-  | ----------------------------------------------------------- | ------ | --------------- | ----------------------------------------------------- |
-  | `WITHIN 1 HENCE (x RAND x) LEST x`, 14 events               | 0.02 s | 1.3 s           | 18 s                                                  |
-  | the same, 18 events                                         | 0.04 s | 21 s, 18 MB     | past 60 s at 16 events (an earlier round); 18 not run |
-  | `WITHIN 7 HENCE (x RAND x) LEST x`, 14 events               | 0.03 s | 1.3 s           | 18 s                                                  |
-  | the same, 18 events                                         | 0.05 s | 20 s, 18 MB     | not run at 18                                         |
-  | `WITHIN 1 HENCE (x RAND x) LEST (x RAND x)`, 2 events       | 0.02 s | past 60 s       | past 60 s                                             |
-  | `MAY ... WITHIN 1 HENCE (x ROR x) LEST (x ROR x)`, 4 events | 0.02 s | past 60 s       | past 60 s                                             |
-  | `WITHIN 0 - 1 LEST (x RAND x)`, 9 events                    | 0.07 s | refused at once | refused at once                                       |
+  Measured on `l4 run`, best of three, against `main` at `4c887e0db` and this PR before and after the review's cost fixes:
 
-  A `LEST (x RAND x)` doubles at each layer the event walks, so its cost grows with how many windows fit between two events, not only with how many events there are.
+  | Rule                                                                          | `main`             | before         | this PR        |
+  | ----------------------------------------------------------------------------- | ------------------ | -------------- | -------------- |
+  | `WITHIN 1 HENCE (x RAND x) LEST (x RAND x)`, events at 0 and 20               | 0.03 s             | past 90 s      | 0.03 s         |
+  | `WITHIN 1 HENCE (x RAND x) LEST x`, 14 events 10 apart                        | 0.03 s             | 2.7 s          | 0.04 s         |
+  | `MAY ... WITHIN 1 HENCE (x ROR x) LEST (x ROR x)`, events at 0, 10, 20 and 30 | 0.03 s             | past 90 s      | 0.02 s         |
+  | `WITHIN 1 LEST x`, one event a million windows late                           | 0.02 s, 45 MB      | 0.66 s, 204 MB | 0.27 s, 46 MB  |
+  | `WITHIN 0 LEST (MUST b WITHIN 1 LEST x)`, a million windows late              | 0.02 s, 45 MB      | 1.3 s, 343 MB  | 1.1 s, 61 MB   |
+  | `WITHIN 1 HENCE (x RAND x) LEST x`, 14 events in time, 0.5 apart              | 1.5 s, 16,384 left | 1.5 s          | 0.02 s, 1 left |
+
+  `jl4-core/test/LateEventScaleSpec.hs` holds the first three and the fourth to a time limit.
 
 - A rule that names itself with a window never open used to leave a residual on `main`; it is now an error.
 - `jl4-mlir`'s runtime (`runDeontic` in `jl4-mlir/runtime/jl4-runtime.mjs`) routes an expiry by the same table, counts what follows from the missed deadline and offers it the revealing event; the `deadline:` cases in `jl4-mlir/runtime/jl4-runtime.test.mjs` give the verdicts `l4 run` gives for the same traces. As on `main`, it answers `FULFILLED` for a `MAY` whose window has not yet closed, where the core leaves it waiting.
