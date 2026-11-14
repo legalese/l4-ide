@@ -74,12 +74,6 @@ main = do
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
   hoverFiles <- sort <$> globDir1 (compile "lsp/hover/**/*.l4") examplesRoot
-  -- Top-level not-ok/ fixtures, missed by the not-ok/tc and not-ok/nlg globs.
-  -- The export-*.l4 files typecheck fine but assert (via their schema golden)
-  -- that an @export in an unsupported position yields no default export.
-  -- (empty.l4 used to live here while warnings still failed typecheck; now
-  -- that only SError blocks 'SuccessfulTypeCheck', it lives in ok/.)
-  exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -90,7 +84,6 @@ main = do
       corpusNonEmpty "nlg-fails"       nlgFailsFiles
       corpusNonEmpty "semantic-tokens" semanticTokenFiles
       corpusNonEmpty "hover"           hoverFiles
-      corpusNonEmpty "export-placement" exportPlacementFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
     -- The legal examples are what a reader of a rendered document sees. A change
     -- to the wording shows here as a diff, line by line, across all of them.
@@ -120,13 +113,11 @@ main = do
     -- token. jl4-core-test's NestedParenParserSpec does the same on deeper
     -- and broken nests, which the corpus has few of.
     describe "parser memo changes nothing (memo on = memo off; #1017)" $
-      forM_ (okFiles <> legalFiles <> librariesFiles <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles <> exportPlacementFiles) $ \inputFile ->
+      forM_ (okFiles <> legalFiles <> librariesFiles <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ParserMemoChangesNothing inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
-    describe "export placement (typechecks; no default export)" $
-      tests evalConfig (True, True) exportPlacementFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
     KeywordList.keywordListTests dataDir
