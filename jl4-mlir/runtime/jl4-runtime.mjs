@@ -595,6 +595,27 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     }
 
     const modal = current.modal || "MUST";
+    // The deadline passed without the action, as in the core evaluator: a
+    // kept prohibition goes on to HENCE, a permission not used to LEST
+    // (default FULFILLED), and any other rule to LEST (default BREACH). The
+    // rule that follows counts from the missed deadline, not from this rule's
+    // start (floored at that start, for a WITHIN below zero). The events up to
+    // the deadline were this rule's; the one that showed the deadline had
+    // passed is left for the rule that follows to match.
+    const lapse = () => {
+      const failedAt = Math.max(absoluteDeadline, obligationStart);
+      while (
+        cursor < sortedEvents.length &&
+        Number(sortedEvents[cursor].at) <= absoluteDeadline
+      ) {
+        cursor++;
+      }
+      now = Math.max(now, failedAt);
+      obligationStart = failedAt;
+      if (modal === "MUSTNOT") return current.hence || { kind: "FULFILLED" };
+      if (modal === "MAY") return current.lest || { kind: "FULFILLED" };
+      return current.lest || { kind: "BREACH" };
+    };
     if (matchingIdx === -1) {
       // No matching event. Find the latest event time the simulator
       // has 'observed' — anything from 'cursor' onward, capped at
@@ -607,13 +628,13 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
         if (et > lastObserved) lastObserved = et;
       }
 
-      // If any event sits strictly past the deadline → obligation
-      // lapsed, take LEST.
+      // If an event not yet read sits strictly past the deadline, the
+      // deadline has passed.
       if (
         absoluteDeadline != null &&
-        sortedEvents.some((e) => Number(e.at) > absoluteDeadline)
+        sortedEvents.slice(cursor).some((e) => Number(e.at) > absoluteDeadline)
       ) {
-        current = current.lest || { kind: "BREACH" };
+        current = lapse();
         continue;
       }
 
@@ -644,13 +665,18 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
     const ev = sortedEvents[matchingIdx];
     const evTime = Number(ev.at);
     if (absoluteDeadline != null && evTime > absoluteDeadline) {
-      current = current.lest || { kind: "BREACH" };
+      current = lapse();
       continue;
     }
     now = evTime;
     cursor = matchingIdx + 1;
     obligationStart = now; // the next obligation in the cascade starts here
-    current = current.hence || { kind: "FULFILLED" };
+    // Doing what a prohibition forbids is its breach; doing anything else
+    // the rule names is compliance.
+    current =
+      modal === "MUSTNOT"
+        ? current.lest || { kind: "BREACH" }
+        : current.hence || { kind: "FULFILLED" };
   }
 
   if (!current) return { value: "FULFILLED", residual: null, ctx };

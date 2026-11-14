@@ -114,6 +114,7 @@ library
     L4.DirectiveFilter
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
+    L4.Evaluate.ValueLazyJSON
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.ContractFrame
@@ -197,6 +198,7 @@ test-suite jl4-core-test
     DirectiveRenameSpec
     MultiClausePrintSpec
     ConsiderScaleSpec
+    LateEventScaleSpec
     OverloadScaleSpec
     YmdOwnDefinitionSpec
     CheckDirectiveResultsSpec

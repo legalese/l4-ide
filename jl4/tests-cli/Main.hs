@@ -540,6 +540,13 @@ evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 evalTraceFixture = fixtureDir </> "evaltrace.l4"
 evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
 
+batchRuleOperandsFixture :: FilePath
+batchRuleOperandsFixture = fixtureDir </> "batch-rule-operands.l4"
+
+breachTraceFixture, breachInputsFixture :: FilePath
+breachTraceFixture  = fixtureDir </> "breach-trace.l4"
+breachInputsFixture = fixtureDir </> "breach-inputs.json"
+
 batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson :: FilePath
 batchEligFixture = fixtureDir </> "batch-elig.l4"
 batchDataJson    = fixtureDir </> "batch-data.json"
@@ -737,6 +744,7 @@ main = do
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
   for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
+       , breachTraceFixture, breachInputsFixture, batchRuleOperandsFixture
        , batchEscapeFixture, batchEscapeInput, batchEscapeRoundtripJson, batchEscapeCellsCsv
        , evalTraceFixture, traceOverflowFixture, traceLoopFixture, refTrailingFixture
        , langEnHintFixture, langEnThenHeFixture, langTagCaseFixture
@@ -3739,6 +3747,74 @@ spec bin = do
           sout `shouldSatisfy` ("[p] is shown" `isInfixOf`)
 
   describe "l4 batch" $ do
+    it "serializes a #TRACE breach with correctly-labeled fields" $ do
+      -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch
+      -- re-prints the module and re-parses it once per input row.
+      Output code sout serr <- runL4 bin
+        ["batch", breachTraceFixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      -- DeadlineMissed labels must follow the constructor slots:
+      --   event party/action/timestamp, obligated party, obligation action,
+      --   deadline (see L4.Evaluate.ValueLazyJSON).
+      let expectedFragments =
+            [ "\"type\":\"deadline_missed\""
+            , "\"eventParty\":\"Bob\""
+            , "\"eventAction\":\"ping\""
+            , "\"timestamp\":15"
+            , "\"obligatedParty\":\"Alice\""
+            , "\"obligationAction\":\"MUST pay 100\""
+            , "\"deadline\":10"
+            ]
+      forM_ expectedFragments \frag ->
+        unless (frag `isInfixOf` sout) $
+          expectationFailure $
+            "Expected batch stdout to contain " ++ show frag
+            ++ "\n--- stdout ---\n" ++ sout
+            ++ "\n--- stderr ---\n" ++ serr
+      -- The old mislabeled fields and the derived-Show AST blob must be gone.
+      let forbiddenFragments = ["\"now\":", "\"elapsed\":", "\"limit\":", "MkAction"]
+      forM_ forbiddenFragments \frag ->
+        unless (not (frag `isInfixOf` sout)) $
+          expectationFailure $
+            "Expected batch stdout NOT to contain " ++ show frag
+            ++ "\n--- stdout ---\n" ++ sout
+
+    -- A rule in an expression prints on one line, so each break its operands
+    -- need has to be a hard one: a soft one collapses and jams their tokens.
+    it "reads back a rule whose clauses hold WITH, WHERE, BRANCH and LET" $ do
+      Output code sout serr <- runL4 bin ["batch", batchRuleOperandsFixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      unless ("\"status\":\"success\"" `isInfixOf` sout) $
+        expectationFailure (sout ++ "\n--- stderr ---\n" ++ serr)
+
+    -- Batch prints a module and parses it again per row, so this is a round trip
+    -- of every #TRACE in that file: rules under HENCE and LEST, in brackets, and
+    -- several events. It must give the verdicts `l4 run` gives.
+    it "agrees with l4 run on every #TRACE of the deontic breach fixture" $ do
+      let fixture = "examples/ok/deontic-breach-semantics.l4"
+      Output code sout serr <- runL4 bin ["batch", fixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      row <- case eitherDecode (BSL8.pack (concat (take 1 (reverse (lines sout))))) of
+        Right v -> pure v
+        Left e -> fail ("batch row is not JSON: " ++ e ++ "\n" ++ sout ++ "\n" ++ serr)
+      objField row "status" `shouldBe` Just (String "success")
+      runEnv <- jsonEnvelope bin ["run", fixture, "--json"]
+      let verdict = \ case
+            String "FULFILLED" -> "fulfilled" :: String
+            -- `A OR B` with one side breached is still open
+            String t | "DEONTIC BREACHED" `T.isPrefixOf` t, not (" OR " `T.isInfixOf` t) -> "breached"
+            Object o | KeyMap.member "breached" o -> "breached"
+            _ -> "open"
+          batchVerdicts = case objField row "output" of
+            Just (Array v) -> [ verdict r | item <- toList v, Just r <- [objField item "result"] ]
+            _ -> []
+          runVerdicts = case objField runEnv "results" of
+            Just (Array v) -> [ verdict r | item <- toList v, Just r <- [objField item "value"] ]
+            _ -> []
+      length runVerdicts `shouldSatisfy` (> 30)
+      -- the last batch row is the exported function's answer
+      take (length runVerdicts) batchVerdicts `shouldBe` runVerdicts
+
     it "streams one NDJSON row per input (default format)" $ do
       Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
       code `shouldBe` ExitSuccess

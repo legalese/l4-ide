@@ -59,9 +59,29 @@ data ScrutinizeEvents = ScrutinizeEvents
   }
   deriving stock Show
 
+-- | The @ev'reoffered@ field threaded through 'ScrutinizeEvent',
+-- 'CurrentTimeWHNF', 'ScrutinizeDue' and 'CheckTiming' records whether the
+-- event under scrutiny is a copy an expiring obligation re-offered in a stalled
+-- hand-off, and if so its mark (looked up at Contract1 via @isReoffered@). The
+-- mark never withholds an event from a layer: it only lets the Contract5 expiry
+-- step refuse a chain whose deadlines have stopped advancing. See the Contract5
+-- NOTE in Machine.hs.
+--
+-- Only a stalled hand-off marks its copy. An unmarked event stands for a mark
+-- whose 'highWater' is the clock of the layer reading it, and whose count is 0.
+data Reoffered = MkReoffered
+  { highWater :: !Rational
+    -- ^ the time no deadline since has passed: the clock of the layer
+    -- whose hand-off first stalled
+  , stalled :: !Int
+    -- ^ how many hand-offs in a row the deadline has failed to pass
+    -- 'highWater'
+  }
+  deriving stock Show
+
 data ScrutinizeEvent = ScrutinizeEvent
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   }
   deriving stock Show
@@ -69,7 +89,7 @@ data ScrutinizeEvent = ScrutinizeEvent
 data CurrentTimeWHNF = CurrentTimeWHNF
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   }
   deriving stock Show
@@ -77,7 +97,7 @@ data CurrentTimeWHNF = CurrentTimeWHNF
 data ScrutinizeDue = ScrutinizeDue
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   }
   deriving stock Show
@@ -85,7 +105,7 @@ data ScrutinizeDue = ScrutinizeDue
 data CheckTiming = CheckTiming
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   }
   deriving stock Show

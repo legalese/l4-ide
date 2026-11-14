@@ -38,6 +38,7 @@ import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.ValueLazy
+import L4.Evaluate.ValueLazyJSON () -- ToJSON instances for NF/Value/ReasonForBreach (batch --json)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
@@ -548,8 +549,9 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   let temporalCtx = initialTemporalContext actualTime
   temporalContext <- newIORef temporalCtx
   let evalTrace = Nothing
+  reofferedEvents <- newIORef mempty
   maxFrameDepth <- readMaxFrameDepthEnv
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth, tracePostprocessor = evalConfig.tracePostprocessor}
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth, tracePostprocessor = evalConfig.tracePostprocessor, reofferedEvents}
 
 -- | @JL4_MAX_FRAME_DEPTH@, a whole number from 1 to the largest 'Int',
 -- replaces 'maximumFrameDepth'. Anything else leaves the default.
