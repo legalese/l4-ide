@@ -128,7 +128,6 @@ hebrew = Map.fromList [ (Text.words en, he) | (en, he) <- entries ]
     , ("failing that,",      "אם לא נעשה כן,")
     , ("if that is done,",   "אם נעשה כן,")
     , ("if that is not done,", "אם לא נעשה כן,")
-    , ("whether or not that is done,", "בין אם נעשה כן ובין אם לאו,")
     , ("condition",          "תנאי")
     , ("result",             "תוצאה")
     , ("source",             "מקור")
