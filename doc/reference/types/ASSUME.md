@@ -55,9 +55,9 @@ ASSUME `the test` IS A FUNCTION FROM NUMBER TO BOOLEAN
 DECIDE `passes` IF `the test` 42
 ```
 
-`l4 check` reports that the input `the test` is a function and that @export does not support that yet, and the service refuses to deploy such a file.
+`l4 check` reports that the input `the test` is a function and that @export does not support that yet, and fails; the service refuses to deploy such a file.
 A function cannot be sent as JSON over REST or MCP, and an assumed function has no definition to run.
-The file still checks, so the rule is still evaluated where you write it.
+That error does not stop the rest of the file: it is still checked for type errors, and the editor still shows the results of its other rules' `#EVAL`s.
 See [An @export with an input or result that cannot be sent yet](../errors/README.md#an-export-with-an-input-or-result-that-cannot-be-sent-yet).
 
 ## Related pages

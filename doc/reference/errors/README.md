@@ -1084,8 +1084,9 @@ A rule that builds or reads an `EVENT` inside its body, and does not name one in
 A rule that gives back a `DEONTIC` is a contract: it says who must do what by when.
 It cannot be published yet, and a contract rule is still evaluated where you write it, so its `#EVAL` and `#EVALTRACE` results still show.
 
-The error is reported by its own check, and not by the type check, so the file still checks: `l4 run` still runs it, the `#EVAL`s of its other rules included.
-`l4 check` reports the error, the editor shows it as an error from `export`, and deploying is refused until you remove the `@export` or change the type.
+`l4 check` reports the error and fails, with exit status 1, and deploying is refused until you remove the `@export` or change the type.
+The editor shows it as an error from `export`.
+The error does not stop the rest of the file: it is still checked for type errors, `l4 run` still runs it, and the editor still shows the results of its `#EVAL`s and `#EVALTRACE`s, the refused rule's own included.
 `@export default` is refused the same way.
 
 **How to fix it:** Take the parts of the event as separate inputs, and build the event inside the rule if it needs one.
