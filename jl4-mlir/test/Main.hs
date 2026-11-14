@@ -412,7 +412,8 @@ testExportRefused rule want =
           pure False
 
 -- | The JS runtime evaluates a contract from the schema (README, known gaps),
--- which is why this path does not refuse what the service refuses here.
+-- and the service deploys a rule whose result is a DEONTIC itself, so neither
+-- refuses it.
 testDeonticResultCompiled :: IO Bool
 testDeonticResultCompiled =
   compileFixture (exportFixture ["GIVETH A DEONTIC Party Act", "`the duty` MEANS PARTY alice MUST ping WITHIN 3"]) >>= \case

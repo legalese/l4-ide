@@ -223,7 +223,7 @@ batchCmd opts = do
       exitFailure
   -- A row can hold no function, so a rule with an input that is one has nothing to
   -- run on. This is all that batch asks of the export check: it runs the rest of
-  -- what the check refuses, a contract rule among them.
+  -- what the check refuses, a MAYBE or a LIST of a DEONTIC among them.
   case concatMap prettyExportError (functionInputs (refusalsOf exportErrs exportFn)) of
     [] -> pure ()
     says -> do
