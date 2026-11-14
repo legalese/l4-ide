@@ -481,6 +481,100 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   );
 }
 
+// --- Where a deadline that passed leads, and from when it counts -----------
+// The same table as the core evaluator (L4.EvaluateLazy.Machine, Contract5):
+// a kept prohibition goes on to HENCE, a permission not used to LEST
+// (default FULFILLED), a duty to LEST (default BREACH), and the rule that
+// follows counts from the missed deadline, with the event that showed it had
+// passed offered to that rule. Each verdict here is the one `l4 run` gives
+// for the same #TRACE.
+{
+  const rule = (modal, action, deadline, hence, lest) => ({
+    kind: "OBLIGATION",
+    modal,
+    party: "Alice",
+    partyKind: "name",
+    action,
+    actionKind: "name",
+    deadline,
+    ...(hence ? { hence } : {}),
+    ...(lest ? { lest } : {}),
+  });
+  const breach = { kind: "BREACH", by: null, because: null };
+  const verdict = (contract, events) =>
+    JSON.stringify(runDeontic(contract, 0, events, {}, null));
+  const at = (party, action, t) => ({ party, action, at: t });
+  const FULFILLED = JSON.stringify("FULFILLED");
+  const BREACH = JSON.stringify("BREACH");
+
+  const grace = rule(
+    "MUST",
+    "pay",
+    30,
+    null,
+    rule("MUST", "pay", 14, null, breach),
+  );
+  eq(
+    "deadline: a LEST counts from the missed deadline, so a payment on day 40 is inside its 14 days",
+    verdict(grace, [at("Alice", "pay", 40)]),
+    FULFILLED,
+  );
+  eq(
+    "deadline: and one on day 50 is after them",
+    verdict(grace, [at("Alice", "pay", 50)]),
+    BREACH,
+  );
+  eq(
+    "deadline: WITHIN 30 LEST (WITHIN 100) is due at 130, not 100",
+    verdict(rule("MUST", "pay", 30, null, rule("MUST", "pay", 100)), [
+      at("Alice", "pay", 120),
+    ]),
+    FULFILLED,
+  );
+  eq(
+    "deadline: a permission not used, with no LEST, is FULFILLED",
+    verdict(rule("MAY", "exercise", 5), [at("Bob", "ping", 10)]),
+    FULFILLED,
+  );
+  eq(
+    "deadline: a permission not used takes its LEST",
+    verdict(rule("MAY", "exercise", 5, null, breach), [at("Bob", "ping", 10)]),
+    BREACH,
+  );
+  const optionThenPay = rule("MAY", "exercise", 5, rule("MUST", "pay", 3));
+  eq(
+    "deadline: a permission not used does not take its HENCE",
+    verdict(optionThenPay, [at("Bob", "ping", 10)]),
+    FULFILLED,
+  );
+  eq(
+    "deadline: a permission used takes its HENCE",
+    verdict(optionThenPay, [at("Alice", "exercise", 2), at("Alice", "pay", 4)]),
+    FULFILLED,
+  );
+  eq(
+    "deadline: a prohibition kept to its deadline is FULFILLED",
+    verdict(rule("MUSTNOT", "smoke", 5), [at("Bob", "ping", 10)]),
+    FULFILLED,
+  );
+  eq(
+    "deadline: a prohibition broken is a breach",
+    verdict(rule("MUSTNOT", "smoke", 5), [at("Alice", "smoke", 2)]),
+    BREACH,
+  );
+  const keptThenPay = rule("MUSTNOT", "smoke", 5, rule("MUST", "pay", 3));
+  eq(
+    "deadline: a kept prohibition's HENCE counts from its deadline, and gets the event that showed it",
+    verdict(keptThenPay, [at("Alice", "pay", 7)]),
+    FULFILLED,
+  );
+  eq(
+    "deadline: so that HENCE is due at 8",
+    verdict(keptThenPay, [at("Alice", "pay", 9)]),
+    BREACH,
+  );
+}
+
 // --- A function the schema marks "supported": false is not run ------------
 // The schema marks a function unsupported when this backend would compute a
 // wrong answer for it (a REFUSE it lowers to a number, a lambda it cannot
