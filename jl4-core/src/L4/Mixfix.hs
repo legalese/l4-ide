@@ -44,7 +44,7 @@ givenParamNames (MkTypeSig _ givenSig _) =
     MkGivenSig _ otns -> map optionallyTypedNameToRawName otns
   where
     optionallyTypedNameToRawName :: OptionallyTypedName Name -> RawName
-    optionallyTypedNameToRawName (MkOptionallyTypedName _ n _) = rawName n
+    optionallyTypedNameToRawName (MkOptionallyTypedName _ n _ _) = rawName n
 
 -- | Extract mixfix pattern information by comparing the AppForm against
 -- the GIVEN parameters in the TypeSig.

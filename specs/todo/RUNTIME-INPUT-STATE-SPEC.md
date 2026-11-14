@@ -1,12 +1,13 @@
 # Specification: Runtime Input State Model
 
-**Status:** ⚠️ BLOCKED (December 2025) - depends on TYPICALLY
+**Status:** ⚠️ BLOCKED (checked 2026-10-30) - depends on TYPICALLY defaults being applied, which nothing does yet
 **Related:** `TYPICALLY-DEFAULTS-SPEC.md` (compile-time defaults), `BOOLEAN-MINIMIZATION-SPEC.md` (partial evaluation), `doc/default-values.md` (conceptual background)
 
 > **⚠️ IMPLEMENTATION STATUS: BLOCKED**
 >
-> This spec depends on the TYPICALLY keyword implementation, which was reverted due to
-> a critical heisenbug. See `TYPICALLY-DEFAULTS-SPEC.md` for details.
+> This spec depends on TYPICALLY defaults being applied to a left-out input.
+> The keyword is built as stage one, which stores and checks a default and applies nothing (`specs/as-built/typically.md`).
+> The first implementation was reverted in December 2025; see `TYPICALLY-DEFAULTS-SPEC.md` for details.
 >
 > The specification below remains valid as a design document for future implementation.
 

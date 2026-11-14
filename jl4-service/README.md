@@ -202,8 +202,19 @@ A synonym at the head of an input's type is read as the type it stands for.
 An input declared through a synonym for `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
 The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 
+The service does not fill a missing input from its `TYPICALLY` value, on either path: the value is stored and checked, and ignored when the rule runs.
+
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
 On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is rejected with the direct path's message.
+A missing `BOOLEAN` costs nothing unless the rule reads it, and is never read as `FALSE`.
+If the rule reads it, evaluation stops and names it:
+
+```
+I could not continue evaluating, because I needed to know the value of
+  `walks (not supplied)`
+but it is an assumed term.
+```
+
 On both paths, an input declared through a synonym for a `MAYBE` is a `MAYBE`: it may be left out, or sent as `null` or `{}`.
 An input declared through any other synonym takes the values of the type the synonym stands for: a record's fields, one of an enum's names, a list, or a date, a time or a date and time as a string. So does a synonym below the head of a type, as in `MAYBE Hue`.
 A synonym that takes no type (`DECLARE Years IS A LIST OF Year`) is answered where the type written out is not: a required `LIST`, `TIME` or `DATETIME` input fails on this path (see the limits below), and a synonym for one does not.
@@ -216,7 +227,7 @@ Limits:
 
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
 - On the wrapper path, a function with a `MAYBE DATE` input fails the request, with an error about the generated code: `incorrect indentation (got 7, should be greater than 7)`, or, when another input is required, a type error about `TODATE`.
-- On the wrapper path, an input declared through a synonym for a `BOOLEAN` that is left out, or sent as `null` in a batch case or an MCP call, is rejected with `Parameter 'b': missing required parameter`, where a `BOOLEAN` written out is `FALSE`.
+- On the wrapper path, an input declared through a synonym for a `BOOLEAN` that is left out, or sent as `null` in a batch case or an MCP call, is rejected with `Parameter 'b': missing required parameter`, where a `BOOLEAN` written out costs nothing unless the rule reads it.
 - On the wrapper path, an input declared through a synonym for a `DATE` whose string does not parse is rejected with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD`, where a `DATE` written out is rejected with `Parameter 'd': could not read "garbage" as a DATE`; a synonym for a `TIME` or a `DATETIME` is rejected with `Could not parse time string …` or `Could not parse datetime string …`, and the type written out fails the wrapper with a type error.
 - On the direct path, a `DATE` string that does not parse is not rejected: the rule receives the text.
 - A list answer of more than 200 elements comes back cut short and ending in two `null`s, with status 200, on the direct path, the wrapper path and in a batch alike.

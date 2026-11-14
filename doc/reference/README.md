@@ -19,6 +19,7 @@ Describe the things your rules talk about: people, contracts, amounts, dates. Th
 | ------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | [DECLARE](types/DECLARE.md)     | Records with HAS, enumerations with ONE OF, computed fields, type synonyms, parameterised types, A and AN |
 | [ASSUME](types/ASSUME.md)       | A name with a type but no value, for facts supplied from outside; how it works with `@export`             |
+| [TYPICALLY](types/TYPICALLY.md) | A usual value written beside a field, an input or an ASSUME: stored and checked, not applied              |
 | [FOR ALL](types/for-all.md)     | Functions that work for values of any type                                                                |
 | [Coercions](types/coercions.md) | Converting between NUMBER, STRING, DATE and other types                                                   |
 
@@ -79,6 +80,13 @@ How an L4 file is written, on one page:
 - **Annotations:** [`@desc`, `@ref`, `@export`](syntax/README.md#annotations), [`@nlg`](syntax/nlg.md)
 - **Directives:** [`#EVAL`, `#CHECK`, `#ASSERT`, `#TRACE`](syntax/README.md#directives)
 - **Legal phrasing:** [genitive 's](syntax/README.md#genitive), [OF](syntax/README.md#of), [ditto ^](syntax/README.md#ditto), [AND and OR over several lines](syntax/README.md#asyndetic-and-and-or)
+
+### [Query planning](query-planning/README.md)
+
+Turning a Boolean decision into an interactive question-and-answer session:
+
+- **[Query Planner](query-planning/README.md):** determinability, question ordering, and the proposal to order questions by information gain with usual values as odds
+- **[Binary Decision Diagrams (ROBDD)](query-planning/robdd.md):** the canonical Boolean-function substrate the planner is built on
 
 ## Library
 

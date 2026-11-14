@@ -18,7 +18,7 @@ This document tracks both specification writing and implementation progress for 
 | 7    | Import/Export Coordination             | 📋 Needs spec | -                                     | ⏳ Todo                       | Depends on Item 6 implementation                |
 | 8    | Performance Optimization               | ✅ Complete   | `PERFORMANCE-OPTIMIZATION-SPEC.md`    | ✅ **Done**                   | Precompiled modules cached at load time         |
 | 9    | ASSUME Parameter Requirements          | 📋 Needs spec | -                                     | ⏳ Todo                       | Can be done independently                       |
-| 10   | TYPICALLY Defaults                     | ✅ Complete   | `TYPICALLY-DEFAULTS-SPEC.md`          | ⚠️ **Reverted**               | Initial impl had heisenbug - needs fresh start  |
+| 10   | TYPICALLY Defaults                     | ✅ Complete   | `TYPICALLY-DEFAULTS-SPEC.md`          | **Stage one built**           | Stored and checked, not applied (2026-10-30)    |
 | 11   | Runtime Input State                    | ✅ Complete   | `RUNTIME-INPUT-STATE-SPEC.md`         | ⚠️ **Blocked**                | Depends on Item 10 (TYPICALLY)                  |
 
 **Legend:**
@@ -84,7 +84,7 @@ Add `X-L4-Trace: none | full` header. When `none`:
 1. **Item 7 (Import/Export)** - Now unblocked by Item 6
 2. **Item 9 (ASSUME)** - Can be done independently
 3. **Item 4 (Boolean Minimization)** - Larger project, separate epic
-4. **Item 10 (TYPICALLY)** - Needs fresh implementation approach
+4. **Item 10 (TYPICALLY)** - Stage one is built (stored and checked, not applied); filling a left-out input from its default is still to do
 5. **Item 11 (Runtime Input State)** - After Item 10
 
 ## Recent Related PRs

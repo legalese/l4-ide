@@ -16,6 +16,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
 
 import L4.Export (ExportedFunction (..), ExportedParam (..))
+import L4.FunctionSchema (typicallyToJson)
 import L4.TypeSynonym (expandSynonyms)
 import L4.Syntax
 import L4.TypeCheck.Environment
@@ -40,7 +41,7 @@ data SchemaType
   | SBoolean !(Maybe Text)
   | SNull
   | SArray !SchemaType !(Maybe Text)
-  | SObject ![(Text, SchemaType, Bool)] !(Maybe Text)
+  | SObject ![(Text, SchemaType, Bool, Maybe Aeson.Value)] !(Maybe Text)
   | SRef !Text !(Maybe Text)
   | SOneOf ![SchemaType] !(Maybe Text)
   | SEnum ![Text] !(Maybe Text)
@@ -79,6 +80,11 @@ schemaTypeToValue :: SchemaType -> Aeson.Value
 schemaTypeToValue st =
   Aeson.object $ schemaTypeToFields st
 
+-- | Render a property schema, attaching a TYPICALLY "default" when present.
+propertyToValue :: SchemaType -> Maybe Aeson.Value -> Aeson.Value
+propertyToValue st mdef =
+  Aeson.object $ schemaTypeToFields st <> maybe [] (\d -> ["default" .= d]) mdef
+
 schemaTypeToFields :: SchemaType -> [(Aeson.Key, Aeson.Value)]
 schemaTypeToFields = \case
   SString desc -> typeField "string" <> descField desc
@@ -93,8 +99,8 @@ schemaTypeToFields = \case
   SObject props desc ->
     let (propFields, reqFields) =
           foldr
-            ( \(name, ty, req) (ps, rs) ->
-                ( (Key.fromText name, schemaTypeToValue ty) : ps
+            ( \(name, ty, req, mdef) (ps, rs) ->
+                ( (Key.fromText name, propertyToValue ty mdef) : ps
                 , if req then name : rs else rs
                 )
             )
@@ -150,15 +156,16 @@ buildParamsSchema ctx params =
   let (props, defs) = foldr addParam ([], ctx.ctxCollectedDefs) params
    in (SObject props Nothing, defs)
  where
-  addParam :: ExportedParam -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
+  addParam :: ExportedParam -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
   addParam param (acc, defs) =
-    case param.paramType of
+    let mdef = typicallyToJson =<< param.paramDefault
+    in case param.paramType of
       Nothing ->
-        ((param.paramName, SString param.paramDescription, param.paramRequired) : acc, defs)
+        ((param.paramName, SString param.paramDescription, param.paramRequired, mdef) : acc, defs)
       Just ty ->
         let (schema, newDefs) = typeToJsonSchema ctx{ctxCollectedDefs = defs} ty
             schemaWithDesc = addDescription schema param.paramDescription
-         in ((param.paramName, schemaWithDesc, param.paramRequired) : acc, newDefs)
+         in ((param.paramName, schemaWithDesc, param.paramRequired, mdef) : acc, newDefs)
 
   addDescription :: SchemaType -> Maybe Text -> SchemaType
   addDescription st Nothing = st
@@ -244,14 +251,14 @@ declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
           let (schema, defs) = typeToJsonSchema ctx ty
            in (addDescToSchema schema desc, defs)
  where
-  addField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
-  addField ctx' (MkTypedName fieldAnn fieldName fieldTy _) (acc, defs) =
+  addField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
+  addField ctx' (MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans) (acc, defs) =
     let fieldNameText = resolvedToText fieldName
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx'{ctxCollectedDefs = defs} fieldTy
         schemaWithDesc = addDescToSchema fieldSchema fieldDesc
         isRequired = not (isMaybeOrOptionalType ctx'.ctxDeclares fieldTy)
-     in ((fieldNameText, schemaWithDesc, isRequired) : acc, newDefs)
+     in ((fieldNameText, schemaWithDesc, isRequired, typicallyToJson =<< mTypically) : acc, newDefs)
 
   addDescToSchema :: SchemaType -> Maybe Text -> SchemaType
   addDescToSchema st Nothing = st
@@ -292,14 +299,14 @@ enumWithPayloads ctx' desc constructors =
   buildOption :: ConDecl Resolved -> ([SchemaType], Map Text SchemaType) -> ([SchemaType], Map Text SchemaType)
   buildOption (MkConDecl _ name fields) (acc, defs) =
     let tagName = resolvedToText name
-        tagProp = ("tag", SConst tagName Nothing, True)
+        tagProp = ("tag", SConst tagName Nothing, True, Nothing)
         (fieldProps, newDefs) = foldr (addConField ctx'{ctxCollectedDefs = defs}) ([], defs) fields
         allProps = tagProp : fieldProps
         objSchema = SObject allProps Nothing
      in (objSchema : acc, newDefs)
 
-  addConField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
-  addConField ctx'' (MkTypedName fieldAnn fieldName fieldTy _) (acc, defs) =
+  addConField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
+  addConField ctx'' (MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans) (acc, defs) =
     let fieldNameText = resolvedToText fieldName
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx''{ctxCollectedDefs = defs} fieldTy
@@ -319,7 +326,7 @@ enumWithPayloads ctx' desc constructors =
             SAnyOf opts _ -> SAnyOf opts (Just d)
             SStringFormat fmt _ -> SStringFormat fmt (Just d)
             SNull -> SNull
-     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType ctx''.ctxDeclares fieldTy)) : acc, newDefs)
+     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType ctx''.ctxDeclares fieldTy), typicallyToJson =<< mTypically) : acc, newDefs)
 
 -- | Is this the builtin MAYBE, or a synonym for it, the types whose schema can
 -- be null? Decided from the resolved, synonym-expanded type, as the decoder

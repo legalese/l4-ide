@@ -1,0 +1,11 @@
+-- TYPICALLY defaults are meaningless on a TYPE binder (a type variable or a
+-- TYPE assumption): a "default value" for a type makes no sense, so it is
+-- rejected rather than silently dropped.
+
+-- ERROR: TYPICALLY on a TYPE assumption
+ASSUME `some type` IS A TYPE TYPICALLY 42
+
+-- ERROR: TYPICALLY on a TYPE parameter
+GIVEN a IS A TYPE TYPICALLY 42
+GIVETH A BOOLEAN
+DECIDE `bad type param` IF TRUE

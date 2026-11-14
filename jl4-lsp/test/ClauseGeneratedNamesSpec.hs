@@ -103,7 +103,7 @@ body :: Decide Resolved -> Expr Resolved
 body (MkDecide _ _ _ b) = b
 
 paramName :: OptionallyTypedName Resolved -> Resolved
-paramName (MkOptionallyTypedName _ n _) = n
+paramName (MkOptionallyTypedName _ n _ _) = n
 
 -- | The local bindings of a body, as the checker left them, before the
 -- outline's filter.
