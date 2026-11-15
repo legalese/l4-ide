@@ -118,7 +118,7 @@ Write a tests module whose expected values come **from the source**: worked exam
 Step 6 checks the inputs somebody thought of.
 For every provision that computes a number or a threshold-driven result, also write **claims about every input**, in a module of their own beside the tests, and check them with `l4 prove`.
 A suite of concrete cases can run to thousands and still say nothing about the input nobody tried.
-One 2026 encoding of a tax credit and its official form had about 2,000 assertions, every one a concrete case (the encoder's count, not re-measured here), and no claim about every input existed until one was written afterwards; when it was, comparing the form with the statute over every input was where the tools mattered.
+One 2026 encoding of a tax credit and its official form had 2,068 assertions, every one a concrete case, and no claim about every input existed until one was written afterwards; when it was, comparing the form with the statute over every input was where the tools mattered.
 
 For each such provision, write:
 
