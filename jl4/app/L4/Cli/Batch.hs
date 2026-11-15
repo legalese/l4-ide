@@ -1005,6 +1005,7 @@ functionInputs errs = [e | e@(ExportUnsendable _ _ (ExportInput _) why) <- errs,
   holdsFunction = \case
     UFunction -> True
     UInField _ _ why -> holdsFunction why
+    UInConstructor _ _ _ why -> holdsFunction why
     UInArgument _ why -> holdsFunction why
     UInBuiltin _ why -> holdsFunction why
     _ -> False

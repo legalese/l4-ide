@@ -273,14 +273,13 @@ Rule source stays L4, backticks included: an action that carries a value, such a
 
 Only a function whose result is a `DEONTIC` itself is a contract.
 A bundle is refused at deploy when an `@export` takes a `DEONTIC` as an input, or returns one inside a `MAYBE`, a `LIST` or an `EITHER`, or through a type you declared as another name for one, with the words `l4 check` uses: `` `the duty` is published with @export, but its result is a MAYBE whose value is a DEONTIC, a contract rule, and @export does not support that yet. ``
-The same goes for any other input or result with no JSON form: an `EVENT`, a function, a type variable, or a record with a field of one of those.
+The same goes for any other input or result with no JSON form: an `EVENT`, a function, a type variable, or a record or a constructor with a field of one of those.
 Remove the `@export` from the rule, or return the `DEONTIC` itself, and the bundle deploys.
 The rule still evaluates where it is written, with its `#EVAL` and `#EVALTRACE`, and [the errors reference](../doc/reference/errors/README.md) says what to do instead.
 
 Limits:
 
 - Only `/evaluation` reads `startTime` and `events`. An MCP `tools/call` and `/evaluation/batch` ignore them, with no error, and answer with the contract as it stands before any event: a contract whose events would fulfil it comes back as its opening `OBLIGATION`.
-- A constructor's fields are not looked at, so a function whose result type has a constructor with a `DEONTIC` field is not a contract: it takes no `startTime` or `events`, its `returnSchema` lists the constructors' names, and it answers with the contract as it stands, as in `{"Duty":{"d":{"OBLIGATION":{"action":"ping","deadline":"3","modal":"MUST","party":"alice"}}}}`.
 
 ### Batch Evaluation
 

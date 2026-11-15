@@ -3498,6 +3498,28 @@ spec = describe "integration" do
           expectationFailure $
             "Expected rejection, but published "
               <> show [fs.fsName | fs <- meta.metaFunctions]
+    -- A constructor's fields are looked at too: one that carries a DEONTIC is
+    -- refused, where it used to deploy as a function that is not a contract and
+    -- answer with the contract.
+    it "rejects an @export whose result has a constructor with a DEONTIC field" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "carrier.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , "DECLARE Carrier IS ONE OF Duty HAS d IS A DEONTIC Party Act"
+        , ""
+        , "@export The carrier"
+        , "GIVETH A Carrier"
+        , "`the carrier` MEANS Duty (PARTY alice MUST ping WITHIN 3)"
+        ]
+      case result of
+        Left err ->
+          err `shouldSatisfy` Text.isInfixOf "its result is of a type `Carrier` whose constructor `Duty` has a field `d` that is a DEONTIC, a contract rule, and @export does not support that yet"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published "
+              <> show [fs.fsName | fs <- meta.metaFunctions]
+
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed

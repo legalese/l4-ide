@@ -19,8 +19,8 @@
 -- > MAYBE a                        JOptional (shape a)       (may be left out or null)
 -- > DECLARE T HAS ...              JRecord                   (fields in declaration order)
 -- > DECLARE T IS ONE OF a, b       JEnum                     (the constructors' names)
--- > DECLARE T IS ONE OF a, b HAS … JEnum                     (the constructors' names; the fields are not part of
---  >                                                          the shape: how they are written is not decided)
+-- > DECLARE T IS ONE OF a, b HAS … JEnum                     (the constructors' names; no shape if a field's
+-- >                                                          type has none: UInConstructor)
 -- > DECLARE T IS A type            the shape of that type
 -- > a type with parameters         the shape of its body, parameters replaced; no shape if
 -- >                                an argument has none, whether or not the parameter is used:
@@ -137,6 +137,9 @@ data Unsendable
     UUnknownType Text
   | -- | The record, the field, and why the field's type has no shape.
     UInField Text Text Unsendable
+  | -- | The type, its constructor, the constructor's field, and why the field's
+    -- type has no shape.
+    UInConstructor Text Text Text Unsendable
   | -- | The type that takes a type, and why what it was given has no shape.
     UInArgument Text Unsendable
   | -- | The built-in type that holds it, and why what it holds has no shape.
@@ -258,8 +261,9 @@ data Reading = MkReading
 -- costs to read however many ways the types can be filled in, and on a cycle the
 -- declarations already read are all there is to say.
 --
--- What is refused is what names something with no shape: 'UInField' says which
--- field of which declaration, and 'UInArgument' which type was given it.
+-- What is refused is what names something with no shape: 'UInField' and
+-- 'UInConstructor' say which field of which declaration, and 'UInArgument' which
+-- type was given it.
 firstUnsendable :: ShapeEnv -> Type' Resolved -> Maybe Unsendable
 firstUnsendable env ty =
   either Just (const Nothing) $
@@ -294,9 +298,13 @@ firstUnsendable env ty =
       let reading = MkReading (Set.fromList params) Set.empty (UUnknownType "TYPE")
       case body of
         SynonymDecl _ inner -> walk reading inner
-        -- A constructor that carries fields is shaped by its name alone: see
-        -- 'expand'.
-        EnumDecl{} -> pure ()
+        -- A constructor's fields are not part of the shape ('expand'), but a
+        -- field of a type with no shape still has no JSON form.
+        EnumDecl _ cons ->
+          for_ cons \(MkConDecl _ conName fields) ->
+            for_ fields \(MkTypedName _ fieldName fieldTy _) ->
+              walk reading fieldTy
+                `catchError` (throwError . UInConstructor typeName (nameText conName) (nameText fieldName))
         RecordDecl _ _ fields ->
           for_ fields \(MkTypedName _ fieldName fieldTy _) ->
             walk reading fieldTy
@@ -326,8 +334,9 @@ expand env = go Set.empty
               case body of
                 SynonymDecl _ t -> inner t
                 -- A constructor that carries fields is shaped by its name alone, as
-                -- the schema has published it until now; how its fields are
-                -- written is open (the wire form of sums), so not refused here.
+                -- the schema has published it until now (card J1 of the wire-form
+                -- bench is ruled and not built); 'firstUnsendable' has looked at
+                -- its fields.
                 EnumDecl _ cons -> JEnum named [nameText c | MkConDecl _ c _ <- cons]
                 RecordDecl _ _ fields -> JRecord named (map (field inner) fields)
        where
@@ -371,6 +380,7 @@ isUnresolved :: Unsendable -> Bool
 isUnresolved = \case
   UUnresolved _ -> True
   UInField _ _ why -> isUnresolved why
+  UInConstructor _ _ _ why -> isUnresolved why
   UInArgument _ why -> isUnresolved why
   UInBuiltin _ why -> isUnresolved why
   _ -> False
@@ -386,6 +396,7 @@ unsendableWhat = \case
   UTypeAsInput -> "a type, so the rule is generic"
   UUnknownType t -> "of the type `" <> t <> "`"
   UInField r f why -> "of a record type `" <> r <> "` whose field `" <> f <> "` is " <> unsendableWhat why
+  UInConstructor t c f why -> "of a type `" <> t <> "` whose constructor `" <> c <> "` has a field `" <> f <> "` that is " <> unsendableWhat why
   UInArgument t why -> "of the type `" <> t <> "`, given " <> dropOf (unsendableWhat why)
   UInBuiltin InList why -> "a list whose elements are each " <> unsendableWhat why
   UInBuiltin InMaybe why -> "a MAYBE whose value is " <> unsendableWhat why
@@ -405,6 +416,7 @@ unsendableHint = \case
   UTypeAsInput -> genericHint
   UUnknownType _ -> "Use a NUMBER, BOOLEAN, STRING, DATE, TIME, DATETIME, a LIST or MAYBE of those, or a record or enumeration of them."
   UInField _ _ why -> unsendableHint why
+  UInConstructor _ _ _ why -> unsendableHint why
   UInArgument _ why -> unsendableHint why
   UInBuiltin _ why -> unsendableHint why
   UNotWorkedOut -> "Write its type in the GIVEN and GIVETH."

@@ -494,6 +494,50 @@ spec = do
               ]
         problems src `shouldBe` Right []
 
+      it "refuses a constructor with a field of a type that has no shape, and says which" $ do
+        let src = Text.unlines $ types ++
+              [ "DECLARE Carrier IS ONE OF"
+              , "  Settled"
+              , "  Owed HAS duty IS A DEONTIC Party Act"
+              , "DECLARE Check IS ONE OF"
+              , "  Always"
+              , "  Test HAS t IS A FUNCTION FROM NUMBER TO BOOLEAN"
+              , "DECLARE Log IS ONE OF Empty, Entry HAS events IS A LIST OF (EVENT Party Act)"
+              , ""
+              , "@export Outcome"
+              , "GIVETH A Carrier"
+              , "`outcome` MEANS Settled"
+              , ""
+              , "@export Run the check"
+              , "GIVEN c IS A Check"
+              , "GIVETH A BOOLEAN"
+              , "`run` MEANS TRUE"
+              , ""
+              , "@export Read the log"
+              , "GIVEN l IS A Log"
+              , "GIVETH A BOOLEAN"
+              , "`read` MEANS TRUE"
+              ]
+        problems src `shouldBe` Right
+          [ (Just 12, "outcome", Nothing, "of a type `Carrier` whose constructor `Owed` has a field `duty` that is a DEONTIC, a contract rule")
+          , (Just 16, "run", Just "c", "of a type `Check` whose constructor `Test` has a field `t` that is a function")
+          , (Just 21, "read", Just "l", "of a type `Log` whose constructor `Entry` has a field `events` that is a list whose elements are each an EVENT")
+          ]
+        noTypeError src
+
+      it "accepts a constructor whose fields have shapes, a type that contains itself among them" $ do
+        let src = Text.unlines
+              [ "DECLARE Chain IS ONE OF End, Link HAS label IS A STRING, rest IS A Chain"
+              , "DECLARE Option a IS ONE OF None, Some HAS v IS AN a"
+              , ""
+              , "@export Length"
+              , "GIVEN c IS A Chain"
+              , "      o IS AN Option OF NUMBER"
+              , "GIVETH A Chain"
+              , "`length` MEANS c"
+              ]
+        problems src `shouldBe` Right []
+
       it "accepts an EITHER whose two sides have shapes, as published until now" $ do
         let src = Text.unlines
               [ "@export Pick"
