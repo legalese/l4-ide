@@ -10,15 +10,15 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 
 ## What it does
 
-- One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:200`), decides whether a type has a form in JSON, and says why when it has none.
+- One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:207`), decides whether a type has a form in JSON, and says why when it has none.
   The table is the header comment of that module.
   `NUMBER`, `BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, `LIST OF`, `MAYBE`, `EITHER` of two types that have shapes, a record, an enumeration, a synonym and a type with parameters have a shape.
   A function, an `EVENT`, a `DEONTIC`, a type variable and any other built-in type that nobody gave a row have none.
   A type that takes a type has none when what it is given has none, used or not (`Box OF (FUNCTION FROM NUMBER TO NUMBER)`; `UInArgument`). `main` refuses that of a function or an `EVENT` written in an input's type, and this refuses it inside a declaration too.
-- `checkExports` (`jl4-core/src/L4/Export.hs:555`) asks it about every input and the result of every `@export`.
+- `checkExports` (`jl4-core/src/L4/Export.hs:557`) asks it about every input and the result of every `@export`.
   An input is a `GIVEN`, or an `ASSUME` of the module that the body of the rule reads itself.
   The result is the written `GIVETH`, or the inferred type when there is none.
-- A result that is a `DEONTIC` itself is not asked about: it is a contract, and is published (`isContractResult`, `Export.hs:536`; ROCKINGCHAIR, see "Revisit").
+- A result that is a `DEONTIC` itself is not asked about: it is a contract, and is published (`isContractResult`, `Export.hs:538`; ROCKINGCHAIR, see "Revisit").
   The test is the one the service uses to decide that a function is a contract, and takes it to its `startTime` and `events` path: a `TyApp` of the `DEONTIC` built-in with two arguments, by unique, so `PROVISION` too.
   It reads the type as written, so a result written with a declared name for a `DEONTIC` (`GIVETH A Duty`, `DECLARE Duty IS A DEONTIC Party Act`) is not a contract to the service: `main` deploys one as a plain function and answers `startTime` with "startTime and events are only valid for functions returning DEONTIC" (measured on 2026-11-15).
   The check refuses it with words of its own, which say to write the `DEONTIC` type out (`contractUnderName`).
@@ -59,7 +59,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   Types are looked up in the declarations of the module and of everything it imports (`moduleDeclares`), and a record that contains itself stops at `JRecursive`.
   Whether a type has a shape is worked out by reading each declaration once, with its parameters taken as fine, and each type argument where it is written, whether or not the parameter is used (`firstUnsendable`). No type is instantiated, so the cost is that of reading the source.
   The shape itself (`expand`) is a tree that writes a declared type out, with its arguments filled in, on every path to it, so it is built only as far as something looks at it: the check discards it, `typeToParameter` walks all of it, and `generateJsonSchema` stops at a declared type, with its arguments, that it has written already.
-- `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite` (`:461`, `:452`), `checkExports`, `checkOneExport` (`:613`), `isContractResult` (`:536`), `withoutRefused` (`:563`), `refusalsOf`, `prettyExportError` (`:512`); `inferredReturnType` (`:175`) gives the result of a definition without a `GIVETH`.
+- `jl4-core/src/L4/Export.hs`: `ExportError` and `ExportSite` (`:461`, `:452`), `checkExports`, `checkOneExport` (`:615`), `isContractResult` (`:538`), `withoutRefused` (`:565`), `refusalsOf`, `prettyExportError` (`:514`); `inferredReturnType` (`:175`) gives the result of a definition without a `GIVETH`.
 - `jl4-service/src/Compiler.hs`, `jl4-lsp/src/LSP/L4/Rules.hs` (the key `ExportCheck`, `:192`) and the two commands use it; none of them has a check of its own.
 
 ## How it is pinned
