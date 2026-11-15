@@ -1328,9 +1328,9 @@ jsonValueToWHNFTyped jsonValue ty0 = do
             innerRef <- allocateValue innerVal
             pure $ ValConstructor TypeCheck.justRef [innerRef]
 
-    -- An EITHER written as the encoder writes it, {"LEFT": [v]} or {"RIGHT": [v]}
-    -- (the wire-form bench, card J3, option B). Anything else is decoded as it
-    -- was, without its type.
+    -- An EITHER in the form the service publishes, {"LEFT": [v]} or {"RIGHT": [v]}
+    -- (card J3, option B; JSONENCODE writes {"RIGHT": v}, which is not read so).
+    -- Anything else is decoded as it was, without its type.
     TyApp _anno eitherRef [leftType, rightType]
       | getUnique eitherRef == TypeCheck.eitherUnique
       , Aeson.Object obj <- jsonValue

@@ -110,6 +110,7 @@ Of the 34 evaluations, 32 answer and 2 fail alike on both: a missing input that 
 
 What stays refused does not come back after a restart, measured the same day the same way: `main` deploys an `@export` whose result is a `MAYBE`, a `LIST` or a declared synonym of a `DEONTIC`, as a function that is not a contract (no `startTime` or `events`, `isDeontic` false, a `returnSchema` of `{"type": "object"}` or an array of objects), and answers it with the contract as it stands.
 This change, started on a copy of that store, registers each of the three as `failed`, "Compilation failed".
+The same holds, measured on 2026-11-15, for a result whose constructor has a `DEONTIC` field, which `main` answers with the contract inside it.
 So a stored deployment of that kind would stop answering after a restart; whether either of the 2 the reviewer found is one is not known here.
 
 The schemas, measured on 2026-11-14 with a build of `6fe8598ae` against one of this change, over every file with an `@export` in this repository (99 files, 163 exports) and in `legalese/commons` at `bdc8fc5b9` (1,378 files, 33,904 exports), comparing what `jl4-service` publishes for each input and result and what `jl4-schema` writes, export by export:
@@ -147,7 +148,8 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
   - An `EITHER` input is read in the form the schema gives it, `{"RIGHT": [5]}` or `{"LEFT": ["x"]}`, by the service's direct path (`fnLiteralToExprTyped`) and by `JSONDECODE`, which the wrapper path uses (assumed, not ruled: it implements J3-B on input; measured on 2026-11-15 on the running service and with `l4 run`).
     A bare value is read as on `main`: `5` reaches the rule as the number, without its side, so a `CONSIDER` on it finds no branch.
     An object in neither form is refused on the direct path ("an EITHER is written {"LEFT": [value]} or {"RIGHT": [value]}") and is `NOTHING` to `JSONDECODE`, as on `main`.
-    On `main` and here alike, the wrapper path fails for an `EITHER` input itself, before it decodes anything: its generated code writes the type as `MAYBE EITHER OF STRING, NUMBER`, which does not parse, so a contract rule with an `EITHER` input fails with that parse error (measured); an `EITHER` in a record's field is read there.
+    On `main` and here alike, the wrapper path fails for an `EITHER` input itself, before it decodes anything: its generated code writes the type as `MAYBE EITHER OF STRING, NUMBER`, which does not parse, so a contract rule with an `EITHER` input, and any call that takes the wrapper (a `null` among the values, in `/evaluation` or a batch case), fails with that parse error (measured); an `EITHER` in a record's field is read there.
+    `JSONENCODE` writes an `EITHER` without the array, `{"RIGHT": 5}`, which `JSONDECODE` does not read as one (measured with `l4 run`).
     The answer is written `{"RIGHT": [v]}` or `{"LEFT": [v]}`, as the schema says.
   - The service's schema of an `EITHER` cannot say that exactly one of `LEFT` and `RIGHT` is there, because a `Parameter` has no `oneOf`; `jl4-schema`'s says so.
   - Card J2 is ruled (J2-A, Meng, 2026-10-15: `returnSchema` takes the record envelope `{"Rec": {...}}` that the encoder writes, at every depth), and not built: `returnSchema` does not show the envelope the encoder writes at every depth (`{"Pair": {"left": 2, "right": 2}}` is answered where `returnSchema` lists `left` and `right` at the top; smucclaw/l4-ide#1010).

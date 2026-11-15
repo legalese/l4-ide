@@ -87,6 +87,7 @@ The type you expect guides the decoding, so say it, with `GIVETH` or by the way 
 - An array decodes to a LIST, a number to a NUMBER, a string to a STRING, `true` and `false` to a BOOLEAN.
 - `null` decodes to `NOTHING` for a MAYBE type; any other value decodes to `JUST` it.
 - A string with a constructor's name decodes to that constructor of an enumeration.
+- `{"LEFT": [v]}` decodes to `LEFT v` and `{"RIGHT": [v]}` to `RIGHT v` for an EITHER type, the form a deployed rule publishes. `JSONENCODE` writes an EITHER without the array, as `{"RIGHT": 5}`, and that form does not decode back to an EITHER.
 - A type declared as another name for a type (`DECLARE Year IS A NUMBER`) decodes as that type, and so does one for a MAYBE: with `DECLARE MaybeYear IS A MAYBE NUMBER`, `null` decodes to `NOTHING` and `2026` to `JUST 2026`.
 
 ```l4
