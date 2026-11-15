@@ -49,6 +49,7 @@ module L4.Export.Shape (
   moduleDeclares,
   shapeEnvFromDeclares,
   jsonShape,
+  contractUnderName,
   unsendableWhat,
   unsendableHint,
 ) where
@@ -146,6 +147,9 @@ data Unsendable
     UInBuiltin Holder Unsendable
   | -- | A result L4 could not work out a type for, from a rule with no GIVETH.
     UNotWorkedOut
+  | -- | A result written with a declared name for a DEONTIC: the name, and the
+    -- DEONTIC it stands for, printed. See 'contractUnderName'.
+    UContractUnderName Text Text
   | -- | A type whose name did not resolve, or that was given the wrong number of
     -- arguments, by name. The cause has its own error (of the type check, here or
     -- in an import), so this one is not reported: see 'isUnresolved'.
@@ -204,6 +208,25 @@ jsonShape :: ShapeEnv -> Type' Resolved -> Either Unsendable JsonShape
 jsonShape env ty = case firstUnsendable env ty of
   Just why -> Left why
   Nothing -> Right (expand env ty)
+
+-- | Is this a declared name for a DEONTIC (@DECLARE Duty IS A DEONTIC Party Act@),
+-- directly or through other names? Then it is 'UContractUnderName', with the
+-- DEONTIC it stands for. A result written so is not a contract: the service
+-- takes a result to its contract path only when it is written as a DEONTIC
+-- ('L4.Export.isContractResult'), so the check refuses it, and says why.
+contractUnderName :: ShapeEnv -> Type' Resolved -> Maybe Unsendable
+contractUnderName env = \case
+  ty@(TyApp _ name _) -> UContractUnderName (nameText name) . prettyLayout <$> go (Set.singleton (getUnique name)) ty
+  _ -> Nothing
+ where
+  go seen = \case
+    TyApp _ name args
+      | Declared _ sub (SynonymDecl _ inner) _ <- typeHead env name args ->
+          case substitute (Map.fromList sub) inner of
+            t@(TyApp _ n [_, _]) | getUnique n == contractUnique -> Just t
+            t@(TyApp _ n _) | getUnique n `Set.notMember` seen -> go (Set.insert (getUnique n) seen) t
+            _ -> Nothing
+    _ -> Nothing
 
 -- | What a type with this name and these arguments is: the table at the top of
 -- this module, as code. The arguments are a type's own or stand for them.
@@ -402,6 +425,7 @@ unsendableWhat = \case
   UInBuiltin InMaybe why -> "a MAYBE whose value is " <> unsendableWhat why
   UInBuiltin InEither why -> "an EITHER one of whose sides is " <> unsendableWhat why
   UNotWorkedOut -> "of a type that L4 could not work out from the rule"
+  UContractUnderName n _ -> "written with `" <> n <> "`, a type name for a DEONTIC"
   UUnresolved t -> "of the type `" <> t <> "`, which has an error of its own"
  where
   dropOf what = fromMaybe what (Text.stripPrefix "of " what)
@@ -420,6 +444,7 @@ unsendableHint = \case
   UInArgument _ why -> unsendableHint why
   UInBuiltin _ why -> unsendableHint why
   UNotWorkedOut -> "Write its type in the GIVEN and GIVETH."
+  UContractUnderName _ t -> "An @export returns a contract only when its GIVETH writes the DEONTIC type out: write GIVETH A " <> t <> " instead."
   UUnresolved _ -> "Fix the error about that type."
  where
   genericHint = "Write the type it is used at in its GIVEN and GIVETH, or publish a rule that calls it at that type."

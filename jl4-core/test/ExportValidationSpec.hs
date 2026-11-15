@@ -413,8 +413,42 @@ spec = do
           [ (Just 6, "maybe", Nothing, "a MAYBE whose value is a DEONTIC, a contract rule")
           , (Just 10, "listed", Nothing, "a list whose elements are each a DEONTIC, a contract rule")
           , (Just 14, "either", Nothing, "an EITHER one of whose sides is a DEONTIC, a contract rule")
-          , (Just 18, "named", Nothing, "a DEONTIC, a contract rule")
+          , (Just 18, "named", Nothing, "written with `Duty`, a type name for a DEONTIC")
           ]
+
+      it "says that a result written with a type name for a DEONTIC is refused for that, and what to write" $ do
+        let src = Text.unlines $ types ++
+              [ "DECLARE Duty IS A DEONTIC Party Act"
+              , "DECLARE `Deposit Duty` IS A Duty"
+              , "DECLARE Owed a IS A DEONTIC Party a"
+              , "DECLARE `Maybe Duty` IS A MAYBE (DEONTIC Party Act)"
+              , ""
+              , "@export Named twice"
+              , "GIVETH A `Deposit Duty`"
+              , "`named twice` MEANS PARTY alice MUST ping WITHIN 3"
+              , ""
+              , "@export Owed"
+              , "GIVETH AN Owed OF Act"
+              , "`owed` MEANS PARTY alice MUST ping WITHIN 3"
+              , ""
+              , "@export Maybe named"
+              , "GIVETH A `Maybe Duty`"
+              , "`maybe named` MEANS NOTHING"
+              , ""
+              , "@export Takes one"
+              , "GIVEN d IS A Duty"
+              , "GIVETH A NUMBER"
+              , "`takes one` MEANS 1"
+              ]
+            writeOut = "An @export returns a contract only when its GIVETH writes the DEONTIC type out: write GIVETH A DEONTIC OF Party, Act instead."
+            deonticHint = "An @export can return a DEONTIC itself, but it can't take one as an input or return one inside another type yet. Return the DEONTIC itself, or remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE."
+        fmap (map prettyExportError) (exportProblems src) `shouldBe` Right
+          [ ["`named twice` is published with @export, but its result is written with `Deposit Duty`, a type name for a DEONTIC, and @export does not support that yet.", writeOut]
+          , ["`owed` is published with @export, but its result is written with `Owed`, a type name for a DEONTIC, and @export does not support that yet.", writeOut]
+          , ["`maybe named` is published with @export, but its result is a MAYBE whose value is a DEONTIC, a contract rule, and @export does not support that yet.", deonticHint]
+          , ["`takes one` is published with @export, but its input `d` is a DEONTIC, a contract rule, and @export does not support that yet.", deonticHint]
+          ]
+        noTypeError src
 
       it "refuses a DEONTIC input" $ do
         let src = Text.unlines $ types ++

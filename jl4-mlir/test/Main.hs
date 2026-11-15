@@ -264,7 +264,7 @@ main = do
     , test "a synonym for a DEONTIC result is refused, having no contract path" $
         testExportRefused
           ["GIVETH A `Duty`", "`refused` MEANS PARTY alice MUST ping WITHIN 3"]
-          "its result is a DEONTIC"
+          "its result is written with `Duty`, a type name for a DEONTIC"
     , test "a DEONTIC result is compiled, as the service deploys it" testDeonticResultCompiled
     , test "a rule the check has nothing to say about is compiled" testPlainExportCompiled
     , test "deontic REFUSE after HENCE is unsupported" $
