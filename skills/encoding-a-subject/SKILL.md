@@ -1,6 +1,6 @@
 ---
 name: encoding-a-subject
-description: Encodes a whole body of law — an Act, a set of regulations, a fee schedule, a standard-form contract — into L4 from its source text, and deposits the result in legalese/canon. Covers the work around the L4 itself — gathering the sources, writing the brief, a coverage table so nothing is silently skipped, nouns before rules, tests taken from the source, a self-check that reads diagnostics rather than exit codes, an independent test pass, NOTES.md, and the canon layout. Use when the user asks to encode, formalise or translate an entire statute, regulation or contract into L4, to "do an encoding" of something for canon, or to write a brief for one. For L4 syntax and drafting idioms it hands off to `writing-l4-rules`.
+description: Encodes a whole body of law — an Act, a set of regulations, a fee schedule, a standard-form contract — into L4 from its source text, and deposits the result in legalese/canon. Covers the work around the L4 itself — gathering the sources, writing the brief, a coverage table so nothing is silently skipped, nouns before rules, tests taken from the source, claims about every input checked with `l4 prove`, a self-check that reads diagnostics rather than exit codes, an independent test pass, NOTES.md, and the canon layout. Use when the user asks to encode, formalise or translate an entire statute, regulation or contract into L4, to "do an encoding" of something for canon, or to write a brief for one. For L4 syntax and drafting idioms it hands off to `writing-l4-rules`.
 ---
 
 # Encoding a body of law in L4
@@ -113,6 +113,41 @@ Write a tests module whose expected values come **from the source**: worked exam
 - **Some tests are meant to fail.** When you transcribe a table of expectations that the law as enacted does not meet (a draft's test cases run against the final text), keep those in their own file, say how many are expected to fail, and count them. That file doubles as proof your harness can fail.
 - Test count is not a quality measure. In the comparison above, assertion counts ran from 149 to 871, and the encoding with the most was the one that departed from the source.
 
+### 6a. Properties over every input
+
+Step 6 checks the inputs somebody thought of.
+For every provision that computes a number or a threshold-driven result, also write **claims about every input**, in a module of their own beside the tests, and check them with `l4 prove`.
+A suite of concrete cases can run to thousands and still say nothing about the input nobody tried.
+One 2026 encoding of a tax credit and its official form had about 2,000 assertions, every one a concrete case (the encoder's count, not re-measured here), and no claim about every input existed until one was written afterwards; when it was, comparing the form with the statute over every input was where the tools mattered.
+
+For each such provision, write:
+
+1. **Bounds.** For example, never below zero, never above the amount before any reduction.
+2. **Direction.** More of an input never raises the result, or never lowers it, where the text implies that.
+3. **The step bound.** The largest change one unit of an input can cause.
+4. **The exact change at each threshold the text names.** "For each $1,000 or fraction thereof" makes the first unit over the threshold cost a whole step: state that as an equation, with the size of the step.
+5. **The form against the statute.** Where an official form, worksheet or calculator implements the same rule and is also encoded, compare the two over every input, in both directions: the form gives at least what the statute gives, and the form gives at most what the statute gives.
+   A failure is a finding.
+   Record it with its counterexample, and leave both encodings as they are (step 6: a failing assertion is a finding).
+
+How to write them:
+
+- **Free inputs.** Put the claims in `<name>-properties.l4`, beside the modules it imports, under a `§` section with its own `GIVEN`: that makes the section's inputs free, so an `#ASSERT` inside is a claim about every input.
+  The `GIVEN` must be in the claims module itself; an assertion that reads a section `GIVEN` declared in an imported file is `unknown`.
+- **State each premise, and say why.** A claim that needs one is written `premise IMPLIES claim`, with a comment saying why it is needed: that a count is not below zero, or is a whole number, or that there is at least one.
+  A claim that needs no premise is better, and a premise you do not need makes the claim say less.
+- **Pair a weak claim with a sharp one.** A bound that a rule returning 0 would satisfy is weak; an exact value at a threshold is sharp.
+  Write both, and say in `NOTES.md` which is which.
+- **Read every verdict, as step 7 reads diagnostics.** `proved` holds at every input.
+  `refuted` comes with a counterexample, which `l4 prove` has replayed in the evaluator: it is a missing premise or a defect in the rule, and which one is a decision for you.
+  `unknown` is a timeout or an input the prover cannot reason about, and it is **not a pass**: record it.
+  Dates, `MAYBE` values, text, lists and some built-ins are refused today, so write the claim over the date-free parts, and say in `NOTES.md` what was fixed to do so.
+- **Run it.** `l4 prove` needs z3 (on `PATH`, or `Z3_EXE`) and an `unstable` `l4`; `main` build 110 has no `prove` command and `main` rejects a section `GIVEN`, so a claims module is read by `unstable` only, whatever the target.
+  `check.sh` does not run a `*-properties.l4` module with `l4 run` or on `main`; it runs `l4 prove` and prints how many claims were proved, refuted and unknown, and goes red on any claim not proved that `expected_open` does not list.
+- **Write it into `NOTES.md`** (step 9), with the verdict lines copied from `l4 prove`.
+
+[`references/properties.md`](references/properties.md) has a worked example in L4, an allowance with a threshold, a step and a floor at zero, with its real `l4 prove` output, the other verdicts, and the form-against-statute comparison.
+
 ### 7. The self-check loop — read the diagnostics
 
 **Read the diagnostics, not only the exit code.**
@@ -130,6 +165,7 @@ L4=/path/to/l4 ./check.sh
 ```
 
 Run it after every unit you land. Report the numbers it prints, never "it's green".
+A module named `*-properties.l4` (step 6a) is the exception, here and in the target check below: `check.sh` checks it with `l4 prove` and prints a row of proved, refuted and unknown claims, and a claim that is not proved is a red row unless `expected_open` lists it; an `unknown` is never a pass.
 
 **It also makes the target check.**
 Unless you set `L4_TARGET=unstable`, `check.sh` runs every module with a main build as well as with your `l4`, and compares the four counts.
@@ -161,6 +197,8 @@ A reviewer reads this first. It carries:
    Also the **target** the encoding was written for, `main` or `unstable`.
 6. **Open questions** for a domain expert.
 7. **Copied modules**, if any (step 5): for each module copied from another encoding, the folder it came from, the commit it was copied at, and its `sha256`.
+8. **Claims about every input**, for every provision that computes a number or a threshold-driven result (step 6a): the `l4` build and the z3 version, one verdict line for each claim (`proved`, `refuted` with its counterexample, `unknown` with its reason), what the encoder did about each one not proved, which claims are weak and which sharp, and, for an input the prover refuses, what was fixed to write the claim without it.
+   Any difference between an official form and the statute is listed with the other findings, unfixed.
 
 [^judgment-calls]:
     Why every reading, and not only the one taken: an ambiguity is a judgment call, and people working with an agent tend to take the reading it argues for.
@@ -190,6 +228,7 @@ Each of these is a way for an encoding to look finished and not be:
 | a home-made `Unresolved` value instead of `REFUSE` / `MAYBE`     | step 5, and `writing-l4-rules`' page 11                  |
 | a number from the amended text answering for the original        | vintages as inputs (step 5)                              |
 | tests that restate the code, so they cannot fail                 | tests from the source; the independent pass (steps 6, 8) |
+| thousands of concrete cases and no claim about every input       | claims checked with `l4 prove` (step 6a)                 |
 | an expected value edited until the test passed                   | a failing assertion is a finding (step 6)                |
 | "all green" over a run with failed or refused assertions         | `check.sh`, not the exit code (step 7)                   |
 | valid-looking syntax rejected by an old binary                   | a current `l4` (step 0)                                  |
