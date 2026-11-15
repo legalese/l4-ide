@@ -189,7 +189,6 @@ A field's name is spelled as declared, spaces included, and not hyphenated as a 
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 An `EITHER` answer is `{"RIGHT": [v]}` or `{"LEFT": [v]}`, the value in an array of one, and the published schema describes it so, with both keys optional.
 An `EITHER` input is read in the same form, `{"RIGHT": [5]}` or `{"LEFT": ["x"]}`; a bare `5` still reaches the rule as a number, without its side.
-A call that takes the wrapper path fails when an input is itself an `EITHER`, with a parse error in the generated code: a contract rule, or a call with a `null` among its values.
 
 A function that reaches a `REFUSE` gives no answer: it declines to, with its author's reason.
 The response is a `200`, as for an answer, with the body `{"tag": "Refused", "contents": {"kind": "refused", "reason": "not modelled"}}`: its `contents` is the refusal, where an answer's `contents` has a `result`. A refusal is how the rules answer that case, so it is not an error: a `422` is only an evaluation that stops with one.

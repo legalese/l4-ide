@@ -83,7 +83,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   It pins that `l4 batch` refuses an input with a function in it and still runs a `DEONTIC` result and an `EVENT` input, and that a broken import gives no export error.
 - `jl4-service/test/IntegrationSpec.hs`: a bundle with an `@export` that takes an `EVENT`, returns an `EVENT`, or returns a `MAYBE` or a `LIST` of a `DEONTIC`, or a type with a constructor whose field is a `DEONTIC`, is refused, with the new words.
   The tests that deploy a contract rule are as on `main` (21 `it` blocks, 26 examples: "deontic evaluation", "deontic answers spell a party and an action one way", "deontic evaluation with record-typed parties", the contract cases of the MAYBE-input bundle, and the missing-input case of a deontic rule); `25fc9d3c9` removed them with the refusal, and they are back with ROCKINGCHAIR.
-  An `EITHER` input is read as `{"RIGHT": [5]}` and `{"LEFT": ["x"]}` on the direct path and in a record's field on the wrapper path, and an object in neither form is refused.
+  An `EITHER` input is read as `{"RIGHT": [5]}` and `{"LEFT": ["x"]}` on the direct path, on the wrapper path (a batch case with a `null`, and a contract rule) and in a record's field there, and an object in neither form is refused; `MaybeLiftSpec` pins the brackets.
 
 ## Measured
 
@@ -148,7 +148,8 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
   - An `EITHER` input is read in the form the schema gives it, `{"RIGHT": [5]}` or `{"LEFT": ["x"]}`, by the service's direct path (`fnLiteralToExprTyped`) and by `JSONDECODE`, which the wrapper path uses (assumed, not ruled: it implements J3-B on input; measured on 2026-11-15 on the running service and with `l4 run`).
     A bare value is read as on `main`: `5` reaches the rule as the number, without its side, so a `CONSIDER` on it finds no branch.
     An object in neither form is refused on the direct path ("an EITHER is written {"LEFT": [value]} or {"RIGHT": [value]}") and is `NOTHING` to `JSONDECODE`, as on `main`.
-    On `main` and here alike, the wrapper path fails for an `EITHER` input itself, before it decodes anything: its generated code writes the type as `MAYBE EITHER OF STRING, NUMBER`, which does not parse, so a contract rule with an `EITHER` input, and any call that takes the wrapper (a `null` among the values, in `/evaluation` or a batch case), fails with that parse error (measured); an `EITHER` in a record's field is read there.
+    The wrapper path's input record brackets a type of more than one word (`MAYBE (EITHER OF STRING, NUMBER)`, `liftTypeText`), where `main` wrote `MAYBE EITHER OF STRING, NUMBER`, which does not parse, so on `main` a contract rule with an `EITHER` input, and any call with one that took the wrapper, failed with that parse error (measured).
+    On `main` and here alike, a `LIST` input fails on the wrapper path, whatever its elements: the record declares it a `LIST OF MAYBE` of them and passes that to the rule, which is a type error (measured with `LIST OF NUMBER`).
     `JSONENCODE` writes an `EITHER` without the array, `{"RIGHT": 5}`, which `JSONDECODE` does not read as one (measured with `l4 run`).
     The answer is written `{"RIGHT": [v]}` or `{"LEFT": [v]}`, as the schema says.
   - The service's schema of an `EITHER` cannot say that exactly one of `LEFT` and `RIGHT` is there, because a `Parameter` has no `oneOf`; `jl4-schema`'s says so.

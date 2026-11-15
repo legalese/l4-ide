@@ -3296,6 +3296,30 @@ spec = describe "integration" do
         let boxed v = Aeson.object ["b" Aeson..= Aeson.object ["v" Aeson..= v], "pad" Aeson..= Aeson.object []]
         call baseUrl mgr "boxed" (boxed (Aeson.object ["RIGHT" Aeson..= [7 :: Int]])) >>= (`shouldCarry` Answers (Aeson.Number 7))
         call baseUrl mgr "boxed" (boxed (Aeson.object ["LEFT" Aeson..= ["x" :: Text]])) >>= (`shouldCarry` Answers (Aeson.Number (-1)))
+      -- The wrapper's input record used to declare the input as `MAYBE EITHER
+      -- OF STRING, NUMBER`, which does not parse, so these failed.
+      it "an EITHER input itself, on the wrapper path: a batch case with a null" \(baseUrl, mgr) -> do
+        req <- buildJsonPost (baseUrl <> "/deployments/either-in/functions/side/evaluation/batch")
+          (Aeson.object
+            [ "outcomes" Aeson..= ([] :: [Text])
+            , "cases" Aeson..=
+                [ Aeson.object ["@id" Aeson..= (1 :: Int), "e" Aeson..= Aeson.object ["RIGHT" Aeson..= [5 :: Int]], "pad" Aeson..= Aeson.Null]
+                , Aeson.object ["@id" Aeson..= (2 :: Int), "e" Aeson..= Aeson.object ["LEFT" Aeson..= ["x" :: Text]], "pad" Aeson..= Aeson.Null]
+                ]
+            ])
+        resp <- httpLbs req mgr
+        wireAt resp ["cases"] `shouldBe` Right (Aeson.toJSON
+          [ Aeson.object ["@id" Aeson..= (1 :: Int), "value" Aeson..= (5 :: Int)]
+          , Aeson.object ["@id" Aeson..= (2 :: Int), "value" Aeson..= (-1 :: Int)]
+          ])
+      it "an EITHER input of a contract rule" \(baseUrl, mgr) -> do
+        let duty v = evalFunction baseUrl mgr "either-in" "duty%20by%20side"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["e" Aeson..= v], "startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])])
+            partyOf resp = wireAt resp ["contents", "result", "value", "OBLIGATION", "party"]
+        right <- duty (Aeson.object ["RIGHT" Aeson..= [5 :: Int]])
+        (statusCode' right, partyOf right) `shouldBe` (200, Right (Aeson.String "bob"))
+        left <- duty (Aeson.object ["LEFT" Aeson..= ["x" :: Text]])
+        (statusCode' left, partyOf left) `shouldBe` (200, Right (Aeson.String "alice"))
       it "refuses an object that is neither form, on the direct path" \(baseUrl, mgr) ->
         call baseUrl mgr "side" (side (Aeson.object ["RIGHT" Aeson..= [1 :: Int, 2]]))
           >>= (`shouldCarry` Refuses "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}")
@@ -4470,7 +4494,8 @@ ladderLeafField field fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
   go (Aeson.Array xs) = concatMap go (toList xs)
   go _ = []
 
--- | A rule with an EITHER input, and one with an EITHER in a record field.
+-- | A rule with an EITHER input, one with an EITHER in a record field, and a
+-- contract rule with an EITHER input, which always takes the wrapper path.
 eitherInputJL4 :: Text
 eitherInputJL4 = Text.unlines
   [ "DECLARE Box HAS v IS AN EITHER STRING NUMBER"
@@ -4484,6 +4509,7 @@ eitherInputJL4 = Text.unlines
   , ""
   , "@export Side"
   , "GIVEN e IS AN EITHER STRING NUMBER"
+  , "      pad IS A MAYBE NUMBER"
   , "GIVETH A NUMBER"
   , "`side` MEANS `value of` e"
   , ""
@@ -4492,4 +4518,15 @@ eitherInputJL4 = Text.unlines
   , "      pad IS A MAYBE NUMBER"
   , "GIVETH A NUMBER"
   , "`boxed` MEANS `value of` (b's v)"
+  , ""
+  , "DECLARE Party IS ONE OF alice, bob"
+  , "DECLARE Act IS ONE OF ping, pong"
+  , ""
+  , "@export Duty by side"
+  , "GIVEN e IS AN EITHER STRING NUMBER"
+  , "GIVETH A DEONTIC Party Act"
+  , "`duty by side` MEANS"
+  , "  CONSIDER e"
+  , "  WHEN LEFT s THEN PARTY alice MUST ping WITHIN 3"
+  , "  WHEN RIGHT n THEN PARTY bob MUST pong WITHIN n"
   ]
