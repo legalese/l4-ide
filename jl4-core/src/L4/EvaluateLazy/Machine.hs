@@ -1328,6 +1328,22 @@ jsonValueToWHNFTyped jsonValue ty0 = do
             innerRef <- allocateValue innerVal
             pure $ ValConstructor TypeCheck.justRef [innerRef]
 
+    -- An EITHER written as the encoder writes it, {"LEFT": [v]} or {"RIGHT": [v]}
+    -- (the wire-form bench, card J3, option B). Anything else is decoded as it
+    -- was, without its type.
+    TyApp _anno eitherRef [leftType, rightType]
+      | getUnique eitherRef == TypeCheck.eitherUnique
+      , Aeson.Object obj <- jsonValue
+      , [(key, Aeson.Array vec)] <- KeyMap.toList obj
+      , [v] <- Vector.toList vec
+      , Just (conRef, sideType) <- case Key.toText key of
+          "LEFT" -> Just (TypeCheck.leftRef, leftType)
+          "RIGHT" -> Just (TypeCheck.rightRef, rightType)
+          _ -> Nothing -> do
+        sideVal <- jsonValueToWHNFTyped v sideType
+        sideRef <- allocateValue sideVal
+        pure $ ValConstructor conRef [sideRef]
+
     -- Handle custom record types and primitives: TyApp conRef []
     TyApp _anno tyRef [] -> do
       let typeName = nameToText (TypeCheck.getName tyRef)

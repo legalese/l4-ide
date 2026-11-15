@@ -80,6 +80,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   It pins that `l4 batch` refuses an input with a function in it and still runs a `DEONTIC` result and an `EVENT` input, and that a broken import gives no export error.
 - `jl4-service/test/IntegrationSpec.hs`: a bundle with an `@export` that takes an `EVENT`, returns an `EVENT`, or returns a `MAYBE` or a `LIST` of a `DEONTIC`, or a type with a constructor whose field is a `DEONTIC`, is refused, with the new words.
   The tests that deploy a contract rule are as on `main` (21 `it` blocks, 26 examples: "deontic evaluation", "deontic answers spell a party and an action one way", "deontic evaluation with record-typed parties", the contract cases of the MAYBE-input bundle, and the missing-input case of a deontic rule); `25fc9d3c9` removed them with the refusal, and they are back with ROCKINGCHAIR.
+  An `EITHER` input is read as `{"RIGHT": [5]}` and `{"LEFT": ["x"]}` on the direct path and in a record's field on the wrapper path, and an object in neither form is refused.
 
 ## Measured
 
@@ -140,7 +141,10 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
 ## Limits
 
 - The schema renders the shape, and the service's decoder and encoder do not follow it: they decide on their own, by reading the type, how a value is read and written (`jsonValueToWHNFTyped`, `jl4-core/src/L4/EvaluateLazy/Machine.hs:1301`; `fnLiteralToExprTyped` and `valueToFnLiteral`, `jl4-service/src/Backend/Jl4.hs`). Where they differ from the schema (`JSONDECODE` measured on 2026-11-14 with `l4 run` of a build of this change; the rest read from the code):
-  - No decoder reads an `EITHER` input, in the form the schema now gives it (J3, option B) or any other: `JSONDECODE` gives `NOTHING` for `{"RIGHT":[5]}` and the bare `5` for `5`, where an `EITHER STRING NUMBER` was asked for, and the service refuses `{"RIGHT":[5]}` ("FnObject but expected type is not a known record") and passes a bare `5` to the rule as the number (measured on the running service).
+  - An `EITHER` input is read in the form the schema gives it, `{"RIGHT": [5]}` or `{"LEFT": ["x"]}`, by the service's direct path (`fnLiteralToExprTyped`) and by `JSONDECODE`, which the wrapper path uses (assumed, not ruled: it implements J3-B on input; measured on 2026-11-15 on the running service and with `l4 run`).
+    A bare value is read as on `main`: `5` reaches the rule as the number, without its side, so a `CONSIDER` on it finds no branch.
+    An object in neither form is refused on the direct path ("an EITHER is written {"LEFT": [value]} or {"RIGHT": [value]}") and is `NOTHING` to `JSONDECODE`, as on `main`.
+    On `main` and here alike, the wrapper path fails for an `EITHER` input itself, before it decodes anything: its generated code writes the type as `MAYBE EITHER OF STRING, NUMBER`, which does not parse, so a contract rule with an `EITHER` input fails with that parse error (measured); an `EITHER` in a record's field is read there.
     The answer is written `{"RIGHT": [v]}` or `{"LEFT": [v]}`, as the schema says.
   - The service's schema of an `EITHER` cannot say that exactly one of `LEFT` and `RIGHT` is there, because a `Parameter` has no `oneOf`; `jl4-schema`'s says so.
   - Card J2 is ruled (J2-A, Meng, 2026-10-15: `returnSchema` takes the record envelope `{"Rec": {...}}` that the encoder writes, at every depth), and not built: `returnSchema` does not show the envelope the encoder writes at every depth (`{"Pair": {"left": 2, "right": 2}}` is answered where `returnSchema` lists `left` and `right` at the top; smucclaw/l4-ide#1010).
@@ -166,7 +170,7 @@ The service's path for contract rules (`startTime` and `events` arguments, `runD
 - On `main` and here alike, an MCP `tools/call` and `/evaluation/batch` ignore a contract's `startTime` and `events`, with no error, and answer with its opening obligation; only `/evaluation` replays them (measured on 2026-11-14, on both builds: the events that make `/evaluation` answer `FULFILLED` give the opening `OBLIGATION` through both).
   ROCKINGCHAIR keeps that a limit, not fixed here (the 10-26 report; legalese/l4-ide#766 was closed on 2026-10-30 on the count of 0).
 - `EITHER` has the shapes of its two sides and is not refused.
-  The schema writes it as the service answers it (card J3, option B), and no decoder reads one (above).
+  The schema writes it as the service answers it (card J3, option B), and the decoders read it in that form (above).
   `jl4-mlir` answers an `EITHER` input wrongly and fails on an `EITHER` result, with the schema of this change and with the one before it alike (measured on 2026-11-14 with `jl4-mlir run` of a build of this change, the earlier schema written into the `.schema.json` by hand): a rule that answers `n` for `RIGHT n` answers `0` for `{"RIGHT": [5]}` and for `5`, and a rule that returns `RIGHT n` stops with "unresolved runtime symbol 'RIGHT'".
   Refusing it was measured to break two files that check today: `subjects/il/hvac-work-licensing-2025/encodings/legalese-full-sonnet-5.5/g1-register.l4` in `legalese/commons` and `jl4/experiments/thailand-cosmetics/orchestrator.l4` in this repository.
 - An `ASSUME` is looked at only when the body of the exported rule reads it itself; an `ASSUME` that the body reaches through a helper or an import is not looked at.

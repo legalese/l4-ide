@@ -188,7 +188,7 @@ A record is an object keyed by its constructor's name, holding its fields: `{"Pa
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 An `EITHER` answer is `{"RIGHT": [v]}` or `{"LEFT": [v]}`, the value in an array of one, and the published schema describes it so, with both keys optional.
-An `EITHER` input is not read as one yet: `{"RIGHT": [5]}` is refused, and a bare `5` reaches the rule as a number.
+An `EITHER` input is read in the same form, `{"RIGHT": [5]}` or `{"LEFT": ["x"]}`; a bare `5` still reaches the rule as a number, without its side.
 
 A function that reaches a `REFUSE` gives no answer: it declines to, with its author's reason.
 The response is a `200`, as for an answer, with the body `{"tag": "Refused", "contents": {"kind": "refused", "reason": "not modelled"}}`: its `contents` is the refusal, where an answer's `contents` has a `result`. A refusal is how the rules answer that case, so it is not an error: a `422` is only an evaluation that stops with one.

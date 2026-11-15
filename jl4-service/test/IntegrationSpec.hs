@@ -3281,6 +3281,25 @@ spec = describe "integration" do
         -- Small file compiles fast enough for the 2s optimistic timeout
         statusCode' resp `shouldSatisfy` (\s -> s == 200 || s == 202)
 
+  -- An EITHER input is read as the schema writes it (card J3, option B): on the
+  -- direct path, and through JSONDECODE on the wrapper path, which `pad: {}`
+  -- takes. A bare value is read as before, without its side.
+  describe "reads an EITHER input as {\"LEFT\": [v]} or {\"RIGHT\": [v]}" do
+    aroundAll (\k -> withServiceFromSources "either-in" [("either.l4", eitherInputJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "either-in" fn (Aeson.object ["arguments" Aeson..= args])
+          side :: Aeson.Value -> Aeson.Value
+          side v = Aeson.object ["e" Aeson..= v]
+      it "RIGHT and LEFT, on the direct path" \(baseUrl, mgr) -> do
+        call baseUrl mgr "side" (side (Aeson.object ["RIGHT" Aeson..= [5 :: Int]])) >>= (`shouldCarry` Answers (Aeson.Number 5))
+        call baseUrl mgr "side" (side (Aeson.object ["LEFT" Aeson..= ["x" :: Text]])) >>= (`shouldCarry` Answers (Aeson.Number (-1)))
+      it "a field of a record, on the wrapper path" \(baseUrl, mgr) -> do
+        let boxed v = Aeson.object ["b" Aeson..= Aeson.object ["v" Aeson..= v], "pad" Aeson..= Aeson.object []]
+        call baseUrl mgr "boxed" (boxed (Aeson.object ["RIGHT" Aeson..= [7 :: Int]])) >>= (`shouldCarry` Answers (Aeson.Number 7))
+        call baseUrl mgr "boxed" (boxed (Aeson.object ["LEFT" Aeson..= ["x" :: Text]])) >>= (`shouldCarry` Answers (Aeson.Number (-1)))
+      it "refuses an object that is neither form, on the direct path" \(baseUrl, mgr) ->
+        call baseUrl mgr "side" (side (Aeson.object ["RIGHT" Aeson..= [1 :: Int, 2]]))
+          >>= (`shouldCarry` Refuses "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}")
+
   describe "compiler" do
     it "compiles valid L4 sources" do
       logger <- newLogger False
@@ -4450,3 +4469,27 @@ ladderLeafField field fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
      in here <> kids
   go (Aeson.Array xs) = concatMap go (toList xs)
   go _ = []
+
+-- | A rule with an EITHER input, and one with an EITHER in a record field.
+eitherInputJL4 :: Text
+eitherInputJL4 = Text.unlines
+  [ "DECLARE Box HAS v IS AN EITHER STRING NUMBER"
+  , ""
+  , "GIVEN e IS AN EITHER STRING NUMBER"
+  , "GIVETH A NUMBER"
+  , "`value of` e MEANS"
+  , "  CONSIDER e"
+  , "  WHEN LEFT s THEN -1"
+  , "  WHEN RIGHT n THEN n"
+  , ""
+  , "@export Side"
+  , "GIVEN e IS AN EITHER STRING NUMBER"
+  , "GIVETH A NUMBER"
+  , "`side` MEANS `value of` e"
+  , ""
+  , "@export Boxed"
+  , "GIVEN b IS A Box"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`boxed` MEANS `value of` (b's v)"
+  ]

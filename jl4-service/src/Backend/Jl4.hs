@@ -487,6 +487,10 @@ stripList :: Type' Resolved -> Maybe (Type' Resolved)
 stripList (TyApp _ name [inner]) | getUnique name == TypeCheck.listUnique = Just inner
 stripList _ = Nothing
 
+stripEither :: Type' Resolved -> Maybe (Type' Resolved, Type' Resolved)
+stripEither (TyApp _ name [l, r]) | getUnique name == TypeCheck.eitherUnique = Just (l, r)
+stripEither _ = Nothing
+
 -- | A type with its synonyms expanded at the head, so that a synonym for MAYBE
 -- is a MAYBE when deciding what a missing or @null@ value means, and a synonym
 -- for a record or an enum is found. A synonym that takes parameters is expanded
@@ -615,7 +619,15 @@ nonMaybeValue mi ty = \case
     case stripList ty of
       Just elemTy -> List emptyAnno <$> traverse (\v -> fnLiteralToExprTyped mi elemTy (Just v)) xs
       Nothing     -> Left "FnArray but expected type is not LIST"
+  -- An EITHER is written as the schema publishes it, {"LEFT": [v]} or
+  -- {"RIGHT": [v]} (the wire-form bench, card J3, option B). A value that is
+  -- not an object is read as before, without its side.
   FnObject fields
+    | Just (leftTy, rightTy) <- stripEither ty ->
+        case fields of
+          [("LEFT", FnArray [v])] -> side TypeCheck.leftRef leftTy v
+          [("RIGHT", FnArray [v])] -> side TypeCheck.rightRef rightTy v
+          _ -> Left "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}"
     | Just (ctorRef, decl) <- lookupRecord mi ty -> do
         -- Walk the record's fields in declaration order and pick each
         -- value from the supplied FnObject (missing fields are handled
@@ -628,6 +640,10 @@ nonMaybeValue mi ty = \case
         Left "FnObject but expected type is not a known record"
   FnUnknown   -> Left "unknown value for a non-MAYBE parameter"
   FnUncertain -> Left "uncertain value is not supported in direct evaluation"
+  where
+    side ref sideTy v = do
+      e <- fnLiteralToExprTyped mi sideTy (Just v)
+      Right (App emptyAnno ref [e])
 
 -- | Get the function's Resolved name from the compiled decide
 getFunctionResolved :: Decide Resolved -> Resolved
