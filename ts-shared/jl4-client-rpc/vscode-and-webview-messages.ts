@@ -987,6 +987,7 @@ export type AiPermissionCategory =
   | 'l4.refactor'
   | 'mcp.l4Rules'
   | 'mcp.vscode'
+  | 'web.fetch'
   | 'meta.askUser'
 
 export type AiPermissionValue = 'never' | 'ask' | 'always'

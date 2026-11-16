@@ -230,6 +230,16 @@
             "default": "always",
             "description": "Legalese AI permission: call tools from the user's MCP servers. Which servers/tools are reachable at all is controlled by the toggles in the sidebar's MCP servers section."
           },
+          "legaleseAi.permissions.fetchWebPages": {
+            "type": "string",
+            "enum": [
+              "never",
+              "ask",
+              "always"
+            ],
+            "default": "always",
+            "description": "Legalese AI permission: read web pages through VS Code's fetch tool. VS Code still asks before fetching from a domain you haven't trusted."
+          },
           "legaleseAi.mcp.enabled": {
             "type": "boolean",
             "default": true,

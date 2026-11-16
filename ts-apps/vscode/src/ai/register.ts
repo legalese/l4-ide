@@ -674,6 +674,7 @@ export function registerAiChatHandlers(deps: {
     'l4.refactor',
     'mcp.l4Rules',
     'mcp.vscode',
+    'web.fetch',
     'meta.askUser',
   ]
   messenger.onRequest(AiPermissionsGet, async () => {
@@ -686,6 +687,7 @@ export function registerAiChatHandlers(deps: {
       'l4.refactor': 'always',
       'mcp.l4Rules': 'always',
       'mcp.vscode': 'ask',
+      'web.fetch': 'always',
       'meta.askUser': 'always',
     }
     for (const cat of ALL_PERMISSION_CATEGORIES) {

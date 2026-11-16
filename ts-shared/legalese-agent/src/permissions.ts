@@ -26,6 +26,7 @@ export type PermissionCategory =
   | 'l4.refactor'
   | 'mcp.l4Rules'
   | 'mcp.vscode'
+  | 'web.fetch'
   | 'meta.askUser'
   | 'meta.statusUpdate'
 
@@ -39,6 +40,7 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
   'l4.refactor',
   'mcp.l4Rules',
   'mcp.vscode',
+  'web.fetch',
   'meta.askUser',
   'meta.statusUpdate',
 ]
@@ -65,6 +67,10 @@ export const DEFAULT_PERMISSIONS: Readonly<
   // still exists (settable to ask/never via VS Code settings) for
   // users who want call-time confirmation on top.
   'mcp.vscode': 'always',
+  // `web__fetch` goes through VS Code's fetch tool, which asks in its
+  // own dialog before a domain the user hasn't trusted. Asking here too
+  // would ask twice.
+  'web.fetch': 'always',
   // `meta__ask_user` has no side effects — it IS the user prompt.
   'meta.askUser': 'always',
   // `meta__post_status_update` only writes a line of prose into the
@@ -98,6 +104,7 @@ export function categoryForTool(toolName: string): PermissionCategory | null {
   if (toolName === 'meta__post_status_update') return 'meta.statusUpdate'
   if (toolName.startsWith('l4-rules__')) return 'mcp.l4Rules'
   if (toolName.startsWith('vsmcp__')) return 'mcp.vscode'
+  if (toolName.startsWith('web__')) return 'web.fetch'
   return null
 }
 

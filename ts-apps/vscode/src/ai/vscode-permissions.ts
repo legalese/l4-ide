@@ -21,6 +21,7 @@ const CATEGORY_SETTING: Record<PermissionCategory, string> = {
   'l4.refactor': 'legaleseAi.permissions.refactorL4',
   'mcp.l4Rules': 'legaleseAi.permissions.runDeployedRules',
   'mcp.vscode': 'legaleseAi.permissions.vscodeMcp',
+  'web.fetch': 'legaleseAi.permissions.fetchWebPages',
   'meta.askUser': 'legaleseAi.permissions.askUser',
   'meta.statusUpdate': 'legaleseAi.permissions.statusUpdate',
 }

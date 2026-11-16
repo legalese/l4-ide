@@ -62,6 +62,8 @@ import { registerChatParticipant } from './chat-participant.js'
 import { registerAiChatHandlers } from './ai/register.js'
 import { commandRenameIdentifier } from './ai/rename-command.js'
 import { VsCodeMcpTools } from './ai/vscode-mcp.js'
+import { WebFetchTools } from './ai/web-fetch-tool.js'
+import { vscodeLmTools } from './ai/vscode-lm.js'
 import { McpOAuthManager, type McpOAuthCallbackResult } from './ai/mcp-oauth.js'
 import { VsCodeWorkspace } from './ai/vscode-workspace.js'
 import {
@@ -697,9 +699,11 @@ export async function activate(context: ExtensionContext) {
     tools: new BuiltinTools(aiWorkspace, aiL4Language),
     permissions: aiPermissions,
     interaction: aiInteraction,
-    // Deployed rules (l4-rules__*), then the user's MCP servers
-    // (vsmcp__*), advertised after the built-ins in this order.
-    providers: [aiMcpClient, vsMcpTools],
+    // Deployed rules (l4-rules__*), the user's MCP servers (vsmcp__*),
+    // then web fetch through VS Code (web__fetch), advertised after the
+    // built-ins in this order. Sidebar only: cloud sessions fetch through
+    // the AI service instead.
+    providers: [aiMcpClient, vsMcpTools, new WebFetchTools(vscodeLmTools)],
   })
   // Pulled from the extension's own packageJSON so a bumped release
   // (and users running older pre-release builds) are both stamped

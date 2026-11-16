@@ -218,6 +218,37 @@ describe('ToolDispatcher', () => {
     assert.deepEqual(calls, ['l4-rules__tax {"x":1}'])
   })
 
+  test('web fetch runs by default and obeys its own permission', async () => {
+    const fetched: string[] = []
+    const web: ToolProvider = {
+      prefix: 'web__',
+      listTools: () => [],
+      callTool: async (_name, args) => {
+        fetched.push(args)
+        return 'page'
+      },
+    }
+    const call = {
+      callId: 'c1',
+      name: 'web__fetch',
+      argsJson: '{"url":"https://example.com"}',
+    }
+    const allowed = dispatcher({ providers: [web] })
+    assert.equal(allowed.dispatcher.categoryFor(call.name), 'web.fetch')
+    assert.deepEqual(await allowed.dispatcher.run(call, ctxA), {
+      ok: true,
+      output: 'page',
+    })
+
+    const refused = dispatcher({
+      providers: [web],
+      permissions: { 'web.fetch': 'never' },
+    })
+    const result = await refused.dispatcher.run(call, ctxA)
+    assert.equal((result as { code?: string }).code, 'denied')
+    assert.equal(fetched.length, 1)
+  })
+
   test('unknown tools are refused', async () => {
     const { dispatcher: d } = dispatcher()
     const result = await d.run(
