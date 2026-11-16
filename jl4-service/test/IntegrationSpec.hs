@@ -3092,6 +3092,31 @@ spec = describe "integration" do
             text <- toolText scoped name arguments
             (name, Aeson.object arguments, reachesOther text) `shouldBe` (name, Aeson.object arguments, False)
 
+    it "MCP search_text keeps the matches first, and explains an empty result after them" do
+      withPendingService "search-hint" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        let texts query = do
+              req <- buildJsonPost (baseUrl <> "/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= ("search_text" :: Text)
+                    , "arguments" Aeson..= Aeson.object [ "query" Aeson..= (query :: Text) ]
+                    ]
+                ]
+              mcpTexts . responseBody <$> httpLbs req mgr
+        found <- texts "^.*(compute_qualifies|no_such_rule)"
+        length found `shouldBe` 1
+        found `shouldSatisfy` all ("compute_qualifies" `Text.isInfixOf`)
+        empty <- texts "nothing_like_this_anywhere"
+        take 1 empty `shouldBe` ["[]"]
+        drop 1 empty `shouldSatisfy` \case
+          [hint] -> "No matches." `Text.isPrefixOf` hint
+                      && not ("nothing_like_this_anywhere" `Text.isInfixOf` hint)
+          _ -> False
+        invalid <- texts "f(x"
+        invalid `shouldSatisfy` any ("is not a valid regular expression" `Text.isInfixOf`)
+
     it "MCP read_file rejects path traversal (../)" do
       withPendingService "precomp-traversal" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         let rpcBody = Aeson.object
@@ -4276,6 +4301,14 @@ lookupKey :: Text -> Maybe Aeson.Object -> Maybe Aeson.Value
 lookupKey k = (>>= Aeson.KeyMap.lookup (Aeson.Key.fromText k))
 
 -- | The text of an MCP tool call's answer, and whether the call was an error.
+-- | Every text item of an MCP tool result, in order.
+mcpTexts :: LBS.ByteString -> [Text]
+mcpTexts body = Maybe.fromMaybe [] do
+  Aeson.Object o <- Aeson.decode body
+  Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+  Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
+  pure [ t | Aeson.Object c <- toList cs, Just (Aeson.String t) <- [Aeson.KeyMap.lookup "text" c] ]
+
 mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)
 mcpToolText body = do
   Aeson.Object o <- Aeson.decode body

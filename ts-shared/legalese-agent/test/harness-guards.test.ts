@@ -1185,6 +1185,25 @@ describe('deployed rule discovery', () => {
     assert.match(out, /no deployed rule covers this/)
   })
 
+  test('search takes the words of a regex-shaped query, and says what it searched', async () => {
+    tools = many()
+    const c = client()
+    await c.listTools()
+    const found = JSON.parse(
+      await c.callTool(
+        'l4-rules__search_rules',
+        JSON.stringify({ query: '^(sacked|dismissal).*' })
+      )
+    ) as Array<{ function: string }>
+    assert.equal(found[0]?.function, 'wrongful dismissal claim')
+    const none = await c.callTool(
+      'l4-rules__search_rules',
+      JSON.stringify({ query: '(fired|terminated)' })
+    )
+    assert.match(none, /searched for the words "fired", "terminated"/)
+    assert.match(none, /Plain words/)
+  })
+
   test('evaluate runs the real rule with the given arguments', async () => {
     tools = many()
     const c = client()
