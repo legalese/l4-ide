@@ -194,6 +194,74 @@ describe('ChatService with fake ports', () => {
     assert.equal((await store.load('conv1'))?.title, 'A short title')
   })
 
+  test('keeps the citations of every response of a turn', async () => {
+    const searched = (sources: Array<{ url: string; title?: string }>) =>
+      `event: tool_activity\ndata: ${JSON.stringify({
+        activities: [
+          {
+            tool: 'web_search',
+            status: 'done',
+            label: 'Web search',
+            message: `${sources.length} sources`,
+            sources,
+          },
+        ],
+      })}`
+    const a = { url: 'https://a.example/law', title: 'A' }
+    const b = { url: 'https://b.example/case', title: 'B' }
+    responses.push(
+      // searched, then paused for a client tool
+      [
+        `event: metadata\ndata: ${JSON.stringify({ conversationId: 'conv1', model: 'm1' })}`,
+        searched([a]),
+        chunk({
+          tool_calls: [
+            {
+              index: 0,
+              id: 'call1',
+              function: {
+                name: 'fs__read_file',
+                arguments: JSON.stringify({ path: 'rules.l4' }),
+              },
+            },
+          ],
+        }),
+        chunk({}, 'tool_calls'),
+      ],
+      // searched again after the tool result
+      [searched([a, b]), chunk({ content: 'Both say so.' }), chunk({}, 'stop')]
+    )
+    const { service, store } = build({ 'rules.l4': 'hi' })
+
+    await service.start({
+      turnId: 'turn1',
+      text: 'Check the law and the case.',
+      mentions: [],
+      attachments: [],
+    })
+
+    const saved = await store.load('conv1')
+    const blocks = (
+      saved?.messages[1] as {
+        _meta?: {
+          blocks?: Array<{
+            kind: string
+            tool?: string
+            sources?: unknown
+            message?: string
+          }>
+        }
+      }
+    )._meta?.blocks
+    const searches = (blocks ?? []).filter(
+      (bl) => bl.kind === 'tool-activity' && bl.tool === 'web_search'
+    )
+    assert.equal(searches.length, 1)
+    assert.deepEqual(searches[0]!.sources, [a, b])
+    assert.equal(searches[0]!.message, '2 sources')
+    await new Promise((r) => setTimeout(r, 20))
+  })
+
   /** Replace fetch: the title request gets `title`, and a chat's stream
    *  stays open after its metadata frame until `release` is called. */
   function holdTurn(
