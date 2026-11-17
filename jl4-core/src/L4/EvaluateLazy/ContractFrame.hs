@@ -96,7 +96,8 @@ instance Show RuleSyntax where
     "RuleSyntax " <> show [hashStableName a, hashStableName b, hashStableName c, hashStableName d, hashStableName e]
 
 -- | What a reference denotes, as far as can be told without evaluating it: a
--- number or a string by its value, anything else by the reference itself.
+-- number or a string by its value, anything else by a reference known to
+-- denote the same (see 'L4.EvaluateLazy.Machine.referenceKey').
 data ValueKey
   = KNumber !Rational
   | KString !Text

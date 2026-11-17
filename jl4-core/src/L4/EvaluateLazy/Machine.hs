@@ -382,10 +382,16 @@ isReoffered rf = do
 data ContractMemo = MkContractMemo
   { applied   :: !(IntMap.IntMap [(AppliedKey, WHNF)])
   , ruleNamesOf :: !(IntMap.IntMap [(RuleSyntax, [Unique])])
+  , referenceKeys :: !(Map Address ValueKey)
+    -- ^ the key each reference was first given ('referenceKey')
+  , objectKeys :: !(IntMap.IntMap [(StableName WHNF, ValueKey)])
+    -- ^ the key of a reference already seen holding each value object
+  , eventsKeys :: !(Map Address EventsKey)
+    -- ^ the key each list of events was first given ('eventListKey')
   }
 
 emptyContractMemo :: ContractMemo
-emptyContractMemo = MkContractMemo IntMap.empty IntMap.empty
+emptyContractMemo = MkContractMemo IntMap.empty IntMap.empty Map.empty IntMap.empty Map.empty
 
 resetContractMemo :: Eval ()
 resetContractMemo = do
@@ -445,9 +451,9 @@ memoKey (ValObligation env (Left party) act (Left due) followup lest) [time, eve
           (m { ruleNamesOf = IntMap.insertWith (<>) h [(syn, names)] m.ruleNamesOf }, ())
         pure names
     nameKeys <- for [ (u, rf) | u <- names, Just rf <- [Map.lookup u env] ] \ (u, rf) ->
-      (u,) <$> referenceKey rf
-    clockKey <- referenceKey time
-    eventsKey <- eventListKey reofferedR events
+      (u,) <$> referenceKey memoR rf
+    clockKey <- referenceKey memoR time
+    eventsKey <- eventListKey memoR reofferedR events
     pure (Just (MkAppliedKey syn nameKeys clockKey eventsKey))
   where
     stableName :: a -> IO (StableName a)
@@ -465,28 +471,79 @@ appliedHash k = ruleSyntaxHash k.ruleSyntax * 1000003 + case k.clock of
 -- | What a reference denotes, without evaluating it ('ValueKey'): a number or
 -- a string already evaluated, or a literal not yet evaluated, by its value; a
 -- name not yet evaluated by what the name refers to, a few steps deep; and
--- anything else by the reference itself.
-referenceKey :: Reference -> IO ValueKey
-referenceKey = go (8 :: Int)
+-- anything else by a reference: its own, or that of another reference already
+-- seen holding the very same value object.
+--
+-- The key of a reference is the first one worked out for it, kept for the
+-- rest of the directive. A reference never changes what it denotes, so a key
+-- that was true once stays true; and keeping it means the key does not change
+-- when the reference is evaluated. Without that, a second name for a rule, or
+-- a rule not yet evaluated, would be keyed one way before it is first
+-- evaluated and another way after, and the applications on either side of
+-- that moment would never meet in the memo.
+referenceKey :: IORef ContractMemo -> Reference -> IO ValueKey
+referenceKey memoR = go (8 :: Int)
   where
     go d rf = do
+      memo <- readIORef memoR
       thunk <- readIORef rf.pointer
-      case thunk of
-        WHNF (ValNumber n) -> pure (KNumber n)
-        WHNF (ValString t) -> pure (KString t)
-        Unevaluated tids e env
-          | Set.null tids, d > 0 -> case e of
-              Lit _ (NumericLit _ n) -> pure (KNumber n)
-              Lit _ (StringLit _ t) -> pure (KString t)
-              Var _ n | Just rf' <- lookupTerm env n -> go (d - 1) rf'
-              App _ n [] | Just rf' <- lookupTerm env n -> go (d - 1) rf'
-              _ -> pure (KAddress rf.address)
-        _ -> pure (KAddress rf.address)
+      case Map.lookup rf.address memo.referenceKeys of
+        Just k -> do
+          -- once evaluated, let a second reference to the same value find it
+          case thunk of
+            WHNF v | not (atomic v) -> void (objectKey v k)
+            _ -> pure ()
+          pure k
+        Nothing -> do
+          k <- case thunk of
+            WHNF (ValNumber n) -> pure (KNumber n)
+            WHNF (ValString t) -> pure (KString t)
+            WHNF v -> objectKey v (KAddress rf.address)
+            Unevaluated tids e env
+              | Set.null tids, d > 0 -> case e of
+                  Lit _ (NumericLit _ n) -> pure (KNumber n)
+                  Lit _ (StringLit _ t) -> pure (KString t)
+                  Var _ n | Just rf' <- lookupTerm env n -> go (d - 1) rf'
+                  App _ n [] | Just rf' <- lookupTerm env n -> go (d - 1) rf'
+                  _ -> pure (KAddress rf.address)
+            _ -> pure (KAddress rf.address)
+          atomicModifyIORef' memoR \ m ->
+            (m { referenceKeys = Map.insert rf.address k m.referenceKeys }, ())
+          pure k
+    atomic = \ case
+      ValNumber _ -> True
+      ValString _ -> True
+      _ -> False
+    -- the key already recorded for this value object, or else record this one
+    objectKey v k = do
+      v' <- Control.Exception.evaluate v
+      sn <- makeStableName v'
+      let h = hashStableName sn
+      memo <- readIORef memoR
+      case lookup sn =<< IntMap.lookup h memo.objectKeys of
+        Just k' -> pure k'
+        Nothing -> do
+          atomicModifyIORef' memoR \ m ->
+            (m { objectKeys = IntMap.insertWith (<>) h [(sn, k)] m.objectKeys }, ())
+          pure k
 
 -- | A list of events, without evaluating it ('EventsKey'). The head event's
 -- 'Reoffered' mark is part of it: the walk that reads the event depends on it.
-eventListKey :: IORef (Map Address Reoffered) -> Reference -> IO EventsKey
-eventListKey reofferedR rf = do
+-- Like 'referenceKey', the key of a list is the first one worked out for it,
+-- so that it does not change when the list is evaluated.
+eventListKey :: IORef ContractMemo -> IORef (Map Address Reoffered) -> Reference -> IO EventsKey
+eventListKey memoR reofferedR rf = do
+  memo <- readIORef memoR
+  case Map.lookup rf.address memo.eventsKeys of
+    Just k -> pure k
+    Nothing -> do
+      k <- eventListKey' memoR reofferedR rf
+      atomicModifyIORef' memoR \ m ->
+        (m { eventsKeys = Map.insert rf.address k m.eventsKeys }, ())
+      pure k
+
+eventListKey' :: IORef ContractMemo -> IORef (Map Address Reoffered) -> Reference -> IO EventsKey
+eventListKey' memoR reofferedR rf = do
   thunk <- readIORef rf.pointer
   case thunk of
     WHNF ValNil -> pure KNoEvents
@@ -494,9 +551,9 @@ eventListKey reofferedR rf = do
       ev <- readIORef e.pointer
       case ev of
         WHNF (ValEvent p a t) -> do
-          pk <- referenceKey p
-          ak <- referenceKey a
-          tk <- referenceKey t
+          pk <- referenceKey memoR p
+          ak <- referenceKey memoR a
+          tk <- referenceKey memoR t
           mark <- Map.lookup e.address <$> readIORef reofferedR
           pure (KEvent pk ak tk (fmap (\ m -> (m.highWater, m.stalled)) mark) es.address)
         _ -> pure (KEventsAt rf.address)
