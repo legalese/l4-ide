@@ -62,7 +62,7 @@ import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1262,6 +1262,24 @@ spec = describe "integration" do
         hardResp <- evalFunction baseUrl mgr "ty-own" "within limit"
           (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
         expectAnswer hardResp (FnLitBool True) ["JSONDECODE Settings: limit"]
+
+    -- Assumed, not ruled: a
+    -- decode the rules make into a record declared under a heading names it
+    -- behind the heading, on the direct path and on the wrapper path alike (a
+    -- `{}` sent for an input takes the wrapper path), in both modes.
+    it "names a decoded record behind its section heading, on both paths and in both modes" do
+      withServiceFromSources "ty-heading" [("heading.l4", headingDecodeJL4)] \baseUrl mgr -> do
+        let hardOf as = Aeson.object ["arguments" Aeson..= Aeson.object as, "presumption" Aeson..= ("hard" :: Text)]
+            direct = ["amount" Aeson..= (5 :: Int), "unused flag" Aeson..= True]
+            wrapped = ["amount" Aeson..= (5 :: Int), "unused flag" Aeson..= Aeson.object []]
+        d1 <- evalFunction baseUrl mgr "ty-heading" "within limit" (args direct)
+        expectAnswer d1 (FnLitBool True) ["JSONDECODE Pricing.Settings: limit"]
+        d2 <- evalFunction baseUrl mgr "ty-heading" "within limit" (hardOf direct)
+        expectAnswer d2 (FnLitBool True) ["JSONDECODE Pricing.Settings: limit"]
+        w1 <- evalFunction baseUrl mgr "ty-heading" "within limit" (args wrapped)
+        expectAnswer w1 (FnLitBool True) ["JSONDECODE Pricing.Settings: limit"]
+        w2 <- evalFunction baseUrl mgr "ty-heading" "within limit" (hardOf wrapped)
+        expectAnswer w2 (FnLitBool True) ["JSONDECODE Pricing.Settings: limit"]
 
     -- T1, ARCHAISM, ruled 2026-10-09: `T WITHAL` is the record a decode of {}
     -- gives. A default it takes is one inside the rules, so it is listed as

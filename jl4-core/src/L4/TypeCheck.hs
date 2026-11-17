@@ -15,6 +15,7 @@ module L4.TypeCheck
   , isQuantifier
   , prettyCheckError
   , prettyCheckErrorWithContext
+  , qualifiedOwner
   -- what the merge of 'checkExpr' tells values apart by; exported to be tested
   , headKey
   -- 'severity' is re-exported via @module X@ (it lives in
