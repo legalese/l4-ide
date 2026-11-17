@@ -1,0 +1,73 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: withal-not-a-record.l4
+  Hidden: no
+  Range: 15:7-15:18
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL builds a record with the default of every field, but
+
+      Rect (defined at withal-not-a-record.l4:10:3-7)
+
+    is one of the alternatives of a type declared with ONE OF, not a record.
+    Every field of such an alternative has to be given, even one that has a
+    TYPICALLY, so write it with WITH or OF.
+
+File: withal-not-a-record.l4
+  Hidden: no
+  Range: 18:7-18:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL builds a record with the default of every field, but
+
+      Dot (defined at withal-not-a-record.l4:11:3-6)
+
+    is one of the alternatives of a type declared with ONE OF, not a record.
+    It has no fields to take defaults for, so write just its name.
+
+File: withal-not-a-record.l4
+  Hidden: no
+  Range: 25:7-25:20
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL builds a record with the default of every field, but
+
+      scaled (defined at withal-not-a-record.l4:23:1-7)
+
+    is not a record: it is a rule, or a field of one. To use a rule and leave
+    some of its inputs to their defaults, name the other inputs with WITH.
+
+File: withal-not-a-record.l4
+  Hidden: no
+  Range: 30:7-30:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL builds a record with the default of every field, but
+
+      coats (defined at withal-not-a-record.l4:28:19-24)
+
+    is not a record: it is a rule, or a field of one. To use a rule and leave
+    some of its inputs to their defaults, name the other inputs with WITH.
+
+File: withal-not-a-record.l4
+  Hidden: no
+  Range: 33:7-33:21
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL builds a record with the default of every field, but
+
+      NOTHING (predefined)
+
+    is one of the alternatives of a type declared with ONE OF, not a record.
+    It has no fields to take defaults for, so write just its name.
