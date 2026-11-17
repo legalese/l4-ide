@@ -327,6 +327,13 @@ What else works:
   request the same way they supply a read `ASSUME`, and fill in a name's
   `TYPICALLY` value when the request leaves it out (see
   [TYPICALLY](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
+  `l4 batch` hands the name to the rules by name, as `#EVAL` does, so an inner
+  `WITH` that overrides it works. Two limits (measured 2026-11-18): a name
+  whose every read is overridden is still read from the case, which has to give
+  it a value of the right kind or leave it out, and two section `GIVEN`s of one
+  name, one in a section and one in a section inside it, that a single rule
+  reaches are refused by `l4 batch` where `#EVAL` answers. Both are described on
+  [the `l4` command-line page](../../tutorials/getting-started/l4-cli.md).
 - **Every export backend** — Decision Model and Notation (DMN), Business Process
   Model and Notation (BPMN), docassemble, Catala, OpenFisca, Blawx and the
   Multi-Level Intermediate Representation (MLIR) — treats a section `GIVEN` as
@@ -490,9 +497,9 @@ accepted, and it went wrong in the worst order — the reassuring step came firs
 - Running the very same row then stopped with _"I could not continue evaluating,
   because I needed to know the value of `gst rate` but it is an assumed term."_
   Adding `"gst rate"` to the row did **not** help: the value was accepted into
-  the row and then ignored, because the way `l4 batch` supplies a value is by
-  rewriting the module it was handed, and it cannot rewrite a module that module
-  merely imports.
+  the row and then ignored, because the way `l4 batch` supplied a value then was
+  by rewriting the module it was handed, and it cannot rewrite a module that
+  module merely imports.
 
 So the answer to _"is this request valid?"_ was yes for a request that could
 never be answered. That is why the first repair is the refusal rather than a

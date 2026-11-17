@@ -16,6 +16,10 @@ The merged stack has the same commits as `e1d26be8f` by subject, plus `5bee81f5a
 Every other cell was read from the code at the function it cites.
 Line numbers drift, so a citation leads with the function's name.
 
+**Changed since this page's tree, on branch `feat/typically-gaps` (local, not landed as of 2026-11-17):** a top-level `null` is read the same way on `/evaluation`, MCP `tools/call` and the batch endpoint, and refused for an input that is not a `MAYBE` (smucclaw/l4-ide#1021).
+The "one known leak" paragraph in §2, the table and its two paragraphs in §4, the "different readings of one request" line in §7 and Q1 in §8 describe the tree before that change, and are left as they were, each marked where it stands.
+Re-measure them when the branch lands.
+
 **This page owns no decision.**
 The semantics of an unknown are [`UNKNOWN-EVALUATION-SPEC.md`](UNKNOWN-EVALUATION-SPEC.md) §4, with its rulings U1 to U13 recorded in its §9, and defaults and the presumption switch are [`TYPICALLY-ONE-BEHAVIOUR-SPEC.md`](TYPICALLY-ONE-BEHAVIOUR-SPEC.md) §5, rulings T1 to T6.
 Where this page disagrees with either, the spec wins and this page is wrong: fix it here, in the same change.
@@ -45,7 +49,7 @@ Keeping left-out and `null` apart is the backend's job from the moment it parses
 jl4-service keeps the difference by decoding `arguments` as `Map Text (Maybe FnLiteral)` (`FnArguments`, `jl4-service/src/Backend/Api.hs`), so a key with `null` is present with no value, and reads the cells with `suppliedIn` (`Backend/Jl4.hs`).
 `l4 batch` keeps it in the JSON and YAML it reads; CSV has no way to spell `null`, and an empty cell is _left out_ (TY T3c, ruled; `rowToJson`, `jl4/app/L4/Cli/Batch.hs`).
 
-**One known leak** (smucclaw/l4-ide#1021, _measured_ today): MCP `tools/call` and the batch endpoint parse each argument with `FromJSON FnLiteral`, whose `Null` case is `FnUnknown`, so a top-level `null` there is not the "present, no value" cell the single endpoint sees.
+**One known leak** (smucclaw/l4-ide#1021, _measured_ 2026-10-09; closed on branch `feat/typically-gaps`, not landed: see the note at the top): MCP `tools/call` and the batch endpoint parse each argument with `FromJSON FnLiteral`, whose `Null` case is `FnUnknown`, so a top-level `null` there is not the "present, no value" cell the single endpoint sees.
 It changes the answer only for a `BOOLEAN` input (_measured_ over MCP): a `NUMBER` sent `null` is refused at once by the wrapper path's decoder ("Field 'n' is null…"), a `DATE` by `wrapperDeclined` ("missing required parameter"), and a `MAYBE` is `NOTHING` on every route.
 §4 says what that changes.
 
@@ -119,7 +123,7 @@ UES's step 6, parked, depends on that unnumbered work item.
 Which path a service request takes is `requiresWrapperEvaluation` (`Backend/Jl4.hs`): any `FnUnknown` or `FnUncertain` at any depth sends it to the wrapper, as does every `DEONTIC` function.
 A key that is left out never does.
 
-That is why one `null` on a `BOOLEAN` is refused by one route and carried by the other two today (_measured_, smucclaw/l4-ide#1021):
+That is why one `null` on a `BOOLEAN` was refused by one route and carried by the other two (_measured_ 2026-10-09, smucclaw/l4-ide#1021; the other two refuse it too on branch `feat/typically-gaps`, not landed: see the note at the top):
 
 | request, `p` sent as `null`       | single `/evaluation` | MCP `tools/call` | batch case          |
 | --------------------------------- | -------------------- | ---------------- | ------------------- |
@@ -254,7 +258,7 @@ See Q2 in §8.
 - The service reports "the answer depends on `x`" and "you left out `x`" under the same `"tag": "InterpreterError"`, so a client has to parse prose to tell them apart (_measured_ 2026-10-09).
 - An error or a `REFUSE` to the right of an unknown is reported as stuck on the left's inputs, not as itself (UES U13's interim).
 
-**Different readings of one request:** `/evaluation` refuses a top-level `null` on a `BOOLEAN` that MCP and the batch endpoint carry as an unknown (smucclaw/l4-ide#1021); the refusal is T3b's interim for the direct path, and which way they should converge is Q1.
+**Different readings of one request** (until branch `feat/typically-gaps`, not landed: see the note at the top): `/evaluation` refuses a top-level `null` on a `BOOLEAN` that MCP and the batch endpoint carry as an unknown (smucclaw/l4-ide#1021); the refusal is T3b's interim for the direct path, and which way they should converge is Q1.
 
 **Different readings, by design:** every shipped ladder and the planner treat a defaulted input as unknown until it is answered, while `#EVAL`, `l4 run`, the REPL, the LSP and MCP take the default.
 TY T4 makes presumption the caller's choice, and those callers have no switch.
@@ -277,6 +281,7 @@ TY T4 makes presumption the caller's choice, and those callers have no switch.
 These are listed, not resolved, and each is a decision about the spec that owns it, not about this page.
 
 **Q1. When should a top-level `null` stop being refused on `/evaluation`?**
+_Part built, not ruled here: branch `feat/typically-gaps` (local, not landed, 2026-11-17) makes MCP and the batch endpoint refuse it as `/evaluation` does, as the TYPICALLY finish wave's scope asked ("the four related gaps we should also do now", #1021 among them). When the direct path gets lazy binding stays open._
 Today `/evaluation` refuses it, while MCP and the batch endpoint carry a `BOOLEAN` one as an unknown (§4; smucclaw/l4-ide#1021, _measured_).
 The rulings point one way.
 T3's table gives `null` the row "an assumed term, **never** the default", and UES reads it as covering every input that is not a `MAYBE`, as TY's W1 says; UES calls extending the placeholder past `BOOLEAN` W1's unbuilt half.

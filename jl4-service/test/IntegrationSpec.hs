@@ -704,6 +704,267 @@ spec = describe "integration" do
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
 
+  -- A top-level @null@ is "I do not know", and it never takes a default (T3).
+  -- For an input that is not a MAYBE it is refused before evaluation, naming
+  -- the input. /evaluation always did; MCP @tools/call@ and a batch case sent
+  -- the same @null@ down the wrapper path instead, where the input became an
+  -- assumed term and the answer depended on the order of the operands
+  -- (smucclaw/l4-ide#1021). Each case is asked of all three surfaces, and each
+  -- verdict is checked on its own, so that three surfaces agreeing on a wrong
+  -- answer do not pass.
+  describe "a top-level null on every surface (smucclaw/l4-ide#1021)" do
+    let deployId = "null-surfaces"
+        janus = Text.unlines
+          [ "@export default both inputs hold, p first"
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE bothHold IF p AND q"
+          , ""
+          , "@export both inputs hold, q first"
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE bothHoldRev IF q AND p"
+          , ""
+          , "@export r has a default"
+          , "GIVEN r IS A BOOLEAN TYPICALLY TRUE"
+          , "      q IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE withDefault IF r AND q"
+          , ""
+          , "@export an unread input beside the others"
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "      x IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE bothHoldX IF q AND p"
+          , ""
+          , "@export three inputs, or"
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "      r IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE or3 IF p OR q OR r"
+          , ""
+          , "@export a MAYBE input"
+          , "GIVEN m IS A MAYBE NUMBER"
+          , "GIVETH A NUMBER"
+          , "orZero m MEANS"
+          , "  CONSIDER m"
+          , "    WHEN JUST x THEN x"
+          , "    WHEN NOTHING THEN 0"
+          ]
+        withJanus = withServiceFromSources deployId [("janus.l4", janus)]
+        -- what each surface answered, in a fixed order
+        onEverySurface :: String -> Manager -> Text -> [Pair] -> IO [(Text, SurfaceAnswer)]
+        onEverySurface baseUrl mgr fn inputs = sequence
+          [ ("/evaluation",) <$> askRest baseUrl mgr deployId fn inputs []
+            -- a tool for a function that is not DEONTIC takes its inputs flat
+          , ("MCP",) <$> askMcpWith baseUrl mgr deployId fn (Aeson.object inputs)
+          , ("batch",) <$> askBatch baseUrl mgr deployId fn inputs []
+          ]
+        -- every surface that did not do what was asked, and what it did instead
+        departures :: (SurfaceAnswer -> Maybe Text) -> [(Text, SurfaceAnswer)] -> [Text]
+        departures verdict answers = [ surface <> ": " <> why | (surface, answer) <- answers, Just why <- [verdict answer] ]
+        showAnswer :: Map Text FnLiteral -> Text
+        showAnswer r = "answered " <> Text.pack (show (Map.lookup "value" r))
+        -- refused, naming the input in these words, and not as one left out
+        refusedAs :: Text -> SurfaceAnswer -> Maybe Text
+        refusedAs expected = \case
+          Right r -> Just (showAnswer r)
+          Left msg
+            | not (expected `Text.isInfixOf` msg) -> Just ("refused in other words: " <> msg)
+            | "not supplied" `Text.isInfixOf` msg -> Just ("called a null an input left out: " <> msg)
+            | otherwise -> Nothing
+        answeredAs :: FnLiteral -> SurfaceAnswer -> Maybe Text
+        answeredAs expected = \case
+          Left msg -> Just ("refused: " <> msg)
+          Right r | Map.lookup "value" r == Just expected -> Nothing
+                  | otherwise -> Just (showAnswer r)
+        refusal name = "Parameter '" <> name <> "' is null, which means the value is not known: supply a value"
+        refusalWithDefault name = "Parameter '" <> name
+          <> "' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"
+
+    -- The issue's cases A to D, and B': the two operand orders, a null that
+    -- would have decided the answer and one that would not, and a default.
+    forM_ [ ("A", "p AND q with p null and q false", "bothHold", ["p" Aeson..= Aeson.Null, "q" Aeson..= False], refusal "p")
+          , ("B", "p AND q with p null and q true", "bothHold", ["p" Aeson..= Aeson.Null, "q" Aeson..= True], refusal "p")
+          , ("C", "q AND p with p null and q false", "bothHoldRev", ["p" Aeson..= Aeson.Null, "q" Aeson..= False], refusal "p")
+          , ("B'", "q AND p with p null and q true", "bothHoldRev", ["p" Aeson..= Aeson.Null, "q" Aeson..= True], refusal "p")
+          , ("D", "r TYPICALLY TRUE, with r null", "withDefault", ["r" Aeson..= Aeson.Null, "q" Aeson..= True], refusalWithDefault "r")
+          ] \(label, what, fn, inputs, expected :: Text) ->
+      it ("case " <> label <> ": " <> what <> " is refused, naming the input, on /evaluation, on MCP and in a batch") do
+        withJanus \baseUrl mgr -> do
+          answers <- onEverySurface baseUrl mgr fn inputs
+          departures (refusedAs expected) answers `shouldBe` []
+
+    it "names every input that is null, not only the first" do
+      withJanus \baseUrl mgr -> do
+        answers <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= Aeson.Null, "q" Aeson..= Aeson.Null]
+        departures (refusedAs (refusal "p")) answers `shouldBe` []
+        departures (refusedAs (refusal "q")) answers `shouldBe` []
+
+    -- A `{}` anywhere in a request sends the whole request down the wrapper path,
+    -- where a BOOLEAN null is an assumed term, refused only if the rule reads it.
+    -- A top-level null is "not known" whatever else the request holds (T3), so it
+    -- is refused before the request takes that path: an unrelated `{}` must not
+    -- bring back the order dependence (review round 1 of #1021).
+    forM_ [ ("x is {}", "bothHoldX", ["p" Aeson..= Aeson.Null, "q" Aeson..= False, "x" Aeson..= Aeson.object []], refusal "p")
+          , ("x is {}, and the null would have decided the other way", "bothHoldX", ["p" Aeson..= Aeson.Null, "q" Aeson..= True, "x" Aeson..= Aeson.object []], refusal "p")
+          , ("r is {}", "or3", ["p" Aeson..= Aeson.Null, "q" Aeson..= True, "r" Aeson..= Aeson.object []], refusal "p")
+          , ("x is false, with no {} anywhere (the control)", "bothHoldX", ["p" Aeson..= Aeson.Null, "q" Aeson..= True, "x" Aeson..= False], refusal "p")
+          ] \(what, fn, inputs, expected :: Text) ->
+      it ("refuses a top-level null where " <> what <> ", on /evaluation, on MCP and in a batch") do
+        withJanus \baseUrl mgr -> do
+          answers <- onEverySurface baseUrl mgr fn inputs
+          departures (refusedAs expected) answers `shouldBe` []
+
+    -- A `{}` IN PLACE of an input says the input is uncertain, which is not the
+    -- same as null: on the wrapper path a BOOLEAN `{}` is an assumed term, refused
+    -- only if the rule reads it, so the answer can depend on the order of the
+    -- operands. That is the documented early/late split, kept (T3b), and it is
+    -- the same on all three surfaces. Hard does not change it: the switch is
+    -- about defaults, not about uncertainty.
+    it "answers or refuses a {} in place of an input by whether the rule reads it, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        decided <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= Aeson.object [], "q" Aeson..= False]
+        departures (answeredAs (FnLitBool False)) decided `shouldBe` []
+        undecided <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= Aeson.object [], "q" Aeson..= True]
+        departures (\case Left msg | "`p (not supplied)`" `Text.isInfixOf` msg -> Nothing
+                                    | otherwise -> Just ("refused in other words: " <> msg)
+                          Right r -> Just (showAnswer r)) undecided `shouldBe` []
+        -- the operand order is what decides which of the two the same {} gets
+        reversed <- onEverySurface baseUrl mgr "bothHoldRev" ["p" Aeson..= Aeson.object [], "q" Aeson..= False]
+        departures (answeredAs (FnLitBool False)) reversed `shouldBe` []
+
+    it "answers a {} in place of an input under hard as it does under soft" do
+      withJanus \baseUrl mgr -> do
+        let hardRest inputs = askRest baseUrl mgr deployId "bothHold" inputs ["presumption" Aeson..= ("hard" :: Text)]
+        decided <- hardRest ["p" Aeson..= Aeson.object [], "q" Aeson..= False]
+        departures (answeredAs (FnLitBool False)) [("/evaluation", decided)] `shouldBe` []
+
+    -- case E: an input left out is refused as it always was, in other words
+    -- than a null's
+    it "case E: an input left out is refused as missing, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        answers <- onEverySurface baseUrl mgr "bothHoldRev" ["q" Aeson..= False]
+        departures (refusedAs "Parameter 'p': missing required parameter") answers `shouldBe` []
+
+    -- case F: with every input supplied, all three answer
+    it "case F: every input supplied is answered, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        answers <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= True, "q" Aeson..= True]
+        departures (answeredAs (FnLitBool True)) answers `shouldBe` []
+
+    -- A MAYBE takes a null as NOTHING: the one input a null is not refused for.
+    it "answers a null for a MAYBE input as NOTHING, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        answers <- onEverySurface baseUrl mgr "orZero" ["m" Aeson..= Aeson.Null]
+        departures (answeredAs (FnLitInt 0)) answers `shouldBe` []
+
+    -- A DEONTIC function takes the wrapper path on every surface, so a top-level
+    -- null for its BOOLEAN input is an assumed term on all three, and is refused
+    -- only because the rule reads it.
+    it "reads a top-level null for a DEONTIC function's BOOLEAN input the same way on all three" do
+      withServiceFromSources "null-surfaces-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do
+        let inputs = ["driver" Aeson..= Aeson.object ["name" Aeson..= ("Ann" :: Text)], "is motorway" Aeson..= Aeson.Null]
+            trace = ["startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])] :: [Pair]
+            fn = "seatbelt requirement"
+        answers <- sequence
+          [ ("/evaluation",) <$> askRest baseUrl mgr "null-surfaces-deontic" fn inputs trace
+          , ("MCP",) <$> askMcp baseUrl mgr "null-surfaces-deontic" fn inputs trace
+          , ("batch",) <$> askBatch baseUrl mgr "null-surfaces-deontic" fn inputs trace
+          ]
+        [ surface <> ": " <> why
+          | (surface, answer) <- answers
+          , Just why <- [case answer of
+              Right r -> Just ("answered " <> Text.pack (show (Map.lookup "value" r)))
+              -- MCP spells the input as its tool does, with a hyphen
+              Left msg | "`is motorway (not supplied)`" `Text.isInfixOf` Text.replace "is-motorway" "is motorway" msg -> Nothing
+                       | otherwise -> Just ("refused in other words: " <> msg)] ]
+          `shouldBe` ([] :: [Text])
+
+  -- A section GIVEN that an export reads and another rule overrides with an inner
+  -- @WITH@ (smucclaw/l4-ide#1000). @l4 run@ answers 103 for `outer`, and a
+  -- request that left the input out did too, but one that SUPPLIED it was a 422,
+  -- "named application supplying an implicit input reached the evaluator
+  -- undischarged ... a compiler bug": the direct path bound a supplied section
+  -- GIVEN by replacing it with a value, and took it off its section's heading, so
+  -- nothing was discharged. /evaluation, a batch case and an MCP call all take
+  -- that path (WebMCP's evaluate tool posts to /evaluation), so each is asked.
+  describe "a supplied section GIVEN under an inner WITH, on every surface (smucclaw/l4-ide#1000)" do
+    let deployId = "with-override-surfaces"
+        source = Text.unlines
+          [ "§ `Rates`"
+          , "    GIVEN r IS A NUMBER TYPICALLY 3"
+          , ""
+          , "GIVETH A NUMBER"
+          , "inner MEANS r"
+          , ""
+          , "@export One read takes the rate, one overrides it"
+          , "GIVEN b IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "outer b MEANS b PLUS inner PLUS (inner WITH r IS 100)"
+          , ""
+          , "@export Every read overridden"
+          , "GIVEN b IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "overridden b MEANS b PLUS (inner WITH r IS 100) PLUS (inner WITH r IS 100) PLUS (inner WITH r IS 100)"
+          ]
+        withRates = withServiceFromSources deployId [("rates.l4", source)]
+        -- an answer, with the inputs it says it presumed
+        asAnswer :: SimpleResponse -> Either Text (Maybe FnLiteral, [Text])
+        asAnswer = \case
+          SimpleResponse r -> Right (Map.lookup "value" r.fnResult, r.presumed)
+          SimpleError e -> Left (prettyEvaluatorError e)
+        onEverySurface :: String -> Manager -> Text -> [Pair] -> IO [(Text, Either Text (Maybe FnLiteral, [Text]))]
+        onEverySurface baseUrl mgr fn inputs = do
+          rest <- do
+            resp <- evalFunction baseUrl mgr deployId fn (Aeson.object ["arguments" Aeson..= Aeson.object inputs])
+            pure $ maybe (Left (errorMessageOf (responseBody resp))) asAnswer (Aeson.decode (responseBody resp))
+          mcp <- do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+              [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int), "method" Aeson..= ("tools/call" :: Text)
+              , "params" Aeson..= Aeson.object [ "name" Aeson..= Text.replace " " "-" fn, "arguments" Aeson..= Aeson.object inputs ] ]
+            resp <- httpLbs req mgr
+            pure $ case mcpToolText (responseBody resp) of
+              Just (False, text) | Just r <- Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 text)) -> asAnswer r
+              Just (_, text) -> Left text
+              Nothing -> Left "not a tool result"
+          batch <- do
+            req <- buildJsonPost
+              (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack (Text.replace " " "%20" fn) <> "/evaluation/batch")
+              (Aeson.object [ "outcomes" Aeson..= ([] :: [Text]), "cases" Aeson..= [Aeson.object ("@id" Aeson..= (1 :: Int) : inputs)] ])
+            resp <- httpLbs req mgr
+            pure $ case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+              Just b | statusCode' resp == 200, [c] <- b.cases -> case c.outcome of
+                CaseAnswered -> Right (Map.lookup "value" c.attributes, c.presumed)
+                CaseRefused reason -> Left ("refused: " <> reason)
+                CaseErrored msg -> Left msg
+                CaseLimited _ msg -> Left msg
+              _ -> Left (errorMessageOf (responseBody resp))
+          pure [("/evaluation", rest), ("MCP", mcp), ("batch", batch)]
+        departures :: Integer -> [Text] -> [(Text, Either Text (Maybe FnLiteral, [Text]))] -> [Text]
+        departures expected presumed answers =
+          [ surface <> ": " <> why
+          | (surface, answer) <- answers
+          , Just why <- [case answer of
+              Left msg -> Just ("refused: " <> msg)
+              Right got | got == (Just (FnLitInt expected), presumed) -> Nothing
+                        | otherwise -> Just ("answered " <> Text.pack (show got))] ]
+
+    forM_ [ ("leaves r out, so it takes the default", "outer", ["b" Aeson..= (0 :: Int)], 103, ["r"])
+          , ("supplies r as the default's own value", "outer", ["b" Aeson..= (0 :: Int), "r" Aeson..= (3 :: Int)], 103, [])
+          , ("supplies r as 5", "outer", ["b" Aeson..= (0 :: Int), "r" Aeson..= (5 :: Int)], 105, [])
+          , ("overrides every read and leaves r out", "overridden", ["b" Aeson..= (0 :: Int)], 300, [])
+          , ("overrides every read and supplies r", "overridden", ["b" Aeson..= (0 :: Int), "r" Aeson..= (5 :: Int)], 300, [])
+          ] \(what, fn, inputs, expected, presumed) ->
+      it ("a request that " <> what <> " answers " <> show expected <> " on /evaluation, on MCP and in a batch") do
+        withRates \baseUrl mgr -> do
+          answers <- onEverySurface baseUrl mgr fn inputs
+          departures expected presumed answers `shouldBe` []
+
   describe "MAYBE inputs on the wrapper path" do
     -- A {} on an unread input sends the request through the generated wrapper.
     let uncertain = Aeson.object []
@@ -1104,9 +1365,10 @@ spec = describe "integration" do
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
         expectAnswer readWrapped (FnLitBool True) ["has capacity"]
 
-    -- T3's four cells, on the wrapper path: absent takes the default, null and
-    -- {} do not. (The direct path's null is the "never takes a default for
-    -- null" test above.)
+    -- T3's four cells, on a request that takes the wrapper path (a {} elsewhere):
+    -- absent takes the default, null and {} do not. A top-level null is refused
+    -- before the wrapper is built, as it is on the direct path; a {} in its place
+    -- is an assumed term, refused only because the rule reads it.
     it "keeps null apart from absent on the wrapper path" do
       withServiceFromSources "ty-null-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
         absent <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
@@ -1114,16 +1376,24 @@ spec = describe "integration" do
         expectAnswer absent (FnLitBool True) ["has capacity"]
         nulled <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
-        expectError nulled "has capacity (not supplied)"
+        expectError nulled "Parameter 'has capacity' is null, which means the value is not known, and that never takes the TYPICALLY default"
         uncertainCap <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
         expectError uncertainCap "has capacity (not supplied)"
+        -- the service README's example: a null is refused whether or not the rule reads
+        -- the input, and a {} in its place only if it does
+        nullUnread <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False, "has capacity" Aeson..= Aeson.Null])
+        expectError nullUnread "Parameter 'has capacity' is null"
+        uncertainUnread <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
+        expectAnswer uncertainUnread (FnLitBool False) []
 
     it "keeps null apart from absent for a section GIVEN on the wrapper path" do
       withServiceFromSources "ty-null-sec" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
         nulled <- evalFunction baseUrl mgr "ty-null-sec" "may contract"
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
-        expectError nulled "has capacity (not supplied)"
+        expectError nulled "Parameter 'has capacity' is null, which means the value is not known, and that never takes the TYPICALLY default"
 
     it "with presumption hard, names every defaulted input left out" do
       withServiceFromSources "ty-hard-two" [("capacity.l4", twoDefaultsJL4)] \baseUrl mgr -> do
@@ -1212,15 +1482,17 @@ spec = describe "integration" do
         sent <- evalFunction baseUrl mgr "ty-schema-enum" "which" (args ["s" Aeson..= ("Red" :: Text)])
         expectAnswer sent (FnLitInt 5) ["k"]
 
-    -- Review m8 and m4, report item 5: on the wrapper path a non-BOOLEAN
-    -- input sent as null is refused by name (it used to be "Evaluation
-    -- produced unknown value"), and hard mode compiles a MAYBE default.
+    -- Review m8 and m4, report item 5: on a request that takes the wrapper path a
+    -- non-BOOLEAN input sent as null is refused by name (it used to be
+    -- "Evaluation produced unknown value"), and hard mode compiles a MAYBE
+    -- default. A top-level null is refused before the wrapper is built, in the
+    -- direct path's words; "Field 'k' ..." is the decoder's, for a null inside a record.
     it "refuses null by name on the wrapper path, and names every input under hard" do
       withServiceFromSources "ty-wrap-null" [("wp.l4", wrapperNullJL4)] \baseUrl mgr -> do
         direct <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["k" Aeson..= Aeson.Null])
         expectError direct "Parameter 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
         wrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain, "k" Aeson..= Aeson.Null])
-        expectError wrapped "Field 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
+        expectError wrapped "Parameter 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
         soft <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain])
         expectAnswer soft (FnLitInt 1050) ["m", "k", "flag"]
         hardWrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp"
@@ -1235,7 +1507,7 @@ spec = describe "integration" do
         expectError direct "Parameter 'shade' is null, which means the value is not known"
         wrapped <- evalFunction baseUrl mgr "ty-enum-null" "is red"
           (args ["shade" Aeson..= Aeson.Null, "second" Aeson..= ("Red" :: Text), "unused flag" Aeson..= uncertain])
-        expectError wrapped "Field 'shade' is null, which means the value is not known"
+        expectError wrapped "Parameter 'shade' is null, which means the value is not known"
         synonym <- evalFunction baseUrl mgr "ty-enum-null" "is red"
           (args ["shade" Aeson..= ("Red" :: Text), "second" Aeson..= Aeson.Null, "unused flag" Aeson..= False])
         expectAnswer synonym (FnLitBool True) []

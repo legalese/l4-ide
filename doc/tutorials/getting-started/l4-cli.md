@@ -503,7 +503,12 @@ To see what the rules establish without any usual values, pass `--presumption ha
 
 `presumed` appears in every output format, on every line that was evaluated, including one that ended in an error. With `--format csv` it is a column holding the same list as compact JSON, `[]` when nothing was presumed; a list rather than names joined by a separator, because a name may itself contain a comma or a semicolon. `--validate-only` evaluates nothing, so its lines have no `presumed`.
 
-One limit, measured 2026-10-02: a rule that overrides a section `GIVEN` for part of a calculation, as in `outer MEANS inner PLUS (inner WITH r IS 100)`, does not run under `l4 batch`, although `#EVAL` answers it. The line is an error that says _You are giving named inputs to `inner` … but it is not a function, so it takes none._, because `l4 batch` supplies a section `GIVEN` by replacing it with a plain value, which a `WITH` can no longer reach. This was so before `TYPICALLY` defaults reached `l4 batch`, and is not changed by them.
+A rule that overrides a section `GIVEN` for part of a calculation, as in `outer MEANS inner PLUS (inner WITH r IS 100)`, runs under `l4 batch` and gives what `#EVAL` gives (smucclaw/l4-ide#1000). If `r` has the usual value 3 and a case gives `outer` the input 0, the answer is 103 whether the case supplies `r` as 3 or leaves it out: the first read of `r` takes the case's value, or the usual one, and the second read is the override. `l4 batch` hands a section `GIVEN` to the rules by name, as `#EVAL` does, and replaces with a plain value only a fact the file declared with `ASSUME`. One consequence: a case that supplies a section `GIVEN` the rules never read, because every read of it is overridden, is accepted, and its value changes nothing.
+
+Two limits remain, measured 2026-11-18:
+
+- **A section `GIVEN` whose every read is overridden is still read from the case.** With every read of `r` overridden, `#EVAL` never needs a value for it, but a case has to give it one of the right kind or leave it out. `{"b": 0, "r": 5}` gives the `#EVAL` answer; `{"b": 0, "r": null}` is refused, naming `r`; and with `--presumption hard`, a case that leaves `r` out is refused, `Missing required field 'r'`, and so is its `--validate-only` check.
+- **Two section `GIVEN`s of one name, in a section and in a section inside it, that one rule reaches, are refused.** `#EVAL` answers such a module; `l4 batch` stops with `There are multiple definitions for the identifier r`, even when the rule overrides one of them. `--validate-only` calls the case valid, which it is not.
 
 #### What each line says
 

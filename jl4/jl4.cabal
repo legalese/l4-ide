@@ -182,6 +182,7 @@ test-suite l4-cli-test
     CliTest.Ledger
     CliTest.Explore
     CliTest.SiblingReads
+    CliTest.WithOverride
     CliTest.OpenFisca
     CliTest.Prove
     CliTest.Yscript
