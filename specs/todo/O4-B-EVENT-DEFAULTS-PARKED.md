@@ -63,6 +63,8 @@ Not the retraction: 400 skipped events with 20 fields each are answered.
 The likely cause is `eventRecordDefault`, called once per presumed entry from `deonticPresumed`, which rebuilds the event definitions (`CodeGen.hs`, the `eventDefinitions` call near line 827) and re-splits the program and the wrapper into lines (near line 836) every time.
 The fix: build the definitions and a map from line to definition once per request.
 With a 2 GB limit, 200 events by 20 fields by 4 obligations took 0.98 s against 0.82 s with every field written (measured by the reviewer).
+P1 is B-only: it is the 256 MB limit met at 150 events, and the likely cause is the work done once per listed default, which exists only where a default is listed, so option A, which takes and lists no default for an event, never meets it.
+It is parked with B.
 
 **H1.**
 At `112c9c7dd` the check looked a key up in the declared constructors with a default of no fields; the refusal came with the review fix that made `hard` refuse any key that is not a declared constructor.
@@ -149,4 +151,4 @@ Changing the fallback is a separate decision, with an unmeasured blast radius.
 - §5.2: field-granular listing for a party that differs, or the narrower promise.
 - §5.3: whether a printed revealing event "rests on" its defaults.
 - Whether to build the settle design at all, given that A refuses the requests concerned and condition 3 (the schema change) is published separately.
-- The question of F7, which of two readings of "lists nothing" holds for an event skipped on its action, is not asked while B is parked; it comes back with B.
+- F7, the question whether the party default of an event skipped on its action counts as an "earlier mismatch" in the sense of O4 condition 1 (so that it lists nothing), is moot while B is parked; it would be put to the maintainer when B resumes.
