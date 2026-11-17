@@ -1,0 +1,7 @@
+-- Imported by batch-typically-decode-import.l4, with the module beside it. The
+-- record is declared under a heading.
+
+§ `Stock items`
+
+DECLARE `Paint Order` HAS
+  coats IS A NUMBER TYPICALLY 2
