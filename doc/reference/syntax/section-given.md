@@ -396,7 +396,7 @@ into its own caller — and the same module with the same two `@export`s compile
 and typechecks. A module may export
 as many rules as it likes; what it may not do is route a call between two of them
 through one that is not exported. If you are here because of a section `GIVEN`
-the condition costs you little, since every rule that reads the binder has to be
+the condition costs you little, since every rule that reads the section `GIVEN` has to be
 exported anyway; if you are applying `@export` to an ordinary helper, it is the
 whole story.
 
@@ -431,8 +431,8 @@ It is worth saying plainly that this is the opposite of where the temptation is
 strongest. The repetition a section `GIVEN` removes grows with the size of the
 encoding — and a large encoding is exactly the one likely to have been split
 into a domain module, several subject modules and a file of test cases. Both of
-the limits below then bite at once: a rule in another module cannot be given the
-binder by name, and the Catala route out of the export refusal needs the whole
+the limits below then bite at once: a rule in another module cannot be given a value for the
+section `GIVEN` by name, and the Catala route out of the export refusal needs the whole
 call chain exported, which a chain that spans modules cannot be. Neither is
 about how many rules share the input; both are about where the callers live.
 
