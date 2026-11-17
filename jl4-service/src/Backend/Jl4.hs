@@ -1087,7 +1087,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     (inputDefaults compiled.compiledModule compiled.compiledDecide)
     (inputNames compiled.compiledModule compiled.compiledDecide) params
 
-  refuseEventRecordGaps presumption (buildModuleInfo compiled.compiledAllDeclares) mPartyType mActionType traceEvents
+  refuseEventRecordGaps presumption compiled.compiledAllDeclares mPartyType mActionType traceEvents
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson plan.wpArguments
@@ -1105,7 +1105,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [r@Eval.MkEvalDirectiveResult{result, trace}] -> do
       listed <- either (throwError . InterpreterError) pure $
-        deonticPresumed plan filepath (wrapperProgram sourceText genCode.generatedWrapper) mPartyType mActionType traceEvents r.presumed
+        deonticPresumed plan filepath (wrapperProgram sourceText genCode.generatedWrapper) genCode.generatedWrapper mPartyType mActionType traceEvents r.presumed
       handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
         listed
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
@@ -1129,29 +1129,27 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
 --
 -- Such an entry is told from a construction of the RULES by its site: in the
 -- evaluated program's own file (not an imported one), on one of the definitions
--- the wrapper wrote ('Backend.CodeGen.eventRecordDefault'). Every other entry
--- is listed as 'wrapperPresumed' lists it.
+-- the wrapper wrote, found by its line counted from the end of the program,
+-- which the wrapper ends ('Backend.CodeGen.eventRecordDefault'). Every other
+-- entry is listed as 'wrapperPresumed' lists it.
 --
--- Failures, loud first: a site on one of those definitions whose construction
--- or field cannot be found in the request is a defect, and the request is
--- refused naming it ('Left'), never listed under a wrong name. Silent: if the
--- site's file ever stopped being the one 'evaluateModule' names for
--- @filepath@, or its line stopped counting from the top of 'wrapperProgram',
--- every such default would be listed as the rules' own (@WITH Driver: licence@);
--- the service tests that list @events[0].party.licence@ are what catch that.
+-- Failures, loud first: a site on one of those definitions that is not its
+-- construction, or names a field the request wrote, is a defect, and the
+-- request is refused naming it ('Left'), never listed under a wrong name.
+-- Silent: if the site's file ever stopped being the one 'evaluateModule' names
+-- for @filepath@, every such default would be listed as the rules' own
+-- (@WITH Driver: licence@); the service tests that list
+-- @events[0].party.licence@ are what catch that.
 deonticPresumed
-  :: WrapperPlan -> FilePath -> Text -> Maybe Text -> Maybe Text -> [TraceEvent] -> [Eval.Presumed] -> Either Text [Text]
-deonticPresumed plan filepath program mParty mAction events =
+  :: WrapperPlan -> FilePath -> Text -> Text -> Maybe Text -> Maybe Text -> [TraceEvent] -> [Eval.Presumed] -> Either Text [Text]
+deonticPresumed plan filepath program wrapper mParty mAction events =
   fmap (nubOrd . catMaybes) . traverse entry
   where
     uri = normalizedFilePathToUri (toNormalizedFilePath filepath)
-    programLines = Text.lines program
-    lineAt n = if n < 1 then Nothing else listToMaybe (drop (n - 1) programLines)
     entry p = case (p.origin, p.path) of
       (Eval.FromNamedApp _ (Just (MkSrcRange (MkSrcPos siteLine siteColumn) _ _ siteUri)), [field])
         | siteUri == uri
-        , Just lineText <- lineAt siteLine
-        , Just named <- eventRecordDefault mParty mAction events lineText siteColumn field
+        , Just named <- eventRecordDefault mParty mAction events program wrapper siteLine siteColumn field
         -> Just <$> named
       _ -> Right (listToMaybe (wrapperPresumed plan [p]))
 
@@ -1160,58 +1158,72 @@ deonticPresumed plan filepath program mParty mAction events =
 -- ruled 2026-10-11, option B).
 --
 -- The wrapper turns each event's record into SOURCE
--- (@`event party 0` MEANS Driver WITH name IS "Alice"@, 'Backend.CodeGen.prepareEvents'),
+-- (@`event 0 party` MEANS Driver WITH name IS "Alice"@, 'Backend.CodeGen.prepareEvents'),
 -- and since W5 the checker fills a field a construction leaves out from its
 -- @TYPICALLY@, whatever the presumption. An event's record is part of the
 -- request, so the switch decides, as it does for the arguments' records:
 --
 -- * under @"presumption": "hard"@ every such field is refused here, before
---   anything is generated, a nested record's included (review rulings R2-2);
+--   anything is generated, a nested record's included (review rulings R2-2),
+--   and a ONE OF constructor's as well as a record's (review F3, 2026-11-18).
+--   A record whose key is not a constructor the rules declare (a rule, whose
+--   inputs may have defaults of their own, W4) is refused too, since what it
+--   leaves to a default cannot be checked here;
 --
 -- * under soft the default is taken, and 'deonticPresumed' lists it as the path
---   the request wrote it at, if the answer read it. Only a record the wrapper
---   writes inline, inside the @EVENT@ (one in a party or action value that is
---   not itself an object, 'Backend.CodeGen.isRecordLit'), is still refused:
---   its default could not be named by its path, and listing it as the rules'
---   own would be untrue.
+--   the request wrote it at, if the answer read it. A record inside a party or
+--   action value that is not itself an object (a list, say;
+--   'Backend.CodeGen.isRecordLit') is still refused, as before B: B is tested
+--   for a value that is an object (assumed, not ruled).
 --
 -- Before card O4 was built (option A) this refused such a field in both modes.
 refuseEventRecordGaps
   :: Monad m
-  => Presumption -> ModuleInfo -> Maybe Text -> Maybe Text -> [TraceEvent] -> ExceptT EvaluatorError m ()
-refuseEventRecordGaps presumption mi mParty mAction events =
-  unless (null gaps) $
-    throwError $ InterpreterError $ Text.intercalate "\n"
-      [ "Missing required field '" <> path <> "." <> field <> "' (" <> con <> "): " <> why
-      | (path, con, field) <- gaps
-      ]
+  => Presumption -> [Declare Resolved] -> Maybe Text -> Maybe Text -> [TraceEvent] -> ExceptT EvaluatorError m ()
+refuseEventRecordGaps presumption decls mParty mAction events =
+  unless (null refusals) $
+    throwError $ InterpreterError $ Text.intercalate "\n" refusals
   where
     soft = presumption == PresumeSoft
     why
       | soft =
           "a record inside an event's party or action that is not itself a record (a list, say) "
-          <> "does not take its fields' TYPICALLY defaults, because presumed could not name the default it took. "
+          <> "does not take its fields' TYPICALLY defaults. "
           <> "Give every field of it."
       | otherwise =
           "presumption is hard, so a field an event's record leaves out does not take its TYPICALLY default. "
           <> "Give every field of it, or leave presumption soft to take the default."
 
-    -- constructor name -> its fields that have a TYPICALLY
-    defaultedFields :: Map Text [Text]
-    defaultedFields = Map.fromList
-      [ (rawNameToText (rawName (getActual ctor)), [ f | (f, _, Just _) <- fields ])
-      | (ctor, fields) <- Map.elems mi.miRecords
-      ]
+    -- every constructor the rules declare, a record's or a ONE OF's, with its
+    -- fields that have a TYPICALLY
+    constructors :: Map Text [Text]
+    constructors = Map.fromListWith (<>) $
+      [ (nameText ctor, defaulted fields) | MkDeclare _ _ _ (RecordDecl _ (Just ctor) fields) <- decls ]
+      <> [ (nameText c, defaulted fields) | MkDeclare _ _ _ (EnumDecl _ ctors) <- decls, MkConDecl _ c fields <- ctors ]
+    nameText n = rawNameToText (rawName (getActual n))
+    defaulted fields = [ nameText f | MkTypedName _ f _ (Just _) _ <- fields ]
 
-    gaps =
-      [ (path, con, field)
+    records =
+      [ record
       | (i, ev) <- zip [0 :: Int ..] events
       , (label, mType, lit) <- [("party", mParty, ev.party), ("action", mAction, ev.action)]
       , not soft || not (isRecordLit lit)
-      , (path, con, given) <- eventRecordsIn ("events[" <> Text.textShow i <> "]." <> label) mType lit
-      , field <- Map.findWithDefault [] con defaultedFields
+      , record <- eventRecordsIn ("events[" <> Text.textShow i <> "]." <> label) mType lit
+      ]
+
+    refusals =
+      [ "Missing required field '" <> path <> "." <> field <> "' (" <> con <> "): " <> why
+      | (path, con, given) <- records
+      , field <- Map.findWithDefault [] con constructors
       , field `notElem` given
       ]
+      <> [ "Not a constructor '" <> con <> "' at '" <> path <> "': presumption is hard, and '" <> con
+           <> "' is not a constructor the rules declare (a rule, say), so the service cannot check that it leaves "
+           <> "nothing to a TYPICALLY default. Write the record with its constructor, or leave presumption soft."
+         | not soft
+         , (path, con, _) <- records
+         , con `Map.notMember` constructors
+         ]
 
 -- | Direct AST evaluation (fast path), for a request with no @{}@ in it and
 -- no @null@ the decoder kept as a value ('requiresWrapperEvaluation');

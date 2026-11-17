@@ -17,7 +17,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Backend.Api (FnLiteral (..), TraceEvent (..), TraceLevel (..))
 import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String, clientName, fnLiteralToL4Expr, fnLiteralToL4ExprWithType, generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode (..), AnswerShape (..), RequiredInput (..), eventRecordDefault)
-import Data.List (find)
 import Language.LSP.Protocol.Types (Uri (..), toNormalizedUri)
 import L4.Lexer (TIdentifiers (..), TLiterals (..), TokenType (..), computedPayload, execLexer, showStringLit)
 import L4.TypeCheck.Environment (boolean, date, maybeType, number)
@@ -35,29 +34,47 @@ spec = describe "CodeGen" $ do
       fmap (.answerShape) (generateDeonticEvalWrapper "f" [] [] [] Map.empty (Aeson.object []) 0 [] Nothing Nothing TraceNone)
         `shouldBe` Right Bare
 
-  -- Card O4 (ruled 2026-10-11, option B): a default an event's record took is
-  -- named by the path the request wrote it at, found from the construction's
-  -- site in the generated wrapper. The line names the record and the column
-  -- picks the construction in it; a " WITH " inside a string is not one.
+  -- Card O4 (ruled 2026-10-11, option B; its review of 2026-11-18): every
+  -- record construction in an event's value is a definition of its own, every
+  -- event has its own, and a default one took is named by the path the request
+  -- wrote. The site's line, counted from the end of the program, names the
+  -- definition, and the construction starts right after `name` MEANS; any other
+  -- site on that line is refused, and a line of the rules is never taken for one.
   describe "eventRecordDefault" $ do
-    let party = FnObject [("name", FnLitString "A WITH B"), ("zhome", FnObject [("Address", FnObject [("zip", FnLitInt 5)])])]
-        events = [TraceEvent (FnLitString "x") (FnLitString "go") 0, TraceEvent party (FnLitString "go") 1]
-        mLine = case generateDeonticEvalWrapper "f" [] [] [] Map.empty (Aeson.object []) 0 events (Just "Driver") (Just "Act") TraceNone of
-          Right g -> find ("`event party 0` MEANS " `Text.isPrefixOf`) (Text.lines g.generatedWrapper)
-          Left _ -> Nothing
-        columnOf needle l = 1 + Text.length (fst (Text.breakOn needle l))
-        named l needle = eventRecordDefault (Just "Driver") (Just "Act") events l (columnOf needle l)
-    it "names a party's own field and a nested record's field by the first event that writes them" $
-      case mLine of
-        Nothing -> expectationFailure "the wrapper has no `event party 0` definition"
-        Just l -> do
-          named l "Driver WITH" "licence" `shouldBe` Just (Right "events[1].party.licence")
-          named l "`Address` WITH" "floor" `shouldBe` Just (Right "events[1].party.zhome.Address.floor")
-          -- a field the construction writes took no default: a defect, said loudly
-          named l "`Address` WITH" "zip" `shouldSatisfy` maybe False isLeft
-    it "leaves a construction on any other line to the rules" $
-      eventRecordDefault (Just "Driver") Nothing events "`helper` MEANS Driver WITH `name` IS \"A\"" 18 "licence"
-        `shouldBe` Nothing
+    let party = FnObject [("aname", FnLitString "A WITH B"), ("home", FnObject [("Address", FnObject [("zip", FnLitInt 5)])]), ("note", FnLitInt 3)]
+        events = [TraceEvent (FnLitString "x") (FnLitString "go") 0, TraceEvent party (FnLitString "go") 1, TraceEvent party (FnLitString "go") 2]
+        wrapper = either (const "") (.generatedWrapper)
+          (generateDeonticEvalWrapper "f" [] [] [] Map.empty (Aeson.object []) 0 events (Just "Driver") (Just "Act") TraceNone)
+        -- the rules hold a line that reads like one of the wrapper's
+        rules = "DECLARE Driver HAS\n    aname IS A STRING\n`event 1 party 1` MEANS `Address` WITH `zip` IS 5\n"
+        program = rules <> wrapper
+        linesOf l = [ n | (n, x) <- zip [1 :: Int ..] (Text.lines program), x == l ]
+        start name = 1 + Text.length ("`" <> name <> "` MEANS ")
+        named line column = eventRecordDefault (Just "Driver") (Just "Act") events program wrapper line column
+    it "writes each record construction on a line of its own, and each event its own" $ do
+      let ls = Text.lines wrapper
+      ls `shouldSatisfy` elem "`event 1 party` MEANS Driver WITH `aname` IS \"A WITH B\", `home` IS `event 1 party 1`, `note` IS 3"
+      ls `shouldSatisfy` elem "`event 1 party 1` MEANS `Address` WITH `zip` IS 5"
+      ls `shouldSatisfy` elem "`event 2 party 1` MEANS `Address` WITH `zip` IS 5"
+      ls `shouldSatisfy` any ("EVENT (`event 1 party`) (`go`) 1" `Text.isInfixOf`)
+    it "names a default by the event that wrote it, and the record it is in" $ do
+      [_, inWrapper] <- pure (linesOf "`event 1 party 1` MEANS `Address` WITH `zip` IS 5")
+      named inWrapper (start "event 1 party 1") "note" `shouldBe` Just (Right "events[1].party.home.Address.note")
+      [top1] <- pure (linesOf "`event 1 party` MEANS Driver WITH `aname` IS \"A WITH B\", `home` IS `event 1 party 1`, `note` IS 3")
+      named top1 (start "event 1 party") "licence" `shouldBe` Just (Right "events[1].party.licence")
+      [event2] <- pure (linesOf "`event 2 party 1` MEANS `Address` WITH `zip` IS 5")
+      named event2 (start "event 2 party 1") "note" `shouldBe` Just (Right "events[2].party.home.Address.note")
+    it "refuses a site on a definition that is not its construction, or a field the record writes" $ do
+      [_, inWrapper] <- pure (linesOf "`event 1 party 1` MEANS `Address` WITH `zip` IS 5")
+      named inWrapper (start "event 1 party 1") "zip" `shouldSatisfy` maybe False isLeft
+      named inWrapper (start "event 1 party 1" + 1) "note" `shouldSatisfy` maybe False isLeft
+      named inWrapper 1 "note" `shouldSatisfy` maybe False isLeft
+    it "leaves a construction on any other line to the rules, one reading like a definition included" $ do
+      [inRules, _] <- pure (linesOf "`event 1 party 1` MEANS `Address` WITH `zip` IS 5")
+      named inRules (start "event 1 party 1") "note" `shouldBe` Nothing
+      (evalLine : _) <- pure [ n | (n, x) <- zip [1 :: Int ..] (Text.lines program), "EVENT (" `Text.isInfixOf` x ]
+      named evalLine 1 "note" `shouldBe` Nothing
+      named 1 1 "note" `shouldBe` Nothing
 
   -- The wrapper unwraps every input that is neither a BOOLEAN nor a MAYBE,
   -- GIVENs before ASSUMEs, and reads a DATE from a string.

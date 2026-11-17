@@ -164,6 +164,7 @@ test-suite jl4-service-test
     CompatibilitySpec
     DecisionQueryCacheKeySpec
     DeploymentIdSpec
+    EventRecordSpec
     IntegrationSpec
     LedgerMcpSpec
     LedgerRoutesSpec

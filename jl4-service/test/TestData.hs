@@ -2514,10 +2514,9 @@ GIVETH A PROVISION OF Driver, `Driver Action`
 -- | As 'deonticFieldDefaultJL4', with the defaulted field one level down: the
 -- party's @zhome@ is an @Address@ whose @floor@ has a @TYPICALLY@ (review
 -- rulings R2-2). The nested record is sent constructor-keyed, the shape the
--- service's own answers use, and it is generated as source like the party. It
--- is the party's alphabetically last field on purpose, because a field after
--- it would be attached to the nested record by the generated @WITH@ (an older
--- defect of the wrapper, not this fixture's business).
+-- service's own answers use, and it is generated as source like the party,
+-- each record a definition of its own. A field sorting after it is the
+-- business of the review's F1 tests (EventRecordSpec), not this fixture's.
 deonticNestedFieldDefaultJL4 :: Text
 deonticNestedFieldDefaultJL4 =
   [i|

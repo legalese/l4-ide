@@ -1661,8 +1661,9 @@ spec = describe "integration" do
       -- Exactly when read, event by event: the party equality stops at the first
       -- field that differs, so Bob's event, which leaves the same field out, is
       -- compared on `name` alone and lists nothing; Alice's event is read, and
-      -- named by its own index. Events that write the same record share one
-      -- default, named by the first event that writes it (assumed, not ruled).
+      -- named by its own index. Every event has its own record, so a second
+      -- Alice is a default of its own; it is compared under the MAY, and lists
+      -- nothing, because its action does not match (review F4, F7).
       it "lists only the event whose record the answer read, by its own index" do
         withServiceFromSources "ty-event-which" [("event.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
           let party nm = Aeson.object ["name" Aeson..= (nm :: Text)]

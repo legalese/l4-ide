@@ -25,7 +25,6 @@ import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Aeson.KeyMap as AesonKeyMap
 import Data.Char (isPrint)
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
@@ -616,170 +615,231 @@ fnLiteralToL4Value = \case
     Right ("(LIST " <> Text.intercalate ", " elems <> ")")
   other -> fnLiteralToL4Expr other
 
--- | Prepare events for EVALTRACE by generating MEANS definitions for record-typed
--- party/action values and a formatted event list expression.
+-- | Prepare events for EVALTRACE: the definitions the events' party and action
+-- records are written as, and the event list expression.
 --
--- Record values (FnObject) can't be inlined in EVENT expressions because L4's parser
--- doesn't handle WITH keyword inside parenthesized arguments. Instead, we generate
--- top-level MEANS definitions and reference them by name — matching how L4 source
--- code typically defines named constants for record values.
+-- A record can't be written inline in an EVENT expression, because L4's
+-- parser doesn't read a WITH inside a parenthesized argument, so it is written
+-- as a top-level MEANS definition and the EVENT refers to it by name
+-- ('eventDefinitions').
 --
 -- Example: {"name": "Alice"} with party type "Driver" generates:
---   `event party 0` MEANS Driver WITH name IS "Alice"
---   ... EVENT (`event party 0`) (`wear seatbelt`) 1
+--   `event 0 party` MEANS Driver WITH `name` IS "Alice"
+--   ... EVENT (`event 0 party`) (`wear seatbelt`) 1
 prepareEvents
   :: Maybe Text -> Maybe Text -> [TraceEvent]
   -> Either Text ([Text], Text)  -- ^ (MEANS definitions, event list expression)
 prepareEvents mPartyType mActionType events = do
-  let -- Deduplicated record-typed party and action values → binding names
-      (uniquePartyRecords, uniqueActionRecords) = eventRecordNames events
+  rendered <- traverse (renderEvent mPartyType mActionType) (zip [0 ..] events)
+  Right
+    ( [ definitionLine d | (_, ds) <- rendered, d <- ds ]
+    , "(LIST " <> Text.intercalate ", " (map fst rendered) <> ")" )
 
-      -- Format a single event, using binding names for records
-      fmtEvent ev = do
-        partyExpr <- case Map.lookup ev.party uniquePartyRecords of
-          Just name -> Right (quoteIdent name)
-          Nothing   -> fnLiteralToL4ExprWithType mPartyType ev.party
-        actionExpr <- case Map.lookup ev.action uniqueActionRecords of
-          Just name -> Right (quoteIdent name)
-          Nothing   -> fnLiteralToL4ExprWithType mActionType ev.action
-        Right ("EVENT (" <> partyExpr <> ") (" <> actionExpr <> ") " <> formatScientific ev.at)
-
-  -- MEANS definitions for record values
-  partyDefns <- for (Map.toList uniquePartyRecords) $ \(lit, name) ->
-    (\rhs -> quoteIdent name <> " MEANS " <> rhs) <$> fnLiteralToL4ExprWithType mPartyType lit
-  actionDefns <- for (Map.toList uniqueActionRecords) $ \(lit, name) ->
-    (\rhs -> quoteIdent name <> " MEANS " <> rhs) <$> fnLiteralToL4ExprWithType mActionType lit
-  eventExprs <- traverse fmtEvent events
-  let eventListExpr = "(LIST " <> Text.intercalate ", " eventExprs <> ")"
-  Right (partyDefns ++ actionDefns, eventListExpr)
-
--- | Whether the wrapper writes an event's party or action value as a top-level
--- definition of its own ('prepareEvents'): any non-empty object. Every other
--- value is written inline, inside the @EVENT@.
+-- | Whether an event's party or action value is an object, which the wrapper
+-- writes as a definition of its own when it is a record ('eventDefinitions').
+-- Any other value is written inline, inside the @EVENT@, with each record in it
+-- a definition of its own.
 isRecordLit :: FnLiteral -> Bool
 isRecordLit (FnObject (_:_)) = True
 isRecordLit _ = False
 
--- | The names of the definitions 'prepareEvents' writes for the events' party
--- and action records: one per distinct value, shared by every event that
--- writes it, numbered in the order of the values (not of the events).
-eventRecordNames :: [TraceEvent] -> (Map FnLiteral Text, Map FnLiteral Text)
-eventRecordNames events =
-  (named "event party " (.party), named "event action " (.action))
+-- | A record that an event's party or action writes, as the wrapper defines it
+-- (card O4, ruled 2026-10-11, option B; its review of 2026-11-18).
+--
+-- Every record construction in an event's value is a top-level definition of
+-- its own, and a record nested in another is referred to by its name. Written
+-- inline, as a field's value, it would take every field written after it:
+-- @home IS Address WITH zip IS 5, note IS 3@ gives the Address a note of 3 and
+-- leaves the outer record's note to its default (review F1).
+--
+-- And every event has its own definitions, numbered by the event's position,
+-- so a default a construction leaves out is a cell of that event's alone, and
+-- is named by that event's path (review F4). Two events that write the same
+-- record no longer share one.
+--
+-- The name is ASCII, so the construction starts at the same column on its
+-- line whatever unit a column is counted in ('eventRecordDefault').
+data EventDefinition = EventDefinition
+  { name         :: Text    -- ^ @event 0 party@ for the event's own record, @event 0 party 1@, ... for the records in it
+  , construction :: Text    -- ^ @Con WITH field IS value, ...@
+  , path         :: Text    -- ^ where the request wrote the record: @events[0].party@, @events[0].party.zhome.Address@
+  , constructor  :: Text    -- ^ the constructor the request named, or the type of an event's own record
+  , given        :: [Text]  -- ^ the fields the request wrote
+  }
+
+definitionLine :: EventDefinition -> Text
+definitionLine d = definitionHead d <> d.construction
+
+-- | What the line of a definition holds before its construction.
+definitionHead :: EventDefinition -> Text
+definitionHead d = "`" <> d.name <> "` MEANS "
+
+-- | Every definition the wrapper writes for the events' records, in the order
+-- of the events, the party before the action, and within one value a record
+-- before the records inside it.
+eventDefinitions :: Maybe Text -> Maybe Text -> [TraceEvent] -> Either Text [EventDefinition]
+eventDefinitions mPartyType mActionType events =
+  concatMap snd <$> traverse (renderEvent mPartyType mActionType) (zip [0 ..] events)
+
+-- | One event as the @EVENT@ writes it, and the definitions it refers to.
+renderEvent :: Maybe Text -> Maybe Text -> (Int, TraceEvent) -> Either Text (Text, [EventDefinition])
+renderEvent mPartyType mActionType (n, ev) = do
+  (partyExpr, partyDefs) <- eventValue ("event " <> k <> " party") ("events[" <> k <> "].party") mPartyType ev.party
+  (actionExpr, actionDefs) <- eventValue ("event " <> k <> " action") ("events[" <> k <> "].action") mActionType ev.action
+  Right ("EVENT (" <> partyExpr <> ") (" <> actionExpr <> ") " <> formatScientific ev.at, partyDefs <> actionDefs)
   where
-    named :: Text -> (TraceEvent -> FnLiteral) -> Map FnLiteral Text
-    named prefix part = Map.fromList
-      [ (lit, prefix <> BaseText.textShow i)
-      | (i, lit) <- zip [0 :: Int ..]
-          $ Set.toList $ Set.fromList [part ev | ev <- events, isRecordLit (part ev)]
-      ]
+    k = BaseText.textShow n
 
--- | Every record that 'fnLiteralToL4ExprWithType' and 'fnLiteralToL4Expr'
--- write as @Con WITH field IS value, ...@ in an event's party or action value,
--- with the path the request wrote it at, its constructor, and the fields it
--- gives. With the type name known the top level is a record of that type (any
--- object); without it, a one-key object whose value is an object names the
--- constructor itself.
+-- | The next number for a record inside a value, and the definitions so far,
+-- each with its number (the value's own record 0, the others in the order
+-- their constructions start).
+type EventRender = StateT (Int, [(Int, EventDefinition)]) (Either Text)
+
+-- | An event's party or action value: the expression the @EVENT@ writes, and a
+-- definition for each record construction in it.
 --
--- A record INSIDE it is generated as source too (review rulings R2-2): the
--- walk follows the codegen's own cases, a constructor-keyed object, an array,
--- or a constructor applied to one argument, down to the leaves. Below the top
--- level the type name is never known, so a nested record is always
--- constructor-keyed.
+-- It writes what 'fnLiteralToL4ExprWithType' and 'fnLiteralToL4Expr' write,
+-- case for case, except that each record is a name. With the type name known,
+-- an object at the top is a record of that type, whose strings are data
+-- ('fnLiteralToL4Value'); below the top, and at the top without the type name,
+-- a record is keyed by its constructor (@{"Address": {"zip": 5}}@), and every
+-- name taken from the request goes through 'clientName'.
 --
--- The list is in the order the generated text writes the constructions: a
--- record before the records inside it, and those in the order of its fields.
--- 'eventRecordDefault' relies on that order.
+-- The path of a record is where the request wrote it, the constructor key
+-- included: @events[0].party.zhome.Address@.
+eventValue :: Text -> Text -> Maybe Text -> FnLiteral -> Either Text (Text, [EventDefinition])
+eventValue base valuePath mType lit = do
+  (expr, (_, defs)) <- runStateT top (1, [])
+  Right (expr, map snd (sortOn fst defs))
+  where
+    top :: EventRender Text
+    top = case (mType, lit) of
+      (Just t, FnObject fs@(_ : _)) -> record (Just 0) valuePath (quoteIdent t) t fs valueOf
+      (Nothing, FnObject [(c, FnObject fs)]) -> do
+        con <- liftEither (clientName c)
+        record (Just 0) (valuePath <> "." <> c) con c fs exprOf
+      _ -> exprOf valuePath lit
+
+    record :: Maybe Int -> Text -> Text -> Text -> [(Text, FnLiteral)] -> (Text -> FnLiteral -> EventRender Text) -> EventRender Text
+    record mNumber recordPath conText conName fields render = do
+      number <- maybe reserve pure mNumber
+      assignments <- for fields \(f, v) -> do
+        value <- render (recordPath <> "." <> f) v
+        liftEither (assignment f value)
+      let defName = if number == 0 then base else base <> " " <> BaseText.textShow number
+          def = EventDefinition
+            { name = defName
+            , construction = conText <> " WITH " <> Text.intercalate ", " assignments
+            , path = recordPath
+            , constructor = conName
+            , given = map fst fields
+            }
+      modify' \(next, ds) -> (next, (number, def) : ds)
+      pure ("`" <> defName <> "`")
+
+    reserve :: EventRender Int
+    reserve = do
+      (next, ds) <- get
+      put (next + 1, ds)
+      pure next
+
+    -- 'fnLiteralToL4Expr'
+    exprOf :: Text -> FnLiteral -> EventRender Text
+    exprOf here = \case
+      FnLitString s -> liftEither (clientName s)
+      FnLitInt x -> pure (BaseText.textShow x)
+      FnLitDouble x -> pure (BaseText.textShow x)
+      FnLitBool True -> pure "TRUE"
+      FnLitBool False -> pure "FALSE"
+      FnArray xs -> listOf exprOf here xs
+      FnObject [(c, FnObject fields)] -> do
+        con <- liftEither (clientName c)
+        record Nothing (here <> "." <> c) con c fields exprOf
+      FnObject [(c, FnArray [])] -> liftEither (clientName c)
+      FnObject [(c, FnArray [single])] -> do
+        con <- liftEither (clientName c)
+        arg <- exprOf (here <> "." <> c <> "[0]") single
+        pure (con <> " " <> arg)
+      FnObject [("tag", val)] -> exprOf (here <> ".tag") val
+      FnObject [(c, val)] -> do
+        con <- liftEither (clientName c)
+        arg <- exprOf (here <> "." <> c) val
+        pure (con <> " " <> arg)
+      FnObject _ -> pure "NOTHING"
+      FnUncertain -> pure "NOTHING"
+      FnUnknown -> pure "NOTHING"
+
+    -- 'fnLiteralToL4Value'
+    valueOf :: Text -> FnLiteral -> EventRender Text
+    valueOf here = \case
+      FnLitString s -> pure (showStringLit s)
+      FnArray xs -> listOf valueOf here xs
+      other -> exprOf here other
+
+    listOf :: (Text -> FnLiteral -> EventRender Text) -> Text -> [FnLiteral] -> EventRender Text
+    listOf render here xs = do
+      elems <- for (zip [0 :: Int ..] xs) \(ix, x) -> render (here <> "[" <> BaseText.textShow ix <> "]") x
+      pure ("(LIST " <> Text.intercalate ", " elems <> ")")
+
+-- | Every record construction an event's party or action value writes
+-- ('eventValue'), with the path the request wrote it at, its constructor, and
+-- the fields it gives. Hard refuses a field one leaves out by this path, and
+-- soft lists it by the same path ('eventRecordDefault'), since both come from
+-- the one walk. A value with a name L4 cannot write has none: the wrapper
+-- refuses it.
 eventRecordsIn :: Text -> Maybe Text -> FnLiteral -> [(Text, Text, [Text])]
-eventRecordsIn path (Just t) (FnObject fs@(_ : _)) = (path, t, map fst fs) : inFields path fs
-eventRecordsIn path Nothing  (FnObject [(c, FnObject fs)]) = (path, c, map fst fs) : inFields path fs
-eventRecordsIn path _        lit = nestedRecordsIn path lit
-
-inFields :: Text -> [(Text, FnLiteral)] -> [(Text, Text, [Text])]
-inFields path fs = concat [ nestedRecordsIn (path <> "." <> k) v | (k, v) <- fs ]
-
-nestedRecordsIn :: Text -> FnLiteral -> [(Text, Text, [Text])]
-nestedRecordsIn path = \case
-  FnArray xs -> concat [ nestedRecordsIn (path <> "[" <> BaseText.textShow i <> "]") x | (i, x) <- zip [0 :: Int ..] xs ]
-  FnObject [(c, FnObject fs)] -> (path <> "." <> c, c, map fst fs) : inFields (path <> "." <> c) fs
-  FnObject [(c, v)] -> nestedRecordsIn (path <> "." <> c) v
-  _ -> []
+eventRecordsIn valuePath mType lit =
+  [ (d.path, d.constructor, d.given) | Right (_, ds) <- [eventValue "event" valuePath mType lit], d <- ds ]
 
 -- | The path the request wrote a field at, for a default the checker took in an
 -- event's party or action record (card O4, ruled 2026-10-11, option B):
 -- @events[0].party.licence@, @events[0].action.mode@,
 -- @events[0].party.zhome.Address.floor@.
 --
--- 'Nothing' when the line is not one of the event-record definitions the
--- wrapper wrote, so the construction is the rules' own. @Just (Left ...)@ when
--- it is one, but the construction or the field cannot be found in the value
--- the definition was written from: a disagreement between this account and the
--- codegen, which the caller refuses loudly rather than list the default under
--- a wrong name.
---
 -- The evaluator reports such a default as the construction's own
 -- ('L4.EvaluateLazy.Machine.FromNamedApp'), with the construction's site. The
--- site's line is one of the definitions 'prepareEvents' writes,
--- @`event party 0` MEANS Driver WITH name IS "Alice"@, which names the value;
--- and the column picks the construction within it: the k-th @ WITH @ of the
--- line (outside quoted names and strings) is the k-th record
--- 'eventRecordsIn' lists, since the text writes them in that order.
+-- wrapper is the end of the program the evaluator ran, so the site's line,
+-- counted from the end, is a line of the wrapper; and a line of the wrapper
+-- that is one of the definitions 'eventDefinitions' writes names exactly one
+-- record, whose construction starts right after @`name` MEANS @.
 --
--- Events that write the same record share one definition, so one default
--- cell: the path names the FIRST event that writes the value. Assumed, not
--- ruled.
+-- 'Nothing' when the site is not on such a line: a construction of the rules,
+-- or of the rest of the wrapper. @Just (Left ...)@ when it is on one but is not
+-- that construction, or names a field the construction writes, or the program
+-- does not end with the wrapper: a disagreement between this account and the
+-- codegen, which the caller refuses loudly rather than list the default under
+-- a wrong name. A line of the rules is never taken for a definition, even one
+-- that reads the same, since only the wrapper's lines are looked at.
 eventRecordDefault
   :: Maybe Text      -- ^ the party type name
   -> Maybe Text      -- ^ the action type name
   -> [TraceEvent]
-  -> Text            -- ^ the line of the evaluated program the construction starts on
+  -> Text            -- ^ the program the evaluator ran
+  -> Text            -- ^ the generated wrapper, which ends it
+  -> Int             -- ^ the line the construction starts on (1-based)
   -> Int             -- ^ the column it starts at (1-based)
   -> Text            -- ^ the field that took its default
   -> Maybe (Either Text Text)
-eventRecordDefault mPartyType mActionType events line column field = do
-  afterTick <- Text.stripPrefix "`" line
-  let (name, afterName) = Text.breakOn "`" afterTick
-  rhs <- Text.stripPrefix "` MEANS " afterName
-  (label, mType, lit, part) <- Map.lookup name definitions
-  pure $ maybe (Left (unnamed name)) Right do
-    i <- findIndex (\ ev -> part ev == lit) events
-    let rhsStart = Text.length line - Text.length rhs
-        site = column - 1
-        before = length (filter (< site) (map (+ rhsStart) (withPositions rhs)))
-    guard (site >= rhsStart)
-    (path, _con, given) <- listToMaybe (drop before (eventRecordsIn ("events[" <> BaseText.textShow i <> "]." <> label) mType lit))
-    -- the checker fills only a field the construction leaves out
-    guard (field `notElem` given)
-    pure (path <> "." <> field)
+eventRecordDefault mPartyType mActionType events program wrapper siteLine siteColumn field = do
+  -- the first line of the wrapper is empty, and may have joined the last line
+  -- of the rules, so it is never one of the definitions
+  guard (wrapperIndex >= 1 && wrapperIndex < length wrapperLines)
+  defs <- either (const Nothing) Just (eventDefinitions mPartyType mActionType events)
+  let lineText = wrapperLines !! wrapperIndex
+  d <- find (\ def -> definitionLine def == lineText) defs
+  pure $
+    if not (wrapper `Text.isSuffixOf` program) then Left (defect d "the program does not end with the wrapper")
+    else if siteColumn /= Text.length (definitionHead d) + 1 then Left (defect d "it is not the record's own construction")
+    else if field `elem` d.given then Left (defect d "the record writes that field")
+    else Right (d.path <> "." <> field)
   where
-    unnamed name =
-      "the default of field '" <> field <> "' that a record in `" <> name
-      <> "` took could not be named by the path the request wrote it at (column "
-      <> BaseText.textShow column <> "); this is a defect in the service"
-    (partyNames, actionNames) = eventRecordNames events
-    definitions :: Map Text (Text, Maybe Text, FnLiteral, TraceEvent -> FnLiteral)
-    definitions = Map.fromList $
-         [ (n, ("party", mPartyType, lit, (.party))) | (lit, n) <- Map.toList partyNames ]
-      <> [ (n, ("action", mActionType, lit, (.action))) | (lit, n) <- Map.toList actionNames ]
-
--- | Where @ WITH @ stands in a generated value, outside quoted names and
--- string literals ('clientName', 'showStringLit'): one for each record
--- construction, in the order the text writes them.
-withPositions :: Text -> [Int]
-withPositions = go 0 . Text.unpack
-  where
-    go :: Int -> String -> [Int]
-    go _ [] = []
-    go i s@(c : cs)
-      | " WITH " `isPrefixOf` s = i : go (i + 1) cs
-      | c == '`' = let (q, r) = break (== '`') cs in go (i + 2 + length q) (drop 1 r)
-      | c == '"' = inString (i + 1) cs
-      | otherwise = go (i + 1) cs
-    inString :: Int -> String -> [Int]
-    inString _ [] = []
-    inString i ('\\' : _ : cs) = inString (i + 2) cs
-    inString i ('"' : cs) = go (i + 1) cs
-    inString i (_ : cs) = inString (i + 1) cs
+    programLines = Text.lines program
+    wrapperLines = Text.lines wrapper
+    wrapperIndex = siteLine - (length programLines - length wrapperLines) - 1
+    defect d why =
+      "the default of field '" <> field <> "' taken on the line of `" <> d.name
+      <> "` (column " <> BaseText.textShow siteColumn <> ") could not be named by the path the request wrote it at: "
+      <> why <> "; this is a defect in the service"
 
 -- | Format a Scientific number as L4 source: in decimal notation and never with
 -- an exponent, which L4's lexer does not read, and as the digits the client
