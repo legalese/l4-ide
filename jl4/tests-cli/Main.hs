@@ -3015,6 +3015,16 @@ spec bin = do
       Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull, "--validate-only"]
       vout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
 
+    -- Card O4 and the TYPICALLY page (documentation review, round 1, C10): under
+    -- hard, leaving an input out is refused too, so the refusal of a null must
+    -- not offer that as the way out. Under soft it still does.
+    it "S6b: a null for a defaulted input offers to leave it out under soft, and does not under hard" $ do
+      Output _ soft _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull]
+      soft `shouldSatisfy` ("never takes the TYPICALLY default: supply a value, or leave it out to use the default" `isInfixOf`)
+      Output _ hard _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull, "--presumption", "hard"]
+      hard `shouldSatisfy` ("Field 'has capacity' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value" `isInfixOf`)
+      hard `shouldSatisfy` (not . ("leave it out to use the default" `isInfixOf`))
+
     -- The cell is the same list as compact JSON, because a name may hold the
     -- characters a separator would need (`of sound mind; sober`).
     it "S7: --format csv carries a presumed column, as a JSON list" $ do

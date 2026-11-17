@@ -6076,7 +6076,7 @@ jsonListToWHNFTyped at = go (0 :: Int)
         SuppliedNull spelling
           | isMaybeFieldTy elementType -> pure (ValConstructor TypeCheck.nothingRef [])
           | otherwise -> userException $ UserError $
-              "Field '" <> renderPresumedPath elementAt.fieldPath <> "' " <> nullRefusalText spelling False
+              "Field '" <> renderPresumedPath elementAt.fieldPath <> "' " <> nullRefusalText spelling NoDefaultToTake
         _ -> jsonValueToWHNFTyped elementAt x elementType
       headRef <- allocateValue headVal
       tailVal <- go (i + 1) xs elementType

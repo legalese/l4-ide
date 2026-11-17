@@ -845,6 +845,25 @@ spec = describe "integration" do
         decided <- hardRest ["p" Aeson..= Aeson.object [], "q" Aeson..= False]
         departures (answeredAs (FnLitBool False)) [("/evaluation", decided)] `shouldBe` []
 
+    -- Card O4 and the TYPICALLY page (documentation review, round 1, C10): under
+    -- hard, leaving an input out is refused too, so the refusal of a null must
+    -- not offer that as the way out. Soft keeps the hint (case D above).
+    it "case D under hard: a null for a defaulted input is refused without offering to leave it out, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        let inputs = ["r" Aeson..= Aeson.Null, "q" Aeson..= True]
+            hard = "presumption" Aeson..= ("hard" :: Text)
+            refusedWithoutTheHint = \case
+              Right r -> Just (showAnswer r)
+              Left msg
+                | not ("Parameter 'r' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value" `Text.isInfixOf` msg) -> Just ("refused in other words: " <> msg)
+                | "leave it out to use the default" `Text.isInfixOf` msg -> Just ("still offers to leave it out: " <> msg)
+                | otherwise -> Nothing
+        rest <- askRest baseUrl mgr deployId "withDefault" inputs [hard]
+        mcp <- askMcpWith baseUrl mgr deployId "withDefault" (Aeson.object (inputs <> [hard]))
+        batch <- askBatchCasesWith baseUrl mgr deployId "withDefault" [hard] [Aeson.object ("@id" Aeson..= (1 :: Int) : inputs)]
+        departures refusedWithoutTheHint
+          ([("/evaluation", rest), ("MCP", mcp)] <> [("batch", b) | b <- batch]) `shouldBe` []
+
     -- case E: an input left out is refused as it always was, in other words
     -- than a null's
     it "case E: an input left out is refused as missing, on /evaluation, on MCP and in a batch" do
@@ -6874,10 +6893,15 @@ askBatch baseUrl mgr deployId fn inputs trace = do
 -- | A batch of cases, as each case's answer in order. A batch that is not a
 -- @200@ with a batch in it is an error on every case.
 askBatchCases :: String -> Manager -> Text -> Text -> [Aeson.Value] -> IO [SurfaceAnswer]
-askBatchCases baseUrl mgr deployId fn cases = do
+askBatchCases baseUrl mgr deployId fn = askBatchCasesWith baseUrl mgr deployId fn []
+
+-- | As 'askBatchCases', with fields beside @cases@ in the body of the request
+-- (the batch endpoint reads @presumption@ there, once for all its cases).
+askBatchCasesWith :: String -> Manager -> Text -> Text -> [Pair] -> [Aeson.Value] -> IO [SurfaceAnswer]
+askBatchCasesWith baseUrl mgr deployId fn bodyFields cases = do
   req <- buildJsonPost
     (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack (Text.replace " " "%20" fn) <> "/evaluation/batch")
-    (Aeson.object [ "outcomes" Aeson..= ([] :: [Text]), "cases" Aeson..= cases ])
+    (Aeson.object ([ "outcomes" Aeson..= ([] :: [Text]), "cases" Aeson..= cases ] <> bodyFields))
   resp <- httpLbs req mgr
   pure $ case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
     Just batch | statusCode' resp == 200 ->

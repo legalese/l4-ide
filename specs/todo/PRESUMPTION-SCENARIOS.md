@@ -12,6 +12,7 @@ Its batch behaviour is W2/W3's (#539): the TYPICALLY spec's §2 census, measured
 The one census row re-run here is p4, a `DECLARE` field default refused at construction, which still holds.
 The construction probes also ran on a binary built from the `#551` branch (`feat/typically-w4w5`: W4 and W5, a default applied at a named call and at a record construction), copied 2026-10-09 05:19 and deleted after the probes.
 `JL4_LIBRARY_PATH` was unset throughout, so each binary used its embedded prelude.
+(2026-11-18: the three `*-hard.json` transcripts below that end a null's refusal with "or leave it out to use the default" are records of what that binary printed. A build after 2026-11-18 prints, under hard, "supply a value (leaving it out is refused too, because presumption is hard)"; soft is unchanged.)
 Every probe file is in Appendix A and every raw output in Appendix B, modulo trailing whitespace.
 
 **Owning documents.** `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md` (T1, T3, T4, T6; D7.3 as restated in its §1.1), `IMPLICIT-PROPS-DESIGN.md` §11.5 (R8), `SURFACE-SUGAR-CLUSTER-2026-09.md` (D7.3), `UNKNOWN-EVALUATION-SPEC.md`, and `UNKNOWNS-BACKEND-CONTRACT.md` (the newer per-backend survey of `TYPICALLY`).
