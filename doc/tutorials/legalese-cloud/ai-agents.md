@@ -40,18 +40,50 @@ This server registers **one tool per exported rule**, plus the same four source-
 
 ### Telling a rule not to assume anything
 
-Some rules give an input a default (see [TYPICALLY](../../reference/types/TYPICALLY.md)): a value the rule uses when a caller leaves that input out. By default an agent that leaves such an input out gets an answer computed from the default, and the result lists it under `presumed` so that the agent can tell the user what was assumed.
+Some rules give an input a default (see [TYPICALLY](../../reference/types/TYPICALLY.md)): a value the rule uses when a caller leaves that input out.
+By default an agent that leaves such an input out gets an answer computed from the default, and the result lists it under `presumed` so that the agent can tell the user what was assumed.
+The one exception is an event's party or action record in a request to a rule that describes obligations (a regulative rule, whose result is a contract; see [Regulative rules](../../reference/regulative/README.md)): every field of it must be written, and a request that leaves one out is refused, in both modes (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
 
-An agent that must not assume anything the user did not say can send the argument `presumption` with the value `"hard"`. Then no default is used: if the call leaves out an input the rule needs, the tool refuses the call and names the input, instead of answering. The value `"soft"` is the same as leaving the argument out. Both values are accepted in any capitalisation, as in a service request; any other value is refused. Send the argument with the call's arguments, not beside them in the request. Three wrong places are refused, with the place the argument goes: inside `arguments` on a rule that returns a contract (unless the rule has an input of that name), beside `arguments` in the request itself, and inside an `arguments` object that wraps the inputs of an ordinary rule. Anywhere else, such as in `_meta`, the argument is not read and is ignored. A default that the rule itself takes inside its own text is still used under `"hard"`, because it is part of the rule, not something a caller left out.
+An agent that must not assume anything the user did not say can send the argument `presumption` with the value `"hard"`.
+Then no default is used: if the call leaves out an input the rule needs, the tool refuses the call and names the input, instead of answering.
+The value `"soft"` is the same as leaving the argument out.
+Both values are accepted in any capitalisation, as in a service request; any other value is refused.
+A default that the rule itself takes inside its own text is still used under `"hard"`, because it is part of the rule, not something a caller left out.
 
-On a jl4-service, every rule's tool advertises `presumption` in its input schema, so an agent finds it without being told. It is one of the arguments of an ordinary rule, and sits beside `arguments` on a rule that returns a contract, whose inputs go inside `arguments`. The [WebMCP embed script](webmcp-embed.md) takes it too and passes it on to the service, but the refusals of a key in the wrong place described here are the MCP endpoint's: the script does not check where the key was put. It is the same argument, with the same two values, as `l4 batch --presumption` and the `presumption` field of a service request.
+Where the argument goes depends on the kind of rule.
+A call to a tool carries one object, the tool's input, which the client sends as the `arguments` member of a `tools/call` request.
+The keys of that object are the ones the tool's input schema lists.
+
+| The rule                                                 | Where `presumption` goes in the tool's input                                              | Example input                                                                  |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| An ordinary rule, one that does not describe obligations | With the rule's own inputs, at the top level of the tool's input                          | `{"applicant": {...}, "presumption": "hard"}`                                  |
+| A rule that describes obligations                        | Beside `arguments`, `startTime` and `events`; the rule's own inputs go inside `arguments` | `{"arguments": {...}, "startTime": 0, "events": [...], "presumption": "hard"}` |
+
+Three wrong places are refused, each with the place the argument goes.
+The first is inside `arguments` on a rule that describes obligations (unless the rule has an input of that name).
+The second is outside the tool's input, as a sibling of the `arguments` member of the `tools/call` request itself, which is the shape of an HTTP request body.
+The third is inside an `arguments` object that wraps the inputs of an ordinary rule.
+Anywhere else, such as in `_meta`, the argument is not read and is ignored.
+
+On this service, every rule's tool advertises `presumption` in its input schema, so an agent finds it without being told.
+The [WebMCP embed script](webmcp-embed.md) takes it too and passes it on to the service, but the refusals of a key in the wrong place described here are the MCP endpoint's: the script does not check where the key was put.
+It is the same argument, with the same two values, as `l4 batch --presumption` and the `presumption` field of a service request (see [Call rules over REST](openapi-spec.md#turn-the-defaults-off)).
 
 What this covers, and what it does not:
 
-- A jl4-service you run yourself reads it on the tool of each rule, and the WebMCP script's tools carry it. The hosted servers on Legalese Cloud work from their own copy of each rule's schema and may not yet list the argument or pass it on; check the tool's schema (`tools/list`, or `get_schema` on the all-deployments server) before relying on it. Where it is not listed, the REST API's `presumption` field does the same thing.
-- An ordinary rule with an input called `presumption` cannot be offered as a tool, because the argument would be taken for the input or the input for the argument. The server leaves that rule's tool out of its list, and a call to it is refused and names the input. Rename the input in the rule, or call the rule through the [REST API](openapi-spec.md), where the inputs are nested inside `arguments`. A rule that returns a contract is still offered, because its inputs are inside `arguments` and `presumption` is beside them.
+- This service's MCP tools advertise `presumption` and read it, and so do the WebMCP script's tools.
+  A hosted server placed in front of this service may not list it until that server is updated, so look at the tool list (`tools/list`, or `get_schema` on the all-deployments server) before relying on it.
+  The hosted servers on Legalese Cloud work from their own copy of each rule's schema.
+  A server that does not know the argument reads it as it reads any name that matches none of a rule's inputs: where the call leaves out an input that has a default, it refuses the call, naming `presumption`, and where the call leaves out no such input, it ignores the argument.
+  Where it is not listed, the REST API's `presumption` field does the same thing.
+- An ordinary rule with an input called `presumption` cannot be offered as a tool, because the argument would be taken for the input or the input for the argument.
+  The server leaves that rule's tool out of its list, and a call to it is refused and names the input.
+  Rename the input in the rule, or call the rule through the [REST API](openapi-spec.md), where the inputs are nested inside `arguments`.
+  A rule that describes obligations is still offered, because its inputs are inside `arguments` and `presumption` is beside them.
 
-A rule's inputs go at the top level of a call, as its tool's schema lists them; only a rule that returns a contract takes them inside `arguments`. If a call to an ordinary rule's MCP tool wraps its inputs in an `arguments` object, the tool refuses it and says where the inputs go, instead of answering from the defaults. The WebMCP script does not do this: it sends such a wrapper on to the service, which refuses an unknown name only when another input the call left out has a default, so an agent using the script should put the inputs at the top level of the call too.
+A rule's inputs go at the top level of a call, as its tool's schema lists them; only a rule that describes obligations takes them inside `arguments`.
+If a call to an ordinary rule's MCP tool wraps its inputs in an `arguments` object, the tool refuses it and says where the inputs go, instead of answering from the defaults.
+The WebMCP script does not do this: it sends such a wrapper on to the service, which refuses an unknown name only when another input the call left out has a default, so an agent using the script should put the inputs at the top level of the call too.
 
 ### Tool names in WebMCP
 
