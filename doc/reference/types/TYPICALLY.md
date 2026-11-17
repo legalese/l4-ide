@@ -431,14 +431,25 @@ govern what counts as leaving a fact out:
   under `presumed` by the path the request wrote it at, such as
   `events[0].party.licence` or, for a record inside the party,
   `events[0].party.zhome.Address.floor`, but only if the answer actually read
-  it: an event that comes after the one that revealed a missed deadline is never
-  looked at, and lists nothing. Under `hard` the request is refused, naming that
-  path. A verdict can therefore rest on a default the client left out of an
-  event, even when the request states the party in full in its arguments; the
-  list shows it, and does not make it correct. Where two events write the same
-  record they share one default, and the path names the first of them. A record
-  inside a party or action that is not itself a record, such as a list of
-  records, still has to give every field under `soft`.
+  it. Every event has a default of its own, named by its own index. An event
+  the answer did not rest on lists nothing: one that comes after the event that
+  revealed a missed deadline, one whose party differs before the defaulted field
+  is reached, and one whose party matches but whose action does not (a default
+  of the action that decided the mismatch is listed). Under `hard` the request
+  is refused, naming that path. A verdict can therefore rest on a default the
+  client left out of an event, even when the request states the party in full in
+  its arguments; the list shows it, and does not make it correct.
+
+  Two limits of event records show nothing in `presumed`, so they are worth
+  knowing. A field whose type is `MAYBE` of a record, written in an event as an
+  object of two or more keys, is read as `NOTHING`, with no warning, under
+  `soft` and `hard` alike (measured 2026-11-18). And the published schema
+  describes a record nested in a party as a plain object, where the service
+  reads it only under its constructor's name. The other limits are refused
+  loudly, with the evaluator's own message and no suggestion: a `MAYBE` field
+  left out or given a value instead of `null`, a key that is not a field, a list
+  of records, and an action that is a `ONE OF` constructor with fields. The
+  service README sorts them, with the messages.
 
 A gap that is known and not closed by this page's behaviour:
 
