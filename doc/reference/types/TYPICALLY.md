@@ -442,8 +442,8 @@ govern what counts as leaving a fact out:
   it: `Missing required field 'events[0].party.licence' (Driver): an event's
 record is part of the request, so it never takes the field's TYPICALLY
 default. Give every field of it.` The answer is the same in `soft` and in
-  `hard`. That refusal is a stop-gap until a default in an event's record can
-  be listed in `presumed` instead (ruled 2026-10-11); it is not built here.
+  `hard`. Letting an event's record take a default and list it in `presumed`
+  instead is not built, so the refusal is the rule.
 - **The refusal can name a field that was written.** A party or an action sent
   as `{"Driver": {"name": "Alice", "licence": "learner"}}`, keyed by its
   constructor, is the wrong shape at the top level: a record that has no
