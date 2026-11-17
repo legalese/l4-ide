@@ -1105,6 +1105,7 @@ A default is therefore not a module-scope expression, may not name another binde
 The fallback a default used to compute is written as an input `MAYBE … TYPICALLY NOTHING` plus an ordinary `CONSIDER … WHEN JUST d THEN d OTHERWISE <expr>`.
 The ruling's words, verbatim, 2026-10-12 in chat: _"if we radically simplified TYPICALLY to prohibit complex expressions and only allowed simple values we increase simplicity without making the desired ideas impossible to express; the programmer just has to find other existing ways of saying the same thing, no?"_ and _"It just feels like we're asking the TYPICALLY keyword to do the job of an OTHERWISE branch."_
 Recorded in `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4, which carries the same line.
+**RULE 1 KEPT 2026-11-17 (bench card U1, declined).** A rule's own defaulted `GIVEN` may be left out only at a named site, and a positional call or construction gives all of them; a section `GIVEN` flows, or takes its default, at either kind of call. Recorded, with the card's three conditions, in `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.2.
 The text above is kept as the record of what was ruled on 2026-09-04.
 
 **What decided it.** Three images today (schema required-and-defaulted, Catala `context`,

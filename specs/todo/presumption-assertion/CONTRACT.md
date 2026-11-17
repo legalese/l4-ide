@@ -28,7 +28,7 @@ The ladder is not the authority on **values**: U10b (`UNKNOWN-EVALUATION-SPEC.md
   - **presumed**: taken from a `TYPICALLY` because nothing supplied or asserted it (R8, T1).
 - **Forced.** A value is forced when the evaluation reads it.
   Reporting is by forcing (T6, today: `notePresumedForce`, `Machine.hs:472–483`, called from `evalRef`, `:6010–6014`): a presumption or assertion the evaluation never read is not listed.
-  Known gap, today's and inherited: a reader that peeks at a thunk without `evalRef` (`peekWHNF`, `peekNF`, the deontic machinery's reads of a party) sees a filled value without reporting it (`Machine.hs:376–379`), and an asserted value bound as a value has the same gap.
+  Known gap, today's and inherited: a reader that peeks at a thunk without `evalRef` (`peekWHNF`, `peekNF`, `peekName`) sees a filled value without reporting it (`Machine.hs`, the comment on `presumable`); the peeks of the deontic machinery feed only the deontic log and the wording of a note, and the answer forces an event's party and action through `evalRef` (`TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §4.1), and an asserted value bound as a value has the same gap.
 - **Soft / hard.** The presumption switch (T4, TU-presume; today: `--presumption`, `"presumption"`).
   Hard withholds presumptions; it never withholds supplied values or assertions.
 - **Absent / `null`.** T3's two absences on the wire, today: a key left out is a gap; `null` is "not known", a value on a `MAYBE` and a refusal elsewhere.
