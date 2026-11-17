@@ -1,0 +1,35 @@
+-- `l4 batch` over a file that KEEPS a directive: #TRACE and #CONTRACT stay in
+-- the module the rows run against, and each of them runs once per row.
+-- `presumed` lists the defaults THIS ROW's evaluation took, and not the default
+-- the file's own #TRACE took when it built its event's party without `licence`.
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md, O1: a default taken inside the rules is
+-- listed in both modes, so the filter is on whose evaluation took it.)
+
+DECLARE Driver HAS
+    name    IS A STRING
+    licence IS A STRING TYPICALLY "full"
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+
+-- the event's party leaves out `licence`, so the file's own run takes its default
+#TRACE `seatbelt requirement` WITH driver IS (Driver WITH name IS "Alice", licence IS "full") AT 0 WITH
+    PARTY (Driver WITH name IS "Alice") DOES `wear seatbelt` AT 0
+
+-- a rule that reads `licence`, so a row that leaves it out takes the default
+@export
+GIVEN driver IS A Driver
+GIVETH A STRING
+`licence of` MEANS driver's licence

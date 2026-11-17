@@ -1,0 +1,41 @@
+-- Who performs an action is read from its record in the order the record
+-- DECLARES its fields, by the subject-first canon (see regulative-actor-duplex.l4),
+-- when the checker filled a default into the record: a default it adds comes
+-- after the written fields, and reading the list as it stands would take the
+-- recipient for the performer.
+--
+-- Each action below is PERFORMED by the party in its `sender` field, and each
+-- obligation names that party. Before the fix, `omitted` and `viaRule` were
+-- performed by Bob, and every PARTY below was rejected or accepted for the wrong
+-- reason. The mirror image, each action under the OTHER party, is in
+-- not-ok/tc/typically-actor-default.l4.
+--
+-- An application that fills nothing is read in the order it was written, as it
+-- always was, so a named construction that writes its party fields out of
+-- declared order is not in this file.
+
+DECLARE Person IS ONE OF Alice, Bob
+
+DECLARE Msg HAS
+    sender    IS A Person TYPICALLY Alice
+    recipient IS A Person
+    body      IS A STRING
+
+-- the sender is left out: it takes its default, Alice
+GIVETH A Msg
+omitted MEANS Msg WITH recipient IS Bob, body IS "hi"
+
+-- a rule's own defaulted input, left out at a named site (W4)
+GIVEN sender    IS A Person TYPICALLY Alice
+      recipient IS A Person
+GIVETH A Msg
+send MEANS Msg OF sender, recipient, "hi"
+
+GIVETH A Msg
+viaRule MEANS send WITH recipient IS Bob
+
+GIVETH A PROVISION OF Person, Msg
+fromOmitted MEANS PARTY Alice MUST omitted WITHIN 1
+
+GIVETH A PROVISION OF Person, Msg
+fromRule MEANS PARTY Alice MUST viaRule WITHIN 1

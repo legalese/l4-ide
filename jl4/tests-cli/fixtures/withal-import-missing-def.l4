@@ -1,0 +1,5 @@
+-- The defining half of withal-import-missing.l4: a record with a field that
+-- has no default.
+DECLARE Order
+  HAS item     IS A STRING
+      quantity IS A NUMBER TYPICALLY 1

@@ -1,0 +1,36 @@
+-- A rule at the top of a file whose name holds a dot, and a rule of the last
+-- name under a section, must not print the same entry (overnight card O6,
+-- 2026-10-11; found in review). Both defaults are TYPICALLY: 3 on
+-- `Pricing.scaled` at the top, 5 on `scaled` in `§ Pricing`. The rows answer 30,
+-- 50 and 80, and list `` `Pricing.scaled` ``, `Pricing.scaled` and both: an
+-- owner with no section in front of it is quoted the way L4 writes it in source,
+-- so the two are told apart.
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+`Pricing.scaled` MEANS rate TIMES base
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+useOne MEANS `Pricing.scaled` WITH base IS n
+
+§ `Pricing`
+
+GIVEN rate IS A NUMBER TYPICALLY 5
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+useTwo MEANS scaled WITH base IS n
+
+§ `Use`
+
+@export default Combine
+GIVEN n IS A NUMBER
+      one IS A BOOLEAN
+      two IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS (IF one THEN useOne n ELSE 0) PLUS (IF two THEN useTwo n ELSE 0)
