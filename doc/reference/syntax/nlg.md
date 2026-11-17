@@ -173,6 +173,19 @@ The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does
 
 Under `--lang he`, `l4 nlg` prints `כברירת מחדל`, from a draft entry in the table of Hebrew phrases that no Hebrew-speaking lawyer has reviewed; `l4 render --lang he` prints "by default" and "(by default)" in English.
 
+**A call inside a call is read flat.**
+When an input of a call is itself a call, `l4 nlg` joins the inputs of the inner call and of the outer one with "and", and nothing marks where the inner ones end.
+In [withal-example.l4](../types/withal-example.l4), `days to deliver` takes a `paint` and has a `rush` input of its own that is usually `FALSE`.
+The call ``(`days to deliver` WITH paint IS Paint WITH coats IS 2, rush IS TRUE)`` reads:
+
+```text
+`days to deliver` where `paint` is `Paint` where `coats` is 2, `rush` is `TRUE` and `colour` is `Red` by default and `rush` is `FALSE` by default is equal to 3
+```
+
+`rush` appears twice, as `TRUE` and as `FALSE` by default.
+The first is the paint's own and the second is the rule's own input, and the sentence does not say which is which.
+When two calls that sit one inside the other have an input of the same name, read the source and not the sentence.
+
 ## Limits
 
 - **An `ASSUME`d function has no named inputs,** so it has no slots, and a call reads as its name and arguments. Use a `BOOLEAN` field or a rule instead.

@@ -123,6 +123,25 @@ out takes the new value. Writing the input at the call, as
   deprecated) keeps its inputs' `TYPICALLY` as a note only, in the file that
   declares it and in a file that imports it alike.
 
+### A rule whose inputs all have a default
+
+A call that names its inputs has to name at least one of them: `WITH` is followed by an input, never by nothing.
+So a rule whose every input has a default cannot be called with all of them left to their defaults.
+Writing the rule's name alone does not call it, and there is no `WITHAL` for a rule, which is only for a record.
+To get the answer the defaults give, name one input and give it the value its default already is.
+
+```l4
+GIVEN rate IS A NUMBER TYPICALLY 3
+GIVETH A NUMBER
+`flat fee` MEANS rate TIMES 100
+
+#EVAL `flat fee` WITH rate IS 3     -- 300: the rate is written, and it is the default
+#EVAL `flat fee`                    -- <function>: the rule itself, not a call of it
+```
+
+`` `flat fee` WITHAL `` is refused, and the error says why.
+A rule with one input that has no default is not in this case: naming that input is enough, and the others take their defaults.
+
 ### Two rules with the same name
 
 Two rules may share a name when their inputs tell them apart.
@@ -258,9 +277,14 @@ Two limits are particular to alternatives:
 - **A field of an alternative cannot be computed.**
   A `MEANS` clause on one is a check error, because the fields of an alternative are given when it is built and the clause would never be used.
   Only the fields of a record can be computed.
-- **`l4 batch` cannot be given an alternative that carries data.**
-  A case that writes `{"tag": "Circle"}` or `{"tag": "Circle", "radius": 2}` is not read as a `Circle`; the answer reports that no branch matched.
-  The default applies where the alternative is built in the rules, with `WITH`.
+- **A case cannot give an alternative that carries data, so a default on its field applies only where the rules build it, with `WITH`.**
+  Each runtime says so in its own words (a case reaches them as JavaScript Object Notation (JSON) text), checked on 2026-11-18 with a rule that reads a `Shape` (`Circle` carries a `radius`, `Dot` carries nothing):
+  - `l4 batch` refuses `{"s": {"tag": "Circle"}}` and `{"s": {"tag": "Circle", "radius": 2}}` with `Could not decode … as Shape for field 's': expected a string naming one of: Dot. A constructor with fields (Circle, Rect) cannot be given as JSON input.`
+    The bare string `"Circle"` is refused too, as `Circle has fields, and a constructor with fields cannot be given as JSON input`.
+    An older build of `l4` says the same, so this is not new.
+  - The decision service refuses the two `tag` forms with `Parameter 's': FnObject but expected type is not a known record`.
+    It accepts the bare string `"Circle"`, and the value it reads is a `Circle` with no `radius`, which no `WHEN Circle r` branch takes: a `CONSIDER` with no `OTHERWISE` then stops with `reached a CONSIDER that has no branch for it`, and one with an `OTHERWISE` takes that.
+  - The schema the service publishes for such an input lists the names only (`"enum": ["Circle", "Rect", "Dot"]`), so it advertises `"Circle"` as a valid value although a `Circle` needs its `radius`.
 
 ## In rendered text: `l4 nlg` and `l4 render`
 
@@ -360,8 +384,8 @@ answer lists it under **`presumed`**, by name (or, for a field, by its path, suc
 as `config.timeout`) — but only if the answer actually used it. These rules
 govern what counts as leaving a fact out:
 
-- **Leaving the name out** is leaving it out. So is an empty cell in a CSV file
-  given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
+- **Leaving the name out** is leaving it out. So is an empty cell in a comma-separated values (CSV)
+  file given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
   and is listed under `presumed` like a default.
 - **`null` is not.** `null` means _not known_, and a fact that is not known never
   takes its default: the case is refused, naming the fact. `{}` means the same,
@@ -372,48 +396,33 @@ govern what counts as leaving a fact out:
   case that leaves out a fact with a default, a name that is not a fact is
   refused, naming the nearest one, since it may misspell the fact left out.
   Where no default is taken, it is ignored.
-- **The presumption can be switched off.** `l4 batch --presumption hard`, or
-  `"presumption": "hard"` in a service request, uses no default for a fact the
-  case leaves out: that fact is missing, and the case is refused, naming it. The default is `soft`.
-  The switch reaches only the facts a case can supply. A record the rules
-  decode with `JSONDECODE` still takes its defaults, whether the JSON is
-  written in the rules or is text the case sent, and in either mode the answer
-  lists them under `presumed` as `JSONDECODE <type>: <field>`: the switch does
-  not withdraw them. The type is named as it is declared, behind the section
-  heading it is declared under (`JSONDECODE Pricing.Settings: limit`), whichever
-  way the rule wrote the type at the decode. A record declared under a heading
-  in an _imported_ file is the exception: it is named without the heading
-  (``JSONDECODE `Paint Order`: coats``), though its `WITH` entry has it. A `MAYBE` field with no `TYPICALLY` that the decoded JSON
-  leaves out is filled with `NOTHING` and listed the same way
-  (`JSONDECODE Partial: note`), in both modes. The same is true of a default a `WITH` call or a construction _inside_
-  the rules takes (see above): neither mode withdraws it, because no case could
-  have supplied it. The answer lists it under `presumed` as
-  `WITH <rule>: <input>`, naming the rule or record as its declaration writes
-  it, behind the section it is declared in: `WITH Pricing.scaled: rate`, or
-  `WITH Pricing.Config: timeout` for a field, for a rule and a record in
-  `§ Pricing`, and `WITH scaled: rate` for a rule at the top of the file, which
-  has no section to name. Two rules of one name in different sections are two
-  entries. A part that L4 would write in backticks in source is written in
-  backticks, with or without a section in front of it: any name with a space,
-  a dot, a hyphen or an apostrophe in it, one that starts with a digit, and a
-  reserved word (``WITH `Part 1. Fees`.scaled: rate``, ``WITH `two words`: rate``
-  for a rule at the top of the file). A backticked part can itself hold a dot or
-  a colon, so read each one whole when you split an entry. The answer lists it
-  only if it actually used the default, under `soft` as well as under `hard`.
-  Two declarations with the same name under the same sections give one entry,
-  because the entry names the sections and not the file: the same name in two
-  imported files, and a rule declared in a `WHERE`, which is named
-  bare, so it also shares an entry with a top-level rule of that name.
-  The entry names the rule and not which of two rules of that name took the
-  default: two rules called `fee` in `§ Pricing`, each with its own default for
-  `rate`, both list `WITH Pricing.fee: rate`, whatever value each took. So
-  `presumed` has more than one shape: a fact's name
-  or path (`has capacity`, `config.timeout`), `WITH <rule>: <input>`, and
-  `JSONDECODE <type>: <field>`. An entry that starts `WITH ` is a usual value
-  the rules took where a call or a construction inside them left it out, which
-  no case could have supplied. One that starts `JSONDECODE ` is a usual value
-  in a decode the rules made, which may be of text the case sent, so it can be
-  a fact that text left out.
+- **The presumption can be switched off.**
+  `l4 batch --presumption hard`, or `"presumption": "hard"` in a service request, uses no default for a fact the case leaves out.
+  That fact is missing, and the case is refused, naming it.
+  The default is `soft`.
+  The switch reaches only the facts a case can supply, so two kinds of default are not withdrawn, and the answer lists both under `presumed` in either mode:
+  - **A default in a record the rules decode with `JSONDECODE`.**
+    It is taken whether the JSON is written in the rules or is text the case sent.
+    It is listed as `JSONDECODE <type>: <field>`.
+    The type is named as it is declared, behind the section heading it is declared under (`JSONDECODE Pricing.Settings: limit`), whichever way the rule wrote the type at the decode.
+    A record declared under a heading in an _imported_ file is the exception: it is named without the heading (``JSONDECODE `Paint Order`: coats``), though its `WITH` entry has it.
+    A `MAYBE` field with no `TYPICALLY` that the decoded JSON leaves out is filled with `NOTHING` and listed the same way (`JSONDECODE Partial: note`).
+  - **A default a `WITH` call or a construction inside the rules takes** (see above).
+    No case could have supplied it, so neither mode withdraws it.
+    It is listed as `WITH <rule>: <input>`, naming the rule or record as its declaration writes it, behind the section it is declared in.
+    `WITH Pricing.scaled: rate` is a rule in `§ Pricing`, `WITH Pricing.Config: timeout` is a field of a record there, and `WITH scaled: rate` is a rule at the top of the file, which has no section to name.
+    Two rules of one name in different sections are two entries.
+- **How an entry in `presumed` is written.**
+  A part that L4 would write in backticks in source is written in backticks, with or without a section in front of it.
+  That means any name with a space, a dot, a hyphen or an apostrophe in it, one that starts with a digit, and a reserved word (``WITH `Part 1. Fees`.scaled: rate``, ``WITH `two words`: rate`` for a rule at the top of the file).
+  A backticked part can itself hold a dot or a colon, so read each one whole when you split an entry.
+  The answer lists an entry only if it actually used the default, under `soft` as well as under `hard`.
+  Two declarations with the same name under the same sections give one entry, because the entry names the sections and not the file.
+  That covers the same name in two imported files, and a rule declared in a `WHERE`, which is named bare and so also shares an entry with a top-level rule of that name.
+  The entry names the rule and not which of two rules of that name took the default: two rules called `fee` in `§ Pricing`, each with its own default for `rate`, both list `WITH Pricing.fee: rate`, whatever value each took.
+  So `presumed` has more than one shape: a fact's name or path (`has capacity`, `config.timeout`), `WITH <rule>: <input>`, and `JSONDECODE <type>: <field>`.
+  An entry that starts `WITH ` is a usual value the rules took where a call or a construction inside them left it out, which no case could have supplied.
+  One that starts `JSONDECODE ` is a usual value in a decode the rules made, which may be of text the case sent, so it can be a fact that text left out.
 - **An event's record in the decision service is not a place a default can
   be left out.** When a request for a rule that describes obligations replays
   events, each event's party or action record has to give every field, whether
@@ -422,6 +431,28 @@ govern what counts as leaving a fact out:
   field out. The schema the service publishes still lists such a field with its
   default, so a client that reads the schema is told it may leave the field out
   and is then refused.
+- **A file and the service differ here, on purpose for now.** In a file, a
+  `#TRACE` event may leave a defaulted field out, and the event takes the
+  default: with `Driver` declared as `HAS name IS A STRING` and
+  `licence IS A STRING TYPICALLY "full"`,
+  `PARTY (Driver WITH name IS "Alice") DOES `wear seatbelt` AT 0` is the event
+  of a driver whose licence is `"full"`, and meets an obligation of
+  `Driver WITH name IS "Alice", licence IS "full"` without a word about the
+  default. The decision service takes the same event from a request and refuses
+  it: `Missing required field 'events[0].party.licence' (Driver): an event's
+record is part of the request, so it never takes the field's TYPICALLY
+default. Give every field of it.` The answer is the same in `soft` and in
+  `hard`. That refusal is a stop-gap until a default in an event's record can
+  be listed in `presumed` instead (ruled 2026-10-11); it is not built here.
+- **The refusal can name a field that was written.** A party or an action sent
+  as `{"Driver": {"name": "Alice", "licence": "learner"}}`, keyed by its
+  constructor, is the wrong shape at the top level: a record that has no
+  `TYPICALLY` at all refuses it with a type error, and one that has a
+  `TYPICALLY` gets the `Missing required field` message above for a field the
+  request did write. Send the fields directly, `{"name": "Alice", "licence":
+"learner"}`. A record nested inside a party or an action is the other way
+  round: it is keyed by its constructor (`{"Address": {...}}`), while the
+  published schema describes it as a plain object.
 
 Two gaps that are known and not closed by this page's behaviour:
 
@@ -436,7 +467,7 @@ Two gaps that are known and not closed by this page's behaviour:
   function" (smucclaw/l4-ide#1000, open).
 
 The list of facts a published rule asks for carries each default as the
-JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
+JSON Schema `default` keyword, and a defaulted fact
 is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
 either, and is not published, in the service's schema or in the query plan's.
 
