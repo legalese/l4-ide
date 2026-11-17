@@ -4619,6 +4619,12 @@ spec = describe "integration" do
         occurrences "body[presumptionKey] = args[presumptionKey]" `shouldBe` 2
       it "refuses a value that is not soft or hard before posting it, in both tools that post" do
         occurrences "presumptionRefusal(args[presumptionKey])" `shouldBe` 2
+      it "keeps a Unicode letter in a name, as the MCP endpoint does, so presumption followed by one is not the reserved key" do
+        -- /[^\p{L}\p{N}_-]/u keeps what Haskell's isAlphaNum keeps; the ASCII-only
+        -- class stripped the letter, read the name as 'presumption', and left a
+        -- tool out for an input that is not named that
+        ("[^\\p{L}\\p{N}_-]" `Text.isInfixOf` script) `shouldBe` True
+        ("[^a-zA-Z0-9_-]" `Text.isInfixOf` script) `shouldBe` False
       it "keeps the key out of the inputs it remaps, and skips a rule that has an input of that name" do
         ("delete flatArgs[presumptionKey]" `Text.isInfixOf` script) `shouldBe` True
         ("hasOwnProperty.call(sanitized.schema.properties || {}, presumptionKey)" `Text.isInfixOf` script) `shouldBe` True
