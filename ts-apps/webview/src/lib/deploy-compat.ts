@@ -546,6 +546,9 @@ export function noticeSummary(
 export function normalizeNotices(raw: unknown): DefaultChangeNotice[] {
   if (!Array.isArray(raw)) return []
   const notices: DefaultChangeNotice[] = []
+  // What was dropped, by the `kind` it carried (or "not an object"), so that a
+  // newer service's new kind of notice shows in the log and is not just gone.
+  const dropped: string[] = []
   for (const item of raw) {
     if (
       item !== null &&
@@ -564,7 +567,18 @@ export function normalizeNotices(raw: unknown): DefaultChangeNotice[] {
         old: n.old,
         new: n.new,
       })
+    } else if (item !== null && typeof item === 'object') {
+      const kind = (item as { kind?: unknown }).kind
+      dropped.push(typeof kind === 'string' ? kind : 'no kind')
+    } else {
+      dropped.push('not an object')
     }
+  }
+  if (dropped.length > 0) {
+    console.warn(
+      `Dropped ${dropped.length} of ${raw.length} default-change notices the service reported, ` +
+        `which this sidebar cannot read (kinds: ${[...new Set(dropped)].join(', ')}).`
+    )
   }
   return notices
 }

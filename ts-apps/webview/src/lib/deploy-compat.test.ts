@@ -386,6 +386,43 @@ describe('normalizeNotices (the job result is read, not trusted)', () => {
     ])
   })
 
+  let warned: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    warned = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    warned.mockRestore()
+  })
+
+  it('says how many entries it dropped, and of which kinds, rather than dropping them silently', () => {
+    const dropped = normalizeNotices([
+      good,
+      { ...good, kind: 'something-else' },
+      { ...good, kind: 'something-else' },
+      { ...good, kind: 'a-newer-kind' },
+      { ...good, function: 7 },
+      null,
+      42,
+    ])
+    expect(dropped).toEqual([good])
+    expect(warned).toHaveBeenCalledTimes(1)
+    const message = String(warned.mock.calls[0]![0])
+    expect(message).toContain('6')
+    expect(message).toContain('something-else')
+    expect(message).toContain('a-newer-kind')
+    // A default-changed entry with a bad field, and entries that are not
+    // objects, are named too, so the log says what was wrong.
+    expect(message).toContain('default-changed')
+    expect(message).toContain('not an object')
+  })
+
+  it('says nothing when nothing was dropped', () => {
+    normalizeNotices([good])
+    normalizeNotices([])
+    normalizeNotices(undefined)
+    expect(warned).not.toHaveBeenCalled()
+  })
+
   it('drops anything else, and returns [] for a missing or odd field', () => {
     expect(normalizeNotices(undefined)).toEqual([])
     expect(normalizeNotices('nope')).toEqual([])
