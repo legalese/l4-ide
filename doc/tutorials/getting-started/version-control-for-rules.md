@@ -167,6 +167,7 @@ What the report cannot see:
 
 - A default that is not a plain value (a number, a piece of text, `TRUE`, `FALSE`, `NOTHING`, `EMPTY`, which is published as an empty list, or a named choice) is not published, so a change to it is not reported. The same goes for a default written on an `ASSUME`.
 - An input whose type changed is reported as a breaking change, and its old and new defaults are not compared. An update rejected for a retyped input therefore lists no changed default for that input, although its default changed too.
+- Right after an upgrade, a deployment that the service loaded without compiling it again can report one default that did not change: an older service published a list input's `EMPTY` default as the text "EMPTY", and the same file now publishes `[]`. It goes away once the deployment has been compiled again, which any redeploy does.
 - Two numbers that differ only beyond about 16 digits compare as equal.
 - A rate or threshold written inside the body of a rule is not a default, so changing it is not reported. The check compares what a rule asks for, and does not compare what it answers.
 
