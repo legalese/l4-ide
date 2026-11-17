@@ -62,7 +62,7 @@ import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -921,6 +921,121 @@ spec = describe "integration" do
           (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int)]])
         expectAnswer resp (FnLitInt 32) ["cfg.colour", "shade", "cfg.timeout"]
 
+    -- W4, W5: a default the RULES take at a named site is not the request's to
+    -- supply, so it is taken in both presumption modes, and the answer rests on
+    -- it in both: `presumed` lists it under the application that took it (T4b,
+    -- R8; O1, ruled 2026-10-11), on both paths. The request's
+    -- own `rate` is 7; `scaled` still takes its 3.
+    it "takes a default a named site inside the rules took in both modes, and lists it in both, on both paths" do
+      withServiceFromSources "ty-named" [("combine.l4", namedSiteDefaultJL4)] \baseUrl mgr -> do
+        let used = ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= True]
+            presumedHere = ["WITH scaled: rate", "WITH Config: timeout"]
+        soft <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ("unused flag" Aeson..= False : used))
+        expectAnswer soft (FnLitInt 60) presumedHere
+        hardRun <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ("unused flag" Aeson..= False : used))
+        expectAnswer hardRun (FnLitInt 60) presumedHere
+        -- a {} on the unread flag sends the request down the wrapper path
+        wrapped <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrapped (FnLitInt 60) presumedHere
+        wrappedHard <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ("unused flag" Aeson..= uncertain : used))
+        expectAnswer wrappedHard (FnLitInt 60) presumedHere
+        -- The positive control: `use` FALSE never reaches either site.
+        skipped <- evalFunction baseUrl mgr "ty-named" "combine"
+          (hard ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer skipped (FnLitInt 0) []
+        skippedSoft <- evalFunction baseUrl mgr "ty-named" "combine"
+          (args ["n" Aeson..= (10 :: Int), "rate" Aeson..= (7 :: Int), "use" Aeson..= False, "unused flag" Aeson..= False])
+        expectAnswer skippedSoft (FnLitInt 0) []
+
+    -- Card O6 (ruled 2026-10-11): two rules of one name in different
+    -- sections are told apart in the entry, so the answer that rests on both
+    -- lists both. Before, all three answers listed one `WITH scaled: rate`.
+    it "names two rules of one name behind their sections" do
+      withServiceFromSources "ty-collide" [("combine.l4", collideSectionsJL4)] \baseUrl mgr -> do
+        let run a b = evalFunction baseUrl mgr "ty-collide" "combine"
+              (hard ["use alpha" Aeson..= (a :: Bool), "use beta" Aeson..= (b :: Bool)])
+        alpha <- run True False
+        expectAnswer alpha (FnLitInt 30) ["WITH Alpha.scaled: rate"]
+        beta <- run False True
+        expectAnswer beta (FnLitInt 50) ["WITH Beta.scaled: rate"]
+        both <- run True True
+        expectAnswer both (FnLitInt 80) ["WITH Alpha.scaled: rate", "WITH Beta.scaled: rate"]
+
+    -- MCP tools always evaluate soft (McpServer.runMcpEvaluationIO), so this
+    -- is the only way a tool-calling client is told that an answer rests on a
+    -- default the rules took (O1, ruled 2026-10-11).
+    it "lists a default a named site took in an MCP tool call, which always evaluates soft" do
+      withServiceFromSources "ty-named-mcp" [("combine.l4", namedSiteDefaultJL4)] \baseUrl mgr -> do
+        let call n use = do
+              req <- buildJsonPost (baseUrl <> "/deployments/ty-named-mcp/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= ("combine" :: Text)
+                    , "arguments" Aeson..= Aeson.object
+                        [ "n" Aeson..= (n :: Int), "rate" Aeson..= (7 :: Int)
+                        , "use" Aeson..= (use :: Bool), "unused flag" Aeson..= False ] ] ]
+              resp <- httpLbs req mgr
+              statusCode' resp `shouldBe` 200
+              pure (mcpToolText (responseBody resp))
+        used <- call 10 True
+        fmap fst used `shouldBe` Just False
+        (presumedOfText . snd =<< used) `shouldBe` Just ["WITH scaled: rate", "WITH Config: timeout"]
+        -- the positive control: `use` FALSE reaches neither site
+        skipped <- call 10 False
+        fmap fst skipped `shouldBe` Just False
+        (presumedOfText . snd =<< skipped) `shouldBe` Just []
+
+    -- A refusal is an answer, and rests on a default the rules took just as an
+    -- answer does: it says so in soft, in its own `presumed` and in the text of
+    -- the error (Backend.Api.prettyEvaluatorError).
+    it "carries a default a named site took on a refusal, under soft and hard" do
+      withServiceFromSources "ty-refuse-named" [("eligible.l4", refuseNamedDefaultJL4)] \baseUrl mgr -> do
+        let refusedWith resp = case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+              Just (SimpleError e@(EvaluatorRefused reason ps)) -> pure (reason, ps, prettyEvaluatorError e)
+              other -> expectationFailure ("Expected a refusal, got: " <> show other) >> pure ("", [], "")
+        soft <- evalFunction baseUrl mgr "ty-refuse-named" "eligible" (args ["years" Aeson..= (30 :: Int)])
+        (reason, ps, shown) <- refusedWith soft
+        reason `shouldBe` "cannot decide for a non-resident"
+        ps `shouldBe` ["WITH resident check: is resident"]
+        shown `shouldSatisfy` Text.isInfixOf "(resting on the defaults of WITH resident check: is resident)"
+        hardRun <- evalFunction baseUrl mgr "ty-refuse-named" "eligible" (hard ["years" Aeson..= (30 :: Int)])
+        (_, hps, _) <- refusedWith hardRun
+        hps `shouldBe` ["WITH resident check: is resident"]
+
+    -- Review F1, 2026-10-03: a default whose value is a bare constructor was
+    -- listed whenever the same constructor was evaluated later in the run. Each
+    -- case is a default that is NOT read (or a pair of which only one is), with a
+    -- later use of the same constructor to trip it, on both paths.
+    it "lists a constructor default a named site took only if the answer read it, on both paths" do
+      withServiceFromSources "ty-ctor" [("ctor.l4", constructorNamedDefaultJL4)] \baseUrl mgr -> do
+        -- under hard; soft lists the same entries for a named site (the test
+        -- above), so a wrong listing shows in either mode
+        let flag = "unused flag" Aeson..= False
+            run fn extra = evalFunction baseUrl mgr "ty-ctor" fn (hard (extra <> [flag]))
+            runWrapped fn extra = evalFunction baseUrl mgr "ty-ctor" fn
+              (hard (extra <> ["unused flag" Aeson..= uncertain]))
+        -- x FALSE: the AND stops at `a`; x TRUE: `b` is read
+        stops <- run "short circuits" ["x" Aeson..= False]
+        expectAnswer stops (FnLitInt 0) []
+        reads' <- run "short circuits" ["x" Aeson..= True]
+        expectAnswer reads' (FnLitInt 0) ["WITH both: b"]
+        stopsWrapped <- runWrapped "short circuits" ["x" Aeson..= False]
+        expectAnswer stopsWrapped (FnLitInt 0) []
+        readsWrapped <- runWrapped "short circuits" ["x" Aeson..= True]
+        expectAnswer readsWrapped (FnLitInt 0) ["WITH both: b"]
+        -- two defaults that are the same constructor: `ignoreD`'s `d` is never
+        -- read, `both`'s `b` is, and only `b` is listed
+        pair <- run "two of one constructor" ["x" Aeson..= True]
+        expectAnswer pair (FnLitBool False) ["WITH both: b"]
+        -- an enum default the rule never mentions, then that enum's constructor
+        enumNever <- run "enum never mentioned" ["x" Aeson..= True]
+        expectAnswer enumNever (FnLitString "Red") []
+
     it "lets a supplied value win, and presumes nothing" do
       withServiceFromSources "ty-supplied" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "ty-supplied" "may contract"
@@ -1128,11 +1243,13 @@ spec = describe "integration" do
           (args ["cfg" Aeson..= Aeson.object ["retries" Aeson..= (2 :: Int), "timeout" Aeson..= Aeson.Null], "unused flag" Aeson..= uncertain])
         expectError nulled "Field 'cfg.timeout' is null"
 
-    -- Review M3 / code #1: a rule's own decode is not the request's.
-    it "lets a rule's own JSONDECODE fill its default under hard, and says so" do
+    -- Review M3 / code #1: a rule's own decode is not the request's. It fills
+    -- its default in both modes and the answer says it rests on it in both
+    -- (O1 condition 3, DECODERRING, ruled 2026-10-11).
+    it "lets a rule's own JSONDECODE fill its default, and says so in both modes" do
       withServiceFromSources "ty-own" [("own.l4", ownDecodeJL4)] \baseUrl mgr -> do
         soft <- evalFunction baseUrl mgr "ty-own" "within limit" (args ["amount" Aeson..= (5 :: Int)])
-        expectAnswer soft (FnLitBool True) []
+        expectAnswer soft (FnLitBool True) ["JSONDECODE Settings: limit"]
         hardResp <- evalFunction baseUrl mgr "ty-own" "within limit"
           (Aeson.object ["arguments" Aeson..= Aeson.object ["amount" Aeson..= (5 :: Int)], "presumption" Aeson..= ("hard" :: Text)])
         expectAnswer hardResp (FnLitBool True) ["JSONDECODE Settings: limit"]
@@ -5754,6 +5871,15 @@ reportOfText t = case Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 t))
   Just (Aeson.Object o) | Just (Aeson.String r) <- Aeson.KeyMap.lookup "report" o -> Just r
   _ -> Nothing
 
+-- | The @presumed@ list an MCP tool result's text states, the text being an
+-- encoded evaluation response.
+presumedOfText :: Text -> Maybe [Text]
+presumedOfText t = do
+  Aeson.Object o <- Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 t))
+  Aeson.Object c <- Aeson.KeyMap.lookup "contents" o
+  Aeson.Array ps <- Aeson.KeyMap.lookup "presumed" c
+  pure [ p | Aeson.String p <- toList ps ]
+
 -- | Whether an MCP @tools/call@ result is an error, and its first text.
 mcpToolText :: LBS.ByteString -> Maybe (Bool, Text)
 mcpToolText body = do
@@ -5917,7 +6043,8 @@ schemaProperties = \case
 -- | Assert a successful evaluation response.
 assertSuccess :: Response LBS.ByteString -> (ResponseWithReason -> IO ()) -> IO ()
 assertSuccess resp check = do
-  statusCode' resp `shouldBe` 200
+  when (statusCode' resp /= 200) $
+    expectationFailure ("expected status 200 but got " <> show (statusCode' resp) <> ": " <> show (responseBody resp))
   case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
     Nothing -> expectationFailure ("Failed to decode eval response: " <> show (responseBody resp))
     Just (SimpleResponse r) -> check r
