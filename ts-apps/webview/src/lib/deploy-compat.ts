@@ -522,9 +522,20 @@ export function noticeEnum(
 }
 
 /** "2 defaults changed", for a notification; "" when none. */
-export function noticeSummary(notices: DefaultChangeNotice[]): string {
-  if (notices.length === 0) return ''
-  return `${notices.length} default${notices.length === 1 ? '' : 's'} changed`
+export function noticeSummary(
+  notices: DefaultChangeNotice[],
+  source: DeployReport['source'] = 'service'
+): string {
+  const n = notices.length
+  if (n === 0) return ''
+  // A list the service did not report is what the review showed before the
+  // deploy: it is not a statement that these defaults changed.
+  if (source !== 'service') {
+    return n === 1
+      ? '1 default change was reported before the deploy'
+      : `${n} default changes were reported before the deploy`
+  }
+  return `${n} default${n === 1 ? '' : 's'} changed`
 }
 
 /**
@@ -571,9 +582,11 @@ export interface DeployReport {
   /** `unknown`: the result of the deploy could not be read, so it may have
    *  been applied. Only `rejected` says that nothing changed. */
   outcome: 'applied' | 'rejected' | 'unknown'
-  /** `service`: the job result carried the list. `review`: it did not, and
-   *  this is what the review showed before the deploy. */
-  source: 'service' | 'review'
+  /** `service`: the job result carried the list. `review`: the job result had
+   *  no list (a service that predates the report), and this is what the review
+   *  showed before the deploy. `unread`: the job result could not be read at
+   *  all, and this is what the review showed. */
+  source: 'service' | 'review' | 'unread'
   notices: DefaultChangeNotice[]
   /** The rules' schemas as they were when the deploy was sent, so that an
    *  enumerated default is spelled as on the card. */

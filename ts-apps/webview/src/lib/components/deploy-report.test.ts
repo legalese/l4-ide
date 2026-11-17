@@ -14,7 +14,7 @@ const notice: DefaultChangeNotice = {
 const text = (report: {
   deploymentId: string
   outcome: 'applied' | 'rejected' | 'unknown'
-  source: 'service' | 'review'
+  source: 'service' | 'review' | 'unread'
 }) =>
   render(DeployReport, {
     props: {
@@ -83,19 +83,51 @@ describe('DeployReport', () => {
     const t = text({
       deploymentId: 'smaller',
       outcome: 'unknown',
-      source: 'review',
+      source: 'unread',
     })
     expect(t).toContain('Deploy of smaller: result not read')
+    expect(t).toContain('The deploy may have been applied.')
     expect(t).toContain(
-      'The result of the deploy could not be read; it may have been applied.'
-    )
-    expect(t).toContain(
-      'Reported before the deploy; the service did not report them.'
-    )
-    expect(t).toContain(
-      'If it was applied, a caller who leaves one of these inputs out now gets the new value.'
+      'Reported before the deploy; the result of the deploy could not be read.'
     )
     expect(t).not.toContain('Nothing changed')
     expect(t).not.toContain('rejected')
+    expect(t).not.toContain('the service did not report them')
+  })
+
+  it('for a result that could not be read, hedges each line instead of claiming the new default is in use', () => {
+    const t = text({
+      deploymentId: 'smaller',
+      outcome: 'unknown',
+      source: 'unread',
+    })
+    expect(t).toContain(
+      'if the deploy was applied, callers who leave b out will get different answers.'
+    )
+    expect(t).not.toContain(
+      'b · typically 0 → 1: callers who leave b out will get'
+    )
+  })
+
+  it('for a rejected update, each line says what would have happened', () => {
+    const t = text({
+      deploymentId: 'smaller',
+      outcome: 'rejected',
+      source: 'service',
+    })
+    expect(t).toContain(
+      'callers who leave b out would have got different answers.'
+    )
+    expect(t).not.toContain('will get')
+  })
+
+  it('for an applied update, each line says what will happen', () => {
+    const t = text({
+      deploymentId: 'smaller',
+      outcome: 'applied',
+      source: 'service',
+    })
+    expect(t).toContain('callers who leave b out will get different answers.')
+    expect(t).not.toContain('would have')
   })
 })

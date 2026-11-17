@@ -32,21 +32,28 @@
   </div>
   <p class="notice-banner-desc">
     {#if report.outcome === 'unknown'}
-      The result of the deploy could not be read; it may have been applied.
+      The deploy may have been applied.
     {/if}
     {#if report.source === 'review'}
       Reported before the deploy; the service did not report them.
+    {:else if report.source === 'unread'}
+      Reported before the deploy; the result of the deploy could not be read.
     {/if}
     {#if report.outcome === 'applied'}
       A caller who leaves one of these inputs out now gets the new value.
     {:else if report.outcome === 'rejected'}
       Nothing changed. The update would have changed these defaults:
-    {:else}
-      If it was applied, a caller who leaves one of these inputs out now gets
-      the new value.
     {/if}
   </p>
-  <DefaultNotices items={report.notices} schemas={report.schemas} />
+  <DefaultNotices
+    items={report.notices}
+    schemas={report.schemas}
+    mood={report.outcome === 'applied'
+      ? 'will'
+      : report.outcome === 'rejected'
+        ? 'would'
+        : 'maybe'}
+  />
 </div>
 
 <style>

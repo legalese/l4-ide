@@ -358,6 +358,16 @@ describe('noticeSummary', () => {
     expect(noticeSummary([n('a')])).toBe('1 default changed')
     expect(noticeSummary([n('a'), n('b')])).toBe('2 defaults changed')
   })
+
+  it('says how many were reported before the deploy when the service did not report them', () => {
+    expect(noticeSummary([n('a')], 'review')).toBe(
+      '1 default change was reported before the deploy'
+    )
+    expect(noticeSummary([n('a'), n('b')], 'review')).toBe(
+      '2 default changes were reported before the deploy'
+    )
+    expect(noticeSummary([], 'review')).toBe('')
+  })
 })
 
 describe('normalizeNotices (the job result is read, not trusted)', () => {

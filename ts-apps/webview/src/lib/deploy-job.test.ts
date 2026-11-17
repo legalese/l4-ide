@@ -200,16 +200,40 @@ describe('finishDeploy: what each outcome shows', () => {
     const f = finish({ kind: 'unreadable', error: 'HTTP 502' })
     expect(f.report).toMatchObject({
       outcome: 'unknown',
-      source: 'review',
+      source: 'unread',
       notices: [notice],
     })
     expect(f.showDeployments).toBe(true)
-    expect(f.refreshDeployments).toBe(true)
     expect(f.toast.type).toBe('warning')
     expect(f.toast.message).toBe(
       'The result of deploying "smaller" could not be read; it may have been applied.'
     )
     expect(f.toast.message).not.toContain('rejected')
+  })
+
+  it('does not ask for the deployments list again when the result could not be read', () => {
+    // The list request answers an empty list on any error, which would show
+    // "No deployments yet" and hide the deployment: keep the list we have.
+    expect(
+      finish({ kind: 'unreadable', error: 'HTTP 502' }).refreshDeployments
+    ).toBe(false)
+    expect(finish({ kind: 'unreadable' }, []).refreshDeployments).toBe(false)
+  })
+
+  it('does not mark the review`s list as one the service did not report when the service was never read', () => {
+    expect(finish({ kind: 'unreadable' }).report!.source).toBe('unread')
+  })
+
+  it('says how many changes the review reported, not that they changed, when the service did not report', () => {
+    expect(finish({ kind: 'applied', notices: undefined }).toast.message).toBe(
+      'Deployed "smaller" successfully. 1 default change was reported before the deploy.'
+    )
+    expect(
+      finish({ kind: 'applied', notices: undefined }, [notice, notice]).toast
+        .message
+    ).toBe(
+      'Deployed "smaller" successfully. 2 default changes were reported before the deploy.'
+    )
   })
 
   it('could not read the result, with nothing reviewed: only the toast', () => {

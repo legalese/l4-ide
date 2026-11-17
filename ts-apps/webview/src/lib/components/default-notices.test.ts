@@ -19,9 +19,10 @@ const n = (
 // The text a reader gets, without the markup.
 const text = (
   items: DefaultChangeNotice[],
-  schemas?: { name: string; parameters?: unknown }[]
+  schemas?: { name: string; parameters?: unknown }[],
+  mood?: 'will' | 'would' | 'maybe'
 ) =>
-  render(DefaultNotices, { props: { items, schemas } })
+  render(DefaultNotices, { props: { items, schemas, mood } })
     .body.replace(/<!--.*?-->/g, '')
     .replace(/<\/li>/g, ' ')
     .replace(/<[^>]+>/g, '')
@@ -69,6 +70,24 @@ describe('DefaultNotices', () => {
     ]
     expect(text([n('pick colour', 'c', 'Green', 'Red')], schemas)).toBe(
       'pick colour · c · typically Green → Red: callers who leave c out will get different answers.'
+    )
+  })
+
+  it('says "would have" when the update did not happen (mood would)', () => {
+    expect(text([n('the smaller of', 'b', 0, 1)], undefined, 'would')).toBe(
+      'the smaller of · b · typically 0 → 1: callers who leave b out would have got different answers.'
+    )
+  })
+
+  it('says "if the deploy was applied" when it is not known whether it was (mood maybe)', () => {
+    expect(text([n('the smaller of', 'b', 0, 1)], undefined, 'maybe')).toBe(
+      'the smaller of · b · typically 0 → 1: if the deploy was applied, callers who leave b out will get different answers.'
+    )
+  })
+
+  it('says "will get" by default', () => {
+    expect(text([n('the smaller of', 'b', 0, 1)])).toContain(
+      'callers who leave b out will get different answers.'
     )
   })
 })

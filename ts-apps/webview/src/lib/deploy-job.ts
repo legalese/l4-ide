@@ -110,7 +110,7 @@ export function finishDeploy(args: {
           type: 'info',
           message:
             `Deployed "${id}" successfully.` +
-            (report ? ` ${noticeSummary(report.notices)}.` : ''),
+            (report ? ` ${noticeSummary(report.notices, report.source)}.` : ''),
         },
       }
     }
@@ -137,13 +137,16 @@ export function finishDeploy(args: {
             ? {
                 deploymentId: id,
                 outcome: 'unknown',
-                source: 'review',
+                source: 'unread',
                 notices: reviewNotices,
                 schemas,
               }
             : null,
         showDeployments: true,
-        refreshDeployments: true,
+        // Not refreshed: the list request answers an empty list on any error,
+        // which would show "No deployments yet" under the banner and hide the
+        // deployment. The list we have stays.
+        refreshDeployments: false,
         toast: {
           type: 'warning',
           message: `The result of deploying "${id}" could not be read; it may have been applied.`,
