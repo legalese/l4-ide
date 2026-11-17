@@ -362,7 +362,16 @@ extractDeonton mFromState MkDeonton{..} = do
     Nothing -> do
       -- No LEST specified - use default based on modal
       case action.modal of
-        DMay -> pure ()  -- MAY without LEST: no failure path needed
+        DMay
+          -- MAY without LEST: a permission not used by its deadline lapses
+          -- to FULFILLED, as the evaluator takes it (the Contract5 expiry in
+          -- L4.EvaluateLazy.Machine routes a lapsed MAY to LEST, by default
+          -- FULFILLED). With no WITHIN it never lapses, so there is no edge.
+          | Just _ <- due -> do
+              fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+              let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing
+              addTransition fromState fulfilledId timeoutLabel LestTransition
+          | otherwise -> pure ()
         DMust -> do
           -- MUST without LEST defaults to Breach
           breachId <- getTerminalState "Breach" TerminalBreach

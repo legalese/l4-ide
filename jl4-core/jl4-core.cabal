@@ -199,6 +199,7 @@ test-suite jl4-core-test
     MultiClausePrintSpec
     ConsiderScaleSpec
     LateEventScaleSpec
+    StateGraphLapseSpec
     OverloadScaleSpec
     YmdOwnDefinitionSpec
     CheckDirectiveResultsSpec

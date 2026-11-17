@@ -58,9 +58,10 @@ This demonstrates how regulative rules create state machines with:
 
 ### Permission: `mayDrink`
 
-Shows a MAY rule (no failure path):
+Shows a MAY rule. A permission not used by its deadline lapses, which ends the rule as fulfilled, so the timeout also leads to Fulfilled:
 ```
 initial --[Bob MAY drink]--> Fulfilled
+initial --[timeout]--> Fulfilled
 ```
 
 ### Obligation: `mustDrink`
