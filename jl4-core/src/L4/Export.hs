@@ -678,10 +678,13 @@ validateExportInputs mod' =
 --   row that provably cannot evaluate;
 -- * a value supplied under that name is accepted into the row and silently
 --   dropped, because nothing binds it; and
--- * @l4 batch@ could not deliver it even if the schema demanded it, since it
---   supplies a binder by rewriting the module's own source and 'L4.Print'
---   re-emits the @IMPORT@ verbatim, so the imported module is re-resolved from
---   disk untouched.
+-- * @l4 batch@ could not deliver it even if the schema demanded it. The call
+--   it generates names only the section @GIVEN@s that THIS module's read-set
+--   ('L4.Discharge.readSets', which does not cross @IMPORT@) says the export
+--   reads, so no @WITH@ it writes reaches a reader in the imported module.
+--   (Until smucclaw/l4-ide#1000 it supplied a binder by rewriting the module's
+--   own source, and 'L4.Print' re-emits the @IMPORT@ verbatim, so the imported
+--   module was re-resolved from disk untouched.)
 --
 -- __Why this refusal comes BEFORE closing the collector over imports.__ Ruled
 -- in @IMPLICIT-PROPS-DESIGN.md@ §11.19: closing the collector on its own turns
