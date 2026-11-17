@@ -96,10 +96,15 @@ data UpdateJob = UpdateJob
 data UpdateJobStatus
   = JobCompiling
   -- ^ Bundle is compiling / being compatibility-checked.
-  | JobApplied
-  -- ^ The new bundle is compiled, compatible, and now the live version.
-  | JobRejected !Text
-  -- ^ Rejected: breaking change, compile failure, or timeout (reason).
+  | JobApplied ![DefaultChange]
+  -- ^ The new bundle is compiled, compatible, and now the live version. Carries
+  -- the notices: each published default this upload changed (U2 option B,
+  -- 2026-11-17: a changed default is reported, never blocked).
+  | JobRejected !Text ![DefaultChange]
+  -- ^ Rejected: breaking change, compile failure, or timeout (reason). A
+  -- rejection for a breaking change lists the notices too, so that a caller
+  -- fixing the break sees every change in the upload at once; compile failure
+  -- and timeout have no new interface to compare, so carry none.
 
 -- | A published default an upload changes, reported beside the deploy result
 -- and never blocking it (U2 option B, bench 2026-11-17). On the wire:

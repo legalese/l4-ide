@@ -15,7 +15,7 @@ import Test.Hspec
 import Application (app)
 import Backend.Api (FnLiteral (..), ResponseWithReason (..))
 import BundleStore (initStore)
-import ControlPlane (DeploymentStatusResponse (..), UpdateStatusResponse (..))
+import ControlPlane (DeploymentStatusResponse (..), UpdateStatusResponse (..), parseVersionCounts)
 import Logging (newLogger)
 import Options (Options (..))
 import Ledger.Store.Config (defaultLedgerStoreConfig)
@@ -24,8 +24,11 @@ import Types
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
+import Data.Aeson.Types (Pair)
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map.Strict as Map
+import Data.Foldable (toList)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -76,6 +79,36 @@ GIVEN walks IS A NUMBER
       drinks IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks >= 1 AND eats AND drinks
+|]
+
+-- | The #1072 sequence: the same rule published three ways. @b@ is a required
+-- input; then it takes a default (a compatible change, nothing to report);
+-- then the default changes from 0 to 1 (U2 option B: applied and reported).
+smallerRequiredSrc, smallerDefault0Src, smallerDefault1Src :: Text
+smallerRequiredSrc = smallerSrc "b IS A NUMBER"
+smallerDefault0Src = smallerSrc "b IS A NUMBER TYPICALLY 0"
+smallerDefault1Src = smallerSrc "b IS A NUMBER TYPICALLY 1"
+
+smallerSrc :: Text -> Text
+smallerSrc bDecl = [i|
+@export default the smaller of two numbers
+GIVEN a IS A NUMBER
+      #{bDecl}
+GIVETH A NUMBER
+DECIDE smaller IS IF a < b THEN a ELSE b
+|]
+
+-- | The base of a changed default beside a real break: 'smallerDefault1Src'
+-- changes @b@'s default from 0 to 1 and drops the required input @z@ this one
+-- has.
+smallerDefault0WithZSrc :: Text
+smallerDefault0WithZSrc = [i|
+@export default the smaller of two numbers
+GIVEN a IS A NUMBER
+      b IS A NUMBER TYPICALLY 0
+      z IS A NUMBER
+GIVETH A NUMBER
+DECIDE smaller IS IF a < b THEN a ELSE b
 |]
 
 -- | Does not parse — guarantees a compile failure.
@@ -181,6 +214,75 @@ spec = describe "PUT deployment compatibility guard (end-to-end)" do
       st `shouldBe` "applied"
       deploymentDescription baseUrl mgr "guard-desc"
         `shouldReturn` Just "Intended use: demo"
+
+  describe "a changed default (U2 option B: applied and reported, never blocked)" do
+    it "applies a PUT whose only change is a default, and reports it on the job" do
+      withService $ \baseUrl mgr -> do
+        deployApplied baseUrl mgr "guard-default" Nothing smallerRequiredSrc
+
+        -- v2: the required input takes a default. Compatible, and nothing to
+        -- report: a default present on one side only is not a change.
+        r2 <- deployPut baseUrl mgr "guard-default" Nothing smallerDefault0Src
+        statusCode' r2 `shouldBe` 202
+        (st2, notices2) <- putJob baseUrl mgr "guard-default" =<< mustUpdateId r2
+        st2 `shouldBe` "applied"
+        notices2 `shouldBe` []
+
+        -- v3: the default changes from 0 to 1. Applied, with the notice.
+        r3 <- deployPut baseUrl mgr "guard-default" Nothing smallerDefault1Src
+        statusCode' r3 `shouldBe` 202
+        uid3 <- mustUpdateId r3
+        (st3, notices3) <- putJob baseUrl mgr "guard-default" uid3
+        st3 `shouldBe` "applied"
+        notices3 `shouldBe`
+          [DefaultChange "smaller" "b" (Aeson.Number 0) (Aeson.Number 1)]
+
+        -- the poll itself answers 200 and carries the same list, as JSON
+        (code, body) <- jobBody baseUrl mgr "guard-default" uid3
+        code `shouldBe` 200
+        lookupNotices body `shouldBe`
+          Just [Aeson.object
+            [ "kind" Aeson..= ("default-changed" :: Text)
+            , "function" Aeson..= ("smaller" :: Text)
+            , "input" Aeson..= ("b" :: Text)
+            , "old" Aeson..= (0 :: Int)
+            , "new" Aeson..= (1 :: Int)
+            ]]
+
+        -- the live version is the new one: a request that leaves b out now
+        -- takes 1, not 0
+        smallerOf baseUrl mgr "guard-default" [] 5 `shouldReturnResult` FnLitInt 1
+
+        -- and the BREAKING counter did not move (MAJOR.BREAKING.RUNNING)
+        mVersion <- deploymentVersionOf baseUrl mgr "guard-default"
+        fmap (fst . parseVersionCounts) mVersion `shouldBe` Just 0
+
+    it "still rejects a real break in the same upload, and lists the default too" do
+      withService $ \baseUrl mgr -> do
+        deployApplied baseUrl mgr "guard-default-break" Nothing smallerDefault0WithZSrc
+
+        r <- deployPut baseUrl mgr "guard-default-break" Nothing smallerDefault1Src
+        statusCode' r `shouldBe` 202
+        uid <- mustUpdateId r
+        (st, notices) <- putJob baseUrl mgr "guard-default-break" uid
+        st `shouldBe` "rejected"
+        notices `shouldBe`
+          [DefaultChange "smaller" "b" (Aeson.Number 0) (Aeson.Number 1)]
+        (_, mErr) <- jobOnce baseUrl mgr "guard-default-break" uid
+        fromMaybe "" mErr `shouldSatisfy` Text.isInfixOf "smaller parameter z removed"
+
+        -- nothing was applied: the old default still serves
+        smallerOf baseUrl mgr "guard-default-break" ["z" Aeson..= (9 :: Int)] 5 `shouldReturnResult` FnLitInt 0
+
+    it "reports nothing on an upload that changes no default" do
+      withService $ \baseUrl mgr -> do
+        deployApplied baseUrl mgr "guard-default-same" Nothing smallerDefault1Src
+        r <- deployPut baseUrl mgr "guard-default-same" Nothing
+               (Text.replace "a < b" "a <= b" smallerDefault1Src)
+        uid <- mustUpdateId r
+        (st, notices) <- putJob baseUrl mgr "guard-default-same" uid
+        st `shouldBe` "applied"
+        notices `shouldBe` []
 
 ------------------------------------------------------------------------
 -- Harness
@@ -305,6 +407,55 @@ jobOnce baseUrl mgr deployId uid = do
   case Aeson.decode (responseBody resp) :: Maybe UpdateStatusResponse of
     Just u  -> pure (u.usStatus, u.usError)
     Nothing -> pure ("undecodable", Nothing)
+
+-- | A terminal job's status and notices, polled.
+putJob :: String -> Manager -> Text -> Text -> IO (Text, [DefaultChange])
+putJob baseUrl mgr deployId uid = go (120 :: Int)
+ where
+  go 0 = pure ("timeout", [])
+  go n = do
+    (_, body) <- jobBody baseUrl mgr deployId uid
+    case Aeson.decode body :: Maybe UpdateStatusResponse of
+      Just u | u.usStatus == "applied" || u.usStatus == "rejected" ->
+        pure (u.usStatus, u.usNotices)
+      _ -> threadDelay 500_000 >> go (n - 1)
+
+-- | One poll of a job: the HTTP status and the raw JSON body.
+jobBody :: String -> Manager -> Text -> Text -> IO (Int, LBS.ByteString)
+jobBody baseUrl mgr deployId uid = do
+  req <- parseRequest
+    (baseUrl <> "/deployments/" <> Text.unpack deployId
+              <> "/updates/" <> Text.unpack uid)
+  resp <- httpLbs req mgr
+  pure (statusCode' resp, responseBody resp)
+
+-- | The @notices@ array of a job's JSON body, as written.
+lookupNotices :: LBS.ByteString -> Maybe [Aeson.Value]
+lookupNotices body = case Aeson.decode body of
+  Just (Aeson.Object o) | Just (Aeson.Array a) <- Aeson.KeyMap.lookup "notices" o -> Just (toList a)
+  _ -> Nothing
+
+-- | The deployment's @MAJOR.BREAKING.RUNNING@ version.
+deploymentVersionOf :: String -> Manager -> Text -> IO (Maybe Text)
+deploymentVersionOf baseUrl mgr deployId = do
+  req <- parseRequest (baseUrl <> "/deployments/" <> Text.unpack deployId)
+  resp <- httpLbs req mgr
+  pure $ case Aeson.decode (responseBody resp) :: Maybe DeploymentStatusResponse of
+    Just s -> (\m -> m.metaDeploymentVersion) <$> s.dsMetadata
+    Nothing -> Nothing
+
+-- | Evaluate @smaller@ with @a@ given, and @extra@ beside it: @b@ takes its
+-- default.
+smallerOf :: String -> Manager -> Text -> [Pair] -> Int -> IO (Response LBS.ByteString)
+smallerOf baseUrl mgr deployId extra a = do
+  req0 <- parseRequest
+    (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/smaller/evaluation")
+  let body = Aeson.object ["arguments" Aeson..= Aeson.object (("a" Aeson..= a) : extra)]
+  httpLbs req0
+    { method = "POST"
+    , requestBody = RequestBodyLBS (Aeson.encode body)
+    , requestHeaders = [("Content-Type", "application/json")]
+    } mgr
 
 -- | Poll a job until it reaches a terminal status (applied/rejected).
 pollJob :: String -> Manager -> Text -> Text -> IO (Text, Maybe Text)
