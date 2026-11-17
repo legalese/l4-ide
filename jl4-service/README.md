@@ -142,6 +142,12 @@ Under `--lazy-load` (off by default) a deployment that has not been loaded since
 So an upgrade of the service that changes how a function's schema is published appears, under `--lazy-load`, as a change in every such deployment, whatever its source: a `PUT` of an unchanged bundle is rejected as breaking, and a `POST` overwrite raises the breaking component of `deploymentVersion`.
 The upgrade that listed every field of an event's party and action under `required` ([An event's party and action](#an-events-party-and-action)) is one: it changes the published schema of every `DEONTIC` function whose party or action has a defaulted field, a nested record or a `MAYBE` field, and the gate compares the `events` and `startTime` of a `DEONTIC` function, as it does every parameter.
 Starting the upgraded service without `--lazy-load`, or loading the deployment before redeploying it (any request for it compiles it), compares with the schema as it is now.
+Measured on 2026-11-18 with an unchanged bundle, deployed by a service from before this change and then served under `--lazy-load`: the `PUT` is rejected (`seatbelt requirement parameter events[].party.licence is now required`), and each of these gets the same bundle through.
+Load the deployment first, by asking for one of its functions, and send the `PUT`.
+Or start the service without `--lazy-load`, and send the `PUT`.
+Or send the bundle with `POST`, which is not gated: that is what `l4 redeploy --force` sends, and it is refused with `409` while the [instance ledger](#instance-ledger) holds instances of the deployment.
+Or `POST` it under a new id.
+No way through needs the deployment to be deleted.
 
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
 
