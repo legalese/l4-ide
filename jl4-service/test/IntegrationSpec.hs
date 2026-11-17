@@ -62,7 +62,7 @@ import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -965,6 +965,15 @@ spec = describe "integration" do
         both <- run True True
         expectAnswer both (FnLitInt 80) ["WITH Alpha.scaled: rate", "WITH Beta.scaled: rate"]
 
+    -- Assumed, not ruled: a heading that is not one plain word is written in
+    -- backticks, so the entry can be split back into its headings and its rule,
+    -- and the quotes survive the JSON response.
+    it "writes a heading with a space or a dot in backticks in the response" do
+      withServiceFromSources "ty-collide-spaced" [("combine.l4", collideSpacedJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "ty-collide-spaced" "combine"
+          (args ["use alpha" Aeson..= True, "use beta" Aeson..= True])
+        expectAnswer resp (FnLitInt 80) ["WITH `Part 1. Fees`.scaled: rate", "WITH `Part 2`.scaled: rate"]
+
     -- MCP tools always evaluate soft (McpServer.runMcpEvaluationIO), so this
     -- is the only way a tool-calling client is told that an answer rests on a
     -- default the rules took (O1, ruled 2026-10-11).
@@ -1001,11 +1010,11 @@ spec = describe "integration" do
         soft <- evalFunction baseUrl mgr "ty-refuse-named" "eligible" (args ["years" Aeson..= (30 :: Int)])
         (reason, ps, shown) <- refusedWith soft
         reason `shouldBe` "cannot decide for a non-resident"
-        ps `shouldBe` ["WITH resident check: is resident"]
-        shown `shouldSatisfy` Text.isInfixOf "(resting on the defaults of WITH resident check: is resident)"
+        ps `shouldBe` ["WITH `resident check`: is resident"]
+        shown `shouldSatisfy` Text.isInfixOf "(resting on the defaults of WITH `resident check`: is resident)"
         hardRun <- evalFunction baseUrl mgr "ty-refuse-named" "eligible" (hard ["years" Aeson..= (30 :: Int)])
         (_, hps, _) <- refusedWith hardRun
-        hps `shouldBe` ["WITH resident check: is resident"]
+        hps `shouldBe` ["WITH `resident check`: is resident"]
 
     -- Review F1, 2026-10-03: a default whose value is a bare constructor was
     -- listed whenever the same constructor was evaluated later in the run. Each

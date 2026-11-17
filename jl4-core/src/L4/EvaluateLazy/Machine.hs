@@ -58,6 +58,7 @@ module L4.EvaluateLazy.Machine
 , Presumed (..)
 , PresumedOrigin (..)
 , PresumedLog
+, presumedOwner
 , emptyPresumedLog
 , presumedEvents
 , renderPresumedPath
@@ -583,6 +584,26 @@ data PresumedOrigin
     -- applies. The path is the one input or field.
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass NFData
+
+-- | How the owner of a default reads in a @presumed@ entry: the way L4 writes
+-- the name in source ('L4.Print.quoteIfNeeded'), so that an entry can be split
+-- back into its parts and two different names do not print alike. A name
+-- behind the headings it is declared under is spelled as L4 spells a qualified
+-- name in an ambiguity error and when it prints source: each part that L4
+-- would write in backticks has them, so a heading with a space or a dot
+-- (@Part 1. Fees@) stays one part. A name with no heading in front of it is
+-- quoted the same way, so a top-level rule called @Pricing.scaled@ prints as
+-- @`Pricing.scaled`@ and not as the rule @scaled@ under @§ Pricing@.
+-- Two declarations with the same name under the same sections print the same
+-- entry: the entry names the sections, not the file, so the same name in two
+-- imported files shares one, and a @WHERE@ or @LET@ local, which is named
+-- bare, shares one with a top-level rule of that name.
+-- Assumed, not ruled: card O6 (ruled 2026-10-11) says the headings are named,
+-- and not how they are quoted.
+presumedOwner :: RawName -> Text
+presumedOwner = \ case
+  q@QualifiedName{} -> prettyLayout q
+  other             -> quoteIfNeeded (rawNameToText other)
 
 -- | Report a default that took effect ('EvalState.presumed'), once.
 tellPresumed :: Presumed -> Eval ()
@@ -2275,7 +2296,7 @@ forwardExpr env = \ case
             registerPresumable rf MkPresumed
               { path       = [rawNameToText fill.binder]
               , declaredAt = fill.declaredAt
-              , origin     = FromNamedApp (rawNameToText fill.owner)
+              , origin     = FromNamedApp (presumedOwner fill.owner)
               }
         pushFrame (App1 rs expectedType)
         -- Re-enter as a 'Var'. That extra 'ForwardMachine' step is what the

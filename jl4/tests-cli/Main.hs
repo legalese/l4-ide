@@ -372,12 +372,16 @@ batchTyLabelsJson = fixtureDir </> "batch-typically-named-labels.json"
 -- | Two declarations of one name, each with a @TYPICALLY@ default, under
 -- different headings (rules, then records), and the two cases a heading cannot
 -- tell apart: top-level rules of two imported files, and @WHERE@ locals.
-batchTyCollideSecImport, batchTyCollideSecImportA, batchTyCollideSecImportB, batchTyCollideWhereTop, batchTyCollideSections, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA, batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson :: FilePath
+batchTyCollideSecImport, batchTyCollideSecImportA, batchTyCollideSecImportB, batchTyCollideWhereTop, batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson, batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA, batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson :: FilePath
 batchTyCollideSections = fixtureDir </> "batch-typically-collide-sections.l4"
+batchTyCollideSpaced   = fixtureDir </> "batch-typically-collide-spaced.l4"
+batchTyCollideDotted   = fixtureDir </> "batch-typically-collide-dotted.l4"
 batchTyCollideSecImport  = fixtureDir </> "batch-typically-collide-secimport.l4"
 batchTyCollideSecImportA = fixtureDir </> "batch-typically-collide-secimport-a.l4"
 batchTyCollideSecImportB = fixtureDir </> "batch-typically-collide-secimport-b.l4"
 batchTyCollideWhereTop   = fixtureDir </> "batch-typically-collide-wheretop.l4"
+batchTyCollideTopmix   = fixtureDir </> "batch-typically-collide-topmix.l4"
+batchTyCollideTopmixJson = fixtureDir </> "batch-typically-collide-topmix.json"
 batchTyCollideRecords  = fixtureDir </> "batch-typically-collide-records.l4"
 batchTyCollideImport   = fixtureDir </> "batch-typically-collide-import.l4"
 batchTyCollideImportA  = fixtureDir </> "batch-typically-collide-import-a.l4"
@@ -802,7 +806,7 @@ coreFixtures =
   , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
   , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
   , batchTyNamed, batchTyNamedJson, batchTyCtors, batchTyCtorsJson, batchTyLabels, batchTyLabelsJson
-  , batchTyCollideSections
+  , batchTyCollideSections, batchTyCollideSpaced, batchTyCollideDotted, batchTyCollideTopmix, batchTyCollideTopmixJson
   , batchTyCollideSecImport, batchTyCollideSecImportA, batchTyCollideSecImportB, batchTyCollideWhereTop
   , batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
   , batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson
@@ -3223,7 +3227,7 @@ spec bin = do
       rows <- decodeArray sout
       map resultAndPresumed rows `shouldBe`
         [ ( Just (Number 140)
-          , presumedOf ["WITH Pricing.scaled: rate", "WITH Pricing.scaled by: factor", "WITH Pricing.Config: timeout"] )
+          , presumedOf ["WITH Pricing.scaled: rate", "WITH Pricing.`scaled by`: factor", "WITH Pricing.Config: timeout"] )
         ]
 
   -- Card O6, ruled 2026-10-11. Before, the entry named a rule by its bare
@@ -3262,6 +3266,36 @@ spec bin = do
         , (Just (Number 50), presumedOf ["WITH scaled: rate"])
         , (Just (Number 80), presumedOf ["WITH scaled: rate"])
         ]
+
+    -- Assumed, not ruled: a part of a qualified name that is more than one
+    -- plain word, or holds a dot, is written in backticks as L4 writes a
+    -- qualified name in source and in its errors. Without it `Part 1. Fees.scaled`
+    -- cannot be split back into a heading and a rule.
+    it "writes a heading with a space or a dot in backticks, as L4 does" $ do
+      rows <- rowsOf batchTyCollideSpaced batchTyCollideJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH `Part 1. Fees`.scaled: rate"])
+        , (Just (Number 50), presumedOf ["WITH `Part 2`.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH `Part 1. Fees`.scaled: rate", "WITH `Part 2`.scaled: rate"])
+        ]
+
+    -- Found in review of the quoting commit: an owner with no section in front
+    -- of it was never quoted, so a top-level rule called `Pricing.scaled` and
+    -- the rule `scaled` under `§ Pricing` both printed `Pricing.scaled`. The
+    -- rows answer 30 (the top-level rule, default 3), 50 (the sectioned one,
+    -- default 5) and 80 (both).
+    it "does not print a top-level rule called `Pricing.scaled` as the rule `scaled` under a section" $ do
+      rows <- rowsOf batchTyCollideDotted batchTyCollideRowsJson
+      rows `shouldBe`
+        [ (Just (Number 30), presumedOf ["WITH `Pricing.scaled`: rate"])
+        , (Just (Number 50), presumedOf ["WITH Pricing.scaled: rate"])
+        , (Just (Number 80), presumedOf ["WITH `Pricing.scaled`: rate", "WITH Pricing.scaled: rate"])
+        ]
+
+    it "writes a top-level name that needs backticks in backticks, as it does under a section" $ do
+      rows <- rowsOf batchTyCollideTopmix batchTyCollideTopmixJson
+      rows `shouldBe`
+        [ (Just (Number 50), presumedOf ["WITH `scaled by`: factor", "WITH `two words`: the rate"]) ]
 
     -- Found in review. The entry names the sections, not the file, so the same
     -- name under the same sections in two imported files is one entry.
