@@ -136,6 +136,8 @@ After the update, the sidebar says what happened to the defaults:
 - When the sidebar cannot read the result of the deploy (the connection to the service fails three times running), it says that the result could not be read and that the deploy may have been applied.
   It lists the defaults the review showed, marked as reported before the deploy.
   It never says the update was rejected, because the service did not say so.
+  The **Deployments** list is left as it was, not fetched again, because a failed fetch would show it empty.
+- The sidebar gives a failed read three tries, but it puts no limit on how long one read may take: if the service neither answers nor fails, the progress bar and the disabled button stay and no message appears.
 - The list comes from the service, so it needs a service that reports changed defaults, which the service that ships with this change does.
   A service that does not report them leaves the sidebar to show the list it held before the deploy, and it says "Reported before the deploy; the service did not report them."
 
