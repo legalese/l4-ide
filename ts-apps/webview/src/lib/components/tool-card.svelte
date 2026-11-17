@@ -134,7 +134,11 @@
     {/if}
     <span class="func-name">{func.name}</span>
     {#if func.isDefault}
-      <span class="badge default-badge">DEFAULT</span>
+      <span
+        class="badge entry-badge"
+        title="The rule l4 batch runs when you name none: the one marked @export default, or the first exported rule"
+        >ENTRY POINT</span
+      >
     {/if}
     {#if !expanded && paramCount > 0}
       <span class="param-count"
@@ -410,7 +414,7 @@
     flex-shrink: 0;
   }
 
-  .default-badge {
+  .entry-badge {
     background: none;
     border: none;
     padding: 0;

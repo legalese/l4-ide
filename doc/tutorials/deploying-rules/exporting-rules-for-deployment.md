@@ -52,7 +52,7 @@ An `@export` anywhere else, such as between `GIVETH` and `DECIDE`, is not picked
 
 ## Step 2: Check what will be published
 
-In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab. It lists every exported rule in the file, with its description, inputs and result type. If the list is empty, the file has no `@export` or does not type-check.
+In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab. It lists every exported rule in the file, with its description, inputs and result type. If the list is empty, the file has no `@export` or does not type-check. The badge **ENTRY POINT** marks the rule `l4 batch` runs when you name none: the one marked `@export default`, or the first exported rule. The service has no such rule: a caller always names the rule. The badge does not mean the rule has a default value.
 
 ### Usual values
 
