@@ -1020,8 +1020,10 @@ export function initializeSidebarMessenger(
         notices: resp.notices,
       }
     } catch (err) {
+      // Not 'rejected': the service did not say that. We could not read the
+      // job, so the deploy may have been applied.
       return {
-        status: 'rejected' as const,
+        status: 'unreadable' as const,
         error: err instanceof Error ? err.message : String(err),
       }
     }

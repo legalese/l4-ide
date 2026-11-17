@@ -557,3 +557,48 @@ export function normalizeNotices(raw: unknown): DefaultChangeNotice[] {
   }
   return notices
 }
+
+/**
+ * What the sidebar says about changed defaults once a deploy job has finished,
+ * applied or rejected: either the list the service reported (`notices` in the
+ * job result, which the service puts on a rejection too), or, when the job
+ * result has no `notices` (a service that predates the report), the list the
+ * review held before the deploy, marked as such. `null` when there is nothing
+ * to say.
+ */
+export interface DeployReport {
+  deploymentId: string
+  /** `unknown`: the result of the deploy could not be read, so it may have
+   *  been applied. Only `rejected` says that nothing changed. */
+  outcome: 'applied' | 'rejected' | 'unknown'
+  /** `service`: the job result carried the list. `review`: it did not, and
+   *  this is what the review showed before the deploy. */
+  source: 'service' | 'review'
+  notices: DefaultChangeNotice[]
+  /** The rules' schemas as they were when the deploy was sent, so that an
+   *  enumerated default is spelled as on the card. */
+  schemas: ReadonlyArray<{ name: string; parameters?: unknown }>
+}
+
+export function reportAfterDeploy(args: {
+  /** The job result's `notices`, as it came: `undefined` when the key is absent. */
+  jobNotices: unknown
+  /** What the review held before the deploy. */
+  reviewNotices: DefaultChangeNotice[]
+}): Pick<DeployReport, 'source' | 'notices'> | null {
+  if (Array.isArray(args.jobNotices)) {
+    const notices = normalizeNotices(args.jobNotices)
+    return notices.length > 0 ? { source: 'service', notices } : null
+  }
+  return args.reviewNotices.length > 0
+    ? { source: 'review', notices: args.reviewNotices }
+    : null
+}
+
+/** The report after a deployment is undeployed: gone if it was about that one. */
+export function clearReportFor(
+  report: DeployReport | null,
+  deploymentId: string
+): DeployReport | null {
+  return report?.deploymentId === deploymentId ? null : report
+}

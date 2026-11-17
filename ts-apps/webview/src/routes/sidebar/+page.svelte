@@ -45,12 +45,14 @@
   import HarnessInstallMenu from '$lib/components/harness-install-menu.svelte'
   import ToolCard from '$lib/components/tool-card.svelte'
   import DefaultNotices from '$lib/components/default-notices.svelte'
+  import DeployReportBanner from '$lib/components/deploy-report.svelte'
   import {
-    noticeSummary,
-    normalizeNotices,
+    clearReportFor,
     reviewDeploy,
     type BreakingChange,
+    type DeployReport,
   } from '$lib/deploy-compat'
+  import { finishDeploy, pollDeployJob, type JobOutcome } from '$lib/deploy-job'
   import { anyDefaultInsideLists } from '$lib/param-defaults'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import DeploymentMetadata from '$lib/components/deployment-metadata.svelte'
@@ -572,12 +574,10 @@
   let breakingChanges: BreakingChange[] = $state([])
   // Inputs whose default this redeploy changes, found before it is sent.
   let defaultNotices: DefaultChangeNotice[] = $state([])
-  // The same list after the deploy, as the service reports it in the job
-  // result; shown on the Deployments tab until dismissed.
-  let appliedNotices: {
-    deploymentId: string
-    notices: DefaultChangeNotice[]
-  } | null = $state(null)
+  // What is said about them after the deploy job has finished (applied or
+  // rejected): the service's report, or, if it sent none, the list the review
+  // held. Shown until dismissed, or until the deployment is undeployed.
+  let deployReport: DeployReport | null = $state(null)
   let verifying: boolean = $state(false)
   let deploying: boolean = $state(false)
 
@@ -922,7 +922,7 @@
     deploymentIdError = ''
     breakingChanges = []
     defaultNotices = []
-    appliedNotices = null
+    deployReport = null
     deploymentMission = ''
     deployView = 'deploy-form'
   }
@@ -982,6 +982,10 @@
     const id = sanitizeDeploymentId(raw)
     deploymentIdError = ''
     verifying = true
+    // Whatever an earlier review of another deployment left behind must not
+    // reach this one (Back does not run showDeployForm, which also resets it).
+    breakingChanges = []
+    defaultNotices = []
 
     // Check for breaking changes against the currently-deployed interface.
     try {
@@ -1015,83 +1019,50 @@
 
   async function executeDeploy(deploymentId: string, overwrite = false) {
     if (!messenger || !activeFileUri) return
+    const m = messenger
+    // The rules as they are when the deploy is sent: a file switch while the job
+    // runs replaces `functions`, and the report must spell what was deployed.
+    const schemas = $state.snapshot(functions)
     deploying = true
     try {
-      const result = await messenger.sendRequest(
-        RequestSidebarDeploy,
-        HOST_EXTENSION,
-        {
-          deploymentId,
-          fileUri: activeFileUri,
-          mission: deploymentMission.trim() || undefined,
-          overwrite,
-        }
-      )
+      const result = await m.sendRequest(RequestSidebarDeploy, HOST_EXTENSION, {
+        deploymentId,
+        fileUri: activeFileUri,
+        mission: deploymentMission.trim() || undefined,
+        overwrite,
+      })
       if (result.success) {
         const did = result.deploymentId ?? deploymentId
+        const updateId = result.updateId
         // No updateId ⇒ resolved immediately (content-hash dedupe).
-        // Otherwise poll the async deploy/update job to a terminal state.
-        let outcome: 'applied' | 'rejected' | 'pending' = result.updateId
-          ? 'pending'
-          : 'applied'
-        let error: string | undefined
-        // Changed defaults, as the service reports them for this job.
-        let jobNotices: DefaultChangeNotice[] = []
-        if (result.updateId) {
-          for (let i = 0; i < 60; i++) {
-            await new Promise((r) => setTimeout(r, 1000))
-            try {
-              const resp = await messenger.sendRequest(
-                GetSidebarUpdateStatus,
-                HOST_EXTENSION,
-                { deploymentId: did, updateId: result.updateId }
-              )
-              error = resp.error
-              if (resp.status === 'applied') {
-                outcome = 'applied'
-                jobNotices = normalizeNotices(resp.notices)
-                break
-              }
-              if (resp.status === 'rejected') {
-                outcome = 'rejected'
-                break
-              }
-            } catch {
-              // ignore transient errors
-            }
-          }
-        }
+        // Otherwise poll the async deploy/update job to an outcome.
+        const outcome: JobOutcome = updateId
+          ? await pollDeployJob(
+              () =>
+                m.sendRequest(GetSidebarUpdateStatus, HOST_EXTENSION, {
+                  deploymentId: did,
+                  updateId,
+                }),
+              { sleep: (ms) => new Promise((r) => setTimeout(r, ms)) }
+            )
+          : { kind: 'immediate' }
         deploying = false
-        if (outcome === 'applied') {
-          // Switch to the deployments tab *before* awaiting the list
-          // fetch, otherwise the deploy panel repaints its Preview
-          // screen for the duration of the round-trip (visible flicker).
-          deployView = 'preview'
-          activeTab = 'deployments'
-          appliedNotices =
-            jobNotices.length > 0
-              ? { deploymentId: did, notices: jobNotices }
-              : null
-          notify(
-            'info',
-            `Deployed "${did}" successfully.` +
-              (jobNotices.length > 0 ? ` ${noticeSummary(jobNotices)}.` : '')
-          )
-          await fetchDeployments()
-        } else if (outcome === 'rejected') {
-          deployView = 'preview'
-          notify(
-            'error',
-            `Deploy "${did}" rejected: ${error ?? 'compilation error'}`
-          )
-        } else {
-          deployView = 'preview'
-          activeTab = 'deployments'
-          notify(
-            'warning',
-            `Deploying "${did}" — still in progress. Refresh later.`
-          )
-        }
+        // What each outcome shows, including the changed defaults, is decided
+        // in deploy-job.ts; this only does it.
+        const finish = finishDeploy({
+          deploymentId: did,
+          outcome,
+          reviewNotices: defaultNotices,
+          schemas,
+        })
+        deployView = 'preview'
+        // Switch to the deployments tab *before* awaiting the list fetch,
+        // otherwise the deploy panel repaints its Preview screen for the
+        // duration of the round-trip (visible flicker).
+        if (finish.showDeployments) activeTab = 'deployments'
+        deployReport = finish.report
+        notify(finish.toast.type, finish.toast.message)
+        if (finish.refreshDeployments) await fetchDeployments()
       } else {
         notify('error', result.error ?? 'Deploy failed')
         deploying = false
@@ -1182,6 +1153,8 @@
       )
       if (result.success) {
         deployments = deployments.filter((d) => d.deploymentId !== deploymentId)
+        // A report about a deployment that no longer exists must not outlive it.
+        deployReport = clearReportFor(deployReport, deploymentId)
         notify('info', `Removed deployment "${deploymentId}".`)
       } else {
         notify('error', result.error ?? `Failed to remove "${deploymentId}"`)
@@ -2047,6 +2020,12 @@
             </div>
           {:else}
             <!-- Normal preview -->
+            {#if deployReport?.outcome === 'rejected'}
+              <DeployReportBanner
+                report={deployReport}
+                onDismiss={() => (deployReport = null)}
+              />
+            {/if}
             {#if functions.length === 0}
               <div class="empty-state">
                 <p class="hint">
@@ -2100,27 +2079,11 @@
             class:with-info-note={connectionStatus.connected &&
               !undeployConfirm}
           >
-            {#if appliedNotices && connectionStatus.connected && !undeployConfirm}
-              <div class="notice-banner" role="status">
-                <div class="notice-banner-head">
-                  <span
-                    >Defaults changed in <strong
-                      >{appliedNotices.deploymentId}</strong
-                    ></span
-                  >
-                  <button
-                    class="notice-banner-close"
-                    title="Dismiss"
-                    aria-label="Dismiss"
-                    onclick={() => (appliedNotices = null)}>&times;</button
-                  >
-                </div>
-                <p class="notice-banner-desc">
-                  A caller who leaves one of these inputs out now gets the new
-                  value.
-                </p>
-                <DefaultNotices items={appliedNotices.notices} />
-              </div>
+            {#if deployReport && deployReport.outcome !== 'rejected' && connectionStatus.connected && !undeployConfirm}
+              <DeployReportBanner
+                report={deployReport}
+                onDismiss={() => (deployReport = null)}
+              />
             {/if}
             {#if undeployConfirm}
               <div class="breaking-warning">
@@ -2379,6 +2342,13 @@
                       {/if}
                     </div>
                   {/each}
+                  {#if anyDefaultInsideLists(deployments.flatMap((d) => d.functions))}
+                    <p class="defaults-note">
+                      A default on a field inside a list is published, but the
+                      fields inside a list are not listed here, so it is not
+                      shown.
+                    </p>
+                  {/if}
                 </div>
               {/if}
             {/if}
@@ -3392,45 +3362,6 @@
   .review-header {
     font-weight: 600;
     margin-bottom: 8px;
-  }
-
-  .notice-banner {
-    flex-shrink: 0;
-    margin-bottom: 12px;
-    padding: 10px 12px;
-    background: var(
-      --vscode-textBlockQuote-background,
-      rgba(127, 127, 127, 0.1)
-    );
-    border-radius: 4px;
-    font-size: 0.9em;
-    line-height: 1.45;
-  }
-
-  .notice-banner-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .notice-banner-close {
-    background: none;
-    border: none;
-    padding: 0 2px;
-    color: var(--vscode-descriptionForeground);
-    cursor: pointer;
-    font-size: 1.2em;
-    line-height: 1;
-  }
-
-  .notice-banner-close:hover {
-    color: var(--vscode-foreground);
-  }
-
-  .notice-banner-desc {
-    margin: 4px 0 6px;
-    color: var(--vscode-descriptionForeground);
   }
 
   .deployments-tab-wrapper {

@@ -438,7 +438,10 @@ export interface DefaultChangeNotice {
  *  the deployment's own status — the live version is unaffected until
  *  the job applies. */
 export interface SidebarUpdateStatusResponse {
-  status: 'compiling' | 'applied' | 'rejected'
+  /** `unreadable` is the extension's own answer when it could not read the
+   *  job from the service (a network or HTTP error): it says nothing about
+   *  the job, which may have been applied. `rejected` is the service's. */
+  status: 'compiling' | 'applied' | 'rejected' | 'unreadable'
   error?: string
   /** Changed defaults the service reports for this job. Absent when the
    *  service predates the report, which reads the same as "none reported". */

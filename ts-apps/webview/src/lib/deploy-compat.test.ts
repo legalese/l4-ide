@@ -10,9 +10,11 @@ import {
   detectBreakingChanges,
   detectDefaultChanges,
   formatNoticeValue,
+  clearReportFor,
   noticeEnum,
   noticeSummary,
   normalizeNotices,
+  reportAfterDeploy,
   reviewDeploy,
 } from './deploy-compat'
 
@@ -636,5 +638,76 @@ describe('a failing default check is logged, names the rule, and loses nothing e
     } finally {
       logged.mockRestore()
     }
+  })
+})
+
+describe('reportAfterDeploy: what is said once the job has finished', () => {
+  const notice = (input: string) => ({
+    kind: 'default-changed' as const,
+    function: 'f',
+    input,
+    old: 0,
+    new: 1,
+  })
+  const reviewed = [notice('b')]
+
+  it('reports what the service reported, for an applied job', () => {
+    expect(
+      reportAfterDeploy({ jobNotices: [notice('c')], reviewNotices: reviewed })
+    ).toEqual({ source: 'service', notices: [notice('c')] })
+  })
+
+  it('reports what the service reported for a rejected job too', () => {
+    // The service puts `notices` on a rejection as well; the caller passes the
+    // job's field whatever the outcome was.
+    expect(
+      reportAfterDeploy({ jobNotices: [notice('c')], reviewNotices: [] })
+    ).toEqual({ source: 'service', notices: [notice('c')] })
+  })
+
+  it('says nothing when the service reported an empty list', () => {
+    expect(
+      reportAfterDeploy({ jobNotices: [], reviewNotices: reviewed })
+    ).toBeNull()
+  })
+
+  it('falls back to the list the review held when the job has no `notices`, and says so', () => {
+    expect(
+      reportAfterDeploy({ jobNotices: undefined, reviewNotices: reviewed })
+    ).toEqual({ source: 'review', notices: reviewed })
+  })
+
+  it('says nothing when there is nothing reported and nothing reviewed', () => {
+    expect(
+      reportAfterDeploy({ jobNotices: undefined, reviewNotices: [] })
+    ).toBeNull()
+  })
+
+  it('reads a malformed `notices` as absent, not as an empty report', () => {
+    expect(
+      reportAfterDeploy({ jobNotices: 'nope', reviewNotices: reviewed })
+    ).toEqual({ source: 'review', notices: reviewed })
+  })
+})
+
+describe('clearReportFor: an undeployed deployment leaves no report behind', () => {
+  const report = {
+    deploymentId: 'smaller',
+    outcome: 'applied' as const,
+    source: 'service' as const,
+    notices: [],
+    schemas: [],
+  }
+
+  it('clears the report of the deployment that was removed', () => {
+    expect(clearReportFor(report, 'smaller')).toBeNull()
+  })
+
+  it('keeps the report of another deployment', () => {
+    expect(clearReportFor(report, 'other')).toBe(report)
+  })
+
+  it('has nothing to clear when there is no report', () => {
+    expect(clearReportFor(null, 'smaller')).toBeNull()
   })
 })
