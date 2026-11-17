@@ -449,8 +449,9 @@ exportToFunction declares implicitParams export =
     }
 
 -- | How the published schema describes the record of an event's @party@ or
--- @action@ (card O4 of the 2026-10-11 overnight bench: "keep A until B
--- lists").
+-- @action@ (card O4 of the 2026-10-11 overnight bench: a request that leaves a
+-- field out of an event's record is refused, so the schema does not promise a
+-- default for it).
 --
 -- An argument record may leave out a field that has a @TYPICALLY@ and take the
 -- default, and its schema says so. An event's record is part of the request, so

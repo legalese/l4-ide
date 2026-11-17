@@ -4202,9 +4202,9 @@ spec = describe "integration" do
   -- wrapper as source text, so it may not: a request that leaves a field out is
   -- refused. The schema built both records the same way and promised the
   -- default for the event too, and described a record nested in an event in the
-  -- plain form an argument uses, which the wrapper does not read. (Card O4:
-  -- "Accept B as the target, and keep A until B lists.") Nothing here changes
-  -- how an event is evaluated.
+  -- plain form an argument uses, which the wrapper does not read. (Card O4: the
+  -- schema stops promising the default.) Nothing here changes how an event is
+  -- evaluated.
   describe "an event's record in the published schema (O4)" do
     let getJson baseUrl mgr path = do
           req <- parseRequest (baseUrl <> path)
