@@ -515,10 +515,10 @@ data EvalState =
       -- Each run gets its own registry ('L4.EvaluateLazy' builds a fresh
       -- 'EvalState' per evaluation), so concurrent requests share none of it.
       --
-      -- Known gap: a reader that peeks at a thunk without 'evalRef'
-      -- ('peekWHNF', 'peekNF'; the deontic machinery's reads of a party) sees
-      -- a decoder-filled default, which is a value from birth, without
-      -- reporting it.
+      -- Known gap: a reader that peeks at a thunk without 'evalRef' ('peekWHNF',
+      -- 'peekNF', 'peekName') sees a decoder-filled default, which is a value
+      -- from birth, without reporting it. The peeks feed only the deontic log and
+      -- a note's wording: the answer forces an event's party and action.
     , recordDefaults :: Map Unique (Map Text (Expr Resolved))
       -- ^ Each record type's field defaults, keyed by the type's 'Unique' and
       -- then by field name, from the @DECLARE@s of the evaluated module and of

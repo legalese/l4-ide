@@ -1065,9 +1065,9 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
 -- their records are decoded from JSON, where the switch applies.
 --
 -- This is a stop-gap and not T1's reading: T1 says a field absent in JSON takes
--- its default under soft and is refused under hard. Soft cannot take it here
--- yet, because the deontic machinery reads a party without forcing it, so a
--- default taken there would be used and never listed in @presumed@. Card O4
+-- its default under soft and is refused under hard. The record here is written
+-- as source, so a default it took would be a construction's: listed in both
+-- modes under the record's name, and not withdrawn by hard. Card O4
 -- (ruled 2026-10-11) makes listing such a default the target and keeps this
 -- refusal until it is built. Owed: decode the event records as the arguments
 -- are, so that soft takes a default and lists it as @events[0].party.licence@,

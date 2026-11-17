@@ -1341,8 +1341,7 @@ spec = describe "integration" do
         assertSuccess written \r -> r.presumed `shouldBe` []
         -- the argument's own record is decoded from JSON, where the switch applies:
         -- soft takes the default, hard refuses it. (Whether `presumed` lists the
-        -- default is not asserted: the deontic machinery reads a party without
-        -- forcing it, the known gap of specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md 4.2.)
+        -- default is not asserted here.)
         let argRequest presumption = Aeson.object $
               [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= nameOnly]
               , "startTime" Aeson..= (0 :: Int)
