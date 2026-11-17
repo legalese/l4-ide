@@ -800,6 +800,14 @@ jobs:
     steps:
       - name: Update repositories
         run: apt update
+      # `nodejs` is for WebMcpParitySpec, which runs the generated WebMCP script
+      # under node to check that it names a rule's inputs as the MCP endpoint
+      # does. This job runs in a bare ubuntu:24.04 container, which has no node
+      # (the runner image's is not in it); the container's own package is node 18
+      # (18.19.1 when this was checked in an ubuntu:24.04 container, 2026-11-18),
+      # which has what the script needs (Unicode property escapes, Array.from,
+      # codePointAt). The test FAILS rather than skips when CI is set and node is
+      # missing, so a node-less run cannot pass unnoticed.
       - name: Install deps
         run: >
           apt install -y
@@ -818,24 +826,13 @@ jobs:
           liblzma-dev
           xz-utils
           z3
+          nodejs
       - name: Update git config
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: actions/checkout@v5
 
       - name: Update git submodules
         run: git submodule update --init
-
-      # WebMcpParitySpec runs the generated WebMCP script under node, to check
-      # that it names a rule's inputs as the MCP endpoint does. This job runs in
-      # a bare ubuntu:24.04 container, which has no node (the runner image's is
-      # not in it), and the test FAILS rather than skips when CI is set and node
-      # is missing, so a node-less run cannot pass unnoticed. No npm cache: the
-      # job installs no npm packages.
-      - name: Use Node.js (for WebMcpParitySpec)
-        uses: actions/setup-node@v5
-        with:
-          node-version: "24.x"
-          package-manager-cache: false
 
       - name: Set up GHC
         uses: haskell-actions/setup@v2
