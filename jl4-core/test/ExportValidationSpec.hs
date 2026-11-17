@@ -15,7 +15,7 @@ import System.Timeout (timeout)
 import L4.API (l4Check)
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
-import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), checkExports, getExportedFunctions, enrichReturnTypes, prettyExportError)
+import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), checkExports, exportErrorCode, getExportedFunctions, enrichReturnTypes, prettyExportError)
 import L4.Export.Shape (JsonField (..), JsonShape (..), Unsendable (..), jsonShape, moduleDeclares, shapeEnvFromDeclares, unsendableWhat)
 import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Parser.SrcSpan (SrcPos(..), SrcRange(..))
@@ -448,6 +448,33 @@ spec = do
           , ["`maybe named` is published with @export, but its result is a MAYBE whose value is a DEONTIC, a contract rule, and @export does not support that yet.", deonticHint]
           , ["`takes one` is published with @export, but its input `d` is a DEONTIC, a contract rule, and @export does not support that yet.", deonticHint]
           ]
+        noTypeError src
+
+      -- A rule with no GIVETH writes no result type, so the error must not say
+      -- that it does (review of #779, 2026-11-17).
+      it "says that an inferred result is a type name for a DEONTIC, and to add a GIVETH, without saying it is written" $ do
+        let src = Text.unlines $ types ++
+              [ "DECLARE Duty IS A DEONTIC Party Act"
+              , ""
+              , "GIVETH A Duty"
+              , "`the duty` MEANS PARTY alice MUST ping WITHIN 3"
+              , ""
+              , "@export Inferred"
+              , "`inferred` MEANS `the duty`"
+              , ""
+              , "@export Written"
+              , "GIVETH A Duty"
+              , "`written` MEANS `the duty`"
+              ]
+        fmap (map prettyExportError) (exportProblems src) `shouldBe` Right
+          [ [ "`inferred` is published with @export, but its result is inferred to be `Duty`, a type name for a DEONTIC, and @export does not support that yet."
+            , "An @export returns a contract only when its GIVETH writes the DEONTIC type out, and this rule has no GIVETH: add GIVETH A DEONTIC OF Party, Act."
+            ]
+          , [ "`written` is published with @export, but its result is written with `Duty`, a type name for a DEONTIC, and @export does not support that yet."
+            , "An @export returns a contract only when its GIVETH writes the DEONTIC type out: write GIVETH A DEONTIC OF Party, Act instead."
+            ]
+          ]
+        fmap (map exportErrorCode) (exportProblems src) `shouldBe` Right ["check/export-deontic-type", "check/export-deontic-type"]
         noTypeError src
 
       it "refuses a DEONTIC input" $ do

@@ -46,7 +46,7 @@ import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
 import L4.TypeSynonym (declaresFromModule, expandSynonyms)
 import L4.TypeCheck.Environment (contractUnique, maybeUnique)
-import L4.Export.Shape (ShapeEnv (..), Unsendable (..), contractUnderName, isUnresolved, jsonShape, unsendableHint, unsendableWhat)
+import L4.Export.Shape (ResultOrigin (..), ShapeEnv (..), Unsendable (..), contractUnderName, isUnresolved, jsonShape, unsendableHint, unsendableWhat)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), EntityInfo, Severity (..))
 import Optics
 
@@ -500,7 +500,7 @@ exportErrorCode = \case
     UInArgument _ why -> unsendableCode site why
     UInBuiltin _ why -> unsendableCode site why
     UNotWorkedOut -> "check/export-unsupported-type"
-    UContractUnderName _ _ -> "check/export-deontic-type"
+    UContractUnderName{} -> "check/export-deontic-type"
     UUnresolved _ -> "check/export-unsupported-type"
     UEvent -> "check/export-event-type"
     UFunction -> case site of
@@ -630,10 +630,13 @@ checkOneExport env assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ n
     , Set.member uniq (collectReferencedUniques body)
     ]
   ++ concat
-    [ case contractUnderName envOfRule ty of
+    [ case contractUnderName envOfRule origin ty of
         Just why -> [ExportUnsendable exportAt fnName ExportResult why]
         Nothing -> unsendable ExportResult ty
-    | Just ty <- [extractReturnType tySig <|> inferredReturnType env.entities fnName]
+    | Just (origin, ty) <-
+        [ ((ResultWritten,) <$> extractReturnType tySig)
+            <|> ((ResultInferred,) <$> inferredReturnType env.entities fnName)
+        ]
     , not (isContractResult ty)
     ]
  where

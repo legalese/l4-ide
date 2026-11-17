@@ -1089,6 +1089,7 @@ A rule that gives back a `DEONTIC` is a contract: it says who must do what by wh
 When its result is the `DEONTIC` itself, it is published as usual, and a request to it sends the events so far and gets back where the contract stands.
 A result that holds a `DEONTIC` inside a `LIST`, a `MAYBE` or an `EITHER`, or names it through a type that you declared as another name for it, cannot be sent yet.
 For a result written with such a name, the error says ``its result is written with `...`, a type name for a DEONTIC``, and the fix is to write the `DEONTIC` type out in the `GIVETH`.
+A rule with no `GIVETH` whose result L4 works out to be such a name gets ``its result is inferred to be `...`, a type name for a DEONTIC``, and the fix is to add a `GIVETH` that writes the `DEONTIC` type out.
 A contract rule that is refused is still evaluated where you write it, so its `#EVAL` and `#EVALTRACE` results still show.
 
 `l4 check` reports the error and fails, with exit status 1, and deploying is refused until you remove the `@export` or change the type.

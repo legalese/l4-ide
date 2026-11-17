@@ -10,7 +10,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
 
 ## What it does
 
-- One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:207`), decides whether a type has a form in JSON, and says why when it has none.
+- One function, `jsonShape` (`jl4-core/src/L4/Export/Shape.hs:215`), decides whether a type has a form in JSON, and says why when it has none.
   The table is the header comment of that module.
   `NUMBER`, `BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, `LIST OF`, `MAYBE`, `EITHER` of two types that have shapes, a record, an enumeration, a synonym and a type with parameters have a shape.
   A function, an `EVENT`, a `DEONTIC`, a type variable and any other built-in type that nobody gave a row have none.
@@ -22,6 +22,7 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
   The test is the one the service uses to decide that a function is a contract, and takes it to its `startTime` and `events` path: a `TyApp` of the `DEONTIC` built-in with two arguments, by unique, so `PROVISION` too.
   It reads the type as written, so a result written with a declared name for a `DEONTIC` (`GIVETH A Duty`, `DECLARE Duty IS A DEONTIC Party Act`) is not a contract to the service: `main` deploys one as a plain function and answers `startTime` with "startTime and events are only valid for functions returning DEONTIC" (measured on 2026-11-15).
   The check refuses it with words of its own, which say to write the `DEONTIC` type out (`contractUnderName`).
+  A rule with no `GIVETH` whose inferred result is such a name is refused alike, and its error says the result "is inferred to be" the name, not "is written with" it, and to add a `GIVETH` (`ResultOrigin`; review of 2026-11-17).
   The service's and `jl4-mlir`'s `isDeonticType` now call it.
   A `DEONTIC` input, and a `DEONTIC` inside a `MAYBE`, a `LIST`, an `EITHER`, a declared synonym, a record's or a constructor's field, or a type's argument, have no shape and are refused, with the code `check/export-deontic-type`.
 - A type with no shape is the error `ExportUnsendable`, ranged at the `@export`, saying which input or the result, what it is, and one line on what to do.
