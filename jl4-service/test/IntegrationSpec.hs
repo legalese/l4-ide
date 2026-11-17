@@ -62,7 +62,7 @@ import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4, deonticActionFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1584,74 +1584,166 @@ spec = describe "integration" do
             ])
         assertSuccess resp \r -> r.presumed `shouldBe` ["is motorway"]
 
-    -- Review F2, 2026-10-03: the wrapper turns an event's party record into
-    -- SOURCE, which since W5 filled a field it left out from its TYPICALLY, under
-    -- "presumption": "hard" as well, and listed it as a default no request could
-    -- supply. The event no longer matched the party it named. An event's record
-    -- is part of the request, so it keeps what it had: every field is written.
-    -- (Card O4, ruled 2026-10-11: the target is to list such a default, and until
-    -- that is built this refusal stays.)
-    it "refuses an event whose record leaves out a defaulted field, in both modes" do
-      withServiceFromSources "ty-event" [("seatbelt.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
-        let driver = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
-            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("drive" :: Text), "at" Aeson..= (0 :: Int)]
-            request presumption party = Aeson.object $
-              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= driver]
-              , "startTime" Aeson..= (0 :: Int)
-              , "events" Aeson..= [event party]
-              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
-            nameOnly = Aeson.object ["name" Aeson..= ("Alice" :: Text)]
-            whole    = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
-            message = "Missing required field 'events[0].party.licence' (Driver)"
-        softGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" nameOnly)
-        expectError softGap message
-        hardGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "hard" nameOnly)
-        expectError hardGap message
-        -- the positive control: the same request with the field written is answered,
-        -- and nothing is presumed
-        written <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" whole)
-        assertSuccess written \r -> r.presumed `shouldBe` []
-        -- the argument's own record is decoded from JSON, where the switch applies:
-        -- soft takes the default, hard refuses it. (Whether `presumed` lists the
-        -- default is not asserted: the deontic machinery reads a party without
-        -- forcing it, the known gap of specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md 4.2.)
-        let argRequest presumption = Aeson.object $
-              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= nameOnly]
-              , "startTime" Aeson..= (0 :: Int)
-              , "events" Aeson..= ([] :: [Aeson.Value])
-              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
-        argSoft <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "soft")
-        assertSuccess argSoft \_ -> pure ()
-        argHard <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "hard")
-        expectError argHard "Missing required field 'driver.licence'"
+    -- Card O4, ruled 2026-10-11, option B. The wrapper turns each event's party
+    -- and action record into SOURCE, which fills a field the record leaves out
+    -- from its TYPICALLY (W5). Until B, the service refused such a request in both
+    -- modes (A: review F2, 2026-10-03; rulings R2-2). B decodes an event's record
+    -- as an argument's is decoded: soft takes the default and lists it in
+    -- `presumed` as `events[0].party.licence`, and hard refuses it, naming the
+    -- same path. A default the answer did not read is not listed, because an
+    -- event the machinery never reached is not read (T6).
+    --
+    -- The ruling's condition 1: three tests, each for a party record, an action
+    -- record and a record nested in a party. Condition 2: the nested record is
+    -- sent constructor-keyed, as clients send it today.
+    describe "an event's record takes a default under soft and is refused under hard (card O4, B)" do
+      let who = "name" Aeson..= ("Alice" :: Text)
+          address fields = Aeson.object ["Address" Aeson..= Aeson.object fields]
+          driverHome home = Aeson.object [who, "zhome" Aeson..= home]
+          zip5 = "zip" Aeson..= (5 :: Int)
+          floor1 = "floor" Aeson..= (1 :: Int)
+          -- a variant is a rule, the request's arguments, and the event it sends
+          -- with the field left out and with it written (the same value as the default)
+          variants =
+            [ ( "a party record", "ty-event-party", deonticFieldDefaultJL4, "seatbelt requirement"
+              , Aeson.object [who, "licence" Aeson..= ("full" :: Text)]
+              , \at -> Aeson.object ["party" Aeson..= Aeson.object [who], "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (at :: Int)]
+              , \at -> Aeson.object ["party" Aeson..= Aeson.object [who, "licence" Aeson..= ("full" :: Text)], "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= at]
+              , "events[0].party.licence" )
+            , ( "an action record", "ty-event-action", deonticActionFieldDefaultJL4, "drive rule"
+              , Aeson.object [who]
+              , \at -> Aeson.object ["party" Aeson..= Aeson.object [who], "action" Aeson..= Aeson.object ["verb" Aeson..= ("drive" :: Text)], "at" Aeson..= at]
+              , \at -> Aeson.object ["party" Aeson..= Aeson.object [who], "action" Aeson..= Aeson.object ["verb" Aeson..= ("drive" :: Text), "mode" Aeson..= ("plain" :: Text)], "at" Aeson..= at]
+              , "events[0].action.mode" )
+            , ( "a record nested in a party record", "ty-event-nested", deonticNestedFieldDefaultJL4, "seatbelt requirement"
+              , driverHome (Aeson.object [zip5, floor1])
+              , \at -> Aeson.object ["party" Aeson..= driverHome (address [zip5]), "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (at :: Int)]
+              , \at -> Aeson.object ["party" Aeson..= driverHome (address [zip5, floor1]), "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= at]
+              , "events[0].party.zhome.Address.floor" )
+            ] :: [(String, Text, Text, Text, Aeson.Value, Int -> Aeson.Value, Int -> Aeson.Value, Text)]
+          eventRequest presumption driver events = Aeson.object $
+            [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= driver]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= (events :: [Aeson.Value])
+            ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+          eventAnswer resp = case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+            Just (SimpleResponse r) | statusCode' resp == 200 -> Right (Map.lookup "value" r.fnResult, r.presumed)
+            Just (SimpleError e) -> Left (prettyEvaluatorError e)
+            _ -> Left (errorMessageOf (responseBody resp))
 
-    -- Review rulings R2-2: the refusal above looked only at the top level of
-    -- an event's record. A record nested in it is generated as source too, so a
-    -- field it left out was filled from its TYPICALLY, in both modes, and the
-    -- event stopped matching its party with status success.
-    it "refuses an event whose nested record leaves out a defaulted field, in both modes" do
-      withServiceFromSources "ty-event-nested" [("seatbelt.l4", deonticNestedFieldDefaultJL4)] \baseUrl mgr -> do
-        let address fields = Aeson.object ["Address" Aeson..= Aeson.object fields]
-            zip5 = "zip" Aeson..= (5 :: Int)
-            floor2 = "floor" Aeson..= (2 :: Int)
-            driverWith home = Aeson.object ["name" Aeson..= ("Alice" :: Text), "zhome" Aeson..= home]
-            -- an argument's record is decoded from plain JSON, an event's is generated
-            -- as source and sent constructor-keyed, the shape the service's answers use
-            plainDriver = driverWith (Aeson.object [zip5, floor2])
-            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (0 :: Int)]
-            request presumption party = Aeson.object $
-              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= plainDriver]
-              , "startTime" Aeson..= (0 :: Int)
-              , "events" Aeson..= [event party]
-              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
-            message = "Missing required field 'events[0].party.zhome.Address.floor' (Address)"
-        softGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5])))
-        expectError softGap message
-        hardGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "hard" (driverWith (address [zip5])))
-        expectError hardGap message
-        -- the positive control: the same request with the nested field written is answered
-        written <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5, floor2])))
-        assertSuccess written \r -> r.presumed `shouldBe` []
+      -- A default the answer read: soft answers as if the field had been written,
+      -- and lists it.
+      forM_ variants \(what, deployId, source, fn, driver, gap, written, path) ->
+        it ("soft takes a default an event's record leaves out and lists it, for " <> what) do
+          withServiceFromSources deployId [("event.l4", source)] \baseUrl mgr -> do
+            viaDefault <- eventAnswer <$> evalFunction baseUrl mgr deployId fn (eventRequest "soft" driver [gap 0])
+            viaWritten <- eventAnswer <$> evalFunction baseUrl mgr deployId fn (eventRequest "soft" driver [written 0])
+            -- the written event is answered, with nothing presumed ...
+            fmap snd viaWritten `shouldBe` Right []
+            -- ... and the one that left the field out gives the same answer, resting on the default
+            fmap fst viaDefault `shouldBe` fmap fst viaWritten
+            fmap snd viaDefault `shouldBe` Right [path]
+
+      -- A default the answer did not read: once the obligation has expired, an
+      -- event after the one that revealed it is never reached, so the field it
+      -- left out took no default that mattered. The revealing event (at 50) is
+      -- not that event: the breach names it, so the answer reads its record
+      -- (`eventParty` in the breach for a party; a breach's normal form forces
+      -- the revealing event's party and action), and a default in it is listed.
+      forM_ variants \(what, deployId, source, fn, driver, gap, written, _) ->
+        it ("lists nothing for an event the machinery never reached, for " <> what) do
+          withServiceFromSources deployId [("event.l4", source)] \baseUrl mgr -> do
+            lateGap <- eventAnswer <$> evalFunction baseUrl mgr deployId fn (eventRequest "soft" driver [written 50, gap 51])
+            lateWritten <- eventAnswer <$> evalFunction baseUrl mgr deployId fn (eventRequest "soft" driver [written 50, written 51])
+            fmap snd lateGap `shouldBe` Right []
+            lateGap `shouldBe` lateWritten
+
+      -- Exactly when read, event by event: the party equality stops at the first
+      -- field that differs, so Bob's event, which leaves the same field out, is
+      -- compared on `name` alone and lists nothing; Alice's event is read, and
+      -- named by its own index. Events that write the same record share one
+      -- default, named by the first event that writes it (assumed, not ruled).
+      it "lists only the event whose record the answer read, by its own index" do
+        withServiceFromSources "ty-event-which" [("event.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
+          let party nm = Aeson.object ["name" Aeson..= (nm :: Text)]
+              event nm at = Aeson.object ["party" Aeson..= party nm, "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (at :: Int)]
+              driver = Aeson.object [who, "licence" Aeson..= ("full" :: Text)]
+          bobFirst <- eventAnswer <$> evalFunction baseUrl mgr "ty-event-which" "seatbelt requirement" (eventRequest "soft" driver [event "Bob" 0, event "Alice" 0])
+          fmap snd bobFirst `shouldBe` Right ["events[1].party.licence"]
+          twice <- eventAnswer <$> evalFunction baseUrl mgr "ty-event-which" "seatbelt requirement" (eventRequest "soft" driver [event "Alice" 0, event "Alice" 0])
+          fmap snd twice `shouldBe` Right ["events[0].party.licence"]
+
+      -- Hard refuses it, naming the path the request wrote, and answers the event
+      -- that writes the field. The argument's own record keeps the switch as before.
+      forM_ variants \(what, deployId, source, fn, driver, gap, written, path) ->
+        it ("hard refuses a field an event's record leaves out, naming its path, for " <> what) do
+          withServiceFromSources deployId [("event.l4", source)] \baseUrl mgr -> do
+            refused <- eventAnswer <$> evalFunction baseUrl mgr deployId fn (eventRequest "hard" driver [gap 0])
+            refused `shouldSatisfy` either (Text.isInfixOf ("Missing required field '" <> path <> "'")) (const False)
+            viaWritten <- eventAnswer <$> evalFunction baseUrl mgr deployId fn (eventRequest "hard" driver [written 0])
+            fmap snd viaWritten `shouldBe` Right []
+
+      -- /evaluation, an MCP call and a batch case all run a DEONTIC function through the
+      -- same wrapper, so the default is taken and listed alike on each.
+      it "lists the default under the same path on /evaluation, on MCP and in a batch" do
+        withServiceFromSources "ty-event-surfaces" [("event.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
+          let driver = Aeson.object [who, "licence" Aeson..= ("full" :: Text)]
+              event = Aeson.object ["party" Aeson..= Aeson.object [who], "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (0 :: Int)]
+              fn = "seatbelt requirement" :: Text
+              rest = eventRequest "soft" driver [event]
+          viaRest <- eventAnswer <$> evalFunction baseUrl mgr "ty-event-surfaces" fn rest
+          viaMcp <- do
+            req <- buildJsonPost (baseUrl <> "/deployments/ty-event-surfaces/.mcp") $ Aeson.object
+              [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int), "method" Aeson..= ("tools/call" :: Text)
+              , "params" Aeson..= Aeson.object [ "name" Aeson..= Text.replace " " "-" fn, "arguments" Aeson..= rest ] ]
+            resp <- httpLbs req mgr
+            pure $ case mcpToolText (responseBody resp) of
+              Just (False, text) | Just r <- Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 text)) -> case r of
+                SimpleResponse a -> Right (Map.lookup "value" a.fnResult, a.presumed)
+                SimpleError e -> Left (prettyEvaluatorError e)
+              Just (_, text) -> Left text
+              Nothing -> Left "not a tool result"
+          viaBatch <- do
+            req <- buildJsonPost
+              (baseUrl <> "/deployments/ty-event-surfaces/functions/seatbelt%20requirement/evaluation/batch")
+              (Aeson.object [ "outcomes" Aeson..= ([] :: [Text])
+                            , "cases" Aeson..= [Aeson.object ["@id" Aeson..= (1 :: Int), "driver" Aeson..= driver, "startTime" Aeson..= (0 :: Int), "events" Aeson..= [event]]] ])
+            resp <- httpLbs req mgr
+            pure $ case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+              Just b | [c] <- b.cases, CaseAnswered <- c.outcome -> Right (Map.lookup "value" c.attributes, c.presumed)
+              Just b | [c] <- b.cases -> Left (Text.pack (show c.outcome))
+              _ -> Left (errorMessageOf (responseBody resp))
+          map (fmap snd) [viaRest, viaMcp, viaBatch] `shouldBe` replicate 3 (Right ["events[0].party.licence"])
+          fmap fst viaMcp `shouldBe` fmap fst viaRest
+          fmap fst viaBatch `shouldBe` fmap fst viaRest
+
+      -- Condition 3 of the ruling: the published schema promises the default of an
+      -- event's record, and B is what makes the promise true. The defaulted field
+      -- is not required and carries `default`, for a party and for an action.
+      it "publishes an event record's defaulted field as optional, with its default" do
+        let at keys v = foldl' (\acc k -> acc >>= \case Aeson.Object o -> Aeson.KeyMap.lookup (Aeson.Key.fromText k) o; _ -> Nothing) (Just v) keys
+            requiredOf = \case
+              Just (Aeson.Array xs) -> Just [ t | Aeson.String t <- toList xs ]
+              _ -> Nothing
+        forM_ [ ("ty-event-schema-party", deonticFieldDefaultJL4, "seatbelt requirement", "party", "licence", Aeson.String "full", ["name"])
+              , ("ty-event-schema-action", deonticActionFieldDefaultJL4, "drive rule", "action", "mode", Aeson.String "plain", ["verb"]) ]
+          \(deployId, source, fn, side, field, deflt, required) ->
+            withServiceFromSources deployId [("event.l4", source)] \baseUrl mgr -> do
+              req <- parseRequest (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack (Text.replace " " "%20" fn))
+              resp <- httpLbs req mgr
+              statusCode' resp `shouldBe` 200
+              let doc = Aeson.decode (responseBody resp) :: Maybe Aeson.Value
+                  record = doc >>= at ["parameters", "properties", "events", "items", "properties", side]
+              (record >>= at ["properties", field, "default"], requiredOf (record >>= at ["required"]))
+                `shouldBe` (Just deflt, Just required)
+
+      it "an argument's own record keeps the switch: soft takes the default, hard refuses it" do
+        withServiceFromSources "ty-event-arg" [("event.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
+          let nameOnly = Aeson.object [who]
+          soft <- eventAnswer <$> evalFunction baseUrl mgr "ty-event-arg" "seatbelt requirement" (eventRequest "soft" nameOnly [])
+          soft `shouldSatisfy` either (const False) (const True)
+          refused <- eventAnswer <$> evalFunction baseUrl mgr "ty-event-arg" "seatbelt requirement" (eventRequest "hard" nameOnly [])
+          refused `shouldSatisfy` either (Text.isInfixOf "Missing required field 'driver.licence'") (const False)
 
     -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
     -- an input or a field left out takes its default, a name that matches

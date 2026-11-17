@@ -7,6 +7,7 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 
 import L4.Annotation
+import L4.Parser.SrcSpan (SrcPos (MkSrcPos), SrcRange (MkSrcRange))
 -- import qualified L4.Evaluate.Value as Eval
 import qualified L4.Evaluate.ValueLazy as Eval
 import qualified L4.EvaluateLazy as Eval
@@ -41,7 +42,7 @@ import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 
 import Backend.Api
-import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..), AnswerShape(..), RequiredInput(..))
+import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..), AnswerShape(..), RequiredInput(..), isRecordLit, eventRecordsIn, eventRecordDefault)
 import L4.Export (AssumeRewrite(..), extractAssumeParamResolveds, rewriteModuleAssumes)
 import L4.Discharge (Binder (..), sectionBinders)
 import L4.Presumption
@@ -1086,7 +1087,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     (inputDefaults compiled.compiledModule compiled.compiledDecide)
     (inputNames compiled.compiledModule compiled.compiledDecide) params
 
-  refuseEventRecordGaps (buildModuleInfo compiled.compiledAllDeclares) mPartyType mActionType traceEvents
+  refuseEventRecordGaps presumption (buildModuleInfo compiled.compiledAllDeclares) mPartyType mActionType traceEvents
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson plan.wpArguments
@@ -1102,49 +1103,99 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
   -- Handle result
   case mEvalRes of
     Nothing -> throwError $ InterpreterError (mconcat errs)
-    Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
+    Just [r@Eval.MkEvalDirectiveResult{result, trace}] -> do
+      listed <- either (throwError . InterpreterError) pure $
+        deonticPresumed plan filepath (wrapperProgram sourceText genCode.generatedWrapper) mPartyType mActionType traceEvents r.presumed
       handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
-        (wrapperPresumed plan r.presumed)
+        listed
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
+-- | 'wrapperPresumed' for a deontic request, where a default an event's party
+-- or action record took is named by the path the request wrote it at (card O4,
+-- ruled 2026-10-11, option B): @events[0].party.licence@,
+-- @events[0].party.zhome.Address.floor@, @events[0].action.mode@.
+--
+-- The wrapper writes each event's record as source
+-- (@`event party 0` MEANS Driver WITH name IS "Alice"@,
+-- 'Backend.CodeGen.prepareEvents'), so a field it leaves out is filled by the
+-- checker from its @TYPICALLY@ (W5), and the evaluator reports it, as every
+-- construction's default, the first time the field is forced
+-- ('Eval.FromNamedApp', with the construction's site). That is exactly when the
+-- answer reads it: the party equality and the action match read an event's
+-- fields through the evaluator (measured), and an event the machinery never
+-- looks at is never forced. A breach that an event revealed carries that
+-- event's party and action, so an answer that names it reads its fields too.
+--
+-- Such an entry is told from a construction of the RULES by its site: in the
+-- evaluated program's own file (not an imported one), on one of the definitions
+-- the wrapper wrote ('Backend.CodeGen.eventRecordDefault'). Every other entry
+-- is listed as 'wrapperPresumed' lists it.
+--
+-- Failures, loud first: a site on one of those definitions whose construction
+-- or field cannot be found in the request is a defect, and the request is
+-- refused naming it ('Left'), never listed under a wrong name. Silent: if the
+-- site's file ever stopped being the one 'evaluateModule' names for
+-- @filepath@, or its line stopped counting from the top of 'wrapperProgram',
+-- every such default would be listed as the rules' own (@WITH Driver: licence@);
+-- the service tests that list @events[0].party.licence@ are what catch that.
+deonticPresumed
+  :: WrapperPlan -> FilePath -> Text -> Maybe Text -> Maybe Text -> [TraceEvent] -> [Eval.Presumed] -> Either Text [Text]
+deonticPresumed plan filepath program mParty mAction events =
+  fmap (nubOrd . catMaybes) . traverse entry
+  where
+    uri = normalizedFilePathToUri (toNormalizedFilePath filepath)
+    programLines = Text.lines program
+    lineAt n = if n < 1 then Nothing else listToMaybe (drop (n - 1) programLines)
+    entry p = case (p.origin, p.path) of
+      (Eval.FromNamedApp _ (Just (MkSrcRange (MkSrcPos siteLine siteColumn) _ _ siteUri)), [field])
+        | siteUri == uri
+        , Just lineText <- lineAt siteLine
+        , Just named <- eventRecordDefault mParty mAction events lineText siteColumn field
+        -> Just <$> named
+      _ -> Right (listToMaybe (wrapperPresumed plan [p]))
+
 -- | Refuse an event whose party or action record leaves out a field that has a
--- @TYPICALLY@ default (W5, T4b; review silent F2, 2026-10-03).
+-- @TYPICALLY@ default, where the default cannot be taken (W5, T4b; card O4,
+-- ruled 2026-10-11, option B).
 --
 -- The wrapper turns each event's record into SOURCE
 -- (@`event party 0` MEANS Driver WITH name IS "Alice"@, 'Backend.CodeGen.prepareEvents'),
 -- and since W5 the checker fills a field a construction leaves out from its
--- @TYPICALLY@. That would make a request's own record take a default the request
--- could have supplied, under @"presumption": "hard"@ as well, and list it as a
--- default "no request could supply": the answer changes (the event no longer
--- matches the party it names) and the switch that exists to withdraw such
--- defaults does nothing. Before W5 the omission failed to check, loudly.
+-- @TYPICALLY@, whatever the presumption. An event's record is part of the
+-- request, so the switch decides, as it does for the arguments' records:
 --
--- So an event's record keeps what it always had: every field is written. A
--- record nested inside it is generated as source too, and is held to the same
--- (review rulings R2-2). The request's arguments are not affected, because
--- their records are decoded from JSON, where the switch applies.
+-- * under @"presumption": "hard"@ every such field is refused here, before
+--   anything is generated, a nested record's included (review rulings R2-2);
 --
--- This is a stop-gap and not T1's reading: T1 says a field absent in JSON takes
--- its default under soft and is refused under hard. Soft cannot take it here
--- yet, because the deontic machinery reads a party without forcing it, so a
--- default taken there would be used and never listed in @presumed@. Card O4
--- (ruled 2026-10-11) makes listing such a default the target and keeps this
--- refusal until it is built. Owed: decode the event records as the arguments
--- are, so that soft takes a default and lists it as @events[0].party.licence@,
--- and hard refuses it.
+-- * under soft the default is taken, and 'deonticPresumed' lists it as the path
+--   the request wrote it at, if the answer read it. Only a record the wrapper
+--   writes inline, inside the @EVENT@ (one in a party or action value that is
+--   not itself an object, 'Backend.CodeGen.isRecordLit'), is still refused:
+--   its default could not be named by its path, and listing it as the rules'
+--   own would be untrue.
+--
+-- Before card O4 was built (option A) this refused such a field in both modes.
 refuseEventRecordGaps
   :: Monad m
-  => ModuleInfo -> Maybe Text -> Maybe Text -> [TraceEvent] -> ExceptT EvaluatorError m ()
-refuseEventRecordGaps mi mParty mAction events =
+  => Presumption -> ModuleInfo -> Maybe Text -> Maybe Text -> [TraceEvent] -> ExceptT EvaluatorError m ()
+refuseEventRecordGaps presumption mi mParty mAction events =
   unless (null gaps) $
     throwError $ InterpreterError $ Text.intercalate "\n"
-      [ "Missing required field '" <> path <> "." <> field <> "' (" <> con <> "): "
-          <> "an event's record is part of the request, so it never takes the field's TYPICALLY default. "
-          <> "Give every field of it."
+      [ "Missing required field '" <> path <> "." <> field <> "' (" <> con <> "): " <> why
       | (path, con, field) <- gaps
       ]
   where
+    soft = presumption == PresumeSoft
+    why
+      | soft =
+          "a record inside an event's party or action that is not itself a record (a list, say) "
+          <> "does not take its fields' TYPICALLY defaults, because presumed could not name the default it took. "
+          <> "Give every field of it."
+      | otherwise =
+          "presumption is hard, so a field an event's record leaves out does not take its TYPICALLY default. "
+          <> "Give every field of it, or leave presumption soft to take the default."
+
     -- constructor name -> its fields that have a TYPICALLY
     defaultedFields :: Map Text [Text]
     defaultedFields = Map.fromList
@@ -1156,37 +1207,11 @@ refuseEventRecordGaps mi mParty mAction events =
       [ (path, con, field)
       | (i, ev) <- zip [0 :: Int ..] events
       , (label, mType, lit) <- [("party", mParty, ev.party), ("action", mAction, ev.action)]
-      , (path, con, given) <- recordsIn ("events[" <> Text.textShow i <> "]." <> label) mType lit
+      , not soft || not (isRecordLit lit)
+      , (path, con, given) <- eventRecordsIn ("events[" <> Text.textShow i <> "]." <> label) mType lit
       , field <- Map.findWithDefault [] con defaultedFields
       , field `notElem` given
       ]
-
-    -- Every record 'Backend.CodeGen.fnLiteralToL4ExprWithType' and
-    -- 'Backend.CodeGen.fnLiteralToL4Expr' turn into @Con WITH field IS value, ...@
-    -- in this literal, with the path the request wrote it at and the fields it
-    -- gives. With the type name known the top level is a record of that type
-    -- (any object); without it, a one-key object whose value is an object names
-    -- the constructor itself.
-    --
-    -- A record INSIDE it is generated as source too, so it fills a field it
-    -- leaves out from the field's TYPICALLY exactly as the top level would
-    -- (review rulings R2-2): the walk follows the codegen's own cases, a
-    -- constructor-keyed object, an array, or a constructor applied to one
-    -- argument, down to the leaves. Below the top level the type name is never
-    -- known, so a nested record is always constructor-keyed.
-    recordsIn :: Text -> Maybe Text -> FnLiteral -> [(Text, Text, [Text])]
-    recordsIn path (Just t) (FnObject fs@(_ : _)) = (path, t, map fst fs) : inFields path fs
-    recordsIn path Nothing  (FnObject [(c, FnObject fs)]) = (path, c, map fst fs) : inFields path fs
-    recordsIn path _        lit = nested path lit
-
-    inFields path fs = concat [ nested (path <> "." <> k) v | (k, v) <- fs ]
-
-    nested :: Text -> FnLiteral -> [(Text, Text, [Text])]
-    nested path = \case
-      FnArray xs -> concat [ nested (path <> "[" <> Text.textShow i <> "]") x | (i, x) <- zip [0 :: Int ..] xs ]
-      FnObject [(c, FnObject fs)] -> (path <> "." <> c, c, map fst fs) : inFields (path <> "." <> c) fs
-      FnObject [(c, v)] -> nested (path <> "." <> c) v
-      _ -> []
 
 -- | Direct AST evaluation (fast path), for a request with no @{}@ in it and
 -- no @null@ the decoder kept as a value ('requiresWrapperEvaluation');
@@ -1425,12 +1450,17 @@ evaluateWrapperInContext presumption filepath wrapperCode sourceText modContext 
   -- Use original source text to preserve layout-sensitive formatting
   -- L4 is layout-sensitive (like Python), so prettyLayout can break indentation
   -- We filter IDE directives (#EVAL, #TRACE, etc.) using text-based filtering
-  let filteredSource = filterIdeDirectivesText sourceText
-      combinedProgram = filteredSource <> wrapperCode
+  let combinedProgram = wrapperProgram sourceText wrapperCode
 
   -- Evaluate the combined program using the original module context
   -- This ensures IMPORT statements can be resolved correctly
   evaluateModule presumption filepath combinedProgram modContext
+
+-- | The program the wrapper path evaluates: the deployed source without its IDE
+-- directives, then the generated wrapper. 'deonticPresumed' reads the lines of
+-- this same text to find a construction by its site.
+wrapperProgram :: Text -> Text -> Text
+wrapperProgram sourceText wrapperCode = filterIdeDirectivesText sourceText <> wrapperCode
 
 -- | Filter IDE directives from source text while preserving layout
 -- Removes lines starting with #EVAL, #TRACE, #EVALTRACE, #ASSERT, #CHECK

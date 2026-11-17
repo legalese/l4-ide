@@ -424,26 +424,28 @@ govern what counts as leaving a fact out:
   no case could have supplied. One that starts `JSONDECODE ` is a usual value
   in a decode the rules made, which may be of text the case sent, so it can be
   a fact that text left out.
-- **An event's record in the decision service is not a place a default can
-  be left out.** When a request for a rule that describes obligations replays
-  events, each event's party or action record has to give every field, whether
-  or not a field has a default, and so does a record nested inside it: the
-  record is part of the request, and the service refuses one that leaves a
-  field out. The schema the service publishes still lists such a field with its
-  default, so a client that reads the schema is told it may leave the field out
-  and is then refused.
+- **An event's record in the decision service takes a default as any other
+  record does.** When a request for a rule that describes obligations replays
+  events, an event's party or action record may leave out a field that has a
+  default. Under `soft` the field takes its default, and the answer lists it
+  under `presumed` by the path the request wrote it at, such as
+  `events[0].party.licence` or, for a record inside the party,
+  `events[0].party.zhome.Address.floor`, but only if the answer actually read
+  it: an event that comes after the one that revealed a missed deadline is never
+  looked at, and lists nothing. Under `hard` the request is refused, naming that
+  path. A verdict can therefore rest on a default the client left out of an
+  event, even when the request states the party in full in its arguments; the
+  list shows it, and does not make it correct. Where two events write the same
+  record they share one default, and the path names the first of them. A record
+  inside a party or action that is not itself a record, such as a list of
+  records, still has to give every field under `soft`.
 
-Two gaps that are known and not closed by this page's behaviour:
+A gap that is known and not closed by this page's behaviour:
 
 - **A default on a record field does not reach the question planner.** The
   planner that orders the questions a user is asked reads the defaults of a
   rule's inputs and of an `ASSUME`, and not those of a record's fields
   (smucclaw/l4-ide#942, open).
-- **An inner `WITH` that overrides a section `GIVEN` runs in a file and fails
-  under `l4 batch`.** `outer MEANS inner PLUS (inner WITH r IS 100)`, where `r` is
-  a section input, evaluates under `l4 run` and fails to type-check under
-  `l4 batch` with "You are giving named inputs to inner … but it is not a
-  function" (smucclaw/l4-ide#1000, open).
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact

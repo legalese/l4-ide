@@ -1071,7 +1071,7 @@ requestPresumed fieldName inputs events =
     -- binder that shares an input's spelling would be listed as that input.
     -- Written @WITH scaled: rate@ (the application, then the input), as a
     -- rules' own decode is written @JSONDECODE T: path@.
-    (FromNamedApp callee, path) ->
+    (FromNamedApp callee _site, path) ->
       Just ("WITH " <> callee <> ": " <> renderPresumedPath path)
     (_, n : rest)
       | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))

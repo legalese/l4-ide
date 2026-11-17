@@ -16,7 +16,8 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Backend.Api (FnLiteral (..), TraceEvent (..), TraceLevel (..))
-import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String, clientName, fnLiteralToL4Expr, fnLiteralToL4ExprWithType, generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode (..), AnswerShape (..), RequiredInput (..))
+import Backend.CodeGen (inputFieldName, transformJsonKeys, escapeAsL4String, clientName, fnLiteralToL4Expr, fnLiteralToL4ExprWithType, generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode (..), AnswerShape (..), RequiredInput (..), eventRecordDefault)
+import Data.List (find)
 import Language.LSP.Protocol.Types (Uri (..), toNormalizedUri)
 import L4.Lexer (TIdentifiers (..), TLiterals (..), TokenType (..), computedPayload, execLexer, showStringLit)
 import L4.TypeCheck.Environment (boolean, date, maybeType, number)
@@ -33,6 +34,30 @@ spec = describe "CodeGen" $ do
     it "is Bare for a deontic function" $
       fmap (.answerShape) (generateDeonticEvalWrapper "f" [] [] [] Map.empty (Aeson.object []) 0 [] Nothing Nothing TraceNone)
         `shouldBe` Right Bare
+
+  -- Card O4 (ruled 2026-10-11, option B): a default an event's record took is
+  -- named by the path the request wrote it at, found from the construction's
+  -- site in the generated wrapper. The line names the record and the column
+  -- picks the construction in it; a " WITH " inside a string is not one.
+  describe "eventRecordDefault" $ do
+    let party = FnObject [("name", FnLitString "A WITH B"), ("zhome", FnObject [("Address", FnObject [("zip", FnLitInt 5)])])]
+        events = [TraceEvent (FnLitString "x") (FnLitString "go") 0, TraceEvent party (FnLitString "go") 1]
+        mLine = case generateDeonticEvalWrapper "f" [] [] [] Map.empty (Aeson.object []) 0 events (Just "Driver") (Just "Act") TraceNone of
+          Right g -> find ("`event party 0` MEANS " `Text.isPrefixOf`) (Text.lines g.generatedWrapper)
+          Left _ -> Nothing
+        columnOf needle l = 1 + Text.length (fst (Text.breakOn needle l))
+        named l needle = eventRecordDefault (Just "Driver") (Just "Act") events l (columnOf needle l)
+    it "names a party's own field and a nested record's field by the first event that writes them" $
+      case mLine of
+        Nothing -> expectationFailure "the wrapper has no `event party 0` definition"
+        Just l -> do
+          named l "Driver WITH" "licence" `shouldBe` Just (Right "events[1].party.licence")
+          named l "`Address` WITH" "floor" `shouldBe` Just (Right "events[1].party.zhome.Address.floor")
+          -- a field the construction writes took no default: a defect, said loudly
+          named l "`Address` WITH" "zip" `shouldSatisfy` maybe False isLeft
+    it "leaves a construction on any other line to the rules" $
+      eventRecordDefault (Just "Driver") Nothing events "`helper` MEANS Driver WITH `name` IS \"A\"" 18 "licence"
+        `shouldBe` Nothing
 
   -- The wrapper unwraps every input that is neither a BOOLEAN nor a MAYBE,
   -- GIVENs before ASSUMEs, and reads a DATE from a string.

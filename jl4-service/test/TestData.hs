@@ -119,6 +119,7 @@ module TestData (
   lineBreakJL4,
   deonticFieldDefaultJL4,
   deonticNestedFieldDefaultJL4,
+  deonticActionFieldDefaultJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -2542,4 +2543,29 @@ GIVETH A PROVISION OF Driver, `Driver Action`
     HENCE
         PARTY driver
         MAY `drive`
+|]
+
+-- | As 'deonticFieldDefaultJL4', with the defaulted field in the ACTION: the
+-- action is a record, and its @mode@ has a @TYPICALLY@. The event's action
+-- record is generated as source like its party (smucclaw/l4-ide O4, card ruled
+-- 2026-10-11).
+deonticActionFieldDefaultJL4 :: Text
+deonticActionFieldDefaultJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+
+DECLARE Act HAS
+    verb IS A STRING
+    mode IS A STRING TYPICALLY "plain"
+
+@export default drive rule
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, Act
+`drive rule` MEANS
+    PARTY driver
+    MUST Act "drive" "plain"
+    WITHIN 1
+    HENCE FULFILLED
+    LEST BREACH
 |]

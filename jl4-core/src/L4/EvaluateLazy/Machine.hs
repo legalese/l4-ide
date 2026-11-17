@@ -518,7 +518,11 @@ data EvalState =
       -- Known gap: a reader that peeks at a thunk without 'evalRef'
       -- ('peekWHNF', 'peekNF'; the deontic machinery's reads of a party) sees
       -- a decoder-filled default, which is a value from birth, without
-      -- reporting it.
+      -- reporting it. Those peeks feed only the deontic log and the wording of
+      -- notes. The reads an answer rests on go through 'evalRef': the
+      -- equality that matches an event's party, the match of its action, and
+      -- the normal form of a breach, which forces the party and action of the
+      -- event that revealed it (measured for card O4, ruled 2026-10-11).
     , recordDefaults :: Map Unique (Map Text (Expr Resolved))
       -- ^ Each record type's field defaults, keyed by the type's 'Unique' and
       -- then by field name, from the @DECLARE@s of the evaluated module and of
@@ -587,11 +591,18 @@ data PresumedOrigin
   | FromDecode !Text
     -- ^ A field of a decode the RULES made, filled the same way; the text is
     -- the type that decode started from.
-  | FromNamedApp !Text
+  | FromNamedApp !Text !(Maybe SrcRange)
     -- ^ An input or field a named application left out and the checker filled
     -- from its @TYPICALLY@ ('DefaultFill'): W4 for a rule's inputs, W5 for a
     -- record's fields. The text is the rule or record constructor the site
-    -- applies. The path is the one input or field.
+    -- applies, and the range is the site itself, the application or the
+    -- construction. The path is the one input or field.
+    --
+    -- The site is what tells two constructions of one record apart, so each
+    -- is reported once, and it is how a caller that generated a construction
+    -- finds it again: the service writes an event's party or action record as
+    -- source, and names a default taken there by the path the request wrote
+    -- it at (card O4, ruled 2026-10-11; 'Backend.Jl4' in jl4-service).
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass NFData
 
@@ -2306,7 +2317,7 @@ forwardExpr env = \ case
             registerPresumable rf MkPresumed
               { path       = [rawNameToText fill.binder]
               , declaredAt = fill.declaredAt
-              , origin     = FromNamedApp (presumedOwner fill.owner)
+              , origin     = FromNamedApp (presumedOwner fill.owner) (rangeOf ann)
               }
         pushFrame (App1 rs expectedType)
         -- Re-enter as a 'Var'. That extra 'ForwardMachine' step is what the
