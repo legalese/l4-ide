@@ -289,6 +289,27 @@ spec = describe "PUT deployment compatibility guard (end-to-end)" do
         notices2 `shouldBe`
           [DefaultChange "smaller" "b" (Aeson.Number 0) (Aeson.Number 1)]
 
+    -- A record held in a list: the input's path spells the list element [], as
+    -- the breaking messages do (and as the deploy sidebar does).
+    it "reports a changed default of a record in a list at a path with [] for the element" do
+      let jobsSrc n = Text.unlines
+            [ "DECLARE Job HAS"
+            , "  retries IS A NUMBER TYPICALLY " <> n
+            , "  label IS A STRING"
+            , ""
+            , "@export default the total of the jobs"
+            , "GIVEN jobs IS A LIST OF Job"
+            , "GIVETH A NUMBER"
+            , "DECIDE total IS 0"
+            ]
+      withService $ \baseUrl mgr -> do
+        deployApplied baseUrl mgr "guard-default-list" Nothing (jobsSrc "3")
+        r <- deployPut baseUrl mgr "guard-default-list" Nothing (jobsSrc "5")
+        (st, notices) <- putJob baseUrl mgr "guard-default-list" =<< mustUpdateId r
+        st `shouldBe` "applied"
+        notices `shouldBe`
+          [DefaultChange "total" "jobs[].retries" (Aeson.Number 3) (Aeson.Number 5)]
+
     it "reports nothing on an upload that changes no default" do
       withService $ \baseUrl mgr -> do
         deployApplied baseUrl mgr "guard-default-same" Nothing smallerDefault1Src
