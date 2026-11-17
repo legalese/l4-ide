@@ -10,6 +10,7 @@ import {
   detectBreakingChanges,
   detectDefaultChanges,
   formatNoticeValue,
+  noticeEnum,
   noticeSummary,
   normalizeNotices,
   reviewDeploy,
@@ -274,6 +275,71 @@ describe('formatNoticeValue', () => {
     expect(formatNoticeValue(false)).toBe('false')
     expect(formatNoticeValue('Red')).toBe('"Red"')
     expect(formatNoticeValue(null)).toBe('nothing')
+  })
+})
+
+describe('formatNoticeValue and an enumerated input', () => {
+  it('spells a constructor bare when the input is an enumeration', () => {
+    expect(formatNoticeValue('Green', ['Green', 'Red'])).toBe('Green')
+  })
+
+  it('still quotes text for an input that is not an enumeration', () => {
+    expect(formatNoticeValue('Green', [])).toBe('"Green"')
+    expect(formatNoticeValue('Green', undefined)).toBe('"Green"')
+  })
+
+  it('leaves numbers, booleans and nothing as they are', () => {
+    expect(formatNoticeValue(3, ['A'])).toBe('3')
+    expect(formatNoticeValue(null, ['A'])).toBe('nothing')
+  })
+})
+
+describe('noticeEnum: the allowed values of the input a notice is about', () => {
+  const schemas = [
+    {
+      name: 'pick colour',
+      parameters: {
+        properties: {
+          c: { type: 'string', enum: ['Green', 'Red'] },
+          cfg: {
+            type: 'object',
+            properties: { shade: { type: 'string', enum: ['Dark', 'Light'] } },
+          },
+          xs: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { tone: { type: 'string', enum: ['Hi', 'Lo'] } },
+            },
+          },
+          n: { type: 'number' },
+        },
+      },
+    },
+  ]
+  const at = (input: string, fn = 'pick colour') => ({
+    kind: 'default-changed' as const,
+    function: fn,
+    input,
+    old: 'x',
+    new: 'y',
+  })
+
+  it('finds a rule input, a record field, and a field of a list element', () => {
+    expect(noticeEnum(schemas, at('c'))).toEqual(['Green', 'Red'])
+    expect(noticeEnum(schemas, at('cfg.shade'))).toEqual(['Dark', 'Light'])
+    expect(noticeEnum(schemas, at('xs[].tone'))).toEqual(['Hi', 'Lo'])
+  })
+
+  it('finds nothing for an input that is not an enumeration, or is not there', () => {
+    expect(noticeEnum(schemas, at('n'))).toBeUndefined()
+    expect(noticeEnum(schemas, at('missing'))).toBeUndefined()
+    expect(noticeEnum(schemas, at('c', 'other rule'))).toBeUndefined()
+    expect(noticeEnum([], at('c'))).toBeUndefined()
+  })
+
+  it('does not read an inherited name as an input', () => {
+    expect(noticeEnum(schemas, at('toString'))).toBeUndefined()
   })
 })
 

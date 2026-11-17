@@ -17,8 +17,11 @@ const n = (
 })
 
 // The text a reader gets, without the markup.
-const text = (items: DefaultChangeNotice[]) =>
-  render(DefaultNotices, { props: { items } })
+const text = (
+  items: DefaultChangeNotice[],
+  schemas?: { name: string; parameters?: unknown }[]
+) =>
+  render(DefaultNotices, { props: { items, schemas } })
     .body.replace(/<!--.*?-->/g, '')
     .replace(/<\/li>/g, ' ')
     .replace(/<[^>]+>/g, '')
@@ -53,5 +56,19 @@ describe('DefaultNotices', () => {
 
   it('lists nothing for no notices', () => {
     expect(text([])).toBe('')
+  })
+
+  it("spells an enumerated input's constructors bare, as the card does, when it has the schema", () => {
+    const schemas = [
+      {
+        name: 'pick colour',
+        parameters: {
+          properties: { c: { type: 'string', enum: ['Green', 'Red'] } },
+        },
+      },
+    ]
+    expect(text([n('pick colour', 'c', 'Green', 'Red')], schemas)).toBe(
+      'pick colour · c · typically Green → Red: callers who leave c out will get different answers.'
+    )
   })
 })

@@ -1,13 +1,21 @@
 <script lang="ts">
   import type { DefaultChangeNotice } from 'jl4-client-rpc'
-  import { formatNoticeValue } from '$lib/deploy-compat'
+  import { formatNoticeValue, noticeEnum } from '$lib/deploy-compat'
 
   // The inputs whose default a redeploy changes: one line per input, as
   // "rule · input · typically old → new: callers who leave input out will get
   // different answers." Shown in the deploy
   // review (before the deploy) and on the Deployments tab (after it, from the
   // service's report). Informational: nothing here blocks a deploy.
-  let { items }: { items: DefaultChangeNotice[] } = $props()
+  let {
+    items,
+    schemas = [],
+  }: {
+    items: DefaultChangeNotice[]
+    /** The rules' schemas, so that an enumerated input's constructors are
+     *  spelled bare, as on the card. Without them, text is quoted. */
+    schemas?: ReadonlyArray<{ name: string; parameters?: unknown }>
+  } = $props()
 </script>
 
 <ul class="notice-list">
@@ -15,9 +23,13 @@
     <li>
       <span class="ident">{n.function}</span> &middot;
       <span class="ident">{n.input}</span> &middot; typically
-      <span class="value">{formatNoticeValue(n.old)}</span>
+      <span class="value"
+        >{formatNoticeValue(n.old, noticeEnum(schemas, n))}</span
+      >
       &rarr;
-      <span class="value">{formatNoticeValue(n.new)}</span>: callers who leave
+      <span class="value"
+        >{formatNoticeValue(n.new, noticeEnum(schemas, n))}</span
+      >: callers who leave
       <span class="ident">{n.input}</span> out will get different answers.
     </li>
   {/each}

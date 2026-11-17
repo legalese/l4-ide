@@ -2022,7 +2022,7 @@
                   <p class="warning-desc">
                     These defaults also change. That does not block the deploy:
                   </p>
-                  <DefaultNotices items={defaultNotices} />
+                  <DefaultNotices items={defaultNotices} schemas={functions} />
                 {/if}
               </div>
             </div>
@@ -2041,7 +2041,7 @@
                   > changes the default of an input. A caller who leaves such an
                   input out will now get the new value. This does not block the deploy.
                 </p>
-                <DefaultNotices items={defaultNotices} />
+                <DefaultNotices items={defaultNotices} schemas={functions} />
                 <p class="warning-desc">Press Deploy Now to go ahead.</p>
               </div>
             </div>

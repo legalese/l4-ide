@@ -484,10 +484,41 @@ export function reviewDeploy(
   return { step, breaking, notices }
 }
 
-/** A default as the review lists it. Text is quoted (the notice does not
- *  say whether the input is an enumeration), NOTHING reads "empty". */
-export function formatNoticeValue(value: unknown): string {
-  return describeDefault({ default: value }) ?? ''
+/**
+ * A default as the review lists it, spelled as the rule card spells it: text is
+ * quoted, a constructor of an enumerated input is bare (pass the input's
+ * allowed values, from {@link noticeEnum}), and NOTHING reads "nothing". A
+ * notice carries only the value, not the input's type, so without the allowed
+ * values a constructor is quoted like any other text.
+ */
+export function formatNoticeValue(
+  value: unknown,
+  enumValues?: string[]
+): string {
+  return describeDefault({ default: value, enum: enumValues }) ?? ''
+}
+
+/**
+ * The allowed values of the input a notice is about, when it is an
+ * enumeration, read from the schemas of the rules (`input` is the dotted path,
+ * `xs[].n` for a field of a list's elements). `undefined` when the rule or the
+ * input is not found or is not an enumeration.
+ */
+export function noticeEnum(
+  schemas: ReadonlyArray<{ name: string; parameters?: unknown }>,
+  notice: DefaultChangeNotice
+): string[] | undefined {
+  const rule = schemas.find((f) => f.name === notice.function)
+  let node = rule?.parameters as SchemaNode | undefined
+  for (const segment of notice.input.split('.')) {
+    const key = segment.replace(/(\[\])+$/, '')
+    const lists = (segment.length - key.length) / 2
+    if (!node?.properties || !hasOwn(node.properties, key)) return undefined
+    node = node.properties[key]
+    for (let i = 0; i < lists; i++) node = node?.items
+  }
+  const values = node?.enum
+  return values && values.length > 0 ? values : undefined
 }
 
 /** "2 defaults changed", for a notification; "" when none. */
