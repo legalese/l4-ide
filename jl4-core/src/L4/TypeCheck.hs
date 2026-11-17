@@ -2599,7 +2599,7 @@ data BodyRead
 bodyRead :: Expr Resolved -> BodyRead
 bodyRead = \ case
   App _ _ args@(_ : _) -> ReadsArgs args                           -- applied / positional record
-  AppNamed _ _ nes _   -> ReadsArgs [ a | MkNamedExpr _ _ a <- nes ]
+  AppNamed _ _ nes mo  -> ReadsArgs (declaredOrderArgs nes mo)
   App _ f []           -> ReadsName f                              -- a bare name: resolve its body
   _                    -> ReadsNothing
 
@@ -3455,6 +3455,24 @@ subjectOfActionExpr partyT = go (0 :: Int)
             use #constBodies >>= \ bodies ->
               maybe (pure Nothing) (go (depth + 1)) (Map.lookup (getUnique f) bodies)
           ReadsNothing   -> pure Nothing
+
+-- | The arguments of a named application, in the order of the callee's declared
+-- parameters (the type checker's @order@ list), not in the order they were
+-- written.
+--
+-- \"Positional\" in 'subjectField' means the declared order, and a named site
+-- does not have to write its arguments in it: @Msg WITH recipient IS Bob, sender IS Alice@
+-- is the same record as @Msg OF Alice, Bob@. Reading the list as it was
+-- written made the performer whichever party-typed field the writer put first.
+--
+-- An entry for a section binder the site overrides (a negative index, see
+-- 'implicitSupplyIndex') is not a field of the callee and is left out. With no
+-- order recorded, the written order stands.
+declaredOrderArgs :: [NamedExpr Resolved] -> Maybe [Int] -> [Expr Resolved]
+declaredOrderArgs nes = \ case
+  Just order | length order == length nes ->
+    map snd (sortOn fst [ (i, a) | (i, MkNamedExpr _ _ a) <- zip order nes, i >= 0 ])
+  _ -> [ a | MkNamedExpr _ _ a <- nes ]
 
 -- | Recover an action /expression/ from a regulative action pattern: a bare
 -- pinned action name (already turned into a value reference by the pattern

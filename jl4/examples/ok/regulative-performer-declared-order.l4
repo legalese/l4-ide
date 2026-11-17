@@ -1,0 +1,30 @@
+-- Who performs an action is read from its record in the order the record
+-- DECLARES its fields: the subject-first canon (see regulative-actor-duplex.l4).
+-- A named construction does not have to write its fields in that order, so the
+-- performer is the party in the FIRST DECLARED party field, whatever was written
+-- first.
+--
+-- Here `sender` is declared first, so Bob performs `reordered` although
+-- `recipient IS Alice` is written before `sender IS Bob`. The same record given
+-- by position, `Msg OF Bob, Alice, "yo"`, has always been performed by Bob.
+-- The mirror image, each action under the other party, is in
+-- not-ok/tc/regulative-performer-declared-order.l4.
+
+DECLARE Person IS ONE OF Alice, Bob
+
+DECLARE Msg HAS
+    sender    IS A Person
+    recipient IS A Person
+    body      IS A STRING
+
+GIVETH A Msg
+reordered MEANS Msg WITH recipient IS Alice, sender IS Bob, body IS "yo"
+
+GIVETH A Msg
+positional MEANS Msg OF Bob, Alice, "yo"
+
+GIVETH A PROVISION OF Person, Msg
+fromReordered MEANS PARTY Bob MUST reordered WITHIN 1
+
+GIVETH A PROVISION OF Person, Msg
+fromPositional MEANS PARTY Bob MUST positional WITHIN 1

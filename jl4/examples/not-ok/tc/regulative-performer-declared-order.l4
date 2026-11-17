@@ -1,0 +1,17 @@
+-- The mirror image of ok/regulative-performer-declared-order.l4: the performer
+-- of an action is the party in the first DECLARED party field of its record, so
+-- an obligation that names the other party is an error. `reordered` writes
+-- `recipient IS Alice` before `sender IS Bob`, and Bob performs it.
+
+DECLARE Person IS ONE OF Alice, Bob
+
+DECLARE Msg HAS
+    sender    IS A Person
+    recipient IS A Person
+    body      IS A STRING
+
+GIVETH A Msg
+reordered MEANS Msg WITH recipient IS Alice, sender IS Bob, body IS "yo"
+
+GIVETH A PROVISION OF Person, Msg
+fromReordered MEANS PARTY Alice MUST reordered WITHIN 1      -- performed by Bob, not by Alice
