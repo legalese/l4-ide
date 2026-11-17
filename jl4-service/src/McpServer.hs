@@ -413,10 +413,12 @@ fileToolDefinitions =
     ]
   ]
 
--- | Sanitize a name for use as a tool name. Allowed chars match
--- Anthropic's tool-name regex `^[a-zA-Z0-9_-]{1,64}$` exactly — no
--- dots, even though MCP spec is more permissive. Dots in the source
--- name are remapped to hyphens.
+-- | Sanitize a name for use as a tool name. Allowed chars are what
+-- 'isAlphaNum' allows (any Unicode letter or number), @_@ and @-@, which is
+-- wider than Anthropic's tool-name regex `^[a-zA-Z0-9_-]{1,64}$` for a name with
+-- a non-ASCII letter — no dots, even though MCP spec is more permissive. Dots in
+-- the source name are remapped to hyphens. A name may start with a digit here;
+-- the WebMCP script gives such a name a leading @_@.
 sanitizeName :: Int -> Text -> Text
 sanitizeName maxLen name =
   let s = Text.map (\c -> if isAlphaNum c || c == '_' || c == '-' then c else '-') name

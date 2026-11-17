@@ -171,9 +171,12 @@ encodeMetadataCache meta =
 
 -- | Raw property name sanitization: replaces special characters with hyphens
 -- and collapses consecutive hyphens. Does NOT truncate.
--- Preserves alphanumeric, underscore, and hyphen — matches Anthropic's
--- tool/property name regex `^[a-zA-Z0-9_-]{1,64}$` (no dots allowed,
--- even though MCP spec is more permissive).
+-- Preserves what 'isAlphaNum' preserves (any Unicode letter or number),
+-- underscore, and hyphen; dots are replaced, though the MCP spec allows them.
+-- That is wider than Anthropic's tool/property name regex
+-- `^[a-zA-Z0-9_-]{1,64}$`, which a name with a non-ASCII letter does not match.
+-- The WebMCP script's sanitiser keeps the same set (the tables of the engine
+-- decide what a letter is, and they are not the same in GHC and in a browser).
 -- Used for structural collision detection (so "foo bar" vs "foo-bar" still collide).
 sanitizePropertyNameRaw :: Text -> Text
 sanitizePropertyNameRaw name =
