@@ -274,6 +274,21 @@ spec = describe "PUT deployment compatibility guard (end-to-end)" do
         -- nothing was applied: the old default still serves
         smallerOf baseUrl mgr "guard-default-break" ["z" Aeson..= (9 :: Int)] 5 `shouldReturnResult` FnLitInt 0
 
+    -- The ungated POST that overwrites a deployment (the sidebar's "Deploy
+    -- Anyway", `l4 redeploy --force`) reports too; a brand-new one has no
+    -- previous interface to compare with.
+    it "reports a changed default on an overwriting POST, and none on a new deployment" do
+      withService $ \baseUrl mgr -> do
+        r1 <- deployPost baseUrl mgr "guard-default-post" Nothing smallerDefault0Src
+        (st1, notices1) <- putJob baseUrl mgr "guard-default-post" =<< mustUpdateId r1
+        (st1, notices1) `shouldBe` ("applied", [])
+        r2 <- deployPost baseUrl mgr "guard-default-post" Nothing smallerDefault1Src
+        statusCode' r2 `shouldBe` 202
+        (st2, notices2) <- putJob baseUrl mgr "guard-default-post" =<< mustUpdateId r2
+        st2 `shouldBe` "applied"
+        notices2 `shouldBe`
+          [DefaultChange "smaller" "b" (Aeson.Number 0) (Aeson.Number 1)]
+
     it "reports nothing on an upload that changes no default" do
       withService $ \baseUrl mgr -> do
         deployApplied baseUrl mgr "guard-default-same" Nothing smallerDefault1Src

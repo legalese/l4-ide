@@ -21,9 +21,9 @@ import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
 
 import L4.FunctionSchema (Parameter (..), Parameters (..))
-import Compatibility (FnIface (..), detectBreakingChanges, detectDefaultChanges)
+import Compatibility (FnIface (..), detectBreakingChanges, detectDefaultChanges, ifaceFromSummary)
 import ControlPlane (nextDeploymentVersion, parseVersionCounts)
-import Types (DefaultChange (..))
+import Types (DefaultChange (..), FunctionSummary (..))
 
 ------------------------------------------------------------------------
 -- Builders
@@ -308,6 +308,21 @@ defaultChangesSpec = describe "Compatibility.detectDefaultChanges" do
           new = ifaceWith [("m", withDefault (Aeson.Number 1) (prim "number"))]
       detectDefaultChanges [old] [new]
         `shouldBe` [DefaultChange "f" "m" Aeson.Null (Aeson.Number 1)]
+
+    -- A deployment restarted and not yet compiled is compared from its cached
+    -- metadata, which is JSON: the default NOTHING is `"default": null` there.
+    it "reports a change from NOTHING read back from the metadata cache" do
+      let summary = FunctionSummary "f" "" (ps [("m", withDefault Aeson.Null (prim "number"))] []) "BOOLEAN" Nothing Nothing False Nothing
+          cached = Aeson.decode (Aeson.encode summary) :: Maybe FunctionSummary
+          new = ifaceWith [("m", withDefault (Aeson.Number 1) (prim "number"))]
+      fmap (\c -> detectDefaultChanges [ifaceFromSummary c] [new]) cached
+        `shouldBe` Just [DefaultChange "f" "m" Aeson.Null (Aeson.Number 1)]
+
+    it "treats a cached summary with no default key as unknown, not as a change" do
+      let summary = FunctionSummary "f" "" (ps [("m", prim "number")] []) "BOOLEAN" Nothing Nothing False Nothing
+          cached = Aeson.decode (Aeson.encode summary) :: Maybe FunctionSummary
+          new = ifaceWith [("m", withDefault (Aeson.Number 1) (prim "number"))]
+      fmap (\c -> detectDefaultChanges [ifaceFromSummary c] [new]) cached `shouldBe` Just []
 
     it "reports a changed default inside a record held in a list, by its path" do
       let rec d = arrP (objP [("retries", withDefault (Aeson.Number d) (prim "number"))] [])
