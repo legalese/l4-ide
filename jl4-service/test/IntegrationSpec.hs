@@ -4266,6 +4266,19 @@ spec = describe "integration" do
               , "startTime" Aeson..= (0 :: Int)
               , "events" Aeson..= [event]
               ]
+            -- Under "hard" the arguments may not leave a default out either, so they
+            -- write every field; only the event is under test.
+            requestHard event = Aeson.object
+              [ "arguments" Aeson..= Aeson.object
+                  [ "driver" Aeson..= Aeson.object
+                      [ "name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("full" :: Text)
+                      , "zhome" Aeson..= Aeson.object ["zip" Aeson..= (5 :: Int), "floor" Aeson..= (1 :: Int)] ]
+                  , "note" Aeson..= Aeson.object ["body" Aeson..= ("hi" :: Text), "channel" Aeson..= ("email" :: Text)]
+                  ]
+              , "startTime" Aeson..= (0 :: Int)
+              , "presumption" Aeson..= ("hard" :: Text)
+              , "events" Aeson..= [event]
+              ]
             -- The example is the schema's own: every required field, the nested record
             -- under its name. Its values are the arguments' (the defaults the arguments
             -- took, "full", 1 and "email", written out), so that the event is the
@@ -4287,6 +4300,14 @@ spec = describe "integration" do
         forM_ [["party", "licence"], ["action", "channel"], ["party", "zhome", "Address", "floor"], ["party", "name"]] \path -> do
           refused <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (request (deleteAt path written))
           (path, statusCode' refused) `shouldBe` (path, 422)
+        -- and under "presumption": "hard" the same event is answered, and the same
+        -- omissions are refused: a field that has a default is not taken for the event
+        -- in either mode, so the schema's "required" is true in both
+        answeredHard <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (requestHard written)
+        assertSuccess answeredHard \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitString "FULFILLED")
+        forM_ [["party", "licence"], ["action", "channel"], ["party", "zhome", "Address", "floor"], ["party", "name"]] \path -> do
+          refused <- evalFunction baseUrl mgr "ev-schema-wire" "seatbelt requirement" (requestHard (deleteAt path written))
+          (path, "hard" :: Text, statusCode' refused) `shouldBe` (path, "hard", 422)
 
     -- Review finding 2: a party that is a LIST of records is an array, and the
     -- records in it are written like a record in any other list.
