@@ -18,9 +18,10 @@ import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
 import L4.FunctionSchema (Parameters (..))
 import DeonticTrace (isDeonticFunction, isStrayArgumentsField, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
-import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, presumptionKey, presumptionSchema, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
+import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, presumptionKey, presumptionSchema, presumptionCollision, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
 import Types
 
+import Control.Monad (forM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (asks, ask)
 import Control.Monad.Trans.Except (runExceptT)
@@ -268,6 +269,20 @@ buildToolList vis mScope = do
       let versionByDep = Map.fromList
             [ (d, m.metaDeploymentVersion) | (d, m) <- metas ]
           toolNames = buildToolNames entries
+      -- A flat tool whose rule has an input named like the reserved
+      -- @presumption@ key is not listed (U3 option A, 2026-11-17).
+      env <- ask
+      listable <- fmap concat $ forM toolNames \t@(tn, deployId, fn) ->
+        case presumptionCollision fn.fsParameters of
+          Just input | not fn.fsIsDeontic -> do
+            liftIO $ logWarn env.logger "MCP tool not listed: an input is named like the reserved presumption key"
+              [ ("toolName", Aeson.toJSON tn)
+              , ("deploymentId", Aeson.toJSON deployId)
+              , ("functionName", Aeson.toJSON fn.fsName)
+              , ("input", Aeson.toJSON input)
+              ]
+            pure []
+          _ -> pure [t]
       pure [ Aeson.object $
         [ "name" .= tn
         , "description" .= ("L4 Rule: " <> fn.fsDescription <> " [" <> deployId <> "/" <> fn.fsName <> "]")
@@ -276,7 +291,7 @@ buildToolList vis mScope = do
         <> case Map.lookup deployId versionByDep of
              Just v | not (Text.null v) -> ["_meta" .= Aeson.object ["version" .= v]]
              _                          -> []
-        | (tn, deployId, fn) <- toolNames
+        | (tn, deployId, fn) <- listable
         ]
     else pure []
 
@@ -489,9 +504,11 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
       -- for: a call that cannot be honoured is not queued as a task.
       let refuse msg = pure $ evalResultToToolResponse reqId reverseMap
             (Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError msg))))
-      case buildMcpCall reverseMap params isDeontic arguments of
-        Left msg -> refuse msg
-        Right call -> do
+      case (presumptionCollision params, buildMcpCall reverseMap params isDeontic arguments) of
+        (Just input, _) | not isDeontic || not (hasArgumentsObject arguments) ->
+          refuse (presumptionCollisionMessage input)
+        (_, Left msg) -> refuse msg
+        (_, Right call) -> do
           let did = DeploymentId deployId
           compResult <- tryCompileWithTimeout did 2_000_000
           case compResult of
@@ -514,6 +531,24 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
               -- to compile" — this code is in the JSON-RPC server-error band
               -- and has no protocol meaning attached to it.
               pure $ jsonRpcError reqId (-32000) ("Deployment failed: " <> err)
+
+-- | Whether a call carries an @arguments@ object, the shape in which a DEONTIC
+-- tool reads its inputs and 'presumptionKey' is a sibling of them.
+hasArgumentsObject :: Aeson.Value -> Bool
+hasArgumentsObject = \case
+  Aeson.Object obj | Just (Aeson.Object _) <- Aeson.KeyMap.lookup "arguments" obj -> True
+  _ -> False
+
+-- | Why a call to a rule with an input named like the reserved key is refused.
+-- Where the key would be read as the switch, the input of that name could
+-- never be given, and where it would be read as the input, a request for
+-- @"hard"@ would be answered softly with no error; so neither is done.
+presumptionCollisionMessage :: Text -> Text
+presumptionCollisionMessage input =
+  "This rule cannot be called through MCP: it has an input named '" <> input
+    <> "', which is the name MCP reserves for the presumption switch (\"soft\" or \"hard\"), "
+    <> "so the switch could be mistaken for the input or the input for the switch. "
+    <> "Rename the input in the rule, or call the rule over HTTP, where the inputs are nested under \"arguments\"."
 
 -- | What a @tools/call@ carries once its arguments are split: the function's
 -- inputs, and the trace fields a DEONTIC export is replayed against.

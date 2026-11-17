@@ -49,6 +49,7 @@ Every rule's tool advertises `presumption` in its input schema, so an agent find
 What this covers, and what it does not:
 
 - It is read by the tool of each rule: on the one-deployment server above, on a jl4-service you run yourself, and in the WebMCP script's tools. The all-deployments server's `evaluate` tool is run by Legalese Cloud, and its own schema (from `get_schema`) says what it accepts.
+- A rule with an input called `presumption` cannot be offered as a tool, because the argument would be taken for the input or the input for the argument. The server leaves that rule's tool out of its list, and a call to it is refused and names the input. Rename the input in the rule, or call the rule through the [REST API](openapi-spec.md), where the inputs are nested inside `arguments`.
 
 ### Tool names in WebMCP
 

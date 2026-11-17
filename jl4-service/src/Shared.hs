@@ -20,6 +20,7 @@ module Shared (
   -- * The reserved presumption argument (MCP and WebMCP)
   presumptionKey,
   presumptionSchema,
+  presumptionCollision,
   buildPropertyReverseMap,
   remapFnLiteralKeys,
   remapTraceKeys,
@@ -50,6 +51,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Char (isAlphaNum)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -287,6 +289,15 @@ presumptionSchema = Aeson.object
       , "Send \"hard\" when the answer must rest only on what you were told."
       ] :: Text)
   ]
+
+-- | The input of a rule whose name, as @tools/list@ advertises it, is
+-- 'presumptionKey': the name the switch would be shadowed by. Tested on the
+-- sanitized name (the one a client sends), so @presumption@ and a name that
+-- sanitizes to it, such as @presumption@ with a trailing space, both match.
+presumptionCollision :: Parameters -> Maybe Text
+presumptionCollision (MkParameters props _) =
+  Maybe.listToMaybe
+    [ orig | (orig, san) <- Map.toList (sanitizePropertyNames (Map.keys props)), san == presumptionKey ]
 
 -- | Build a reverse mapping from sanitized property names back to original L4 names.
 -- Recursively includes entries from nested object properties and array items,

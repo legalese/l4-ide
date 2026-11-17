@@ -4404,6 +4404,15 @@ spec = describe "integration" do
           Left msg -> (what :: String, needle `Text.isInfixOf` msg) `shouldBe` (what, True)
           Right r -> expectationFailure (what <> " was answered, not refused: " <> show r.fnResult)
         presumedOf = fmap (\r -> (Map.lookup "value" r.fnResult, r.presumed))
+        -- a rule whose input is named like the reserved key, flat and DEONTIC
+        namedInputFlat = [("named.l4", Text.unlines
+          [ "@export default may proceed"
+          , "GIVEN presumption IS A BOOLEAN"
+          , "      `other flag` IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "`may proceed` MEANS presumption AND `other flag`"
+          ])]
+        namedInputDeontic = [("named.l4", Text.replace "`is motorway`" "presumption" deonticDefaultJL4)]
         seatbelt extra = Aeson.object $
           [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
           , "startTime" Aeson..= (0 :: Int)
@@ -4489,6 +4498,43 @@ spec = describe "integration" do
           (Aeson.object (hardArg : capacityInputs))
         either (Text.isInfixOf "missing required parameter") (const False) hardAnswer `shouldBe` True
 
+    describe "a rule with an input named presumption" do
+      it "is not listed as a flat tool, and a call to it is refused naming the input" do
+        withServiceFromSources "mcp-clash" namedInputFlat \baseUrl mgr -> do
+          schema <- mcpToolInputSchema baseUrl mgr "mcp-clash" "may proceed"
+          schema `shouldBe` Nothing
+          answer <- asked baseUrl mgr "mcp-clash" "may proceed" ["presumption" Aeson..= True, "other flag" Aeson..= True]
+          refusedWith "flat" answer "an input named 'presumption'"
+          -- the other tools of the deployment are not taken down with it
+          other <- mcpToolInputSchema baseUrl mgr "mcp-clash" "list_files"
+          other `shouldSatisfy` Maybe.isJust
+
+      it "is still answered over REST, where the inputs are nested" do
+        withServiceFromSources "mcp-clash-rest" namedInputFlat \baseUrl mgr -> do
+          viaRest <- askRest baseUrl mgr "mcp-clash-rest" "may proceed" ["presumption" Aeson..= True, "other flag" Aeson..= True] []
+          fmap (Map.lookup "value") viaRest `shouldBe` Right (Just (FnLitBool True))
+
+      it "is listed as a DEONTIC tool: the inputs are nested, the switch is a sibling of them" do
+        withServiceFromSources "mcp-clash-deontic" namedInputDeontic \baseUrl mgr -> do
+          schema <- mcpToolInputSchema baseUrl mgr "mcp-clash-deontic" "seatbelt requirement"
+          fmap schemaProperties schema `shouldBe` Just ["arguments", "events", "presumption", "startTime"]
+          -- the input of that name goes inside "arguments", the switch beside it
+          answered <- askMcpFull baseUrl mgr "mcp-clash-deontic" "seatbelt requirement" $ Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+                , "presumption" Aeson..= False ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            , hardArg ]
+          fmap (.presumed) answered `shouldBe` Right []
+          -- a call with no "arguments" cannot say which is which, and is refused
+          flat <- askMcpFull baseUrl mgr "mcp-clash-deontic" "seatbelt requirement" $ Aeson.object
+            [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+            , "presumption" Aeson..= False
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value]) ]
+          refusedWith "flat DEONTIC" flat "an input named 'presumption'"
+
     -- WebMCP builds a second copy of the tool surface in a script. The page is
     -- a script in a string: this reads it, it does not run it.
     describe "the WebMCP script" do
@@ -4507,8 +4553,9 @@ spec = describe "integration" do
         occurrences "body[presumptionKey] = args[presumptionKey]" `shouldBe` 2
       it "refuses a value that is not soft or hard before posting it, in both tools that post" do
         occurrences "presumptionRefusal(args[presumptionKey])" `shouldBe` 2
-      it "keeps the key out of the inputs it remaps" do
+      it "keeps the key out of the inputs it remaps, and skips a rule that has an input of that name" do
         ("delete flatArgs[presumptionKey]" `Text.isInfixOf` script) `shouldBe` True
+        ("hasOwnProperty.call(sanitized.schema.properties || {}, presumptionKey)" `Text.isInfixOf` script) `shouldBe` True
 
   describe "deployments query params" do
     it "?functions=full includes parameters in listing" do
