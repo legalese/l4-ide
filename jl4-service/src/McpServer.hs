@@ -165,6 +165,7 @@ handleMethod vis mScope reqId "tools/call" params = do
           pure $ jsonRpcError reqId (-32602) "Missing 'name' in params"
         Just toolName -> do
           callTool vis mScope reqId toolName tasksRequested
+                   (misplacedPresumption obj)
                    (Maybe.fromMaybe (Aeson.object []) mArguments)
     _ ->
       pure $ jsonRpcError reqId (-32602) "Invalid params for tools/call"
@@ -463,22 +464,22 @@ findUniquePrefix dep others = go 1
 -- tools/call dispatch
 -- ----------------------------------------------------------------------------
 
-callTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Aeson.Value -> AppM Aeson.Value
-callTool vis mScope reqId toolName tasksRequested arguments = do
+callTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Bool -> Aeson.Value -> AppM Aeson.Value
+callTool vis mScope reqId toolName tasksRequested presumptionBesideArguments arguments = do
   case toolName of
     "list_files" | vis.showFiles -> callListFiles reqId arguments
     "read_file" | vis.showFiles -> callReadFile reqId arguments
     "search_identifier" | vis.showFiles -> callSearchIdentifier reqId arguments
     "search_text" | vis.showFiles -> callSearchText reqId arguments
-    _ -> callFunctionTool vis mScope reqId toolName tasksRequested arguments
+    _ -> callFunctionTool vis mScope reqId toolName tasksRequested presumptionBesideArguments arguments
 
 -- | Execute a function evaluation tool call.
 -- When the deployment is still compiling AND the client opted in to the
 -- Tasks extension via _meta, we return a task handle and continue work
 -- in the background. Otherwise we fall back to the legacy synchronous
 -- "{status:'compiling'}" text payload that 2025-era clients understand.
-callFunctionTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Aeson.Value -> AppM Aeson.Value
-callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
+callFunctionTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Bool -> Aeson.Value -> AppM Aeson.Value
+callFunctionTool _vis mScope reqId toolName tasksRequested presumptionBesideArguments arguments = do
   env <- ask
   entries <- collectMetadataEntries mScope
   let toolMap = Map.fromList
@@ -505,6 +506,7 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
       let refuse msg = pure $ evalResultToToolResponse reqId reverseMap
             (Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError msg))))
       case (presumptionCollision params, buildMcpCall reverseMap params isDeontic arguments) of
+        _ | presumptionBesideArguments -> refuse (presumptionBesideArgumentsMessage isDeontic)
         (Just input, _) | not isDeontic || not (hasArgumentsObject arguments) ->
           refuse (presumptionCollisionMessage input)
         (_, Left msg) -> refuse msg
@@ -531,6 +533,35 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
               -- to compile" — this code is in the JSON-RPC server-error band
               -- and has no protocol meaning attached to it.
               pure $ jsonRpcError reqId (-32000) ("Deployment failed: " <> err)
+
+-- | Whether a @tools/call@'s params carry a @presumption@ of their own, beside
+-- @arguments@: the shape of the HTTP body, where it is read, and not of a tool
+-- call, where it is an argument of the tool and is dropped here. A null is a key
+-- left out.
+misplacedPresumption :: Aeson.Object -> Bool
+misplacedPresumption obj =
+  case Aeson.KeyMap.lookup (Aeson.Key.fromText presumptionKey) obj of
+    Just v -> v /= Aeson.Null
+    Nothing -> False
+
+-- | Why a call whose params carry a @presumption@ beside @arguments@ is
+-- refused, and where the key goes. A request that asked for @"hard"@ and had the
+-- key dropped would be answered soft with a success.
+presumptionBesideArgumentsMessage :: Bool -> Text
+presumptionBesideArgumentsMessage isDeontic =
+  "presumption was sent beside `arguments` in the request's params, where it is not read. "
+    <> "It is an argument of the tool: put it inside the call's `arguments`"
+    <> if isDeontic
+         then ", beside the rule's own `arguments`: {\"arguments\": {\"arguments\": {...}, \"presumption\": \"hard\"}}."
+         else ", with the rule's inputs: {\"arguments\": {\"presumption\": \"hard\", ...}}."
+
+-- | Why a DEONTIC call that has @presumption@ inside its @arguments@, which the
+-- rule has no input of that name for, is refused: the key would be read as an
+-- input the rule does not have and the request answered soft.
+presumptionInsideArgumentsMessage :: Text
+presumptionInsideArgumentsMessage =
+  "presumption is not an input of this rule, so it cannot go inside `arguments`: "
+    <> "put it beside `arguments`, among the tool's own arguments: {\"arguments\": {...}, \"presumption\": \"hard\"}."
 
 -- | Whether a call carries an @arguments@ object, the shape in which a DEONTIC
 -- tool reads its inputs and 'presumptionKey' is a sibling of them.
@@ -608,6 +639,15 @@ buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> Either Tex
 buildMcpCall reverseMap params isDeontic arguments = case arguments of
   Aeson.Object obj -> do
     presumption <- readPresumption (present (Aeson.Key.fromText presumptionKey) obj Aeson.KeyMap.empty)
+    -- Inside a DEONTIC tool's `arguments` the key is an input, and a rule that
+    -- has no input of that name has none to read: a hard request put there is
+    -- not read, so it is refused instead of answered soft.
+    case Aeson.KeyMap.lookup "arguments" obj of
+      Just (Aeson.Object argsObj)
+        | isDeontic
+        , Aeson.KeyMap.member (Aeson.Key.fromText presumptionKey) argsObj
+        , Maybe.isNothing (presumptionCollision params) -> Left presumptionInsideArgumentsMessage
+      _ -> Right ()
     pure $ case () of
       _ | isDeontic
         , Just (Aeson.Object argsObj) <- Aeson.KeyMap.lookup "arguments" obj ->

@@ -4488,6 +4488,38 @@ spec = describe "integration" do
         flag <- asked baseUrl mgr "mcp-bad" "may contract" ("presumption" Aeson..= True : capacityInputs)
         refusedWith "true" flag "presumption must be \"soft\" or \"hard\", not true"
 
+    -- A hard request put where it is not read used to be dropped and answered
+    -- soft, with a success: a silent wrong answer. Each of these is now refused,
+    -- and the message says where the key goes.
+    describe "a presumption in the wrong place" do
+      let driver = ["driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]] :: [Pair]
+          trace = ["startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])] :: [Pair]
+
+      it "inside the arguments of a DEONTIC tool, when the rule has no input of that name, is refused" do
+        withServiceFromSources "mcp-misplace-in" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+          answered <- askMcpFull baseUrl mgr "mcp-misplace-in" "seatbelt requirement" $ Aeson.object $
+            ("arguments" Aeson..= Aeson.object (driver <> [hardArg])) : trace
+          refusedWith "inside arguments" answered "put it beside `arguments`"
+          -- beside `arguments`, where it goes, the same request is read as hard
+          placed <- askMcpFull baseUrl mgr "mcp-misplace-in" "seatbelt requirement" (seatbelt [hardArg])
+          refusedWith "beside arguments" placed "motorway"
+
+      it "beside arguments in the request's params, the shape of an HTTP body, is refused on a flat tool" do
+        withServiceFromSources "mcp-misplace-params" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+          answered <- askMcpFullParams baseUrl mgr "mcp-misplace-params" "may contract" [hardArg]
+            (Aeson.object capacityInputs)
+          refusedWith "params" answered "presumption was sent beside `arguments` in the request's params"
+          refusedWith "params, flat" answered "with the rule's inputs"
+          -- a null there is a key left out, as it is in HTTP
+          nulled <- askMcpFullParams baseUrl mgr "mcp-misplace-params" "may contract" ["presumption" Aeson..= Aeson.Null]
+            (Aeson.object capacityInputs)
+          presumedOf nulled `shouldBe` Right (Just (FnLitBool True), ["has capacity"])
+
+      it "beside arguments in the request's params is refused on a DEONTIC tool too" do
+        withServiceFromSources "mcp-misplace-params-d" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+          answered <- askMcpFullParams baseUrl mgr "mcp-misplace-params-d" "seatbelt requirement" [hardArg] (seatbelt [])
+          refusedWith "params, DEONTIC" answered "beside the rule's own `arguments`"
+
     it "is advertised on every function tool, optional, as soft or hard" do
       let advertised schema =
             ( fmap (Aeson.KeyMap.lookup (name "presumption")) (propertiesOf schema)
@@ -5994,15 +6026,20 @@ askMcpWith baseUrl mgr deployId fn toolArguments = do
 -- | An MCP @tools/call@ answered in full: the message of the refusal, or the
 -- evaluation's response (with what it @presumed@).
 askMcpFull :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Either Text ResponseWithReason)
-askMcpFull baseUrl mgr deployId fn toolArguments = do
+askMcpFull baseUrl mgr deployId fn = askMcpFullParams baseUrl mgr deployId fn []
+
+-- | 'askMcpFull' with members of its own put in the call's params, beside
+-- @name@ and @arguments@.
+askMcpFullParams :: String -> Manager -> Text -> Text -> [Pair] -> Aeson.Value -> IO (Either Text ResponseWithReason)
+askMcpFullParams baseUrl mgr deployId fn extraParams toolArguments = do
   req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
     [ "jsonrpc" Aeson..= ("2.0" :: Text)
     , "id" Aeson..= (1 :: Int)
     , "method" Aeson..= ("tools/call" :: Text)
     , "params" Aeson..= Aeson.object
-        [ "name" Aeson..= Text.replace " " "-" fn
-        , "arguments" Aeson..= toolArguments
-        ]
+        ([ "name" Aeson..= Text.replace " " "-" fn
+         , "arguments" Aeson..= toolArguments
+         ] <> extraParams)
     ]
   body <- responseBody <$> httpLbs req mgr
   pure $ case mcpToolText body of
