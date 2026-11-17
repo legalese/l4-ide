@@ -1129,10 +1129,13 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
 -- its default under soft and is refused under hard. The record here is written
 -- as source, so a default it took would be a construction's: listed in both
 -- modes under the record's name, and not withdrawn by hard. Card O4
--- (ruled 2026-10-11) makes listing such a default the target and keeps this
--- refusal until it is built. Owed: decode the event records as the arguments
--- are, so that soft takes a default and lists it as @events[0].party.licence@,
--- and hard refuses it.
+-- (ruled 2026-10-11, option B) makes listing such a default the target and
+-- keeps this refusal until the listing holds. It does not hold yet: option B
+-- was built and reviewed twice, and is parked (2026-11-18; see
+-- specs/todo/O4-B-EVENT-DEFAULTS-PARKED.md on the branch
+-- feat/o4-b-event-defaults), so this refusal is the rule, in both modes. Not
+-- built: decoding the event records as the arguments are, so that soft takes a
+-- default and lists it as @events[0].party.licence@, and hard refuses it.
 refuseEventRecordGaps
   :: Monad m
   => ModuleInfo -> Maybe Text -> Maybe Text -> [TraceEvent] -> ExceptT EvaluatorError m ()
