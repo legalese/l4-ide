@@ -84,6 +84,17 @@ spec = do
           v -> expectationFailure ("Expected JSON object, got: " <> show v)
       Hspec.prop "round-trips through JSON" $ \p ->
         Aeson.fromJSON (Aeson.toJSON (p :: Parameter)) === Aeson.Success p
+      -- NOTHING is a default: a MAYBE input with TYPICALLY NOTHING publishes
+      -- "default": null. Read back from the metadata cache it must still be a
+      -- default, or a redeploy that changes it is not reported.
+      it "reads an explicit null default back as a default, not as none" do
+        let p = (Parameter "number" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing)
+                  { parameterDefault = Just Aeson.Null }
+        Aeson.fromJSON (Aeson.toJSON p) `shouldBe` Aeson.Success p
+        (.parameterDefault) <$> (Aeson.eitherDecode "{\"type\":\"number\",\"default\":null}" :: Either String Parameter)
+          `shouldBe` Right (Just Aeson.Null)
+        (.parameterDefault) <$> (Aeson.eitherDecode "{\"type\":\"number\"}" :: Either String Parameter)
+          `shouldBe` Right Nothing
 
     -- A batch case that failed is written with @error and no value, and read
     -- back as failed rather than as an answer whose result is named "@error".

@@ -12,7 +12,7 @@ module L4.FunctionSchema (
 ) where
 
 import Base
-import Data.Aeson (FromJSON, ToJSON, (.:), (.:?), (.=), (.!=))
+import Data.Aeson (FromJSON, ToJSON, (.:), (.:!), (.:?), (.=), (.!=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -108,7 +108,11 @@ instance FromJSON Parameter where
       <*> p .:? "items"
       <*> p .:? "required"
       <*> p .:? "x-l4-type"
-      <*> p .:? "default"
+      -- `.:!`, not `.:?`: an explicit null is the default NOTHING (a MAYBE
+      -- input), a default like any other. `.:?` reads it as no default, so a
+      -- schema read back from the metadata cache would lose it and a changed
+      -- NOTHING default would go unreported on redeploy.
+      <*> p .:! "default"
 
 declaresFromModule :: Module Resolved -> Map Text (Declare Resolved)
 declaresFromModule (MkModule _ _ section) =
