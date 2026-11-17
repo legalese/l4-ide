@@ -469,17 +469,12 @@ default. Give every field of it.` The answer is the same in `soft` and in
   round: it is keyed by its constructor (`{"Address": {...}}`), while the
   published schema describes it as a plain object.
 
-Two gaps that are known and not closed by this page's behaviour:
+One gap is known and not closed by this page's behaviour:
 
 - **A default on a record field does not reach the question planner.** The
   planner that orders the questions a user is asked reads the defaults of a
   rule's inputs and of an `ASSUME`, and not those of a record's fields
   (smucclaw/l4-ide#942, open).
-- **An inner `WITH` that overrides a section `GIVEN` runs in a file and fails
-  under `l4 batch`.** `outer MEANS inner PLUS (inner WITH r IS 100)`, where `r` is
-  a section input, evaluates under `l4 run` and fails to type-check under
-  `l4 batch` with "You are giving named inputs to inner … but it is not a
-  function" (smucclaw/l4-ide#1000, open).
 
 The list of facts a published rule asks for carries each default as the
 JSON Schema `default` keyword, and a defaulted fact

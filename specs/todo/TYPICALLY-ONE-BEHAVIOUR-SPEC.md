@@ -361,7 +361,7 @@ Its six conditions, as built:
 - **U4, ruled 2026-11-17: accepted, option C, with no note** (marked at 14:12:47Z): no fixed order for the work after the in-file piece, with three constraints: (1) the sidebar's two halves go to one builder; (2) the five-runtime test is measured again before any port to `main`; (3) the schema change of O4's condition 3 is settled before the in-file piece lands, and is moot if O4 B is built. (2026-11-18: O4 B is parked, so the "moot if" does not apply, and constraint 3 binds; see O4 above.)
 - **2026-11-17: `TYPICALLY` reaches `main` as one topic pull request once the four requirements of smucclaw/l4-ide#1072 are met.**
 - **2026-11-17: the VS Code sidebar work and the four gaps (smucclaw/l4-ide#1021, smucclaw/l4-ide#1000, O4 B and WebMCP) are in this wave.** (2026-11-18: O4 B was built and is parked; it does not ship in this wave, see O4 above.)
-  This branch closes none of them: #1000 still reproduces under `l4 batch` on it, as the page says.
+  The in-file work alone closes none of them: #1000 still reproduces under `l4 batch` on it. On the integrated wave, #1021 and #1000 are closed by the gaps work, WebMCP is built on the service branch, and O4 B is parked.
 
 **Assumed, not ruled.**
 A choice that has a commit of its own is named by that commit's subject, so that it can be reverted alone; the rest are inside the commit that built the behaviour and cannot be.
