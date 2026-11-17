@@ -39,12 +39,14 @@ import Compiler (toDecl)
 import EvalLimits (withEvalLimits)
 import L4.FunctionSchema (Parameters (..))
 import Options (Options)
+import Shared (inputSanitizedTo)
 import Types
 
 import Control.Monad.Trans.Except (runExceptT, throwE)
 import qualified Data.Aeson as Aeson
 import Data.Int (Int64)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Scientific (Scientific)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -103,13 +105,18 @@ noTraceForOtherFunctions = "startTime and events are only valid for functions re
 
 -- | Whether a field of a request to a function that is not DEONTIC is a trace
 -- the function has no use for: a field named @startTime@ or @events@ that is
--- not one of the function's inputs. A function that is not DEONTIC may declare
--- inputs of those names, and then they are inputs. MCP and a batch case put a
+-- not one of the function's inputs, by the rule's own spelling or by the name a
+-- tool lists it under. A function that is not DEONTIC may declare inputs of those
+-- names, and then they are inputs. MCP and a batch case put a
 -- function's inputs and its trace on one level, so this is how they tell them
 -- apart; @/evaluation@ has the trace as its own fields and does not need it.
 isStrayTraceField :: Parameters -> Text -> Bool
 isStrayTraceField params field =
-  field `elem` ["startTime", "events"] && Map.notMember field params.parameterMap
+  field `elem` ["startTime", "events"]
+    && Map.notMember field params.parameterMap
+    -- a tool, and a batch case, may also give an input by the name a tool lists
+    -- it under: an input spelt `events?` is the key `events`
+    && Maybe.isNothing (inputSanitizedTo field params)
 
 -- | What a DEONTIC function that has no compiled module reports. The compiler
 -- falls back to a per-file session for a function whose module did not

@@ -3801,6 +3801,29 @@ spec = describe "integration" do
           schema <- mcpToolInputSchema baseUrl mgr elapsedId elapsedFn
           fmap schemaProperties schema `shouldBe` Just ["events", "presumption", "startTime"]
 
+    -- A tool, and a batch case, may give an input by the name a tool lists it
+    -- under, so an input spelt `events?` is the key `events`. The check that a
+    -- startTime or events is a trace and not an input compared the rule's own
+    -- spelling only, so such an input was refused as a trace sent to a rule that
+    -- is not a DEONTIC (the same class as the `arguments?` input).
+    describe "a rule that is not a DEONTIC, with an input spelt events? or startTime?" do
+      let ruleFor name maybeInput = Text.unlines
+            [ "@export default " <> name <> " q"
+            , "GIVEN `" <> name <> "?` IS A " <> (if maybeInput then "MAYBE " else "") <> "NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`" <> name <> " q` MEANS " <> (if maybeInput then "NOT `" <> name <> "?` EQUALS NOTHING" else "`" <> name <> "?` EQUALS 3")
+            ]
+      forM_ [("events" :: Text), "startTime"] \name ->
+        forM_ [(False, "a plain" :: String), (True, "a MAYBE")] \(isMaybe, kind) ->
+          it ("reads " <> kind <> " input spelt " <> Text.unpack name <> "? as an input, over MCP and in a batch") do
+            let did = "trace-q-" <> Text.toLower name <> (if isMaybe then "-maybe" else "-plain")
+                ruleName = name <> " q"
+            withServiceFromSources did [("q.l4", ruleFor name isMaybe)] \baseUrl mgr -> do
+              viaMcp <- askMcpWith baseUrl mgr did ruleName (Aeson.object [Aeson.Key.fromText name Aeson..= (3 :: Int)])
+              fmap (Map.lookup "value") viaMcp `shouldBe` Right (Just (FnLitBool True))
+              viaBatch <- askBatch baseUrl mgr did ruleName [Aeson.Key.fromText name Aeson..= (3 :: Int)] []
+              fmap (Map.lookup "value") viaBatch `shouldBe` Right (Just (FnLitBool True))
+
     -- Found in review, 2026-10-27: MCP left a top-level @arguments@ out of every
     -- call to a function that is not a DEONTIC, taking it for the wrapper a
     -- client puts around a flat call, so an input of that name was never read:
