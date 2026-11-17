@@ -47,6 +47,7 @@
     detectBreakingChanges,
     type BreakingChange,
   } from '$lib/deploy-compat'
+  import { anyInputHasDefault } from '$lib/param-defaults'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import DeploymentMetadata from '$lib/components/deployment-metadata.svelte'
   import DocsPanel from '$lib/components/docs-panel.svelte'
@@ -2019,6 +2020,14 @@
                       : undefined}
                   />
                 {/each}
+                {#if anyInputHasDefault(functions)}
+                  <p class="defaults-note">
+                    An input marked "usually" has a usual value: a caller may
+                    leave it out and the rule uses that value. A usual value set
+                    on an ASSUME is not published, and the fields inside a list
+                    are not listed, so none is shown for them.
+                  </p>
+                {/if}
               </div>
             {/if}
           {/if}
@@ -2598,6 +2607,13 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .defaults-note {
+    margin: 4px 0 0;
+    font-size: 0.85em;
+    line-height: 1.4;
+    color: var(--vscode-descriptionForeground);
   }
 
   .progress-bar {

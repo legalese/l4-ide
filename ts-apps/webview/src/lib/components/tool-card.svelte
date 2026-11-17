@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ExportedFunctionInfo, FunctionParameter } from 'jl4-client-rpc'
+  import { describeDefault, hasDefault } from '$lib/param-defaults'
 
   let {
     func,
@@ -38,6 +39,11 @@
     return params.required?.includes(name) ?? false
   }
 
+  /** Tooltip for the "usually" tag: what leaving the input out means. */
+  function usualTitle(param: FunctionParameter): string {
+    return `You may leave this input out. The rule then uses ${describeDefault(param)}.`
+  }
+
   function hasNestedProps(param: FunctionParameter): boolean {
     return (
       param.properties !== undefined && Object.keys(param.properties).length > 0
@@ -61,6 +67,11 @@
         {#if requiredFields && !requiredFields.includes(nestedName)}
           <span class="badge optional-badge">optional</span>
         {/if}
+        {#if hasDefault(nestedParam)}
+          <span class="badge usual-badge" title={usualTitle(nestedParam)}
+            >usually {describeDefault(nestedParam)}</span
+          >
+        {/if}
       </div>
       {#if nestedParam.description}
         <div class="param-desc nested">
@@ -70,7 +81,11 @@
       {#if nestedParam.enum && nestedParam.enum.length > 0}
         <div class="param-enums nested">
           {#each nestedParam.enum as val}
-            <span class="enum-tag">{val}</span>
+            <span
+              class="enum-tag"
+              class:usual={hasDefault(nestedParam) &&
+                nestedParam.default === val}>{val}</span
+            >
           {/each}
         </div>
       {/if}
@@ -130,6 +145,11 @@
               {#if !isRequired(name, func.parameters)}
                 <span class="badge optional-badge">optional</span>
               {/if}
+              {#if hasDefault(param)}
+                <span class="badge usual-badge" title={usualTitle(param)}
+                  >usually {describeDefault(param)}</span
+                >
+              {/if}
             </div>
             {#if param.description}
               <div class="param-desc">{param.description}</div>
@@ -137,7 +157,11 @@
             {#if param.enum && param.enum.length > 0}
               <div class="param-enums">
                 {#each param.enum as val}
-                  <span class="enum-tag">{val}</span>
+                  <span
+                    class="enum-tag"
+                    class:usual={hasDefault(param) && param.default === val}
+                    >{val}</span
+                  >
                 {/each}
               </div>
             {/if}
@@ -362,6 +386,22 @@
     padding: 0;
     color: var(--vscode-descriptionForeground);
     opacity: 0.5;
+  }
+
+  /* The input's usual value: what the rule takes when a caller leaves the
+     input out. Kept readable, not dimmed like the optional marker, because
+     it is information a person acts on. */
+  .usual-badge {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-editor-font-family, monospace);
+  }
+
+  .enum-tag.usual {
+    border-color: var(--vscode-descriptionForeground);
+    color: var(--vscode-foreground);
   }
 
   .return-info {

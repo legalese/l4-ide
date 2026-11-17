@@ -233,6 +233,15 @@ export interface FunctionParameter {
    *  the sanitised keys) back to the schema's original L4 names
    *  without re-implementing the server's sanitisation. */
   'x-sanitized-name'?: string
+  /** The input's usual value (`TYPICALLY`), the JSON Schema `default`
+   *  keyword: a rule input, or a record field in its parent's `properties`.
+   *  A caller may leave the input out and the rule then takes this value.
+   *  A plain value: a number, a piece of text, TRUE or FALSE, an enumerated
+   *  constructor by its name, or NOTHING, which is `null`. Not published for
+   *  an `ASSUME`. The key is absent when there is none, so test for the key,
+   *  not for truthiness: 0, `false`, "" and `null` are all usual values.
+   *  Absent from a deployment that an older service stored. */
+  default?: unknown
 }
 
 export interface FunctionParameters {
