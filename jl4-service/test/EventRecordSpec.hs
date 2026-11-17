@@ -30,7 +30,7 @@ import qualified Data.Map.Strict as Map
 import Data.String.Interpolate (i)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Network.HTTP.Client (Manager, Response, responseBody, responseStatus)
+import Network.HTTP.Client (Manager, Request, RequestBody (..), Response, httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseStatus)
 import Network.HTTP.Types.Status (statusCode)
 
 -- | What a request was answered: its value and its @presumed@, or the refusal.
@@ -57,6 +57,18 @@ event party action at = Aeson.object ["party" .= party, "action" .= action, "at"
 -- | The request was refused, and the refusal names the text.
 refusedNaming :: Text -> Answer -> Bool
 refusedNaming needle = either (Text.isInfixOf needle) (const False)
+
+-- | As 'ask', to a deployment of several files, with a query string.
+askQuery :: String -> Manager -> Text -> Text -> String -> [Pair] -> [Aeson.Value] -> IO Answer
+askQuery baseUrl mgr deployId fn query arguments events = do
+  req0 <- parseRequest (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack fn <> "/evaluation" <> query)
+  let body = Aeson.object ["arguments" .= Aeson.object arguments, "startTime" .= (0 :: Int), "events" .= events]
+      req :: Request
+      req = req0 { method = "POST", requestBody = RequestBodyLBS (Aeson.encode body), requestHeaders = [("Content-Type", "application/json")] }
+  answerOf <$> httpLbs req mgr
+
+isRefused :: Answer -> Bool
+isRefused = either (const True) (const False)
 
 str :: Text -> Aeson.Value
 str = Aeson.String
@@ -335,6 +347,83 @@ spec = describe "an event's record under option B, after its review (card O4)" d
         viaGap <- go [event (party [("zip", num 5)]) seatbelt 0]
         viaGap `shouldBe` fmap (\(v, _) -> (v, ["events[0].party.zhome.Address.floor"])) viaWritten
 
+  -- F8: shapes the review asked to see pinned. What is documented as refused
+  -- loudly is refused; what is documented as silent is pinned as it is, so that
+  -- the documentation and the build cannot drift apart unseen.
+  describe "F8: types from another file, trace levels, and the shapes the README sorts loud and silent" do
+    let driverWith extra = obj ([("name", str "Alice")] <> extra)
+        argsOf extra = ["driver" .= driverWith extra]
+    it "a record type declared in an imported file is listed by its path and refused by it under hard" do
+      withServiceFromSources "o4r-import" [("types.l4", importTypesJL4), ("main.l4", importMainJL4)] \baseUrl mgr -> do
+        let args = argsOf [("zhome", obj [("zip", num 5), ("floor", num 1)]), ("licence", str "full")]
+            party fs extra = driverWith ([("zhome", obj [("Address", obj fs)])] <> extra)
+            go p evs = ask baseUrl mgr "o4r-import" seatFn p args evs
+        viaWritten <- go "soft" [event (party [("zip", num 5), ("floor", num 1)] [("licence", str "full")]) seatbelt 0]
+        fmap snd viaWritten `shouldBe` Right []
+        viaGap <- go "soft" [event (party [("zip", num 5)] []) seatbelt 0]
+        fmap (fmap List.sort) viaGap
+          `shouldBe` fmap (\(v, _) -> (v, ["events[0].party.licence", "events[0].party.zhome.Address.floor"])) viaWritten
+        hard <- go "hard" [event (party [("zip", num 5)] [("licence", str "full")]) seatbelt 0]
+        hard `shouldSatisfy` refusedNaming "Missing required field 'events[0].party.zhome.Address.floor'"
+    it "presumed is the same at every trace level" do
+      withServiceFromSources "o4r-trace" [("types.l4", importTypesJL4), ("main.l4", importMainJL4)] \baseUrl mgr -> do
+        let args = argsOf [("zhome", obj [("zip", num 5), ("floor", num 1)]), ("licence", str "full")]
+            gap = [event (driverWith [("zhome", obj [("Address", obj [("zip", num 5)])])]) seatbelt 0]
+        plain <- ask baseUrl mgr "o4r-trace" seatFn "soft" args gap
+        fmap (List.sort . snd) plain `shouldBe` Right ["events[0].party.licence", "events[0].party.zhome.Address.floor"]
+        forM_ ["none", "full"] \level -> do
+          traced <- askQuery baseUrl mgr "o4r-trace" seatFn ("?trace=" <> level) args gap
+          (fmap (List.sort . snd) traced, fmap fst traced) `shouldBe` (fmap (List.sort . snd) plain, fmap fst plain)
+    -- Loud: the request is refused, with the evaluator's own message.
+    it "a MAYBE field left out, or given a value, is refused; null is NOTHING" do
+      withServiceFromSources "o4r-maybe-str" [("event.l4", maybeStringJL4)] \baseUrl mgr -> do
+        let args = argsOf [("nickname", Aeson.Null)]
+            go party = ask baseUrl mgr "o4r-maybe-str" seatFn "soft" args [event party seatbelt 0]
+        left <- go (driverWith [])
+        left `shouldSatisfy` refusedNaming "you have not supplied these inputs"
+        left `shouldSatisfy` refusedNaming "nickname"
+        valued <- go (driverWith [("nickname", str "Al")])
+        valued `shouldSatisfy` refusedNaming "MAYBE OF STRING"
+        written <- go (driverWith [("nickname", Aeson.Null)])
+        fmap snd written `shouldBe` Right []
+    it "a key that is not a field of the record is refused" do
+      withServiceFromSources "o4r-typo" [("event.l4", seatJL4)] \baseUrl mgr -> do
+        refused <- ask baseUrl mgr "o4r-typo" seatFn "soft" ["driver" .= obj [("name", str "Alice"), ("licence", str "full")]]
+          [event (obj [("name", str "Alice"), ("licnce", str "full")]) seatbelt 0]
+        refused `shouldSatisfy` refusedNaming "I could not find a definition for the identifier"
+        refused `shouldSatisfy` refusedNaming "licnce"
+    it "a list of records in an event's party is refused, written in full or leaving a default out" do
+      withServiceFromSources "o4r-list" [("event.l4", listJL4)] \baseUrl mgr -> do
+        let home fs = obj fs
+            party homes = driverWith [("homes", Aeson.toJSON (homes :: [Aeson.Value]))]
+            args = argsOf [("homes", Aeson.toJSON [home [("zip", num 5), ("note", num 9)]])]
+            go homes = ask baseUrl mgr "o4r-list" seatFn "soft" args [event (party homes) seatbelt 0]
+        written <- go [home [("zip", num 5), ("note", num 9)]]
+        written `shouldSatisfy` isRefused
+        gap <- go [home [("zip", num 5)]]
+        gap `shouldSatisfy` isRefused
+    -- Silent: pinned as it is. When the service stops reading a record-valued
+    -- MAYBE field of an event as NOTHING, this test is the one to change, with
+    -- the README's "Answered wrongly, with no warning" paragraph.
+    it "a MAYBE record written as an object of two or more keys is read as NOTHING (a known silent defect)" do
+      withServiceFromSources "o4r-maybe-rec" [("event.l4", maybeRecordJL4)] \baseUrl mgr -> do
+        let home = [("zip", num 5), ("note", num 9)]
+            args hm = ["driver" .= driverWith hm]
+            asObject p = ask baseUrl mgr "o4r-maybe-rec" seatFn p (args [("home", obj home)]) [event (driverWith [("home", obj home)]) seatbelt 0]
+            asNull p = ask baseUrl mgr "o4r-maybe-rec" seatFn p (args [("home", obj home)]) [event (driverWith [("home", Aeson.Null)]) seatbelt 0]
+        objSoft <- asObject "soft"
+        nullSoft <- asNull "soft"
+        fmap snd objSoft `shouldBe` Right []
+        objSoft `shouldBe` nullSoft
+        objHard <- asObject "hard"
+        objHard `shouldBe` objSoft
+        -- One key is read as a constructor applied to a value, and refused; a
+        -- record keyed by its constructor is refused too.
+        oneKey <- ask baseUrl mgr "o4r-maybe-rec" seatFn "soft" (args [("home", obj home)]) [event (driverWith [("home", obj [("zip", num 5)])]) seatbelt 0]
+        oneKey `shouldSatisfy` isRefused
+        keyed <- ask baseUrl mgr "o4r-maybe-rec" seatFn "soft" (args [("home", obj home)]) [event (driverWith [("home", obj [("Address", obj home)])]) seatbelt 0]
+        keyed `shouldSatisfy` isRefused
+
   describe ("the listing property over " <> show (length allShapes) <> " generated record shapes and "
             <> show (sum (map (length . omissions) allShapes)) <> " request pairs (depth 0-2, nested record before and after the same-named field, party and action records)") do
     forM_ shapeGroups \(gid, shapes) ->
@@ -527,7 +616,7 @@ tshow = Text.pack . show
 -- Fixtures (the review's modules, kept as it wrote them where it wrote one)
 -- ----------------------------------------------------------------------------
 
-stealJL4, steal2JL4, steal3JL4, actJL4, actMissedJL4, actFastJL4, seatJL4, seatLestJL4, randSeatFirstJL4, randDriveFirstJL4, derivedJL4, payloadJL4, fnkeyJL4, scanJL4, nestedJL4 :: Text
+stealJL4, steal2JL4, steal3JL4, actJL4, actMissedJL4, actFastJL4, seatJL4, seatLestJL4, randSeatFirstJL4, randDriveFirstJL4, derivedJL4, payloadJL4, fnkeyJL4, scanJL4, nestedJL4 , importTypesJL4, importMainJL4, maybeStringJL4, maybeRecordJL4, listJL4 :: Text
 
 stealJL4 = [i|
 DECLARE Address HAS
@@ -869,6 +958,107 @@ DECLARE Address HAS
 DECLARE Driver HAS
     name IS A STRING
     zhome IS AN Address
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+|]
+
+importTypesJL4 = [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+    floor IS A NUMBER TYPICALLY 1
+
+DECLARE Driver HAS
+    name IS A STRING
+    zhome IS AN Address
+    licence IS A STRING TYPICALLY "full"
+|]
+
+importMainJL4 = [i|
+IMPORT types
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+|]
+
+maybeStringJL4 = [i|
+DECLARE Driver HAS
+    name IS A STRING
+    nickname IS A MAYBE STRING
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+|]
+
+maybeRecordJL4 = [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+    note IS A NUMBER TYPICALLY 9
+
+DECLARE Driver HAS
+    name IS A STRING
+    home IS A MAYBE Address
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+|]
+
+listJL4 = [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+    note IS A NUMBER TYPICALLY 9
+
+DECLARE Driver HAS
+    name IS A STRING
+    homes IS A LIST OF Address
 
 DECLARE `Driver Action` IS ONE OF
     `wear seatbelt`
