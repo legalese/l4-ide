@@ -52,7 +52,7 @@
     type BreakingChange,
     type DeployReport,
   } from '$lib/deploy-compat'
-  import { finishDeploy, pollDeployJob, type JobOutcome } from '$lib/deploy-job'
+  import { runDeploy } from '$lib/deploy-job'
   import { anyDefaultInsideLists } from '$lib/param-defaults'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import DeploymentMetadata from '$lib/components/deployment-metadata.svelte'
@@ -1018,59 +1018,51 @@
   }
 
   async function executeDeploy(deploymentId: string, overwrite = false) {
-    if (!messenger || !activeFileUri) return
+    // One deploy at a time: a second would share `deploying`, the report and
+    // the review's notices with the first.
+    if (!messenger || !activeFileUri || deploying) return
     const m = messenger
+    const fileUri = activeFileUri
     // The rules as they are when the deploy is sent: a file switch while the job
     // runs replaces `functions`, and the report must spell what was deployed.
     const schemas = $state.snapshot(functions)
-    deploying = true
-    try {
-      const result = await m.sendRequest(RequestSidebarDeploy, HOST_EXTENSION, {
-        deploymentId,
-        fileUri: activeFileUri,
-        mission: deploymentMission.trim() || undefined,
-        overwrite,
-      })
-      if (result.success) {
-        const did = result.deploymentId ?? deploymentId
-        const updateId = result.updateId
-        // No updateId ⇒ resolved immediately (content-hash dedupe).
-        // Otherwise poll the async deploy/update job to an outcome.
-        const outcome: JobOutcome = updateId
-          ? await pollDeployJob(
-              () =>
-                m.sendRequest(GetSidebarUpdateStatus, HOST_EXTENSION, {
-                  deploymentId: did,
-                  updateId,
-                }),
-              { sleep: (ms) => new Promise((r) => setTimeout(r, ms)) }
-            )
-          : { kind: 'immediate' }
-        deploying = false
-        // What each outcome shows, including the changed defaults, is decided
-        // in deploy-job.ts; this only does it.
-        const finish = finishDeploy({
-          deploymentId: did,
-          outcome,
-          reviewNotices: defaultNotices,
-          schemas,
-        })
-        deployView = 'preview'
-        // Switch to the deployments tab *before* awaiting the list fetch,
-        // otherwise the deploy panel repaints its Preview screen for the
-        // duration of the round-trip (visible flicker).
-        if (finish.showDeployments) activeTab = 'deployments'
-        deployReport = finish.report
-        notify(finish.toast.type, finish.toast.message)
-        if (finish.refreshDeployments) await fetchDeployments()
-      } else {
-        notify('error', result.error ?? 'Deploy failed')
-        deploying = false
-      }
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'Deploy failed')
-      deploying = false
+    // The whole sequence (send once, poll the job, decide what to show, clear
+    // `deploying`) is runDeploy's, in deploy-job.ts, tested there with fakes;
+    // this supplies the two requests and does what it returns.
+    const run = await runDeploy(
+      {
+        sendDeploy: () =>
+          m.sendRequest(RequestSidebarDeploy, HOST_EXTENSION, {
+            deploymentId,
+            fileUri,
+            mission: deploymentMission.trim() || undefined,
+            overwrite,
+          }),
+        fetchStatus: (id, updateId) =>
+          m.sendRequest(GetSidebarUpdateStatus, HOST_EXTENSION, {
+            deploymentId: id,
+            updateId,
+          }),
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        isDeploying: () => deploying,
+        setDeploying: (value) => (deploying = value),
+      },
+      { deploymentId, reviewNotices: defaultNotices, schemas }
+    )
+    if (run.kind === 'busy') return
+    if (run.kind === 'failed') {
+      notify(run.toast.type, run.toast.message)
+      return
     }
+    const finish = run.finish
+    deployView = 'preview'
+    // Switch to the deployments tab *before* awaiting the list fetch,
+    // otherwise the deploy panel repaints its Preview screen for the
+    // duration of the round-trip (visible flicker).
+    if (finish.showDeployments) activeTab = 'deployments'
+    deployReport = finish.report
+    notify(finish.toast.type, finish.toast.message)
+    if (finish.refreshDeployments) await fetchDeployments()
   }
 
   async function fetchDeployments() {
@@ -1172,6 +1164,8 @@
   }
 
   function handleAction() {
+    // A deploy in progress owns the footer button and the shared state.
+    if (deploying) return
     if (connectionStatus.status === 'connected') {
       if (undeployConfirm) {
         handleUndeploy()

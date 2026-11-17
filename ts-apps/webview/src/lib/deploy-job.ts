@@ -6,6 +6,7 @@
  */
 import type {
   DefaultChangeNotice,
+  SidebarDeployResponse,
   SidebarUpdateStatusResponse,
 } from 'jl4-client-rpc'
 import {
@@ -13,6 +14,27 @@ import {
   reportAfterDeploy,
   type DeployReport,
 } from './deploy-compat'
+
+/**
+ * Any thrown value as a readable string. A request through the webview
+ * messenger can reject with a plain object (a JSON-RPC error), which `String`
+ * turns into "[object Object]".
+ */
+export function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message || err.name
+  if (typeof err === 'string') return err
+  if (err !== null && typeof err === 'object') {
+    const { message, error } = err as { message?: unknown; error?: unknown }
+    if (typeof message === 'string' && message) return message
+    if (typeof error === 'string' && error) return error
+    try {
+      return JSON.stringify(err)
+    } catch {
+      return 'an object that could not be written as text'
+    }
+  }
+  return String(err)
+}
 
 /** How a deploy ended. */
 export type JobOutcome =
@@ -52,7 +74,7 @@ export async function pollDeployJob(
     try {
       resp = await fetchStatus()
     } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err)
+      lastError = errorText(err)
     }
     if (!resp || resp.status === 'unreadable') {
       if (resp) lastError = resp.error
@@ -169,5 +191,85 @@ export function finishDeploy(args: {
         refreshDeployments: true,
         toast: { type: 'info', message: `Deployed "${id}" successfully.` },
       }
+  }
+}
+
+/** What `runDeploy` needs from the page: the two requests, the clock and the
+ *  page's `deploying` flag. Fakes of these test the whole sequence. */
+export interface DeployPorts {
+  /** Send the deploy. Called once per run. */
+  sendDeploy: () => Promise<SidebarDeployResponse>
+  /** Ask for a job: the id the send returned, and the job's id. */
+  fetchStatus: (
+    deploymentId: string,
+    updateId: string
+  ) => Promise<SidebarUpdateStatusResponse>
+  sleep: (ms: number) => Promise<void>
+  isDeploying: () => boolean
+  setDeploying: (deploying: boolean) => void
+}
+
+export type RunDeployResult =
+  /** Another deploy is in progress: nothing was sent. */
+  | { kind: 'busy' }
+  /** The deploy was not sent, or the send failed: stay on the form. */
+  | { kind: 'failed'; toast: DeployFinish['toast'] }
+  /** The deploy was sent and has ended: leave the form and show `finish`. */
+  | { kind: 'done'; finish: DeployFinish }
+
+/**
+ * The whole sequence after the person confirms: refuse to start while another
+ * deploy is in progress, send the deploy ONCE, poll the job it started by the
+ * id the send returned, decide what to show, and clear the `deploying` flag on
+ * every way out, including a send that throws. The page only calls this.
+ */
+export async function runDeploy(
+  ports: DeployPorts,
+  args: {
+    deploymentId: string
+    reviewNotices: DefaultChangeNotice[]
+    schemas: DeployReport['schemas']
+  }
+): Promise<RunDeployResult> {
+  if (ports.isDeploying()) return { kind: 'busy' }
+  ports.setDeploying(true)
+  try {
+    const result = await ports.sendDeploy()
+    if (!result.success) {
+      return {
+        kind: 'failed',
+        toast: { type: 'error', message: result.error || 'Deploy failed' },
+      }
+    }
+    const id = result.deploymentId ?? args.deploymentId
+    const updateId = result.updateId
+    // No updateId: resolved at once (same content). Otherwise poll the job.
+    const outcome: JobOutcome = updateId
+      ? await pollDeployJob(() => ports.fetchStatus(id, updateId), {
+          sleep: ports.sleep,
+        })
+      : { kind: 'immediate' }
+    if (outcome.kind === 'unreadable') {
+      console.error(
+        `Could not read the result of deploying "${id}"; it may have been applied.`,
+        outcome.error
+      )
+    }
+    return {
+      kind: 'done',
+      finish: finishDeploy({
+        deploymentId: id,
+        outcome,
+        reviewNotices: args.reviewNotices,
+        schemas: args.schemas,
+      }),
+    }
+  } catch (err) {
+    return {
+      kind: 'failed',
+      toast: { type: 'error', message: errorText(err) || 'Deploy failed' },
+    }
+  } finally {
+    ports.setDeploying(false)
   }
 }

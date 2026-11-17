@@ -19,6 +19,11 @@ const provider = readFileSync(
   'utf8'
 )
 
+/** Source without comments, so that a call left in a comment does not count. */
+function code(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(?<!:)\/\/.*$/gm, '')
+}
+
 /** The text of a top-level function of the page's script, by name. */
 function fn(source: string, name: string): string {
   const start = source.search(
@@ -26,22 +31,45 @@ function fn(source: string, name: string): string {
   )
   expect(start, `function ${name} not found`).toBeGreaterThanOrEqual(0)
   const end = source.indexOf('\n  }\n', start)
-  return source.slice(start, end + 4)
+  return code(source.slice(start, end + 4))
 }
+
+/** `text` with runs of whitespace as one space, for matching across lines. */
+const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 describe('the sidebar page: deploying', () => {
   const executeDeploy = fn(page, 'executeDeploy')
+  const flatDeploy = flat(executeDeploy)
 
-  it('polls the job through pollDeployJob and decides what to show in finishDeploy', () => {
-    expect(executeDeploy).toContain('pollDeployJob(')
-    expect(executeDeploy).toContain('finishDeploy(')
+  it('hands the whole sequence to runDeploy, as code and not as a comment', () => {
+    expect(executeDeploy).toContain('await runDeploy(')
   })
 
-  it('hands finishDeploy the changed defaults the review held', () => {
-    expect(executeDeploy).toContain('reviewNotices: defaultNotices')
+  it('wires the send port to RequestSidebarDeploy and the status port to GetSidebarUpdateStatus, each once', () => {
+    expect(executeDeploy.match(/RequestSidebarDeploy/g)).toHaveLength(1)
+    expect(executeDeploy.match(/GetSidebarUpdateStatus/g)).toHaveLength(1)
+    expect(flatDeploy).toMatch(
+      /sendDeploy: \(\) => m\.sendRequest\(RequestSidebarDeploy,/
+    )
+    expect(flatDeploy).toMatch(
+      /fetchStatus: \(id, updateId\) => m\.sendRequest\(GetSidebarUpdateStatus, HOST_EXTENSION, \{ deploymentId: id, updateId,? \}/
+    )
   })
 
-  it('shows what finishDeploy says: the report, the toast, the tab and the refresh', () => {
+  it('lets runDeploy own the deploying flag, through the page`s own state', () => {
+    expect(flatDeploy).toContain('isDeploying: () => deploying')
+    expect(flatDeploy).toContain('setDeploying: (value) => (deploying = value)')
+    // The page does not set the flag itself around the run.
+    expect(executeDeploy).not.toMatch(/\n\s*deploying = (true|false)/)
+  })
+
+  it('hands runDeploy the changed defaults the review held', () => {
+    expect(flatDeploy).toContain('reviewNotices: defaultNotices')
+  })
+
+  it('does what runDeploy returns: nothing when busy, a toast when it failed, else the finish', () => {
+    expect(executeDeploy).toContain("if (run.kind === 'busy') return")
+    expect(executeDeploy).toContain("if (run.kind === 'failed')")
     expect(executeDeploy).toContain('deployReport = finish.report')
     expect(executeDeploy).toContain(
       'notify(finish.toast.type, finish.toast.message)'
@@ -58,14 +86,25 @@ describe('the sidebar page: deploying', () => {
     expect(executeDeploy).not.toContain('reportAfterDeploy')
     expect(executeDeploy).not.toContain('resp.notices')
     expect(executeDeploy).not.toContain("outcome === 'rejected'")
+    expect(executeDeploy).not.toContain('pollDeployJob')
   })
 
   it('snapshots the rules BEFORE the deploy is sent', () => {
     const snapshot = executeDeploy.indexOf('$state.snapshot(functions)')
-    const send = executeDeploy.indexOf('RequestSidebarDeploy')
+    const send = executeDeploy.indexOf('await runDeploy(')
     expect(snapshot).toBeGreaterThanOrEqual(0)
     expect(snapshot).toBeLessThan(send)
-    expect(executeDeploy).toContain('schemas,')
+    expect(flatDeploy).toContain('schemas }')
+  })
+
+  it('does not start a deploy while one is in progress', () => {
+    expect(
+      flat(executeDeploy.slice(0, executeDeploy.indexOf('const m =')))
+    ).toContain('if (!messenger || !activeFileUri || deploying) return')
+    const action = fn(page, 'handleAction')
+    expect(action.replace(/^\s*function handleAction\(\) \{\s*/, '')).toMatch(
+      /^if \(deploying\) return/
+    )
   })
 })
 

@@ -1,9 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   DefaultChangeNotice,
+  SidebarDeployResponse,
   SidebarUpdateStatusResponse,
 } from 'jl4-client-rpc'
-import { finishDeploy, pollDeployJob, type JobOutcome } from './deploy-job'
+import {
+  errorText,
+  finishDeploy,
+  pollDeployJob,
+  runDeploy,
+  type DeployPorts,
+  type JobOutcome,
+} from './deploy-job'
 
 const notice: DefaultChangeNotice = {
   kind: 'default-changed',
@@ -274,5 +282,274 @@ describe('finishDeploy: what each outcome shows', () => {
     ] as JobOutcome[]) {
       expect(finish(outcome).report?.outcome).not.toBe('rejected')
     }
+  })
+})
+
+describe('errorText: any thrown value as a readable string', () => {
+  it('reads an Error by its message', () => {
+    expect(errorText(new Error('port closed'))).toBe('port closed')
+  })
+
+  it('reads a string as it is', () => {
+    expect(errorText('HTTP 502')).toBe('HTTP 502')
+  })
+
+  it('reads a plain object with a message, as a JSON-RPC rejection has', () => {
+    expect(errorText({ code: -32603, message: 'internal error' })).toBe(
+      'internal error'
+    )
+  })
+
+  it('reads a plain object with an error string', () => {
+    expect(errorText({ error: 'not allowed' })).toBe('not allowed')
+  })
+
+  it('never says [object Object]', () => {
+    expect(errorText({ code: 7 })).toBe('{"code":7}')
+    const circular: Record<string, unknown> = {}
+    circular['self'] = circular
+    expect(errorText(circular)).not.toContain('[object Object]')
+  })
+
+  it('reads the rest as text', () => {
+    expect(errorText(undefined)).toBe('undefined')
+    expect(errorText(null)).toBe('null')
+    expect(errorText(42)).toBe('42')
+  })
+})
+
+describe('pollDeployJob: a plain-object rejection', () => {
+  it('is reported by its message, not as [object Object]', async () => {
+    let calls = 0
+    const fetchStatus = async (): Promise<SidebarUpdateStatusResponse> => {
+      calls += 1
+      throw { code: -32603, message: 'port closed' }
+    }
+    expect(await pollDeployJob(fetchStatus, { sleep: async () => {} })).toEqual(
+      {
+        kind: 'unreadable',
+        error: 'port closed',
+      }
+    )
+    expect(calls).toBe(3)
+  })
+})
+
+/** The two ports of a run, as fakes that count what they are asked. */
+function ports(
+  opts: {
+    send?: () => Promise<SidebarDeployResponse>
+    statuses?: Array<SidebarUpdateStatusResponse | Error>
+    deploying?: boolean
+  } = {}
+) {
+  const sent: number[] = []
+  const asked: Array<{ deploymentId: string; updateId: string }> = []
+  const flag: boolean[] = []
+  let current = opts.deploying ?? false
+  const statuses = opts.statuses ?? [{ status: 'applied' }]
+  const p: DeployPorts = {
+    sendDeploy:
+      opts.send ??
+      (async () => {
+        return { success: true, deploymentId: 'returned-id', updateId: 'job-1' }
+      }),
+    fetchStatus: async (deploymentId, updateId) => {
+      asked.push({ deploymentId, updateId })
+      const answer = statuses[Math.min(asked.length - 1, statuses.length - 1)]!
+      if (answer instanceof Error) throw answer
+      return answer
+    },
+    sleep: async () => {},
+    isDeploying: () => current,
+    setDeploying: (v) => {
+      current = v
+      flag.push(v)
+    },
+  }
+  const original = p.sendDeploy
+  p.sendDeploy = async () => {
+    sent.push(1)
+    return original()
+  }
+  return { p, sent, asked, flag }
+}
+
+const U: SidebarUpdateStatusResponse = { status: 'unreadable' }
+const C: SidebarUpdateStatusResponse = { status: 'compiling' }
+const A: SidebarUpdateStatusResponse = { status: 'applied', notices: [] }
+const R: SidebarUpdateStatusResponse = {
+  status: 'rejected',
+  error: 'type error',
+}
+
+const run = (p: DeployPorts) =>
+  runDeploy(p, {
+    deploymentId: 'asked-for-id',
+    reviewNotices: [],
+    schemas: [],
+  })
+
+describe('runDeploy: send once, poll, finish', () => {
+  // A result that cannot be read is logged (and tested to be, below): keep the
+  // run quiet.
+  let logged: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const sequences: Array<[string, Array<SidebarUpdateStatusResponse | Error>]> =
+    [
+      ['applied at once', [A]],
+      ['compiling, then applied', [C, A]],
+      [
+        'unreadable twice, compiling, unreadable twice, applied',
+        [U, U, C, U, U, A],
+      ],
+      ['unreadable three times', [U, U, U]],
+      ['rejected', [R]],
+      ['compiling for ever (the poll times out)', [C]],
+      ['a thrown error each time', [new Error('boom')]],
+    ]
+
+  for (const [name, statuses] of sequences) {
+    it(`sends the deploy exactly once: ${name}`, async () => {
+      const { p, sent } = ports({ statuses })
+      await run(p)
+      expect(sent).toHaveLength(1)
+    })
+
+    it(`asks for the job by the id the send returned, every time: ${name}`, async () => {
+      const { p, asked } = ports({ statuses })
+      await run(p)
+      expect(asked.length).toBeGreaterThan(0)
+      for (const a of asked) {
+        expect(a).toEqual({ deploymentId: 'returned-id', updateId: 'job-1' })
+      }
+    })
+
+    it(`clears the deploying flag once the run is over: ${name}`, async () => {
+      const { p, flag } = ports({ statuses })
+      await run(p)
+      expect(flag).toEqual([true, false])
+    })
+  }
+
+  it('uses the id it was asked for when the send returns none', async () => {
+    const { p, asked } = ports({
+      send: async () => ({ success: true, updateId: 'job-2' }),
+    })
+    await run(p)
+    expect(asked[0]!.deploymentId).toBe('asked-for-id')
+  })
+
+  it('asks for no job when the send returns none (resolved at once)', async () => {
+    const { p, asked } = ports({
+      send: async () => ({ success: true, deploymentId: 'd' }),
+    })
+    const result = await run(p)
+    expect(asked).toEqual([])
+    expect(result).toMatchObject({
+      kind: 'done',
+      finish: { toast: { message: 'Deployed "d" successfully.' } },
+    })
+  })
+
+  it('finishes with what the job said: applied and rejected', async () => {
+    const applied = await run(ports({ statuses: [A] }).p)
+    expect(applied).toMatchObject({
+      kind: 'done',
+      finish: { toast: { type: 'info' } },
+    })
+    const rejected = await run(ports({ statuses: [R] }).p)
+    expect(rejected).toMatchObject({
+      kind: 'done',
+      finish: {
+        toast: {
+          type: 'error',
+          message: 'Deploy "returned-id" rejected: type error',
+        },
+      },
+    })
+  })
+
+  it('does nothing when a deploy is already in progress', async () => {
+    const { p, sent, asked, flag } = ports({ deploying: true })
+    expect(await run(p)).toEqual({ kind: 'busy' })
+    expect(sent).toEqual([])
+    expect(asked).toEqual([])
+    expect(flag).toEqual([])
+  })
+
+  it('does not start a second deploy while the first polls', async () => {
+    // The first run is still polling (its poll never answers) when a second
+    // starts: the second finds the flag set and sends nothing.
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const first = ports({ statuses: [C, A] })
+    const slow = first.p.fetchStatus
+    first.p.fetchStatus = async (id, job) => {
+      await held
+      return slow(id, job)
+    }
+    const running = run(first.p)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(await run(first.p)).toEqual({ kind: 'busy' })
+    expect(first.sent).toHaveLength(1)
+    release()
+    await running
+    expect(first.sent).toHaveLength(1)
+  })
+
+  it('reports a send that failed, clears the flag, and polls nothing', async () => {
+    const { p, asked, flag } = ports({
+      send: async () => ({ success: false, error: 'no such file' }),
+    })
+    expect(await run(p)).toEqual({
+      kind: 'failed',
+      toast: { type: 'error', message: 'no such file' },
+    })
+    expect(asked).toEqual([])
+    expect(flag).toEqual([true, false])
+  })
+
+  it('says "Deploy failed" for a failed send that gave no reason', async () => {
+    const { p } = ports({ send: async () => ({ success: false }) })
+    expect(await run(p)).toMatchObject({
+      toast: { message: 'Deploy failed' },
+    })
+  })
+
+  it('reports a send that throws, clears the flag, and never reads the thrown value as [object Object]', async () => {
+    for (const thrown of [
+      new Error('port closed'),
+      { message: 'port closed' },
+    ]) {
+      const { p, flag, asked } = ports({
+        send: async () => {
+          throw thrown
+        },
+      })
+      expect(await run(p)).toEqual({
+        kind: 'failed',
+        toast: { type: 'error', message: 'port closed' },
+      })
+      expect(flag).toEqual([true, false])
+      expect(asked).toEqual([])
+    }
+  })
+
+  it('logs why a result could not be read', async () => {
+    const { p } = ports({
+      statuses: [{ status: 'unreadable', error: 'HTTP 502' }],
+    })
+    await run(p)
+    expect(logged).toHaveBeenCalledTimes(1)
+    expect(String(logged.mock.calls[0]![0])).toContain('returned-id')
+    expect(logged.mock.calls[0]![1]).toBe('HTTP 502')
   })
 })
