@@ -197,6 +197,6 @@ makes the default take effect for a rule given no value.
 - [WITH](../functions/WITH.md) — supplying, and overriding, an input by name
 - [DECLARE](DECLARE.md) — declaring record types
 - [GIVEN](../functions/GIVEN.md) — the inputs of one rule
-- [Query Planning](../query-planning/README.md) — the planner that decides which question to ask next, and takes a `BOOLEAN` input on a rule's own `GIVEN` as likely to have its usual value
+- [Query Planning](../query-planning/README.md) — the planner that decides which question to ask next, and takes a `BOOLEAN` input on a rule's own `GIVEN`, or an `ASSUME`, as likely to have its usual value
 - [Getting Ready to Deploy](../../courses/advanced/module-a4-production.md#getting-ready-to-deploy)
   — TYPICALLY in a published rule

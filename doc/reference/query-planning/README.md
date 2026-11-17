@@ -21,7 +21,7 @@ If it is answered `TRUE`, both are still needed.
 
 An input that can no longer change the outcome is not asked.
 Of the inputs still needed, the planner puts first the one whose answer is expected to tell the most about the outcome.
-It treats each input as equally likely to be answered either way, except a `BOOLEAN` input on the rule's own `GIVEN` that has a [TYPICALLY](../types/TYPICALLY.md) value: that one is taken as likely to have its usual value, which can change the order.
+It treats each input as equally likely to be answered either way, except a `BOOLEAN` input on the rule's own `GIVEN`, or a `BOOLEAN` `ASSUME`, that has a [TYPICALLY](../types/TYPICALLY.md) value: that one is taken as likely to have its usual value, which can change the order.
 
 ## Where you meet it
 
