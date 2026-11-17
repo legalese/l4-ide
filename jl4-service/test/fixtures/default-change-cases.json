@@ -215,6 +215,32 @@
           }
         ]
       }
+    },
+    {
+      "name": "input retyped (number to string): breaking by the existing rule, its default is not compared",
+      "function": "the smaller of",
+      "old": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 0 }
+        },
+        "required": ["a"]
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "string", "default": "0" }
+        },
+        "required": ["a"]
+      },
+      "expect": {
+        "breaking": [
+          "the smaller of parameter b type changed from number to string"
+        ],
+        "notices": []
+      }
     }
   ]
 }

@@ -293,7 +293,7 @@ defaultChangesSpec = describe "Compatibility.detectDefaultChanges" do
     -- The positive control for the loop below: a fixture that loaded as
     -- nothing would pass every case it never ran.
     it "loaded the cases" do
-      length cases `shouldSatisfy` (>= 8)
+      length cases `shouldSatisfy` (>= 9)
     forM_ cases \c -> it (Text.unpack c.caseName) do
       let old = fn c.caseFunction c.caseOld "" Nothing
           new = fn c.caseFunction c.caseNew "" Nothing
