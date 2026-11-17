@@ -89,13 +89,13 @@
           >
         {/if}
       </div>
-      {#if status.hint}
-        <div class="param-hint nested">{status.hint}</div>
-      {/if}
       {#if nestedParam.description}
         <div class="param-desc nested">
           {nestedParam.description}
         </div>
+      {/if}
+      {#if status.hint}
+        <div class="param-hint nested">{status.hint}</div>
       {/if}
       {#if nestedParam.enum && nestedParam.enum.length > 0}
         <div class="param-enums nested">
@@ -176,11 +176,11 @@
                 >{status.label}</span
               >
             </div>
-            {#if status.hint}
-              <div class="param-hint">{status.hint}</div>
-            {/if}
             {#if param.description}
               <div class="param-desc">{param.description}</div>
+            {/if}
+            {#if status.hint}
+              <div class="param-hint">{status.hint}</div>
             {/if}
             {#if param.enum && param.enum.length > 0}
               <div class="param-enums">
