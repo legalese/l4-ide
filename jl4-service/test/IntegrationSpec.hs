@@ -3283,7 +3283,8 @@ spec = describe "integration" do
 
   -- An EITHER input is read as the schema writes it (card J3, option B): on the
   -- direct path, and through JSONDECODE on the wrapper path, which `pad: {}`
-  -- takes. A bare value is read as before, without its side.
+  -- takes. Any other form, a bare value among them, is refused, naming the
+  -- input, on every path (review of #779, 2026-11-17).
   describe "reads an EITHER input as {\"LEFT\": [v]} or {\"RIGHT\": [v]}" do
     aroundAll (\k -> withServiceFromSources "either-in" [("either.l4", eitherInputJL4)] (curry k)) do
       let call baseUrl mgr fn args = evalFunction baseUrl mgr "either-in" fn (Aeson.object ["arguments" Aeson..= args])
@@ -3323,6 +3324,64 @@ spec = describe "integration" do
       it "refuses an object that is neither form, on the direct path" \(baseUrl, mgr) ->
         call baseUrl mgr "side" (side (Aeson.object ["RIGHT" Aeson..= [1 :: Int, 2]]))
           >>= (`shouldCarry` Refuses "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}")
+      -- The reviewer's rule: `WHEN RIGHT amount THEN amount * 0.05`, `OTHERWISE
+      -- 50`. A bare 2000 reached it without its side and answered 50, on both
+      -- paths, in a batch and through MCP.
+      describe "refuses a bare value, or an object with both keys, naming the input" do
+        let refusal = "Parameter 'the claim': an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}"
+            claim v extra = Aeson.object (("the claim" Aeson..= v) : extra)
+            bare = Aeson.Number 2000
+            both = Aeson.object ["LEFT" Aeson..= ["x" :: Text], "RIGHT" Aeson..= [1 :: Int]]
+            wrapped = ["pad" Aeson..= Aeson.object []]
+        it "answers the published form, on both paths" \(baseUrl, mgr) -> do
+          let right = Aeson.object ["RIGHT" Aeson..= [2000 :: Int]]
+          call baseUrl mgr "fee" (claim right []) >>= (`shouldCarry` Answers (Aeson.Number 100))
+          call baseUrl mgr "fee" (claim right wrapped) >>= (`shouldCarry` Answers (Aeson.Number 100))
+        it "on the direct path" \(baseUrl, mgr) -> do
+          call baseUrl mgr "fee" (claim bare []) >>= (`shouldCarry` Refuses refusal)
+          call baseUrl mgr "fee" (claim both []) >>= (`shouldCarry` Refuses refusal)
+          call baseUrl mgr "fee" (claim (Aeson.String "2000") []) >>= (`shouldCarry` Refuses refusal)
+        it "on the wrapper path" \(baseUrl, mgr) -> do
+          call baseUrl mgr "fee" (claim bare wrapped) >>= (`shouldCarry` Refuses refusal)
+          call baseUrl mgr "fee" (claim both wrapped) >>= (`shouldCarry` Refuses refusal)
+        it "in a record's field, on both paths" \(baseUrl, mgr) -> do
+          let boxed extra = Aeson.object (("b" Aeson..= Aeson.object ["v" Aeson..= bare]) : extra)
+              inField = "Parameter 'b': an EITHER is written"
+          call baseUrl mgr "boxed" (boxed []) >>= (`shouldCarry` Refuses inField)
+          call baseUrl mgr "boxed" (boxed wrapped) >>= (`shouldCarry` Refuses inField)
+        it "in an element of a list" \(baseUrl, mgr) ->
+          call baseUrl mgr "total" (Aeson.object ["es" Aeson..= [Aeson.object ["RIGHT" Aeson..= [1 :: Int]], bare]])
+            >>= (`shouldCarry` Refuses "Parameter 'es': an EITHER is written")
+        it "of a contract rule" \(baseUrl, mgr) -> do
+          resp <- evalFunction baseUrl mgr "either-in" "duty%20by%20side"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["e" Aeson..= bare], "startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])])
+          resp `shouldCarry` Refuses "Parameter 'e': an EITHER is written"
+        it "in a batch case" \(baseUrl, mgr) -> do
+          req <- buildJsonPost (baseUrl <> "/deployments/either-in/functions/fee/evaluation/batch")
+            (Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "the claim" Aeson..= bare]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "the claim" Aeson..= bare, "pad" Aeson..= Aeson.Null]
+                  , Aeson.object ["@id" Aeson..= (3 :: Int), "the claim" Aeson..= Aeson.object ["RIGHT" Aeson..= [2000 :: Int]]]
+                  ]
+              ])
+          resp <- httpLbs req mgr
+          wireAt resp ["cases"] `shouldBe` Right (Aeson.toJSON
+            [ Aeson.object ["@id" Aeson..= (1 :: Int), "@error" Aeson..= refusal]
+            , Aeson.object ["@id" Aeson..= (2 :: Int), "@error" Aeson..= refusal]
+            , Aeson.object ["@id" Aeson..= (3 :: Int), "value" Aeson..= (100 :: Int)]
+            ])
+        it "in an MCP tool call" \(baseUrl, mgr) -> do
+          called <- mcpRpc baseUrl mgr "either-in" "tools/call" $ Aeson.object
+            ["name" Aeson..= ("fee" :: Text), "arguments" Aeson..= claim bare []]
+          fmap fst (mcpPayloadText =<< called) `shouldBe` Just True
+          fmap (Text.isInfixOf "an EITHER is written" . snd) (mcpPayloadText =<< called) `shouldBe` Just True
+        it "still calls a missing, null or {} EITHER input missing" \(baseUrl, mgr) -> do
+          let missing = "Parameter 'the claim': missing required parameter"
+          call baseUrl mgr "fee" (Aeson.object []) >>= (`shouldCarry` Refuses missing)
+          call baseUrl mgr "fee" (claim Aeson.Null []) >>= (`shouldCarry` Refuses missing)
+          call baseUrl mgr "fee" (claim (Aeson.object []) []) >>= (`shouldCarry` Refuses missing)
 
   describe "compiler" do
     it "compiles valid L4 sources" do
@@ -4529,4 +4588,18 @@ eitherInputJL4 = Text.unlines
   , "  CONSIDER e"
   , "  WHEN LEFT s THEN PARTY alice MUST ping WITHIN 3"
   , "  WHEN RIGHT n THEN PARTY bob MUST pong WITHIN n"
+  , ""
+  , "@export Fee"
+  , "GIVEN `the claim` IS AN EITHER STRING NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`fee` MEANS"
+  , "  CONSIDER `the claim`"
+  , "  WHEN RIGHT amount THEN amount * 0.05"
+  , "  OTHERWISE 50"
+  , ""
+  , "@export Total"
+  , "GIVEN es IS A LIST OF (EITHER STRING NUMBER)"
+  , "GIVETH A NUMBER"
+  , "`total` MEANS 0"
   ]

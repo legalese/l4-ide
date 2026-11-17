@@ -1,0 +1,18 @@
+-- An EITHER input, read by l4 batch (review of #779, 2026-11-17).
+-- A bare value used to reach the rule without its side, so the CONSIDER fell
+-- through to OTHERWISE and the claim of 2000 answered 50.
+
+DECLARE Box HAS v IS AN EITHER STRING NUMBER
+
+@export default Fee for a claim
+GIVEN `the claim` IS AN EITHER STRING NUMBER
+GIVETH A NUMBER
+fee MEANS
+  CONSIDER `the claim`
+  WHEN RIGHT amount THEN amount * 0.05
+  OTHERWISE 50
+
+@export Fee for a boxed claim
+GIVEN b IS A Box
+GIVETH A NUMBER
+`boxed fee` MEANS fee WITH `the claim` IS b's v

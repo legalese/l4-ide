@@ -188,7 +188,10 @@ A record is an object keyed by its constructor's name, holding its fields: `{"Pa
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 An `EITHER` answer is `{"RIGHT": [v]}` or `{"LEFT": [v]}`, the value in an array of one, and the published schema describes it so, with both keys optional.
-An `EITHER` input is read in the same form, `{"RIGHT": [5]}` or `{"LEFT": ["x"]}`; a bare `5` still reaches the rule as a number, without its side.
+An `EITHER` input is read in the same form, `{"RIGHT": [5]}` or `{"LEFT": ["x"]}`, and in no other.
+A bare `5`, an object with both keys or neither, or `{"RIGHT": 5}` without the array is refused with a `422` that names the input: `Parameter 'e': an EITHER is written {"LEFT": [value]} or {"RIGHT": [value]}`.
+That holds at any depth (in a record's field, a list's element or a `MAYBE`), on both paths, in a batch case (its `@error`) and in an MCP tool call (`isError`).
+A missing, `null` or `{}` `EITHER` input is missing, as any other is.
 
 A function that reaches a `REFUSE` gives no answer: it declines to, with its author's reason.
 The response is a `200`, as for an answer, with the body `{"tag": "Refused", "contents": {"kind": "refused", "reason": "not modelled"}}`: its `contents` is the refusal, where an answer's `contents` has a `result`. A refusal is how the rules answer that case, so it is not an error: a `422` is only an evaluation that stops with one.

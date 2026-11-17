@@ -86,7 +86,7 @@ import L4.Syntax
   ( AppForm(..), Declare(..), Module(..), Resolved, Section(..), TopDecl(Declare, Section)
   , Type'(..), TypeDecl(..), Unique, getUnique
   )
-import L4.TypeCheck.Environment (maybeUnique)
+import L4.TypeCheck.Environment (eitherUnique, maybeUnique)
 
 import L4.Cli.Common
 
@@ -355,6 +355,17 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
             , Key.fromString "errors" Aeson..= errs
             ]
       in pure (env, not ok)
+  -- An input typed EITHER, sent in another form than {"LEFT": [v]} or
+  -- {"RIGHT": [v]}, is refused here, naming the input; the wrapper's
+  -- JSONDECODE would refuse it too, but without the input's name.
+  | errs@(_ : _) <- eitherFieldErrors synonyms schema input = pure
+      ( Aeson.object
+          [ Key.fromString "input"       Aeson..= input
+          , Key.fromString "output"      Aeson..= Aeson.Null
+          , Key.fromString "status"      Aeson..= ("error" :: Text)
+          , Key.fromString "diagnostics" Aeson..= errs
+          ]
+      , True )
   | otherwise = do
       let wrapperCode     = generateBatchWrapper exportFn.exportName params input
           combinedProgram = filteredSource <> wrapperCode
@@ -430,7 +441,7 @@ resultExceptionMsgs (MkEvalDirectiveResult _ res _) = case res of
 -- that primitive-typed values have the right JSON kind. Lenient on
 -- compound/unknown types (never rejects what it cannot judge).
 validateRow :: Map.Map Unique (Type' Resolved) -> [ExportedParam] -> Aeson.Value -> [Text]
-validateRow synonyms schema (Aeson.Object o) = concatMap checkParam schema
+validateRow synonyms schema input@(Aeson.Object o) = concatMap checkParam schema <> eitherFieldErrors synonyms schema input
   where
     -- a synonym for @MAYBE@ is a @MAYBE@ (@DECLARE MaybeYear IS A MAYBE NUMBER@),
     -- as evaluation reads it, though the export's own flag does not see that
@@ -454,6 +465,30 @@ validateRow synonyms schema (Aeson.Object o) = concatMap checkParam schema
       _ -> ""
 validateRow _ _ other =
   [ "Input record is not a JSON object: " <> jsonKindName other ]
+
+-- | An input whose type is an EITHER (behind MAYBEs and synonyms) sent in
+-- another form than @{"LEFT": [v]}@ or @{"RIGHT": [v]}@ (the wire-form bench,
+-- card J3, option B), by name. A missing or null input is left to the checks
+-- for those; an EITHER further down, in a record or a list, is refused by
+-- JSONDECODE when the row is evaluated.
+eitherFieldErrors :: Map.Map Unique (Type' Resolved) -> [ExportedParam] -> Aeson.Value -> [Text]
+eitherFieldErrors synonyms schema (Aeson.Object o) =
+  [ "Field '" <> p.paramName <> "': an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}"
+  | p <- schema
+  , Just ty <- [p.paramType]
+  , TyApp _ name [_, _] <- [throughMaybe synonyms ty]
+  , getUnique name == eitherUnique
+  , Just v <- [KeyMap.lookup (Key.fromText p.paramName) o]
+  , v /= Aeson.Null
+  , not (eitherForm v)
+  ]
+  where
+    eitherForm = \case
+      Aeson.Object kv
+        | [(k, Aeson.Array vec)] <- KeyMap.toList kv
+        , Vector.length vec == 1 -> Key.toText k `elem` ["LEFT", "RIGHT"]
+      _ -> False
+eitherFieldErrors _ _ _ = []
 
 data PrimKind = KNum | KBool | KStr
 

@@ -583,7 +583,61 @@ nonMaybeValue
   -> Type' Resolved
   -> FnLiteral
   -> Either Text (Expr Resolved)
-nonMaybeValue mi ty = \case
+nonMaybeValue mi ty
+  -- An EITHER is read only as the schema publishes it, {"LEFT": [v]} or
+  -- {"RIGHT": [v]} (the wire-form bench, card J3, option B). A bare value, or
+  -- an object with both keys or neither, is refused: read without its side,
+  -- it reached the rule as a value its type does not allow (review of #779,
+  -- 2026-11-17).
+  | Just (leftTy, rightTy) <- stripEither ty = \case
+      FnObject [("LEFT", FnArray [v])] -> side TypeCheck.leftRef leftTy v
+      FnObject [("RIGHT", FnArray [v])] -> side TypeCheck.rightRef rightTy v
+      FnUnknown -> Left "unknown value for a non-MAYBE parameter"
+      FnUncertain -> Left "uncertain value is not supported in direct evaluation"
+      _ -> Left eitherFormMessage
+  | otherwise = nonEitherValue mi ty
+  where
+    side ref sideTy v = do
+      e <- fnLiteralToExprTyped mi sideTy (Just v)
+      Right (App emptyAnno ref [e])
+
+-- | What a request is told when it sends an EITHER in any other form.
+eitherFormMessage :: Text
+eitherFormMessage = "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}"
+
+-- | The first place in an input's value where an EITHER is not written
+-- @{"LEFT": [v]}@ or @{"RIGHT": [v]}@, with 'eitherFormMessage'. It walks the
+-- value along its type, through MAYBE, LIST, records and synonyms, and passes
+-- over a missing, unknown or uncertain value, which the paths answer for
+-- themselves. Run before a request is routed, so the wrapper path, which reads
+-- its inputs with JSONDECODE, refuses with the input's name as the direct
+-- path does.
+eitherFormError :: ModuleInfo -> Type' Resolved -> FnLiteral -> Maybe Text
+eitherFormError mi ty0 val = case val of
+  FnUnknown -> Nothing
+  FnUncertain -> Nothing
+  _ | Just inner <- stripMaybe ty -> case val of
+        FnLitString "NOTHING" -> Nothing
+        _ -> eitherFormError mi inner val
+    | Just (leftTy, rightTy) <- stripEither ty -> case val of
+        FnObject [("LEFT", FnArray [v])] -> eitherFormError mi leftTy v
+        FnObject [("RIGHT", FnArray [v])] -> eitherFormError mi rightTy v
+        _ -> Just eitherFormMessage
+    | Just elemTy <- stripList ty, FnArray xs <- val ->
+        listToMaybe (mapMaybe (eitherFormError mi elemTy) xs)
+    | Just (_, decl) <- lookupRecord mi ty, FnObject fields <- val ->
+        listToMaybe
+          [ e | (fname, fty) <- decl, Just v <- [lookup fname fields], Just e <- [eitherFormError mi fty v] ]
+    | otherwise -> Nothing
+  where
+    ty = expandSyn mi ty0
+
+nonEitherValue
+  :: ModuleInfo
+  -> Type' Resolved
+  -> FnLiteral
+  -> Either Text (Expr Resolved)
+nonEitherValue mi ty = \case
   FnLitInt i     -> Right (Lit emptyAnno (NumericLit emptyAnno (fromIntegral i)))
   FnLitDouble d  -> Right (Lit emptyAnno (NumericLit emptyAnno
                             (toRational (Scientific.fromFloatDigits d))))
@@ -619,15 +673,7 @@ nonMaybeValue mi ty = \case
     case stripList ty of
       Just elemTy -> List emptyAnno <$> traverse (\v -> fnLiteralToExprTyped mi elemTy (Just v)) xs
       Nothing     -> Left "FnArray but expected type is not LIST"
-  -- An EITHER is written as the schema publishes it, {"LEFT": [v]} or
-  -- {"RIGHT": [v]} (the wire-form bench, card J3, option B). A value that is
-  -- not an object is read as before, without its side.
   FnObject fields
-    | Just (leftTy, rightTy) <- stripEither ty ->
-        case fields of
-          [("LEFT", FnArray [v])] -> side TypeCheck.leftRef leftTy v
-          [("RIGHT", FnArray [v])] -> side TypeCheck.rightRef rightTy v
-          _ -> Left "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}"
     | Just (ctorRef, decl) <- lookupRecord mi ty -> do
         -- Walk the record's fields in declaration order and pick each
         -- value from the supplied FnObject (missing fields are handled
@@ -640,10 +686,6 @@ nonMaybeValue mi ty = \case
         Left "FnObject but expected type is not a known record"
   FnUnknown   -> Left "unknown value for a non-MAYBE parameter"
   FnUncertain -> Left "uncertain value is not supported in direct evaluation"
-  where
-    side ref sideTy v = do
-      e <- fnLiteralToExprTyped mi sideTy (Just v)
-      Right (App emptyAnno ref [e])
 
 -- | Get the function's Resolved name from the compiled decide
 getFunctionResolved :: Decide Resolved -> Resolved
@@ -701,12 +743,41 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params trace
       assumeNameOf r = rawNameToText (rawName (getActual r))
       assumeValues = [(assumeNameOf r, join $ Map.lookup (assumeNameOf r) inputMap) | (r, _) <- assumeRefs]
 
+  checkEitherForms compiled params
+
   -- Fall back to the wrapper path only for values the direct path can't express
   -- as AST (FnObject / FnUncertain / FnUnknown / missing non-MAYBE). ASSUMEs
   -- are handled directly via LetIn bindings.
   if requiresWrapperEvaluation (fullParams ++ assumeValues)
     then evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz
     else evaluateDirectAST compiled fullParams assumeRefs assumeValues traceLevel includeGraphViz
+
+-- | Refuse a request that sends an EITHER in any form but @{"LEFT": [v]}@ or
+-- @{"RIGHT": [v]}@, anywhere in an input, naming the input as the direct path
+-- does ('evaluateDirectAST'). It runs before a request is routed, so the
+-- wrapper path, a batch case, an MCP tool call and a contract rule refuse it
+-- alike; without it the wrapper's JSONDECODE refuses it too, but without the
+-- input's name.
+checkEitherForms :: CompiledModule -> [(Text, Maybe FnLiteral)] -> ExceptT EvaluatorError IO ()
+checkEitherForms compiled params =
+  case listToMaybe (mapMaybe bad (givens <> assumes)) of
+    Just err -> throwError (InterpreterError err)
+    Nothing -> pure ()
+  where
+    mi = buildModuleInfo compiled.compiledAllDeclares
+    inputMap = Map.fromList params
+    valueOf name = join (Map.lookup name inputMap)
+    givens =
+      [ ("Parameter '" <> name <> "'", ty, valueOf name)
+      | (name, ty) <- extractParamTypes compiled.compiledDecide ]
+    assumes =
+      [ ("ASSUME '" <> name <> "'", ty, valueOf name)
+      | (r, ty) <- extractAssumeParamResolveds compiled.compiledModule compiled.compiledDecide
+      , let name = rawNameToText (rawName (getActual r)) ]
+    bad (label, ty, mVal) = do
+      v <- mVal
+      err <- eitherFormError mi ty v
+      pure (label <> ": " <> err)
 
 -- | Evaluate a deontic function with startTime and events via EVALTRACE wrapper.
 -- Always uses the wrapper path since events need to go through L4 typechecking.
@@ -728,6 +799,8 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
   let givenParamTypes = maybeSynonymHeads compiled.compiledAllDeclares (extractParamTypes compiled.compiledDecide)
       assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
         (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
+
+  checkEitherForms compiled params
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params

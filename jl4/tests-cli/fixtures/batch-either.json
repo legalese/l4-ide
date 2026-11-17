@@ -1,0 +1,7 @@
+[
+  { "the claim": 2000 },
+  { "the claim": { "RIGHT": [2000] } },
+  { "the claim": { "LEFT": ["x"] } },
+  { "the claim": { "LEFT": ["x"], "RIGHT": [1] } },
+  { "the claim": { "RIGHT": 2000 } }
+]

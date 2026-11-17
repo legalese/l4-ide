@@ -1328,21 +1328,33 @@ jsonValueToWHNFTyped jsonValue ty0 = do
             innerRef <- allocateValue innerVal
             pure $ ValConstructor TypeCheck.justRef [innerRef]
 
-    -- An EITHER in the form the service publishes, {"LEFT": [v]} or {"RIGHT": [v]}
-    -- (card J3, option B; JSONENCODE writes {"RIGHT": v}, which is not read so).
-    -- Anything else is decoded as it was, without its type.
+    -- An EITHER is read only in the form the service publishes, {"LEFT": [v]}
+    -- or {"RIGHT": [v]} (card J3, option B). Anything else, a bare value or an
+    -- object with both keys or neither, is refused, as a value of the wrong
+    -- JSON type is for a NUMBER: read without its side, it reached the rule
+    -- as a value its type does not allow, and a CONSIDER on it fell through to
+    -- its OTHERWISE (review of #779, 2026-11-17). JSONENCODE writes
+    -- {"RIGHT": v}, without the array, which is refused too.
     TyApp _anno eitherRef [leftType, rightType]
-      | getUnique eitherRef == TypeCheck.eitherUnique
-      , Aeson.Object obj <- jsonValue
-      , [(key, Aeson.Array vec)] <- KeyMap.toList obj
-      , [v] <- Vector.toList vec
-      , Just (conRef, sideType) <- case Key.toText key of
-          "LEFT" -> Just (TypeCheck.leftRef, leftType)
-          "RIGHT" -> Just (TypeCheck.rightRef, rightType)
-          _ -> Nothing -> do
-        sideVal <- jsonValueToWHNFTyped v sideType
-        sideRef <- allocateValue sideVal
-        pure $ ValConstructor conRef [sideRef]
+      | getUnique eitherRef == TypeCheck.eitherUnique ->
+        case eitherSide jsonValue of
+          Just (conRef, sideType, v) -> do
+            sideVal <- jsonValueToWHNFTyped v sideType
+            sideRef <- allocateValue sideVal
+            pure $ ValConstructor conRef [sideRef]
+          Nothing ->
+            userException $ UserError $
+              "Expected an EITHER written {\"LEFT\": [value]} or {\"RIGHT\": [value]} but got: " <> Text.pack (show jsonValue)
+      where
+        eitherSide = \case
+          Aeson.Object obj
+            | [(key, Aeson.Array vec)] <- KeyMap.toList obj
+            , [v] <- Vector.toList vec ->
+                case Key.toText key of
+                  "LEFT" -> Just (TypeCheck.leftRef, leftType, v)
+                  "RIGHT" -> Just (TypeCheck.rightRef, rightType, v)
+                  _ -> Nothing
+          _ -> Nothing
 
     -- Handle custom record types and primitives: TyApp conRef []
     TyApp _anno tyRef [] -> do

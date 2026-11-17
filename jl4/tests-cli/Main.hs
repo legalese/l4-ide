@@ -553,6 +553,12 @@ batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 batchMaybeTextJson = fixtureDir </> "batch-maybe-text.json"
 
+-- | An EITHER input, as the input itself and as a record's field.
+batchEitherFixture, batchEitherJson, batchEitherBoxedJson :: FilePath
+batchEitherFixture = fixtureDir </> "batch-either.l4"
+batchEitherJson = fixtureDir </> "batch-either.json"
+batchEitherBoxedJson = fixtureDir </> "batch-either-boxed.json"
+
 -- | A CSV with columns no input declares, run against 'batchEligFixture'.
 batchUndeclaredColumnCsv :: FilePath
 batchUndeclaredColumnCsv = fixtureDir </> "batch-undeclared-column.csv"
@@ -4356,6 +4362,30 @@ spec bin = do
             resultOf number `shouldBe` Just (Number 25)
             show (objField notANumber "diagnostics") `shouldSatisfy` ("abc" `isInfixOf`)
           other -> expectationFailure ("expected 3 rows, got " ++ show (length other))
+
+      -- An EITHER input is read only as {"LEFT": [v]} or {"RIGHT": [v]} (card
+      -- J3, option B). A bare value reached the rule without its side, so the
+      -- CONSIDER fell through to its OTHERWISE: the claim of 2000 answered 50
+      -- (review of #779, 2026-11-17). An input is refused by name; a record's
+      -- field by JSONDECODE, which names the form.
+      it "refuses an EITHER input that is not {\"LEFT\": [v]} or {\"RIGHT\": [v]}, at the top and in a record" $ do
+        let diagnosed want row = show (objField row "diagnostics") `shouldSatisfy` (want `isInfixOf`)
+        (code, _, rows) <- rowsOf [batchEitherFixture, "--inputs", batchEitherJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["error", "success", "success", "error", "error"]
+        case rows of
+          [bare, right, left, both, noArray] -> do
+            resultOf bare `shouldBe` Nothing
+            resultOf right `shouldBe` Just (Number 100)
+            resultOf left `shouldBe` Just (Number 50)
+            forM_ [bare, both, noArray] (diagnosed "Field 'the claim': an EITHER is written {")
+          other -> expectationFailure ("expected 5 rows, got " ++ show (length other))
+        (code', _, boxed) <- rowsOf [batchEitherFixture, "-e", "boxed fee", "--inputs", batchEitherBoxedJson]
+        code' `shouldSatisfy` (/= ExitSuccess)
+        map statusAndResult (drop 1 boxed) `shouldBe` [succeeded (Number 100)]
+        forM_ (take 1 boxed) (diagnosed "Expected an EITHER written")
+        (_, _, validated) <- rowsOf [batchEitherFixture, "--inputs", batchEitherJson, "--validate-only"]
+        map (`objField` "status") validated `shouldBe` map (Just . String) ["invalid", "valid", "valid", "invalid", "invalid"]
 
       -- An input declared through a synonym is the type the synonym stands for
       -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:
