@@ -327,6 +327,13 @@ What else works:
   request the same way they supply a read `ASSUME`, and fill in a name's
   `TYPICALLY` value when the request leaves it out (see
   [TYPICALLY](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
+  `l4 batch` hands the name to the rules by name, as `#EVAL` does, so an inner
+  `WITH` that overrides it works. Two limits (measured 2026-11-18): a name
+  whose every read is overridden is still read from the case, which has to give
+  it a value of the right kind or leave it out, and two section `GIVEN`s of one
+  name, one in a section and one in a section inside it, that a single rule
+  reaches are refused by `l4 batch` where `#EVAL` answers. Both are described on
+  [the `l4` command-line page](../../tutorials/getting-started/l4-cli.md).
 - **Every export backend** — Decision Model and Notation (DMN), Business Process
   Model and Notation (BPMN), docassemble, Catala, OpenFisca, Blawx and the
   Multi-Level Intermediate Representation (MLIR) — treats a section `GIVEN` as
