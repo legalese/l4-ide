@@ -15,6 +15,30 @@ export type ShownBlock =
       }
     }
 
+/**
+ * A turn's web search citations: `earlier` with `later`'s added, each URL
+ * once, in the order first seen. A turn that pauses for client tools gets
+ * one `web_search` activity per response, each with only that response's
+ * citations, so a new list adds to the old one instead of replacing it.
+ */
+export function mergeSources<S extends { url: string }>(
+  earlier: readonly S[] | undefined,
+  later: readonly S[] | undefined
+): S[] | undefined {
+  if (!earlier && !later) return undefined
+  const byUrl = new Map<string, S>()
+  for (const s of [...(earlier ?? []), ...(later ?? [])]) {
+    if (!byUrl.has(s.url)) byUrl.set(s.url, s)
+  }
+  return [...byUrl.values()]
+}
+
+/** A `web_search` activity's message for `n` citations, as the AI service
+ *  words it. */
+export function sourcesLabel(n: number): string {
+  return n === 1 ? '1 source' : `${n} sources`
+}
+
 /** What a plain activity row puts on screen: a bold label, the message
  *  when it says something else, and whether its dot is red. */
 export function activityRow(activity: {

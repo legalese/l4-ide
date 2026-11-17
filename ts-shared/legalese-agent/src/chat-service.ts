@@ -1,8 +1,10 @@
-import type {
-  AiChatAttachment,
-  AiChatInjectParams,
-  AiChatMessage,
-  AiChatStartParams,
+import {
+  mergeSources,
+  sourcesLabel,
+  type AiChatAttachment,
+  type AiChatInjectParams,
+  type AiChatMessage,
+  type AiChatStartParams,
 } from 'jl4-client-rpc'
 import { AiError, type AiClient } from './ai-client.js'
 import {
@@ -880,15 +882,19 @@ export class ChatService {
         // survive a history reload. Single row per turn keyed on the
         // fixed `web_search` tool name; `running → done` collapses in
         // place (the running event has no sources, the done event
-        // carries the full list).
+        // carries the list). A turn that pauses for client tools gets
+        // one activity per response, each with that response's
+        // citations, so the lists are merged, not replaced.
         if (ev.tool === 'web_search') {
           const existing = blocks.find(
             (b) => b.kind === 'tool-activity' && b.tool === 'web_search'
           )
           if (existing && existing.kind === 'tool-activity') {
             existing.status = ev.status
-            existing.message = ev.message
-            if (ev.sources !== undefined) existing.sources = ev.sources
+            existing.sources = mergeSources(existing.sources, ev.sources)
+            existing.message = existing.sources
+              ? sourcesLabel(existing.sources.length)
+              : ev.message
           } else {
             blocks.push({
               kind: 'tool-activity',

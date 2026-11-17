@@ -31,6 +31,8 @@ import {
   type AiMentionCandidate,
   type AiPermissionCategory,
   type AiPermissionValue,
+  mergeSources,
+  sourcesLabel,
 } from 'jl4-client-rpc'
 
 export interface PendingQuestion {
@@ -1396,7 +1398,15 @@ export function createAiChatStore(
           b.activity.status = params.status
           if (params.message) b.activity.message = params.message
           if (params.label !== undefined) b.activity.label = params.label
-          if (params.sources !== undefined) b.activity.sources = params.sources
+          // One activity per response of the turn (a pause for client
+          // tools starts a new one): add to the citations, don't replace.
+          if (params.sources !== undefined) {
+            b.activity.sources = mergeSources(
+              b.activity.sources,
+              params.sources
+            )
+            b.activity.message = sourcesLabel(b.activity.sources!.length)
+          }
           if (params.error !== undefined) b.activity.error = params.error
           return
         }
