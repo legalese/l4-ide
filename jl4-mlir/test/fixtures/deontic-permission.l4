@@ -1,0 +1,17 @@
+-- Parity fixture: a permission (MAY) whose window has not closed is still
+-- waiting, on jl4-service as on the WASM runtime; it is FULFILLED only once
+-- its deadline has passed unused, and its HENCE applies only if it is used.
+
+DECLARE Party IS ONE OF `the holder`, `the issuer`
+DECLARE `Option Action` IS ONE OF `exercise the option`, `pay the strike`, `send a notice`
+
+@export default an option the holder may exercise within 10, then pay within 5
+GIVETH A DEONTIC Party `Option Action`
+`option contract` MEANS
+    PARTY `the holder`
+    MAY `exercise the option`
+    WITHIN 10
+    HENCE
+        PARTY `the holder`
+        MUST `pay the strike`
+        WITHIN 5

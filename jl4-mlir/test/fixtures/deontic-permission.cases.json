@@ -1,0 +1,30 @@
+{
+  "option-contract": [
+    { "arguments": {}, "startTime": 0, "events": [] },
+    {
+      "arguments": {},
+      "startTime": 0,
+      "events": [{ "party": "the issuer", "action": "send a notice", "at": 4 }]
+    },
+    {
+      "arguments": {},
+      "startTime": 0,
+      "events": [{ "party": "the issuer", "action": "send a notice", "at": 12 }]
+    },
+    {
+      "arguments": {},
+      "startTime": 0,
+      "events": [
+        { "party": "the holder", "action": "exercise the option", "at": 3 }
+      ]
+    },
+    {
+      "arguments": {},
+      "startTime": 0,
+      "events": [
+        { "party": "the holder", "action": "exercise the option", "at": 3 },
+        { "party": "the holder", "action": "pay the strike", "at": 6 }
+      ]
+    }
+  ]
+}

@@ -536,6 +536,35 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     verdict(rule("MAY", "exercise", 5), [at("Bob", "ping", 10)]),
     FULFILLED,
   );
+  // A permission whose window has not closed is still waiting, as `l4 run`
+  // leaves it: `PARTY Alice MAY exercise WITHIN 5` with no event answers the
+  // rule itself, and with an unrelated event at 2, the rule with 3 left.
+  const openMay = (deadline) =>
+    JSON.stringify({
+      OBLIGATION: {
+        action: "exercise",
+        deadline,
+        modal: "MAY",
+        party: "Alice",
+      },
+    });
+  eq(
+    "deadline: a permission with no event yet is still waiting, not FULFILLED",
+    verdict(rule("MAY", "exercise", 5), []),
+    openMay("5"),
+  );
+  eq(
+    "deadline: a permission whose window is still open after an event is still waiting",
+    verdict(rule("MAY", "exercise", 5), [at("Bob", "ping", 2)]),
+    openMay(3),
+  );
+  eq(
+    "deadline: a permission still open does not take its HENCE",
+    verdict(rule("MAY", "exercise", 5, rule("MUST", "pay", 3)), [
+      at("Bob", "ping", 2),
+    ]),
+    openMay(3),
+  );
   eq(
     "deadline: a permission not used takes its LEST",
     verdict(rule("MAY", "exercise", 5, null, breach), [at("Bob", "ping", 10)]),

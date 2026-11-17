@@ -638,14 +638,11 @@ function runDeonticInternal(contract, startTime, events, args, meta) {
         continue;
       }
 
-      if (modal === "MAY") {
-        // MAY is a permission — no event = terminal FULFILLED.
-        current = { kind: "FULFILLED" };
-        continue;
-      }
-
-      // Residual OBLIGATION. If 'now' has advanced past the
-      // obligation's start (real events tested against it), surface
+      // Residual OBLIGATION, for a permission as for a duty: a MAY whose
+      // window has not closed is still waiting, as in the core evaluator; it
+      // is FULFILLED only once its deadline has passed (lapse, above).
+      // If 'now' has advanced past the obligation's start (real events
+      // tested against it), surface
       // the *remaining* time as a JSON number; otherwise hand back
       // the original WITHIN literal as a string (matches
       // jl4-service's lazy display of un-instantiated obligations).
