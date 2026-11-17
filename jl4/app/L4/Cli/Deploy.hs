@@ -198,7 +198,7 @@ publish mode opts = do
 
   (outcome, notices) <-
     if opts.noWait
-      then pure (Right "accepted", [])
+      then pure (Right "accepted", Nothing)
       else case updateId of
         Just job -> do
           note "Compiling…"
@@ -206,10 +206,10 @@ publish mode opts = do
         -- No job: the sources are identical to what's deployed (or an
         -- older service). Fall back to the deployment's own status.
         Nothing
-          | (accepted >>= textField "status") == Just "ready" -> pure (Right "unchanged", [])
+          | (accepted >>= textField "status") == Just "ready" -> pure (Right "unchanged", Nothing)
           | otherwise -> do
               note "Compiling…"
-              (\o -> (o, [])) <$> waitForDeployment t depName
+              (\o -> (o, Nothing)) <$> waitForDeployment t depName
 
   case outcome of
     Left err -> do
@@ -223,7 +223,7 @@ publish mode opts = do
           note (err <> hint)
           -- a changed default is reported beside a rejection too, so the
           -- caller sees every change in the upload at once
-          mapM_ note (renderDefaultNotices False notices)
+          mapM_ note (renderDefaultNotices False (fromMaybe [] notices))
       exitFailure
     Right "accepted" ->
       if opts.jsonOut
@@ -253,7 +253,7 @@ publish mode opts = do
                    [] -> "."
                    _ -> " with " <> plural (length fns) "function" <> ":"
           mapM_ (Text.putStrLn . ("  " <>)) fns
-          mapM_ Text.putStrLn (renderDefaultNotices True notices)
+          mapM_ Text.putStrLn (renderDefaultNotices True (fromMaybe [] notices))
           Text.putStrLn ("API: " <> url)
   where
     verb = case mode of
@@ -350,19 +350,22 @@ getDeployment t depName = do
 
 -- | Poll a deploy/update job until it's applied (Right) or rejected (Left),
 -- with the job's notices: the published defaults the upload changed (U2
--- option B, 2026-11-17: reported, never blocking). An older service sends no
--- @notices@, which reads as none.
-waitForJob :: Target -> Text -> Text -> IO (Either Text Text, [Aeson.Value])
+-- option B, 2026-11-17: reported, never blocking). 'Nothing' is a service that
+-- did not say (an older one sends no @notices@ key, and a job that was not
+-- polled has none to read); @Just []@ is a service that said there were none.
+-- @--json@ carries the difference as @null@ and @[]@, so that a script reading
+-- @.notices@ does not take "the service did not say" for "nothing changed".
+waitForJob :: Target -> Text -> Text -> IO (Either Text Text, Maybe [Aeson.Value])
 waitForJob t depName job = poll \n -> do
   r <- send t =<< newRequest t "GET" (updatePath t depName job)
   if r.status == 404 && n == 0
-    then Just . (\o -> (o, [])) <$> waitForDeployment t depName -- a service without job polling
+    then Just . (\o -> (o, Nothing)) <$> waitForDeployment t depName -- a service without job polling
     else do
       unless (isSuccess r) $ pollFailed t depName r
       let o = decodeObject r.body
           notices = case o >>= KeyMap.lookup "notices" of
-            Just (Aeson.Array a) -> Vector.toList a
-            _ -> []
+            Just (Aeson.Array a) -> Just (Vector.toList a)
+            _ -> Nothing
       pure $ case o >>= textField "status" of
         Just "applied" -> Just (Right "deployed", notices)
         Just "rejected" -> Just (Left (fromMaybe "The update was rejected." (o >>= textField "error")), notices)

@@ -83,6 +83,13 @@ appliedOld = Aeson.object
   [ "updateId" Aeson..= ("job-1" :: String), "deploymentId" Aeson..= ("late-fee" :: String)
   , "status" Aeson..= ("applied" :: String) ]
 
+-- | The @notices@ member of the JSON a command printed; 'Nothing' when there
+-- is no such member, so that "null" and "absent" are not mixed up either.
+noticesIn :: String -> Maybe Aeson.Value
+noticesIn out = case Aeson.decode (BSL8.pack out) of
+  Just (Aeson.Object o) -> KeyMap.lookup "notices" o
+  _ -> Nothing
+
 spec :: FilePath -> Spec
 spec bin = describe "l4 redeploy, a changed default (stub service)" $ do
   let redeploy port extra = runL4 bin
@@ -118,11 +125,22 @@ spec bin = describe "l4 redeploy, a changed default (stub service)" $ do
       sout `shouldSatisfy` ("Deployed 'late-fee'" `isInfixOf`)
       sout `shouldSatisfy` (not . ("Changed default" `isInfixOf`))
 
-  it "reads a job with no notices at all (an older service) as none" $
+  it "prints nothing extra for a job from an older service, which sent no notices" $
     against appliedOld $ \port -> do
       Output code sout _ <- redeploy port []
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` (not . ("Changed default" `isInfixOf`))
+
+  -- A script reading .notices must be able to tell a service that said there
+  -- were none ([]) from one that did not say (null): an older service sends
+  -- no notices at all.
+  it "says [] under --json when the service said there were none, and null when it did not say" $ do
+    against (applied []) $ \port -> do
+      Output _ sout _ <- redeploy port ["--json"]
+      noticesIn sout `shouldBe` Just (Aeson.Array mempty)
+    against appliedOld $ \port -> do
+      Output _ sout _ <- redeploy port ["--json"]
+      noticesIn sout `shouldBe` Just Aeson.Null
 
   it "lists the changed defaults beside the error when the update is rejected, and still fails" $
     against (rejected [fee]) $ \port -> do
