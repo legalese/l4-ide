@@ -624,7 +624,7 @@ The deployment is named after the file unless you pass `--name`. `l4` typechecks
 | `l4 deployments`   | Lists your organization's deployments.                                                                                                                              |
 | `l4 undeploy NAME` | Deletes a deployment after you type its name to confirm. In scripts, pass `--yes`.                                                                                  |
 
-`--json` prints machine-readable results, and `--no-wait` returns as soon as the upload is accepted instead of waiting for it to compile.
+`--json` prints machine-readable results, and `--no-wait` returns as soon as the upload is accepted instead of waiting for it to compile. With `--no-wait`, the JSON has no `notices` key at all, because the job has not finished and the service has said nothing about it yet.
 
 An update that changes the default of an input, the value a rule uses when a caller leaves that input out, is applied and not blocked. The command lists each change after the deployed functions (an input inside a record is named by its path, `cfg.retries`, and one inside a list of records is written with `[]` for the elements, `jobs[].retries`), and `--json` carries the same list as `notices`. In `--json`, `notices` is `[]` when the service said that no default changed, and `null` when the service did not say, as an older service does not; a script should read `null` as "not reported", not as "nothing changed":
 
