@@ -9,6 +9,9 @@ module L4.EvaluateLazy.Machine
 , Machine
 , Eval
 , EvalState (..)
+, ContractMemo
+, emptyContractMemo
+, resetContractMemo
 , Stack (..)
 , emptyStack
 , runEval
@@ -92,6 +95,8 @@ import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
 import L4.Utils.Ratio
 import Text.Read (readMaybe)
+import qualified Data.IntMap.Strict as IntMap
+import System.Mem.StableName (StableName, makeStableName, hashStableName)
 import qualified Data.Scientific as Sci
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Exception (SomeException, catch)
@@ -174,6 +179,10 @@ data EvalState =
       -- mark never withholds an event from a layer; it only lets the
       -- machine refuse a chain whose deadlines have stopped advancing,
       -- loudly, instead of walking it forever.
+    , contractMemo :: !(IORef ContractMemo)
+      -- ^ the results of RAND and ROR operands already applied to a clock and
+      -- events, by 'AppliedKey' (see 'applyOperand'). Emptied at each
+      -- directive and whenever the temporal context changes.
     }
 
 data Stack =
@@ -341,6 +350,8 @@ putTemporalContext :: TemporalContext -> Eval ()
 putTemporalContext ctx = do
   r <- asks (.temporalContext)
   liftIO (writeIORef r ctx)
+  -- a rule that reads the clock or the timezone could answer differently now
+  resetContractMemo
 
 -- | Record that an EVENT value (identified by its store address) has been
 -- re-offered to a HENCE/LEST continuation in a stalled hand-off, with its
@@ -364,6 +375,132 @@ isReoffered :: Reference -> Eval (Maybe Reoffered)
 isReoffered rf = do
   r <- asks (.reofferedEvents)
   liftIO (Map.lookup rf.address <$> readIORef r)
+
+-- | The memo behind 'applyOperand': applications of RAND and ROR operands
+-- already evaluated, and the names each rule's syntax uses. Each map is keyed
+-- by a hash, and holds every entry with that hash with its whole key.
+data ContractMemo = MkContractMemo
+  { applied   :: !(IntMap.IntMap [(AppliedKey, WHNF)])
+  , ruleNamesOf :: !(IntMap.IntMap [(RuleSyntax, [Unique])])
+  }
+
+emptyContractMemo :: ContractMemo
+emptyContractMemo = MkContractMemo IntMap.empty IntMap.empty
+
+resetContractMemo :: Eval ()
+resetContractMemo = do
+  r <- asks (.contractMemo)
+  liftIO (writeIORef r emptyContractMemo)
+
+-- | NOTE [Applying RAND and ROR operands once]
+--
+-- Every operand of a RAND or ROR is applied to the clock and the events of
+-- the compound. When two operands, at whatever depth, are the same rule
+-- applied to the same clock and events, they reach the same result, because
+-- evaluation is pure; so the second is answered from the memo instead of
+-- being evaluated again.
+--
+-- This is what keeps a rule that names itself, or two rules that name each
+-- other, under a RAND or ROR from costing twice as much at every window: @x@
+-- and @y@, each @WITHIN 1 LEST (x RAND y)@, start @x@ and @y@ again at every
+-- window an event is past, once from @x@'s @LEST@ and once from @y@'s, so the
+-- applications double at each window although only two of them, @x@ and @y@
+-- from that window's deadline, are different. 'sameRule' catches only the case
+-- where both operands are written as the same name; this catches every case,
+-- however the rule is reached (a second name for it, a parameter, a rule
+-- that names the other).
+--
+-- The key ('AppliedKey') is the rule's syntax node by identity, what every
+-- name the rule uses denotes, the clock, and the events, each compared only
+-- by what can be seen without evaluating anything. Only a rule written as a
+-- 'Regulative' and not yet advanced by an event is keyed; a compound operand
+-- is evaluated as before, and its own operands are keyed.
+--
+-- The memo is consulted only at an operand, never at the hand-off from a
+-- rule to its @HENCE@ or @LEST@. A hand-off is a tail call, and a chain of
+-- them, an event a million windows late, keeps the stack flat; recording a
+-- result there would need a frame per window. An operand already holds a
+-- frame for its RAND or ROR, and adds one more.
+--
+-- What it does not change: the result. An application answered from the memo
+-- returns the very value the first one did. What it does change: a trace
+-- (#EVALTRACE) shows that operand returning at once, without the steps the
+-- first application took.
+memoKey :: WHNF -> [Reference] -> Eval (Maybe AppliedKey)
+memoKey (ValObligation env (Left party) act (Left due) followup lest) [time, events] = do
+  memoR <- asks (.contractMemo)
+  reofferedR <- asks (.reofferedEvents)
+  liftIO do
+    syn <- MkRuleSyntax
+      <$> stableName party <*> stableName act <*> stableName due
+      <*> stableName followup <*> stableName lest
+    let h = ruleSyntaxHash syn
+    memo <- readIORef memoR
+    names <- case lookup syn =<< IntMap.lookup h memo.ruleNamesOf of
+      Just names -> pure names
+      Nothing -> do
+        let names = Set.toList $ Set.fromList $ map getUnique $
+              toList party <> toList act <> foldMap toList due <> toList followup <> foldMap toList lest
+        atomicModifyIORef' memoR \ m ->
+          (m { ruleNamesOf = IntMap.insertWith (<>) h [(syn, names)] m.ruleNamesOf }, ())
+        pure names
+    nameKeys <- for [ (u, rf) | u <- names, Just rf <- [Map.lookup u env] ] \ (u, rf) ->
+      (u,) <$> referenceKey rf
+    clockKey <- referenceKey time
+    eventsKey <- eventListKey reofferedR events
+    pure (Just (MkAppliedKey syn nameKeys clockKey eventsKey))
+  where
+    stableName :: a -> IO (StableName a)
+    stableName x = Control.Exception.evaluate x >>= makeStableName
+memoKey _ _ = pure Nothing
+
+ruleSyntaxHash :: RuleSyntax -> Int
+ruleSyntaxHash (MkRuleSyntax a b _ d _) = hashStableName a * 7919 + hashStableName b * 31 + hashStableName d
+
+appliedHash :: AppliedKey -> Int
+appliedHash k = ruleSyntaxHash k.ruleSyntax * 1000003 + case k.clock of
+  KNumber n -> fromInteger ((numerator n * 31 + denominator n) `mod` 1000003)
+  _ -> 0
+
+-- | What a reference denotes, without evaluating it ('ValueKey'): a number or
+-- a string already evaluated, or a literal not yet evaluated, by its value; a
+-- name not yet evaluated by what the name refers to, a few steps deep; and
+-- anything else by the reference itself.
+referenceKey :: Reference -> IO ValueKey
+referenceKey = go (8 :: Int)
+  where
+    go d rf = do
+      thunk <- readIORef rf.pointer
+      case thunk of
+        WHNF (ValNumber n) -> pure (KNumber n)
+        WHNF (ValString t) -> pure (KString t)
+        Unevaluated tids e env
+          | Set.null tids, d > 0 -> case e of
+              Lit _ (NumericLit _ n) -> pure (KNumber n)
+              Lit _ (StringLit _ t) -> pure (KString t)
+              Var _ n | Just rf' <- lookupTerm env n -> go (d - 1) rf'
+              App _ n [] | Just rf' <- lookupTerm env n -> go (d - 1) rf'
+              _ -> pure (KAddress rf.address)
+        _ -> pure (KAddress rf.address)
+
+-- | A list of events, without evaluating it ('EventsKey'). The head event's
+-- 'Reoffered' mark is part of it: the walk that reads the event depends on it.
+eventListKey :: IORef (Map Address Reoffered) -> Reference -> IO EventsKey
+eventListKey reofferedR rf = do
+  thunk <- readIORef rf.pointer
+  case thunk of
+    WHNF ValNil -> pure KNoEvents
+    WHNF (ValCons e es) -> do
+      ev <- readIORef e.pointer
+      case ev of
+        WHNF (ValEvent p a t) -> do
+          pk <- referenceKey p
+          ak <- referenceKey a
+          tk <- referenceKey t
+          mark <- Map.lookup e.address <$> readIORef reofferedR
+          pure (KEvent pk ak tk (fmap (\ m -> (m.highWater, m.stalled)) mark) es.address)
+        _ -> pure (KEventsAt rf.address)
+    _ -> pure (KEventsAt rf.address)
 
 -- | How many hand-offs in a row a re-offered event may make to a
 -- continuation whose deadline is no later than one it has already revealed
@@ -483,6 +620,12 @@ continueDone whnf = pure (DoneMachine whnf)
 -- once matters for a rule that names itself on both sides, @x RAND x@: there,
 -- each window an event is past would otherwise double the work. Any other pair
 -- compares unequal, so two operands that could differ are never merged.
+--
+-- This is only the case that can be seen in the syntax, and it is kept because
+-- it also decides how such a compound prints before it is applied to events.
+-- The same rule reached any other way, under another name, through a
+-- parameter, or from two rules that name each other, is applied once by the
+-- memo behind 'applyOperand' (NOTE [Applying RAND and ROR operands once]).
 sameRule :: Expr Resolved -> Expr Resolved -> Bool
 sameRule (App _ n1 args1) (App _ n2 args2) =
   getUnique n1 == getUnique n2
@@ -685,9 +828,9 @@ backward val = withPoppedFrame $ \ case
         -- make sure to reassemble the operation after returning
         pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
         -- apply the arguments of the left hand expression to the
-        -- expression
-        pushFrame f
-        maybeEvaluate env rexpr1 -- TODO: build application
+        -- expression, once it is a rule (see 'applyOperand')
+        pushFrame (ContractFrame (ROperand rs))
+        maybeEvaluate env rexpr1
       ValUnaryBuiltinFun fn -> do
         r <- expect1 rs
         pushFrame (UnaryBuiltin0 fn mTy)
@@ -1146,9 +1289,17 @@ backwardContractFrame val = \ case
     -- push a frame for when the evaluation of the
     -- second argument has completed
     pushCFrame $ RBinOp2 MkRBinOp2 {rval1 = val, ..}
-    -- pass the arguments to the regulative expression
-    pushFrame $ App1 args Nothing
+    -- pass the arguments to the regulative expression (see 'applyOperand')
+    pushCFrame (ROperand args)
     maybeEvaluate env rexpr2
+
+  ROperand args -> applyOperand val args
+
+  MemoStore key -> do
+    memoR <- asks (.contractMemo)
+    liftIO $ atomicModifyIORef' memoR \ m ->
+      (m { applied = IntMap.insertWith (<>) (appliedHash key) [(key, val)] m.applied }, ())
+    continueBackward val
 
   RBinOp2 MkRBinOp2 {..}
     -- if both obligations have been breached — with ANY mix of breach kinds
@@ -1246,6 +1397,28 @@ backwardContractFrame val = \ case
       ValNumber i -> pure i
       v -> internalException $ RuntimeTypeError $
         "expected a NUMBER but got: " <> prettyLayout v
+
+-- | Apply an operand of a RAND or ROR, now evaluated to a rule, to the
+-- compound's clock and events: from the memo if the same rule has already been
+-- applied to the same, and otherwise by evaluating it and recording the
+-- result. See NOTE [Applying RAND and ROR operands once].
+applyOperand :: WHNF -> [Reference] -> Machine Config
+applyOperand rule args = do
+  mkey <- memoKey rule args
+  case mkey of
+    Nothing -> apply
+    Just key -> do
+      memoR <- asks (.contractMemo)
+      memo <- liftIO (readIORef memoR)
+      case lookup key =<< IntMap.lookup (appliedHash key) memo.applied of
+        Just result -> continueBackward result
+        Nothing -> do
+          pushFrame (ContractFrame (MemoStore key))
+          apply
+  where
+    apply = do
+      pushFrame (App1 args Nothing)
+      continueBackward rule
 
 maybeEvaluate :: Environment -> MaybeEvaluated -> Machine Config
 maybeEvaluate env = either (continueExpr env) continueBackward
