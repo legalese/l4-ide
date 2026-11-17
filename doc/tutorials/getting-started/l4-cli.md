@@ -630,7 +630,18 @@ The deployment is named after the file unless you pass `--name`. `l4` typechecks
 | `l4 deployments`   | Lists your organization's deployments.                                                                                                                              |
 | `l4 undeploy NAME` | Deletes a deployment after you type its name to confirm. In scripts, pass `--yes`.                                                                                  |
 
-`--json` prints machine-readable results, and `--no-wait` returns as soon as the upload is accepted instead of waiting for it to compile.
+`--json` prints machine-readable results, and `--no-wait` returns as soon as the upload is accepted instead of waiting for it to compile. With `--no-wait`, the JSON has no `notices` key at all, because the job has not finished and the service has said nothing about it yet.
+
+An update that changes the default of an input, the value a rule uses when a caller leaves that input out, is applied and not blocked. The command lists each change after the deployed functions (an input inside a record is named by its path, `cfg.retries`, and one inside a list of records is written with `[]` for the elements, `jobs[].retries`), and `--json` carries the same list as `notices`. In `--json`, `notices` is `[]` when the service said that no default changed, and `null` when the service did not say, as an older service does not; a script should read `null` as "not reported", not as "nothing changed":
+
+```
+Deployed 'late-fee' (version 1.0.1) with 1 function:
+  fee
+Changed default (reported, not blocking): a caller that leaves it out now gets the new value.
+  fee, input grace days: 5 -> 7
+```
+
+If the same update also breaks an integration and is rejected, the rejection lists the changed defaults too, except for an input whose type changed: that is reported as the break, and its old and new defaults are not compared. The report covers only a default that is a plain value on both the old and the new version. It does not see a rate or threshold written in the body of a rule, and two numbers that differ only beyond about 16 digits count as equal. See [Manage rules in git and CI](version-control-for-rules.md#redeploy-when-a-merge-changes-a-live-api).
 
 ### Your own jl4-service
 

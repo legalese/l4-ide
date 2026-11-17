@@ -161,6 +161,16 @@ When you redeploy to an existing deployment name, the interface of the new bundl
 - narrowing the accepted values of an input enum
 - changing a rule's return type, removing a result field, or widening an output enum with values consumers may not handle
 
+**Reported, not blocked:** changing the _default_ of an input, which is the value a rule uses when a caller leaves that input out (see [TYPICALLY](../../reference/types/TYPICALLY.md)). The update goes through, and the deploy result lists each changed default: the rule, the input, its old value and its new value. An input inside a record is named by its path, such as `cfg.retries`, and one inside a list of records is written with `[]` for the list's elements, such as `jobs[].retries`. Nothing about the shape of the interface changed, but a caller who leaves the input out now gets an answer computed from the new value, so it is worth telling the people who depend on the rule. A changed default does not count as a breaking change, so the breaking component of the version does not move. Adding a default stays compatible and is not reported, and removing one makes the input required, which is breaking. A default is reported only when the old and the new version both publish one.
+
+What the report cannot see:
+
+- A default that is not a plain value (a number, a piece of text, `TRUE`, `FALSE`, `NOTHING`, `EMPTY`, which is published as an empty list, or a named choice) is not published, so a change to it is not reported. The same goes for a default written on an `ASSUME`.
+- An input whose type changed is reported as a breaking change, and its old and new defaults are not compared. An update rejected for a retyped input therefore lists no changed default for that input, although its default changed too.
+- Right after an upgrade, a deployment that the service loaded without compiling it again can report one default that did not change: an older service published a list input's `EMPTY` default as the text "EMPTY", and the same file now publishes `[]`. It goes away once the deployment has been compiled again, which any redeploy does.
+- Two numbers that differ only beyond about 16 digits compare as equal.
+- A rate or threshold written inside the body of a rule is not a default, so changing it is not reported. The check compares what a rule asks for, and does not compare what it answers.
+
 Both surfaces enforce this. The VS Code Deploy tab runs the check client-side and warns you before you confirm ([Update a deployment](../deploying-rules/exporting-rules-for-deployment.md#update-a-deployment)); the service runs the same diff server-side on a guarded update and rejects it outright with a message listing every incompatibility:
 
 ```

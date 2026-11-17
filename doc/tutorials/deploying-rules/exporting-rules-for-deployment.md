@@ -74,6 +74,8 @@ Deploying to a name that already exists updates that deployment. The extension f
 
 The `l4` command deploys the same way. Sign in once with the `legalese` command (`l4 install legalese`, then `legalese login`), then run `l4 deploy insurance-premium.l4` to create the deployment and `l4 redeploy insurance-premium.l4` to update it; `redeploy` refuses breaking changes unless you add `--force`. `l4 deployments` lists your deployments and `l4 undeploy NAME` removes one. With `--server`, the same commands deploy to a jl4-service you run yourself. See [Using the l4 CLI](../getting-started/l4-cli.md).
 
+A changed default is not a breaking change. If an update changes the default of an input, the value a rule uses when a caller leaves that input out, the service applies the update and reports each such change (the rule, the input, the old value and the new one) in the result of the deploy, and `l4 deploy` and `l4 redeploy` print it. The report sees only a default that is a plain value on both versions; a rate written in the body of a rule is not a default, and a change to one is not reported. An input whose type changed is reported as a breaking change and its defaults are not compared, so a rejection for a retyped input lists no changed default for it.
+
 ---
 
 ## Step 4: Manage deployments

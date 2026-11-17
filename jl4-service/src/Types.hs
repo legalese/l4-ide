@@ -5,6 +5,7 @@ module Types (
   DeploymentState (..),
   UpdateJob (..),
   UpdateJobStatus (..),
+  DefaultChange (..),
   DeploymentMetadata (..),
   FunctionSummary (..),
   FileEntry (..),
@@ -95,10 +96,44 @@ data UpdateJob = UpdateJob
 data UpdateJobStatus
   = JobCompiling
   -- ^ Bundle is compiling / being compatibility-checked.
-  | JobApplied
-  -- ^ The new bundle is compiled, compatible, and now the live version.
-  | JobRejected !Text
-  -- ^ Rejected: breaking change, compile failure, or timeout (reason).
+  | JobApplied ![DefaultChange]
+  -- ^ The new bundle is compiled, compatible, and now the live version. Carries
+  -- the notices: each published default this upload changed (U2 option B,
+  -- 2026-11-17: a changed default is reported, never blocked).
+  | JobRejected !Text ![DefaultChange]
+  -- ^ Rejected: breaking change, compile failure, or timeout (reason). A
+  -- rejection for a breaking change lists the notices too, so that a caller
+  -- fixing the break sees every change in the upload at once; compile failure
+  -- and timeout have no new interface to compare, so carry none.
+
+-- | A published default an upload changes, reported beside the deploy result
+-- and never blocking it (U2 option B, bench 2026-11-17). On the wire:
+-- @{"kind":"default-changed","function":...,"input":...,"old":...,"new":...}@,
+-- the shape the deploy sidebar reads. @input@ is the dotted path of the input
+-- (a record field is @cfg.retries@).
+data DefaultChange = DefaultChange
+  { dcFunction :: !Text
+  , dcInput    :: !Text
+  , dcOld      :: !Aeson.Value
+  , dcNew      :: !Aeson.Value
+  }
+  deriving stock (Eq, Show)
+
+instance ToJSON DefaultChange where
+  toJSON c = Aeson.object
+    [ "kind"     .= ("default-changed" :: Text)
+    , "function" .= c.dcFunction
+    , "input"    .= c.dcInput
+    , "old"      .= c.dcOld
+    , "new"      .= c.dcNew
+    ]
+
+instance FromJSON DefaultChange where
+  parseJSON = Aeson.withObject "DefaultChange" $ \o -> do
+    kind <- o .: "kind"
+    if kind == ("default-changed" :: Text)
+      then DefaultChange <$> o .: "function" <*> o .: "input" <*> o .: "old" <*> o .: "new"
+      else fail ("unknown notice kind " <> show kind)
 
 -- | Metadata persisted alongside a deployment bundle.
 data DeploymentMetadata = DeploymentMetadata

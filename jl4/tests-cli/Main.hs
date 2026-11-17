@@ -58,6 +58,7 @@ import qualified CliTest.Coverage as Coverage
 import qualified CliTest.DmnBpmn as DmnBpmn
 import qualified CliTest.Ledger as Ledger
 import qualified CliTest.Explore as Explore
+import qualified CliTest.Deploy as Deploy
 import qualified CliTest.SiblingReads as SiblingReads
 import qualified CliTest.WithOverride as WithOverride
 import qualified CliTest.Docassemble as Docassemble
@@ -5722,6 +5723,7 @@ spec bin = do
   Explore.spec bin
   SiblingReads.spec bin
   WithOverride.spec bin
+  Deploy.spec bin
   Prove.spec bin
   BuildVersion.spec bin
   BuildIdentity.spec

@@ -196,9 +196,9 @@ publish mode opts = do
         , "updateId"   Aeson..= updateId
         ] <> extra
 
-  outcome <-
+  (outcome, notices) <-
     if opts.noWait
-      then pure (Right "accepted")
+      then pure (Right "accepted", Nothing)
       else case updateId of
         Just job -> do
           note "Compiling…"
@@ -206,10 +206,10 @@ publish mode opts = do
         -- No job: the sources are identical to what's deployed (or an
         -- older service). Fall back to the deployment's own status.
         Nothing
-          | (accepted >>= textField "status") == Just "ready" -> pure (Right "unchanged")
+          | (accepted >>= textField "status") == Just "ready" -> pure (Right "unchanged", Nothing)
           | otherwise -> do
               note "Compiling…"
-              waitForDeployment t depName
+              (\o -> (o, Nothing)) <$> waitForDeployment t depName
 
   case outcome of
     Left err -> do
@@ -218,8 +218,12 @@ publish mode opts = do
               "\nTo apply it anyway, run `l4 redeploy " <> Text.pack opts.file <> nameFlag opts <> " --force`."
             _ -> ""
       if opts.jsonOut
-        then BSL8.putStrLn (Aeson.encode (result "rejected" ["error" Aeson..= err]))
-        else note (err <> hint)
+        then BSL8.putStrLn (Aeson.encode (result "rejected" ["error" Aeson..= err, "notices" Aeson..= notices]))
+        else do
+          note (err <> hint)
+          -- a changed default is reported beside a rejection too, so the
+          -- caller sees every change in the upload at once
+          mapM_ note (renderDefaultNotices False (fromMaybe [] notices))
       exitFailure
     Right "accepted" ->
       if opts.jsonOut
@@ -239,6 +243,7 @@ publish mode opts = do
           [ "version"   Aeson..= version
           , "functions" Aeson..= fns
           , "url"       Aeson..= url
+          , "notices"   Aeson..= notices
           ]
         else do
           Text.putStrLn $
@@ -248,6 +253,7 @@ publish mode opts = do
                    [] -> "."
                    _ -> " with " <> plural (length fns) "function" <> ":"
           mapM_ (Text.putStrLn . ("  " <>)) fns
+          mapM_ Text.putStrLn (renderDefaultNotices True (fromMaybe [] notices))
           Text.putStrLn ("API: " <> url)
   where
     verb = case mode of
@@ -342,19 +348,59 @@ getDeployment t depName = do
   r <- send t =<< newRequest t "GET" (deploymentPath t depName)
   pure (if isSuccess r then decodeObject r.body else Nothing)
 
--- | Poll a deploy/update job until it's applied (Right) or rejected (Left).
-waitForJob :: Target -> Text -> Text -> IO (Either Text Text)
+-- | Poll a deploy/update job until it's applied (Right) or rejected (Left),
+-- with the job's notices: the published defaults the upload changed (U2
+-- option B, 2026-11-17: reported, never blocking). 'Nothing' is a service that
+-- did not say (an older one sends no @notices@ key, and a job that was not
+-- polled has none to read); @Just []@ is a service that said there were none.
+-- @--json@ carries the difference as @null@ and @[]@, so that a script reading
+-- @.notices@ does not take "the service did not say" for "nothing changed".
+waitForJob :: Target -> Text -> Text -> IO (Either Text Text, Maybe [Aeson.Value])
 waitForJob t depName job = poll \n -> do
   r <- send t =<< newRequest t "GET" (updatePath t depName job)
   if r.status == 404 && n == 0
-    then Just <$> waitForDeployment t depName -- a service without job polling
+    then Just . (\o -> (o, Nothing)) <$> waitForDeployment t depName -- a service without job polling
     else do
       unless (isSuccess r) $ pollFailed t depName r
       let o = decodeObject r.body
+          notices = case o >>= KeyMap.lookup "notices" of
+            Just (Aeson.Array a) -> Just (Vector.toList a)
+            _ -> Nothing
       pure $ case o >>= textField "status" of
-        Just "applied" -> Just (Right "deployed")
-        Just "rejected" -> Just (Left (fromMaybe "The update was rejected." (o >>= textField "error")))
+        Just "applied" -> Just (Right "deployed", notices)
+        Just "rejected" -> Just (Left (fromMaybe "The update was rejected." (o >>= textField "error")), notices)
         _ -> Nothing
+
+-- | The lines that report the changed defaults of an upload; none when there
+-- are none. A notice is @{"kind":"default-changed","function":...,
+-- "input":...,"old":...,"new":...}@; one of another kind, or one that does not
+-- have that shape, is left out rather than guessed at. @applied@ says whether
+-- the update went ahead.
+renderDefaultNotices :: Bool -> [Aeson.Value] -> [Text]
+renderDefaultNotices applied notices =
+  case mapMaybe render notices of
+    [] -> []
+    ls -> heading (length ls) : ls
+ where
+  heading n
+    | applied =
+        "Changed " <> (if n == 1 then "default" else "defaults")
+          <> " (reported, not blocking): a caller that leaves "
+          <> (if n == 1 then "it" else "them") <> " out now gets "
+          <> (if n == 1 then "the new value" else "the new values") <> "."
+    | otherwise =
+        "The upload also changes " <> plural n "default"
+          <> " (reported, not a reason for the rejection):"
+  render = \case
+    Aeson.Object o
+      | textField "kind" o == Just "default-changed"
+      , Just fn <- textField "function" o
+      , Just input <- textField "input" o
+      , Just old <- KeyMap.lookup "old" o
+      , Just new <- KeyMap.lookup "new" o ->
+          Just ("  " <> fn <> ", input " <> input <> ": " <> showValue old <> " -> " <> showValue new)
+    _ -> Nothing
+  showValue = TE.decodeUtf8 . BSL.toStrict . Aeson.encode
 
 -- | Poll the deployment itself until it's ready or failed.
 waitForDeployment :: Target -> Text -> IO (Either Text Text)

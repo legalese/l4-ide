@@ -20,7 +20,7 @@ import ControlPlane (DeploymentStatusResponse (..))
 import Logging (newLogger, newLoggerTo)
 import Options (Options (..))
 import Ledger.Store.Config (defaultLedgerStoreConfig)
-import Shared (encodeMetadataCache)
+import Shared (encodeMetadataCache, presumptionSchema)
 import Types
 import L4.FunctionSchema (Parameters (..))
 
@@ -1146,6 +1146,27 @@ spec = describe "integration" do
         required `shouldContain` ["is adult"]
         (capacity >>= \case Aeson.Object c -> Aeson.KeyMap.lookup "default" c; _ -> Nothing)
           `shouldBe` Just (Aeson.Bool True)
+
+    -- EMPTY is the empty list. The constructor's own name is what an enum
+    -- default publishes, which for an array input said its default was the
+    -- text "EMPTY".
+    it "publishes a list input's TYPICALLY EMPTY as an empty array, not as the text EMPTY" do
+      withServiceFromSources "ty-empty" [("total.l4", Text.unlines
+        [ "@export default total"
+        , "GIVEN lst IS A LIST OF NUMBER TYPICALLY EMPTY"
+        , "GIVETH A NUMBER"
+        , "DECIDE total IS 0"
+        ])] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-empty/functions/total")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            lstSchema = case lookupKey "parameters" body of
+              Just (Aeson.Object params) | Just (Aeson.Object props) <- Aeson.KeyMap.lookup "properties" params ->
+                Aeson.KeyMap.lookup "lst" props
+              _ -> Nothing
+        (lstSchema >>= \case Aeson.Object l -> Aeson.KeyMap.lookup "default" l; _ -> Nothing)
+          `shouldBe` Just (Aeson.Array mempty)
 
     it "fills a left-out section GIVEN on the direct path and lists it in presumed" do
       withServiceFromSources "ty-sec-direct" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
@@ -4176,7 +4197,7 @@ spec = describe "integration" do
           provisionSource = [("contract.l4", Text.replace "GIVETH A DEONTIC Party `Contract Action`" "GIVETH A PROVISION OF Party, `Contract Action`" deonticExportJL4)]
           withProvision = withServiceFromSources provisionId provisionSource
           shape = fmap schemaProperties
-          deonticShape = Just ["arguments", "events", "startTime"]
+          deonticShape = Just ["arguments", "events", "presumption", "startTime"]
 
       it "is the sale contract written with the alias, and nothing else" do
         let written = Text.concat (map snd provisionSource)
@@ -4283,7 +4304,30 @@ spec = describe "integration" do
       it "is listed as a flat tool, with startTime and events among its inputs" do
         withServiceFromSources elapsedId elapsedSource \baseUrl mgr -> do
           schema <- mcpToolInputSchema baseUrl mgr elapsedId elapsedFn
-          fmap schemaProperties schema `shouldBe` Just ["events", "startTime"]
+          fmap schemaProperties schema `shouldBe` Just ["events", "presumption", "startTime"]
+
+    -- A tool, and a batch case, may give an input by the name a tool lists it
+    -- under, so an input spelt `events?` is the key `events`. The check that a
+    -- startTime or events is a trace and not an input compared the rule's own
+    -- spelling only, so such an input was refused as a trace sent to a rule that
+    -- is not a DEONTIC (the same class as the `arguments?` input).
+    describe "a rule that is not a DEONTIC, with an input spelt events? or startTime?" do
+      let ruleFor name maybeInput = Text.unlines
+            [ "@export default " <> name <> " q"
+            , "GIVEN `" <> name <> "?` IS A " <> (if maybeInput then "MAYBE " else "") <> "NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`" <> name <> " q` MEANS " <> (if maybeInput then "NOT `" <> name <> "?` EQUALS NOTHING" else "`" <> name <> "?` EQUALS 3")
+            ]
+      forM_ [("events" :: Text), "startTime"] \name ->
+        forM_ [(False, "a plain" :: String), (True, "a MAYBE")] \(isMaybe, kind) ->
+          it ("reads " <> kind <> " input spelt " <> Text.unpack name <> "? as an input, over MCP and in a batch") do
+            let did = "trace-q-" <> Text.toLower name <> (if isMaybe then "-maybe" else "-plain")
+                ruleName = name <> " q"
+            withServiceFromSources did [("q.l4", ruleFor name isMaybe)] \baseUrl mgr -> do
+              viaMcp <- askMcpWith baseUrl mgr did ruleName (Aeson.object [Aeson.Key.fromText name Aeson..= (3 :: Int)])
+              fmap (Map.lookup "value") viaMcp `shouldBe` Right (Just (FnLitBool True))
+              viaBatch <- askBatch baseUrl mgr did ruleName [Aeson.Key.fromText name Aeson..= (3 :: Int)] []
+              fmap (Map.lookup "value") viaBatch `shouldBe` Right (Just (FnLitBool True))
 
     -- Found in review, 2026-10-27: MCP left a top-level @arguments@ out of every
     -- call to a function that is not a DEONTIC, taking it for the wrapper a
@@ -4336,7 +4380,32 @@ spec = describe "integration" do
       it "is listed as a flat tool, with arguments among its inputs" do
         withServiceFromSources sevenId sevenSource \baseUrl mgr -> do
           schema <- mcpToolInputSchema baseUrl mgr sevenId sevenFn
-          fmap schemaProperties schema `shouldBe` Just ["arguments"]
+          fmap schemaProperties schema `shouldBe` Just ["arguments", "presumption"]
+
+      -- A tool is called with the names it lists, so an input spelt `arguments?`
+      -- is the key `arguments`: the check that a call's `arguments` is not an
+      -- input must ask the listed name, not the rule's spelling.
+      it "reads an input spelt arguments? as the key arguments, for a plain and for a MAYBE input" do
+        let sevenQ = [("seven.l4", Text.unlines
+              [ "@export default is seven q"
+              , "GIVEN `arguments?` IS A NUMBER"
+              , "GIVETH A BOOLEAN"
+              , "`is seven q` MEANS `arguments?` EQUALS 7"
+              ])]
+            givenQ = [("given.l4", Text.unlines
+              [ "@export default was given q"
+              , "GIVEN `arguments?` IS A MAYBE NUMBER"
+              , "GIVETH A BOOLEAN"
+              , "`was given q` MEANS NOT `arguments?` EQUALS NOTHING"
+              ])]
+        withServiceFromSources "deontic-arguments-q" sevenQ \baseUrl mgr -> do
+          schema <- mcpToolInputSchema baseUrl mgr "deontic-arguments-q" "is seven q"
+          fmap schemaProperties schema `shouldBe` Just ["arguments", "presumption"]
+          viaMcp <- askMcpWith baseUrl mgr "deontic-arguments-q" "is seven q" (Aeson.object ["arguments" Aeson..= (7 :: Int)])
+          answered viaMcp `shouldBe` isBool True
+        withServiceFromSources "deontic-arguments-q-maybe" givenQ \baseUrl mgr -> do
+          viaMcp <- askMcpWith baseUrl mgr "deontic-arguments-q-maybe" "was given q" (Aeson.object ["arguments" Aeson..= (3 :: Int)])
+          answered viaMcp `shouldBe` isBool True
 
       it "reads it as an input: the same answer on REST, on MCP and in a batch" do
         withServiceFromSources sevenId sevenSource \baseUrl mgr ->
@@ -4361,12 +4430,46 @@ spec = describe "integration" do
               ((e, s), surface :: String, answered answer) `shouldBe` ((e, s), surface, isBool expected)
 
       -- assumed, not ruled: an arguments that is not an input of the function
-      -- is still left out, as it was, and not read as one
-      it "still leaves out an arguments that is not one of its inputs, as the wrapper it may be" do
-        withServiceFromSources doubleId doubleSource \baseUrl mgr -> do
-          viaMcp <- askMcpWith baseUrl mgr doubleId doubleFn
-            (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.object ["n" Aeson..= (99 :: Int)]])
-          answered viaMcp `shouldBe` Right (Just (FnLitInt 6))
+      -- is refused, naming it and saying where the inputs go. It used to be left
+      -- out, so that {"arguments": {"m": 7}} on a rule whose only input is a
+      -- MAYBE or has a default was answered from what was left (NOTHING, the
+      -- default) with a success.
+      describe "an arguments that is not one of its inputs" do
+        let refusesWrapper what source ruleFn inputs = it what do
+              withServiceFromSources "mcp-stray-arguments" source \baseUrl mgr -> do
+                answer <- askMcpWith baseUrl mgr "mcp-stray-arguments" ruleFn inputs
+                case answer of
+                  Left msg -> (what, "`arguments` is not an input of this rule" `Text.isInfixOf` msg
+                                   , "top level of the call" `Text.isInfixOf` msg) `shouldBe` (what, True, True)
+                  Right r -> expectationFailure (what <> ": answered, not refused: " <> show r)
+            maybeOnly = [("maybe.l4", Text.unlines
+              [ "@export default seven or nothing"
+              , "GIVEN m IS A MAYBE NUMBER"
+              , "GIVETH A NUMBER"
+              , "`seven or nothing` MEANS"
+              , "  CONSIDER m"
+              , "    WHEN JUST p THEN p"
+              , "    WHEN NOTHING THEN 0"
+              ])]
+            defaulted = [("defaulted.l4", Text.unlines
+              [ "@export default five unless said"
+              , "GIVEN d IS A NUMBER TYPICALLY 5"
+              , "GIVETH A NUMBER"
+              , "DECIDE `five unless said` IS d"
+              ])]
+        refusesWrapper "is refused on a rule whose only input is a MAYBE" maybeOnly "seven or nothing"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["m" Aeson..= (7 :: Int)]])
+        refusesWrapper "is refused on a rule whose only input has a default" defaulted "five unless said"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["d" Aeson..= (7 :: Int)]])
+        refusesWrapper "is refused beside inputs that are given at the top level" doubleSource doubleFn
+          (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.object ["n" Aeson..= (99 :: Int)]])
+        refusesWrapper "is refused with a presumption inside it, which would otherwise be dropped" doubleSource doubleFn
+          (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.object ["presumption" Aeson..= ("hard" :: Text)]])
+        it "is a key left out when it is null, as in HTTP" do
+          withServiceFromSources doubleId doubleSource \baseUrl mgr -> do
+            viaMcp <- askMcpWith baseUrl mgr doubleId doubleFn
+              (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.Null])
+            answered viaMcp `shouldBe` Right (Just (FnLitInt 6))
 
     -- Meng, 2026-10-26: "trace going to non-DEONTIC should error." /evaluation
     -- has always answered 400 to a startTime or events for such a function. MCP
@@ -4897,6 +5000,229 @@ spec = describe "integration" do
                 in hasFileTool `shouldBe` False
               _ -> expectationFailure "Expected tools array"
           _ -> expectationFailure "Expected result object"
+
+  -- U3 option A (bench ruling 2026-11-17): MCP reads the reserved @presumption@
+  -- argument that @/evaluation@ and @l4 batch@ read, on every function tool.
+  describe "the MCP presumption switch (U3 option A)" do
+    let name = Aeson.Key.fromText
+        hardArg = "presumption" Aeson..= ("hard" :: Text)
+        asked baseUrl mgr did fn pairs = askMcpFull baseUrl mgr did fn (Aeson.object pairs)
+        capacityInputs = ["is adult" Aeson..= True, "unused flag" Aeson..= False] :: [Pair]
+        refusedWith what answer needle = case answer of
+          Left msg -> (what :: String, needle `Text.isInfixOf` msg) `shouldBe` (what, True)
+          Right r -> expectationFailure (what <> " was answered, not refused: " <> show r.fnResult)
+        presumedOf = fmap (\r -> (Map.lookup "value" r.fnResult, r.presumed))
+        -- a rule whose input is named like the reserved key, flat and DEONTIC
+        namedInputFlat = [("named.l4", Text.unlines
+          [ "@export default may proceed"
+          , "GIVEN presumption IS A BOOLEAN"
+          , "      `other flag` IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "`may proceed` MEANS presumption AND `other flag`"
+          ])]
+        namedInputDeontic = [("named.l4", Text.replace "`is motorway`" "presumption" deonticDefaultJL4)]
+        seatbelt extra = Aeson.object $
+          [ "arguments" Aeson..= Aeson.object [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+          , "startTime" Aeson..= (0 :: Int)
+          , "events" Aeson..= ([] :: [Aeson.Value])
+          ] <> extra
+
+    it "takes a default when the call sends no presumption, or soft, and lists it" do
+      withServiceFromSources "mcp-soft" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        left <- asked baseUrl mgr "mcp-soft" "may contract" capacityInputs
+        presumedOf left `shouldBe` Right (Just (FnLitBool True), ["has capacity"])
+        soft <- asked baseUrl mgr "mcp-soft" "may contract" ("presumption" Aeson..= ("soft" :: Text) : capacityInputs)
+        presumedOf soft `shouldBe` Right (Just (FnLitBool True), ["has capacity"])
+        -- null is a key left out, as in HTTP
+        nulled <- asked baseUrl mgr "mcp-soft" "may contract" ("presumption" Aeson..= Aeson.Null : capacityInputs)
+        presumedOf nulled `shouldBe` Right (Just (FnLitBool True), ["has capacity"])
+
+    it "refuses a left-out input under hard, naming it, as HTTP does" do
+      withServiceFromSources "mcp-hard" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        viaMcp <- asked baseUrl mgr "mcp-hard" "may contract" (hardArg : capacityInputs)
+        refusedWith "MCP" viaMcp "'has-capacity': missing required parameter"
+        viaRest <- askRest baseUrl mgr "mcp-hard" "may contract" capacityInputs [hardArg]
+        either (Text.isInfixOf "'has capacity': missing required parameter") (const False) viaRest `shouldBe` True
+        -- and a call that gives the input is answered under hard, listing nothing
+        given <- asked baseUrl mgr "mcp-hard" "may contract" (hardArg : "has capacity" Aeson..= True : capacityInputs)
+        presumedOf given `shouldBe` Right (Just (FnLitBool True), [])
+
+    it "refuses a left-out MAYBE input under hard, and takes NOTHING under soft" do
+      withServiceFromSources "mcp-maybe" [("premium.l4", maybeHardJL4)] \baseUrl mgr -> do
+        soft <- asked baseUrl mgr "mcp-maybe" "premium due" ["unused flag" Aeson..= False]
+        presumedOf soft `shouldBe` Right (Just (FnLitInt 0), ["premium"])
+        hardAsk <- asked baseUrl mgr "mcp-maybe" "premium due" [hardArg, "unused flag" Aeson..= False]
+        refusedWith "MCP" hardAsk "a MAYBE left out is NOTHING only while presumption is soft"
+
+    it "reads it beside \"arguments\" on a DEONTIC tool, as HTTP does" do
+      withServiceFromSources "mcp-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        let traceOnly = ["startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])] :: [Pair]
+            driver = ["driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]] :: [Pair]
+        soft <- askMcpFull baseUrl mgr "mcp-deontic" "seatbelt requirement" (seatbelt [])
+        fmap (.presumed) soft `shouldBe` Right ["is motorway"]
+        hardAsk <- askMcpFull baseUrl mgr "mcp-deontic" "seatbelt requirement" (seatbelt [hardArg])
+        refusedWith "MCP" hardAsk "motorway"
+        viaRest <- askRest baseUrl mgr "mcp-deontic" "seatbelt requirement" driver (hardArg : traceOnly)
+        either (Text.isInfixOf "motorway") (const False) viaRest `shouldBe` True
+        -- the flat shape a DEONTIC call is also read in takes it too
+        flat <- askMcpFull baseUrl mgr "mcp-deontic" "seatbelt requirement" (Aeson.object (hardArg : driver <> traceOnly))
+        refusedWith "MCP, flat" flat "motorway"
+
+    it "refuses a value that is not soft or hard, naming it, instead of reading it as soft" do
+      withServiceFromSources "mcp-bad" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        medium <- asked baseUrl mgr "mcp-bad" "may contract" ("presumption" Aeson..= ("medium" :: Text) : capacityInputs)
+        refusedWith "medium" medium "presumption must be \"soft\" or \"hard\", not \"medium\""
+        flag <- asked baseUrl mgr "mcp-bad" "may contract" ("presumption" Aeson..= True : capacityInputs)
+        refusedWith "true" flag "presumption must be \"soft\" or \"hard\", not true"
+
+    -- A hard request put where it is not read used to be dropped and answered
+    -- soft, with a success: a silent wrong answer. Each of these is now refused,
+    -- and the message says where the key goes.
+    describe "a presumption in the wrong place" do
+      let driver = ["driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]] :: [Pair]
+          trace = ["startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])] :: [Pair]
+
+      it "inside the arguments of a DEONTIC tool, when the rule has no input of that name, is refused" do
+        withServiceFromSources "mcp-misplace-in" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+          answered <- askMcpFull baseUrl mgr "mcp-misplace-in" "seatbelt requirement" $ Aeson.object $
+            ("arguments" Aeson..= Aeson.object (driver <> [hardArg])) : trace
+          refusedWith "inside arguments" answered "put it beside `arguments`"
+          -- beside `arguments`, where it goes, the same request is read as hard
+          placed <- askMcpFull baseUrl mgr "mcp-misplace-in" "seatbelt requirement" (seatbelt [hardArg])
+          refusedWith "beside arguments" placed "motorway"
+
+      -- null is a key left out, in the call's params and among a flat tool's
+      -- arguments, and so it is here
+      it "inside the arguments of a DEONTIC tool, a null is a key left out, not a refusal" do
+        withServiceFromSources "mcp-misplace-null" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+          answered <- askMcpFull baseUrl mgr "mcp-misplace-null" "seatbelt requirement" $ Aeson.object $
+            ("arguments" Aeson..= Aeson.object (driver <> ["presumption" Aeson..= Aeson.Null])) : trace
+          fmap (.presumed) answered `shouldBe` Right ["is motorway"]
+
+      it "beside arguments in the request's params, the shape of an HTTP body, is refused on a flat tool" do
+        withServiceFromSources "mcp-misplace-params" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+          answered <- askMcpFullParams baseUrl mgr "mcp-misplace-params" "may contract" [hardArg]
+            (Aeson.object capacityInputs)
+          refusedWith "params" answered "presumption was sent beside `arguments` in the request's params"
+          refusedWith "params, flat" answered "with the rule's inputs"
+          -- a null there is a key left out, as it is in HTTP
+          nulled <- askMcpFullParams baseUrl mgr "mcp-misplace-params" "may contract" ["presumption" Aeson..= Aeson.Null]
+            (Aeson.object capacityInputs)
+          presumedOf nulled `shouldBe` Right (Just (FnLitBool True), ["has capacity"])
+
+      it "beside arguments in the request's params is refused on a DEONTIC tool too" do
+        withServiceFromSources "mcp-misplace-params-d" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+          answered <- askMcpFullParams baseUrl mgr "mcp-misplace-params-d" "seatbelt requirement" [hardArg] (seatbelt [])
+          refusedWith "params, DEONTIC" answered "beside the rule's own `arguments`"
+
+    it "is advertised on every function tool, optional, as soft or hard" do
+      let advertised schema =
+            ( fmap (Aeson.KeyMap.lookup (name "presumption")) (propertiesOf schema)
+            , requiredOf schema )
+          propertiesOf = \case
+            Just (Aeson.Object o) | Just (Aeson.Object ps) <- Aeson.KeyMap.lookup "properties" o -> Just ps
+            _ -> Nothing
+          requiredOf = \case
+            Just (Aeson.Object o) | Just (Aeson.Array rs) <- Aeson.KeyMap.lookup "required" o -> [t | Aeson.String t <- toList rs]
+            _ -> []
+          enumOf = \case
+            Just (Just (Aeson.Object p)) -> Aeson.KeyMap.lookup "enum" p
+            _ -> Nothing
+      withServiceFromSources "mcp-adv" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
+        flatSchema <- mcpToolInputSchema baseUrl mgr "mcp-adv" "may contract"
+        let (flatProp, flatRequired) = advertised flatSchema
+        enumOf flatProp `shouldBe` Just (Aeson.toJSON (["soft", "hard"] :: [Text]))
+        flatRequired `shouldNotContain` ["presumption"]
+        (flatProp >>= id) `shouldBe` Just presumptionSchema
+      withServiceFromSources "mcp-adv-deontic" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+        schema <- mcpToolInputSchema baseUrl mgr "mcp-adv-deontic" "seatbelt requirement"
+        let (prop, required) = advertised schema
+        (prop >>= id) `shouldBe` Just presumptionSchema
+        required `shouldNotContain` ["presumption"]
+
+    it "reaches a task started while the deployment compiles" do
+      withCompilingService "mcp-task" [("capacity.l4", sectionBooleanJL4)] \compiling ready baseUrl mgr -> do
+        hardAnswer <- askMcpTask baseUrl mgr "mcp-task" "may contract" compiling ready
+          (Aeson.object (hardArg : capacityInputs))
+        either (Text.isInfixOf "missing required parameter") (const False) hardAnswer `shouldBe` True
+
+    describe "a rule with an input named presumption" do
+      it "is not listed as a flat tool, and a call to it is refused naming the input" do
+        withServiceFromSources "mcp-clash" namedInputFlat \baseUrl mgr -> do
+          schema <- mcpToolInputSchema baseUrl mgr "mcp-clash" "may proceed"
+          schema `shouldBe` Nothing
+          answer <- asked baseUrl mgr "mcp-clash" "may proceed" ["presumption" Aeson..= True, "other flag" Aeson..= True]
+          refusedWith "flat" answer "an input named 'presumption'"
+          -- the other tools of the deployment are not taken down with it
+          other <- mcpToolInputSchema baseUrl mgr "mcp-clash" "list_files"
+          other `shouldSatisfy` Maybe.isJust
+
+      -- The input's real name is in the message, not the name the tool would
+      -- list it under: `presumption?` sanitizes to presumption.
+      it "names the input as the rule spells it, not as the tool would list it" do
+        withServiceFromSources "mcp-clash-name" [("named.l4", Text.unlines
+          [ "@export default may proceed"
+          , "GIVEN `presumption?` IS A BOOLEAN"
+          , "      `other flag` IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "`may proceed` MEANS `presumption?` AND `other flag`"
+          ])] \baseUrl mgr -> do
+          answer <- asked baseUrl mgr "mcp-clash-name" "may proceed" ["other flag" Aeson..= True]
+          refusedWith "named" answer "an input named 'presumption?'"
+
+      it "is still answered over REST, where the inputs are nested" do
+        withServiceFromSources "mcp-clash-rest" namedInputFlat \baseUrl mgr -> do
+          viaRest <- askRest baseUrl mgr "mcp-clash-rest" "may proceed" ["presumption" Aeson..= True, "other flag" Aeson..= True] []
+          fmap (Map.lookup "value") viaRest `shouldBe` Right (Just (FnLitBool True))
+
+      it "is listed as a DEONTIC tool: the inputs are nested, the switch is a sibling of them" do
+        withServiceFromSources "mcp-clash-deontic" namedInputDeontic \baseUrl mgr -> do
+          schema <- mcpToolInputSchema baseUrl mgr "mcp-clash-deontic" "seatbelt requirement"
+          fmap schemaProperties schema `shouldBe` Just ["arguments", "events", "presumption", "startTime"]
+          -- the input of that name goes inside "arguments", the switch beside it
+          answered <- askMcpFull baseUrl mgr "mcp-clash-deontic" "seatbelt requirement" $ Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+                , "presumption" Aeson..= False ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            , hardArg ]
+          fmap (.presumed) answered `shouldBe` Right []
+          -- a call with no "arguments" cannot say which is which, and is refused
+          flat <- askMcpFull baseUrl mgr "mcp-clash-deontic" "seatbelt requirement" $ Aeson.object
+            [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+            , "presumption" Aeson..= False
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value]) ]
+          refusedWith "flat DEONTIC" flat "an input named 'presumption'"
+
+    -- WebMCP builds a second copy of the tool surface in a script. The page is
+    -- a script in a string: this reads it, it does not run it.
+    describe "the WebMCP script" do
+      let RawJs js = renderOrgWebMCPScript
+          script = Text.Encoding.decodeUtf8 (LBS.toStrict js)
+          occurrences needle = length (Text.splitOn needle script) - 1
+      it "carries the same schema for the key as tools/list" do
+        ("var presumptionSchema = " <> Text.Encoding.decodeUtf8 (LBS.toStrict (Aeson.encode presumptionSchema)) <> ";")
+          `shouldSatisfy` (`Text.isInfixOf` script)
+        ("var presumptionKey = \"presumption\";" `Text.isInfixOf` script) `shouldBe` True
+      it "advertises the key on the discovery tool, the flat tool and the DEONTIC tool" do
+        -- evaluate_rule, and the DEONTIC shape of a direct tool, put it beside
+        -- "arguments"; a flat direct tool puts it among the inputs
+        occurrences "presumption: presumptionSchema" `shouldBe` 3
+      it "forwards the key into the /evaluation body beside arguments, in both tools that post it" do
+        occurrences "body[presumptionKey] = args[presumptionKey]" `shouldBe` 2
+      it "refuses a value that is not soft or hard before posting it, in both tools that post" do
+        occurrences "presumptionRefusal(args[presumptionKey])" `shouldBe` 2
+      it "keeps a Unicode letter in a name, as the MCP endpoint does, so presumption followed by one is not the reserved key" do
+        -- /[^\p{L}\p{N}_-]/u keeps what Haskell's isAlphaNum keeps; the ASCII-only
+        -- class stripped the letter, read the name as 'presumption', and left a
+        -- tool out for an input that is not named that
+        ("[^\\p{L}\\p{N}_-]" `Text.isInfixOf` script) `shouldBe` True
+        ("[^a-zA-Z0-9_-]" `Text.isInfixOf` script) `shouldBe` False
+      it "keeps the key out of the inputs it remaps, and skips a rule that has an input of that name" do
+        ("delete flatArgs[presumptionKey]" `Text.isInfixOf` script) `shouldBe` True
+        ("hasOwnProperty.call(sanitized.schema.properties || {}, presumptionKey)" `Text.isInfixOf` script) `shouldBe` True
 
   describe "deployments query params" do
     it "?functions=full includes parameters in listing" do
@@ -6319,6 +6645,32 @@ askMcpWith baseUrl mgr deployId fn toolArguments = do
         ]
     ]
   mcpAnswer . responseBody <$> httpLbs req mgr
+
+-- | An MCP @tools/call@ answered in full: the message of the refusal, or the
+-- evaluation's response (with what it @presumed@).
+askMcpFull :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Either Text ResponseWithReason)
+askMcpFull baseUrl mgr deployId fn = askMcpFullParams baseUrl mgr deployId fn []
+
+-- | 'askMcpFull' with members of its own put in the call's params, beside
+-- @name@ and @arguments@.
+askMcpFullParams :: String -> Manager -> Text -> Text -> [Pair] -> Aeson.Value -> IO (Either Text ResponseWithReason)
+askMcpFullParams baseUrl mgr deployId fn extraParams toolArguments = do
+  req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+    [ "jsonrpc" Aeson..= ("2.0" :: Text)
+    , "id" Aeson..= (1 :: Int)
+    , "method" Aeson..= ("tools/call" :: Text)
+    , "params" Aeson..= Aeson.object
+        ([ "name" Aeson..= Text.replace " " "-" fn
+         , "arguments" Aeson..= toolArguments
+         ] <> extraParams)
+    ]
+  body <- responseBody <$> httpLbs req mgr
+  pure $ case mcpToolText body of
+    Just (True, text) -> Left (errorMessageOf (LBS.fromStrict (Text.Encoding.encodeUtf8 text)))
+    Just (False, text) -> case Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 text)) :: Maybe SimpleResponse of
+      Just (SimpleResponse r) -> Right r
+      _ -> Left ("not an error, and not an answer: " <> text)
+    Nothing -> Left ("not a tool result: " <> Text.Encoding.decodeUtf8 (LBS.toStrict body))
 
 -- | An MCP tool result as 'SurfaceAnswer': an error result is a refusal, with
 -- its message, and anything that is neither an error nor an evaluation's answer

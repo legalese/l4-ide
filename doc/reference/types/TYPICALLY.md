@@ -410,6 +410,11 @@ govern what counts as leaving a fact out:
   `l4 batch --presumption hard`, or `"presumption": "hard"` in a service request, uses no default for a fact the case leaves out.
   That fact is missing, and the case is refused, naming it.
   The default is `soft`.
+  An AI agent calling a rule through MCP, or through the WebMCP script, sets it the same way, with a `presumption` argument that is `"soft"` or `"hard"` and that every rule's tool advertises.
+  On a flat tool it is one of the arguments; on a rule that returns a contract, whose facts go inside `arguments`, it sits beside `arguments`, as in a service request.
+  The two values are accepted in any capitalisation, as in a service request; any other value is refused, naming it.
+  Because the name is reserved, an ordinary rule with a fact called `presumption` cannot be offered as an MCP or WebMCP tool, and the server says so; the same rule still runs through a service request, where the facts are inside `arguments`.
+  A rule that returns a contract is still offered, because its facts are inside `arguments` and the switch is beside them.
   The switch reaches only the facts a case can supply, so two kinds of default are not withdrawn, and the answer lists both under `presumed` in either mode:
   - **A default in a record the rules decode with `JSONDECODE`.**
     It is taken whether the JSON is written in the rules or is text the case sent.

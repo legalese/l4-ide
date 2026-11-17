@@ -177,6 +177,7 @@ test-suite l4-cli-test
     CliTest.Catala
     CliTest.Common
     CliTest.Coverage
+    CliTest.Deploy
     CliTest.DmnBpmn
     CliTest.Docassemble
     CliTest.Ledger
@@ -199,7 +200,10 @@ test-suite l4-cli-test
     directory,
     filepath,
     hspec,
+    http-types,
     jl4-core,
     process,
     temporary,
     text,
+    wai,
+    warp,
