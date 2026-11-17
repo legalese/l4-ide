@@ -1017,6 +1017,7 @@ export function initializeSidebarMessenger(
       return {
         status: resp.status as 'compiling' | 'applied' | 'rejected',
         error: resp.error,
+        notices: resp.notices,
       }
     } catch (err) {
       return {

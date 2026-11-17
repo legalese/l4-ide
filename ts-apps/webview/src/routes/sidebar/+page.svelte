@@ -37,14 +37,18 @@
     type GetSidebarConnectionStatusResponse,
     type SidebarDeploymentInfo,
     type SidebarImportedFile,
+    type DefaultChangeNotice,
     type AiChatAttachment,
     type Harness,
   } from 'jl4-client-rpc'
   import type { WebviewApi } from 'vscode-webview'
   import HarnessInstallMenu from '$lib/components/harness-install-menu.svelte'
   import ToolCard from '$lib/components/tool-card.svelte'
+  import DefaultNotices from '$lib/components/default-notices.svelte'
   import {
-    detectBreakingChanges,
+    noticeSummary,
+    normalizeNotices,
+    reviewDeploy,
     type BreakingChange,
   } from '$lib/deploy-compat'
   import { anyInputHasDefault } from '$lib/param-defaults'
@@ -547,7 +551,15 @@
   // `mission` collects deployment-level metadata (description/mission),
   // then the actual deploy fires. `breaking-warning` interrupts before
   // the deploy if the new shape would break existing integrations.
-  type DeployView = 'preview' | 'deploy-form' | 'mission' | 'breaking-warning'
+  // `default-review` is shown when nothing breaks but an input's usual value
+  // changes: a non-blocking notice (ruling U2, option B, 2026-11-17), one
+  // click to go on.
+  type DeployView =
+    | 'preview'
+    | 'deploy-form'
+    | 'mission'
+    | 'breaking-warning'
+    | 'default-review'
   let deployView: DeployView = $state('preview')
   let deploymentIdInput: string = $state('')
   let deploymentIdError: string = $state('')
@@ -558,6 +570,14 @@
   // sees/edits the current value rather than silently blanking it.
   let deploymentMission: string = $state('')
   let breakingChanges: BreakingChange[] = $state([])
+  // Inputs whose usual value this redeploy changes, found before it is sent.
+  let defaultNotices: DefaultChangeNotice[] = $state([])
+  // The same list after the deploy, as the service reports it in the job
+  // result; shown on the Deployments tab until dismissed.
+  let appliedNotices: {
+    deploymentId: string
+    notices: DefaultChangeNotice[]
+  } | null = $state(null)
   let verifying: boolean = $state(false)
   let deploying: boolean = $state(false)
 
@@ -833,6 +853,7 @@
       if (deploying) return 'Deploying...'
       if (verifying) return 'Verifying...'
       if (deployView === 'breaking-warning') return 'Deploy Anyway'
+      if (deployView === 'default-review') return 'Deploy Now'
       if (deployView === 'mission') return 'Deploy Now'
       if (deployView === 'deploy-form') return 'Continue'
       // Tabs that aren't the Deploy tab surface the button as
@@ -900,6 +921,8 @@
     deploymentIdInput = deriveDeploymentId(activeFileName)
     deploymentIdError = ''
     breakingChanges = []
+    defaultNotices = []
+    appliedNotices = null
     deploymentMission = ''
     deployView = 'deploy-form'
   }
@@ -968,14 +991,13 @@
         { deploymentId: id }
       )
       // `null` ⇒ deployment doesn't exist yet ⇒ first deploy, nothing to break.
-      if (remoteFns) {
-        const changes = detectBreakingChanges(functions, remoteFns)
-        if (changes.length > 0) {
-          breakingChanges = changes
-          verifying = false
-          deployView = 'breaking-warning'
-          return
-        }
+      const review = reviewDeploy(functions, remoteFns)
+      if (review.step !== 'deploy') {
+        breakingChanges = review.breaking
+        defaultNotices = review.notices
+        verifying = false
+        deployView = review.step
+        return
       }
     } catch {
       // Schema fetch failed — don't block the deploy on a detection error.
@@ -1013,6 +1035,8 @@
           ? 'pending'
           : 'applied'
         let error: string | undefined
+        // Changed usual values, as the service reports them for this job.
+        let jobNotices: DefaultChangeNotice[] = []
         if (result.updateId) {
           for (let i = 0; i < 60; i++) {
             await new Promise((r) => setTimeout(r, 1000))
@@ -1025,6 +1049,7 @@
               error = resp.error
               if (resp.status === 'applied') {
                 outcome = 'applied'
+                jobNotices = normalizeNotices(resp.notices)
                 break
               }
               if (resp.status === 'rejected') {
@@ -1043,7 +1068,15 @@
           // screen for the duration of the round-trip (visible flicker).
           deployView = 'preview'
           activeTab = 'deployments'
-          notify('info', `Deployed "${did}" successfully.`)
+          appliedNotices =
+            jobNotices.length > 0
+              ? { deploymentId: did, notices: jobNotices }
+              : null
+          notify(
+            'info',
+            `Deployed "${did}" successfully.` +
+              (jobNotices.length > 0 ? ` ${noticeSummary(jobNotices)}.` : '')
+          )
           await fetchDeployments()
         } else if (outcome === 'rejected') {
           deployView = 'preview'
@@ -1171,6 +1204,9 @@
         handleUndeploy()
       } else if (deployView === 'breaking-warning') {
         deployAnyway()
+      } else if (deployView === 'default-review') {
+        // Guarded update, not the ungated overwrite: nothing was broken.
+        executeDeploy(sanitizeDeploymentId(deploymentIdInput))
       } else if (deployView === 'mission') {
         continueDeploy()
       } else if (deployView === 'deploy-form') {
@@ -1982,6 +2018,33 @@
                     </li>
                   {/each}
                 </ul>
+                {#if defaultNotices.length > 0}
+                  <p class="warning-desc">
+                    These usual values also change. That does not block the
+                    deploy:
+                  </p>
+                  <DefaultNotices items={defaultNotices} />
+                {/if}
+              </div>
+            </div>
+          {:else if deployView === 'default-review'}
+            <!-- Changed usual values: a notice, not a warning. Nothing is
+                 incompatible, so the footer button just deploys. -->
+            <div class="default-review">
+              <button class="back-btn" onclick={() => (deployView = 'mission')}
+                >&larr; Back</button
+              >
+              <div class="review-header">Usual values change</div>
+              <div class="warning-body">
+                <p class="warning-desc">
+                  Deploying the following rules in <strong
+                    >{deploymentIdInput}</strong
+                  > changes the usual value of an input. A caller who leaves such
+                  an input out will now get the new value. This does not block the
+                  deploy.
+                </p>
+                <DefaultNotices items={defaultNotices} />
+                <p class="warning-desc">Press Deploy Now to go ahead.</p>
               </div>
             </div>
           {:else}
@@ -2040,6 +2103,28 @@
             class:with-info-note={connectionStatus.connected &&
               !undeployConfirm}
           >
+            {#if appliedNotices && connectionStatus.connected && !undeployConfirm}
+              <div class="notice-banner" role="status">
+                <div class="notice-banner-head">
+                  <span
+                    >Usual values changed in <strong
+                      >{appliedNotices.deploymentId}</strong
+                    ></span
+                  >
+                  <button
+                    class="notice-banner-close"
+                    title="Dismiss"
+                    aria-label="Dismiss"
+                    onclick={() => (appliedNotices = null)}>&times;</button
+                  >
+                </div>
+                <p class="notice-banner-desc">
+                  A caller who leaves one of these inputs out now gets the new
+                  value.
+                </p>
+                <DefaultNotices items={appliedNotices.notices} />
+              </div>
+            {/if}
             {#if undeployConfirm}
               <div class="breaking-warning">
                 <button class="back-btn" onclick={cancelUndeploy}
@@ -3299,6 +3384,56 @@
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 0.92em;
     color: var(--l4-tok-identifier, #4ec9b0);
+  }
+
+  /* Changed usual values: informational, so no warning colour. */
+  .default-review {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .review-header {
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .notice-banner {
+    flex-shrink: 0;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: var(
+      --vscode-textBlockQuote-background,
+      rgba(127, 127, 127, 0.1)
+    );
+    border-radius: 4px;
+    font-size: 0.9em;
+    line-height: 1.45;
+  }
+
+  .notice-banner-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .notice-banner-close {
+    background: none;
+    border: none;
+    padding: 0 2px;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+    font-size: 1.2em;
+    line-height: 1;
+  }
+
+  .notice-banner-close:hover {
+    color: var(--vscode-foreground);
+  }
+
+  .notice-banner-desc {
+    margin: 4px 0 6px;
+    color: var(--vscode-descriptionForeground);
   }
 
   .deployments-tab-wrapper {

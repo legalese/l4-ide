@@ -1,3 +1,4 @@
+import type { DefaultChangeNotice } from 'jl4-client-rpc'
 import type { AuthManager } from './auth.js'
 import { LEGALESE_CLOUD_DOMAIN } from './auth.js'
 import { canonicalToApiHostPath } from './api-host-path.js'
@@ -17,6 +18,9 @@ export interface UpdateStatusResponse {
   deploymentId: string
   status: 'compiling' | 'applied' | 'rejected'
   error?: string
+  /** Inputs whose usual value this update changed (non-blocking; absent
+   *  from a service that predates the report). */
+  notices?: DefaultChangeNotice[]
 }
 
 export interface ServiceHealth {
