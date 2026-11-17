@@ -205,7 +205,7 @@ and the lineage is worth knowing.
 
 - [Flowcharts, Decision Tables, and Real Logic](logic-not-flowcharts.md) — the argument this reading supports
 - [Design Principles](principles.md)
-- [Query Planning](../../reference/query-planning/README.md) — what L4 actually does with the ROBDD
+- [Query Planning](../../reference/query-planning/README.md) — what the planner does
 
 _The full research record — including the sources we checked and rejected, the
 citation traps, and an honest account of what this project got wrong before it got it

@@ -49,7 +49,6 @@
 ## Query planning
 
 - [Query Planning](query-planning/README.md)
-  - [Binary Decision Diagrams (ROBDD)](query-planning/robdd.md)
 
 ## Library
 
