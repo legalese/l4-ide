@@ -122,11 +122,14 @@ govern what counts as leaving a fact out:
   the same way, with a `presumption` argument that is `"soft"` or `"hard"`
   and that every rule's tool advertises. On a flat tool it is one of the
   arguments; on a rule that returns a contract, whose facts go inside
-  `arguments`, it sits beside `arguments`, as in a service request. Any other
-  value is refused, naming it. Because the name is reserved, a rule with a fact
-  called `presumption` cannot be offered as an MCP or WebMCP tool, and the
-  server says so; the same rule still runs through a service request, where
-  the facts are inside `arguments`.
+  `arguments`, it sits beside `arguments`, as in a service request. The two
+  values are accepted in any capitalisation, as in a service request; any other
+  value is refused, naming it. Because the name is reserved, an ordinary rule
+  with a fact called `presumption` cannot be offered as an MCP or WebMCP tool,
+  and the server says so; the same rule still runs through a service request,
+  where the facts are inside `arguments`. A rule that returns a contract is
+  still offered, because its facts are inside `arguments` and the switch is
+  beside them.
   The switch reaches only the facts a case can supply. A record the rules
   decode from JSON of their own (`JSONDECODE`) still takes its defaults, and
   under `hard` the answer lists them under `presumed` as
