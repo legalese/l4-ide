@@ -117,6 +117,8 @@ module TestData (
   implicitFlagJL4,
   nameClashJL4,
   lineBreakJL4,
+  deonticFieldDefaultJL4,
+  deonticNestedFieldDefaultJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -2482,3 +2484,62 @@ dnfRule k clauses =
   where
     inputs = Text.unwords (concat [ ["a" <> Text.pack (show j), "b" <> Text.pack (show j)] | j <- [1 .. k] ])
 
+-- | A deontic rule whose party record has a field with a @TYPICALLY@. The
+-- generated wrapper builds each event's party as SOURCE, which since W5 would
+-- fill an omitted field from its default (review silent F2, 2026-10-03).
+deonticFieldDefaultJL4 :: Text
+deonticFieldDefaultJL4 =
+  [i|
+DECLARE Driver HAS
+    name IS A STRING
+    licence IS A STRING TYPICALLY "full"
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+|]
+
+-- | As 'deonticFieldDefaultJL4', with the defaulted field one level down: the
+-- party's @zhome@ is an @Address@ whose @floor@ has a @TYPICALLY@ (review
+-- rulings R2-2). The nested record is sent constructor-keyed, the shape the
+-- service's own answers use, and it is generated as source like the party. It
+-- is the party's alphabetically last field on purpose, because a field after
+-- it would be attached to the nested record by the generated @WITH@ (an older
+-- defect of the wrapper, not this fixture's business).
+deonticNestedFieldDefaultJL4 :: Text
+deonticNestedFieldDefaultJL4 =
+  [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+    floor IS A NUMBER TYPICALLY 1
+
+DECLARE Driver HAS
+    name IS A STRING
+    zhome IS AN Address
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`
+|]

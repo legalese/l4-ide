@@ -62,7 +62,7 @@ import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 
 spec :: SpecWith ()
@@ -1311,6 +1311,75 @@ spec = describe "integration" do
             , "events" Aeson..= ([] :: [Aeson.Value])
             ])
         assertSuccess resp \r -> r.presumed `shouldBe` ["is motorway"]
+
+    -- Review F2, 2026-10-03: the wrapper turns an event's party record into
+    -- SOURCE, which since W5 filled a field it left out from its TYPICALLY, under
+    -- "presumption": "hard" as well, and listed it as a default no request could
+    -- supply. The event no longer matched the party it named. An event's record
+    -- is part of the request, so it keeps what it had: every field is written.
+    -- (Card O4, ruled 2026-10-11: the target is to list such a default, and until
+    -- that is built this refusal stays.)
+    it "refuses an event whose record leaves out a defaulted field, in both modes" do
+      withServiceFromSources "ty-event" [("seatbelt.l4", deonticFieldDefaultJL4)] \baseUrl mgr -> do
+        let driver = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
+            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("drive" :: Text), "at" Aeson..= (0 :: Int)]
+            request presumption party = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= driver]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event party]
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+            nameOnly = Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+            whole    = Aeson.object ["name" Aeson..= ("Alice" :: Text), "licence" Aeson..= ("learner" :: Text)]
+            message = "Missing required field 'events[0].party.licence' (Driver)"
+        softGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" nameOnly)
+        expectError softGap message
+        hardGap <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "hard" nameOnly)
+        expectError hardGap message
+        -- the positive control: the same request with the field written is answered,
+        -- and nothing is presumed
+        written <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (request "soft" whole)
+        assertSuccess written \r -> r.presumed `shouldBe` []
+        -- the argument's own record is decoded from JSON, where the switch applies:
+        -- soft takes the default, hard refuses it. (Whether `presumed` lists the
+        -- default is not asserted: the deontic machinery reads a party without
+        -- forcing it, the known gap of specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md 4.2.)
+        let argRequest presumption = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= nameOnly]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= ([] :: [Aeson.Value])
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+        argSoft <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "soft")
+        assertSuccess argSoft \_ -> pure ()
+        argHard <- evalFunction baseUrl mgr "ty-event" "seatbelt requirement" (argRequest "hard")
+        expectError argHard "Missing required field 'driver.licence'"
+
+    -- Review rulings R2-2: the refusal above looked only at the top level of
+    -- an event's record. A record nested in it is generated as source too, so a
+    -- field it left out was filled from its TYPICALLY, in both modes, and the
+    -- event stopped matching its party with status success.
+    it "refuses an event whose nested record leaves out a defaulted field, in both modes" do
+      withServiceFromSources "ty-event-nested" [("seatbelt.l4", deonticNestedFieldDefaultJL4)] \baseUrl mgr -> do
+        let address fields = Aeson.object ["Address" Aeson..= Aeson.object fields]
+            zip5 = "zip" Aeson..= (5 :: Int)
+            floor2 = "floor" Aeson..= (2 :: Int)
+            driverWith home = Aeson.object ["name" Aeson..= ("Alice" :: Text), "zhome" Aeson..= home]
+            -- an argument's record is decoded from plain JSON, an event's is generated
+            -- as source and sent constructor-keyed, the shape the service's answers use
+            plainDriver = driverWith (Aeson.object [zip5, floor2])
+            event party = Aeson.object ["party" Aeson..= party, "action" Aeson..= ("wear seatbelt" :: Text), "at" Aeson..= (0 :: Int)]
+            request presumption party = Aeson.object $
+              [ "arguments" Aeson..= Aeson.object ["driver" Aeson..= plainDriver]
+              , "startTime" Aeson..= (0 :: Int)
+              , "events" Aeson..= [event party]
+              ] <> [ "presumption" Aeson..= (presumption :: Text) | presumption /= "soft" ]
+            message = "Missing required field 'events[0].party.zhome.Address.floor' (Address)"
+        softGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5])))
+        expectError softGap message
+        hardGap <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "hard" (driverWith (address [zip5])))
+        expectError hardGap message
+        -- the positive control: the same request with the nested field written is answered
+        written <- evalFunction baseUrl mgr "ty-event-nested" "seatbelt requirement" (request "soft" (driverWith (address [zip5, floor2])))
+        assertSuccess written \r -> r.presumed `shouldBe` []
 
     -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
     -- an input or a field left out takes its default, a name that matches
