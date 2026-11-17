@@ -54,20 +54,41 @@ An `@export` anywhere else, such as between `GIVETH` and `DECIDE`, is not picked
 
 In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab. It lists every exported rule in the file, with its description, inputs and result type. If the list is empty, the file has no `@export` or does not type-check. The badge **ENTRY POINT** marks the rule `l4 batch` runs when you name none: the one marked `@export default`, or the first exported rule. The service has no such rule: a caller always names the rule. The badge does not mean the rule has a default value.
 
-### Usual values
+### Defaults
 
-Some inputs have a **usual value**: what the rule uses when a caller leaves that input out.
-L4 calls it a default and writes it with [`TYPICALLY`](../../reference/types/TYPICALLY.md).
-The Deploy tab shows it beside the input, as `optional` and `usually 3`, so you can see what a caller who says nothing will get.
-It does the same for the fields of a record, and for an input that is a choice from a list it marks the usual choice.
-`usually empty` means the usual value is "nothing", and `usually false` means the usual answer is no.
+Some inputs have a **default**: a value the rule uses when a caller leaves that input out.
+L4 writes it with [`TYPICALLY`](../../reference/types/TYPICALLY.md), so the Deploy tab says "typically".
+A default is not a suggestion: it is applied, and the answer says so.
 
-The Deploy tab shows what the service publishes, and it has two limits:
+Each input on a rule's card reads one of these:
 
-- A usual value on an `ASSUME` (older files) is not published, and the service does not use it, so the tab shows nothing for it.
-- The tab lists the fields of a record under the input, but not the fields inside the elements of a list, so a usual value on such a field is not shown there, although the service publishes it.
+- `required`: a caller must supply it.
+- `optional`: a caller may leave it out. This is an input that may have no value, a `MAYBE`, and left out it is `NOTHING`.
+- `optional, typically 0`: a caller may leave it out. The rule then uses 0, and the answer lists the input under `presumed` when the answer relied on it.
 
-An input with no `usually` beside it can therefore still carry a usual value in the file.
+The card says it in words under the input: "If left out, 0 is used, and the answer lists b under presumed when it relies on that."
+A field of a record is named by its path, such as `cfg.retries`.
+For an input that is a choice from a list, the card marks the default choice.
+`typically nothing` means the default is "nothing", and `typically false` means the default answer is no.
+
+When some input has a default, the card adds a line: "Callers can turn the defaults off with presumption: hard (HTTP, batch, MCP, WebMCP)."
+With presumption `hard`, a caller who leaves an input out gets an error naming it, instead of the default.
+A service that has not been updated for the MCP and WebMCP switch does not offer it there.
+
+Under the inputs, **What callers see** is collapsed.
+Open it to read the schema of the rule's inputs as it is published to OpenAPI and MCP clients, with each default written as `"default": 0` and the inputs a caller must supply listed under `"required"`.
+The card shows the schema it was given by the language server or the service; it does not compose its own.
+
+The Deploy tab shows what the service publishes, and it has limits:
+
+- A default on an `ASSUME` (older files) is not published, and the service does not use it.
+  The Deploy tab says `typically (not published)` for that input, and callers must still supply it.
+  The Deployments tab cannot say this, because the service publishes no marker, so such an input reads `required` there.
+- The tab lists the fields of a record under the input, but not the fields inside the elements of a list.
+  A default on such a field is published, but it is not shown, and the tab says so.
+- A deployment made by an older service publishes no defaults, so none are shown.
+
+An input with no `typically` beside it can therefore still carry a default in the file.
 
 ---
 
@@ -85,24 +106,24 @@ The extension uploads the file and the service compiles it, and its status goes 
 
 Deploying to a name that already exists updates that deployment. The extension first checks for **breaking changes**, such as a removed rule, a removed or renamed input, or a changed result type, and warns you before you confirm. [Manage rules in git and CI](../getting-started/version-control-for-rules.md#redeploy-when-a-merge-changes-a-live-api) explains which changes break callers.
 
-#### When a usual value changes
+#### When a default changes
 
-A caller who leaves an input out gets its usual value, so changing that value changes the answer such a caller gets, without any message to them.
+A caller who leaves an input out gets its default, so changing the default changes the answer such a caller gets, without any message to them.
 That is why the extension tells you.
-Before it sends the update, it shows a **Usual values change** screen listing each change: the rule, the input, the old value and the new one.
+Before it sends the update, it shows a **Defaults change** screen with one line for each change, such as "the smaller of · b · typically 0 → 1: callers who leave b out will get different answers."
 A field of a record is named by its path, such as `cfg.retries`.
 
-A changed usual value is reported, not refused.
+A changed default is reported, not refused.
 It does not count as a breaking change, the screen is not a warning, and **Deploy Now** goes ahead.
 When the update has been applied, the **Deployments** tab lists the same changes, as the service reported them, until you dismiss the list.
-If the update also contains a breaking change, the usual warning appears, with the changed usual values listed under it.
+If the update also contains a breaking change, the usual warning appears, with the changed defaults listed under it.
 
 What the check compares:
 
-- It compares an input's usual value only when both the deployed version and the new one publish one.
-- Adding a usual value to an input is not a change: the input just becomes optional, which callers cannot notice.
-- Removing a usual value makes the input required again, which is a breaking change and is warned about as one.
-- A deployment made by an older service publishes no usual values, so there is nothing to compare.
+- It compares an input's default only when both the deployed version and the new one publish one.
+- Adding a default to an input is not a change: the input just becomes optional, which callers cannot notice.
+- Removing a default makes the input required again, which is a breaking change and is warned about as one.
+- A deployment made by an older service publishes no defaults, so there is nothing to compare.
 - An update with exactly the same content as the live version is not sent to the service as an update, so nothing is listed after it.
 
 ### From the command line
@@ -113,7 +134,7 @@ The `l4` command deploys the same way. Sign in once with the `legalese` command 
 
 ## Step 4: Manage deployments
 
-The **Deployments** tab in the sidebar lists your organization's deployments, with each one's rules, descriptions and inputs, and the usual value of each input that has one (the same limits as in [Usual values](#usual-values) apply). From there you can open a deployment's **Integrate** dialog, which shows its addresses for each kind of client, or **Undeploy** it. Undeploying asks for confirmation, because it breaks every integration that uses the deployment.
+The **Deployments** tab in the sidebar lists your organization's deployments, with each one's rules, descriptions and inputs, and the default of each input that has one (the same limits as in [Defaults](#defaults) apply). From there you can open a deployment's **Integrate** dialog, which shows its addresses for each kind of client, or **Undeploy** it. Undeploying asks for confirmation, because it breaks every integration that uses the deployment.
 
 ---
 
