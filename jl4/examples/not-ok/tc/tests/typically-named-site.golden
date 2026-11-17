@@ -1,0 +1,75 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-named-site.l4
+  Hidden: no
+  Range: 15:7-15:16
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      scaled (defined at typically-named-site.l4:8:1-7)
+
+    expects 2 inputs,
+    but here it is given 1 input.
+
+File: typically-named-site.l4
+  Hidden: no
+  Range: 18:7-18:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    In this use of
+
+      scaled (defined at typically-named-site.l4:8:1-7)
+
+    you have not supplied these inputs:
+
+      base of type NUMBER
+
+File: typically-named-site.l4
+  Hidden: no
+  Range: 22:31-22:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      rte
+
+    which I have inferred to be of type: 
+
+      NUMBER
+
+File: typically-named-site.l4
+  Hidden: no
+  Range: 26:16-26:40
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    In this use of
+
+      Config (defined at typically-named-site.l4:10:9-15)
+
+    you have not supplied these inputs:
+
+      retries of type NUMBER
+
+File: typically-named-site.l4
+  Hidden: no
+  Range: 27:18-27:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      Config (defined at typically-named-site.l4:10:9-15)
+
+    expects 2 inputs,
+    but here it is given 1 input.

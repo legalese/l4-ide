@@ -414,6 +414,34 @@ recordConstruction =
   \  THEN Assessment WITH rate IS 40, band IS \"high\"\n\
   \  ELSE Assessment WITH rate IS 0, band IS \"low\"\n"
 
+-- | A construction that leaves out a field with a @TYPICALLY@ (W5): the checker
+-- adds the default as one more named argument, so the exporter sees every field.
+-- The field is an ENUM, whose default is a bare constructor, the one kind of
+-- default a DMN rule row has to QUOTE (FEEL reads @green@ as a variable that is
+-- not there, and Camunda evaluates the field to null and reports success).
+-- 'recordConstructionWritten' is the same module with the field written out.
+recordConstructionDefaulted, recordConstructionWritten :: Text
+recordConstructionDefaulted = recordWithColour ""
+recordConstructionWritten   = recordWithColour ", colour IS green"
+
+recordWithColour :: Text -> Text
+recordWithColour colourArg =
+  Text.unlines
+    [ "DECLARE Colour IS ONE OF green, red"
+    , ""
+    , "DECLARE Assessment"
+    , "  HAS rate IS A NUMBER"
+    , "      colour IS A Colour TYPICALLY green"
+    , "      band IS A STRING"
+    , ""
+    , "GIVEN c IS A BOOLEAN"
+    , "GIVETH AN Assessment"
+    , "assess MEANS"
+    , "  IF c"
+    , "  THEN Assessment WITH rate IS 40, band IS \"high\"" <> colourArg
+    , "  ELSE Assessment WITH rate IS 0, band IS \"low\"" <> colourArg
+    ]
+
 -- | The other half of the pair: projection was always rendered @r.f@, so
 -- construction had to use the same field names or the two would not meet.
 recordProjection :: Text
@@ -1133,9 +1161,24 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- and `r.f` cannot disagree.
       map (.code) t.dtNotes `shouldNotContain` ["D-NONFEELOUTPUT"]
 
+    -- Review R-M1, 2026-10-03: the default's name lost its resolved info when
+    -- the checker copied it into the call site, and a rule row, which has no
+    -- set of the module's constructors to fall back on, no longer knew it was a
+    -- constructor. It shipped bare (`colour: green`); the written-out twin quoted it.
+    it "a construction that leaves out a defaulted ENUM field quotes it like one that writes it out" $ do
+      let omitted = tableOf "assess" recordConstructionDefaulted
+          written = tableOf "assess" recordConstructionWritten
+      map (.drOutput.feText) omitted.dtRules
+        `shouldBe` ["{rate: 40, colour: \"green\", band: \"high\"}"]
+      map (.drOutput.feText) omitted.dtRules `shouldBe` map (.drOutput.feText) written.dtRules
+      fmap (.feText) omitted.dtOutput.ocDefault `shouldBe` fmap (.feText) written.dtOutput.ocDefault
+      fmap (.feText) omitted.dtOutput.ocDefault
+        `shouldBe` Just "{rate: 0, colour: \"green\", band: \"low\"}"
+
     -- No missing-field test, and the absence is a measurement: L4's
-    -- typechecker REJECTS a construction that omits a stored field ("you
-    -- forgot to supply the following arguments", measured 2026-08-01), so the
+    -- typechecker REJECTS a construction that omits a stored field that has no
+    -- TYPICALLY ("you forgot to supply the following arguments", measured
+    -- 2026-08-01; a field WITH one is added by the checker, above), so the
     -- arm's completeness guard is unreachable through checked source and
     -- stands as defence-in-depth only.
     it "a FUNCTION applied WITH named arguments stays verbatim, BKM callee or not" $ do

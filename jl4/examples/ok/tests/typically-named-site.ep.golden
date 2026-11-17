@@ -1,0 +1,84 @@
+-- A rule's own TYPICALLY default is taken at a NAMED call site that leaves the
+-- input out (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4, the named-site half of R8).
+--
+-- Only a named site: `scaled WITH base IS 10` may omit `rate`, but the
+-- positional `scaled 10` still asks for both inputs (R8 rule 1; see
+-- not-ok/tc/typically-named-site.l4 for what each of those says).
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+-- The default is taken ...
+#ASSERT (scaled WITH base IS 10) EQUALS 30
+-- ... and a value the site supplies wins over it, in either order.
+#ASSERT (scaled WITH base IS 10, rate IS 2) EQUALS 20
+#ASSERT (scaled WITH rate IS 2, base IS 10) EQUALS 20
+#EVAL scaled WITH base IS 10
+
+-- Every kind of default a TYPICALLY accepts: a number, a string, a boolean, an
+-- enum constructor and NOTHING.
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN colour IS A Colour TYPICALLY Red
+      label IS A STRING TYPICALLY "plain"
+      urgent IS A BOOLEAN TYPICALLY FALSE
+      note IS A MAYBE STRING TYPICALLY NOTHING
+      coats IS A NUMBER
+GIVETH A STRING
+`describe the paint` MEANS
+  CONSIDER colour
+    WHEN Red THEN CONCAT label, " red, ", (IF urgent THEN "rush" ELSE "no rush")
+    WHEN Green THEN CONCAT label, " green, ", (IF urgent THEN "rush" ELSE "no rush")
+
+#EVAL `describe the paint` WITH coats IS 2
+#EVAL `describe the paint` WITH coats IS 2, colour IS Green, urgent IS TRUE
+#EVAL `describe the paint` WITH label IS "gloss", coats IS 1
+
+-- A rule that calls one with a default, the default unused.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`maybe scaled` MEANS IF n EQUALS 0 THEN 0 ELSE scaled WITH base IS n
+
+#EVAL `maybe scaled` 0
+#EVAL `maybe scaled` 4
+
+-- A rule that recurses, taking its own default on every step. `step` is not
+-- passed on, so the second line below is one step of 2 and then four of 1.
+GIVEN n IS A NUMBER
+      step IS A NUMBER TYPICALLY 1
+GIVETH A NUMBER
+countdown MEANS IF n AT MOST 0 THEN 0 ELSE 1 PLUS (countdown WITH n IS n MINUS step)
+
+#EVAL countdown WITH n IS 5
+#EVAL countdown WITH n IS 6, step IS 2
+
+-- A rule declared in a WHERE.
+GIVETH A NUMBER
+`use the local one` MEANS inner WITH x IS 4
+  WHERE
+    GIVEN k IS A NUMBER TYPICALLY 2
+          x IS A NUMBER
+    GIVETH A NUMBER
+    inner MEANS k TIMES x
+
+#ASSERT `use the local one` EQUALS 8
+
+-- A section input and a rule's own default, together. `scaled with surcharge`
+-- reads the section's `the surcharge`, so discharge gives it that input as a
+-- parameter of its own; the site below still leaves `rate` out.
+§ `Surcharges`
+    GIVEN `the surcharge` IS A NUMBER TYPICALLY 100
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+`scaled with surcharge` MEANS (rate TIMES base) PLUS `the surcharge`
+
+GIVETH A NUMBER
+`the whole bill` MEANS `scaled with surcharge` WITH base IS 10
+
+#ASSERT `the whole bill` EQUALS 130
+#ASSERT (`the whole bill` WITH `the surcharge` IS 1) EQUALS 31
+#ASSERT (`scaled with surcharge` WITH base IS 10, `the surcharge` IS 1, rate IS 5) EQUALS 51
