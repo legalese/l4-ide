@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   ExportedFunctionInfo,
   FunctionParameters,
@@ -55,8 +55,8 @@ function remoteFn(c: SharedCase): RemoteFunctionSchema {
 }
 
 describe('shared default-change cases: breaking[]', () => {
-  it('reads the eight shared cases', () => {
-    expect(sharedCases).toHaveLength(8)
+  it('reads the nine shared cases', () => {
+    expect(sharedCases).toHaveLength(9)
   })
 
   for (const c of sharedCases) {
@@ -238,6 +238,8 @@ describe('reviewDeploy: what the deploy review does with each shared case', () =
     'enum default changed (a constructor name)': 'default-review',
     'a default change and an unrelated breaking change in one upload: the default is reported, the break still blocks':
       'breaking-warning',
+    'input retyped (number to string): breaking by the existing rule, its default is not compared':
+      'breaking-warning',
   }
 
   for (const c of sharedCases) {
@@ -320,5 +322,253 @@ describe('normalizeNotices (the job result is read, not trusted)', () => {
         { kind: 'default-changed', function: 'f' },
       ])
     ).toEqual([good])
+  })
+})
+
+describe('a retyped node: its default is not compared (as the service skips it)', () => {
+  const rule = (properties: Record<string, unknown>) => ({
+    name: 'f',
+    description: '',
+    isDefault: false,
+    returnType: 'NUMBER',
+    isDeontic: false,
+    parameters: {
+      type: 'object' as const,
+      properties,
+      required: [],
+    } as unknown as FunctionParameters,
+  })
+  const remote = (properties: Record<string, unknown>) => ({
+    name: 'f',
+    returnType: 'NUMBER',
+    parameters: rule(properties).parameters,
+  })
+
+  it('reports no notice for an input whose type changed, and the break', () => {
+    const local = [rule({ b: { type: 'string', default: '0' } })]
+    const deployed = [remote({ b: { type: 'number', default: 0 } })]
+    expect(detectDefaultChanges(local, deployed)).toEqual([])
+    expect(
+      detectBreakingChanges(local, deployed).map(changeToPlainText)
+    ).toEqual(['f parameter b type changed from number to string'])
+  })
+
+  it('skips the fields under a retyped input too', () => {
+    const local = [
+      rule({
+        x: {
+          type: 'string',
+          properties: { y: { type: 'number', default: 2 } },
+        },
+      }),
+    ]
+    const deployed = [
+      remote({
+        x: {
+          type: 'object',
+          properties: { y: { type: 'number', default: 1 } },
+        },
+      }),
+    ]
+    expect(detectDefaultChanges(local, deployed)).toEqual([])
+  })
+
+  it('still compares the fields of an input whose type did not change', () => {
+    const local = [
+      rule({
+        x: {
+          type: 'object',
+          properties: { y: { type: 'number', default: 2 } },
+        },
+      }),
+    ]
+    const deployed = [
+      remote({
+        x: {
+          type: 'object',
+          properties: { y: { type: 'number', default: 1 } },
+        },
+      }),
+    ]
+    expect(detectDefaultChanges(local, deployed).map((n) => n.input)).toEqual([
+      'x.y',
+    ])
+  })
+})
+
+describe('reviewDeploy: a failure in the default check cannot hide the breaking list', () => {
+  const rule = (properties: Record<string, unknown>) => ({
+    name: 'f',
+    description: '',
+    isDefault: false,
+    returnType: 'NUMBER',
+    isDeontic: false,
+    parameters: {
+      type: 'object' as const,
+      properties,
+      required: [],
+    } as unknown as FunctionParameters,
+  })
+  const remote = (properties: Record<string, unknown>) => ({
+    name: 'f',
+    returnType: 'NUMBER',
+    parameters: rule(properties).parameters,
+  })
+  const boom = () => {
+    throw new TypeError('boom')
+  }
+  // The failure is logged (and tested to be, below); keep the run quiet.
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('keeps the breaking list when the default check throws', () => {
+    const review = reviewDeploy(
+      [rule({ b: { type: 'string' } })],
+      [remote({ b: { type: 'number' } })],
+      boom
+    )
+    expect(review.step).toBe('breaking-warning')
+    expect(review.breaking.map(changeToPlainText)).toEqual([
+      'f parameter b type changed from number to string',
+    ])
+    expect(review.notices).toEqual([])
+  })
+
+  it('goes on to the deploy, with no notices, when it throws and nothing breaks', () => {
+    const review = reviewDeploy([rule({})], [remote({})], boom)
+    expect(review).toEqual({ step: 'deploy', breaking: [], notices: [] })
+  })
+
+  it('does not throw on a null property node under a retyped input', () => {
+    const local = [rule({ x: { type: 'string', properties: { y: {} } } })]
+    const deployed = [
+      remote({ x: { type: 'number', properties: { y: null } } }),
+    ]
+    const review = reviewDeploy(local, deployed)
+    expect(review.step).toBe('breaking-warning')
+    expect(review.breaking.map(changeToPlainText)).toEqual([
+      'f parameter x type changed from number to string',
+    ])
+  })
+
+  it('does not throw in the default check on a null node under an unchanged type', () => {
+    const local = [
+      rule({ x: { type: 'object', properties: { y: { default: 1 } } } }),
+    ]
+    const deployed = [
+      remote({ x: { type: 'object', properties: { y: null } } }),
+    ]
+    expect(detectDefaultChanges(local, deployed)).toEqual([])
+  })
+})
+
+describe('an input named like something every object has', () => {
+  const rule = (properties: Record<string, unknown>) => ({
+    name: 'f',
+    description: '',
+    isDefault: false,
+    returnType: 'NUMBER',
+    isDeontic: false,
+    parameters: {
+      type: 'object' as const,
+      properties,
+      required: [],
+    } as unknown as FunctionParameters,
+  })
+  const remote = (properties: Record<string, unknown>) => ({
+    name: 'f',
+    returnType: 'NUMBER',
+    parameters: rule(properties).parameters,
+  })
+
+  for (const name of ['toString', 'constructor', 'valueOf', 'hasOwnProperty']) {
+    it(`reports a removed input named ${name}`, () => {
+      expect(
+        detectBreakingChanges(
+          [rule({})],
+          [remote({ [name]: { type: 'number' } })]
+        ).map(changeToPlainText)
+      ).toEqual([`f parameter ${name} removed`])
+    })
+
+    it(`does not read ${name} as an input the deployed version already had`, () => {
+      // A new input named like that is new, not changed: no break, and no default compared.
+      const local = [rule({ [name]: { type: 'number', default: 1 } })]
+      expect(detectBreakingChanges(local, [remote({})])).toEqual([])
+      expect(detectDefaultChanges(local, [remote({})])).toEqual([])
+    })
+
+    it(`compares the default of an input named ${name}`, () => {
+      const local = [rule({ [name]: { type: 'number', default: 1 } })]
+      const deployed = [remote({ [name]: { type: 'number', default: 0 } })]
+      expect(detectDefaultChanges(local, deployed).map((n) => n.input)).toEqual(
+        [name]
+      )
+    })
+  }
+})
+
+describe('a failing default check is logged, names the rule, and loses nothing else', () => {
+  const ok = (name: string, d: number) => ({
+    name,
+    description: '',
+    isDefault: false,
+    returnType: 'NUMBER',
+    isDeontic: false,
+    parameters: {
+      type: 'object' as const,
+      properties: { b: { type: 'number', default: d } },
+      required: [],
+    } as unknown as FunctionParameters,
+  })
+  const deployedOk = (name: string, d: number) => ({
+    name,
+    returnType: 'NUMBER',
+    parameters: ok(name, d).parameters,
+  })
+  // A rule whose schema cannot be read: reading `properties` throws.
+  const broken = (name: string) => ({
+    ...ok(name, 1),
+    parameters: {
+      type: 'object',
+      get properties(): never {
+        throw new TypeError('cannot read properties')
+      },
+      required: [],
+    } as unknown as FunctionParameters,
+  })
+
+  it('logs the failure naming the rule, and still reports the other rules', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const notices = detectDefaultChanges(
+        [broken('bad rule'), ok('good rule', 2)],
+        [deployedOk('bad rule', 0), deployedOk('good rule', 1)]
+      )
+      expect(notices.map((n) => n.function)).toEqual(['good rule'])
+      expect(logged).toHaveBeenCalledTimes(1)
+      expect(String(logged.mock.calls[0]![0])).toContain('bad rule')
+    } finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('logs when the whole check fails, and the review keeps its breaking list', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const review = reviewDeploy([ok('f', 1)], [deployedOk('g', 0)], () => {
+        throw new Error('boom')
+      })
+      expect(review.breaking.map(changeToPlainText)).toEqual(['rule g removed'])
+      expect(review.notices).toEqual([])
+      expect(logged).toHaveBeenCalledTimes(1)
+      expect(String(logged.mock.calls[0]![0])).toContain('default check')
+    } finally {
+      logged.mockRestore()
+    }
   })
 })

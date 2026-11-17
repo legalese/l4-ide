@@ -59,6 +59,14 @@ export type SchemaNode = {
   items?: SchemaNode
 }
 
+/** Whether `obj` itself has `key`. Not `key in obj`: an input may be named
+ *  `toString`, `constructor` or `valueOf`, which every object "has" through
+ *  its prototype, and the service's check (a map lookup) sees only the inputs
+ *  that are really there. */
+function hasOwn(obj: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key)
+}
+
 /** Direction of compatibility: `in` = request parameter (caller sends),
  *  `out` = return value (caller consumes). The two are mirror images —
  *  e.g. a *new optional input* is safe, but a *removed output field* is
@@ -162,7 +170,7 @@ function diffNode(
 
     for (const key of Object.keys(rProps)) {
       const childLoc = loc ? `${loc}.${key}` : key
-      if (!(key in lProps)) {
+      if (!hasOwn(lProps, key)) {
         changes.push([
           ...subject(fn, kind, childLoc),
           dir === 'in' ? txt(' removed') : txt(' no longer returned'),
@@ -183,7 +191,7 @@ function diffNode(
     }
 
     for (const key of Object.keys(lProps)) {
-      if (key in rProps) continue
+      if (hasOwn(rProps, key)) continue
       const childLoc = loc ? `${loc}.${key}` : key
       // New optional input / new output field → compatible. Only a new
       // *required* input breaks existing callers.
@@ -332,6 +340,16 @@ function diffDefaults(
   local: SchemaNode,
   notices: DefaultChangeNotice[]
 ) {
+  // A node missing on either side has nothing to compare (a null node is not
+  // a schema, and the service's own check never meets one).
+  if (!remote || !local) return
+
+  // A node whose type changed is skipped with everything under it, as the
+  // service's check does (Compatibility.hs `diffDefault`): the type change is
+  // reported as breaking, and the defaults of a retyped input are not
+  // comparable.
+  if (remote.type && local.type && remote.type !== local.type) return
+
   // A default on one side only is not a change: adding one makes the input
   // optional, which is compatible; removing one makes it required, which the
   // breaking check already reports; a deployment stored by a service that did
@@ -354,7 +372,7 @@ function diffDefaults(
   const rProps = remote.properties ?? {}
   const lProps = local.properties ?? {}
   for (const key of Object.keys(lProps).sort()) {
-    if (!(key in rProps)) continue
+    if (!hasOwn(rProps, key)) continue
     diffDefaults(
       fn,
       loc ? `${loc}.${key}` : key,
@@ -391,13 +409,25 @@ export function detectDefaultChanges(
   for (const local of localFns) {
     const remote = remoteByName.get(local.name)
     if (!remote?.parameters || !local.parameters) continue
-    diffDefaults(
-      local.name,
-      '',
-      remote.parameters as unknown as SchemaNode,
-      local.parameters as unknown as SchemaNode,
-      notices
-    )
+    // One rule's schema that cannot be read costs that rule's notices, not the
+    // others'. The failure is logged, because the person then sees no default
+    // review for that rule and nothing else says why.
+    const found: DefaultChangeNotice[] = []
+    try {
+      diffDefaults(
+        local.name,
+        '',
+        remote.parameters as unknown as SchemaNode,
+        local.parameters as unknown as SchemaNode,
+        found
+      )
+      notices.push(...found)
+    } catch (err) {
+      console.error(
+        `The default check failed for rule "${local.name}"; no changed defaults are shown for it.`,
+        err
+      )
+    }
   }
   return notices
 }
@@ -427,11 +457,24 @@ export interface DeployReview {
  */
 export function reviewDeploy(
   localFns: ExportedFunctionInfo[],
-  remoteFns: RemoteFunctionSchema[] | null
+  remoteFns: RemoteFunctionSchema[] | null,
+  checkDefaults: typeof detectDefaultChanges = detectDefaultChanges
 ): DeployReview {
   if (!remoteFns) return { step: 'deploy', breaking: [], notices: [] }
   const breaking = detectBreakingChanges(localFns, remoteFns)
-  const notices = detectDefaultChanges(localFns, remoteFns)
+  // The default check only informs. If it fails, the review goes on without
+  // its notices: the breaking list, which blocks, must never be lost to it.
+  // The person then sees no default review at all, so the failure is logged.
+  let notices: DefaultChangeNotice[] = []
+  try {
+    notices = checkDefaults(localFns, remoteFns)
+  } catch (err) {
+    console.error(
+      'The default check failed; no changed defaults are shown for this deploy.',
+      err
+    )
+    notices = []
+  }
   const step: ReviewStep =
     breaking.length > 0
       ? 'breaking-warning'
