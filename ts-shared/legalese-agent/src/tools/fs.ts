@@ -8,6 +8,12 @@ import type {
 } from '../ports.js'
 import { positionAt } from '../text-positions.js'
 import {
+  compilePatterns,
+  invalidPatternNote,
+  matchesAny,
+  noMatchHint,
+} from '../search-patterns.js'
+import {
   describeFileState,
   formatChecked,
   formatL4Diagnostics,
@@ -60,11 +66,12 @@ export interface FsReadArgs {
    *  output, capped at `startLine + 499` (500-line ceiling). Naming one
    *  also raises the character cap, see EXPLICIT_RANGE_CHAR_LIMIT. */
   endLine?: number
-  /** Optional keyword filter. One or more keywords separated by
-   *  whitespace; a line is a hit if it matches ANY of them (OR).
-   *  Each keyword is parsed as a case-insensitive regex, falling
-   *  back to a literal substring when the regex doesn't compile.
-   *  For files, matching lines are returned with 2 lines of
+  /** Optional pattern filter, in the syntax of `search-patterns.ts`:
+   *  space-separated case-insensitive regexes (spaces inside `()`,
+   *  `[]`, `{}`, backticks or double quotes don't separate), a line
+   *  matching if ANY does. A pattern that doesn't compile is matched
+   *  as plain text, and the result says so; no match says how to
+   *  search instead. For files, matching lines are returned with 2 lines of
    *  surrounding context. For directories, the tree is walked
    *  recursively (skipping `.git`, `node_modules`, `.DS_Store`)
    *  and both entry *names* and file *contents* are searched — name
@@ -318,26 +325,19 @@ function sliceLines(
   return `[${r.relative} ${startLine}-${endLine}/${total}]\n${body}`
 }
 
-/**
- * Build a line matcher from a whitespace-separated keyword string.
- * Splits on runs of whitespace, compiles each keyword as a
- * case-insensitive regex (literal-substring fallback when it doesn't
- * compile), and returns a predicate that's true when a line matches
- * ANY keyword (OR semantics). An empty/blank string matches nothing.
- */
-function buildKeywordMatcher(raw: string): (line: string) => boolean {
-  const keywords = raw.trim().split(/\s+/).filter(Boolean)
-  if (keywords.length === 0) return () => false
-  const tests = keywords.map((kw): ((line: string) => boolean) => {
-    try {
-      const re = new RegExp(kw, 'i')
-      return (line) => re.test(line)
-    } catch {
-      const needle = kw.toLowerCase()
-      return (line) => line.toLowerCase().includes(needle)
-    }
-  })
-  return (line) => tests.some((t) => t(line))
+/** A keyword string's patterns (see `search-patterns.ts`): a line test,
+ *  and a note naming any pattern matched as plain text. */
+function keywordMatcher(raw: string): {
+  matches: (line: string) => boolean
+  note: string | null
+} {
+  const patterns = compilePatterns(raw)
+  return { matches: matchesAny(patterns), note: invalidPatternNote(patterns) }
+}
+
+/** Header, then the note on invalid patterns if any, then the body. */
+function withNote(header: string, note: string | null, body: string): string {
+  return [header, ...(note ? [note] : []), ...(body ? [body] : [])].join('\n')
 }
 
 /**
@@ -374,7 +374,7 @@ function grepLines(
       ? clampInt(endLineRaw, rangeStart + 1, total)
       : total
 
-  const matcher = buildKeywordMatcher(keywordsRaw)
+  const { matches: matcher, note } = keywordMatcher(keywordsRaw)
 
   const matchIdx: number[] = []
   for (let i = rangeStart; i < rangeEnd; i++) {
@@ -382,7 +382,15 @@ function grepLines(
   }
   const keywordsLabel = JSON.stringify(keywordsRaw)
   if (matchIdx.length === 0) {
-    return `[${r.relative} keywords=${keywordsLabel} matches=0]`
+    const narrowed = startLineRaw !== undefined || endLineRaw !== undefined
+    return withNote(
+      `[${r.relative} keywords=${keywordsLabel} matches=0]`,
+      note,
+      noMatchHint(
+        (narrowed ? 'drop startLine/endLine to search the whole file, ' : '') +
+          'search a folder such as `.` to cover the whole workspace'
+      )
+    )
   }
 
   // Directories have no "context" — just return the matching entries
@@ -398,7 +406,7 @@ function grepLines(
     const header =
       `[${r.relative} keywords=${keywordsLabel} matches=${matchIdx.length}` +
       (truncated ? `, shown=${shown}/${matchIdx.length}]` : `]`)
-    return `${header}\n${body}`
+    return withNote(header, note, body)
   }
 
   // Files: expand each match to a [start, end] context window and
@@ -455,7 +463,7 @@ function grepLines(
     `[${r.relative} keywords=${keywordsLabel} matches=${matchIdx.length} ` +
     `chunks=${chunksShown}/${chunks.length}` +
     (truncated ? `, truncated]` : `]`)
-  return `${header}\n${rendered.join('\n---\n')}`
+  return withNote(header, note, rendered.join('\n---\n'))
 }
 
 function clampInt(n: number, lo: number, hi: number): number {
@@ -486,7 +494,7 @@ async function grepDirRecursive(
   r: ResolvedPath,
   keywordsRaw: string
 ): Promise<string> {
-  const matcher = buildKeywordMatcher(keywordsRaw)
+  const { matches: matcher, note } = keywordMatcher(keywordsRaw)
 
   const names: string[] = []
   const rows: string[] = []
@@ -564,7 +572,18 @@ async function grepDirRecursive(
     (totalMatches > 0 ? ` files=${filesWithMatches.size}` : '') +
     (tooLarge > 0 ? ` over1MB=${tooLarge}` : '') +
     (shown.length < total ? `, shown=${shown.length}/${total}]` : `]`)
-  return [header, ...shown].join('\n')
+  if (total === 0) {
+    return withNote(
+      header,
+      note,
+      noMatchHint(
+        r.relative === '.'
+          ? 'a single distinctive word'
+          : 'search `.` to cover the whole workspace'
+      )
+    )
+  }
+  return withNote(header, note, shown.join('\n'))
 }
 
 /** What `.` covers: every folder the workspace has loaded. */

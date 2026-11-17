@@ -64,6 +64,7 @@ library
     OpenApiDoc
     Options
     Schema
+    SearchPattern
     Shared
     Types
     Version
@@ -104,6 +105,8 @@ library
     lsp-types,
     optics,
     optparse-applicative,
+    -- search_text patterns: linear time, so no pattern can stall the server
+    regex-tdfa,
     template-haskell,
     text,
     time,
@@ -137,6 +140,7 @@ test-suite jl4-service-test
     QueryPlanWasmDeclineSpec
     SchemaSpec
     SanitizationSpec
+    SearchPatternSpec
     StdlibResolutionSpec
     TestData
     UnresolvedImportSpec

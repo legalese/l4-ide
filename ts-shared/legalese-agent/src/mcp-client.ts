@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { AiTool, Logger, ToolProvider } from './ports.js'
+import { searchWords } from './search-patterns.js'
 
 /**
  * Thin MCP (streamable HTTP, JSON responses) client for the L4 Rules
@@ -59,6 +60,12 @@ const INDEX_RULE_LIMIT = 400
 const SEARCH_DEFAULT_LIMIT = 8
 const SCHEMA_MAX_CHARS = 16_000
 
+/** `search_rules`'s query, as the remote rules server describes it too. */
+const SEARCH_RULES_QUERY =
+  "Plain words, matched against each rule's name and description, case-insensitive. " +
+  'A rule matches if any word does, and rules matching more words rank first. ' +
+  'Punctuation and regex syntax are ignored: `^(tax|levy)` searches "tax" and "levy".'
+
 /** A deployed rule found in `tools/list`. */
 interface RuleEntry {
   deployId: string
@@ -77,12 +84,12 @@ const DISCOVERY_TOOLS: AiTool[] = [
     function: {
       name: `${MCP_L4_RULES_PREFIX}search_rules`,
       description:
-        "Find deployed rules by keyword. Keywords match a rule's name and description literally, so try several words. Returns each rule's deployment, name and description.",
+        "Find deployed rules by keyword. Returns each rule's deployment, name and description.",
       parameters: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          query: { type: 'string', description: 'Space-separated keywords.' },
+          query: { type: 'string', description: SEARCH_RULES_QUERY },
           limit: { type: 'number', description: 'Max rules (default 8).' },
         },
         required: ['query'],
@@ -315,10 +322,7 @@ export class McpToolClient implements ToolProvider {
   private searchRules(argsJson: string): string {
     const args = parseObject(argsJson)
     const query = typeof args.query === 'string' ? args.query : ''
-    const keywords = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((k) => k.length >= 2)
+    const keywords = searchWords(query)
     const limit =
       typeof args.limit === 'number' && args.limit > 0
         ? Math.min(Math.floor(args.limit), 25)
@@ -338,7 +342,17 @@ export class McpToolClient implements ToolProvider {
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
     if (scored.length === 0) {
-      return `No deployed rule matched "${query}". Keywords match literally, so check the rule names you were given and try other words. If no rule applies, tell the user that no deployed rule covers this before answering from general knowledge.`
+      const searched =
+        keywords.length > 0
+          ? `the words ${keywords.map((k) => JSON.stringify(k)).join(', ')}`
+          : 'no words (the query had none of two letters or more)'
+      return (
+        `No deployed rule matched; searched for ${searched}. ` +
+        `${SEARCH_RULES_QUERY} Try other words: synonyms, a shorter form ` +
+        '("tax" for "taxation"), or a name from the rule list you were given. ' +
+        'If no rule applies, tell the user that no deployed rule covers this ' +
+        'before answering from general knowledge.'
+      )
     }
     return JSON.stringify(
       scored.map(({ rule }) => ({

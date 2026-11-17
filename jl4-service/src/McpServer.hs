@@ -13,7 +13,8 @@ module McpServer (
 
 import qualified BundleStore
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
-import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
+import FileBrowser (searchIdentifier, searchTextWith, SearchMatch (..))
+import SearchPattern (compilePatterns, identifierSyntax, invalidPatternNote, noMatchHint, patternSyntax)
 import Logging (logInfo, logWarn)
 import Shared (collectMetadataEntries, collectDeploymentMetadata, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
 import Types
@@ -341,12 +342,13 @@ fileToolDefinitions =
     ]
   , Aeson.object
     [ "name" .= ("search_identifier" :: Text)
-    , "description" .= ("Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments." :: Text)
+    , "description" .= ("Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments. " <> identifierSyntax)
     , "inputSchema" .= Aeson.object
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
             [ "identifier" .= Aeson.object
                 [ "type" .= ("string" :: Text)
+                , "description" .= ("One L4 name as written, e.g. `the greater of`" :: Text)
                 ]
             , "deployment" .= Aeson.object
                 [ "type" .= ("string" :: Text)
@@ -362,12 +364,13 @@ fileToolDefinitions =
     ]
   , Aeson.object
     [ "name" .= ("search_text" :: Text)
-    , "description" .= ("Tooling: Search text in .l4 source files (case-insensitive)" :: Text)
+    , "description" .= ("Tooling: Search .l4 source files line by line, like grep -E -i. Returns matching lines with context." :: Text)
     , "inputSchema" .= Aeson.object
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
             [ "query" .= Aeson.object
                 [ "type" .= ("string" :: Text)
+                , "description" .= patternSyntax
                 ]
             , "deployment" .= Aeson.object
                 [ "type" .= ("string" :: Text)
@@ -894,8 +897,9 @@ callSearchIdentifier mScope reqId arguments = do
     Just identifier -> do
       sources <- loadSourcesForSearch env mScope mDeployment mFile
       let matches = searchIdentifier identifier sources
-          result = Aeson.encode (map matchToJson matches)
-      pure $ mcpTextResult reqId (Text.Encoding.decodeUtf8 (LBS.toStrict result)) False
+          hint = "No definitions or references. " <> identifierSyntax
+      pure $ mcpTextResults reqId $
+        matchesJson matches : [hint | null matches]
 
 callSearchText :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
 callSearchText mScope reqId arguments = do
@@ -909,9 +913,21 @@ callSearchText mScope reqId arguments = do
       pure $ jsonRpcError reqId (-32602) "Missing required argument: query"
     Just query -> do
       sources <- loadSourcesForSearch env mScope mDeployment mFile
-      let matches = searchText query sources
-          result = Aeson.encode (map matchToJson matches)
-      pure $ mcpTextResult reqId (Text.Encoding.decodeUtf8 (LBS.toStrict result)) False
+      let pats = compilePatterns query
+          matches = searchTextWith pats sources
+          -- never the query: a scoped endpoint's answer mustn't show it
+          elsewhere = case (mFile, mDeployment) of
+            (Just _, _) -> "drop `file` to search every file"
+            (Nothing, Just _) -> "drop `deployment` to search every deployment"
+            _ -> "search_identifier for one whole L4 name"
+      pure $ mcpTextResults reqId $
+        matchesJson matches
+          : maybe [] pure (invalidPatternNote pats)
+          <> [noMatchHint elsewhere | null matches]
+
+-- | The matches as JSON: always the first content item of a search result.
+matchesJson :: [SearchMatch] -> Text
+matchesJson = Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode . map matchToJson
 
 loadSourcesForSearch :: AppEnv -> Maybe Text -> Maybe Text -> Maybe Text -> AppM (Map FilePath Text)
 loadSourcesForSearch env mScope mDeployment mFile = do
@@ -947,6 +963,13 @@ matchToJson m = Aeson.object
   , "lineEnd" .= m.smLineEnd
   , "content" .= m.smContent
   , "isDefinition" .= m.smIsDefinition
+  ]
+
+-- | A successful result of several text items, in order. Clients that read
+-- only the first still get what 'mcpTextResult' would have given them.
+mcpTextResults :: Maybe Aeson.Value -> [Text] -> Aeson.Value
+mcpTextResults reqId texts = jsonRpcResult reqId $ Aeson.object
+  [ "content" .= [ Aeson.object [ "type" .= ("text" :: Text), "text" .= t ] | t <- texts ]
   ]
 
 mcpTextResult :: Maybe Aeson.Value -> Text -> Bool -> Aeson.Value

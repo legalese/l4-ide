@@ -154,12 +154,61 @@ describe('fs tools over the Workspace port', () => {
     )
   })
 
-  test('a directory search says what it looked in when empty', async () => {
+  test('a directory search says what it looked in when empty, and how to search', async () => {
     const { tools } = session({ 'a.l4': 'x' })
-    assert.equal(
-      await tools.readFile({ path: '.', search_keywords: 'nothing' }),
-      '[./ keywords="nothing" names=0 matches=0]'
+    const [header, hint, ...rest] = (
+      await tools.readFile({ path: '.', search_keywords: 'nothing' })
+    ).split('\n')
+    assert.equal(header, '[./ keywords="nothing" names=0 matches=0]')
+    assert.match(
+      hint!,
+      /^No matches\. Each space-separated pattern is a case-insensitive regular expression/
     )
+    assert.deepEqual(rest, [])
+  })
+
+  test('a regex with spaces inside a group or backticks is one pattern', async () => {
+    const { tools } = session({
+      'rules.l4': [
+        'GIVEN x IS A NUMBER',
+        'DECIDE `the greater of` a AND b IF a > b',
+        '-- unrelated',
+        'total MEANS sum OF prices',
+      ].join('\n'),
+    })
+    const out = await tools.readFile({
+      path: 'rules.l4',
+      search_keywords:
+        '^(GIVEN|DECIDE|@export)?.*(sum|max|min|map|`the greater of`|maximum|minimum|fold)',
+    })
+    assert.match(out, /^\[rules\.l4 keywords=".*" matches=2 /)
+    assert.match(out, />>> 2: DECIDE `the greater of`/)
+    assert.match(out, />>> 4: total MEANS sum OF prices/)
+    assert.doesNotMatch(out, /Note:/)
+  })
+
+  test('says which pattern was matched as plain text, and why', async () => {
+    const { tools } = session({ 'a.l4': 'f(x\nother' })
+    const out = await tools.readFile({ path: 'a.l4', search_keywords: 'f(x' })
+    const lines = out.split('\n')
+    assert.match(lines[0]!, /matches=1 /)
+    assert.equal(
+      lines[1],
+      'Note: "f(x" is not a valid regular expression (Unterminated group), so it was matched as plain text.'
+    )
+    assert.match(lines[2]!, /^>>> 1: f\(x/)
+  })
+
+  test('an empty file search points at the whole file and the workspace', async () => {
+    const { tools } = session({ 'a.l4': 'one\ntwo\nthree' })
+    const out = await tools.readFile({
+      path: 'a.l4',
+      search_keywords: 'four',
+      startLine: 2,
+    })
+    assert.match(out, /^\[a\.l4 keywords="four" matches=0\]\nNo matches\./)
+    assert.match(out, /drop startLine\/endLine to search the whole file/)
+    assert.match(out, /search a folder such as `\.`/)
   })
 
   test('paths from a directory search work as they stand', async () => {

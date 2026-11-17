@@ -13,10 +13,12 @@ module WebMCPPage (
 import qualified Data.ByteString.Char8 as BS8
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.Aeson as Aeson
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
+import SearchPattern (identifierSyntax, noMatchHint, patternSyntax, rulesQuerySyntax)
 import Network.HTTP.Media ((//), (/:))
 import Servant (Accept (..), MimeRender (..))
 
@@ -61,6 +63,10 @@ mkOriginTrialToken raw
   isBase64Char c = isAsciiUpper c || isAsciiLower c || isDigit c || c == '+' || c == '/' || c == '='
 
 -- | Far above the size of a real token, which is a few hundred characters.
+-- | The text as a JavaScript string literal (JSON is valid JavaScript).
+jsString :: Text -> Text
+jsString = Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode
+
 maxOriginTrialTokenLength :: Int
 maxOriginTrialTokenLength = 4096
 
@@ -352,16 +358,19 @@ renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.
   , ""
   , "    regTool({"
   , "      name: 'search_rules',"
-  , "      description: 'Tooling: Search ' + fns.length + ' available legal rules by keyword. Returns matching deployment, name, description, return type, and parameter names.',"
-  , "      inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Search keyword' } }, required: ['query'] },"
+  , "      description: 'Tooling: Search ' + fns.length + ' available legal rules by keyword. Words match the start of a word in a rule\\'s name, description, deployment or parameter names. Returns matching deployment, name, description, return type, and parameter names.',"
+  , "      inputSchema: { type: 'object', properties: { query: { type: 'string', description: " <> jsString rulesQuerySyntax <> " } }, required: ['query'] },"
   , "      annotations: { readOnlyHint: true },"
   , "      execute: function(args) {"
-  , "        var words = (args.query || '').toLowerCase().split(/\\s+/).filter(Boolean);"
-  , "        var matches = index.filter(function(fn) {"
-  , "          var hay = (fn.name + ' ' + fn.description + ' ' + fn.deployment + ' ' + fn.parameterNames.join(' ')).toLowerCase();"
-  , "          return words.every(function(w) { return hay.split(/\\s+/).some(function(t) { return t.indexOf(w) === 0 || w.indexOf(t) === 0; }); });"
-  , "        });"
-  , "        return { content: [{ type: 'text', text: JSON.stringify(matches, null, 2) }] };"
+  , "        var words = Array.from(new Set(((args.query || '').toLowerCase().match(/[\\p{L}\\p{N}][\\p{L}\\p{N}_'-]*/gu) || []).filter(function(w) { return w.length >= 2; })));"
+  , "        var scored = index.map(function(fn) {"
+  , "          var tokens = (fn.name + ' ' + fn.description + ' ' + fn.deployment + ' ' + fn.parameterNames.join(' ')).toLowerCase().split(/\\s+/).filter(Boolean);"
+  , "          var score = words.filter(function(w) { return tokens.some(function(t) { return t.indexOf(w) === 0 || (t.length >= 4 && w.indexOf(t) === 0); }); }).length;"
+  , "          return { fn: fn, score: score };"
+  , "        }).filter(function(s) { return s.score > 0; }).sort(function(a, b) { return b.score - a.score; });"
+  , "        var content = [{ type: 'text', text: JSON.stringify(scored.map(function(s) { return s.fn; }), null, 2) }];"
+  , "        if (scored.length === 0) content.push({ type: 'text', text: " <> jsString ("No rule matched. " <> rulesQuerySyntax <> " Try other words: synonyms, or a shorter form (\"tax\" for \"taxation\").") <> " });"
+  , "        return { content: content };"
   , "      }"
   , "    });"
   , ""
@@ -443,31 +452,39 @@ renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.
   , ""
   , "    regTool({"
   , "      name: 'search_identifier',"
-  , "      description: 'Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments.',"
-  , "      inputSchema: { type: 'object', properties: { identifier: { type: 'string' }, deployment: { type: 'string', description: 'Omit for all deployments' }, file: { type: 'string', description: 'Scope to one file' } }, required: ['identifier'] },"
+  , "      description: " <> jsString ("Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments. " <> identifierSyntax) <> ","
+  , "      inputSchema: { type: 'object', properties: { identifier: { type: 'string', description: 'One L4 name as written, e.g. `the greater of`' }, deployment: { type: 'string', description: 'Omit for all deployments' }, file: { type: 'string', description: 'Scope to one file' } }, required: ['identifier'] },"
   , "      annotations: { readOnlyHint: true },"
   , "      execute: function(args, ctx) {"
   , "        var dep = args.deployment || (deployments[0] && deployments[0].id) || '';"
   , "        var url = baseUrl + '/deployments/' + encodeURIComponent(dep) + '/files?identifier=' + encodeURIComponent(args.identifier);"
   , "        if (args.file) url += '&file=' + encodeURIComponent(args.file);"
   , "        return doFetch(url, { signal: execSignal(ctx) }).then(function(r) { return r.json(); })"
-  , "          .then(function(data) { return { content: [{ type: 'text', text: JSON.stringify(data.matches || [], null, 2) }] }; });"
+  , "          .then(function(data) { return searchResult(data, " <> jsString ("No definitions or references. " <> identifierSyntax) <> "); });"
   , "      }"
   , "    });"
   , ""
   , "    regTool({"
   , "      name: 'search_text',"
-  , "      description: 'Tooling: Search text in .l4 source files (case-insensitive)',"
-  , "      inputSchema: { type: 'object', properties: { query: { type: 'string' }, deployment: { type: 'string', description: 'Omit for all deployments' }, file: { type: 'string', description: 'Scope to one file' } }, required: ['query'] },"
+  , "      description: 'Tooling: Search .l4 source files line by line, like grep -E -i. Returns matching lines with context.',"
+  , "      inputSchema: { type: 'object', properties: { query: { type: 'string', description: " <> jsString patternSyntax <> " }, deployment: { type: 'string', description: 'Omit for all deployments' }, file: { type: 'string', description: 'Scope to one file' } }, required: ['query'] },"
   , "      annotations: { readOnlyHint: true },"
   , "      execute: function(args, ctx) {"
   , "        var dep = args.deployment || (deployments[0] && deployments[0].id) || '';"
   , "        var url = baseUrl + '/deployments/' + encodeURIComponent(dep) + '/files?search=' + encodeURIComponent(args.query);"
   , "        if (args.file) url += '&file=' + encodeURIComponent(args.file);"
   , "        return doFetch(url, { signal: execSignal(ctx) }).then(function(r) { return r.json(); })"
-  , "          .then(function(data) { return { content: [{ type: 'text', text: JSON.stringify(data.matches || [], null, 2) }] }; });"
+  , "          .then(function(data) { return searchResult(data, " <> jsString (noMatchHint "drop `file` to search the whole deployment, or name another `deployment`") <> "); });"
   , "      }"
   , "    });"
+  , ""
+  , "    // The matches, and after them the hint when there are none."
+  , "    function searchResult(data, hint) {"
+  , "      var matches = data.matches || [];"
+  , "      var content = [{ type: 'text', text: JSON.stringify(matches, null, 2) }];"
+  , "      if (matches.length === 0) content.push({ type: 'text', text: hint });"
+  , "      return { content: content };"
+  , "    }"
   , ""
   , "    return promises;"
   , "  }"

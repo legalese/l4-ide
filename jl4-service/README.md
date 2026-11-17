@@ -164,8 +164,8 @@ Browse L4 source files within a deployment. **File browsing works immediately af
 
 The `/files` endpoint supports three query parameters (combinable):
 
-- `?identifier=name` — find definitions and references of an L4 identifier (text-based, works pre-compilation)
-- `?search=text` — grep source files (case-insensitive, works pre-compilation)
+- `?identifier=name` — find definitions and references of an L4 identifier: one whole name, case-sensitive, backticks optional (text-based, works pre-compilation)
+- `?search=patterns` — grep source files (works pre-compilation). Each space-separated pattern is a case-insensitive regular expression, and a line matches if any one does; spaces inside `()`, `[]`, `{}`, backticks or double quotes stay in one pattern, and double quotes make a phrase. `\s \d \w` work; a pattern that isn't a valid regular expression is matched as plain text. The MCP tool `search_text` takes the same query and says when nothing matched, or a pattern was taken as plain text.
 - `?file=path.l4` — scope to a specific file
 
 Export information (which functions a file exports) is available only after compilation. Pre-compilation responses include file content but empty export lists.
