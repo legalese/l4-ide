@@ -141,6 +141,38 @@ Wording can still read two ways in these cases:
 
 If a rule reads two ways because of one of these, give the condition a rule of its own, with a sentence, and call that.
 
+## A value the checker supplied
+
+A `WITH` call that names its inputs may leave out an input that has a [`TYPICALLY`](../types/TYPICALLY.md) default, and a construction may leave out a field that has one.
+The checker fills the value in, and the text says so after it, because someone reading the text never sees the source and would otherwise take the value for one that was stipulated.
+`#ASSERT (scaled WITH base IS 10) EQUALS 30` reads `` `scaled` where `base` is 10 and `rate` is 3 by default is equal to 30 ``, where `scaled WITH base IS 10, rate IS 3` reads the same without "by default".
+
+`l4 render` marks the value wherever it prints it.
+In a sentence it reads as above.
+A record construction prints as a list of fields, and there the words follow the value in parentheses:
+
+```text
+- coats — 2
+- colour — red (by default)
+```
+
+A table marks each cell on its own, because one column can hold a default in one row and a value you wrote in the next:
+
+```text
+| coats | colour           |
+|-------|------------------|
+| 1     | red (by default) |
+| 2     | blue             |
+```
+
+The mark follows a value the checker added at a call or a construction, and nowhere else.
+It does not follow a default taken at the root of a [section `GIVEN`](section-given.md): for a rule that reads a section's `surcharge`, whose default is 2, ``#ASSERT (`tax on` WITH amount IS 10) EQUALS 12`` reads `` `tax on` where `amount` is 10 is equal to 12 ``, with nothing about the 2, while ``(`tax on` WITH amount IS 10, surcharge IS 7)`` prints the 7.
+So a value with no mark was not added at this call; it may still have used a default.
+The defaults an answer used are listed under `presumed` by `l4 batch` and the decision service, which [the `TYPICALLY` page](../types/TYPICALLY.md#in-rendered-text-l4-nlg-and-l4-render) explains.
+The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
+
+Under `--lang he`, `l4 nlg` prints `כברירת מחדל`, from a draft entry in the table of Hebrew phrases that no Hebrew-speaking lawyer has reviewed; `l4 render --lang he` prints "by default" and "(by default)" in English.
+
 ## Limits
 
 - **An `ASSUME`d function has no named inputs,** so it has no slots, and a call reads as its name and arguments. Use a `BOOLEAN` field or a rule instead.
