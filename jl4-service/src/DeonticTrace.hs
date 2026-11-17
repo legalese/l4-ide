@@ -115,7 +115,7 @@ isStrayTraceField params field =
 -- | Whether a field of a call to a function that is not DEONTIC is an
 -- @arguments@ wrapper and not an input: a field named @arguments@ that is not
 -- one of the function's inputs. The tool's schema is flat, so a wrapper is not
--- read, only left out; a function may declare an input of that name, and then
+-- read, and the call is refused ('McpServer'); a function may declare an input of that name, and then
 -- it is an input as any other, as @startTime@ and @events@ are
 -- ('isStrayTraceField'). A DEONTIC function's own schema nests its inputs under
 -- @arguments@, so this does not apply to it.

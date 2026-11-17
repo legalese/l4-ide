@@ -560,6 +560,14 @@ presumptionBesideArgumentsMessage isDeontic =
          then ", beside the rule's own `arguments`: {\"arguments\": {\"arguments\": {...}, \"presumption\": \"hard\"}}."
          else ", with the rule's inputs: {\"arguments\": {\"presumption\": \"hard\", ...}}."
 
+-- | Why a call to a flat tool with an @arguments@ wrapper is refused, and where
+-- the inputs go. A flat tool's schema lists the rule's inputs at the top level.
+strayArgumentsMessage :: Text
+strayArgumentsMessage =
+  "`arguments` is not an input of this rule, so this call is refused: put the rule's inputs, "
+    <> "and `presumption` if you send it, at the top level of the call, not inside an `arguments` object "
+    <> "(that nesting is for a rule that returns a contract): {\"some input\": ..., \"presumption\": \"hard\"}."
+
 -- | Why a DEONTIC call that has @presumption@ inside its @arguments@, which the
 -- rule has no input of that name for, is refused: the key would be read as an
 -- input the rule does not have and the request answered soft.
@@ -631,8 +639,8 @@ data McpCall = McpCall
 -- a trace unless the function declares an input of that name ('isStrayTraceField'),
 -- in which case it is an input as any other. A stray one is not an input and is
 -- kept in the 'McpCall' so that the call can be refused. An @arguments@ on it is
--- left out unless the function declares an input of that name
--- ('isStrayArgumentsField'), in which case it is an input as any other.
+-- refused ('strayArgumentsMessage') unless the function declares an input of
+-- that name ('isStrayArgumentsField'), in which case it is an input as any other.
 --
 -- The reserved @presumption@ argument ('presumptionKey') is read on every
 -- function tool and is never an input: beside @arguments@ on a DEONTIC tool, as
@@ -652,6 +660,13 @@ buildMcpCall reverseMap params isDeontic arguments = case arguments of
         | isDeontic
         , Aeson.KeyMap.member (Aeson.Key.fromText presumptionKey) argsObj
         , Maybe.isNothing (presumptionCollision params) -> Left presumptionInsideArgumentsMessage
+      -- On a flat tool a key called `arguments` that is not one of the rule's
+      -- inputs is a wrapper put around the inputs, as a DEONTIC tool takes
+      -- them. It used to be dropped and the call answered from what was left:
+      -- a MAYBE read as NOTHING, a defaulted input taking its default, with a
+      -- success. It is refused, saying where the inputs go. A null is a key left
+      -- out, and a rule that has an input of that name reads it as that input.
+      Just v | not isDeontic, v /= Aeson.Null, isStrayArgumentsField params "arguments" -> Left strayArgumentsMessage
       _ -> Right ()
     pure $ case () of
       _ | isDeontic
@@ -671,9 +686,8 @@ buildMcpCall reverseMap params isDeontic arguments = case arguments of
               }
         | otherwise ->
             let strays = filter (isStrayTraceField params) traceKeys
-                wrappers = filter (isStrayArgumentsField params) ["arguments"]
             in McpCall
-              { inputs = pairs (without (presumptionKey : wrappers <> strays) obj)
+              { inputs = pairs (without (presumptionKey : strays) obj)
               , startTime = if "startTime" `elem` strays then present "startTime" obj Aeson.KeyMap.empty else Nothing
               , events = if "events" `elem` strays then present "events" obj Aeson.KeyMap.empty else Nothing
               , presumption

@@ -3877,12 +3877,46 @@ spec = describe "integration" do
               ((e, s), surface :: String, answered answer) `shouldBe` ((e, s), surface, isBool expected)
 
       -- assumed, not ruled: an arguments that is not an input of the function
-      -- is still left out, as it was, and not read as one
-      it "still leaves out an arguments that is not one of its inputs, as the wrapper it may be" do
-        withServiceFromSources doubleId doubleSource \baseUrl mgr -> do
-          viaMcp <- askMcpWith baseUrl mgr doubleId doubleFn
-            (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.object ["n" Aeson..= (99 :: Int)]])
-          answered viaMcp `shouldBe` Right (Just (FnLitInt 6))
+      -- is refused, naming it and saying where the inputs go. It used to be left
+      -- out, so that {"arguments": {"m": 7}} on a rule whose only input is a
+      -- MAYBE or has a default was answered from what was left (NOTHING, the
+      -- default) with a success.
+      describe "an arguments that is not one of its inputs" do
+        let refusesWrapper what source ruleFn inputs = it what do
+              withServiceFromSources "mcp-stray-arguments" source \baseUrl mgr -> do
+                answer <- askMcpWith baseUrl mgr "mcp-stray-arguments" ruleFn inputs
+                case answer of
+                  Left msg -> (what, "`arguments` is not an input of this rule" `Text.isInfixOf` msg
+                                   , "top level of the call" `Text.isInfixOf` msg) `shouldBe` (what, True, True)
+                  Right r -> expectationFailure (what <> ": answered, not refused: " <> show r)
+            maybeOnly = [("maybe.l4", Text.unlines
+              [ "@export default seven or nothing"
+              , "GIVEN m IS A MAYBE NUMBER"
+              , "GIVETH A NUMBER"
+              , "`seven or nothing` MEANS"
+              , "  CONSIDER m"
+              , "    WHEN JUST p THEN p"
+              , "    WHEN NOTHING THEN 0"
+              ])]
+            defaulted = [("defaulted.l4", Text.unlines
+              [ "@export default five unless said"
+              , "GIVEN d IS A NUMBER TYPICALLY 5"
+              , "GIVETH A NUMBER"
+              , "DECIDE `five unless said` IS d"
+              ])]
+        refusesWrapper "is refused on a rule whose only input is a MAYBE" maybeOnly "seven or nothing"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["m" Aeson..= (7 :: Int)]])
+        refusesWrapper "is refused on a rule whose only input has a default" defaulted "five unless said"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["d" Aeson..= (7 :: Int)]])
+        refusesWrapper "is refused beside inputs that are given at the top level" doubleSource doubleFn
+          (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.object ["n" Aeson..= (99 :: Int)]])
+        refusesWrapper "is refused with a presumption inside it, which would otherwise be dropped" doubleSource doubleFn
+          (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.object ["presumption" Aeson..= ("hard" :: Text)]])
+        it "is a key left out when it is null, as in HTTP" do
+          withServiceFromSources doubleId doubleSource \baseUrl mgr -> do
+            viaMcp <- askMcpWith baseUrl mgr doubleId doubleFn
+              (Aeson.object ["n" Aeson..= (3 :: Int), "arguments" Aeson..= Aeson.Null])
+            answered viaMcp `shouldBe` Right (Just (FnLitInt 6))
 
     -- Meng, 2026-10-26: "trace going to non-DEONTIC should error." /evaluation
     -- has always answered 400 to a startTime or events for such a function. MCP

@@ -51,6 +51,8 @@ What this covers, and what it does not:
 - It is read by the tool of each rule: on the one-deployment server above, on a jl4-service you run yourself, and in the WebMCP script's tools. The all-deployments server's `evaluate` tool is run by Legalese Cloud, and its own schema (from `get_schema`) says what it accepts.
 - A rule with an input called `presumption` cannot be offered as a tool, because the argument would be taken for the input or the input for the argument. The server leaves that rule's tool out of its list, and a call to it is refused and names the input. Rename the input in the rule, or call the rule through the [REST API](openapi-spec.md), where the inputs are nested inside `arguments`.
 
+A rule's inputs go at the top level of a call, as its tool's schema lists them; only a rule that returns a contract takes them inside `arguments`. If a call to an ordinary rule wraps its inputs in an `arguments` object, the tool refuses it and says where the inputs go, instead of answering from the defaults.
+
 ### Tool names in WebMCP
 
 The [WebMCP embed script](webmcp-embed.md) offers the same search, schema and run steps under different names: `search_rules`, `get_rule_schema` and `evaluate_rule`. An agent that uses both sees both sets.
