@@ -2373,6 +2373,7 @@ const L4_RESERVED_WORDS = new Set([
   "ONE",
   "OF",
   "WITH",
+  "WITHAL",
   "A",
   "AN",
   "HAS",
