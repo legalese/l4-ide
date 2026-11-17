@@ -982,7 +982,10 @@ moduleInputDefaults (MkModule _ _ sect) = Map.map (Map.map untyped) (fromSection
 -- loud. Assumed, not ruled.
 --
 -- Every record constructor has an entry, EMPTY when no field declares a
--- default; 'supplyAppNamed' reads a missing entry and an empty one the same way.
+-- default. That is how @T WITHAL@ ('inferWithal') tells a record from an enum
+-- constructor that carries data, which has none, and from a rule with no
+-- defaulted input; 'supplyAppNamed' reads a missing entry and an empty one the
+-- same way.
 recordInputDefaults :: [Text] -> Declare Resolved -> InputDefaults
 recordInputDefaults heads = \ case
   MkDeclare _ _ _ (RecordDecl _ (Just con) tns) ->
@@ -5207,8 +5210,18 @@ inferExpr' g =
       let binderOnly = not (null nes) && and binderSupplies
           nameRivals = filter (couldTakeNamedSite binderOnly) rivals
       t <- instantiate pt
-      noDefault <- siteTakesNoDefault rn t nes nameRivals
-      (ornes, rt) <- inferAppNamed noDefault rn t nes
+      -- A named application with nothing written after the keyword is @T
+      -- WITHAL@: the parser reads @WITH@ with one or more arguments, so this
+      -- is the only way a parsed one comes out empty ('inferWithal'). It takes
+      -- the name-level overload test, not 'siteTakesNoDefault': it writes no
+      -- value for a rival to fit or not fit, so any rival that could take a
+      -- named site by its name is reason enough to refuse.
+      (ornes, rt) <-
+        if null nes
+          then inferWithal (not (null nameRivals)) rn t
+          else do
+            noDefault <- siteTakesNoDefault rn t nes nameRivals
+            inferAppNamed noDefault rn t nes
       let (order, rnes) = unzip ornes
       pure (AppNamed ann rn rnes (Just order), rt)
     IfThenElse ann e1 e2 e3 -> do
@@ -5443,6 +5456,115 @@ inferAppNamed _noDefault r t nes = do
       v <- fresh (NormalName "v")
       pure ([], v) -- TODO: This is unnecessarily lossy. We could still check the expressions and treat all names as out of scope.
 
+-- | @T WITHAL@ (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1, ARCHAISM): the record @T@
+-- built with EVERY field's @TYPICALLY@ default, and nothing written.
+--
+-- It is checked as @T WITH@ followed by every field's default and comes out as
+-- exactly that: the arguments are the same 'DefaultFill'ed ones a @WITH@ that
+-- omits the fields gets ('fillDefaults'), so the evaluator, the exporters, the
+-- ladder and the NLG already do with it what they do with those, and
+-- both presumption modes list each as @WITH T: field@ with no second path.
+--
+-- A field with no default is an error that names it ('IncompleteWithal'): the
+-- spelling asks for every default, so a field that has none is the author
+-- being told the record is not defaulted all the way down.
+--
+-- Records only, and a refusal for anything else, because what is not ruled
+-- stays loud: @WITHAL@ on a rule is not offered ('WithalOnRule'), and neither
+-- is it on an enum constructor that carries data, whose payload fields still
+-- have to be given even when they carry a @TYPICALLY@
+-- ('WithalOnAlternative').
+--
+-- __How a record is told from those: by its declaration.__ A record declared in
+-- this module is found among 'declareDeclarations' as a @RecordDecl@ whose
+-- constructor this is; one from an @IMPORT@ is found in the table that
+-- 'recordInputDefaults' builds from the same declaration, which has an entry for
+-- every record constructor, empty or not. Presence in the table alone would not do for
+-- this module's own records: 'withCheckedFieldDefaults' installs their entries
+-- AFTER the field defaults are checked, and 'scanFunSigModule' checks a rule's
+-- @GIVEN@ defaults before it, so in @inner IS AN Inner TYPICALLY (Inner WITHAL)@
+-- the table has no entry for @Inner@ yet and a record was reported as "one of the
+-- alternatives of a type declared with ONE OF" (review, not-ok/tc/
+-- withal-in-a-default.l4).
+--
+-- That early state, a record of this module whose defaults are not installed
+-- yet, says nothing and gives the record's type. It is reachable only while a
+-- @TYPICALLY@ default is being checked, and 'checkTypically' rejects every named
+-- application there as no literal ('TypicallyValueNotALiteral'), so the author
+-- is told, once, and in words that are true; a second error here about fields
+-- with "no default" would be false.
+--
+-- At an overload it refuses too ('WithalOverloaded'): @WITH@ names fields,
+-- which is what lets a site choose between two definitions of one name, and
+-- @WITHAL@ names none, so a default must not be what decides. Every candidate
+-- then fails and what the author reads is the ambiguity error that follows
+-- ("there are multiple definitions", not-ok/tc/withal-overloaded.l4); the text
+-- of 'WithalOverloaded' itself never reaches the author. The guard is NOT dead
+-- code. For a record with at least one field, 'fillDefaults' already withholds
+-- the defaults at an overload, so the record's own branch fails too and the
+-- guard changes nothing visible (measured with it switched off, before the O3
+-- rule below was spliced in). For a record with NO field there is nothing to
+-- withhold: the record's branch succeeds with @([], t)@, the rule's branch
+-- fails with 'WithalOnRule', and the site would resolve to the record by
+-- elimination, which is what the guard prevents (@DECLARE Marker HAS@ beside a
+-- rule @Marker@ with one input).
+--
+-- The flag @overloaded@ is the name-level test, not O3's: the call site in
+-- 'inferExpr'' hands this function @not (null nameRivals)@ and does not ask
+-- 'siteTakesNoDefault'. O3 withholds a default only when a rival FITS the
+-- values a site writes, and @WITHAL@ writes none, so there is nothing for the
+-- narrower rule to narrow with; and 'siteTakesNoDefault' is silent for a record
+-- that has no defaulted field, which is the case the guard exists for. So an
+-- overload is refused here exactly as it was before O3. That was checked on
+-- the combined tree by the goldens of not-ok/tc/withal-overloaded.l4 and a
+-- record with no field beside a rule of one input, not by switching the guard
+-- off again.
+inferWithal :: Bool -> Resolved -> Type' Resolved -> Check ([(Int, NamedExpr Resolved)], Type' Resolved)
+inferWithal overloaded r t = do
+  mFields <- asks (Map.lookup (getUnique r) . (.visibleInputDefaults))
+  declared <- asks (.declareDeclarations)
+  let ownRecord = any (declaresRecord . (.payload)) (Map.elems declared)
+  case (resolvedTermKind r, mFields) of
+    -- A name that is not in scope has been reported as that, and what it would
+    -- have been is not known: a second error here would only be noise (the name
+    -- of a type that is not a record lands here, since only terms resolve).
+    _ | OutOfScope {} <- r                -> pure ([], t)
+    _ | overloaded                        -> refuse WithalOverloaded
+    (Just Constructor, Just _) -> case t of
+      Fun _ onts res -> do
+        (missing, fills) <- fillDefaults overloaded r (zip [0 ..] onts)
+        unless (null missing) $
+          addError (IncompleteWithal r missing)
+        pure (fills, res)
+      -- A record with no fields has nothing to default.
+      _ -> pure ([], t)
+    -- This module's own record, its defaults not installed yet: see above.
+    (Just Constructor, Nothing)
+      | ownRecord                         -> pure ([], resultOf t)
+      | otherwise -> case t of
+          Fun {} -> refuse WithalOnAlternative
+          _      -> refuse WithalOnPlainAlternative
+    _                                     -> refuse WithalOnRule
+ where
+  refuse why = do
+    addError (IllegalWithal r why)
+    v <- fresh (NormalName "v")
+    pure ([], v)
+  resultOf = \ case
+    Fun _ _ res -> res
+    other       -> other
+  declaresRecord = \ case
+    MkDeclare _ _ _ (RecordDecl _ (Just con) _) -> getUnique con == getUnique r
+    _                                           -> False
+
+-- | What the checker stamped on a resolved name when it looked it up: whether
+-- it is a constructor, a rule, a field selector, and so on.
+resolvedTermKind :: Resolved -> Maybe TermKind
+resolvedTermKind r = case getActual r of
+  MkName cAnn _ -> case cAnn.extra.resolvedInfo of
+    Just (TypeInfo _ mk) -> mk
+    _                    -> Nothing
+
 -- | Could a candidate of this type be what a named application means, going by
 -- the names alone? It is the first test a callee's rivals have to pass for the
 -- callee to count as an overload ('overloadedCallees'); 'rivalFitsSite' then
@@ -5663,8 +5785,10 @@ sectionBinderFor n = do
 
 -- | What a named site left out, split into the inputs or fields that take
 -- their @TYPICALLY@ default (with the argument that supplies it) and those that
--- do not, which are missing. Used when a @WITH@ runs out of written arguments
--- ('supplyAppNamed').
+-- do not, which are missing. Shared by a @WITH@ that runs out of written
+-- arguments ('supplyAppNamed') and by @T WITHAL@ ('inferWithal'), which writes
+-- none: the two differ only in how they report a missing one, so the default a
+-- field takes cannot differ between them.
 fillDefaults
   :: Bool
   -> Resolved
@@ -8459,6 +8583,43 @@ prettyCheckError (IncompleteAppNamed r onts)               =
   , "you have not supplied these inputs:"
   , ""
   ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
+prettyCheckError (IncompleteWithal r onts)                 =
+  [ "WITHAL takes the default of every field, but these fields of"
+  , ""
+  , "  " <> prettyResolvedWithRange r
+  , ""
+  , "have none:"
+  , ""
+  ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
+  ++
+  [ ""
+  , "Give each of them a TYPICALLY default where the record is declared,"
+  , "or build the record with WITH and name them."
+  ]
+prettyCheckError (IllegalWithal r why)                     =
+  [ "WITHAL builds a record with the default of every field, but"
+  , ""
+  , "  " <> prettyResolvedWithRange r
+  , ""
+  ] ++ case why of
+    WithalOnRule ->
+      [ "is not a record: it is a rule, or a field of one. To use a rule and leave"
+      , "some of its inputs to their defaults, name the other inputs with WITH."
+      ]
+    WithalOnAlternative ->
+      [ "is one of the alternatives of a type declared with ONE OF, not a record."
+      , "Every field of such an alternative has to be given, even one that has a"
+      , "TYPICALLY, so write it with WITH or OF."
+      ]
+    WithalOnPlainAlternative ->
+      [ "is one of the alternatives of a type declared with ONE OF, not a record."
+      , "It has no fields to take defaults for, so write just its name."
+      ]
+    WithalOverloaded ->
+      [ "has more than one definition here, and WITHAL names no field that could"
+      , "tell them apart. Rename one of them, or build the record with WITH and"
+      , "name its fields."
+      ]
 -- A '#CHECK' over a polymorphic term carries residual inference variables,
 -- and the raw layout prints them as the checker's gensyms (@a24@) — not a name
 -- in any scope, and different after every edit. Render for display instead:
