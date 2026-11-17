@@ -382,6 +382,8 @@ isReoffered rf = do
 data ContractMemo = MkContractMemo
   { applied   :: !(IntMap.IntMap [(AppliedKey, WHNF)])
   , ruleNamesOf :: !(IntMap.IntMap [(RuleSyntax, [Unique])])
+  , residuals :: !(IntMap.IntMap [((Bool, StableName WHNF, StableName WHNF), WHNF)])
+    -- ^ residual compounds by operator and operand objects ('internResidual')
   , referenceKeys :: !(Map Address ValueKey)
     -- ^ the key each reference was first given ('referenceKey')
   , objectKeys :: !(IntMap.IntMap [(StableName WHNF, ValueKey)])
@@ -391,7 +393,7 @@ data ContractMemo = MkContractMemo
   }
 
 emptyContractMemo :: ContractMemo
-emptyContractMemo = MkContractMemo IntMap.empty IntMap.empty Map.empty IntMap.empty Map.empty
+emptyContractMemo = MkContractMemo IntMap.empty IntMap.empty IntMap.empty Map.empty IntMap.empty Map.empty
 
 resetContractMemo :: Eval ()
 resetContractMemo = do
@@ -558,6 +560,59 @@ eventListKey' memoR reofferedR rf = do
           pure (KEvent pk ak tk (fmap (\ m -> (m.highWater, m.stalled)) mark) es.address)
         _ -> pure (KEventsAt rf.address)
     _ -> pure (KEventsAt rf.address)
+
+-- | NOTE [One residual for the same operand twice]
+--
+-- When both operands of a RAND or ROR return the very same value, the
+-- compound is that value: @R RAND R@ and @R ROR R@ each behave as @R@. A
+-- residual is a value of the machine, not a description of how it was
+-- reached, so the same object on both sides is one rule waiting for the same
+-- events, and whatever happens to one copy happens to the other; when both
+-- are the same breach, the tie-break picks one of two identical breaches.
+--
+-- The memo of NOTE [Applying RAND and ROR operands once] is what makes this
+-- case arise: an operand answered from it returns the value the first
+-- application did. And a residual compound whose operands are the same two
+-- objects is made once ('internResidual'), so that the copies one level up
+-- are again the same object. Together they keep the residual of @x@ and @y@,
+-- each @WITHIN 1 LEST (x RAND y)@, at two obligations however many windows
+-- an event is past, instead of doubling at each.
+--
+-- Sameness is by object identity ('StableName'), never by how the values
+-- print: two equal-looking residuals reached separately stay two.
+--
+-- This changes what prints for a contract still open: one copy where the
+-- tree had several identical ones. Assumed, not ruled, like 'sameRule'.
+sameObject :: WHNF -> WHNF -> IO Bool
+sameObject a b = do
+  sa <- Control.Exception.evaluate a >>= makeStableName
+  sb <- Control.Exception.evaluate b >>= makeStableName
+  pure (sa == sb)
+
+-- | The residual @l op r@, made once for each pair of operand objects: a
+-- second compound of the same operator over the same two objects is the
+-- first one (NOTE [One residual for the same operand twice]). The
+-- environment is not part of it, because an operand already evaluated
+-- ('Right') never reads it.
+internResidual :: Environment -> RBinOp -> WHNF -> WHNF -> Eval WHNF
+internResidual env op l r = do
+  memoR <- asks (.contractMemo)
+  liftIO do
+    l' <- Control.Exception.evaluate l
+    r' <- Control.Exception.evaluate r
+    sl <- makeStableName l'
+    sr <- makeStableName r'
+    let isAnd = case op of ValRAnd -> True; ValROr -> False
+        key = (isAnd, sl, sr)
+        h = hashStableName sl * 1000003 + hashStableName sr * 2 + fromEnum isAnd
+    memo <- readIORef memoR
+    case lookup key =<< IntMap.lookup h memo.residuals of
+      Just v -> pure v
+      Nothing -> do
+        let v = ValROp env op (Right l') (Right r')
+        atomicModifyIORef' memoR \ m ->
+          (m { residuals = IntMap.insertWith (<>) h [(key, v)] m.residuals }, ())
+        pure v
 
 -- | How many hand-offs in a row a re-offered event may make to a
 -- continuation whose deadline is no later than one it has already revealed
@@ -1132,6 +1187,12 @@ backward val = withPoppedFrame $ \ case
   Just (UpdateThunk rf) -> do
     updateThunkToWHNF rf val
     continueBackward val
+  Just (ContractFrame (RBinOp2 frame)) -> do
+    -- See NOTE [One residual for the same operand twice].
+    same <- liftIO (sameObject frame.rval1 val)
+    if same
+      then continueBackward val
+      else backwardContractFrame val (RBinOp2 frame)
   Just (ContractFrame cFrame) -> backwardContractFrame val cFrame
 
 backwardContractFrame :: Value Reference -> ContractFrame -> Machine Config
@@ -1354,9 +1415,12 @@ backwardContractFrame val = \ case
 
   MemoStore key -> do
     memoR <- asks (.contractMemo)
+    -- the value itself, evaluated, so that the application answered from the
+    -- memo returns the very object this one does
+    result <- liftIO (Control.Exception.evaluate val)
     liftIO $ atomicModifyIORef' memoR \ m ->
-      (m { applied = IntMap.insertWith (<>) (appliedHash key) [(key, val)] m.applied }, ())
-    continueBackward val
+      (m { applied = IntMap.insertWith (<>) (appliedHash key) [(key, result)] m.applied }, ())
+    continueBackward result
 
   RBinOp2 MkRBinOp2 {..}
     -- if both obligations have been breached — with ANY mix of breach kinds
@@ -1430,7 +1494,7 @@ backwardContractFrame val = \ case
   -- any reduction of the contract clauses and thus have to return
   -- a value that represents the operator applied to each operand
   RBinOp2 MkRBinOp2 {..} ->
-    continueBackward (ValROp env op (Right rval1) (Right val))
+    internResidual env op rval1 val >>= continueBackward
   where
     tryNextEvent :: ScrutinizeEvents -> Reference -> Machine Config
     tryNextEvent frame events = do

@@ -81,3 +81,47 @@ spec = describe "a #TRACE whose event is many windows late" $ do
     out <- evalWithin $ traced "PARTY Alice MUST tick WITHIN 1 LEST `x`"
       [tick "1000000.5"]
     out `shouldSatisfy` Text.isInfixOf "FULFILLED"
+
+  -- The same rule reached another way than by its own name on both sides, so
+  -- that 'sameRule' does not see it: the memo of applied operands does
+  -- (NOTE [Applying RAND and ROR operands once] in 'L4.EvaluateLazy.Machine').
+  -- Before it, the first case took over 60 s and 8.6 GB, and the second, at
+  -- WAITUNTIL 20, 46 s and 1.3 GB.
+  it "walks x RAND (a second name for x) once per window" $ do
+    out <- evalWithin $ Text.unlines
+      [ "DECLARE Person IS ONE OF Alice, Bob"
+      , "DECLARE Action IS ONE OF tick"
+      , ""
+      , "GIVETH A DEONTIC Person Action"
+      , "`x` MEANS"
+      , "  PARTY Alice MUST tick WITHIN 1 HENCE (`x` RAND `the same rule`) LEST (`x` RAND `the same rule`)"
+      , ""
+      , "GIVETH A DEONTIC Person Action"
+      , "`the same rule` MEANS `x`"
+      , ""
+      , "#TRACE `x` AT 0 WITH"
+      , "  " <> tick "0"
+      , "  " <> tick "30"
+      ]
+    out `shouldSatisfy` Text.isInfixOf "\"success\":true"
+    -- one obligation is left: both operands are the same rule at each window
+    Text.count "MUST tick" out `shouldBe` 1
+
+  it "walks two rules that name each other once per window" $ do
+    out <- evalWithin $ Text.unlines
+      [ "DECLARE Person IS ONE OF Alice, Bob"
+      , "DECLARE Action IS ONE OF act"
+      , ""
+      , "GIVETH A DEONTIC Person Action"
+      , "`x` MEANS PARTY Alice MUST act WITHIN 1 LEST (`x` RAND `y`)"
+      , ""
+      , "GIVETH A DEONTIC Person Action"
+      , "`y` MEANS PARTY Bob MUST act WITHIN 1 LEST (`x` RAND `y`)"
+      , ""
+      , "#TRACE `x` AT 0 WITH"
+      , "  WAITUNTIL 40"
+      ]
+    out `shouldSatisfy` Text.isInfixOf "\"success\":true"
+    -- two obligations are left, x and y from the last deadline, as on main;
+    -- without sharing the copies of them, 2^39
+    Text.count "MUST act" out `shouldBe` 2
