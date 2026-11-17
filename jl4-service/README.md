@@ -426,30 +426,38 @@ In `openapi.json` it also sits under `arguments` of the `/evaluation` request bo
 The top-level `events` of the `/evaluation` request body, which is the one it reads, has items of just `{"type": "object"}`, and so has the query-plan request's.
 So a client that builds an `/evaluation` request from `openapi.json` alone has no description of an event.
 
-**What the service cannot yet read in an event's record.**
+**What the service cannot yet read in an event's record, sorted by how it shows.**
 The service writes an event's record into the generated wrapper as source text, and does not decode it as it decodes an argument, so it reads only what it can write as source.
-These were measured on 2026-11-18 on a build of this branch over `35aa3bd67`, and each is refused with `422`, usually with a type-check message, except the plain object for a `MAYBE` record, below.
-The schema describes these fields as ordinary ones, so a client that follows it can meet them:
+These were measured on 2026-11-18 on a build of this branch over `35aa3bd67`.
+The schema describes these fields as ordinary ones, so a client that follows it can meet them.
+
+**Refused, loudly: `422`, usually with a type-check message.**
 
 - A field of text type is written as text directly in the party or action, and is refused inside a record nested in it.
   A field of an enumeration type is the other way round: inside a nested record it is its plain name (`"kind": "Home"`); directly in the party or action the plain name is refused, and it is written `{"tag": "Active"}` or `{"Active": []}`.
 - A `MAYBE` field is written as `null`, which is `NOTHING`; the schema's description of the field says so.
   A `MAYBE NUMBER` can also be written `{"JUST": [3]}`; a plain value for a `MAYBE` of number or text, and `{"JUST": ["Al"]}` for text, are refused.
-  A `MAYBE` of a record is refused when it is written under its constructor's name or as `{"JUST": [...]}`, **but a plain object of two or more keys is accepted and read as `NOTHING`**, with no warning: the event then does not match a party that states the record (measured with `"presumption": "soft"`).
-  The schema publishes a record inside a `MAYBE` field in that plain form, and its description of the field says to write `null`.
+  A `MAYBE` of a record written under its constructor's name, or as `{"JUST": [...]}`, is refused.
 - The service writes a record's fields in the sorted order of their JSON keys, whatever order the request wrote them in, and a record nested in another takes every field written after it.
   So a nested record has to be the last of its parent's fields in that order: a record with a field whose name sorts after the nested record's is refused, and a record with two record-typed fields can never be written.
 - A list of records is read for one element only: two records are refused with a parser message (`unexpected WITH`), not a type-check one.
 - A fractional number below 0.1, or of 10,000,000 or more, is written in exponent form (`1.0e-2`) and refused (`could not find a definition for the identifier e`).
 
+**Read wrongly, with no warning: `200`, nothing in `presumed`, no refusal.**
+
+- **A `MAYBE` field of a record type, written as an object of two or more keys, is read as `NOTHING`.**
+  For a `Driver` whose `home` is a `MAYBE Address` with the fields `zip` and `floor`, `"home": {"zip": 5, "floor": 1}` in an event is accepted and means no home, so the event does not match a party that states that home, and does match one that leaves it out.
+  The schema publishes the record inside a `MAYBE` field in that plain form, and its description of the field says to write `null`.
+  An argument is not affected: the same object in an argument is read as a record, on the direct path and on the wrapper path (measured with a function that returns whether `home` is `NOTHING`).
+  The same holds under `"presumption": "hard"`, which does not refuse it.
+- **A number that has no exact binary form does not equal itself.**
+  A fractional number that a binary floating-point number cannot hold exactly, such as `0.1`, `0.3` or `1.1`, is read, but it does not equal the same number given in `arguments`.
+  An event that carries it does not match the party, so the obligation stays open, with nothing in the answer to say why.
+  `0.25` and `0.5` are held exactly and match, and so do whole numbers.
+  This predates the schema change and is not part of it.
+
 The spellings `{"tag": ...}`, `{"Active": []}` and `{"JUST": [3]}` are what the writer happens to read today.
 The schema does not publish them, and they are not promised.
-
-**A number that has no exact binary form does not equal itself.**
-A fractional number that a binary floating-point number cannot hold exactly, such as `0.1`, `0.3` or `1.1`, is read, but it does not equal the same number given in `arguments`.
-An event that carries it does not match the party, so the obligation stays open, and a later event leaves a breach, with nothing in the answer to say why.
-`0.25` and `0.5` are held exactly and match, and so do whole numbers.
-This predates the schema change and is not part of it.
 
 Fields of boolean type, whole numbers, and lists of text or numbers were tried and are read.
 Other types were not tried.
