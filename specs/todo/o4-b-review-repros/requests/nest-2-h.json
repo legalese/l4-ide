@@ -1,0 +1,3 @@
+{"arguments": {"driver": {"name": "Alice", "licence": "full"}}, "presumption": "hard", "startTime": 0,
+ "events": [{"party": {"name": "Alice", "licence": "full"}, "action": "drive", "at": 0},
+            {"party": {"name": "Alice", "licence": "full"}, "action": "wear seatbelt", "at": 0}]}

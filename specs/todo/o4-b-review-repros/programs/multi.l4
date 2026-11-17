@@ -1,0 +1,75 @@
+DECLARE Driver HAS
+    name IS A STRING
+    licence IS A STRING TYPICALLY "full"
+
+DECLARE Act IS ONE OF
+    `wear seatbelt`
+    `drive`
+    pay HAS amount IS A NUMBER
+
+@export default guard rule
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, Act
+`guard rule` MEANS
+    PARTY driver
+    MUST `wear seatbelt` PROVIDED driver's name EQUALS "nobody"
+    WITHIN 10
+    HENCE FULFILLED
+    LEST BREACH
+
+@export default early rule
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, Act
+`early rule` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    AFTER 3
+    WITHIN 10
+    HENCE FULFILLED
+    LEST BREACH
+
+@export default lest chain
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, Act
+`lest chain` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE FULFILLED
+    LEST (PARTY driver MUST `drive` WITHIN 10 HENCE FULFILLED LEST BREACH)
+
+@export default ror rule
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, Act
+`ror rule` MEANS
+    (PARTY driver MUST `wear seatbelt` WITHIN 1 HENCE FULFILLED LEST BREACH)
+    ROR
+    (PARTY driver MUST `drive` WITHIN 1 HENCE FULFILLED LEST BREACH)
+
+@export default rand three
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, Act
+`rand three` MEANS
+    ((PARTY driver MUST `wear seatbelt` WITHIN 5 HENCE FULFILLED LEST BREACH)
+     RAND
+     (PARTY driver MUST `drive` WITHIN 5 HENCE FULFILLED LEST BREACH))
+    RAND
+    (PARTY driver MUST `wear seatbelt` PROVIDED driver's name EQUALS "nobody" WITHIN 5 HENCE FULFILLED LEST BREACH)
+
+@export default shant rule
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, Act
+`shant rule` MEANS
+    PARTY driver
+    SHANT `drive`
+    WITHIN 5
+
+@export default hence lest
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, Act
+`hence lest` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE (PARTY driver MUST `drive` WITHIN 10 HENCE FULFILLED LEST BREACH)
+    LEST (PARTY driver MUST `wear seatbelt` WITHIN 10 HENCE FULFILLED LEST BREACH)

@@ -1,0 +1,35 @@
+DECLARE Driver HAS
+    name IS A STRING
+    licence IS A STRING TYPICALLY "learner"
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+-- a record of the rules that leaves its licence to the default
+`inner driver` MEANS Driver WITH name IS "Zed"
+
+GIVETH A PROVISION OF Driver, `Driver Action`
+`inner rule` MEANS
+    PARTY `inner driver`
+    MUST `drive`
+    WITHIN 5
+    HENCE FULFILLED
+    LEST BREACH
+
+-- the inner run compares `inner driver` with itself (its licence is forced
+-- there), and is FULFILLED whatever the default is; its licence is then read
+`the licence` MEANS
+    IF (EVALTRACE `inner rule` 0 (LIST EVENT `inner driver` `drive` 1)) EQUALS FULFILLED
+    THEN `inner driver`'s licence
+    ELSE "never"
+
+@export default outer rule
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`outer rule` MEANS
+    PARTY Driver WITH name IS driver's name, licence IS `the licence`
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE FULFILLED
+    LEST BREACH

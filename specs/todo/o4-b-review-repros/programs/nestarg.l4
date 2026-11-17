@@ -1,0 +1,35 @@
+DECLARE Driver HAS
+    name IS A STRING
+    licence IS A STRING TYPICALLY "full"
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+GIVEN d IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`inner rule` MEANS
+    PARTY d
+    MUST `drive`
+    WITHIN 5
+    HENCE FULFILLED
+    LEST BREACH
+
+-- the inner run compares d with itself, so it forces d's licence, and is
+-- FULFILLED whatever the licence is; the licence is then read
+GIVEN d IS A Driver
+GIVETH A STRING
+`licence checked` MEANS
+    IF (EVALTRACE (`inner rule` d) 0 (LIST EVENT d `drive` 1)) EQUALS FULFILLED
+    THEN d's licence
+    ELSE "never"
+
+@export default outer rule
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`outer rule` MEANS
+    PARTY Driver WITH name IS driver's name, licence IS `licence checked` driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE FULFILLED
+    LEST BREACH

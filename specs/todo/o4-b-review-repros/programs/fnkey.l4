@@ -1,0 +1,27 @@
+DECLARE Address HAS
+    zip IS A NUMBER
+    floor IS A NUMBER
+
+GIVEN zip IS A NUMBER
+      floor IS A NUMBER TYPICALLY 1
+GIVETH AN Address
+mkAddr MEANS Address WITH zip IS zip, floor IS floor
+
+DECLARE Driver HAS
+    name IS A STRING
+    zhome IS AN Address
+
+DECLARE `Driver Action` IS ONE OF
+    `wear seatbelt`
+    `drive`
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+GIVETH A PROVISION OF Driver, `Driver Action`
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST `wear seatbelt`
+    WITHIN 1
+    HENCE
+        PARTY driver
+        MAY `drive`

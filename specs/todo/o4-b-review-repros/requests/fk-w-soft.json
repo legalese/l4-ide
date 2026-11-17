@@ -1,0 +1,1 @@
+{"arguments": {"driver": {"name": "Alice", "zhome": {"zip": 5, "floor": 1}}}, "startTime": 0, "events": [{"party": {"name": "Alice", "zhome": {"mkAddr": {"zip": 5, "floor": 1}}}, "action": "wear seatbelt", "at": 0}]}
