@@ -704,6 +704,134 @@ spec = describe "integration" do
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
 
+  -- A top-level @null@ is "I do not know", and it never takes a default (T3).
+  -- For an input that is not a MAYBE it is refused before evaluation, naming
+  -- the input. /evaluation always did; MCP @tools/call@ and a batch case sent
+  -- the same @null@ down the wrapper path instead, where the input became an
+  -- assumed term and the answer depended on the order of the operands
+  -- (smucclaw/l4-ide#1021). Each case is asked of all three surfaces, and each
+  -- verdict is checked on its own, so that three surfaces agreeing on a wrong
+  -- answer do not pass.
+  describe "a top-level null on every surface (smucclaw/l4-ide#1021)" do
+    let deployId = "null-surfaces"
+        janus = Text.unlines
+          [ "@export default both inputs hold, p first"
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE bothHold IF p AND q"
+          , ""
+          , "@export both inputs hold, q first"
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE bothHoldRev IF q AND p"
+          , ""
+          , "@export r has a default"
+          , "GIVEN r IS A BOOLEAN TYPICALLY TRUE"
+          , "      q IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE withDefault IF r AND q"
+          , ""
+          , "@export a MAYBE input"
+          , "GIVEN m IS A MAYBE NUMBER"
+          , "GIVETH A NUMBER"
+          , "orZero m MEANS"
+          , "  CONSIDER m"
+          , "    WHEN JUST x THEN x"
+          , "    WHEN NOTHING THEN 0"
+          ]
+        withJanus = withServiceFromSources deployId [("janus.l4", janus)]
+        -- what each surface answered, in a fixed order
+        onEverySurface :: String -> Manager -> Text -> [Pair] -> IO [(Text, SurfaceAnswer)]
+        onEverySurface baseUrl mgr fn inputs = sequence
+          [ ("/evaluation",) <$> askRest baseUrl mgr deployId fn inputs []
+            -- a tool for a function that is not DEONTIC takes its inputs flat
+          , ("MCP",) <$> askMcpWith baseUrl mgr deployId fn (Aeson.object inputs)
+          , ("batch",) <$> askBatch baseUrl mgr deployId fn inputs []
+          ]
+        -- every surface that did not do what was asked, and what it did instead
+        departures :: (SurfaceAnswer -> Maybe Text) -> [(Text, SurfaceAnswer)] -> [Text]
+        departures verdict answers = [ surface <> ": " <> why | (surface, answer) <- answers, Just why <- [verdict answer] ]
+        showAnswer :: Map Text FnLiteral -> Text
+        showAnswer r = "answered " <> Text.pack (show (Map.lookup "value" r))
+        -- refused, naming the input in these words, and not as one left out
+        refusedAs :: Text -> SurfaceAnswer -> Maybe Text
+        refusedAs expected = \case
+          Right r -> Just (showAnswer r)
+          Left msg
+            | not (expected `Text.isInfixOf` msg) -> Just ("refused in other words: " <> msg)
+            | "not supplied" `Text.isInfixOf` msg -> Just ("called a null an input left out: " <> msg)
+            | otherwise -> Nothing
+        answeredAs :: FnLiteral -> SurfaceAnswer -> Maybe Text
+        answeredAs expected = \case
+          Left msg -> Just ("refused: " <> msg)
+          Right r | Map.lookup "value" r == Just expected -> Nothing
+                  | otherwise -> Just (showAnswer r)
+        refusal name = "Parameter '" <> name <> "' is null, which means the value is not known: supply a value"
+        refusalWithDefault name = "Parameter '" <> name
+          <> "' is null, which means the value is not known, and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"
+
+    -- The issue's cases A to D, and B': the two operand orders, a null that
+    -- would have decided the answer and one that would not, and a default.
+    forM_ [ ("A", "p AND q with p null and q false", "bothHold", ["p" Aeson..= Aeson.Null, "q" Aeson..= False], refusal "p")
+          , ("B", "p AND q with p null and q true", "bothHold", ["p" Aeson..= Aeson.Null, "q" Aeson..= True], refusal "p")
+          , ("C", "q AND p with p null and q false", "bothHoldRev", ["p" Aeson..= Aeson.Null, "q" Aeson..= False], refusal "p")
+          , ("B'", "q AND p with p null and q true", "bothHoldRev", ["p" Aeson..= Aeson.Null, "q" Aeson..= True], refusal "p")
+          , ("D", "r TYPICALLY TRUE, with r null", "withDefault", ["r" Aeson..= Aeson.Null, "q" Aeson..= True], refusalWithDefault "r")
+          ] \(label, what, fn, inputs, expected :: Text) ->
+      it ("case " <> label <> ": " <> what <> " is refused, naming the input, on /evaluation, on MCP and in a batch") do
+        withJanus \baseUrl mgr -> do
+          answers <- onEverySurface baseUrl mgr fn inputs
+          departures (refusedAs expected) answers `shouldBe` []
+
+    it "names every input that is null, not only the first" do
+      withJanus \baseUrl mgr -> do
+        answers <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= Aeson.Null, "q" Aeson..= Aeson.Null]
+        departures (refusedAs (refusal "p")) answers `shouldBe` []
+        departures (refusedAs (refusal "q")) answers `shouldBe` []
+
+    -- case E: an input left out is refused as it always was, in other words
+    -- than a null's
+    it "case E: an input left out is refused as missing, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        answers <- onEverySurface baseUrl mgr "bothHoldRev" ["q" Aeson..= False]
+        departures (refusedAs "Parameter 'p': missing required parameter") answers `shouldBe` []
+
+    -- case F: with every input supplied, all three answer
+    it "case F: every input supplied is answered, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        answers <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= True, "q" Aeson..= True]
+        departures (answeredAs (FnLitBool True)) answers `shouldBe` []
+
+    -- A MAYBE takes a null as NOTHING: the one input a null is not refused for.
+    it "answers a null for a MAYBE input as NOTHING, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        answers <- onEverySurface baseUrl mgr "orZero" ["m" Aeson..= Aeson.Null]
+        departures (answeredAs (FnLitInt 0)) answers `shouldBe` []
+
+    -- A DEONTIC function takes the wrapper path on every surface, so a top-level
+    -- null for its BOOLEAN input is an assumed term on all three, and is refused
+    -- only because the rule reads it.
+    it "reads a top-level null for a DEONTIC function's BOOLEAN input the same way on all three" do
+      withServiceFromSources "null-surfaces-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do
+        let inputs = ["driver" Aeson..= Aeson.object ["name" Aeson..= ("Ann" :: Text)], "is motorway" Aeson..= Aeson.Null]
+            trace = ["startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])] :: [Pair]
+            fn = "seatbelt requirement"
+        answers <- sequence
+          [ ("/evaluation",) <$> askRest baseUrl mgr "null-surfaces-deontic" fn inputs trace
+          , ("MCP",) <$> askMcp baseUrl mgr "null-surfaces-deontic" fn inputs trace
+          , ("batch",) <$> askBatch baseUrl mgr "null-surfaces-deontic" fn inputs trace
+          ]
+        [ surface <> ": " <> why
+          | (surface, answer) <- answers
+          , Just why <- [case answer of
+              Right r -> Just ("answered " <> Text.pack (show (Map.lookup "value" r)))
+              -- MCP spells the input as its tool does, with a hyphen
+              Left msg | "`is motorway (not supplied)`" `Text.isInfixOf` Text.replace "is-motorway" "is motorway" msg -> Nothing
+                       | otherwise -> Just ("refused in other words: " <> msg)] ]
+          `shouldBe` ([] :: [Text])
+
   describe "MAYBE inputs on the wrapper path" do
     -- A {} on an unread input sends the request through the generated wrapper.
     let uncertain = Aeson.object []

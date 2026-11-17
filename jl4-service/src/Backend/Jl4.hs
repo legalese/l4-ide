@@ -772,8 +772,11 @@ buildFunctionCallExpr funName args =
 -- key with no value, or an MCP argument that fails to parse
 -- ('parseFnLiteral'). The direct path then fills the input's default, makes
 -- a MAYBE NOTHING, or refuses it ('L4.Presumption.fillDecision'). MCP and
--- the batch endpoint decode a top-level @null@ as 'FnUnknown' instead, so
--- they take the wrapper path for it (smucclaw/l4-ide#1021).
+-- the batch endpoint decode a top-level @null@ as 'FnUnknown' instead;
+-- 'evaluateWithCompiled' reads it as the key with no value that
+-- @/evaluation@ reads ('topLevelNull'), before it asks this, so it does not
+-- take the wrapper path (smucclaw/l4-ide#1021). A @null@ inside a record or a
+-- list still does.
 requiresWrapperEvaluation :: [(Text, Maybe FnLiteral)] -> Bool
 requiresWrapperEvaluation = any (\(_, mVal) -> maybe False needsWrapper mVal)
   where
@@ -864,11 +867,26 @@ requestEvalConfig policy presumption viaWrapper = do
     , Eval.allocationLimit = limit
     }
 
+-- | A top-level @null@ is the same request on every surface: a key with no
+-- value, as @/evaluation@ decodes it ('FnArguments'). MCP and the batch
+-- endpoint decode it as 'FnUnknown', a value, which sent the request down the
+-- wrapper path, where a BOOLEAN input became the assumed term
+-- @p (not supplied)@ and the answer depended on the order of the operands
+-- (smucclaw/l4-ide#1021). Read as a key with no value, it is T3's @null@: an
+-- input that is not a MAYBE is refused, naming it, and never takes its
+-- default ('L4.Presumption.fillDecision', 'RefuseNull'); a MAYBE takes NOTHING.
+-- A DEONTIC function takes the wrapper path on every surface and decodes both
+-- the same way, so it does not come through here.
+topLevelNull :: (Text, Maybe FnLiteral) -> (Text, Maybe FnLiteral)
+topLevelNull (name, Just FnUnknown) = (name, Nothing)
+topLevelNull param = param
+
 -- | Evaluate using precompiled module (fast path) - direct AST evaluation
 -- This avoids the text round-trip through prettyLayout and re-parsing
 -- Sends a request to the wrapper path instead when it holds a @{}@ anywhere,
--- or a @null@ the decoder kept as a value: inside a record or list, or at
--- the top level from MCP and batch ('requiresWrapperEvaluation').
+-- or a @null@ the decoder kept as a value, inside a record or list
+-- ('requiresWrapperEvaluation'). A @null@ at the top level does not: it is
+-- the same on every surface ('topLevelNull').
 evaluateWithCompiled
   :: FilePath
   -> FunctionDeclaration
@@ -880,10 +898,11 @@ evaluateWithCompiled
   -> Bool
   -> Presumption
   -> ExceptT EvaluatorError IO ResponseWithReason
-evaluateWithCompiled filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption = do
-  -- One entry per GIVEN: Nothing for one left out, or for a top-level null on
-  -- /evaluation, which 'FnArguments' decodes the same way.
-  let expectedParams = map fst (extractParamTypes compiled.compiledDecide)
+evaluateWithCompiled filepath fnDecl compiled sourceText modContext params0 traceLevel includeGraphViz presumption = do
+  -- One entry per GIVEN: Nothing for one left out, or for a top-level null,
+  -- which every surface now sends as /evaluation does ('topLevelNull').
+  let params = map topLevelNull params0
+      expectedParams = map fst (extractParamTypes compiled.compiledDecide)
       inputMap = Map.fromList params
       -- join flattens Maybe (Maybe FnLiteral) -> Maybe FnLiteral
       fullParams = [(name, join $ Map.lookup name inputMap) | name <- expectedParams]
@@ -898,10 +917,9 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params trace
     (inputNames compiled.compiledModule compiled.compiledDecide) params
 
   -- Take the wrapper path only for a @{}@ anywhere, or a @null@ the decoder
-  -- kept as a value: inside a record or list, or at the top level from MCP
-  -- and batch ('requiresWrapperEvaluation'). A parameter left out, or a
-  -- top-level @null@ on /evaluation, stays on the direct path, and so do the
-  -- ASSUMEs, which 'evaluateDirectAST' binds by 'rewriteModuleAssumes'.
+  -- kept as a value: inside a record or list ('requiresWrapperEvaluation'). A
+  -- parameter left out, or a top-level @null@, stays on the direct path, and
+  -- so do the ASSUMEs, which 'evaluateDirectAST' binds by 'rewriteModuleAssumes'.
   if requiresWrapperEvaluation (fullParams ++ assumeValues)
     then evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption
     else evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presumption
