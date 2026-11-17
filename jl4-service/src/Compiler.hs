@@ -481,9 +481,10 @@ exportToFunction declares implicitParams export =
 -- spellings are not published here, so the decoder is free to replace them.
 --
 -- In openapi.json this schema sits under @arguments@ of the @/evaluation@ request
--- body and in the batch cases, where the service does not read it; the top-level
--- @events@ it does read is untyped there. The function document is where an
--- event is described as the service reads it.
+-- body, where the service does not read it, and under each batch case's
+-- @events@, which it does; the top-level @events@ of the @/evaluation@ request,
+-- which it reads, is untyped there. The function document describes an event as
+-- the service reads it.
 eventRecordParameter :: Parameter -> Parameter
 eventRecordParameter p = case p.parameterProperties of
   -- A party or action that is not a record has no fields to require: an

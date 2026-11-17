@@ -403,21 +403,22 @@ The plain form an argument takes, `"zhome": { "zip": 5, "floor": 2 }`, is refuse
 The schema describes the form the service reads.
 
 **Where `openapi.json` describes an event.**
-The typed schema of an event is in the function document (`GET .../functions/{fn}`), which is the one place that describes it as the service reads it.
-In `openapi.json` the same typed schema sits under `arguments` of the `/evaluation` request body, listed beside the function's own inputs, and under each batch case.
-The service ignores events in both places: an event put only under `arguments` leaves the obligation open, and so does a batch case with a matching event.
-The top-level `events` of the `/evaluation` request body, which is the one it reads, has items of just `{"type": "object"}`.
-So a client that builds its request from `openapi.json` alone has no description of an event.
+The typed schema of an event is in the function document (`GET .../functions/{fn}`), and in `openapi.json` under each batch case's `events`, which the service reads.
+In `openapi.json` it also sits under `arguments` of the `/evaluation` request body, listed beside the function's own inputs, where the service does not read it: a request that puts `events` only there is refused (`events is required for functions returning DEONTIC`).
+The top-level `events` of the `/evaluation` request body, which is the one it reads, has items of just `{"type": "object"}`, and so has the query-plan request's.
+So a client that builds an `/evaluation` request from `openapi.json` alone has no description of an event.
 
 **What the service cannot yet read in an event's record.**
 The service writes an event's record into the generated wrapper as source text, and does not decode it as it decodes an argument, so it reads only what it can write as source.
-These were measured on 2026-10-11 at `72044c7b9` and again on this branch, and each is refused with `422`, usually with a type-check message.
+These were measured on 2026-11-18 on a build of this branch over `35aa3bd67`, and each is refused with `422`, usually with a type-check message, except the plain object for a `MAYBE` record, below.
 The schema describes these fields as ordinary ones, so a client that follows it can meet them:
 
 - A field of text type is written as text directly in the party or action, and is refused inside a record nested in it.
   A field of an enumeration type is the other way round: inside a nested record it is its plain name (`"kind": "Home"`); directly in the party or action the plain name is refused, and it is written `{"tag": "Active"}` or `{"Active": []}`.
 - A `MAYBE` field is written as `null`, which is `NOTHING`; the schema's description of the field says so.
-  A `MAYBE NUMBER` can also be written `{"JUST": [3]}`; a value for a `MAYBE` of text or of a record is refused.
+  A `MAYBE NUMBER` can also be written `{"JUST": [3]}`; a plain value for a `MAYBE` of number or text, and `{"JUST": ["Al"]}` for text, are refused.
+  A `MAYBE` of a record is refused when it is written under its constructor's name or as `{"JUST": [...]}`, **but a plain object of two or more keys is accepted and read as `NOTHING`**, with no warning: the event then does not match a party that states the record (measured with `"presumption": "soft"`).
+  The schema publishes a record inside a `MAYBE` field in that plain form, and its description of the field says to write `null`.
 - The service writes a record's fields in the sorted order of their JSON keys, whatever order the request wrote them in, and a record nested in another takes every field written after it.
   So a nested record has to be the last of its parent's fields in that order: a record with a field whose name sorts after the nested record's is refused, and a record with two record-typed fields can never be written.
 - A list of records is read for one element only: two records are refused with a parser message (`unexpected WITH`), not a type-check one.
