@@ -543,9 +543,17 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
 -- decodes the row as the request record ('requestRecordName'), so the
 -- request's own events are the ones that decode raised. The filter is the
 -- service's too ('requestPresumed').
+--
+-- Only the row's own directive counts. The module a row runs against is the
+-- file's source with the directives 'filterIdeDirectives' drops removed, which
+-- keeps @#TRACE@ and @#CONTRACT@, and the wrapper's @#EVAL@ is appended after
+-- them: so a file that keeps a directive evaluates it once per row, ahead of the
+-- row's own, and a default that directive took (an event's party built without a
+-- defaulted field, say) is not one the row's answer rests on. The row's directive
+-- is the last result.
 rowPresumed :: [ExportedParam] -> [EvalDirectiveResult] -> [Text]
 rowPresumed schema results =
-  requestPresumed id inputs (concatMap (.presumed) results)
+  requestPresumed id inputs (concatMap (.presumed) (take 1 (reverse results)))
   where
     inputs = Set.fromList [ x.paramName | x <- schema ]
 

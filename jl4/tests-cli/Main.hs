@@ -420,6 +420,13 @@ batchTyOverload, batchTyOverloadJson :: FilePath
 batchTyOverload     = fixtureDir </> "batch-typically-overload.l4"
 batchTyOverloadJson = fixtureDir </> "batch-typically-overload.json"
 
+-- | A file that keeps a @#TRACE@: it runs once per row, ahead of the row's own
+-- directive, and the default its event's party takes is not the row's.
+batchTyDirective, batchTyDirectiveSupplied, batchTyDirectiveOmitted :: FilePath
+batchTyDirective         = fixtureDir </> "batch-typically-directive.l4"
+batchTyDirectiveSupplied = fixtureDir </> "batch-typically-directive-supplied.json"
+batchTyDirectiveOmitted  = fixtureDir </> "batch-typically-directive-omitted.json"
+
 -- | The @output@ result and @presumed@ list of one batch envelope.
 resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
 resultAndPresumed env =
@@ -835,6 +842,7 @@ coreFixtures =
   , batchTyCollideRecords, batchTyCollideImport, batchTyCollideImportA
   , batchTyCollideImportB, batchTyCollideWhere, batchTyCollideJson, batchTyCollideRowsJson
   , batchTyOverload, batchTyOverloadJson
+  , batchTyDirective, batchTyDirectiveSupplied, batchTyDirectiveOmitted
   , batchWithal, batchWithalJson, withalImportMissing, withalImportMissingDef, withalTypeName
   , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
   , dupDiagDiamondEntry
@@ -3522,6 +3530,40 @@ spec bin = do
       rows <- decodeArray sout
       map resultAndPresumed rows `shouldBe`
         [ (Just (Number 30), presumedOf ["WITH scaled: rate"]) ]
+
+  -- `presumed` lists the defaults THIS ROW's evaluation took. A file that keeps a
+  -- @#TRACE@ evaluates it once per row, and the default its event's party takes
+  -- (`licence`, left out of `Driver WITH name IS "Alice"`) used to be listed in
+  -- every row, in both modes, though the row had supplied `licence` itself.
+  describe "l4 batch: presumed does not list a default the file's own directive took" $ do
+    let batchWith entry presumption input =
+          jsonEnvelope bin [ "batch", batchTyDirective, "--inputs", input, "--entrypoint", entry
+                           , "--presumption", presumption ]
+    it "a row that supplies the field lists nothing, under soft and under hard" $ do
+      envS <- batchWith "seatbelt requirement" "soft" batchTyDirectiveSupplied
+      envH <- batchWith "seatbelt requirement" "hard" batchTyDirectiveSupplied
+      objField envS "presumed" `shouldBe` presumedOf []
+      objField envH "presumed" `shouldBe` presumedOf []
+
+    it "a row that leaves the field out is not charged with the directive's default either" $ do
+      env <- batchWith "seatbelt requirement" "soft" batchTyDirectiveOmitted
+      objField env "presumed" `shouldBe` presumedOf []
+
+    -- the positive control: the row's own evaluation does take the default
+    it "still lists the row's own default, and only that one" $ do
+      envSupplied <- batchWith "licence of" "soft" batchTyDirectiveSupplied
+      envOmitted  <- batchWith "licence of" "soft" batchTyDirectiveOmitted
+      -- the file's #TRACE has a result of its own, ahead of the row's
+      let rowResult env = case objField env "output" of
+            Just (Array rs) | not (null rs) -> objField (last (toList rs)) "result"
+            _                               -> Nothing
+      (rowResult envSupplied, objField envSupplied "presumed") `shouldBe` (Just (String "learner"), presumedOf [])
+      (rowResult envOmitted,  objField envOmitted  "presumed") `shouldBe` (Just (String "full"),    presumedOf ["driver.licence"])
+
+    it "under hard, a row that leaves the field out is refused and lists nothing" $ do
+      env <- batchWith "licence of" "hard" batchTyDirectiveOmitted
+      objField env "status" `shouldBe` Just (String "error")
+      objField env "presumed" `shouldBe` presumedOf []
 
   -- Each example works in a directory of its own (`withSystemTempDirectory`):
   -- two runs of this suite on one machine, say two worktrees' gates at once,
