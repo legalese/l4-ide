@@ -13,7 +13,9 @@
 -- This runs the generated script under @node@ against a stub of the browser's
 -- @modelContext@ and of @fetch@, and compares the property names of each tool it
 -- registers with 'Shared.sanitizeParameters', which @tools/list@ uses. It is
--- skipped (pending) where @node@ is not on the PATH.
+-- skipped (pending) where @node@ is not on the PATH, unless the environment
+-- variable @CI@ is set: a CI run without @node@ would otherwise skip it silently,
+-- so there it fails and says why.
 module WebMcpParitySpec (spec) where
 
 import Test.Hspec
@@ -23,6 +25,7 @@ import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBS8
+import Data.Char (toLower)
 import Data.Foldable (toList)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -33,6 +36,7 @@ import System.Directory (findExecutable)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
+import System.Environment (lookupEnv)
 import System.Process (readProcessWithExitCode)
 
 import L4.FunctionSchema (Parameter (..), Parameters (..))
@@ -97,12 +101,25 @@ trickyNames =
   , "has capacity"
   ]
 
+-- | Whether the environment says this is a CI run: @CI@ set to anything but empty,
+-- @false@ or @0@ (GitHub Actions sets it to @true@).
+ciIsSet :: IO Bool
+ciIsSet = do
+  v <- lookupEnv "CI"
+  pure $ case v of
+    Just s -> map toLower s `notElem` ["", "false", "0"]
+    Nothing -> False
+
 spec :: Spec
 spec = describe "WebMCP script and MCP endpoint (property names)" do
   it "name a rule's inputs the same way, including letters outside the BMP and hash suffixes" do
     mNode <- findExecutable "node"
+    inCI <- ciIsSet
     case mNode of
-      Nothing -> pendingWith "node is not on the PATH"
+      Nothing
+        | inCI -> expectationFailure
+            "node is not on the PATH, and CI is set: this test runs the generated WebMCP script under node, and a CI run without it would skip the check silently. Install node (actions/setup-node) in the job."
+        | otherwise -> pendingWith "node is not on the PATH"
       Just node -> withSystemTempDirectory "webmcp-parity" \dir -> do
         let params = paramsOf trickyNames
             RawJs js = renderOrgWebMCPScript

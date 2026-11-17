@@ -825,6 +825,18 @@ jobs:
       - name: Update git submodules
         run: git submodule update --init
 
+      # WebMcpParitySpec runs the generated WebMCP script under node, to check
+      # that it names a rule's inputs as the MCP endpoint does. This job runs in
+      # a bare ubuntu:24.04 container, which has no node (the runner image's is
+      # not in it), and the test FAILS rather than skips when CI is set and node
+      # is missing, so a node-less run cannot pass unnoticed. No npm cache: the
+      # job installs no npm packages.
+      - name: Use Node.js (for WebMcpParitySpec)
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          package-manager-cache: false
+
       - name: Set up GHC
         uses: haskell-actions/setup@v2
         id: setup
