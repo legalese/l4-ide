@@ -1038,7 +1038,7 @@ checkFieldDefaults t (MkDeclare dann dsig daf rt) =
  where
   conFields (MkConDecl _ _ tns) (MkConDecl cann cn rtns) = MkConDecl cann cn <$> fields tns rtns
   fields = zipWithM \ (MkTypedName _ n _ mTypically _) (MkTypedName fann fn fty _ fmeans) -> do
-    rTypically <- checkTypically n fty mTypically
+    rTypically <- checkTypicallyIn True n fty mTypically
     pure (MkTypedName fann fn fty rTypically fmeans)
 
 -- | Where an 'Assume' node came from. Only an author-written @ASSUME@ is the
@@ -2519,14 +2519,25 @@ typedNameOptionallyNamedType (MkTypedName _ n t _ _) = MkOptionallyNamedType emp
 -- ('functionInputDefaults', 'recordInputDefaults') and where discharge and the
 -- JSON decoders do (TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
 --
--- A default naming something that is not in scope is reported once, as that:
--- 'OutOfScope' is no literal, and saying so as well was a second, misleading
--- error about a name the first one had already explained (p10 of the spec).
+-- A default naming something that is not in scope is reported once, as that,
+-- where every name of the module is in scope ('checkTypicallyIn', for a record's
+-- fields): 'OutOfScope' is no literal, and saying so as well was a second,
+-- misleading error about a name the first one had already explained (p10 of the
+-- spec). A rule's input is checked when its signature is scanned, before the
+-- definitions after it are in scope, so there a name that does not resolve may
+-- be a definition of this very file, and the default gets "must be a literal"
+-- (HAIRCUT, 2026-10-12) with its hint as well.
 checkTypically :: Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
-checkTypically n ty = traverse $ \ e -> do
+checkTypically = checkTypicallyIn False
+
+-- | 'checkTypically', told whether every name of the module is in scope where
+-- the default is checked: only then is a name that does not resolve known to be
+-- defined nowhere, and reported as that alone.
+checkTypicallyIn :: Bool -> Name -> Type' Resolved -> Maybe (Expr Name) -> Check (Maybe (Expr Resolved))
+checkTypicallyIn scopeIsComplete n ty = traverse $ \ e -> do
   re <- checkExprExact (ExpectTypicallyValueContext n) e ty
   literal <- isTypicallyLiteral re
-  unless (literal || unresolved re) $ addError (TypicallyValueNotALiteral n)
+  unless (literal || (scopeIsComplete && unresolved re)) $ addError (TypicallyValueNotALiteral n)
   pure re
  where
   unresolved = \ case
@@ -5551,6 +5562,31 @@ inferAppNamed _noDefault r t nes = do
 -- the combined tree by the goldens of not-ok/tc/withal-overloaded.l4 and a
 -- record with no field beside a rule of one input, not by switching the guard
 -- off again.
+-- | Could a @TYPICALLY@ default be written for a field of this type? A default
+-- is a literal ('isTypicallyLiteral'): a number or a string, or a nullary
+-- constructor (TRUE, FALSE, NOTHING, a constructor of an enumeration). So a field
+-- of a type that has no such value, a record that has fields, or a date, can
+-- never take one, and an error that tells the author to give it a default sends
+-- them somewhere that cannot work. The test is the checker's own: is there a
+-- nullary constructor whose result is the field's type. Every doubt answers
+-- 'True', so the message still offers a default where it might work.
+fieldTakesLiteralDefault :: Type' Resolved -> Check Bool
+fieldTakesLiteralDefault ty = case resultTypeHeadUnique ty of
+  Nothing -> pure True
+  Just u
+    | u `elem` [numberUnique, stringUnique] -> pure True
+    | otherwise -> do
+        info <- asks (.entityInfo)
+        pure (any (nullaryConstructorOf u) (Map.elems info))
+ where
+  nullaryConstructorOf u (_, entity) = case entity of
+    KnownTerm cty Constructor -> isNullary cty && resultTypeHeadUnique cty == Just u
+    _                         -> False
+  isNullary = \ case
+    Forall _ _ t -> isNullary t
+    Fun {}       -> False
+    _            -> True
+
 inferWithal :: Bool -> Resolved -> Type' Resolved -> Check ([(Int, NamedExpr Resolved)], Type' Resolved)
 inferWithal overloaded r t = do
   mFields <- asks (Map.lookup (getUnique r) . (.visibleInputDefaults))
@@ -5565,8 +5601,9 @@ inferWithal overloaded r t = do
     (Just Constructor, Just _) -> case t of
       Fun _ onts res -> do
         (missing, fills) <- fillDefaults overloaded r (zip [0 ..] onts)
-        unless (null missing) $
-          addError (IncompleteWithal r missing)
+        unless (null missing) $ do
+          canDefault <- traverse (\ (MkOptionallyNamedType _ _ fty) -> fieldTakesLiteralDefault fty) missing
+          addError (IncompleteWithal r (zip missing canDefault))
         pure (fills, res)
       -- A record with no fields has nothing to default.
       _ -> pure ([], t)
@@ -5576,7 +5613,7 @@ inferWithal overloaded r t = do
       -- Not in the table and not declared here: an alternative that carries
       -- nothing, which has no entry. One that carries fields would have one.
       | otherwise                         -> refuse WithalOnPlainAlternative
-    _                                     -> refuse WithalOnRule
+    _                                     -> refuse (WithalOnRule (everyInputHasDefault t mFields))
  where
   refuse why = do
     addError (IllegalWithal r why)
@@ -5585,6 +5622,11 @@ inferWithal overloaded r t = do
   resultOf = \ case
     Fun _ _ res -> res
     other       -> other
+  -- a rule all of whose inputs carry a default: no call can leave them all to it
+  everyInputHasDefault ty mFields = case (ty, mFields) of
+    (Fun _ onts _, Just ds) | not (null onts) ->
+      all (\ (MkOptionallyNamedType _ mn _) -> maybe False (\ i -> Map.member (getUnique i) ds) mn) onts
+    _ -> False
   declaresConstructorWithFields = \ case
     MkDeclare _ _ _ (RecordDecl _ (Just con) _) -> getUnique con == getUnique r
     MkDeclare _ _ _ (EnumDecl _ cds)            -> or [ getUnique con == getUnique r | MkConDecl _ con (_ : _) <- cds ]
@@ -8652,28 +8694,49 @@ prettyCheckError (IncompleteAppNamed r onts)               =
   , "you have not supplied these inputs:"
   , ""
   ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
-prettyCheckError (IncompleteWithal r onts)                 =
+prettyCheckError (IncompleteWithal r ofts)                 =
   [ "WITHAL takes the default of every field, but these fields of"
   , ""
   , "  " <> prettyResolvedWithRange r
   , ""
   , "have none:"
   , ""
-  ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) onts
-  ++
-  [ ""
-  , "Give each of them a TYPICALLY default where the record is declared,"
-  , "or build the record with WITH and name them."
-  ]
+  ] ++ map (\ (ont, _) -> "  " <> prettyOptionallyNamedType ont) ofts
+  ++ case [ ont | (ont, False) <- ofts ] of
+    -- every one of them can be given a default: say so, and the way around it
+    [] ->
+      [ ""
+      , "Give each of them a TYPICALLY default where the record is declared,"
+      , "or build the record with WITH and name them."
+      ]
+    -- some cannot: a default is a fixed value, so offering one would send the
+    -- author somewhere that cannot work
+    cannot ->
+      [ ""
+      , "A default has to be a fixed value written out: a number, a string, TRUE,"
+      , "FALSE, NOTHING or a constructor of an enumeration. These fields hold"
+      , "something else, so they cannot have one:"
+      , ""
+      ] ++ map (\ ont -> "  " <> prettyOptionallyNamedType ont) cannot
+      ++
+      [ ""
+      , "So build the record with WITH and name the fields that have none."
+      ]
 prettyCheckError (IllegalWithal r why)                     =
   [ "WITHAL builds a record with the default of every field, but"
   , ""
   , "  " <> prettyResolvedWithRange r
   , ""
   ] ++ case why of
-    WithalOnRule ->
+    WithalOnRule False ->
       [ "is not a record: it is a rule, or a field of one. To use a rule and leave"
       , "some of its inputs to their defaults, name the other inputs with WITH."
+      ]
+    WithalOnRule True ->
+      [ "is not a record: it is a rule, and every one of its inputs has a TYPICALLY"
+      , "default. A call that names its inputs has to name at least one of them, so"
+      , "there is no way to leave all of them to their defaults: name one input, and"
+      , "give it the value its default already is."
       ]
     WithalOnPlainAlternative ->
       [ "is one of the alternatives of a type declared with ONE OF, not a record."

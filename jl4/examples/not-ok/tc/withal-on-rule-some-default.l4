@@ -1,0 +1,10 @@
+-- `T WITHAL` on a rule: the error says a rule is not a record, and for a rule
+-- some of whose inputs have no default it points at WITH. (A rule every input of
+-- which has a default has its own sentence: not-ok/tc/withal-not-a-record.l4.)
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+#EVAL scaled WITHAL

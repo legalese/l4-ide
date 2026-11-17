@@ -1,7 +1,13 @@
--- A default naming something that is not in scope is reported once, as that:
--- `zzz` is not defined. It used to be reported a second time as "must be a
--- literal", which was a misleading way to say it (p10 of
--- TYPICALLY-ONE-BEHAVIOUR-SPEC.md), on a rule's input and on a record's field.
+-- A default naming something that is not in scope is reported once, as that,
+-- on a record's field (p10 of TYPICALLY-ONE-BEHAVIOUR-SPEC.md): a field's default
+-- is checked once every name of the module is in scope, so a name that does not
+-- resolve there is defined nowhere, and saying "must be a literal" as well was a
+-- misleading second error.
+--
+-- On a rule's INPUT it is not: the signature is scanned before the definitions
+-- after it are in scope, so `zzz` below may be a definition of this very file,
+-- and the default gets the literal error and its hint as well. The three shapes
+-- that name something in the file are in not-ok/tc/typically-non-literal-input.l4.
 
 GIVEN x IS A NUMBER TYPICALLY zzz
 GIVETH A NUMBER

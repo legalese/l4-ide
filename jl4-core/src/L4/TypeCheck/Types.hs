@@ -142,8 +142,10 @@ data CheckErrorWithContext =
 
 -- | Why @T WITHAL@ cannot be read as a record built from its defaults.
 data WithalMisuse
-  = WithalOnRule
-    -- ^ @T@ is a rule or a field selector, not a record.
+  = WithalOnRule Bool
+    -- ^ @T@ is a rule or a field selector, not a record. The flag is @True@ for
+    -- a rule every input of which has a @TYPICALLY@ default: no call can leave
+    -- all of them to their defaults, because @WITH@ names at least one input.
   | WithalOnPlainAlternative
     -- ^ @T@ is an alternative of an enumeration that carries nothing.
   | WithalOverloaded
@@ -182,7 +184,9 @@ data CheckError =
   | IllegalApp Resolved (Type' Resolved) Int
   | IllegalAppNamed Resolved (Type' Resolved)
   | IncompleteAppNamed Resolved [OptionallyNamedType Resolved]
-  | IncompleteWithal Resolved [OptionallyNamedType Resolved]
+  | IncompleteWithal Resolved [(OptionallyNamedType Resolved, Bool)]
+    -- ^ The fields that have no default, each with whether a @TYPICALLY@ could
+    -- give it one ('L4.TypeCheck.fieldTakesLiteralDefault').
     -- ^ @T WITHAL@ (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1) on a record, some of
     -- whose fields declare no @TYPICALLY@: it names each of them.
   | IllegalWithal Resolved WithalMisuse

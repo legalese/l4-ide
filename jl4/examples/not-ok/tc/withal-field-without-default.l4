@@ -1,0 +1,37 @@
+-- `T WITHAL` takes the default of every field, and the error that says a field
+-- has none offers a TYPICALLY default only where one can work. A default is a
+-- fixed value (a number, a string, TRUE, FALSE, NOTHING or a constructor of an
+-- enumeration), so a field that holds a record that has fields, or a date,
+-- cannot have one, and the error then offers WITH alone and names the fields
+-- that cannot (TYPICALLY-ONE-BEHAVIOUR-SPEC.md, T1, ruled 2026-10-09; HAIRCUT,
+-- ruled 2026-10-12).
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Address HAS street IS A STRING TYPICALLY "none"
+
+DECLARE Person
+  HAS name   IS A STRING
+      colour IS A Colour
+      flag   IS A BOOLEAN
+      note   IS A MAYBE STRING
+      home   IS AN Address
+      born   IS A DATE
+
+-- the fields that can take a default and have none, and the two that cannot
+#EVAL Person WITHAL
+
+DECLARE Tag
+  HAS label  IS A STRING
+      colour IS A Colour
+      flag   IS A BOOLEAN
+      note   IS A MAYBE STRING
+
+-- every field that has no default could be given one: the error offers it
+#EVAL Tag WITHAL
+
+DECLARE Place
+  HAS home IS AN Address
+
+-- the only field cannot take a default: WITH alone
+#EVAL Place WITHAL

@@ -26,8 +26,10 @@ File: withal-not-a-record.l4
 
       scaled (defined at withal-not-a-record.l4:21:1-7)
 
-    is not a record: it is a rule, or a field of one. To use a rule and leave
-    some of its inputs to their defaults, name the other inputs with WITH.
+    is not a record: it is a rule, and every one of its inputs has a TYPICALLY
+    default. A call that names its inputs has to name at least one of them, so
+    there is no way to leave all of them to their defaults: name one input, and
+    give it the value its default already is.
 
 File: withal-not-a-record.l4
   Hidden: no
