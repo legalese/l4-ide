@@ -22,7 +22,7 @@ import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamsWithDefaults, extractImplicitAssumeParams)
 import L4.Syntax
-import L4.TypeCheck.Environment (falseUnique, maybeUnique, nothingUnique, trueUnique)
+import L4.TypeCheck.Environment (emptyUnique, falseUnique, maybeUnique, nothingUnique, trueUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -348,8 +348,9 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
 -- | Convert a TYPICALLY default value to a JSON value for the function schema.
 -- A default is a literal ('L4.TypeCheck.isTypicallyLiteral'): a number, a
 -- string, or a nullary constructor. TRUE and FALSE are JSON booleans, NOTHING
--- is null, and any other nullary constructor is an enum value, which the wire
--- spells as its name. Anything else yields Nothing (no "default" key emitted).
+-- is null, EMPTY (the empty list) is the empty array, and any other nullary
+-- constructor is an enum value, which the wire spells as its name. Anything
+-- else yields Nothing (no "default" key emitted).
 typicallyToJson :: Expr Resolved -> Maybe Aeson.Value
 typicallyToJson = \case
   Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
@@ -361,6 +362,9 @@ typicallyToJson = \case
     | getUnique r == trueUnique = Aeson.Bool True
     | getUnique r == falseUnique = Aeson.Bool False
     | getUnique r == nothingUnique = Aeson.Null
+    -- an array input's default: the constructor's own name would publish the
+    -- text "EMPTY" as the default of a list
+    | getUnique r == emptyUnique = Aeson.Array mempty
     -- the constructor's own name, as a request spells the value: a
     -- section-qualified reference (`Light`.Red) is still "Red"
     | otherwise = Aeson.String (unqualifiedRawNameToText (rawName (getActual r)))

@@ -886,6 +886,27 @@ spec = describe "integration" do
         (capacity >>= \case Aeson.Object c -> Aeson.KeyMap.lookup "default" c; _ -> Nothing)
           `shouldBe` Just (Aeson.Bool True)
 
+    -- EMPTY is the empty list. The constructor's own name is what an enum
+    -- default publishes, which for an array input said its default was the
+    -- text "EMPTY".
+    it "publishes a list input's TYPICALLY EMPTY as an empty array, not as the text EMPTY" do
+      withServiceFromSources "ty-empty" [("total.l4", Text.unlines
+        [ "@export default total"
+        , "GIVEN lst IS A LIST OF NUMBER TYPICALLY EMPTY"
+        , "GIVETH A NUMBER"
+        , "DECIDE total IS 0"
+        ])] \baseUrl mgr -> do
+        req <- parseRequest (baseUrl <> "/deployments/ty-empty/functions/total")
+        resp <- httpLbs req mgr
+        statusCode' resp `shouldBe` 200
+        let body = decodeObject (responseBody resp)
+            lstSchema = case lookupKey "parameters" body of
+              Just (Aeson.Object params) | Just (Aeson.Object props) <- Aeson.KeyMap.lookup "properties" params ->
+                Aeson.KeyMap.lookup "lst" props
+              _ -> Nothing
+        (lstSchema >>= \case Aeson.Object l -> Aeson.KeyMap.lookup "default" l; _ -> Nothing)
+          `shouldBe` Just (Aeson.Array mempty)
+
     it "fills a left-out section GIVEN on the direct path and lists it in presumed" do
       withServiceFromSources "ty-sec-direct" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "ty-sec-direct" "may contract"

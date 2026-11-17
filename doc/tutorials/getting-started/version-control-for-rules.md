@@ -165,7 +165,7 @@ When you redeploy to an existing deployment name, the interface of the new bundl
 
 What the report cannot see:
 
-- A default that is not a plain value (a number, a piece of text, `TRUE`, `FALSE`, `NOTHING` or a named choice) is not published, so a change to it is not reported. The same goes for a default written on an `ASSUME`.
+- A default that is not a plain value (a number, a piece of text, `TRUE`, `FALSE`, `NOTHING`, `EMPTY`, which is published as an empty list, or a named choice) is not published, so a change to it is not reported. The same goes for a default written on an `ASSUME`.
 - Two numbers that differ only beyond about 16 digits compare as equal.
 - A rate or threshold written inside the body of a rule is not a default, so changing it is not reported. The check compares what a rule asks for, and does not compare what it answers.
 
