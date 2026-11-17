@@ -14,6 +14,7 @@ import {
   type ExportedFunctionInfo,
   type RemoteFunctionSchema,
 } from 'jl4-client-rpc'
+import { hasDefault } from './param-defaults'
 
 /** A segment of a breaking change message: either plain text or an identifier. */
 export type ChangeSegment = {
@@ -50,6 +51,8 @@ export type SchemaNode = {
   type?: string
   format?: string
   enum?: string[]
+  /** The input's usual value, when it has one (`null` is a value). */
+  default?: unknown
   properties?: Record<string, SchemaNode>
   required?: string[]
   items?: SchemaNode
@@ -315,4 +318,105 @@ export function detectBreakingChanges(
   }
 
   return changes
+}
+
+/**
+ * A changed usual value of an input, reported by the deploy review before a
+ * redeploy and by the job's result after it. Never blocks: a redeploy that
+ * changes a published default is accepted and reported (ruling U2, option B,
+ * 2026-11-17), so the BREAKING list does not move for it.
+ * The same shape jl4-service puts in the deploy job's `notices`.
+ */
+export interface DefaultChangeNotice {
+  kind: 'default-changed'
+  /** The rule's name. */
+  function: string
+  /** The input, as a dotted path: `b`, or `cfg.retries` for a record field
+   *  (`xs[].n` for a field of a list's elements, as in the breaking messages). */
+  input: string
+  /** The deployed usual value, as JSON. */
+  old: unknown
+  /** The usual value the new bundle publishes, as JSON. */
+  new: unknown
+}
+
+function sameJson(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+function diffDefaults(
+  fn: string,
+  loc: string,
+  remote: SchemaNode,
+  local: SchemaNode,
+  notices: DefaultChangeNotice[]
+) {
+  // A default on one side only is not a change: adding one makes the input
+  // optional, which is compatible; removing one makes it required, which the
+  // breaking check already reports; a deployment stored by a service that did
+  // not publish defaults carries none, so there is nothing to compare.
+  if (
+    loc !== '' &&
+    hasDefault(remote) &&
+    hasDefault(local) &&
+    !sameJson(remote.default, local.default)
+  ) {
+    notices.push({
+      kind: 'default-changed',
+      function: fn,
+      input: loc,
+      old: remote.default,
+      new: local.default,
+    })
+  }
+
+  const rProps = remote.properties ?? {}
+  const lProps = local.properties ?? {}
+  for (const key of Object.keys(lProps).sort()) {
+    if (!(key in rProps)) continue
+    diffDefaults(
+      fn,
+      loc ? `${loc}.${key}` : key,
+      rProps[key]!,
+      lProps[key]!,
+      notices
+    )
+  }
+
+  if (remote.items && local.items) {
+    diffDefaults(
+      fn,
+      loc ? `${loc}[]` : '[]',
+      remote.items,
+      local.items,
+      notices
+    )
+  }
+}
+
+/**
+ * The inputs whose usual value (the `default` the service publishes) differs
+ * between the currently-deployed interface and the one about to be deployed,
+ * for rules and inputs present on both sides. Recurses through record fields
+ * and list elements. Not a compatibility check: nothing here can block a
+ * deploy; it only says what a caller who leaves an input out will now get.
+ */
+export function detectDefaultChanges(
+  localFns: ExportedFunctionInfo[],
+  remoteFns: RemoteFunctionSchema[]
+): DefaultChangeNotice[] {
+  const notices: DefaultChangeNotice[] = []
+  const remoteByName = new Map(remoteFns.map((f) => [f.name, f]))
+  for (const local of localFns) {
+    const remote = remoteByName.get(local.name)
+    if (!remote?.parameters || !local.parameters) continue
+    diffDefaults(
+      local.name,
+      '',
+      remote.parameters as unknown as SchemaNode,
+      local.parameters as unknown as SchemaNode,
+      notices
+    )
+  }
+  return notices
 }
