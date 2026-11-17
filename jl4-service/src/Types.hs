@@ -5,6 +5,7 @@ module Types (
   DeploymentState (..),
   UpdateJob (..),
   UpdateJobStatus (..),
+  DefaultChange (..),
   DeploymentMetadata (..),
   FunctionSummary (..),
   FileEntry (..),
@@ -99,6 +100,35 @@ data UpdateJobStatus
   -- ^ The new bundle is compiled, compatible, and now the live version.
   | JobRejected !Text
   -- ^ Rejected: breaking change, compile failure, or timeout (reason).
+
+-- | A published default an upload changes, reported beside the deploy result
+-- and never blocking it (U2 option B, bench 2026-11-17). On the wire:
+-- @{"kind":"default-changed","function":...,"input":...,"old":...,"new":...}@,
+-- the shape the deploy sidebar reads. @input@ is the dotted path of the input
+-- (a record field is @cfg.retries@).
+data DefaultChange = DefaultChange
+  { dcFunction :: !Text
+  , dcInput    :: !Text
+  , dcOld      :: !Aeson.Value
+  , dcNew      :: !Aeson.Value
+  }
+  deriving stock (Eq, Show)
+
+instance ToJSON DefaultChange where
+  toJSON c = Aeson.object
+    [ "kind"     .= ("default-changed" :: Text)
+    , "function" .= c.dcFunction
+    , "input"    .= c.dcInput
+    , "old"      .= c.dcOld
+    , "new"      .= c.dcNew
+    ]
+
+instance FromJSON DefaultChange where
+  parseJSON = Aeson.withObject "DefaultChange" $ \o -> do
+    kind <- o .: "kind"
+    if kind == ("default-changed" :: Text)
+      then DefaultChange <$> o .: "function" <*> o .: "input" <*> o .: "old" <*> o .: "new"
+      else fail ("unknown notice kind " <> show kind)
 
 -- | Metadata persisted alongside a deployment bundle.
 data DeploymentMetadata = DeploymentMetadata
