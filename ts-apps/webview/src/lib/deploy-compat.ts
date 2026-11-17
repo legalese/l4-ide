@@ -52,7 +52,7 @@ export type SchemaNode = {
   type?: string
   format?: string
   enum?: string[]
-  /** The input's usual value, when it has one (`null` is a value). */
+  /** The input's default, when it has one (`null` is a value). */
   default?: unknown
   properties?: Record<string, SchemaNode>
   required?: string[]
@@ -376,7 +376,7 @@ function diffDefaults(
 }
 
 /**
- * The inputs whose usual value (the `default` the service publishes) differs
+ * The inputs whose default (the `default` the service publishes) differs
  * between the currently-deployed interface and the one about to be deployed,
  * for rules and inputs present on both sides. Recurses through record fields
  * and list elements. Not a compatibility check: nothing here can block a
@@ -406,17 +406,17 @@ export function detectDefaultChanges(
 export type ReviewStep =
   /** Nothing to show: send the deploy. */
   | 'deploy'
-  /** Only changed usual values: show them, non-blocking, then deploy. */
+  /** Only changed defaults: show them, non-blocking, then deploy. */
   | 'default-review'
   /** At least one incompatible change: the existing warning, which the
-   *  person must confirm. Changed usual values are listed there too. */
+   *  person must confirm. Changed defaults are listed there too. */
   | 'breaking-warning'
 
 export interface DeployReview {
   step: ReviewStep
   /** Incompatible changes; the only thing that blocks. */
   breaking: BreakingChange[]
-  /** Changed usual values; never block and never count as breaking. */
+  /** Changed defaults; never block and never count as breaking. */
   notices: DefaultChangeNotice[]
 }
 
@@ -441,16 +441,16 @@ export function reviewDeploy(
   return { step, breaking, notices }
 }
 
-/** A usual value as the review lists it. Text is quoted (the notice does not
+/** A default as the review lists it. Text is quoted (the notice does not
  *  say whether the input is an enumeration), NOTHING reads "empty". */
 export function formatNoticeValue(value: unknown): string {
   return describeDefault({ default: value }) ?? ''
 }
 
-/** "2 usual values changed", for a notification; "" when none. */
+/** "2 defaults changed", for a notification; "" when none. */
 export function noticeSummary(notices: DefaultChangeNotice[]): string {
   if (notices.length === 0) return ''
-  return `${notices.length} usual value${notices.length === 1 ? '' : 's'} changed`
+  return `${notices.length} default${notices.length === 1 ? '' : 's'} changed`
 }
 
 /**

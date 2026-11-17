@@ -18,7 +18,7 @@ export interface UpdateStatusResponse {
   deploymentId: string
   status: 'compiling' | 'applied' | 'rejected'
   error?: string
-  /** Inputs whose usual value this update changed (non-blocking; absent
+  /** Inputs whose default this update changed (non-blocking; absent
    *  from a service that predates the report). */
   notices?: DefaultChangeNotice[]
 }

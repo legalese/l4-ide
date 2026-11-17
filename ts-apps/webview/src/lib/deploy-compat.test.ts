@@ -132,7 +132,7 @@ describe('detectDefaultChanges', () => {
     parameters: rule(name, properties).parameters,
   })
 
-  it('treats a null default (the usual value NOTHING) as a default', () => {
+  it('treats a null default (the default NOTHING) as a default', () => {
     const num = { type: 'number', enum: [], description: '' }
     expect(
       detectDefaultChanges(
@@ -267,11 +267,11 @@ describe('reviewDeploy: what the deploy review does with each shared case', () =
 })
 
 describe('formatNoticeValue', () => {
-  it('spells a value as the card spells a usual value', () => {
+  it('spells a value as the card spells a default', () => {
     expect(formatNoticeValue(0)).toBe('0')
     expect(formatNoticeValue(false)).toBe('false')
     expect(formatNoticeValue('Red')).toBe('"Red"')
-    expect(formatNoticeValue(null)).toBe('empty')
+    expect(formatNoticeValue(null)).toBe('nothing')
   })
 })
 
@@ -285,8 +285,8 @@ describe('noticeSummary', () => {
   })
   it('counts the changes in words', () => {
     expect(noticeSummary([])).toBe('')
-    expect(noticeSummary([n('a')])).toBe('1 usual value changed')
-    expect(noticeSummary([n('a'), n('b')])).toBe('2 usual values changed')
+    expect(noticeSummary([n('a')])).toBe('1 default changed')
+    expect(noticeSummary([n('a'), n('b')])).toBe('2 defaults changed')
   })
 })
 

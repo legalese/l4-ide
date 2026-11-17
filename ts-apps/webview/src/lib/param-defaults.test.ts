@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  PRESUMPTION_NOTE,
+  anyDefaultInsideLists,
   anyInputHasDefault,
   defaultOf,
   describeDefault,
   hasDefault,
+  inputStatus,
 } from './param-defaults'
 
 describe('hasDefault', () => {
@@ -67,8 +70,8 @@ describe('describeDefault', () => {
     ).toBe('Red')
   })
 
-  it('spells a null default as empty', () => {
-    expect(describeDefault({ default: null })).toBe('empty')
+  it('spells a null default as nothing', () => {
+    expect(describeDefault({ default: null })).toBe('nothing')
   })
 
   it('has nothing to say when there is no default', () => {
@@ -126,5 +129,90 @@ describe('anyInputHasDefault', () => {
       anyInputHasDefault([{ parameters: params({ a: {}, b: { type: 'x' } }) }])
     ).toBe(false)
     expect(anyInputHasDefault([])).toBe(false)
+  })
+})
+
+describe('anyDefaultInsideLists', () => {
+  const params = (props: Record<string, unknown>) => ({
+    parameters: { properties: props as Record<string, never> },
+  })
+
+  it('finds a default on a field of a list element', () => {
+    expect(
+      anyDefaultInsideLists([
+        params({ xs: { items: { properties: { n: { default: 1 } } } } }),
+      ])
+    ).toBe(true)
+  })
+
+  it('does not count a default outside a list, nor an empty list', () => {
+    expect(anyDefaultInsideLists([params({ a: { default: 1 } })])).toBe(false)
+    expect(anyDefaultInsideLists([params({ xs: { items: {} } })])).toBe(false)
+    expect(anyDefaultInsideLists([])).toBe(false)
+  })
+})
+
+describe('inputStatus', () => {
+  it('says required for an input with no default that the schema requires', () => {
+    expect(inputStatus('a', {}, true)).toEqual({
+      kind: 'required',
+      label: 'required',
+    })
+  })
+
+  it('says optional for one that is not required and has no default (a MAYBE input)', () => {
+    expect(inputStatus('m', {}, false)).toEqual({
+      kind: 'optional',
+      label: 'optional',
+    })
+  })
+
+  it('says what a caller who leaves a defaulted input out gets', () => {
+    expect(inputStatus('b', { default: 0 }, false)).toEqual({
+      kind: 'typically',
+      label: 'optional, typically 0',
+      hint: 'If left out, 0 is used, and the answer lists b under presumed when it relies on that.',
+    })
+  })
+
+  it('names a record field by its path', () => {
+    expect(inputStatus('cfg.retries', { default: 3 }, false).hint).toContain(
+      'lists cfg.retries under presumed'
+    )
+  })
+
+  it('says nothing is used for a default of NOTHING, and false for false', () => {
+    expect(inputStatus('m', { default: null }, false).label).toBe(
+      'optional, typically nothing'
+    )
+    expect(inputStatus('flag', { default: false }, false).label).toBe(
+      'optional, typically false'
+    )
+  })
+
+  it('never shows an unpublished default as plain required, nor hides it', () => {
+    const s = inputStatus('jurisdiction', {}, true, true)
+    expect(s.kind).toBe('unpublished')
+    expect(s.label).toBe('typically (not published)')
+    expect(s.hint).toContain('neither publishes nor uses it')
+    expect(s.hint).toContain('Callers must still supply it')
+  })
+
+  it('does not tell a caller to supply an unpublished default that is not required', () => {
+    expect(inputStatus('m', {}, false, true).hint).not.toContain(
+      'must still supply'
+    )
+  })
+
+  it('prefers the published default over the unpublished marker', () => {
+    expect(inputStatus('b', { default: 1 }, false, true).kind).toBe('typically')
+  })
+})
+
+describe('PRESUMPTION_NOTE', () => {
+  it('names the switch and where it works', () => {
+    expect(PRESUMPTION_NOTE).toBe(
+      'Callers can turn the defaults off with presumption: hard (HTTP, batch, MCP, WebMCP).'
+    )
   })
 })

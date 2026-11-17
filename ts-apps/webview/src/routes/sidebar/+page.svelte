@@ -51,7 +51,7 @@
     reviewDeploy,
     type BreakingChange,
   } from '$lib/deploy-compat'
-  import { anyInputHasDefault } from '$lib/param-defaults'
+  import { anyDefaultInsideLists } from '$lib/param-defaults'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import DeploymentMetadata from '$lib/components/deployment-metadata.svelte'
   import DocsPanel from '$lib/components/docs-panel.svelte'
@@ -551,7 +551,7 @@
   // `mission` collects deployment-level metadata (description/mission),
   // then the actual deploy fires. `breaking-warning` interrupts before
   // the deploy if the new shape would break existing integrations.
-  // `default-review` is shown when nothing breaks but an input's usual value
+  // `default-review` is shown when nothing breaks but an input's default
   // changes: a non-blocking notice (ruling U2, option B, 2026-11-17), one
   // click to go on.
   type DeployView =
@@ -570,7 +570,7 @@
   // sees/edits the current value rather than silently blanking it.
   let deploymentMission: string = $state('')
   let breakingChanges: BreakingChange[] = $state([])
-  // Inputs whose usual value this redeploy changes, found before it is sent.
+  // Inputs whose default this redeploy changes, found before it is sent.
   let defaultNotices: DefaultChangeNotice[] = $state([])
   // The same list after the deploy, as the service reports it in the job
   // result; shown on the Deployments tab until dismissed.
@@ -1035,7 +1035,7 @@
           ? 'pending'
           : 'applied'
         let error: string | undefined
-        // Changed usual values, as the service reports them for this job.
+        // Changed defaults, as the service reports them for this job.
         let jobNotices: DefaultChangeNotice[] = []
         if (result.updateId) {
           for (let i = 0; i < 60; i++) {
@@ -2020,28 +2020,26 @@
                 </ul>
                 {#if defaultNotices.length > 0}
                   <p class="warning-desc">
-                    These usual values also change. That does not block the
-                    deploy:
+                    These defaults also change. That does not block the deploy:
                   </p>
                   <DefaultNotices items={defaultNotices} />
                 {/if}
               </div>
             </div>
           {:else if deployView === 'default-review'}
-            <!-- Changed usual values: a notice, not a warning. Nothing is
+            <!-- Changed defaults: a notice, not a warning. Nothing is
                  incompatible, so the footer button just deploys. -->
             <div class="default-review">
               <button class="back-btn" onclick={() => (deployView = 'mission')}
                 >&larr; Back</button
               >
-              <div class="review-header">Usual values change</div>
+              <div class="review-header">Defaults change</div>
               <div class="warning-body">
                 <p class="warning-desc">
                   Deploying the following rules in <strong
                     >{deploymentIdInput}</strong
-                  > changes the usual value of an input. A caller who leaves such
-                  an input out will now get the new value. This does not block the
-                  deploy.
+                  > changes the default of an input. A caller who leaves such an
+                  input out will now get the new value. This does not block the deploy.
                 </p>
                 <DefaultNotices items={defaultNotices} />
                 <p class="warning-desc">Press Deploy Now to go ahead.</p>
@@ -2083,12 +2081,11 @@
                       : undefined}
                   />
                 {/each}
-                {#if anyInputHasDefault(functions)}
+                {#if anyDefaultInsideLists(functions)}
                   <p class="defaults-note">
-                    An input marked "usually" has a usual value: a caller may
-                    leave it out and the rule uses that value. A usual value set
-                    on an ASSUME is not published, and the fields inside a list
-                    are not listed, so none is shown for them.
+                    A default on a field inside a list is published, but the
+                    fields inside a list are not listed here, so it is not
+                    shown.
                   </p>
                 {/if}
               </div>
@@ -2107,7 +2104,7 @@
               <div class="notice-banner" role="status">
                 <div class="notice-banner-head">
                   <span
-                    >Usual values changed in <strong
+                    >Defaults changed in <strong
                       >{appliedNotices.deploymentId}</strong
                     ></span
                   >
@@ -3386,7 +3383,7 @@
     color: var(--l4-tok-identifier, #4ec9b0);
   }
 
-  /* Changed usual values: informational, so no warning colour. */
+  /* Changed defaults: informational, so no warning colour. */
   .default-review {
     display: flex;
     flex-direction: column;
