@@ -93,8 +93,9 @@ scaled MEANS rate TIMES base
 
 - **Only a call that names its inputs.** `scaled 10`, which gives its inputs by
   position, still has to give all of them: it is told it "expects 2 inputs, but
-  here it is given 1". A position says which input a value is for only if every
-  input before it has been given, so a gap cannot be left.
+  here it is given 1", and the message shows the call that names its inputs
+  (`scaled WITH base IS <value>`). A position says which input a value is for
+  only if every input before it has been given, so a gap cannot be left.
 - **An input with no default is still asked for.** `scaled WITH rate IS 1` is
   told it has not supplied `base`, and a name the rule does not have is still an
   error, so a misspelling of `rate` is not read as a default taken. The one
@@ -418,7 +419,21 @@ govern what counts as leaving a fact out:
   events, each event's party or action record has to give every field, whether
   or not a field has a default, and so does a record nested inside it: the
   record is part of the request, and the service refuses one that leaves a
-  field out.
+  field out. The schema the service publishes still lists such a field with its
+  default, so a client that reads the schema is told it may leave the field out
+  and is then refused.
+
+Two gaps that are known and not closed by this page's behaviour:
+
+- **A default on a record field does not reach the question planner.** The
+  planner that orders the questions a user is asked reads the defaults of a
+  rule's inputs and of an `ASSUME`, and not those of a record's fields
+  (smucclaw/l4-ide#942, open).
+- **An inner `WITH` that overrides a section `GIVEN` runs in a file and fails
+  under `l4 batch`.** `outer MEANS inner PLUS (inner WITH r IS 100)`, where `r` is
+  a section input, evaluates under `l4 run` and fails to type-check under
+  `l4 batch` with "You are giving named inputs to inner … but it is not a
+  function" (smucclaw/l4-ide#1000, open).
 
 The list of facts a published rule asks for carries each default as the
 JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
@@ -489,9 +504,12 @@ The companion file no longer carries this spelling.
   supplied always wins, and `null` (not known) is never an omission.
 - The default must match the annotated type, or type checking fails.
 - The default must be a literal, a fixed value written out, like `18` or `"yes"`.
-- A call that gives its inputs by position, and a construction that gives its
-  fields by position, give all of them: only `WITH` may leave one out, and
-  `WITHAL` leaves out every field of a record.
+- A rule's own defaulted input and a record's defaulted field may be left out
+  only where they are named: a call or a construction that gives them by
+  position gives all of them, and only `WITH` may leave one out (`WITHAL` leaves
+  out every field of a record). A section `GIVEN` is different: it flows into
+  the rule that reads it, and takes its default, at a positional call too
+  (`scaled 10` gives 30 where `scaled` reads a section `rate` that is 3).
 - On a computed field (one with a MEANS clause) a TYPICALLY is an error.
 - For anything a fixed value cannot express, write an ordinary definition
   instead; for a usual value worked out from other facts, use a `MAYBE` input and
