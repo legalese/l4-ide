@@ -4562,6 +4562,19 @@ spec = describe "integration" do
           other <- mcpToolInputSchema baseUrl mgr "mcp-clash" "list_files"
           other `shouldSatisfy` Maybe.isJust
 
+      -- The input's real name is in the message, not the name the tool would
+      -- list it under: `presumption?` sanitizes to presumption.
+      it "names the input as the rule spells it, not as the tool would list it" do
+        withServiceFromSources "mcp-clash-name" [("named.l4", Text.unlines
+          [ "@export default may proceed"
+          , "GIVEN `presumption?` IS A BOOLEAN"
+          , "      `other flag` IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "`may proceed` MEANS `presumption?` AND `other flag`"
+          ])] \baseUrl mgr -> do
+          answer <- asked baseUrl mgr "mcp-clash-name" "may proceed" ["other flag" Aeson..= True]
+          refusedWith "named" answer "an input named 'presumption?'"
+
       it "is still answered over REST, where the inputs are nested" do
         withServiceFromSources "mcp-clash-rest" namedInputFlat \baseUrl mgr -> do
           viaRest <- askRest baseUrl mgr "mcp-clash-rest" "may proceed" ["presumption" Aeson..= True, "other flag" Aeson..= True] []

@@ -503,7 +503,12 @@ callFunctionTool _vis mScope reqId toolName tasksRequested presumptionBesideArgu
       -- A refusal is an error RESULT (isError), as every other refusal of a
       -- call is, and is decided before the deployment is compiled or waited
       -- for: a call that cannot be honoured is not queued as a task.
-      let refuse msg = pure $ evalResultToToolResponse reqId reverseMap
+      --
+      -- The message is the server's own and is sent as written: it names the
+      -- rule's inputs as the rule spells them, which the reverse map would
+      -- rewrite to the names the tool lists them under (an input called
+      -- `presumption?` would be reported as 'presumption').
+      let refuse msg = pure $ evalResultToToolResponse reqId Map.empty
             (Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError msg))))
       case (presumptionCollision params, buildMcpCall reverseMap params isDeontic arguments) of
         _ | presumptionBesideArguments -> refuse (presumptionBesideArgumentsMessage isDeontic)
