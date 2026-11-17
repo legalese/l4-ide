@@ -699,7 +699,9 @@ presumedMark = (.count) <$> readEvalRef (.presumed)
 -- reported before the first mark, or reported again after the second, stays
 -- listed.
 retractPresumed :: (Int, Int) -> Eval ()
-retractPresumed (from, upto) = do
+retractPresumed (from, upto) = when (upto > from) do
+  -- Nothing was reported between the marks: nothing to take back, and no walk
+  -- of the log on every action mismatch.
   psRef <- asks (.presumed)
   l <- liftIO (readIORef psRef)
   let inStretch f = f.direct && f.forceNo >= from && f.forceNo < upto
