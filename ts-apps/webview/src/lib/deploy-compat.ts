@@ -11,10 +11,11 @@
  */
 import {
   takesDeonticEnvelope,
+  type DefaultChangeNotice,
   type ExportedFunctionInfo,
   type RemoteFunctionSchema,
 } from 'jl4-client-rpc'
-import { hasDefault } from './param-defaults'
+import { describeDefault, hasDefault } from './param-defaults'
 
 /** A segment of a breaking change message: either plain text or an identifier. */
 export type ChangeSegment = {
@@ -320,26 +321,6 @@ export function detectBreakingChanges(
   return changes
 }
 
-/**
- * A changed usual value of an input, reported by the deploy review before a
- * redeploy and by the job's result after it. Never blocks: a redeploy that
- * changes a published default is accepted and reported (ruling U2, option B,
- * 2026-11-17), so the BREAKING list does not move for it.
- * The same shape jl4-service puts in the deploy job's `notices`.
- */
-export interface DefaultChangeNotice {
-  kind: 'default-changed'
-  /** The rule's name. */
-  function: string
-  /** The input, as a dotted path: `b`, or `cfg.retries` for a record field
-   *  (`xs[].n` for a field of a list's elements, as in the breaking messages). */
-  input: string
-  /** The deployed usual value, as JSON. */
-  old: unknown
-  /** The usual value the new bundle publishes, as JSON. */
-  new: unknown
-}
-
 function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
@@ -417,6 +398,88 @@ export function detectDefaultChanges(
       local.parameters as unknown as SchemaNode,
       notices
     )
+  }
+  return notices
+}
+
+/** What the deploy review does next, for a redeploy of an existing deployment. */
+export type ReviewStep =
+  /** Nothing to show: send the deploy. */
+  | 'deploy'
+  /** Only changed usual values: show them, non-blocking, then deploy. */
+  | 'default-review'
+  /** At least one incompatible change: the existing warning, which the
+   *  person must confirm. Changed usual values are listed there too. */
+  | 'breaking-warning'
+
+export interface DeployReview {
+  step: ReviewStep
+  /** Incompatible changes; the only thing that blocks. */
+  breaking: BreakingChange[]
+  /** Changed usual values; never block and never count as breaking. */
+  notices: DefaultChangeNotice[]
+}
+
+/**
+ * The review of a redeploy, before it is sent. `remoteFns` is the deployed
+ * interface, `null` when there is no such deployment yet (a first deploy has
+ * nothing to break and nothing to change).
+ */
+export function reviewDeploy(
+  localFns: ExportedFunctionInfo[],
+  remoteFns: RemoteFunctionSchema[] | null
+): DeployReview {
+  if (!remoteFns) return { step: 'deploy', breaking: [], notices: [] }
+  const breaking = detectBreakingChanges(localFns, remoteFns)
+  const notices = detectDefaultChanges(localFns, remoteFns)
+  const step: ReviewStep =
+    breaking.length > 0
+      ? 'breaking-warning'
+      : notices.length > 0
+        ? 'default-review'
+        : 'deploy'
+  return { step, breaking, notices }
+}
+
+/** A usual value as the review lists it. Text is quoted (the notice does not
+ *  say whether the input is an enumeration), NOTHING reads "empty". */
+export function formatNoticeValue(value: unknown): string {
+  return describeDefault({ default: value }) ?? ''
+}
+
+/** "2 usual values changed", for a notification; "" when none. */
+export function noticeSummary(notices: DefaultChangeNotice[]): string {
+  if (notices.length === 0) return ''
+  return `${notices.length} usual value${notices.length === 1 ? '' : 's'} changed`
+}
+
+/**
+ * The `notices` of a deploy job result, read defensively: the field is
+ * absent from a service that predates the report, and a notice that is not
+ * the agreed shape is dropped rather than shown half-formed.
+ */
+export function normalizeNotices(raw: unknown): DefaultChangeNotice[] {
+  if (!Array.isArray(raw)) return []
+  const notices: DefaultChangeNotice[] = []
+  for (const item of raw) {
+    if (
+      item !== null &&
+      typeof item === 'object' &&
+      (item as { kind?: unknown }).kind === 'default-changed' &&
+      typeof (item as { function?: unknown }).function === 'string' &&
+      typeof (item as { input?: unknown }).input === 'string' &&
+      'old' in item &&
+      'new' in item
+    ) {
+      const n = item as DefaultChangeNotice
+      notices.push({
+        kind: 'default-changed',
+        function: n.function,
+        input: n.input,
+        old: n.old,
+        new: n.new,
+      })
+    }
   }
   return notices
 }

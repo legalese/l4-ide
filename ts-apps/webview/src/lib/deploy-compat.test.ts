@@ -9,6 +9,10 @@ import {
   changeToPlainText,
   detectBreakingChanges,
   detectDefaultChanges,
+  formatNoticeValue,
+  noticeSummary,
+  normalizeNotices,
+  reviewDeploy,
 } from './deploy-compat'
 
 /** The cases the service's compatibility check runs too (U2). */
@@ -218,5 +222,103 @@ describe('detectDefaultChanges', () => {
 
   it('does not report the first deploy, when there is no deployed rule', () => {
     expect(detectDefaultChanges([rule('f', {})], [])).toEqual([])
+  })
+})
+
+describe('reviewDeploy: what the deploy review does with each shared case', () => {
+  const expectedStep: Record<string, string> = {
+    'default changed 0 to 1': 'default-review',
+    'unchanged default': 'deploy',
+    'default added (input becomes optional): compatible, no notice': 'deploy',
+    'default removed (input becomes required): breaking by the existing rule, no notice':
+      'breaking-warning',
+    'old side carries no default key (cached metadata from an older service): unknown, no notice':
+      'deploy',
+    'record field default changed, reported by its path': 'default-review',
+    'enum default changed (a constructor name)': 'default-review',
+    'a default change and an unrelated breaking change in one upload: the default is reported, the break still blocks':
+      'breaking-warning',
+  }
+
+  for (const c of sharedCases) {
+    it(c.name, () => {
+      const review = reviewDeploy([localFn(c)], [remoteFn(c)])
+      expect(review.step).toBe(expectedStep[c.name])
+      expect(review.breaking.map(changeToPlainText)).toEqual(c.expect.breaking)
+      expect(review.notices).toEqual(c.expect.notices)
+    })
+  }
+
+  it('a changed default alone is never a breaking-changes prompt', () => {
+    const c = sharedCases[0]!
+    const review = reviewDeploy([localFn(c)], [remoteFn(c)])
+    expect(review.breaking).toEqual([])
+    expect(review.step).not.toBe('breaking-warning')
+  })
+
+  it('goes straight ahead on a first deploy, when no deployment exists', () => {
+    const c = sharedCases[0]!
+    expect(reviewDeploy([localFn(c)], null)).toEqual({
+      step: 'deploy',
+      breaking: [],
+      notices: [],
+    })
+  })
+})
+
+describe('formatNoticeValue', () => {
+  it('spells a value as the card spells a usual value', () => {
+    expect(formatNoticeValue(0)).toBe('0')
+    expect(formatNoticeValue(false)).toBe('false')
+    expect(formatNoticeValue('Red')).toBe('"Red"')
+    expect(formatNoticeValue(null)).toBe('empty')
+  })
+})
+
+describe('noticeSummary', () => {
+  const n = (input: string) => ({
+    kind: 'default-changed' as const,
+    function: 'f',
+    input,
+    old: 0,
+    new: 1,
+  })
+  it('counts the changes in words', () => {
+    expect(noticeSummary([])).toBe('')
+    expect(noticeSummary([n('a')])).toBe('1 usual value changed')
+    expect(noticeSummary([n('a'), n('b')])).toBe('2 usual values changed')
+  })
+})
+
+describe('normalizeNotices (the job result is read, not trusted)', () => {
+  const good = {
+    kind: 'default-changed',
+    function: 'the smaller of',
+    input: 'b',
+    old: 0,
+    new: 1,
+  }
+
+  it('keeps well-formed notices, including a null value', () => {
+    expect(normalizeNotices([good, { ...good, old: null }])).toEqual([
+      good,
+      { ...good, old: null },
+    ])
+  })
+
+  it('drops anything else, and returns [] for a missing or odd field', () => {
+    expect(normalizeNotices(undefined)).toEqual([])
+    expect(normalizeNotices('nope')).toEqual([])
+    expect(normalizeNotices({})).toEqual([])
+    expect(
+      normalizeNotices([
+        good,
+        null,
+        42,
+        { ...good, kind: 'something-else' },
+        { ...good, function: 7 },
+        { kind: 'default-changed', function: 'f' },
+      ])
+    ).toEqual([good])
   })
 })
