@@ -21,6 +21,7 @@ module Shared (
   presumptionKey,
   presumptionSchema,
   presumptionCollision,
+  inputSanitizedTo,
   buildPropertyReverseMap,
   remapFnLiteralKeys,
   remapTraceKeys,
@@ -295,9 +296,17 @@ presumptionSchema = Aeson.object
 -- sanitized name (the one a client sends), so @presumption@ and a name that
 -- sanitizes to it, such as @presumption@ with a trailing space, both match.
 presumptionCollision :: Parameters -> Maybe Text
-presumptionCollision (MkParameters props _) =
+presumptionCollision = inputSanitizedTo presumptionKey
+
+-- | The input of a rule that a tool lists under the given name: the rule's own
+-- spelling of the input whose sanitized name is it, if any. A tool is called with
+-- the sanitized names, so a question of whether a key of a call is one of the
+-- rule's inputs is asked of these and not of the rule's own spellings (an input
+-- called @arguments?@ is the key @arguments@).
+inputSanitizedTo :: Text -> Parameters -> Maybe Text
+inputSanitizedTo name (MkParameters props _) =
   Maybe.listToMaybe
-    [ orig | (orig, san) <- Map.toList (sanitizePropertyNames (Map.keys props)), san == presumptionKey ]
+    [ orig | (orig, san) <- Map.toList (sanitizePropertyNames (Map.keys props)), san == name ]
 
 -- | Build a reverse mapping from sanitized property names back to original L4 names.
 -- Recursively includes entries from nested object properties and array items,

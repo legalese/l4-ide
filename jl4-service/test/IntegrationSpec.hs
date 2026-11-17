@@ -3854,6 +3854,31 @@ spec = describe "integration" do
           schema <- mcpToolInputSchema baseUrl mgr sevenId sevenFn
           fmap schemaProperties schema `shouldBe` Just ["arguments", "presumption"]
 
+      -- A tool is called with the names it lists, so an input spelt `arguments?`
+      -- is the key `arguments`: the check that a call's `arguments` is not an
+      -- input must ask the listed name, not the rule's spelling.
+      it "reads an input spelt arguments? as the key arguments, for a plain and for a MAYBE input" do
+        let sevenQ = [("seven.l4", Text.unlines
+              [ "@export default is seven q"
+              , "GIVEN `arguments?` IS A NUMBER"
+              , "GIVETH A BOOLEAN"
+              , "`is seven q` MEANS `arguments?` EQUALS 7"
+              ])]
+            givenQ = [("given.l4", Text.unlines
+              [ "@export default was given q"
+              , "GIVEN `arguments?` IS A MAYBE NUMBER"
+              , "GIVETH A BOOLEAN"
+              , "`was given q` MEANS NOT `arguments?` EQUALS NOTHING"
+              ])]
+        withServiceFromSources "deontic-arguments-q" sevenQ \baseUrl mgr -> do
+          schema <- mcpToolInputSchema baseUrl mgr "deontic-arguments-q" "is seven q"
+          fmap schemaProperties schema `shouldBe` Just ["arguments", "presumption"]
+          viaMcp <- askMcpWith baseUrl mgr "deontic-arguments-q" "is seven q" (Aeson.object ["arguments" Aeson..= (7 :: Int)])
+          answered viaMcp `shouldBe` isBool True
+        withServiceFromSources "deontic-arguments-q-maybe" givenQ \baseUrl mgr -> do
+          viaMcp <- askMcpWith baseUrl mgr "deontic-arguments-q-maybe" "was given q" (Aeson.object ["arguments" Aeson..= (3 :: Int)])
+          answered viaMcp `shouldBe` isBool True
+
       it "reads it as an input: the same answer on REST, on MCP and in a batch" do
         withServiceFromSources sevenId sevenSource \baseUrl mgr ->
           forM_ [(7 :: Int, True), (8, False)] \(given, expected) -> do

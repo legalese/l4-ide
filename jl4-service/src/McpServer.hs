@@ -17,8 +17,8 @@ import EvalLimits (withEvalLimits)
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
 import L4.FunctionSchema (Parameters (..))
-import DeonticTrace (isDeonticFunction, isStrayArgumentsField, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
-import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, presumptionKey, presumptionSchema, presumptionCollision, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
+import DeonticTrace (isDeonticFunction, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
+import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, presumptionKey, presumptionSchema, presumptionCollision, inputSanitizedTo, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
 import Types
 
 import Control.Monad (forM)
@@ -640,7 +640,7 @@ data McpCall = McpCall
 -- in which case it is an input as any other. A stray one is not an input and is
 -- kept in the 'McpCall' so that the call can be refused. An @arguments@ on it is
 -- refused ('strayArgumentsMessage') unless the function declares an input of
--- that name ('isStrayArgumentsField'), in which case it is an input as any other.
+-- that name, as the tool lists it ('inputSanitizedTo'), in which case it is an input as any other.
 --
 -- The reserved @presumption@ argument ('presumptionKey') is read on every
 -- function tool and is never an input: beside @arguments@ on a DEONTIC tool, as
@@ -666,7 +666,7 @@ buildMcpCall reverseMap params isDeontic arguments = case arguments of
       -- a MAYBE read as NOTHING, a defaulted input taking its default, with a
       -- success. It is refused, saying where the inputs go. A null is a key left
       -- out, and a rule that has an input of that name reads it as that input.
-      Just v | not isDeontic, v /= Aeson.Null, isStrayArgumentsField params "arguments" -> Left strayArgumentsMessage
+      Just v | not isDeontic, v /= Aeson.Null, Maybe.isNothing (inputSanitizedTo "arguments" params) -> Left strayArgumentsMessage
       _ -> Right ()
     pure $ case () of
       _ | isDeontic
