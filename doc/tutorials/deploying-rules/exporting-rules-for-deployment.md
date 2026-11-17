@@ -58,12 +58,14 @@ In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab
 
 Some inputs have a **default**: a value the rule uses when a caller leaves that input out.
 A caller is an application or an AI agent that runs your rule.
+Below, "the service" is the decision service that runs your published rules, either on Legalese Cloud or on a `jl4-service` you run yourself.
 L4 writes a default with [`TYPICALLY`](../../reference/types/TYPICALLY.md), so the Deploy tab says "typically".
 A default is not a suggestion: it is applied, and the answer says so.
 
 Every answer from a published rule carries a list called **`presumed`**: the inputs the caller left out and the rule filled in for itself.
 It lets whoever reads the answer see which facts were supplied and which were assumed.
 It lists a default only when the answer relied on it.
+The one exception is an event's party or action record in a request to a rule that describes obligations: every field of it must be written, and a request that leaves one out is refused, in both modes (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
 
 Each input on a rule's card reads one of these:
 
@@ -80,16 +82,21 @@ When some input has a default, the card adds a line: "Callers can turn the defau
 The switch is a setting named `presumption` that a caller sends with a request.
 With it set to `hard`, a caller who leaves an input out gets an error naming it, instead of the default.
 It works over **HTTP** (the ordinary web request a program sends to the address in [Step 5](#step-5-call-a-rule)) and in `l4 batch` (the command that runs a rule over many cases).
-It is meant to work through **MCP** (the Model Context Protocol, which lets an AI agent use a rule as a tool; see [Connect an AI agent](../legalese-cloud/ai-agents.md)) and **WebMCP** (the same for the AI assistant in a visitor's browser; see [Embed rules in a website](../legalese-cloud/webmcp-embed.md)).
-A service that has not been updated for that does not offer the switch there.
+It works through **MCP** (the Model Context Protocol, which lets an AI agent use a rule as a tool; see [Connect an AI agent](../legalese-cloud/ai-agents.md)) and **WebMCP** (the same for the AI assistant in a visitor's browser; see [Embed rules in a website](../legalese-cloud/webmcp-embed.md)) too: this service's MCP tools advertise `presumption` and read it.
+A hosted server placed in front of this service may not list it until that server is updated, so look at the tool list.
+A server that does not know the argument reads it as it reads any name that matches none of a rule's inputs: where the call leaves out an input that has a default, it refuses the call, naming `presumption`, and where the call leaves out no such input, it ignores the argument.
 
 Under the inputs, **What callers see** is collapsed.
 Open it to read the schema of the rule's inputs as the service describes them to callers, with each default written as `"default": 0` and the inputs a caller must supply listed under `"required"`.
 The service publishes that schema in its **OpenAPI** document (OpenAPI is the standard format for describing a web interface; see [Call rules over REST](../legalese-cloud/openapi-spec.md)) and in its MCP tool list.
+Without VS Code, read it from the OpenAPI document, from the MCP tool list, or from the function's own document, `GET .../functions/{fn}`.
+The typed schema of an event, for a rule that describes obligations, is published in the function document and in `openapi.json` under each batch case's `events`.
 The card takes the schema it was given by the language server or the service and removes only the keys that are for L4's own tools, which both of those also leave out; it does not compose its own.
 MCP and WebMCP spell input names without spaces: `start year` becomes `start-year`.
 One thing differs: the OpenAPI document leaves out an input whose name is one of four reserved names (`alias`, `propertyOrder`, `x-l4-type` and `x-sanitized-name`) while still listing it as required, which is a defect in the service.
 The card shows such an input, as the MCP tool list does.
+The document leaves the input out because of its name, so renaming the input in the rule to a name that is not one of the four, and redeploying, makes the document list it.
+A rename is a breaking change for callers that send the old name ([Manage rules in git and CI](../getting-started/version-control-for-rules.md#redeploy-when-a-merge-changes-a-live-api)).
 
 The Deploy tab shows what the service publishes, and it has limits:
 
