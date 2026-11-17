@@ -1971,6 +1971,7 @@ export function createAiChatStore(
       'l4.refactor': 'always',
       'mcp.l4Rules': 'always',
       'mcp.vscode': 'ask',
+      'web.fetch': 'always',
       'meta.askUser': 'always',
     } as Record<AiPermissionCategory, AiPermissionValue>
     if (!m) return empty

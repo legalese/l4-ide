@@ -176,6 +176,13 @@
         target: null,
         click: null,
       }
+    if (name === 'web__fetch')
+      return {
+        running: 'Fetching…',
+        settled: 'Fetched',
+        target: typeof a.url === 'string' ? a.url : null,
+        click: null,
+      }
     if (name.startsWith('l4-rules__')) {
       const sub = name.slice('l4-rules__'.length)
       // Infrastructure tools (list_files / read_file / search_*) are

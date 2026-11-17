@@ -152,6 +152,11 @@
       hint: 'Browse and evaluate deployed L4 rules on Legalese Cloud',
     },
     {
+      id: 'web.fetch',
+      label: 'Fetch web pages',
+      hint: "Read a web page through VS Code, which asks before a domain you haven't trusted",
+    },
+    {
       id: 'meta.askUser',
       label: 'Ask you clarifying questions',
       hint: 'Briefly pause an AI chat to make a choice',

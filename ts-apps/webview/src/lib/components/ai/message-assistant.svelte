@@ -287,13 +287,29 @@
 
   // Turn-end review card: web-search citations the model provider
   // attached to this turn (aggregated by the AI service into the
-  // `sources` field of a synthetic `web_search` activity). Deduped by URL across all activity blocks in case a
-  // single turn fired the search more than once.
+  // `sources` field of a synthetic `web_search` activity), and the pages
+  // the sidebar fetched (finished `web__fetch` calls). Deduped by URL
+  // across all blocks in case a turn found or fetched a page more than once.
   type Source = { url: string; title?: string }
+  /** The page a finished `web__fetch` call read, if this is one. */
+  function fetchedUrl(call: RenderedToolCall): string | null {
+    if (call.name !== 'web__fetch' || call.status !== 'done') return null
+    try {
+      const url = (JSON.parse(call.argsJson) as { url?: unknown }).url
+      return typeof url === 'string' && url.length > 0 ? url : null
+    } catch {
+      return null
+    }
+  }
   const sources = $derived.by<Source[]>(() => {
     if (!blocks) return []
     const byUrl = new Map<string, Source>()
     for (const b of blocks) {
+      if (b.kind === 'tool-call') {
+        const url = fetchedUrl(b.call)
+        if (url && !byUrl.has(url)) byUrl.set(url, { url })
+        continue
+      }
       if (b.kind !== 'tool-activity') continue
       if (b.activity.tool !== 'web_search') continue
       const list = b.activity.sources
