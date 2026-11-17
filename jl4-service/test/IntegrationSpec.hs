@@ -820,6 +820,30 @@ spec = describe "integration" do
           answers <- onEverySurface baseUrl mgr fn inputs
           departures (refusedAs expected) answers `shouldBe` []
 
+    -- A `{}` IN PLACE of an input says the input is uncertain, which is not the
+    -- same as null: on the wrapper path a BOOLEAN `{}` is an assumed term, refused
+    -- only if the rule reads it, so the answer can depend on the order of the
+    -- operands. That is the documented early/late split, kept (T3b), and it is
+    -- the same on all three surfaces. Hard does not change it: the switch is
+    -- about defaults, not about uncertainty.
+    it "answers or refuses a {} in place of an input by whether the rule reads it, on /evaluation, on MCP and in a batch" do
+      withJanus \baseUrl mgr -> do
+        decided <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= Aeson.object [], "q" Aeson..= False]
+        departures (answeredAs (FnLitBool False)) decided `shouldBe` []
+        undecided <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= Aeson.object [], "q" Aeson..= True]
+        departures (\case Left msg | "`p (not supplied)`" `Text.isInfixOf` msg -> Nothing
+                                    | otherwise -> Just ("refused in other words: " <> msg)
+                          Right r -> Just (showAnswer r)) undecided `shouldBe` []
+        -- the operand order is what decides which of the two the same {} gets
+        reversed <- onEverySurface baseUrl mgr "bothHoldRev" ["p" Aeson..= Aeson.object [], "q" Aeson..= False]
+        departures (answeredAs (FnLitBool False)) reversed `shouldBe` []
+
+    it "answers a {} in place of an input under hard as it does under soft" do
+      withJanus \baseUrl mgr -> do
+        let hardRest inputs = askRest baseUrl mgr deployId "bothHold" inputs ["presumption" Aeson..= ("hard" :: Text)]
+        decided <- hardRest ["p" Aeson..= Aeson.object [], "q" Aeson..= False]
+        departures (answeredAs (FnLitBool False)) [("/evaluation", decided)] `shouldBe` []
+
     -- case E: an input left out is refused as it always was, in other words
     -- than a null's
     it "case E: an input left out is refused as missing, on /evaluation, on MCP and in a batch" do
@@ -1232,6 +1256,14 @@ spec = describe "integration" do
         uncertainCap <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
         expectError uncertainCap "has capacity (not supplied)"
+        -- the service README's example: a null is refused whether or not the rule reads
+        -- the input, and a {} in its place only if it does
+        nullUnread <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False, "has capacity" Aeson..= Aeson.Null])
+        expectError nullUnread "Parameter 'has capacity' is null"
+        uncertainUnread <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
+          (args ["is adult" Aeson..= False, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
+        expectAnswer uncertainUnread (FnLitBool False) []
 
     it "keeps null apart from absent for a section GIVEN on the wrapper path" do
       withServiceFromSources "ty-null-sec" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do

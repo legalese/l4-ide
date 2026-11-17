@@ -222,8 +222,8 @@ The function's published `returnSchema` does not describe two of these shapes ye
 
 #### Missing and uncertain inputs
 
-An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` ("uncertain") is treated exactly like `null`, whatever its type, a record's included.
-The two are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an absent input can take a default, and a `null` one never does.
+An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` is _uncertain_.
+They are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an absent input can take a default, a `null` one never does, and a `{}` one is neither: on the wrapper path a `BOOLEAN` that is `{}` is an assumed term, refused only if the rule reads it (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 
 **Defaults.** An input with a `TYPICALLY` default — on the exported function's own `GIVEN`, on a section `GIVEN` it reads, or on a field of a record it takes — may be left out, and then takes its default.
 The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
@@ -261,9 +261,10 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
 A `null` at the top level of a request's arguments is read the same way on `/evaluation`, over MCP and in a batch case (smucclaw/l4-ide#1021): as an input the caller does not know.
-It is refused for an input that is not a `MAYBE`, before evaluation starts, in either operand order, with the message `/evaluation` always gave, `Parameter 'p' is null, which means the value is not known: supply a value`.
-That message never calls the input "not supplied", which is the wording for an input left out.
+It is refused for an input that is not a `MAYBE`, before evaluation starts, whatever else the request holds (a `{}` in another input included) and whichever operand a rule reads first, with the message `/evaluation` always gave, `Parameter 'p' is null, which means the value is not known: supply a value`.
+That message does not call the input "not supplied", which is the wording for an input left out; every null input is named, one per line.
 A `MAYBE` input sent as `null` is `NOTHING` on all three.
+A function that describes obligations is the exception, and a `{}` in place of an input is a different case: both are below.
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; and every request to a `DEONTIC` function, whether to `/evaluation`, over MCP or as a batch case.
 On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
@@ -290,8 +291,11 @@ The default report is the only one so far: it shows an answer that is still wait
 Limits, measured 2026-10-02:
 
 - On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, or, for a `DATE`, `TIME` or `DATETIME`, which the wrapper reads as a string and converts, `Parameter 'unused': missing required parameter`.
-- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused by `/evaluation`, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. A top-level `null` is read the same way on `/evaluation`, over MCP and in a batch case (smucclaw/l4-ide#1021), so the split depends on what else the request holds, not on the surface: a `null` inside a record or a list, or a `{}` anywhere, is what sends a request to the wrapper path. This is the early/late split above; it did not create it.
-  - A `DEONTIC` function is the exception on every surface, since it always takes the wrapper path: a top-level `null` for its `BOOLEAN` input is an assumed term there, refused only if the rule reads it.
+- **`null` is refused early; a `{}` in its place is refused late.** A top-level `null` for an input that is not a `MAYBE` is refused before evaluation, on every surface, whatever else the request holds (smucclaw/l4-ide#1021): `{"is adult": false, "has capacity": null, "unused flag": false}` is refused, and so is the same request with `"unused flag": {}`, both naming `has capacity`. A `{}` in place of the input is uncertain, and on the wrapper path it is an assumed term, refused only if the rule reads it: `{"is adult": false, "has capacity": {}, "unused flag": false}` answers `false`, because `has capacity` is never read.
+  So with `p` sent as `{}`, `p AND q` answers `false` when `q` is `false` and is refused, naming `p (not supplied)`, when `q` is `true`: the answer can depend on the order of the operands. `"presumption": "hard"` does not change this, because that switch is about defaults and not about uncertainty. `l4 batch` is stricter, and the two differ: it refuses a `{}` for an input that is not a `MAYBE` (`Field 'p' is {}, which means the value is not known: supply a value`) where the service answers. This is the early/late split described above; it is the documented behaviour of `{}`, not a defect of the null rule.
+  - A `DEONTIC` function is the exception on every surface, since it always takes the wrapper path: a top-level `null` for its `BOOLEAN` input is an assumed term there, refused only if the rule reads it, so the answer can depend on the order of the operands there too (found in review, 2026-11-18).
+  - The wording is not the same on every surface: `l4 batch` says `Field 'p'` where the service says `Parameter 'p'`, an MCP call spells the input as its tool does (`has-capacity` for `has capacity`), and where more than one input is `null` `l4 batch` names only the first and the service names each.
+  - The slow path of `createFunction`, which runs only when a module does not precompile and then type-checks, does not read a top-level `null` as the other paths do. No request that reaches it has been found.
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Before UNKNOWN-EVALUATION-SPEC §8 step 1, a rule that read such an input through `CONSIDER` with an `OTHERWISE` answered `200` with the `OTHERWISE` value instead, which the direct path does not give. Inputs declared with a section `GIVEN` are delivered.
 - A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
@@ -305,10 +309,10 @@ Measured 2026-10-15, on `unstable` at `6930bccf6`:
 
 - On the wrapper path, an input declared through a synonym for a `BOOLEAN` is decoded as its own type, where a `BOOLEAN` written out is lifted to `MAYBE` (above).
   Left out, it is refused with `Missing required field 'b' in JSON object`, even when the rule never reads it; a `BOOLEAN` written out and left out is refused only if the rule reads it, and then names `b (not supplied)`.
-  A `null` for it in a batch case or an MCP call is refused with `Field 'b' is null, which means the value is not known: supply a value`, where a `BOOLEAN` written out is treated as left out.
+  A top-level `null` for it is refused like any input that is not a `MAYBE`, with `Parameter 'b' is null, which means the value is not known: supply a value` (a `null` inside a record is the decoder's `Field …`).
   A value, and a string that is not a boolean, are treated the same: the string is refused in both, with `Expected JSON boolean for field 'b' but got: String "maybe"`.
 - On the wrapper path, an input declared through a synonym for a `DATE`, `TIME` or `DATETIME` is decoded as its own type, where the type written out is read from a string and converted (above).
-  Left out, it is refused with `Missing required field 'd' in JSON object`; a string that does not parse, with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD` (`Could not parse time string …` for a `TIME`, `Could not parse datetime string …` for a `DATETIME`); a `null` in a batch case or an MCP call, with `Field 'd' is null, which means the value is not known: supply a value`.
+  Left out, it is refused with `Missing required field 'd' in JSON object`; a string that does not parse, with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD` (`Could not parse time string …` for a `TIME`, `Could not parse datetime string …` for a `DATETIME`); a top-level `null`, with `Parameter 'd' is null, which means the value is not known: supply a value`.
   The type written out gives `Parameter 'd': missing required parameter` and `Parameter 'd': could not read "garbage" as a DATE`.
   A value that parses is answered the same.
 
@@ -414,7 +418,7 @@ An answered case carries the function's result under `value`.
 `outcomes` is required, but the service does not use it yet: every answered case carries the whole result.
 Every case carries its own `@presumed`, the inputs it left out whose defaults its answer or refusal used (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
-That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
+That message is not always the one the single-case endpoint gives for the same input, because a case with a `{}` or a `null` inside a record goes through the generated wrapper, and a single request holding neither does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 Neither has a `value`.
 A case whose evaluation fails on the service's own fault, and not on a limit or on what the case said, is an `@error` too: it says the case could not be evaluated, the details are in the service log, and the cases beside it are answered.
 That wording and that treatment are **assumed, not ruled**.
