@@ -162,7 +162,7 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 | `@ref`, `<<...>>`      | A reference to the legal source                                                                                                        | [Syntax and directives](syntax/README.md#annotations) |
 | `@ref-src`, `@ref-map` | Where references are looked up: `@ref-map` maps names to URLs for `@ref`; `@ref-src` is accepted and ignored (CSV loading was removed) | [Syntax and directives](syntax/README.md#annotations) |
 | `@export`              | Publishes a function as an API endpoint when the file is deployed                                                                      | [Syntax and directives](syntax/README.md#annotations) |
-| `@export default`      | The function a deployment calls when no function is named                                                                              | [Syntax and directives](syntax/README.md#annotations) |
+| `@export default`      | The function `l4 batch` runs when no function is named (a deployment always needs the function named)                                  | [Syntax and directives](syntax/README.md#annotations) |
 
 ## Symbols
 

@@ -38,11 +38,11 @@ DECIDE `qualifies for discount` IF
     AND applicant's `risk score` <= 0.5
 ```
 
-| Annotation                      | Meaning                                                                     |
-| ------------------------------- | --------------------------------------------------------------------------- |
-| `@export <description>`         | Publish this rule, with this description.                                   |
-| `@export default <description>` | Publish it as the **default** rule, used when a caller names no rule.       |
-| `@desc <description>`           | After a `GIVEN` input: describe the input for people and agents calling it. |
+| Annotation                      | Meaning                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `@export <description>`         | Publish this rule, with this description.                                                                           |
+| `@export default <description>` | Publish it as the **default** rule: `l4 batch` runs it when you name no rule. The service always needs a rule name. |
+| `@desc <description>`           | After a `GIVEN` input: describe the input for people and agents calling it.                                         |
 
 The descriptions become the rule's documentation in the API schema, and they are all an AI agent knows when it decides whether and how to call the rule, so write them with care. Rules without `@export` stay internal: other rules can use them, but they are not published.
 
@@ -57,14 +57,19 @@ In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab
 ### Defaults
 
 Some inputs have a **default**: a value the rule uses when a caller leaves that input out.
-L4 writes it with [`TYPICALLY`](../../reference/types/TYPICALLY.md), so the Deploy tab says "typically".
+A caller is an application or an AI agent that runs your rule.
+L4 writes a default with [`TYPICALLY`](../../reference/types/TYPICALLY.md), so the Deploy tab says "typically".
 A default is not a suggestion: it is applied, and the answer says so.
+
+Every answer from a published rule carries a list called **`presumed`**: the inputs the caller left out and the rule filled in for itself.
+It lets whoever reads the answer see which facts were supplied and which were assumed.
+It lists a default only when the answer relied on it.
 
 Each input on a rule's card reads one of these:
 
 - `required`: a caller must supply it.
-- `optional`: a caller may leave it out. This is an input that may have no value, a `MAYBE`, and left out it is `NOTHING`.
-- `optional, typically 0`: a caller may leave it out. The rule then uses 0, and the answer lists the input under `presumed` when the answer relied on it.
+- `optional`: a caller may leave it out. This is an input that may have no value (a `MAYBE`), and left out it is `NOTHING`.
+- `optional, typically 0`: a caller may leave it out. The rule then uses 0, and the answer lists the input under `presumed` when it relied on it.
 
 The card says it in words under the input: "If left out, 0 is used, and the answer lists b under presumed when it relies on that."
 A field of a record is named by its path, such as `cfg.retries`.
@@ -72,20 +77,27 @@ For an input that is a choice from a list, the card marks the default choice.
 `typically nothing` means the default is "nothing", and `typically false` means the default answer is no.
 
 When some input has a default, the card adds a line: "Callers can turn the defaults off with presumption: hard (HTTP, batch, MCP, WebMCP)."
-With presumption `hard`, a caller who leaves an input out gets an error naming it, instead of the default.
-A service that has not been updated for the MCP and WebMCP switch does not offer it there.
+The switch is a setting named `presumption` that a caller sends with a request.
+With it set to `hard`, a caller who leaves an input out gets an error naming it, instead of the default.
+It works over **HTTP** (the ordinary web request a program sends to the address in [Step 5](#step-5-call-a-rule)) and in `l4 batch` (the command that runs a rule over many cases).
+It is meant to work through **MCP** (the Model Context Protocol, which lets an AI agent use a rule as a tool; see [Connect an AI agent](../legalese-cloud/ai-agents.md)) and **WebMCP** (the same for the AI assistant in a visitor's browser; see [Embed rules in a website](../legalese-cloud/webmcp-embed.md)).
+A service that has not been updated for that does not offer the switch there.
 
 Under the inputs, **What callers see** is collapsed.
-Open it to read the schema of the rule's inputs as it is published to OpenAPI and MCP clients, with each default written as `"default": 0` and the inputs a caller must supply listed under `"required"`.
-The card shows the schema it was given by the language server or the service; it does not compose its own.
+Open it to read the schema of the rule's inputs as the service describes them to callers, with each default written as `"default": 0` and the inputs a caller must supply listed under `"required"`.
+The service publishes that schema in its **OpenAPI** document (OpenAPI is the standard format for describing a web interface; see [Call rules over REST](../legalese-cloud/openapi-spec.md)) and in its MCP tool list.
+The card takes the schema it was given by the language server or the service and removes only the keys that are for L4's own tools, which both of those also leave out; it does not compose its own.
+MCP and WebMCP spell input names without spaces: `start year` becomes `start-year`.
+One thing differs: the OpenAPI document leaves out an input whose name is one of four reserved names (`alias`, `propertyOrder`, `x-l4-type` and `x-sanitized-name`) while still listing it as required, which is a defect in the service.
+The card shows such an input, as the MCP tool list does.
 
 The Deploy tab shows what the service publishes, and it has limits:
 
 - A default on an `ASSUME` (older files) is not published, and the service does not use it.
   The Deploy tab says `typically (not published)` for that input, and callers must still supply it.
   The Deployments tab cannot say this, because the service publishes no marker, so such an input reads `required` there.
-- The tab lists the fields of a record under the input, but not the fields inside the elements of a list.
-  A default on such a field is published, but it is not shown, and the tab says so.
+- Neither tab lists the fields inside the elements of a list.
+  A default on such a field is published, but it is not shown, and each tab says so.
 - A deployment made by an older service publishes no defaults, so none are shown.
 
 An input with no `typically` beside it can therefore still carry a default in the file.
@@ -115,16 +127,27 @@ A field of a record is named by its path, such as `cfg.retries`.
 
 A changed default is reported, not refused.
 It does not count as a breaking change, the screen is not a warning, and **Deploy Now** goes ahead.
-When the update has been applied, the **Deployments** tab lists the same changes, as the service reported them, until you dismiss the list.
 If the update also contains a breaking change, the usual warning appears, with the changed defaults listed under it.
+
+After the update, the sidebar says what happened to the defaults:
+
+- When it has been applied, the **Deployments** tab lists the changes, as the service reported them, until you dismiss the list or open the **Deploy** form again, which clears it.
+- When the service rejects it, the **Deploy** tab says that nothing changed and lists the defaults the update would have changed.
+- When the sidebar cannot read the result of the deploy (the connection to the service fails three times running), it says that the result could not be read and that the deploy may have been applied.
+  It lists the defaults the review showed, marked as reported before the deploy.
+  It never says the update was rejected, because the service did not say so.
+- The list comes from the service, so it needs a service that reports changed defaults, which the service that ships with this change does.
+  A service that does not report them leaves the sidebar to show the list it held before the deploy, and it says "Reported before the deploy; the service did not report them."
 
 What the check compares:
 
 - It compares an input's default only when both the deployed version and the new one publish one.
-- Adding a default to an input is not a change: the input just becomes optional, which callers cannot notice.
-- Removing a default makes the input required again, which is a breaking change and is warned about as one.
+- It does not compare an input whose type changed, or the fields under it: the type change is a breaking change and is warned about as one.
+- Adding a default to an input that was required makes it optional, which callers cannot notice, so it is not reported.
+- Removing a default from an input that is required without it makes it required again, which is a breaking change and is warned about as one.
+- An input that may have no value (a `MAYBE`) is optional with or without a default, so adding or removing one there changes nothing about what callers must supply.
 - A deployment made by an older service publishes no defaults, so there is nothing to compare.
-- An update with exactly the same content as the live version is not sent to the service as an update, so nothing is listed after it.
+- An update whose content is exactly the live version's reaches the service as an unchanged upload, which has no changed defaults, so the service lists none.
 
 ### From the command line
 
