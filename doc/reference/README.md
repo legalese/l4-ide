@@ -88,7 +88,7 @@ How an L4 file is written, on one page:
 
 ### [Query planning](query-planning/README.md)
 
-Turn a Boolean decision into an interactive question-and-answer wizard: which question to ask next, and when the outcome is already settled. The [ROBDD page](query-planning/robdd.md) describes the canonical Boolean form the planner is built on.
+Turn a Boolean decision into an interactive question-and-answer session: which question to ask next, and when the outcome is already settled.
 
 ## Library
 

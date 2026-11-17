@@ -238,7 +238,7 @@ The function's published `returnSchema` does not describe two of these shapes ye
 #### Missing and uncertain inputs
 
 An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` is _uncertain_.
-They are different (T3 in `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`): an absent input can take a default, a `null` one never does, and a `{}` one is neither: on the wrapper path a `BOOLEAN` that is `{}` is an assumed term, refused only if the rule reads it (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
+They are different: an absent input can take a default, a `null` one never does, and a `{}` one is neither: on the wrapper path a `BOOLEAN` that is `{}` is an assumed term, refused only if the rule reads it (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 
 **Defaults.** An input with a `TYPICALLY` default — on the exported function's own `GIVEN`, on a section `GIVEN` it reads, or on a field of a record it takes — may be left out, and then takes its default.
 The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
@@ -299,16 +299,14 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
-It stops however the rule reads the input, including through a `CONSIDER` with an `OTHERWISE` branch: before UNKNOWN-EVALUATION-SPEC §8 step 1 the `OTHERWISE` took the missing input, and the request answered `200` with that branch's value, where it now answers `422` and names the input.
-
-Before the fix for smucclaw/l4-ide#992, such an input was silently `FALSE` on this path.
+It stops however the rule reads the input, including through a `CONSIDER` with an `OTHERWISE` branch: the request answers `422` and names the input.
 
 A missing `DATE`, `TIME` or `DATETIME` input is refused on this path with the direct path's message, and one whose string does not parse is refused with a message that quotes it: `Parameter 't': could not read "not a time" as a TIME`; when more than one does, the message names them all, without quoting.
 
 A synonym for a record, an enum or a `LIST` is read as the type it stands for on this path, and so is a synonym below the head of a type, as in `MAYBE Hue`: the decoder expands it.
 
 Every evaluation and batch response says which report it carries, as `"report": "default"`.
-The default report is the only one so far: it shows an answer that is still waiting for an input as the `422` above (UNKNOWN-EVALUATION-SPEC §4.7.4).
+The default report is the only one: it shows an answer that is still waiting for an input as the `422` above.
 
 Limits, measured 2026-10-02:
 
@@ -318,8 +316,8 @@ Limits, measured 2026-10-02:
   - A `DEONTIC` function is the exception on every surface, since it always takes the wrapper path: a top-level `null` for its `BOOLEAN` input is an assumed term there, refused only if the rule reads it, so the answer can depend on the order of the operands there too (found in review, 2026-11-18).
   - The wording is not the same on every surface: `l4 batch` says `Field 'p'` where the service says `Parameter 'p'`, an MCP call spells the input as its tool does (`has-capacity` for `has capacity`), and where more than one input is `null` `l4 batch` names only the first and the service names each.
   - The slow path of `createFunction`, which runs only when a module does not precompile and then type-checks, does not read a top-level `null` as the other paths do. No request that reaches it has been found.
-- On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Before UNKNOWN-EVALUATION-SPEC §8 step 1, a rule that read such an input through `CONSIDER` with an `OTHERWISE` answered `200` with the `OTHERWISE` value instead, which the direct path does not give. Inputs declared with a section `GIVEN` are delivered.
-- A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required (W6 of `specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md`).
+- On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Inputs declared with a section `GIVEN` are delivered.
+- A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required.
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
 
 Measured 2026-10-06:

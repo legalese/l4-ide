@@ -494,6 +494,27 @@ DECIDE ...
 
 **Rule:** The innermost (most specific) TYPICALLY wins. Here, the GIVEN's TYPICALLY 21 overrides the DECLARE's TYPICALLY 30 for this function.
 
+### 6. Usual values as odds in the query planner (built on unstable)
+
+The user page `doc/reference/query-planning/README.md` no longer carries the design (review of #809).
+The design is `specs/todo/QUESTION-ORDERING-SPEC.md` §3 and §4, whose status header predates the build.
+This section records what is built.
+
+What is built, read from the code on unstable at `35aa3bd67` (not re-run):
+
+- A `BOOLEAN` `TYPICALLY TRUE` or `TYPICALLY FALSE` on a rule's own `GIVEN`, or on an `ASSUME`, is collected by `collectTypicallyDefaults` (`jl4-core/src/L4/Viz/Ladder.hs:402-413`) and becomes the prior 0.9 or 0.1 on its atom (`boolPriorsFromBody`, `jl4-core/src/L4/Viz/VizExpr.hs:206-221`); every other atom has 0.5.
+  A numeric or string default gives no prior.
+- The planner ranks the inputs still needed by expected information gain under those priors, ties broken by the atom's level in the diagram (`rankedVars`, `jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs:749-752`).
+  So a presumed input is not always asked later: in `presumed AND a` with `presumed` `TYPICALLY FALSE`, asking `presumed` scores higher (worked by hand from the formula, not run), because its likely answer settles the outcome.
+  The service, the language server and the WASM build all pass the priors in (`jl4-service/src/Backend/DecisionQueryPlan.hs:245`, `jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs:153`, `jl4-wasm/app/QueryPlanWasm.hs:74`).
+  The TypeScript planner takes the same weights from `typicallyBridge` (`ts-shared/viz-expr/viz-expr.ts:524`).
+- Pinned end to end by `typicallyOrderingTests` (`jl4-service/test/QueryPlanSpec.hs:494`): `presumed OR a OR b` with `presumed` `TYPICALLY FALSE` asks `presumed` last.
+- Whether a section `GIVEN`'s `BOOLEAN` default reaches the planner was not checked.
+  The collector reads only the rule's `GIVEN` and the module's `ASSUME`s; `L4.Discharge` adds a section `GIVEN` to the `GIVEN` of each rule that reads it (`jl4-core/src/L4/Discharge.hs:259-262`), so it may reach the collector if the ladder is drawn after that pass, and nothing here checked which.
+
+The ROBDD exists twice, kept in step by hand and with no external BDD library: `ts-shared/boolean-analysis/src/robdd.ts` (ranked by `decision-query.ts`) and `jl4-query-plan/src/L4/Decision/BooleanDecisionQuery.hs` (wrapped by `QueryPlan.hs`).
+Bryant (1986) and the difference between variable order and question order are in `QUESTION-ORDERING-SPEC.md` §1 and §9.
+
 ## Migration Path
 
 ### Backward Compatibility
