@@ -173,7 +173,12 @@ data CheckError =
   | AmbiguousOperatorError Text
   | AmbiguousTypeError Name [(Resolved, Kind)]
   | InternalAmbiguityError
-  | IncorrectArgsNumberApp Resolved Int Int -- expected, given
+  | IncorrectArgsNumberApp Resolved Int Int [Text] [Text]
+    -- ^ expected, given; then, when a call by position gives fewer inputs than
+    -- the callee takes and the callee declares a @TYPICALLY@ default for some
+    -- of them, the names of the inputs that have one and of those that do not,
+    -- so the message can show the @WITH@ form that leaves the first to their
+    -- defaults (both lists are empty otherwise).
   | IllegalApp Resolved (Type' Resolved) Int
   | IllegalAppNamed Resolved (Type' Resolved)
   | IncompleteAppNamed Resolved [OptionallyNamedType Resolved]

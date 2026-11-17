@@ -6614,6 +6614,21 @@ inferLit (StringLit _ _) =
 -- NOTE that if there are *no* arguments, we are not expecting a function,
 -- and are trivially done.
 --
+-- | For the arity error of a call by position: the names of the callee's inputs
+-- that carry a @TYPICALLY@ default, and of those that do not, when the call
+-- gives fewer inputs than the callee takes, every input is named and at least
+-- one has a default; otherwise both are empty and the error says nothing more.
+defaultedInputNames :: Resolved -> [OptionallyNamedType Resolved] -> Int -> Check ([Text], [Text])
+defaultedInputNames callee onts nargs
+  | nargs >= length onts = pure ([], [])
+  | length named /= length onts = pure ([], [])
+  | otherwise = do
+      defaults <- asks (Map.findWithDefault Map.empty (getUnique callee) . (.visibleInputDefaults))
+      let (hasOne, hasNone) = List.partition (\ n -> Map.member (getUnique n) defaults) named
+      pure $ if null hasOne then ([], []) else (map prettyLayout hasOne, map prettyLayout hasNone)
+  where
+    named = [ n | MkOptionallyNamedType _ (Just n) _ <- onts ]
+
 matchFunTy :: Bool -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr Resolved], Type' Resolved)
 matchFunTy _isProjection _r t []   =
   pure ([], t)
@@ -6660,7 +6675,8 @@ matchFunTy  isProjection r t0 args =
               pure (rargs, rt)
 
             | otherwise -> do
-              addError (IncorrectArgsNumberApp r nonts nargs)
+              (withDefault, others) <- defaultedInputNames r onts nargs
+              addError (IncorrectArgsNumberApp r nonts nargs withDefault others)
               rargs <- fst . unzip <$> traverse inferExpr args
               pure (rargs, rt)
             where
@@ -6713,7 +6729,7 @@ matchPatFunTy  r t args =
         pure (rargs, rt, concat extends)
 
       | otherwise -> do
-        addError (IncorrectArgsNumberApp r nonts nargs)
+        addError (IncorrectArgsNumberApp r nonts nargs [] [])
         (rargs, _, extends) <- unzip3 <$> traverse (descendActionPattern . inferPattern) args
         pure (rargs, rt, concat extends)
       where
@@ -8578,14 +8594,34 @@ prettyCheckError (NonDistinctError ndc nns)                  =
   , "But the following names have multiple occurrences:"
   , ""
   ] ++ map prettyNameWithRange (concat nns)
-prettyCheckError (IncorrectArgsNumberApp r expected given)   =
+prettyCheckError (IncorrectArgsNumberApp r expected given withDefault others) =
   [ "The function"
   , ""
   , "  " <> prettyResolvedWithRange r
   , ""
   , "expects " <> prettyCount expected "input" <> ","
   , "but here it is given " <> prettyCount given "input" <> "."
-  ]
+  ] ++ withFormHint
+  where
+    -- An input with a TYPICALLY default can be left out only of a call that
+    -- names its inputs; a call by position gives all of them. Said only when
+    -- the callee declares such a default, and shown with the callee's own
+    -- input names.
+    withFormHint = case withDefault of
+      [] -> []
+      _  ->
+        [ ""
+        , "An input that has a TYPICALLY default can be left out of a call that names its inputs,"
+        , "but not of a call that gives its inputs by position. "
+            <> ( if null others
+                   then "To give only some of the inputs, name them, as in"
+                   else "To leave " <> oxford withDefault
+                          <> (if length withDefault == 1 then " to its default" else " to their defaults")
+                          <> ", write" )
+        , ""
+        , "  " <> prettyLayout r <> " WITH " <> Text.intercalate ", " [ n <> " IS <value>" | n <- shown ]
+        ]
+    shown = if null others then take 1 withDefault else others
 prettyCheckError (IllegalApp r t n)                          =
   [ "You are giving " <> prettyCount n "input" <> " to"
   , ""

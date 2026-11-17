@@ -15,6 +15,11 @@ File: typically-named-site.l4
     expects 2 inputs,
     but here it is given 1 input.
 
+    An input that has a TYPICALLY default can be left out of a call that names its inputs,
+    but not of a call that gives its inputs by position. To leave rate to its default, write
+
+      scaled WITH base IS <value>
+
 File: typically-named-site.l4
   Hidden: no
   Range: 18:7-18:28
@@ -73,3 +78,8 @@ File: typically-named-site.l4
 
     expects 2 inputs,
     but here it is given 1 input.
+
+    An input that has a TYPICALLY default can be left out of a call that names its inputs,
+    but not of a call that gives its inputs by position. To leave timeout to its default, write
+
+      Config WITH retries IS <value>
