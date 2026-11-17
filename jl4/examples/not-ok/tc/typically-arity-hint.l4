@@ -1,0 +1,32 @@
+-- The arity error of a call BY POSITION says how to leave an input to its
+-- default (TYPICALLY-ONE-BEHAVIOUR-SPEC.md section 4.2, U1: R8 rule 1 is kept,
+-- and the error names the WITH form; the wording is assumed, not ruled).
+-- It says so only when the callee declares a TYPICALLY default for an input.
+
+GIVEN base IS A NUMBER
+      rate IS A NUMBER TYPICALLY 3
+GIVETH A NUMBER
+`last input defaulted` MEANS base TIMES rate
+
+GIVEN a IS A NUMBER TYPICALLY 1
+      b IS A NUMBER TYPICALLY 2
+GIVETH A NUMBER
+`both defaulted` MEANS a PLUS b
+
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`no defaults` MEANS x PLUS y
+
+-- One short, and the callee has a default: the error shows the WITH form.
+#EVAL `last input defaulted` 10
+
+-- Every input has a default, and none is given by name: the error shows the form
+-- with the first input as the example, and says "to their defaults".
+#EVAL `both defaulted` 5
+
+-- No input has a default: the message is what it was before.
+#EVAL `no defaults` 5
+
+-- More inputs than the callee takes: not a matter of a default, and unchanged.
+#EVAL `last input defaulted` 1 2 3

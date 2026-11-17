@@ -129,6 +129,7 @@ expr ::=
   | name+                              -- constructor / function application
   | name "OF" args                     -- also constructor / function application
   | name "WITH" namedargs              -- also constructor / function application
+  | name "WITHAL"                      -- a record with EVERY field's TYPICALLY default; standalone, no namedargs
   | givens "YIELD" expr                -- anonymous function / lambda
   | expr "'s" name                     -- record projection
   | "THE" name "OF" expr               -- also record projection (under discussion / should perhaps become generally possible as application syntax)

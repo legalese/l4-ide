@@ -1,0 +1,23 @@
+-- KNOWN LIMIT, pinned so that it cannot change silently. A decode the rules make
+-- into a record declared under a heading in an IMPORTED module names the type
+-- bare (`JSONDECODE `Paint Order`: coats`), while the WITH entry of the same
+-- record carries the heading (`WITH `Stock items`.`Paint Order`: coats`). The
+-- headings of an imported module do not reach the evaluator: it receives the
+-- imports' DECLAREs as a flat list. A record declared under a heading in THIS
+-- module is named behind it (batch-typically-decode-*.l4).
+
+IMPORT `batch-typically-decode-import-lib`
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING `Paint Order`
+parseOrder s MEANS JSONDECODE s
+
+GIVETH A NUMBER
+`decoded coats` MEANS CONSIDER parseOrder "{}"
+    WHEN RIGHT o THEN o's coats
+    WHEN LEFT e THEN 0
+
+@export default coats
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+DECIDE coats amount IS (`Paint Order` WITHAL)'s coats PLUS `decoded coats` PLUS amount

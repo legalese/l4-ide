@@ -1,0 +1,14 @@
+Parsing successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: withal-then-override.l4
+  Hidden: no
+  Range: 12:33-12:35
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+       |
+    12 | glossy MEANS Paint WITHAL label IS "gloss"
+       |                                 ^^
+    unexpected IS
+    expecting &&, *, +, -, .., ..., /, ;, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, GREATER, IMPLIES, LESS, MINUS, MODULO, OR, PLUS, RAND, ROR, TIMES, UNLESS, WHERE, end of input, infix identifier, mixfix keyword, or ||

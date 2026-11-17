@@ -1003,10 +1003,26 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     App        _ n es -> printWithLayout n <> case es of
       [] -> mempty
       exprs@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
+    -- A named argument the checker ADDED from a TYPICALLY default
+    -- ('DefaultFill') is not part of what the author wrote, and printing it
+    -- would turn the default into an explicit value: the module re-checked from
+    -- this text (@l4 batch@ re-emits one) would no longer take the default, and
+    -- so could not report that it did.
+    --
+    -- A @WITH@ always writes at least one argument (the parser reads a list of
+    -- one or more), so a named application with NONE written is the other
+    -- spelling: @T WITHAL@, which the parser leaves with an empty list and the
+    -- checker fills with every field's default. It prints as it was written.
+    -- Bare @T@ would be the constructor itself, a different expression, so
+    -- this is a correctness path for @l4 batch@ and the REPL, which print a
+    -- module and run it again.
     AppNamed   _ n namedExpr _ ->
-          printWithLayout n
-      <+> "WITH"
-      <+> align (vcatHard (fmap printWithLayout namedExpr))
+      case filter (not . isDefaultFill) namedExpr of
+        []      -> printWithLayout n <+> "WITHAL"
+        written ->
+              printWithLayout n
+          <+> "WITH"
+          <+> align (vcatHard (fmap printWithLayout written))
     IfThenElse _ cond then' else' ->
       -- Use single-line format to avoid layout/indentation issues when re-parsing
       "IF" <+> parensIfNeeded cond
