@@ -1,0 +1,17 @@
+-- smucclaw/l4-ide#1000: a written ASSUME and a section GIVEN in one export.
+-- The ASSUME is redefined over the row, as it always was; the section GIVEN is
+-- supplied by name at the call, and one read of it is overridden by an inner
+-- WITH. For b 1, `flat fee` 10 and r 3: 1 + 10 + 3 + 100.
+
+ASSUME `flat fee` IS A NUMBER
+
+§ `Rates`
+    GIVEN r IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+inner MEANS r
+
+@export A written ASSUME beside a section GIVEN, one read overridden
+GIVEN b IS A NUMBER
+GIVETH A NUMBER
+outer b MEANS b PLUS `flat fee` PLUS inner PLUS (inner WITH r IS 100)

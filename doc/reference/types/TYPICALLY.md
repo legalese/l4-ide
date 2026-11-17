@@ -110,7 +110,17 @@ govern what counts as leaving a fact out:
   takes its default: the case is refused, naming the fact. `{}` means the same,
   for a record too. The one exception is a `MAYBE` fact, which is allowed to
   have no value: `null` on it is `NOTHING`, a value, and nothing is presumed or
-  refused.
+  refused. A service request is read this way whichever way it arrives: as a
+  single evaluation, as a case of a batch, or as a call to the MCP tool
+  (smucclaw/l4-ide#1021).
+- **A `WITH` inside the rules still wins.** If a rule reads a section `GIVEN`
+  and another rule overrides it for one calculation, as in
+  `outer MEANS inner PLUS (inner WITH r IS 100)`, a case sent to `l4 batch` gets
+  the answer `#EVAL` gives: the case's value, or the default, for the read that
+  was not overridden, and the override for the one that was
+  (smucclaw/l4-ide#1000). A case that supplies a section fact which the rules
+  never read, because every read of it is overridden, is accepted, and its value
+  changes nothing.
 - **A name that matches nothing is refused where a default is taken.** In a
   case that leaves out a fact with a default, a name that is not a fact is
   refused, naming the nearest one, since it may misspell the fact left out.

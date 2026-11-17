@@ -490,9 +490,9 @@ accepted, and it went wrong in the worst order — the reassuring step came firs
 - Running the very same row then stopped with _"I could not continue evaluating,
   because I needed to know the value of `gst rate` but it is an assumed term."_
   Adding `"gst rate"` to the row did **not** help: the value was accepted into
-  the row and then ignored, because the way `l4 batch` supplies a value is by
-  rewriting the module it was handed, and it cannot rewrite a module that module
-  merely imports.
+  the row and then ignored, because the way `l4 batch` supplied a value then was
+  by rewriting the module it was handed, and it cannot rewrite a module that
+  module merely imports.
 
 So the answer to _"is this request valid?"_ was yes for a request that could
 never be answered. That is why the first repair is the refusal rather than a
