@@ -626,6 +626,17 @@ The deployment is named after the file unless you pass `--name`. `l4` typechecks
 
 `--json` prints machine-readable results, and `--no-wait` returns as soon as the upload is accepted instead of waiting for it to compile.
 
+An update that changes the default of an input, the value a rule uses when a caller leaves that input out, is applied and not blocked. The command lists each change after the deployed functions, and `--json` carries the same list as `notices`:
+
+```
+Deployed 'late-fee' (version 1.0.1) with 1 function:
+  fee
+Changed default (reported, not blocking): a caller that leaves it out now gets the new value.
+  fee, input grace days: 5 -> 7
+```
+
+If the same update also breaks an integration and is rejected, the rejection lists the changed defaults too. The report covers only a default that is a plain value on both the old and the new version. It does not see a rate or threshold written in the body of a rule, and two numbers that differ only beyond about 16 digits count as equal. See [Manage rules in git and CI](version-control-for-rules.md#redeploy-when-a-merge-changes-a-live-api).
+
 ### Your own jl4-service
 
 To deploy to a jl4-service you run yourself, name it with `--server`:
