@@ -654,11 +654,13 @@ buildMcpCall reverseMap params isDeontic arguments = case arguments of
     presumption <- readPresumption (present (Aeson.Key.fromText presumptionKey) obj Aeson.KeyMap.empty)
     -- Inside a DEONTIC tool's `arguments` the key is an input, and a rule that
     -- has no input of that name has none to read: a hard request put there is
-    -- not read, so it is refused instead of answered soft.
+    -- not read, so it is refused instead of answered soft. A null is a key left
+    -- out, here as everywhere else.
     case Aeson.KeyMap.lookup "arguments" obj of
       Just (Aeson.Object argsObj)
         | isDeontic
-        , Aeson.KeyMap.member (Aeson.Key.fromText presumptionKey) argsObj
+        , Just notNull <- Aeson.KeyMap.lookup (Aeson.Key.fromText presumptionKey) argsObj
+        , notNull /= Aeson.Null
         , Maybe.isNothing (presumptionCollision params) -> Left presumptionInsideArgumentsMessage
       -- On a flat tool a key called `arguments` that is not one of the rule's
       -- inputs is a wrapper put around the inputs, as a DEONTIC tool takes
@@ -672,7 +674,7 @@ buildMcpCall reverseMap params isDeontic arguments = case arguments of
       _ | isDeontic
         , Just (Aeson.Object argsObj) <- Aeson.KeyMap.lookup "arguments" obj ->
             McpCall
-              { inputs = pairs (without traceKeys argsObj)
+              { inputs = pairs (without (traceKeys <> [ presumptionKey | Maybe.isNothing (presumptionCollision params) ]) argsObj)
               , startTime = present "startTime" obj argsObj
               , events = remapTraceKeys reverseMap <$> present "events" obj argsObj
               , presumption

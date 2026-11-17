@@ -4563,6 +4563,14 @@ spec = describe "integration" do
           placed <- askMcpFull baseUrl mgr "mcp-misplace-in" "seatbelt requirement" (seatbelt [hardArg])
           refusedWith "beside arguments" placed "motorway"
 
+      -- null is a key left out, in the call's params and among a flat tool's
+      -- arguments, and so it is here
+      it "inside the arguments of a DEONTIC tool, a null is a key left out, not a refusal" do
+        withServiceFromSources "mcp-misplace-null" [("seatbelt.l4", deonticDefaultJL4)] \baseUrl mgr -> do
+          answered <- askMcpFull baseUrl mgr "mcp-misplace-null" "seatbelt requirement" $ Aeson.object $
+            ("arguments" Aeson..= Aeson.object (driver <> ["presumption" Aeson..= Aeson.Null])) : trace
+          fmap (.presumed) answered `shouldBe` Right ["is motorway"]
+
       it "beside arguments in the request's params, the shape of an HTTP body, is refused on a flat tool" do
         withServiceFromSources "mcp-misplace-params" [("capacity.l4", sectionBooleanJL4)] \baseUrl mgr -> do
           answered <- askMcpFullParams baseUrl mgr "mcp-misplace-params" "may contract" [hardArg]
