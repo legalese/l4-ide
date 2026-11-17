@@ -443,9 +443,9 @@ govern what counts as leaving a fact out:
   events, each event's party or action record has to give every field, whether
   or not a field has a default, and so does a record nested inside it: the
   record is part of the request, and the service refuses one that leaves a
-  field out. The schema the service publishes still lists such a field with its
-  default, so a client that reads the schema is told it may leave the field out
-  and is then refused.
+  field out. The schema the service publishes says the same: it lists every
+  field of an event's party and action as required, with no default, so a client
+  that writes an event from the schema is not refused.
 - **A file and the service differ here, on purpose for now.** In a file, a
   `#TRACE` event may leave a defaulted field out, and the event takes the
   default: with `Driver` declared as `HAS name IS A STRING` and
@@ -466,8 +466,8 @@ default. Give every field of it.` The answer is the same in `soft` and in
   `TYPICALLY` gets the `Missing required field` message above for a field the
   request did write. Send the fields directly, `{"name": "Alice", "licence":
 "learner"}`. A record nested inside a party or an action is the other way
-  round: it is keyed by its constructor (`{"Address": {...}}`), while the
-  published schema describes it as a plain object.
+  round: it is keyed by its constructor (`{"Address": {...}}`), and the
+  published schema describes it that way.
 
 One gap is known and not closed by this page's behaviour:
 
@@ -480,6 +480,14 @@ The list of facts a published rule asks for carries each default as the
 JSON Schema `default` keyword, and a defaulted fact
 is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
 either, and is not published, in the service's schema or in the query plan's.
+The one record that does not follow this is an event's party or action, in a
+request to a rule that describes obligations.
+That record is part of the request, so it never takes a default.
+The schema lists each of its fields under `required` and gives none a `default`,
+and a request that leaves a field out is refused.
+A record inside it is written under its constructor's name.
+The [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action)
+says how, and what the service cannot yet read there.
 
 A default is a fixed value written out: it does not name another `GIVEN`, and will not (ruled 2026-10-12; see [When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts)).
 

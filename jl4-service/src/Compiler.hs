@@ -2,6 +2,7 @@ module Compiler (
   compileBundle,
   computeVersion,
   toDecl,
+  eventRecordParameter,
 ) where
 
 import qualified Backend.Jl4 as Jl4
@@ -20,10 +21,12 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Aeson as Aeson
 import Data.Aeson (toJSON)
 import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Ord (comparing)
 import qualified Data.Set as Set
 import Data.Text (Text)
@@ -377,11 +380,13 @@ exportToFunction declares implicitParams export =
           Just (p, a) -> (Just p, Just a)
           Nothing -> (Nothing, Nothing)
         Nothing -> (Nothing, Nothing)
-      -- Build typed event schema using actual party/action types
+      -- Build typed event schema using actual party/action types. An event's
+      -- record is not decoded the way an argument is, so it is not described
+      -- the way an argument is ('eventRecordParameter').
       (partyParam, actionParam) = case export.exportReturnType of
         Just (TyApp _ _ [partyTy, actionTy]) ->
-          ( (typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" }
-          , (typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" }
+          ( eventRecordParameter ((typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" })
+          , eventRecordParameter ((typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" })
           )
         _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing Nothing
              , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing Nothing
@@ -442,6 +447,99 @@ exportToFunction declares implicitParams export =
     , returnSchema = mReturnSchema
     , isDeontic = isDeontic
     }
+
+-- | How the published schema describes the record of an event's @party@ or
+-- @action@ (card O4 of the 2026-10-11 overnight bench: "keep A until B
+-- lists").
+--
+-- An argument record may leave out a field that has a @TYPICALLY@ and take the
+-- default, and its schema says so. An event's record is part of the request, so
+-- it never takes a default: the request has to give every field.
+-- 'Backend.CodeGen.prepareEvents' writes each such record into the generated
+-- wrapper as source text (@Driver WITH name IS "Alice"@). A schema built exactly
+-- like an argument's would promise a default the service never takes. So here:
+--
+-- * every field is @required@ and none carries a @default@, at every depth;
+--
+-- * a record inside the record is written under its constructor's name,
+--   @{"Address": {"zip": 5, "floor": 2}}@, which is the only form the wrapper
+--   reads ('Backend.CodeGen.fnLiteralToL4Expr'); the plain @{"zip": 5}@ an
+--   argument uses fails to type-check. The same holds for a record in a list.
+--   The party or action record itself is written plainly, as before.
+--
+-- This describes what the wrapper reads today; it does not change what the
+-- wrapper reads. What it cannot write as source it still cannot, and the schema
+-- does not hide that by describing a different shape. Measured on 2026-10-11 at
+-- 72044c7b9, and listed in the service README ("What the service cannot yet
+-- read"): a text field inside a nested record; a field of an enumeration type,
+-- which directly in the party is read as @{"tag": "Active"}@ and not as its
+-- plain name; a @MAYBE@ given anything but @null@ (a @MAYBE NUMBER@ also reads
+-- @{"JUST": [3]}@); a list of two records; a fractional number below 0.1 or of
+-- 1e7 and over, which is written in exponent form; and a nested record that is
+-- not the last of its parent's fields in key order (the wrapper writes the
+-- fields in key order and the nested record's @WITH@ takes the rest). Those
+-- spellings are not published here, so the decoder is free to replace them.
+--
+-- In openapi.json this schema sits under @arguments@ of the @/evaluation@ request
+-- body, where the service does not read it, and under each batch case's
+-- @events@, which it does; the top-level @events@ of the @/evaluation@ request,
+-- which it reads, is untyped there. The function document describes an event as
+-- the service reads it.
+eventRecordParameter :: Parameter -> Parameter
+eventRecordParameter p = case p.parameterProperties of
+  -- A party or action that is not a record has no fields to require: an
+  -- enumeration, a number, an opaque type. A list is written element by element
+  -- ('Backend.CodeGen.fnLiteralToL4Expr'), each record in it like a record in
+  -- any other list.
+  Nothing -> p { parameterItems = eventFieldParameter False <$> p.parameterItems }
+  Just fields -> p
+    { parameterProperties = Just (Map.mapWithKey (\name field -> eventFieldParameter (isMaybeField name field) field) fields)
+    , parameterRequired = Just (Maybe.fromMaybe (Map.keys fields) p.parameterPropertyOrder)
+    }
+ where
+  -- 'typeToParameter' publishes a @MAYBE x@ field as @x@, so the type is gone;
+  -- what is left is that the record's own @required@ omits it and it has no
+  -- default, or that its default is @NOTHING@ (a @null@). Any other @TYPICALLY@
+  -- is a literal ('L4.TypeCheck.isTypicallyLiteral') and is published, so a
+  -- field with neither is a @MAYBE@ without a default.
+  isMaybeField name field = case field.parameterDefault of
+    Just Aeson.Null -> True
+    Just _ -> False
+    Nothing -> name `notElem` Maybe.fromMaybe [] p.parameterRequired
+
+-- | A field of an event's record: no default, and a record written under its
+-- constructor's name ('eventRecordParameter'). A @MAYBE@ field is told apart,
+-- because the one value the wrapper reads for every @MAYBE@ is @null@, which
+-- its published type (the inner one) does not admit; the description says so.
+-- A record in a @MAYBE@ is published plain, as the party itself is: the
+-- constructor-keyed form is not read there either (a type error, @MAYBE@
+-- against the record).
+eventFieldParameter :: Bool -> Parameter -> Parameter
+eventFieldParameter maybeField field0
+  | maybeField = describedWith "Optional in the rule (a MAYBE): write null, which is read as NOTHING." $
+      case field.parameterProperties of
+        Just _ -> eventRecordParameter field
+        Nothing -> inElements
+  | Just _ <- field.parameterProperties, Just constructor <- field.parameterL4Type =
+      describedWith ("Written under its constructor's name: {\"" <> constructor <> "\": {...}}.") field
+        { parameterProperties = Just (Map.singleton constructor (eventRecordParameter field) { parameterDescription = "" })
+        , parameterPropertyOrder = Just [constructor]
+        , parameterRequired = Just [constructor]
+        , parameterL4Type = Nothing
+        }
+  | otherwise = inElements
+ where
+  field = field0 { parameterDefault = Nothing }
+  inElements = field { parameterItems = eventFieldParameter False <$> field.parameterItems }
+
+-- | A parameter with a sentence added to its description.
+describedWith :: Text -> Parameter -> Parameter
+describedWith hint p =
+  let described = Text.strip p.parameterDescription
+   in p { parameterDescription =
+            if Text.null described then hint
+            else described <> (if "." `Text.isSuffixOf` described then " " else ". ") <> hint
+        }
 
 -- | Build Parameters from ExportedParam list.
 --

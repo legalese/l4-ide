@@ -104,6 +104,9 @@ module TestData (
   headingDecodeJL4,
   withalJL4,
   deonticDefaultJL4,
+  deonticEventRecordsJL4,
+  deonticListPartyJL4,
+  deonticMaybeFieldsJL4,
   spinJL4,
   spinOrRefuseJL4,
   spinWrapperJL4,
@@ -1553,6 +1556,88 @@ GIVETH A PROVISION OF Driver, `Driver Action`
             WITHIN 1
     ELSE    PARTY driver
             MAY `drive`
+|]
+
+-- | A deontic rule whose party and action are records with a @TYPICALLY@ field
+-- each, and a record nested in the party (O4 of the 2026-10-11 overnight bench).
+-- An argument may leave those fields out; an event's record may not. The nested
+-- @zhome@ sorts after every other field of @Driver@ on purpose: the service
+-- writes an event's record in key order, and a field after a nested record
+-- would be taken by the nested record's @WITH@.
+deonticEventRecordsJL4 :: Text
+deonticEventRecordsJL4 =
+  [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+    floor IS A NUMBER TYPICALLY 1
+
+DECLARE Driver HAS
+    name IS A STRING
+    licence IS A STRING TYPICALLY "full"
+    zhome IS AN Address
+
+DECLARE Msg HAS
+    body IS A STRING
+    channel IS A STRING TYPICALLY "email"
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+      note IS A Msg
+GIVETH A PROVISION OF Driver, Msg
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST note
+    WITHIN 5
+|]
+
+-- | A deontic rule whose party is a LIST of records, a group acting as one party
+-- (O4, review finding 2): the record with a @TYPICALLY@ is the list's element, so
+-- the party's own schema is an array, not an object.
+deonticListPartyJL4 :: Text
+deonticListPartyJL4 =
+  [i|
+DECLARE Crew HAS
+    id IS A NUMBER
+    shift IS A NUMBER TYPICALLY 1
+
+DECLARE Msg HAS
+    body IS A STRING
+
+@export default seatbelt requirement
+GIVEN crew IS A LIST OF Crew
+      note IS A Msg
+GIVETH A DEONTIC (LIST OF Crew) Msg
+`seatbelt requirement` MEANS
+    PARTY crew
+    MUST note
+    WITHIN 5
+|]
+
+-- | A deontic rule whose party has @MAYBE@ fields, one of them a record (O4,
+-- review finding 8). An event writes each as @null@, which reads as @NOTHING@;
+-- the argument leaves them out, which does too, so the two parties are equal.
+deonticMaybeFieldsJL4 :: Text
+deonticMaybeFieldsJL4 =
+  [i|
+DECLARE Address HAS
+    zip IS A NUMBER
+
+DECLARE Driver HAS
+    name IS A STRING
+    nickname IS A MAYBE STRING
+    zhome IS A MAYBE Address
+
+DECLARE Msg HAS
+    body IS A STRING
+
+@export default seatbelt requirement
+GIVEN driver IS A Driver
+      note IS A Msg
+GIVETH A PROVISION OF Driver, Msg
+`seatbelt requirement` MEANS
+    PARTY driver
+    MUST note
+    WITHIN 5
 |]
 
 -- | A rule whose cost is set by its input: it counts @n@ down to zero, so one
