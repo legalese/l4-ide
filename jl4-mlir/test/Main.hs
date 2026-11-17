@@ -281,6 +281,21 @@ main = do
         testDeonticRefuse False ["MUST `pay`", "WITHIN REFUSE \"no deadline modelled\""]
     , test "REFUSE in a called definition is unsupported" $
         testExportMark refuseMark [] (feeInYear oldFeeRefuses "`the old fee`")
+    -- The lowering has no image of an EITHER (review of #779, 2026-11-17):
+    -- a rule that answered n for RIGHT n answered 0 for {"RIGHT": [5]} and for
+    -- 5, so an EITHER in the signature marks the export unsupported.
+    , test "an EITHER input is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN e IS AN EITHER STRING NUMBER"] "GIVETH A NUMBER" "`fee` e MEANS\n  CONSIDER e\n  WHEN RIGHT n THEN n\n  OTHERWISE 50")
+    , test "an EITHER in a MAYBE input is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN e IS A MAYBE (EITHER STRING NUMBER)"] "GIVETH A NUMBER" "`fee` e MEANS 1")
+    , test "an EITHER in a record field of an input is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN b IS A Claim"] "GIVETH A NUMBER" "`fee` b MEANS 1")
+    , test "an EITHER behind a synonym in a list input is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN es IS A LIST OF Amount"] "GIVETH A NUMBER" "`fee` es MEANS 1")
+    , test "an EITHER result is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN n IS A NUMBER"] "GIVETH AN EITHER STRING NUMBER" "`fee` n MEANS RIGHT n")
+    , test "an export with no EITHER beside a record that holds one stays supported" $
+        testExportMark Nothing [] (eitherExport ["GIVEN n IS A NUMBER"] "GIVETH A NUMBER" "`fee` n MEANS n")
     , test "a called definition with no REFUSE stays supported" $
         testExportMark Nothing [] (feeInYear oldFeeIsFifty "`the old fee`")
     , test "REFUSE two calls away is unsupported" $
@@ -783,6 +798,22 @@ theExportMark json = case Aeson.decodeStrict (TE.encodeUtf8 json) of
                      Just (Aeson.String reason) -> Just reason
                      _ -> Nothing)
   _ -> Left ("expected a schema with one export, got: " <> T.unpack (T.take 400 json))
+
+-- | The mark an export with an EITHER in its signature gets.
+eitherMark :: Maybe T.Text
+eitherMark = Just "EITHER in an input or the result is not supported by the WASM backend"
+
+-- | A module that declares a record and a synonym that hold an EITHER, then
+-- an export with these inputs, this GIVETH and this definition.
+eitherExport :: [T.Text] -> T.Text -> T.Text -> [T.Text]
+eitherExport givens giveth def =
+  [ "DECLARE Amount IS AN EITHER STRING NUMBER"
+  , "DECLARE Claim HAS amount IS AN Amount"
+  , ""
+  , "@export The fee"
+  ]
+    <> givens
+    <> [giveth, def]
 
 -- | A module with the given definitions, then an export that answers 100
 -- from the year 2000 and otherwise the given expression.

@@ -49,7 +49,7 @@ import Data.Char (isAlphaNum)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.List (sortOn)
-import Data.Maybe (fromMaybe, maybeToList)
+import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -66,11 +66,12 @@ import L4.Syntax
   , Pattern(..), BranchLhs(..)
   , Deonton(..), RAction(..), DeonticModal(..)
   , Lit(..)
-  , rawName, rawNameToText, getActual
+  , rawName, rawNameToText, getActual, getUnique
   )
 import L4.Annotation (HasSrcRange, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
 import L4.TypeCheck.Types (InfoMap, EntityInfo)
+import L4.TypeCheck.Environment (eitherUnique)
 import qualified L4.Utils.IntervalMap as IV
 import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, isContractResult)
 import L4.Refusal (refusalReasons)
@@ -789,6 +790,16 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
       -- WITHIN is carried as printed text, which the runtime reads as a
       -- number.
       refuseInBody = mayRefuse ef.exportDecide
+      -- The lowering has no image of an EITHER: it lowers neither LEFT nor
+      -- RIGHT, and a pattern on one matches every value, and the runtime
+      -- reads no {"LEFT": [v]} or {"RIGHT": [v]} input. So an export with an
+      -- EITHER in an input or its result, at any depth, is marked
+      -- unsupported, as a REFUSE is, and is evaluated by jl4-service, which
+      -- reads and writes that form.
+      eitherInSignature = signatureHasEither declares ef
+      unsupportedReasons =
+        [ refuseUnsupportedReason | refuseInBody ]
+          <> [ eitherUnsupportedReason | eitherInSignature ]
   in FunctionExport
        { apiName     = sanitizeFunctionName name
        , wasmSymbol  = sanitizeWasmSymbol name
@@ -798,11 +809,12 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
        , returnSchema = returnSchema_
        , isDeontic   = isDeonticFn
        , paramOrder  = paramOrder_
-       -- Assume compilable unless evaluation may reach a REFUSE;
-       -- 'applyDiagnostics' downgrades functions the lowering flagged as
-       -- unsupported.
-       , supported   = not refuseInBody
-       , unsupportedReason = if refuseInBody then Just refuseUnsupportedReason else Nothing
+       -- Assume compilable unless evaluation may reach a REFUSE, or the
+       -- signature holds an EITHER; 'applyDiagnostics' downgrades functions
+       -- the lowering flagged as unsupported.
+       , supported   = null unsupportedReasons
+       , unsupportedReason =
+           if null unsupportedReasons then Nothing else Just (Text.intercalate "; " unsupportedReasons)
        , traceMeta   = Just traceMeta_
        , deonticContract = deonticContract_
        }
@@ -810,6 +822,35 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
 -- | Why an export from which evaluation may reach a REFUSE is unsupported.
 refuseUnsupportedReason :: Text
 refuseUnsupportedReason = "REFUSE is not supported by the WASM backend"
+
+-- | Why an export with an EITHER in an input or its result is unsupported.
+eitherUnsupportedReason :: Text
+eitherUnsupportedReason = "EITHER in an input or the result is not supported by the WASM backend"
+
+-- | Does an input or the result of this export hold an EITHER, at any depth:
+-- in a LIST, a MAYBE, a type's argument, a record's field, a constructor's
+-- field, or behind a synonym? A declared type is looked at once, so a record
+-- that contains itself ends the walk.
+signatureHasEither :: Map Text (Declare Resolved) -> ExportedFunction -> Bool
+signatureHasEither declares ef =
+  any (go Set.empty) (mapMaybe (.paramType) ef.exportParams <> maybeToList ef.exportReturnType)
+  where
+    go :: Set.Set Text -> Type' Resolved -> Bool
+    go seen = \case
+      TyApp _ name args
+        | getUnique name == eitherUnique -> True
+        | any (go seen) args -> True
+        | otherwise ->
+            let nameText = rawNameToText (rawName (getActual name))
+            in not (Set.member nameText seen) && case Map.lookup nameText declares of
+                 Just (MkDeclare _ _ _ decl) -> inDecl (Set.insert nameText seen) decl
+                 Nothing -> False
+      Forall _ _ inner -> go seen inner
+      _ -> False
+    inDecl seen = \case
+      RecordDecl _ _ fields -> or [ go seen t | MkTypedName _ _ t _ <- fields ]
+      EnumDecl _ cons -> or [ go seen t | MkConDecl _ _ fs <- cons, MkTypedName _ _ t _ <- fs ]
+      SynonymDecl _ body -> go seen body
 
 -- | M6: walk a 'Decide' body to extract a 'DeonticContract' tree.
 -- The body is a 'Regulative' wrapping a 'Deonton' record; the
