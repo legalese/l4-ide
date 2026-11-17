@@ -45,7 +45,15 @@ Where it is the whole construction, setting a field after it is a parse error:
 ```
 
 Inside another `WITH`, a comma after `Paint WITHAL` is not an error: what follows the comma belongs to the outer call, not to the `Paint`.
-Suppose `days to deliver` takes a `paint` and has a `rush` input of its own, usually `FALSE`.
+Suppose `days to deliver` takes a `paint` and has a `rush` input of its own, usually `FALSE`:
+
+```l4
+GIVEN paint IS A Paint
+      rush  IS A BOOLEAN TYPICALLY FALSE
+GIVETH A NUMBER
+`days to deliver` MEANS IF rush THEN 1 ELSE IF paint's rush THEN 3 ELSE 10
+```
+
 These two calls differ only in which one `rush IS TRUE` is given to:
 
 ```l4

@@ -98,7 +98,8 @@ own supply, a default, or the request at the entry point.
 
 The rule's own inputs are a different matter: because a call is all-named or
 all-positional, a site that names a section `GIVEN` must also name every one of the rule's own
-inputs.
+inputs, except an input that has a [`TYPICALLY`](../types/TYPICALLY.md) default, which the call may leave out and which then takes its default.
+If `n` is declared `n IS A NUMBER TYPICALLY 2`, then `bump WITH `the rate` IS 5` leaves `n` out, takes it as 2, and gives 10.
 
 ```l4
 GIVEN n IS A NUMBER
