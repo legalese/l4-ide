@@ -87,16 +87,17 @@
     if (name === 'fs__read_file') {
       const keywords =
         typeof a.search_keywords === 'string' ? a.search_keywords.trim() : ''
-      if (keywords)
+      // What was searched, not the patterns: they're written for the
+      // tool (`^(GIVEN|DECIDE).*sum`) and read as noise in the row.
+      if (keywords) {
+        const inFile = !!path && path !== '.'
         return {
           running: 'Searching…',
           settled: 'Searched',
-          target:
-            path && path !== '.'
-              ? `${path} for ${keywords}`
-              : `for ${keywords}`,
-          click: 'open',
+          target: inFile ? path : 'the workspace',
+          click: inFile ? 'open' : null,
         }
+      }
       // "Read" works as both base and past tense (read/read/read) —
       // settled label stays unchanged.
       return {
