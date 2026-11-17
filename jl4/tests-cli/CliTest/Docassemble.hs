@@ -136,7 +136,7 @@ shouldContainAny what haystack needles =
 -- rather than corpus exhibits and so live beside the other @tests-cli@
 -- fixtures, not in @examples/docassemble/@.
 daGlossLossSource, daRuntimeCollisionSource :: FilePath
-daGlobalShadowSource, daGatheredMaybeSource :: FilePath
+daGlobalShadowSource, daGatheredMaybeSource, daPayloadDefaultSource :: FilePath
 daGlossLossSource        = fixtureDir </> "docassemble-glossary-losses.l4"
 daRuntimeCollisionSource = fixtureDir </> "docassemble-runtime-collision.l4"
 -- The other two thirds of the same namespace hazard (repair pass, 2026-08-17):
@@ -145,6 +145,8 @@ daGlobalShadowSource     = fixtureDir </> "docassemble-global-shadow.l4"
 -- A paired `MAYBE NUMBER` inside a gathered element: the one place the
 -- changed-answer repair does NOT reach, declared rather than silent.
 daGatheredMaybeSource    = fixtureDir </> "docassemble-gathered-maybe.l4"
+-- A payload field's TYPICALLY pre-fills its follow-up question (L7).
+daPayloadDefaultSource   = fixtureDir </> "docassemble-payload-default.l4"
 
 -- | The four citations carried by @citations.l4@, herald-stripped: L4's own
 -- @\@ref @ prefix and the inline @\<\< \>\>@ delimiters are L4 syntax and must
@@ -1511,6 +1513,17 @@ spec bin = do
       shouldContain' "the fidelity report" report "h.claimants[i].declared_income"
       removePathForcibly ymlPath
       removePathForcibly repPath
+
+    it "pre-fills a payload field's TYPICALLY, as a record field's is (L7)" $ do
+      Output code sout serr <- runL4 bin ["export", "docassemble", daPayloadDefaultSource]
+      unless (code == ExitSuccess) $
+        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
+      -- the payload field's own question carries the default …
+      shouldContain' "the payload question" sout
+        "  - \"radius\": s_radius\n    datatype: number\n    default: 1\n"
+      -- … and the fidelity note lists the field with the other pre-filled ones.
+      shouldContain' "the fidelity report" (sout ++ serr) "[DA-TYPICALLY]"
+      shouldContain' "the fidelity report" (sout ++ serr) "s_radius"
 
     it "refuses M4's own two new collisions, by their own names (I)" $
       for_ daM4Refused \(fixture, diagnostic) -> do

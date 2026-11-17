@@ -1,0 +1,3 @@
+`read paint` with {} is equal to `RIGHT` with `Paint` where `colour` is red by default and `coats` is 2 by default
+`read settings` with {} is equal to `RIGHT` with `Settings` where `limit` is 10 and `note` is `NOTHING`
+`read settings` with {}

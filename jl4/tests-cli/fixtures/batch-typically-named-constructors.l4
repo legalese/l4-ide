@@ -1,0 +1,62 @@
+-- l4 batch over rules that take a TYPICALLY default whose value is a bare
+-- CONSTRUCTOR (TRUE, FALSE, an enum value) at a NAMED site
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 for a rule's input, W5 for a record's
+-- field). A numeric default is a literal and always has a cell of its own; a
+-- constructor is a name, and every use of it in a run used to share one cell,
+-- so a default that was never read was listed as soon as the same constructor
+-- was evaluated anywhere later (review F1, 2026-10-03).
+--
+-- Each exported rule has one answer per row of the input file, and a `presumed`
+-- that must hold exactly the defaults the answer rests on.
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Config
+  HAS timeout IS A NUMBER TYPICALLY 30
+      strict IS A BOOLEAN TYPICALLY TRUE
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN TYPICALLY FALSE
+GIVETH A BOOLEAN
+both MEANS a AND b
+
+GIVEN a IS A BOOLEAN
+      c IS A Colour TYPICALLY Red
+GIVETH A NUMBER
+ignoreC MEANS 0
+
+GIVEN a IS A BOOLEAN
+      d IS A BOOLEAN TYPICALLY FALSE
+GIVETH A NUMBER
+ignoreD MEANS 0
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN TYPICALLY FALSE
+GIVETH A BOOLEAN
+readsB MEANS IF (ignoreD WITH a IS a) EQUALS 0 THEN b ELSE TRUE
+
+-- x FALSE: the AND stops at `a`, so `b` is never read and nothing is listed,
+-- although the rule goes on to evaluate FALSE. x TRUE: `b` is read.
+@export default Short circuits
+GIVEN x IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE `short circuits` IS IF (both WITH a IS x) THEN 1 ELSE 0
+
+-- `ignoreC` never mentions `c`, and the rule then evaluates Red itself.
+@export default Never mentioned
+GIVEN x IS A BOOLEAN
+GIVETH A Colour
+DECIDE `never mentioned` IS IF (ignoreC WITH a IS x) EQUALS 0 THEN Red ELSE Green
+
+-- Two defaults that are the same constructor: `readsB` reads its `b`, while the
+-- `ignoreD` it calls first never reads its `d`. Only `b` is listed.
+@export default Two of one constructor
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `two of one constructor` IS readsB WITH a IS x
+
+-- A record's boolean field the construction leaves out and nothing reads.
+@export default Unread field
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `unread field` IS IF (Config WITH timeout IS 5)'s timeout EQUALS 5 THEN TRUE ELSE x

@@ -204,6 +204,12 @@ data TypeCheckResult = TypeCheckResult
     -- dependencies'. Propagated to importers by 'unionCheckEnv' so that an
     -- @\@export@ reaching one can be refused. See
     -- 'L4.TypeCheck.Types.CheckResult.implicitReaders'.
+  , inputDefaults :: TypeCheck.InputDefaults
+    -- ^ The @TYPICALLY@ defaults of this module's rules and records, and its
+    -- dependencies'. Propagated to importers by 'unionCheckEnv' so that a named
+    -- application of an imported rule, or a construction of an imported record,
+    -- can leave a defaulted input or field out. See
+    -- 'L4.TypeCheck.Types.CheckResult.inputDefaults'.
   }
   deriving stock (Generic)
 
@@ -233,6 +239,7 @@ instance NFData TypeCheckResult where
     `seq` rnf mixfixRegistry
     `seq` rnf sectionPaths
     `seq` rnf implicitReaders
+    `seq` rnf inputDefaults
 
 -- | The module a result belongs to.
 moduleUriOf :: TypeCheckResult -> NormalizedUri
@@ -1167,12 +1174,13 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
           , plural = False
           , bindLog = []
           , bindLogLen = 0
+          , overloadedCallees = Map.empty
           }
         -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
         -- applied when the TypeCheckResult is built below), as
         -- 'unionImportedCheckEnv' requires.
         unionCheckEnv cEnv tcRes =
-          TypeCheck.unionImportedCheckEnv cEnv tcRes.environment tcRes.entityInfo tcRes.mixfixRegistry tcRes.implicitReaders
+          TypeCheck.unionImportedCheckEnv cEnv tcRes.environment tcRes.entityInfo tcRes.mixfixRegistry tcRes.implicitReaders tcRes.inputDefaults
         -- NOTE: we don't want to leak the inference variables from the substitution
         initCheckState = set #substitution Map.empty $ foldl' unionCheckStates TypeCheck.initialCheckState dependencies
         initCheckEnv = foldl' unionCheckEnv (TypeCheck.initialCheckEnv uri) dependencies
@@ -1200,6 +1208,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , mixfixRegistry = result.mixfixRegistry
         , sectionPaths = result.sectionPaths
         , implicitReaders = result.implicitReaders
+        , inputDefaults = result.inputDefaults
         }
       )
 

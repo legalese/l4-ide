@@ -1,4 +1,4 @@
--- TYPICALLY: default values, recorded but not applied (rebuttable presumptions)
+-- TYPICALLY: default values (rebuttable presumptions)
 
 -- Fields of a record, with defaults
 DECLARE Person HAS
@@ -14,8 +14,17 @@ GIVEN
 GIVETH A BOOLEAN
 DECIDE `may purchase alcohol` IF age >= 18
 
--- Defaults change nothing when the rule is run: every input is still required.
+-- Given by position, a rule gets every input, defaulted or not.
 #EVAL `may purchase alcohol` 21 FALSE
+
+-- Given by name, an input with a default may be left out: `married` takes FALSE.
+#EVAL `may purchase alcohol` WITH age IS 21
+
+-- A record built by name may leave out a field with a default.
+GIVETH A Person
+`a new person` MEANS Person WITH name IS "Alex"
+
+#EVAL `a new person`'s jurisdiction
 
 -- A section GIVEN with a default: one name for every rule in the section
 § `Part 3 -- Capacity`

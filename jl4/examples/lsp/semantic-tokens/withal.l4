@@ -1,0 +1,15 @@
+-- `Paint WITHAL` takes every field's TYPICALLY default and writes none
+-- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1). WITHAL is a keyword like WITH, and the
+-- Check phase below must still have tokens for this file: the checker adds one
+-- argument per field, none of which the author wrote.
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Paint
+  HAS colour IS A Colour TYPICALLY Red
+      coats  IS A NUMBER TYPICALLY 2
+
+GIVETH A Paint
+`stock` MEANS Paint WITHAL
+
+#EVAL `stock`

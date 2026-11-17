@@ -1,0 +1,36 @@
+-- A rule that lacks a name the site writes still counts as a reading of the
+-- site, so a default is not taken to choose the other rule. Only a value that
+-- does not fit the type of an input the rule HAS rules it out
+-- (ok/typically-overload-fit.l4). Each site below is ambiguous, as it was
+-- before TYPICALLY.
+
+-- 1. The author means the flat fee, the second rule, and writes `amount`, the
+-- first rule's spelling of its input, by mistake. If the second rule were ruled
+-- out for not having `amount`, the first would be run on a presumed `rate`, and
+-- the misspelling would go unreported.
+GIVEN amount IS A NUMBER
+      currency IS A STRING
+      rate IS A NUMBER TYPICALLY 0.02
+GIVETH A NUMBER
+fee MEANS amount TIMES rate
+
+GIVEN amt IS A NUMBER
+      currency IS A STRING
+GIVETH A NUMBER
+fee MEANS 5
+
+#EVAL fee WITH amount IS 100, currency IS "SGD"
+
+-- 2. The other rule shares no name with the site at all. It is still a reading
+-- the author may have meant, and the site does not say which.
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN width IS A NUMBER
+      height IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS width TIMES height
+
+#EVAL scaled WITH base IS 10

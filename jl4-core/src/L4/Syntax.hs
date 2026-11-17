@@ -1104,9 +1104,43 @@ data Extension = Extension
     -- @the will _ is duly executed without _@. See 'annMixfixCanonical'.
   , pmSynthetic  :: Maybe PmSynthetic
     -- ^ Set on the nodes a multi-clause group is compiled to. See 'PmSynthetic'.
+  , defaultFill :: Maybe DefaultFill
+    -- ^ Set on a value the type checker ADDED to a named application, because
+    -- the callee declares a @TYPICALLY@ default for an input or field the
+    -- site left out. See 'DefaultFill'.
   }
-  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving stock (GHC.Generic, Eq, Ord)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | Written by hand so that @defaultFill@, which is 'Nothing' on every node the
+-- author wrote, leaves the text of @show@ exactly as it was before the field
+-- existed. An atomId is the hash of @show@ of a term with its annotations
+-- emptied (L4.Viz.AtomKey), and a derived 'Show' lists every field, so adding
+-- one would move every atomId a deployed service has handed out, though no leaf
+-- changed (the same reason 'Refs' has its own 'Show'). A node that carries a
+-- 'DefaultFill' shows the field, so two such nodes still differ from the node
+-- without one.
+instance Show Extension where
+  showsPrec d e =
+    showParen (d >= 11) $
+      showString "Extension {"
+        . foldr (.) id (intersperse (showString ", ") (map (\ (n, v) -> showString n . showString " = " . v) fields))
+        . showString "}"
+   where
+    fields =
+      [ ("resolvedInfo", showsPrec 0 e.resolvedInfo)
+      , ("nlg", showsPrec 0 e.nlg)
+      , ("nlgAlts", showsPrec 0 e.nlgAlts)
+      , ("desc", showsPrec 0 e.desc)
+      , ("ref", showsPrec 0 e.ref)
+      , ("fixityAnn", showsPrec 0 e.fixityAnn)
+      , ("nonassertable", showsPrec 0 e.nonassertable)
+      , ("nonassertableOnInputs", showsPrec 0 e.nonassertableOnInputs)
+      , ("pmMatrix", showsPrec 0 e.pmMatrix)
+      , ("mixfixCanonical", showsPrec 0 e.mixfixCanonical)
+      , ("pmSynthetic", showsPrec 0 e.pmSynthetic)
+      ]
+      <> [ ("defaultFill", showsPrec 0 df) | Just df <- [e.defaultFill] ]
 
 -- | The refs a node holds; 'annRefs' reads them as a list.
 --
@@ -1129,11 +1163,63 @@ instance ToExpr Refs where
   toExpr (MkRefs rs) = toExpr rs
 
 instance Semigroup Extension where
-  Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 pm1 mx1 syn1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 pm2 mx2 syn2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2)
+  Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 pm1 mx1 syn1 df1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 pm2 mx2 syn2 df2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2) (df1 <|> df2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing Nothing
+
+-- | Marks a value the type checker put into a named application that the
+-- author did not write (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5).
+--
+-- @scaled WITH base IS 10@, where @scaled@ declares @rate IS A NUMBER TYPICALLY 3@,
+-- and @Config WITH retries IS 2@, where @Config@ declares
+-- @timeout IS A NUMBER TYPICALLY 30@, each check as a COMPLETE application: the
+-- checker adds the default as one more named argument, so every consumer of the
+-- checked tree (the evaluator, discharge, the exporters, the MLIR lowering) sees
+-- every argument and none has to know defaults exist. This mark, on the added
+-- value's own annotation, is what says it was added:
+--
+-- * the printer and the evaluator's @presumed@ report tell it from a value the
+--   author wrote. 'L4.Print' leaves it out, so a printed module re-checks to the
+--   same fill instead of turning the default into an explicit value; and
+--
+-- * the evaluator reports it ('L4.EvaluateLazy.Machine.Presumed') the first time
+--   the value is forced, because an answer that rests on it rests on a default.
+--
+-- It sits on the VALUE and not on the 'NamedExpr', because 'L4.Discharge' and
+-- the evaluator both reduce a named application to a plain one that carries the
+-- values alone.
+data DefaultFill = MkDefaultFill
+  { owner      :: RawName
+    -- ^ The rule or record constructor the site applies.
+  , binder     :: RawName
+    -- ^ The input or field the default supplies.
+  , declaredAt :: Maybe SrcRange
+    -- ^ The @TYPICALLY@ that gave the value.
+  }
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The mark of an added default, read off the value it sits on. Only the two
+-- shapes a default can take are looked at ('L4.TypeCheck.isTypicallyLiteral':
+-- a literal, or a nullary constructor), which keeps the test to one constructor
+-- check for every other expression.
+--
+-- A third shape is looked at because the document exporter produces it: it
+-- rewrites a whole number of 10,000 or more into the text @12,500@, an 'Inert'
+-- node that keeps the annotation of the literal it replaced
+-- ('L4.Export.Document.rewriteExpr'), so the mark is still on it.
+exprDefaultFill :: Expr n -> Maybe DefaultFill
+exprDefaultFill = \ case
+  Lit ann _     -> (.extra.defaultFill) ann
+  App ann _ []  -> (.extra.defaultFill) ann
+  Inert ann _ _ -> (.extra.defaultFill) ann
+  _             -> Nothing
+
+-- | A named argument the type checker added, as opposed to one the author wrote.
+isDefaultFill :: NamedExpr n -> Bool
+isDefaultFill (MkNamedExpr _ _ e) = isJust (exprDefaultFill e)
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -1143,7 +1229,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -1241,6 +1327,11 @@ annPmMatrix = #extra % #pmMatrix
 -- 'annNlg': a fact about a node, recorded on the node.
 annMixfixCanonical :: Lens' Anno (Maybe RawName)
 annMixfixCanonical = #extra % #mixfixCanonical
+
+-- | Whether a value was added by the checker as a @TYPICALLY@ default. See
+-- 'DefaultFill'.
+annDefaultFill :: Lens' Anno (Maybe DefaultFill)
+annDefaultFill = #extra % #defaultFill
 
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
@@ -1913,6 +2004,7 @@ instance Serialise Anno where
   encode = encode . view annPmSynthetic
   decode = (\ m -> emptyAnno & annPmSynthetic .~ m) <$> decode
 deriving anyclass instance Serialise Extension
+deriving anyclass instance Serialise DefaultFill
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
 deriving anyclass instance Serialise LangTag

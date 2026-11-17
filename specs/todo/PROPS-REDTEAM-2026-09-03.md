@@ -388,7 +388,7 @@ the default in any case (probes typ1 and t4, Appendix A).
    `TYPICALLY` lives there. (As first agreed this read "a restatement in a sibling or child may not
    carry its own `TYPICALLY`"; under the amended R3 of the same day a same-named `GIVEN` in another
    section is a distinct binder with its own default, so the rule reduces to the sentence above.)
-3. **A default is a module-scope expression.** It may refer to another binder or to a definition
+3. **A default is a module-scope expression.** _[Reversed 2026-10-12 by HAIRCUT: a default is a literal. See `IMPLICIT-PROPS-DESIGN.md` §11.5; this is the 2026-09-03 text.]_ It may refer to another binder or to a definition
    (`GIVEN beta IS A NUMBER TYPICALLY phi`, where `phi MEANS alpha TIMES 2`), and is evaluated
    lazily at the root after supply. Section placement is irrelevant, visibility being module-flat;
    what matters is the read-set. **Cycle:** `b ∈ R*(default(b))`, the binder transitively read by

@@ -1,0 +1,14 @@
+-- The entry names the sections a rule is declared under, not the file: two
+-- imported files that each declare `scaled` under `§ Pricing` give one entry
+-- (overnight card O6, 2026-10-11; found in review). The rows answer 30, 50 and
+-- 80, and every one lists `WITH Pricing.scaled: rate`.
+
+IMPORT `batch-typically-collide-secimport-a`
+IMPORT `batch-typically-collide-secimport-b`
+
+@export default Combine
+GIVEN n IS A NUMBER
+      one IS A BOOLEAN
+      two IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS (IF one THEN useOne n ELSE 0) PLUS (IF two THEN useTwo n ELSE 0)

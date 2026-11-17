@@ -972,7 +972,8 @@ atomIdentityShapeTests = do
   -- smucclaw/l4-ide#1013), and when `Extension` gained the `@nonassertable`
   -- fields (the key is `show` of the AST with its annotations emptied, and
   -- `show` of an `Extension` lists every field it has, so a new field moves
-  -- every id).
+  -- every id). `defaultFill` moved none: `Show Extension` is written by hand
+  -- (L4.Syntax) and prints that field only when it is set.
   it "the atomIds committed in the ladder-core TS fixture are unmoved" do
     src <- Text.pack <$> readFile "../jl4/examples/ok/typically-basic.l4"
     (info, vizState, _params) <- lspCache "may purchase alcohol" src
