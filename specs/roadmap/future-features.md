@@ -122,9 +122,7 @@ interactive surface:
 - `Forget` ≈ un-restricting one atom and re-planning over the rest.
 
 None of the four needs new substrate; what's missing is threading per-step provenance from the
-planner through to the wizard UI instead of discarding it after each "what's next" call. See
-[Query Planning](../../doc/reference/query-planning/README.md#interactive-explanation-surface-backlog)
-for the doc-side writeup. Not scheduled.
+planner through to the wizard UI instead of discarding it after each "what's next" call. Not scheduled.
 
 **Bidirectional differential exchange with Axiom Foundation's RuleSpec** (backlogged 2026-09-10,
 prompted by a cross-session request from an Axiom-side session, alongside
