@@ -95,8 +95,8 @@ A `JSONDECODE` the rules make of their own fills its defaults in both modes.
 A written `ASSUME … TYPICALLY` is not a default for the evaluator, `l4 batch` or the service (`honouredDefault`, `jl4-core/src/L4/Export.hs`), although the ladder folds it into the planner's priors (`collectTypicallyDefaults`, `jl4-core/src/L4/Viz/Ladder.hs`) and #550's Catala exporter maps it to `context`.
 TY's ruling T2 says it is honoured; its build, W6, is deferred by Meng's word, _"I'd be ok with skipping or deferring W6 as ASSUME is being deprecated"_, which is recorded only in #558's copy of TY (W10, open).
 
-**Today a `TYPICALLY` takes only a literal**, so a `MAYBE` input can default only to `NOTHING`, and a `DATE` input cannot carry one at all (_measured_: `TYPICALLY JUST 7` and `TYPICALLY DATE OF 1, 2, 2026` are parse errors, and `TYPICALLY "2026-02-01"` on a `DATE` is a type error).
-Expression defaults are W7, legalese/l4-ide#557, open.
+**A `TYPICALLY` takes only a literal** (ruled 2026-10-12, HAIRCUT), so a `MAYBE` input can default only to `NOTHING`, and a `DATE` input cannot carry one at all (_measured_: `TYPICALLY JUST 7` and `TYPICALLY DATE OF 1, 2, 2026` are parse errors, and `TYPICALLY "2026-02-01"` on a `DATE` is a type error).
+Expression defaults were W7, legalese/l4-ide#557; HAIRCUT (2026-10-12) withdrew them, so a fallback that is worked out is written as a `MAYBE … TYPICALLY NOTHING` input plus an ordinary `CONSIDER … WHEN JUST d THEN d OTHERWISE <expr>`.
 
 **Today `#EVAL` honours a section `GIVEN`'s default but not a rule `GIVEN`'s at a named call**: `#EVAL withDefault WITH q IS TRUE`, where `r` is a rule `GIVEN` with `TYPICALLY TRUE`, is a check error (_measured_), while batch and the service fill the same default.
 TY accepts that gap (its R1) until W4 and W5, legalese/l4-ide#551, open.
