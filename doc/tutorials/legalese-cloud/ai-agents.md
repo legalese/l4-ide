@@ -38,6 +38,18 @@ https://mcp.legalese.cloud/{orgSlug}/{deploymentId}
 
 This server registers **one tool per exported rule**, plus the same four source-browsing tools. Tool names and input fields are the L4 names with spaces turned into hyphens, because tool names may only contain letters, digits, `_` and `-`: `` `calculate premium` `` becomes the tool `calculate-premium`, and the field `` `risk score` `` becomes `risk-score`. The server maps them back when it runs the rule. Each tool's description is your `@export` text, and its input schema comes from the `GIVEN` inputs and their `@desc` texts.
 
+### Telling a rule not to assume anything
+
+Some rules give an input a default (see [TYPICALLY](../../reference/types/TYPICALLY.md)): a value the rule uses when a caller leaves that input out. By default an agent that leaves such an input out gets an answer computed from the default, and the result lists it under `presumed` so that the agent can tell the user what was assumed.
+
+An agent that must not assume anything the user did not say can send the argument `presumption` with the value `"hard"`. Then no default is used: if the call leaves out an input the rule needs, the tool refuses the call and names the input, instead of answering. The value `"soft"` is the same as leaving the argument out. Any other value is refused. A default that the rule itself takes inside its own text is still used under `"hard"`, because it is part of the rule, not something a caller left out.
+
+Every rule's tool advertises `presumption` in its input schema, so an agent finds it without being told. It is one of the arguments of an ordinary rule, and sits beside `arguments` on a rule that returns a contract, whose inputs go inside `arguments`. It works the same way in the [WebMCP embed script](webmcp-embed.md), and it is the same argument, with the same two values, as `l4 batch --presumption` and the `presumption` field of a service request.
+
+What this covers, and what it does not:
+
+- It is read by the tool of each rule: on the one-deployment server above, on a jl4-service you run yourself, and in the WebMCP script's tools. The all-deployments server's `evaluate` tool is run by Legalese Cloud, and its own schema (from `get_schema`) says what it accepts.
+
 ### Tool names in WebMCP
 
 The [WebMCP embed script](webmcp-embed.md) offers the same search, schema and run steps under different names: `search_rules`, `get_rule_schema` and `evaluate_rule`. An agent that uses both sees both sets.

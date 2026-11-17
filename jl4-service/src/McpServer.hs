@@ -16,9 +16,9 @@ import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import EvalLimits (withEvalLimits)
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
-import L4.FunctionSchema (Parameters)
+import L4.FunctionSchema (Parameters (..))
 import DeonticTrace (isDeonticFunction, isStrayArgumentsField, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
-import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
+import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, presumptionKey, presumptionSchema, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
 import Types
 
 import Control.Monad.IO.Class (liftIO)
@@ -29,6 +29,7 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVar, readTVarIO, writeTVar, TVar)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson.Types
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import Data.Char (isAlphaNum)
@@ -283,6 +284,17 @@ buildToolList vis mScope = do
 
   pure (fnTools ++ fileTools)
 
+-- | A flat tool's schema with 'presumptionKey' added beside the inputs.
+addPresumption :: Aeson.Value -> Aeson.Value
+addPresumption = \case
+  Aeson.Object o ->
+    let props = case Aeson.KeyMap.lookup "properties" o of
+          Just (Aeson.Object ps) -> ps
+          _ -> Aeson.KeyMap.empty
+    in Aeson.Object $ Aeson.KeyMap.insert "properties"
+         (Aeson.Object (Aeson.KeyMap.insert (Aeson.Key.fromText presumptionKey) presumptionSchema props)) o
+  v -> v
+
 mcpToolSchema :: FunctionSummary -> Aeson.Value
 mcpToolSchema fn
   | fn.fsIsDeontic =
@@ -290,6 +302,7 @@ mcpToolSchema fn
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
             [ "arguments" .= sanitizeParameters fn.fsParameters
+            , Aeson.Key.fromText presumptionKey .= presumptionSchema
             , "startTime" .= Aeson.object
                 [ "type" .= ("number" :: Text)
                 , "description" .= ("Start time for contract simulation" :: Text)
@@ -302,7 +315,7 @@ mcpToolSchema fn
             ]
         , "required" .= (["arguments", "startTime", "events"] :: [Text])
         ]
-  | otherwise = sanitizeParameters fn.fsParameters
+  | otherwise = addPresumption (sanitizeParameters fn.fsParameters)
 
 fileToolDefinitions :: [Aeson.Value]
 fileToolDefinitions =
@@ -471,30 +484,36 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
         , ("tasksRequested", Aeson.toJSON tasksRequested)
         ]
       let reverseMap = buildPropertyReverseMap params
-      let call = buildMcpCall reverseMap params isDeontic arguments
-
-      let did = DeploymentId deployId
-      compResult <- tryCompileWithTimeout did 2_000_000
-      case compResult of
-        CompilationReady fns _meta ->
-          case Map.lookup fnName fns of
-            Just vf -> do
-              evalResult <- runMcpEvaluation vf call
-              pure $ evalResultToToolResponse reqId reverseMap evalResult
-            Nothing ->
-              pure $ jsonRpcError reqId (-32602) ("Function not found: " <> fnName)
-        CompilationInProgress
-          | tasksRequested ->
-              spawnEvaluationTask reqId did fnName reverseMap call
-          | otherwise ->
-              pure $ mcpTextResult reqId
-                "{\"status\":\"compiling\",\"retryAfterMs\":2000}" False
-        CompilationError err ->
-          -- 2026-07-28 reassigns -32002 to MissingResource (JSON-RPC standard
-          -- aliasing). Use -32000 (server-defined) for "deployment failed
-          -- to compile" — this code is in the JSON-RPC server-error band
-          -- and has no protocol meaning attached to it.
-          pure $ jsonRpcError reqId (-32000) ("Deployment failed: " <> err)
+      -- A refusal is an error RESULT (isError), as every other refusal of a
+      -- call is, and is decided before the deployment is compiled or waited
+      -- for: a call that cannot be honoured is not queued as a task.
+      let refuse msg = pure $ evalResultToToolResponse reqId reverseMap
+            (Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError msg))))
+      case buildMcpCall reverseMap params isDeontic arguments of
+        Left msg -> refuse msg
+        Right call -> do
+          let did = DeploymentId deployId
+          compResult <- tryCompileWithTimeout did 2_000_000
+          case compResult of
+            CompilationReady fns _meta ->
+              case Map.lookup fnName fns of
+                Just vf -> do
+                  evalResult <- runMcpEvaluation vf call
+                  pure $ evalResultToToolResponse reqId reverseMap evalResult
+                Nothing ->
+                  pure $ jsonRpcError reqId (-32602) ("Function not found: " <> fnName)
+            CompilationInProgress
+              | tasksRequested ->
+                  spawnEvaluationTask reqId did fnName reverseMap call
+              | otherwise ->
+                  pure $ mcpTextResult reqId
+                    "{\"status\":\"compiling\",\"retryAfterMs\":2000}" False
+            CompilationError err ->
+              -- 2026-07-28 reassigns -32002 to MissingResource (JSON-RPC standard
+              -- aliasing). Use -32000 (server-defined) for "deployment failed
+              -- to compile" — this code is in the JSON-RPC server-error band
+              -- and has no protocol meaning attached to it.
+              pure $ jsonRpcError reqId (-32000) ("Deployment failed: " <> err)
 
 -- | What a @tools/call@ carries once its arguments are split: the function's
 -- inputs, and the trace fields a DEONTIC export is replayed against.
@@ -508,6 +527,9 @@ data McpCall = McpCall
   { inputs    :: [(Text, Maybe FnLiteral)]
   , startTime :: Maybe Aeson.Value
   , events    :: Maybe Aeson.Value
+  , presumption :: Presumption
+  -- ^ The call's reserved @presumption@ argument ('presumptionKey'); soft when
+  -- the call does not send one, as @/evaluation@ reads it.
   }
 
 -- | Split a tools/call invocation into a 'McpCall'.
@@ -540,33 +562,52 @@ data McpCall = McpCall
 -- kept in the 'McpCall' so that the call can be refused. An @arguments@ on it is
 -- left out unless the function declares an input of that name
 -- ('isStrayArgumentsField'), in which case it is an input as any other.
-buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> McpCall
+--
+-- The reserved @presumption@ argument ('presumptionKey') is read on every
+-- function tool and is never an input: beside @arguments@ on a DEONTIC tool, as
+-- in HTTP, and among the arguments on a flat tool, where a rule with an input of
+-- that name is refused before this is called ('presumptionCollision'). It is
+-- @"soft"@ or @"hard"@ and anything else is refused ('Left'), naming what was
+-- sent, rather than read as soft; a @null@ is a key left out, as in HTTP.
+buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> Either Text McpCall
 buildMcpCall reverseMap params isDeontic arguments = case arguments of
-  Aeson.Object obj
-    | isDeontic
-    , Just (Aeson.Object argsObj) <- Aeson.KeyMap.lookup "arguments" obj ->
-        McpCall
-          { inputs = pairs (without traceKeys argsObj)
-          , startTime = present "startTime" obj argsObj
-          , events = remapTraceKeys reverseMap <$> present "events" obj argsObj
-          }
-    | isDeontic ->
-        McpCall
-          { inputs = pairs (without ("arguments" : traceKeys) obj)
-          , startTime = present "startTime" obj Aeson.KeyMap.empty
-          , events = remapTraceKeys reverseMap <$> present "events" obj Aeson.KeyMap.empty
-          }
-    | otherwise ->
-        let strays = filter (isStrayTraceField params) traceKeys
-            wrappers = filter (isStrayArgumentsField params) ["arguments"]
-        in McpCall
-          { inputs = pairs (without (wrappers <> strays) obj)
-          , startTime = if "startTime" `elem` strays then present "startTime" obj Aeson.KeyMap.empty else Nothing
-          , events = if "events" `elem` strays then present "events" obj Aeson.KeyMap.empty else Nothing
-          }
-  _ -> McpCall { inputs = [], startTime = Nothing, events = Nothing }
+  Aeson.Object obj -> do
+    presumption <- readPresumption (present (Aeson.Key.fromText presumptionKey) obj Aeson.KeyMap.empty)
+    pure $ case () of
+      _ | isDeontic
+        , Just (Aeson.Object argsObj) <- Aeson.KeyMap.lookup "arguments" obj ->
+            McpCall
+              { inputs = pairs (without traceKeys argsObj)
+              , startTime = present "startTime" obj argsObj
+              , events = remapTraceKeys reverseMap <$> present "events" obj argsObj
+              , presumption
+              }
+        | isDeontic ->
+            McpCall
+              { inputs = pairs (without ("arguments" : presumptionKey : traceKeys) obj)
+              , startTime = present "startTime" obj Aeson.KeyMap.empty
+              , events = remapTraceKeys reverseMap <$> present "events" obj Aeson.KeyMap.empty
+              , presumption
+              }
+        | otherwise ->
+            let strays = filter (isStrayTraceField params) traceKeys
+                wrappers = filter (isStrayArgumentsField params) ["arguments"]
+            in McpCall
+              { inputs = pairs (without (presumptionKey : wrappers <> strays) obj)
+              , startTime = if "startTime" `elem` strays then present "startTime" obj Aeson.KeyMap.empty else Nothing
+              , events = if "events" `elem` strays then present "events" obj Aeson.KeyMap.empty else Nothing
+              , presumption
+              }
+  _ -> Right McpCall { inputs = [], startTime = Nothing, events = Nothing, presumption = PresumeSoft }
  where
   traceKeys = ["startTime", "events"]
+  readPresumption = \case
+    Nothing -> Right PresumeSoft
+    Just v -> case Aeson.Types.parseEither Aeson.parseJSON v of
+      Right p -> Right p
+      Left _ ->
+        Left $ "presumption must be \"soft\" or \"hard\", not "
+          <> Text.Encoding.decodeUtf8 (LBS.toStrict (Aeson.encode v))
   without keys o = Map.toList (Map.withoutKeys (Aeson.KeyMap.toMapText o) (Set.fromList keys))
   pairs kvs =
     [ (Map.findWithDefault k k reverseMap, remapFnLiteralKeys reverseMap <$> parseFnLiteral v)
@@ -645,7 +686,7 @@ runMcpEvaluationIO cfg vf call
       case traceFromJSON call.startTime call.events of
         Left refusal -> pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError refusal)))
         Right (startTime, events) ->
-          mcpOutcome <$> runDeonticLimited cfg vf call.inputs startTime events TraceNone False PresumeSoft True
+          mcpOutcome <$> runDeonticLimited cfg vf call.inputs startTime events TraceNone False call.presumption True
   | Maybe.isJust call.startTime || Maybe.isJust call.events =
       pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError noTraceForOtherFunctions)))
   | otherwise =
@@ -653,7 +694,7 @@ runMcpEvaluationIO cfg vf call
         Nothing -> pure $ Left "No evaluator available"
         Just runFn ->
           fmap mcpOutcome $ withEvalLimits cfg $
-            runExceptT (runFn.runFunction call.inputs Nothing TraceNone False PresumeSoft)
+            runExceptT (runFn.runFunction call.inputs Nothing TraceNone False call.presumption)
 
 -- | An evaluation's outcome as the (error, result) text of an MCP result.
 mcpOutcome :: Either (LimitHit, Int64) (Either EvaluatorError ResponseWithReason, Int64) -> Either Text Text

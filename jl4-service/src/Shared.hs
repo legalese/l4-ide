@@ -17,6 +17,9 @@ module Shared (
   sanitizePropertyName,
   sanitizePropertyNames,
   sanitizeParameters,
+  -- * The reserved presumption argument (MCP and WebMCP)
+  presumptionKey,
+  presumptionSchema,
   buildPropertyReverseMap,
   remapFnLiteralKeys,
   remapTraceKeys,
@@ -266,6 +269,24 @@ sanitizeParameterValue p =
         Just items -> Aeson.KeyMap.insert "items" (sanitizeParameterValue items) withProps
         Nothing -> withProps
   in Aeson.Object withItems
+
+-- | The reserved argument that sets the presumption (U3 option A, bench ruling
+-- 2026-11-17): the same name and values as @/evaluation@ and @l4 batch@.
+presumptionKey :: Text
+presumptionKey = "presumption"
+
+-- | What @tools/list@ advertises for 'presumptionKey', on every function tool.
+presumptionSchema :: Aeson.Value
+presumptionSchema = Aeson.object
+  [ "type" .= ("string" :: Text)
+  , "enum" .= (["soft", "hard"] :: [Text])
+  , "description" .= (Text.unwords
+      [ "Optional. What to do with an input you leave out that the rule gives a default (TYPICALLY)."
+      , "\"soft\" (the default): the rule uses its default, and the answer lists it under \"presumed\"."
+      , "\"hard\": nothing is assumed for you, and a call that leaves out an input the rule needs is refused, naming it."
+      , "Send \"hard\" when the answer must rest only on what you were told."
+      ] :: Text)
+  ]
 
 -- | Build a reverse mapping from sanitized property names back to original L4 names.
 -- Recursively includes entries from nested object properties and array items,

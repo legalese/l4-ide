@@ -8,12 +8,16 @@ module WebMCPPage (
   renderOrgWebMCPScript,
 ) where
 
+import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Network.HTTP.Media ((//), (/:))
 import Servant (Accept (..), MimeRender (..))
+
+import Shared (presumptionKey, presumptionSchema)
 
 -- | HTML content type for Servant.
 data HTML
@@ -200,6 +204,22 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "    return result;"
   , "  }"
   , ""
+  , "  // The reserved presumption argument (U3 option A): the same name, values"
+  , "  // and wording as the MCP endpoint's tools/list, from the same definition."
+  , "  // A rule tool carries it beside its inputs (flat) or beside `arguments`"
+  , "  // (DEONTIC), and forwards it into the /evaluation body beside `arguments`,"
+  , "  // where /evaluation reads it. An invalid value is the service's to refuse."
+  , "  var presumptionKey = " <> jsonText presumptionKey <> ";"
+  , "  var presumptionSchema = " <> jsonText presumptionSchema <> ";"
+  , "  // A value that is not soft or hard is refused here too, in the service's own"
+  , "  // words, instead of being posted: the service's 400 for it is not JSON, which"
+  , "  // a tool could not read, so the agent would see a parse failure, not the reason."
+  , "  function presumptionRefusal(v) {"
+  , "    if (v === undefined || v === null) return null;"
+  , "    if (typeof v === 'string' && (v.toLowerCase() === 'soft' || v.toLowerCase() === 'hard')) return null;"
+  , "    return { content: [{ type: 'text', text: JSON.stringify({ error: 'presumption must be \"soft\" or \"hard\", not ' + JSON.stringify(v) }) }], isError: true };"
+  , "  }"
+  , ""
   , "  // Every tool below is annotated readOnlyHint: true. Rule evaluation is a"
   , "  // pure function call and the discovery/file tools only read, so agents"
   , "  // can call them without asking the user to confirm a side effect."
@@ -360,10 +380,13 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "    regTool({"
   , "      name: 'evaluate_rule',"
   , "      description: 'Tooling: Evaluate a legal rule with arguments. Use get_rule_schema first to understand required inputs. For DEONTIC rules, also pass startTime (number) and events (array of {party, action, at}).',"
-  , "      inputSchema: { type: 'object', properties: { deployment: { type: 'string', description: 'Deployment ID' }, function_name: { type: 'string', description: 'Function name' }, arguments: { type: 'object', description: 'Key-value pairs matching the function parameters' }, startTime: { type: 'number', description: 'Start time for DEONTIC contract simulation' }, events: { type: 'array', description: 'Events for DEONTIC contract simulation', items: { type: 'object' } } }, required: ['deployment', 'function_name', 'arguments'] },"
+  , "      inputSchema: { type: 'object', properties: { deployment: { type: 'string', description: 'Deployment ID' }, function_name: { type: 'string', description: 'Function name' }, arguments: { type: 'object', description: 'Key-value pairs matching the function parameters' }, presumption: presumptionSchema, startTime: { type: 'number', description: 'Start time for DEONTIC contract simulation' }, events: { type: 'array', description: 'Events for DEONTIC contract simulation', items: { type: 'object' } } }, required: ['deployment', 'function_name', 'arguments'] },"
   , "      annotations: { readOnlyHint: true },"
   , "      execute: function(args, ctx) {"
+  , "        var refusal = presumptionRefusal(args[presumptionKey]);"
+  , "        if (refusal) return refusal;"
   , "        var body = { arguments: args.arguments };"
+  , "        if (args[presumptionKey] !== undefined) body[presumptionKey] = args[presumptionKey];"
   , "        if (args.startTime !== undefined) body.startTime = args.startTime;"
   , "        if (args.events !== undefined) body.events = args.events;"
   , "        return doFetch(baseUrl + '/deployments/' + encodeURIComponent(args.deployment) + '/functions/' + encodeURIComponent(args.function_name) + '/evaluation', {"
@@ -457,14 +480,21 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "    return named.map(function(entry) {"
   , "      var fn = entry.fn;"
   , "      var sanitized = sanitizeParamsSchema(fn.parameters);"
+  , "      var flatSchema = Object.assign({}, sanitized.schema, { properties: Object.assign({}, sanitized.schema.properties, { presumption: presumptionSchema }) });"
   , "      return registerToolAsync({"
   , "        name: entry.toolName,"
   , "        description: 'L4 Rule: ' + (fn.description || fn.name) + ' [' + fn.deployment + '/' + fn.name + ']',"
-  , "        inputSchema: fn.isDeontic ? { type: 'object', properties: { arguments: sanitized.schema, startTime: { type: 'number', description: 'Start time for contract simulation' }, events: { type: 'array', description: 'Events for contract simulation (each: {party, action, at})', items: { type: 'object' } } }, required: ['arguments', 'startTime', 'events'] } : sanitized.schema,"
+  , "        inputSchema: fn.isDeontic ? { type: 'object', properties: { arguments: sanitized.schema, presumption: presumptionSchema, startTime: { type: 'number', description: 'Start time for contract simulation' }, events: { type: 'array', description: 'Events for contract simulation (each: {party, action, at})', items: { type: 'object' } } }, required: ['arguments', 'startTime', 'events'] } : flatSchema,"
   , "        annotations: { readOnlyHint: true },"
   , "        execute: function(args, ctx) {"
-  , "          var originalArgs = fn.isDeontic ? remapArgs(args.arguments || {}, sanitized.reverseMap) : remapArgs(args, sanitized.reverseMap);"
+  , "          var refusal = presumptionRefusal(args[presumptionKey]);"
+  , "          if (refusal) return refusal;"
+  , "          // the switch is never an input: take it out before the keys are remapped"
+  , "          var flatArgs = Object.assign({}, args);"
+  , "          delete flatArgs[presumptionKey];"
+  , "          var originalArgs = fn.isDeontic ? remapArgs(args.arguments || {}, sanitized.reverseMap) : remapArgs(flatArgs, sanitized.reverseMap);"
   , "          var body = { arguments: originalArgs };"
+  , "          if (args[presumptionKey] !== undefined) body[presumptionKey] = args[presumptionKey];"
   , "          if (fn.isDeontic) { body.startTime = args.startTime; body.events = args.events; }"
   , "          return doFetch(baseUrl + '/deployments/' + encodeURIComponent(fn.deployment) + '/functions/' + encodeURIComponent(fn.name) + '/evaluation', {"
   , "            method: 'POST',"
@@ -483,3 +513,7 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "  }"
   , "})();"
   ]
+
+-- | A JSON value as text, for a JavaScript literal.
+jsonText :: Aeson.ToJSON a => a -> Text
+jsonText = Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode
