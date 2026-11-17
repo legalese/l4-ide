@@ -635,7 +635,7 @@ Changed default (reported, not blocking): a caller that leaves it out now gets t
   fee, input grace days: 5 -> 7
 ```
 
-If the same update also breaks an integration and is rejected, the rejection lists the changed defaults too. The report covers only a default that is a plain value on both the old and the new version. It does not see a rate or threshold written in the body of a rule, and two numbers that differ only beyond about 16 digits count as equal. See [Manage rules in git and CI](version-control-for-rules.md#redeploy-when-a-merge-changes-a-live-api).
+If the same update also breaks an integration and is rejected, the rejection lists the changed defaults too, except for an input whose type changed: that is reported as the break, and its old and new defaults are not compared. The report covers only a default that is a plain value on both the old and the new version. It does not see a rate or threshold written in the body of a rule, and two numbers that differ only beyond about 16 digits count as equal. See [Manage rules in git and CI](version-control-for-rules.md#redeploy-when-a-merge-changes-a-live-api).
 
 ### Your own jl4-service
 
