@@ -921,8 +921,51 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params0 trac
   -- parameter left out, or a top-level @null@, stays on the direct path, and
   -- so do the ASSUMEs, which 'evaluateDirectAST' binds by 'rewriteModuleAssumes'.
   if requiresWrapperEvaluation (fullParams ++ assumeValues)
-    then evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption
+    then do
+      -- A top-level @null@ is refused wherever the request goes: a @{}@ or a
+      -- nested @null@ elsewhere in it must not hand it to a wrapper where a
+      -- BOOLEAN would be an assumed term ('refuseTopLevelNulls').
+      refuseTopLevelNulls presumption compiled inputMap
+      evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption
     else evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presumption
+
+-- | Refuse every top-level @null@ for an input that is not a @MAYBE@, in the
+-- words the direct path uses ('rootInputExpr': @Parameter 'p' is null, which
+-- means the value is not known: supply a value@), before a request that the
+-- wrapper path evaluates is built. T3 gives a @null@ the meaning "not known",
+-- which never takes a default, and that must not depend on what else the
+-- request holds: a @{}@ in another input, or a @null@ inside a record, sends the
+-- whole request to the wrapper, where a BOOLEAN @null@ is an assumed term that
+-- is refused only if the rule reads it, so the answer used to turn on the order
+-- of the operands (review round 1 of smucclaw/l4-ide#1021). A @{}@ IN PLACE of
+-- an input is not checked here: it is "uncertain" and the wrapper treats it as
+-- an assumed term, the documented early/late split.
+refuseTopLevelNulls
+  :: Monad m
+  => Presumption -> CompiledModule -> Map Text (Maybe FnLiteral) -> ExceptT EvaluatorError m ()
+refuseTopLevelNulls presumption compiled inputMap =
+  unless (null refusals) $ throwError $ InterpreterError (Text.intercalate "\n" refusals)
+  where
+    mi        = buildModuleInfo compiled.compiledAllDeclares
+    defaults  = inputDefaults compiled.compiledModule compiled.compiledDecide
+    binders   = sectionBinders compiled.compiledModule
+    nameOf r  = rawNameToText (rawName (getActual r))
+    inputs =
+      [ ("Parameter '" <> name <> "'", name, ty) | (name, ty) <- extractParamTypes compiled.compiledDecide ]
+      <> [ (label, nm, ty)
+         | (r, ty) <- extractAssumeParamResolveds compiled.compiledModule compiled.compiledDecide
+         , let nm = nameOf r
+               -- as the direct path labels them: a section GIVEN is a parameter
+               label | Map.member (getUnique r) binders = "Parameter '" <> nm <> "'"
+                     | otherwise = "ASSUME '" <> nm <> "'"
+         ]
+    refusals =
+      [ label <> " " <> nullRefusalText spelling hasDefault
+      | (label, name, ty) <- inputs
+      , Just Nothing <- [Map.lookup name inputMap]
+      , RefuseNull spelling hasDefault <-
+          [fillDecision (presumption == PresumeSoft) (isJust (stripMaybe (expandSyn mi ty))) (Map.lookup name defaults) (suppliedIn inputMap name)]
+      ]
 
 -- | How the wrapper path decodes one request, decided once for the three
 -- places that build a wrapper ('evaluateWithWrapper', the deontic one, and

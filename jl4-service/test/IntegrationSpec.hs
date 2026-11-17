@@ -733,6 +733,20 @@ spec = describe "integration" do
           , "GIVETH A BOOLEAN"
           , "DECIDE withDefault IF r AND q"
           , ""
+          , "@export an unread input beside the others"
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "      x IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE bothHoldX IF q AND p"
+          , ""
+          , "@export three inputs, or"
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "      r IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE or3 IF p OR q OR r"
+          , ""
           , "@export a MAYBE input"
           , "GIVEN m IS A MAYBE NUMBER"
           , "GIVETH A NUMBER"
@@ -790,6 +804,21 @@ spec = describe "integration" do
         answers <- onEverySurface baseUrl mgr "bothHold" ["p" Aeson..= Aeson.Null, "q" Aeson..= Aeson.Null]
         departures (refusedAs (refusal "p")) answers `shouldBe` []
         departures (refusedAs (refusal "q")) answers `shouldBe` []
+
+    -- A `{}` anywhere in a request sends the whole request down the wrapper path,
+    -- where a BOOLEAN null is an assumed term, refused only if the rule reads it.
+    -- A top-level null is "not known" whatever else the request holds (T3), so it
+    -- is refused before the request takes that path: an unrelated `{}` must not
+    -- bring back the order dependence (review round 1 of #1021).
+    forM_ [ ("x is {}", "bothHoldX", ["p" Aeson..= Aeson.Null, "q" Aeson..= False, "x" Aeson..= Aeson.object []], refusal "p")
+          , ("x is {}, and the null would have decided the other way", "bothHoldX", ["p" Aeson..= Aeson.Null, "q" Aeson..= True, "x" Aeson..= Aeson.object []], refusal "p")
+          , ("r is {}", "or3", ["p" Aeson..= Aeson.Null, "q" Aeson..= True, "r" Aeson..= Aeson.object []], refusal "p")
+          , ("x is false, with no {} anywhere (the control)", "bothHoldX", ["p" Aeson..= Aeson.Null, "q" Aeson..= True, "x" Aeson..= False], refusal "p")
+          ] \(what, fn, inputs, expected :: Text) ->
+      it ("refuses a top-level null where " <> what <> ", on /evaluation, on MCP and in a batch") do
+        withJanus \baseUrl mgr -> do
+          answers <- onEverySurface baseUrl mgr fn inputs
+          departures (refusedAs expected) answers `shouldBe` []
 
     -- case E: an input left out is refused as it always was, in other words
     -- than a null's
@@ -1188,9 +1217,10 @@ spec = describe "integration" do
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain])
         expectAnswer readWrapped (FnLitBool True) ["has capacity"]
 
-    -- T3's four cells, on the wrapper path: absent takes the default, null and
-    -- {} do not. (The direct path's null is the "never takes a default for
-    -- null" test above.)
+    -- T3's four cells, on a request that takes the wrapper path (a {} elsewhere):
+    -- absent takes the default, null and {} do not. A top-level null is refused
+    -- before the wrapper is built, as it is on the direct path; a {} in its place
+    -- is an assumed term, refused only because the rule reads it.
     it "keeps null apart from absent on the wrapper path" do
       withServiceFromSources "ty-null-wrap" [("capacity.l4", ruleDefaultJL4)] \baseUrl mgr -> do
         absent <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
@@ -1198,7 +1228,7 @@ spec = describe "integration" do
         expectAnswer absent (FnLitBool True) ["has capacity"]
         nulled <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
-        expectError nulled "has capacity (not supplied)"
+        expectError nulled "Parameter 'has capacity' is null, which means the value is not known, and that never takes the TYPICALLY default"
         uncertainCap <- evalFunction baseUrl mgr "ty-null-wrap" "may contract"
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= False, "has capacity" Aeson..= uncertain])
         expectError uncertainCap "has capacity (not supplied)"
@@ -1207,7 +1237,7 @@ spec = describe "integration" do
       withServiceFromSources "ty-null-sec" [("capacity.l4", sectionSecondJL4)] \baseUrl mgr -> do
         nulled <- evalFunction baseUrl mgr "ty-null-sec" "may contract"
           (args ["is adult" Aeson..= True, "unused flag" Aeson..= uncertain, "has capacity" Aeson..= Aeson.Null])
-        expectError nulled "has capacity (not supplied)"
+        expectError nulled "Parameter 'has capacity' is null, which means the value is not known, and that never takes the TYPICALLY default"
 
     it "with presumption hard, names every defaulted input left out" do
       withServiceFromSources "ty-hard-two" [("capacity.l4", twoDefaultsJL4)] \baseUrl mgr -> do
@@ -1296,15 +1326,17 @@ spec = describe "integration" do
         sent <- evalFunction baseUrl mgr "ty-schema-enum" "which" (args ["s" Aeson..= ("Red" :: Text)])
         expectAnswer sent (FnLitInt 5) ["k"]
 
-    -- Review m8 and m4, report item 5: on the wrapper path a non-BOOLEAN
-    -- input sent as null is refused by name (it used to be "Evaluation
-    -- produced unknown value"), and hard mode compiles a MAYBE default.
+    -- Review m8 and m4, report item 5: on a request that takes the wrapper path a
+    -- non-BOOLEAN input sent as null is refused by name (it used to be
+    -- "Evaluation produced unknown value"), and hard mode compiles a MAYBE
+    -- default. A top-level null is refused before the wrapper is built, in the
+    -- direct path's words; "Field 'k' ..." is the decoder's, for a null inside a record.
     it "refuses null by name on the wrapper path, and names every input under hard" do
       withServiceFromSources "ty-wrap-null" [("wp.l4", wrapperNullJL4)] \baseUrl mgr -> do
         direct <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["k" Aeson..= Aeson.Null])
         expectError direct "Parameter 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
         wrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain, "k" Aeson..= Aeson.Null])
-        expectError wrapped "Field 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
+        expectError wrapped "Parameter 'k' is null, which means the value is not known, and that never takes the TYPICALLY default"
         soft <- evalFunction baseUrl mgr "ty-wrap-null" "wp" (args ["u" Aeson..= uncertain])
         expectAnswer soft (FnLitInt 1050) ["m", "k", "flag"]
         hardWrapped <- evalFunction baseUrl mgr "ty-wrap-null" "wp"
@@ -1319,7 +1351,7 @@ spec = describe "integration" do
         expectError direct "Parameter 'shade' is null, which means the value is not known"
         wrapped <- evalFunction baseUrl mgr "ty-enum-null" "is red"
           (args ["shade" Aeson..= Aeson.Null, "second" Aeson..= ("Red" :: Text), "unused flag" Aeson..= uncertain])
-        expectError wrapped "Field 'shade' is null, which means the value is not known"
+        expectError wrapped "Parameter 'shade' is null, which means the value is not known"
         synonym <- evalFunction baseUrl mgr "ty-enum-null" "is red"
           (args ["shade" Aeson..= ("Red" :: Text), "second" Aeson..= Aeson.Null, "unused flag" Aeson..= False])
         expectAnswer synonym (FnLitBool True) []
