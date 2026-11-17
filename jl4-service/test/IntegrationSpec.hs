@@ -832,6 +832,86 @@ spec = describe "integration" do
                        | otherwise -> Just ("refused in other words: " <> msg)] ]
           `shouldBe` ([] :: [Text])
 
+  -- A section GIVEN that an export reads and another rule overrides with an inner
+  -- @WITH@ (smucclaw/l4-ide#1000). @l4 run@ answers 103 for `outer`, and a
+  -- request that left the input out did too, but one that SUPPLIED it was a 422,
+  -- "named application supplying an implicit input reached the evaluator
+  -- undischarged ... a compiler bug": the direct path bound a supplied section
+  -- GIVEN by replacing it with a value, and took it off its section's heading, so
+  -- nothing was discharged. /evaluation, a batch case and an MCP call all take
+  -- that path (WebMCP's evaluate tool posts to /evaluation), so each is asked.
+  describe "a supplied section GIVEN under an inner WITH, on every surface (smucclaw/l4-ide#1000)" do
+    let deployId = "with-override-surfaces"
+        source = Text.unlines
+          [ "§ `Rates`"
+          , "    GIVEN r IS A NUMBER TYPICALLY 3"
+          , ""
+          , "GIVETH A NUMBER"
+          , "inner MEANS r"
+          , ""
+          , "@export One read takes the rate, one overrides it"
+          , "GIVEN b IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "outer b MEANS b PLUS inner PLUS (inner WITH r IS 100)"
+          , ""
+          , "@export Every read overridden"
+          , "GIVEN b IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "overridden b MEANS b PLUS (inner WITH r IS 100) PLUS (inner WITH r IS 100) PLUS (inner WITH r IS 100)"
+          ]
+        withRates = withServiceFromSources deployId [("rates.l4", source)]
+        -- an answer, with the inputs it says it presumed
+        asAnswer :: SimpleResponse -> Either Text (Maybe FnLiteral, [Text])
+        asAnswer = \case
+          SimpleResponse r -> Right (Map.lookup "value" r.fnResult, r.presumed)
+          SimpleError e -> Left (prettyEvaluatorError e)
+        onEverySurface :: String -> Manager -> Text -> [Pair] -> IO [(Text, Either Text (Maybe FnLiteral, [Text]))]
+        onEverySurface baseUrl mgr fn inputs = do
+          rest <- do
+            resp <- evalFunction baseUrl mgr deployId fn (Aeson.object ["arguments" Aeson..= Aeson.object inputs])
+            pure $ maybe (Left (errorMessageOf (responseBody resp))) asAnswer (Aeson.decode (responseBody resp))
+          mcp <- do
+            req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+              [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int), "method" Aeson..= ("tools/call" :: Text)
+              , "params" Aeson..= Aeson.object [ "name" Aeson..= Text.replace " " "-" fn, "arguments" Aeson..= Aeson.object inputs ] ]
+            resp <- httpLbs req mgr
+            pure $ case mcpToolText (responseBody resp) of
+              Just (False, text) | Just r <- Aeson.decode (LBS.fromStrict (Text.Encoding.encodeUtf8 text)) -> asAnswer r
+              Just (_, text) -> Left text
+              Nothing -> Left "not a tool result"
+          batch <- do
+            req <- buildJsonPost
+              (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/functions/" <> Text.unpack (Text.replace " " "%20" fn) <> "/evaluation/batch")
+              (Aeson.object [ "outcomes" Aeson..= ([] :: [Text]), "cases" Aeson..= [Aeson.object ("@id" Aeson..= (1 :: Int) : inputs)] ])
+            resp <- httpLbs req mgr
+            pure $ case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+              Just b | statusCode' resp == 200, [c] <- b.cases -> case c.outcome of
+                CaseAnswered -> Right (Map.lookup "value" c.attributes, c.presumed)
+                CaseRefused reason -> Left ("refused: " <> reason)
+                CaseErrored msg -> Left msg
+                CaseLimited _ msg -> Left msg
+              _ -> Left (errorMessageOf (responseBody resp))
+          pure [("/evaluation", rest), ("MCP", mcp), ("batch", batch)]
+        departures :: Integer -> [Text] -> [(Text, Either Text (Maybe FnLiteral, [Text]))] -> [Text]
+        departures expected presumed answers =
+          [ surface <> ": " <> why
+          | (surface, answer) <- answers
+          , Just why <- [case answer of
+              Left msg -> Just ("refused: " <> msg)
+              Right got | got == (Just (FnLitInt expected), presumed) -> Nothing
+                        | otherwise -> Just ("answered " <> Text.pack (show got))] ]
+
+    forM_ [ ("leaves r out, so it takes the default", "outer", ["b" Aeson..= (0 :: Int)], 103, ["r"])
+          , ("supplies r as the default's own value", "outer", ["b" Aeson..= (0 :: Int), "r" Aeson..= (3 :: Int)], 103, [])
+          , ("supplies r as 5", "outer", ["b" Aeson..= (0 :: Int), "r" Aeson..= (5 :: Int)], 105, [])
+          , ("overrides every read and leaves r out", "overridden", ["b" Aeson..= (0 :: Int)], 300, [])
+          , ("overrides every read and supplies r", "overridden", ["b" Aeson..= (0 :: Int), "r" Aeson..= (5 :: Int)], 300, [])
+          ] \(what, fn, inputs, expected, presumed) ->
+      it ("a request that " <> what <> " answers " <> show expected <> " on /evaluation, on MCP and in a batch") do
+        withRates \baseUrl mgr -> do
+          answers <- onEverySurface baseUrl mgr fn inputs
+          departures expected presumed answers `shouldBe` []
+
   describe "MAYBE inputs on the wrapper path" do
     -- A {} on an unread input sends the request through the generated wrapper.
     let uncertain = Aeson.object []

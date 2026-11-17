@@ -1072,7 +1072,11 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
 -- 'Unique', and the module's own definitions are evaluated fresh per
 -- call, so all of them see the supplied value. A LET around the call (or
 -- around the inlined body) would not: a helper's closure captures the
--- module environment, where the ASSUME is still 'ValAssumed'.
+-- module environment, where the ASSUME is still 'ValAssumed'. A section
+-- GIVEN's elaboration is bound the same way but stays on its section's
+-- heading ('BindAssume'), so that discharge still makes every rule that reads
+-- it a function of it: an inner @WITH@ that overrides it for one call
+-- would otherwise reach the evaluator undischarged (smucclaw/l4-ide#1000).
 --
 -- An input the request left out that has a default takes it while
 -- presumption is soft (W3): a GIVEN, or a record field inside any input, by a
@@ -1133,7 +1137,12 @@ evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presum
   let bindAssume (MkAssume _ tySig appForm@(MkAppForm _ r _ _) _ _) =
         case Map.lookup (getUnique r) assumeExprs of
           Nothing        -> KeepAssume
-          Just valueExpr -> ReplaceAssume (Decide emptyAnno (MkDecide emptyAnno tySig appForm valueExpr))
+          Just valueExpr ->
+            let bound = Decide emptyAnno (MkDecide emptyAnno tySig appForm valueExpr)
+            -- a section GIVEN stays one, so that discharge still makes the rules
+            -- that read it functions of it and an inner WITH has something to
+            -- override (smucclaw/l4-ide#1000); a written ASSUME is a plain value
+            in if Map.member (getUnique r) binders then BindAssume bound else ReplaceAssume bound
       boundModule = addRootFills fills (rewriteModuleAssumes bindAssume compiled.compiledModule)
       rootFills = Map.fromList [ (getUnique f.fillRef, f.fillPresumed) | f <- fills ]
       callExpr = buildFunctionCallExpr (getFunctionResolved compiled.compiledDecide) argExprs

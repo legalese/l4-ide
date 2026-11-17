@@ -115,8 +115,8 @@ govern what counts as leaving a fact out:
   (smucclaw/l4-ide#1021).
 - **A `WITH` inside the rules still wins.** If a rule reads a section `GIVEN`
   and another rule overrides it for one calculation, as in
-  `outer MEANS inner PLUS (inner WITH r IS 100)`, a case sent to `l4 batch` gets
-  the answer `#EVAL` gives: the case's value, or the default, for the read that
+  `outer MEANS inner PLUS (inner WITH r IS 100)`, a case sent to `l4 batch`, and
+  a request sent to the decision service, gets the answer `#EVAL` gives: the case's value, or the default, for the read that
   was not overridden, and the override for the one that was
   (smucclaw/l4-ide#1000). A case that supplies a section fact which the rules
   never read, because every read of it is overridden, is accepted, and its value
