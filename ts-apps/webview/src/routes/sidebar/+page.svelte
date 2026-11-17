@@ -37,14 +37,23 @@
     type GetSidebarConnectionStatusResponse,
     type SidebarDeploymentInfo,
     type SidebarImportedFile,
-    type RemoteFunctionSchema,
-    takesDeonticEnvelope,
+    type DefaultChangeNotice,
     type AiChatAttachment,
     type Harness,
   } from 'jl4-client-rpc'
   import type { WebviewApi } from 'vscode-webview'
   import HarnessInstallMenu from '$lib/components/harness-install-menu.svelte'
   import ToolCard from '$lib/components/tool-card.svelte'
+  import DefaultNotices from '$lib/components/default-notices.svelte'
+  import DeployReportBanner from '$lib/components/deploy-report.svelte'
+  import {
+    clearReportFor,
+    reviewDeploy,
+    type BreakingChange,
+    type DeployReport,
+  } from '$lib/deploy-compat'
+  import { runDeploy } from '$lib/deploy-job'
+  import { anyDefaultInsideLists } from '$lib/param-defaults'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
   import DeploymentMetadata from '$lib/components/deployment-metadata.svelte'
   import DocsPanel from '$lib/components/docs-panel.svelte'
@@ -544,7 +553,15 @@
   // `mission` collects deployment-level metadata (description/mission),
   // then the actual deploy fires. `breaking-warning` interrupts before
   // the deploy if the new shape would break existing integrations.
-  type DeployView = 'preview' | 'deploy-form' | 'mission' | 'breaking-warning'
+  // `default-review` is shown when nothing breaks but an input's default
+  // changes: a non-blocking notice (ruling U2, option B, 2026-11-17), one
+  // click to go on.
+  type DeployView =
+    | 'preview'
+    | 'deploy-form'
+    | 'mission'
+    | 'breaking-warning'
+    | 'default-review'
   let deployView: DeployView = $state('preview')
   let deploymentIdInput: string = $state('')
   let deploymentIdError: string = $state('')
@@ -555,6 +572,12 @@
   // sees/edits the current value rather than silently blanking it.
   let deploymentMission: string = $state('')
   let breakingChanges: BreakingChange[] = $state([])
+  // Inputs whose default this redeploy changes, found before it is sent.
+  let defaultNotices: DefaultChangeNotice[] = $state([])
+  // What is said about them after the deploy job has finished (applied or
+  // rejected): the service's report, or, if it sent none, the list the review
+  // held. Shown until dismissed, or until the deployment is undeployed.
+  let deployReport: DeployReport | null = $state(null)
   let verifying: boolean = $state(false)
   let deploying: boolean = $state(false)
 
@@ -830,6 +853,7 @@
       if (deploying) return 'Deploying...'
       if (verifying) return 'Verifying...'
       if (deployView === 'breaking-warning') return 'Deploy Anyway'
+      if (deployView === 'default-review') return 'Deploy Now'
       if (deployView === 'mission') return 'Deploy Now'
       if (deployView === 'deploy-form') return 'Continue'
       // Tabs that aren't the Deploy tab surface the button as
@@ -897,6 +921,8 @@
     deploymentIdInput = deriveDeploymentId(activeFileName)
     deploymentIdError = ''
     breakingChanges = []
+    defaultNotices = []
+    deployReport = null
     deploymentMission = ''
     deployView = 'deploy-form'
   }
@@ -941,294 +967,6 @@
     deployView = 'preview'
   }
 
-  /** A segment of a breaking change message: either plain text or an identifier. */
-  type ChangeSegment = { text: string; ident?: boolean }
-  type BreakingChange = ChangeSegment[]
-
-  function ident(name: string): ChangeSegment {
-    const needsBackticks = /\s/.test(name)
-    return { text: needsBackticks ? `\`${name}\`` : name, ident: true }
-  }
-  function txt(text: string): ChangeSegment {
-    return { text }
-  }
-
-  /** A node in a parameter / return-value JSON schema (structurally a
-   *  superset of both `FunctionParameters` and `FunctionParameter`). */
-  type SchemaNode = {
-    type?: string
-    format?: string
-    enum?: string[]
-    properties?: Record<string, SchemaNode>
-    required?: string[]
-    items?: SchemaNode
-  }
-
-  /** Direction of compatibility: `in` = request parameter (caller sends),
-   *  `out` = return value (caller consumes). The two are mirror images —
-   *  e.g. a *new optional input* is safe, but a *removed output field* is
-   *  not (and vice-versa). */
-  type Dir = 'in' | 'out'
-
-  function subject(
-    fn: string,
-    kind: 'parameter' | 'return value',
-    loc: string
-  ): ChangeSegment[] {
-    return loc
-      ? [ident(fn), txt(` ${kind} `), ident(loc)]
-      : [ident(fn), txt(` ${kind}`)]
-  }
-
-  /**
-   * Recursively diff one schema node (old `remote` vs new `local`),
-   * appending a message for every backwards-incompatible change.
-   * Recurses through object `properties` and array `items` so nested
-   * record/list parameters are compared at every depth.
-   */
-  function diffNode(
-    fn: string,
-    kind: 'parameter' | 'return value',
-    loc: string,
-    remote: SchemaNode,
-    local: SchemaNode,
-    dir: Dir,
-    changes: BreakingChange[]
-  ) {
-    const here = () => subject(fn, kind, loc)
-
-    // Type change — once the type differs, deeper structural diffing
-    // would just be noise, so report and stop descending this branch.
-    if (remote.type && local.type && remote.type !== local.type) {
-      changes.push([
-        ...here(),
-        txt(' type changed from '),
-        ident(remote.type),
-        txt(' to '),
-        ident(local.type),
-      ])
-      return
-    }
-
-    // Format change (e.g. plain string → date) is a contract change.
-    const rFmt = remote.format ?? ''
-    const lFmt = local.format ?? ''
-    if (rFmt !== lFmt && (rFmt || lFmt)) {
-      changes.push([
-        ...here(),
-        txt(' format changed from '),
-        ident(rFmt || 'none'),
-        txt(' to '),
-        ident(lFmt || 'none'),
-      ])
-    }
-
-    // Enum (allowed value set).
-    const rEnum = remote.enum ?? []
-    const lEnum = local.enum ?? []
-    if (rEnum.length && lEnum.length) {
-      if (dir === 'in') {
-        const dropped = rEnum.filter((v) => !lEnum.includes(v))
-        if (dropped.length)
-          changes.push([
-            ...here(),
-            txt(' no longer accepts '),
-            ident(dropped.join(', ')),
-          ])
-      } else {
-        const added = lEnum.filter((v) => !rEnum.includes(v))
-        if (added.length)
-          changes.push([
-            ...here(),
-            txt(' may now return new values '),
-            ident(added.join(', ')),
-          ])
-      }
-    } else if (dir === 'in' && !rEnum.length && lEnum.length) {
-      // Previously any value, now restricted — rejects formerly-valid input.
-      changes.push([
-        ...here(),
-        txt(' is now restricted to a fixed set of values'),
-      ])
-    } else if (dir === 'out' && rEnum.length && !lEnum.length) {
-      // Previously a fixed set, now unbounded — exhaustive consumers break.
-      changes.push([
-        ...here(),
-        txt(' is no longer limited to a fixed set of values'),
-      ])
-    }
-
-    // Object properties.
-    if (remote.properties || local.properties) {
-      const rProps = remote.properties ?? {}
-      const lProps = local.properties ?? {}
-      const rReq = new Set(remote.required ?? [])
-      const lReq = new Set(local.required ?? [])
-
-      for (const key of Object.keys(rProps)) {
-        const childLoc = loc ? `${loc}.${key}` : key
-        if (!(key in lProps)) {
-          changes.push([
-            ...subject(fn, kind, childLoc),
-            dir === 'in' ? txt(' removed') : txt(' no longer returned'),
-          ])
-          continue
-        }
-        // Required-ness tightening.
-        if (dir === 'in' && lReq.has(key) && !rReq.has(key)) {
-          changes.push([
-            ...subject(fn, kind, childLoc),
-            txt(' is now required'),
-          ])
-        }
-        if (dir === 'out' && rReq.has(key) && !lReq.has(key)) {
-          changes.push([
-            ...subject(fn, kind, childLoc),
-            txt(' may now be absent from the result'),
-          ])
-        }
-        diffNode(fn, kind, childLoc, rProps[key], lProps[key], dir, changes)
-      }
-
-      for (const key of Object.keys(lProps)) {
-        if (key in rProps) continue
-        const childLoc = loc ? `${loc}.${key}` : key
-        // New optional input / new output field → compatible. Only a new
-        // *required* input breaks existing callers.
-        if (dir === 'in' && lReq.has(key)) {
-          changes.push([
-            ident(fn),
-            txt(' has a new required parameter '),
-            ident(childLoc),
-          ])
-        }
-      }
-    }
-
-    // Array element schema.
-    if (remote.items || local.items) {
-      diffNode(
-        fn,
-        kind,
-        loc ? `${loc}[]` : '[]',
-        remote.items ?? {},
-        local.items ?? {},
-        dir,
-        changes
-      )
-    }
-  }
-
-  /**
-   * Remove the DEONTIC simulation-envelope keys ('startTime', 'events')
-   * from a parameter schema's top-level properties/required. These keys
-   * are present in jl4-service's deployed schema but not in the LSP's
-   * local schema, so they would otherwise drive false-positive diffs.
-   * Returns the schema unchanged when not deontic or when no properties
-   * are present.
-   */
-  function stripDeonticEnvelope(
-    schema: SchemaNode | undefined,
-    isDeontic: boolean
-  ): SchemaNode | undefined {
-    if (!isDeontic || !schema || !schema.properties) return schema
-    const props = { ...schema.properties }
-    delete props.startTime
-    delete props.events
-    const required = (schema.required ?? []).filter(
-      (k) => k !== 'startTime' && k !== 'events'
-    )
-    return { ...schema, properties: props, required }
-  }
-
-  /**
-   * Detect backwards-incompatible changes between the local functions
-   * and the currently-deployed interface (fetched per-function from
-   * jl4-service). New functions and new optional parameters are safe;
-   * removals, renames, type/format changes, required-ness tightening and
-   * enum narrowing are breaking — checked recursively at every depth.
-   */
-  function detectBreakingChanges(
-    localFns: ExportedFunctionInfo[],
-    remoteFns: RemoteFunctionSchema[]
-  ): BreakingChange[] {
-    const changes: BreakingChange[] = []
-    const remoteByName = new Map(remoteFns.map((f) => [f.name, f]))
-
-    for (const local of localFns) {
-      const remote = remoteByName.get(local.name)
-      if (!remote) continue // new function — not breaking
-
-      // Return type (display name, e.g. BOOLEAN / DEONTIC OF P, A). A
-      // change here also covers deontic ⇄ non-deontic (different request
-      // envelope).
-      const returnTypeChanged =
-        !!remote.returnType &&
-        !!local.returnType &&
-        remote.returnType !== local.returnType
-      if (returnTypeChanged) {
-        changes.push([
-          ident(local.name),
-          txt(' return type changed from '),
-          ident(remote.returnType as string),
-          txt(' to '),
-          ident(local.returnType),
-        ])
-      }
-
-      // For DEONTIC functions, jl4-service injects 'startTime' and 'events'
-      // into the deployed parameter schema (the simulation envelope), but
-      // the LSP-derived local schema does not. Strip them on both sides
-      // before diffing so the envelope's presence/absence doesn't show up
-      // as a spurious "parameter removed" breaking change.
-      const isDeontic = takesDeonticEnvelope(remote, local)
-      const remoteParams = stripDeonticEnvelope(
-        remote.parameters as unknown as SchemaNode,
-        isDeontic
-      )
-      const localParams = stripDeonticEnvelope(
-        local.parameters as unknown as SchemaNode,
-        isDeontic
-      )
-
-      // Recursive parameter (input) diff.
-      diffNode(
-        local.name,
-        'parameter',
-        '',
-        remoteParams ?? {},
-        localParams ?? {},
-        'in',
-        changes
-      )
-
-      // Recursive return-value (output) diff — mirror image of inputs:
-      // a removed/renamed output field or a narrowed output type breaks
-      // existing consumers. Only meaningful when the return type itself
-      // is unchanged and both sides expose a structured schema.
-      if (!returnTypeChanged && remote.returnSchema && local.returnSchema) {
-        diffNode(
-          local.name,
-          'return value',
-          '',
-          remote.returnSchema as unknown as SchemaNode,
-          local.returnSchema as unknown as SchemaNode,
-          'out',
-          changes
-        )
-      }
-    }
-
-    // Removed functions.
-    for (const remote of remoteFns) {
-      if (!localFns.find((f) => f.name === remote.name)) {
-        changes.push([txt('rule '), ident(remote.name), txt(' removed')])
-      }
-    }
-
-    return changes
-  }
-
   async function continueDeploy() {
     if (!messenger) return
     const raw = deploymentIdInput.trim()
@@ -1244,6 +982,10 @@
     const id = sanitizeDeploymentId(raw)
     deploymentIdError = ''
     verifying = true
+    // Whatever an earlier review of another deployment left behind must not
+    // reach this one (Back does not run showDeployForm, which also resets it).
+    breakingChanges = []
+    defaultNotices = []
 
     // Check for breaking changes against the currently-deployed interface.
     try {
@@ -1253,14 +995,13 @@
         { deploymentId: id }
       )
       // `null` ⇒ deployment doesn't exist yet ⇒ first deploy, nothing to break.
-      if (remoteFns) {
-        const changes = detectBreakingChanges(functions, remoteFns)
-        if (changes.length > 0) {
-          breakingChanges = changes
-          verifying = false
-          deployView = 'breaking-warning'
-          return
-        }
+      const review = reviewDeploy(functions, remoteFns)
+      if (review.step !== 'deploy') {
+        breakingChanges = review.breaking
+        defaultNotices = review.notices
+        verifying = false
+        deployView = review.step
+        return
       }
     } catch {
       // Schema fetch failed — don't block the deploy on a detection error.
@@ -1277,81 +1018,51 @@
   }
 
   async function executeDeploy(deploymentId: string, overwrite = false) {
-    if (!messenger || !activeFileUri) return
-    deploying = true
-    try {
-      const result = await messenger.sendRequest(
-        RequestSidebarDeploy,
-        HOST_EXTENSION,
-        {
-          deploymentId,
-          fileUri: activeFileUri,
-          mission: deploymentMission.trim() || undefined,
-          overwrite,
-        }
-      )
-      if (result.success) {
-        const did = result.deploymentId ?? deploymentId
-        // No updateId ⇒ resolved immediately (content-hash dedupe).
-        // Otherwise poll the async deploy/update job to a terminal state.
-        let outcome: 'applied' | 'rejected' | 'pending' = result.updateId
-          ? 'pending'
-          : 'applied'
-        let error: string | undefined
-        if (result.updateId) {
-          for (let i = 0; i < 60; i++) {
-            await new Promise((r) => setTimeout(r, 1000))
-            try {
-              const resp = await messenger.sendRequest(
-                GetSidebarUpdateStatus,
-                HOST_EXTENSION,
-                { deploymentId: did, updateId: result.updateId }
-              )
-              error = resp.error
-              if (resp.status === 'applied') {
-                outcome = 'applied'
-                break
-              }
-              if (resp.status === 'rejected') {
-                outcome = 'rejected'
-                break
-              }
-            } catch {
-              // ignore transient errors
-            }
-          }
-        }
-        deploying = false
-        if (outcome === 'applied') {
-          // Switch to the deployments tab *before* awaiting the list
-          // fetch, otherwise the deploy panel repaints its Preview
-          // screen for the duration of the round-trip (visible flicker).
-          deployView = 'preview'
-          activeTab = 'deployments'
-          notify('info', `Deployed "${did}" successfully.`)
-          await fetchDeployments()
-        } else if (outcome === 'rejected') {
-          deployView = 'preview'
-          notify(
-            'error',
-            `Deploy "${did}" rejected: ${error ?? 'compilation error'}`
-          )
-        } else {
-          deployView = 'preview'
-          activeTab = 'deployments'
-          notify(
-            'warning',
-            `Deploying "${did}" — still in progress. Refresh later.`
-          )
-        }
-      } else {
-        notify('error', result.error ?? 'Deploy failed')
-        deploying = false
-      }
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'Deploy failed')
-      deploying = false
+    // One deploy at a time: a second would share `deploying`, the report and
+    // the review's notices with the first.
+    if (!messenger || !activeFileUri || deploying) return
+    const m = messenger
+    const fileUri = activeFileUri
+    // The rules as they are when the deploy is sent: a file switch while the job
+    // runs replaces `functions`, and the report must spell what was deployed.
+    const schemas = $state.snapshot(functions)
+    // The whole sequence (send once, poll the job, decide what to show, clear
+    // `deploying`) is runDeploy's, in deploy-job.ts, tested there with fakes;
+    // this supplies the two requests and does what it returns.
+    const run = await runDeploy(
+      {
+        sendDeploy: () =>
+          m.sendRequest(RequestSidebarDeploy, HOST_EXTENSION, {
+            deploymentId,
+            fileUri,
+            mission: deploymentMission.trim() || undefined,
+            overwrite,
+          }),
+        fetchStatus: (id, updateId) =>
+          m.sendRequest(GetSidebarUpdateStatus, HOST_EXTENSION, {
+            deploymentId: id,
+            updateId,
+          }),
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        isDeploying: () => deploying,
+        setDeploying: (value) => (deploying = value),
+      },
+      { deploymentId, reviewNotices: defaultNotices, schemas }
+    )
+    if (run.kind === 'busy') return
+    if (run.kind === 'failed') {
+      notify(run.toast.type, run.toast.message)
+      return
     }
+    const finish = run.finish
+    deployView = 'preview'
+    // Switch to the deployments tab *before* awaiting the list fetch,
+    // otherwise the deploy panel repaints its Preview screen for the
+    // duration of the round-trip (visible flicker).
+    if (finish.showDeployments) activeTab = 'deployments'
+    deployReport = finish.report
+    notify(finish.toast.type, finish.toast.message)
+    if (finish.refreshDeployments) await fetchDeployments()
   }
 
   async function fetchDeployments() {
@@ -1434,6 +1145,8 @@
       )
       if (result.success) {
         deployments = deployments.filter((d) => d.deploymentId !== deploymentId)
+        // A report about a deployment that no longer exists must not outlive it.
+        deployReport = clearReportFor(deployReport, deploymentId)
         notify('info', `Removed deployment "${deploymentId}".`)
       } else {
         notify('error', result.error ?? `Failed to remove "${deploymentId}"`)
@@ -1451,11 +1164,16 @@
   }
 
   function handleAction() {
+    // A deploy in progress owns the footer button and the shared state.
+    if (deploying) return
     if (connectionStatus.status === 'connected') {
       if (undeployConfirm) {
         handleUndeploy()
       } else if (deployView === 'breaking-warning') {
         deployAnyway()
+      } else if (deployView === 'default-review') {
+        // Guarded update, not the ungated overwrite: nothing was broken.
+        executeDeploy(sanitizeDeploymentId(deploymentIdInput))
       } else if (deployView === 'mission') {
         continueDeploy()
       } else if (deployView === 'deploy-form') {
@@ -2267,10 +1985,41 @@
                     </li>
                   {/each}
                 </ul>
+                {#if defaultNotices.length > 0}
+                  <p class="warning-desc">
+                    These defaults also change. That does not block the deploy:
+                  </p>
+                  <DefaultNotices items={defaultNotices} schemas={functions} />
+                {/if}
+              </div>
+            </div>
+          {:else if deployView === 'default-review'}
+            <!-- Changed defaults: a notice, not a warning. Nothing is
+                 incompatible, so the footer button just deploys. -->
+            <div class="default-review">
+              <button class="back-btn" onclick={() => (deployView = 'mission')}
+                >&larr; Back</button
+              >
+              <div class="review-header">Defaults change</div>
+              <div class="warning-body">
+                <p class="warning-desc">
+                  Deploying the following rules in <strong
+                    >{deploymentIdInput}</strong
+                  > changes the default of an input. A caller who leaves such an
+                  input out will now get the new value. This does not block the deploy.
+                </p>
+                <DefaultNotices items={defaultNotices} schemas={functions} />
+                <p class="warning-desc">Press Deploy Now to go ahead.</p>
               </div>
             </div>
           {:else}
             <!-- Normal preview -->
+            {#if deployReport?.outcome === 'rejected'}
+              <DeployReportBanner
+                report={deployReport}
+                onDismiss={() => (deployReport = null)}
+              />
+            {/if}
             {#if functions.length === 0}
               <div class="empty-state">
                 <p class="hint">
@@ -2305,6 +2054,13 @@
                       : undefined}
                   />
                 {/each}
+                {#if anyDefaultInsideLists(functions)}
+                  <p class="defaults-note">
+                    A default on a field inside a list is published, but the
+                    fields inside a list are not listed here, so it is not
+                    shown.
+                  </p>
+                {/if}
               </div>
             {/if}
           {/if}
@@ -2317,6 +2073,12 @@
             class:with-info-note={connectionStatus.connected &&
               !undeployConfirm}
           >
+            {#if deployReport && deployReport.outcome !== 'rejected' && connectionStatus.connected && !undeployConfirm}
+              <DeployReportBanner
+                report={deployReport}
+                onDismiss={() => (deployReport = null)}
+              />
+            {/if}
             {#if undeployConfirm}
               <div class="breaking-warning">
                 <button class="back-btn" onclick={cancelUndeploy}
@@ -2574,6 +2336,13 @@
                       {/if}
                     </div>
                   {/each}
+                  {#if anyDefaultInsideLists(deployments.flatMap((d) => d.functions))}
+                    <p class="defaults-note">
+                      A default on a field inside a list is published, but the
+                      fields inside a list are not listed here, so it is not
+                      shown.
+                    </p>
+                  {/if}
                 </div>
               {/if}
             {/if}
@@ -2884,6 +2653,13 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .defaults-note {
+    margin: 4px 0 0;
+    font-size: 0.85em;
+    line-height: 1.4;
+    color: var(--vscode-descriptionForeground);
   }
 
   .progress-bar {
@@ -3569,6 +3345,17 @@
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 0.92em;
     color: var(--l4-tok-identifier, #4ec9b0);
+  }
+
+  /* Changed defaults: informational, so no warning colour. */
+  .default-review {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .review-header {
+    font-weight: 600;
+    margin-bottom: 8px;
   }
 
   .deployments-tab-wrapper {

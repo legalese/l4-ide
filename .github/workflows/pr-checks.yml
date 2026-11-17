@@ -99,6 +99,10 @@ jobs:
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+              # The webview's deploy-review tests read this file; the service's
+              # own check reads it too (U2). An edit to the fixture alone must
+              # reach the job that runs them.
+              - 'jl4-service/test/fixtures/default-change-cases.json'
               # Hosts `prettier --check .`, which is the only gate on this
               # file's own formatting. See the note on the haskell filter.
               - '.github/workflows/pr-checks.yml'
