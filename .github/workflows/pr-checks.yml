@@ -76,6 +76,11 @@ jobs:
               # would otherwise reach no job and break the next PR instead.
               - 'jl4/examples/openfisca/**'
               - 'jl4/tests-cli/fixtures/**'
+              # The test cases for the redeploy notice on a changed default
+              # (U2 option B). jl4-service-test reads this file and the deploy
+              # sidebar's TypeScript test reads it too, and it is in no `.hs`
+              # glob, so an edit to it alone would otherwise reach neither job.
+              - 'jl4-service/test/fixtures/default-change-cases.json'
               - '.github/workflows/pr-checks.yml'
             typescript:
               - '**/*.ts'
