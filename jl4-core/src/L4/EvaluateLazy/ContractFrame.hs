@@ -378,6 +378,9 @@ data PartyEqual = PartyEqual
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
+  , presumedFrom :: Int
+    -- ^ where the reports of defaults stood before the event's party was
+    -- forced ('L4.EvaluateLazy.Machine.presumedMark')
   , seen :: Int
     -- ^ how many events this scan has taken from its stream: the position
     -- of the event under scrutiny, counted from the stream the obligation
@@ -393,6 +396,8 @@ data ScrutinizeParty = ScrutinizeParty
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
+  , presumedFrom :: Int
+    -- ^ as 'PartyEqual''s
   , seen :: Int
     -- ^ how many events this scan has taken from its stream: the position
     -- of the event under scrutiny, counted from the stream the obligation
@@ -437,6 +442,10 @@ data ActionDoesn'tmatch = ActionDoesn'tmatch
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, ev'relooked :: Bool
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
+  , partyForces :: (Int, Int)
+    -- ^ the reports of defaults made while the event's party was forced and
+    -- compared, taken back if the action does not match
+    -- ('L4.EvaluateLazy.Machine.retractPresumed')
   , seen :: Int
     -- ^ how many events this scan has taken from its stream: the position
     -- of the event under scrutiny, counted from the stream the obligation

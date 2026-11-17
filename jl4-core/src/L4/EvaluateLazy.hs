@@ -821,11 +821,13 @@ nfAux _d (ValAssumed n ty)           = pure (MkNF (ValAssumed n ty))
 nfAux _d (ValTerm t)                 = pure (MkNF (ValTerm t))
 nfAux _d (ValEnvironment env)        = pure (MkNF (ValEnvironment env))
 nfAux d (ValBreached r')             = do
-  -- Every reference inside the breach — the revealing event's party and
-  -- action, and each failure's party and BECAUSE — is forced to normal form;
-  -- the 'Traversable' instances of 'ReasonForBreach', 'Blame' and 'Failure'
-  -- reach all of them.
-  r <- traverse (evalAndNF d) r'
+  -- Every reference an answer prints — a missed deadline's revealing event
+  -- (its party and action), and each failure's party and BECAUSE — is forced
+  -- to normal form; the 'Traversable' instances of 'ReasonForBreach', 'Blame'
+  -- and 'Failure' reach all of them. The event that revealed each failure
+  -- ('revealedBy') is printed by nobody, and is left out, unforced
+  -- ('withoutRevealingEvents').
+  r <- traverse (evalAndNF d) (withoutRevealingEvents r')
   pure (MkNF (ValBreached r))
 nfAux d (ValROp env op l r) = do
   l' <- traverseAndNF d l

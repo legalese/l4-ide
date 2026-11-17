@@ -546,14 +546,32 @@ data EvalState =
     }
 
 -- | 'EvalState.presumed': the events in the order forced, and the ones seen,
--- so that a repeat is dropped without rescanning the list.
+-- so that a repeat is dropped without rescanning the list; and every report
+-- made, newest first, so that the reports of a stretch of the run can be
+-- taken back ('retractPresumed').
 data PresumedLog = MkPresumedLog
   { events :: !(DList Presumed)
   , seen   :: !(Set ([Text], PresumedOrigin))
+  , forces :: ![PresumedForce]
+  , count  :: !Int
+    -- ^ how many reports have been made: what 'presumedMark' reads
+  }
+
+-- | One report of a default: the n-th made in the directive, the cell that was
+-- forced (its address and pointer, as 'EvalState.presumable' keeps them), the
+-- default, whether it was the first report of it, the one
+-- 'PresumedLog.events' holds, and whether the comparison of an event's party
+-- forced it itself ('forcedByPartyComparison').
+data PresumedForce = MkPresumedForce
+  { forceNo    :: !Int
+  , cell       :: !(Int, IORef Thunk)
+  , presumedOf :: !Presumed
+  , told       :: !Bool
+  , direct     :: !Bool
   }
 
 emptyPresumedLog :: PresumedLog
-emptyPresumedLog = MkPresumedLog mempty Set.empty
+emptyPresumedLog = MkPresumedLog mempty Set.empty [] 0
 
 presumedEvents :: PresumedLog -> [Presumed]
 presumedEvents l = DList.toList l.events
@@ -626,15 +644,77 @@ presumedOwner = \ case
   q@QualifiedName{} -> prettyLayout q
   other             -> quoteIfNeeded (rawNameToText other)
 
--- | Report a default that took effect ('EvalState.presumed'), once.
-tellPresumed :: Presumed -> Eval ()
-tellPresumed p = do
+-- | Report a default that took effect ('EvalState.presumed'), once, forced in
+-- the cell given ('notePresumedForce').
+tellPresumed :: (Int, IORef Thunk) -> Presumed -> Eval ()
+tellPresumed fromCell p = do
+  byComparison <- forcedByPartyComparison
   psRef <- asks (.presumed)
   liftIO $ modifyIORef' psRef \ l ->
     let key = (p.path, p.origin)
-    in if key `Set.member` l.seen
-         then l
-         else MkPresumedLog (l.events `DList.snoc` p) (Set.insert key l.seen)
+        isFirst = key `Set.notMember` l.seen
+    in MkPresumedLog
+         (if isFirst then l.events `DList.snoc` p else l.events)
+         (Set.insert key l.seen)
+         (MkPresumedForce l.count fromCell p isFirst byComparison : l.forces)
+         (l.count + 1)
+
+-- | Whether a default being forced now is forced by the comparison of an
+-- event's party with the obligation's itself ('Contract8'), and not by a
+-- computation the comparison started. A computation keeps its value
+-- ('UpdateThunk'), so a default it read is not read again when that value is
+-- used again, and taking its report back could lose it ('retractPresumed').
+forcedByPartyComparison :: Eval Bool
+forcedByPartyComparison = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  pure $ case find (\ f -> isComputation f || isComparison f) stack.frames of
+    Just f  -> isComparison f
+    Nothing -> False
+  where
+    isComputation = \ case
+      UpdateThunk{} -> True
+      _             -> False
+    isComparison = \ case
+      ContractFrame (Contract8 _) -> True
+      _                           -> False
+
+-- | Where the reports of the directive have got to, for 'retractPresumed'.
+presumedMark :: Eval Int
+presumedMark = (.count) <$> readEvalRef (.presumed)
+
+-- | Take back the reports of defaults forced in a cell between two marks
+-- ('presumedMark'), when what they were forced for turned out not to rest on
+-- them: the party of an event that was compared with the obligation's, when
+-- the event's action then does not match (card O4, review F7, 2026-11-18).
+-- The event is skipped whatever the party is, since a party that differs
+-- skips it too, so the answer does not rest on the party's defaults.
+--
+-- Only a default the comparison forced itself is taken back. One that a
+-- computation read (a field of the obligation's party built from an input's
+-- field, say) stays listed: the computation keeps its value, so nothing would
+-- read the default again when the answer uses that value.
+--
+-- Each cell is a default again, reported if anything forces it later (the
+-- answer printing that party, a later event scan comparing it). A default
+-- reported before the first mark, or reported again after the second, stays
+-- listed.
+retractPresumed :: (Int, Int) -> Eval ()
+retractPresumed (from, upto) = do
+  psRef <- asks (.presumed)
+  l <- liftIO (readIORef psRef)
+  let inStretch f = f.direct && f.forceNo >= from && f.forceNo < upto
+      (back, kept) = partition inStretch l.forces
+      keyOf f = (f.presumedOf.path, f.presumedOf.origin)
+      untold = Set.fromList [ keyOf f | f <- back, f.told ] `Set.difference` Set.fromList (map keyOf kept)
+  unless (null back) do
+    liftIO $ writeIORef psRef $ MkPresumedLog
+      (DList.fromList [ p | p <- DList.toList l.events, (p.path, p.origin) `Set.notMember` untold ])
+      (l.seen `Set.difference` untold)
+      kept
+      l.count
+    pRef <- asks (.presumable)
+    liftIO $ modifyIORef' pRef \ m ->
+      foldl' (\ acc f -> let (n, ptr) = f.cell in IntMap.insert n (ptr, f.presumedOf) acc) m back
 
 -- | Mark a reference as a default, so that forcing it reports one.
 registerPresumable :: Reference -> Presumed -> Eval ()
@@ -665,7 +745,7 @@ notePresumedForce rf = do
     for_ (IntMap.lookup (addressNumber rf.address) m) \ (ptr, p) ->
       when (ptr == rf.pointer) do
         liftIO $ modifyIORef' pRef (IntMap.delete (addressNumber rf.address))
-        tellPresumed p
+        tellPresumed (addressNumber rf.address, ptr) p
 
 -- | A note the run reports beside a directive's value ('EvalState.notes').
 -- Plain text: rendered where it is raised, from what the machine has in
@@ -3405,6 +3485,9 @@ backwardContractFrame val = \ case
         maybeEvaluate env party
   Contract6 PartyWHNF {..} -> do
     -- P2b: the party is forced now; every later frame's key knows the bearer.
+    -- The defaults the event's party is about to report are marked, to be
+    -- taken back if its action then does not match ('retractPresumed').
+    presumedFrom <- presumedMark
     pushCFrame (Contract7 PartyEqual {party = val, norm = bearing val norm, ..})
     continueRef ev'party
   Contract7 PartyEqual {..} -> do
@@ -3418,7 +3501,8 @@ backwardContractFrame val = \ case
     named <- naming party norm
     case val of
       ValBool True -> do
-        pushCFrame (Contract11 (ActionDoesn'tmatch {norm = named, ..}))
+        upto <- presumedMark
+        pushCFrame (Contract11 (ActionDoesn'tmatch {norm = named, partyForces = (presumedFrom, upto), ..}))
         pushCFrame (Contract9 ScrutinizeEnvironment {norm = named, ..})
         continuePattern ev'act env act.action
       ValBool False -> do
@@ -5350,7 +5434,10 @@ patternMatchFailure = withPoppedFrame $ \ case
     continueBranches clauses scrutinee env branches
   -- we have unwound the frame that would reenter when scrutinizing the event
   Just (ContractFrame (Contract11 ActionDoesn'tmatch {..})) -> do
-    -- P2b: the action pattern did not match; next event.
+    -- P2b: the action pattern did not match; next event. The event is
+    -- skipped whatever its party is, so the defaults comparing the party
+    -- forced are taken back (card O4, review F7).
+    retractPresumed partyForces
     whenDeonticLog \ l -> do
       stamp <- case time of
         ValNumber t -> pure t

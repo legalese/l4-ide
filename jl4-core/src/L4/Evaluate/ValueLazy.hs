@@ -295,6 +295,26 @@ data ReasonForBreach a
   deriving stock (Generic, Show, Functor, Foldable, Traversable)
   deriving anyclass NFData
 
+-- | A breach without the events that revealed its failures ('revealedBy').
+--
+-- No answer prints them: the JSON of a breach, the service's, and the printer
+-- name a failure's party, act, reason and instants, and a 'DeadlineMissed'
+-- keeps the event that revealed its anchor in fields of its own, which they do
+-- print. So the normal form of a breach leaves them out ('L4.EvaluateLazy.nfAux'):
+-- forcing them forced the party and action of an event the answer does not
+-- carry (the event behind a @LEST BREACH@, say), and a default taken there was
+-- listed as one the answer rests on (card O4, review F2, 2026-11-18).
+withoutRevealingEvents :: ReasonForBreach a -> ReasonForBreach a
+withoutRevealingEvents = \ case
+  DeadlineMissed p act stamp b -> DeadlineMissed p act stamp (blame b)
+  ExplicitBreach b             -> ExplicitBreach (blame b)
+  where
+    blame (Blame bs a afters ds) = Blame (map failure bs) (failure a) (map failure afters) ds
+    failure = \ case
+      MissedDeadline p act deadline t -> MissedDeadline p act deadline (timing t)
+      DeclaredBreach p reason mt      -> DeclaredBreach p reason (fmap timing mt)
+    timing (Timing effective observed _) = Timing effective observed Nothing
+
 -- | The blame of a breach, whichever kind it is anchored at.
 breachBlame :: ReasonForBreach a -> Blame a
 breachBlame = \ case
