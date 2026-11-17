@@ -20,3 +20,6 @@ export * from './render-l4-value.js'
 
 // What the chat shows for an assistant message's blocks
 export * from './assistant-blocks.js'
+
+// When a rule call's row asks for the schema it renders L4 with
+export * from './rule-render-meta.js'
