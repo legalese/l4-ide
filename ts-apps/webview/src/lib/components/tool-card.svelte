@@ -5,6 +5,7 @@
     anyInputHasDefault,
     inputStatus,
   } from '$lib/param-defaults'
+  import { publishedInputSchema } from '$lib/published-schema'
 
   let {
     func,
@@ -51,10 +52,13 @@
    *  is worth a line. */
   let showsDefault = $derived(anyInputHasDefault([func]))
 
-  /** The inputs' schema exactly as this card was given it: what the language
-   *  server (before deploy) or the service (after) published, and so what an
-   *  OpenAPI, MCP or WebMCP client is shown. Never composed here. */
-  let publishedSchema = $derived(JSON.stringify(func.parameters, null, 2))
+  /** The inputs' schema as this card was given it, less the keys only the
+   *  language server and the service use (alias, propertyOrder, x-l4-type,
+   *  x-sanitized-name), which the OpenAPI document and the MCP tool list drop:
+   *  what a client is shown. Never composed here. */
+  let publishedSchema = $derived(
+    JSON.stringify(publishedInputSchema(func.parameters), null, 2)
+  )
 
   function hasNestedProps(param: FunctionParameter): boolean {
     return (
@@ -209,8 +213,10 @@
         <details class="callers-see">
           <summary>What callers see</summary>
           <p class="callers-see-note">
-            The schema of this rule's inputs, as published to OpenAPI and MCP
-            clients.{#if func.isDeontic}
+            The schema of this rule's inputs, as the service describes them to
+            callers, less the keys that are only for L4's own tools. MCP and
+            WebMCP spell input names without spaces (for example start year
+            becomes start-year).{#if func.isDeontic}
               A DEONTIC rule also takes <code>startTime</code> and
               <code>events</code>, which the service adds.{/if}
           </p>

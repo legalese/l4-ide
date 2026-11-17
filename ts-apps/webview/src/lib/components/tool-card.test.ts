@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { render } from 'svelte/server'
 import type { ExportedFunctionInfo } from 'jl4-client-rpc'
@@ -202,5 +203,58 @@ describe('ToolCard: What callers see', () => {
     expect(t).toContain('startTime')
     expect(t).toContain('events')
     expect(text(fn(smaller))).not.toContain('startTime')
+  })
+})
+
+describe('ToolCard: What callers see, for a rule with a record, an enum and a spaced name', () => {
+  // Recorded from a live service: see __fixtures__/starter-rule.json.
+  const { starter } = JSON.parse(
+    readFileSync(
+      new URL('../__fixtures__/starter-rule.json', import.meta.url),
+      'utf8'
+    )
+  )
+  const func = fn(starter.metadataParameters, { name: 'describe' })
+  const shown = () => {
+    const pre = html(func).match(/<pre[^>]*>([\s\S]*?)<\/pre>/)![1]!
+    return JSON.parse(
+      pre
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+    )
+  }
+
+  it('shows exactly what the OpenAPI document publishes for the inputs', () => {
+    expect(shown()).toEqual(starter.openApiArguments)
+  })
+
+  it('does not show the keys no client receives', () => {
+    const raw = JSON.stringify(shown())
+    for (const key of [
+      'x-l4-type',
+      'propertyOrder',
+      'x-sanitized-name',
+      'alias',
+    ]) {
+      expect(raw).not.toContain(key)
+    }
+  })
+
+  it('says the schema is as the service describes it to callers, not that it is the OpenAPI document', () => {
+    const t = text(func).replace(/\s+/g, ' ')
+    expect(t).toContain('as the service describes them to callers')
+    expect(t).not.toContain('OpenAPI document publishes')
+  })
+
+  it('says MCP and WebMCP spell input names without spaces', () => {
+    expect(text(func).replace(/\s+/g, ' ')).toContain(
+      'MCP and WebMCP spell input names without spaces (for example start year becomes start-year).'
+    )
+  })
+
+  it('keeps the input names as the OpenAPI document spells them', () => {
+    expect(JSON.stringify(shown())).toContain('"start year"')
   })
 })
