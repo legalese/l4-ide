@@ -34,6 +34,8 @@ jobs:
               - 'cabal.project'
               - 'cabal.project.local'
               - 'jl4-core/libraries/**'
+              # It checks the jl4-service binary this job builds.
+              - 'etc/check-glibc.sh'
             typescript:
               - '**/*.ts'
               - '**/*.tsx'
@@ -254,6 +256,12 @@ jobs:
           strip bin/linux-x64/jl4-service || true
           sha256sum bin/linux-x64/jl4-service | awk '{print $1}' > bin/linux-x64/jl4-service.sha256
           ls -lh bin/linux-x64/
+
+      # A dependency that uses a newer glibc symbol shows up here, before a
+      # release would ship a binary production cannot start.
+      - name: Check the glibc jl4-service needs
+        if: needs.changes.outputs.haskell == 'true'
+        run: bash etc/check-glibc.sh bin/linux-x64/jl4-service
 
       - name: Upload jl4-service artifact
         if: needs.changes.outputs.haskell == 'true'
