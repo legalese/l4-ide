@@ -10,7 +10,9 @@ It is used wherever the name is left out:
   value for it;
 - **on a rule's own `GIVEN`**, by a call that names its inputs with
   [`WITH`](../functions/WITH.md) and leaves this one out;
-- **on a record field**, by a construction that leaves the field out (a
+- **on a record field**, by a construction that leaves the field out (to
+  construct a record is to write it out with `WITH`, as
+  [below](#on-a-record-field-leaving-a-field-out-of-a-construction) does; a
   **record** is a bundle of named facts, such as an invoice with an amount and a
   number of days overdue; see [`DECLARE`](DECLARE.md)); and
 - **when a case reaches `l4 batch` or the decision service** and leaves the
@@ -46,6 +48,7 @@ name IS A Type TYPICALLY literal
 
 A **literal** is a fixed value written out: a number, a piece of text, `TRUE`, `FALSE`, `NOTHING`, or a constructor of an enumeration.
 An **enumeration** is a type that is a choice from a list of names, as in `DECLARE Colour IS ONE OF Red, Green`, and each name in the list (`Red`) is a **constructor** of it.
+This page and [`WITHAL`](WITHAL.md) also call a constructor an **alternative** when they speak of the data it carries.
 Nothing else is a default: see [What the default must be](#what-the-default-must-be).
 
 A rule is told some facts about the case in front of it (its **"inputs"**, the
@@ -122,11 +125,9 @@ scaled MEANS rate TIMES base
   only if every input before it has been given, so a gap cannot be left.
 - **An input with no default is still asked for.** `scaled WITH rate IS 1` is
   told it has not supplied `base`, and a name the rule does not have is still an
-  error, so a misspelling of `rate` is not read as a default taken. The one
-  misspelling this cannot catch is a name that is itself something else the rule
-  reads, a section `GIVEN` that the call may override (`ratee`, where the rule
-  reads a section `GIVEN` of that name). That is a valid override, and `rate` then
-  takes its default.
+  error, so a misspelling of `rate` is not read as a default taken.
+  The one misspelling this cannot catch is one that spells the name of a section `GIVEN` the rule reads (`ratee`, below).
+  A call may override a section `GIVEN` by its name, so that name is a valid override and not a misspelling, and `rate` then takes its default.
   Here the rule reads a section `GIVEN ratee IS A NUMBER TYPICALLY 100`, and `scaled MEANS rate TIMES base PLUS ratee`.
   An author who means `rate IS 2` and types `ratee IS 2` gets 32 and not 120, and `l4 check` says nothing:
 
@@ -248,11 +249,10 @@ It is printed only together with the first: with `scaled WITH base IS 10, rate I
 A name that only one rule has does not settle the choice either.
 If the second `scaled` took `width` and `height` and had no `base`, the call `scaled WITH base IS 10` would still be ambiguous: it does not say which rule it means.
 
-One more limit, which keeps the check fast.
+One more limit.
 A value that itself contains a call that names its inputs is not compared with the other rule's types, and a record built with `WITH` is such a call.
 So `scaled WITH base IS (double WITH x IS 5)` stays ambiguous, although the number it gives would settle the choice.
-A value that is a positional call (`double 5`) is compared, and so is a name: give the value a name with `WHERE` first, and write that name in the call.
-Without this limit the time to check calls inside calls grew several-fold with every level.
+A value that is a positional call (`double 5`) is compared, and so is a name: give the value a name with [`WHERE`](../functions/LET.md#where) first, and write that name in the call.
 
 There are two ways to settle a call that is still ambiguous.
 Write the input that has the default (`scaled WITH base IS 10, rate IS 3`): the call is then complete as written for the first rule and not for the second, so the first is the rule meant (rule 1 above).
@@ -330,13 +330,13 @@ Two limits are particular to alternatives:
 
 Someone reading rendered text never sees the source.
 `` `scaled` where `base` is 10 and `rate` is 3 `` would tell that reader that the author stipulated the 3, when the author wrote only `scaled WITH base IS 10` and the 3 is the default declared on `rate`.
-So a value the checker added is marked as one:
+So a value L4 filled in is marked as one:
 
 - **In a sentence**, `l4 nlg` and `l4 render` print `` `rate` is 3 by default ``. A rule whose whole body is a call to another rule reads as a sentence.
   `l4 nlg` prints one for a directive such as `#ASSERT (scaled WITH base IS 10) EQUALS 30`.
   `l4 render` leaves a rule with no inputs out of its document when only a `#EVAL` or `#ASSERT` refers to it, so for such a rule add `--include-unused` to see the sentence.
 - **In a list of fields**, `l4 render` prints `- colour — Red (by default)`, for a `colour` of the `Colour` enumeration above whose default is `Red`. A record construction prints this way.
-- **In a table**, `l4 render` prints `Red (by default)` in each cell the checker filled in, and nothing in the cells the author wrote. A column that holds both is marked cell by cell.
+- **In a table**, `l4 render` prints `Red (by default)` in each cell L4 filled in, and nothing in the cells the author wrote. A column that holds both is marked cell by cell.
 - **In the document JSON** (`l4 render --format json`), the mark is part of the text of the value, `"3 (by default)"`. No key was added, so the shape of the document is the same.
 
 A value you wrote is never marked, whatever it equals: `scaled WITH base IS 10, rate IS 3` prints `` `rate` is 3 ``.
@@ -344,7 +344,7 @@ A value you wrote is never marked, whatever it equals: `scaled WITH base IS 10, 
 What the mark does and does not tell you:
 
 - **It covers a default added at a call that names its inputs, or at a construction.** Those are the two places where a call or a construction that the author wrote gets a value the author did not write.
-- **It does not cover a default taken at the root of a section `GIVEN`.** With `surcharge TYPICALLY 2` on a section `GIVEN`, `` `tax on` WITH amount IS 10 `` prints as `` `tax on` where `amount` is 10 is equal to 12 ``, and the 2 is not in the text. Written at the call, `surcharge IS 7` is printed.
+- **It does not cover a default that comes from the `TYPICALLY` of a section `GIVEN`.** With `surcharge TYPICALLY 2` on a section `GIVEN`, `` `tax on` WITH amount IS 10 `` prints as `` `tax on` where `amount` is 10 is equal to 12 ``, and the 2 is not in the text. Written at the call, `surcharge IS 7` is printed.
 - **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, a field default in a record the rules decode with `JSONDECODE`, and, whether `presumption` is `soft` or `hard`, one added at a call or a construction inside the rules. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
 - **The words are English in `l4 render`, whatever `--lang` says.** `l4 nlg --lang he` prints `כברירת מחדל` from a draft entry in its table of Hebrew phrases, which no Hebrew-speaking lawyer has reviewed, and `l4 render` does not use that table for these words ([the `@nlg` page](../syntax/nlg.md#a-value-the-checker-supplied) says so).
 
@@ -461,10 +461,12 @@ These rules govern what counts as leaving a fact out:
   `l4 batch --presumption hard`, or `"presumption": "hard"` in a service request, uses no default for a fact the case leaves out.
   That fact is missing, and the case is refused, naming it.
   This holds even for a fact the rules would never have read: for an ordinary rule, `l4 batch`, a request to `/evaluation` and a call over MCP all refuse it.
+  For a rule that describes obligations, an input of the rule that its text reads is refused too: a request to `/evaluation` is answered with HTTP status 422 and a message that names the input, such as `Missing required field 'days to comply' in JSON object (it has a TYPICALLY default, but presumption is hard, so the default is not used)`, where under `soft` the same request is answered and `presumed` lists `days to comply`.
+  Whether `hard` also refuses an input that such a rule never reads is not established.
+  An answer does not say which setting it was computed under: with nothing left out, `presumed` is `[]` under `soft` and under `hard`, and what `hard` changes is a case or request that does leave a fact out.
   The default is `soft`.
   An AI agent calling a rule through MCP, or through the WebMCP script (the script that gives the AI assistant in a visitor's browser these tools; see [Embed rules in a website](../../tutorials/legalese-cloud/webmcp-embed.md)), sets it the same way, with a `presumption` argument that is `"soft"` or `"hard"`.
-  This service's MCP tools advertise `presumption` and read it; a hosted server placed in front of this service may not list it until that server is updated, so look at the tool list.
-  [Connect an AI agent](../../tutorials/legalese-cloud/ai-agents.md#telling-a-rule-not-to-assume-anything) says where the argument goes for each kind of rule and what a server that does not know it does.
+  [Connect an AI agent](../../tutorials/legalese-cloud/ai-agents.md#telling-a-rule-not-to-assume-anything) says which servers list the argument, where it goes for each kind of rule, and what a server that does not know it does.
   The two values are accepted in any capitalisation, as in a service request; any other value is refused, naming it.
   Because the name is reserved, an ordinary rule with a fact called `presumption` cannot be offered as an MCP or WebMCP tool, and the server says so; the same rule still runs through a service request, where the facts are inside `arguments`.
   A rule that describes obligations is still offered, because its facts are inside `arguments` and the switch is beside them.
@@ -482,13 +484,7 @@ One gap is known and not closed by this page's behaviour:
 The schema of a published rule carries each default as the JSON Schema `default` keyword, and a defaulted fact is not listed under `required`, the list of facts a caller must supply.
 A `TYPICALLY` on an `ASSUME` is not used here either, and is not published, in the service's schema or in the query plan's.
 The one record that does not follow this is an event's party or action, in a request to a rule that describes obligations.
-That record is part of the request, so it never takes a default.
-The schema lists each of its fields under `required` and gives none a `default`,
-and a request that leaves a field out is refused.
-A record inside it is written under its constructor's name.
-The typed schema of an event is published in the function document (the document the service returns for one rule at `GET .../functions/{fn}`, with its description, inputs and result) and in `openapi.json` under each batch case's `events`.
-The [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action)
-says how, and what the service cannot yet read there.
+It is part of the request, so it never takes a default; [An event's party and action record](#an-events-party-and-action-record) says what the schema lists for it and how a request must write it.
 
 A default is a fixed value written out: it does not name another `GIVEN`, and that is a decision and not a gap (see [When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts)).
 
@@ -505,7 +501,7 @@ An entry has one of three shapes:
 | `JSONDECODE Pricing.Settings: limit` | A record that the rules read out of JSON text with `JSONDECODE` took a default for a field the text left out. The text may be written in the rules or be text the case sent, so this can be a fact the case left out. | `soft` and `hard`                            |
 
 A reader who wants only the facts a case left out can skip the entries that begin `WITH`.
-The entries that begin `JSONDECODE` are not safe to skip.
+The entries that begin `JSONDECODE` are not safe to skip, because the JSON text may be the case's own, so one can be a fact the case left out (the last row above).
 An entry is listed only if the answer actually used the default.
 
 Here is one rule that produces all three.
@@ -569,6 +565,7 @@ What it means depends on where it is sent:
 | A fact that is a `MAYBE`                        | `NOTHING`, and the case succeeds.                                                                                         | `NOTHING`, as a `null` is, whether `presumption` is `soft` or `hard`, and nothing is listed under `presumed`. A `MAYBE` fact that is left out is different: it is `NOTHING` and listed under `soft`, and refused under `hard`. |
 | JSON text that the rules read with `JSONDECODE` | It supplies nothing, so a field that has a default takes it.                                                              | The same: it supplies nothing, so a field that has a default takes it.                                                                                                                                                         |
 
+Because a request with a `{}` is refused only when the answer depends on that fact, the order of the operands can matter: with a `BOOLEAN` fact `p` sent as `{}`, `p AND q` answers `false` when `q` is `false` and is refused, naming `p`, when `q` is `true`.
 The `JSONDECODE` row is the same in both because it happens inside the rules, after the case has been read.
 The service column is described in the [service documentation](../../../jl4-service/README.md#missing-and-uncertain-inputs).
 
@@ -582,9 +579,10 @@ A rule describes obligations when its result type is `DEONTIC`, and the Deploy t
 When the party or the action is a record, **every field of it has to be written, whether or not the field has a default**, and so does every field of a record nested inside it.
 The record is part of the request, so it never takes a default, and the service answers one that leaves a field out with an error that names the field.
 The answer is the same in `soft` and in `hard`.
-The schema the service publishes says the same: it lists every field of an event's party and action as required, with no default, so a client that writes every field the schema lists does not meet this error.
-The service cannot yet read every type of field that the schema describes, and the [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action) says which.
-The typed schema of an event is published in the function document (`GET .../functions/{fn}`) and in `openapi.json` under each batch case's `events`.
+The schema the service publishes for an event says the same: it lists every field of an event's party and action as required, with no default, so a client that writes every field that schema lists leaves none out.
+That typed schema is published in the function document (the document the service returns for one rule at `GET .../functions/{fn}`, with its description, inputs and result) and in `openapi.json` under each batch case's `events`.
+The top-level `events` of the `/evaluation` request body in `openapi.json` is untyped (its items are `{"type": "object"}`), so a client that builds a request from `openapi.json` alone has no description of an event.
+The service cannot yet read every type of field that the typed schema describes, and the [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action) says which.
 
 A file and the service differ here, on purpose.
 In a file, a `#TRACE` event may leave a defaulted field out, and the event takes the default.
@@ -611,7 +609,9 @@ The rule says that the driver Alice must wear a seatbelt within 10; `HENCE FULFI
 `#TRACE` runs the rule from time 0 against the events listed under it, here one: at time 0, Alice wears a seatbelt.
 `l4 run` gives `FULFILLED`: the event is that of a driver whose licence is `"full"`, so it meets the obligation of `Driver WITH name IS "Alice", licence IS "full"` without a word about the default.
 The decision service takes the same event from a request and answers with HTTP status 422, the same in `soft` and in `hard`.
-The body is:
+A case of a batch request that carries the same event is an `@error` with the same message, in `soft` and in `hard`: the response is still 200, the other cases are answered, and `casesIgnored` in the `summary` counts it.
+A `tools/call` over MCP is refused with the same message too: its result has `isError` true.
+The body of the 422 is:
 
 ```json
 {
@@ -623,6 +623,9 @@ The body is:
   "tag": "Error"
 }
 ```
+
+Like an answer (see [Call rules over REST](../../tutorials/legalese-cloud/openapi-spec.md)), the body has a `tag` and a `report`: the outer `tag` is `Error` where an answer's is `SimpleResponse`, and `report` is `"default"`, the only report.
+`contents` holds the error: its own `tag`, `InterpreterError`, names its kind, and its `contents` is the message.
 
 An event with every field written looks like this:
 
@@ -641,15 +644,19 @@ and this one leaves the licence out, so the service answers it with the error ab
 ```
 
 Neither a file nor `l4 batch` shows this error, because a file takes the default and `l4 batch` does not replay events.
+A `TYPICALLY` on a field of such a record still counts where the rules build the record with `WITH`, where a rule takes the record as an ordinary input, and in a file's `#TRACE`; only an event in a request to the service cannot take it.
 To see it before you deploy, send the request to a decision service you run yourself, as the [service documentation](../../../jl4-service/README.md) describes.
 How a rule that describes obligations is written is taught under [Regulative rules](../regulative/README.md).
 
+**How an event's records are written.**
+The party or action itself is written plainly: its fields are keys of it, as in the event above.
+A record nested inside it is written under its constructor's name, such as `"zhome": { "Address": { "zip": 5, "floor": 2 } }`, and the published schema describes it that way; the [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action) has a whole event.
+
 **The error can name a field that was written.**
-A party or an action sent as `{"Driver": {"name": "Alice", "licence": "learner"}}`, keyed by its constructor, is the wrong shape at the top level.
+A party or an action sent keyed by its constructor, `{"Driver": {"name": "Alice", "licence": "learner"}}`, is the wrong shape at the top level.
 The service looks for each field that has a default as a key of the party or action itself, and with the constructor name around the fields the only key it finds is `Driver`.
 So a record that has a `TYPICALLY` gets the `Missing required field` message above, naming a field the request did write, and a record that has no `TYPICALLY` at all gets a type error.
 When that message names a field you wrote, the cause is the shape, not a missing field: send the fields directly, as in the event above.
-A record nested inside a party or an action is the other way round: it is keyed by its constructor (`{"Address": {...}}`), and the published schema describes it that way.
 
 ## Examples
 

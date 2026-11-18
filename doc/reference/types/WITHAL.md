@@ -133,6 +133,7 @@ GIVETH AN EITHER STRING Paint
 That holds only when every field has a usual value.
 A field declared `MAYBE` with no usual value is filled with `NOTHING` when the text is read, while `WITHAL` refuses to build the record and names the field.
 `WITHAL` takes the usual values a record declares, and never works one out from a field's kind of thing.
+A `MAYBE` fact that a case leaves out is `NOTHING` too, but that is the rule for a case, not for `WITHAL`: see [At the boundary](TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service).
 
 An empty object written as the _value_ of a record input in a case is a different thing.
 It means "not known".
