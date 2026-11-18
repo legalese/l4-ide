@@ -122,9 +122,8 @@ jobs:
         run: |
           status=0
           for f in $(git ls-files '*.l4'); do
-            out=$(l4 run "$f" 2>&1) || status=1
-            if echo "$out" | grep -q "assertion failed"; then
-              echo "::error file=$f::assertion failed in $f"
+            if ! out=$(l4 run "$f" 2>&1); then
+              echo "::error file=$f::l4 run failed in $f"
               echo "$out"
               status=1
             fi
@@ -137,7 +136,7 @@ To pin a version, replace the `tag=$(...)` line with a fixed tag, such as `tag=l
 Two details worth knowing:
 
 - `l4 check` exits non-zero on any parse or type error, so the typecheck step needs no extra logic.
-- `l4 run` exits non-zero on type errors and on directives that crash during evaluation, but **not** on failed assertions — a failing `#ASSERT` prints `assertion failed` while the file still typechecks. That is why the test step greps for it (alternatively, use `l4 run --json` and inspect results of `"kind": "assertion"`).
+- `l4 run` exits non-zero on type errors, on directives that crash during evaluation, and on a failed `#ASSERT`, which prints `assertion failed` and exits 1 while the file still typechecks. So the test step needs only the exit status; with `l4 run --json` the same failure shows as `"ok": false` and an `"assertion"` result whose `"value"` is `false`.
 
 If rules use `NOW` or `TODAY`, add `--fixed-now <ISO8601>` to the `l4 run` calls so CI results do not depend on the day the job runs.
 
@@ -161,7 +160,7 @@ When you redeploy to an existing deployment name, the interface of the new bundl
 - narrowing the accepted values of an input enum
 - changing a rule's return type, removing a result field, or widening an output enum with values consumers may not handle
 
-**Reported, not blocked:** changing the _default_ of an input, which is the value a rule uses when a caller leaves that input out (see [TYPICALLY](../../reference/types/TYPICALLY.md)). The update goes through, and the deploy result lists each changed default: the rule, the input, its old value and its new value. An input inside a record is named by its path, such as `cfg.retries`, and one inside a list of records is written with `[]` for the list's elements, such as `jobs[].retries`. Nothing about the shape of the interface changed, but a caller who leaves the input out now gets an answer computed from the new value, so it is worth telling the people who depend on the rule. A changed default does not count as a breaking change, so the breaking component of the version does not move (a deployment version reads `major.breaking.running`, as in `1.0.1`: the last number goes up with every applied deploy, and the middle one only with a deploy that breaks an integration). Adding a default stays compatible and is not reported, and removing one makes the input required, which is breaking. A default is reported only when the old and the new version both publish one.
+**Reported, not blocked:** changing the _default_ of an input, which is the value a rule uses when a caller leaves that input out (see [TYPICALLY](../../reference/types/TYPICALLY.md)). The update goes through, and the deploy result lists each changed default: the rule, the input, its old value and its new value. An input inside a record is named by its path, such as `cfg.retries`, and one inside a list of records is written with `[]` for the list's elements, such as `jobs[].retries`. Nothing about the shape of the interface changed, but a caller who leaves the input out now gets an answer computed from the new value, so it is worth telling the people who depend on the rule: the report is part of the deploy result, which reaches whoever sent the update, and an answer to a caller carries no notice of it. A changed default does not count as a breaking change, so the breaking component of the version does not move (a deployment version reads `major.breaking.running`, as in `1.0.1`: the last number goes up with every applied deploy, and the middle one only with a deploy that breaks an integration). Adding a default stays compatible and is not reported, and removing one makes the input required, which is breaking. A default is reported only when the old and the new version both publish one.
 
 What the report cannot see:
 
@@ -180,6 +179,8 @@ Update rejected — it would break existing integrations:
 ```
 
 If the break is intentional, overwrite explicitly: confirm the warning in VS Code, or run `l4 redeploy --force`. The deployment's version number records it — the breaking component of the version is bumped, so consumers can see at a glance that the interface changed incompatibly.
+
+One case looks like a break and comes from the upgrade, not from your change: right after the service itself is upgraded, a service started with `--lazy-load` (an operator setting that compiles a deployment only when something first asks for it) compares your update with the schema the previous run cached, so an unchanged bundle can be rejected as breaking. [The service documentation](../../../jl4-service/README.md#async-deployupdate-jobs) lists the ways through; one is `l4 redeploy --force`, which the service refuses with `409` while the deployment has instances in its instance ledger.
 
 Practical workflow:
 
