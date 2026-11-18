@@ -3,8 +3,10 @@
   import { colorize } from '@repo/l4-highlight'
   import {
     AiToolRenderMeta,
+    RenderMetaLoader,
     renderArgumentsAsL4,
     renderJsonAsL4,
+    renderMetaQuery,
     type FunctionParameter,
   } from 'jl4-client-rpc'
   import type { Messenger } from 'vscode-messenger-webview'
@@ -307,40 +309,30 @@
   // Lazy-fetched: we only ask the extension for the schema once the
   // row's expand panel is opened on a rule call, and cache the result
   // for the lifetime of this component.
-  let renderMeta = $state<{
+  type RenderMeta = {
     parameters: FunctionParameter
     returnSchema?: FunctionParameter
-  } | null>(null)
-  let renderMetaInFlight = false
-  async function ensureRenderMeta(): Promise<void> {
-    if (renderMeta || renderMetaInFlight || !messenger || !isRuleCall) return
-    renderMetaInFlight = true
-    try {
-      const res = await messenger.sendRequest(
+  }
+  let renderMeta = $state<RenderMeta | null>(null)
+  // One request at a time, and another when the call names its rule
+  // while one is out (the generic `evaluate` does, as its arguments
+  // arrive): see RenderMetaLoader.
+  const renderMetaLoader = new RenderMetaLoader<RenderMeta>({
+    query: () => (messenger && isRuleCall ? renderMetaQuery(call) : null),
+    fetch: async (query) => {
+      const res = await messenger!.sendRequest(
         AiToolRenderMeta,
         { type: 'extension' },
-        {
-          toolName: call.name,
-          ...(call.deploymentId ? { deploymentId: call.deploymentId } : {}),
-          ...(call.ruleFnName ? { fnName: call.ruleFnName } : {}),
-        }
+        query
       )
-      if (res.kind === 'meta') {
-        renderMeta = {
-          parameters: res.parameters,
-          returnSchema: res.returnSchema,
-        }
-      }
-      // `unavailable` responses leave `renderMeta` null and the
-      // in-flight flag clears below, so the next effect tick retries
-      // once the call settles (the MCP tool list may not have been
-      // populated yet when the first row mounted on a streaming turn).
-    } catch {
-      // Network hiccup — retry on the next effect tick.
-    } finally {
-      renderMetaInFlight = false
-    }
-  }
+      return res.kind === 'meta'
+        ? { parameters: res.parameters, returnSchema: res.returnSchema }
+        : null
+    },
+    onLoaded: (meta) => {
+      renderMeta = meta
+    },
+  })
 
   // Pre-fetch render-meta as soon as the row mounts on a rule call,
   // not on first expand. The previous on-expand fire produced a
@@ -357,10 +349,14 @@
   // target map is warm. Without this, multiple rows for the same rule
   // in a streaming turn would race the MCP list refresh, the early
   // ones would get `unavailable`, and only the last row (mounting
-  // after the list settled) would render as L4.
+  // after the list settled) would render as L4. And on the rule's name
+  // and deployment, which a generic `evaluate` row only learns from its
+  // arguments.
   $effect(() => {
     void call.status
-    if (isRuleCall && !renderMeta) void ensureRenderMeta()
+    void call.deploymentId
+    void call.ruleFnName
+    if (isRuleCall && !renderMeta) void renderMetaLoader.load()
   })
 
   // L4-rendered argument block. Falls back to null when we don't have

@@ -83,6 +83,7 @@ import type { AuthManager } from '../auth.js'
 import type { ServiceClient } from '../service-client.js'
 import { isLocalMode } from './ai-endpoint.js'
 import type { AiLogger } from './logger.js'
+import { DeploymentVersionCache } from './deployment-version-cache.js'
 import {
   DICTATION_MAX_SECONDS,
   DictationError,
@@ -879,6 +880,13 @@ export function registerAiChatHandlers(deps: {
       }
     | { kind: 'unavailable' }
   const renderMetaInFlight = new Map<string, Promise<RenderMetaResult>>()
+  // The deployment version behind the cache above, checked at most once a
+  // minute per deployment: otherwise every rule row in a conversation asks
+  // for the deployment's status, though the cached schema answers them all.
+  const deploymentVersions = new DeploymentVersionCache(async (deployId) => {
+    const status = await serviceClient.getDeploymentStatus(deployId)
+    return (status.metadata as { version?: string } | undefined)?.version ?? ''
+  })
   // Fetch + cache one function's schema, keyed by (deployId, fnName)
   // and invalidated on redeploy via the deployment version SHA. Shared
   // by both the MCP-target path and the direct deployment path.
@@ -892,9 +900,7 @@ export function registerAiChatHandlers(deps: {
     if (existing) return existing
     const work = (async (): Promise<RenderMetaResult> => {
       try {
-        const status = await serviceClient.getDeploymentStatus(deployId)
-        const version =
-          (status.metadata as { version?: string } | undefined)?.version ?? ''
+        const version = await deploymentVersions.version(deployId)
         const cached = renderMetaCache.get(cacheKey)
         if (cached && cached.version === version) {
           return { kind: 'meta' as const, ...cached.meta }
