@@ -43,6 +43,7 @@
   - [HTTP and JSON](builtins/http-json.md)
 - [Standard libraries](libraries/README.md)
   - [prelude](libraries/prelude.md)
+  - [negation-as-failure](libraries/negation-as-failure.md)
   - [math](libraries/math.md)
   - [daydate](libraries/daydate.md)
   - [time](libraries/time.md)

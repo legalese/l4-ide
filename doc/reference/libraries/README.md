@@ -9,6 +9,7 @@ Functions built into the language, such as `TOSTRING`, `CONCAT` or `FETCH`, need
 ### Core
 
 - [prelude](prelude.md): lists, MAYBE and EITHER values, pairs and dictionaries.
+- [negation-as-failure](negation-as-failure.md): `holds`, `naf` and `presumed` over `MAYBE BOOLEAN`. It imports the prelude itself, so ``IMPORT `negation-as-failure` `` alone is enough.
 - [math](math.md): `exp`, logarithms, square roots and trigonometry that give `NOTHING` instead of failing on bad input.
 
 ### Dates and time
