@@ -13,9 +13,10 @@ It is used wherever the name is left out:
 - **on a record field**, by a construction that leaves the field out (a
   **record** is a bundle of named facts, such as an invoice with an amount and a
   number of days overdue; see [`DECLARE`](DECLARE.md)); and
-- **at the boundary**, `l4 batch` and the decision service, by a case that
-  leaves the fact out.
+- **when a case reaches `l4 batch` or the decision service** and leaves the
+  fact out.
   The **decision service** (`jl4-service`) is the program that publishes rules for applications and AI agents to call, on Legalese Cloud or on one you run yourself.
+  [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below says what counts as leaving a fact out.
 
 Each is described below, with what a default does _not_ excuse.
 
@@ -24,17 +25,18 @@ Each is described below, with what a default does _not_ excuse.
 The pages about `TYPICALLY` and `l4 batch` use several words for neighbouring things.
 This table says which is which.
 
-| Word                              | What it means here                                                                                                                                                                                                                                                                                 |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| default, usual value, presumption | The value written after `TYPICALLY`. "Usual value" is the same thing in plainer words. A default is a rebuttable presumption, a value taken to hold unless a case says otherwise, so "presumption" is also the name of the switch (`--presumption`, `"presumption"`) that turns defaults off.      |
-| input                             | A name listed after `GIVEN`: something a rule is told.                                                                                                                                                                                                                                             |
-| fact                              | What the caller supplies for an input, or for a field of a record, in a case sent to `l4 batch` or a request sent to the decision service.                                                                                                                                                         |
-| field                             | A named part of a record.                                                                                                                                                                                                                                                                          |
-| case                              | One set of facts: a line or row of the file given to `l4 batch`, or one request (or one entry of a batch request) to the decision service.                                                                                                                                                         |
-| `presumed`                        | The list in an answer of the defaults that answer used. A default the answer did not need is not listed.                                                                                                                                                                                           |
-| refused                           | Turned away before the rules ran, with the reason named. In `l4 batch` such a line has `status` `error`: the `refused` status there means something else, that the rules themselves declined to answer (see [What each line says](../../tutorials/getting-started/l4-cli.md#what-each-line-says)). |
-| rule that describes obligations   | A regulative rule: one whose result is a contract (of type `DEONTIC`) saying who must, may or must not do what, and by when. The service pages also call it a rule that returns a contract. See [Regulative rules](../regulative/README.md).                                                       |
-| event                             | A record that a party did an action at a time. A rule that describes obligations is run against a list of events. See [`EVENT`](../regulative/EVENT.md).                                                                                                                                           |
+| Word                              | What it means here                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| default, usual value, presumption | The value written after `TYPICALLY`. "Usual value" is the same thing in plainer words. A default is a rebuttable presumption, a value taken to hold unless a case says otherwise, so "presumption" is also the name of the switch (`--presumption`, `"presumption"`) that turns defaults off.                                                                                                            |
+| input                             | A name listed after `GIVEN`: something a rule is told.                                                                                                                                                                                                                                                                                                                                                   |
+| fact                              | What the caller supplies for an input, or for a field of a record, in a case sent to `l4 batch` or a request sent to the decision service.                                                                                                                                                                                                                                                               |
+| field                             | A named part of a record.                                                                                                                                                                                                                                                                                                                                                                                |
+| case                              | One set of facts: a line or row of the file given to `l4 batch`, or one request (or one entry of a batch request) to the decision service.                                                                                                                                                                                                                                                               |
+| `presumed`                        | The list in an answer of the defaults that answer used. A default the answer did not need is not listed.                                                                                                                                                                                                                                                                                                 |
+| refused                           | A case or request turned away before the rules ran, with the reason named: the decision service answers with an error, `l4 batch` marks the line `status` `error`, and a batch case carries `@error`. The `refused` of `status` and `@refused` means something else: the rules themselves declined to answer (see [What each line says](../../tutorials/getting-started/l4-cli.md#what-each-line-says)). |
+| `soft`, `hard`                    | The two settings of the `presumption` switch. `soft`, the default, lets a fact a case leaves out take its default. `hard` uses no default, so that fact is missing. See [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service).                                                                                                                                                           |
+| rule that describes obligations   | A regulative rule: one whose result is a contract (of type `DEONTIC`) saying who must, may or must not do what, and by when. The service pages also call it a rule that returns a contract. See [Regulative rules](../regulative/README.md).                                                                                                                                                             |
+| event                             | A record that a party did an action at a time. A rule that describes obligations is run against a list of events. See [`EVENT`](../regulative/EVENT.md).                                                                                                                                                                                                                                                 |
 
 ## Syntax
 
@@ -136,8 +138,9 @@ scaled MEANS rate TIMES base
 - **The default is used only if the rule reads it.** A rule that never needs the
   input never forces its default, which is also what `presumed` (below) counts.
 
-This works for a rule in the same file, a rule declared in a `WHERE`, and a rule
-in a file you `IMPORT`. A default declared in a file you `IMPORT` stays with
+This works for a rule in the same file, a rule declared in a
+[`WHERE`](../functions/LET.md#where) (a helper written under the rule that uses
+it), and a rule in a file you [`IMPORT`](../libraries/README.md#import). A default declared in a file you `IMPORT` stays with
 that file: if its `TYPICALLY` value is edited, a call here that leaves the input
 out takes the new value. Writing the input at the call, as
 `scaled WITH base IS 10, rate IS 3`, pins it. Two things it does not do:
@@ -157,7 +160,7 @@ out takes the new value. Writing the input at the call, as
 
 A call that names its inputs has to name at least one of them: `WITH` is followed by an input, never by nothing.
 So a rule whose every input has a default cannot be called with all of them left to their defaults.
-Writing the rule's name alone does not call it, and there is no `WITHAL` for a rule, which is only for a record.
+Writing the rule's name alone does not call it, and there is no [`WITHAL`](WITHAL.md) for a rule, which is only for a record (`WITHAL` builds a record from every field's default).
 To get the answer the defaults give, name one input and give it the value its default already is.
 
 ```l4
@@ -174,6 +177,7 @@ A rule with one input that has no default is not in this case: naming that input
 
 ### Two rules with the same name
 
+In one line: a default never decides which of two rules of the same name a call means; only the values the call gives do.
 Two rules may share a name when their inputs tell them apart.
 A call that names its inputs and leaves one out takes the default only if the call cannot mean any other rule of that name.
 A rule **could not take** the call when a value the call gives does not fit the type of that rule's input of that name.
@@ -244,7 +248,7 @@ It is printed only together with the first: with `scaled WITH base IS 10, rate I
 A name that only one rule has does not settle the choice either.
 If the second `scaled` took `width` and `height` and had no `base`, the call `scaled WITH base IS 10` would still be ambiguous: it does not say which rule it means.
 
-One more limit, chosen to keep the check fast and not ruled on.
+One more limit, which keeps the check fast.
 A value that itself contains a call that names its inputs is not compared with the other rule's types, and a record built with `WITH` is such a call.
 So `scaled WITH base IS (double WITH x IS 5)` stays ambiguous, although the number it gives would settle the choice.
 A value that is a positional call (`double 5`) is compared, and so is a name: give the value a name with `WHERE` first, and write that name in the call.
@@ -313,13 +317,14 @@ Two limits are particular to alternatives:
   A `MEANS` clause on one is a check error, because the fields of an alternative are given when it is built and the clause would never be used.
   Only the fields of a record can be computed.
 - **A case cannot give an alternative that carries data, so a default on its field applies only where the rules build it, with `WITH`.**
-  Each runtime says so in its own words (a case reaches them as JavaScript Object Notation (JSON) text, the plain-text format in which a case's facts are written, as in `{"is adult": true}`), checked on 2026-11-18 with a rule that reads a `Shape` (`Circle` carries a `radius`, `Dot` carries nothing):
+  `l4 batch` and the decision service each say so in their own words.
+  A case reaches both as JavaScript Object Notation (JSON) text, the plain-text format in which a case's facts are written, as in `{"is adult": true}`.
+  Take a rule that reads a `Shape` (`Circle` carries a `radius`, `Dot` carries nothing):
   - `l4 batch` refuses `{"s": {"tag": "Circle"}}` and `{"s": {"tag": "Circle", "radius": 2}}` with `Could not decode … as Shape for field 's': expected a string naming one of: Dot. A constructor with fields (Circle, Rect) cannot be given as JSON input.`
     The bare string `"Circle"` is refused too, as `Circle has fields, and a constructor with fields cannot be given as JSON input`.
-    An older build of `l4` says the same, so this is not new.
   - The decision service refuses the two `tag` forms with `Parameter 's': FnObject but expected type is not a known record`.
     It accepts the bare string `"Circle"`, and the value it reads is a `Circle` with no `radius`, which no `WHEN Circle r` branch takes: a `CONSIDER` with no `OTHERWISE` then stops with `reached a CONSIDER that has no branch for it`, and one with an `OTHERWISE` takes that.
-  - The **schema** the service publishes for such an input (its list of the facts a rule asks for, with each one's type, whether it is required, and any default) lists the names only (`"enum": ["Circle", "Rect", "Dot"]`), so it advertises `"Circle"` as a valid value although a `Circle` needs its `radius`.
+  - The **schema** the service publishes for such an input (its list of the facts a rule asks for, with each one's type, whether it is required, and any default, written in JSON Schema, a standard way of describing the shape of JSON) lists the names only (`"enum": ["Circle", "Rect", "Dot"]`), so it advertises `"Circle"` as a valid value although a `Circle` needs its `radius`.
 
 ## In rendered text: `l4 nlg` and `l4 render`
 
@@ -340,7 +345,7 @@ What the mark does and does not tell you:
 
 - **It covers a default added at a call that names its inputs, or at a construction.** Those are the two places where a call or a construction that the author wrote gets a value the author did not write.
 - **It does not cover a default taken at the root of a section `GIVEN`.** With `surcharge TYPICALLY 2` on a section `GIVEN`, `` `tax on` WITH amount IS 10 `` prints as `` `tax on` where `amount` is 10 is equal to 12 ``, and the 2 is not in the text. Written at the call, `surcharge IS 7` is printed.
-- **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, a field default in a record the rules decode with `JSONDECODE`, and, in either mode, one added at a call or a construction inside the rules. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
+- **No mark does not mean that no default was used.** The defaults an answer used are listed under `presumed` when it comes from `l4 batch` or the decision service (see [At the boundary](#at-the-boundary-l4-batch-and-the-decision-service) below): a section `GIVEN` default the case left out, a field default in a record the rules decode with `JSONDECODE`, and, whether `presumption` is `soft` or `hard`, one added at a call or a construction inside the rules. The evaluation trace prints the value that was used (`scaled OF 3, 10`) and does not yet say it was a default.
 - **The words are English in `l4 render`, whatever `--lang` says.** `l4 nlg --lang he` prints `כברירת מחדל` from a draft entry in its table of Hebrew phrases, which no Hebrew-speaking lawyer has reviewed, and `l4 render` does not use that table for these words ([the `@nlg` page](../syntax/nlg.md#a-value-the-checker-supplied) says so).
 
 ## What the default must be
@@ -415,32 +420,37 @@ With a list price of 1000, `final price` is 900 when no discount is given and 95
 
 ## At the boundary: `l4 batch` and the decision service
 
+A case is written outside the rules: a line of a file for `l4 batch`, or a request to the decision service.
+The boundary is where it reaches the rules.
 A case sent to `l4 batch`, or a request sent to the decision service, may leave
 out any fact that has a default, whether the `TYPICALLY` is on a section
 `GIVEN`, on the exported rule's own `GIVEN`, or on a field of a record the rule
 takes as an input. The default is filled in where the case arrives, and the
 answer lists it under **`presumed`**, by name (or, for a field, by its path, such
 as `config.timeout`) — but only if the answer actually used it.
-The one exception is an event's party or action record in a request to a rule that describes obligations: every field of it must be written, and a request that leaves one out is refused, in both modes (see [An event's party and action record](#an-events-party-and-action-record)).
+The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations: every field of it must be written, and a request that leaves one out is answered with an error that names the field, whether `presumption` is `soft` or `hard` (see [An event's party and action record](#an-events-party-and-action-record)).
+`l4 batch` does not replay events, so it has no such exception.
 These rules govern what counts as leaving a fact out:
 
 - **Leaving the name out** is leaving it out. So is an empty cell in a comma-separated values (CSV)
   file given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
   and is listed under `presumed` like a default.
 - **`null` is not.** `null` means _not known_, and a fact that is not known never
-  takes its default: the case is refused, naming the fact. `{}` means the same,
-  for a record too. The one exception is a `MAYBE` fact, which is allowed to
+  takes its default: the case is refused, naming the fact. A `{}` given in place
+  of a fact is not leaving it out either, but what it means depends on where it
+  is sent: see [When a fact is given as an empty object](#when-a-fact-is-given-as-an-empty-object).
+  The one exception is a `MAYBE` fact, which is allowed to
   have no value: `null` on it is `NOTHING`, a value, and nothing is presumed or
   refused. A service request is read this way whichever way it arrives: as a
   single evaluation, as a case of a batch, or as a call to the tool of the
-  Model Context Protocol (MCP), the standard way an AI agent calls a rule
-  (smucclaw/l4-ide#1021; see [Connect an AI agent](../../tutorials/legalese-cloud/ai-agents.md)).
+  Model Context Protocol (MCP), the standard way an AI agent calls a rule (see
+  [Connect an AI agent](../../tutorials/legalese-cloud/ai-agents.md)).
 - **A `WITH` inside the rules still wins.** If a rule reads a section `GIVEN`
   and another rule overrides it for one calculation, as in
   `outer MEANS inner PLUS (inner WITH r IS 100)`, a case sent to `l4 batch`, and
   a request sent to the decision service, gets the answer `#EVAL` gives: the case's value, or the default, for the read that
-  was not overridden, and the override for the one that was
-  (smucclaw/l4-ide#1000). A case that supplies a section fact which the rules
+  was not overridden, and the override for the one that was.
+  A case that supplies a section fact which the rules
   never read, because every read of it is overridden, is accepted, and its value
   changes nothing.
 - **A name that matches nothing is refused where a default is taken.** In a
@@ -452,37 +462,13 @@ These rules govern what counts as leaving a fact out:
   That fact is missing, and the case is refused, naming it.
   The default is `soft`.
   An AI agent calling a rule through MCP, or through the WebMCP script (the script that gives the AI assistant in a visitor's browser these tools; see [Embed rules in a website](../../tutorials/legalese-cloud/webmcp-embed.md)), sets it the same way, with a `presumption` argument that is `"soft"` or `"hard"`.
-  This service's MCP tools advertise `presumption` and read it.
-  A hosted server placed in front of this service may not list it until that server is updated, so look at the tool list.
-  A server that does not know the argument reads it as it reads any name that matches none of a rule's inputs: where the call leaves out an input that has a default, it refuses the call, naming `presumption`, and where the call leaves out no such input, it ignores the argument.
-  On the tool of an ordinary rule, one that does not describe obligations, it is one of the arguments.
-  On the tool of a rule that describes obligations, whose facts go inside `arguments`, it sits beside `arguments`, as in a service request.
+  This service's MCP tools advertise `presumption` and read it; a hosted server placed in front of this service may not list it until that server is updated, so look at the tool list.
+  [Connect an AI agent](../../tutorials/legalese-cloud/ai-agents.md#telling-a-rule-not-to-assume-anything) says where the argument goes for each kind of rule and what a server that does not know it does.
   The two values are accepted in any capitalisation, as in a service request; any other value is refused, naming it.
   Because the name is reserved, an ordinary rule with a fact called `presumption` cannot be offered as an MCP or WebMCP tool, and the server says so; the same rule still runs through a service request, where the facts are inside `arguments`.
   A rule that describes obligations is still offered, because its facts are inside `arguments` and the switch is beside them.
-  The switch reaches only the facts a case can supply, so two kinds of default are not withdrawn, and the answer lists both under `presumed` in either mode:
-  - **A default in a record the rules decode with `JSONDECODE`** (the built-in that reads a record out of JSON text; see [`WITHAL`](WITHAL.md#what-it-does-at-the-boundary)).
-    It is taken whether the JSON is written in the rules or is text the case sent.
-    It is listed as `JSONDECODE <type>: <field>`.
-    The type is named as it is declared, behind the section heading it is declared under (`JSONDECODE Pricing.Settings: limit`), whichever way the rule wrote the type at the decode.
-    A record declared under a heading in an _imported_ file is the exception: it is named without the heading (``JSONDECODE `Paint Order`: coats``), though its `WITH` entry has it.
-    A `MAYBE` field with no `TYPICALLY` that the decoded JSON leaves out is filled with `NOTHING` and listed the same way (`JSONDECODE Partial: note`).
-  - **A default a `WITH` call or a construction inside the rules takes** (see above).
-    No case could have supplied it, so neither mode withdraws it.
-    It is listed as `WITH <rule>: <input>`, naming the rule or record as its declaration writes it, behind the section it is declared in.
-    `WITH Pricing.scaled: rate` is a rule in `§ Pricing`, `WITH Pricing.Config: timeout` is a field of a record there, and `WITH scaled: rate` is a rule at the top of the file, which has no section to name.
-    Two rules of one name in different sections are two entries.
-- **How an entry in `presumed` is written.**
-  A part that L4 would write in backticks in source is written in backticks, with or without a section in front of it.
-  That means any name with a space, a dot, a hyphen or an apostrophe in it, one that starts with a digit, and a reserved word (``WITH `Part 1. Fees`.scaled: rate``, ``WITH `two words`: rate`` for a rule at the top of the file).
-  A backticked part can itself hold a dot or a colon, so read each one whole when you split an entry.
-  The answer lists an entry only if it actually used the default, under `soft` as well as under `hard`.
-  Two declarations with the same name under the same sections give one entry, because the entry names the sections and not the file.
-  That covers the same name in two imported files, and a rule declared in a `WHERE`, which is named bare and so also shares an entry with a top-level rule of that name.
-  The entry names the rule and not which of two rules of that name took the default: two rules called `fee` in `§ Pricing`, each with its own default for `rate`, both list `WITH Pricing.fee: rate`, whatever value each took.
-  So `presumed` has more than one shape: a fact's name or path (`has capacity`, `config.timeout`), `WITH <rule>: <input>`, and `JSONDECODE <type>: <field>`.
-  An entry that starts `WITH ` is a usual value the rules took where a call or a construction inside them left it out, which no case could have supplied.
-  One that starts `JSONDECODE ` is a usual value in a decode the rules made, which may be of text the case sent, so it can be a fact that text left out.
+  The switch reaches only the facts a case can supply.
+  A default that the rules take inside their own text, at a `WITH` call, at a construction or in a `JSONDECODE`, is not withdrawn, and the answer lists it under `presumed` whether `presumption` is `soft` or `hard`: see [What `presumed` lists](#what-presumed-lists).
 
 One gap is known and not closed by this page's behaviour:
 
@@ -490,10 +476,9 @@ One gap is known and not closed by this page's behaviour:
   planner that orders the questions a user is asked (see
   [Query Planning](../query-planning/README.md)) reads the defaults of a
   rule's inputs and of an `ASSUME`, and not those of a record's fields
-  (smucclaw/l4-ide#942, open).
+  (tracked as [smucclaw/l4-ide#942](https://github.com/smucclaw/l4-ide/issues/942)).
 
-The schema of a published rule is written in JSON Schema, a standard way of describing the shape of JSON.
-It carries each default as the JSON Schema `default` keyword, and a defaulted fact is not listed under `required`, the list of facts a caller must supply.
+The schema of a published rule carries each default as the JSON Schema `default` keyword, and a defaulted fact is not listed under `required`, the list of facts a caller must supply.
 A `TYPICALLY` on an `ASSUME` is not used here either, and is not published, in the service's schema or in the query plan's.
 The one record that does not follow this is an event's party or action, in a request to a rule that describes obligations.
 That record is part of the request, so it never takes a default.
@@ -504,17 +489,100 @@ The typed schema of an event is published in the function document (`GET .../fun
 The [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action)
 says how, and what the service cannot yet read there.
 
-A default is a fixed value written out: it does not name another `GIVEN`, and will not (ruled 2026-10-12; see [When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts)).
+A default is a fixed value written out: it does not name another `GIVEN`, and that is a decision and not a gap (see [When the usual value is worked out from other facts](#when-the-usual-value-is-worked-out-from-other-facts)).
+
+### What `presumed` lists
+
+`presumed` is for whoever reads an answer, the sender or a reviewer.
+It lists the usual values the answer rests on that nobody wrote into the case, so that a reader can tell what was assumed.
+An entry has one of three shapes:
+
+| The entry looks like                 | It says                                                                                                                                                                                                               | Taken under                                  |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `has capacity`, `config.timeout`     | A fact the case left out took its default. A field is named by its path. A `MAYBE` fact with no default that was left out is listed too, because it is `NOTHING`.                                                     | `soft` only: `hard` refuses the case instead |
+| `WITH Pricing.scaled: rate`          | A `WITH` call, or a record built with `WITH`, inside the rules left an input or a field out, and the rules took its default. No case could have supplied it.                                                          | `soft` and `hard`                            |
+| `JSONDECODE Pricing.Settings: limit` | A record that the rules read out of JSON text with `JSONDECODE` took a default for a field the text left out. The text may be written in the rules or be text the case sent, so this can be a fact the case left out. | `soft` and `hard`                            |
+
+A reader who wants only the facts a case left out can skip the entries that begin `WITH`.
+The entries that begin `JSONDECODE` are not safe to skip.
+An entry is listed only if the answer actually used the default.
+
+Here is one rule that produces all three.
+`has capacity` is a section `GIVEN` that the case leaves out, `scaled` is called with `WITH` and leaves out its `rate`, and `read settings` decodes the JSON text `{}` into a `Settings` whose `limit` is then its default:
+
+```l4
+§ `Pricing`
+    GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+
+DECLARE Settings HAS limit IS A NUMBER TYPICALLY 10
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN text IS A STRING
+GIVETH AN EITHER STRING Settings
+`read settings` MEANS JSONDECODE text
+
+GIVETH A NUMBER
+`the limit` MEANS
+  CONSIDER `read settings` "{}"
+    WHEN RIGHT s THEN s's limit
+    OTHERWISE 0
+
+@export Price an order
+GIVEN base IS A NUMBER
+GIVETH A NUMBER
+`price` MEANS IF `has capacity` THEN (scaled WITH base IS base) PLUS `the limit` ELSE 0
+```
+
+For the case `{"base": 10}`, `l4 batch` prints this line, where the answer 40 is 3 × 10 plus 10:
+
+```
+{"diagnostics":[],"input":{"base":10},"output":[{"result":40,"trace":null}],"presumed":["has capacity","WITH Pricing.scaled: rate","JSONDECODE Pricing.Settings: limit"],"status":"success"}
+```
+
+How an entry is written:
+
+- The label of a `WITH` entry names the rule or record as its declaration writes it, behind the section it is declared in: `WITH Pricing.scaled: rate` is a rule in `§ Pricing`, `WITH Pricing.Config: timeout` is a field of a record there, and `WITH scaled: rate` is a rule at the top of the file, which has no section to name.
+  Two rules of one name in different sections are two entries.
+- The type of a `JSONDECODE` entry is named as it is declared, behind the section heading it is declared under (`JSONDECODE Pricing.Settings: limit`), whichever way the rule wrote the type at the decode.
+  A record declared under a heading in an _imported_ file is the exception: it is named without the heading (``JSONDECODE `Paint Order`: coats``), though its `WITH` entry has it.
+  A `MAYBE` field with no `TYPICALLY` that the decoded JSON leaves out is filled with `NOTHING` and listed the same way (`JSONDECODE Partial: note`).
+- A part that L4 would write in backticks in source is written in backticks, with or without a section in front of it.
+  That means any name with a space, a dot, a hyphen or an apostrophe in it, one that starts with a digit, and a reserved word (``WITH `Part 1. Fees`.scaled: rate``, ``WITH `two words`: rate`` for a rule at the top of the file).
+  A backticked part can itself hold a dot or a colon, so read each one whole when you split an entry.
+- Two declarations with the same name under the same sections give one entry, because the entry names the sections and not the file.
+  That covers the same name in two imported files, and a rule declared in a `WHERE`, which is named bare and so also shares an entry with a top-level rule of that name.
+  The entry names the rule and not which of two rules of that name took the default: two rules called `fee` in `§ Pricing`, each with its own default for `rate`, both list `WITH Pricing.fee: rate`, whatever value each took.
+
+### When a fact is given as an empty object
+
+A `{}` in place of a fact is neither left out nor a value.
+What it means depends on where it is sent:
+
+| A `{}` given as                                 | In `l4 batch`                                                                                                             | In the decision service                                                                                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A fact that is not a `MAYBE`, a record included | _Not known_: the line is an error naming the fact, `Field 'p' is {}, which means the value is not known: supply a value`. | _Uncertain_: the request is answered unless the answer depends on that fact, and then it is refused, naming it. A `null` in its place is refused at once, in both. |
+| A fact that is a `MAYBE`                        | `NOTHING`, and the case succeeds.                                                                                         | Not stated in the service documentation.                                                                                                                           |
+| JSON text that the rules read with `JSONDECODE` | It supplies nothing, so a field that has a default takes it.                                                              | The same: it supplies nothing, so a field that has a default takes it.                                                                                             |
+
+The `JSONDECODE` row is the same in both because it happens inside the rules, after the case has been read.
+The service column is described in the [service documentation](../../../jl4-service/README.md#missing-and-uncertain-inputs).
 
 ### An event's party and action record
 
 An event (a record that a party did an action at a time) is part of a request to the decision service for a rule that describes obligations.
-That request replays a list of events against the rule, and each event names a party and an action.
+That request replays a list of events against the rule, and each event names a party, an action and a time.
+The request also has a `startTime`, when the contract begins.
+Both times are numbers on the rule's own timeline, which has no fixed unit: use the unit the rule's `WITHIN` numbers use (see [`WITHIN`](../regulative/consequences.md#within)).
 A rule describes obligations when its result type is `DEONTIC`, and the Deploy tab and the function document list each rule's result type.
 When the party or the action is a record, **every field of it has to be written, whether or not the field has a default**, and so does every field of a record nested inside it.
-The record is part of the request, so it never takes a default, and the service refuses one that leaves a field out.
+The record is part of the request, so it never takes a default, and the service answers one that leaves a field out with an error that names the field.
 The answer is the same in `soft` and in `hard`.
-The schema the service publishes says the same: it lists every field of an event's party and action as required, with no default, so a client that writes an event from the schema is not refused.
+The schema the service publishes says the same: it lists every field of an event's party and action as required, with no default, so a client that writes every field the schema lists does not meet this error.
+The service cannot yet read every type of field that the schema describes, and the [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action) says which.
 The typed schema of an event is published in the function document (`GET .../functions/{fn}`) and in `openapi.json` under each batch case's `events`.
 
 A file and the service differ here, on purpose.
@@ -538,21 +606,40 @@ DECLARE Act IS ONE OF `wear seatbelt`
   PARTY (Driver WITH name IS "Alice") DOES `wear seatbelt` AT 0     -- FULFILLED
 ```
 
+The rule says that the driver Alice must wear a seatbelt within 10; `HENCE FULFILLED` is what follows if she does, and `LEST BREACH` if she does not.
+`#TRACE` runs the rule from time 0 against the events listed under it, here one: at time 0, Alice wears a seatbelt.
 `l4 run` gives `FULFILLED`: the event is that of a driver whose licence is `"full"`, so it meets the obligation of `Driver WITH name IS "Alice", licence IS "full"` without a word about the default.
-The decision service takes the same event from a request and refuses it, in `soft` and in `hard`:
+The decision service takes the same event from a request and answers with an error, in `soft` and in `hard`:
 
 ```
 Missing required field 'events[0].party.licence' (Driver): an event's record is part of the request, so it never takes the field's TYPICALLY default. Give every field of it.
 ```
 
-The refusal is the rule.
+An event with every field written looks like this:
+
+```json
+{
+  "party": { "name": "Alice", "licence": "full" },
+  "action": "wear seatbelt",
+  "at": 1
+}
+```
+
+and this one leaves the licence out, so the service answers it with the error above:
+
+```json
+{ "party": { "name": "Alice" }, "action": "wear seatbelt", "at": 1 }
+```
+
+Neither a file nor `l4 batch` shows this error, because a file takes the default and `l4 batch` does not replay events.
+To see it before you deploy, send the request to a decision service you run yourself, as the [service documentation](../../../jl4-service/README.md) describes.
 How a rule that describes obligations is written is taught under [Regulative rules](../regulative/README.md).
 
-**The refusal can name a field that was written.**
+**The error can name a field that was written.**
 A party or an action sent as `{"Driver": {"name": "Alice", "licence": "learner"}}`, keyed by its constructor, is the wrong shape at the top level.
 The service looks for each field that has a default as a key of the party or action itself, and with the constructor name around the fields the only key it finds is `Driver`.
-So a record that has a `TYPICALLY` gets the `Missing required field` message above, naming a field the request did write, and a record that has no `TYPICALLY` at all refuses it with a type error.
-When that message names a field you wrote, the cause is the shape, not a missing field: send the fields directly, `{"name": "Alice", "licence": "learner"}`.
+So a record that has a `TYPICALLY` gets the `Missing required field` message above, naming a field the request did write, and a record that has no `TYPICALLY` at all gets a type error.
+When that message names a field you wrote, the cause is the shape, not a missing field: send the fields directly, as in the event above.
 A record nested inside a party or an action is the other way round: it is keyed by its constructor (`{"Address": {...}}`), and the published schema describes it that way.
 
 ## Examples
