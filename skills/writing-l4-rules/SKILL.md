@@ -155,14 +155,14 @@ LEST    penaltyState           -- optional; consequence on failure
 
 **Deontic polarity** — which branch fires for each modal:
 
-| Modal   | HENCE fires when                             | LEST fires when                        |
-| ------- | -------------------------------------------- | -------------------------------------- |
-| `MUST`  | action is taken                              | deadline passes without action         |
-| `MAY`   | action is taken, or deadline passes (unused) | never — a `LEST` after `MAY` is unused |
-| `SHANT` | deadline passes (prohibition respected)      | action is taken (prohibition violated) |
-| `DO`    | action is taken                              | deadline passes                        |
+| Modal   | HENCE fires when                        | LEST fires when                        |
+| ------- | --------------------------------------- | -------------------------------------- |
+| `MUST`  | action is taken                         | deadline passes without action         |
+| `MAY`   | action is taken                         | deadline passes (permission unused)    |
+| `SHANT` | deadline passes (prohibition respected) | action is taken (prohibition violated) |
+| `DO`    | action is taken                         | deadline passes                        |
 
-`SHANT` flips polarity — for prohibitions, doing the action is the failure. Not using a permission is never a breach.
+`SHANT` flips polarity — for prohibitions, doing the action is the failure. Not using a permission is not a breach unless a `LEST BREACH` makes it one.
 
 **Actors and actions are sum types.** Declare them first; a regulative rule's type is `DEONTIC Party Action`, not `CONTRACT`:
 

@@ -1,0 +1,3 @@
+executing contract `names itself, window below zero` at 0 with the following events: party `Bob` did `deliver` at 7
+executing contract `names itself, no window` at 0 with the following events: party `Bob` did `deliver` at 7
+executing contract `names itself, with a window` at 0 with the following events: party `Alice` did `deliver` at 7

@@ -422,7 +422,6 @@ GIVETH A DEONTIC `Licence Party` `Licence Action`
         LEST
             -- Reinstatement period after suspension
             -- DO: an option. Doing it leads to HENCE, letting the time pass to LEST.
-            -- (A MAY would never reach its LEST.)
             PARTY holder
             DO `apply for reinstatement`
             WITHIN 60

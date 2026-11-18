@@ -1,0 +1,23 @@
+-- Fixture for the `l4 batch` breach-JSON test.
+--
+-- The #TRACE below misses its deadline (event at 15 > deadline 0+10), so the
+-- eval results carry a ValBreached (DeadlineMissed ...) that `l4 batch`
+-- serializes via the ToJSON instances in L4.Evaluate.ValueLazyJSON.
+-- Reaching it at all also exercises the #TRACE AT/WITH pretty-printer
+-- round-trip (batch re-prints the module and re-parses it per input row).
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF
+  pay HAS amount IS A NUMBER
+  ping
+
+payObligation MEANS
+  PARTY Alice
+  MUST pay 100
+  WITHIN 10
+
+#TRACE payObligation AT 0 WITH
+  PARTY Bob DOES ping AT 15
+
+@export default trivial entrypoint so batch has a function to call
+alwaysTrue MEANS TRUE

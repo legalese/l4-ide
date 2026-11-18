@@ -38,6 +38,7 @@ import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.ValueLazy
+import L4.Evaluate.ValueLazyJSON () -- ToJSON instances for NF/Value/ReasonForBreach (batch --json)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
@@ -145,6 +146,9 @@ runConfig = \ case
 -- not just WHNF.
 nfDirective :: EvalDirective -> Eval EvalDirectiveResult
 nfDirective (MkEvalDirective r traced assertKind expr env) = do
+  -- each directive starts with no memo of applied rules, so what one keeps
+  -- alive ends with it
+  resetContractMemo
   (v, mt) <-
     if traced
       then second Just <$> do
@@ -548,8 +552,10 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   let temporalCtx = initialTemporalContext actualTime
   temporalContext <- newIORef temporalCtx
   let evalTrace = Nothing
+  reofferedEvents <- newIORef mempty
+  contractMemo <- newIORef emptyContractMemo
   maxFrameDepth <- readMaxFrameDepthEnv
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth, tracePostprocessor = evalConfig.tracePostprocessor}
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, entityInfo, evalTime = actualTime, temporalContext, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, answerInJust = evalConfig.answerInJust, maxFrameDepth, tracePostprocessor = evalConfig.tracePostprocessor, reofferedEvents, contractMemo}
 
 -- | @JL4_MAX_FRAME_DEPTH@, a whole number from 1 to the largest 'Int',
 -- replaces 'maximumFrameDepth'. Anything else leaves the default.

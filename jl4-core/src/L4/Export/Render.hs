@@ -381,12 +381,13 @@ deonticFlow party modal act due prov hence lest =
     _      -> False
 
 -- | What leads into @HENCE@ and @LEST@. An obligation continues with @HENCE@ once
--- it is met and with @LEST@ if it is not. A permission continues with @HENCE@
--- whether or not it is used. A prohibition is the other way round: @LEST@ is what
--- follows doing the thing.
+-- it is met and with @LEST@ if it is not. A permission continues with @HENCE@ if
+-- it is used and with @LEST@ if it is not used by its deadline, so the two read
+-- as alternatives. A prohibition is the other way round: @LEST@ is what follows
+-- doing the thing.
 consequenceWords :: Text -> (Text, Text)
 consequenceWords = \case
-  "may"      -> ("Whether or not that is done,", "Failing that,")
+  "may"      -> ("If that is done,", "If that is not done,")
   "must not" -> ("If that is not done,", "If that is done,")
   _          -> ("Once that is done,", "Failing that,")
 

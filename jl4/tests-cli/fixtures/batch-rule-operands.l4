@@ -1,0 +1,55 @@
+-- Fixture for `l4 batch`, which prints a module and parses it again: rules whose
+-- clauses hold an expression with breaks of its own.
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF a, b
+DECLARE Pair HAS who IS A Person, n IS A NUMBER
+
+flag MEANS TRUE
+
+withRecord MEANS
+  PARTY Alice
+  MUST a
+  WITHIN (Pair WITH who IS Bob, n IS 5)'s n
+
+recordParty MEANS
+  PARTY (Pair WITH who IS Bob, n IS 5)'s who
+  MUST a
+  WITHIN 5
+
+withWhere MEANS
+  PARTY Alice
+  MUST a
+  WITHIN (j WHERE j MEANS 3)
+
+withBranch MEANS
+  PARTY Alice
+  MUST a
+  WITHIN
+    BRANCH
+      IF flag THEN 2
+      OTHERWISE 5
+
+withLet MEANS
+  PARTY Alice
+  MUST a
+  WITHIN (LET j MEANS 3 IN j)
+  LEST (PARTY Bob MUST b WITHIN (Pair WITH who IS Bob, n IS 5)'s n)
+
+#TRACE withRecord AT 0 WITH
+  PARTY Alice DOES a AT 1
+
+#TRACE recordParty AT 0 WITH
+  PARTY Bob DOES a AT 1
+
+#TRACE withWhere AT 0 WITH
+  PARTY Alice DOES a AT 1
+
+#TRACE withBranch AT 0 WITH
+  PARTY Alice DOES a AT 1
+
+#TRACE withLet AT 0 WITH
+  PARTY Bob DOES b AT 7
+
+@export default entry
+`probe entry` MEANS TRUE

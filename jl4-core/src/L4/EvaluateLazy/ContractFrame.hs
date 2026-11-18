@@ -1,5 +1,8 @@
 module L4.EvaluateLazy.ContractFrame where
 
+import Data.Text (Text)
+import System.Mem.StableName (StableName, hashStableName)
+
 import L4.Evaluate.ValueLazy
 import L4.Syntax
 
@@ -50,7 +53,69 @@ data ContractFrame
   -- ^ Regulative BinOp frame while evaluating a regulative expression
   | RBinOp2 RBinOp2
   -- ^ Regulative BinOp frame while evaluating the second expression of a bin op
+  | ROperand [Reference]
+  -- ^ an operand of a RAND or ROR has been evaluated to a rule: apply it to
+  -- the clock and events in the list, or answer from the memo of rules already
+  -- applied to the same (see 'AppliedKey'). It always sits directly on the
+  -- 'RBinOp1' or 'RBinOp2' frame of its compound.
   deriving stock Show
+
+-- | What the application of a RAND or ROR operand to a clock and events is
+-- remembered under: which rule, read through every name it uses, at which
+-- clock, on which events. Two applications under equal keys reach the same
+-- result, because the evaluator is pure: the rule is the same piece of syntax
+-- ('RuleSyntax'), every name it uses denotes the same value ('ruleNames'), and
+-- the clock and the events are the same.
+--
+-- A key only ever claims sameness it can see without evaluating anything, so
+-- two applications that would agree may still get different keys (a miss,
+-- which costs a second evaluation), but two that could disagree never get the
+-- same one.
+data AppliedKey = MkAppliedKey
+  { ruleSyntax :: !RuleSyntax
+  , ruleNames  :: ![(Unique, ValueKey)]
+    -- ^ each name occurring in the rule that the rule's environment binds,
+    -- with what it denotes
+  , clock      :: !ValueKey
+  , events     :: !EventsKey
+  }
+  deriving stock (Eq, Show)
+
+-- | The syntax of a rule, by identity: the party, action, deadline, @HENCE@ and
+-- @LEST@ of one 'Regulative' node. These are the very objects of the
+-- program's syntax tree, which every evaluation of that node shares, so the
+-- same node gives equal names and two different nodes never do.
+data RuleSyntax = MkRuleSyntax
+  !(StableName RExpr) !(StableName (RAction Resolved)) !(StableName (Maybe RExpr))
+  !(StableName RExpr) !(StableName (Maybe RExpr))
+  deriving stock Eq
+
+instance Show RuleSyntax where
+  show (MkRuleSyntax a b c d e) =
+    "RuleSyntax " <> show [hashStableName a, hashStableName b, hashStableName c, hashStableName d, hashStableName e]
+
+-- | What a reference denotes, as far as can be told without evaluating it: a
+-- number or a string by its value, anything else by a reference known to
+-- denote the same (see 'L4.EvaluateLazy.Machine.referenceKey').
+data ValueKey
+  = KNumber !Rational
+  | KString !Text
+  | KAddress !Address
+  deriving stock (Eq, Show)
+
+-- | A list of events, as far as can be told without evaluating it.
+data EventsKey
+  = KNoEvents
+    -- ^ the empty list
+  | KEvent !ValueKey !ValueKey !ValueKey !(Maybe (Rational, Int)) !Address
+    -- ^ an event's party, action and time, the 'Reoffered' mark of the event
+    -- copy, and the reference to the rest of the list. A copy an expiring
+    -- rule re-offers is a fresh value at a fresh address on a fresh list, so
+    -- the copies two expiring rules make of one event compare equal only by
+    -- their content.
+  | KEventsAt !Address
+    -- ^ a list not yet evaluated, or not of this shape, by its reference
+  deriving stock (Eq, Show)
 
 data ScrutinizeEvents = ScrutinizeEvents
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
@@ -59,9 +124,29 @@ data ScrutinizeEvents = ScrutinizeEvents
   }
   deriving stock Show
 
+-- | The @ev'reoffered@ field threaded through 'ScrutinizeEvent',
+-- 'CurrentTimeWHNF', 'ScrutinizeDue' and 'CheckTiming' records whether the
+-- event under scrutiny is a copy an expiring obligation re-offered in a stalled
+-- hand-off, and if so its mark (looked up at Contract1 via @isReoffered@). The
+-- mark never withholds an event from a layer: it only lets the Contract5 expiry
+-- step refuse a chain whose deadlines have stopped advancing. See the Contract5
+-- NOTE in Machine.hs.
+--
+-- Only a stalled hand-off marks its copy. An unmarked event stands for a mark
+-- whose 'highWater' is the clock of the layer reading it, and whose count is 0.
+data Reoffered = MkReoffered
+  { highWater :: !Rational
+    -- ^ the time no deadline since has passed: the clock of the layer
+    -- whose hand-off first stalled
+  , stalled :: !Int
+    -- ^ how many hand-offs in a row the deadline has failed to pass
+    -- 'highWater'
+  }
+  deriving stock Show
+
 data ScrutinizeEvent = ScrutinizeEvent
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   }
   deriving stock Show
@@ -69,7 +154,7 @@ data ScrutinizeEvent = ScrutinizeEvent
 data CurrentTimeWHNF = CurrentTimeWHNF
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   }
   deriving stock Show
@@ -77,7 +162,7 @@ data CurrentTimeWHNF = CurrentTimeWHNF
 data ScrutinizeDue = ScrutinizeDue
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   }
   deriving stock Show
@@ -85,7 +170,7 @@ data ScrutinizeDue = ScrutinizeDue
 data CheckTiming = CheckTiming
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   }
   deriving stock Show
@@ -143,6 +228,11 @@ data RBinOp1 = MkRBinOp1
   , rexpr2 :: MaybeEvaluated
   , args :: [Reference] -- ^ the arguments to the remaining contract expr
   , env :: Environment
+  , record1 :: Maybe AppliedKey
+    -- ^ the key the left operand's result is recorded under in the memo when
+    -- it returns here, if it was keyed and not answered from the memo. Kept
+    -- in this frame rather than in one of its own, so that a chain of RANDs,
+    -- one per window, holds no more frames than it did without the memo.
   }
   deriving stock Show
 
@@ -150,5 +240,7 @@ data RBinOp2 = MkRBinOp2
   { op :: RBinOp
   , rval1 :: WHNF
   , env :: Environment
+  , record2 :: Maybe AppliedKey
+    -- ^ the same, for the right operand
   }
   deriving stock Show
