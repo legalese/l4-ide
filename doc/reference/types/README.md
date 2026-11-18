@@ -38,7 +38,8 @@ These built-in types take another type as a parameter.
 | `MAYBE a`    | `JUST 42` when there is a value, `NOTHING` when there is none | [maybe-example.l4](maybe-example.l4)   |
 | `EITHER a b` | `LEFT "error"` or `RIGHT 42`                                  | [either-example.l4](either-example.l4) |
 
-L4 has no null: a value that may be missing has a `MAYBE` type, and [CONSIDER](../control-flow/CONSIDER.md) handles both cases.
+L4 has no null value inside a rule: a value that may be missing has a `MAYBE` type, and [CONSIDER](../control-flow/CONSIDER.md) handles both cases.
+A case sent to `l4 batch` or to the decision service may carry a `null`, which means "not known": it is refused for a fact that is not a `MAYBE`, and is `NOTHING` for one that is (see [TYPICALLY](TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
 Functions on these types, and the `PAIR` and `Dictionary` types, are in the [prelude](../libraries/prelude.md).
 
 ## Records and enumerations

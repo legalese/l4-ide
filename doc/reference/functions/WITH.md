@@ -98,8 +98,7 @@ own supply, a default, or the request at the entry point.
 
 The rule's own inputs are a different matter: because a call is all-named or
 all-positional, a site that names a section `GIVEN` must also name every one of the rule's own
-inputs, except an input that has a [`TYPICALLY`](../types/TYPICALLY.md) default, which the call may leave out and which then takes its default.
-If `n` is declared `n IS A NUMBER TYPICALLY 2`, then `bump WITH `the rate` IS 5` leaves `n` out, takes it as 2, and gives 10.
+inputs:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -107,6 +106,18 @@ GIVETH A NUMBER
 bump n MEANS n TIMES `the rate`
 
 #EVAL bump WITH n IS 3, `the rate` IS 5        -- 15
+```
+
+The exception is an input that has a [`TYPICALLY`](../types/TYPICALLY.md) default.
+The call may leave it out, and it then takes its default:
+
+```l4
+GIVEN n IS A NUMBER TYPICALLY 2
+GIVETH A NUMBER
+lift n MEANS n TIMES `the rate`
+
+#EVAL lift WITH `the rate` IS 5               -- 10: `n` is left out and takes its default, 2
+#EVAL lift WITH n IS 3, `the rate` IS 5       -- 15
 ```
 
 ## Limits

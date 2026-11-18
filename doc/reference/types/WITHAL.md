@@ -66,7 +66,11 @@ If you mean a `Paint` that is rushed, write `Paint WITH rush IS TRUE`.
 
 A name after `WITHAL` is not read as a field being set.
 It is read as a function applied to the record, so `Paint WITHAL coats` is the number of coats, 2, the same as `coats (Paint WITHAL)`.
-That is why the example above fails at the `IS` and not at `coats`.
+That is why `` `glossy paint` MEANS Paint WITHAL coats IS 3 ``, the parse error shown earlier on this page, is reported at the `IS` and not at `coats`:
+
+```
+unexpected IS
+```
 
 To change one field, name it with `WITH`.
 The other fields still take their usual values:
@@ -108,13 +112,14 @@ So there is exactly one way to write each construction: `WITH` names the fields 
 ## What it does at the boundary
 
 A usual value is a _presumption_, and the presumption can be switched off for a case: `l4 batch --presumption hard`, or `"presumption": "hard"` in a request to the decision service.
-`WITHAL` is inside your rules, where no case could have supplied the value, so it takes the usual values in both modes.
-In either mode the answer lists each one under **`presumed`** as `WITH Paint: coats`, exactly as it lists a `WITH` that left the field out.
+`WITHAL` is inside your rules, where no case could have supplied the value, so it takes the usual values whether `presumption` is `soft` or `hard`.
+The answer lists each one under **`presumed`** as `WITH Paint: coats`, exactly as it lists a `WITH` that left the field out.
 A record declared under a section heading is named behind it: `WITH Pricing.Paint: coats`.
 
 A rule can also read a record from JavaScript Object Notation (JSON) text.
 When the text is an empty object, `{}`, it supplies nothing, and a field that has a usual value takes it.
 So for a record in which **every** field has a usual value, reading `{}` gives the record `WITHAL` builds.
+`EITHER STRING Paint` is either an error message (`LEFT`) or a `Paint` (`RIGHT`), and `JSONDECODE` gives `RIGHT` when the text reads as a `Paint`.
 Both `l4 batch` and the decision service run this:
 
 ```l4

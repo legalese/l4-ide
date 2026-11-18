@@ -243,7 +243,10 @@ cannot introduce the hazard.
 ## What a section `GIVEN` does in this release
 
 **A section `GIVEN` that nothing supplies behaves as an assumed term, exactly
-as an older `ASSUME` did.** A rule whose answer depends on one cannot be run to
+as an older `ASSUME` did.** An **assumed term** is a name that a rule is told
+but that nobody has given a value: that is what an [`ASSUME`](../types/ASSUME.md)
+declares, and what a section `GIVEN` without a `TYPICALLY` is until something
+supplies it. A rule whose answer depends on one cannot be run to
 an answer until the name is supplied; `#EVAL` on such a rule reports
 
 ```
