@@ -38,11 +38,11 @@ DECIDE `qualifies for discount` IF
     AND applicant's `risk score` <= 0.5
 ```
 
-| Annotation                      | Meaning                                                                                                             |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `@export <description>`         | Publish this rule, with this description.                                                                           |
-| `@export default <description>` | Publish it as the **default** rule: `l4 batch` runs it when you name no rule. The service always needs a rule name. |
-| `@desc <description>`           | After a `GIVEN` input: describe the input for people and agents calling it.                                         |
+| Annotation                      | Meaning                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `@export <description>`         | Publish this rule, with this description.                                                                          |
+| `@export default <description>` | Publish it as the **entry point**: `l4 batch` runs it when you name no rule. The service always needs a rule name. |
+| `@desc <description>`           | After a `GIVEN` input: describe the input for people and agents calling it.                                        |
 
 The descriptions become the rule's documentation in the API schema, and they are all an AI agent knows when it decides whether and how to call the rule, so write them with care. Rules without `@export` stay internal: other rules can use them, but they are not published.
 
@@ -60,7 +60,6 @@ Some inputs have a **default**: a value the rule uses when a caller leaves that 
 A caller is an application or an AI agent that runs your rule.
 Below, "the service" is the decision service that runs your published rules, either on Legalese Cloud or on a `jl4-service` you run yourself.
 L4 writes a default with [`TYPICALLY`](../../reference/types/TYPICALLY.md), so the Deploy tab says "typically".
-This is not the `default` of `@export default` (the entry point), and not the `"report": "default"` in an answer: those are different things.
 A default is not a suggestion: it is applied, and the answer says so.
 
 Every answer from a published rule carries a list called **`presumed`**: the inputs the caller left out and the rule filled in for itself.
@@ -83,8 +82,8 @@ When some input has a default, the card adds a line: "Callers can turn the defau
 The switch is a setting named `presumption` that a caller sends with a request.
 With it set to `hard`, a caller who leaves an input out gets an error naming it, instead of the default.
 It works over **HTTP** (the ordinary web request a program sends to the address in [Step 5](#step-5-call-a-rule)) and in `l4 batch` (the command that runs a rule over many cases).
-It works through **MCP** (the Model Context Protocol, which lets an AI agent use a rule as a tool; see [Connect an AI agent](../legalese-cloud/ai-agents.md)) and **WebMCP** (the same for the AI assistant in a visitor's browser; see [Embed rules in a website](../legalese-cloud/webmcp-embed.md)) too: this service's MCP tools advertise `presumption` and read it; a hosted server placed in front of this service may not list it until that server is updated, so look at the tool list.
-[Connect an AI agent](../legalese-cloud/ai-agents.md#telling-a-rule-not-to-assume-anything) says what a server that does not know the argument does.
+It works through **MCP** (the Model Context Protocol, which lets an AI agent use a rule as a tool; see [Connect an AI agent](../legalese-cloud/ai-agents.md)) and **WebMCP** (the same for the AI assistant in a visitor's browser; see [Embed rules in a website](../legalese-cloud/webmcp-embed.md)) too.
+[Connect an AI agent](../legalese-cloud/ai-agents.md#telling-a-rule-not-to-assume-anything) says which servers list `presumption`, and what a server that does not know the argument does.
 
 Under the inputs, **What callers see** is collapsed.
 Open it to read the schema of the rule's inputs as the service describes them to callers, with each default written as `"default": 0` and the inputs a caller must supply listed under `"required"`.
@@ -93,7 +92,7 @@ Without VS Code, read it from the OpenAPI document (`.../openapi.json`), from th
 The typed schema of an event, for a rule that describes obligations, is published in the function document and in `openapi.json` under each batch case's `events`.
 The card shows the same schema that callers get, and does not write one of its own.
 MCP and WebMCP spell input names without spaces: `start year` becomes `start-year`.
-One thing differs: the OpenAPI document leaves out an input whose name is one of four reserved names (`alias`, `propertyOrder`, `x-l4-type` and `x-sanitized-name`) while still listing it as required, which is a defect in the service: for an input with one of those names, do not rely on the OpenAPI document.
+One thing differs: the OpenAPI document leaves out an input whose name is one of four reserved names (`alias`, `propertyOrder`, `x-l4-type` and `x-sanitized-name`) while still listing it as required, so for an input with one of those names, do not rely on the OpenAPI document.
 The card shows such an input, as the MCP tool list does.
 The document leaves the input out because of its name, so renaming the input in the rule to a name that is not one of the four, and redeploying, makes the document list it.
 A rename is a breaking change for callers that send the old name ([Manage rules in git and CI](../getting-started/version-control-for-rules.md#redeploy-when-a-merge-changes-a-live-api)).
@@ -144,8 +143,8 @@ After the update, the sidebar says what happened to the defaults:
   It lists the defaults the review showed, marked as reported before the deploy.
   It never says the update was rejected, because the service did not say so.
   The **Deployments** list is left as it was, not fetched again, because a failed fetch would show it empty.
-- The sidebar gives a failed read three tries, but it puts no limit on how long one read may take: if the service neither answers nor fails, the progress bar and the disabled button stay and no message appears.
-- The list comes from the service, so it needs a service that reports changed defaults, which the service that ships with this change does.
+- The sidebar gives a failed read three tries, but it puts no limit on how long one read may take: if the service neither answers nor fails, the sidebar keeps waiting and no message appears.
+- The list comes from the service, so it needs a service that reports changed defaults, as `jl4-service` does.
   A service that does not report them leaves the sidebar to show the list it held before the deploy, and it says "Reported before the deploy; the service did not report them."
 
 What the check compares:
