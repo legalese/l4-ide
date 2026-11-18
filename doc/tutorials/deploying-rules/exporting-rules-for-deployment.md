@@ -66,7 +66,7 @@ A default is not a suggestion: it is applied, and the answer says so.
 Every answer from a published rule carries a list called **`presumed`**: the inputs the caller left out and the rule filled in for itself.
 It lets whoever reads the answer see which facts were supplied and which were assumed.
 It lists a default only when the answer relied on it.
-The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations: every field of it must be written, and a request that leaves one out is answered with an error that names the field, whether `presumption` is `soft` or `hard` (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
+The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations: every field of it must be written, and a request that leaves one out is answered with an error (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
 
 Each input on a rule's card reads one of these:
 

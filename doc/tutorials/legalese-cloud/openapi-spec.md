@@ -49,7 +49,7 @@ curl -X POST https://api.legalese.cloud/{orgSlug}/insurance-premium/functions/qu
 The answer is in `value`, under `result`. With the same applicant, `calculate-premium` gives `{ "value": 1400 }`.
 
 `presumed` lists the inputs the call left out that took a default (a `TYPICALLY` value, or `NOTHING` for a `MAYBE`) and that the answer used; here there are none. `report` says which report the answer carries; the default report is the only one so far.
-The one exception to "a left-out input takes its default" is an event's party or action record in a request for a rule that describes obligations: every field of it must be written, and a request that leaves one out is answered with an error that names the field, whether `presumption` is `soft` or `hard` (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
+The one exception to "a left-out input takes its default" is an event's party or action record in a request for a rule that describes obligations: every field of it must be written, and a request that leaves one out is answered with an error (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
 The typed schema of an event is published in the function document (`GET .../functions/{fn}`) and in `openapi.json` under each batch case's `events`; the [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action) says more.
 
 ## Read the answer
@@ -118,7 +118,7 @@ What else a case can carry:
 - **`@error`**: the case failed, and the message says why, for example a fact the rule needs that the case left out. Once the request has been accepted, a case that fails does not spoil the others: they still get their answers.
 - **`@limit`**, beside `@error`: the service stopped the case because it took longer than the service allows (`"time"`) or used more memory than it allows (`"memory"`). Sending it again may give an answer, for a `"time"` case especially when the service is less busy. Neither `@limit` nor its absence is a promise about the next try, though: the service keeps some of the work it has already done for one case and reuses it for later ones, so a case can fail once and then answer when it is sent again, unchanged.
 - **`@refused`**: the rule itself declined to answer this case, and says why.
-- **`@presumed`**: the usual values the case's answer rests on: the facts the case left out, by name, and the usual values the rules took themselves, which begin `WITH` or `JSONDECODE`. No case could have supplied a `WITH` entry. An empty list means the answer rests only on what the case supplied. [What `presumed` lists](../../reference/types/TYPICALLY.md#what-presumed-lists) describes each kind of entry.
+- **`@presumed`**: the usual values the case's answer rests on, as [What `presumed` lists](../../reference/types/TYPICALLY.md#what-presumed-lists) describes them. An empty list means the answer rests only on what the case supplied.
 
 For every detail of the request and the response, see the [decision service's own documentation](../../../jl4-service/README.md#batch-evaluation).
 
@@ -126,7 +126,8 @@ For every detail of the request and the response, see the [decision service's ow
 
 Some inputs have a default, written with [`TYPICALLY`](../../reference/types/TYPICALLY.md): a value the rule uses when a request leaves that input out, and `presumed` says so.
 To have a rule use no default at all, send `"presumption": "hard"`.
-The input the request leaves out is then missing, as it would be if it had no default, and the error names it.
+The input the request leaves out is then missing, as it would be if it had no default, and this holds whether or not the rules would have read it (checked for an ordinary rule).
+A request to `/evaluation` is answered with HTTP status 422 and a message that names the input, such as `Parameter 'c': missing required parameter (it has a TYPICALLY default, but presumption is hard, so the default is not used)`.
 The value `"soft"` is the default: it uses the defaults, as a request without the field does.
 
 In a request to `/evaluation`, `presumption` sits beside `arguments`, not inside it:
@@ -150,6 +151,18 @@ In a batch request it sits at the top of the request body, beside `outcomes` and
 }
 ```
 
+A batch request is still answered with status 200, and a case that leaves such an input out is an `@error` naming it, while the other cases are answered:
+
+```json
+{
+  "@error": "Parameter 'b': missing required parameter (it has a TYPICALLY default, but presumption is hard, so the default is not used)",
+  "@id": 1,
+  "@presumed": []
+}
+```
+
+In the `summary`, that case is counted in `casesIgnored`, not in `casesProcessed`.
+Without `"presumption": "hard"` the same case is answered with the default, and its `@presumed` lists `b`.
 Each case still carries its own `@presumed`.
 A default that the rules take inside their own text is still used, and still listed, under `"hard"`, because no request could have supplied it.
 The two values are accepted in any capitalisation, and any other value is an error.

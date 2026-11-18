@@ -42,10 +42,10 @@ This server registers **one tool per exported rule**, plus the same four source-
 
 Some rules give an input a default (see [TYPICALLY](../../reference/types/TYPICALLY.md)): a value the rule uses when a caller leaves that input out.
 By default an agent that leaves such an input out gets an answer computed from the default, and the result lists it under `presumed` so that the agent can tell the user what was assumed.
-The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations (a regulative rule, whose result is a contract; see [Regulative rules](../../reference/regulative/README.md)): every field of it must be written, and a request that leaves one out is answered with an error that names the field, whether `presumption` is `soft` or `hard` (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
+The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations (a regulative rule, whose result is a contract; see [Regulative rules](../../reference/regulative/README.md)): every field of it must be written, and a request that leaves one out is answered with an error (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
 
 An agent that must not assume anything the user did not say can send the argument `presumption` with the value `"hard"`.
-Then no default is used: if the call leaves out an input the rule needs, the tool refuses the call and names the input, instead of answering.
+Then no default is used: if the call leaves out an input that has a default, the tool refuses the call and names the input, instead of answering, whether or not the rule would have read it (checked for an ordinary rule).
 The value `"soft"` is the same as leaving the argument out.
 Both values are accepted in any capitalisation, as in a service request; any other value is refused.
 A default that the rule itself takes inside its own text is still used under `"hard"`, because it is part of the rule, not something a caller left out.

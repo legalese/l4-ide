@@ -428,7 +428,7 @@ out any fact that has a default, whether the `TYPICALLY` is on a section
 takes as an input. The default is filled in where the case arrives, and the
 answer lists it under **`presumed`**, by name (or, for a field, by its path, such
 as `config.timeout`) — but only if the answer actually used it.
-The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations: every field of it must be written, and a request that leaves one out is answered with an error that names the field, whether `presumption` is `soft` or `hard` (see [An event's party and action record](#an-events-party-and-action-record)).
+The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations: every field of it must be written, and a request that leaves one out is answered with an error (see [An event's party and action record](#an-events-party-and-action-record)).
 `l4 batch` does not replay events, so it has no such exception.
 These rules govern what counts as leaving a fact out:
 
@@ -460,6 +460,7 @@ These rules govern what counts as leaving a fact out:
 - **The presumption can be switched off.**
   `l4 batch --presumption hard`, or `"presumption": "hard"` in a service request, uses no default for a fact the case leaves out.
   That fact is missing, and the case is refused, naming it.
+  This holds even for a fact the rules would never have read: for an ordinary rule, `l4 batch`, a request to `/evaluation` and a call over MCP all refuse it.
   The default is `soft`.
   An AI agent calling a rule through MCP, or through the WebMCP script (the script that gives the AI assistant in a visitor's browser these tools; see [Embed rules in a website](../../tutorials/legalese-cloud/webmcp-embed.md)), sets it the same way, with a `presumption` argument that is `"soft"` or `"hard"`.
   This service's MCP tools advertise `presumption` and read it; a hosted server placed in front of this service may not list it until that server is updated, so look at the tool list.
@@ -609,10 +610,18 @@ DECLARE Act IS ONE OF `wear seatbelt`
 The rule says that the driver Alice must wear a seatbelt within 10; `HENCE FULFILLED` is what follows if she does, and `LEST BREACH` if she does not.
 `#TRACE` runs the rule from time 0 against the events listed under it, here one: at time 0, Alice wears a seatbelt.
 `l4 run` gives `FULFILLED`: the event is that of a driver whose licence is `"full"`, so it meets the obligation of `Driver WITH name IS "Alice", licence IS "full"` without a word about the default.
-The decision service takes the same event from a request and answers with an error, in `soft` and in `hard`:
+The decision service takes the same event from a request and answers with HTTP status 422, the same in `soft` and in `hard`.
+The body is:
 
-```
-Missing required field 'events[0].party.licence' (Driver): an event's record is part of the request, so it never takes the field's TYPICALLY default. Give every field of it.
+```json
+{
+  "contents": {
+    "contents": "Missing required field 'events[0].party.licence' (Driver): an event's record is part of the request, so it never takes the field's TYPICALLY default. Give every field of it.",
+    "tag": "InterpreterError"
+  },
+  "report": "default",
+  "tag": "Error"
+}
 ```
 
 An event with every field written looks like this:
@@ -625,7 +634,7 @@ An event with every field written looks like this:
 }
 ```
 
-and this one leaves the licence out, so the service answers it with the error above:
+and this one leaves the licence out, so the service answers it with the error above (an event that writes every field is answered normally):
 
 ```json
 { "party": { "name": "Alice" }, "action": "wear seatbelt", "at": 1 }
