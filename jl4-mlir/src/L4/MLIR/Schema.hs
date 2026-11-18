@@ -797,9 +797,16 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
       -- unsupported, as a REFUSE is, and is evaluated by jl4-service, which
       -- reads and writes that form.
       eitherInSignature = signatureHasEither declares ef
+      -- Nor does its runtime read or write a constructor that carries data in
+      -- the tagged form, {"Card": {its fields}} (wire-form card J1, option A;
+      -- HATBOX), nor the oneOf of a type that has both kinds of constructor
+      -- (MULLET): such an export is marked unsupported too (assumed, not
+      -- ruled).
+      taggedInSignature = signatureHas isTaggedDecl declares ef
       unsupportedReasons =
         [ refuseUnsupportedReason | refuseInBody ]
           <> [ eitherUnsupportedReason | eitherInSignature ]
+          <> [ taggedUnsupportedReason | taggedInSignature ]
   in FunctionExport
        { apiName     = sanitizeFunctionName name
        , wasmSymbol  = sanitizeWasmSymbol name
@@ -827,23 +834,44 @@ refuseUnsupportedReason = "REFUSE is not supported by the WASM backend"
 eitherUnsupportedReason :: Text
 eitherUnsupportedReason = "EITHER in an input or the result is not supported by the WASM backend"
 
+-- | Why an export with a constructor that carries data in an input or the
+-- result is unsupported.
+taggedUnsupportedReason :: Text
+taggedUnsupportedReason = "a constructor that carries data, in an input or the result, is not supported by the WASM backend"
+
+-- | A type declared with a constructor that carries fields.
+isTaggedDecl :: TypeDecl Resolved -> Bool
+isTaggedDecl = \case
+  EnumDecl _ cons -> any (\(MkConDecl _ _ fs) -> not (null fs)) cons
+  _ -> False
+
 -- | Does an input or the result of this export hold an EITHER, at any depth:
 -- in a LIST, a MAYBE, a type's argument, a record's field, a constructor's
 -- field, or behind a synonym? A declared type is looked at once, so a record
 -- that contains itself ends the walk.
 signatureHasEither :: Map Text (Declare Resolved) -> ExportedFunction -> Bool
-signatureHasEither declares ef =
+signatureHasEither = signatureHasType (\name -> getUnique name == eitherUnique) (const False)
+
+-- | Does an input or the result of this export reach a declared type of which
+-- this is true, at any depth, as 'signatureHasEither' walks?
+signatureHas :: (TypeDecl Resolved -> Bool) -> Map Text (Declare Resolved) -> ExportedFunction -> Bool
+signatureHas = signatureHasType (const False)
+
+-- | The walk of 'signatureHasEither' and 'signatureHas': a built-in type by
+-- its name, a declared type by its declaration.
+signatureHasType :: (Resolved -> Bool) -> (TypeDecl Resolved -> Bool) -> Map Text (Declare Resolved) -> ExportedFunction -> Bool
+signatureHasType builtin declared declares ef =
   any (go Set.empty) (mapMaybe (.paramType) ef.exportParams <> maybeToList ef.exportReturnType)
   where
     go :: Set.Set Text -> Type' Resolved -> Bool
     go seen = \case
       TyApp _ name args
-        | getUnique name == eitherUnique -> True
+        | builtin name -> True
         | any (go seen) args -> True
         | otherwise ->
             let nameText = rawNameToText (rawName (getActual name))
             in not (Set.member nameText seen) && case Map.lookup nameText declares of
-                 Just (MkDeclare _ _ _ decl) -> inDecl (Set.insert nameText seen) decl
+                 Just (MkDeclare _ _ _ decl) -> declared decl || inDecl (Set.insert nameText seen) decl
                  Nothing -> False
       Forall _ _ inner -> go seen inner
       _ -> False

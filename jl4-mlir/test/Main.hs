@@ -296,6 +296,14 @@ main = do
         testExportMark eitherMark [] (eitherExport ["GIVEN n IS A NUMBER"] "GIVETH AN EITHER STRING NUMBER" "`fee` n MEANS RIGHT n")
     , test "an export with no EITHER beside a record that holds one stays supported" $
         testExportMark Nothing [] (eitherExport ["GIVEN n IS A NUMBER"] "GIVETH A NUMBER" "`fee` n MEANS n")
+    -- The runtime reads no tagged constructor, {"Card": {its fields}}, nor the
+    -- oneOf of a type with both kinds (HATBOX, MULLET, 2026-11-18).
+    , test "a constructor that carries data in an input is unsupported" $
+        testExportMark taggedMark [] (taggedExport ["GIVEN p IS A Payment"] "GIVETH A NUMBER" "`fee` p MEANS 1")
+    , test "a constructor that carries data in a result is unsupported" $
+        testExportMark taggedMark [] (taggedExport ["GIVEN n IS A NUMBER"] "GIVETH A Payment" "`fee` n MEANS Cash")
+    , test "an enumeration whose constructors carry nothing stays supported" $
+        testExportMark Nothing [] (taggedExport ["GIVEN c IS A Colour"] "GIVETH A Colour" "`fee` c MEANS c")
     , test "a called definition with no REFUSE stays supported" $
         testExportMark Nothing [] (feeInYear oldFeeIsFifty "`the old fee`")
     , test "REFUSE two calls away is unsupported" $
@@ -798,6 +806,24 @@ theExportMark json = case Aeson.decodeStrict (TE.encodeUtf8 json) of
                      Just (Aeson.String reason) -> Just reason
                      _ -> Nothing)
   _ -> Left ("expected a schema with one export, got: " <> T.unpack (T.take 400 json))
+
+-- | The mark an export with a constructor that carries data in its signature gets.
+taggedMark :: Maybe T.Text
+taggedMark = Just "a constructor that carries data, in an input or the result, is not supported by the WASM backend"
+
+-- | A module that declares a type with a constructor that carries data, and an
+-- enumeration, then an export with these inputs, this GIVETH and this definition.
+taggedExport :: [T.Text] -> T.Text -> T.Text -> [T.Text]
+taggedExport givens giveth def =
+  [ "DECLARE Payment IS ONE OF"
+  , "  Cash"
+  , "  Card HAS `card fee` IS A NUMBER"
+  , "DECLARE Colour IS ONE OF Red, Green"
+  , ""
+  , "@export The fee"
+  ]
+    <> givens
+    <> [giveth, def]
 
 -- | The mark an export with an EITHER in its signature gets.
 eitherMark :: Maybe T.Text
