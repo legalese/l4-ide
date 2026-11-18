@@ -331,7 +331,7 @@ What else works:
   `TYPICALLY` value when the request leaves it out (see
   [TYPICALLY](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
   `l4 batch` hands the name to the rules by name, as `#EVAL` does, so an inner
-  `WITH` that overrides it works. Two limits (measured 2026-11-18): a name
+  `WITH` that overrides it works. Two limits: a name
   whose every read is overridden is still read from the case, which has to give
   it a value of the right kind or leave it out, and two section `GIVEN`s of one
   name, one in a section and one in a section inside it, that a single rule
