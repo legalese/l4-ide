@@ -172,7 +172,7 @@ Trace:
   (no trace captured; add #EVALTRACE to the directive)
 ```
 
-Each `Evaluation[n]` block corresponds to one `#EVAL` (or `#EVALTRACE`) directive, in file order, with the source range it came from. The `Trace:` line under each result is explained in the next section. Diagnostics (errors, warnings) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks, every directive evaluates without crashing, and no `#ASSERT` fails; type errors, runtime evaluation errors (such as a `CONSIDER` with no matching branch) and a failing `#ASSERT` exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
+Each `Evaluation[n]` block corresponds to one `#EVAL` (or `#EVALTRACE`) directive, in file order, with the source range it came from. The `Trace:` line under each result is explained in the next section. Diagnostics (errors and warnings, and an information message that repeats each result) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks, every directive evaluates without crashing, and no `#ASSERT` fails; type errors, runtime evaluation errors (such as a `CONSIDER` with no matching branch) and a failing `#ASSERT` exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
@@ -269,6 +269,8 @@ Add `--json` for a single JSON envelope, useful for editors, CI, and other tools
 l4 run late-fee.l4 --json
 ```
 
+With the `#EVALTRACE` line added above, `late-fee.l4` has three directives, so the envelope has three results (without that line it has the first two):
+
 ```json
 {
   "file": "late-fee.l4",
@@ -276,10 +278,14 @@ l4 run late-fee.l4 --json
   "diagnostics": ["..."],
   "results": [
     { "kind": "value", "range": "late-fee.l4:27:1-43", "value": "20" },
-    { "kind": "value", "range": "late-fee.l4:28:1-39", "value": "50" }
+    { "kind": "value", "range": "late-fee.l4:28:1-39", "value": "50" },
+    { "kind": "value", "range": "late-fee.l4:29:1-48", "value": "20" }
   ]
 }
 ```
+
+`"ok"` is `false` when the file has an error or an `#ASSERT` fails.
+`"diagnostics"` holds the same text that `l4 run` prints on the error stream, so it is not empty even when everything went well; `"..."` stands for that text.
 
 ### Pinning the clock
 
@@ -493,19 +499,22 @@ What counts as leaving a fact out:
 
 - **The usual value works the same wherever the `TYPICALLY` is written**: on a section `GIVEN` as above (the `GIVEN` indented under the `§` heading, which declares a fact once for every rule in the section; see [The section `GIVEN`](../../reference/syntax/section-given.md)), on a rule's own `GIVEN`, or on a field of a record the rule takes as an input. A field is listed by its path, such as `config.timeout`.
   A **record** is a bundle of named facts, such as the `Invoice` of Step 2, with an `amount` and `days overdue`.
-  The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations (a regulative rule, whose result is a contract; see the [table of words](../../reference/types/TYPICALLY.md#words-this-page-uses)): every field of it must be written, and a request that leaves one out is answered with an error (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
-  Such a request carries a `startTime`, when the contract begins, and `events`, a list of what the parties did.
-  `l4 batch` does not replay events: for a rule that describes obligations it answers `<obligation>`, the contract's initial obligation, and it ignores a `startTime` or `events` in a case.
+- **Events are the one exception, and `l4 batch` takes no part in it.**
+  A request to the decision service (the program that runs deployed rules; see [Defaults](../deploying-rules/exporting-rules-for-deployment.md#defaults)) for a rule that describes obligations (a regulative rule, whose result is a contract; see the [table of words](../../reference/types/TYPICALLY.md#words-this-page-uses)) carries a `startTime`, when the contract begins, and `events`, a list of what the parties did.
+  Every field of an event's party or action record must be written, and a request that leaves one out is answered with an error (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
+  `l4 batch` does not replay events: for a rule that describes obligations it answers `<obligation>`, the contract's initial obligation, and it ignores a `startTime` or `events` in a case, so this exception never reaches a batch.
 - **Leaving the name out of the case is leaving the fact out.** In a CSV file, a blank cell means the same, exactly as a column missing from the file does: an empty cell, a cell holding only spaces, or a quoted `""`. That holds for every kind of fact, a `STRING` included, so CSV cannot carry an empty or all-space text: to pass one, use JSON or YAML, which write a string as a string. So a fact with a usual value takes it, a `MAYBE` fact with none is `NOTHING`, and any other fact is missing, which makes the line an error that says `Missing required field` and names it. One file can let one row take the usual value while the next row supplies its own. A blank line is not a case, and neither is a line holding only spaces or tabs; a quoted `"   "` is a case whose one cell is empty. A line with more or fewer cells than the header is an error that names its line number, because a cell missing from a short line would otherwise take its usual value without anyone having said so. A file saved as Excel's "CSV UTF-8", which starts with an invisible byte-order mark, reads the same as one without, and so does a file with Windows line ends.
-- **`null` is not leaving it out.** In JSON and YAML, `null` means _not known_, and a fact that is not known never takes the usual value: the line is an error that names the fact. That holds for every fact that is not a `MAYBE`, whether or not it has a usual value. In `l4 batch`, `{}` given as a fact's value means the same as `null`, a fact that is a record included, and so does `{}` as an item of a list (the decision service reads a `{}` differently: see [When a fact is given as an empty object](../../reference/types/TYPICALLY.md#when-a-fact-is-given-as-an-empty-object)); a whole case `{}` supplies nothing, so every usual value applies. There is not yet a way to say "this record, with every field at its usual value"; leave out each field you mean to leave to its usual value.
+- **`null` is not leaving it out.** In JSON and YAML, `null` means _not known_, and a fact that is not known never takes the usual value: the line is an error that names the fact. That holds for every fact that is not a `MAYBE`, whether or not it has a usual value. In `l4 batch`, `{}` given as a fact's value means the same as `null`, a fact that is a record included, and so does `{}` as an item of a list.
+  The decision service reads a `{}` differently: [When a fact is given as an empty object](../../reference/types/TYPICALLY.md#when-a-fact-is-given-as-an-empty-object) sets the two side by side.
+  A whole case `{}` supplies nothing, so every usual value applies. There is not yet a way to say "this record, with every field at its usual value"; leave out each field you mean to leave to its usual value.
 - **A misspelled name is an error where a usual value is taken.** In a case that leaves out a fact with a usual value, a name that matches no fact (a JSON key, or a CSV column) is an error that names it and the nearest fact, `Unknown field 'has capasity' (did you mean 'has capacity'?)`, because it may be the fact that was left out. The same holds inside a record. In a case where nothing takes a usual value, an extra name is ignored, as it always was. `--validate-only` reports it the same way.
 - **A `MAYBE` fact with no `TYPICALLY`**, left out, is `NOTHING`, as before, and that is listed under `presumed` too: it is a presumption that the case is silent because there is nothing to say.
 - **A `TYPICALLY` on an `ASSUME` is not used**, here or by `l4 run`, and the fact stays required; move it under its section's heading to make it count.
 - **A call inside the file may leave out the same things.**
   A rule's own defaulted input, a record's defaulted field and a section `GIVEN` may each be left out of a case, and each may be left out of a ``#EVAL `the rule` WITH …`` call inside a file, where it takes the same usual value.
   A **`WITH` call** is a call that gives a rule's inputs by name, as in `scaled WITH base IS 10`; `WITH` also builds a record, as it builds an `Invoice` in Step 2 (see [`WITH`](../../reference/functions/WITH.md)).
-  (Left out of a call that gives its inputs by position, an input is still missing.
-  A call to a name that two rules share takes the default only when the values it writes settle which rule it means; when they do not, it is still ambiguous, as [the `TYPICALLY` page](../../reference/types/TYPICALLY.md#two-rules-with-the-same-name) says.)
+  A call that gives its inputs by position cannot leave one out: the input is still missing.
+  A call to a name that two rules share takes the default only when the values it writes settle which rule it means; when they do not, it is still ambiguous, as [the `TYPICALLY` page](../../reference/types/TYPICALLY.md#two-rules-with-the-same-name) says.
 - **A usual value taken inside the rules is listed too, whether `presumption` is `soft` or `hard`.**
   An entry that begins `WITH` or `JSONDECODE` is a usual value the rules took themselves, which no case could have supplied; [What `presumed` lists](../../reference/types/TYPICALLY.md#what-presumed-lists) has a table of the three shapes of entry, a sample answer, and who reads `presumed` and how.
 
@@ -551,7 +560,7 @@ Every case that is run produces one line, or one item with `--format json`, `yam
 - `success`: the rules gave an answer.
 - `error`: the rules could not be run on the case, or raised an error. A fact is missing or `null`, a value cannot be read as the type the fact declares, a CSV line has the wrong number of cells, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
 - `undetermined`: the rules need a fact the case does not supply (see [Needed the value of an assumed term](../../reference/errors/README.md#needed-the-value-of-an-assumed-term)). The batch carries on.
-- `refused`: the rules declined to answer this case, and `diagnostics` says why. That is an answer, not a failure, and the batch carries on.
+- `refused`: the rules declined to answer this case, and `diagnostics` says why. That is an answer, not a failure, and the batch carries on. A case turned away before the rules ran is an `error`, not `refused`.
 
 The command exits with status 0 when every case was `success` or `refused`, and 1 when any case was `error` or `undetermined`, once every case that was going to run has run.
 
