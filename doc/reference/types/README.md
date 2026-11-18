@@ -8,8 +8,8 @@ Types are usually inferred, but writing them in `GIVEN` and `GIVETH` makes rules
 
 - [DECLARE](DECLARE.md): records, enumerations, type synonyms, opaque types, parameterised types, `A`/`AN` and type expressions
 - [ASSUME (deprecated)](ASSUME.md): the older spelling of an input, an opaque type or a refusal, and what to write instead
-- [TYPICALLY](TYPICALLY.md): a usual value for a field or an input, and where it is taken
-- [WITHAL](WITHAL.md): a record built from the default of every field
+- [TYPICALLY](TYPICALLY.md): a default (a usual value) for a field or an input, and where it is taken
+- [WITHAL](WITHAL.md): a record built from the default (usual value) of every field
 - [FOR ALL](for-all.md): type variables in the type of a function the section takes in
 - [Coercions](coercions.md): converting between types (`TOSTRING`, `TONUMBER`, `TODATE`, `AS STRING` and others)
 

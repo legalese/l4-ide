@@ -485,7 +485,7 @@ That record is part of the request, so it never takes a default.
 The schema lists each of its fields under `required` and gives none a `default`,
 and a request that leaves a field out is refused.
 A record inside it is written under its constructor's name.
-The typed schema of an event is published in the function document (`GET .../functions/{fn}`) and in `openapi.json` under each batch case's `events`.
+The typed schema of an event is published in the function document (the document the service returns for one rule at `GET .../functions/{fn}`, with its description, inputs and result) and in `openapi.json` under each batch case's `events`.
 The [service's own documentation](../../../jl4-service/README.md#an-events-party-and-action)
 says how, and what the service cannot yet read there.
 

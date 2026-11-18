@@ -238,7 +238,7 @@ The function's published `returnSchema` does not describe two of these shapes ye
 #### Missing and uncertain inputs
 
 An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` is _uncertain_.
-They are different: an absent input can take a default, a `null` one never does, and a `{}` one is neither: on the wrapper path a `BOOLEAN` that is `{}` is an assumed term, refused only if the rule reads it (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
+They are different: an absent input can take a default, a `null` one never does, and a `{}` one is neither: on the wrapper path a `BOOLEAN` that is `{}` is an assumed term, refused only if the rule reads it (for most requests the service evaluates the rule directly; for some it writes a short piece of L4 source around the request's values, the generated wrapper, and runs that, which is the wrapper path; see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 
 **Defaults.** An input with a `TYPICALLY` default — on the exported function's own `GIVEN`, on a section `GIVEN` it reads, or on a field of a record it takes — may be left out, and then takes its default.
 The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
