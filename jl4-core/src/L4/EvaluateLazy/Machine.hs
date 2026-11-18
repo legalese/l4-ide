@@ -388,12 +388,15 @@ data ContractMemo = MkContractMemo
     -- ^ the key each reference was first given ('referenceKey')
   , objectKeys :: !(IntMap.IntMap [(StableName WHNF, ValueKey)])
     -- ^ the key of a reference already seen holding each value object
+  , ruleNameKeys :: !(IntMap.IntMap [(RuleSyntax, [(Unique, ValueKey)])])
+    -- ^ the last 'ruleNames' worked out for each rule, shared by every key
+    -- that has the same
   , eventsKeys :: !(Map Address EventsKey)
     -- ^ the key each list of events was first given ('eventListKey')
   }
 
 emptyContractMemo :: ContractMemo
-emptyContractMemo = MkContractMemo IntMap.empty IntMap.empty IntMap.empty Map.empty IntMap.empty Map.empty
+emptyContractMemo = MkContractMemo IntMap.empty IntMap.empty IntMap.empty Map.empty IntMap.empty IntMap.empty Map.empty
 
 resetContractMemo :: Eval ()
 resetContractMemo = do
@@ -428,7 +431,8 @@ resetContractMemo = do
 -- rule to its @HENCE@ or @LEST@. A hand-off is a tail call, and a chain of
 -- them, an event a million windows late, keeps the stack flat; recording a
 -- result there would need a frame per window. An operand already holds a
--- frame for its RAND or ROR, and adds one more.
+-- frame for its RAND or ROR, and the key rides in that frame
+-- ('RBinOp1'/'RBinOp2'), so the memo adds no frame.
 --
 -- What it does not change: the result. An application answered from the memo
 -- returns the very value the first one did. What it does change: a trace
@@ -452,8 +456,15 @@ memoKey (ValObligation env (Left party) act (Left due) followup lest) [time, eve
         atomicModifyIORef' memoR \ m ->
           (m { ruleNamesOf = IntMap.insertWith (<>) h [(syn, names)] m.ruleNamesOf }, ())
         pure names
-    nameKeys <- for [ (u, rf) | u <- names, Just rf <- [Map.lookup u env] ] \ (u, rf) ->
+    nameKeys0 <- for [ (u, rf) | u <- names, Just rf <- [Map.lookup u env] ] \ (u, rf) ->
       (u,) <$> referenceKey memoR rf
+    -- one copy of the list for every key of this rule that has the same one,
+    -- which is all of them for a rule that uses no parameter: a walk of a
+    -- million windows keeps one list, not a million
+    nameKeys <- atomicModifyIORef' memoR \ m ->
+      case lookup syn =<< IntMap.lookup h m.ruleNameKeys of
+        Just shared | shared == nameKeys0 -> (m, shared)
+        _ -> (m { ruleNameKeys = IntMap.insert h [(syn, nameKeys0)] m.ruleNameKeys }, nameKeys0)
     clockKey <- referenceKey memoR time
     eventsKey <- eventListKey memoR reofferedR events
     pure (Just (MkAppliedKey syn nameKeys clockKey eventsKey))
@@ -476,10 +487,10 @@ appliedHash k = ruleSyntaxHash k.ruleSyntax * 1000003 + case k.clock of
 -- anything else by a reference: its own, or that of another reference already
 -- seen holding the very same value object.
 --
--- The key of a reference is the first one worked out for it, kept for the
--- rest of the directive. A reference never changes what it denotes, so a key
--- that was true once stays true; and keeping it means the key does not change
--- when the reference is evaluated. Without that, a second name for a rule, or
+-- The key of a reference not yet evaluated is the first one worked out for
+-- it, kept for the rest of the directive. A reference never changes what it
+-- denotes, so a key that was true once stays true; and keeping it means the
+-- key does not change when the reference is evaluated. Without that, a second name for a rule, or
 -- a rule not yet evaluated, would be keyed one way before it is first
 -- evaluated and another way after, and the applications on either side of
 -- that moment would never meet in the memo.
@@ -496,22 +507,25 @@ referenceKey memoR = go (8 :: Int)
             WHNF v | not (atomic v) -> void (objectKey v k)
             _ -> pure ()
           pure k
-        Nothing -> do
-          k <- case thunk of
-            WHNF (ValNumber n) -> pure (KNumber n)
-            WHNF (ValString t) -> pure (KString t)
-            WHNF v -> objectKey v (KAddress rf.address)
-            Unevaluated tids e env
-              | Set.null tids, d > 0 -> case e of
-                  Lit _ (NumericLit _ n) -> pure (KNumber n)
-                  Lit _ (StringLit _ t) -> pure (KString t)
-                  Var _ n | Just rf' <- lookupTerm env n -> go (d - 1) rf'
-                  App _ n [] | Just rf' <- lookupTerm env n -> go (d - 1) rf'
-                  _ -> pure (KAddress rf.address)
-            _ -> pure (KAddress rf.address)
-          atomicModifyIORef' memoR \ m ->
-            (m { referenceKeys = Map.insert rf.address k m.referenceKeys }, ())
-          pure k
+        Nothing -> case thunk of
+          -- an evaluated reference gives the same key every time, so it is
+          -- not kept: a number or string by its value, any other value by
+          -- the reference first seen holding it
+          WHNF (ValNumber n) -> pure (KNumber n)
+          WHNF (ValString t) -> pure (KString t)
+          WHNF v -> objectKey v (KAddress rf.address)
+          Unevaluated tids e env -> do
+            k <- if Set.null tids && d > 0
+              then case e of
+                Lit _ (NumericLit _ n) -> pure (KNumber n)
+                Lit _ (StringLit _ t) -> pure (KString t)
+                Var _ n | Just rf' <- lookupTerm env n -> go (d - 1) rf'
+                App _ n [] | Just rf' <- lookupTerm env n -> go (d - 1) rf'
+                _ -> pure (KAddress rf.address)
+              else pure (KAddress rf.address)
+            atomicModifyIORef' memoR \ m ->
+              (m { referenceKeys = Map.insert rf.address k m.referenceKeys }, ())
+            pure k
     atomic = \ case
       ValNumber _ -> True
       ValString _ -> True
@@ -531,8 +545,8 @@ referenceKey memoR = go (8 :: Int)
 
 -- | A list of events, without evaluating it ('EventsKey'). The head event's
 -- 'Reoffered' mark is part of it: the walk that reads the event depends on it.
--- Like 'referenceKey', the key of a list is the first one worked out for it,
--- so that it does not change when the list is evaluated.
+-- Like 'referenceKey', the key of a list not yet evaluated is the first one
+-- worked out for it, so that it does not change when the list is evaluated.
 eventListKey :: IORef ContractMemo -> IORef (Map Address Reoffered) -> Reference -> IO EventsKey
 eventListKey memoR reofferedR rf = do
   memo <- readIORef memoR
@@ -540,8 +554,12 @@ eventListKey memoR reofferedR rf = do
     Just k -> pure k
     Nothing -> do
       k <- eventListKey' memoR reofferedR rf
-      atomicModifyIORef' memoR \ m ->
-        (m { eventsKeys = Map.insert rf.address k m.eventsKeys }, ())
+      -- a key read from the evaluated list is the same every time; only one
+      -- read from a list or event not yet evaluated could change, and is kept
+      case k of
+        KEventsAt _ -> atomicModifyIORef' memoR \ m ->
+          (m { eventsKeys = Map.insert rf.address k m.eventsKeys }, ())
+        _ -> pure ()
       pure k
 
 eventListKey' :: IORef ContractMemo -> IORef (Map Address Reoffered) -> Reference -> IO EventsKey
@@ -938,7 +956,7 @@ backward val = withPoppedFrame $ \ case
         continueRef events
       ValROp env op rexpr1 rexpr2 -> do
         -- make sure to reassemble the operation after returning
-        pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
+        pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, record1 = Nothing, ..}
         -- apply the arguments of the left hand expression to the
         -- expression, once it is a rule (see 'applyOperand')
         pushFrame (ContractFrame (ROperand rs))
@@ -1187,12 +1205,16 @@ backward val = withPoppedFrame $ \ case
   Just (UpdateThunk rf) -> do
     updateThunkToWHNF rf val
     continueBackward val
+  Just (ContractFrame (RBinOp1 frame)) -> do
+    val' <- recordOperand frame.record1 val
+    backwardContractFrame val' (RBinOp1 frame)
   Just (ContractFrame (RBinOp2 frame)) -> do
+    val' <- recordOperand frame.record2 val
     -- See NOTE [One residual for the same operand twice].
-    same <- liftIO (sameObject frame.rval1 val)
+    same <- liftIO (sameObject frame.rval1 val')
     if same
-      then continueBackward val
-      else backwardContractFrame val (RBinOp2 frame)
+      then continueBackward val'
+      else backwardContractFrame val' (RBinOp2 frame)
   Just (ContractFrame cFrame) -> backwardContractFrame val cFrame
 
 backwardContractFrame :: Value Reference -> ContractFrame -> Machine Config
@@ -1406,21 +1428,13 @@ backwardContractFrame val = \ case
 
     -- push a frame for when the evaluation of the
     -- second argument has completed
-    pushCFrame $ RBinOp2 MkRBinOp2 {rval1 = val, ..}
+    pushCFrame $ RBinOp2 MkRBinOp2 {rval1 = val, record2 = Nothing, ..}
     -- pass the arguments to the regulative expression (see 'applyOperand')
     pushCFrame (ROperand args)
     maybeEvaluate env rexpr2
 
   ROperand args -> applyOperand val args
 
-  MemoStore key -> do
-    memoR <- asks (.contractMemo)
-    -- the value itself, evaluated, so that the application answered from the
-    -- memo returns the very object this one does
-    result <- liftIO (Control.Exception.evaluate val)
-    liftIO $ atomicModifyIORef' memoR \ m ->
-      (m { applied = IntMap.insertWith (<>) (appliedHash key) [(key, result)] m.applied }, ())
-    continueBackward result
 
   RBinOp2 MkRBinOp2 {..}
     -- if both obligations have been breached — with ANY mix of breach kinds
@@ -1534,12 +1548,31 @@ applyOperand rule args = do
       case lookup key =<< IntMap.lookup (appliedHash key) memo.applied of
         Just result -> continueBackward result
         Nothing -> do
-          pushFrame (ContractFrame (MemoStore key))
+          -- the compound's own frame, just below, records the result when
+          -- the operand returns to it
+          withPoppedFrame \ case
+            Just (ContractFrame (RBinOp1 f)) -> pushFrame (ContractFrame (RBinOp1 f {record1 = Just key}))
+            Just (ContractFrame (RBinOp2 f)) -> pushFrame (ContractFrame (RBinOp2 f {record2 = Just key}))
+            Just f -> pushFrame f
+            Nothing -> pure ()
           apply
   where
     apply = do
       pushFrame (App1 args Nothing)
       continueBackward rule
+
+-- | Record an operand's result in the memo under its key, if it has one, and
+-- return the result evaluated, so that an application answered from the memo
+-- returns the very object this one does.
+recordOperand :: Maybe AppliedKey -> WHNF -> Eval WHNF
+recordOperand Nothing val = pure val
+recordOperand (Just key) val = do
+  memoR <- asks (.contractMemo)
+  liftIO do
+    result <- Control.Exception.evaluate val
+    atomicModifyIORef' memoR \ m ->
+      (m { applied = IntMap.insertWith (<>) (appliedHash key) [(key, result)] m.applied }, ())
+    pure result
 
 maybeEvaluate :: Environment -> MaybeEvaluated -> Machine Config
 maybeEvaluate env = either (continueExpr env) continueBackward

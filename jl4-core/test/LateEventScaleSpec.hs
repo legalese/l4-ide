@@ -125,3 +125,22 @@ spec = describe "a #TRACE whose event is many windows late" $ do
     -- two obligations are left, x and y from the last deadline, as on main;
     -- without sharing the copies of them, 2^39
     Text.count "MUST act" out `shouldBe` 2
+
+  it "walks two parameterised rules that name each other once per window" $ do
+    out <- evalWithin $ Text.unlines
+      [ "DECLARE Person IS ONE OF Alice, Bob"
+      , "DECLARE Action IS ONE OF act"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "GIVETH A DEONTIC Person Action"
+      , "`x` n MEANS PARTY Alice MUST act WITHIN n LEST (`x` n ROR `y` n)"
+      , ""
+      , "GIVEN n IS A NUMBER"
+      , "GIVETH A DEONTIC Person Action"
+      , "`y` n MEANS PARTY Bob MUST act WITHIN n LEST (`x` n ROR `y` n)"
+      , ""
+      , "#TRACE `x` 1 AT 0 WITH"
+      , "  WAITUNTIL 40"
+      ]
+    out `shouldSatisfy` Text.isInfixOf "\"success\":true"
+    Text.count "MUST act" out `shouldBe` 2

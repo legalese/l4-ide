@@ -56,9 +56,8 @@ data ContractFrame
   | ROperand [Reference]
   -- ^ an operand of a RAND or ROR has been evaluated to a rule: apply it to
   -- the clock and events in the list, or answer from the memo of rules already
-  -- applied to the same (see 'AppliedKey')
-  | MemoStore AppliedKey
-  -- ^ the operand rule under this key has been applied: record its result
+  -- applied to the same (see 'AppliedKey'). It always sits directly on the
+  -- 'RBinOp1' or 'RBinOp2' frame of its compound.
   deriving stock Show
 
 -- | What the application of a RAND or ROR operand to a clock and events is
@@ -229,6 +228,11 @@ data RBinOp1 = MkRBinOp1
   , rexpr2 :: MaybeEvaluated
   , args :: [Reference] -- ^ the arguments to the remaining contract expr
   , env :: Environment
+  , record1 :: Maybe AppliedKey
+    -- ^ the key the left operand's result is recorded under in the memo when
+    -- it returns here, if it was keyed and not answered from the memo. Kept
+    -- in this frame rather than in one of its own, so that a chain of RANDs,
+    -- one per window, holds no more frames than it did without the memo.
   }
   deriving stock Show
 
@@ -236,5 +240,7 @@ data RBinOp2 = MkRBinOp2
   { op :: RBinOp
   , rval1 :: WHNF
   , env :: Environment
+  , record2 :: Maybe AppliedKey
+    -- ^ the same, for the right operand
   }
   deriving stock Show
