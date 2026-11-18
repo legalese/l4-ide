@@ -134,10 +134,9 @@ migration that lost it would silently change which programs compile.
 **A hand-written `ASSUME` of a name the heading already binds.** A section that
 binds a name on its heading and _also_ writes its own `ASSUME` of that name in
 its body type-checks when the two are at different types (L4 resolves names by
-type), and the `ASSUME` draws the usual deprecation warning. Until 2026-09-07
-the printer took the hand-written `ASSUME` for the section's own and dropped
-it, so `l4 batch` and the REPL rebuilt a module that had lost it; it now tells
-the two apart and keeps it. Write the second binding as another `GIVEN`
+type), and the `ASSUME` draws the usual deprecation warning. The printer tells
+the hand-written `ASSUME` from the section's own and keeps it, so `l4 batch` and
+the REPL rebuild the module with it intact. Write the second binding as another `GIVEN`
 parameter on the heading anyway — that is what the warning asks for.
 
 ## One name, one value
@@ -240,7 +239,7 @@ A `GIVEN` at column 1 followed by another `§` heading is rejected outright. The
 formatter never moves a `GIVEN` across the column boundary, so formatting
 cannot introduce the hazard.
 
-## What a section `GIVEN` does in this release
+## What a section `GIVEN` does
 
 **A section `GIVEN` that nothing supplies behaves as an assumed term, exactly
 as an older `ASSUME` did.** An **assumed term** is a name that a rule is told
@@ -255,8 +254,7 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
-**Supplying one inside the file works, by name, with `WITH`** (landed with the
-discharge change, 2026-09-05): ``#EVAL `the fee` WITH `applicable rate` IS 0.2``
+**Supplying one inside the file works, by name, with `WITH`**: ``#EVAL `the fee` WITH `applicable rate` IS 0.2``
 supplies the name to the rule and to everything it relies on, and `#ASSERT`
 takes the same form. This is the one thing an `ASSUME` never had; against an
 `ASSUME`d name the same line is a check error. A value written _before_ the
@@ -345,7 +343,7 @@ What else works:
 - **Diagnostics and hover**, which point at the `GIVEN` line under the heading
   (a "defined at" note names that line, and hovering the name shows the kind
   of thing it stands for). Go-to-definition and find-references have not been
-  exercised on a section `GIVEN` in this release.
+  exercised on a section `GIVEN`.
 
 **What Catala makes of one, measured 2026-09-07.** The backends compile the
 module as you wrote it, not the rewritten one in which the section's `GIVEN` has
