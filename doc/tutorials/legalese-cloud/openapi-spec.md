@@ -59,6 +59,7 @@ What `value` holds depends on what the rule gives back:
 | a list                                                 | a JSON array, even when the list has only one item                                                                          |
 | one of a list of choices, such as `` `under review` `` | the name as a string, without backticks: `"under review"`                                                                   |
 | a record, such as a `Pair` of `left` and `right side`  | an object with one key, the record's name, holding its fields: `{"Pair": {"left": 5, "right side": 6}}`                     |
+| a choice that carries data, such as `Card` with a fee  | an object with one key, the choice's name, holding its fields: `{"Card": {"card fee": 2}}`; send it the same way            |
 
 Five things to know:
 

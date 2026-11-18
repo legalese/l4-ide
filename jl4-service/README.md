@@ -122,7 +122,7 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 | `applied`   | The new bundle is compiled, compatible, and now the live version   |
 | `rejected`  | Breaking change, compile failure, or timeout — `error` has details |
 
-`POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. Terminal jobs are retained for 10 minutes, then pruned.
+`POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. For a `oneOf`, a form (the names, or the tagged object) that is added is fine and one that is removed is rejected; a form on both sides is compared by these same rules. Terminal jobs are retained for 10 minutes, then pruned.
 
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
 
@@ -186,6 +186,7 @@ A list is a JSON array, even when it has one element.
 An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
 A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
 A constructor that carries data is written the same way, keyed by its name, `{"Card": {"card fee": 2}}`, and one that carries none is its name, `"Cash"`, in an answer and in an input alike.
+The published schema says so: a type whose constructors all carry data is an object with one key per constructor; one with both kinds is a `oneOf` of a string `enum` of the names and that object, with no `type` of its own; one whose constructors carry nothing is the string `enum`, as before.
 An input that sends the bare name of a constructor that carries data, or an object in another form, is refused with a `422` that names the input, at any depth and on every path, as an `EITHER` in another form is.
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
