@@ -41,6 +41,16 @@ objP props req =
 arrP :: Parameter -> Parameter
 arrP item = (prim "array") { parameterItems = Just item }
 
+-- | A type with a constructor that carries fields and one that carries none:
+-- a oneOf of its names and its tagged constructors (MULLET).
+mixedP :: [Text] -> [(Text, Parameter)] -> Parameter
+mixedP names tagged =
+  (prim "") { parameterOneOf = Just [enumP names, objP tagged []] }
+
+-- | The tagged constructors of a type whose constructors all carry fields.
+taggedP :: [(Text, Parameter)] -> Parameter
+taggedP tagged = objP tagged []
+
 -- | A function's parameter object (top-level inputs).
 ps :: [(Text, Parameter)] -> [Text] -> Parameters
 ps props req = MkParameters (Map.fromList props) req
@@ -69,6 +79,34 @@ mentions needle = any (Text.isInfixOf needle)
 
 spec :: Spec
 spec = describe "Compatibility.detectBreakingChanges" do
+
+  -- A type with a constructor that carries fields and one that carries none is
+  -- a oneOf of two forms; the gate compares them by their type (MULLET, Meng,
+  -- 2026-11-18).
+  describe "oneOf forms" do
+    let card = objP [("card fee", prim "number")] ["card fee"]
+        input p = fn "fee" (ps [("p", p)] ["p"]) "NUMBER" Nothing
+        result p = fn "pay" (ps [] []) "Payment" (Just p)
+    it "an unchanged oneOf is compatible, as an input and as a result" do
+      let m = mixedP ["Cash"] [("Card", card)]
+      shouldBeCompatible [input m] [input m]
+      shouldBeCompatible [result m] [result m]
+    it "adding a form is not breaking: an enum of names gains the tagged object" do
+      changes [input (enumP ["Cash"])] [input (mixedP ["Cash"] [("Card", card)])] `shouldBe` []
+      changes [result (enumP ["Cash"])] [result (mixedP ["Cash"] [("Card", card)])] `shouldBe` []
+      changes [input (taggedP [("Card", card)])] [input (mixedP ["Cash"] [("Card", card)])] `shouldBe` []
+    it "removing a form is breaking" do
+      let m = mixedP ["Cash"] [("Card", card)]
+      changes [input m] [input (enumP ["Cash"])] `shouldSatisfy` mentions "fee parameter p no longer accepts an object"
+      changes [input m] [input (taggedP [("Card", card)])] `shouldSatisfy` mentions "fee parameter p no longer accepts a string"
+      changes [result m] [result (enumP ["Cash"])] `shouldSatisfy` mentions "pay return value no longer returns an object"
+    it "a changed form is compared as any node: a name dropped from an input, a field removed from a result" do
+      changes [input (mixedP ["Cash", "Cheque"] [("Card", card)])] [input (mixedP ["Cash"] [("Card", card)])]
+        `shouldSatisfy` mentions "no longer accepts Cheque"
+      changes [result (mixedP ["Cash"] [("Card", card)])] [result (mixedP ["Cash"] [("Card", objP [] [])])]
+        `shouldSatisfy` mentions "Card.card fee no longer returned"
+      changes [input (mixedP ["Cash"] [("Card", card)])] [input (mixedP ["Cash"] [("Card", card), ("Voucher", objP [] [])])]
+        `shouldBe` []
 
   describe "whole functions" do
     it "identical interface is compatible" do

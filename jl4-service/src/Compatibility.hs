@@ -22,6 +22,15 @@
 --
 -- New functions are safe; removed functions are breaking. This mirrors
 -- the client-side check in the deploy sidebar so both surfaces agree.
+--
+-- A type with a constructor that carries fields and one that carries none is
+-- a @oneOf@ of two forms, its names (a string) and its tagged constructors (an
+-- object); a node without a @oneOf@ is one form, of its own type. The forms
+-- are matched by their type: one the new interface adds is not breaking, one
+-- it removes is, and two that match are compared as any node is, so a name
+-- removed from an input or added to a result is breaking (MULLET, Meng,
+-- 2026-11-18; comparing a matched form by the rules above is assumed, not
+-- ruled).
 module Compatibility
   ( FnIface (..)
   , ifaceFromFunction
@@ -32,7 +41,7 @@ module Compatibility
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 
 import L4.FunctionSchema (Parameter (..), Parameters (..))
 import Types (Function (..), FunctionSummary (..))
@@ -117,6 +126,13 @@ diffFn old new =
 -- at every depth.
 diffNode :: Dir -> Text -> Text -> Parameter -> Parameter -> [Text]
 diffNode dir fn loc old new
+  | isJust old.parameterOneOf || isJust new.parameterOneOf =
+      concat
+        [ case lookup ty newForms of
+            Nothing -> [ subject fn dir loc <> " no longer " <> takesOrGives <> " " <> formName ty ]
+            Just nf -> diffNode dir fn loc of' nf
+        | (ty, of') <- oldForms
+        ]
   -- A type change makes deeper diffing noise; report and stop here.
   | not (Text.null old.parameterType)
       && not (Text.null new.parameterType)
@@ -126,6 +142,10 @@ diffNode dir fn loc old new
   | otherwise =
       formatMsgs ++ enumMsgs ++ objectMsgs ++ itemsMsgs
  where
+  oldForms = formsOf old
+  newForms = formsOf new
+  takesOrGives = case dir of In -> "accepts"; Out -> "returns"
+  formName ty = "a" <> (if Text.take 1 ty `elem` ["a", "e", "i", "o", "u"] then "n " else " ") <> ty
   oFmt = fromMaybe "" old.parameterFormat
   nFmt = fromMaybe "" new.parameterFormat
   formatMsgs
@@ -169,6 +189,13 @@ diffNode dir fn loc old new
       (Just oi, Just ni) ->
         diffNode dir fn (if Text.null loc then "[]" else loc <> "[]") oi ni
       _ -> []
+
+-- | The forms a node's value takes, by their type: its @oneOf@'s members, or
+-- itself.
+formsOf :: Parameter -> [(Text, Parameter)]
+formsOf p = case p.parameterOneOf of
+  Just members -> [ (m.parameterType, m) | m <- members ]
+  Nothing -> [ (p.parameterType, p) ]
 
 -- | Diff an object's property set (used for both the top-level parameter
 -- object and every nested record), honouring required-ness in the
