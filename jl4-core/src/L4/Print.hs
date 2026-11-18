@@ -16,6 +16,7 @@ import qualified Data.Time.Zones as TZ
 import qualified Data.Time.Zones.All as TZAll
 import qualified Data.Text.Encoding as TE
 import Control.Exception (SomeException, catch)
+import qualified Optics
 import System.IO.Unsafe (unsafePerformIO)
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -32,6 +33,37 @@ prettyLayout a = docText $ printWithLayout a
 
 docText :: Doc ann -> Text
 docText = renderStrict . layoutPretty (LayoutOptions Unbounded)
+
+-- | 'prettyLayout' for a module that will be READ AGAIN: every name's @\@nlg@
+-- annotation is written back after it, in the bracket form, and a clause
+-- group's on a line of its own above its first clause.
+--
+-- Opt-in, and the only way in. 'prettyLayout' prints every name bare, as it
+-- always has, because almost every caller prints a name as a label, a key or
+-- an answer — a ladder atom and its atomId, a query plan, a diagnostic, a
+-- trace, a service field, a jl4-mlir schema — and there an annotation is noise
+-- or worse: the query planner stopped recognising the input that settles a rule
+-- once its atom label carried one. The callers that re-emit a whole module to
+-- parse it again are few and are named here, so they choose this instead:
+-- @l4 batch@ ("L4.Cli.Batch"). The REPL re-emits a module too, and reads no
+-- annotation back from it, so it stays on 'prettyLayout'.
+--
+-- It works by printing the module over 'WithNlg' names, so every printer that
+-- is generic in its name type writes the annotation through 'LayoutPrinter'
+-- 'WithNlg', and nothing else changes.
+prettyLayoutWithNlg :: (Functor f, LayoutPrinter (f (WithNlg n))) => f n -> Text
+prettyLayoutWithNlg = prettyLayout . fmap WithNlg
+
+-- | A name that prints its @\@nlg@ annotation after it. See
+-- 'prettyLayoutWithNlg', the only place that builds one.
+newtype WithNlg n = WithNlg n
+
+instance HasName n => HasName (WithNlg n) where
+  getName (WithNlg n) = getName n
+
+instance LayoutPrinterWithName n => LayoutPrinter (WithNlg n) where
+  printWithLayout (WithNlg n) = printWithLayout n <> inlineNlgOf (getName n)
+  ownLineNlg (WithNlg n) = ownLineNlgOf (getName n)
 
 -- | A map from constructor 'Unique' to its field names (in order).
 -- Used for pretty-printing constructor values with named fields.
@@ -81,6 +113,10 @@ class LayoutPrinter a where
   printWithLayout :: a -> Doc ann
   parensIfNeeded :: a -> Doc ann
   parensIfNeeded = printWithLayout
+  -- | The line a clause group's head writes above its first clause: nothing,
+  -- except for a 'WithNlg' name with an annotation ('ownLineNlgOf').
+  ownLineNlg :: a -> [Doc ann]
+  ownLineNlg _ = []
 
 type LayoutPrinterWithName name = (LayoutPrinter name, HasName name)
 
@@ -99,7 +135,12 @@ instance LayoutPrinter RawName where
 instance LayoutPrinterWithName a => LayoutPrinter (Type' a) where
   printWithLayout = \ case
     Type _ -> "TYPE"
-    TyApp _ n ps -> printWithLayout n <> case ps of
+    -- 'bareName', not 'printWithLayout': a TYPE never carries an annotation
+    -- into print. See 'inlineNlgOf' for why that is a narrowing and not an
+    -- inconsistency — a type is printed in evaluation results and diagnostics
+    -- as well as in source, and @#CHECK@ answering
+    -- @BOOLEAN [5% with %amount%]@ is the shape that made the point.
+    TyApp _ n ps -> bareName n <> case ps of
       [] -> mempty
       params@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap printWithLayout params))
     Fun _ args ty ->
@@ -162,7 +203,13 @@ displayTypeVarNames =
 goDisplayTy :: Map Int Text -> Type' Resolved -> Doc ann
 goDisplayTy m = \ case
   Type _ -> "TYPE"
-  TyApp _ n ps -> printWithLayout n <> case ps of
+  -- 'bareName' here for the same reason as in the 'Type'' instance, and this
+  -- is the copy that actually reaches the user: a @#CHECK@ reports its
+  -- inferred type through THIS function, and it answered
+  -- @BOOLEAN [5% with %amount%]@ until it did. Being "a mirror of the 'Type''
+  -- layout instance" is what let it be missed — the instance was fixed first
+  -- and the golden did not move.
+  TyApp _ n ps -> bareName n <> case ps of
     [] -> mempty
     params@(_ : _) -> space <> "OF" <+> hsep (punctuate comma (fmap (goDisplayTy m) params))
   Fun _ args ty' ->
@@ -335,18 +382,36 @@ writtenClauses ann (MkAppForm _ hd _ _) expr = do
   bodies <- clauseBodies matrix.scrutinees patterns expr
   let clauses = zip patterns bodies
   guard (length clauses >= 2 || any (any isDistinguishablePat . fst) clauses)
-  pure
+  pure $ ownLineNlg hd <>
     [ vcat
         -- Each clause with its own @AKA@ ('PmMatrixClause'): a run of bare
         -- names that the checker separates into overloads gives each its
         -- own, so a printed module must keep them with their clauses.
-        [ "DECIDE" <+> printWithLayout hd <> foldMap ((space <>) . clauseHeadPattern) pats
+        [ "DECIDE" <+> bareName hd <> foldMap ((space <>) . clauseHeadPattern) pats
             <> foldMap ((space <>) . printWithLayout) cl.clauseAka
             <+> "IS"
         , indent 2 (printWithLayout body)
         ]
     | (cl, (pats, body)) <- zip matrix.clauses clauses
     ]
+
+-- | The group's wording, on a line of its own above the first clause, which
+-- is where a drafter writes it and where the parser reads it as the rule's.
+--
+-- Not the bracket form after each clause's head, which is what the name
+-- printer would emit: the group has ONE head, so every clause would repeat
+-- it, and the parser does not read a bracket after a clause head as the
+-- rule's. Measured 2026-11-09: @DECIDE code [the code of %c%] Red IS 1@ gives
+-- the wording to the group's input @c@, and the same bracket on the second
+-- clause gives it to the constructor @Green@, so the printed module said the
+-- rule's sentence was an input's. The line form runs to the end of the line,
+-- which here is the end of the annotation, so it needs nothing but the
+-- escapes 'printInlineNlg' already writes (each decodes the same in both
+-- forms).
+ownLineNlgOf :: Name -> [Doc ann]
+ownLineNlgOf n = case Optics.view (annoOf Optics.% annNlg) n of
+  Nothing  -> []
+  Just nlg -> ["@nlg" <+> printInlineNlg nlg]
 
 -- | A pattern in a clause head, as 'L4.Parser.pmClause' reads one: all on one
 -- line, and in brackets unless it is a single name or a literal, with every
@@ -784,6 +849,132 @@ instance LayoutPrinter Nlg where
 instance LayoutPrinter Desc where
   printWithLayout = \ case
     MkDesc _ann n -> pretty n
+
+-- | Re-emit the @\@nlg@ annotation carried by a name, in the bare inline form.
+-- Only 'LayoutPrinter' 'WithNlg' calls this; see 'prettyLayoutWithNlg'.
+--
+-- Measured 2026-09-19: an @\@nlg@ annotation attaches to a 'Name' node and to
+-- nothing else. That includes a trailing annotation which reads as though it
+-- sat on an expression — in @ok\/nlg_decide2.l4@ the @\@nlg Expression@ under
+-- @(a PLUS c)@ lands on the USE occurrence of @c@, not on the 'Expr'. So the
+-- name printer is the one hook that recovers all of them, and until it existed
+-- every re-printed module had lost every annotation (smucclaw\/l4-ide#966).
+--
+-- __The bracket form, not the @\@nlg@ herald, and that is forced.__ A heralded
+-- line annotation runs to the end of the line, so emitting one for a name in
+-- the middle of @DECIDE foo a b c IS@ would swallow the rest of the line, @IS@
+-- included, and the result would not re-parse. The bracket form is
+-- self-delimiting and therefore composes wherever a name is printed. Checked
+-- against the parser in every position a name occurs: appform head, appform
+-- parameter, GIVEN parameter, a type name, a record field, an enum constructor,
+-- and a use occurrence inside a body.
+--
+-- __Not on a type name, even in a re-emitted module.__ When this printed
+-- through every 'prettyLayout' (as on @unstable@), a type was printed in
+-- places that are not source — an evaluation result, a diagnostic, an LSP
+-- hover — so an annotation there was noise rather than fidelity.
+-- @ok\/nlg-percent.l4@ made the point concretely: its @#CHECK@
+-- answered @BOOLEAN [5% with %amount%]@, because the annotation the author
+-- wrote above the @DECIDE@ had attached to the @GIVETH@ type. Which is the
+-- second reason for the exclusion — measured 2026-09-19, an annotation that
+-- reaches a type name is essentially always that misplacement (11 of 116
+-- across ten sampled files; @prelude.l4@ has 0 of 67), so what is suppressed
+-- here is an annotation that renders nowhere anyway.
+--
+-- __What it still cannot carry is a language tag.__ @\@nlg:he@ has no bracket
+-- spelling, so a tagged annotation prints here without its tag, and only the
+-- default rendering ('annNlg') prints: the others ('annNlgAlts') are dropped.
+-- That is a narrowing of this fix rather than a regression it introduces — the
+-- whole annotation was dropped before.
+inlineNlgOf :: Name -> Doc ann
+inlineNlgOf n = case Optics.view (annoOf Optics.% annNlg) n of
+  Nothing  -> mempty
+  Just nlg -> space <> brackets (printInlineNlg nlg)
+
+-- | An annotation rendered for the bracket form.
+--
+-- Deliberately not 'LayoutPrinter' 'Nlg', which is the hover\/diagnostic
+-- rendering: that one separates a reference fragment from its neighbour with
+-- @\<+\>@, and since whitespace between words is ALREADY its own text
+-- fragment, doing so here would add a space on every round trip — @%b%\'s@
+-- would print as @%b% \'s@, which re-parses into different fragments. A stray
+-- space is cosmetic in a hover and a defect in printed source.
+printInlineNlg :: Nlg -> Doc ann
+printInlineNlg = \ case
+  -- An invalid annotation has no text to re-emit. 'LayoutPrinter' 'Nlg' prints
+  -- the placeholder @Invalid Nlg@, which is the right thing in a hover and the
+  -- wrong thing here, where it would land in the file as prose.
+  MkInvalidNlg _          -> mempty
+  MkParsedNlg _ _ frags   -> foldMap inlineNlgFragment frags
+  MkResolvedNlg _ _ frags -> foldMap inlineNlgFragment frags
+
+inlineNlgFragment :: (LayoutPrinter a, HasName a) => NlgFragment a -> Doc ann
+inlineNlgFragment = \ case
+  MkNlgText _ t -> pretty (escapeInlineNlgText t)
+  -- Bare on purpose: going through 'LayoutPrinter' 'Name' would recurse into
+  -- this name\'s own annotation if it ever carried one.
+  MkNlgRef  _ n -> "%" <> bareName n <> "%"
+
+-- | A name with nothing attached — no @\@nlg@, just the identifier.
+--
+-- Still goes through 'LayoutPrinter' 'RawName', so this suppresses the
+-- annotation and nothing else.
+bareName :: (LayoutPrinter a, HasName a) => a -> Doc ann
+bareName = printWithLayout . rawName . getName
+
+-- | Escape a close bracket, so a LINE-form annotation survives being re-emitted
+-- in the bracket form.
+--
+-- Fragment text is stored VERBATIM — @\\%@ and @\\]@ reach the AST still
+-- escaped, so that exactprint can re-emit them byte for byte — so this steps
+-- OVER an existing escape pair rather than re-escaping its backslash.
+--
+-- Only @]@ needs it, and the asymmetry is the point. A line annotation runs to
+-- end of line and can therefore contain a bare @]@ (measured: @\@nlg see note
+-- [3] here@ stores @]@ as a fragment of its own), which in the bracket form
+-- would end the annotation early and leave the rest of the line as stray
+-- source. @[@ is ordinary text in BOTH forms, and @\\[@, though
+-- 'L4.Nlg.unescapeNlgText' honours it, protects nothing, so leaving @[@ bare
+-- re-emits what was written.
+--
+-- __And it puts the annotation on one line.__ A wording may run over several
+-- lines in the source, @[the f of@ then @%n%] n MEANS …@ at the margin, and
+-- printed with its line break the continuation lands at the margin again, where
+-- it ends the definition: @l4 batch@ failed every row of such a file (measured
+-- 2026-11-09). The clause group's line form ('ownLineNlgOf') cannot hold a line
+-- break at all. So a line break, with the spaces around it, prints as one
+-- space. Rendering already treats it as one: @l4 nlg@ and @l4 render@ read the
+-- wording the same either way.
+escapeInlineNlgText :: Text -> Text
+escapeInlineNlgText = Text.pack . go . Text.unpack . oneLine
+ where
+  oneLine :: Text -> Text
+  oneLine t = case Text.splitOn "\n" t of
+    []       -> t
+    [_]      -> t
+    (l : ls) ->
+      Text.intercalate " " $
+        [Text.stripEnd l]
+          <> filter (not . Text.null) (map Text.strip (init ls))
+          <> [Text.stripStart (last ls)]
+  go :: String -> String
+  go = \ case
+    []             -> []
+    -- A LONE TRAILING BACKSLASH, which is the case that got away. A line
+    -- annotation may end in one — @\@nlg a discount of 50\\@ sits in
+    -- @ok\/nlg-percent.l4@ precisely to pin that a backslash which cannot
+    -- begin an escape is ordinary text. Copied through unchanged it lands
+    -- immediately before the @]@ this printer appends and escapes IT, so the
+    -- annotation never closes: the printed module swallowed the next five
+    -- lines into one annotation and stopped parsing. Doubling it decodes back
+    -- to the single backslash the author wrote.
+    --
+    -- Found by the corpus-wide round-trip suite, not by the unit tests, which
+    -- had the bare-@]@ case and not this one.
+    ['\\']         -> "\\\\"
+    '\\' : c : cs  -> '\\' : c : go cs
+    ']'  : cs      -> '\\' : ']' : go cs
+    c    : cs      -> c : go cs
 
 instance LayoutPrinterWithName a => LayoutPrinter (NlgFragment a) where
   printWithLayout = \ case
