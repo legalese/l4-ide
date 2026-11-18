@@ -42,7 +42,7 @@ This server registers **one tool per exported rule**, plus the same four source-
 
 Some rules give an input a default (see [TYPICALLY](../../reference/types/TYPICALLY.md)): a value the rule uses when a caller leaves that input out.
 By default an agent that leaves such an input out gets an answer computed from the default, and the result lists it under `presumed` so that the agent can tell the user what was assumed.
-The one exception is an event's party or action record in a request to a rule that describes obligations (a regulative rule, whose result is a contract; see [Regulative rules](../../reference/regulative/README.md)): every field of it must be written, and a request that leaves one out is refused, in both modes (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
+The one exception is an event's party or action record in a request to the decision service for a rule that describes obligations (a regulative rule, whose result is a contract; see [Regulative rules](../../reference/regulative/README.md)): every field of it must be written, and a request that leaves one out is answered with an error that names the field, whether `presumption` is `soft` or `hard` (see [An event's party and action record](../../reference/types/TYPICALLY.md#an-events-party-and-action-record)).
 
 An agent that must not assume anything the user did not say can send the argument `presumption` with the value `"hard"`.
 Then no default is used: if the call leaves out an input the rule needs, the tool refuses the call and names the input, instead of answering.
@@ -59,10 +59,40 @@ The keys of that object are the ones the tool's input schema lists.
 | An ordinary rule, one that does not describe obligations | With the rule's own inputs, at the top level of the tool's input                          | `{"applicant": {...}, "presumption": "hard"}`                                  |
 | A rule that describes obligations                        | Beside `arguments`, `startTime` and `events`; the rule's own inputs go inside `arguments` | `{"arguments": {...}, "startTime": 0, "events": [...], "presumption": "hard"}` |
 
-Three wrong places are refused, each with the place the argument goes.
-The first is inside `arguments` on a rule that describes obligations (unless the rule has an input of that name).
-The second is outside the tool's input, as a sibling of the `arguments` member of the `tools/call` request itself, which is the shape of an HTTP request body.
-The third is inside an `arguments` object that wraps the inputs of an ordinary rule.
+For a rule that describes obligations the word `arguments` appears twice, because the request has two layers.
+Here is a whole call, with the right place for `presumption`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "service-requirement",
+    "arguments": {
+      "arguments": { "state": { "status": "Active" } },
+      "startTime": 0,
+      "events": [
+        {
+          "party": { "Name": "Alice" },
+          "action": "maintain eligible service",
+          "at": 1
+        }
+      ],
+      "presumption": "hard"
+    }
+  }
+}
+```
+
+The outer `arguments`, a member of `params`, is the tool's input.
+The inner `arguments` holds the rule's own inputs, and `presumption` sits beside it.
+Three other places are refused, each with a message that says where the argument goes:
+
+- **Inside the inner `arguments`**, with the rule's own inputs, on a rule that describes obligations (unless the rule has an input of that name).
+- **Beside the outer `arguments`**, as a member of `params`, which is the shape of an HTTP request body.
+- **Inside an `arguments` object that wraps the inputs of an ordinary rule**: its inputs and `presumption` go at the top level of the tool's input, as in the table.
+
 Anywhere else, such as in `_meta`, the argument is not read and is ignored.
 
 On this service, every rule's tool advertises `presumption` in its input schema, so an agent finds it without being told.
