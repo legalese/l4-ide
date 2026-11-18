@@ -185,6 +185,7 @@ test-suite jl4-core-test
     PatternMatchParserSpec
     PatternClausesMissingSpec
     NestedParenParserSpec
+    ClauseLayoutParserSpec
     EventExactPrintSpec
     FormatFidelitySpec
     UUID5Spec

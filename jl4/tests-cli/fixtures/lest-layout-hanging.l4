@@ -1,0 +1,21 @@
+-- smucclaw/l4-ide#1068: a nested rule written left of the outer rule's
+-- clauses, which hang right of PARTY. Its LEST, written at its own clauses,
+-- is its own. The first version of the fix gave it to the outer rule, so the
+-- trace below blamed Buyer for the Seller's missed delivery.
+
+DECLARE Person IS ONE OF Seller, Buyer, Carrier
+DECLARE Action IS ONE OF delivery, payment, collection
+
+hanging MEANS
+  PARTY Seller
+      MUST delivery
+      WITHIN 3
+      HENCE
+    PARTY Buyer
+    MUST payment
+    WITHIN 7
+    LEST BREACH BY Buyer
+
+-- The Seller never delivers; an unrelated event on day 10 shows the miss.
+#TRACE hanging AT 0 WITH
+  PARTY Carrier DOES collection AT 10

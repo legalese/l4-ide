@@ -480,6 +480,13 @@ nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
 libraryAliasTwoTypes = fixtureDir </> "library-alias-two-types.l4"
 renderDeepNesting = fixtureDir </> "render-deep-nesting.l4"
 
+-- Which rule a HENCE or LEST belongs to (smucclaw/l4-ide#1068).
+lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest :: FilePath
+lestLayoutRepro = fixtureDir </> "lest-layout-1068.l4"
+lestLayoutFixture = fixtureDir </> "lest-layout.l4"
+lestLayoutHanging = fixtureDir </> "lest-layout-hanging.l4"
+lestLayoutHenceAfterLest = fixtureDir </> "lest-layout-hence-after-lest.l4"
+
 nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
 nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
 nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
@@ -757,6 +764,7 @@ main = do
        , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
        , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
        , slotScope, slotScopeSentence, nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
+       , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest
        , nlgPositionalMain, nlgPositionalLib
        , buildIdentityScript, buildIdentityPackageJson ] \fp -> do
     ok <- doesFileExist fp
@@ -3737,6 +3745,59 @@ spec bin = do
         Just (Output code sout _) -> do
           code `shouldBe` ExitSuccess
           sout `shouldSatisfy` ("[p] is shown" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1068: clause columns decide which rule a HENCE or LEST
+  -- belongs to. A nested rule keeps one written at its own clauses, and ends
+  -- at one written at the clauses of the rule it is nested in. Before, the
+  -- innermost open rule took it, with exit 0 everywhere. `l4 run` prints a
+  -- rule without brackets, so each case runs a #TRACE in which the Seller
+  -- delivers, and pins the rule left over whole: the Seller's LEST is gone
+  -- from it exactly when it was the Seller's. The fixtures are the same as on
+  -- unstable; where one has no such #TRACE, it is appended in a copy.
+  describe "HENCE and LEST belong to the rule whose clauses they line up with" $ do
+    let lastResult sout =
+          case [ unwords (words (unlines (takeWhile (not . null . words) rest)))
+               | ("Result:" : rest) <- tails (lines (filter (/= '\r') sout)) ] of
+            [] -> ""
+            results -> last results
+        residualOf args = do
+          Output code sout _ <- runL4 bin ("run" : args)
+          code `shouldBe` ExitSuccess
+          pure (lastResult sout)
+        residualAfterDelivery fixture contract =
+          withSystemTempDirectory "l4-lest-layout" \dir -> do
+            src <- readFile fixture
+            let file = dir </> takeFileName fixture
+            writeFile file (src <> "\n#TRACE " <> contract <> " AT 0 WITH\n  PARTY Seller DOES delivery AT 1\n")
+            residualOf [file]
+
+    it "gives the issue's outer LEST to the Seller, and the Buyer's own LEST to the Buyer" $
+      residualOf [lestLayoutRepro] >>= (`shouldBe`
+        "PARTY Buyer MUST payment EXACTLY 100 WITHIN 7 HENCE FULFILLED LEST PARTY Buyer MUST payment EXACTLY 120 WITHIN 14")
+
+    it "gives the LEST after a rule written on its HENCE's line to the outer rule" $
+      residualAfterDelivery lestLayoutFixture "sameLine" >>= (`shouldBe`
+        "PARTY Buyer MUST payment 100 WITHIN 7 HENCE FULFILLED")
+
+    it "chains a HENCE written at the nested rule's own clauses after that rule" $
+      residualAfterDelivery lestLayoutFixture "henceChain" >>= (`shouldBe`
+        "PARTY Buyer MUST payment 100 WITHIN 7 HENCE PARTY Seller MUST delivery WITHIN 9")
+
+    it "keeps a nested rule's LEST at its own clauses when the outer rule's clauses hang right of them" $
+      residualAfterDelivery lestLayoutHanging "hanging" >>= (`shouldBe`
+        "PARTY Buyer MUST payment WITHIN 7 HENCE FULFILLED LEST BREACH BY Buyer")
+
+    it "so a missed delivery in that layout is the Seller's breach, not the Buyer's" $ do
+      Output code sout _ <- runL4 bin ["run", lestLayoutHanging]
+      code `shouldBe` ExitSuccess
+      unwords (words (filter (/= '\r') sout)) `shouldSatisfy`
+        ("surpassed the deadline of party Seller who had to do obligatory action MUST delivery" `isInfixOf`)
+
+    it "refuses a HENCE at the outer rule's clauses after its LEST, naming the rule" $ do
+      Output code _ serr <- runL4 bin ["check", lestLayoutHenceAfterLest]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This HENCE lines up with the clauses of the rule that starts with PARTY at line 8, column 3. It comes after that rule's LEST. Write HENCE before LEST." `isInfixOf`)
 
   describe "l4 batch" $ do
     it "streams one NDJSON row per input (default format)" $ do

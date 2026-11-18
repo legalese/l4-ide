@@ -1,0 +1,157 @@
+-- Which rule a HENCE or LEST belongs to, when a rule is nested inside another
+-- rule's HENCE or LEST without brackets (smucclaw/l4-ide#1068).
+--
+-- A nested rule keeps a HENCE or LEST written at its own clauses, and ends at
+-- one written at the clauses of the rule it is nested in (the whole rule is in
+-- doc/reference/regulative/consequences.md). Each #EVAL below prints the rule
+-- without brackets, so this file's golden alone does not show where each HENCE
+-- and LEST landed; jl4-core's ClauseLayoutParserSpec does. Before the fix, the
+-- first three rules' outer LEST was the innermost rule's; the fourth failed.
+
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  delivery
+  cancel
+  payment HAS amount IS A NUMBER
+
+-- The issue's repro. The Buyer's own LEST (the 120 payment) stays with the
+-- Buyer's first rule; the Seller's LEST, at the Seller's clauses, is the
+-- Seller's.
+GIVETH A DEONTIC Person Action
+`two levels` MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  HENCE
+    PARTY Buyer
+    MUST payment 100
+    WITHIN 7
+    LEST
+      PARTY Buyer
+      MUST payment 120
+      WITHIN 14
+  LEST BREACH BY Seller
+
+-- One level: an inner rule with no LEST of its own does not take the outer
+-- LEST either. Under a MAY, taking it would turn an unused permission into a
+-- breach.
+GIVETH A DEONTIC Person Action
+`one level` MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  HENCE
+    PARTY Buyer
+    MAY cancel
+    WITHIN 7
+  LEST BREACH BY Seller
+
+-- Clauses indented under the head, the layout the EVERY pages use: the outer
+-- rule's clause column is 9, not its head's 5.
+GIVETH A DEONTIC Person Action
+`indented clauses` MEANS
+    PARTY Seller
+        MUST delivery
+        WITHIN 3
+        HENCE
+            PARTY Buyer
+                MUST payment 100
+                WITHIN 7
+        LEST BREACH BY Seller
+
+-- A rule on the same line as its HENCE: the LEST on the next line, at the
+-- outer rule's clauses, is the outer rule's.
+GIVETH A DEONTIC Person Action
+`same line` MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  HENCE PARTY Buyer MUST payment 100 WITHIN 7
+  LEST BREACH BY Seller
+
+-- The HENCE side: a HENCE at the nested rule's own clauses chains after the
+-- nested rule, and the LEST at the outer clauses is still the outer rule's.
+GIVETH A DEONTIC Person Action
+`hence chain` MEANS
+  PARTY Seller MUST delivery WITHIN 3
+  HENCE PARTY Buyer MUST payment 100 WITHIN 7
+        HENCE PARTY Seller MUST delivery WITHIN 9
+  LEST BREACH BY Seller
+
+-- On ONE line, a later LEST still belongs to the rule on that line.
+GIVETH A DEONTIC Person Action
+`one line inner lest` MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  HENCE PARTY Buyer MUST payment 100 WITHIN 7 LEST BREACH BY Buyer
+  LEST BREACH BY Seller
+
+-- Indented past the middle rule's clauses (column 5), a LEST belongs to the
+-- innermost rule, even at a column that matches no rule's clauses.
+GIVETH A DEONTIC Person Action
+`between columns` MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  HENCE
+    PARTY Buyer
+    MUST payment 100
+    WITHIN 7
+    LEST
+      PARTY Buyer
+      MUST payment 120
+      WITHIN 14
+     LEST BREACH BY Seller
+
+-- Brackets reset the columns: a rule whose head sits mid-line after "(" may
+-- write its clauses left of its head.
+GIVETH A DEONTIC Person Action
+`bracketed mid-line head` MEANS
+    (PARTY Seller
+        MUST delivery
+        WITHIN 3
+        HENCE (PARTY Buyer
+            MUST payment 100
+            WITHIN 7
+            HENCE FULFILLED)
+        LEST BREACH BY Seller)
+
+-- The outer rule's clauses hang right of its PARTY, and the nested rule is
+-- written further left. Each LEST goes to the rule whose clauses it lines up
+-- with: the first to the Buyer, the second to the Seller.
+GIVETH A DEONTIC Person Action
+`nested rule left of hanging clauses` MEANS
+  PARTY Seller
+      MUST delivery
+      WITHIN 3
+      HENCE
+    PARTY Buyer
+    MUST payment 100
+    WITHIN 7
+    LEST BREACH BY Buyer
+      LEST BREACH BY Seller
+
+-- Both rules' clauses at one column: a LEST there is the nested rule's.
+-- Brackets would give it to the outer rule.
+GIVETH A DEONTIC Person Action
+`same column` MEANS
+  PARTY Seller
+    MUST delivery
+    WITHIN 3
+    HENCE
+    PARTY Buyer
+    MUST payment 100
+    WITHIN 7
+    LEST BREACH BY Buyer
+
+#EVAL `two levels`
+#EVAL `one level`
+#EVAL `indented clauses`
+#EVAL `same line`
+#EVAL `hence chain`
+#EVAL `one line inner lest`
+#EVAL `between columns`
+#EVAL `bracketed mid-line head`
+#EVAL `nested rule left of hanging clauses`
+#EVAL `same column`

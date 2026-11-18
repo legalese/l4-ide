@@ -1,0 +1,15 @@
+-- smucclaw/l4-ide#1068: the HENCE at the outer rule's clauses, after its LEST,
+-- was silently given to the rule nested in that LEST. It is now refused.
+
+DECLARE Person IS ONE OF Seller
+DECLARE Action IS ONE OF delivery
+
+c MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  LEST
+    PARTY Seller
+    MUST delivery
+    WITHIN 5
+  HENCE FULFILLED
