@@ -20,7 +20,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamTypes, extractImplicitAssumeParams)
-import L4.Export.Shape (JsonField (..), JsonShape (..), ShapeEnv, ShapeName (..), Unsendable, jsonShape, moduleDeclares, shapeEnvFromDeclares)
+import L4.Export.Shape (JsonConstructor (..), JsonField (..), JsonShape (..), ShapeEnv, ShapeName (..), Unsendable, jsonShape, moduleDeclares, shapeEnvFromDeclares)
 import L4.TypeSynonym (declaresFromModule, expandSynonyms)
 import L4.Syntax
 import L4.TypeCheck.Environment (maybeUnique)
@@ -44,6 +44,11 @@ data Parameter = Parameter
   , parameterItems :: !(Maybe Parameter) -- Array items schema for array types
   , parameterRequired :: !(Maybe [Text]) -- Required field names for nested object types
   , parameterL4Type :: !(Maybe Text) -- L4 user-declared type name (record/enum) when this node came from a DECLARE; serialised as "x-l4-type"
+  , parameterOneOf :: !(Maybe [Parameter])
+  -- ^ For a type with a constructor that carries fields and one that carries
+  -- none, the two forms its value takes: the names of those that carry none
+  -- (a string enum) and the others tagged (an object, one key each). Only
+  -- such a type has it, and then it has no "type" (MULLET, Meng, 2026-11-18).
   }
   deriving stock (Show, Read, Ord, Eq, Generic)
 
@@ -65,7 +70,7 @@ instance FromJSON Parameters where
 instance ToJSON Parameter where
   toJSON p =
     Aeson.object $
-      [ "type" .= p.parameterType ]
+      (if Text.null p.parameterType then [] else [ "type" .= p.parameterType ])
         ++ (if Text.null p.parameterDescription then [] else ["description" .= p.parameterDescription])
         ++ case p.parameterAlias of
           Nothing -> []
@@ -91,11 +96,14 @@ instance ToJSON Parameter where
         ++ case p.parameterL4Type of
           Nothing -> []
           Just l4ty -> ["x-l4-type" .= l4ty]
+        ++ case p.parameterOneOf of
+          Nothing -> []
+          Just members -> ["oneOf" .= members]
 
 instance FromJSON Parameter where
   parseJSON = Aeson.withObject "Parameter" $ \p ->
     Parameter
-      <$> p .: "type"
+      <$> p .:? "type" .!= ""
       <*> p .:? "alias"
       <*> p .:? "format"
       <*> p .:? "enum" .!= []
@@ -105,6 +113,7 @@ instance FromJSON Parameter where
       <*> p .:? "items"
       <*> p .:? "required"
       <*> p .:? "x-l4-type"
+      <*> p .:? "oneOf"
 
 -- | The schema of an input or a result: the shape the export check gives its
 -- type ('jsonShape'), written out as a 'Parameter'. So an @\@export@ that the
@@ -149,6 +158,30 @@ shapeToParameter = \case
       , parameterRequired = Just [f.fieldName | f <- fields, f.fieldRequired]
       , parameterL4Type = Just named.shapeTypeName
       }
+  -- A constructor that carries fields is tagged, {"Card": {"card fee": 2}},
+  -- and one that carries none is its name, "Cash" (wire-form card J1, option
+  -- A; HATBOX, Meng, 2026-11-18). A type whose constructors all carry fields is
+  -- that object alone, one key for each, none required; one that has both is a
+  -- oneOf of the names and that object (MULLET, Meng, 2026-11-18). That the
+  -- object holds exactly one key is not said, as for an EITHER.
+  JTagged named constructors ->
+    let bare = [c.constructorName | c <- constructors, null c.constructorFields]
+        withFields = [c | c <- constructors, not (null c.constructorFields)]
+        names = (emptyParam "string") {parameterEnum = bare}
+        tagged =
+          (emptyParam "object")
+            { parameterProperties = Just (Map.fromList [(c.constructorName, recordParam c.constructorFields) | c <- withFields])
+            , parameterPropertyOrder = Just [c.constructorName | c <- withFields]
+            }
+        described q =
+          q
+            { parameterDescription = Maybe.fromMaybe "" named.shapeTypeDescription
+            , parameterL4Type = Just named.shapeTypeName
+            }
+     in described $
+          if null bare
+            then tagged
+            else (emptyParam "") {parameterOneOf = Just [names, tagged]}
   -- Expansion stops here, to keep the schema finite; the name still lets a
   -- client render the value as @TypeName WITH …@.
   JRecursive named -> (emptyParam "object") {parameterL4Type = Just named.shapeTypeName}
@@ -156,6 +189,17 @@ shapeToParameter = \case
   JOptional inner -> shapeToParameter inner
   JEither left right -> eitherParameter (shapeToParameter left) (shapeToParameter right)
  where
+  -- A constructor's fields, as a record's are written.
+  recordParam fields =
+    (emptyParam "object")
+      { parameterProperties =
+          Just $ Map.fromList
+            [ (f.fieldName, addDesc f.fieldDescription (shapeToParameter f.fieldShape))
+            | f <- fields
+            ]
+      , parameterPropertyOrder = Just [f.fieldName | f <- fields]
+      , parameterRequired = Just [f.fieldName | f <- fields, f.fieldRequired]
+      }
   addDesc :: Maybe Text -> Parameter -> Parameter
   addDesc Nothing p = p
   addDesc (Just d) p = p {parameterDescription = d}
@@ -188,6 +232,7 @@ emptyParam t =
     , parameterItems = Nothing
     , parameterRequired = Nothing
     , parameterL4Type = Nothing
+    , parameterOneOf = Nothing
     }
 
 parametersFromDecide :: Module Resolved -> Decide Resolved -> Parameters

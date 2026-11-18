@@ -444,6 +444,7 @@ exportedFunctionToSummary env ef =
               , parameterItems = Nothing
               , parameterRequired = Nothing
               , parameterL4Type = Nothing
+              , parameterOneOf = Nothing
               }
             -- The caller leaves out what the export check refuses, so every
             -- input here has a shape.

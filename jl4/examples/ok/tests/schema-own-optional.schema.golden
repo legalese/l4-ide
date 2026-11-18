@@ -16,11 +16,33 @@
             "type": "object"
         },
         "Optional OF NUMBER": {
-            "enum": [
-                "Absent",
-                "Present"
-            ],
-            "type": "string"
+            "oneOf": [
+                {
+                    "enum": [
+                        "Absent"
+                    ],
+                    "type": "string"
+                },
+                {
+                    "properties": {
+                        "Present": {
+                            "properties": {
+                                "value": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "value"
+                            ],
+                            "type": "object"
+                        }
+                    },
+                    "required": [
+                        "Present"
+                    ],
+                    "type": "object"
+                }
+            ]
         }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",

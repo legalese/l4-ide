@@ -231,6 +231,7 @@ sanitizeParameterValue p =
            $ Aeson.KeyMap.delete "properties"
            $ Aeson.KeyMap.delete "items"
            $ Aeson.KeyMap.delete "required"
+           $ Aeson.KeyMap.delete "oneOf"
            $ case Aeson.toJSON p of
                Aeson.Object o -> o
                _ -> Aeson.KeyMap.empty
@@ -253,7 +254,12 @@ sanitizeParameterValue p =
       withItems = case p.parameterItems of
         Just items -> Aeson.KeyMap.insert "items" (sanitizeParameterValue items) withProps
         Nothing -> withProps
-  in Aeson.Object withItems
+      -- the two forms of a type with a constructor that carries fields and one
+      -- that carries none (MULLET)
+      withOneOf = case p.parameterOneOf of
+        Just members -> Aeson.KeyMap.insert "oneOf" (Aeson.toJSON (map sanitizeParameterValue members)) withItems
+        Nothing -> withItems
+  in Aeson.Object withOneOf
 
 -- | Build a reverse mapping from sanitized property names back to original L4 names.
 -- Recursively includes entries from nested object properties and array items,
@@ -277,6 +283,7 @@ buildNestedReverseMap props =
   collectFromParameter p =
     maybe mempty buildNestedReverseMap p.parameterProperties
     <> maybe mempty (maybe mempty buildNestedReverseMap . (.parameterProperties)) p.parameterItems
+    <> maybe mempty (foldMap collectFromParameter) p.parameterOneOf
 
 -- | Wrapper around 'FunctionSummary' whose 'ToJSON' instance enriches
 -- the `parameters` and `returnSchema` fields with `x-sanitized-name`
@@ -321,7 +328,8 @@ annotateSanitizedNames (Aeson.Object obj) =
       Just v -> Aeson.KeyMap.insert k (f v) m
     obj' = update "properties" annotatePropertiesObject obj
     obj'' = update "items" annotateSanitizedNames obj'
-  in Aeson.Object obj''
+    obj''' = update "oneOf" annotateSanitizedNames obj''
+  in Aeson.Object obj'''
 annotateSanitizedNames (Aeson.Array arr) =
   Aeson.Array (fmap annotateSanitizedNames arr)
 annotateSanitizedNames v = v
@@ -418,3 +426,4 @@ checkParameter parentContext (fieldName, p) =
      ++ maybe [] (\items ->
           maybe [] (checkPropertyMap (nestedContext <> "[]")) items.parameterProperties
         ) p.parameterItems
+     ++ maybe [] (concatMap (\m -> maybe [] (checkPropertyMap nestedContext) m.parameterProperties)) p.parameterOneOf

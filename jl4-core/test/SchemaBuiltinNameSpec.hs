@@ -307,7 +307,10 @@ spec = describe "a type named like a builtin" $ do
           props = maybe (error "no properties") id p.parameterProperties
           field n = maybe (error ("no field " <> show n)) id (Map.lookup n props)
       p.parameterRequired `shouldBe` Just ["o", "w"]
-      (field "o").parameterEnum `shouldBe` ["Absent", "Present"]
+      -- a constructor with a field and one without: the names and the tagged
+      -- constructor (HATBOX, MULLET)
+      fmap (map (\m -> (m.parameterType, m.parameterEnum, fmap Map.keys m.parameterProperties))) (field "o").parameterOneOf
+        `shouldBe` Just [("string", ["Absent"], Nothing), ("object", [], Just ["Present"])]
       fmap Map.keys (field "w").parameterProperties `shouldBe` Just ["v"]
       (field "m").parameterType `shouldBe` "number"
 
@@ -410,13 +413,54 @@ spec = describe "a type named like a builtin" $ do
           , ("next", Aeson.object [("anyOf", Aeson.toJSON [Aeson.object [("properties", Aeson.object []), ("type", "object")], Aeson.object (jsonType "null")])])
           ])
 
-    -- The service has published the names; jl4-schema wrote a "tag" form that
-    -- no decoder reads. How the fields are written is not decided. A @desc is
-    -- carried as written, with the space after the keyword.
-    it "a constructor that carries fields is one of the constructors' names" $ do
+    -- A constructor that carries fields is tagged, {"Circle": {"radius": 2}},
+    -- and one that carries none is its name, "Dot" (wire-form card J1, option
+    -- A; HATBOX). A type with both is a oneOf of the two forms on both
+    -- generators (MULLET). A @desc is carried as written, with the space after
+    -- the keyword.
+    it "a type with a constructor that carries fields and one that carries none is a oneOf of names and tagged objects" $ do
       let r = checked [] shapes
           d = jsonDefinition r "Figure"
-      KeyMap.lookup "enum" d `shouldBe` Just (Aeson.toJSON ["Dot", "Circle" :: Text])
+          circle = Aeson.object
+            [ ("properties", Aeson.object [("Circle", Aeson.object
+                [ ("properties", Aeson.object [("radius", Aeson.object (jsonType "number"))])
+                , ("required", Aeson.toJSON ["radius" :: Text])
+                , ("type", "object") ])])
+            , ("required", Aeson.toJSON ["Circle" :: Text])
+            , ("type", "object") ]
+      KeyMap.lookup "oneOf" d `shouldBe` Just (Aeson.toJSON
+        [ Aeson.object [("enum", Aeson.toJSON ["Dot" :: Text]), ("type", "string")], circle ])
       KeyMap.lookup "description" d `shouldBe` Just " A shape that carries its size"
-      (parameter r "f").parameterEnum `shouldBe` ["Dot", "Circle"]
-      (parameter r "f").parameterDescription `shouldBe` " A shape that carries its size"
+      let p = parameter r "f"
+      p.parameterType `shouldBe` ""
+      p.parameterDescription `shouldBe` " A shape that carries its size"
+      p.parameterL4Type `shouldBe` Just "Figure"
+      fmap (map (\m -> (m.parameterType, m.parameterEnum, fmap Map.keys m.parameterProperties))) p.parameterOneOf
+        `shouldBe` Just [("string", ["Dot"], Nothing), ("object", [], Just ["Circle"])]
+      fmap (map (\m -> (.parameterRequired) <$> (Map.lookup "Circle" =<< m.parameterProperties))) p.parameterOneOf
+        `shouldBe` Just [Nothing, Just (Just ["radius"])]
+
+    it "a type whose constructors all carry fields is the tagged object alone" $ do
+      let r = checked [] (Text.unlines
+            [ "DECLARE Cut IS ONE OF"
+            , "  Slice HAS width IS A NUMBER"
+            , "  Wedge HAS angle IS A NUMBER"
+            , "@export cut"
+            , "GIVEN c IS A Cut"
+            , "GIVETH A NUMBER"
+            , "cutting c MEANS 1"
+            ])
+          p = parameter r "c"
+      (p.parameterType, p.parameterOneOf, fmap Map.keys p.parameterProperties) `shouldBe` ("object", Nothing, Just ["Slice", "Wedge"])
+      KeyMap.lookup "oneOf" (jsonDefinition r "Cut") `shouldSatisfy` maybe False (\v -> case v of Aeson.Array a -> length a == 2; _ -> False)
+
+    it "an enumeration whose constructors carry nothing is still the names" $ do
+      let r = checked [] (Text.unlines
+            [ "DECLARE Hue IS ONE OF Red, Blue"
+            , "@export hue"
+            , "GIVEN h IS A Hue"
+            , "GIVETH A Hue"
+            , "same h MEANS h"
+            ])
+          p = parameter r "h"
+      (p.parameterType, p.parameterEnum, p.parameterOneOf) `shouldBe` ("string", ["Red", "Blue"], Nothing)

@@ -1811,6 +1811,7 @@ emptyParam t = Parameter
   , parameterItems         = Nothing
   , parameterRequired      = Nothing
   , parameterL4Type        = Nothing
+  , parameterOneOf         = Nothing
   }
 
 

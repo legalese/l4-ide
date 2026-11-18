@@ -14,7 +14,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
 
 import L4.Export (ExportedFunction (..), ExportedParam (..))
-import L4.Export.Shape (JsonField (..), JsonShape (..), ShapeEnv, ShapeName (..), Unsendable, jsonShape)
+import L4.Export.Shape (JsonConstructor (..), JsonField (..), JsonShape (..), ShapeEnv, ShapeName (..), Unsendable, jsonShape)
 
 data JsonSchema = JsonSchema
   { schemaVersion :: !Text
@@ -163,6 +163,25 @@ shapeToJsonSchema = \case
   JOptional inner -> (\s -> SAnyOf [s, SNull] Nothing) <$> shapeToJsonSchema inner
   JEither left right -> eitherSchema <$> shapeToJsonSchema left <*> shapeToJsonSchema right
   JEnum named constructors -> define named (pure (SEnum constructors named.shapeTypeDescription))
+  -- A constructor that carries fields is an object with its name as the one
+  -- key, {"Card": {"card fee": 2}}, and one that carries none is its name,
+  -- "Cash" (the wire-form bench, card J1, option A; HATBOX, Meng,
+  -- 2026-11-18). A type that has both is a oneOf of the names and of one object
+  -- for each constructor that carries fields (MULLET, Meng, 2026-11-18); one
+  -- object for each, with its key required, says that exactly one constructor
+  -- is there, which one object with every key optional would not (assumed, not
+  -- ruled).
+  JTagged named constructors ->
+    define named do
+      let bare = [c.constructorName | c <- constructors, null c.constructorFields]
+      tagged <- for [c | c <- constructors, not (null c.constructorFields)] \c -> do
+        props <- for c.constructorFields \f -> do
+          schema <- shapeToJsonSchema f.fieldShape
+          pure (f.fieldName, withDescription f.fieldDescription schema, f.fieldRequired)
+        pure (SObject [(c.constructorName, SObject props Nothing, True)] Nothing)
+      pure $ case [SEnum bare Nothing | not (null bare)] <> tagged of
+        [one] -> withDescription named.shapeTypeDescription one
+        members -> SOneOf members named.shapeTypeDescription
   JRecord named fields ->
     define named do
       props <- for fields \f -> do

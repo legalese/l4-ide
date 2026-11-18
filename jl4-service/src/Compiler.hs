@@ -342,13 +342,13 @@ exportToFunction env declares implicitParams export =
           ( (schemaOf partyTy) { parameterDescription = "The party performing the action" }
           , (schemaOf actionTy) { parameterDescription = "The action performed" }
           )
-        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing
-             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing
+        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing Nothing
+             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing Nothing
              )
       finalParams = if isDeontic
         then mergedParams
           { parameterMap = mergedParams.parameterMap <> Map.fromList
-              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing)
+              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing Nothing)
               , ("events", Parameter
                   { parameterType = "array"
                   , parameterAlias = Nothing
@@ -366,15 +366,17 @@ exportToFunction env declares implicitParams export =
                       , parameterProperties = Just $ Map.fromList
                           [ ("party", partyParam)
                           , ("action", actionParam)
-                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing)
+                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing Nothing)
                           ]
                       , parameterPropertyOrder = Just ["party", "action", "at"]
                       , parameterItems = Nothing
                       , parameterRequired = Just ["party", "action", "at"]
                       , parameterL4Type = Nothing
+                      , parameterOneOf = Nothing
                       }
                   , parameterRequired = Nothing
                   , parameterL4Type = Nothing
+                  , parameterOneOf = Nothing
                   })
               ]
           , required = mergedParams.required <> ["startTime", "events"]

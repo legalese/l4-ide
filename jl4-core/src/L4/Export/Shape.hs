@@ -19,8 +19,11 @@
 -- > MAYBE a                        JOptional (shape a)       (may be left out or null)
 -- > DECLARE T HAS ...              JRecord                   (fields in declaration order)
 -- > DECLARE T IS ONE OF a, b       JEnum                     (the constructors' names)
--- > DECLARE T IS ONE OF a, b HAS … JEnum                     (the constructors' names; no shape if a field's
--- >                                                          type has none: UInConstructor)
+-- > DECLARE T IS ONE OF a, b HAS … JTagged                   (a constructor that carries fields is
+-- >                                                          {"b": {its fields}}, one that carries none
+-- >                                                          its name: wire-form card J1, option A; no
+-- >                                                          shape if a field's type has none:
+-- >                                                          UInConstructor)
 -- > DECLARE T IS A type            the shape of that type
 -- > a type with parameters         the shape of its body, parameters replaced; no shape if
 -- >                                an argument has none, whether or not the parameter is used:
@@ -41,6 +44,7 @@
 module L4.Export.Shape (
   JsonShape (..),
   JsonField (..),
+  JsonConstructor (..),
   ShapeName (..),
   Unsendable (..),
   ResultOrigin (..),
@@ -86,8 +90,14 @@ data JsonShape
   | JDate
   | JTime
   | JDateTime
-  | -- | The type and its constructors' names.
+  | -- | The type and its constructors' names, when none carries fields.
     JEnum ShapeName [Text]
+  | -- | The type and its constructors, when one at least carries fields. One
+    -- that carries fields is written @{"Card": {"card fee": 2}}@, keyed by its
+    -- name, and one that carries none is its name, @"Cash"@ (the wire-form
+    -- bench, card J1, option A, ruled by Meng on 2026-10-15), as the encoder
+    -- writes them.
+    JTagged ShapeName [JsonConstructor]
   | -- | The type and its fields.
     JRecord ShapeName [JsonField]
   | -- | A record that is being expanded already: the type only.
@@ -98,6 +108,14 @@ data JsonShape
     -- @{"RIGHT": [v]}@ (the wire-form bench, card J3, option B, ruled by Meng
     -- on 2026-10-15).
     JEither JsonShape JsonShape
+  deriving stock (Eq, Show)
+
+-- | A constructor of a 'JTagged' type: its name and its fields, none for one
+-- that is written as its name.
+data JsonConstructor = JsonConstructor
+  { constructorName :: !Text
+  , constructorFields :: ![JsonField]
+  }
   deriving stock (Eq, Show)
 
 data JsonField = JsonField
@@ -366,11 +384,17 @@ expand env = go Set.empty
              in
               case body of
                 SynonymDecl _ t -> inner t
-                -- A constructor that carries fields is shaped by its name alone, as
-                -- the schema has published it until now (card J1 of the wire-form
-                -- bench is ruled and not built); 'firstUnsendable' has looked at
-                -- its fields.
-                EnumDecl _ cons -> JEnum named [nameText c | MkConDecl _ c _ <- cons]
+                -- A type none of whose constructors carries fields is the
+                -- constructors' names. One that carries fields is tagged with its
+                -- name (card J1 of the wire-form bench, option A); 'firstUnsendable'
+                -- has looked at its fields.
+                EnumDecl _ cons
+                  | all (\(MkConDecl _ _ fs) -> null fs) cons -> JEnum named [nameText c | MkConDecl _ c _ <- cons]
+                  | otherwise ->
+                      JTagged named
+                        [ JsonConstructor (nameText c) (map (field inner) fs)
+                        | MkConDecl _ c fs <- cons
+                        ]
                 RecordDecl _ _ fields -> JRecord named (map (field inner) fields)
        where
         named = MkShapeName typeName (map (prettyLayout . snd) sub) desc

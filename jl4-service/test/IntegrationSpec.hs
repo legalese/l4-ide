@@ -3479,6 +3479,25 @@ spec = describe "integration" do
         call baseUrl mgr "boxed fee" (Aeson.object ["b" Aeson..= Aeson.object ["p" Aeson..= Aeson.String "Card"]])
           >>= (`shouldCarry` Refuses "Parameter 'b': the constructor `Card` carries fields")
         call baseUrl mgr "total fee" (Aeson.object ["ps" Aeson..= [card, Aeson.String "Cash", card]]) >>= (`shouldCarry` Answers (Aeson.Number 4))
+      -- The schema says so: a oneOf of the names and the tagged constructors
+      -- (MULLET), on the function's schema and in MCP's tools/list, where a
+      -- field's name is hyphenated and read back.
+      it "publishes the oneOf, and MCP reads a hyphenated field back" \(baseUrl, mgr) -> do
+        fnResp <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/tagged-in/functions/fee%20for")
+        let pSchema = wireAt fnResp ["parameters", "properties", "p"]
+            oneOf = case pSchema of
+              Right (Aeson.Object o) -> Aeson.KeyMap.lookup "oneOf" o
+              _ -> Nothing
+        fmap (\case Aeson.Array a -> length a; _ -> 0) oneOf `shouldBe` Just 2
+        listed <- mcpRpc baseUrl mgr "tagged-in" "tools/list" (Aeson.object [])
+        let tool = case listed of
+              Just (Aeson.Object r) | Just (Aeson.Array ts) <- Aeson.KeyMap.lookup "tools" r ->
+                [ t | Aeson.Object t <- toList ts, Aeson.KeyMap.lookup "name" t == Just (Aeson.String "fee-for") ]
+              _ -> []
+        show tool `shouldSatisfy` List.isInfixOf "card-fee"
+        called <- mcpRpc baseUrl mgr "tagged-in" "tools/call" $ Aeson.object
+          ["name" Aeson..= ("fee-for" :: Text), "arguments" Aeson..= Aeson.object ["p" Aeson..= Aeson.object ["Card" Aeson..= Aeson.object ["card-fee" Aeson..= (3 :: Int)]]]]
+        fmap (Text.isInfixOf "\"value\":3" . snd) (mcpPayloadText =<< called) `shouldBe` Just True
 
   describe "compiler" do
     it "compiles valid L4 sources" do

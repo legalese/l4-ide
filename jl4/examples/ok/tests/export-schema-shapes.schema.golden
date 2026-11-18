@@ -37,11 +37,56 @@
             "type": "object"
         },
         "Shape": {
-            "enum": [
-                "Circle",
-                "Square"
-            ],
-            "type": "string"
+            "oneOf": [
+                {
+                    "properties": {
+                        "Circle": {
+                            "properties": {
+                                "radius": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "radius"
+                            ],
+                            "type": "object"
+                        }
+                    },
+                    "required": [
+                        "Circle"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "Square": {
+                            "properties": {
+                                "label": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
+                                },
+                                "side": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "side"
+                            ],
+                            "type": "object"
+                        }
+                    },
+                    "required": [
+                        "Square"
+                    ],
+                    "type": "object"
+                }
+            ]
         }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",
