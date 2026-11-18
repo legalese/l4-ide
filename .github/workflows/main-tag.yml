@@ -197,7 +197,12 @@ jobs:
 
   build-lsp-linux-x64:
     name: Build jl4-lsp + l4 + jl4-service - Linux x64
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: a binary needs at least the glibc it was linked
+    # against (see etc/check-glibc.sh). When ubuntu-latest moved to ubuntu-26.04,
+    # build 112 came out needing glibc 2.43, and production, on 2.34, could not
+    # start it. The dependency cache key below names the image too, so a store
+    # built on another image is never restored here.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
@@ -262,7 +267,7 @@ jobs:
         uses: actions/cache/restore@v5
         id: cache
         env:
-          key: lsp-linux-x64-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
+          key: lsp-linux-x64-ubuntu-24.04-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
@@ -306,6 +311,9 @@ jobs:
           echo "jl4-service SHA256: $(cat bin/linux-x64/jl4-service.sha256)"
 
           ls -lh bin/linux-x64/
+
+      - name: Check the glibc the binaries need
+        run: bash etc/check-glibc.sh bin/linux-x64/jl4-lsp bin/linux-x64/l4 bin/linux-x64/jl4-service
 
       # The binary that is released must say the version it is released as:
       # production reads it from /health, and new deployments take their major
@@ -435,6 +443,9 @@ jobs:
           strip bin/linux-arm64/l4      || true
           chmod +x bin/linux-arm64/jl4-lsp bin/linux-arm64/l4
           ls -lh bin/linux-arm64/
+
+      - name: Check the glibc the binaries need
+        run: bash etc/check-glibc.sh bin/linux-arm64/jl4-lsp bin/linux-arm64/l4
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v6
