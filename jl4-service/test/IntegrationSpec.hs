@@ -2897,6 +2897,43 @@ spec = describe "integration" do
           _ -> expectationFailure "Expected empty deployments array"
 
   describe "lazy-load (compile on first request)" do
+    -- A pending deployment's cached metadata was written by the binary that
+    -- deployed it. A PUT or POST over it used to be compared with that cache,
+    -- so a schema this binary writes differently refused an unchanged PUT, and
+    -- bumped BREAKING on a POST, where an eager start compared the bundle with
+    -- itself. Now the stored sources are compiled first, as eager mode does
+    -- (STALEMENU, Meng, 2026-11-18).
+    describe "PUT and POST over a pending deployment whose cached schema differs" do
+      let major = Text.pack (show Version.serviceMajor)
+          staleCache meta = meta
+            { metaFunctions =
+                [ fs { fsParameters = MkParameters (Map.map (\p -> p { parameterType = "string" }) m) r }
+                | fs <- meta.metaFunctions
+                , let MkParameters m r = fs.fsParameters
+                ]
+            }
+          src = [("qualifies.l4", qualifiesJL4)]
+      it "applies a PUT of the unchanged bundle, at RUNNING + 1" do
+        withPendingCachedService "lazy-stale-put" src staleCache \baseUrl mgr -> do
+          resp <- (`httpLbs` mgr) =<< buildMultipartMethod "PUT" (baseUrl <> "/deployments/lazy-stale-put") Nothing (createZipBundle src)
+          statusCode' resp `shouldBe` 202
+          outcome <- pollUpdate baseUrl mgr "lazy-stale-put" resp
+          outcome `shouldBe` ("applied", Nothing)
+          deploymentVersionOf baseUrl mgr "lazy-stale-put" `shouldReturn` Just (major <> ".0.1")
+      it "answers a POST of the unchanged bundle with the deployment as it stands, as in eager mode" do
+        withPendingCachedService "lazy-stale-post-same" src staleCache \baseUrl mgr -> do
+          resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "lazy-stale-post-same" (createZipBundle src)
+          let decoded = Aeson.decode (responseBody resp) :: Maybe DeploymentStatusResponse
+          fmap (\d -> (d.dsStatus, d.dsUpdateId)) decoded `shouldBe` Just ("ready", Nothing)
+          deploymentVersionOf baseUrl mgr "lazy-stale-post-same" `shouldReturn` Just (major <> ".0.0")
+      it "does not bump BREAKING on a POST of a bundle with the same interface" do
+        withPendingCachedService "lazy-stale-post" src staleCache \baseUrl mgr -> do
+          resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "lazy-stale-post"
+            (createZipBundle [("qualifies.l4", qualifiesJL4 <> "\n-- v2\n")])
+          outcome <- pollUpdate baseUrl mgr "lazy-stale-post" resp
+          outcome `shouldBe` ("applied", Nothing)
+          deploymentVersionOf baseUrl mgr "lazy-stale-post" `shouldReturn` Just (major <> ".0.1")
+
     it "GET /deployments/{id} compiles pending deployment and returns ready" do
       withPendingService "lazy-get" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         req <- parseRequest (baseUrl <> "/deployments/lazy-get")
@@ -3931,6 +3968,41 @@ withPendingServices' storeName deployments act = do
     cleanDir tmpPath
     pure result
 
+-- | A deployment registered as pending, as after a lazy restart, whose stored
+-- metadata says version MAJOR.0.0 and whose cached metadata is what this
+-- binary compiles the sources to, changed by the given function: the cache an
+-- older binary would have written.
+withPendingCachedService
+  :: Text -> [(FilePath, Text)] -> (DeploymentMetadata -> DeploymentMetadata)
+  -> (String -> Manager -> IO a) -> IO a
+withPendingCachedService deployId sources change act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+      sourceMap = Map.fromList sources
+      major = Text.pack (show Version.serviceMajor) <> ".0.0"
+  cleanDir tmpPath
+  store <- initStore tmpPath
+  logger <- newLogger False
+  compiled <- compileBundle logger deployId sourceMap
+  meta <- case compiled of
+    Right (_, m) -> pure (change m) {metaDeploymentVersion = major}
+    Left err -> expectationFailure (Text.unpack err) >> fail "did not compile"
+  BundleStore.saveBundle store deployId sourceMap BundleStore.StoredMetadata
+    { BundleStore.smVersion = computeVersion sourceMap
+    , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
+    , BundleStore.smDescription = Nothing
+    , BundleStore.smServiceVersion = Nothing
+    , BundleStore.smDeploymentVersion = Just major
+    }
+  registry <- newTVarIO (Map.singleton (DeploymentId deployId) (DeploymentPending (Just meta)))
+  pendingUpd <- newTVarIO Map.empty
+  tasksReg <- newTVarIO Map.empty
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  mgr <- newManager defaultManagerSettings
+  testWithApplication (pure $ app env) \port -> do
+    result <- act ("http://localhost:" <> show port) mgr
+    cleanDir tmpPath
+    pure result
+
 -- | Compile sources, and register the deployment as still compiling, with its
 -- metadata cached in the BundleStore, as a service has a deployment that it
 -- compiles after a restart. The test is given two actions: one marks the
@@ -4395,6 +4467,60 @@ buildMultipartRequest url deployId zipBytes = do
     , requestBody = RequestBodyLBS body
     , requestHeaders = [("Content-Type", "multipart/form-data; boundary=" <> boundary)]
     }
+
+-- | A multipart request by this method, with an "id" field when given, and a
+-- "sources" zip file.
+buildMultipartMethod :: BS.ByteString -> String -> Maybe Text -> LBS.ByteString -> IO Request
+buildMultipartMethod httpMethod url mDeployId zipBytes = do
+  req <- parseRequest url
+  let boundary = "----TestBoundary12345" :: BS.ByteString
+      crlf = "\r\n" :: BS.ByteString
+      dashdash = "--" :: BS.ByteString
+      idPart = case mDeployId of
+        Nothing -> []
+        Just deployId ->
+          [ dashdash <> boundary <> crlf
+          , "Content-Disposition: form-data; name=\"id\"" <> crlf <> crlf
+          , Text.Encoding.encodeUtf8 deployId <> crlf
+          ]
+      bodyParts = idPart <>
+        [ dashdash <> boundary <> crlf
+        , "Content-Disposition: form-data; name=\"sources\"; filename=\"bundle.zip\"" <> crlf
+        , "Content-Type: application/zip" <> crlf <> crlf
+        ]
+      body = LBS.fromChunks bodyParts <> zipBytes <> LBS.fromChunks [crlf, dashdash <> boundary <> dashdash <> crlf]
+  pure req
+    { method = httpMethod
+    , requestBody = RequestBodyLBS body
+    , requestHeaders = [("Content-Type", "multipart/form-data; boundary=" <> boundary)]
+    }
+
+-- | The update id of a deploy response, if it has one.
+jobOutcome :: Response LBS.ByteString -> Maybe Text
+jobOutcome resp = (Aeson.decode (responseBody resp) :: Maybe DeploymentStatusResponse) >>= (.dsUpdateId)
+
+-- | Poll the job a deploy response names until it is applied or rejected:
+-- its status and error.
+pollUpdate :: String -> Manager -> Text -> Response LBS.ByteString -> IO (Text, Maybe Text)
+pollUpdate baseUrl mgr deployId resp = case jobOutcome resp of
+  Nothing -> pure ("no job: " <> Text.Encoding.decodeUtf8 (LBS.toStrict (responseBody resp)), Nothing)
+  Just job -> go job (120 :: Int)
+ where
+  go _ 0 = pure ("timeout", Nothing)
+  go job n = do
+    r <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/updates/" <> Text.unpack job)
+    let field k = case wireAt r [k] of Right (Aeson.String t) -> Just t; _ -> Nothing
+    case field "status" of
+      Just st | st `elem` ["applied", "rejected"] -> pure (st, field "error")
+      _ -> threadDelay 250_000 >> go job (n - 1)
+
+-- | The deploymentVersion GET /deployments/{id} reports.
+deploymentVersionOf :: String -> Manager -> Text -> IO (Maybe Text)
+deploymentVersionOf baseUrl mgr deployId = do
+  r <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/" <> Text.unpack deployId)
+  pure $ case wireAt r ["metadata", "deploymentVersion"] of
+    Right (Aeson.String v) -> Just v
+    _ -> Nothing
 
 -- | Build a JSON POST request.
 buildJsonPost :: String -> Aeson.Value -> IO Request
