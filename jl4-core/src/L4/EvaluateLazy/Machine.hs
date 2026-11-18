@@ -1420,6 +1420,17 @@ jsonValueToWHNFTyped jsonValue ty0 = do
           case Map.lookup (getUnique tyRef) entityInfo of
             Nothing ->
               jsonValueToWHNF jsonValue
+            Just (typeNameRef, _checkEntity)
+              -- A type with a constructor that carries fields, other than a
+              -- record's one constructor named like the type, is written tagged:
+              -- a constructor that carries fields is {"Card": {its fields}},
+              -- one that carries none its name, "Cash" (the wire-form bench, card
+              -- J1, option A; HATBOX, Meng, 2026-11-18). Anything else is refused,
+              -- as a value of the wrong JSON type is for a NUMBER.
+              | ctors <- constructorsOf entityInfo tyRef
+              , any (\(_, _, conType) -> not (isNullaryConstructorReturning conType tyRef)) ctors
+              , not (isRecordShaped typeNameRef ctors) ->
+                  jsonValueToTagged typeNameRef ctors jsonValue
             Just (typeNameRef, _checkEntity) -> do
               -- Now look for a constructor with the same name
               let constructors = Map.toList entityInfo
@@ -1456,30 +1467,8 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                 Just (conUnique, conName, conType) -> do
                   -- Construct a Resolved reference for the constructor
                   let conRef = Def conUnique conName
-                  -- Extract BOTH field names AND types from the constructor type
-                  fieldNamesAndTypes <- extractFieldNamesAndTypes conType
                   case jsonValue of
-                    Aeson.Object obj -> do
-                      -- Decode each field from the JSON object WITH TYPE INFORMATION
-                      -- Note: We ignore extra fields in the JSON (Postel's Law)
-                      fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType0) -> do
-                        -- a synonym for MAYBE is a MAYBE: expand before deciding
-                        fieldType <- expandTypeSynonyms fieldType0
-                        case KeyMap.lookup (Key.fromText fieldName) obj of
-                          Nothing
-                            | isMaybeFieldTy fieldType ->
-                              -- MAYBE field missing in JSON: treat as NOTHING
-                              allocateValue $ ValConstructor TypeCheck.nothingRef []
-                            | otherwise -> do
-                              -- Required field missing in JSON: error
-                              userException $ UserError $
-                                "Missing required field '" <> fieldName <> "' in JSON object"
-                          Just fieldValue -> do
-                            -- RECURSIVELY decode the field value WITH TYPE INFORMATION
-                            fieldWHNF <- jsonValueToWHNFTyped fieldValue fieldType
-                            allocateValue fieldWHNF
-                      -- Construct the record with the decoded fields
-                      pure $ ValConstructor conRef fieldRefs
+                    Aeson.Object obj -> decodeConstructorFields conRef conType obj
                     _ -> do
                       -- JSON value is not an object, can't decode to record
                       userException $ UserError $
@@ -1487,6 +1476,87 @@ jsonValueToWHNFTyped jsonValue ty0 = do
 
     -- For other types, fall back to generic decoding
     _ -> jsonValueToWHNF jsonValue
+
+-- | The constructors of a declared type, from the entity info: each one's
+-- unique, name and type.
+constructorsOf :: EntityInfo -> Resolved -> [(Unique, Name, Type' Resolved)]
+constructorsOf entityInfo tyRef =
+  [ (unique, name, conType)
+  | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- Map.toList entityInfo
+  , constructorResult conType == Just (getUnique tyRef)
+  ]
+ where
+  constructorResult = \case
+    Forall _ _ t -> constructorResult t
+    Fun _ _ t -> constructorResult t
+    TyApp _ r _ -> Just (getUnique r)
+    _ -> Nothing
+
+-- | A record: one constructor, named like the type.
+isRecordShaped :: Name -> [(Unique, Name, Type' Resolved)] -> Bool
+isRecordShaped typeName = \case
+  [(_, conName, _)] -> nameToText (TypeCheck.getName conName) == nameToText (TypeCheck.getName typeName)
+  _ -> False
+
+-- | A value of a type written tagged (see 'jsonValueToWHNFTyped').
+jsonValueToTagged :: Name -> [(Unique, Name, Type' Resolved)] -> Aeson.Value -> Machine WHNF
+jsonValueToTagged typeName ctors jsonValue = case jsonValue of
+  Aeson.String s
+    | Just (u, n, conType) <- byName s ->
+        if carriesFields conType
+          then userException $ UserError $
+            "The constructor `" <> s <> "` carries fields, so it is written {\"" <> s <> "\": {its fields}}, but got: " <> Text.pack (show jsonValue)
+          else pure (ValConstructor (Def u n) [])
+  Aeson.Object obj
+    | [(key, given)] <- KeyMap.toList obj
+    , Just inner <- case given of
+        Aeson.Object o -> Just o
+        -- no fields given, as the service's wrapper writes {"Voucher": {}}
+        Aeson.Null -> Just KeyMap.empty
+        _ -> Nothing
+    , Just (u, n, conType) <- byName (Key.toText key)
+    , carriesFields conType ->
+        decodeConstructorFields (Def u n) conType inner
+  _ -> userException $ UserError $
+    "Expected a `" <> nameToText (TypeCheck.getName typeName) <> "` written as the name of a constructor that carries no fields ("
+      <> Text.intercalate ", " [ conText n | (_, n, t) <- ctors, not (carriesFields t) ]
+      <> ") or as {\"<constructor>\": {its fields}} for one that does ("
+      <> Text.intercalate ", " [ conText n | (_, n, t) <- ctors, carriesFields t ]
+      <> "), but got: " <> Text.pack (show jsonValue)
+ where
+  conText n = nameToText (TypeCheck.getName n)
+  byName s = listToMaybe [ c | c@(_, n, _) <- ctors, conText n == s ]
+  carriesFields = \case
+    Forall _ _ t -> carriesFields t
+    Fun {} -> True
+    _ -> False
+
+-- | A constructor's fields, read by name from a JSON object, each by its type.
+-- A MAYBE field that is missing is NOTHING; extra keys are ignored.
+decodeConstructorFields :: Resolved -> Type' Resolved -> Aeson.Object -> Machine WHNF
+decodeConstructorFields conRef conType obj = do
+  -- Extract BOTH field names AND types from the constructor type
+  fieldNamesAndTypes <- extractFieldNamesAndTypes conType
+  -- Decode each field from the JSON object WITH TYPE INFORMATION
+  -- Note: We ignore extra fields in the JSON (Postel's Law)
+  fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType0) -> do
+    -- a synonym for MAYBE is a MAYBE: expand before deciding
+    fieldType <- expandTypeSynonyms fieldType0
+    case KeyMap.lookup (Key.fromText fieldName) obj of
+      Nothing
+        | isMaybeFieldTy fieldType ->
+          -- MAYBE field missing in JSON: treat as NOTHING
+          allocateValue $ ValConstructor TypeCheck.nothingRef []
+        | otherwise -> do
+          -- Required field missing in JSON: error
+          userException $ UserError $
+            "Missing required field '" <> fieldName <> "' in JSON object"
+      Just fieldValue -> do
+        -- RECURSIVELY decode the field value WITH TYPE INFORMATION
+        fieldWHNF <- jsonValueToWHNFTyped fieldValue fieldType
+        allocateValue fieldWHNF
+  -- Construct the record with the decoded fields
+  pure $ ValConstructor conRef fieldRefs
 
 -- | A type with its synonyms expanded at the head, as far as they go. The
 -- checker records a synonym's body on its 'TypeCheck.KnownType'; a

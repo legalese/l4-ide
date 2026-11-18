@@ -3420,6 +3420,66 @@ spec = describe "integration" do
           call baseUrl mgr "fee" (claim Aeson.Null []) >>= (`shouldCarry` Refuses missing)
           call baseUrl mgr "fee" (claim (Aeson.object []) []) >>= (`shouldCarry` Refuses missing)
 
+  -- A constructor that carries fields is read as {"Card": {its fields}}, and
+  -- one that carries none as its name (wire-form card J1, option A; HATBOX,
+  -- Meng, 2026-11-18). Any other form, the bare name of a constructor that
+  -- carries fields among them, is refused, naming the input, on every path.
+  describe "reads a constructor that carries data as {\"Card\": {its fields}}" do
+    aroundAll (\k -> withServiceFromSources "tagged-in" [("tagged.l4", taggedInputJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "tagged-in" fn (Aeson.object ["arguments" Aeson..= args])
+          pay v extra = Aeson.object (("p" Aeson..= v) : extra)
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          card = Aeson.object ["Card" Aeson..= Aeson.object ["card fee" Aeson..= (2 :: Int)]]
+          bare = "Parameter 'p': the constructor `Card` carries fields, so it is written {\"Card\": {its fields}}"
+          malformed = "Parameter 'p': a `Payment` is the name of a constructor that carries no fields (Cash) or {\"<constructor>\": {its fields}} for one that does (Card, Voucher)"
+      it "answers the tagged form and a fieldless name, on both paths" \(baseUrl, mgr) -> do
+        forM_ [[], wrapped] \extra -> do
+          call baseUrl mgr "fee for" (pay card extra) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          call baseUrl mgr "fee for" (pay (Aeson.String "Cash") extra) >>= (`shouldCarry` Answers (Aeson.Number 0))
+      it "gives a constructor whose fields are all MAYBE as {\"Voucher\": {}}" \(baseUrl, mgr) ->
+        call baseUrl mgr "fee for" (pay (Aeson.object ["Voucher" Aeson..= Aeson.object []]) [])
+          >>= (`shouldCarry` Answers (Aeson.Number 1))
+      it "refuses the bare name of a constructor that carries fields, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "fee for" (pay (Aeson.String "Card") extra) >>= (`shouldCarry` Refuses bare)
+      it "refuses a malformed object, on both paths" \(baseUrl, mgr) ->
+        forM_ [ Aeson.object ["card fee" Aeson..= (2 :: Int)]
+              , Aeson.object ["Cash" Aeson..= Aeson.object []]
+              , Aeson.object ["Card" Aeson..= Aeson.object ["card fee" Aeson..= (2 :: Int)], "Cash" Aeson..= Aeson.object []]
+              ] \v -> forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "fee for" (pay v extra) >>= (`shouldCarry` Refuses malformed)
+      it "in a batch case and an MCP tool call" \(baseUrl, mgr) -> do
+        req <- buildJsonPost (baseUrl <> "/deployments/tagged-in/functions/fee%20for/evaluation/batch")
+          (Aeson.object
+            [ "outcomes" Aeson..= ([] :: [Text])
+            , "cases" Aeson..=
+                [ Aeson.object ["@id" Aeson..= (1 :: Int), "p" Aeson..= card]
+                , Aeson.object ["@id" Aeson..= (2 :: Int), "p" Aeson..= card, "pad" Aeson..= Aeson.Null]
+                , Aeson.object ["@id" Aeson..= (3 :: Int), "p" Aeson..= Aeson.String "Card"]
+                ]
+            ])
+        resp <- httpLbs req mgr
+        wireAt resp ["cases"] `shouldBe` Right (Aeson.toJSON
+          [ Aeson.object ["@id" Aeson..= (1 :: Int), "value" Aeson..= (2 :: Int)]
+          , Aeson.object ["@id" Aeson..= (2 :: Int), "value" Aeson..= (2 :: Int)]
+          , Aeson.object ["@id" Aeson..= (3 :: Int), "@error" Aeson..= bare]
+          ])
+        called <- mcpRpc baseUrl mgr "tagged-in" "tools/call" $ Aeson.object
+          ["name" Aeson..= ("fee-for" :: Text), "arguments" Aeson..= pay card []]
+        fmap (Text.isInfixOf "\"value\":2" . snd) (mcpPayloadText =<< called) `shouldBe` Just True
+      -- JSONDECODE, which the wrapper path reads with, used to take a type with
+      -- a constructor named like it for a record.
+      it "reads a type with a constructor named like it, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra -> do
+          let v x = Aeson.object (("v" Aeson..= x) : extra)
+          call baseUrl mgr "verdict" (v (Aeson.object ["Verdict" Aeson..= Aeson.object ["reason" Aeson..= ("ok" :: Text)]])) >>= (`shouldCarry` Answers (Aeson.Number 1))
+          call baseUrl mgr "verdict" (v (Aeson.String "None")) >>= (`shouldCarry` Answers (Aeson.Number 0))
+      it "in a record's field and a list's element" \(baseUrl, mgr) -> do
+        call baseUrl mgr "boxed fee" (Aeson.object ["b" Aeson..= Aeson.object ["p" Aeson..= card]]) >>= (`shouldCarry` Answers (Aeson.Number 2))
+        call baseUrl mgr "boxed fee" (Aeson.object ["b" Aeson..= Aeson.object ["p" Aeson..= Aeson.String "Card"]])
+          >>= (`shouldCarry` Refuses "Parameter 'b': the constructor `Card` carries fields")
+        call baseUrl mgr "total fee" (Aeson.object ["ps" Aeson..= [card, Aeson.String "Cash", card]]) >>= (`shouldCarry` Answers (Aeson.Number 4))
+
   describe "compiler" do
     it "compiles valid L4 sources" do
       logger <- newLogger False
@@ -4681,6 +4741,55 @@ ladderLeafField field fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
 
 -- | A rule with an EITHER input, one with an EITHER in a record field, and a
 -- contract rule with an EITHER input, which always takes the wrapper path.
+taggedInputJL4 :: Text
+taggedInputJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE Payment IS ONE OF"
+  , "  Cash"
+  , "  Card HAS `card fee` IS A NUMBER"
+  , "  Voucher HAS code IS A MAYBE STRING"
+  , ""
+  , "DECLARE Box HAS p IS A Payment"
+  , ""
+  , "DECLARE Verdict IS ONE OF"
+  , "  Verdict HAS reason IS A STRING"
+  , "  None"
+  , ""
+  , "GIVEN p IS A Payment"
+  , "GIVETH A NUMBER"
+  , "`fee of` p MEANS"
+  , "  CONSIDER p"
+  , "  WHEN Card f THEN f"
+  , "  WHEN Voucher c THEN 1"
+  , "  WHEN Cash THEN 0"
+  , ""
+  , "@export Fee for a payment"
+  , "GIVEN p IS A Payment"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`fee for` MEANS `fee of` p"
+  , ""
+  , "@export Fee in a box"
+  , "GIVEN b IS A Box"
+  , "GIVETH A NUMBER"
+  , "`boxed fee` MEANS `fee of` (b's p)"
+  , ""
+  , "@export Total fee"
+  , "GIVEN ps IS A LIST OF Payment"
+  , "GIVETH A NUMBER"
+  , "`total fee` MEANS sum (map `fee of` ps)"
+  , ""
+  , "@export Verdict"
+  , "GIVEN v IS A Verdict"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`verdict` MEANS"
+  , "  CONSIDER v"
+  , "  WHEN Verdict r THEN 1"
+  , "  WHEN None THEN 0"
+  ]
+
 eitherInputJL4 :: Text
 eitherInputJL4 = Text.unlines
   [ "DECLARE Box HAS v IS AN EITHER STRING NUMBER"

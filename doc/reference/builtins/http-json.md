@@ -86,7 +86,7 @@ The type you expect guides the decoding, so say it, with `GIVETH` or by the way 
 - A JSON object decodes to a record whose field names match its keys. Keys the record does not declare are ignored.
 - An array decodes to a LIST, a number to a NUMBER, a string to a STRING, `true` and `false` to a BOOLEAN.
 - `null` decodes to `NOTHING` for a MAYBE type; any other value decodes to `JUST` it.
-- A string with a constructor's name decodes to that constructor of an enumeration.
+- A string with a constructor's name decodes to that constructor of an enumeration. A constructor that carries fields is an object keyed by its name, `{"Card": {"card fee": 2}}`, the form a deployed rule publishes; its bare name, or any other form, stops the evaluation with an error naming the type's constructors. `JSONENCODE` writes such a constructor without its name, so that form does not decode back.
 - `{"LEFT": [v]}` decodes to `LEFT v` and `{"RIGHT": [v]}` to `RIGHT v` for an EITHER type, the form a deployed rule publishes. Any other JSON for an EITHER, such as a bare `5` or an object with both keys, stops the evaluation with `Expected an EITHER written {"LEFT": [value]} or {"RIGHT": [value]}`, as a string for a NUMBER does. `JSONENCODE` writes an EITHER without the array, as `{"RIGHT": 5}`, so that form does not decode back: it stops with the same error.
 - A type declared as another name for a type (`DECLARE Year IS A NUMBER`) decodes as that type, and so does one for a MAYBE: with `DECLARE MaybeYear IS A MAYBE NUMBER`, `null` decodes to `NOTHING` and `2026` to `JUST 2026`.
 

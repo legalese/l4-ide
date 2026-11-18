@@ -553,6 +553,11 @@ batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 batchMaybeTextJson = fixtureDir </> "batch-maybe-text.json"
 
+-- | A constructor that carries data, as an input.
+batchTaggedFixture, batchTaggedJson :: FilePath
+batchTaggedFixture = fixtureDir </> "batch-tagged.l4"
+batchTaggedJson = fixtureDir </> "batch-tagged.json"
+
 -- | An EITHER input, as the input itself and as a record's field.
 batchEitherFixture, batchEitherJson, batchEitherBoxedJson :: FilePath
 batchEitherFixture = fixtureDir </> "batch-either.l4"
@@ -4386,6 +4391,22 @@ spec bin = do
         forM_ (take 1 boxed) (diagnosed "Expected an EITHER written")
         (_, _, validated) <- rowsOf [batchEitherFixture, "--inputs", batchEitherJson, "--validate-only"]
         map (`objField` "status") validated `shouldBe` map (Just . String) ["invalid", "valid", "valid", "invalid", "invalid"]
+
+      -- A constructor that carries data is read as {"Card": {its fields}}, and
+      -- one that carries none as its name (card J1, option A; HATBOX, Meng,
+      -- 2026-11-18). Both forms used to reach the rule without their fields, so
+      -- that no WHEN matched them (review of #779, 2026-11-17).
+      it "reads a constructor that carries data as {\"Card\": {its fields}}, and refuses its bare name" $ do
+        (code, _, rows) <- rowsOf [batchTaggedFixture, "--inputs", batchTaggedJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "success", "error", "error"]
+        case rows of
+          [cash, card, bare, malformed] -> do
+            resultOf cash `shouldBe` Just (Number 0)
+            resultOf card `shouldBe` Just (Number 2)
+            show (objField bare "diagnostics") `shouldSatisfy` ("The constructor `Card` carries fields" `isInfixOf`)
+            show (objField malformed "diagnostics") `shouldSatisfy` ("Expected a `Payment` written as the name of a constructor" `isInfixOf`)
+          other -> expectationFailure ("expected 4 rows, got " ++ show (length other))
 
       -- An input declared through a synonym is the type the synonym stands for
       -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:

@@ -434,6 +434,10 @@ data ModuleInfo = ModuleInfo
     -- ^ enum type unique -> [(variant name, variant constructor ref)]
   , miSynonyms     :: Map Unique ([Unique], Type' Resolved)
     -- ^ synonym type unique -> (its parameters, its body)
+  , miTagged       :: Map Unique (Text, [(Text, Resolved, [(Text, Type' Resolved)])])
+    -- ^ for an enum type with a constructor that carries fields: the type's
+    -- name, and each constructor's name, ref and fields (none for one that
+    -- carries none), in declaration order
   }
 
 -- | Flatten a module's own top-level + nested DECLAREs. Does not
@@ -456,8 +460,18 @@ buildModuleInfo decls = ModuleInfo
   , miSynonyms     = Map.fromList
       [ (getUnique tyName, (map getUnique params, body))
       | MkDeclare _ _ (MkAppForm _ tyName params _) (SynonymDecl _ body) <- decls ]
+  , miTagged       = Map.fromList
+      [ (getUnique tyName, (rawNameToText (rawName (getActual tyName)), map conOf ctors))
+      | MkDeclare _ _ (MkAppForm _ tyName _ _) (EnumDecl _ ctors) <- decls
+      , any (\(MkConDecl _ _ fs) -> not (null fs)) ctors
+      ]
   }
   where
+    conOf (MkConDecl _ c fs) =
+      ( rawNameToText (rawName (getActual c))
+      , c
+      , [ (rawNameToText (rawName (getActual fn)), fty) | MkTypedName _ fn fty _ <- fs ]
+      )
 
     recordFor :: Declare Resolved -> Maybe (Unique, (Resolved, [(Text, Type' Resolved)]))
     -- A 'RecordDecl' carries its value-level constructor in the 'Maybe n'
@@ -542,6 +556,10 @@ lookupEnum :: ModuleInfo -> Type' Resolved -> Maybe [(Text, Resolved)]
 lookupEnum mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miEnumVariants
 lookupEnum _ _                 = Nothing
 
+lookupTagged :: ModuleInfo -> Type' Resolved -> Maybe (Text, [(Text, Resolved, [(Text, Type' Resolved)])])
+lookupTagged mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miTagged
+lookupTagged _ _                 = Nothing
+
 lookupRecord :: ModuleInfo -> Type' Resolved -> Maybe (Resolved, [(Text, Type' Resolved)])
 lookupRecord mi (TyApp _ name _) = Map.lookup (getUnique name) mi.miRecords
 lookupRecord _ _                 = Nothing
@@ -606,31 +624,75 @@ eitherFormMessage :: Text
 eitherFormMessage = "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}"
 
 -- | The first place in an input's value where an EITHER is not written
--- @{"LEFT": [v]}@ or @{"RIGHT": [v]}@, with 'eitherFormMessage'. It walks the
--- value along its type, through MAYBE, LIST, records and synonyms, and passes
+-- @{"LEFT": [v]}@ or @{"RIGHT": [v]}@ ('eitherFormMessage'), or a value of a type
+-- with a constructor that carries fields is neither a constructor's name nor
+-- @{"Card": {its fields}}@, or is the bare name of one that carries fields
+-- ('taggedFormMessage', 'bareConstructorMessage'). It walks the value along its
+-- type, through MAYBE, LIST, records, constructors' fields and synonyms, and passes
 -- over a missing, unknown or uncertain value, which the paths answer for
 -- themselves. Run before a request is routed, so the wrapper path, which reads
 -- its inputs with JSONDECODE, refuses with the input's name as the direct
 -- path does.
-eitherFormError :: ModuleInfo -> Type' Resolved -> FnLiteral -> Maybe Text
-eitherFormError mi ty0 val = case val of
+wireFormError :: ModuleInfo -> Type' Resolved -> FnLiteral -> Maybe Text
+wireFormError mi ty0 val = case val of
   FnUnknown -> Nothing
   FnUncertain -> Nothing
   _ | Just inner <- stripMaybe ty -> case val of
         FnLitString "NOTHING" -> Nothing
-        _ -> eitherFormError mi inner val
+        _ -> wireFormError mi inner val
     | Just (leftTy, rightTy) <- stripEither ty -> case val of
-        FnObject [("LEFT", FnArray [v])] -> eitherFormError mi leftTy v
-        FnObject [("RIGHT", FnArray [v])] -> eitherFormError mi rightTy v
+        FnObject [("LEFT", FnArray [v])] -> wireFormError mi leftTy v
+        FnObject [("RIGHT", FnArray [v])] -> wireFormError mi rightTy v
         _ -> Just eitherFormMessage
     | Just elemTy <- stripList ty, FnArray xs <- val ->
-        listToMaybe (mapMaybe (eitherFormError mi elemTy) xs)
+        listToMaybe (mapMaybe (wireFormError mi elemTy) xs)
     | Just (_, decl) <- lookupRecord mi ty, FnObject fields <- val ->
         listToMaybe
-          [ e | (fname, fty) <- decl, Just v <- [lookup fname fields], Just e <- [eitherFormError mi fty v] ]
+          [ e | (fname, fty) <- decl, Just v <- [lookup fname fields], Just e <- [wireFormError mi fty v] ]
+    -- A constructor that carries fields is written {"Card": {its fields}}, and
+    -- one that carries none its name (card J1, option A; HATBOX).
+    | Just tagged@(_, ctors) <- lookupTagged mi ty -> case val of
+        FnLitString s
+          | Just (_, _, _ : _) <- findCtor s ctors -> Just (bareConstructorMessage s)
+          | otherwise -> Nothing
+        FnObject [(k, inner)]
+          | Just (_, _, decl@(_ : _)) <- findCtor k ctors
+          , Just fields <- constructorFieldsOf inner ->
+              listToMaybe
+                [ e | (fname, fty) <- decl, Just v <- [lookup fname fields], Just e <- [wireFormError mi fty v] ]
+        _ -> Just (taggedFormMessage tagged)
     | otherwise -> Nothing
   where
     ty = expandSyn mi ty0
+
+-- | The fields given to a tagged constructor: an object's, or none for @{}@
+-- (which the request reads as 'FnUncertain') or @null@ (which the wrapper path
+-- writes for it).
+constructorFieldsOf :: FnLiteral -> Maybe [(Text, FnLiteral)]
+constructorFieldsOf = \case
+  FnObject fields -> Just fields
+  FnUncertain -> Just []
+  FnUnknown -> Just []
+  _ -> Nothing
+
+-- | A constructor of a tagged type, by name.
+findCtor :: Text -> [(Text, Resolved, [(Text, Type' Resolved)])] -> Maybe (Text, Resolved, [(Text, Type' Resolved)])
+findCtor s ctors = listToMaybe [ c | c@(n, _, _) <- ctors, n == s ]
+
+-- | What a request is told when it sends a constructor that carries fields as
+-- its bare name.
+bareConstructorMessage :: Text -> Text
+bareConstructorMessage s = "the constructor `" <> s <> "` carries fields, so it is written {\"" <> s <> "\": {its fields}}"
+
+-- | What a request is told when it sends a value of a tagged type in a form
+-- that is neither a constructor's name nor {"Card": {its fields}}.
+taggedFormMessage :: (Text, [(Text, Resolved, [(Text, Type' Resolved)])]) -> Text
+taggedFormMessage (tyName, ctors) =
+  "a `" <> tyName <> "` is the name of a constructor that carries no fields ("
+    <> Text.intercalate ", " [ n | (n, _, []) <- ctors ]
+    <> ") or {\"<constructor>\": {its fields}} for one that does ("
+    <> Text.intercalate ", " [ n | (n, _, _ : _) <- ctors ]
+    <> ")"
 
 nonEitherValue
   :: ModuleInfo
@@ -644,6 +706,9 @@ nonEitherValue mi ty = \case
   FnLitBool True  -> Right (App emptyAnno TypeCheck.trueRef [])
   FnLitBool False -> Right (App emptyAnno TypeCheck.falseRef [])
   FnLitString s
+    -- A constructor that carries fields is not its bare name (card J1, option A).
+    | Just (_, ctors) <- lookupTagged mi ty, Just (_, _, _ : _) <- findCtor s ctors ->
+        Left (bareConstructorMessage s)
     -- If the expected type is an enum, resolve the string to a variant.
     | Just variants <- lookupEnum mi ty ->
         case lookup s variants of
@@ -674,6 +739,18 @@ nonEitherValue mi ty = \case
       Just elemTy -> List emptyAnno <$> traverse (\v -> fnLiteralToExprTyped mi elemTy (Just v)) xs
       Nothing     -> Left "FnArray but expected type is not LIST"
   FnObject fields
+    -- {"Card": {its fields}}: the constructor, given its fields in declaration
+    -- order, read as a record's are (card J1, option A; HATBOX).
+    | Just tagged@(_, ctors) <- lookupTagged mi ty ->
+        case fields of
+          [(k, given)]
+            | Just (_, ref, decl@(_ : _)) <- findCtor k ctors
+            , Just inner <- constructorFieldsOf given -> do
+                let innerMap = Map.fromList inner
+                argExprs <- forM decl $ \(fname, fty) ->
+                  fnLiteralToExprTyped mi fty (Map.lookup fname innerMap)
+                Right (App emptyAnno ref argExprs)
+          _ -> Left (taggedFormMessage tagged)
     | Just (ctorRef, decl) <- lookupRecord mi ty -> do
         -- Walk the record's fields in declaration order and pick each
         -- value from the supplied FnObject (missing fields are handled
@@ -743,7 +820,7 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params trace
       assumeNameOf r = rawNameToText (rawName (getActual r))
       assumeValues = [(assumeNameOf r, join $ Map.lookup (assumeNameOf r) inputMap) | (r, _) <- assumeRefs]
 
-  checkEitherForms compiled params
+  checkWireForms compiled params
 
   -- Fall back to the wrapper path only for values the direct path can't express
   -- as AST (FnObject / FnUncertain / FnUnknown / missing non-MAYBE). ASSUMEs
@@ -753,13 +830,14 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params trace
     else evaluateDirectAST compiled fullParams assumeRefs assumeValues traceLevel includeGraphViz
 
 -- | Refuse a request that sends an EITHER in any form but @{"LEFT": [v]}@ or
--- @{"RIGHT": [v]}@, anywhere in an input, naming the input as the direct path
+-- @{"RIGHT": [v]}@, or a constructor in any form but its name or
+-- @{"Card": {its fields}}@ ('wireFormError'), anywhere in an input, naming the input as the direct path
 -- does ('evaluateDirectAST'). It runs before a request is routed, so the
 -- wrapper path, a batch case, an MCP tool call and a contract rule refuse it
 -- alike; without it the wrapper's JSONDECODE refuses it too, but without the
 -- input's name.
-checkEitherForms :: CompiledModule -> [(Text, Maybe FnLiteral)] -> ExceptT EvaluatorError IO ()
-checkEitherForms compiled params =
+checkWireForms :: CompiledModule -> [(Text, Maybe FnLiteral)] -> ExceptT EvaluatorError IO ()
+checkWireForms compiled params =
   case listToMaybe (mapMaybe bad (givens <> assumes)) of
     Just err -> throwError (InterpreterError err)
     Nothing -> pure ()
@@ -776,7 +854,7 @@ checkEitherForms compiled params =
       , let name = rawNameToText (rawName (getActual r)) ]
     bad (label, ty, mVal) = do
       v <- mVal
-      err <- eitherFormError mi ty v
+      err <- wireFormError mi ty v
       pure (label <> ": " <> err)
 
 -- | Evaluate a deontic function with startTime and events via EVALTRACE wrapper.
@@ -800,7 +878,7 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
       assumeParamTypes = maybeSynonymHeads compiled.compiledAllDeclares
         (extractAssumeParamTypes compiled.compiledModule compiled.compiledDecide)
 
-  checkEitherForms compiled params
+  checkWireForms compiled params
 
   -- Convert input parameters to JSON
   inputJson <- paramsToJson params

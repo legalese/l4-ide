@@ -185,6 +185,8 @@ A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
 A list is a JSON array, even when it has one element.
 An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
 A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+A constructor that carries data is written the same way, keyed by its name, `{"Card": {"card fee": 2}}`, and one that carries none is its name, `"Cash"`, in an answer and in an input alike.
+An input that sends the bare name of a constructor that carries data, or an object in another form, is refused with a `422` that names the input, at any depth and on every path, as an `EITHER` in another form is.
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 An `EITHER` answer is `{"RIGHT": [v]}` or `{"LEFT": [v]}`, the value in an array of one, and the published schema describes it so, with both keys optional.
