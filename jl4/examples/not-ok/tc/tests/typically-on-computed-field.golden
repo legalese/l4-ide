@@ -1,0 +1,38 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-on-computed-field.l4
+  Hidden: no
+  Range: 8:31-8:45
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/typically-on-computed-field
+  Message:
+    The field `gross` takes its value from its MEANS, so a usual value
+    written with TYPICALLY means nothing there.
+    Remove one or the other: without the TYPICALLY the field stays computed,
+    and without the MEANS it becomes an input with a usual value.
+
+File: typically-on-computed-field.l4
+  Hidden: no
+  Range: 13:31-13:33
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/typically-on-computed-field
+  Message:
+    The field `taxed` takes its value from its MEANS, so a usual value
+    written with TYPICALLY means nothing there.
+    Remove one or the other: without the TYPICALLY the field stays computed,
+    and without the MEANS it becomes an input with a usual value.
+
+File: typically-on-computed-field.l4
+  Hidden: no
+  Range: 21:32-21:36
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/typically-on-computed-field
+  Message:
+    The field `adult` takes its value from its MEANS, so a usual value
+    written with TYPICALLY means nothing there.
+    Remove one or the other: without the TYPICALLY the field stays computed,
+    and without the MEANS it becomes an input with a usual value.

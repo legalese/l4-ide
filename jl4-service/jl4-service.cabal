@@ -131,6 +131,7 @@ test-suite jl4-service-test
     CodeGenSpec
     CompatibilitySpec
     DecisionQueryCacheKeySpec
+    DefaultsAgreeSpec
     DisplayNamesAgreeSpec
     ImportRingSpec
     IntegrationSpec
@@ -143,6 +144,7 @@ test-suite jl4-service-test
     SearchPatternSpec
     StdlibResolutionSpec
     TestData
+    TypicallyPublishedSpec
     UnresolvedImportSpec
 
   hs-source-dirs:

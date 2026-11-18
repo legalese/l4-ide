@@ -89,7 +89,9 @@ This change keeps main's request handling and carries #562's handling of the wra
 
 Measured 2026-10-07 against jl4-service built from main 838c92ed4, run with `XDG_DATA_HOME` pointed at an empty directory (on a machine whose `~/.local/share/jl4/libraries` holds a newer prelude, the wrapper's `IMPORT prelude` resolves to it instead and fails to parse it). None of these is changed by this change, which touches only the answer side:
 
-- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`'s `range`), so every function in a module that uses one fails with "I could not find a definition"; a function with a `BOOLEAN` input fails the same way, on the `fromMaybe` the generated wrapper uses to read it.
+- On the wrapper path, a name the module gets by `IMPORT` is not found (measured with `prelude`'s `range`), so every function in a module that uses one fails with "I could not find a definition"; on 838c92ed4 a function with a `BOOLEAN` input failed the same way, on the `fromMaybe` the generated wrapper used to read it.
+- Measured 2026-10-30 on main f9cb513d6, with `XDG_DATA_HOME` unset and again pointed at an empty directory: that failure is gone, and a `BOOLEAN` input left out of a request that has a `{}` in it is read as `FALSE`, so the answer is silently wrong (smucclaw/l4-ide#992).
+  The TYPICALLY change binds a left-out `BOOLEAN` to a placeholder assumed term `<name> (not supplied)` instead, and evaluation stops, naming it, only if the rule reads it (`specs/as-built/typically.md`; pinned by "a missing BOOLEAN on the wrapper path" in `jl4-service/test/IntegrationSpec.hs`).
 - On the wrapper path, a required `LIST OF NUMBER` input fails with a type error (the wrapper reads it as `LIST OF MAYBE OF NUMBER`), and so does a required `TIME` or `DATETIME` input (`TOTIME` and `TODATETIME` are applied to an already-typed value).
   So the `TIME` and `DATETIME` rejections above are not reached on main; the `DATE` one is.
 - On the wrapper path, a function with a `MAYBE` input followed by another input fails with a parser error in the generated input record (measured with `MAYBE NUMBER` and `MAYBE DATE`).

@@ -13,6 +13,7 @@ module L4.Export (
   buildTypeDescMap,
   assumesFromModule,
   extractAssumeParamTypes,
+  extractAssumeParamsWithDefaults,
   extractAssumeParamResolveds,
   extractImplicitAssumeParams,
   hasTypeInferenceVars,
@@ -59,6 +60,7 @@ data ExportedParam = ExportedParam
   , paramType :: !(Maybe (Type' Resolved))
   , paramDescription :: !(Maybe Text)
   , paramRequired :: !Bool
+  , paramDefault :: !(Maybe (Expr Resolved)) -- ^ TYPICALLY default value, if declared
   }
   deriving stock (Eq, Show, Generic)
 #if defined(SERIALISE_ENABLED)
@@ -198,7 +200,7 @@ extractParams :: TypeDescMap -> TypeSig Resolved -> [ExportedParam]
 extractParams typeDescMap (MkTypeSig _ (MkGivenSig _ names) _) =
   fmap toParam names
  where
-  toParam (MkOptionallyTypedName ann resolved mType) =
+  toParam (MkOptionallyTypedName ann resolved mType mTypically) =
     let paramDesc = fmap getDesc (ann ^. annDesc)
         fallbackDesc = mType >>= getTypeDesc typeDescMap
     in ExportedParam
@@ -206,6 +208,7 @@ extractParams typeDescMap (MkTypeSig _ (MkGivenSig _ names) _) =
       , paramType = mType
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
+      , paramDefault = mTypically
       }
 
 extractReturnType :: TypeSig Resolved -> Maybe (Type' Resolved)
@@ -249,7 +252,7 @@ assumesFromModule mod'@(MkModule _ _ section) =
     decls >>= collectDecl
 
   collectDecl = \case
-    Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) mType) ->
+    Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) mType _mTypically) ->
       case mType of
         Just ty | isFunctionTypeExpanded synonyms ty -> []  -- Skip function-typed ASSUMEs
         _ -> [(getUnique name, assume)]
@@ -346,7 +349,7 @@ extractAssumedDependencies typeDescMap assumes (MkDecide _ _ _ body) =
 
 -- | Convert an ASSUME declaration to an ExportedParam
 assumeToParam :: TypeDescMap -> Assume Resolved -> ExportedParam
-assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType) =
+assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType mTypically) =
   let
     paramDesc = fmap getDesc (ann ^. annDesc)
     fallbackDesc = mType >>= getTypeDesc typeDescMap
@@ -356,6 +359,7 @@ assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType) =
       , paramType = mType
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
+      , paramDefault = mTypically
       }
 
 -- | Decide whether an input is required from its type with synonyms expanded
@@ -382,6 +386,30 @@ extractAssumeParamTypes
 extractAssumeParamTypes mod' decide =
   [ (resolvedToText r, ty) | (r, ty) <- extractAssumeParamResolveds mod' decide ]
 
+-- | Like 'extractAssumeParamTypes' but also returns the TYPICALLY default
+-- value (if any) declared on each ASSUME. Used by the function schema to
+-- expose defaults to API consumers.
+extractAssumeParamsWithDefaults
+  :: Module Resolved
+  -> Decide Resolved
+  -> [(Text, Type' Resolved, Maybe (Expr Resolved))]
+extractAssumeParamsWithDefaults mod' (MkDecide _ _ _ body) =
+  let
+    assumes = assumesFromModule mod'
+    referencedUniques = collectReferencedUniques body
+    matchingAssumes =
+      [ assume
+      | (uniq, assume) <- Map.toList assumes
+      , Set.member uniq referencedUniques
+      ]
+  in
+    mapMaybe assumeInfo matchingAssumes
+ where
+  assumeInfo :: Assume Resolved -> Maybe (Text, Type' Resolved, Maybe (Expr Resolved))
+  assumeInfo (MkAssume _ _ (MkAppForm _ name _ _) (Just ty) mTypically) =
+    Just (resolvedToText name, ty, mTypically)
+  assumeInfo _ = Nothing
+
 -- | Like 'extractAssumeParamTypes' but returns the 'Resolved' name instead of
 -- its textual form. Consumers that need to bind the ASSUME in a local scope
 -- (e.g. MLIR lowering) need the Resolved so subsequent in-scope references
@@ -403,7 +431,7 @@ extractAssumeParamResolveds mod' (MkDecide _ _ _ body) =
     mapMaybe assumeToResolvedInfo matchingAssumes
  where
   assumeToResolvedInfo :: Assume Resolved -> Maybe (Resolved, Type' Resolved)
-  assumeToResolvedInfo (MkAssume _ _ (MkAppForm _ name _ _) (Just ty)) =
+  assumeToResolvedInfo (MkAssume _ _ (MkAppForm _ name _ _) (Just ty) _mTypically) =
     Just (name, ty)
   assumeToResolvedInfo _ = Nothing
 
@@ -495,7 +523,7 @@ allAssumesFromModule (MkModule _ _ section) =
  where
   collectSection (MkSection _ _ _ decls) = decls >>= collectDecl
   collectDecl = \case
-    Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) _) ->
+    Assume _ assume@(MkAssume _ _ (MkAppForm _ name _ _) _ _) ->
       [(getUnique name, assume)]
     Section _ sub -> collectSection sub
     _ -> []
@@ -518,7 +546,7 @@ checkGivenFunctionInputs
   -> [CheckErrorWithContext]
 checkGivenFunctionInputs synonyms fnName (MkTypeSig _ (MkGivenSig _ names) _) =
   [ mkExportFunErr fnName paramName
-  | MkOptionallyTypedName _ paramName (Just ty) <- names
+  | MkOptionallyTypedName _ paramName (Just ty) _ <- names
   , isFunctionTypeExpanded synonyms ty
   ]
 
@@ -531,7 +559,7 @@ checkAssumeFunctionInputs
 checkAssumeFunctionInputs synonyms assumes fnName (MkDecide _ _ _ body) =
   let referencedUniques = collectReferencedUniques body
   in [ mkExportFunErr fnName paramName
-     | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
+     | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty) _mTypically) <- Map.toList assumes
      , Set.member uniq referencedUniques
      , isFunctionTypeExpanded synonyms ty
      ]
@@ -546,12 +574,12 @@ checkEventTypes
   -> [CheckErrorWithContext]
 checkEventTypes entInfo synonyms assumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ fnName _ _) body) =
   [ mkExportEventErr exportAt fnName (Just paramName)
-  | MkOptionallyTypedName _ paramName (Just ty) <- names
+  | MkOptionallyTypedName _ paramName (Just ty) _ <- names
   , mentionsEvent synonyms ty
   ]
   ++
   [ mkExportEventErr exportAt fnName (Just paramName)
-  | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty)) <- Map.toList assumes
+  | (uniq, MkAssume _ _ (MkAppForm _ paramName _ _) (Just ty) _) <- Map.toList assumes
   , Set.member uniq (collectReferencedUniques body)
   , mentionsEvent synonyms ty
   ]

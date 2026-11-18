@@ -323,7 +323,7 @@ decideName (MkDecide _ _ (MkAppForm _ n _ _) _) = rawNameToText (rawName (getAct
 coreRule :: [Module Resolved] -> Decide Resolved -> CoreRule
 coreRule mods d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) giveth) _ _) =
   MkCoreRule
-    { givens = [rawNameToText (rawName (getActual n)) | MkOptionallyTypedName _ n _ <- otns]
+    { givens = [rawNameToText (rawName (getActual n)) | MkOptionallyTypedName _ n _ _ <- otns]
     , boolean = case giveth of
         Just (MkGivethSig _ (TyApp _ t [])) -> rawNameToText (rawName (getActual t)) == "BOOLEAN"
         _ -> False

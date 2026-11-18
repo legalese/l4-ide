@@ -1,0 +1,16 @@
+-- A TYPICALLY default on a DECLARE field that names an enum constructor is
+-- checked against the field's type.
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Size IS ONE OF Small, Large
+
+-- ERROR: a constructor of another enum
+DECLARE Paint HAS
+    colour IS A Colour TYPICALLY Small
+
+-- ERROR: the same mistake on the field of a constructor
+DECLARE Shape IS ONE OF
+    Dot
+    Disc HAS
+        tint IS A Colour TYPICALLY Large

@@ -20,7 +20,7 @@ import LSP.Logger
 import L4.EvaluateLazy (resolveEvalConfig)
 import L4.TracePolicy (apiDefaultPolicy)
 import L4.Export (ExportedFunction (..), getExportedFunctions)
-import L4.JsonSchema (SchemaContext (..), emptyContext, generateJsonSchema)
+import L4.JsonSchema (SchemaContext (..), emptyContext, generateJsonSchema, schemaNumber)
 import L4.Syntax (TopDecl (..), Declare (..), Module (..), Resolved, Section (..), AppForm (..), rawNameToText, rawName, getActual)
 
 data Options = MkOptions
@@ -83,7 +83,7 @@ main = do
             Just export -> do
               let ctx = buildContext resolvedModule
                   schema = generateJsonSchema ctx export
-                  jsonOutput = AesonPretty.encodePretty schema
+                  jsonOutput = AesonPretty.encodePretty' AesonPretty.defConfig {AesonPretty.confNumFormat = AesonPretty.Custom schemaNumber} schema
               case options.output of
                 Nothing -> BL.putStrLn jsonOutput
                 Just outFile -> BL.writeFile outFile jsonOutput

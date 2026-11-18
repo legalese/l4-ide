@@ -1,0 +1,22 @@
+-- A computed field takes its value from its MEANS, so a TYPICALLY beside the
+-- MEANS would be a usual value for something nobody supplies. It is refused,
+-- whether or not the value fits the field's type, and wherever the clause sits.
+
+-- ERROR: on the same line, and the value does not fit
+DECLARE Pay HAS
+  net IS A NUMBER TYPICALLY 100
+  gross IS A NUMBER TYPICALLY "not a number" MEANS net * 1.2
+
+-- ERROR: on the line before the MEANS, and the value fits
+DECLARE Widget HAS
+  price IS A NUMBER
+  taxed IS A NUMBER TYPICALLY 11
+    MEANS price * 1.09
+
+§ `inside a section`
+
+-- ERROR: one of two computed fields in a record inside a section
+DECLARE Buyer HAS
+  age IS A NUMBER
+  adult IS A BOOLEAN TYPICALLY TRUE MEANS age >= 18
+  senior IS A BOOLEAN MEANS age >= 65

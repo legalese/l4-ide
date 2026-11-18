@@ -1412,7 +1412,7 @@ This is a new endpoint, so no backward compatibility concerns. However, we shoul
 
 ### TYPICALLY: Overrideable Defaults (Not Yet Implemented)
 
-**Status:** Conceptual design exists in `doc/default-values.md`, but `TYPICALLY` is not a keyword in the current L4 lexer.
+**Status:** `TYPICALLY` is a keyword that stores and checks a default (stage one, `specs/as-built/typically.md`, checked 2026-10-30); the partial-evaluation behaviour described here is not built.
 
 **Motivation:** When we talk about a "person" in legal contexts, we typically assume they are:
 

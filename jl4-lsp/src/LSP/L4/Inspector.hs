@@ -444,6 +444,7 @@ exportedFunctionToSummary declares ef =
               , parameterItems = Nothing
               , parameterRequired = Nothing
               , parameterL4Type = Nothing
+              , parameterDefault = Nothing
               }
             Just ty -> FSchema.typeToParameter declares Set.empty ty
           desc = case ep.paramDescription of

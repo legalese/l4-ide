@@ -98,6 +98,18 @@ spec = describe "diagnostic codes" do
       codes <- codesOf (fun "f" "x PLUS TRUE")
       codes `shouldContain` ["check/type-mismatch"]
 
+    it "name a TYPICALLY default that is not a literal, has no type, sits on a type or a computed field, or does not fit" do
+      codesOf "DECLARE Flags HAS\n  x IS A BOOLEAN TYPICALLY (TRUE AND FALSE)\n"
+        >>= (`shouldContain` ["check/typically-not-a-literal"])
+      codesOf "GIVEN x TYPICALLY 5\nGIVETH A BOOLEAN\nDECIDE `needs a type` IF x\n"
+        >>= (`shouldContain` ["check/typically-without-type"])
+      codesOf "ASSUME `some type` IS A TYPE TYPICALLY 42\n"
+        >>= (`shouldContain` ["check/typically-on-type"])
+      codesOf "DECLARE Pay HAS\n  net IS A NUMBER\n  gross IS A NUMBER TYPICALLY 5 MEANS net * 2\n"
+        >>= (`shouldContain` ["check/typically-on-computed-field"])
+      codesOf "GIVEN x IS A BOOLEAN TYPICALLY 42\nGIVETH A BOOLEAN\nDECIDE `does not fit` IF x\n"
+        >>= (`shouldContain` ["check/type-mismatch"])
+
   describe "evaluation" do
     it "names a failed #ASSERT" do
       codesOf "#ASSERT FALSE\n" `shouldReturn` ["eval/assertion-failed"]

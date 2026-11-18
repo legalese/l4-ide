@@ -10,7 +10,7 @@ import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
 import Shared (validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
-import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
+import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule, typicallyToJson)
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import Types
@@ -327,13 +327,13 @@ exportToFunction declares implicitParams export =
           ( (typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" }
           , (typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" }
           )
-        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing
-             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing
+        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing Nothing
+             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing Nothing
              )
       finalParams = if isDeontic
         then mergedParams
           { parameterMap = mergedParams.parameterMap <> Map.fromList
-              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing)
+              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing Nothing)
               , ("events", Parameter
                   { parameterType = "array"
                   , parameterAlias = Nothing
@@ -351,15 +351,17 @@ exportToFunction declares implicitParams export =
                       , parameterProperties = Just $ Map.fromList
                           [ ("party", partyParam)
                           , ("action", actionParam)
-                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing)
+                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing Nothing)
                           ]
                       , parameterPropertyOrder = Just ["party", "action", "at"]
                       , parameterItems = Nothing
                       , parameterRequired = Just ["party", "action", "at"]
                       , parameterL4Type = Nothing
+                      , parameterDefault = Nothing
                       }
                   , parameterRequired = Nothing
                   , parameterL4Type = Nothing
+                  , parameterDefault = Nothing
                   })
               ]
           , required = mergedParams.required <> ["startTime", "events"]
@@ -395,16 +397,18 @@ parametersFromExport declares params =
     , required = [param.paramName | param <- map (expandRequired declares) params, param.paramRequired]
     }
 
--- | Convert an ExportedParam to a Parameter.
+-- | Convert an ExportedParam to a Parameter. The TYPICALLY value is published
+-- as @default@, as jl4-schema does ('L4.JsonSchema.generateJsonSchema').
 paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
 paramToParameter declares param =
   let p0 = maybe
-              (Parameter "object" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing)
+              (Parameter "object" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing Nothing)
               (typeToParameter declares Set.empty)
               param.paramType
   in p0
     { parameterAlias = Nothing
     , parameterDescription = Text.strip $ maybe "" id param.paramDescription
+    , parameterDefault = typicallyToJson =<< param.paramDefault
     }
 
 -- | Convert a Function to a FunctionDeclaration for the Backend.

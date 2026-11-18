@@ -308,7 +308,7 @@ drawnDecline tcRes = planDecline (tcRes.module' : map (.module') (transitiveDepe
 -- Here rather than in the document-symbol handler, which the tests cannot
 -- reach (@jl4-lsp\/app@).
 outlineGivenParams :: [OptionallyTypedName Resolved] -> [OptionallyTypedName Resolved]
-outlineGivenParams = filter \ (MkOptionallyTypedName _ pn _) ->
+outlineGivenParams = filter \ (MkOptionallyTypedName _ pn _ _) ->
   not (isGeneratedName (rawName (getOriginal pn)))
 
 -- | The local definitions of a body that the outline lists. The bindings a

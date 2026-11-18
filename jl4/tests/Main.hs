@@ -354,7 +354,10 @@ jl4JsonSchemaGolden evalConfig dir inputFile = do
                  -- beside it, written from 'Text', held the same source text
                  -- correctly — which is the control that makes this visible.
                  -- smucclaw/l4-ide#962.
-                 in Text.unpack (TE.decodeUtf8 (BL.toStrict (AP.encodePretty schema))) ++ "\n"
+                 --
+                 -- The number format is jl4-schema's (jl4/app/Schema.hs), so the
+                 -- golden shows a TYPICALLY number as jl4-schema writes it.
+                 in Text.unpack (TE.decodeUtf8 (BL.toStrict (AP.encodePretty' AP.defConfig {AP.confNumFormat = AP.Custom JsonSchema.schemaNumber} schema))) ++ "\n"
   pure
     Golden
       { output
