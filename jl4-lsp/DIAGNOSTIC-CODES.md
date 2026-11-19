@@ -53,33 +53,34 @@ Match it with `^\s*Code:\s+(\S+)$`.
 
 ## check/
 
-| Code                                 | Meaning                                                            |
-| ------------------------------------ | ------------------------------------------------------------------ |
-| `check/ambiguous-identifier`         | Several definitions fit this name, and none can be chosen.         |
-| `check/ambiguous-operator`           | Several types fit this operator, and none can be chosen.           |
-| `check/ambiguous-type`               | Several types have this name, and none can be chosen.              |
-| `check/clause-pattern-count`         | Clauses have another number of patterns than the GIVEN has inputs. |
-| `check/cyclic-computed-fields`       | Computed fields depend on each other in a ring.                    |
-| `check/cyclic-type-synonyms`         | Type synonyms refer to each other in a ring.                       |
-| `check/duplicate-name`               | A name occurs twice where names must be distinct.                  |
-| `check/empty-breach-by`              | `BREACH BY` names a list written out empty.                        |
-| `check/export-clauses-without-given` | An `@export` of clauses with no GIVEN.                             |
-| `check/export-event-type`            | An `@export` takes or returns an EVENT.                            |
-| `check/export-function-input`        | An `@export` has an input of a function type.                      |
-| `check/internal-error`               | A bug in the checker.                                              |
-| `check/invalid-type-parameter`       | A parameter of a type declaration is not of type TYPE.             |
-| `check/missing-named-arguments`      | A call with named arguments leaves some out.                       |
-| `check/mixfix-mismatch`              | An expression does not match the mixfix form of a rule.            |
-| `check/name-not-in-definition`       | A name in the signature is not in the definition.                  |
-| `check/name-not-in-signature`        | A name in the definition is not in the signature.                  |
-| `check/not-a-function`               | Something that is not a function is applied to arguments.          |
-| `check/result`                       | The answer to a `#CHECK`. Severity Information.                    |
-| `check/supplied-computed-field`      | A record constructor supplies a computed field.                    |
-| `check/type-mismatch`                | A value has another type than the place it is in requires.         |
-| `check/type-synonym-chain-too-long`  | A chain of type synonyms is too long to follow.                    |
-| `check/unknown-identifier`           | Nothing in scope defines this name.                                |
-| `check/wrong-argument-count`         | A function is applied to the wrong number of arguments.            |
-| `check/wrong-type-argument-count`    | A type is applied to the wrong number of arguments.                |
+| Code                                    | Meaning                                                            |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| `check/ambiguous-identifier`            | Several definitions fit this name, and none can be chosen.         |
+| `check/ambiguous-operator`              | Several types fit this operator, and none can be chosen.           |
+| `check/ambiguous-type`                  | Several types have this name, and none can be chosen.              |
+| `check/clause-pattern-count`            | Clauses have another number of patterns than the GIVEN has inputs. |
+| `check/cyclic-computed-fields`          | Computed fields depend on each other in a ring.                    |
+| `check/cyclic-type-synonyms`            | Type synonyms refer to each other in a ring.                       |
+| `check/duplicate-name`                  | A name occurs twice where names must be distinct.                  |
+| `check/empty-breach-by`                 | `BREACH BY` names a list written out empty.                        |
+| `check/breach-by-list-needs-party-type` | `BREACH BY` names a list before the party type is known.           |
+| `check/export-clauses-without-given`    | An `@export` of clauses with no GIVEN.                             |
+| `check/export-event-type`               | An `@export` takes or returns an EVENT.                            |
+| `check/export-function-input`           | An `@export` has an input of a function type.                      |
+| `check/internal-error`                  | A bug in the checker.                                              |
+| `check/invalid-type-parameter`          | A parameter of a type declaration is not of type TYPE.             |
+| `check/missing-named-arguments`         | A call with named arguments leaves some out.                       |
+| `check/mixfix-mismatch`                 | An expression does not match the mixfix form of a rule.            |
+| `check/name-not-in-definition`          | A name in the signature is not in the definition.                  |
+| `check/name-not-in-signature`           | A name in the definition is not in the signature.                  |
+| `check/not-a-function`                  | Something that is not a function is applied to arguments.          |
+| `check/result`                          | The answer to a `#CHECK`. Severity Information.                    |
+| `check/supplied-computed-field`         | A record constructor supplies a computed field.                    |
+| `check/type-mismatch`                   | A value has another type than the place it is in requires.         |
+| `check/type-synonym-chain-too-long`     | A chain of type synonyms is too long to follow.                    |
+| `check/unknown-identifier`              | Nothing in scope defines this name.                                |
+| `check/wrong-argument-count`            | A function is applied to the wrong number of arguments.            |
+| `check/wrong-type-argument-count`       | A type is applied to the wrong number of arguments.                |
 
 ## lint/
 

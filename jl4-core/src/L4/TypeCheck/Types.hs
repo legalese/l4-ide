@@ -142,6 +142,14 @@ data CheckError =
     -- literal is decidable here; a COMPUTED list that turns out empty is
     -- refused when the rule runs instead (R-T3, EVERY-EACH-QUANTIFIER-SPEC
     -- §6.1 on @unstable@). Carries the expression for its source range.
+  | BreachByListNeedsPartyType (Expr Name)
+    -- ^ @BREACH BY@ given a LIST while the rule's party type is still an
+    -- inference variable: a top-level @MEANS@ with no @GIVETH@, or the first
+    -- operand of a @RAND@\/@ROR@. Whether the list names several parties or
+    -- one list-valued party is decided by the party type
+    -- ('L4.TypeCheck.checkBreachParty'), so it cannot be decided here (from
+    -- @unstable@'s 9d620c355, EVERY-EACH-QUANTIFIER-SPEC §6.1.1 there).
+    -- Carries the expression for its source range.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -343,6 +351,7 @@ checkErrorCode = \ case
   ExportFunctionTypeInput {}     -> "check/export-function-input"
   ExportEventType {}             -> "check/export-event-type"
   EmptyBreachBy {}               -> "check/empty-breach-by"
+  BreachByListNeedsPartyType {}  -> "check/breach-by-list-needs-party-type"
 
 -- | The code of a checker warning. See 'checkErrorCode'.
 checkWarningCode :: CheckWarning -> Text
@@ -438,6 +447,7 @@ instance HasSrcRange CheckError where
   rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (ExportEventType r _ _)           = r
   rangeOf (EmptyBreachBy e)                 = rangeOf e
+  rangeOf (BreachByListNeedsPartyType e)    = rangeOf e
   rangeOf (CheckInfo _ mr)                  = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.

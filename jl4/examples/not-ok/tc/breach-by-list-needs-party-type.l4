@@ -1,0 +1,35 @@
+-- A LIST after `BREACH BY` names several parties, one per element, unless
+-- the rule's party type is itself that list type, in which case it names ONE
+-- party whose value is a list. Which reading is meant is decided by the party
+-- type, so a BREACH reached with nothing upstream fixing its party type
+-- cannot decide it, and is refused HERE, at the BREACH. Guessing the element
+-- reading instead pinned the party type to the element type and failed
+-- later, at the use site, naming the wrong place, and passed with the RAND's
+-- operands swapped. (From unstable's 9d620c355, EVERY-EACH-QUANTIFIER-SPEC
+-- §6.1.1 there.)
+--
+-- Shape 1 is fixed by a GIVETH on the definition. Shapes 2 and 3 are fixed by
+-- writing the PARTY operand first. Shape 3 is accepted on unstable, which
+-- carries the GIVETH's type into both operands of a RAND; here it does not
+-- reach the first operand.
+
+DECLARE Step IS ONE OF deliver
+
+-- 1. A top-level MEANS with no GIVETH: nothing says the party type.
+`the pair fails` MEANS
+    BREACH BY (LIST "a", "b") BECAUSE "pair"
+
+-- 2. The first operand of a RAND with no GIVETH: the compound is inferred
+--    with a fresh party type, and the first operand is checked before the
+--    second (the PARTY) has fixed it.
+`pair` MEANS
+    (BREACH BY (LIST "a", "b") BECAUSE "pair")
+    RAND
+    (PARTY (LIST "a", "b") MUST deliver WITHIN 5)
+
+-- 3. The same under a GIVETH: the GIVETH does not reach the first operand.
+GIVETH A DEONTIC STRING Step
+`pair with a signature` MEANS
+    (BREACH BY (LIST "a", "b") BECAUSE "pair")
+    RAND
+    (PARTY "a" MUST deliver WITHIN 5)

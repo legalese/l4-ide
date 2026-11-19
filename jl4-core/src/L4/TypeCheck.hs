@@ -2215,15 +2215,21 @@ checkExprWith pr ec e t = pr $ errorContext (WhileCheckingExpression e) do
 -- party type) and invisible to exactprint, which prints the parsed tree.
 --
 -- That decision needs the party type, and a @BREACH@ reached by INFERENCE — a
--- top-level @x MEANS BREACH BY …@ with no @GIVETH@, or an operand of a
--- @RAND@\/@ROR@ — arrives with a fresh one. Here a LIST there is read as
--- several parties, which pins the party type to the element type. @unstable@
--- refuses that case at the @BREACH@ instead (@BreachByListNeedsPartyType@,
--- its adversarial pass of 2026-09-16, round 2), and checks a @RAND@\/@ROR@
--- against a known type first so that a @GIVETH@ reaches both operands; neither
--- is on this branch. So a list-typed party under a @RAND@ is refused here
--- with a mismatch where @unstable@ accepts it, and a list after @BY@ under an
--- unknown party type is accepted here where @unstable@ refuses it.
+-- top-level @x MEANS BREACH BY …@ with no @GIVETH@, or the first operand of a
+-- @RAND@\/@ROR@ — arrives with a fresh one. Reading the list as several
+-- parties there would PIN the party type to the element type and fail later,
+-- at the use site, with a mismatch that names the wrong place, and the same
+-- rule would pass with its operands swapped. So a LIST after @BY@ under a
+-- party type that is not yet known is REFUSED here, at the @BREACH@
+-- ('BreachByListNeedsPartyType'), and the party type is left for the use site
+-- to fix, so that one cause is one error. This is @unstable@'s 9d620c355
+-- (its adversarial pass of 2026-09-15, round 2, R2-TC-1).
+--
+-- @unstable@ also checks a @RAND@\/@ROR@ against a known type first
+-- (@checkRegulativeBinOp@), so that a @GIVETH@ reaches the first operand;
+-- that is not on this branch. So here a @GIVETH@ does not rescue a list after
+-- @BY@ in a first operand, which is refused where @unstable@ accepts it, and
+-- the message says to write the other operand first.
 --
 -- A list LITERAL with nobody in it (@EMPTY@, or @LIST@ with no elements) is
 -- refused here, loudly: a breach blames at least one party, and the literal
@@ -2238,7 +2244,8 @@ checkBreachParty :: Type' Resolved -> Expr Name -> Check (Expr Resolved)
 checkBreachParty partyT p = errorContext (WhileCheckingExpression p) do
   partyT' <- applySubst partyT
   (rp, pt) <- inferExpr p
-  when (isEmptyListLiteral rp) $ addError (EmptyBreachBy p)
+  let emptyLiteral = isEmptyListLiteral rp
+  when emptyLiteral $ addError (EmptyBreachBy p)
   pt' <- applySubst pt
   let ground t = not (hasInfVarKey (typeKey t))
   case pt' of
@@ -2248,11 +2255,17 @@ checkBreachParty partyT p = errorContext (WhileCheckingExpression p) do
           -- the party type IS this list type: one party, wrapped (see above)
           rp' <- setAnnResolvedType pt' Nothing rp
           pure (List emptyAnno [rp'])
-        else do
-          -- several parties, one per element
-          b <- unify partyT elemT
-          unless b $ addError (TypeMismatch ExpectBreachPartyContext partyT pt')
-          setAnnResolvedType pt' Nothing rp
+        else if not (ground partyT') && not emptyLiteral
+          then do
+            -- the reading cannot be decided yet: refuse at the BREACH (see
+            -- above) and leave the party type for the use site to fix
+            addError (BreachByListNeedsPartyType p)
+            setAnnResolvedType pt' Nothing rp
+          else do
+            -- several parties, one per element
+            b <- unify partyT elemT
+            unless b $ addError (TypeMismatch ExpectBreachPartyContext partyT pt')
+            setAnnResolvedType pt' Nothing rp
     _ -> do
       expect ExpectBreachPartyContext partyT pt'
       setAnnResolvedType pt' Nothing rp
@@ -5231,6 +5244,20 @@ prettyCheckError (EmptyBreachBy _) =
   , "A breach blames at least one party: give BY a party, or a LIST with"
   , "someone in it, or leave BY out to blame nobody. (A list that is computed"
   , "and turns out empty is refused when the rule runs.)"
+  ]
+prettyCheckError (BreachByListNeedsPartyType _) =
+  [ "BREACH BY names a list, but the rule's party type is not known here."
+  , ""
+  , "A LIST after BY names several parties, one per element — unless the"
+  , "party type is itself that kind of list, in which case it names one party"
+  , "whose value is a list. Which of the two is meant is decided by the party"
+  , "type, and nothing has fixed it at this point: this BREACH is checked"
+  , "before anything says what the rule's party type is. Either"
+  , ""
+  , "  - if this BREACH is the whole definition, give the definition a"
+  , "    signature, GIVETH A DEONTIC <party> <action>, or"
+  , "  - if this BREACH is the first operand of a RAND or ROR, write the PARTY"
+  , "    operand first. A signature does not reach the first operand."
   ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.
