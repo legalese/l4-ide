@@ -368,6 +368,9 @@ Some files that `l4 run` runs give a type error here on every case: among them, 
 If a `#TRACE` ends in a breach for a missed deadline, the result is `{"breached": {"type": "deadline_missed", ...}}`: `eventParty`, `eventAction` and `timestamp` describe the event that showed the deadline had passed, and `obligatedParty`, `obligationAction` and `deadline` describe the duty that was missed.
 When that event is a `WAITUNTIL`, `eventParty` and `eventAction` read `NEVERMATCHESPARTY` and `NEVERMATCHESACT`, since a `WAITUNTIL` only moves the clock.
 `obligationAction` is the action as the rule writes it, so an input of the rule shows by its name: `MUST pay n`, not the amount.
+A breach the rule states with `BREACH` is `{"breached": {"type": "explicit_breach", ...}}`, with `party` and `reason`.
+Either kind can name several failures, such as both sides of a `RAND`: those fields then describe the failure it is anchored at, `failures` lists every failure in the order the rule is written, `anchor` is the position in `failures` of the one the other fields describe, and `obligatedParties` or `parties` lists every party named.
+`effective` and `observed` say when the breach took effect and when it came to light, on the breach and on each failure, and `decisive` lists the positions of the failures that decided when it happened (see [When a breach happened](../../reference/regulative/consequences.md#when-a-breach-happened)).
 
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`).
 A value is read as the type its parameter declares, whichever kind of file the case comes from.

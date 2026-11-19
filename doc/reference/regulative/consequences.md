@@ -50,6 +50,7 @@ GIVETH A DEONTIC Party Action
 - A rule that names itself after `LEST`, or a prohibition that names itself after `HENCE`, with a window that is never open, `WITHIN 0` or a negative `WITHIN`, never reaches an open window.
   L4 stops it with an error that begins "A chain of HENCE or LEST continuations has stalled" and gives the time of the event, not the name of the rule.
 - A rule whose `WITHIN` computes below zero was past its deadline when it became active. It fails at that moment, not before it existed, and the rule that follows counts from there.
+  When nothing follows and the rule ends in a breach, the breach says so: after the deadline it missed, it prints `but was only entered at, and so failed at` and the moment the rule became active.
 
 ## HENCE and LEST
 
@@ -98,9 +99,11 @@ LEST BREACH
 LEST BREACH BY party
 LEST BREACH BECAUSE reason
 LEST BREACH BY party BECAUSE reason
+LEST BREACH BY LIST party, party BECAUSE reason
 ```
 
 `BY` names the party in breach and [BECAUSE](BECAUSE.md) gives the reason, a STRING.
+`BY` also takes a `LIST` of parties, for a breach several parties carry together; see [BECAUSE](BECAUSE.md#several-parties).
 `FULFILLED` is also the natural result for a case where no duty arises: ``IF NOT `conditions are met` THEN FULFILLED ELSE PARTY …``.
 
 ## PROVIDED
@@ -155,13 +158,11 @@ An action with one argument needs no parentheses: `MUST pay EXACTLY 100`.
 
 `RAND` and `ROR` combine two rules that run at the same time, on the same events.
 
-- `A RAND B` is fulfilled when both are fulfilled, and breached as soon as either is breached.
-- `A ROR B` is fulfilled as soon as either is fulfilled, and breached only when both are breached.
+- `A RAND B` is fulfilled when both are fulfilled, and breached as soon as either is breached. When both sides fail, the compound is breached at the **earlier** of the two failures, because the first failure already loses it, and the breach names both sides' failures, left first.
+- `A ROR B` is fulfilled as soon as either is fulfilled, and breached only when both are breached. When both alternatives fail, the compound is breached at the **later** of the failures, when the last alternative missed its chance, and the breach names both alternatives' failures, left first.
 
-When both sides are breached the result is one breach, dated at the event that revealed it.
-If separate events revealed the two, `RAND` reports the earlier and `ROR` the later.
-If one event revealed both, which is the usual case, they tie, and `RAND` reports its left side and `ROR` its right side, whichever deadline came first.
-A `LEST BREACH` records no time, so a pair with one in it ties in the same way.
+In both, the order the operands are written in makes no difference to when, or to which failure decided it; see [When a breach happened](#when-a-breach-happened).
+Nothing is collapsed: the same party failing on both sides is named twice, once for each thing it failed to do.
 
 ```l4
 DECLARE Party IS ONE OF Seller
@@ -176,6 +177,54 @@ GIVETH A DEONTIC Party Action
 
 `RAND` binds more tightly than `ROR`: `A ROR B RAND C` means `A ROR (B RAND C)`.
 A combination can follow `HENCE` or `LEST`, so one event can start several duties.
+
+## When a breach happened
+
+Every failure a breach names carries two instants.
+
+- **When it took effect.** For a missed deadline, the deadline, or, for a rule that was already past its deadline when it became active, the moment it became active (see [WITHIN](#within)). For a broken prohibition, the act that broke it. For a `BREACH` written in a `HENCE` or `LEST`, the moment that rule counts from: the missed deadline under a `LEST`, the act (or a kept prohibition's deadline) under a `HENCE`.
+- **When it came to light.** The time of the event that showed it. L4 only learns that a deadline has passed when a later event arrives, so a deadline of 5 that nothing shows until an event at 10 took effect at 5 and came to light at 10.
+
+A combination is breached at the moment its parts' failures took effect, worked out the way the operators read: a `RAND` at the earliest, an `ROR` at the latest, and inside out when they are nested.
+With `(P MUST x WITHIN 1 ROR Q MUST y WITHIN 10) RAND R MUST z WITHIN 5` and nobody acting, the `ROR` holds until Q's deadline at 10, so the `RAND` is lost at 5, by R: not at 1, because P's miss lost nothing while Q could still act.
+The failures that fix that moment are the **decisive** ones.
+The breach report prints the first of them in the usual words, then any others that failed at the same moment, then every failure in the order the rule is written:
+
+```text
+DEONTIC BREACHED:
+  party
+    NEVERMATCHESPARTY
+  who did action
+    NEVERMATCHESACT
+  at
+    10
+  surpassed the deadline of party
+    P
+  who had to do obligatory action
+    MUST x
+  before their deadline, which was at
+    5
+  and at the same instant
+    Q
+      who had to do obligatory action
+        MUST y
+      before their deadline, which was at
+        5
+  and the breach names, in order
+    P
+      ...
+    Q
+      ...
+```
+
+That is `(PARTY P MUST x WITHIN 5) RAND (PARTY Q MUST y WITHIN 5)` with one `WAITUNTIL 10`.
+Written the other way round, it reports the same moment and the same two decisive failures; only the order of the lists follows the rule, and the first line names Q.
+The `at` is when the breach came to light; `NEVERMATCHESPARTY` and `NEVERMATCHESACT` are how a `WAITUNTIL` event prints.
+When the decisive failures include a missed deadline, the report leads with one; a `BREACH` written in the rule leads only when every decisive failure is one.
+
+`l4 batch` gives the same answer as data: each object in `failures` has `effective` and `observed`, and the breach has the combination's `effective` and `observed` and `decisive`, the positions in `failures` of the decisive ones.
+`anchor` is the position of the one the other fields describe.
+The decision service (`jl4-service`) reports `failures` and `anchor` too, but not `effective`, `observed` or `decisive`.
 
 ## Related pages
 
