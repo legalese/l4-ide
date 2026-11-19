@@ -44,6 +44,7 @@ module L4.EvaluateLazy.Machine
 , emptyEnvironment
 , boolView
 , pattern ValBool
+, pattern ValFulfilled
 -- * Constants exposed for the eager evaluator
 , builtinBinOps
 , writeJSONToReferences
@@ -81,7 +82,7 @@ import L4.Annotation
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (TemporalContext (..))
-import L4.Parser.SrcSpan (SrcRange)
+import L4.Parser.SrcSpan (SrcRange, prettySrcRangeM)
 import L4.Print hiding (tryLoadTZ, tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
@@ -376,6 +377,50 @@ isReoffered rf = do
   r <- asks (.reofferedEvents)
   liftIO (Map.lookup rf.address <$> readIORef r)
 
+-- | Allocate an EVENT copy re-offered to a HENCE\/LEST continuation, whether
+-- or not the hand-off stalled, so that a declared breach the continuation
+-- reaches can name it as the event that revealed the miss
+-- ('revealingEvent'). Such a copy, and only such a copy, is given a NEGATIVE
+-- address: 'newAddress' counts up from 0, and this takes the same count
+-- below zero, so addresses stay distinct and 'isRevealing' reads the fact
+-- off the address.
+--
+-- NOTE [Revealing events are not part of the memo key]
+--
+-- Whether an event is a revealing copy is not recorded anywhere: there is no
+-- registry to keep, and nothing to drop when a copy can no longer be read. A
+-- registry of every copy, each entry dropped by a weak pointer when its copy
+-- died, took the walk of an event a million windows late from 0.26 s and
+-- 45 MB to 0.69 s and 63 MB; with negative addresses it takes 0.27 s and
+-- 45 MB (2026-11-19, best of three, @l4 run@ of
+-- @MUST tick WITHIN 1 LEST x@ with the event at 1000000.5).
+--
+-- The memo of NOTE [Applying RAND and ROR operands once] keys an operand's
+-- events by what can be seen of them ('eventListKey''), and that includes a
+-- STALLED copy's 'Reoffered' mark but not the address of the event itself.
+-- That is sound because nothing a keyed application returns depends on
+-- whether the head of its incoming events is a revealing copy. The one reader
+-- is the @App1@ frame's 'ValBreached' arm, reached by a breach VALUE applied
+-- to events, and a breach is never keyed: only a rule written as a
+-- 'Regulative' is ('memoKey'). An obligation never hands its incoming head on
+-- unchanged: it performs it, passes over it to the rest of the stream, or
+-- re-offers a FRESH copy of it, allocated here. And a copy only ever sits at
+-- the head of the fresh list made for it, so the rest of any stream holds no
+-- revealing copy. Keeping it out of the key keeps two applications that
+-- differ only in it sharing one result.
+allocateRevealing :: WHNF -> Eval Reference
+allocateRevealing whnf = do
+  i <- nextSupply
+  u <- asks (.moduleUri)
+  pointer <- liftIO (newIORef (WHNF whnf))
+  pure (MkReference (MkAddress u (-1 - i)) pointer)
+
+-- | Is this EVENT value a copy re-offered to a continuation? (see
+-- 'allocateRevealing')
+isRevealing :: Reference -> Bool
+isRevealing rf = case rf.address of
+  MkAddress _ i -> i < 0
+
 -- | The memo behind 'applyOperand': applications of RAND and ROR operands
 -- already evaluated, and the names each rule's syntax uses. Each map is keyed
 -- by a hash, and holds every entry with that hash with its whole key.
@@ -585,8 +630,11 @@ eventListKey' memoR reofferedR rf = do
 -- compound is that value: @R RAND R@ and @R ROR R@ each behave as @R@. A
 -- residual is a value of the machine, not a description of how it was
 -- reached, so the same object on both sides is one rule waiting for the same
--- events, and whatever happens to one copy happens to the other; when both
--- are the same breach, the tie-break picks one of two identical breaches.
+-- events, and whatever happens to one copy happens to the other. When both
+-- are the same breach, the compound is that breach, naming its failures once;
+-- two breaches that are different objects name both operands' failures (the
+-- both-breached clause of 'backwardContractFrame'), and @unstable@, which has
+-- no such sharing, names the same failures twice.
 --
 -- The memo of NOTE [Applying RAND and ROR operands once] is what makes this
 -- case arise: an operand answered from it returns the value the first
@@ -655,6 +703,58 @@ stalledChainRefusal highWater stamp = Text.unwords
   , "negative WITHIN, or a WITHIN 0 - is such a chain. Give it a positive WITHIN,"
   , "or end the chain with BREACH."
   ]
+
+-- | A @BREACH BY@ whose computed list turned out empty (R-T3,
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1 on @unstable@): a breach blames at least one
+-- party. A literal empty list is refused by the checker instead
+-- ('L4.TypeCheck.checkBreachParty').
+emptyBreachByRefusal :: Text -> Text
+emptyBreachByRefusal clause = Text.unwords
+  [ "BREACH BY names an empty list, at " <> clause <> "."
+  , "A breach blames at least one party: give BY a party, or a LIST with"
+  , "someone in it, or leave BY out to blame nobody."
+  , "(EVERY-EACH-QUANTIFIER-SPEC section 6.1, R-T3.)"
+  ]
+
+-- | Read a reference WITHOUT forcing it: anything it would say about an
+-- unforced thunk is 'Nothing'.
+peekWHNF :: Reference -> Eval (Maybe WHNF)
+peekWHNF rf = liftIO (readIORef rf.pointer) >>= pure . \ case
+  WHNF v         -> Just v
+  Unevaluated {} -> Nothing
+
+-- | The contract clock held in a reference, if it has been forced.
+peekClock :: Reference -> Eval (Maybe Rational)
+peekClock rf = peekWHNF rf >>= pure . \ case
+  Just (ValNumber t) -> Just t
+  _                  -> Nothing
+
+-- | The event at the head of a stream, when it is a copy RE-OFFERED to a
+-- continuation (Contract5's expiry: the event that revealed a missed
+-- deadline, or a kept SHANT's discharge) — its party, action and stamp.
+-- Peeked, never forced: a re-offered copy is allocated as a value, so a head
+-- that is still a thunk is not one.
+revealingEvent :: Reference -> Eval (Maybe (Reference, Reference, Rational))
+revealingEvent evs = peekWHNF evs >>= \ case
+  Just (ValCons hd _)
+    | isRevealing hd -> peekWHNF hd >>= \ case
+        Just (ValEvent p a tR) -> fmap (p, a,) <$> peekClock tR
+        _                      -> pure Nothing
+  _ -> pure Nothing
+
+-- | A breach whose declared failures have no timing yet, given one (SEESAW,
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1.2 on @unstable@). When nothing in it had a
+-- timing — one @BREACH@, naming one party or a list — every entry now took
+-- effect at the one instant, so every entry is decisive; otherwise the
+-- decisive entries stay as they were.
+restamp :: Timing Reference -> ReasonForBreach Reference -> ReasonForBreach Reference
+restamp t reason = breachOf $
+  if allUntimed then filled {alsoDecisive = filter (/= anchorIndex filled) [0 .. length (blameList filled) - 1]}
+  else filled
+  where
+    blame = breachBlame reason
+    filled = fillDeclaredTiming t blame
+    allUntimed = all (isNothing . failureTiming) (blameList blame)
 
 -- | Atomically inspect-and-update a thunk. The update function additionally
 -- receives the current thread id (for blackhole bookkeeping).
@@ -746,7 +846,8 @@ continueDone whnf = pure (DoneMachine whnf)
 -- to the same names and literals? Both operands read the same events from the
 -- same moment, so the same rule on both sides reaches the same outcome on both,
 -- and @A RAND A@ and @A ROR A@ each behave as @A@ (when both are breached, the
--- tie-break picks one of two identical breaches). Evaluating such an operand
+-- breach names its failures once, where @unstable@ names them twice: see NOTE
+-- [One residual for the same operand twice]). Evaluating such an operand
 -- once matters for a rule that names itself on both sides, @x RAND x@: there,
 -- each window an event is past would otherwise double the work. Any other pair
 -- compares unequal, so two operands that could differ are never merged.
@@ -894,11 +995,23 @@ forwardExpr env = \ case
   AsString _ann e -> do
     pushFrame AsStringFrame
     continueExpr env e
-  Breach _ann mParty mReason -> do
-    -- Explicit breach terminal clause - immediately produces a breach value
-    mPartyRef <- traverse (\p -> allocate_ p env) mParty
+  Breach ann mParty mReason -> do
+    -- Explicit breach terminal clause - produces a breach value. The BY
+    -- expression is a party or a LIST of parties (R-T3,
+    -- EVERY-EACH-QUANTIFIER-SPEC §6.1 on @unstable@): the checker admits both
+    -- and leaves no mark, so the machine forces it and decides by shape
+    -- ('BreachBy'). The one collision — a party type that is itself a LIST —
+    -- the checker settles by handing the party over wrapped as a one-element
+    -- list ('TypeCheck.checkBreachParty'). A breach with no BY is ONE declared
+    -- failure naming nobody.
     mReasonRef <- traverse (\r -> allocate_ r env) mReason
-    continueBackward (ValBreached (ExplicitBreach mPartyRef mReasonRef))
+    case mParty of
+      Nothing -> continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing mReasonRef Nothing))))
+      Just p  -> do
+        partyRef <- allocate_ p env
+        pushFrame $ ContractFrame $ BreachBy BreachByFrame
+          { partyRef, acc = [], mReason = mReasonRef, clause = prettySrcRangeM (rangeOf ann) }
+        continueRef partyRef
   -- REFUSE only ever reaches 'forwardExpr' when the machine actually REDUCES
   -- it, so a refusal inside an unforced thunk is never entered. That is what
   -- makes @FALSE AND <refusing>@ answer FALSE while @<refusing> AND FALSE@
@@ -952,6 +1065,8 @@ backward val = withPoppedFrame $ \ case
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
+        -- the clock the obligation is entered at, kept as @time@ moves on
+        let armed = time
         pushFrame (ContractFrame (Contract1 ScrutinizeEvents {..}))
         continueRef events
       ValROp env op rexpr1 rexpr2 -> do
@@ -992,7 +1107,21 @@ backward val = withPoppedFrame $ \ case
         pushFrame (TernaryBuiltin1 fn arg2 z)
         continueRef arg1
       ValFulfilled -> continueBackward ValFulfilled
-      ValBreached r -> continueBackward (ValBreached r)
+      -- SEESAW (EVERY-EACH-QUANTIFIER-SPEC §6.1.2 on @unstable@): a declared
+      -- breach takes its effective instant from the clock of the hand-off that
+      -- reached it — the deadline (no earlier than the failed obligation's
+      -- arming) under a LEST or a kept SHANT's HENCE, the violating stamp
+      -- under a SHANT's LEST, the act's stamp under a HENCE, the start of a
+      -- run at the top. Here, where every contract value meets its
+      -- @[time, events]@, is the one place every route to a BREACH passes. The
+      -- clock is forced, and the stamp goes on a FRESH value: a @BREACH@
+      -- shared by two continuations is one cached thunk, reached at two
+      -- clocks.
+      ValBreached r
+        | hasUntimed (breachBlame r), [t, evs] <- rs -> do
+            pushFrame (ContractFrame (StampBreach StampBreachFrame {reason = r, eventsRef = evs}))
+            continueRef t
+        | otherwise -> continueBackward (ValBreached r)
       ValAssumed r ->
         stuckOnAssumed r -- TODO: we can do better here
       res -> internalException (RuntimeTypeError $ "expected a function but found: " <> prettyLayout res)
@@ -1288,11 +1417,14 @@ backwardContractFrame val = \ case
       -- discharged at the end of its window. Counting from the event would let
       -- a payment thousands of days late discharge a 14-day grace period.
       --
-      -- The clock is floored at the obligation's arming: one that was already
-      -- past its deadline when it was entered (a computed negative WITHIN) fails
-      -- when it is entered, not before it existed. 'time'' is the arming here,
-      -- because such an obligation expires at its first event; for any other,
-      -- 'time'' is an event no later than the deadline, and the floor is idle.
+      -- The clock is floored at the obligation's arming ('armed', the clock it
+      -- was entered at; SEESAW's card A2 on @unstable@): one that was already
+      -- past its deadline when it was entered (a computed negative WITHIN)
+      -- fails when it is entered, not before it existed, and its breach says
+      -- so ("but was only entered at, and so failed at"). The arming was forced
+      -- when the obligation met its first event, so it is read without forcing
+      -- ('peekClock'). @unstable@ also reports the floor in a note on the
+      -- result; this branch has no channel for notes, so it does not.
       --
       -- Termination. Because a continuation counts from the missed deadline,
       -- its own deadline can lie BEFORE the re-offered event's stamp, so the
@@ -1313,9 +1445,15 @@ backwardContractFrame val = \ case
       -- Only a STALLED hand-off is marked. An unmarked event takes this layer's
       -- clock as its high-water mark: for a copy handed on by a layer whose
       -- deadline advanced, that clock is the deadline it revealed, or later.
-      -- So a walk whose deadlines keep advancing, however long, records nothing.
+      -- So a walk whose deadlines keep advancing, however long, records no
+      -- mark. Every copy, stalled or not, is allocated as a REVEALING event
+      -- instead ('allocateRevealing'), which only a declared breach reached at
+      -- the hand-off reads, to name the event that revealed the miss; that
+      -- costs nothing to keep, and is not part of the memo's key.
       then do
-        let reoffer followup' = do
+        armedT <- peekClock armed
+        let floored = maybe deadline (max deadline) armedT
+            reoffer followup' = do
               let highWater = maybe time' (.highWater) ev'reoffered
                   stalled = maybe 0 (.stalled) ev'reoffered
               mark <-
@@ -1324,9 +1462,9 @@ backwardContractFrame val = \ case
                   else if stalled >= maximumStalledReoffers
                     then userException (UserError (stalledChainRefusal highWater stamp))
                     else pure (Just MkReoffered {highWater, stalled = stalled + 1})
-              clock <- allocateValue (ValNumber (max deadline time'))
+              clock <- allocateValue (ValNumber floored)
               ev'timeR <- allocateValue ev'time
-              evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
+              evR <- allocateRevealing (ValEvent ev'party ev'act ev'timeR)
               traverse_ (markReoffered evR) mark
               eventsR <- allocateValue (ValCons evR events)
               continueWithFollowup env followup' eventsR clock
@@ -1344,8 +1482,14 @@ backwardContractFrame val = \ case
             case lest of
               Nothing -> do
                 -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
+                -- The breach is DATED at the revealing event ('stamp') and
+                -- carries the deadline it missed. SEESAW (EVERY-EACH-QUANTIFIER-SPEC
+                -- §6.1.2 on @unstable@): it took effect at the deadline, floored
+                -- at the obligation's arming as the clock above is, and was
+                -- observed at the revealing event.
                 partyR <- either (`allocate_` env) allocateValue party
-                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
+                let timing = Timing {effective = floored, observed = stamp, revealedBy = Just (ev'party, ev'act)}
+                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline timing))))
               Just lestFollowup -> reoffer lestFollowup
       else do
         -- NOTE: we have observed the event and do not branch, either, the
@@ -1407,7 +1551,9 @@ backwardContractFrame val = \ case
               -- consequences.md only mandates SHANT+action => LEST/breach and
               -- does not prescribe the breach record's deadline field, so this
               -- does not contradict it.
-              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp partyRef act stamp))
+              -- SEESAW: a violation takes effect when it happens, and is seen then
+              let timing = Timing {effective = stamp, observed = stamp, revealedBy = Just (ev'partyRef, ev'act)}
+              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp timing))))
           -- MUST, MAY, DO: action done = success
           _ -> allocateValue time
             >>= continueWithFollowup (env `Map.union` henceEnv) followup events
@@ -1435,6 +1581,42 @@ backwardContractFrame val = \ case
 
   ROperand args -> applyOperand val args
 
+  -- SEESAW: the hand-off clock a declared breach takes ('StampBreach'). It
+  -- is observed at that clock too, unless the stream it was handed starts
+  -- with a re-offered event — the event that revealed the miss its LEST (or
+  -- a kept SHANT's HENCE) answers — which is then the observation. A clock
+  -- that is not a number leaves the breach untimed.
+  StampBreach StampBreachFrame {..} -> case val of
+    ValNumber clock -> do
+      revealed <- revealingEvent eventsRef
+      let timing = case revealed of
+            Just (p, a, stamp) -> Timing {effective = clock, observed = max clock stamp, revealedBy = Just (p, a)}
+            Nothing            -> Timing {effective = clock, observed = clock, revealedBy = Nothing}
+      continueBackward (ValBreached (restamp timing reason))
+    _ -> continueBackward (ValBreached reason)
+
+  -- BREACH BY e: the party expression, forced. A LIST names each of its
+  -- elements (walked one cell per step), ONE declared failure each, in the
+  -- list's order and WITH duplicates — @BY LIST a, a@ is two entries (RULED
+  -- 2026-09-15, EVERY-EACH-QUANTIFIER-SPEC §6.1 on @unstable@: no dedup). The
+  -- elements themselves stay thunks; nothing here needs them forced. Anything
+  -- that is not a list is the one party. The head of the list is the anchor
+  -- (a declared breach carries no time yet, so the choice is nominal).
+  BreachBy BreachByFrame {..} ->
+    case val of
+      ValCons hd tl -> do
+        pushCFrame (BreachBy BreachByFrame {acc = hd : acc, ..})
+        continueRef tl
+      ValNil -> case reverse acc of
+        []       -> userException (UserError (emptyBreachByRefusal clause))
+        (p : ps) -> continueBackward $ ValBreached $ ExplicitBreach
+          Blame { before = [], anchor = declared p, after = map declared ps, alsoDecisive = [] }
+      _ | null acc -> continueBackward (ValBreached (ExplicitBreach (singleBlame (declared partyRef))))
+        | otherwise -> internalException $ RuntimeTypeError $
+            "expected a LIST of parties after BREACH BY but found: " <> prettyLayout val
+    where
+      declared p = DeclaredBreach (Just p) mReason Nothing
+
 
   RBinOp2 MkRBinOp2 {..}
     -- if both obligations have been breached — with ANY mix of breach kinds
@@ -1444,30 +1626,27 @@ backwardContractFrame val = \ case
     | ValBreached r1 <- rval1
     , ValBreached r2 <- val
     -> do
-      -- NOTE: depending on the operation, we return
-      -- the first breach, if the operation was and,
-      -- because they're already the reason
-      -- the second breach, if the operation was or,
-      -- because they "missed their chance"
-      -- If both happen at the same time, we return
-      -- an arbitrary one (consistently with CSL):
-      -- the left operand for RAND, the right for ROR.
-      -- ExplicitBreach carries no timestamp (adding one would ripple through
-      -- the constructor arity and the jl4-service wire — known limitation),
-      -- so a pair involving one is treated as simultaneous and resolved by
-      -- the same tie-break.
-      continueBackward $ ValBreached $
-        case (breachTime r1, breachTime r2) of
-          (Just vt, Just vt')
-            | vt <= vt' -> case op of
-                ValRAnd -> r1
-                ValROr -> r2
-            | otherwise -> case op of
-                ValROr -> r1
-                ValRAnd -> r2
-          _ -> case op of
-            ValRAnd -> r1
-            ValROr -> r2
+      -- NOTE: the compound breach NAMES every failure of both operands (R-T3,
+      -- EVERY-EACH-QUANTIFIER-SPEC §6.1 on @unstable@, built there 2026-09-15;
+      -- per-entry detail and no dedup RULED the same day) and is dated along
+      -- the operand tree (SEESAW, §6.1.2 there, RULED 2026-10-09): a RAND is
+      -- lost at the EARLIER of its operands' effective instants, because the
+      -- first failure already loses the conjunction; an ROR at the LATER,
+      -- because that is when the last alternative missed its chance. The
+      -- entries that fix that instant are the deciding operand's own decisive
+      -- entries, or both operands' when the instants are equal
+      -- ('combineBlame'). Nothing is chosen by position: swapping the operands
+      -- decides the same entries, and only the order of the list — the
+      -- drafter's — changes. Before the port the operands' REVEALING stamps
+      -- decided and a tie fell to the left operand for RAND and the right for
+      -- ROR, so one event that revealed two misses reported deadline 5 one way
+      -- round and 10 the other.
+      --
+      -- The failures are the CONCATENATION of both operands', left operand
+      -- first, with duplicates: @PARTY alice MUST x RAND PARTY alice MUST y@
+      -- both missed names alice twice, once per way. A breach with no BY is
+      -- one entry naming nobody.
+      continueBackward (ValBreached (breachOf (snd (combineBlame op (breachBlame r1) (breachBlame r2)))))
 
   RBinOp2 MkRBinOp2 {..}
     | ValFulfilled <- val
@@ -1516,12 +1695,6 @@ backwardContractFrame val = \ case
       continueRef events
 
     pushCFrame = pushFrame . ContractFrame
-
-    -- | The time at which a breach materialized, if it carries one.
-    -- ExplicitBreach is untimestamped (see NOTE at the both-breached clause).
-    breachTime :: ReasonForBreach a -> Maybe Rational
-    breachTime (DeadlineMissed _ _ stamp _ _ _) = Just stamp
-    breachTime (ExplicitBreach _ _) = Nothing
 
     continueWithFollowup :: Environment -> RExpr -> Reference -> Reference -> Machine Config
     continueWithFollowup env followup events time = do

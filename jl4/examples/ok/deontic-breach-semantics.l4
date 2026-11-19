@@ -1,11 +1,11 @@
 -- Regression pins for the deontic breach-semantics fix cluster:
 --
 --   (b) RAND/ROR over ANY both-breached pair (DeadlineMissed and/or
---       ExplicitBreach) reports a breach instead of a residual. A breach is
---       dated at the event that revealed it. RAND reports the earlier and ROR
---       the later when separate events reveal them; one event revealing both
---       is a tie, and a tie, like any pair with an ExplicitBreach, goes to the
---       left for RAND and the right for ROR, whichever deadline came first.
+--       ExplicitBreach) reports a breach instead of a residual, dated at the
+--       failures' effective instants (RAND the earliest, ROR the latest,
+--       whichever side they are on; SEESAW, EVERY-EACH-QUANTIFIER-SPEC §6.1.2
+--       on unstable), naming BOTH failures with their detail, in the order
+--       written.
 --   (c) the event whose timestamp reveals deadline expiry is re-offered to
 --       the HENCE/LEST continuation instead of being silently consumed, and
 --       the continuation's clock starts at the missed deadline.
@@ -38,8 +38,8 @@ GIVETH A DEONTIC Person Action
     ROR
     (PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST BREACH BY Bob BECAUSE "missed second")
 
--- Both alternatives definitively breached => single breach (not a residual OR).
--- ExplicitBreach is untimestamped, so ROR reports the RIGHT operand.
+-- Both alternatives definitively breached => single breach (not a residual OR),
+-- naming BOTH failures, left first, each with its own BECAUSE.
 #TRACE `ror both explicit` AT 0 WITH
     WAITUNTIL 20
 
@@ -49,7 +49,8 @@ GIVETH A DEONTIC Person Action
     RAND
     (PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST BREACH BY Bob BECAUSE "missed second")
 
--- RAND over an untimestamped pair reports the LEFT operand ("the reason").
+-- RAND over two declared breaches: lost at 5, Alice's, and naming both, each
+-- with its own BECAUSE.
 #TRACE `rand both explicit` AT 0 WITH
     WAITUNTIL 20
 
@@ -65,7 +66,8 @@ GIVETH A DEONTIC Person Action
     ROR
     (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
 
--- Mixed breach kinds, both operand orders: a single breach, the right operand.
+-- Mixed kinds, both orders: the ROR is lost at 10, when Bob's delivery is
+-- missed, after Alice's LEST BREACH at 5 — on either side — naming BOTH.
 #TRACE `explicit or deadline` AT 0 WITH
     WAITUNTIL 20
 
@@ -78,9 +80,10 @@ GIVETH A DEONTIC Person Action
     ROR
     (PARTY Bob MUST deliver WITHIN 10)
 
--- Separate events: RAND reports the earlier breach and ROR the later,
--- whichever side each is on. One event: a tie, left for RAND and right for ROR,
--- whichever deadline came first.
+-- A RAND is lost at the earlier deadline (Alice's, 5) and an ROR at the later
+-- (Bob's, 10), whichever side each is on, and whether separate events reveal
+-- the two misses or one event reveals both. The breach shows the event that
+-- revealed the deciding miss, and names both misses in the order written.
 GIVETH A DEONTIC Person Action
 `short then long and` MEANS (PARTY Alice MUST deliver WITHIN 5) RAND (PARTY Bob MUST deliver WITHIN 10)
 
@@ -111,14 +114,14 @@ GIVETH A DEONTIC Person Action
     WAITUNTIL 7
     WAITUNTIL 20
 
--- RAND, one event: the left side, Alice then Bob.
+-- RAND, one event: Alice's miss decides, from either side.
 #TRACE `short then long and` AT 0 WITH
     WAITUNTIL 20
 
 #TRACE `long then short and` AT 0 WITH
     WAITUNTIL 20
 
--- ROR, one event: the right side, Bob then Alice.
+-- ROR, one event: Bob's miss decides, from either side.
 #TRACE `short then long or` AT 0 WITH
     WAITUNTIL 20
 
@@ -137,7 +140,8 @@ GIVETH A DEONTIC Person Action
     RAND
     (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
 
--- Mixed breach kinds under RAND, both operand orders: the left operand.
+-- Mixed kinds under RAND, both orders: lost at 5, by Alice's LEST BREACH, on
+-- either side, naming both.
 #TRACE `explicit and deadline` AT 0 WITH
     WAITUNTIL 20
 
@@ -423,6 +427,13 @@ GIVETH A DEONTIC Person Action
 
 #TRACE `cure after a negative window` 20 AT 0 WITH
   PARTY Bob DOES deliver AT 4
+
+-- The floor is the rule's own arming, not the clock of the event before the
+-- miss. Entered at 10, with an event stamped -5 seen first, the rule still
+-- fails at 10, so the cure is due at 13 and a delivery at 12 performs it.
+#TRACE `cure after a negative window` 20 AT 10 WITH
+  PARTY Bob DOES deliver AT -5
+  PARTY Bob DOES deliver AT 12
 
 -- ---------------------------------------------------------------------------
 -- `l4 batch` prints this whole file and parses it again for each line of input,

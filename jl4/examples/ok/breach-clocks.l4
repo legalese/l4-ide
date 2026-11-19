@@ -1,0 +1,187 @@
+-- When a compound breach happened, and who decided it (SEESAW, built on
+-- unstable 2026-10-09; ported to main with the blame set).
+--
+-- EVERY-EACH-QUANTIFIER-SPEC section 6.1.2 on unstable. Each failure a breach
+-- names carries two instants: when it took EFFECT (a missed deadline, never
+-- earlier than the obligation's own arming; a violating act's stamp; a
+-- declared BREACH's hand-off clock) and when it was OBSERVED (the stamp of the
+-- event that revealed it). A RAND is breached at the earliest effective
+-- instant of its operands, an ROR at the latest, worked out along the operand
+-- tree; the entries that fix that instant are the DECISIVE ones. Every pair
+-- below is written both ways round and must report the same instant and the
+-- same decisive entries; only the order of the list (the drafter's) differs.
+--
+-- The numbering is unstable's. Its §4 (an obligation armed after its own
+-- deadline, written WITHIN ... OF THE ARMING), §8 (a barrier, EVERY ... ONCE
+-- ALL HAVE) and §9 (THE JOIN) need syntax this branch does not have, so they
+-- are not here.
+
+IMPORT prelude
+
+DECLARE Actor IS ONE OF P, Q, R
+DECLARE Action IS ONE OF x, y, z, w
+
+-- §1 Nesting. (P by 1 ROR Q by 10) RAND R by 5: the ROR holds until 10, so
+-- the RAND is lost at 5, by R. Not at 1: P's miss broke nothing while Q was
+-- still open. One event at 11 reveals all three misses at once.
+
+GIVETH A DEONTIC Actor Action
+`p or q` MEANS (PARTY P MUST x WITHIN 1) ROR (PARTY Q MUST y WITHIN 10)
+
+GIVETH A DEONTIC Actor Action
+`q or p` MEANS (PARTY Q MUST y WITHIN 10) ROR (PARTY P MUST x WITHIN 1)
+
+GIVETH A DEONTIC Actor Action
+`r by 5` MEANS PARTY R MUST z WITHIN 5
+
+GIVETH A DEONTIC Actor Action
+`or, then and` MEANS `p or q` RAND `r by 5`
+
+GIVETH A DEONTIC Actor Action
+`and, then or` MEANS `r by 5` RAND `q or p`
+
+#TRACE `or, then and` AT 0 WITH
+  (WAITUNTIL 11)
+
+#TRACE `and, then or` AT 0 WITH
+  (WAITUNTIL 11)
+
+-- Three events instead of one: the same answer.
+#TRACE `or, then and` AT 0 WITH
+  (WAITUNTIL 2)
+  (WAITUNTIL 6)
+  (WAITUNTIL 11)
+
+#TRACE `and, then or` AT 0 WITH
+  (WAITUNTIL 2)
+  (WAITUNTIL 6)
+  (WAITUNTIL 11)
+
+-- §2 Two misses at one instant. Both due at 5, one event at 10: both entries
+-- are decisive.
+
+GIVETH A DEONTIC Actor Action
+`both due at 5` MEANS (PARTY P MUST x WITHIN 5) RAND (PARTY Q MUST y WITHIN 5)
+
+GIVETH A DEONTIC Actor Action
+`both due at 5, swapped` MEANS (PARTY Q MUST y WITHIN 5) RAND (PARTY P MUST x WITHIN 5)
+
+#TRACE `both due at 5` AT 0 WITH
+  (WAITUNTIL 10)
+
+#TRACE `both due at 5, swapped` AT 0 WITH
+  (WAITUNTIL 10)
+
+-- §3 A missed deadline beside a declared BREACH at the same instant. Q's
+-- LEST BREACH takes effect at Q's deadline, 5, the instant P misses too.
+-- Neither kind wins by position: the report is a missed deadline (not every
+-- decisive entry is declared), and both entries are decisive.
+
+GIVETH A DEONTIC Actor Action
+`miss` MEANS PARTY P MUST x WITHIN 5
+
+GIVETH A DEONTIC Actor Action
+`declared` MEANS PARTY Q MUST y WITHIN 5 LEST BREACH BY Q BECAUSE "late"
+
+GIVETH A DEONTIC Actor Action
+`miss and declared` MEANS `miss` RAND `declared`
+
+GIVETH A DEONTIC Actor Action
+`declared and miss` MEANS `declared` RAND `miss`
+
+#TRACE `miss and declared` AT 0 WITH
+  (WAITUNTIL 10)
+
+#TRACE `declared and miss` AT 0 WITH
+  (WAITUNTIL 10)
+
+-- §5 A kept prohibition hands its HENCE the end of its window (5), however
+-- many idle events the trace carries before the next one. R is due at 6 in
+-- both traces.
+
+GIVETH A DEONTIC Actor Action
+`kept, then R` MEANS PARTY P SHANT x WITHIN 5 HENCE (PARTY R MUST z WITHIN 1)
+
+#TRACE `kept, then R` AT 0 WITH
+  (WAITUNTIL 10)
+
+#TRACE `kept, then R` AT 0 WITH
+  (WAITUNTIL 6)
+  (WAITUNTIL 10)
+
+-- A declared BREACH in that HENCE takes effect at 5 too, so beside Q's miss
+-- at 7 it decides the RAND, whichever side it is on and however many events
+-- came between.
+
+GIVETH A DEONTIC Actor Action
+`kept, then breach` MEANS PARTY P SHANT x WITHIN 5 HENCE BREACH BY P BECAUSE "kept"
+
+GIVETH A DEONTIC Actor Action
+`q by 7` MEANS PARTY Q MUST y WITHIN 7
+
+GIVETH A DEONTIC Actor Action
+`kept breach and q` MEANS `kept, then breach` RAND `q by 7`
+
+GIVETH A DEONTIC Actor Action
+`q and kept breach` MEANS `q by 7` RAND `kept, then breach`
+
+#TRACE `kept breach and q` AT 0 WITH
+  (WAITUNTIL 10)
+
+#TRACE `q and kept breach` AT 0 WITH
+  (WAITUNTIL 10)
+
+#TRACE `kept breach and q` AT 0 WITH
+  (WAITUNTIL 6)
+  (WAITUNTIL 10)
+
+-- §6 ROR: breached only when the last alternative fails. A lapsed MAY's bare
+-- LEST BREACH takes effect at the MAY's deadline (5), Q's miss at 7: the ROR
+-- is lost at 7, by Q; the RAND at 5, by the BREACH.
+
+GIVETH A DEONTIC Actor Action
+`may lapses` MEANS PARTY P MAY x WITHIN 5 LEST BREACH
+
+GIVETH A DEONTIC Actor Action
+`may or q` MEANS `may lapses` ROR `q by 7`
+
+GIVETH A DEONTIC Actor Action
+`q or may` MEANS `q by 7` ROR `may lapses`
+
+GIVETH A DEONTIC Actor Action
+`may and q` MEANS `may lapses` RAND `q by 7`
+
+GIVETH A DEONTIC Actor Action
+`q and may` MEANS `q by 7` RAND `may lapses`
+
+#TRACE `may or q` AT 0 WITH
+  (WAITUNTIL 10)
+
+#TRACE `q or may` AT 0 WITH
+  (WAITUNTIL 10)
+
+#TRACE `may and q` AT 0 WITH
+  (WAITUNTIL 10)
+
+#TRACE `q and may` AT 0 WITH
+  (WAITUNTIL 10)
+
+-- §7 One BREACH reached twice. `oops` is shared; reached at 5 on the left and
+-- at 9 on the right, each reach takes its own instant: the left RAND is lost
+-- at 5, the right at 7 (Q's miss beats the reach at 9), so the ROR is lost
+-- at 7, by Q.
+
+GIVETH A DEONTIC Actor Action
+`oops` MEANS BREACH BY P BECAUSE "shared"
+
+GIVETH A DEONTIC Actor Action
+`left half` MEANS (PARTY P MUST x WITHIN 5 LEST `oops`) RAND (PARTY Q MUST w WITHIN 100)
+
+GIVETH A DEONTIC Actor Action
+`right half` MEANS (PARTY R MUST z WITHIN 9 LEST `oops`) RAND (PARTY Q MUST y WITHIN 7)
+
+GIVETH A DEONTIC Actor Action
+`whole` MEANS `left half` ROR `right half`
+
+#TRACE `whole` AT 0 WITH
+  (WAITUNTIL 200)

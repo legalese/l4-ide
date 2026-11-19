@@ -1,0 +1,78 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-blame.l4:42:1-43:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+    and at the same instant
+      Tenant OF "Bob"
+        who had to do obligatory action
+          MUST Sign bob
+        before their deadline, which was at
+          14
+    and the breach names, in order
+      Tenant OF "Alice"
+        who had to do obligatory action
+          MUST Sign alice
+        before their deadline, which was at
+          14
+      Tenant OF "Bob"
+        who had to do obligatory action
+          MUST Sign bob
+        before their deadline, which was at
+          14
+run-blame.l4:55:1-56:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+    and at the same instant
+      Tenant OF "Alice"
+        who had to do obligatory action
+          MUST Refund alice
+        before their deadline, which was at
+          14
+    and the breach names, in order
+      Tenant OF "Alice"
+        who had to do obligatory action
+          MUST Sign alice
+        before their deadline, which was at
+          14
+      Tenant OF "Alice"
+        who had to do obligatory action
+          MUST Refund alice
+        before their deadline, which was at
+          14
+run-blame.l4:68:1-69:17:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Alice" BECAUSE "the tenants carry it"
+    BY Tenant OF "Bob" BECAUSE "the tenants carry it"
+    BY Tenant OF "Alice" BECAUSE "the tenants carry it"
+run-blame.l4:85:1-86:17:
+  BREACH BY names an empty list, at run-blame.l4:83:16-47. A breach blames at least one party: give BY a party, or a LIST with someone in it, or leave BY out to blame nobody. (EVERY-EACH-QUANTIFIER-SPEC section 6.1, R-T3.)
+run-blame.l4:103:1-104:17:
+  DEONTIC BREACHED:
+    BREACH
+    BY LIST "a", "b"
+    BECAUSE "the pair did not deliver"

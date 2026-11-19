@@ -1,0 +1,373 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+breach-clocks.l4:43:1-44:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      11
+    surpassed the deadline of party
+      R
+    who had to do obligatory action
+      MUST z
+    before their deadline, which was at
+      5
+    and the breach names, in order
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          1
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          10
+      R
+        who had to do obligatory action
+          MUST z
+        before their deadline, which was at
+          5
+breach-clocks.l4:46:1-47:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      11
+    surpassed the deadline of party
+      R
+    who had to do obligatory action
+      MUST z
+    before their deadline, which was at
+      5
+    and the breach names, in order
+      R
+        who had to do obligatory action
+          MUST z
+        before their deadline, which was at
+          5
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          10
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          1
+breach-clocks.l4:50:1-53:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      6
+    surpassed the deadline of party
+      R
+    who had to do obligatory action
+      MUST z
+    before their deadline, which was at
+      5
+    and the breach names, in order
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          1
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          10
+      R
+        who had to do obligatory action
+          MUST z
+        before their deadline, which was at
+          5
+breach-clocks.l4:55:1-58:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      6
+    surpassed the deadline of party
+      R
+    who had to do obligatory action
+      MUST z
+    before their deadline, which was at
+      5
+    and the breach names, in order
+      R
+        who had to do obligatory action
+          MUST z
+        before their deadline, which was at
+          5
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          10
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          1
+breach-clocks.l4:69:1-70:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      10
+    surpassed the deadline of party
+      P
+    who had to do obligatory action
+      MUST x
+    before their deadline, which was at
+      5
+    and at the same instant
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          5
+    and the breach names, in order
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          5
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          5
+breach-clocks.l4:72:1-73:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      10
+    surpassed the deadline of party
+      Q
+    who had to do obligatory action
+      MUST y
+    before their deadline, which was at
+      5
+    and at the same instant
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          5
+    and the breach names, in order
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          5
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          5
+breach-clocks.l4:92:1-93:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      10
+    surpassed the deadline of party
+      P
+    who had to do obligatory action
+      MUST x
+    before their deadline, which was at
+      5
+    and at the same instant
+      Q BECAUSE "late"
+    and the breach names, in order
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          5
+      Q BECAUSE "late"
+breach-clocks.l4:95:1-96:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      10
+    surpassed the deadline of party
+      P
+    who had to do obligatory action
+      MUST x
+    before their deadline, which was at
+      5
+    and at the same instant
+      Q BECAUSE "late"
+    and the breach names, in order
+      Q BECAUSE "late"
+      P
+        who had to do obligatory action
+          MUST x
+        before their deadline, which was at
+          5
+breach-clocks.l4:105:1-106:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      10
+    surpassed the deadline of party
+      R
+    who had to do obligatory action
+      MUST z
+    before their deadline, which was at
+      6
+breach-clocks.l4:108:1-110:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      10
+    surpassed the deadline of party
+      R
+    who had to do obligatory action
+      MUST z
+    before their deadline, which was at
+      6
+breach-clocks.l4:128:1-129:17:
+  DEONTIC BREACHED:
+    BREACH
+    BY P BECAUSE "kept"
+    BY Q
+      who had to do obligatory action
+        MUST y
+      before their deadline, which was at
+        7
+breach-clocks.l4:131:1-132:17:
+  DEONTIC BREACHED:
+    BREACH
+    BY Q
+      who had to do obligatory action
+        MUST y
+      before their deadline, which was at
+        7
+    BY P BECAUSE "kept"
+breach-clocks.l4:134:1-136:17:
+  DEONTIC BREACHED:
+    BREACH
+    BY P BECAUSE "kept"
+    BY Q
+      who had to do obligatory action
+        MUST y
+      before their deadline, which was at
+        7
+breach-clocks.l4:157:1-158:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      10
+    surpassed the deadline of party
+      Q
+    who had to do obligatory action
+      MUST y
+    before their deadline, which was at
+      7
+    and the breach names, in order
+      (nobody named)
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          7
+breach-clocks.l4:160:1-161:17:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      10
+    surpassed the deadline of party
+      Q
+    who had to do obligatory action
+      MUST y
+    before their deadline, which was at
+      7
+    and the breach names, in order
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          7
+      (nobody named)
+breach-clocks.l4:163:1-164:17:
+  DEONTIC BREACHED:
+    BREACH
+    BY (nobody named)
+    BY Q
+      who had to do obligatory action
+        MUST y
+      before their deadline, which was at
+        7
+breach-clocks.l4:166:1-167:17:
+  DEONTIC BREACHED:
+    BREACH
+    BY Q
+      who had to do obligatory action
+        MUST y
+      before their deadline, which was at
+        7
+    BY (nobody named)
+breach-clocks.l4:186:1-187:18:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      200
+    surpassed the deadline of party
+      Q
+    who had to do obligatory action
+      MUST y
+    before their deadline, which was at
+      7
+    and the breach names, in order
+      P BECAUSE "shared"
+      Q
+        who had to do obligatory action
+          MUST w
+        before their deadline, which was at
+          100
+      P BECAUSE "shared"
+      Q
+        who had to do obligatory action
+          MUST y
+        before their deadline, which was at
+          7

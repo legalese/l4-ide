@@ -62,6 +62,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/cyclic-computed-fields`       | Computed fields depend on each other in a ring.                    |
 | `check/cyclic-type-synonyms`         | Type synonyms refer to each other in a ring.                       |
 | `check/duplicate-name`               | A name occurs twice where names must be distinct.                  |
+| `check/empty-breach-by`              | `BREACH BY` names a list written out empty.                        |
 | `check/export-clauses-without-given` | An `@export` of clauses with no GIVEN.                             |
 | `check/export-event-type`            | An `@export` takes or returns an EVENT.                            |
 | `check/export-function-input`        | An `@export` has an input of a function type.                      |

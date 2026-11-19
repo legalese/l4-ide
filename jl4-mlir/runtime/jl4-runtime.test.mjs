@@ -399,7 +399,12 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     answer(breached, late),
     JSON.stringify({
       BREACH: {
+        anchor: 0,
         detail: "not repaid",
+        failures: [
+          { detail: "not repaid", party: "the borrower", reason: "explicit" },
+        ],
+        parties: ["the borrower"],
         party: "the borrower",
         reason: "explicit",
       },
