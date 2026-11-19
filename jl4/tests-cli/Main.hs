@@ -559,6 +559,11 @@ batchRecordLikeFixture, batchRecordLikeJson :: FilePath
 batchRecordLikeFixture = fixtureDir </> "batch-record-like.l4"
 batchRecordLikeJson = fixtureDir </> "batch-record-like.json"
 
+-- | A type whose only constructor is named like it and carries no fields.
+batchUnitFixture, batchUnitJson :: FilePath
+batchUnitFixture = fixtureDir </> "batch-unit.l4"
+batchUnitJson = fixtureDir </> "batch-unit.json"
+
 batchTaggedFixture, batchTaggedJson :: FilePath
 batchTaggedFixture = fixtureDir </> "batch-tagged.l4"
 batchTaggedJson = fixtureDir </> "batch-tagged.json"
@@ -4425,6 +4430,14 @@ spec bin = do
             resultOf fields `shouldBe` Just (Number 40)
             show (objField tagged "diagnostics") `shouldSatisfy` ("Missing required field 'amount'" `isInfixOf`)
           other -> expectationFailure ("expected 2 rows, got " ++ show (length other))
+
+      -- A type whose only constructor is named like it and carries no fields is
+      -- read as its name, the form the schemas publish, and as {} (assumed, not
+      -- ruled; review of #779, 2026-11-19).
+      it "reads a fieldless type named like its constructor as its name, and as {}" $ do
+        (_, _, rows) <- rowsOf [batchUnitFixture, "--inputs", batchUnitJson]
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "success", "error"]
+        map resultOf (take 2 rows) `shouldBe` [Just (Number 1), Just (Number 1)]
 
       -- An input declared through a synonym is the type the synonym stands for
       -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:

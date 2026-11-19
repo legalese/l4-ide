@@ -1469,6 +1469,17 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                   let conRef = Def conUnique conName
                   case jsonValue of
                     Aeson.Object obj -> decodeConstructorFields conRef conType obj
+                    -- A constructor that carries no fields, named like its
+                    -- type, is also read as its name, which is how JSONENCODE
+                    -- writes it and the schemas publish one declared IS ONE OF
+                    -- (DECLARE Unit IS ONE OF Unit): so "Unit" is read on every
+                    -- path and JSONENCODE's output reads back. The entity table
+                    -- cannot tell it from DECLARE Unit HAS, which this reads so
+                    -- too (assumed, not ruled; review of #779, 2026-11-19).
+                    Aeson.String s
+                      | isNullaryConstructorReturning conType tyRef
+                      , s == nameToText (TypeCheck.getName conName) ->
+                          pure $ ValConstructor conRef []
                     _ -> do
                       -- JSON value is not an object, can't decode to record
                       userException $ UserError $

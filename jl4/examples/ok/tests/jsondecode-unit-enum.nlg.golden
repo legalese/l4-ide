@@ -1,0 +1,4 @@
+`decode unit` with "Unit"
+`decode unit` with {}
+`JSONENCODE` with `Unit`
+`decode unit` with `JSONENCODE` with `Unit`

@@ -3553,6 +3553,20 @@ spec = describe "integration" do
         call baseUrl mgr "refund of" (Aeson.object ["n" Aeson..= (40 :: Int)])
           >>= (`shouldCarry` Answers (Aeson.object ["Deposit Refund" Aeson..= fields]))
 
+  -- A type whose only constructor is named like it and carries no fields is
+  -- published as its name, and JSONDECODE, which the fallback path reads with,
+  -- reads that name too, so both paths answer it (assumed, not ruled; review
+  -- of #779, 2026-11-19).
+  describe "reads a fieldless type named like its constructor as its name" do
+    aroundAll (\k -> withServiceFromSources "unit" [("unit.l4", unitJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "unit" fn (Aeson.object ["arguments" Aeson..= args])
+      it "on both paths, and answers it as its name" \(baseUrl, mgr) -> do
+        forM_ [[], ["pad" Aeson..= Aeson.object []]] \extra ->
+          call baseUrl mgr "takes unit" (Aeson.object (("u" Aeson..= Aeson.String "Unit") : extra))
+            >>= (`shouldCarry` Answers (Aeson.Number 1))
+        call baseUrl mgr "gives unit" (Aeson.object ["n" Aeson..= (1 :: Int)])
+          >>= (`shouldCarry` Answers (Aeson.String "Unit"))
+
   describe "compiler" do
     it "compiles valid L4 sources" do
       logger <- newLogger False
@@ -4861,6 +4875,26 @@ taggedInputJL4 = Text.unlines
   , "  CONSIDER v"
   , "  WHEN Verdict r THEN 1"
   , "  WHEN None THEN 0"
+  ]
+
+unitJL4 :: Text
+unitJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE Unit IS ONE OF Unit"
+  , ""
+  , "@export Takes a unit"
+  , "GIVEN u IS A Unit"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`takes unit` MEANS"
+  , "  CONSIDER u"
+  , "  WHEN Unit THEN 1"
+  , ""
+  , "@export Gives a unit"
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A Unit"
+  , "`gives unit` MEANS Unit"
   ]
 
 recordFormJL4 :: Text
