@@ -99,9 +99,10 @@ data Env = Env
     --
     -- The memo need not key on it: 'parenExpr' and 'parenPattern' memoise
     -- 'paren', which resets it before anything inside reads it, and
-    -- 'clauseBody' sets it from its own column, which is already part of
-    -- that memo's key. So every memoised parser's reply is independent of
-    -- the context it was reached with.
+    -- 'clauseBody' sets it from its own column and the enclosing
+    -- 'standAside', both part of that memo's key. So every memoised
+    -- parser's reply is independent of the rest of the context it was
+    -- reached with.
   , memoiseGroups :: Bool
     -- ^ Does 'memoGroup' memoise? 'True' for every parse the tools run.
     -- 'False' parses a bracketed group afresh wherever it is reached, as the
@@ -121,6 +122,49 @@ data ClauseCtx = ClauseCtx
   , nestedIn :: Maybe NestedIn
     -- ^ Which of that rule's bodies we are in, for the refusal messages
     -- ('obligation'); 'Nothing' outside any rule's body.
+  , standAside :: Bool
+    -- ^ Must a rule's refusal of a @HENCE@ on its first line ('obligation')
+    -- stand aside here, leaving the keyword to what is outside the rule?
+    -- Standing aside is what every rule did before smucclaw/l4-ide#1074,
+    -- so setting this where it is not needed changes which rule a refusal
+    -- names, never what is accepted. It is set in two kinds of place
+    -- ('standingAside'):
+    --
+    -- * Where something outside can still take a @HENCE@ written after this
+    --   point. 'hence' has two callers: a rule's own slot ('obligation') and
+    --   the continuation of a @RECORD@, @COMMIT@ or @ATTEST@
+    --   ('recordOrCommitExpr'). So that is everything a rule parses before
+    --   its @HENCE@ slot (its action, its @AFTER@, @WITHIN@ or @BEFORE@, and
+    --   its join line), and the value of a @RECORD@, @COMMIT@ or @ATTEST@.
+    --   Everywhere else between the nearest brackets or definition and a
+    --   rule, each rule outside has used the slot this one is nested in.
+    -- * Where a @try@ around the parse would backtrack a refusal and another
+    --   parse would then succeed, so that the run failed later at a token
+    --   that is fine, naming nothing. Every @try@ in this module that can
+    --   parse a rule as the last thing it parses, checked one by one
+    --   (ClauseLayoutParserSpec, "every try that can end in a rule"):
+    --
+    --     - stands aside, because what follows a failed @try@ can succeed:
+    --       an operator's right operand ('cont', 'singleLineExpressionCont'),
+    --       a user-defined infix or mixfix operand ('infixAhead',
+    --       'mixfixChainExprNextLine', which covers 'gatherChain'), the
+    --       values of @f WITH x IS ...@ ('baseExpr'' around 'namedApp'), and
+    --       a function's arguments, of which a bullet block can end in a rule
+    --       ('parseAppArgs');
+    --     - needs nothing, because every alternative after it fails as well,
+    --       so the refusal is the error furthest on and is the one reported:
+    --       'event' and 'bulletBlock' in 'baseExpr'', 'decidePatternMatch'
+    --       and the later clauses it reads, 'singleInlineLetDeclRelaxed',
+    --       and @TIMEZONE IS@ ('topdecl').
+    --
+    --   The other @try@s parse no expression that can end in a rule: names,
+    --   literals, patterns, section headings, postfix operators,
+    --   projections, and look-aheads.
+    --
+    -- Carried into a rule's bodies; into the body of a @DECIDE@ or @MEANS@
+    -- definition, a @WHERE@ definition among them ('clauseBody', whose memo
+    -- keys on it); and into a @LET@ definition, which inherits the whole
+    -- context. Reset by 'paren'.
   }
   deriving stock (Show, Eq)
 
@@ -131,7 +175,19 @@ data NestedIn = InHence | InLest
 -- | Outside any rule's body: at the top of a definition whose clause is at
 -- this column, or inside brackets (column 1).
 topClauseCtx :: Pos -> ClauseCtx
-topClauseCtx col = ClauseCtx {threshold = col, nestedIn = Nothing}
+topClauseCtx col = ClauseCtx
+  { threshold = col
+  , nestedIn = Nothing
+  , standAside = False
+  }
+
+-- | Parse with 'standAside' set; see there for where.
+standingAside :: Parser a -> Parser a
+standingAside = local setStandAside
+
+-- | Set 'standAside'.
+setStandAside :: Env -> Env
+setStandAside e = e { clauseCtx = (e.clauseCtx) { standAside = True } }
 
 -- | Only ever prepended to, and read only once the parse is over: 'memoGroup' replays a group's additions on that basis.
 data PState = PState
@@ -1348,14 +1404,16 @@ pmClause clauseCol =
 -- readings parse the same body at the same position with the same column,
 -- so the second replays the first instead of parsing the body again.
 --
--- The body's 'clauseCtx' is @'topClauseCtx' col@, set inside the memo so the
--- memoised parser depends on nothing but the position and @col@: the outermost
--- rule of a definition takes any @HENCE@ or @LEST@ written right of the
--- definition.
+-- The body's 'clauseCtx' is @'topClauseCtx' col@, keeping only the enclosing
+-- 'standAside' (a @WHERE@ inside a @RECORD@'s value is still inside it), set
+-- inside the memo so the memoised parser depends on nothing but the position,
+-- @col@ and that flag, which make its key: the outermost rule of a definition
+-- takes any @HENCE@ or @LEST@ written right of the definition.
 clauseBody :: Pos -> Parser (Expr Name)
-clauseBody col =
-  memoGroupAt (unPos col) #clauseBodies
-    (local (\ e -> e { clauseCtx = topClauseCtx col }) (indentedExpr col))
+clauseBody col = do
+  outerAside <- asks (.clauseCtx.standAside)
+  memoGroupAt (2 * unPos col + fromEnum outerAside) #clauseBodies
+    (local (\ e -> e { clauseCtx = (topClauseCtx col) { standAside = outerAside } }) (indentedExpr col))
 
 
 -- | Extract the term (value) parameter names from a GIVEN signature, skipping
@@ -1812,8 +1870,9 @@ memoGroup = memoGroupAt 0
 -- | 'memoGroup' for a parser that also depends on one more number, which
 -- becomes part of the key: @memoGroupAt k table p@ must behave exactly as
 -- @p@ wherever it is reached at the same position, with the same
--- 'ofIsAnchor' and the same @k@. 'clauseBody' passes its column. (Numbers
--- from 4095 up share one key; no column is that wide.)
+-- 'ofIsAnchor' and the same @k@. 'clauseBody' passes twice its column, plus
+-- one when 'standAside' is set. (Numbers from 8191 up share one key; no
+-- column is that wide.)
 memoGroupAt :: Int -> Lens' GroupMemo (IntMap.IntMap (GroupReply a)) -> Parser a -> Parser a
 memoGroupAt extra table p =
   ReaderT \ env ->
@@ -1822,7 +1881,7 @@ memoGroupAt extra table p =
       else runReaderT p env
   where
     memoised env = StateT \ outer -> Megaparsec.ParsecT \ s cok cerr eok eerr -> do
-      let key = (2 * s.stateOffset + fromEnum env.ofIsAnchor) * 4096 + min 4095 extra
+      let key = (2 * s.stateOffset + fromEnum env.ofIsAnchor) * 8192 + min 8191 extra
       known <- gets (IntMap.lookup key . view table)
       Megaparsec.Reply s' consumption result <- case known of
         Just reply -> pure reply
@@ -2025,7 +2084,7 @@ singleLineExpressionCont startLine = try $ do
   -- same-line keywords only, preserving the directive's line discipline)
   (prio, assoc, op) <- operator
   l <- currentLine
-  arg <- mixfixChainOperand
+  arg <- standingAside mixfixChainOperand
   pure (MkCont op prio assoc l (mkPos 1) arg)
 
 data Stack a =
@@ -2200,7 +2259,7 @@ cont pop pbase p =
     (prio, assoc, op) <- pop
     -- parg <- Lexer.indentGuard spaces GT p
     l <- currentLine
-    arg <- pbase
+    arg <- standingAside pbase
     pure (MkCont op prio assoc l pos arg) -- the line we store is the line of the argument, not the operator
 
 -- TODO: We should think whether we can obtain this more cheaply.
@@ -2470,7 +2529,7 @@ infixAhead exprLineInfo = try $ do
   tok <- lookAhead anySingle
   guard (tok.range.start.line == exprLineInfo.exprEndLine)
   operandLayout <- peekNextTokenLayout
-  operand <- baseExpr'
+  operand <- standingAside baseExpr'
   pure (MkInfixAhead kw operandLayout operand)
 
 -- | Parse a mixfix chain expression.
@@ -2529,7 +2588,7 @@ mixfixChainExprNextLine nextLineOk = do
   -- When 'baseExprStep' has already parsed a same-line keyword and its
   -- operand, the chain starts from them; see 'postfixOrInfix' for why the
   -- keyword is certain to be one 'mixfixChainCont' would have taken.
-  mChain <- case firstAhead of
+  mChain <- standingAside $ case firstAhead of
     Just ahead -> Just <$> mixfixChainFrom allowNextLine hints ahead
     Nothing -> optional $ try (mixfixChainCont allowNextLine hints firstExprInfo)
   case mChain of
@@ -2663,7 +2722,7 @@ baseExpr' =
   <|> refuse
   <|> lam
   <|> consider
-  <|> try namedApp -- This is not nice
+  <|> try (standingAside namedApp) -- This is not nice; and see 'standAside'.
   <|> app
   <|> lit
   <|> lifecycleExpr
@@ -2881,7 +2940,8 @@ parseAppArgs current fname = go True
     funcLine = nameEndLine fname
 
     go allowBreak = do
-      mArg <- optional $ try $ parseOne allowBreak
+      -- A bullet block can end in a rule ('standAside').
+      mArg <- optional $ try $ standingAside $ parseOne allowBreak
       case mArg of
         Nothing -> pure []
         Just arg -> (arg :) <$> go False
@@ -3015,7 +3075,9 @@ recordOrCommitExpr = do
       <|> ((True, Nothing) <$ annoLexeme (spacedKeyword_ TKAttest) <* annoHole (pure (Nothing :: Maybe (Expr Name))))
     cell  <- annoHole cellExpr                                -- cell hole (field 2)
     _     <- annoLexeme (spacedKeyword_ TKIs)
-    val   <- annoHole (indentedExpr current)                  -- val hole (field 3)
+    -- A rule in the value leaves a HENCE on its first line to mHence below,
+    -- as it did before smucclaw/l4-ide#1074 ('standAside').
+    val   <- annoHole (standingAside (indentedExpr current))  -- val hole (field 3)
     _     <- annoHole (pure isOfficial)                       -- isOfficial placeholder hole (field 4)
     mHence <- optionalWithHole (hence (mkPos 1) <|> implicitSeq current)  -- mHence hole (field 5)
     pure (Record emptyAnno mParty cell val isOfficial mHence)
@@ -3329,8 +3391,11 @@ obligation = do
 
     -- The HENCE or LEST slot. The keyword is looked at first, without
     -- 'hidden', so a missing one leaves the same expected-token hint the
-    -- plain optional slot left. Exactly one hole on every path.
-    clauseSlot :: NestedIn -> AnnoParser (Expr Name) -> Maybe Pos -> AnnoParser (Maybe (Expr Name), Maybe Pos)
+    -- plain optional slot left. Exactly one hole on every path. The 'Bool'
+    -- says whether the body starts with a bracket, for the refusal's advice
+    -- ('ownershipGuard'): a rule in brackets cannot be written into after
+    -- its @)@.
+    clauseSlot :: NestedIn -> AnnoParser (Expr Name) -> Maybe Pos -> AnnoParser (Maybe (Expr Name), Maybe Pos, Bool)
     clauseSlot which slot cc = do
       let kw = case which of
             InHence -> TKHence
@@ -3341,33 +3406,52 @@ obligation = do
         then do
           let
             cc' = foldCol cc pos
-            inner = ClauseCtx {threshold = ownCol cc', nestedIn = Just which}
+            inner = ctx {threshold = ownCol cc', nestedIn = Just which}
+          bracketed <- noAnno (isJust <$> optional (try (lookAhead (hidden (spacedKeyword_ kw *> spacedSymbol_ TPOpen)))))
           body <- localAnno (\ e -> e { clauseCtx = inner }) slot
-          pure (Just body, cc')
+          pure (Just body, cc', bracketed)
         else do
           none <- annoHole (pure Nothing)
-          pure (none, cc)
+          pure (none, cc, False)
 
     -- See the haddock above: a HENCE or LEST that is this rule's by its
     -- column, but has no slot left.
-    ownershipGuard :: String -> Maybe Pos -> Maybe (Expr Name) -> Bool -> AnnoParser ()
-    ownershipGuard hw cc henceP hasLest = noAnno do
+    --
+    -- On the head line, after both slots, a HENCE is refused here too, unless
+    -- 'standAside' is set: then nothing outside can take it (each rule this
+    -- one is nested in, inside the same brackets, has used the slot it is
+    -- nested in, so each would refuse it as well: a second HENCE, or a HENCE
+    -- after the LEST), and only this rule can say which rule the HENCE is on
+    -- by the line it is written on (smucclaw/l4-ide#1074, F2). Where
+    -- 'standAside' is set, the keyword is left outward as before #1074: to
+    -- the continuation of a RECORD, to a rule whose action or edge this rule
+    -- is in, or past a try to the rule outside, which refuses it by name.
+    ownershipGuard :: String -> Maybe Pos -> Maybe (Expr Name) -> Bool -> Bool -> AnnoParser ()
+    ownershipGuard hw cc henceP henceBracketed hasLest = noAnno do
       next <- optional (lookAhead (hidden (True <$ spacedKeyword_ TKHence <|> False <$ spacedKeyword_ TKLest)))
       pos@(line, col) <- (,) <$> currentLine <*> Lexer.indentLevel
-      for_ next \ isHence ->
-        when (line > headLine && ownsAt cc pos) $
-          fancyFailure (Set.singleton (ErrorFail (refusal isHence col)))
+      for_ next \ isHence -> do
+        when ((line > headLine && ownsAt cc pos) || (line == headLine && headLineRefuses isHence)) $ do
+          -- Is what follows the HENCE in brackets? For the advice on a HENCE
+          -- after the LEST.
+          nextBracketed <- isJust <$> optional (try (lookAhead (hidden (spacedKeyword_ TKHence *> spacedSymbol_ TPOpen))))
+          fancyFailure (Set.singleton (ErrorFail (refusal isHence nextBracketed line col)))
       where
         own = ownCol cc
         theRule =
           "the rule that starts with " <> hw <> " at line "
             <> show (unPos headLine) <> ", column " <> show (unPos current)
-        refusal isHence col =
+        -- Which keyword left over on this rule's first line it refuses here,
+        -- rather than leaving it outward (see above).
+        headLineRefuses isHence = isHence && not ctx.standAside
+        refusal isHence nextBracketed line col =
           whose <> " " <> problem <> advice
           where
             kwName = if isHence then "HENCE" else "LEST"
             -- Why it is this rule's.
             whose
+              | line == headLine =
+                  "This " <> kwName <> " is part of " <> theRule <> ", because it is on that rule's first line."
               | col == own =
                   "This " <> kwName <> " lines up with the clauses of " <> theRule <> "."
               | col > thr, isJust ctx.nestedIn =
@@ -3379,17 +3463,30 @@ obligation = do
               | otherwise =
                   "This " <> kwName <> " is part of " <> theRule
                     <> ", because it is right of that rule's clauses."
+            -- Moved before the LEST, a rule after the HENCE would take the
+            -- LEST, on one line or at that rule's clauses, unless brackets
+            -- end it (smucclaw/l4-ide#1074).
             problem
               | isHence && isNothing henceP && hasLest =
                   "It comes after that rule's LEST. Write HENCE before LEST."
+                    <> (if nextBracketed then "" else
+                          " If what follows HENCE is a rule, or ends with one, put it in brackets, \
+                          \or that rule can take the LEST.")
               | isHence = "That rule already has a HENCE, and a rule has one."
               | otherwise = "That rule already has a LEST, and a rule has one."
+            -- For a second HENCE after a rule in this one's HENCE: say how
+            -- to chain it after that rule, only when that rule can still
+            -- take one. A rule in brackets ends at its @)@, so the HENCE goes
+            -- before it (smucclaw/l4-ide#1074, F4).
             advice
               | isHence, isNothing henceP = ""
               | isHence = case henceP of
-                  Just (Regulative {}) ->
-                    " To make it follow the rule in that one's HENCE, \
-                    \write it inside that rule, in line with its clauses."
+                  Just (Regulative _ nestedRule)
+                    | isNothing nestedRule.hence ->
+                        " To make it follow the rule in that one's HENCE, write it inside "
+                          <> (if henceBracketed then "the innermost brackets around that rule, before their )" else "that rule")
+                          <> ", in line with its clauses"
+                          <> (if isJust nestedRule.lest then ", and before its LEST." else ".")
                   _ -> ""
               | ctx.nestedIn == Just InHence =
                   if own == thr
@@ -3406,14 +3503,16 @@ obligation = do
           Party {} -> "PARTY"
           Every {} -> "EVERY"
     modalPos <- peek
-    act <- annoHole (must current)
-    (opensP, cc1) <- tracked (foldCol Nothing modalPos) (optionalWithHole (opening current))
-    (dueP, cc2) <- tracked cc1 (optionalWithHole (closingEdge current))
+    -- A rule inside these slots leaves a HENCE on its first line to this
+    -- rule, whose HENCE slot is still free ('standAside').
+    act <- annoHole (standingAside (must current))
+    (opensP, cc1) <- tracked (foldCol Nothing modalPos) (optionalWithHole (localAnno setStandAside (opening current)))
+    (dueP, cc2) <- tracked cc1 (optionalWithHole (localAnno setStandAside (closingEdge current)))
     edgeOrderGuard
-    (joinP, cc3) <- tracked cc2 (optionalWithHole (joinLine current))
-    (henceP, cc4) <- clauseSlot InHence (hence current) cc3
-    (lestP, cc5) <- clauseSlot InLest (lest current) cc4
-    ownershipGuard hw cc5 henceP (isJust lestP)
+    (joinP, cc3) <- tracked cc2 (optionalWithHole (localAnno setStandAside (joinLine current)))
+    (henceP, cc4, henceBracketed) <- clauseSlot InHence (hence current) cc3
+    (lestP, cc5, _) <- clauseSlot InLest (lest current) cc4
+    ownershipGuard hw cc5 henceP henceBracketed (isJust lestP)
     pure (MkDeonton emptyAnno subj act opensP dueP joinP henceP lestP)
 
 -- | A plain parser that records no annotation, for use in an 'AnnoParser'.

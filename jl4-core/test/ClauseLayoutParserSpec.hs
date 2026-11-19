@@ -420,13 +420,251 @@ spec = do
         (bodyLine 2, 3)
         "unexpected ROR\nexpecting %, ;, WHERE, end of input, or space token\n"
 
+  describe "on a rule's first line, a HENCE after its slots is that rule's, and refused by it (#1074 F2)" $ do
+    it "a HENCE after a LEST on a nested rule's line names the nested rule (once the outer one)" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE PARTY Buyer MUST payment 100 LEST BREACH BY Buyer HENCE FULFILLED"
+        , "  LEST BREACH BY Seller"
+        ]
+        (bodyLine 3, 59)
+        ("This HENCE is part of " <> ruleAt 3 9 <> ", because it is on that rule's first line. \
+         \It comes after that rule's LEST. Write HENCE before LEST." <> ifRuleAfter)
+
+    it "a second HENCE on a nested rule's line names the nested rule (once the outer one)" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE PARTY Buyer MUST payment 100 HENCE FULFILLED HENCE PARTY Seller MUST delivery"
+        ]
+        (bodyLine 3, 54)
+        ("This HENCE is part of " <> ruleAt 3 9 <> ", because it is on that rule's first line. \
+         \That rule already has a HENCE, and a rule has one.\n")
+
+    -- A refusal inside an operator's right operand would be backtracked and
+    -- surface as a bare "unexpected RAND" ('L4.Parser.standAside'), so there
+    -- the HENCE is left to the rule outside, which refuses it by name, as
+    -- before #1074. Pinned so that a change to either is seen.
+    it "in an unbracketed right operand of RAND, the HENCE is left to the rule outside, as before" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE (PARTY Buyer MUST payment 100) RAND PARTY Seller MUST delivery LEST BREACH BY Seller HENCE FULFILLED"
+        ]
+        (bodyLine 3, 94)
+        ("This HENCE is part of " <> ruleAt 1 3 <> ". That rule already has a HENCE, and a rule has one.\n")
+
+    it "a HENCE after a LEST on a one-line rule (once a bare \"unexpected HENCE\")" $
+      failsWith
+        [ "  PARTY Seller MUST delivery LEST BREACH BY Seller HENCE FULFILLED"
+        ]
+        (bodyLine 1, 52)
+        ("This HENCE is part of " <> ruleAt 1 3 <> ", because it is on that rule's first line. \
+         \It comes after that rule's LEST. Write HENCE before LEST." <> ifRuleAfter)
+
+  describe "the advice for a second HENCE after a rule in the HENCE says only what can be done (#1074 F4)" $ do
+    it "the rule in the HENCE is in brackets: write it before the )" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE"
+        , "    ( PARTY Buyer"
+        , "      MUST payment 100 )"
+        , "  HENCE FULFILLED"
+        ]
+        (bodyLine 6, 3)
+        ("This HENCE lines up with the clauses of " <> ruleAt 1 3 <> ". \
+         \That rule already has a HENCE, and a rule has one. \
+         \To make it follow the rule in that one's HENCE, write it inside the innermost brackets around that rule, \
+         \before their ), in line with its clauses.\n")
+
+    it "the rule in the HENCE has a HENCE of its own: no advice" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "    HENCE FULFILLED"
+        , "  HENCE FULFILLED"
+        ]
+        (bodyLine 7, 3)
+        ("This HENCE lines up with the clauses of " <> ruleAt 1 3 <> ". \
+         \That rule already has a HENCE, and a rule has one.\n")
+
+    it "the rule in the HENCE has a LEST: write it before that LEST" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "    LEST BREACH BY Buyer"
+        , "  HENCE FULFILLED"
+        ]
+        (bodyLine 7, 3)
+        ("This HENCE lines up with the clauses of " <> ruleAt 1 3 <> ". \
+         \That rule already has a HENCE, and a rule has one. \
+         \To make it follow the rule in that one's HENCE, write it inside that rule, \
+         \in line with its clauses, and before its LEST.\n")
+
+  -- 'L4.Parser.standAside': where something outside can still take the
+  -- HENCE, or a try would backtrack the refusal, the rule leaves the HENCE
+  -- on its first line outward, as every rule did before #1074. Each of
+  -- these was accepted, or named by the rule outside, before #1074, and
+  -- the first version of F2 refused it or failed at the operator.
+  describe "where something outside can still take a HENCE on a rule's first line, the rule leaves it there (#1074)" $ do
+    it "a RECORD's value: the second HENCE is the RECORD's" $
+      sameTree
+        ["  RECORD `x` IS PARTY Seller MUST delivery HENCE FULFILLED HENCE FULFILLED"]
+        ["  RECORD `x` IS (PARTY Seller MUST delivery HENCE FULFILLED) HENCE FULFILLED"]
+
+    it "an ATTEST's value: a HENCE after the rule's LEST is the ATTEST's" $
+      sameTree
+        ["  ATTEST `x` IS PARTY Seller MUST delivery LEST FULFILLED HENCE FULFILLED"]
+        ["  ATTEST `x` IS (PARTY Seller MUST delivery LEST FULFILLED) HENCE FULFILLED"]
+
+    it "a WHERE inside a RECORD's value is still inside it" $
+      sameTree
+        ["  RECORD `x` IS y WHERE y MEANS PARTY Seller MUST delivery HENCE FULFILLED HENCE FULFILLED"]
+        ["  RECORD `x` IS y WHERE y MEANS (PARTY Seller MUST delivery HENCE FULFILLED) HENCE FULFILLED"]
+
+    it "a rule in another rule's WITHIN: the second HENCE is the outer rule's" $
+      sameTree
+        ["  PARTY Seller MUST delivery WITHIN PARTY Buyer MUST payment 100 HENCE FULFILLED HENCE FULFILLED"]
+        ["  PARTY Seller MUST delivery WITHIN (PARTY Buyer MUST payment 100 HENCE FULFILLED) HENCE FULFILLED"]
+
+    it "a rule in a user-defined infix operand in a WITHIN: the second HENCE is the outer rule's" $
+      sameTree
+        ("  PARTY Seller MUST delivery WITHIN 3 `days for` PARTY Buyer MUST payment 100 HENCE FULFILLED HENCE FULFILLED" : daysFor)
+        ("  PARTY Seller MUST delivery WITHIN 3 `days for` (PARTY Buyer MUST payment 100 HENCE FULFILLED) HENCE FULFILLED" : daysFor)
+
+    it "a rule in a user-defined infix operand in a HENCE: the rule outside names it, not a bare error at the operator" $
+      failsWith
+        ("  PARTY Seller MUST delivery HENCE 3 `days for` PARTY Buyer MUST payment 100 HENCE FULFILLED HENCE FULFILLED" : daysFor)
+        (bodyLine 1, 94)
+        ("This HENCE is part of " <> ruleAt 1 3 <> ", because it is on that rule's first line. \
+         \That rule already has a HENCE, and a rule has one.\n")
+
+    it "a rule in an operand of a directive: the error is at the HENCE, not at the operator" $
+      failsWithContaining
+        [ "  FULFILLED"
+        , ""
+        , "#EVAL FULFILLED RAND PARTY Seller MUST delivery HENCE FULFILLED HENCE FULFILLED"
+        ]
+        (bodyLine 3, 65)
+        "unexpected HENCE\n"
+
+  describe "the advice, followed, gives the keyword to the rule it names (#1074)" $ do
+    it "a HENCE after the LEST, moved before it with what follows in brackets: the LEST stays the outer rule's" $
+      sameTree
+        ["  PARTY Seller MUST delivery HENCE (PARTY Buyer MUST payment 100) LEST BREACH BY Seller"]
+        [ "  PARTY Seller MUST delivery"
+        , "  HENCE PARTY Buyer MUST payment 100"
+        , "  LEST BREACH BY Seller"
+        ]
+
+    it "a second HENCE moved inside the brackets around the rule in the HENCE: it follows that rule" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE"
+        , "    ( PARTY Buyer"
+        , "      MUST payment 100"
+        , "      HENCE FULFILLED )"
+        ]
+        ["  PARTY Seller MUST delivery HENCE (PARTY Buyer MUST payment 100 HENCE FULFILLED)"]
+
+    it "inside the innermost of two pairs of brackets: it follows that rule" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE"
+        , "    (( PARTY Buyer"
+        , "       MUST payment 100"
+        , "       HENCE FULFILLED ))"
+        ]
+        ["  PARTY Seller MUST delivery HENCE (PARTY Buyer MUST payment 100 HENCE FULFILLED)"]
+
+    it "a second HENCE moved inside the rule in the HENCE, before its LEST: it follows that rule" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "    HENCE FULFILLED"
+        , "    LEST BREACH BY Buyer"
+        ]
+        ["  PARTY Seller MUST delivery HENCE (PARTY Buyer MUST payment 100 HENCE FULFILLED LEST BREACH BY Buyer)"]
+
+  -- One test per try in L4.Parser that can parse a rule as the last thing
+  -- it parses ('L4.Parser.standAside' lists them). A refusal under a try is
+  -- backtracked; where what follows the try can then succeed, the run used to
+  -- fail later at a token that is fine (WITH, a bullet), naming nothing.
+  describe "every try that can end in a rule leaves a first-line HENCE where it can be refused by name (#1074)" $ do
+    let leftover = "PARTY Buyer MUST payment 100 HENCE FULFILLED HENCE FULFILLED"
+        outerHas = "This HENCE is part of " <> ruleAt 1 3 <> ". That rule already has a HENCE, and a rule has one.\n"
+        firstLine n col = "This HENCE is part of " <> ruleAt n col <> ", because it is on that rule's first line. \
+                          \That rule already has a HENCE, and a rule has one.\n"
+    -- Stands aside: the rule outside refuses it, as before #1074.
+    it "an operator's right operand ('cont')" $
+      failsWith ["  PARTY Seller", "  MUST delivery", "  HENCE FULFILLED RAND " <> leftover] (bodyLine 3, 69) outerHas
+    it "a directive's operand ('singleLineExpressionCont'): as before, bare at the HENCE" $
+      failsWithContaining ["  FULFILLED", "", "#EVAL FULFILLED RAND " <> leftover] (bodyLine 3, 67) "unexpected HENCE\n"
+    it "a user-defined infix operand ('infixAhead')" $
+      failsWith (["  PARTY Seller", "  MUST delivery", "  HENCE 3 `days for` " <> leftover] <> daysFor) (bodyLine 3, 67) outerHas
+    it "a mixfix operand ('mixfixChainExprNextLine')" $
+      failsWith
+        ( ["  PARTY Seller", "  MUST delivery", "  HENCE 3 `split` (PARTY Buyer MUST payment 100) `and` " <> leftover]
+            <> ["", "GIVEN n IS A NUMBER", "      d IS A DEONTIC Person Action", "      e IS A DEONTIC Person Action", "GIVETH A NUMBER", "n `split` d `and` e MEANS n"] )
+        (bodyLine 3, 101) outerHas
+    it "a named argument's value ('namedApp'; once a bare \"unexpected WITH\")" $
+      failsWith ["  PARTY Seller", "  MUST delivery", "  HENCE pick WITH y IS " <> leftover] (bodyLine 3, 69) outerHas
+    it "a named argument's value with no rule outside: as before, bare at the HENCE (once at WITH)" $
+      failsWithContaining ["  pick WITH y IS " <> leftover] (bodyLine 1, 63) "unexpected HENCE\n"
+    it "a bullet block as a function's argument ('parseAppArgs'; once a bare \"unexpected \8226\")" $
+      failsWith ["  PARTY Seller", "  MUST delivery", "  HENCE firstOf", "          \8226 " <> leftover] (bodyLine 4, 58) outerHas
+    -- Needs nothing: every alternative after the try fails too, so the
+    -- refusal is the error furthest on. The rule names it.
+    it "an event's operand ('event')" $
+      failsWith ["  FULFILLED", "", "#TRACE c AT 0 WITH", "  PARTY Seller DOES delivery AT " <> leftover] (bodyLine 4, 78) (firstLine 4 33)
+    it "a bullet block ('bulletBlock')" $
+      failsWith ["  \8226 " <> leftover] (bodyLine 1, 50) (firstLine 1 5)
+    it "the first of several pattern clauses ('decidePatternMatch')" $
+      failsWith
+        ["  FULFILLED", "", "GIVEN x IS A Person", "GIVETH A DEONTIC Person Action", "DECIDE f Seller IS " <> leftover, "DECIDE f Buyer IS FULFILLED"]
+        (bodyLine 5, 65) (firstLine 5 20)
+    it "a later pattern clause ('decidePatternMatch')" $
+      failsWith
+        ["  FULFILLED", "", "GIVEN x IS A Person", "GIVETH A DEONTIC Person Action", "DECIDE f Seller IS FULFILLED", "DECIDE f Buyer IS " <> leftover]
+        (bodyLine 6, 64) (firstLine 6 19)
+    it "a one-line LET definition ('singleInlineLetDeclRelaxed')" $
+      failsWith ["  PARTY Seller", "  MUST delivery", "  HENCE LET z MEANS " <> leftover <> " IN z"] (bodyLine 3, 66) (firstLine 3 21)
+    it "TIMEZONE IS ('topdecl')" $
+      failsWith ["  FULFILLED", "", "TIMEZONE IS " <> leftover] (bodyLine 3, 58) (firstLine 3 13)
+
   describe "the parser's memo changes nothing on these layouts" $
     for_ memoCases \ (name, body) ->
       it name $ memoChangesNothing (rule body)
   where
     afterLest =
       "This HENCE lines up with the clauses of " <> ruleAt 1 3 <> ". \
-      \It comes after that rule's LEST. Write HENCE before LEST.\n"
+      \It comes after that rule's LEST. Write HENCE before LEST." <> ifRuleAfter
+    -- The advice on a HENCE after the LEST when what follows the HENCE is
+    -- not in brackets: moved before the LEST, a rule there would take it.
+    ifRuleAfter =
+      " If what follows HENCE is a rule, or ends with one, put it in brackets, \
+      \or that rule can take the LEST.\n"
+    -- A user-defined infix operator, after the definition under test.
+    daysFor =
+      [ ""
+      , "GIVEN n IS A NUMBER"
+      , "      d IS A DEONTIC Person Action"
+      , "GIVETH A NUMBER"
+      , "n `days for` d MEANS n"
+      ]
     -- How a refusal names the rule whose head is on line @n@ of the body.
     ruleAt :: Int -> Int -> Text
     ruleAt n col =
@@ -436,6 +674,7 @@ spec = do
       , ("the repro with the inner rule in brackets", ["  PARTY Seller", "  MUST delivery", "  HENCE", "    (PARTY Buyer", "     MUST payment 100", "     LEST", "       PARTY Buyer", "       MUST payment 120)", "  LEST BREACH BY Seller"])
       , ("a second LEST inside brackets", ["  PARTY Seller", "  MUST delivery", "  HENCE", "    (PARTY Buyer", "     MUST payment 100", "     LEST BREACH BY Buyer", "     LEST BREACH BY Seller)"])
       , ("a nested rule left of the outer rule's hanging clauses", ["  PARTY Seller", "      MUST delivery", "      HENCE", "    PARTY Buyer", "    MUST payment 100", "    LEST BREACH BY Buyer", "      LEST BREACH BY Seller"])
+      , ("a WHERE inside a RECORD's value", ["  RECORD `x` IS y WHERE y MEANS PARTY Seller MUST delivery HENCE FULFILLED HENCE FULFILLED"])
       ]
 
 -- | The declarations every case shares; a case's body starts on the line
@@ -484,6 +723,16 @@ failsWith body at expected =
     Left errs -> do
       [(e.range.start.line, e.range.start.column) | e <- toList errs] `shouldBe` [at]
       [T.takeEnd (T.length expected) e.message | e <- toList errs] `shouldBe` [expected]
+
+-- | Like 'failsWith', for a bare error whose list of expected tokens is
+-- long: the message contains @expected@.
+failsWithContaining :: [Text] -> (Int, Int) -> Text -> Expectation
+failsWithContaining body at expected =
+  case execProgramParserWithHintPass uri (rule body) of
+    Right _ -> expectationFailure "parsed, but should have failed"
+    Left errs -> do
+      [(e.range.start.line, e.range.start.column) | e <- toList errs] `shouldBe` [at]
+      [expected `T.isInfixOf` e.message | e <- toList errs] `shouldBe` [True]
 
 -- | Parse with the memo on and off ('L4.Parser.clauseCtx' says why the memo
 -- need not key on it); both must give the same answer.

@@ -140,7 +140,7 @@ BRANCH takes the first condition that is TRUE, and OTHERWISE covers the rest. Se
 
 Which rule a `HENCE` or `LEST` belongs to is decided by its column (see [Which rule a HENCE or LEST belongs to](../regulative/consequences.md#which-rule-a-hence-or-lest-belongs-to)).
 When that rule already has one, L4 refuses it rather than give it to another rule.
-The message names the rule and says why the keyword is that rule's: it lines up with the rule's clauses, or it is right of the clauses of the rule that one is nested in.
+The message names the rule and says why the keyword is that rule's: it lines up with the rule's clauses, it is right of the clauses of the rule that one is nested in, or it is on the rule's first line.
 
 ```l4
 DECLARE Party IS ONE OF Seller, Buyer
@@ -171,6 +171,7 @@ If it is the Seller's, do that:
 ```
 
 A second `HENCE` is refused the same way, and so is a `HENCE` written after the rule's `LEST`, with `It comes after that rule's LEST. Write HENCE before LEST.`
+When what follows that `HENCE` is not in brackets, the message adds `If what follows HENCE is a rule, or ends with one, put it in brackets, or that rule can take the LEST.`, because a rule written after the `HENCE`, moved before the `LEST` without brackets, can take the `LEST` itself.
 
 ---
 
