@@ -45,11 +45,14 @@ arrP item = (prim "array") { parameterItems = Just item }
 -- a oneOf of its names and its tagged constructors (MULLET).
 mixedP :: [Text] -> [(Text, Parameter)] -> Parameter
 mixedP names tagged =
-  (prim "") { parameterOneOf = Just [enumP names, objP tagged []] }
+  (prim "") { parameterOneOf = Just [enumP names, taggedP tagged] }
 
--- | The tagged constructors of a type whose constructors all carry fields.
+-- | The tagged constructors of a type whose constructors all carry fields: an
+-- object with one key for each and no @required@, as
+-- 'L4.FunctionSchema.shapeToParameter' writes it.
 taggedP :: [(Text, Parameter)] -> Parameter
-taggedP tagged = objP tagged []
+taggedP tagged =
+  (prim "object") { parameterProperties = Just (Map.fromList tagged) }
 
 -- | A function's parameter object (top-level inputs).
 ps :: [(Text, Parameter)] -> [Text] -> Parameters
@@ -110,6 +113,51 @@ spec = describe "Compatibility.detectBreakingChanges" do
       changes [result (mixedP ["Cash"] [("Card", card)])] [result (mixedP ["Cash"] [("Card", objP [] [])])]
         `shouldSatisfy` mentions "Card.card fee no longer returned"
       changes [input (mixedP ["Cash"] [("Card", card)])] [input (mixedP ["Cash"] [("Card", card), ("Voucher", objP [] [])])]
+        `shouldBe` []
+
+  -- The keys of the tagged object are constructors, compared as an enum's
+  -- names are: one added to a result is breaking, one removed from an input is
+  -- breaking (STOWAWAY carried to the constructors within the tagged form,
+  -- assumed, not ruled; review of #779, 2026-11-19).
+  describe "constructors within the tagged object" do
+    let reason = objP [("reason", prim "string")] ["reason"]
+        court = objP [("court", prim "string")] ["court"]
+        input p = fn "decide" (ps [("o", p)] ["o"]) "NUMBER" Nothing
+        result p = fn "decide" (ps [] []) "Outcome" (Just p)
+    it "a result that gains its first constructor that carries data may now return an object" do
+      changes [result (enumP ["Approved", "Rejected"])] [result (mixedP ["Approved", "Rejected"] [("Referred", reason)])]
+        `shouldBe` ["decide return value may now return an object"]
+    it "a result that has one constructor that carries data and gains a second may now return it" do
+      changes [result (mixedP ["Approved", "Rejected"] [("Referred", reason)])]
+              [result (mixedP ["Approved", "Rejected"] [("Referred", reason), ("Appealed", court)])]
+        `shouldBe` ["decide return value may now return new values Appealed"]
+      changes [result (taggedP [("Referred", reason)])] [result (taggedP [("Referred", reason), ("Appealed", court)])]
+        `shouldBe` ["decide return value may now return new values Appealed"]
+    it "a result that loses a constructor that carries data is not breaking, as a name removed from its enum is not" do
+      changes [result (taggedP [("Referred", reason), ("Appealed", court)])] [result (taggedP [("Referred", reason)])]
+        `shouldBe` []
+    it "an input that loses a constructor that carries data no longer accepts it" do
+      changes [input (taggedP [("Referred", reason), ("Appealed", court)])] [input (taggedP [("Referred", reason)])]
+        `shouldBe` ["decide parameter o no longer accepts Appealed"]
+      changes [input (mixedP ["Approved"] [("Referred", reason), ("Appealed", court)])] [input (mixedP ["Approved"] [("Referred", reason)])]
+        `shouldBe` ["decide parameter o no longer accepts Appealed"]
+    it "an input that gains a constructor that carries data is not breaking" do
+      changes [input (taggedP [("Referred", reason)])] [input (taggedP [("Referred", reason), ("Appealed", court)])]
+        `shouldBe` []
+    it "a constructor on both sides has its fields compared as a record's" do
+      changes [result (taggedP [("Referred", reason)])] [result (taggedP [("Referred", objP [] [])])]
+        `shouldBe` ["decide return value Referred.reason no longer returned"]
+      changes [input (taggedP [("Referred", objP [] [])])] [input (taggedP [("Referred", reason)])]
+        `shouldBe` ["decide has a new required parameter o.Referred.reason"]
+      changes [result (taggedP [("Referred", reason)])]
+              [result (taggedP [("Referred", objP [("reason", prim "string"), ("note", prim "string")] ["reason"])])]
+        `shouldBe` []
+    it "a record is still compared by its fields: one gaining an optional result field is compatible" do
+      changes [result (objP [("reason", prim "string")] ["reason"])]
+              [result (objP [("reason", prim "string"), ("note", prim "string")] ["reason"])]
+        `shouldBe` []
+      changes [result (objP [("reason", prim "string")] [])]
+              [result (objP [("reason", prim "string"), ("note", prim "string")] [])]
         `shouldBe` []
 
   describe "whole functions" do

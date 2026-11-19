@@ -452,6 +452,10 @@ spec = describe "a type named like a builtin" $ do
             ])
           p = parameter r "c"
       (p.parameterType, p.parameterOneOf, fmap Map.keys p.parameterProperties) `shouldBe` ("object", Nothing, Just ["Slice", "Wedge"])
+      -- no `required`, where a record's object always has one: the service's
+      -- compatibility gate reads its keys as alternatives by that
+      (p.parameterRequired, (.parameterRequired) <$> (Map.lookup "Slice" =<< p.parameterProperties))
+        `shouldBe` (Nothing, Just (Just ["width"]))
       KeyMap.lookup "oneOf" (jsonDefinition r "Cut") `shouldSatisfy` maybe False (\v -> case v of Aeson.Array a -> length a == 2; _ -> False)
 
     it "an enumeration whose constructors carry nothing is still the names" $ do

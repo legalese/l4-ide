@@ -33,6 +33,17 @@
 -- compared as any node is, so a name removed from an input or added to a
 -- result is breaking (comparing a matched form by the rules above is assumed,
 -- not ruled).
+--
+-- The keys of the tagged object are constructors, alternatives of which a value
+-- holds one, not fields a value holds together, so they are compared as an
+-- enum's names are: one added to a result is breaking ("may now return new
+-- values"), one removed from an input is breaking ("no longer accepts"), and
+-- the fields of one on both sides are compared by the rules above. That is
+-- STOWAWAY's rule carried to the constructors within the tagged form (assumed,
+-- not ruled). The schema tells the tagged object from a record by its
+-- @required@: a record's object always has one, the tagged object never does
+-- ('L4.FunctionSchema.shapeToParameter'); an EITHER's object has none either,
+-- and its keys are alternatives too.
 module Compatibility
   ( FnIface (..)
   , ifaceFromFunction
@@ -186,6 +197,8 @@ diffNode dir fn loc old new
   objectMsgs =
     case (old.parameterProperties, new.parameterProperties) of
       (Nothing, Nothing) -> []
+      (Just oa, Just na)
+        | isAlternatives old && isAlternatives new -> diffAlternatives dir fn loc oa na
       (mo, mn) ->
         diffObject dir fn loc
           (fromMaybe Map.empty mo) (fromMaybe [] old.parameterRequired)
@@ -196,6 +209,29 @@ diffNode dir fn loc old new
       (Just oi, Just ni) ->
         diffNode dir fn (if Text.null loc then "[]" else loc <> "[]") oi ni
       _ -> []
+
+-- | An object whose keys are alternatives, of which a value holds exactly one:
+-- the tagged constructors of a type with a constructor that carries fields, or
+-- the two sides of an EITHER. Their schema has no @required@, which a record's
+-- always has.
+isAlternatives :: Parameter -> Bool
+isAlternatives p = isJust p.parameterProperties && p.parameterRequired == Nothing
+
+-- | Diff the keys of two objects of alternatives ('isAlternatives') as an enum's
+-- names are diffed: one added to a result, or removed from an input, is
+-- breaking, and one on both sides is compared as any node.
+diffAlternatives :: Dir -> Text -> Text -> Map.Map Text Parameter -> Map.Map Text Parameter -> [Text]
+diffAlternatives dir fn loc oldAlts newAlts =
+  [ subject fn dir loc <> " no longer accepts " <> Text.intercalate ", " dropped
+  | dir == In, not (null dropped) ]
+    ++ [ subject fn dir loc <> " may now return new values " <> Text.intercalate ", " added
+       | dir == Out, not (null added) ]
+    ++ concat
+         [ diffNode dir fn (childLoc loc k) ov nv
+         | (k, ov) <- Map.toList oldAlts, Just nv <- [Map.lookup k newAlts] ]
+ where
+  dropped = Map.keys (Map.difference oldAlts newAlts)
+  added = Map.keys (Map.difference newAlts oldAlts)
 
 -- | The forms a node's value takes, by their type: its @oneOf@'s members, or
 -- itself.

@@ -86,6 +86,14 @@ GIVETH A BOOLEAN
 DECIDE compute_qualifies IF walks AND AND
 |]
 
+-- | A module declaring @Outcome@ with the given constructors, one to a line,
+-- and one exported rule with the given inputs, result and body.
+outcomeSrc :: [Text] -> Text -> Text -> Text -> Text
+outcomeSrc ctors givens giveth body = Text.unlines $
+  [ "DECLARE Outcome IS ONE OF" ]
+    <> [ "  " <> c | c <- ctors ]
+    <> [ "", "@export default decide", givens, giveth, body ]
+
 ------------------------------------------------------------------------
 -- Spec
 ------------------------------------------------------------------------
@@ -180,6 +188,43 @@ spec = describe "PUT deployment compatibility guard (end-to-end)" do
       st `shouldBe` "applied"
       deploymentDescription baseUrl mgr "guard-desc"
         `shouldReturn` Just "Intended use: demo"
+
+  -- The constructors of a type's tagged object are compared as an enum's names
+  -- are (STOWAWAY carried to them, assumed, not ruled; review of #779,
+  -- 2026-11-19), here from the schemas the service builds from L4 itself.
+  describe "a type with a constructor that carries data" do
+    let outcome ctors = outcomeSrc ctors "GIVEN n IS A NUMBER" "GIVETH AN Outcome"
+          (if "Approved" `elem` ctors then "decision MEANS Approved" else "decision MEANS Referred \"late\"")
+        takesOutcome ctors = outcomeSrc ctors "GIVEN o IS AN Outcome" "GIVETH A NUMBER" "decision MEANS 1"
+        verdict deployId old new = withService $ \baseUrl mgr -> do
+          deployApplied baseUrl mgr deployId Nothing old
+          r <- deployPut baseUrl mgr deployId Nothing new
+          uid <- mustUpdateId r
+          pollJob baseUrl mgr deployId uid
+        approved = ["Approved", "Rejected"]
+        referred = approved <> ["Referred HAS reason IS A STRING"]
+        appealed = referred <> ["Appealed HAS court IS A STRING"]
+    it "rejects a result that gains its first constructor that carries data" do
+      (st, err) <- verdict "guard-outcome-first" (outcome approved) (outcome referred)
+      st `shouldBe` "rejected"
+      fromMaybe "" err `shouldSatisfy` Text.isInfixOf "decision return value may now return an object"
+    it "rejects a result that has one constructor that carries data and gains a second" do
+      (st, err) <- verdict "guard-outcome-second" (outcome referred) (outcome appealed)
+      st `shouldBe` "rejected"
+      fromMaybe "" err `shouldSatisfy` Text.isInfixOf "decision return value may now return new values Appealed"
+    it "rejects a result whose constructors all carry data and that gains one" do
+      (st, err) <- verdict "guard-outcome-tagged" (outcome (drop 2 referred)) (outcome (drop 2 appealed))
+      st `shouldBe` "rejected"
+      fromMaybe "" err `shouldSatisfy` Text.isInfixOf "decision return value may now return new values Appealed"
+    it "rejects an input that loses a constructor that carries data, and applies one that gains it" do
+      (st, err) <- verdict "guard-outcome-input-loses" (takesOutcome appealed) (takesOutcome referred)
+      st `shouldBe` "rejected"
+      fromMaybe "" err `shouldSatisfy` Text.isInfixOf "decision parameter o no longer accepts Appealed"
+      (st', _) <- verdict "guard-outcome-input-gains" (takesOutcome referred) (takesOutcome appealed)
+      st' `shouldBe` "applied"
+    it "applies an unchanged bundle" do
+      (st, _) <- verdict "guard-outcome-same" (outcome appealed) (outcome appealed)
+      st `shouldBe` "applied"
 
 ------------------------------------------------------------------------
 -- Harness

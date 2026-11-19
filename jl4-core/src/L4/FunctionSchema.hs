@@ -163,7 +163,10 @@ shapeToParameter = \case
   -- A; HATBOX, Meng, 2026-11-18). A type whose constructors all carry fields is
   -- that object alone, one key for each, none required; one that has both is a
   -- oneOf of the names and that object (MULLET, Meng, 2026-11-18). That the
-  -- object holds exactly one key is not said, as for an EITHER.
+  -- object holds exactly one key is not said, as for an EITHER. It has no
+  -- @required@, where a record always has one, and that is how the service's
+  -- compatibility gate tells its keys, which are alternatives, from a record's
+  -- fields ('Compatibility.isAlternatives' in jl4-service): do not give it one.
   JTagged named constructors ->
     let bare = [c.constructorName | c <- constructors, null c.constructorFields]
         withFields = [c | c <- constructors, not (null c.constructorFields)]
