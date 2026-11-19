@@ -52,7 +52,12 @@ An `@export` anywhere else, such as between `GIVETH` and `DECIDE`, is not picked
 
 ## Step 2: Check what will be published
 
-In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab. It lists every exported rule in the file, with its description, inputs and result type. If the list is empty, the file has no `@export` or does not type-check.
+In VS Code, open the file, open the **L4** sidebar and select the **Deploy** tab. It lists the exported rules that can be published, with their descriptions, inputs and result types.
+
+A rule whose input or result has a type that cannot be sent as JSON yet, such as a function, cannot be published. It is left out of the list, and VS Code underlines its `@export` line in red, with the reason in the **Problems** panel ([An @export with an input or result that cannot be sent yet](../../reference/errors/README.md#an-export-with-an-input-or-result-that-cannot-be-sent-yet)).
+While the file has such a rule, the sidebar says how many errors block deploying it, and **Deploy** stays off, as it does for any other error.
+
+If the list is empty, the file has no `@export`, or it does not type-check, or every rule it exports is one that cannot be published; the red underlines and the **Problems** panel say which.
 
 ---
 
