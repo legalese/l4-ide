@@ -26,11 +26,13 @@
 -- A type with a constructor that carries fields and one that carries none is
 -- a @oneOf@ of two forms, its names (a string) and its tagged constructors (an
 -- object); a node without a @oneOf@ is one form, of its own type. The forms
--- are matched by their type: one the new interface adds is not breaking, one
--- it removes is, and two that match are compared as any node is, so a name
--- removed from an input or added to a result is breaking (MULLET, Meng,
--- 2026-11-18; comparing a matched form by the rules above is assumed, not
--- ruled).
+-- are matched by their type. One the new interface removes is breaking in
+-- both directions. One it adds is not breaking on an input, and is breaking on
+-- a result, as a name added to a result's enum is (MULLET, Meng, 2026-11-18;
+-- the result direction STOWAWAY, Meng, 2026-11-19). Two that match are
+-- compared as any node is, so a name removed from an input or added to a
+-- result is breaking (comparing a matched form by the rules above is assumed,
+-- not ruled).
 module Compatibility
   ( FnIface (..)
   , ifaceFromFunction
@@ -133,6 +135,11 @@ diffNode dir fn loc old new
             Just nf -> diffNode dir fn loc of' nf
         | (ty, of') <- oldForms
         ]
+        ++ [ subject fn dir loc <> " may now return " <> formName ty
+           | dir == Out
+           , (ty, _) <- newForms
+           , ty `notElem` map fst oldForms
+           ]
   -- A type change makes deeper diffing noise; report and stop here.
   | not (Text.null old.parameterType)
       && not (Text.null new.parameterType)

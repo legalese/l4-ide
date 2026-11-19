@@ -91,10 +91,14 @@ spec = describe "Compatibility.detectBreakingChanges" do
       let m = mixedP ["Cash"] [("Card", card)]
       shouldBeCompatible [input m] [input m]
       shouldBeCompatible [result m] [result m]
-    it "adding a form is not breaking: an enum of names gains the tagged object" do
+    it "adding a form to an input is not breaking" do
       changes [input (enumP ["Cash"])] [input (mixedP ["Cash"] [("Card", card)])] `shouldBe` []
-      changes [result (enumP ["Cash"])] [result (mixedP ["Cash"] [("Card", card)])] `shouldBe` []
       changes [input (taggedP [("Card", card)])] [input (mixedP ["Cash"] [("Card", card)])] `shouldBe` []
+    it "adding a form to a result is breaking, as a name added to a result's enum is (STOWAWAY)" do
+      changes [result (enumP ["Cash"])] [result (mixedP ["Cash"] [("Card", card)])]
+        `shouldBe` ["pay return value may now return an object"]
+      changes [result (taggedP [("Card", card)])] [result (mixedP ["Cash"] [("Card", card)])]
+        `shouldBe` ["pay return value may now return a string"]
     it "removing a form is breaking" do
       let m = mixedP ["Cash"] [("Card", card)]
       changes [input m] [input (enumP ["Cash"])] `shouldSatisfy` mentions "fee parameter p no longer accepts an object"
