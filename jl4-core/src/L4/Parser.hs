@@ -100,9 +100,9 @@ data Env = Env
     -- The memo need not key on it: 'parenExpr' and 'parenPattern' memoise
     -- 'paren', which resets it before anything inside reads it, and
     -- 'clauseBody' sets it from its own column and the enclosing
-    -- 'standAside', both part of that memo's key. So every memoised
-    -- parser's reply is independent of the rest of the context it was
-    -- reached with.
+    -- 'standAside' and 'ruleOutside', all part of that memo's key. So every
+    -- memoised parser's reply is independent of the rest of the context it
+    -- was reached with.
   , memoiseGroups :: Bool
     -- ^ Does 'memoGroup' memoise? 'True' for every parse the tools run.
     -- 'False' parses a bracketed group afresh wherever it is reached, as the
@@ -122,6 +122,16 @@ data ClauseCtx = ClauseCtx
   , nestedIn :: Maybe NestedIn
     -- ^ Which of that rule's bodies we are in, for the refusal messages
     -- ('obligation'); 'Nothing' outside any rule's body.
+  , ruleOutside :: Bool
+    -- ^ Is a rule outside this definition still open, so that it may take a
+    -- @HENCE@ or @LEST@ written after the definition ends? Set by
+    -- 'clauseBody' for a definition inside a rule's body (a @WHERE@
+    -- definition; a @LET@ definition inherits the rule's context, whose
+    -- 'nestedIn' already stops the refusal), and carried into the
+    -- definitions inside that one; reset by 'paren'.
+    -- Read only by the refusal of a keyword at or left of the definition's
+    -- column ('obligation'; smucclaw/l4-ide#1074, F3), which must not fire
+    -- then.
   , standAside :: Bool
     -- ^ Must a rule's refusal of a @HENCE@ on its first line ('obligation')
     -- stand aside here, leaving the keyword to what is outside the rule?
@@ -189,6 +199,7 @@ topClauseCtx :: Pos -> ClauseCtx
 topClauseCtx col = ClauseCtx
   { threshold = col
   , nestedIn = Nothing
+  , ruleOutside = False
   , standAside = False
   , inBranch = False
   }
@@ -1427,9 +1438,13 @@ pmClause clauseCol =
 -- takes any @HENCE@ or @LEST@ written right of the definition.
 clauseBody :: Pos -> Parser (Expr Name)
 clauseBody col = do
-  outerAside <- asks (.clauseCtx.standAside)
-  memoGroupAt (2 * unPos col + fromEnum outerAside) #clauseBodies
-    (local (\ e -> e { clauseCtx = (topClauseCtx col) { standAside = outerAside } }) (indentedExpr col))
+  outer <- asks (.clauseCtx)
+  let outerAside = outer.standAside
+      -- Inside a rule's body, that rule is still open and may take a HENCE
+      -- or LEST written after the definition (smucclaw/l4-ide#1074, F3).
+      inRule = outer.ruleOutside || isJust outer.nestedIn
+  memoGroupAt (4 * unPos col + 2 * fromEnum inRule + fromEnum outerAside) #clauseBodies
+    (local (\ e -> e { clauseCtx = (topClauseCtx col) { standAside = outerAside, ruleOutside = inRule } }) (indentedExpr col))
 
 
 -- | Extract the term (value) parameter names from a GIVEN signature, skipping
@@ -1886,9 +1901,9 @@ memoGroup = memoGroupAt 0
 -- | 'memoGroup' for a parser that also depends on one more number, which
 -- becomes part of the key: @memoGroupAt k table p@ must behave exactly as
 -- @p@ wherever it is reached at the same position, with the same
--- 'ofIsAnchor' and the same @k@. 'clauseBody' passes twice its column, plus
--- one when 'standAside' is set. (Numbers from 8191 up share one key; no
--- column is that wide.)
+-- 'ofIsAnchor' and the same @k@. 'clauseBody' passes four times its column,
+-- plus two when 'ruleOutside' is set and one when 'standAside' is. (Numbers
+-- from 16383 up share one key; no column is that wide.)
 memoGroupAt :: Int -> Lens' GroupMemo (IntMap.IntMap (GroupReply a)) -> Parser a -> Parser a
 memoGroupAt extra table p =
   ReaderT \ env ->
@@ -1897,7 +1912,7 @@ memoGroupAt extra table p =
       else runReaderT p env
   where
     memoised env = StateT \ outer -> Megaparsec.ParsecT \ s cok cerr eok eerr -> do
-      let key = (2 * s.stateOffset + fromEnum env.ofIsAnchor) * 8192 + min 8191 extra
+      let key = (2 * s.stateOffset + fromEnum env.ofIsAnchor) * 16384 + min 16383 extra
       known <- gets (IntMap.lookup key . view table)
       Megaparsec.Reply s' consumption result <- case known of
         Just reply -> pure reply
@@ -3461,8 +3476,49 @@ obligation = do
           -- after the LEST.
           nextBracketed <- isJust <$> optional (try (lookAhead (hidden (spacedKeyword_ TKHence *> spacedSymbol_ TPOpen))))
           fancyFailure (Set.singleton (ErrorFail (refusal isHence nextBracketed line col)))
+        -- A HENCE or LEST on a later line, at or left of the column where
+        -- the definition (or the brackets) this rule is in starts, with no
+        -- rule around this one to take it: no rule can, so the parse would
+        -- fail anyway, at the keyword, with a bare "unexpected". Say which
+        -- rule it is near and where to write it instead (#1074, F3;
+        -- ruled by Meng 2026-11-22: Clause Layout Rulings F3 A). Not
+        -- where a rule outside the definition is still open ('ruleOutside'),
+        -- nor where 'standAside' is set: there something outside may still
+        -- take it (a RECORD's continuation, a rule whose edge this rule is
+        -- in), or a try would backtrack the refusal.
+        when (line > headLine && not (ownsAt cc pos) && isNothing ctx.nestedIn && not ctx.ruleOutside && not ctx.standAside) $ do
+          nextBracketed <- isJust <$> optional (try (lookAhead (hidden (spacedKeyword_ TKHence *> spacedSymbol_ TPOpen))))
+          fancyFailure (Set.singleton (ErrorFail (outsideRefusal isHence nextBracketed col)))
       where
         own = ownCol cc
+        -- It fires at the definition's column, or left of both that column
+        -- and this rule's clauses ('ownsAt'); the first sentence says so.
+        outsideRefusal isHence nextBracketed col =
+          "This " <> kwName <> " is at column " <> show (unPos col) <> ", so it is not part of "
+            <> theRule <> ": on a later line, a " <> kwName <> " at column " <> show (unPos thr)
+            <> ", where its definition starts (or column 1 inside brackets), \
+               \or left of both that column and that rule's clauses, ends the rule." <> remedy
+          where
+            kwName = if isHence then "HENCE" else "LEST"
+            remedy
+              | isHence, isJust henceP = " That rule already has a HENCE, and a rule has one."
+              | not isHence, hasLest = " That rule already has a LEST, and a rule has one."
+              -- Moved before the LEST, a rule after the HENCE could take the
+              -- LEST, as for the refusal of a HENCE after the LEST above.
+              | isHence, hasLest =
+                  " To make it that rule's HENCE, write it before that rule's LEST, in line with its clauses."
+                    <> (if nextBracketed then "" else
+                          " If what follows HENCE is a rule, or ends with one, put it in brackets, \
+                          \or that rule can take the LEST.")
+              -- A rule still open at the end of the HENCE would take a LEST
+              -- at this rule's clauses when its own are there too, or
+              -- hang left of them; brackets end it (consequences.md).
+              | not isHence, openRuleAtEnd henceP henceBracketed =
+                  " To make it that rule's LEST, put what follows its HENCE in brackets, and write the LEST at column "
+                    <> show (unPos own) <> ", in line with that rule's clauses."
+              | otherwise =
+                  " To make it that rule's " <> kwName <> ", write it at column " <> show (unPos own)
+                    <> ", in line with that rule's clauses."
         theRule =
           "the rule that starts with " <> hw <> " at line "
             <> show (unPos headLine) <> ", column " <> show (unPos current)
@@ -3551,6 +3607,33 @@ noAnno p = wrapAnnoParser (WithAnno [] <$> p)
 -- | 'local' through an 'AnnoParser'.
 localAnno :: (Env -> Env) -> AnnoParser a -> AnnoParser a
 localAnno f p = wrapAnnoParser (local f (unwrapAnnoParser p))
+
+-- | Could a rule still be open at the end of this rule body, given whether
+-- the body starts with a bracket ('clauseSlot')? A body that is one rule in
+-- brackets is closed; otherwise follow the body's last part. Errs towards
+-- 'True', which only adds advice ('obligation').
+openRuleAtEnd :: Maybe (Expr Name) -> Bool -> Bool
+openRuleAtEnd body bracketed = case body of
+  Just Regulative {} | bracketed -> False
+  Just e -> endsInRule e
+  Nothing -> False
+  where
+    endsInRule = \ case
+      Regulative {} -> True
+      RAnd _ _ r -> endsInRule r
+      ROr _ _ r -> endsInRule r
+      IfThenElse _ _ _ e -> endsInRule e
+      MultiWayIf _ _ e -> endsInRule e
+      LetIn _ _ e -> endsInRule e
+      -- A WHERE's definitions come after its expression.
+      Where _ e ds -> case reverse [b | LocalDecide _ (MkDecide _ _ _ b) <- ds] of
+        b : _ -> endsInRule b
+        [] -> endsInRule e
+      Consider _ _ bs -> case reverse bs of
+        MkBranch _ _ e : _ -> endsInRule e
+        [] -> False
+      Record _ _ _ v _ mh -> maybe (endsInRule v) endsInRule mh
+      _ -> False
 
 -- | After the closing-edge slot, an @AFTER@ can only be the opening edge
 -- written in the wrong place (@WITHIN 30 AFTER 3@), or a second one; a

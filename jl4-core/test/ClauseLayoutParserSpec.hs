@@ -739,6 +739,200 @@ spec = do
     it "TIMEZONE IS ('topdecl')" $
       failsWith ["  FULFILLED", "", "TIMEZONE IS " <> leftover] (bodyLine 3, 58) (firstLine 3 13)
 
+  describe "a HENCE or LEST at or left of its definition's column is refused by name (#1074 F3, ruled by Meng 2026-11-22: Clause Layout Rulings F3 A)" $ do
+    it "the issue's first repro: a LEST at column 1 (once a bare \"unexpected LEST\")" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "LEST BREACH BY Seller"
+        ]
+        (bodyLine 3, 1)
+        ("This LEST is at column 1, so it is not part of " <> ruleAt 1 3 <> ": on a later line, a LEST at column 1, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \To make it that rule's LEST, write it at column 3, in line with that rule's clauses.\n")
+
+    it "the issue's second repro: a HENCE at a WHERE definition's column (once a bare \"unexpected HENCE\")" $
+      failsWith
+        [ "  inner"
+        , "  WHERE"
+        , "    inner MEANS"
+        , "      PARTY Seller"
+        , "      MUST delivery"
+        , "    HENCE FULFILLED"
+        ]
+        (bodyLine 6, 5)
+        ("This HENCE is at column 5, so it is not part of " <> ruleAt 4 7 <> ": on a later line, a HENCE at column 5, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \To make it that rule's HENCE, write it at column 7, in line with that rule's clauses.\n")
+
+    it "after a nested rule, the outermost rule is the one named" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE"
+        , "    PARTY Buyer"
+        , "    MUST payment 100"
+        , "LEST BREACH BY Seller"
+        ]
+        (bodyLine 6, 1)
+        ("This LEST is at column 1, so it is not part of " <> ruleAt 1 3 <> ": on a later line, a LEST at column 1, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \To make it that rule's LEST, put what follows its HENCE in brackets, \
+         \and write the LEST at column 3, in line with that rule's clauses.\n")
+
+    it "a rule whose LEST is used: no column to suggest" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  LEST BREACH BY Seller"
+        , "LEST BREACH BY Buyer"
+        ]
+        (bodyLine 4, 1)
+        ("This LEST is at column 1, so it is not part of " <> ruleAt 1 3 <> ": on a later line, a LEST at column 1, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \That rule already has a LEST, and a rule has one.\n")
+
+    -- 'L4.Parser.standAside', set by 'clauseBody' inside a rule's body: the
+    -- rule outside is still open, so the end of a WHERE definition is not
+    -- the end of the search. Accepted before #1074, and refused by the first
+    -- version of this commit; so was the RECORD case.
+    it "a rule in a WHERE definition inside a HENCE: the LEST after it is the outer rule's, as before" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  WITHIN 3"
+        , "  HENCE `pay`"
+        , "    WHERE"
+        , "      `pay` MEANS"
+        , "        PARTY Buyer"
+        , "        MUST payment 100"
+        , "        WITHIN 7"
+        , "  LEST BREACH BY Seller"
+        ]
+        [ "  PARTY Seller MUST delivery WITHIN 3"
+        , "  HENCE (`pay` WHERE `pay` MEANS (PARTY Buyer MUST payment 100 WITHIN 7))"
+        , "  LEST BREACH BY Seller"
+        ]
+
+    it "a rule in a RECORD's value: a HENCE at column 1 is the RECORD's, as before" $
+      sameTree
+        [ "  RECORD `x` IS PARTY Seller MUST delivery"
+        , "HENCE BREACH BY Seller"
+        ]
+        ["  RECORD `x` IS (PARTY Seller MUST delivery) HENCE BREACH BY Seller"]
+
+    it "inside brackets, the column it must be right of is 1" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE (PARTY Buyer"
+        , "         MUST payment 100"
+        , "LEST BREACH BY Buyer)"
+        ]
+        (bodyLine 5, 1)
+        ("This LEST is at column 1, so it is not part of " <> ruleAt 3 10 <> ": on a later line, a LEST at column 1, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \To make it that rule's LEST, write it at column 10, in line with that rule's clauses.\n")
+
+    it "inside brackets, the advice followed: the LEST is that rule's" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE (PARTY Buyer"
+        , "         MUST payment 100"
+        , "         LEST BREACH BY Buyer)"
+        ]
+        ["  PARTY Seller MUST delivery HENCE (PARTY Buyer MUST payment 100 LEST BREACH BY Buyer)"]
+
+    it "the advice followed: at the clauses, the LEST is the named rule's" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  LEST BREACH BY Seller"
+        ]
+        ["  PARTY Seller MUST delivery LEST BREACH BY Seller"]
+
+    -- A tie (the nested rule's clauses at the outer rule's) keeps the LEST
+    -- with the nested rule, so a column alone would give it to the wrong
+    -- rule; brackets end the nested rule.
+    it "after a nested rule whose clauses are at the outer rule's: the advice adds brackets" $
+      failsWith
+        [ "  PARTY Seller"
+        , "      MUST delivery"
+        , "      HENCE"
+        , "    PARTY Buyer"
+        , "      MUST payment 100"
+        , "LEST BREACH BY Seller"
+        ]
+        (bodyLine 6, 1)
+        ("This LEST is at column 1, so it is not part of " <> ruleAt 1 3 <> ": on a later line, a LEST at column 1, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \To make it that rule's LEST, put what follows its HENCE in brackets, \
+         \and write the LEST at column 7, in line with that rule's clauses.\n")
+
+    it "after that tie, the advice followed: the LEST is the outer rule's" $
+      sameTree
+        [ "  PARTY Seller"
+        , "      MUST delivery"
+        , "      HENCE"
+        , "    (PARTY Buyer"
+        , "      MUST payment 100)"
+        , "      LEST BREACH BY Seller"
+        ]
+        ["  PARTY Seller MUST delivery HENCE (PARTY Buyer MUST payment 100) LEST BREACH BY Seller"]
+
+    -- A second review: the bracket advice must also follow a WHERE, whose
+    -- definitions come after its expression ('L4.Parser.openRuleAtEnd').
+    it "after a WHERE whose definition ends in a rule: the advice adds brackets" $
+      failsWith
+        ["  PARTY Seller", "    MUST delivery", "    HENCE i", "   WHERE", "   i MEANS", "     PARTY Buyer", "     MUST payment 100", "LEST BREACH BY Seller"]
+        (bodyLine 8, 1)
+        ("This LEST is at column 1, so it is not part of " <> ruleAt 1 3 <> ": on a later line, a LEST at column 1, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \To make it that rule's LEST, put what follows its HENCE in brackets, \
+         \and write the LEST at column 5, in line with that rule's clauses.\n")
+
+    it "after that WHERE, the advice followed: the LEST is the outer rule's" $
+      sameTree
+        ["  PARTY Seller", "    MUST delivery", "    HENCE (i", "   WHERE", "   i MEANS", "     PARTY Buyer", "     MUST payment 100)", "    LEST BREACH BY Seller"]
+        ["  PARTY Seller MUST delivery HENCE (i WHERE i MEANS PARTY Buyer MUST payment 100) LEST BREACH BY Seller"]
+
+    -- Moved before the LEST, a rule after the HENCE could take the LEST, so
+    -- the advice carries the same caution as the refusal of a HENCE after
+    -- the LEST.
+    it "a HENCE after the rule's LEST, followed by a rule not in brackets: the advice adds the caution" $
+      failsWith
+        ["  PARTY Seller", "      MUST delivery", "      LEST BREACH BY Seller", "HENCE", "    PARTY Buyer", "      MUST payment 100"]
+        (bodyLine 4, 1)
+        ("This HENCE is at column 1, so it is not part of " <> ruleAt 1 3 <> ": on a later line, a HENCE at column 1, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \To make it that rule's HENCE, write it before that rule's LEST, in line with its clauses. \
+         \If what follows HENCE is a rule, or ends with one, put it in brackets, or that rule can take the LEST.\n")
+
+    -- The first sentence must hold when a rule's clauses are left of its
+    -- definition's column: there the keyword is the rule's between the two.
+    it "a rule whose clauses are left of its definition's column: at that column, refused" $
+      failsWith
+        ["  inner", "  WHERE", "    inner MEANS", "      PARTY Buyer", "  MUST payment 100", "    LEST BREACH BY Buyer"]
+        (bodyLine 6, 5)
+        ("This LEST is at column 5, so it is not part of " <> ruleAt 4 7 <> ": on a later line, a LEST at column 5, \
+         \where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. \
+         \To make it that rule's LEST, write it at column 3, in line with that rule's clauses.\n")
+
+    it "a rule whose clauses are left of its definition's column: between the two, still the rule's" $
+      sameTree
+        ["  inner", "  WHERE", "    inner MEANS", "      PARTY Buyer", "  MUST payment 100", "   LEST BREACH BY Buyer"]
+        ["  inner", "  WHERE", "    inner MEANS PARTY Buyer MUST payment 100 LEST BREACH BY Buyer"]
+
+    it "unchanged: right of the definition's column, left of the clauses, it is still the rule's" $
+      sameTree
+        [ "  PARTY Seller"
+        , "    MUST delivery"
+        , " LEST BREACH BY Seller"
+        ]
+        [ "  PARTY Seller MUST delivery LEST BREACH BY Seller"
+        ]
+
   describe "the parser's memo changes nothing on these layouts" $
     for_ memoCases \ (name, body) ->
       it name $ memoChangesNothing (rule body)

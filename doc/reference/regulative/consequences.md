@@ -389,7 +389,7 @@ The whole rule, for a `HENCE` or `LEST` on a line of its own after a nested rule
 1. At the column of the nested rule's own clauses, it is the nested rule's.
 2. Otherwise, at the column of the outer rule's clauses, it is the outer rule's, and the nested rule ends.
 3. Otherwise, if it is right of either rule's clauses, it is the nested rule's, even at a column that lines up with nothing.
-4. Otherwise, left of both, it is the outer rule's.
+4. Otherwise, left of both, it is the outer rule's, unless it is also at or left of the column where the definition starts (column 1 inside brackets): then it ends the definition instead of going to the outer rule, as **What is refused** below says.
 
 With rules nested deeper, this is applied one level at a time, from the innermost rule out.
 Rule 1 comes first, so when the nested rule's clauses are at the same column as the outer rule's, a `HENCE` or `LEST` at that column is the nested rule's.
@@ -399,10 +399,16 @@ Brackets end a rule outright, as in `HENCE (PARTY Buyer MUST pay 100 WITHIN 7)`,
 **What is refused.** A `HENCE` or `LEST` that belongs to a rule by the steps above, when that rule already has one (a second `LEST`, a second `HENCE`, or a `HENCE` after the `LEST`), is refused with an error that names the rule, rather than given to another rule.
 `HENCE` comes before `LEST`.
 A second `LEST` on a rule's own first line is refused the same way: it belongs to the rule on that line, as above, even when a rule outside still has its `LEST` free.
+A `HENCE` or `LEST` on a line of its own at the column where its definition starts (column 1 inside brackets), or left of both that column and its rule's clauses, with no rule around that definition to take it, belongs to no rule, unless the rule's clause column is that column too, which makes it the rule's.
+It is refused with an error that names the outermost rule above it and says where to write it: at that rule's clauses, and, when what follows that rule's `HENCE` ends with a rule not in brackets, with what follows that `HENCE` in brackets too.
+When the keyword's body is on the next line, the body has to stay right of the keyword, so if the column the error gives is at or right of the body's column, move the body too.
 
 In a few places these refusals name no rule, and the error is a plain "unexpected" one instead; the file is refused all the same.
 For a second `LEST` on a rule's first line, that is when the rule is the right operand of an operator such as `RAND`, `ROR`, `OR`, `AND`, `PLUS` or `EQUALS` (the error is at the operator), the value in `f WITH x IS …` (at the `WITH`), the operand of an operator you defined yourself (at the rule's `PARTY`), or a function's argument written as a bullet (at the bullet).
 That holds inside brackets too: with the whole of a `HENCE` in brackets and the rule a `RAND` operand inside them, not in brackets of its own, the error is at the `RAND`.
+For a `HENCE` or `LEST` at or left of its definition's column, it is when the rule is the right operand of an operator, the operand of an operator you defined yourself, the value in `f WITH x IS …`, or a function's argument; the error is at the keyword.
+When the rule is the value of a `RECORD`, `COMMIT` or `ATTEST`, a definition inside that value included, a `LEST` there gets the same plain error, and a `HENCE` is not refused at all: it is the `RECORD`'s, `COMMIT`'s or `ATTEST`'s own `HENCE`.
+For a keyword at or left of its definition's column, a rule inside another rule's `AFTER`, `WITHIN` or `BEFORE` is not one of these places: the rule outside it names the keyword.
 
 **What is not placed this way.** Only the clauses of the rule a nested rule is written under count, not those of rules further out.
 In a layout where a rule two levels out has its clauses right of the rule one level out, a `HENCE` or `LEST` that lines up with the rule two levels out can stay with the innermost rule, with no error; brackets settle it.

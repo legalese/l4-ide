@@ -608,6 +608,9 @@ lestLayoutFixture = fixtureDir </> "lest-layout.l4"
 lestLayoutHanging = fixtureDir </> "lest-layout-hanging.l4"
 lestLayoutHenceAfterLest = fixtureDir </> "lest-layout-hence-after-lest.l4"
 
+clauseLayoutOutside :: FilePath
+clauseLayoutOutside = fixtureDir </> "clause-layout-1074-outside.l4"
+
 clauseLayoutHeadline, clauseLayoutRecord :: FilePath
 clauseLayoutHeadline = fixtureDir </> "clause-layout-1074-headline.l4"
 clauseLayoutRecord = fixtureDir </> "clause-layout-1074-record.l4"
@@ -784,6 +787,7 @@ coreFixtures =
   , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
   , nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
   , slotScope, slotScopeSentence, renderHoleAndClause, renderLedgerWriteOperand
+  , clauseLayoutOutside
   , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest
   , clauseLayoutHeadline, clauseLayoutRecord
   , clauseLayoutSecondLest
@@ -4759,6 +4763,15 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       filter (/= '\r') serr `shouldSatisfy`
         ("This HENCE lines up with the clauses of the rule that starts with PARTY at line 8, column 3. It comes after that rule's LEST. Write HENCE before LEST. If what follows HENCE is a rule, or ends with one, put it in brackets, or that rule can take the LEST." `isInfixOf`)
+
+    -- smucclaw/l4-ide#1074 (F3, ruled by Meng 2026-11-22: Clause Layout
+    -- Rulings F3 A; this test goes with the commit that refuses it): a LEST
+    -- at column 1 used to be a bare "unexpected LEST".
+    it "refuses a LEST left of its definition, naming the rule above it and where to write it" $ do
+      Output code _ serr <- runL4 bin ["check", clauseLayoutOutside]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This LEST is at column 1, so it is not part of the rule that starts with PARTY at line 9, column 3: on a later line, a LEST at column 1, where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. To make it that rule's LEST, put what follows its HENCE in brackets, and write the LEST at column 3, in line with that rule's clauses." `isInfixOf`)
 
     -- smucclaw/l4-ide#1074 (F2): on a rule's first line, a HENCE after its
     -- LEST is that rule's, and the refusal names it; before, it named the
