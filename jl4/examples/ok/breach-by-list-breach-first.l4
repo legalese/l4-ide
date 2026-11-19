@@ -1,0 +1,31 @@
+-- A BREACH BY a list written as the FIRST operand of a RAND, under a GIVETH.
+-- The GIVETH's type reaches both operands, so the checker knows the party
+-- type before it reads the list, and decides the reading by it: under a
+-- party type that is itself the list's type the list is ONE party, and under
+-- its element type the list names one party per element. Without a GIVETH
+-- the same shapes are refused (not-ok/tc/breach-by-list-needs-party-type.l4).
+-- (From unstable's 9d620c355; the first case is `the pair, breach first` in
+-- unstable's ok/every/run-blame.l4. #817, which this branch is built on and
+-- which has no blame list, accepts it too, as one party.)
+
+DECLARE Step IS ONE OF deliver
+
+-- The pair as one party: the BREACH names the list once.
+GIVETH A DEONTIC (LIST OF STRING) Step
+`the pair, breach first` MEANS
+    (BREACH BY (LIST "a", "b") BECAUSE "declared against the pair")
+    RAND
+    (PARTY (LIST "a", "b") MUST deliver WITHIN 5)
+
+#TRACE `the pair, breach first` AT 0 WITH
+  WAITUNTIL 20
+
+-- Each member as a party: the BREACH names "a" and "b".
+GIVETH A DEONTIC STRING Step
+`each of the pair, breach first` MEANS
+    (BREACH BY (LIST "a", "b") BECAUSE "declared against each")
+    RAND
+    (PARTY "a" MUST deliver WITHIN 5)
+
+#TRACE `each of the pair, breach first` AT 0 WITH
+  WAITUNTIL 20

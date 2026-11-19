@@ -540,6 +540,46 @@ checkBinOp t1 t2 tr opname op ann e1 e2 = do
   e2' <- checkExpr (ExpectBinOpArgContext opname 2) e2 t2
   pure (op ann e1' e2', tr)
 
+-- | A regulative @RAND@\/@ROR@ whose @DEONTIC party action@ type is given:
+-- both operands are checked against it, left first, with the inert context
+-- set for each. Shared by the two paths — 'inferExpr' gives a fresh contract
+-- type, 'checkRegulativeBinOp' the expected one after unifying with it.
+-- (From @unstable@'s 9d620c355.)
+regulativeBinOpAt ::
+     Type' Resolved
+  -> Text
+  -> (Anno -> Expr Resolved -> Expr Resolved -> Expr Resolved)
+  -> InertContext
+  -> Anno
+  -> Expr Name
+  -> Expr Name
+  -> Check (Expr Resolved, Type' Resolved)
+regulativeBinOpAt contractT opname op ctx ann e1 e2 =
+  checkBinOp contractT contractT contractT opname op ann
+    (setInertContext ctx e1) (setInertContext ctx e2)
+
+-- | A regulative @RAND@\/@ROR@ checked against an expected type: unify the
+-- expected type with a @DEONTIC party action@ FIRST, then check both operands
+-- at it, so a @BREACH BY <list>@ in either operand is read against the
+-- rule's party type (see the 'checkExprWith' clauses that call this, and
+-- 'checkBreachParty'). (From @unstable@'s 9d620c355.)
+checkRegulativeBinOp ::
+     ExpectationContext
+  -> Text
+  -> (Anno -> Expr Resolved -> Expr Resolved -> Expr Resolved)
+  -> InertContext
+  -> Anno
+  -> Expr Name
+  -> Expr Name
+  -> Type' Resolved
+  -> Check (Expr Resolved)
+checkRegulativeBinOp ec opname op ctx ann e1 e2 t = do
+  partyT <- fresh (NormalName "party")
+  actT <- fresh (NormalName "action")
+  let contractT = contract partyT actT
+  expect ec t contractT
+  fst <$> regulativeBinOpAt contractT opname op ctx ann e1 e2
+
 -- Phase 4.
 inferDeclare :: Declare Name -> Check (Declare Resolved, [CheckInfo])
 inferDeclare (MkDeclare ann _tysig appForm _t) =
@@ -2180,8 +2220,9 @@ checkExprWith pr ec (LetIn ann ds e) t = pr $ do
 -- that its BY expression is read against the rule's party type (see
 -- 'checkBreachParty'): inferring it with a fresh party type and unifying
 -- afterwards would decide the list-versus-party reading before the party type
--- was known. A LEST/HENCE and a top-level @x MEANS BREACH BY …@ under a
--- GIVETH arrive here.
+-- was known. A LEST/HENCE, the operand of a RAND/ROR under a GIVETH (via the
+-- two clauses below), and a top-level @x MEANS BREACH BY …@ under a GIVETH
+-- all arrive here.
 checkExprWith pr ec e@(Breach ann mParty mReason) t = pr $ errorContext (WhileCheckingExpression e) do
   partyT <- fresh (NormalName "party")
   actionT <- fresh (NormalName "action")
@@ -2189,6 +2230,23 @@ checkExprWith pr ec e@(Breach ann mParty mReason) t = pr $ errorContext (WhileCh
   mParty' <- traverse (checkBreachParty partyT) mParty
   mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
   setAnnResolvedType t Nothing (Breach ann mParty' mReason')
+-- A RAND\/ROR checked against a KNOWN deontic type likewise unifies with it
+-- FIRST and then checks both operands against it, so that a @BREACH BY <list>@
+-- in EITHER operand sees the rule's party type. Inferring the compound (as
+-- 'inferExpr' must, when nothing says its type) checks the left operand
+-- under a fresh party type, which the left operand's own shape then fixes for
+-- the right, and a @BREACH BY <list>@ on the LEFT cannot fix it
+-- ('checkBreachParty' refuses it there). Without these two clauses a
+-- @GIVETH A DEONTIC …@ never reached the operands, and a @BREACH BY@ a
+-- list-valued party as the first operand was refused where #817, with no
+-- blame list, accepted it. (From @unstable@'s 9d620c355, its adversarial pass
+-- of 2026-09-15, round 2, R2-TC-1.)
+checkExprWith pr ec e@(RAnd ann e1 e2) t = pr $ errorContext (WhileCheckingExpression e) do
+  re <- checkRegulativeBinOp ec "AND" RAnd InertCtxAnd ann e1 e2 t
+  setAnnResolvedType t Nothing re
+checkExprWith pr ec e@(ROr ann e1 e2) t = pr $ errorContext (WhileCheckingExpression e) do
+  re <- checkRegulativeBinOp ec "OR" ROr InertCtxOr ann e1 e2 t
+  setAnnResolvedType t Nothing re
 checkExprWith pr ec e t = pr $ errorContext (WhileCheckingExpression e) do
   (re, rt) <- inferExpr e
   expect ec t rt
@@ -2216,7 +2274,8 @@ checkExprWith pr ec e t = pr $ errorContext (WhileCheckingExpression e) do
 --
 -- That decision needs the party type, and a @BREACH@ reached by INFERENCE — a
 -- top-level @x MEANS BREACH BY …@ with no @GIVETH@, or the first operand of a
--- @RAND@\/@ROR@ — arrives with a fresh one. Reading the list as several
+-- @RAND@\/@ROR@ that has none (with one, 'checkRegulativeBinOp' pushes the
+-- @GIVETH@'s type into both operands first) — arrives with a fresh one. Reading the list as several
 -- parties there would PIN the party type to the element type and fail later,
 -- at the use site, with a mismatch that names the wrong place, and the same
 -- rule would pass with its operands swapped. So a LIST after @BY@ under a
@@ -2224,12 +2283,6 @@ checkExprWith pr ec e t = pr $ errorContext (WhileCheckingExpression e) do
 -- ('BreachByListNeedsPartyType'), and the party type is left for the use site
 -- to fix, so that one cause is one error. This is @unstable@'s 9d620c355
 -- (its adversarial pass of 2026-09-15, round 2, R2-TC-1).
---
--- @unstable@ also checks a @RAND@\/@ROR@ against a known type first
--- (@checkRegulativeBinOp@), so that a @GIVETH@ reaches the first operand;
--- that is not on this branch. So here a @GIVETH@ does not rescue a list after
--- @BY@ in a first operand, which is refused where @unstable@ accepts it, and
--- the message says to write the other operand first.
 --
 -- A list LITERAL with nobody in it (@EMPTY@, or @LIST@ with no elements) is
 -- refused here, loudly: a breach blames at least one party, and the literal
@@ -2567,21 +2620,15 @@ inferExpr' g =
       dsFun <- desugarBinOpToFunction (rawName orName) (Or ann e1' e2') ann e1' e2'
       inferOperatorApp (binaryOperands ann) dsFun
     RAnd ann e1 e2 -> do
-      -- Set inert context to AND for subexpressions
-      let e1' = setInertContext InertCtxAnd e1
-          e2' = setInertContext InertCtxAnd e2
+      -- nothing says the compound's type: a fresh DEONTIC, which the LEFT
+      -- operand then fixes for the right (see 'checkRegulativeBinOp')
       partyT <- fresh (NormalName "party")
       actT <- fresh (NormalName "action")
-      let contractT = contract partyT actT
-      checkBinOp contractT contractT contractT "AND" RAnd ann e1' e2'
+      regulativeBinOpAt (contract partyT actT) "AND" RAnd InertCtxAnd ann e1 e2
     ROr ann e1 e2 -> do
-      -- Set inert context to OR for subexpressions
-      let e1' = setInertContext InertCtxOr e1
-          e2' = setInertContext InertCtxOr e2
       partyT <- fresh (NormalName "party")
       actT <- fresh (NormalName "action")
-      let contractT = contract partyT actT
-      checkBinOp contractT contractT contractT "OR" ROr ann e1' e2'
+      regulativeBinOpAt (contract partyT actT) "OR" ROr InertCtxOr ann e1 e2
     Implies ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName impliesName) g ann e1 e2
       inferOperatorApp (binaryOperands ann) dsFun
@@ -5254,10 +5301,9 @@ prettyCheckError (BreachByListNeedsPartyType _) =
   , "type, and nothing has fixed it at this point: this BREACH is checked"
   , "before anything says what the rule's party type is. Either"
   , ""
-  , "  - if this BREACH is the whole definition, give the definition a"
-  , "    signature, GIVETH A DEONTIC <party> <action>, or"
+  , "  - give the definition a signature, GIVETH A DEONTIC <party> <action>, or"
   , "  - if this BREACH is the first operand of a RAND or ROR, write the PARTY"
-  , "    operand first. A signature does not reach the first operand."
+  , "    operand first."
   ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.

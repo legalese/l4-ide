@@ -3821,6 +3821,38 @@ spec bin = do
       -- the last batch row is the exported function's answer
       take (length runVerdicts) batchVerdicts `shouldBe` runVerdicts
 
+    -- Batch re-prints the module without the brackets of a left-nested RAND,
+    -- and the parser nests the chain to the right, so the BREACH BY LIST
+    -- written as the second operand is the first operand of an inner RAND in
+    -- the module batch checks. Batch must read it back and name the failures
+    -- `l4 run` names, in order (the adversarial pass of 2026-11-20, F4).
+    it "reads back a BREACH BY a list in a left-nested RAND, naming the failures l4 run names" $ do
+      let fixture = fixtureDir </> "batch-by-list-left-nested.l4"
+      Output code sout serr <- runL4 bin ["batch", fixture, "--inputs", breachInputsFixture]
+      code `shouldBe` ExitSuccess
+      row <- case eitherDecode (BSL8.pack (concat (take 1 (reverse (lines sout))))) of
+        Right v -> pure v
+        Left e -> fail ("batch row is not JSON: " ++ e ++ "\n" ++ sout ++ "\n" ++ serr)
+      objField row "status" `shouldBe` Just (String "success")
+      let batchParties = case objField row "output" of
+            Just (Array v)
+              | (item : _) <- toList v
+              , Just r <- objField item "result"
+              , Just b <- objField r "breached"
+              , Just (Array fs) <- objField b "failures" ->
+                  [ p | f <- toList fs, Just (String p) <- [objField f "party"] ]
+            _ -> []
+      runEnv <- jsonEnvelope bin ["run", fixture, "--json"]
+      let runParties = case objField runEnv "results" of
+            Just (Array v)
+              | (item : _) <- toList v
+              , Just (String t) <- objField item "value" ->
+                  [ T.takeWhile (/= ' ') (T.drop 3 l)
+                  | l <- map T.stripStart (T.lines t), "BY " `T.isPrefixOf` l ]
+            _ -> []
+      batchParties `shouldBe` ["Carol", "Alice", "Bob", "Dave"]
+      runParties `shouldBe` batchParties
+
     -- A declared breach reached by a hand-off is observed at the event that
     -- revealed the miss, also as an operand of a RAND, as unstable's table
     -- says (NOTE [A declared breach in a RAND is observed at the revealing

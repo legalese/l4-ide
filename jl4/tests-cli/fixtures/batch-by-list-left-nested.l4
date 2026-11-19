@@ -1,0 +1,20 @@
+-- Fixture for "l4 batch reads back a BREACH BY a list in a left-nested RAND".
+--
+-- `l4 batch` re-prints the module and checks it again. The printer writes
+-- (a RAND b) RAND c without its brackets, and the parser reads that back as
+-- a RAND (b RAND c), so the BREACH BY LIST below, the second operand as
+-- written, is the FIRST operand of the inner RAND in the module batch
+-- checks. With no GIVETH, the PARTY operand before it fixes the party type
+-- either way. (The adversarial pass of 2026-11-20: F4 without a GIVETH.)
+
+DECLARE Person IS ONE OF Alice, Bob, Carol, Dave
+DECLARE Action IS ONE OF deliver, notify, exercise
+
+`root` MEANS
+    ((PARTY Carol MUST deliver WITHIN 3) RAND (BREACH BY LIST Alice, Bob BECAUSE "x")) RAND (PARTY Dave MUST notify WITHIN 4)
+
+#TRACE `root` AT 0 WITH
+  PARTY Dave DOES exercise AT 20
+
+@export default trivial entrypoint so batch has a function to call
+alwaysTrue MEANS TRUE

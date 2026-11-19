@@ -1,0 +1,22 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+breach-by-list-breach-first.l4:20:1-21:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY LIST "a", "b" BECAUSE "declared against the pair"
+    BY LIST "a", "b"
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        5
+breach-by-list-breach-first.l4:30:1-31:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY "a" BECAUSE "declared against each"
+    BY "b" BECAUSE "declared against each"
+    BY "a"
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        5

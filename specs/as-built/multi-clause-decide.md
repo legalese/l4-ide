@@ -286,7 +286,7 @@ Measured, `l4 check`: 1,000 lines took 29.5 s at `6d0146f27`; now 2,000 take 0.3
 `PatternMatchParserSpec` required 1,000 lines to parse in less than 8 times the wall-clock time of 250; since round 3 it compares CPU time for 250 and 2,000 lines.
 
 Item 3, the clause after a new name.
-`checkClauseMatrix` resolves the patterns even where the missing-clause analysis stands down (a list, a `MAYBE` value, an `EXACTLY` it cannot read), and finds the first clause whose patterns all match anything because some are new names (`newNameCatchAll`, `TypeCheck.hs:1069`).
+`checkClauseMatrix` resolves the patterns even where the missing-clause analysis stands down (a list, a `MAYBE` value, an `EXACTLY` it cannot read), and finds the first clause whose patterns all match anything because some are new names (`newNameCatchAll`, `TypeCheck.hs:1107`).
 `warnUnreachableClauses` (`:1165`) gives the clauses after it one warning, `AfterClauseBindingNewName` (`Types.hs:132`; message at `TypeCheck.hs:4613`): "This clause of `colour` is never used, because the clause above it with the new name `Gren` matches every input."
 Main has no hint for a name close to a value, so there is no CONSIDER-worded hint to translate, as there was on unstable.
 This keeps ruling M1's condition: main warns only about clauses after one that matches every input, and a new name does; a repeated clause still draws no warning.

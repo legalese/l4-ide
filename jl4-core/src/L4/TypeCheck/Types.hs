@@ -145,7 +145,7 @@ data CheckError =
   | BreachByListNeedsPartyType (Expr Name)
     -- ^ @BREACH BY@ given a LIST while the rule's party type is still an
     -- inference variable: a top-level @MEANS@ with no @GIVETH@, or the first
-    -- operand of a @RAND@\/@ROR@. Whether the list names several parties or
+    -- operand of a @RAND@\/@ROR@ that has none. Whether the list names several parties or
     -- one list-valued party is decided by the party type
     -- ('L4.TypeCheck.checkBreachParty'), so it cannot be decided here (from
     -- @unstable@'s 9d620c355, EVERY-EACH-QUANTIFIER-SPEC §6.1.1 there).

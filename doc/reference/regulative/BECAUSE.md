@@ -83,8 +83,8 @@ To blame nobody, write no `BY` at all.
 
 When the party type is itself a `LIST` (a group as one party, as in `PARTY (LIST "a", "b") MUST deliver`), `BY` followed by such a list names that one party, not its members; a list of such lists names several.
 Which of the two a list means depends on the party type, so a `BREACH BY LIST …` written where nothing has fixed the party type yet is refused when the file is checked, at the `BREACH`.
-That happens in two places: a definition with no `GIVETH` that is only the `BREACH`, and the first operand of a `RAND` or `ROR`, even in a definition with a `GIVETH`.
-The message names the fix: give the first a `GIVETH A DEONTIC <party> <action>`, and write the `PARTY` operand of the second first.
+That happens in two places, both in a definition with no `GIVETH`: a definition that is only the `BREACH`, and the first operand of a `RAND` or `ROR`.
+The message names the two fixes: give the definition a `GIVETH A DEONTIC <party> <action>`, which reaches both operands of a `RAND` or `ROR`, or write the `PARTY` operand first.
 A `BY` under a `LEST` or `HENCE` always knows the party type, because the `PARTY` line above it fixed it.
 
 You do not have to write the list yourself when the language already knows who failed.

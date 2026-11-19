@@ -1,0 +1,20 @@
+-- A BREACH BY whose party is of the wrong type, as an operand of a RAND under
+-- a GIVETH: the error is a type mismatch at the BY expression, as on
+-- unstable. Before this branch ported unstable's checkRegulativeBinOp, the
+-- first said the party type was not known, and the second pointed at the
+-- whole RAND, blaming its second operand. (The adversarial pass of
+-- 2026-11-20: BL-5, BL-6.)
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF deliver, noop
+
+-- 1. A list of STRINGs after BY in the second operand.
+GIVETH A DEONTIC Person Action
+`a list of the wrong type` MEANS FULFILLED RAND (BREACH BY LIST "x", "y")
+
+-- 2. A STRING after BY in the first operand.
+GIVETH A DEONTIC Person Action
+`a party of the wrong type` MEANS
+    (BREACH BY "Alice" BECAUSE "late")
+    RAND
+    (PARTY Bob MUST deliver WITHIN 5)

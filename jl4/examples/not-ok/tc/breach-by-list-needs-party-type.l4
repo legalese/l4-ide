@@ -8,10 +8,9 @@
 -- operands swapped. (From unstable's 9d620c355, EVERY-EACH-QUANTIFIER-SPEC
 -- §6.1.1 there.)
 --
--- Shape 1 is fixed by a GIVETH on the definition. Shapes 2 and 3 are fixed by
--- writing the PARTY operand first. Shape 3 is accepted on unstable, which
--- carries the GIVETH's type into both operands of a RAND; here it does not
--- reach the first operand.
+-- Each shape is fixed by a GIVETH on the definition, which reaches both
+-- operands of a RAND (ok/breach-by-list-breach-first.l4), or, for the RAND,
+-- by writing the PARTY operand first.
 
 DECLARE Step IS ONE OF deliver
 
@@ -26,10 +25,3 @@ DECLARE Step IS ONE OF deliver
     (BREACH BY (LIST "a", "b") BECAUSE "pair")
     RAND
     (PARTY (LIST "a", "b") MUST deliver WITHIN 5)
-
--- 3. The same under a GIVETH: the GIVETH does not reach the first operand.
-GIVETH A DEONTIC STRING Step
-`pair with a signature` MEANS
-    (BREACH BY (LIST "a", "b") BECAUSE "pair")
-    RAND
-    (PARTY "a" MUST deliver WITHIN 5)

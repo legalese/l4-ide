@@ -1,0 +1,39 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+breach-by-list-operands.l4:18:1-19:33:
+  FULFILLED
+breach-by-list-operands.l4:26:1-27:33:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "x"
+    BY Bob BECAUSE "x"
+breach-by-list-operands.l4:36:1-37:33:
+  DEONTIC BREACHED:
+    BREACH
+    BY Dave
+      who had to do obligatory action
+        MUST notify
+      before their deadline, which was at
+        4
+    BY Alice BECAUSE "x"
+    BY Bob BECAUSE "x"
+    BY Carol
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        3
+breach-by-list-operands.l4:45:1-46:30:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BY Bob
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        8
+breach-by-list-operands.l4:55:1-56:35:
+  DEONTIC BREACHED:
+    BREACH
+    BY LIST "a"
