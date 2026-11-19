@@ -42,6 +42,7 @@ import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import Backend.Api
 import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..), AnswerShape(..), RequiredInput(..))
 import L4.Export (extractAssumeParamTypes, extractAssumeParamResolveds)
+import L4.Export.Shape (recordLikeConstructor)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
 import qualified Data.Scientific as Scientific
@@ -462,11 +463,17 @@ buildModuleInfo decls = ModuleInfo
       | MkDeclare _ _ (MkAppForm _ tyName params _) (SynonymDecl _ body) <- decls ]
   , miTagged       = Map.fromList
       [ (getUnique tyName, (rawNameToText (rawName (getActual tyName)), map conOf ctors))
-      | MkDeclare _ _ (MkAppForm _ tyName _ _) (EnumDecl _ ctors) <- decls
+      | MkDeclare _ _ (MkAppForm _ tyName _ _) decl@(EnumDecl _ ctors) <- decls
+      , not (recordLike tyName decl)
       , any (\(MkConDecl _ _ fs) -> not (null fs)) ctors
       ]
   }
   where
+    -- One constructor, named like the type, that carries fields: a record, as
+    -- JSONDECODE and the schemas read it ('recordLikeConstructor'), so it is
+    -- among the records, and neither tagged nor an enum.
+    recordLike tyName decl = isJust (recordLikeConstructor (rawNameToText (rawName (getActual tyName))) decl)
+
     conOf (MkConDecl _ c fs) =
       ( rawNameToText (rawName (getActual c))
       , c
@@ -481,13 +488,17 @@ buildModuleInfo decls = ModuleInfo
     -- 'App' using the constructor Resolved.
     recordFor (MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ (Just ctor) fields)) =
       Just (getUnique tyName, (ctor, map fieldOf fields))
-      where
-        fieldOf (MkTypedName _ fn fty _) = (rawNameToText (rawName (getActual fn)), fty)
+    recordFor (MkDeclare _ _ (MkAppForm _ tyName _ _) decl@EnumDecl {})
+      | Just (ctor, fields) <- recordLikeConstructor (rawNameToText (rawName (getActual tyName))) decl =
+          Just (getUnique tyName, (ctor, map fieldOf fields))
     recordFor _ = Nothing
 
+    fieldOf (MkTypedName _ fn fty _) = (rawNameToText (rawName (getActual fn)), fty)
+
     enumFor :: Declare Resolved -> Maybe (Unique, [(Text, Resolved)])
-    enumFor (MkDeclare _ _ (MkAppForm _ tyName _ _) (EnumDecl _ ctors)) =
-      Just (getUnique tyName, map ctorOf ctors)
+    enumFor (MkDeclare _ _ (MkAppForm _ tyName _ _) decl@(EnumDecl _ ctors))
+      | not (recordLike tyName decl) =
+          Just (getUnique tyName, map ctorOf ctors)
       where
         ctorOf (MkConDecl _ c _) = (rawNameToText (rawName (getActual c)), c)
     enumFor _ = Nothing

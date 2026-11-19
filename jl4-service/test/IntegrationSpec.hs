@@ -3520,6 +3520,39 @@ spec = describe "integration" do
         held (Aeson.String "x") >>= (`shouldCarry` Refuses "Parameter 'h': a `Pair` is an object of its fields (left, right)")
         held (Aeson.object ["left" Aeson..= (2 :: Int), "right" Aeson..= (3 :: Int)]) >>= (`shouldCarry` Answers (Aeson.Number 5))
 
+  -- A type whose only constructor is named like it and carries fields is what
+  -- DECLARE T HAS declares, to the evaluator, so JSONDECODE reads it as a
+  -- record; the schemas and the direct path read it so too, and every path
+  -- reads the one form, its fields alone (assumed, not ruled; review of #779,
+  -- 2026-11-19, which found it published tagged and refused by JSONDECODE).
+  describe "reads a type whose only constructor is named like it as a record" do
+    aroundAll (\k -> withServiceFromSources "record-like" [("refund.l4", recordLikeJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "record-like" fn (Aeson.object ["arguments" Aeson..= args])
+          refund v extra = Aeson.object (("r" Aeson..= v) : extra)
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          fields = Aeson.object ["amount" Aeson..= (40 :: Int)]
+          tagged = Aeson.object ["Deposit Refund" Aeson..= fields]
+          notObject = "Parameter 'r': a `Deposit Refund` is an object of its fields (amount)"
+      it "answers its fields alone, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "refund amount" (refund fields extra) >>= (`shouldCarry` Answers (Aeson.Number 40))
+      it "refuses the tagged form, as a record sent in its envelope is, on both paths" \(baseUrl, mgr) -> do
+        call baseUrl mgr "refund amount" (refund tagged []) >>= (`shouldCarry` Refuses "Parameter 'r': missing required parameter")
+        call baseUrl mgr "refund amount" (refund tagged wrapped) >>= (`shouldCarry` Refuses "Missing required field 'amount' in JSON object")
+      it "refuses its bare name, as a record that is not an object is, naming the input on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "refund amount" (refund (Aeson.String "Deposit Refund") extra) >>= (`shouldCarry` Refuses notObject)
+      it "publishes it as a record, its fields alone, and answers it as a record is answered" \(baseUrl, mgr) -> do
+        fnResp <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/record-like/functions/refund%20amount")
+        let keysAt path = case wireAt fnResp path of
+              Right (Aeson.Object o) -> Just (map Aeson.Key.toText (Aeson.KeyMap.keys o))
+              _ -> Nothing
+        keysAt ["parameters", "properties", "r", "properties"] `shouldBe` Just ["amount"]
+        wireAt fnResp ["parameters", "properties", "r", "required"] `shouldBe` Right (Aeson.toJSON ["amount" :: Text])
+        -- the answer keeps the envelope a record's has (card J2, not built)
+        call baseUrl mgr "refund of" (Aeson.object ["n" Aeson..= (40 :: Int)])
+          >>= (`shouldCarry` Answers (Aeson.object ["Deposit Refund" Aeson..= fields]))
+
   describe "compiler" do
     it "compiles valid L4 sources" do
       logger <- newLogger False
@@ -4848,6 +4881,27 @@ recordFormJL4 = Text.unlines
   , "GIVEN h IS A Holder"
   , "GIVETH A NUMBER"
   , "`held sum` MEANS h's q's left + h's q's right"
+  ]
+
+recordLikeJL4 :: Text
+recordLikeJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE `Deposit Refund` IS ONE OF"
+  , "  `Deposit Refund` HAS amount IS A NUMBER"
+  , ""
+  , "@export Refund amount"
+  , "GIVEN r IS A `Deposit Refund`"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`refund amount` MEANS"
+  , "  CONSIDER r"
+  , "  WHEN `Deposit Refund` a THEN a"
+  , ""
+  , "@export A refund"
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A `Deposit Refund`"
+  , "`refund of` MEANS `Deposit Refund` n"
   ]
 
 eitherInputJL4 :: Text

@@ -186,6 +186,7 @@ A list is a JSON array, even when it has one element.
 An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
 A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
 A constructor that carries data is written the same way, keyed by its name, `{"Card": {"card fee": 2}}`, and one that carries none is its name, `"Cash"`, in an answer and in an input alike.
+A type whose only constructor is named like the type and carries data (``DECLARE `Deposit Refund` IS ONE OF `Deposit Refund` HAS amount IS A NUMBER``) is a record: it is answered as one, `{"Deposit Refund": {"amount": 40}}`, published as one, and read as its fields alone, `{"amount": 40}`.
 The published schema says so: a type whose constructors all carry data is an object with one key per constructor; one with both kinds is a `oneOf` of a string `enum` of the names and that object, with no `type` of its own; one whose constructors carry nothing is the string `enum`, as before.
 An input that sends the bare name of a constructor that carries data, or an object in another form, is refused with a `422` that names the input, at any depth and on every path, as an `EITHER` in another form is.
 A record input that is not an object, at any depth, is refused the same way: `Parameter 'p': a `Pair` is an object of its fields (left, right)`.

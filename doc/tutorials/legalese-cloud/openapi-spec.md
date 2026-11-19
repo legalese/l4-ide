@@ -61,6 +61,8 @@ What `value` holds depends on what the rule gives back:
 | a record, such as a `Pair` of `left` and `right side`  | an object with one key, the record's name, holding its fields: `{"Pair": {"left": 5, "right side": 6}}`                     |
 | a choice that carries data, such as `Card` with a fee  | an object with one key, the choice's name, holding its fields: `{"Card": {"card fee": 2}}`; send it the same way            |
 
+A type with only one choice, named like the type, such as ``DECLARE `Deposit Refund` IS ONE OF `Deposit Refund` HAS amount IS A NUMBER``, is a record: it comes back as a record does, `{"Deposit Refund": {"amount": 40}}`, and you send its fields alone, `{"amount": 40}`.
+
 Five things to know:
 
 - Field names inside an answer are spelled as the rule spells them, spaces included; they are not turned into hyphens.

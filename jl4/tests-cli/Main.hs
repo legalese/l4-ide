@@ -554,6 +554,11 @@ batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 batchMaybeTextJson = fixtureDir </> "batch-maybe-text.json"
 
 -- | A constructor that carries data, as an input.
+-- | A type whose only constructor is named like it, as an input.
+batchRecordLikeFixture, batchRecordLikeJson :: FilePath
+batchRecordLikeFixture = fixtureDir </> "batch-record-like.l4"
+batchRecordLikeJson = fixtureDir </> "batch-record-like.json"
+
 batchTaggedFixture, batchTaggedJson :: FilePath
 batchTaggedFixture = fixtureDir </> "batch-tagged.l4"
 batchTaggedJson = fixtureDir </> "batch-tagged.json"
@@ -4407,6 +4412,19 @@ spec bin = do
             show (objField bare "diagnostics") `shouldSatisfy` ("The constructor `Card` carries fields" `isInfixOf`)
             show (objField malformed "diagnostics") `shouldSatisfy` ("Expected a `Payment` written as the name of a constructor" `isInfixOf`)
           other -> expectationFailure ("expected 4 rows, got " ++ show (length other))
+
+      -- A type whose only constructor is named like it is read as a record,
+      -- its fields alone, as the schemas publish it (review of #779,
+      -- 2026-11-19); the tagged form is refused.
+      it "reads a type whose only constructor is named like it as a record" $ do
+        (code, _, rows) <- rowsOf [batchRecordLikeFixture, "--inputs", batchRecordLikeJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "error"]
+        case rows of
+          [fields, tagged] -> do
+            resultOf fields `shouldBe` Just (Number 40)
+            show (objField tagged "diagnostics") `shouldSatisfy` ("Missing required field 'amount'" `isInfixOf`)
+          other -> expectationFailure ("expected 2 rows, got " ++ show (length other))
 
       -- An input declared through a synonym is the type the synonym stands for
       -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:

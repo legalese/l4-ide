@@ -18,6 +18,9 @@
 -- > LIST OF a                      JArray (shape a)
 -- > MAYBE a                        JOptional (shape a)       (may be left out or null)
 -- > DECLARE T HAS ...              JRecord                   (fields in declaration order)
+-- > DECLARE T IS ONE OF T HAS …    JRecord                   (one constructor, named like the type: a
+-- >                                                          record, as the decoder reads it:
+-- >                                                          'recordLikeConstructor')
 -- > DECLARE T IS ONE OF a, b       JEnum                     (the constructors' names)
 -- > DECLARE T IS ONE OF a, b HAS … JTagged                   (a constructor that carries fields is
 -- >                                                          {"b": {its fields}}, one that carries none
@@ -54,6 +57,7 @@ module L4.Export.Shape (
   moduleDeclares,
   shapeEnvFromDeclares,
   jsonShape,
+  recordLikeConstructor,
   contractUnderName,
   unsendableWhat,
   unsendableHint,
@@ -388,6 +392,10 @@ expand env = go Set.empty
                 -- constructors' names. One that carries fields is tagged with its
                 -- name (card J1 of the wire-form bench, option A); 'firstUnsendable'
                 -- has looked at its fields.
+                -- One constructor, named like the type, that carries fields is
+                -- a record, as 'recordLikeConstructor' says.
+                EnumDecl {}
+                  | Just (_, fs) <- recordLikeConstructor typeName body -> JRecord named (map (field inner) fs)
                 EnumDecl _ cons
                   | all (\(MkConDecl _ _ fs) -> null fs) cons -> JEnum named [nameText c | MkConDecl _ c _ <- cons]
                   | otherwise ->
@@ -430,6 +438,21 @@ substitute sub
 
 nameText :: Resolved -> Text
 nameText = rawNameToText . rawName . getActual
+
+-- | The constructor and its fields, when a type declared @IS ONE OF@ has one
+-- constructor only, named like the type, and it carries fields:
+-- @DECLARE Refund IS ONE OF Refund HAS amount IS A NUMBER@. The evaluator
+-- cannot tell it from @DECLARE Refund HAS amount IS A NUMBER@, so @JSONDECODE@
+-- reads it as a record ('L4.EvaluateLazy.Machine.isRecordShaped') and
+-- @JSONENCODE@ writes it as one, its fields alone. The schemas ('jsonShape')
+-- and the service's decoder take it for a record too, so that every reader
+-- reads the one form, @{"amount": 40}@ (assumed, not ruled: the review of #779
+-- of 2026-11-19 found the schemas publishing it tagged, which @JSONDECODE@
+-- refuses). Given the type's name as 'nameText' writes it.
+recordLikeConstructor :: Text -> TypeDecl Resolved -> Maybe (Resolved, [TypedName Resolved])
+recordLikeConstructor typeName = \case
+  EnumDecl _ [MkConDecl _ c fs@(_ : _)] | nameText c == typeName -> Just (c, fs)
+  _ -> Nothing
 
 -- | Is this only that a type did not resolve? Then the error about that says what
 -- is wrong, and saying the type cannot be sent would only mislead.

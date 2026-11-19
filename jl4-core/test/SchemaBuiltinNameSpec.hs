@@ -458,6 +458,26 @@ spec = describe "a type named like a builtin" $ do
         `shouldBe` (Nothing, Just (Just ["width"]))
       KeyMap.lookup "oneOf" (jsonDefinition r "Cut") `shouldSatisfy` maybe False (\v -> case v of Aeson.Array a -> length a == 2; _ -> False)
 
+    -- One constructor, named like the type, that carries fields is what
+    -- DECLARE T HAS declares, to the evaluator, which reads and writes it as a
+    -- record: both generators describe it so, its fields alone (assumed, not
+    -- ruled; review of #779, 2026-11-19).
+    it "a type whose only constructor is named like it is a record, on both generators" $ do
+      let r = checked [] (Text.unlines
+            [ "DECLARE `Deposit Refund` IS ONE OF"
+            , "  `Deposit Refund` HAS amount IS A NUMBER"
+            , "@export refund"
+            , "GIVEN r IS A `Deposit Refund`"
+            , "GIVETH A NUMBER"
+            , "refunding r MEANS 1"
+            ])
+          p = parameter r "r"
+      (p.parameterType, p.parameterOneOf, fmap Map.keys p.parameterProperties, p.parameterRequired, p.parameterL4Type)
+        `shouldBe` ("object", Nothing, Just ["amount"], Just ["amount"], Just "Deposit Refund")
+      KeyMap.lookup "properties" (jsonDefinition r "Deposit Refund")
+        `shouldBe` Just (Aeson.object [("amount", Aeson.object (jsonType "number"))])
+      KeyMap.lookup "required" (jsonDefinition r "Deposit Refund") `shouldBe` Just (Aeson.toJSON ["amount" :: Text])
+
     it "an enumeration whose constructors carry nothing is still the names" $ do
       let r = checked [] (Text.unlines
             [ "DECLARE Hue IS ONE OF Red, Blue"

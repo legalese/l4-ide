@@ -1,0 +1,22 @@
+-- A type whose only constructor is named like it is what DECLARE ... HAS
+-- declares, to the evaluator: JSONDECODE reads it, and JSONENCODE writes it,
+-- as a record, its fields alone. That is the form the schemas publish for it,
+-- as the schema of the export below says (review of #779, 2026-11-19).
+
+DECLARE `Deposit Refund` IS ONE OF
+  `Deposit Refund` HAS amount IS A NUMBER
+
+@export Refund amount
+GIVEN r IS A `Deposit Refund`
+GIVETH A NUMBER
+`refund amount` MEANS
+  CONSIDER r
+  WHEN `Deposit Refund` a THEN a
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING `Deposit Refund`
+`decode refund` s MEANS JSONDECODE s
+
+#EVAL `decode refund` "{\"amount\": 40}"
+#EVAL JSONENCODE (`Deposit Refund` 40)
+#EVAL `decode refund` (JSONENCODE (`Deposit Refund` 40))
