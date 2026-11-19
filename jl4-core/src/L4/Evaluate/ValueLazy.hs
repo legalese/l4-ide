@@ -2,6 +2,7 @@ module L4.Evaluate.ValueLazy where
 
 import Base
 import Control.Concurrent (ThreadId)
+import qualified Data.IntSet as IntSet
 import Data.Time (Day, UTCTime)
 import Data.Time.LocalTime (TimeOfDay)
 import L4.Syntax
@@ -290,11 +291,19 @@ combineBlame op l r = (decider, rebuild)
 -- first in order. Only a tie on all three falls to position, and the entries
 -- it then chooses between took effect at one instant and came to light at
 -- one instant.
+--
+-- The decisive positions are looked up in an 'IntSet'. A list lookup made
+-- this linear in the entries TIMES the decisive ones at every combine, so a
+-- chain of n tied operands, every entry decisive, cost n cubed in all (2,000
+-- tied deadlines: 10.7 s, against 2.3 s with the 'IntSet' and 1.6 s untied;
+-- @unstable@'s copy of this function has the same lookup). The candidates
+-- and their order are the same, so the answer is.
 representative :: [Failure a] -> [Int] -> Int
-representative entries decisive = case sortOn key [ (i, f) | (i, f) <- zip [0 ..] entries, i `elem` decisive ] of
+representative entries decisive = case sortOn key [ (i, f) | (i, f) <- zip [0 ..] entries, i `IntSet.member` decisiveSet ] of
   ((i, _) : _) -> i
   []           -> 0
   where
+    decisiveSet = IntSet.fromList decisive
     -- kind, then whether it has a time at all (an untimed one last), then
     -- when it was observed, then position
     key (i, f) = case f of
