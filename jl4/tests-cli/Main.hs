@@ -3821,6 +3821,44 @@ spec bin = do
       -- the last batch row is the exported function's answer
       take (length runVerdicts) batchVerdicts `shouldBe` runVerdicts
 
+    -- A declared breach reached by a hand-off is observed at the event that
+    -- revealed the miss, also as an operand of a RAND, as unstable's table
+    -- says (NOTE [A declared breach in a RAND is observed at the revealing
+    -- event] in L4.EvaluateLazy.Machine); nothing else pins `observed`. The
+    -- observation helps choose the anchor, and so the headline party.
+    describe "l4 batch: when a declared breach was observed" $ do
+      it "is the revealing event, for a breach under a LEST and for one in a RAND under a LEST" $ do
+        bs <- batchBreaches bin (fixtureDir </> "breach-observed.l4")
+        [ objField f0 "observed" | b <- bs, Just (Array fs) <- [objField b "failures"], (f0 : _) <- [toList fs] ]
+          `shouldBe` [Just (Number 20), Just (Number 20)]
+      it "leaves two breaches observed at one event to be anchored by position" $ do
+        bs <- batchBreaches bin (fixtureDir </> "breach-observed-anchor.l4")
+        [ (objField b "anchor", objField b "party") | b <- bs ]
+          `shouldBe` [(Just (Number 0), Just (String "R")), (Just (Number 0), Just (String "Q"))]
+
+    -- Two silent differences between `l4 run` and `l4 batch`: both exit 0
+    -- and name a different number of failures. Both are #817's, made visible
+    -- by the blame list, not the port's: #817's names-once merge depends on
+    -- how a chain is grouped, which `l4 batch`'s re-print changes, and its
+    -- memo keys an argument by where it is until it is evaluated and by its
+    -- value after, which an `#EVAL` that `l4 batch` drops can change. unstable
+    -- names the larger count under both. Pinned, not fixed (the adversarial
+    -- pass of 2026-11-20; NOTE [The same breach on both sides is named once]
+    -- in L4.EvaluateLazy.Machine).
+    describe "l4 run and l4 batch: where #817's merge and memo name a failure once under one and twice under the other" $ do
+      it "names the same rule once in a left-nested chain under l4 run, and twice under l4 batch, which regroups the chain" $ do
+        let fixture = fixtureDir </> "run-batch-grouping.l4"
+        bs <- batchBreaches bin fixture
+        [ breachParties b | b <- bs ] `shouldBe` [["Alice", "Alice", "Bob"]]
+        runEnv <- jsonEnvelope bin ["run", fixture, "--json"]
+        runBreaches runEnv `shouldBe` [["Alice", "Bob"]]
+      it "names a miss once under l4 run when an #EVAL evaluated the argument first, and twice under l4 batch, which drops the #EVAL" $ do
+        let fixture = fixtureDir </> "run-batch-eval-first.l4"
+        bs <- batchBreaches bin fixture
+        [ breachParties b | b <- bs ] `shouldBe` [["Alice", "Alice"]]
+        runEnv <- jsonEnvelope bin ["run", fixture, "--json"]
+        runBreaches runEnv `shouldBe` [["Alice"]]
+
     it "streams one NDJSON row per input (default format)" $ do
       Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
       code `shouldBe` ExitSuccess
@@ -5102,3 +5140,43 @@ buildIdentitySpec = describe "etc/build-identity.sh" $ do
     code `shouldSatisfy` (/= ExitSuccess)
     out `shouldBe` ""
     err `shouldSatisfy` ("GITHUB_SHA" `isInfixOf`)
+
+-- | The @breached@ objects among the results of @l4 batch@ on a fixture with
+-- one empty input row, in the order of its directives.
+batchBreaches :: FilePath -> FilePath -> IO [Value]
+batchBreaches bin fixture = do
+  Output code sout serr <- runL4 bin ["batch", fixture, "--inputs", breachInputsFixture]
+  unless (code == ExitSuccess) $
+    expectationFailure ("l4 batch " ++ fixture ++ " exited with " ++ show code ++ "\n" ++ serr)
+  case eitherDecode (BSL8.pack (concat (take 1 (reverse (lines sout))))) of
+    Left e -> fail ("batch row is not JSON: " ++ e ++ "\n" ++ sout ++ "\n" ++ serr)
+    Right row -> pure
+      [ b
+      | Just (Array v) <- [objField row "output"]
+      , item <- toList v
+      , Just r <- [objField item "result"]
+      , Just b <- [objField r "breached"]
+      ]
+
+-- | The parties a breach in @l4 batch@'s output names, in order.
+breachParties :: Value -> [T.Text]
+breachParties b = case objField b "failures" of
+  Just (Array fs) -> [ p | f <- toList fs, Just (String p) <- [objField f "party"] ]
+  _ -> []
+
+-- | For each breach among the results of @l4 run --json@, the parties its text
+-- names: the list after "the breach names", or, when it names one failure and
+-- has no list, the party whose deadline was surpassed.
+runBreaches :: Value -> [[T.Text]]
+runBreaches env = case objField env "results" of
+  Just (Array v) ->
+    [ parties (map T.strip (T.lines t))
+    | item <- toList v
+    , Just (String t) <- [objField item "value"]
+    , "DEONTIC BREACHED" `T.isPrefixOf` t
+    ]
+  _ -> []
+  where
+    parties ls = case break ("and the breach names" `T.isPrefixOf`) ls of
+      (_, _ : rest) -> [ p | (p, w) <- zip rest (drop 1 rest), w == "who had to do obligatory action" ]
+      _ -> [ p | (h, p) <- zip ls (drop 1 ls), h == "surpassed the deadline of party" ]

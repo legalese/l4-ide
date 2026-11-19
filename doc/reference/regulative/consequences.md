@@ -162,8 +162,14 @@ An action with one argument needs no parentheses: `MUST pay EXACTLY 100`.
 - `A ROR B` is fulfilled as soon as either is fulfilled, and breached only when both are breached. When both alternatives fail, the compound is breached at the **later** of the failures, when the last alternative missed its chance, and the breach names both alternatives' failures, left first.
 
 In both, the order the operands are written in makes no difference to when, or to which failure decided it; see [When a breach happened](#when-a-breach-happened).
-The same party failing on both sides is named twice, once for each thing it failed to do.
-The same rule on both sides, written twice as in `x RAND x`, under a second name, or passed in twice, is one thing to do: it is checked once, and when it fails its failure is named once.
+A party failing two different things is named twice, once for each thing it failed to do.
+But when both sides come back with one and the same failure, it is named once.
+That happens when the same rule is on both sides, written twice as in `x RAND x`, under a second name, or passed in twice, which is one thing to do and is checked once.
+It also happens when two different rules each hand on, under their `LEST`, to the same rule inside a `RAND` or `ROR` at the same moment and on the same events (when their deadlines differ, it is named twice), and when one side passes on a failure from a side that was kept, as `signs RAND (pays RAND signs)` does once `pays` is done.
+So whether a failure reached two ways is named once or twice can depend on how the rules are written, and on the events.
+It can also depend on the order in which values are worked out, so `l4 batch` can name a failure twice where `l4 run` names it once: when a chain of one operator starts with the same rule twice in brackets, as in `(signs RAND signs) RAND late`, and when an `#EVAL` earlier in the file has already worked out a value the rules use, because `l4 batch` does not run `#EVAL`.
+A failure reached several ways that do not come back as one failure is named once for each way, so rules whose `LEST`s lead on to each other can name a great many.
+In `x1 RAND y1`, where `x1` and `y1` each hand on to `x2 RAND y2`, whose rules each hand on to `x3 RAND y3`, and so on, the breach names 4 failures when the chain is two pairs deep, 8 when it is three, and about a million when it is twenty.
 
 ```l4
 DECLARE Party IS ONE OF Seller

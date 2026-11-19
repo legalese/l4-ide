@@ -1,0 +1,26 @@
+-- Fixture for "l4 batch: when a declared breach was observed".
+--
+-- Two declared breaches, both effective at 5 and both observed at 9, the
+-- event that revealed the misses: R's, through Q's LEST, and a bare BREACH
+-- BY Q beside it in a RAND. They tie on everything that chooses the anchor
+-- but position, so the anchor is the first, whichever side it is written
+-- on: R in the first trace, Q in the second. (unstable observes the bare
+-- BREACH at 5, so there it is the anchor in both.)
+
+DECLARE Actor IS ONE OF P, Q, R
+DECLARE Action IS ONE OF x, y
+
+GIVETH A DEONTIC Actor Action
+`bare right` MEANS PARTY P MUST x WITHIN 5 LEST ((PARTY Q MUST y WITHIN 0 LEST BREACH BY R) RAND (BREACH BY Q))
+
+GIVETH A DEONTIC Actor Action
+`bare left` MEANS PARTY P MUST x WITHIN 5 LEST ((BREACH BY Q) RAND (PARTY Q MUST y WITHIN 0 LEST BREACH BY R))
+
+#TRACE `bare right` AT 0 WITH
+    PARTY R DOES x AT 9
+
+#TRACE `bare left` AT 0 WITH
+    PARTY R DOES x AT 9
+
+@export default trivial entrypoint so batch has a function to call
+alwaysTrue MEANS TRUE

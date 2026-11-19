@@ -1,0 +1,31 @@
+-- `l4 run` and `l4 batch` name a different number of failures here, and both
+-- exit 0. #817's memo keys an argument that is not yet evaluated by where it
+-- is, and one that is by its value. Under `l4 run`, `#EVAL k` evaluates `k`
+-- first, so `r 5` and `r k` share a key and Alice's miss is named once;
+-- `l4 batch` drops `#EVAL` directives, so `k` is still unevaluated when the
+-- memo keys it and the miss is named twice. unstable names it twice under
+-- both. This is #817's behaviour, made visible by the blame list, not the
+-- port's (the adversarial pass of 2026-11-20; NOTE [The same breach on both
+-- sides is named once] in L4.EvaluateLazy.Machine).
+DECLARE Person IS ONE OF Alice
+DECLARE Action IS ONE OF deliver
+
+GIVEN d IS A NUMBER
+GIVETH A DEONTIC Person Action
+r d MEANS PARTY Alice MUST deliver WITHIN d
+
+GIVEN x IS A DEONTIC Person Action
+      y IS A DEONTIC Person Action
+GIVETH A DEONTIC Person Action
+both x y MEANS x RAND y
+
+k MEANS 2 + 3
+c MEANS both (r 5) (r k)
+
+#EVAL k
+
+#TRACE c AT 0 WITH
+  WAITUNTIL 20
+
+@export default trivial entry point, so l4 batch has a function to call
+zzT MEANS TRUE

@@ -1,0 +1,24 @@
+-- Fixture for "l4 batch: when a declared breach was observed".
+--
+-- Alice misses 5 and the one event, at 20, reveals it. The declared breach
+-- her LEST reaches takes effect at 5 and is observed at 20, the revealing
+-- event, both bare and as an operand of a RAND (NOTE [A declared breach in
+-- a RAND is observed at the revealing event] in L4.EvaluateLazy.Machine).
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF deliver, noop
+
+GIVETH A DEONTIC Person Action
+`bare` MEANS PARTY Alice MUST deliver WITHIN 5 LEST BREACH BY Alice
+
+GIVETH A DEONTIC Person Action
+`in a RAND` MEANS PARTY Alice MUST deliver WITHIN 5 LEST (FULFILLED RAND (BREACH BY Alice))
+
+#TRACE `bare` AT 0 WITH
+    PARTY Alice DOES noop AT 20
+
+#TRACE `in a RAND` AT 0 WITH
+    PARTY Alice DOES noop AT 20
+
+@export default trivial entrypoint so batch has a function to call
+alwaysTrue MEANS TRUE

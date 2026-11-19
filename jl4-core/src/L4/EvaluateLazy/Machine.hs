@@ -646,7 +646,10 @@ eventListKey' memoR reofferedR rf = do
 -- an event is past, instead of doubling at each.
 --
 -- Sameness is by object identity ('StableName'), never by how the values
--- print: two equal-looking residuals reached separately stay two.
+-- print: two equal-looking residuals reached separately stay two, unless the
+-- memo answered both from one entry, which made them one object. Whether it
+-- does can depend on evaluation order: see the limit left unpinned in NOTE
+-- [The same breach on both sides is named once].
 --
 -- This changes what prints for a contract still open: one copy where the
 -- tree had several identical ones. Assumed, not ruled, like 'sameRule'.
@@ -735,6 +738,16 @@ peekClock rf = peekWHNF rf >>= pure . \ case
 -- deadline, or a kept SHANT's discharge) — its party, action and stamp.
 -- Peeked, never forced: a re-offered copy is allocated as a value, so a head
 -- that is still a thunk is not one.
+--
+-- NOTE [A declared breach in a RAND is observed at the revealing event]
+--
+-- A declared BREACH reached by a hand-off is observed at the event that revealed the miss, when the events it was handed start with one ('StampBreach'), and that holds when the BREACH is an operand of a RAND or ROR under the hand-off too.
+-- With @PARTY Alice MUST deliver WITHIN 5 LEST (FULFILLED RAND (BREACH BY Alice))@ and one event, at 20, the breach takes effect at 5 and is observed at 20, as it is under a bare @LEST BREACH BY Alice@.
+-- That is what @unstable@'s table says (EVERY-EACH-QUANTIFIER-SPEC §6.1.2 there, the row for a declared BREACH reached through a LEST: "the re-offered event that revealed the miss").
+-- @unstable@'s in-step RAND (smucclaw/l4-ide#1069, legalese/l4-ide#827, Note [Operands in step] there) is not ported, and it gives 5, the clock, for the RAND, against that table, while for @BREACH ROR (BREACH BY Alice)@ in the same place it gives 20.
+-- (Measured with @l4 batch@ on 2026-11-20; that its operands are applied to a fresh gate rather than the compound's events is the adversarial pass's reading of its source.)
+-- The observation is one of the things that choose a breach's anchor ('representative'), so on @unstable@ it can move the anchor, and the party at the head of @l4 batch@'s answer, too.
+-- @jl4/tests-cli/Main.hs@ pins both ("l4 batch: when a declared breach was observed").
 revealingEvent :: Reference -> Eval (Maybe (Reference, Reference, Rational))
 revealingEvent evs = peekWHNF evs >>= \ case
   Just (ValCons hd _)
@@ -845,11 +858,44 @@ continueDone whnf = pure (DoneMachine whnf)
 
 -- | NOTE [The same breach on both sides is named once]
 --
--- With the blame list, a breach of the same rule on both sides of a RAND or ROR names its failure once here, where @unstable@ names it twice.
--- With @signs MEANS PARTY Alice MUST sign WITHIN 14@ and @alias MEANS signs@, each of @signs RAND signs@, @signs RAND alias@ and @signs ROR signs@ names Alice once here and twice on @unstable@ (measured with @l4 batch@ on 2026-11-19).
--- @jl4/examples/ok/breach-same-operand.l4@ pins those three shapes and five more, nested and declared breaches among them.
--- This follows #817's assumption that @A RAND A@ and @A ROR A@ each behave as @A@ ('sameRule', and the merge of NOTE [One residual for the same operand twice]): assumed, not ruled.
--- The @unstable@ trace that pins no dedup, @alice twice@ in @run-blame.l4@, has two different obligations on its two sides, which neither merge touches, and names her twice here too.
+-- With the blame list, when both operands of a RAND or ROR come back as the very same breach, the compound names its failures once here, where @unstable@ names them once for each operand.
+-- Two merges make that happen: 'sameRule' evaluates the same rule written on both sides once, and the frame dispatcher keeps one of two operand values that are the same object ('sameObject', NOTE [One residual for the same operand twice]), which the memo of NOTE [Applying RAND and ROR operands once] makes common.
+-- So it is wider than the same rule twice.
+-- Measured with @l4 batch@ (2026-11-19 and 2026-11-20), failures named here against @unstable@:
+--
+-- * The same rule on both sides: @signs RAND signs@, @signs RAND alias@ and @signs ROR signs@, with @signs MEANS PARTY Alice MUST sign WITHIN 14@ and @alias MEANS signs@, name 1 against 2.
+-- * Two different rules that hand on to one reparation reached as an operand at the same moment, on the same events: @a RAND b@, each of @a@ and @b@ an obligation @WITHIN 1 LEST (z RAND FULFILLED)@, with @z@ breached, names 1 against 2.
+--   With @b@'s window 2 instead of 1, @z@ is reached later from @b@, the memo's key differs, and it names 2 against 2.
+--   @LEST z@, which means the same, names 2 against 2, because a hand-off is not a RAND or ROR operand and the memo does not answer it.
+-- * A breach passed through a fulfilled sibling: @signs RAND (pays RAND signs)@ names 1 against 2 when @pays@ is done, and 3 against 3 when it is not, so the count depends on the trace.
+--
+-- @jl4/examples/ok/breach-same-operand.l4@ pins each of these, with the three controls, and nested and declared breaches among them.
+-- This follows #817's assumption that @A RAND A@ and @A ROR A@ each behave as @A@: assumed, not ruled.
+-- Two different obligations on the two sides that come back as two breaches are both named, as on @unstable@: its trace @alice twice@ in @run-blame.l4@ names her twice here too.
+--
+-- Two run/batch differences follow, both silent (each surface exits 0 and names a different number of failures), and both pinned by the l4-cli-test "l4 run and l4 batch: where #817's merge and memo name a failure once under one and twice under the other".
+-- They are #817's behaviour, made visible by the blame list, not the port's; @unstable@ names the larger count under both surfaces.
+-- Main may fix them, in the printer or in #817's merge and memo; that is not decided here.
+--
+-- * Grouping: @l4 batch@ prints the module and checks it again, and the printer writes a left-nested chain of one operator without its brackets, which the parser reads back nested to the right.
+--   The merge depends on the grouping, so @(signs RAND signs) RAND late@ names @signs@ once under @l4 run@ and twice under @l4 batch@ (@jl4/tests-cli/fixtures/run-batch-grouping.l4@).
+-- * An @#EVAL@ first: with @k MEANS 2 + 3@, @c MEANS both (r 5) (r k)@ and @#EVAL k@ before @#TRACE c AT 0 WITH WAITUNTIL 20@, @l4 run@ names Alice's miss once, and @l4 batch@, which drops @#EVAL@ directives, names it twice (@jl4/tests-cli/fixtures/run-batch-eval-first.l4@; the evaluation-order limit below).
+--
+-- Read from the source at 561214143, not run: jl4-service does not re-print a module, so the grouping difference is @l4 batch@'s only.
+-- Its compiled path evaluates the AST directly (@jl4-service/src/Backend/Jl4.hs:662@), and its wrapper, which every deontic call with events takes (@:696@), strips the module's directives as text and appends the wrapper (@:906@, @:919@).
+-- Stripping them drops an @#EVAL@ as @l4 batch@ does, so on the service the second repro would name what @l4 batch@ names.
+--
+-- One limit stays unpinned, a decision still to be made: the count depends on evaluation order, that is, on whether an argument was evaluated before the memo first keyed it.
+-- The memo keys a reference that is still a thunk by its address and an evaluated number by its value ('referenceKey'), so @r 5@ and @r k@ share a key once @k@ is evaluated, and do not before.
+-- With @r d MEANS PARTY Alice MUST deliver WITHIN d@ and @both x y MEANS x RAND y@, each of these names Alice's miss once where @unstable@ names it twice (measured 2026-11-20, @l4 run@ and @l4 batch@):
+--
+-- * The same directive twice: two identical @#TRACE c AT 0 WITH WAITUNTIL 20@, with @c MEANS both (r 5) (r (2 + 3))@, name it twice, then once, on both surfaces.
+--   The memo is emptied for each directive, but @c@ is a top-level value whose @2 + 3@ the first directive evaluated.
+-- * The @#EVAL k@ repro above, under @l4 run@.
+-- * One directive whose body evaluates the argument in a condition first: @g n MEANS IF n > 4 THEN both (r 5) (r n) ELSE both (r 5) (r 5)@ and @c MEANS g (2 + 3)@ name it once on both surfaces.
+--
+-- The controls, the second without its @#EVAL@ and the third without its @IF@, name it twice, as @unstable@ does.
+-- No fix is applied: changing what 'resetContractMemo' keeps between directives would close only the first, because in the other two the argument is evaluated before the memo takes any key.
 
 -- | Are the two operands of a RAND or ROR the same rule: the same name, applied
 -- to the same names and literals? Both operands read the same events from the
@@ -1593,8 +1639,10 @@ backwardContractFrame val = \ case
   -- SEESAW: the hand-off clock a declared breach takes ('StampBreach'). It
   -- is observed at that clock too, unless the stream it was handed starts
   -- with a re-offered event — the event that revealed the miss its LEST (or
-  -- a kept SHANT's HENCE) answers — which is then the observation. A clock
-  -- that is not a number leaves the breach untimed.
+  -- a kept SHANT's HENCE) answers — which is then the observation, also for
+  -- an operand of a RAND (NOTE [A declared breach in a RAND is observed at
+  -- the revealing event]). A clock that is not a number leaves the breach
+  -- untimed.
   StampBreach StampBreachFrame {..} -> case val of
     ValNumber clock -> do
       revealed <- revealingEvent eventsRef
