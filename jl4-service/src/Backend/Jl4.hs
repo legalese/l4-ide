@@ -627,7 +627,8 @@ eitherFormMessage = "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [va
 -- @{"LEFT": [v]}@ or @{"RIGHT": [v]}@ ('eitherFormMessage'), or a value of a type
 -- with a constructor that carries fields is neither a constructor's name nor
 -- @{"Card": {its fields}}@, or is the bare name of one that carries fields
--- ('taggedFormMessage', 'bareConstructorMessage'). It walks the value along its
+-- ('taggedFormMessage', 'bareConstructorMessage'), or a value of a record type
+-- is not an object ('recordFormMessage'). It walks the value along its
 -- type, through MAYBE, LIST, records, constructors' fields and synonyms, and passes
 -- over a missing, unknown or uncertain value, which the paths answer for
 -- themselves. Run before a request is routed, so the wrapper path, which reads
@@ -646,9 +647,14 @@ wireFormError mi ty0 val = case val of
         _ -> Just eitherFormMessage
     | Just elemTy <- stripList ty, FnArray xs <- val ->
         listToMaybe (mapMaybe (wireFormError mi elemTy) xs)
-    | Just (_, decl) <- lookupRecord mi ty, FnObject fields <- val ->
-        listToMaybe
-          [ e | (fname, fty) <- decl, Just v <- [lookup fname fields], Just e <- [wireFormError mi fty v] ]
+    -- A record is an object of its fields. Anything else used to reach the rule
+    -- as a value its type does not allow on the direct path, where JSONDECODE,
+    -- on the wrapper path, refused it.
+    | Just (_, decl) <- lookupRecord mi ty -> case val of
+        FnObject fields ->
+          listToMaybe
+            [ e | (fname, fty) <- decl, Just v <- [lookup fname fields], Just e <- [wireFormError mi fty v] ]
+        _ -> Just (recordFormMessage ty decl)
     -- A constructor that carries fields is written {"Card": {its fields}}, and
     -- one that carries none its name (card J1, option A; HATBOX).
     | Just tagged@(_, ctors) <- lookupTagged mi ty -> case val of
@@ -664,6 +670,16 @@ wireFormError mi ty0 val = case val of
     | otherwise -> Nothing
   where
     ty = expandSyn mi ty0
+
+-- | What a request is told when it sends a value of a record type that is not
+-- an object.
+recordFormMessage :: Type' Resolved -> [(Text, Type' Resolved)] -> Text
+recordFormMessage ty decl =
+  "a `" <> tyName <> "` is an object of its fields (" <> Text.intercalate ", " (map fst decl) <> ")"
+  where
+    tyName = case ty of
+      TyApp _ name _ -> rawNameToText (rawName (getActual name))
+      _ -> "record"
 
 -- | The fields given to a tagged constructor: an object's, or none for @{}@
 -- (which the request reads as 'FnUncertain') or @null@ (which the wrapper path

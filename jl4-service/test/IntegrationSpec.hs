@@ -3499,6 +3499,27 @@ spec = describe "integration" do
           ["name" Aeson..= ("fee-for" :: Text), "arguments" Aeson..= Aeson.object ["p" Aeson..= Aeson.object ["Card" Aeson..= Aeson.object ["card-fee" Aeson..= (3 :: Int)]]]]
         fmap (Text.isInfixOf "\"value\":3" . snd) (mcpPayloadText =<< called) `shouldBe` Just True
 
+  -- A record is an object of its fields. A value that is not one used to reach
+  -- the rule on the direct path as a value its type does not allow, where
+  -- JSONDECODE, on the wrapper path, refused it; it is refused before routing
+  -- now, naming the input, on both paths (assumed, not ruled; review of #779,
+  -- 2026-11-19).
+  describe "refuses a record input that is not an object" do
+    aroundAll (\k -> withServiceFromSources "record-form" [("pair.l4", recordFormJL4)] (curry k)) do
+      let call baseUrl mgr args = evalFunction baseUrl mgr "record-form" "pair sum" (Aeson.object ["arguments" Aeson..= args])
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          notObject = "Parameter 'p': a `Pair` is an object of its fields (left, right)"
+      it "on both paths, for a string, a number and an array" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra -> do
+          forM_ [Aeson.String "x", Aeson.Number 5, Aeson.toJSON [1 :: Int, 2]] \v ->
+            call baseUrl mgr (Aeson.object (("p" Aeson..= v) : extra)) >>= (`shouldCarry` Refuses notObject)
+          call baseUrl mgr (Aeson.object (("p" Aeson..= Aeson.object ["left" Aeson..= (2 :: Int), "right" Aeson..= (3 :: Int)]) : extra))
+            >>= (`shouldCarry` Answers (Aeson.Number 5))
+      it "in a record's field" \(baseUrl, mgr) -> do
+        let held v = evalFunction baseUrl mgr "record-form" "held sum" (Aeson.object ["arguments" Aeson..= Aeson.object ["h" Aeson..= Aeson.object ["q" Aeson..= v]]])
+        held (Aeson.String "x") >>= (`shouldCarry` Refuses "Parameter 'h': a `Pair` is an object of its fields (left, right)")
+        held (Aeson.object ["left" Aeson..= (2 :: Int), "right" Aeson..= (3 :: Int)]) >>= (`shouldCarry` Answers (Aeson.Number 5))
+
   describe "compiler" do
     it "compiles valid L4 sources" do
       logger <- newLogger False
@@ -4807,6 +4828,26 @@ taggedInputJL4 = Text.unlines
   , "  CONSIDER v"
   , "  WHEN Verdict r THEN 1"
   , "  WHEN None THEN 0"
+  ]
+
+recordFormJL4 :: Text
+recordFormJL4 = Text.unlines
+  [ "DECLARE Pair HAS"
+  , "  left IS A NUMBER"
+  , "  right IS A NUMBER"
+  , ""
+  , "@export Pair sum"
+  , "GIVEN p IS A Pair"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`pair sum` MEANS p's left + p's right"
+  , ""
+  , "DECLARE Holder HAS q IS A Pair"
+  , ""
+  , "@export Held sum"
+  , "GIVEN h IS A Holder"
+  , "GIVETH A NUMBER"
+  , "`held sum` MEANS h's q's left + h's q's right"
   ]
 
 eitherInputJL4 :: Text
