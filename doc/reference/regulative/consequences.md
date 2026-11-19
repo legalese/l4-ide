@@ -398,6 +398,11 @@ Brackets end a rule outright, as in `HENCE (PARTY Buyer MUST pay 100 WITHIN 7)`,
 
 **What is refused.** A `HENCE` or `LEST` that belongs to a rule by the steps above, when that rule already has one (a second `LEST`, a second `HENCE`, or a `HENCE` after the `LEST`), is refused with an error that names the rule, rather than given to another rule.
 `HENCE` comes before `LEST`.
+A second `LEST` on a rule's own first line is refused the same way: it belongs to the rule on that line, as above, even when a rule outside still has its `LEST` free.
+
+In a few places these refusals name no rule, and the error is a plain "unexpected" one instead; the file is refused all the same.
+For a second `LEST` on a rule's first line, that is when the rule is the right operand of an operator such as `RAND`, `ROR`, `OR`, `AND`, `PLUS` or `EQUALS` (the error is at the operator), the value in `f WITH x IS …` (at the `WITH`), the operand of an operator you defined yourself (at the rule's `PARTY`), or a function's argument written as a bullet (at the bullet).
+That holds inside brackets too: with the whole of a `HENCE` in brackets and the rule a `RAND` operand inside them, not in brackets of its own, the error is at the `RAND`.
 
 **What is not placed this way.** Only the clauses of the rule a nested rule is written under count, not those of rules further out.
 In a layout where a rule two levels out has its clauses right of the rule one level out, a `HENCE` or `LEST` that lines up with the rule two levels out can stay with the innermost rule, with no error; brackets settle it.

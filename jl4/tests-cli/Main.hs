@@ -612,6 +612,9 @@ clauseLayoutHeadline, clauseLayoutRecord :: FilePath
 clauseLayoutHeadline = fixtureDir </> "clause-layout-1074-headline.l4"
 clauseLayoutRecord = fixtureDir </> "clause-layout-1074-record.l4"
 
+clauseLayoutSecondLest :: FilePath
+clauseLayoutSecondLest = fixtureDir </> "clause-layout-1074-second-lest.l4"
+
 -- Library sentences at a call site, and library aliases used at two types.
 nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting :: FilePath
 nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
@@ -783,6 +786,7 @@ coreFixtures =
   , slotScope, slotScopeSentence, renderHoleAndClause, renderLedgerWriteOperand
   , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest
   , clauseLayoutHeadline, clauseLayoutRecord
+  , clauseLayoutSecondLest
   , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
@@ -4769,6 +4773,16 @@ spec bin = do
     it "leaves a HENCE on the first line of a RECORD's rule to the RECORD" $ do
       Output code _ _ <- runL4 bin ["check", clauseLayoutRecord]
       code `shouldBe` ExitSuccess
+
+    -- smucclaw/l4-ide#1074 (F1, ruled by Meng 2026-11-22: Clause Layout
+    -- Rulings F1 A; this test goes with the commit that refuses it): a second
+    -- LEST on a nested rule's first line is that rule's, where before it went
+    -- to the outer rule with exit 0.
+    it "refuses a second LEST on a nested rule's first line, naming that rule" $ do
+      Output code _ serr <- runL4 bin ["check", clauseLayoutSecondLest]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This LEST is part of the rule that starts with PARTY at line 10, column 9, because it is on that rule's first line. That rule already has a LEST, and a rule has one. To give it to the rule that one is nested in, write it on a line of its own at column 3, in line with that rule's clauses." `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

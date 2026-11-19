@@ -165,6 +165,17 @@ data ClauseCtx = ClauseCtx
     -- definition, a @WHERE@ definition among them ('clauseBody', whose memo
     -- keys on it); and into a @LET@ definition, which inherits the whole
     -- context. Reset by 'paren'.
+  , inBranch :: Bool
+    -- ^ Are we in a branch that another branch follows: an @IF@'s @THEN@, a
+    -- @BRANCH@'s guarded @THEN@, or a @CONSIDER@'s @WHEN@, inside the body
+    -- of the rule this one is nested in? Then that rule cannot take a
+    -- keyword until the whole expression ends, so the refusal of a second
+    -- @LEST@ on this rule's first line does not advise writing it at that
+    -- rule's clauses ('obligation'; smucclaw/l4-ide#1074). A @WHEN@ counts
+    -- even when it is the last, which only loses that advice. Refusals on
+    -- later lines keep their advice, as before.
+    -- Set by 'inABranch'; cleared in a rule's bodies, by 'paren' and by
+    -- 'clauseBody', so the memo need not key on it.
   }
   deriving stock (Show, Eq)
 
@@ -179,7 +190,12 @@ topClauseCtx col = ClauseCtx
   { threshold = col
   , nestedIn = Nothing
   , standAside = False
+  , inBranch = False
   }
+
+-- | Parse a branch that another branch follows; see 'inBranch'.
+inABranch :: Parser a -> Parser a
+inABranch = local (\ e -> e { clauseCtx = (e.clauseCtx) { inBranch = True } })
 
 -- | Parse with 'standAside' set; see there for where.
 standingAside :: Parser a -> Parser a
@@ -3233,7 +3249,7 @@ ifthenelse = do
       <$  annoLexeme (spacedKeyword_ TKIf)
       <*> annoHole (indentedExpr current)
       <*  annoLexeme (spacedKeyword_ TKThen)
-      <*> annoHole (indentedExpr current)
+      <*> annoHole (inABranch (indentedExpr current))
       <*  annoLexeme (spacedKeyword_ TKElse)
       <*> annoHole (indentedExpr current)
 
@@ -3261,7 +3277,7 @@ parseGuardedExpr pos = attachAnno $
         *> annoHole (indentedExpr pos)
     <*> ind do
        annoLexeme (spacedKeyword_ TKThen)
-        *> annoHole (indentedExpr pos)
+        *> annoHole (inABranch (indentedExpr pos))
   where
   ind = flip indented' pos
 
@@ -3406,7 +3422,7 @@ obligation = do
         then do
           let
             cc' = foldCol cc pos
-            inner = ctx {threshold = ownCol cc', nestedIn = Just which}
+            inner = ctx {threshold = ownCol cc', nestedIn = Just which, inBranch = False}
           bracketed <- noAnno (isJust <$> optional (try (lookAhead (hidden (spacedKeyword_ kw *> spacedSymbol_ TPOpen)))))
           body <- localAnno (\ e -> e { clauseCtx = inner }) slot
           pure (Just body, cc', bracketed)
@@ -3426,6 +3442,15 @@ obligation = do
     -- 'standAside' is set, the keyword is left outward as before #1074: to
     -- the continuation of a RECORD, to a rule whose action or edge this rule
     -- is in, or past a try to the rule outside, which refuses it by name.
+    --
+    -- A LEST there is refused too, whether or not 'standAside' is set, as the
+    -- reference page says (a later LEST on one line belongs to the rule on
+    -- that line), where it used to go to an enclosing rule with exit 0 when
+    -- that rule's LEST was free (#1074, F1; ruled by Meng 2026-11-22:
+    -- Clause Layout Rulings F1 A). Under a try the refusal is
+    -- backtracked and the parse fails at the operator, naming nothing; that
+    -- is still loud, where standing aside would hand the LEST to a rule
+    -- outside silently.
     ownershipGuard :: String -> Maybe Pos -> Maybe (Expr Name) -> Bool -> Bool -> AnnoParser ()
     ownershipGuard hw cc henceP henceBracketed hasLest = noAnno do
       next <- optional (lookAhead (hidden (True <$ spacedKeyword_ TKHence <|> False <$ spacedKeyword_ TKLest)))
@@ -3443,7 +3468,7 @@ obligation = do
             <> show (unPos headLine) <> ", column " <> show (unPos current)
         -- Which keyword left over on this rule's first line it refuses here,
         -- rather than leaving it outward (see above).
-        headLineRefuses isHence = isHence && not ctx.standAside
+        headLineRefuses isHence = not isHence || not ctx.standAside
         refusal isHence nextBracketed line col =
           whose <> " " <> problem <> advice
           where
@@ -3488,14 +3513,18 @@ obligation = do
                           <> ", in line with its clauses"
                           <> (if isJust nestedRule.lest then ", and before its LEST." else ".")
                   _ -> ""
+              -- On the first line, in a branch another branch follows, the
+              -- rule this one is nested in cannot take it yet ('inBranch').
+              | ctx.nestedIn == Just InHence, ctx.inBranch, line == headLine = ""
               | ctx.nestedIn == Just InHence =
                   if own == thr
                     then
                       " To give it to the rule that one is nested in, put the nested rule in brackets: \
                       \their clauses are at the same column."
                     else
-                      " To give it to the rule that one is nested in, \
-                      \write it at column " <> show (unPos thr) <> ", in line with that rule's clauses."
+                      " To give it to the rule that one is nested in, write it "
+                        <> (if line == headLine then "on a line of its own " else "")
+                        <> "at column " <> show (unPos thr) <> ", in line with that rule's clauses."
               | otherwise = ""
   attachAnno $ do
     subj <- annoHole (subject current)
@@ -3927,7 +3956,7 @@ when' = do
                 <$  annoLexeme (spacedKeyword_ TKWhen)
                 <*> annoHole (indentedPattern current)
       <*  annoLexeme (spacedKeyword_ TKThen)
-      <*> annoHole (indentedExpr current)
+      <*> annoHole (inABranch (indentedExpr current))
 
 otherwise' :: Parser (Branch Name)
 otherwise' = do

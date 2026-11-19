@@ -463,6 +463,100 @@ spec = do
         ("This HENCE is part of " <> ruleAt 1 3 <> ", because it is on that rule's first line. \
          \It comes after that rule's LEST. Write HENCE before LEST." <> ifRuleAfter)
 
+  describe "on a rule's first line, a second LEST is that rule's, and refused by it (#1074 F1, ruled by Meng 2026-11-22: Clause Layout Rulings F1 A)" $ do
+    it "the issue's repro: a second LEST on a nested rule's line (once the outer rule's, exit 0)" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE PARTY Buyer MUST payment 100 LEST BREACH BY Buyer LEST BREACH BY Seller"
+        ]
+        (bodyLine 3, 59)
+        ("This LEST is part of " <> ruleAt 3 9 <> ", because it is on that rule's first line. \
+         \That rule already has a LEST, and a rule has one. \
+         \To give it to the rule that one is nested in, write it on a line of its own at column 3, \
+         \in line with that rule's clauses.\n")
+
+    it "a second LEST on the line of a rule nested in a LEST: no advice, the outer LEST is used" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  LEST PARTY Buyer MUST payment 100 LEST BREACH BY Buyer LEST BREACH BY Seller"
+        ]
+        (bodyLine 3, 58)
+        ("This LEST is part of " <> ruleAt 3 8 <> ", because it is on that rule's first line. \
+         \That rule already has a LEST, and a rule has one.\n")
+
+    -- Unlike a HENCE, the LEST is not left to the rule outside the operand,
+    -- which would take it silently; the refusal is backtracked by 'cont'
+    -- and the parse fails at the operator. Loud, but naming nothing.
+    it "in an unbracketed right operand of RAND, the refusal surfaces as the operator" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE (PARTY Buyer MUST payment 100) RAND PARTY Seller MUST delivery LEST BREACH BY Seller LEST BREACH BY Buyer"
+        ]
+        (bodyLine 3, 40)
+        "unexpected RAND\nexpecting %, ;, LEST, WHERE, end of input, infix identifier, mixfix keyword, or space token\n"
+
+    -- 'L4.Parser.inBranch' drops only that first-line advice: a refusal on
+    -- a later line keeps the advice it had before.
+    it "on a later line in a CONSIDER's WHEN: the advice is kept" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE CONSIDER x"
+        , "        WHEN cancel THEN PARTY Buyer"
+        , "                         MUST payment 100"
+        , "                         LEST BREACH BY Buyer"
+        , "                         LEST BREACH BY Seller"
+        ]
+        (bodyLine 7, 26)
+        ("This LEST lines up with the clauses of " <> ruleAt 4 26 <> ". \
+         \That rule already has a LEST, and a rule has one. \
+         \To give it to the rule that one is nested in, write it at column 3, in line with that rule's clauses.\n")
+
+    it "on a later line in a CONSIDER's WHEN, the advice followed: the LEST is the outer rule's" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE CONSIDER x"
+        , "        WHEN cancel THEN PARTY Buyer"
+        , "                         MUST payment 100"
+        , "                         LEST BREACH BY Buyer"
+        , "  LEST BREACH BY Seller"
+        ]
+        ["  PARTY Seller MUST delivery HENCE (CONSIDER x WHEN cancel THEN (PARTY Buyer MUST payment 100 LEST BREACH BY Buyer)) LEST BREACH BY Seller"]
+
+    -- 'L4.Parser.inBranch': before the ELSE, the outer rule cannot take the
+    -- LEST, so a line of its own at its clauses would not give it to it.
+    it "in an IF's THEN branch: no advice, since the outer rule cannot take it before the ELSE" $
+      failsWith
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE IF TRUE THEN PARTY Buyer MUST payment 100 LEST BREACH BY Buyer LEST BREACH BY Seller ELSE FULFILLED"
+        ]
+        (bodyLine 3, 72)
+        ("This LEST is part of " <> ruleAt 3 22 <> ", because it is on that rule's first line. \
+         \That rule already has a LEST, and a rule has one.\n")
+
+    it "the advice, followed: on a line of its own at the outer rule's clauses, the LEST is the outer rule's" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE PARTY Buyer MUST payment 100 LEST BREACH BY Buyer"
+        , "  LEST BREACH BY Seller"
+        ]
+        ["  PARTY Seller MUST delivery HENCE (PARTY Buyer MUST payment 100 LEST BREACH BY Buyer) LEST BREACH BY Seller"]
+
+    it "the advice, followed in an IF's ELSE branch, the last: the LEST is the outer rule's" $
+      sameTree
+        [ "  PARTY Seller"
+        , "  MUST delivery"
+        , "  HENCE IF TRUE THEN FULFILLED ELSE PARTY Buyer MUST payment 100 LEST BREACH BY Buyer"
+        , "  LEST BREACH BY Seller"
+        ]
+        ["  PARTY Seller MUST delivery HENCE (IF TRUE THEN FULFILLED ELSE (PARTY Buyer MUST payment 100 LEST BREACH BY Buyer)) LEST BREACH BY Seller"]
+
   describe "the advice for a second HENCE after a rule in the HENCE says only what can be done (#1074 F4)" $ do
     it "the rule in the HENCE is in brackets: write it before the )" $
       failsWith
