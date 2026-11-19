@@ -222,7 +222,7 @@ GIVETH A DEONTIC Party Action
 
 `RAND` and `ROR` compose obligations in parallel.
 
-- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches. When both sides are lost the breach names both sides' failures, left first, one line each with that side's own action-and-deadline or `BECAUSE`; the same party failing twice is named twice.
+- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches. When both sides are lost the breach names both sides' failures, left first, one line each with that side's own action-and-deadline or `BECAUSE`; the same party failing twice is named twice, but the same rule on both sides (`x RAND x`, or under a second name) is checked once and named once.
 - **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound; it breaches only when every side is lost, and then names every side's failure the same way.
 - **When a compound breach happened.** Each failure took effect at an instant: a missed deadline at the deadline, a broken `SHANT` at the act, a `LEST BREACH` at the instant its `LEST` counts from. A `RAND` is lost at the earliest of its sides' instants and an `ROR` at the latest, worked out inside out, whichever side is written first; the failures at that instant are the decisive ones, printed first. Reference: <https://legalese.com/l4/reference/regulative/consequences.md#when-a-breach-happened>
 - **Precedence:** `RAND` binds tighter than `ROR`, so `A ROR B RAND C` means `A ROR (B RAND C)`.

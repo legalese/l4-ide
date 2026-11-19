@@ -87,6 +87,7 @@ Write the `BREACH` as the second operand instead.
 
 You do not have to write the list yourself when the language already knows who failed.
 When both sides of a `RAND`, or both alternatives of an `ROR`, are lost, the breach names both sides' failures, each with its own reason or its own missed deadline (see [RAND and ROR](consequences.md#rand-and-ror)).
+The same rule on both sides is one failure, and is named once.
 
 ## Related pages
 

@@ -1,0 +1,102 @@
+-- The same breach on both sides of a RAND or ROR names its failures ONCE
+-- here, and twice on unstable, which shares nothing (R-T3's no dedup,
+-- EVERY-EACH-QUANTIFIER-SPEC section 6.1 on unstable). The operand is applied
+-- once and both sides are the one breach, following #817's assumption that
+-- A RAND A behaves as A: assumed, not ruled (NOTE [The same breach on both
+-- sides is named once] in L4.EvaluateLazy.Machine). Every breach below names
+-- one entry here where unstable names two or more. Two DIFFERENT obligations
+-- of hers on the two sides name her twice here, as on unstable (`alice
+-- twice` in run-blame.l4).
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign   HAS signer IS AN Actor
+    Refund HAS who    IS AN Actor
+
+alice MEANS Tenant OF "Alice"
+
+GIVETH A DEONTIC Actor Action
+signs MEANS PARTY alice MUST Sign alice WITHIN 14
+
+GIVETH A DEONTIC Actor Action
+`a second name for signs` MEANS signs
+
+GIVEN r IS A DEONTIC Actor Action
+      s IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+`both of` r s MEANS r RAND s
+
+-- One compound, reached three ways: written twice, under a second name, and
+-- through two parameters given the same rule. Each names Alice once here,
+-- twice on unstable.
+GIVETH A DEONTIC Actor Action
+`written twice` MEANS signs RAND signs
+
+GIVETH A DEONTIC Actor Action
+`under a second name` MEANS signs RAND `a second name for signs`
+
+GIVETH A DEONTIC Actor Action
+`through parameters` MEANS `both of` signs signs
+
+GIVETH A DEONTIC Actor Action
+`either` MEANS signs ROR signs
+
+#TRACE `written twice` AT 0 WITH
+  WAITUNTIL 20
+
+#TRACE `under a second name` AT 0 WITH
+  WAITUNTIL 20
+
+#TRACE `through parameters` AT 0 WITH
+  WAITUNTIL 20
+
+#TRACE `either` AT 0 WITH
+  WAITUNTIL 20
+
+-- A declared breach on both sides names its BY and BECAUSE once here, twice
+-- on unstable, dated at 14, the deadline its LEST counts from, and observed
+-- at 20, the refund that revealed the miss.
+GIVETH A DEONTIC Actor Action
+`signs, or is in breach` MEANS
+  PARTY alice MUST Sign alice WITHIN 14 LEST BREACH BY alice BECAUSE "did not sign"
+
+GIVETH A DEONTIC Actor Action
+`declared twice` MEANS `signs, or is in breach` RAND `signs, or is in breach`
+
+#TRACE `declared twice` AT 0 WITH
+  PARTY alice DOES Refund alice AT 20
+
+-- Nested: one entry here, where unstable names four for two compounds and
+-- eight for three.
+GIVETH A DEONTIC Actor Action
+`twice over` MEANS `written twice` RAND `written twice`
+
+GIVETH A DEONTIC Actor Action
+`three deep` MEANS `twice over` ROR `twice over`
+
+#TRACE `twice over` AT 0 WITH
+  WAITUNTIL 20
+
+#TRACE `three deep` AT 0 WITH
+  WAITUNTIL 20
+
+-- A compound of the same rule under the LEST of the operand of another: the
+-- refund is missed at 2, and the breach names it once here, four times on
+-- unstable.
+GIVETH A DEONTIC Actor Action
+`refunds` MEANS PARTY alice MUST Refund alice WITHIN 1
+
+GIVETH A DEONTIC Actor Action
+`signs, or two refunds` MEANS PARTY alice MUST Sign alice WITHIN 1 LEST (`refunds` RAND `refunds`)
+
+GIVETH A DEONTIC Actor Action
+`a run` MEANS `signs, or two refunds` RAND `signs, or two refunds`
+
+#TRACE `a run` AT 0 WITH
+  WAITUNTIL 20
+
+-- Kept in time, it is FULFILLED.
+#TRACE `a run` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1

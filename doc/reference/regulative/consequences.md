@@ -162,7 +162,8 @@ An action with one argument needs no parentheses: `MUST pay EXACTLY 100`.
 - `A ROR B` is fulfilled as soon as either is fulfilled, and breached only when both are breached. When both alternatives fail, the compound is breached at the **later** of the failures, when the last alternative missed its chance, and the breach names both alternatives' failures, left first.
 
 In both, the order the operands are written in makes no difference to when, or to which failure decided it; see [When a breach happened](#when-a-breach-happened).
-Nothing is collapsed: the same party failing on both sides is named twice, once for each thing it failed to do.
+The same party failing on both sides is named twice, once for each thing it failed to do.
+The same rule on both sides, written twice as in `x RAND x`, under a second name, or passed in twice, is one thing to do: it is checked once, and when it fails its failure is named once.
 
 ```l4
 DECLARE Party IS ONE OF Seller

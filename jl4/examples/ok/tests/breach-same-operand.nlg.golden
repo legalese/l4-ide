@@ -1,0 +1,9 @@
+executing contract `written twice` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `under a second name` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `through parameters` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `either` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `declared twice` at 0 with the following events: party `alice` did `Refund` with `alice` at 20
+executing contract `twice over` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `three deep` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `a run` at 0 with the following events: `WAITUNTIL` with 20
+executing contract `a run` at 0 with the following events: party `alice` did `Sign` with `alice` at 1

@@ -634,7 +634,8 @@ eventListKey' memoR reofferedR rf = do
 -- are the same breach, the compound is that breach, naming its failures once;
 -- two breaches that are different objects name both operands' failures (the
 -- both-breached clause of 'backwardContractFrame'), and @unstable@, which has
--- no such sharing, names the same failures twice.
+-- no such sharing, names the same failures twice (NOTE [The same breach on
+-- both sides is named once]).
 --
 -- The memo of NOTE [Applying RAND and ROR operands once] is what makes this
 -- case arise: an operand answered from it returns the value the first
@@ -842,12 +843,20 @@ continueDone :: WHNF -> Machine Config
 continueDone whnf = pure (DoneMachine whnf)
 {-# INLINE continueDone #-}
 
+-- | NOTE [The same breach on both sides is named once]
+--
+-- With the blame list, a breach of the same rule on both sides of a RAND or ROR names its failure once here, where @unstable@ names it twice.
+-- With @signs MEANS PARTY Alice MUST sign WITHIN 14@ and @alias MEANS signs@, each of @signs RAND signs@, @signs RAND alias@ and @signs ROR signs@ names Alice once here and twice on @unstable@ (measured with @l4 batch@ on 2026-11-19).
+-- @jl4/examples/ok/breach-same-operand.l4@ pins those three shapes and five more, nested and declared breaches among them.
+-- This follows #817's assumption that @A RAND A@ and @A ROR A@ each behave as @A@ ('sameRule', and the merge of NOTE [One residual for the same operand twice]): assumed, not ruled.
+-- The @unstable@ trace that pins no dedup, @alice twice@ in @run-blame.l4@, has two different obligations on its two sides, which neither merge touches, and names her twice here too.
+
 -- | Are the two operands of a RAND or ROR the same rule: the same name, applied
 -- to the same names and literals? Both operands read the same events from the
 -- same moment, so the same rule on both sides reaches the same outcome on both,
 -- and @A RAND A@ and @A ROR A@ each behave as @A@ (when both are breached, the
 -- breach names its failures once, where @unstable@ names them twice: see NOTE
--- [One residual for the same operand twice]). Evaluating such an operand
+-- [The same breach on both sides is named once]). Evaluating such an operand
 -- once matters for a rule that names itself on both sides, @x RAND x@: there,
 -- each window an event is past would otherwise double the work. Any other pair
 -- compares unequal, so two operands that could differ are never merged.
@@ -1645,7 +1654,9 @@ backwardContractFrame val = \ case
       -- The failures are the CONCATENATION of both operands', left operand
       -- first, with duplicates: @PARTY alice MUST x RAND PARTY alice MUST y@
       -- both missed names alice twice, once per way. A breach with no BY is
-      -- one entry naming nobody.
+      -- one entry naming nobody. Two operands that are the very same breach
+      -- never get here: they merged in the frame dispatcher, and are named
+      -- once (NOTE [The same breach on both sides is named once]).
       continueBackward (ValBreached (breachOf (snd (combineBlame op (breachBlame r1) (breachBlame r2)))))
 
   RBinOp2 MkRBinOp2 {..}

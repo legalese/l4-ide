@@ -81,7 +81,10 @@ instance NFData RBinOp where
 -- failed: a missed deadline carries the party, the action it owed and the
 -- deadline it missed; a declared breach carries whom @BREACH BY@ named (if
 -- anyone) and its @BECAUSE@ (if any). Nothing is deduplicated — the same party
--- twice is two entries, and the two ways are visible in them.
+-- twice is two entries, and the two ways are visible in them. The same breach
+-- on both sides of a @RAND@\/@ROR@ is one breach, not two, and is named once
+-- (NOTE [The same breach on both sides is named once] in
+-- 'L4.EvaluateLazy.Machine').
 --
 -- Each entry also carries its 'Timing' (SEESAW, spec §6.1.2): when it took
 -- effect and when it came to light. A missed deadline has one from the moment
@@ -148,8 +151,8 @@ data Blame a = Blame
 -- The two constructors say what KIND of failure the breach is anchored at:
 -- 'DeadlineMissed' carries the event that revealed the anchoring miss (its
 -- party, action and stamp) beside the blame; 'ExplicitBreach' is anchored at a
--- declared breach. A compound breach — both operands of a @RAND@\/@ROR@ lost
--- — concatenates both sides' failures and is
+-- declared breach. A compound breach — both operands of a @RAND@\/@ROR@ lost,
+-- as two different breaches — concatenates both sides' failures and is
 -- a 'DeadlineMissed' unless EVERY decisive entry is a declared breach
 -- ('breachOf'), so which constructor it gets does not depend on the order of
 -- the operands (SEESAW, spec §6.1.2). A single obligation's breach is the

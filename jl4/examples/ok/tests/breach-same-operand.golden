@@ -1,0 +1,108 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+breach-same-operand.l4:46:1-47:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:49:1-50:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:52:1-53:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:55:1-56:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:68:1-69:38:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Alice"
+    BECAUSE "did not sign"
+breach-same-operand.l4:79:1-80:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:82:1-83:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:97:1-98:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Refund alice
+    before their deadline, which was at
+      2
+breach-same-operand.l4:101:1-102:35:
+  FULFILLED
