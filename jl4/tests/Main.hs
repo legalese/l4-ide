@@ -74,6 +74,10 @@ main = do
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
   hoverFiles <- sort <$> globDir1 (compile "lsp/hover/**/*.l4") examplesRoot
+  -- Top-level not-ok/export-*.l4: files that type-check and evaluate, and that
+  -- `l4 check` fails for an @export the export check refuses. ok/ holds only
+  -- files that `l4 check` passes (review of #779, 2026-11-20).
+  exportRefusedFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -84,6 +88,7 @@ main = do
       corpusNonEmpty "nlg-fails"       nlgFailsFiles
       corpusNonEmpty "semantic-tokens" semanticTokenFiles
       corpusNonEmpty "hover"           hoverFiles
+      corpusNonEmpty "export-refused"  exportRefusedFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
     -- The legal examples are what a reader of a rendered document sees. A change
     -- to the wording shows here as a diff, line by line, across all of them.
@@ -99,7 +104,7 @@ main = do
     -- it silently records mangled output — this compares against the verbatim
     -- source and so cannot bless a regression.
     describe "exactprint identity (source round-trips l4 format)" $
-      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+      forM_ (okFiles <> legalFiles <> librariesFiles <> exportRefusedFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ExactPrintIdentity evalConfig inputFile
     -- Invariant: the parser's memo of bracketed groups changes nothing
@@ -113,11 +118,13 @@ main = do
     -- token. jl4-core-test's NestedParenParserSpec does the same on deeper
     -- and broken nests, which the corpus has few of.
     describe "parser memo changes nothing (memo on = memo off; #1017)" $
-      forM_ (okFiles <> legalFiles <> librariesFiles <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles) $ \inputFile ->
+      forM_ (okFiles <> legalFiles <> librariesFiles <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles <> exportRefusedFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ParserMemoChangesNothing inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
+    describe "export refused (type-checks; l4 check fails)" $
+      tests evalConfig (True, True) exportRefusedFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
     KeywordList.keywordListTests dataDir
