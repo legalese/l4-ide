@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Negative control for etc/dmn-check/selftest.sh: the same table as clean.dmn
+  with two defects dmn-check 1.4.0 is documented to catch, both under a UNIQUE
+  hit policy, where they are errors rather than warnings:
+
+    * r1 and r1_again have the same input ("red") and different outputs (1, 9):
+      ConflictingRuleValidator.
+    * r2 and r2_again are the same row twice: DuplicateRuleValidator.
+
+  ShadowedRuleValidator also reports both second rules as shadowed by the first,
+  so the run has four errors: Conflicting 1, Duplicate 1, Shadowed 2. Numbers are
+  typeRef="integer" so that no type finding mixes in (see clean.dmn).
+
+  Note what this is NOT: two rules whose input ranges merely intersect. dmn-check
+  compares the TEXT of the input entries (ConflictingRuleValidator groups on it),
+  so this is the overlap it can see, and not the only overlap there is.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_overlap" name="overlap" namespace="https://legalese.com/l4/dmn/fixture/overlap">
+  <inputData id="input_colour" name="colour">
+    <variable id="input_colour_var" name="colour" typeRef="string"/>
+  </inputData>
+  <decision id="decision_score" name="score">
+    <variable id="decision_score_var" name="score" typeRef="integer"/>
+    <informationRequirement id="decision_score_ir1">
+      <requiredInput href="#input_colour"/>
+    </informationRequirement>
+    <decisionTable id="decision_score_table" hitPolicy="UNIQUE">
+      <input id="decision_score_i1" label="colour">
+        <inputExpression id="decision_score_i1_expr" typeRef="string">
+          <text>colour</text>
+        </inputExpression>
+      </input>
+      <output id="decision_score_o1" name="score" typeRef="integer"/>
+      <rule id="decision_score_r1">
+        <inputEntry id="decision_score_r1_i1">
+          <text>"red"</text>
+        </inputEntry>
+        <outputEntry id="decision_score_r1_o1">
+          <text>1</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_score_r1_again">
+        <inputEntry id="decision_score_r1_again_i1">
+          <text>"red"</text>
+        </inputEntry>
+        <outputEntry id="decision_score_r1_again_o1">
+          <text>9</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_score_r2">
+        <inputEntry id="decision_score_r2_i1">
+          <text>"blue"</text>
+        </inputEntry>
+        <outputEntry id="decision_score_r2_o1">
+          <text>2</text>
+        </outputEntry>
+      </rule>
+      <rule id="decision_score_r2_again">
+        <inputEntry id="decision_score_r2_again_i1">
+          <text>"blue"</text>
+        </inputEntry>
+        <outputEntry id="decision_score_r2_again_o1">
+          <text>2</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>
