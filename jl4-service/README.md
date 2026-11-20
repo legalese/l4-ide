@@ -189,7 +189,7 @@ A constructor that carries data is written the same way, keyed by its name, `{"C
 A type whose only constructor is named like the type and carries data (``DECLARE `Deposit Refund` IS ONE OF `Deposit Refund` HAS amount IS A NUMBER``) is a record: it is answered as one, `{"Deposit Refund": {"amount": 40}}`, published as one, and read as its fields alone, `{"amount": 40}`.
 The published schema says so: a type whose constructors all carry data is an object with one key per constructor; one with both kinds is a `oneOf` of a string `enum` of the names and that object, with no `type` of its own; one whose constructors carry nothing is a string `enum` of their names.
 An input that sends the bare name of a constructor that carries data, or an object in another form, is refused with a `422` that names the input, at any depth and on every path, as an `EITHER` in another form is.
-A record input that is not an object, at any depth, is refused the same way: `Parameter 'p': a `Pair` is an object of its fields (left, right)`.
+A record input that is not an object, at any depth, is refused the same way: ``Parameter 'p': a `Pair` is an object of its fields (left, right)``.
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
 An `EITHER` answer is `{"RIGHT": [v]}` or `{"LEFT": [v]}`, the value in an array of one, and the published schema describes it so, with both keys optional.
