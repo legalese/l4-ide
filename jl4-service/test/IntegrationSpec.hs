@@ -3567,6 +3567,38 @@ spec = describe "integration" do
         call baseUrl mgr "gives unit" (Aeson.object ["n" Aeson..= (1 :: Int)])
           >>= (`shouldCarry` Answers (Aeson.String "Unit"))
 
+  -- A type that takes a type is read with what it is given in place of its
+  -- parameters. The direct path read each of these; JSONDECODE, which the
+  -- fallback path reads with, decoded every one to NOTHING (review of #779,
+  -- 2026-11-20).
+  describe "reads a type that takes a type, as the schemas publish it" do
+    aroundAll (\k -> withServiceFromSources "type-params" [("params.l4", typeParamsJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "type-params" fn (Aeson.object ["arguments" Aeson..= args])
+          bothPaths = [[], ["pad" Aeson..= Aeson.object []]]
+          number = Aeson.Number
+          cases =
+            [ ("holding amount", "h", Aeson.object ["amount" Aeson..= (5 :: Int)], number 5)
+            , ("box value", "b", Aeson.object ["value" Aeson..= (5 :: Int)], number 5)
+            , ("pick value", "p", Aeson.object ["Take" Aeson..= Aeson.object ["item" Aeson..= (5 :: Int)]], number 5)
+            , ("pick value", "p", Aeson.String "Skip", number 0)
+            , ("bag total", "g", Aeson.object ["items" Aeson..= [1, 2 :: Int]], number 3)
+            , ("opt value", "o", Aeson.object ["inner" Aeson..= (5 :: Int)], number 5)
+              -- a null takes the fallback path with or without the pad
+            , ("opt value", "o", Aeson.object ["inner" Aeson..= Aeson.Null], number (-1))
+            ]
+      it "answers each form on both paths" \(baseUrl, mgr) ->
+        forM_ cases \(fn, input, v, answer) -> forM_ bothPaths \extra ->
+          call baseUrl mgr fn (Aeson.object ((Aeson.Key.fromText input Aeson..= v) : extra)) >>= (`shouldCarry` Answers answer)
+      it "publishes a record of its fields, and a type with a constructor that carries data as a oneOf" \(baseUrl, mgr) -> do
+        let paramAt fn path = do
+              resp <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/type-params/functions/" <> fn)
+              pure (wireAt resp (["parameters", "properties"] <> path))
+            keysOf = \case
+              Right (Aeson.Object o) -> Just (map Aeson.Key.toText (Aeson.KeyMap.keys o))
+              _ -> Nothing
+        (keysOf <$> paramAt "holding%20amount" ["h", "properties"]) `shouldReturn` Just ["amount"]
+        (either (const False) (const True) <$> paramAt "pick%20value" ["p", "oneOf"]) `shouldReturn` True
+
   describe "compiler" do
     it "compiles valid L4 sources" do
       logger <- newLogger False
@@ -4915,6 +4947,58 @@ recordFormJL4 = Text.unlines
   , "GIVEN h IS A Holder"
   , "GIVETH A NUMBER"
   , "`held sum` MEANS h's q's left + h's q's right"
+  ]
+
+typeParamsJL4 :: Text
+typeParamsJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE Holding a IS ONE OF"
+  , "  Holding HAS amount IS AN a"
+  , "DECLARE Box a HAS value IS AN a"
+  , "DECLARE Pick a IS ONE OF"
+  , "  Skip"
+  , "  Take HAS item IS AN a"
+  , "DECLARE Bag a HAS items IS A LIST OF a"
+  , "DECLARE Opt a HAS inner IS A MAYBE a"
+  , ""
+  , "@export Holding amount"
+  , "GIVEN h IS A Holding OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`holding amount` MEANS"
+  , "  CONSIDER h"
+  , "  WHEN Holding n THEN n"
+  , ""
+  , "@export Box value"
+  , "GIVEN b IS A Box OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`box value` MEANS b's value"
+  , ""
+  , "@export Pick value"
+  , "GIVEN p IS A Pick OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`pick value` MEANS"
+  , "  CONSIDER p"
+  , "  WHEN Skip THEN 0"
+  , "  WHEN Take n THEN n"
+  , ""
+  , "@export Bag total"
+  , "GIVEN g IS A Bag OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`bag total` MEANS sum (g's items)"
+  , ""
+  , "@export Opt value"
+  , "GIVEN o IS AN Opt OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`opt value` MEANS"
+  , "  CONSIDER o's inner"
+  , "  WHEN JUST n THEN n"
+  , "  WHEN NOTHING THEN -1"
   ]
 
 recordLikeJL4 :: Text

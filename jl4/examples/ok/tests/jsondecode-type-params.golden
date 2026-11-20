@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+jsondecode-type-params.l4:46:1-41:
+  RIGHT OF (Holding OF 5)
+jsondecode-type-params.l4:47:1-36:
+  RIGHT OF (Box OF 5)
+jsondecode-type-params.l4:48:1-48:
+  RIGHT OF (Take OF 5)
+jsondecode-type-params.l4:49:1-31:
+  RIGHT OF Skip
+jsondecode-type-params.l4:50:1-41:
+  RIGHT OF (Bag OF (LIST 1, 2))
+jsondecode-type-params.l4:51:1-36:
+  RIGHT OF (Opt OF (JUST OF 5))
+jsondecode-type-params.l4:52:1-39:
+  RIGHT OF (Opt OF NOTHING)
+jsondecode-type-params.l4:53:1-48:
+  RIGHT OF (Holding OF 5)
+jsondecode-type-params.l4:54:1-40:
+  RIGHT OF (Box OF 5)

@@ -1238,7 +1238,8 @@ isNullaryConstructorReturning conType targetTypeRef = case conType of
   -- If it's a function type, it's not nullary
   Fun {} -> False
   -- If it's directly a type application, check if it matches our target
-  TyApp _ tyRef [] -> getUnique tyRef == getUnique targetTypeRef
+  -- (a type that takes types too: Skip in Pick a IS ONE OF Skip, Take ...)
+  TyApp _ tyRef _ -> getUnique tyRef == getUnique targetTypeRef
   -- Other cases: not a match
   _ -> False
 
@@ -1356,6 +1357,12 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                   _ -> Nothing
           _ -> Nothing
 
+    -- A declared type given types (Box OF NUMBER): read as the type is, with
+    -- what it is given put in place of its parameters in each constructor's
+    -- fields (review of #779, 2026-11-20: without them, every form of such a
+    -- type that the schemas publish decoded to NOTHING).
+    TyApp _anno tyRef args@(_ : _) -> jsonValueToDeclared tyRef args jsonValue
+
     -- Handle custom record types and primitives: TyApp conRef []
     TyApp _anno tyRef [] -> do
       let typeName = nameToText (TypeCheck.getName tyRef)
@@ -1412,7 +1419,14 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                   "Expected JSON string for DATETIME field but got: " <> Text.pack (show jsonValue)
 
         -- Not a primitive, check if it's a custom record type
-        _ -> do
+        _ -> jsonValueToDeclared tyRef [] jsonValue
+
+    -- For other types, fall back to generic decoding
+    _ -> jsonValueToWHNF jsonValue
+
+-- | A value of a declared type, given what the type is given ('instantiate').
+jsonValueToDeclared :: Resolved -> [Type' Resolved] -> Aeson.Value -> Machine WHNF
+jsonValueToDeclared tyRef args jsonValue = do
           -- For record types, we need to find the constructor with the same name
           entityInfo <- getEntityInfo
 
@@ -1427,7 +1441,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
               -- one that carries none its name, "Cash" (the wire-form bench, card
               -- J1, option A; HATBOX, Meng, 2026-11-18). Anything else is refused,
               -- as a value of the wrong JSON type is for a NUMBER.
-              | ctors <- constructorsOf entityInfo tyRef
+              | ctors <- [ (u, n, instantiate args t) | (u, n, t) <- constructorsOf entityInfo tyRef ]
               , any (\(_, _, conType) -> not (isNullaryConstructorReturning conType tyRef)) ctors
               , not (isRecordShaped typeNameRef ctors) ->
                   jsonValueToTagged typeNameRef ctors jsonValue
@@ -1439,6 +1453,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                     | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
                     , nameToText (TypeCheck.getName name) == nameToText (TypeCheck.getName typeNameRef)
                     ]
+                    & fmap (\(u, n, t) -> (u, n, instantiate args t))
 
               case matchingConstructor of
                 Nothing -> do
@@ -1485,9 +1500,6 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                       userException $ UserError $
                         "Expected JSON object to decode to record type, but got: " <> Text.pack (show jsonValue)
 
-    -- For other types, fall back to generic decoding
-    _ -> jsonValueToWHNF jsonValue
-
 -- | The constructors of a declared type, from the entity info: each one's
 -- unique, name and type.
 constructorsOf :: EntityInfo -> Resolved -> [(Unique, Name, Type' Resolved)]
@@ -1508,6 +1520,29 @@ isRecordShaped :: Name -> [(Unique, Name, Type' Resolved)] -> Bool
 isRecordShaped typeName = \case
   [(_, conName, _)] -> nameToText (TypeCheck.getName conName) == nameToText (TypeCheck.getName typeName)
   _ -> False
+
+-- | A constructor's type with what its type is given put in place of the
+-- type's parameters: @Holding OF NUMBER@'s constructor @Holding@, of type
+-- @FOR ALL a. amount IS AN a -> Holding OF a@, has a field @amount@ of type
+-- @NUMBER@. The parameters are matched by place in the constructor's result,
+-- which names them in the order the type declares them.
+instantiate :: [Type' Resolved] -> Type' Resolved -> Type' Resolved
+instantiate [] conType = conType
+instantiate args conType = case conType of
+  Forall _ vs body
+    | TyApp _ _ resultArgs <- resultOf body ->
+        substituteTypeParams
+          (Map.fromList
+            [ (getUnique v, arg)
+            | (TyApp _ v [], arg) <- zip resultArgs args
+            , getUnique v `elem` map getUnique vs
+            ])
+          body
+  _ -> conType
+ where
+  resultOf = \case
+    Fun _ _ t -> resultOf t
+    t -> t
 
 -- | A value of a type written tagged (see 'jsonValueToWHNFTyped').
 jsonValueToTagged :: Name -> [(Unique, Name, Type' Resolved)] -> Aeson.Value -> Machine WHNF
