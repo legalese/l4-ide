@@ -612,16 +612,19 @@ spec = describe "Unification" $ do
     -- resolution to add their own cost, so that nothing but the descent is
     -- timed (the same shape through `l4 check` is mostly the cost of
     -- everything else, and the square only shows far down). Four times the
-    -- depth takes about four times as long when the descent is linear, up
-    -- to about six when the larger heap makes collection dearer, and about
-    -- fifteen times as long when it is quadratic.
+    -- depth takes about four times as long when the descent is linear (3.35
+    -- to 4.30 in 50 rounds, quiet and under load, with a collection before
+    -- every run; up to about six without one, when the larger heap made
+    -- collection dearer), and about fifteen times as long when it is
+    -- quadratic. The limit is 8, as for the check above, so that the control
+    -- below has room too: it measured as low as 12.14.
     it "unifies a type nested on the left with its instance in time linear in the nesting" $
-      unifiesInLinearTime 4000 16000 10
+      unifiesInLinearTime 4000 16000 8
 
     -- The control: on the same depths and limit, the guard fails work that
     -- is quadratic in the depth.
     it "fails work quadratic in the nesting on the same depths (the control)" $
-      quadraticControl 4000 16000 10
+      quadraticControl 4000 16000 8
 
   describe "occurs check within one walk" $ do
     it "rejects PAIR OF a, a against PAIR OF b, LIST OF b" $ do
