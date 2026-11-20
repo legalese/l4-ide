@@ -1498,10 +1498,24 @@ jsonValueToDeclared tyRef args jsonValue = do
                       | isNullaryConstructorReturning conType tyRef
                       , s == nameToText (TypeCheck.getName conName) ->
                           pure $ ValConstructor conRef []
-                    _ -> do
-                      -- JSON value is not an object, can't decode to record
-                      userException $ UserError $
-                        "Expected JSON object to decode to record type, but got: " <> jsonForMessage jsonValue
+                    -- Anything else is refused, naming the type and the form
+                    -- it is read in, as the service's check names it
+                    -- ('recordFormMessage'): one whose constructor carries no
+                    -- fields is the string of its name, published so, and one
+                    -- that carries fields is an object of them. It said
+                    -- "record type" for both, though the first is published
+                    -- as a string (review of #779, 2026-11-20).
+                    _ | isNullaryConstructorReturning conType tyRef ->
+                          userException $ UserError $
+                            "Expected a `" <> typeText <> "` written as the string \"" <> typeText
+                              <> "\", the name of its constructor, but got: " <> jsonForMessage jsonValue
+                      | otherwise -> do
+                          fields <- extractFieldNamesAndTypes conType
+                          userException $ UserError $
+                            "Expected a `" <> typeText <> "` written as an object of its fields ("
+                              <> Text.intercalate ", " (map fst fields) <> "), but got: " <> jsonForMessage jsonValue
+                 where
+                  typeText = nameToText (TypeCheck.getName typeNameRef)
 
 -- | The constructors of a declared type, from the entity info: each one's
 -- unique, name and type.
