@@ -7,6 +7,7 @@ import qualified Base.Text as Text
 import L4.Evaluate.ValueLazy as Lazy
 import qualified L4.Lexer as Lexer
 import L4.Print.Columnar (Cell, Grid, DittoOpts, defaultDittoOpts, renderDittoGrid)
+import L4.Print.Layout (layoutUnboundedLocal)
 import L4.Syntax
 import qualified L4.TypeCheck.Environment as TCEnv
 import qualified L4.TypeCheck.Types as TC
@@ -34,8 +35,12 @@ import System.FilePath (takeFileName)
 prettyLayout :: LayoutPrinter a => a -> Text
 prettyLayout a = docText $ printWithLayout a
 
+-- | One line per hard line break, however long: the same text as
+-- @layoutPretty (LayoutOptions Unbounded)@, in time linear in the text when
+-- every group fits (smucclaw/l4-ide#1075; Note [Why L4.Print does not use
+-- the library's Unbounded layout] in "L4.Print.Layout").
 docText :: Doc ann -> Text
-docText = renderStrict . layoutPretty (LayoutOptions Unbounded)
+docText = renderStrict . layoutUnboundedLocal
 
 -- | A map from constructor 'Unique' to its field names (in order).
 -- Used for pretty-printing constructor values with named fields.
@@ -187,7 +192,7 @@ prefixKeywordBuiltin r
 quotedName :: Name -> Text
 quotedName n =
     renderStrict
-  $ layoutPretty (LayoutOptions Unbounded)
+  $ layoutUnboundedLocal
   $ pretty . quote . rawNameToText . rawName $ n
 
 class LayoutPrinter a where
