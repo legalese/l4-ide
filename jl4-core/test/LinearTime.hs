@@ -7,12 +7,10 @@
 -- How it fails, sorted by whether anyone would notice:
 --
 -- * Loud: work reused from one run to the next (a value computed once and
---   shared) that makes the later small runs take no time makes the ratio
---   enormous, and the guard fails.
---
--- * Silent: reused work that makes the later large runs take no time makes
---   the ratio near 0, and the guard passes. That is why each run gets its
---   input from @prepare@ afresh.
+--   shared) makes the later small runs take no time, so the ratio is
+--   enormous and the guard fails; or makes the later large runs take no
+--   time, so the ratio is under 0.1, which 'cpuRatio' fails outright. That
+--   is why each run gets its input from @prepare@ afresh.
 --
 -- * Loud: a control whose small runs were reused would pass with an enormous
 --   ratio, so 'quadraticControl' also fails a ratio far beyond the square of
@@ -102,10 +100,16 @@ small case was timed.
 -- ratio on a busy machine]. @prepare@ runs before each timed run, outside the
 -- timed span, so that building the input is not timed and no run reuses
 -- another's input. A small run that reads as less than 1 ms counts as 1 ms.
+--
+-- It fails the test when the ratio is under 0.1. No large case takes a tenth
+-- of the time of its small one, so that means the large runs reused a result
+-- computed earlier, which would otherwise pass any guard unnoticed.
 cpuRatio :: (k -> IO a) -> (a -> IO ()) -> k -> k -> IO Double
 cpuRatio prepare run small large = do
   rs <- traverse (const pair) [1 .. 3 :: Int]
-  pure (sort rs !! 1)
+  let r = sort rs !! 1
+  r `shouldSatisfy` (> 0.1)
+  pure r
   where
     pair = do
       s <- timed small
