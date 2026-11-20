@@ -1,8 +1,8 @@
 # Verification Backend Lowering Specification
 
-**Status:** Proposal. **Phase 1 is ruled, and partly built on a branch not yet merged.** R-V1–R-V10 were answered by Meng on 2026-09-07 (§"Phase 1 rulings").
-`l4 prove` is built on `feat/l4-prove`, draft legalese/l4-ide#784 (2026-10-30), not merged into `unstable`; until it merges, `l4 prove` does not exist in the tree, and this document's present-tense mentions of it are still plans.
-What #784 builds, by ruling: R-V2's unfolding (every reached `DECIDE` a `define-fun`), not its generated obligations; R-V3's selection of obligations (an `#ASSERT` that reads a section binder and that the evaluator did not decide), not its diagnostic reword; R-V4 (each `analyzeSafety` clause a side condition or a named refusal); R-V5; R-V6 with z3 only; R-V7 except `STRING`; R-V8.
+**Status:** Proposal. **Phase 1 is ruled, and partly built: `l4 prove` is on `unstable`.** R-V1–R-V10 were answered by Meng on 2026-09-07 (§"Phase 1 rulings").
+`l4 prove` was built on `feat/l4-prove` and merged into `unstable` by legalese/l4-ide#784 on 2026-11-12 (merge commit `2818cc21e`).
+What #784 built, by ruling: R-V2's unfolding (every reached `DECIDE` a `define-fun`), not its generated obligations; R-V3's selection of obligations (an `#ASSERT` that reads a section binder and that the evaluator did not decide), not its diagnostic reword; R-V4 (each `analyzeSafety` clause a side condition or a named refusal); R-V5; R-V6 with z3 only; R-V7 except `STRING`, `DATE`, optional types and a bodiless `DECLARE` as an uninterpreted sort, all of which `jl4-core/src/L4/Prove/Lower.hs` refuses by name (`sortOf`, `datatypeSort`); [PROVER-COVERAGE-SPEC.md](../todo/PROVER-COVERAGE-SPEC.md) plans the date and the option; R-V8.
 **R-V10 is discharged as a design** in #784 (2026-10-30): the Mode A/B gate now calls the real emitted scope at a witness per realisable combination; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`). See CATALA-EXPORT-SPEC §8.4's discharge note.
 R-V3's `deferred` outcome and its `l4 run` exit-code change are withdrawn: UNKNOWN-EVALUATION-SPEC U1b (ruled 2026-10-01) supersedes them, by Meng's firing of PECKINGORDER on 2026-10-30; see the note under R-V3.
 **Author:** Meng Wong
@@ -427,7 +427,7 @@ subtle) would have excluded the class this was built for.
 
 **Dates: `DATE` → `Int` day serial, exact — but only up to the calendar constructors.** There is no
 date arithmetic _operator_ at all; dates convert through integer day serials
-(`DATE_SERIAL`/`DATE_FROM_SERIAL`, epoch `0001-01-01`). Comparisons, serial round-trips and day
+(`DATE_SERIAL`/`DATE_FROM_SERIAL`; the serial of `0000-01-01` is -1 and of `0001-01-01` is 365, `dayNumberFromDay` in `EvaluateLazy/Machine.hs`). Comparisons, serial round-trips and day
 offsets are therefore exact and linear.
 
 The calendar constructors are **not** in the v1 fragment, and this ruling agrees with
