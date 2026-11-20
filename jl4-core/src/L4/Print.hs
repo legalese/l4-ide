@@ -948,27 +948,91 @@ instance LayoutPrinter BinOp where
     BinOpSplit -> "SPLIT"
     BinOpCharAt -> "CHARAT"
 
+-- | A breach names every obligation that failed (R-T3, EVERY-EACH-QUANTIFIER-SPEC
+-- §6.1 on @unstable@; per-entry detail and no dedup RULED 2026-09-15). ONE
+-- failure prints exactly as it always did. TWO OR MORE — both operands of a
+-- @RAND@\/@ROR@ lost, or @BY LIST p, q@ — print one entry per failure, in
+-- operand order, each with its own action and deadline or its own @BECAUSE@,
+-- so a reader can see the two ways.
+--
+-- Under a missed-deadline anchor the revealing event's three lines vouch for
+-- the ANCHOR only — the event at that stamp surpassed that one deadline —
+-- so the anchor prints first in the singleton's own words, and the full
+-- list follows under @and the breach names, in order@, a header that claims
+-- nothing about when each entry was revealed (the pass of 2026-09-15, round
+-- 2, on @unstable@ found the earlier @revealed the breach of@ header listing
+-- a deadline the event could not have passed). Under a declared anchor there
+-- is no stamp to vouch for anything: @BREACH@ followed by one @BY …@ line
+-- per entry.
 instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
   printWithLayout = \ case
-    DeadlineMissed ev'party ev'action ev'time party action deadline -> vcat
+    DeadlineMissed ev'party ev'action ev'time blame -> vcat $
       [ "party"
       , i2 $ printWithLayout ev'party
       , "who did action"
       , i2 $ printWithLayout ev'action
       , "at"
       , i2 $ pretty (prettyRatio ev'time)
-      , "surpassed the deadline of party"
-      , i2 $ printWithLayout party
-      , "who had to do obligatory action"
-      , i2 $ printWithLayout action
-      , "before their deadline, which was at"
-      , i2 $ pretty (prettyRatio deadline)
       ]
-      where i2 = indent 2
-    ExplicitBreach mParty mReason -> vcat $
-      [ "BREACH" ]
-      <> maybe [] (\p -> [ "BY" <+> printWithLayout p ]) mParty
-      <> maybe [] (\r -> [ "BECAUSE" <+> printWithLayout r ]) mReason
+      <> anchorLines blame.anchor
+      <> together blame
+      <> case blameList blame of
+        _ :| [] -> []
+        fs -> "and the breach names, in order" : map (i2 . printFailure "") (NE.toList fs)
+      where
+        i2 = indent 2
+        -- the singleton's six lines for a missed deadline; an anchor that is
+        -- a declared breach under a missed-deadline stamp is not built by any
+        -- constructor site (spec §6.1.1 on @unstable@) but prints rather than crashes
+        anchorLines = \ case
+          MissedDeadline p action deadline t ->
+            [ "surpassed the deadline of party"
+            , i2 $ printWithLayout p
+            , "who had to do obligatory action"
+            , i2 $ printWithLayout action
+            , "before their deadline, which was at"
+            , i2 $ pretty (prettyRatio deadline)
+            ]
+            -- SEESAW (spec §6.1.2): an obligation entered after its own
+            -- deadline failed when it was entered, not before it existed
+            <> if t.effective > deadline
+                 then [ "but was only entered at, and so failed at"
+                      , i2 $ pretty (prettyRatio t.effective) ]
+                 else []
+          f@DeclaredBreach {} ->
+            [ "revealed the breach of", i2 $ printFailure "" f ]
+    ExplicitBreach blame -> vcat $
+      "BREACH" : case blameList blame of
+        DeclaredBreach mParty mReason _ :| [] ->
+          maybe [] (\p -> [ "BY" <+> printWithLayout p ]) mParty
+          <> maybe [] (\r -> [ "BECAUSE" <+> printWithLayout r ]) mReason
+        fs -> map (printFailure "BY ") (NE.toList fs)
+    where
+      -- SEESAW (spec §6.1.2): the other entries that failed at the
+      -- compound's instant — a tie, so the anchor is one of several, and
+      -- no operand's position chose it. Nothing is printed for the
+      -- ordinary case of one decisive entry.
+      together blame = case blame.alsoDecisive of
+        [] -> []
+        is -> "and at the same instant" :
+          [ indent 2 (printFailure "" f) | (i, f) <- zip [0 :: Int ..] (NE.toList (blameList blame)), i `elem` is ]
+
+-- | One failure of a compound breach, under a prefix (@BY @ under a declared
+-- anchor, nothing under a missed-deadline one). A party that owed an action
+-- gets its action and deadline on the lines below; a declared breach is one
+-- line, with its @BECAUSE@ if it has one; an entry that names nobody says so.
+printFailure :: LayoutPrinter a => Doc ann -> Failure a -> Doc ann
+printFailure prefix = \ case
+  MissedDeadline p action deadline _ -> vcat
+    [ prefix <> printWithLayout p
+    , indent 2 "who had to do obligatory action"
+    , indent 4 $ printWithLayout action
+    , indent 2 "before their deadline, which was at"
+    , indent 4 $ pretty (prettyRatio deadline)
+    ]
+  DeclaredBreach mParty mReason _ ->
+    prefix <> maybe "(nobody named)" printWithLayout mParty
+      <> maybe mempty (\r -> " BECAUSE" <+> printWithLayout r) mReason
 
 instance LayoutPrinter Lazy.NF where
   printWithLayout = \ case

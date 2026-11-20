@@ -1,0 +1,5 @@
+executing contract `second operand of an ROR` at 0 with the following events: party `Dave` did `exercise` at 20
+executing contract `second operand of a RAND` at 0 with the following events: party `Dave` did `exercise` at 20
+executing contract `first operand of the right operand` at 0 with the following events: party `Dave` did `exercise` at 20
+executing contract `first operand under a LEST` at 0 with the following events: party `Alice` did `noop` at 20
+executing contract `a list-valued party under a LEST` at 0 with the following events: party list of a did `idle` at 20

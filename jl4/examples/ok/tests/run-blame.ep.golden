@@ -1,0 +1,104 @@
+IMPORT prelude
+-- The BLAME LIST (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1 on unstable, built
+-- there 2026-09-15; ported to main with SEESAW).
+--
+-- A breach names every obligation that failed, not one of them — one entry
+-- per failure, each with what was failed (the action and deadline missed, or
+-- the reason declared), duplicates kept: the same party twice is two entries,
+-- and the two ways are visible (RULED 2026-09-15: no dedup). On this branch a
+-- compound breach comes from `RAND` or `ROR` when both sides are lost; both
+-- sides' failures are named, left operand first. And `BREACH BY` takes a LIST
+-- of parties as well as a party. A single obligation's breach prints exactly
+-- as it always did.
+--
+-- The numbering is unstable's (jl4/examples/ok/every/run-blame.l4 there). Its
+-- §1-3 and §6 are barriers (EVERY ... ONCE ALL HAVE), which this branch does
+-- not have; its §8 needs a GIVETH to reach both operands of a RAND, which this
+-- branch does not do either, so it is not here.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign   HAS signer IS AN Actor
+    Refund HAS who    IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+
+-- 4. RAND of two single-party obligations, both missed: both failures are
+--    named, left operand first. The anchor is the earliest breach as before
+--    (here a tie, revealed by the same event, so the left one).
+GIVETH A DEONTIC Actor Action
+`both sign` MEANS
+    (PARTY alice MUST Sign alice WITHIN 14)
+    RAND
+    (PARTY bob   MUST Sign bob   WITHIN 14)
+
+#TRACE `both sign` AT 0 WITH
+  (WAITUNTIL 20)
+
+-- The same party on both sides of a RAND is named TWICE, once per way: Alice
+-- missed the signing and Alice missed the refund, and the answer says both.
+-- (Meng, 2026-09-15: "maybe we need to be able to say, 'well, Alice screwed
+-- the pooch two different ways'".)
+GIVETH A DEONTIC Actor Action
+`alice twice` MEANS
+    (PARTY alice MUST Sign alice WITHIN 14)
+    RAND
+    (PARTY alice MUST Refund alice WITHIN 14)
+
+#TRACE `alice twice` AT 0 WITH
+  (WAITUNTIL 20)
+
+-- 5. BREACH BY a LIST of parties: the drafter names several, and the answer
+--    names them as written — one entry each, in order, duplicates kept, each
+--    carrying the BECAUSE.
+GIVETH A DEONTIC Actor Action
+`joint and several` MEANS
+    PARTY theLandlord
+        MUST   Refund theLandlord
+        WITHIN 3
+        LEST   BREACH BY LIST alice, bob, alice BECAUSE "the tenants carry it"
+
+#TRACE `joint and several` AT 0 WITH
+  (WAITUNTIL 20)
+
+-- A computed LIST with nobody in it is refused at run time, by name: a breach
+-- blames at least one party. (A literal empty list — `BY EMPTY` — is refused
+-- when the file is checked; see not-ok/tc/breach-by-empty.l4.)
+GIVEN t IS AN Actor
+GIVETH A BOOLEAN
+nobody t MEANS FALSE
+
+GIVETH A DEONTIC Actor Action
+`blame nobody` MEANS
+    PARTY theLandlord
+        MUST   Refund theLandlord
+        WITHIN 3
+        LEST   BREACH BY filter nobody tenants
+
+#TRACE `blame nobody` AT 0 WITH
+  (WAITUNTIL 20)
+
+-- 7. A party that is itself a LIST. `BY` then names the one party, not its
+--    elements: the checker reads a LIST at the party type as that party
+--    (and a LIST of such lists as several). Unstable writes this rule with
+--    `GIVETH A DEONTIC (LIST OF STRING) Step`; this branch prints that
+--    signature back so that it no longer checks (`l4 batch` and the printer's
+--    round-trip test report an arity mismatch, as they do without this
+--    change), so the party type here comes from the PARTY line instead.
+DECLARE Step IS ONE OF deliver
+
+`the pair delivers` MEANS
+    PARTY (LIST "a", "b")
+        MUST   deliver
+        WITHIN 5
+        LEST   BREACH BY (LIST "a", "b") BECAUSE "the pair did not deliver"
+
+#TRACE `the pair delivers` AT 0 WITH
+  (WAITUNTIL 20)

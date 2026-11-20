@@ -864,10 +864,30 @@ function deonticBreachToWire(b) {
   // record { detail, party, reason: "explicit" }. The BECAUSE clause
   // is an L4 string literal that pretty-prints with surrounding
   // double quotes; strip them so the wire 'detail' is the bare text.
+  //
+  // Beside the scalars, which describe the ANCHORING failure, the reference
+  // emits the BLAME LIST (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1 on unstable;
+  // per-entry detail and no dedup RULED 2026-09-15): 'parties' (every party
+  // named, in order, with duplicates), 'failures' (one object per failed
+  // obligation, in the same order) and 'anchor' (the anchor's index into
+  // 'failures'). This runtime models one obligation at a time (no RAND, no
+  // BREACH BY a list), so its arrays are always the singleton of the scalar's
+  // failure, and 'anchor' is 0.
+  const detail = stripStringLiteralQuotes(b.because);
+  const party = b.by;
   return {
     BREACH: {
-      detail: stripStringLiteralQuotes(b.because),
-      party: b.by,
+      anchor: 0,
+      detail: detail == null ? null : detail,
+      failures: [
+        {
+          detail: detail == null ? null : detail,
+          party: party == null ? null : party,
+          reason: "explicit",
+        },
+      ],
+      parties: party == null ? [] : [party],
+      party: party == null ? null : party,
       reason: "explicit",
     },
   };

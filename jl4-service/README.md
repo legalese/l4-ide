@@ -261,7 +261,10 @@ curl -X POST http://localhost:8080/deployments/my-contract/functions/service-req
 
 In the structured fields of the answer, a party and an action are spelled as an enum answer is (above): the name, without backticks.
 An `OBLIGATION` names them in `party` and `action`, and so does each operand of a `RAND` or `ROR` that is an `OBLIGATION`.
-A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligationAction` (the obligation that was missed), and, for a breach the rule states with `BREACH BY`, in `party`.
+A `BREACH` names them in `eventParty` and `eventAction` (the event that revealed it), in `obligatedParty` and `obligationAction` (the obligation that was missed), for a breach the rule states with `BREACH BY`, in `party`, and in the `party` and `action` of each entry of `failures`.
+A breach can name several failures: both sides of a `RAND`, both alternatives of an `ROR`, or every party of a `BREACH BY LIST`.
+The single fields describe the one failure the breach is anchored at, and `anchor` is its position in `failures`, which has one object per failure in the order the rule is written; `obligatedParties` (for a missed deadline) or `parties` (for a `BREACH`) lists every party named, in the same order and with repeats.
+When the breach happened is not on this wire: `l4 batch` carries it (see [When a breach happened](../doc/reference/regulative/consequences.md#when-a-breach-happened)).
 So a client can ask whether the party who acted is the party who was obliged by comparing two strings: for a party the rule writes as `` `the seller` ``, both are `the seller`.
 A name taken from an answer can also be sent back unchanged as the `party` or `action` of an event in the next request's `events`, when the rule's file defines that name at the top level, as an enum constructor, a `MEANS` definition or a record constant, or when a file that it imports declares that name as an enum constructor: an answer that says `party` is `the seller` and `action` is `deliver the goods` is met by the event `{"party": "the seller", "action": "deliver the goods", "at": 5}`.
 The name is the identifier the rule uses, not the party it stands for: a party written as a `GIVEN` input or as a `MEANS` definition answers with that identifier until an event has been compared with it, so the comparison is still false there.

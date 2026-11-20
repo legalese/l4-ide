@@ -1,0 +1,167 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+breach-same-operand.l4:51:1-52:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:54:1-55:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:57:1-58:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:60:1-61:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:73:1-74:38:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Alice"
+    BECAUSE "did not sign"
+breach-same-operand.l4:84:1-85:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:87:1-88:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:102:1-103:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Refund alice
+    before their deadline, which was at
+      2
+breach-same-operand.l4:106:1-107:35:
+  FULFILLED
+breach-same-operand.l4:130:1-131:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Carol"
+    BECAUSE "no refund"
+breach-same-operand.l4:144:1-145:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Carol" BECAUSE "no refund"
+    BY Tenant OF "Carol" BECAUSE "no refund"
+breach-same-operand.l4:156:1-158:34:
+  DEONTIC BREACHED:
+    party
+      Tenant OF "Bob"
+    who did action
+      Refund OF (Tenant OF "Bob")
+    at
+      40
+    surpassed the deadline of party
+      Tenant OF "Alice"
+    who had to do obligatory action
+      MUST Sign alice
+    before their deadline, which was at
+      14
+breach-same-operand.l4:162:1-163:34:
+  DEONTIC BREACHED:
+    party
+      Tenant OF "Bob"
+    who did action
+      Refund OF (Tenant OF "Bob")
+    at
+      40
+    surpassed the deadline of party
+      Tenant OF "Carol"
+    who had to do obligatory action
+      MUST Refund carol
+    before their deadline, which was at
+      8
+    and the breach names, in order
+      Tenant OF "Alice"
+        who had to do obligatory action
+          MUST Sign alice
+        before their deadline, which was at
+          14
+      Tenant OF "Carol"
+        who had to do obligatory action
+          MUST Refund carol
+        before their deadline, which was at
+          8
+      Tenant OF "Alice"
+        who had to do obligatory action
+          MUST Sign alice
+        before their deadline, which was at
+          14
+breach-same-operand.l4:173:1-174:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Carol" BECAUSE "no refund"
+    BY Tenant OF "Carol" BECAUSE "no refund"

@@ -46,3 +46,4 @@ executing contract `three prohibitions` at 0 with the following events: party `A
 executing contract `three prohibitions` at 0 with the following events: `WAITUNTIL` with 11 party `Alice` did `smoke` at 12 `WAITUNTIL` with 20
 executing contract `cure after a negative window` with 20 at 0 with the following events: party `Bob` did `deliver` at 1
 executing contract `cure after a negative window` with 20 at 0 with the following events: party `Bob` did `deliver` at 4
+executing contract `cure after a negative window` with 20 at 10 with the following events: party `Bob` did `deliver` at -5 party `Bob` did `deliver` at 12

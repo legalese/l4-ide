@@ -1,0 +1,25 @@
+-- `l4 run` and `l4 batch` name a different number of failures here, and both
+-- exit 0. `l4 batch` prints the module and checks it again, and the printer
+-- writes `(signs RAND signs) RAND late` without its brackets, which reads
+-- back as `signs RAND (signs RAND late)`. #817's names-once merge depends on
+-- that grouping, so `l4 run` names Alice once and `l4 batch` twice; unstable
+-- names her twice under both. This is #817's behaviour, made visible by the
+-- blame list, not the port's (the adversarial pass of 2026-11-20, F1; NOTE
+-- [The same breach on both sides is named once] in L4.EvaluateLazy.Machine).
+DECLARE Person IS ONE OF Alice, Bob, Carol, Dave
+DECLARE Action IS ONE OF deliver, notify, ship, exercise
+
+GIVETH A DEONTIC Person Action
+`signs` MEANS PARTY Alice MUST deliver WITHIN 8
+
+GIVETH A DEONTIC Person Action
+`late` MEANS PARTY Bob MUST ship WITHIN 5
+
+GIVETH A DEONTIC Person Action
+`root` MEANS (`signs` RAND `signs`) RAND `late`
+
+#TRACE `root` AT 0 WITH
+  PARTY Dave DOES exercise AT 40
+
+@export default trivial entry point, so l4 batch has a function to call
+zzT MEANS TRUE

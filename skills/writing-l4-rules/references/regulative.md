@@ -113,7 +113,10 @@ LEST  BREACH
 LEST  BREACH BY Seller
 LEST  BREACH BECAUSE "delivery deadline exceeded"
 LEST  BREACH BY Seller BECAUSE "failed to deliver within 14 days"
+LEST  BREACH BY LIST Seller, Carrier BECAUSE "goods lost in transit"
 ```
+
+`BY LIST` names several parties: one line each in the answer, in the order written, each with the `BECAUSE`, repeats kept. A list written out empty (`BY EMPTY`) is a check error; a computed list that turns out empty is an error when the rule runs.
 
 `BECAUSE` attaches a reason to a breach and is reported in the trace output. Use it — breach reasons are the thing a legal reviewer or downstream system actually wants to read.
 
@@ -219,8 +222,9 @@ GIVETH A DEONTIC Party Action
 
 `RAND` and `ROR` compose obligations in parallel.
 
-- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches.
-- **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound.
+- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches. When both sides are lost the breach names both sides' failures, left first, one line each with that side's own action-and-deadline or `BECAUSE`; the same party failing two different things is named twice, but a failure both sides come back with is named once: the same rule on both sides (`x RAND x`, or under a second name, checked once), two `LEST`s that lead to the same rule inside a `RAND`/`ROR` at the same moment on the same events, or a failure passed on from a kept side (`signs RAND (pays RAND signs)` once `pays` is done), so the count can depend on the events and on the order values are worked out, and `l4 batch` can name a failure twice where `l4 run` names it once. A failure reached several ways that stay separate is named once per way, so `LEST`s that lead on to each other can name 2ⁿ failures n pairs deep.
+- **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound; it breaches only when every side is lost, and then names every side's failure the same way.
+- **When a compound breach happened.** Each failure took effect at an instant: a missed deadline at the deadline, a broken `SHANT` at the act, a `LEST BREACH` at the instant its `LEST` counts from. A `RAND` is lost at the earliest of its sides' instants and an `ROR` at the latest, worked out inside out, whichever side is written first; the failures at that instant are the decisive ones, printed first. Reference: <https://legalese.com/l4/reference/regulative/consequences.md#when-a-breach-happened>
 - **Precedence:** `RAND` binds tighter than `ROR`, so `A ROR B RAND C` means `A ROR (B RAND C)`.
 
 ```l4

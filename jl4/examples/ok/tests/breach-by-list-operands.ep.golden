@@ -1,0 +1,56 @@
+-- A BREACH BY a list as an operand of a RAND or ROR, wherever the party type
+-- is known by the time the list is read: from the GIVETH, which reaches both
+-- operands, or from a PARTY operand checked before it. Each list names one
+-- party per element. Before this branch ported unstable's
+-- checkRegulativeBinOp, each of these was refused at the BREACH
+-- (check/breach-by-list-needs-party-type). Each answer under l4 run equals
+-- unstable's. (The adversarial pass of 2026-11-20: F3, F3b, BL-1, BL-4.)
+
+DECLARE Person IS ONE OF Alice, Bob, Carol, Dave
+DECLARE Action IS ONE OF deliver, notify, exercise, noop
+DECLARE Step IS ONE OF handover, idle
+
+-- 1. The second operand, under a GIVETH, after an operand that names nobody.
+GIVETH A DEONTIC Person Action
+`second operand of an ROR` MEANS
+    (FULFILLED) ROR (BREACH BY LIST Alice, Bob BECAUSE "x")
+
+#TRACE `second operand of an ROR` AT 0 WITH
+  PARTY Dave DOES exercise AT 20
+
+-- 2. The same as the second operand of a RAND.
+GIVETH A DEONTIC Person Action
+`second operand of a RAND` MEANS
+    (FULFILLED) RAND (BREACH BY LIST Alice, Bob BECAUSE "x")
+
+#TRACE `second operand of a RAND` AT 0 WITH
+  PARTY Dave DOES exercise AT 20
+
+-- 3. No GIVETH: the first operand of the RIGHT operand, after a PARTY operand
+--    that fixes the party type.
+`first operand of the right operand` MEANS
+    (PARTY Dave MUST notify WITHIN 4)
+    RAND
+    ((BREACH BY LIST Alice, Bob BECAUSE "x") RAND (PARTY Carol MUST deliver WITHIN 3))
+
+#TRACE `first operand of the right operand` AT 0 WITH
+  PARTY Dave DOES exercise AT 20
+
+-- 4. No GIVETH: the first operand of a RAND under a LEST, whose PARTY line
+--    fixes the party type.
+`first operand under a LEST` MEANS
+    PARTY Alice MUST deliver WITHIN 5
+    LEST ((BREACH BY LIST Alice, Bob) RAND (PARTY Bob MUST deliver WITHIN 3))
+
+#TRACE `first operand under a LEST` AT 0 WITH
+  PARTY Alice DOES noop AT 20
+
+-- 5. No GIVETH, a party whose value is a list, and one BY naming it: the
+--    PARTY line fixes the party type as the list's type, so the list is ONE
+--    party.
+`a list-valued party under a LEST` MEANS
+    PARTY (LIST "a") MUST handover WITHIN 5
+    LEST (FULFILLED RAND (BREACH BY (LIST "a")))
+
+#TRACE `a list-valued party under a LEST` AT 0 WITH
+  PARTY (LIST "a") DOES idle AT 20

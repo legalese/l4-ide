@@ -136,6 +136,20 @@ data CheckError =
     -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
     -- the exported function's name, and the input's name (Nothing when it is
     -- the result).
+  | EmptyBreachBy (Expr Name)
+    -- ^ @BREACH BY@ given a list literal with nobody in it (@EMPTY@, or
+    -- @LIST@ with no elements). A breach blames at least one party, and a
+    -- literal is decidable here; a COMPUTED list that turns out empty is
+    -- refused when the rule runs instead (R-T3, EVERY-EACH-QUANTIFIER-SPEC
+    -- §6.1 on @unstable@). Carries the expression for its source range.
+  | BreachByListNeedsPartyType (Expr Name)
+    -- ^ @BREACH BY@ given a LIST while the rule's party type is still an
+    -- inference variable: a top-level @MEANS@ with no @GIVETH@, or the first
+    -- operand of a @RAND@\/@ROR@ that has none. Whether the list names several parties or
+    -- one list-valued party is decided by the party type
+    -- ('L4.TypeCheck.checkBreachParty'), so it cannot be decided here (from
+    -- @unstable@'s 9d620c355, EVERY-EACH-QUANTIFIER-SPEC §6.1.1 there).
+    -- Carries the expression for its source range.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -245,6 +259,7 @@ data ExpectationContext =
   | ExpectPostBodyContext -- body argument of POST
   | ExpectConcatArgumentContext -- argument of CONCAT
   | ExpectAsStringArgumentContext -- argument of AS STRING
+  | ExpectBreachPartyContext -- the BY argument of BREACH: a party, or a LIST of parties
   | ExpectBreachReasonContext -- reason argument of BREACH
   | ExpectRefuseMessageContext -- message argument of REFUSE
   | ExpectAssertRefusedBecauseContext -- the BECAUSE literal of #ASSERT REFUSED
@@ -335,6 +350,8 @@ checkErrorCode = \ case
   SuppliedComputedField {}       -> "check/supplied-computed-field"
   ExportFunctionTypeInput {}     -> "check/export-function-input"
   ExportEventType {}             -> "check/export-event-type"
+  EmptyBreachBy {}               -> "check/empty-breach-by"
+  BreachByListNeedsPartyType {}  -> "check/breach-by-list-needs-party-type"
 
 -- | The code of a checker warning. See 'checkErrorCode'.
 checkWarningCode :: CheckWarning -> Text
@@ -429,6 +446,8 @@ instance HasSrcRange CheckError where
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
   rangeOf (ExportedClausesWithoutGiven r _) = r
   rangeOf (ExportEventType r _ _)           = r
+  rangeOf (EmptyBreachBy e)                 = rangeOf e
+  rangeOf (BreachByListNeedsPartyType e)    = rangeOf e
   rangeOf (CheckInfo _ mr)                  = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
@@ -1587,6 +1606,16 @@ typeKey = \ case
   Fun _ onts t  -> TyKFun (typeKey . optionallyNamedTypeType <$> onts) (typeKey t)
   Forall _ ns t -> TyKForall (length ns) (typeKey t)
   InfVar _ _ i  -> TyKInfVar i
+
+-- | Does the type still contain an inference variable anywhere? (From
+-- @unstable@; 'L4.TypeCheck.checkBreachParty' needs it.)
+hasInfVarKey :: TypeKey -> Bool
+hasInfVarKey = \ case
+  TyKType       -> False
+  TyKApp _ ks   -> any hasInfVarKey ks
+  TyKFun ks k   -> any hasInfVarKey ks || hasInfVarKey k
+  TyKForall _ k -> hasInfVarKey k
+  TyKInfVar _   -> True
 
 -- | Bind an unbound inference variable, and record that it was bound
 -- ('CheckState.bindLog'). The only way to bind one.

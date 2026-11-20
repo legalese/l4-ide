@@ -2410,6 +2410,8 @@ spec = describe "integration" do
   -- client asking "is the party who acted the party who was obliged?" by
   -- comparing the two strings got a false no. The README's rule for an enum
   -- answer is the plain name, and a party or an action NAME is an enum answer.
+  -- The blame set's `obligatedParties` and the `party` and `action` of each of
+  -- a BREACH's `failures` are spelled the same way.
   describe "deontic answers spell a party and an action one way" do
     let seller = "the seller" :: Text
         buyer = "the buyer" :: Text
@@ -2459,7 +2461,15 @@ spec = describe "integration" do
               stringAt "eventParty" fields `shouldBe` Just seller
               stringAt "eventAction" fields `shouldBe` Just delivery
               -- the obligation that was missed
+              stringAt "obligatedParty" fields `shouldBe` Just seller
               stringAt "obligationAction" fields `shouldBe` Just delivery
+              -- the blame set (R-T3): every party named, and every failure
+              lookup "obligatedParties" fields `shouldBe` Just (FnArray [FnLitString seller])
+              case lookup "failures" fields of
+                Just (FnArray [FnObject failure]) -> do
+                  stringAt "party" failure `shouldBe` Just seller
+                  stringAt "action" failure `shouldBe` Just delivery
+                other -> expectationFailure ("Expected one failure, got: " <> show other)
             other -> expectationFailure ("Expected BREACH, got: " <> show other)
 
     -- the client's question, asked across two answers

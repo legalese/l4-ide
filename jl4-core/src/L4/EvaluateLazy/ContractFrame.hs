@@ -58,6 +58,15 @@ data ContractFrame
   -- the clock and events in the list, or answer from the memo of rules already
   -- applied to the same (see 'AppliedKey'). It always sits directly on the
   -- 'RBinOp1' or 'RBinOp2' frame of its compound.
+  | StampBreach StampBreachFrame
+  -- ^ SEESAW (EVERY-EACH-QUANTIFIER-SPEC §6.1.2 on @unstable@): a breach that
+  -- names a declared failure with no timing yet has met the @[time, events]@
+  -- of the hand-off that reached it; the clock is being forced, so the
+  -- failure can take it as its effective instant ('L4.EvaluateLazy.Machine',
+  -- the @App1@ frame). A breach already timed is never re-stamped.
+  | BreachBy BreachByFrame
+  -- ^ @BREACH BY e@, with @e@ under evaluation: a party, or a LIST of parties
+  -- walked one cell per step (R-T3, §6.1 on @unstable@).
   deriving stock Show
 
 -- | What the application of a RAND or ROR operand to a clock and events is
@@ -117,9 +126,15 @@ data EventsKey
     -- ^ a list not yet evaluated, or not of this shape, by its reference
   deriving stock (Eq, Show)
 
+-- | An obligation scrutinising its events. Every record from here to
+-- 'ActionDoesn'tmatch' also carries @armed@: the clock the obligation was
+-- entered at, the @time@ it met its events with at 'App1', kept while @time@
+-- moves on to each event it sees. The expiry step floors a missed deadline's
+-- effective instant and the hand-off clock at it (SEESAW, EVERY-EACH-QUANTIFIER-SPEC
+-- §6.1.2 on @unstable@, its card A2), as @unstable@ does.
 data ScrutinizeEvents = ScrutinizeEvents
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
-  , time :: Reference
+  , time :: Reference, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -146,7 +161,7 @@ data Reoffered = MkReoffered
 
 data ScrutinizeEvent = ScrutinizeEvent
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
-  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -154,7 +169,7 @@ data ScrutinizeEvent = ScrutinizeEvent
 data CurrentTimeWHNF = CurrentTimeWHNF
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
-  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -162,7 +177,7 @@ data CurrentTimeWHNF = CurrentTimeWHNF
 data ScrutinizeDue = ScrutinizeDue
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
+  , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -170,7 +185,7 @@ data ScrutinizeDue = ScrutinizeDue
 data CheckTiming = CheckTiming
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -178,7 +193,7 @@ data CheckTiming = CheckTiming
 data PartyWHNF = PartyWHNF
   { act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -186,7 +201,7 @@ data PartyWHNF = PartyWHNF
 data PartyEqual = PartyEqual
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -194,7 +209,7 @@ data PartyEqual = PartyEqual
 data ScrutinizeParty = ScrutinizeParty
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -202,7 +217,7 @@ data ScrutinizeParty = ScrutinizeParty
 data ScrutinizeEnvironment = ScrutinizeEnvironment
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -210,7 +225,7 @@ data ScrutinizeEnvironment = ScrutinizeEnvironment
 data ScrutinizeActions = ScrutinizeActions
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, armed :: Reference
   , env :: Environment, henceEnv :: Environment -- ^ the environment to extend by when evaluating the hence clause
   }
   deriving stock Show
@@ -218,7 +233,7 @@ data ScrutinizeActions = ScrutinizeActions
 data ActionDoesn'tmatch = ActionDoesn'tmatch
   { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, armed :: Reference
   , env :: Environment
   }
   deriving stock Show
@@ -242,5 +257,22 @@ data RBinOp2 = MkRBinOp2
   , env :: Environment
   , record2 :: Maybe AppliedKey
     -- ^ the same, for the right operand
+  }
+  deriving stock Show
+
+-- | A breach whose declared failures are waiting for their hand-off clock
+-- ('StampBreach').
+data StampBreachFrame = StampBreachFrame
+  { reason    :: ReasonForBreach Reference -- ^ the breach as it arrived
+  , eventsRef :: Reference                 -- ^ the stream it was handed: a re-offered event at its head revealed it
+  }
+  deriving stock Show
+
+-- | @BREACH BY e@, with @e@ under evaluation.
+data BreachByFrame = BreachByFrame
+  { partyRef :: Reference          -- ^ the whole @BY@ expression, allocated (forced on return)
+  , acc      :: [Reference]        -- ^ list elements collected so far, reversed
+  , mReason  :: Maybe Reference    -- ^ the @BECAUSE@, allocated
+  , clause   :: Text               -- ^ where the @BREACH@ was written, for the empty-list error
   }
   deriving stock Show
