@@ -553,7 +553,6 @@ batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 batchMaybeTextJson = fixtureDir </> "batch-maybe-text.json"
 
--- | A constructor that carries data, as an input.
 -- | A type whose only constructor is named like it, as an input.
 batchRecordLikeFixture, batchRecordLikeJson :: FilePath
 batchRecordLikeFixture = fixtureDir </> "batch-record-like.l4"
@@ -564,6 +563,12 @@ batchUnitFixture, batchUnitJson :: FilePath
 batchUnitFixture = fixtureDir </> "batch-unit.l4"
 batchUnitJson = fixtureDir </> "batch-unit.json"
 
+-- | Types that take a type, as inputs.
+batchTypeParamsFixture, batchTypeParamsJson :: FilePath
+batchTypeParamsFixture = fixtureDir </> "batch-type-params.l4"
+batchTypeParamsJson = fixtureDir </> "batch-type-params.json"
+
+-- | A constructor that carries data, as an input.
 batchTaggedFixture, batchTaggedJson :: FilePath
 batchTaggedFixture = fixtureDir </> "batch-tagged.l4"
 batchTaggedJson = fixtureDir </> "batch-tagged.json"
@@ -4438,6 +4443,19 @@ spec bin = do
         (_, _, rows) <- rowsOf [batchUnitFixture, "--inputs", batchUnitJson]
         map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "success", "error"]
         map resultOf (take 2 rows) `shouldBe` [Just (Number 1), Just (Number 1)]
+
+      -- A type that takes a type is read with what it is given in place of its
+      -- parameters, in the form the schemas publish: each of these decoded to
+      -- NOTHING, and the wrapper's input record did not parse with a second
+      -- input after such a type (review of #779, 2026-11-20).
+      it "reads a type that takes a type, as the schemas publish it" $ do
+        (code, _, rows) <- rowsOf [batchTypeParamsFixture, "--inputs", batchTypeParamsJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "success", "error"]
+        map resultOf (take 2 rows) `shouldBe` [Just (Number 115), Just (Number 5)]
+        case drop 2 rows of
+          [tagged] -> show (objField tagged "diagnostics") `shouldSatisfy` ("Missing required field 'amount'" `isInfixOf`)
+          other -> expectationFailure ("expected 3 rows, got " ++ show (length other + 2))
 
       -- An input declared through a synonym is the type the synonym stands for
       -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:

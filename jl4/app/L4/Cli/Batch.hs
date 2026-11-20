@@ -975,8 +975,15 @@ generateInputRecord params = Text.unlines $
   where
     formatField (idx, (name, mty)) =
       let fieldIndent = if idx == 0 then "  " else ", "
-          tyText      = maybe "A NUMBER" prettyLayout mty
+          tyText      = maybe "A NUMBER" (bracketed . prettyLayout) mty
       in fieldIndent <> quoteIdent name <> " IS " <> tyText
+    -- A type of more than one word is bracketed: unbracketed, the comma that
+    -- starts the next field is read as one more of its arguments
+    -- (@h IS Holding OF NUMBER@ then @, pad IS ...@ is a parse error), as the
+    -- service's wrapper brackets one ('Backend.MaybeLift.liftTypeText').
+    bracketed t
+      | Text.any (== ' ') t = "(" <> t <> ")"
+      | otherwise = t
 
 generateDecoder :: Text
 generateDecoder = Text.unlines
