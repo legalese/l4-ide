@@ -1,0 +1,6 @@
+IMPORT `sub/../core`
+IMPORT core
+
+twice MEANS coremarker + coremarker
+
+#EVAL twice

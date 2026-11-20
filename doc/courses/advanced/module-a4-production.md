@@ -52,7 +52,7 @@ DECLARE Person
         `bankrupt` IS A BOOLEAN
 ```
 
-Each rule file imports it by name; a name with a hyphen goes in backticks:
+Each rule file imports it by name; a name with a hyphen goes in backticks. (If the shared file lives in another folder, write its path in backticks instead, relative to the file that imports it: ``IMPORT `../shared/shared-types` ``.)
 
 ```l4
 -- governors.l4

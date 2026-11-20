@@ -1,0 +1,6 @@
+IMPORT `../b/mod`
+IMPORT `./helper`
+
+`answer` MEANS modmarker + helpmarker
+
+#EVAL answer
