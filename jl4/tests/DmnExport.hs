@@ -3521,9 +3521,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         let live = drgOf (helperSrc <> "GIVETH A NUMBER\nliveuse MEANS helper 5\n")
         map (.bkmName) (drgBkms live) `shouldSatisfy` elem "helper"
 
-    -- §7.7: the 10th-constructor tripwire. 'UserEvalException' has exactly 9
+    -- §7.7: the constructor tripwire. 'UserEvalException' has exactly 10
     -- constructors, and every one is either foreclosed by a DMN-SAFE clause
-    -- or deliberately NOT foreclosed. A tenth constructor makes the case
+    -- or deliberately NOT foreclosed. An eleventh constructor makes the case
     -- below incomplete — under -Wall -Werror the WARNING is the alarm — and
     -- the count assertion is the belt to those braces. When it fires: add the
     -- constructor to the coverage map AND to L4.Dmn.Analysis, or record why
@@ -3544,11 +3544,15 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               -- unknown input, and never reported: the directive boundary
               -- rewrites it into 'Stuck' (UNKNOWN-EVALUATION-SPEC §4.5)
               RanOutOfSteps               -> "TERMINATES (a resource bound on an unknown; reported as Stuck)"
-            constructorCount = 9 :: Int
+              -- smucclaw/l4-ide#1075: a program TERMINATES certifies can
+              -- still be stopped by a budget on a large enough input, as it
+              -- can by StackOverflow
+              OverBudget _                -> "TERMINATES (a resource bound, not a clause)"
+            constructorCount = 10 :: Int
         -- the case above is TOTAL; -Werror's incomplete-pattern warning fires
-        -- on a tenth constructor before this assertion ever runs
+        -- on an eleventh constructor before this assertion ever runs
         coveredBy StackOverflow `shouldSatisfy` (not . Text.null)
-        constructorCount `shouldBe` 9
+        constructorCount `shouldBe` 10
 
   -- smucclaw/l4-ide#936. Two gaps, one issue, and the tests are written in that
   -- order deliberately: the FEEL lowering alone would have removed a loud

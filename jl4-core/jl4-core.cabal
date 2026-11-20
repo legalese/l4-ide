@@ -331,6 +331,7 @@ test-suite jl4-core-test
     ConsiderScaleSpec
     VariadicRescueScaleSpec
     PrintLayoutSpec
+    BudgetSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

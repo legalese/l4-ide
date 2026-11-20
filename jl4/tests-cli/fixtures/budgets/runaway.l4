@@ -1,0 +1,14 @@
+-- smucclaw/l4-ide#1075: each missed window of w1 starts w3 and w1 again, and
+-- each of w3's starts w1 and w3, so what is open doubles every two units
+-- of time. The #TRACE stops at the limit on open obligations; the #EVAL after
+-- it still answers.
+DECLARE Person IS ONE OF Alice, Carol
+DECLARE Action IS ONE OF deliver, smoke
+
+w1 MEANS PARTY Carol MUST deliver WITHIN 2 LEST (w3 ROR w1)
+w3 MEANS PARTY Alice MAY smoke WITHIN 2 LEST (w1 RAND w3)
+
+#TRACE w1 AT 0 WITH
+  (`WAIT UNTIL` 60)
+
+#EVAL 1 PLUS 1

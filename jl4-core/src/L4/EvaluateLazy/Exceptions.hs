@@ -5,12 +5,15 @@ module L4.EvaluateLazy.Exceptions
 ( EvalException (..)
 , InternalEvalException (..)
 , UserEvalException (..)
+, Budget (..)
 , Refusal (..)
 , prettyEvalException
 , prettyRefusal
 , maximumStackSize
 , maximumFrameDepth
 , maximumUnknownSteps
+, maximumOpenObligations
+, maximumClosureApplications
 )
 where
 
@@ -21,6 +24,7 @@ import L4.Evaluate.ValueLazy
 import L4.Evaluate.Operators
 import L4.Print
 import L4.Annotation (emptyAnno)
+import L4.Parser.SrcSpan (SrcRange, prettySrcRangeM)
 import L4.Syntax
 import L4.Utils.Ratio
 
@@ -89,6 +93,37 @@ data UserEvalException =
     -- right operand ran out, or the directive boundary, rewrites it into
     -- 'Stuck' naming the inputs that started the count.
   | UserError Text -- ^ general user-facing error (e.g. missing TIMEZONE declaration)
+  | OverBudget Budget
+    -- ^ smucclaw/l4-ide#1075: the directive went over one of the machine's
+    -- budgets ('Budget'). Raised as any user exception is, so
+    -- 'tryEval' makes it that directive's result and the next directive
+    -- still runs.
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | Which budget a directive went over, with the limit it went over. The
+-- first two count something the machine does, never time or memory, so the
+-- same program stops at the same place on every machine, and they are on by
+-- default; they carry the site that took the directive over. The last two
+-- are opt-in, and are not (smucclaw/l4-ide#1075).
+data Budget
+  = OpenObligations Int (Maybe SrcRange)
+    -- ^ more obligations armed and not yet handed on, breached or left
+    -- waiting at the end of the events than the limit: a HENCE or LEST that
+    -- arms two obligations and leads back to itself doubles this each time
+    -- round. The site is the action of the obligation whose arming went over.
+  | ClosureApplications Int (Maybe SrcRange)
+    -- ^ more applications of functions written in L4 than the limit: a
+    -- function that calls itself with new inputs and never stops pushes no
+    -- frame, so the frame limit never sees it. The site is the body of the
+    -- function whose application went over.
+  | TimeLimit Int
+    -- ^ the directive ran longer than the opt-in @--eval-timeout@, in
+    -- seconds of wall-clock time. Not deterministic: it depends on the
+    -- machine and its load.
+  | MemoryLimit Int
+    -- ^ the directive allocated more than the opt-in @--max-eval-memory-mb@,
+    -- in megabytes: every byte allocated while working, not what is held.
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
@@ -187,6 +222,21 @@ prettyUserEvalException = \ case
       <> Text.textShow maximumUnknownSteps <> " steps." ]
   UserError msg ->
     [ msg ]
+  -- Wording decided by Claude 2026-11-20, pending Meng's review.
+  OverBudget (OpenObligations limit site) ->
+    [ "I stopped evaluating: more than " <> Text.textShow limit <> " obligations were open at once."
+    , "The last one was armed by the rule at " <> prettySrcRangeM site <> "."
+    , "A HENCE or LEST that names more than one obligation adds to what is open,"
+    , "and a chain of them that leads back to where it started multiplies it each time round." ]
+  OverBudget (ClosureApplications limit site) ->
+    [ "I stopped evaluating: functions were applied more than " <> Text.textShow limit <> " times."
+    , "The last one applied was the function at " <> prettySrcRangeM site <> "."
+    , "A function that calls itself with new inputs, and never reaches a case that stops, never ends." ]
+  OverBudget (TimeLimit limit) ->
+    [ "I stopped evaluating: this took longer than " <> Text.textShow limit <> " seconds (--eval-timeout)." ]
+  OverBudget (MemoryLimit limit) ->
+    [ "I stopped evaluating: this allocated more than " <> Text.textShow limit <> " MB (--max-eval-memory-mb)."
+    , "That counts every byte allocated while working it out, not only what is kept." ]
 
 -- | A name a 'Stuck' carries, as its message prints it. An input prints
 -- exactly as it always has, so the one-input message is unchanged.
@@ -204,6 +254,20 @@ indentStuckName = \ case
 -- take far more, measures it again.
 maximumUnknownSteps :: Int
 maximumUnknownSteps = 250_000
+
+-- | How many obligations one directive may have open at once before the
+-- machine stops it with 'OpenObligations' (smucclaw/l4-ide#1075). PROVISIONAL:
+-- the number waits for the corpus sweep and Meng's ruling on decision 4 of
+-- the #1075 design advice. A rent rule that re-arms itself holds one open;
+-- #1075's rule holds 16,384 at WAIT UNTIL 30.
+maximumOpenObligations :: Int
+maximumOpenObligations = 100_000
+
+-- | How many applications of L4 functions one directive may make before the
+-- machine stops it with 'ClosureApplications' (smucclaw/l4-ide#1075).
+-- PROVISIONAL, as 'maximumOpenObligations' is.
+maximumClosureApplications :: Int
+maximumClosureApplications = 100_000_000
 
 -- | Depth cutoff when converting WHNF results to normal form (deeper parts
 -- of the result are 'Omitted').

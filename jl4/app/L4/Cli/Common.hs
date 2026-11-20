@@ -9,6 +9,9 @@ module L4.Cli.Common
     FixedNowOpt(..)
   , fixedNowParser
   , parseFixedNowText
+  , EvalLimitsOpt(..)
+  , evalLimitsParser
+  , withEvalLimits
   , langTagReader
   , langOption
 
@@ -76,7 +79,7 @@ import qualified LSP.L4.Rules as Rules
 import L4.Syntax (Module (..), Resolved)
 import qualified Data.List as List
 import L4.EvaluateLazy
-  ( EvalConfig
+  ( EvalConfig(..)
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
   , parseFixedNow
@@ -120,6 +123,40 @@ fixedNowParser = fmap FixedNowOpt $ optional $
     <> metavar "ISO8601"
     <> help "Pin evaluation clock (e.g. 2025-01-31T15:45:30Z) so NOW/TODAY stay deterministic"
     )
+
+-- | The opt-in limits on each directive's evaluation (smucclaw/l4-ide#1075),
+-- named as jl4-service names its own. A directive over either one becomes an
+-- error, and the directives after it still run. Neither is deterministic, so
+-- both are off unless asked for; the counted budgets ('maximumOpenObligations',
+-- 'maximumClosureApplications') are on by default.
+data EvalLimitsOpt = EvalLimitsOpt
+  { limitSeconds   :: Maybe Int
+  , limitMegabytes :: Maybe Int
+  }
+
+evalLimitsParser :: Options.Parser EvalLimitsOpt
+evalLimitsParser = EvalLimitsOpt
+  <$> optional (option positiveIntReader
+        ( long "eval-timeout"
+        <> metavar "SECONDS"
+        <> help "Stop any one #EVAL, #ASSERT or #TRACE that runs longer than SECONDS of wall-clock time, and go on with the next"
+        ))
+  <*> optional (option positiveIntReader
+        ( long "max-eval-memory-mb"
+        <> metavar "MB"
+        <> help "Stop any one #EVAL, #ASSERT or #TRACE that allocates more than MB megabytes (every byte allocated, not only what is kept), and go on with the next"
+        ))
+  where
+    positiveIntReader = eitherReader \ input -> case reads input of
+      [(n, "")] | n > (0 :: Int) -> Right n
+      _ -> Left ("expected a whole number above 0, got " <> show input)
+
+-- | Put the opt-in limits into an 'EvalConfig'.
+withEvalLimits :: EvalLimitsOpt -> EvalConfig -> EvalConfig
+withEvalLimits lims cfg = cfg
+  { directiveSeconds   = lims.limitSeconds
+  , directiveMegabytes = lims.limitMegabytes
+  }
 
 -- | Read a @--lang@ value into a 'LangTag'.
 --

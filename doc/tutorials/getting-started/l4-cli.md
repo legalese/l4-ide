@@ -289,6 +289,36 @@ If your rules use `NOW` or `TODAY`, pin the evaluation clock so results are repr
 l4 run --fixed-now 2025-01-31T15:45:30Z myfile.l4
 ```
 
+### Stopping a line that runs too long
+
+A rule can be written so that working it out never ends: a function that keeps calling itself, or obligations that keep starting more obligations.
+L4 stops any one `#EVAL`, `#ASSERT` or `#TRACE` that applies functions more than 100,000,000 times, or has more than 100,000 obligations open at once, and says which; the [error messages](../../reference/errors/README.md#functions-were-applied-more-than-so-many-times) page explains both.
+Those limits count steps, not seconds, so a file stops at the same place on every computer.
+They limit how long a line runs, not how much memory it holds: a function that keeps every value it passes along can run out of memory first.
+
+Two more limits are off unless you ask for them:
+
+```bash
+l4 run --eval-timeout 10 --max-eval-memory-mb 500 myfile.l4
+```
+
+- `--eval-timeout SECONDS` stops any one line that runs longer than that, by the clock on the wall. The same file can stop on a busy computer and finish on an idle one.
+- `--max-eval-memory-mb MB` stops any one line that allocates more than that many megabytes. It counts every byte allocated while working, not only what is kept, so set it well above what the file holds; because what is kept can never be more than what was allocated, it also stops a line before it holds that much.
+
+Either way, only that line stops: it is reported as an error, the lines after it still run, and `l4 run` exits with an error.
+In `--json` output its result carries `"limit"`, which is `"time"`, `"memory"`, `"obligations"` or `"applications"`; no other result has that key.
+`l4 batch` takes the same two flags.
+
+What the limits do not cover: they are checked between steps of the evaluation, so one step that is itself a long calculation (raising a number to a huge power) finishes before it is stopped, and printing the answer comes after the line has finished, outside the limits.
+
+To cap the memory the whole run may hold, whatever it is doing, add `+RTS -M2g -RTS` (or another size) after the other arguments:
+
+```bash
+l4 run myfile.l4 +RTS -M2g -RTS
+```
+
+This cap is not per line: when the run holds more than that, the whole run stops with `Heap exhausted`, and none of the lines after it run.
+
 ---
 
 ## Step 4: `l4 check` — Typecheck Without Running

@@ -177,6 +177,7 @@ data BatchOptions = BatchOptions
   , batchValidateOnly   :: Bool
   , batchFixedNow       :: FixedNowOpt
   , batchPresumption    :: Presumption
+  , batchLimits         :: EvalLimitsOpt
   }
 
 outputFormatReader :: ReadM OutputFormat
@@ -243,6 +244,7 @@ batchOptionsParser = BatchOptions
         <> showDefaultWith (const "soft")
         <> help "soft (default): an input a row leaves out takes its TYPICALLY default; hard: it is a missing input, and the row is an error naming it"
         )
+  <*> evalLimitsParser
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -250,7 +252,7 @@ batchOptionsParser = BatchOptions
 
 batchCmd :: BatchOptions -> IO ()
 batchCmd opts = do
-  evalConfig0 <- makeEvalConfig opts.batchFixedNow
+  evalConfig0 <- withEvalLimits opts.batchLimits <$> makeEvalConfig opts.batchFixedNow
   -- T4: one switch for the whole evaluation. The JSON decoder reads it for
   -- every input and record field it fills; discharge reads it for a section
   -- binder (which batch supplies through the decoder anyway, see below).

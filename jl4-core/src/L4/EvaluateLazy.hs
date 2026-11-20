@@ -136,6 +136,22 @@ data EvalConfig = EvalConfig
     -- them ran before, one operand over the whole stream and then the other,
     -- where the sibling-read check refuses what that order gets wrong; it is
     -- there only so that tests can compare the two orders.
+  , maxOpenObligations :: !(Maybe Int)
+    -- ^ smucclaw/l4-ide#1075: the most obligations one directive may have
+    -- open at once ('OpenObligations'). 'maximumOpenObligations' by default;
+    -- 'Nothing' sets no limit.
+  , maxClosureApplications :: !(Maybe Int)
+    -- ^ the most applications of L4 functions one directive may make
+    -- ('ClosureApplications'). 'maximumClosureApplications' by default;
+    -- 'Nothing' sets no limit.
+  , directiveSeconds :: !(Maybe Int)
+    -- ^ the opt-in wall-clock limit on each directive, in seconds
+    -- ('TimeLimit'; @--eval-timeout@). 'Nothing' by default.
+  , directiveMegabytes :: !(Maybe Int)
+    -- ^ the opt-in allocation limit on each directive, in megabytes
+    -- ('MemoryLimit'; @--max-eval-memory-mb@). 'Nothing' by default. Unlike
+    -- 'allocationLimit', which caps a whole module from outside, this one
+    -- stops one directive and lets the next run.
   }
 
 -- | A cap, in bytes, on what an evaluation may allocate.
@@ -153,7 +169,8 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True
+         (Just maximumOpenObligations) (Just maximumClosureApplications) Nothing Nothing)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -271,6 +288,8 @@ runConfig = \ case
     -- UNKNOWN-EVALUATION-SPEC §4.5: every step counts once the counter has
     -- started, and none before
     tickUnknownSteps
+    -- smucclaw/l4-ide#1075: and the opt-in time and allocation limits
+    tickLimits
     runConfigStep config
 
 runConfigStep :: Config -> Eval WHNF
@@ -316,6 +335,8 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- UNKNOWN-EVALUATION-SPEC §4.5 (C4): the step counter starts afresh, and
   -- stopped, for every directive.
   resetUnknownSteps
+  -- smucclaw/l4-ide#1075: and so do the budgets
+  resetBudget
   -- Snapshot the ambient temporal context and restore it unconditionally
   -- after the directive. 'unwindFrame' already restores saved contexts
   -- frame by frame during exceptional unwinding; this directive boundary is
@@ -938,6 +959,14 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   -- UNKNOWN-EVALUATION-SPEC §4.5: stopped until a directive's first term
   unknownSteps   <- newIORef (-1)
   unknownReached <- newIORef []
+  -- smucclaw/l4-ide#1075: reset per directive ('resetBudget'). The clock
+  -- reads nothing until then: a step taken outside any directive is under
+  -- no time or allocation limit, rather than measured from zero, which
+  -- would stop it at once.
+  armings      <- newIORef 0
+  closes       <- newIORef 0
+  applications <- newIORef 0
+  limitClock   <- newIORef (MkLimitClock maxBound 0 0)
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
   pure MkEvalState
@@ -946,6 +975,13 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
     , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog
+    , armings, closes, applications
+    , openLimit = evalConfig.maxOpenObligations
+    , applicationLimit = evalConfig.maxClosureApplications
+    , directiveLimits = case (evalConfig.directiveSeconds, evalConfig.directiveMegabytes) of
+        (Nothing, Nothing) -> Nothing
+        (secs, mbs)        -> Just MkDirectiveLimits {seconds = secs, megabytes = mbs}
+    , limitClock
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run

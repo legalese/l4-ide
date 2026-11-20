@@ -47,6 +47,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Unknown annotation](#unknown-annotation)
 - [Malformed annotation](#malformed-annotation)
 - [Infinite loop detected](#infinite-loop-detected)
+- [Functions were applied more than so many times](#functions-were-applied-more-than-so-many-times)
 
 **Assumed terms and refusals**
 
@@ -63,6 +64,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Regulative rules**
 
 - [#EVAL shows the rule instead of an outcome](#eval-shows-the-rule-instead-of-an-outcome)
+- [More obligations were open at once than the limit](#more-obligations-were-open-at-once-than-the-limit)
 
 **Export**
 
@@ -1024,7 +1026,7 @@ x MEANS x + 1
 
 To find `x`, L4 needs `x + 1`, which needs `x` again. L4 notices this for a value defined in terms of itself and stops with this error.
 
-A function that calls itself with new inputs, and never reaches a case that stops, is not caught: its `#EVAL` keeps running and never answers.
+A function that calls itself with new inputs, and never reaches a case that stops, is caught differently: see [Functions were applied more than so many times](#functions-were-applied-more-than-so-many-times).
 
 **How to fix it:** If you meant recursion, give it a case that stops:
 
@@ -1039,6 +1041,30 @@ factorial n MEANS
 ```
 
 If you did not, you probably meant another name on the right-hand side.
+
+---
+
+### Functions were applied more than so many times
+
+**Error:** `I stopped evaluating: functions were applied more than 100000000 times.`, then `The last one applied was the function at` and the place in your file.
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+countDown n MEANS
+    IF n EQUALS 0 THEN 0
+    ELSE countDown (n - 2)
+
+#EVAL countDown 5
+```
+
+`countDown` stops when `n` is 0, but counting down by 2 from 5 goes 3, 1, -1, and never meets 0. Each call starts afresh rather than waiting on the one before, so L4 cannot see a loop the way it does for [Infinite loop detected](#infinite-loop-detected); it counts instead. One `#EVAL`, `#ASSERT` or `#TRACE` may apply functions written in L4 at most 100,000,000 times, and past that it stops with this error.
+
+The count is of steps, not of time, so the same file stops at the same place on every computer. Only the line that went over the limit stops: the lines after it still run, and `l4 run` exits with an error.
+
+The count limits how long a line runs, not how much memory it uses. A function that passes along a value it never looks at, such as `countUp n MEANS countUp (n + 1)`, where nothing reads `n`, keeps every one of those values, and can run out of memory long before it reaches the limit. The `--max-eval-memory-mb` option of `l4 run` stops it sooner: see [Stopping a line that runs too long](../../tutorials/getting-started/l4-cli.md#stopping-a-line-that-runs-too-long).
+
+**How to fix it:** Make sure the function reaches its stopping case from every input: test with `AT MOST 0` rather than `EQUALS 0` when the input can step past 0. If the function does stop, but only after more than 100,000,000 calls, the work is too big for one evaluation: split it into smaller questions.
 
 ---
 
@@ -1289,6 +1315,29 @@ GIVETH A DEONTIC Party Action
 ```
 
 This gives `FULFILLED`. See [Regulative rules](../regulative/README.md) and [EVENT](../regulative/EVENT.md).
+
+---
+
+### More obligations were open at once than the limit
+
+**Error:** `I stopped evaluating: more than 100000 obligations were open at once.`, then `The last one was armed by the rule at` and the place in your file.
+
+```l4
+DECLARE Person IS ONE OF Alice, Carol
+DECLARE Action IS ONE OF deliver, smoke
+
+w1 MEANS PARTY Carol MUST deliver WITHIN 2 LEST (w3 ROR w1)
+w3 MEANS PARTY Alice MAY smoke WITHIN 2 LEST (w1 RAND w3)
+
+#TRACE w1 AT 0 WITH
+  (`WAIT UNTIL` 60)
+```
+
+Each time `w1`'s window closes, its `LEST` starts two obligations, `w3` and a new `w1`, and each of those does the same when its own window closes. What is open doubles every two units of time, so by time 60 it would be in the hundreds of millions. L4 counts the obligations a `#TRACE` or `#EVAL` has started and not yet finished, handed on or left waiting at the end of the trace, and stops at 100,000.
+
+A rule that starts itself again in its `HENCE` or `LEST`, as monthly rent does, holds one obligation open at a time, however long its trace, and never comes near the limit. Only the line that went over the limit stops: the lines after it still run, and `l4 run` exits with an error.
+
+**How to fix it:** Make sure that the `HENCE` or `LEST` of a rule that leads back to itself names one obligation, not two. If the rule really does mean that obligations multiply, give the trace fewer steps.
 
 ---
 

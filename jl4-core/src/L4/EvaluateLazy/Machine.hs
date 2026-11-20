@@ -18,6 +18,11 @@ module L4.EvaluateLazy.Machine
 -- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
 , tickUnknownSteps
 , resetUnknownSteps
+, resetBudget
+, budgetSpent
+, tickLimits
+, DirectiveLimits (..)
+, LimitClock (..)
 , reachedUnknowns
 , unknownNames
 , withPoppedFrame
@@ -146,6 +151,8 @@ import Text.Read (readMaybe)
 import qualified Data.Scientific as Sci
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Exception (SomeException, catch, fromException, throwIO, uninterruptibleMask_)
+import Data.Int (Int64)
+import GHC.Clock (getMonotonicTime)
 import GHC.Conc (getAllocationCounter, setAllocationCounter)
 import qualified Control.Exception
 
@@ -473,6 +480,31 @@ data EvalState =
       -- ^ UNKNOWN-EVALUATION-SPEC §4.5's step counter (C4): negative until a
       -- site of §4.3's table first receives a term in this directive, then
       -- the machine steps still allowed. Reset per directive.
+    , armings :: !(IORef Int)
+      -- ^ smucclaw/l4-ide#1075: the obligations this directive has armed
+      -- ('noteArming'). Reset per directive.
+    , closes :: !(IORef Int)
+      -- ^ the armed obligations this directive has closed: handed on to a
+      -- HENCE or LEST, or breached with no LEST ('noteClose'). An armed
+      -- obligation that is neither is waiting at the end of its events, so
+      -- @armings - closes@ is the number open. Kept apart from 'armings' so
+      -- that a missed close shows as a count that grows with the trace.
+    , applications :: !(IORef Int)
+      -- ^ the applications of L4 functions this directive has made
+      -- ('noteApplication'). Reset per directive.
+    , openLimit :: !(Maybe Int)
+      -- ^ the most obligations a directive may have open at once
+      -- ('OpenObligations'); 'Nothing' sets no limit
+    , applicationLimit :: !(Maybe Int)
+      -- ^ the most function applications a directive may make
+      -- ('ClosureApplications'); 'Nothing' sets no limit
+    , directiveLimits :: !(Maybe DirectiveLimits)
+      -- ^ the opt-in time and allocation limits on each directive
+      -- (@--eval-timeout@, @--max-eval-memory-mb@); 'Nothing' when neither
+      -- is set, and then 'tickLimits' costs one field read per step
+    , limitClock :: !(IORef LimitClock)
+      -- ^ where this directive's time and allocation started, and how many
+      -- steps until 'tickLimits' next reads them. Reset per directive.
     , unknownReached :: !(IORef [Term])
       -- ^ every input, or field of one, that reached a §4.3 site in this
       -- directive, first first: what a directive that runs out of steps is
@@ -1311,6 +1343,107 @@ resetUnknownSteps = do
   liftIO (writeIORef stepsRef (-1))
   reachedRef <- asks (.unknownReached)
   liftIO (writeIORef reachedRef [])
+
+-- | smucclaw/l4-ide#1075: an obligation meets its events. Counted, and
+-- stopped with 'OpenObligations' when more are open than the limit allows.
+-- The count is of what the machine does, so the stop falls at the same
+-- place on every machine and under every load.
+noteArming :: RAction Resolved -> Eval ()
+noteArming act = do
+  armedRef <- asks (.armings)
+  armed <- liftIO (readIORef armedRef)
+  let armed' = armed + 1
+  liftIO (writeIORef armedRef armed')
+  asks (.openLimit) >>= traverse_ \ limit -> do
+    closed <- liftIO . readIORef =<< asks (.closes)
+    when (armed' - closed > limit) $
+      userException (OverBudget (OpenObligations limit (rangeOf act)))
+
+-- | An armed obligation is handed on to its HENCE or LEST, or breached
+-- with no LEST to go to: it is no longer open.
+noteClose :: Eval ()
+noteClose = do
+  closedRef <- asks (.closes)
+  liftIO (modifyIORef' closedRef (+ 1))
+
+-- | A function written in L4 is applied to its arguments. Counted, and
+-- stopped with 'ClosureApplications' past the limit: a function that calls
+-- itself with new inputs pushes no frame, so nothing else stops it.
+noteApplication :: Expr Resolved -> Eval ()
+noteApplication body = do
+  appliedRef <- asks (.applications)
+  applied <- liftIO (readIORef appliedRef)
+  let applied' = applied + 1
+  liftIO (writeIORef appliedRef applied')
+  asks (.applicationLimit) >>= traverse_ \ limit ->
+    when (applied' > limit) $
+      userException (OverBudget (ClosureApplications limit (rangeOf body)))
+{-# INLINE noteApplication #-}
+
+-- | Start a directive with nothing armed, closed or applied, and its time
+-- and allocation counted from now.
+resetBudget :: Eval ()
+resetBudget = do
+  for_ [(.armings), (.closes), (.applications)] \ field -> do
+    counter <- asks field
+    liftIO (writeIORef counter 0)
+  clockRef <- asks (.limitClock)
+  liftIO do
+    now <- getMonotonicTime
+    allocation <- getAllocationCounter
+    writeIORef clockRef (MkLimitClock limitCheckInterval now allocation)
+
+-- | The opt-in limits on one directive: wall-clock seconds and megabytes
+-- allocated. Unlike the counted budgets, neither falls at the same place on
+-- every run: the time depends on the machine and its load, and the
+-- allocation on the compiler.
+data DirectiveLimits = MkDirectiveLimits
+  { seconds :: !(Maybe Int)
+  , megabytes :: !(Maybe Int)
+  }
+
+-- | Steps left until the next check, and the monotonic time and the
+-- thread's allocation counter when the directive started.
+data LimitClock = MkLimitClock !Int !Double !Int64
+
+-- | How many machine steps pass between two readings of the clock and the
+-- allocation counter: a step takes about a microsecond, so a few
+-- milliseconds.
+limitCheckInterval :: Int
+limitCheckInterval = 4_096
+
+-- | One machine step under the opt-in limits: every 'limitCheckInterval'
+-- steps, stop the directive if it has run longer or allocated more than
+-- its limit. The stop is an ordinary evaluation exception, so the stack
+-- unwinds as for any other and the next directive runs. The allocation is
+-- read from the counter of the thread that runs the machine, which is the
+-- thread doing the work, whichever thread the caller is on (#1018). A step
+-- that runs one long Haskell computation (a huge power of a number) is not
+-- interrupted until it ends.
+tickLimits :: Eval ()
+tickLimits = asks (.directiveLimits) >>= traverse_ \ lims -> do
+  clockRef <- asks (.limitClock)
+  MkLimitClock left started allocation <- liftIO (readIORef clockRef)
+  if left > 0
+    then liftIO (writeIORef clockRef (MkLimitClock (left - 1) started allocation))
+    else do
+      liftIO (writeIORef clockRef (MkLimitClock limitCheckInterval started allocation))
+      for_ lims.seconds \ limit -> do
+        now <- liftIO getMonotonicTime
+        when (now - started > fromIntegral limit) $
+          userException (OverBudget (TimeLimit limit))
+      for_ lims.megabytes \ limit -> do
+        remaining <- liftIO getAllocationCounter
+        when (allocation - remaining > fromIntegral limit * 1_048_576) $
+          userException (OverBudget (MemoryLimit limit))
+{-# INLINE tickLimits #-}
+
+-- | What this directive has spent so far: obligations armed, obligations
+-- closed, and function applications.
+budgetSpent :: Eval (Int, Int, Int)
+budgetSpent = do
+  let readCounter field = liftIO . readIORef =<< asks field
+  (,,) <$> readCounter (.armings) <*> readCounter (.closes) <*> readCounter (.applications)
 
 -- | The inputs that reached a §4.3 site in this directive.
 reachedUnknowns :: Eval [Term]
@@ -2514,6 +2647,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
   Just f@(App1 rs mTy) -> do
     case val of
       ValClosure givens e env' -> do
+        noteApplication e
         env'' <- matchGivens env' givens f rs
         continueExpr (Map.union env'' env') e
       ValUnappliedConstructor r ->
@@ -2526,6 +2660,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- P2b: this is the ENTRY into the obligation's site — the activation
         -- the step log's key counts. Lazy when the log is off.
         norm <- armNormKey party act
+        noteArming act
         -- smucclaw/l4-ide#1069: the sibling-read check's clock is the arming
         -- time until an event is taken
         noteClock time
@@ -3334,6 +3469,7 @@ backwardContractFrame val = \ case
                   mBearer <- peekWHNF partyR
                   expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
                 let timing = Timing {effective, observed = stamp, revealedBy = Just (ev'party, ev'act)}
+                noteClose
                 continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline timing))))
               Just lestFollowup -> reofferResolve False lestFollowup ToLest
       else do
@@ -3470,6 +3606,7 @@ backwardContractFrame val = \ case
               -- not contradict the spec.
               -- SEESAW: a violation takes effect when it happens, and is seen then
               let timing = Timing {effective = stamp, observed = stamp, revealedBy = Just (ev'partyRef, ev'act)}
+              noteClose
               continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp timing))))
           -- MUST, MAY, DO: action done = success
           _ -> do
@@ -4032,6 +4169,9 @@ backwardContractFrame val = \ case
     -- See 'sentinelArgs'.
     continueWithFollowup :: Maybe Text -> Lifecycle -> Environment -> RExpr -> Reference -> Reference -> Int -> Machine Config
     continueWithFollowup mParty lifecycle env followup events time seen = do
+      -- smucclaw/l4-ide#1075: every hand-off closes the obligation that
+      -- makes it; whatever the continuation arms is counted when it arms
+      noteClose
       mOriginal <- getCurrentParty
       putCurrentParty mParty
       -- smucclaw/l4-ide#1069: a RECORD or RECALL in the continuation is made
