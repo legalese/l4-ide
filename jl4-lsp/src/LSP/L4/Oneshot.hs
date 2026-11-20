@@ -35,9 +35,14 @@ oneshotL4ActionAndErrors = oneshotL4ActionAndErrorsIn Rules.AmbientLibraries
 -- serves bundles somebody else uploaded asks for 'Rules.EmbeddedStdlibOnly', so
 -- that nothing on the host can stand in for the stdlib.
 oneshotL4ActionAndErrorsIn :: Rules.LibraryScope -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO ([Text], b)
-oneshotL4ActionAndErrorsIn scope evalConfig fp act = do
+oneshotL4ActionAndErrorsIn scope evalConfig fp = oneshotL4ActionAndErrorsInRoot scope (takeDirectory fp) evalConfig fp
+
+-- | 'oneshotL4ActionAndErrorsIn' with the session's root directory given
+-- rather than taken from the file (see 'oneshotL4ActionWithDiagsInRoot').
+oneshotL4ActionAndErrorsInRoot :: Rules.LibraryScope -> FilePath -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO ([Text], b)
+oneshotL4ActionAndErrorsInRoot scope root evalConfig fp act = do
   (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
-  (_diags, res) <- oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act
+  (_diags, res) <- oneshotL4ActionWithDiagsInRoot scope root recorder evalConfig fp act
   errs <- getLog
   pure (errs, res)
 
@@ -69,9 +74,20 @@ oneshotL4ActionAndDiagnosticsIn
   -> FilePath
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], [FileDiagnostic], b)
-oneshotL4ActionAndDiagnosticsIn scope evalConfig fp act = do
+oneshotL4ActionAndDiagnosticsIn scope evalConfig fp = oneshotL4ActionAndDiagnosticsInRoot scope (takeDirectory fp) evalConfig fp
+
+-- | 'oneshotL4ActionAndDiagnosticsIn' with the session's root directory given
+-- rather than taken from the file (see 'oneshotL4ActionWithDiagsInRoot').
+oneshotL4ActionAndDiagnosticsInRoot
+  :: Rules.LibraryScope
+  -> FilePath
+  -> EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([Text], [FileDiagnostic], b)
+oneshotL4ActionAndDiagnosticsInRoot scope root evalConfig fp act = do
   (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
-  (diags, res) <- oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act
+  (diags, res) <- oneshotL4ActionWithDiagsInRoot scope root recorder evalConfig fp act
   errs <- getLog
   pure (errs, diags, res)
 
@@ -99,11 +115,30 @@ oneshotL4ActionWithDiagsIn
   -> FilePath
   -> (NormalizedFilePath -> Action b)
   -> IO ([FileDiagnostic], b)
-oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act = do
-  let curDir = takeDirectory fp
-  state <- Shake.oneshotIdeState (cmapWithPrio ShakeLog recorder) curDir do
+oneshotL4ActionWithDiagsIn scope recorder evalConfig fp =
+  oneshotL4ActionWithDiagsInRoot scope (takeDirectory fp) recorder evalConfig fp
+
+-- | 'oneshotL4ActionWithDiagsIn' with the session's root directory given.
+--
+-- The root is where a bare @IMPORT@ looks after the importing file's own
+-- directory ('Rules.jl4RulesIn'). The other functions here take it from the
+-- file the session was started on, which is right for a file on disk, where the
+-- file's directory is the project. A host that registers a tree of virtual
+-- files all under one place (the service, for a bundle) names that place
+-- instead, so that the root does not depend on which of its files happens to be
+-- the one the session starts on.
+oneshotL4ActionWithDiagsInRoot
+  :: Rules.LibraryScope
+  -> FilePath
+  -> Recorder (WithPriority Log)
+  -> EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([FileDiagnostic], b)
+oneshotL4ActionWithDiagsInRoot scope root recorder evalConfig fp act = do
+  state <- Shake.oneshotIdeState (cmapWithPrio ShakeLog recorder) root do
     Store.fileStoreRules (cmapWithPrio StoreLog recorder) (const $ pure False)
-    Rules.jl4RulesIn scope evalConfig curDir (cmapWithPrio RulesLog recorder)
+    Rules.jl4RulesIn scope evalConfig root (cmapWithPrio RulesLog recorder)
 
   let nfp = normalizeFilePath fp
 

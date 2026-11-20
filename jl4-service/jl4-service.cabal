@@ -158,6 +158,7 @@ test-suite jl4-service-test
   other-modules:
     ApiSpec
     BooleanDecisionQuerySpec
+    BundleRootSpec
     BundleStoreSpec
     CheckStoreSpec
     CodeGenSpec

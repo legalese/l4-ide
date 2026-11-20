@@ -61,9 +61,38 @@ Each deployment has an `id`, a `status` of `ok` or `failed`, a `functions` count
 
 ---
 
+## Step 4: Compare What Each Version Could Not Find
+
+The exit status tells you whether every deployment compiles. It does not tell you whether every `IMPORT` still finds the file it names.
+
+When an `IMPORT` in a deployment finds nothing, the deployment still compiles. The service writes a warning to its log, `Bundle IMPORT resolves to nothing`, and marks the deployment `ok`. Every call that needs something from the missing file then fails. So if a new version looks for an imported file somewhere the old one did not, the check prints `ok` and exits with `0`, and the new version stops answering those calls.
+
+The warnings go to the log, which the check writes to stderr, apart from the report. Run the check with both versions, keep each one's log, and compare the warnings:
+
+```
+jl4-service-old --check-store /var/lib/jl4-service/store 2> old.log
+jl4-service-new --check-store /var/lib/jl4-service/store 2> new.log
+jq -c 'select(.msg | startswith("Bundle IMPORT resolves to nothing")) | {deploymentId, file, module}' old.log | sort > old.txt
+jq -c 'select(.msg | startswith("Bundle IMPORT resolves to nothing")) | {deploymentId, file, module}' new.log | sort > new.txt
+diff old.txt new.txt
+```
+
+(`jl4-service-old` and `jl4-service-new` stand for the two versions; use their real paths. `jq` reads the log, which has one JSON object per line.) A line that only `new.txt` has is a deployment the new version breaks:
+
+```
+> {"deploymentId":"folder-rules","file":"b/x.l4","module":"helper"}
+```
+
+This says that in the deployment `folder-rules`, the file `b/x.l4` imports `helper`, and the new version does not find it. No output from `diff` means the new version finds everything the old one found.
+
+**Why this matters for one change in particular.** Versions of the service built before the bundle root changed looked an `IMPORT` of a plain name up, when they compiled the upload, from the folder of the first file of the upload in alphabetical order. Later versions look it up beside the importing file and at the top of the upload, and nowhere else ([how the service finds a library](../../reference/libraries/resolution.md)). An upload that has folders, and that relied on the old place, compiles under both versions, and only the warnings tell them apart. An upload whose files all sit in one folder is not affected. For example, a deployment of `a/helper.l4` and `b/x.l4`, where `b/x.l4` imports `helper`, answered under the old version; under the new one it is still `ok` and `ready`, and a call answers `helpmark is not in scope`.
+
+---
+
 ## What the Check Does Not Do
 
 - **It does not change the store.** It does not create the folder, remove the leftovers of an interrupted deploy, or write the version numbers and caches that starting the service writes. You can run it on the live store while the old version is serving.
+- **It does not fail a deployment whose `IMPORT` finds nothing.** That is a warning in the log, not a failure; Step 4 shows how to find it.
 - **It compiles; it does not run your rules.** A deployment that compiles can still answer a call differently under a new version. Compare a few answers from both versions before you rely on it.
 - **It uses the same limits as starting the service.** The compile time and memory limits are the ones you pass (`--compile-timeout`, `--max-compile-memory-mb`; the defaults are 60 seconds and 256 MB). A deployment that is slow enough to fail the check would fail when the service starts. The memory limit rarely stops a compile in practice, so a deployment is more likely to fail the time limit than the memory limit.
 - **It does not read an old `bundle.cbor`.** Earlier versions of the service left a file called `bundle.cbor` beside the sources of each deployment. The service no longer reads it, and the check does not touch it. If the folder is there, the line says `bundle.cbor present, written by an unknown build`, because nothing in the file says which version wrote it. In the JSON, `bundleCbor.present` is `true` and `bundleCbor.writtenBy` is `null`.
