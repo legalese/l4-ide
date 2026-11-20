@@ -1,0 +1,9 @@
+`decode holding` with {"amount": 5}
+`decode box` with {"value": 5}
+`decode pick` with {"Take": {"item": 5}}
+`decode pick` with "Skip"
+`decode bag` with {"items": [1, 2]}
+`decode opt` with {"inner": 5}
+`decode opt` with {"inner": null}
+`decode holding` with `JSONENCODE` with `Holding` with 5
+`decode box` with `JSONENCODE` with `Box` with 5

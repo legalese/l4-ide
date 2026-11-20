@@ -5,7 +5,7 @@ import qualified Base.Text as Text
 import qualified Data.Aeson.Encode.Pretty as AesonPretty
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.List as List
-import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
 import Options.Applicative
 import System.Directory (getCurrentDirectory)
@@ -19,9 +19,9 @@ import LSP.Logger
 
 import L4.EvaluateLazy (resolveEvalConfig)
 import L4.TracePolicy (apiDefaultPolicy)
-import L4.Export (ExportedFunction (..), getExportedFunctions)
-import L4.JsonSchema (SchemaContext (..), emptyContext, generateJsonSchema)
-import L4.Syntax (TopDecl (..), Declare (..), Module (..), Resolved, Section (..), AppForm (..), rawNameToText, rawName, getActual)
+import L4.Export (ExportedFunction (..), getExportedFunctions, prettyExportError, refusalsOf)
+import qualified L4.Export.Shape as Shape
+import L4.JsonSchema (generateJsonSchema)
 
 data Options = MkOptions
   { file :: !FilePath
@@ -61,13 +61,18 @@ main = do
       Nothing -> pure Nothing
       Just tcRes
         | not tcRes.success -> pure Nothing
-        | otherwise -> pure $ Just tcRes.module'
+        | otherwise -> do
+            exportErrs <- Shake.use Rules.ExportCheck uri
+            -- What the check reads types from, so the schema is the shape it gives.
+            let declares = foldMap (Shape.moduleDeclares . (.module')) (tcRes : Rules.transitiveDependencies tcRes)
+                env = Shape.shapeEnvFromDeclares declares tcRes.entityInfo
+            pure $ Just (tcRes.module', env, fromMaybe [] exportErrs)
 
   case result of
     Nothing -> do
       hPutStrLn stderr "Error: Failed to parse or typecheck L4 file"
       exitWith (ExitFailure 1)
-    Just resolvedModule -> do
+    Just (resolvedModule, env, exportErrs) -> do
       let exports = getExportedFunctions resolvedModule
       if null exports
         then do
@@ -80,13 +85,19 @@ main = do
               hPutStrLn stderr $ "Error: Export not found: " <> maybe "(default)" Text.unpack options.functionName
               hPutStrLn stderr $ "Available exports: " <> List.intercalate ", " (map (Text.unpack . (.exportName)) exports)
               exitWith (ExitFailure 2)
-            Just export -> do
-              let ctx = buildContext resolvedModule
-                  schema = generateJsonSchema ctx export
-                  jsonOutput = AesonPretty.encodePretty schema
-              case options.output of
-                Nothing -> BL.putStrLn jsonOutput
-                Just outFile -> BL.writeFile outFile jsonOutput
+            -- What the check refuses is not published, so it has no schema.
+            Just export | refused@(_ : _) <- refusalsOf exportErrs export -> do
+              mapM_ (hPutStrLn stderr . Text.unpack) (concatMap prettyExportError refused)
+              exitWith (ExitFailure 1)
+            Just export -> case generateJsonSchema env export of
+              Left (input, why) -> do
+                hPutStrLn stderr $ "Error: no schema for the input `" <> Text.unpack input <> "`, which is " <> Text.unpack (Shape.unsendableWhat why)
+                exitWith (ExitFailure 1)
+              Right schema -> do
+                let jsonOutput = AesonPretty.encodePretty schema
+                case options.output of
+                  Nothing -> BL.putStrLn jsonOutput
+                  Just outFile -> BL.writeFile outFile jsonOutput
 
 selectExport :: Maybe Text -> [ExportedFunction] -> Maybe ExportedFunction
 selectExport Nothing exports =
@@ -97,23 +108,6 @@ selectExport Nothing exports =
       (x : _) -> Just x
 selectExport (Just name) exports =
   List.find (\e -> e.exportName == name) exports
-
-buildContext :: Module Resolved -> SchemaContext
-buildContext (MkModule _ _ section) =
-  emptyContext{ctxDeclares = collectDeclares section}
- where
-  collectDeclares :: Section Resolved -> Map.Map Text (Declare Resolved)
-  collectDeclares (MkSection _ _ _ decls) =
-    Map.fromList $ concatMap collectDecl decls
-
-  collectDecl :: TopDecl Resolved -> [(Text, Declare Resolved)]
-  collectDecl = \case
-    Declare _ decl@(MkDeclare _ _ appForm _) ->
-      [(getDeclName appForm, decl)]
-    Section _ sub -> Map.toList $ collectDeclares sub
-    _ -> []
-
-  getDeclName (MkAppForm _ name _ _) = rawNameToText (rawName (getActual name))
 
 data Log = IdeLog Rules.Log
 

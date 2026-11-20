@@ -1,0 +1,22 @@
+-- A type whose only constructor is named like it and carries no fields: the
+-- schemas publish its name, "Unit", and JSONENCODE writes it, so JSONDECODE
+-- reads the name, as well as {}, which is how it reads DECLARE Unit HAS. So
+-- JSONENCODE's output reads back (review of #779, 2026-11-19).
+
+DECLARE Unit IS ONE OF Unit
+
+@export Takes a unit
+GIVEN u IS A Unit
+GIVETH A NUMBER
+`takes unit` MEANS
+  CONSIDER u
+  WHEN Unit THEN 1
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Unit
+`decode unit` s MEANS JSONDECODE s
+
+#EVAL `decode unit` "\"Unit\""
+#EVAL `decode unit` "{}"
+#EVAL JSONENCODE Unit
+#EVAL `decode unit` (JSONENCODE Unit)

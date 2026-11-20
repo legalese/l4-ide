@@ -1,0 +1,54 @@
+-- A type that takes a type is read by JSONDECODE with what it is given put in
+-- place of its parameters, in the form the schemas publish for it: a record
+-- of its fields, a constructor that carries data tagged, a fieldless one by
+-- its name (review of #779, 2026-11-20). Each of these decoded to NOTHING.
+
+DECLARE Holding a IS ONE OF
+  Holding HAS amount IS AN a
+
+DECLARE Box a HAS value IS AN a
+
+DECLARE Pick a IS ONE OF
+  Skip
+  Take HAS item IS AN a
+
+DECLARE Bag a HAS items IS A LIST OF a
+
+DECLARE Opt a HAS inner IS A MAYBE a
+
+@export Holding amount
+GIVEN h IS A Holding OF NUMBER
+GIVETH A NUMBER
+`holding amount` MEANS
+  CONSIDER h
+  WHEN Holding n THEN n
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (Holding OF NUMBER)
+`decode holding` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (Box OF NUMBER)
+`decode box` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (Pick OF NUMBER)
+`decode pick` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (Bag OF NUMBER)
+`decode bag` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (Opt OF NUMBER)
+`decode opt` s MEANS JSONDECODE s
+
+#EVAL `decode holding` "{\"amount\": 5}"
+#EVAL `decode box` "{\"value\": 5}"
+#EVAL `decode pick` "{\"Take\": {\"item\": 5}}"
+#EVAL `decode pick` "\"Skip\""
+#EVAL `decode bag` "{\"items\": [1, 2]}"
+#EVAL `decode opt` "{\"inner\": 5}"
+#EVAL `decode opt` "{\"inner\": null}"
+#EVAL `decode holding` (JSONENCODE (Holding 5))
+#EVAL `decode box` (JSONENCODE (Box 5))

@@ -40,41 +40,49 @@
             "oneOf": [
                 {
                     "properties": {
-                        "radius": {
-                            "type": "number"
-                        },
-                        "tag": {
-                            "const": "Circle"
+                        "Circle": {
+                            "properties": {
+                                "radius": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "radius"
+                            ],
+                            "type": "object"
                         }
                     },
                     "required": [
-                        "tag",
-                        "radius"
+                        "Circle"
                     ],
                     "type": "object"
                 },
                 {
                     "properties": {
-                        "label": {
-                            "anyOf": [
-                                {
-                                    "type": "string"
+                        "Square": {
+                            "properties": {
+                                "label": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "null"
+                                        }
+                                    ]
                                 },
-                                {
-                                    "type": "null"
+                                "side": {
+                                    "type": "number"
                                 }
-                            ]
-                        },
-                        "side": {
-                            "type": "number"
-                        },
-                        "tag": {
-                            "const": "Square"
+                            },
+                            "required": [
+                                "side"
+                            ],
+                            "type": "object"
                         }
                     },
                     "required": [
-                        "tag",
-                        "side"
+                        "Square"
                     ],
                     "type": "object"
                 }

@@ -20,8 +20,40 @@
 --     widening its enum (new values a consumer may not handle) is
 --     breaking; adding a new field is safe.
 --
--- New functions are safe; removed functions are breaking. This mirrors
--- the client-side check in the deploy sidebar so both surfaces agree.
+-- New functions are safe; removed functions are breaking. The client-side
+-- check in the editor's Deploy panel
+-- (ts-apps/webview/src/lib/breaking-changes.ts, with its tests beside it)
+-- applies the same rules, the ones below for a oneOf, the tagged object and a
+-- change of form included, in the same directions, so that the panel's
+-- warning before a redeploy says what this gate decides. A rule changed here
+-- is changed there.
+--
+-- A type with a constructor that carries fields and one that carries none is
+-- a @oneOf@ of two forms, its names (a string) and its tagged constructors (an
+-- object); a node without a @oneOf@ is one form, of its own type. The forms
+-- are matched by their type. One the new interface removes is breaking in
+-- both directions. One it adds is not breaking on an input, and is breaking on
+-- a result, as a name added to a result's enum is (MULLET, Meng, 2026-11-18;
+-- the result direction STOWAWAY, Meng, 2026-11-19). Two that match are
+-- compared as any node is, so a name removed from an input or added to a
+-- result is breaking (comparing a matched form by the rules above is assumed,
+-- not ruled).
+--
+-- A record's object (an object of its fields) on one side and an object keyed
+-- by constructor on the other, as when a type whose only constructor is named
+-- like it gains a second, is reported as a change of form, naming both, in
+-- either direction (review of #779, 2026-11-20).
+--
+-- The keys of the tagged object are constructors, alternatives of which a value
+-- holds one, not fields a value holds together, so they are compared as an
+-- enum's names are: one added to a result is breaking ("may now return new
+-- values"), one removed from an input is breaking ("no longer accepts"), and
+-- the fields of one on both sides are compared by the rules above. That is
+-- STOWAWAY's rule carried to the constructors within the tagged form (assumed,
+-- not ruled). The schema tells the tagged object from a record by its
+-- @required@: a record's object always has one, the tagged object never does
+-- ('L4.FunctionSchema.shapeToParameter'); an EITHER's object has none either,
+-- and its keys are alternatives too.
 module Compatibility
   ( FnIface (..)
   , ifaceFromFunction
@@ -32,7 +64,7 @@ module Compatibility
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 
 import L4.FunctionSchema (Parameter (..), Parameters (..))
 import Types (Function (..), FunctionSummary (..))
@@ -117,15 +149,44 @@ diffFn old new =
 -- at every depth.
 diffNode :: Dir -> Text -> Text -> Parameter -> Parameter -> [Text]
 diffNode dir fn loc old new
+  | isJust old.parameterOneOf || isJust new.parameterOneOf =
+      concat
+        [ case lookup ty newForms of
+            Nothing -> [ subject fn dir loc <> " no longer " <> takesOrGives <> " " <> formName ty ]
+            Just nf -> diffNode dir fn loc of' nf
+        | (ty, of') <- oldForms
+        ]
+        ++ [ subject fn dir loc <> " may now return " <> formName ty
+           | dir == Out
+           , (ty, _) <- newForms
+           , ty `notElem` map fst oldForms
+           ]
   -- A type change makes deeper diffing noise; report and stop here.
   | not (Text.null old.parameterType)
       && not (Text.null new.parameterType)
       && old.parameterType /= new.parameterType =
       [ subject fn dir loc <> " type changed from "
           <> old.parameterType <> " to " <> new.parameterType ]
+  -- A record's object and an object keyed by constructor are both objects,
+  -- and a key-by-key diff of one against the other reports each field of the
+  -- record as removed (or no longer returned), which is not what changed. A
+  -- type whose only constructor is named like it is a record, its fields
+  -- alone; given a second constructor, it is keyed by constructor. Report
+  -- that the form changed, and stop here (review of #779, 2026-11-20).
+  | formChanged =
+      [ subject fn dir loc <> " form changed from " <> objectForm old <> " to " <> objectForm new ]
   | otherwise =
       formatMsgs ++ enumMsgs ++ objectMsgs ++ itemsMsgs
  where
+  formChanged =
+    (isRecordObject old && isAlternatives new) || (isAlternatives old && isRecordObject new)
+  objectForm p =
+    (if isAlternatives p then "an object keyed by its constructor (" else "an object of its fields (")
+      <> Text.intercalate ", " (maybe [] Map.keys p.parameterProperties) <> ")"
+  oldForms = formsOf old
+  newForms = formsOf new
+  takesOrGives = case dir of In -> "accepts"; Out -> "returns"
+  formName ty = "a" <> (if Text.take 1 ty `elem` ["a", "e", "i", "o", "u"] then "n " else " ") <> ty
   oFmt = fromMaybe "" old.parameterFormat
   nFmt = fromMaybe "" new.parameterFormat
   formatMsgs
@@ -159,6 +220,8 @@ diffNode dir fn loc old new
   objectMsgs =
     case (old.parameterProperties, new.parameterProperties) of
       (Nothing, Nothing) -> []
+      (Just oa, Just na)
+        | isAlternatives old && isAlternatives new -> diffAlternatives dir fn loc oa na
       (mo, mn) ->
         diffObject dir fn loc
           (fromMaybe Map.empty mo) (fromMaybe [] old.parameterRequired)
@@ -169,6 +232,41 @@ diffNode dir fn loc old new
       (Just oi, Just ni) ->
         diffNode dir fn (if Text.null loc then "[]" else loc <> "[]") oi ni
       _ -> []
+
+-- | An object whose keys are alternatives, of which a value holds exactly one:
+-- the tagged constructors of a type with a constructor that carries fields, or
+-- the two sides of an EITHER. Their schema has no @required@, which a record's
+-- always has.
+isAlternatives :: Parameter -> Bool
+isAlternatives p = isJust p.parameterProperties && p.parameterRequired == Nothing
+
+-- | A record's object: its schema always has a @required@
+-- ('L4.FunctionSchema.shapeToParameter').
+isRecordObject :: Parameter -> Bool
+isRecordObject p = isJust p.parameterProperties && isJust p.parameterRequired
+
+-- | Diff the keys of two objects of alternatives ('isAlternatives') as an enum's
+-- names are diffed: one added to a result, or removed from an input, is
+-- breaking, and one on both sides is compared as any node.
+diffAlternatives :: Dir -> Text -> Text -> Map.Map Text Parameter -> Map.Map Text Parameter -> [Text]
+diffAlternatives dir fn loc oldAlts newAlts =
+  [ subject fn dir loc <> " no longer accepts " <> Text.intercalate ", " dropped
+  | dir == In, not (null dropped) ]
+    ++ [ subject fn dir loc <> " may now return new values " <> Text.intercalate ", " added
+       | dir == Out, not (null added) ]
+    ++ concat
+         [ diffNode dir fn (childLoc loc k) ov nv
+         | (k, ov) <- Map.toList oldAlts, Just nv <- [Map.lookup k newAlts] ]
+ where
+  dropped = Map.keys (Map.difference oldAlts newAlts)
+  added = Map.keys (Map.difference newAlts oldAlts)
+
+-- | The forms a node's value takes, by their type: its @oneOf@'s members, or
+-- itself.
+formsOf :: Parameter -> [(Text, Parameter)]
+formsOf p = case p.parameterOneOf of
+  Just members -> [ (m.parameterType, m) | m <- members ]
+  Nothing -> [ (p.parameterType, p) ]
 
 -- | Diff an object's property set (used for both the top-level parameter
 -- object and every nested record), honouring required-ness in the

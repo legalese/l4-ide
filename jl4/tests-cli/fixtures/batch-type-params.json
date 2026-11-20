@@ -1,0 +1,5 @@
+[
+  { "h": { "amount": 5 }, "p": { "Take": { "item": 10 } }, "o": { "inner": 100 } },
+  { "h": { "amount": 5 }, "p": "Skip", "o": { "inner": null } },
+  { "h": { "Holding": { "amount": 5 } }, "p": "Skip", "o": { "inner": null } }
+]

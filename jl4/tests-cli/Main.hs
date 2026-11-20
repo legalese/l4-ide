@@ -553,6 +553,38 @@ batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
 batchMaybeTextJson = fixtureDir </> "batch-maybe-text.json"
 
+-- | A type whose only constructor is named like it, as an input.
+batchRecordLikeFixture, batchRecordLikeJson :: FilePath
+batchRecordLikeFixture = fixtureDir </> "batch-record-like.l4"
+batchRecordLikeJson = fixtureDir </> "batch-record-like.json"
+
+-- | A type whose only constructor is named like it and carries no fields.
+batchUnitFixture, batchUnitJson :: FilePath
+batchUnitFixture = fixtureDir </> "batch-unit.l4"
+batchUnitJson = fixtureDir </> "batch-unit.json"
+
+-- | Types that take a type, as inputs.
+batchTypeParamsFixture, batchTypeParamsJson :: FilePath
+batchTypeParamsFixture = fixtureDir </> "batch-type-params.l4"
+batchTypeParamsJson = fixtureDir </> "batch-type-params.json"
+
+-- | A constructor that carries data, as a result, and that result sent back.
+batchTaggedResultFixture, batchTaggedResultJson, batchTaggedResultBackJson :: FilePath
+batchTaggedResultFixture = fixtureDir </> "batch-tagged-result.l4"
+batchTaggedResultJson = fixtureDir </> "batch-tagged-result.json"
+batchTaggedResultBackJson = fixtureDir </> "batch-tagged-result-back.json"
+
+-- | A constructor that carries data, as an input.
+batchTaggedFixture, batchTaggedJson :: FilePath
+batchTaggedFixture = fixtureDir </> "batch-tagged.l4"
+batchTaggedJson = fixtureDir </> "batch-tagged.json"
+
+-- | An EITHER input, as the input itself and as a record's field.
+batchEitherFixture, batchEitherJson, batchEitherBoxedJson :: FilePath
+batchEitherFixture = fixtureDir </> "batch-either.l4"
+batchEitherJson = fixtureDir </> "batch-either.json"
+batchEitherBoxedJson = fixtureDir </> "batch-either-boxed.json"
+
 -- | A CSV with columns no input declares, run against 'batchEligFixture'.
 batchUndeclaredColumnCsv :: FilePath
 batchUndeclaredColumnCsv = fixtureDir </> "batch-undeclared-column.csv"
@@ -824,6 +856,22 @@ spec bin = do
     it "succeeds on a clean file" $
       expectOk bin ["run", cleanFixture] "Checking succeeded."
 
+    -- l4 run prints what l4 check reports of an @export, on standard error as
+    -- its other diagnostics, and still evaluates the file. An error of the
+    -- check fails the run as a type error does; the warning for a GIVEN with
+    -- no type does not (assumed, not ruled; review of #779, 2026-11-20).
+    it "prints an @export that cannot be published, still evaluates, and fails" $ do
+      Output code sout serr <- runL4 bin ["run", fixtureDir </> "run-export-refused.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("check/export-function-input" `isInfixOf`)
+      serr `shouldSatisfy` ("Source:   export" `isInfixOf`)
+      sout `shouldSatisfy` ("Result:\n  12" `isInfixOf`) . filter (/= '\r')
+    it "prints the warning for an exported GIVEN with no type, and succeeds" $ do
+      Output code sout serr <- runL4 bin ["run", fixtureDir </> "run-export-untyped.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("lint/export-untyped-given" `isInfixOf`)
+      sout `shouldSatisfy` ("Result:\n  7" `isInfixOf`) . filter (/= '\r')
+
     it "emits a well-shaped JSON envelope on a clean file" $ do
       env <- jsonEnvelope bin ["run", cleanFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool True)
@@ -983,6 +1031,143 @@ spec bin = do
           Just (Output code _ serr) -> do
             code `shouldBe` ExitFailure 1
             length serr `shouldSatisfy` (> 65536)
+
+  describe "l4 batch and what the export check refuses" $ do
+    let withRule rule rows act = withSystemTempDirectory "l4-batch-refused" \dir -> do
+          writeFile (dir </> "rule.l4") (unlines rule)
+          writeFile (dir </> "rows.json") rows
+          act (dir </> "rule.l4") (dir </> "rows.json")
+
+    it "refuses an input that is a function, in the words of the check" $
+      withRule
+        [ "@export default r"
+        , "GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER"
+        , "      n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`r` MEANS f n"
+        ]
+        "[{\"n\":1,\"f\":1}]"
+        \file rows -> do
+          Output code sout serr <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitFailure 1
+          (sout <> serr) `shouldSatisfy` ("its input `f` is a function" `isInfixOf`)
+          (sout <> serr) `shouldSatisfy` (not . ("Internal error" `isInfixOf`))
+
+    it "refuses a record with a function among its fields" $
+      withRule
+        [ "DECLARE Rule HAS test IS A FUNCTION FROM NUMBER TO NUMBER"
+        , "@export default r"
+        , "GIVEN x IS A Rule"
+        , "GIVETH A NUMBER"
+        , "`r` MEANS 1"
+        ]
+        "[{\"x\":{\"test\":1}}]"
+        \file rows -> do
+          Output code sout serr <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitFailure 1
+          (sout <> serr) `shouldSatisfy` ("whose field `test` is a function" `isInfixOf`)
+
+    it "refuses only the rule it is calling" $
+      withRule
+        [ "@export default The one it calls"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "`same` MEANS n"
+        , ""
+        , "@export Another"
+        , "GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER"
+        , "GIVETH A NUMBER"
+        , "`other` MEANS f 1"
+        ]
+        "[{\"n\":1}]"
+        \file rows -> do
+          Output code sout _ <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+
+    it "still runs a rule that returns a DEONTIC" $
+      withRule
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , "@export default r"
+        , "GIVETH A DEONTIC Party Act"
+        , "`r` MEANS PARTY alice MUST ping WITHIN 3"
+        ]
+        "[{}]"
+        \file rows -> do
+          Output code sout _ <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+
+    it "still runs a rule with an EVENT input that a row can hold" $
+      withRule
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "@export default r"
+        , "GIVEN e IS AN EVENT Party Party"
+        , "GIVETH A NUMBER"
+        , "`r` MEANS 7"
+        ]
+        "[{\"e\":{\"party\":\"alice\",\"action\":\"alice\",\"at\":0}}]"
+        \file rows -> do
+          Output code sout _ <- runL4 bin ["batch", file, "--inputs", rows]
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("\"result\":7" `isInfixOf`)
+
+  describe "jl4-schema and what the export check refuses" $ do
+    let withExports act = withSystemTempDirectory "l4-schema-refused" \dir -> do
+          writeFile (dir </> "exports.l4") $ unlines
+            [ "@export default A rule that cannot be published"
+            , "GIVEN test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "`apply the test` MEANS test 1"
+            , ""
+            , "@export A rule that can"
+            , "GIVEN n IS A NUMBER"
+            , "GIVETH A NUMBER"
+            , "`same number` MEANS n"
+            ]
+          act (dir </> "exports.l4")
+        schemaGenerator =
+          findExecutable "jl4-schema" >>= maybe (fail "jl4-schema is not on the PATH: run this with cabal test") pure
+
+    it "writes no schema for an export the check refuses, and says why" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code sout serr <- runL4 schema [file]
+        code `shouldBe` ExitFailure 1
+        sout `shouldBe` ""
+        serr `shouldSatisfy` ("its input `test` is a function" `isInfixOf`)
+
+    it "refuses it by name too" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code _ serr <- runL4 schema [file, "--function", "apply the test"]
+        code `shouldBe` ExitFailure 1
+        serr `shouldSatisfy` ("its input `test` is a function" `isInfixOf`)
+
+    it "writes the schema of another export of that file" $
+      withExports \file -> do
+        schema <- schemaGenerator
+        Output code sout _ <- runL4 schema [file, "--function", "same number"]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("\"n\"" `isInfixOf`)
+
+  describe "an export whose type comes through a broken import" $
+    it "is told about the import, and not that the type cannot be sent" $
+      withSystemTempDirectory "l4-export-broken-import" \dir -> do
+        writeFile (dir </> "a.l4") $ unlines
+          [ "IMPORT b"
+          , "@export r"
+          , "GIVEN x IS A Mid"
+          , "GIVETH A BOOLEAN"
+          , "`r` MEANS TRUE"
+          ]
+        writeFile (dir </> "b.l4") "IMPORT c\nDECLARE Mid HAS\n  d IS A Deep\n"
+        writeFile (dir </> "c.l4") "DECLARE Deep HAS\n  n IS A NUMBER\nthis does not parse (\n"
+        Output code sout serr <- runL4 bin ["check", dir </> "a.l4"]
+        code `shouldBe` ExitFailure 1
+        (sout <> serr) `shouldSatisfy` ("has errors" `isInfixOf`)
+        (sout <> serr) `shouldSatisfy` (not . ("is published with @export" `isInfixOf`))
 
   describe "l4 import cycles" $ do
     forM_ ["check", "run"] \cmd -> do
@@ -4220,6 +4405,102 @@ spec bin = do
             show (objField notANumber "diagnostics") `shouldSatisfy` ("abc" `isInfixOf`)
           other -> expectationFailure ("expected 3 rows, got " ++ show (length other))
 
+      -- An EITHER input is read only as {"LEFT": [v]} or {"RIGHT": [v]} (card
+      -- J3, option B). A bare value reached the rule without its side, so the
+      -- CONSIDER fell through to its OTHERWISE: the claim of 2000 answered 50
+      -- (review of #779, 2026-11-17). An input is refused by name; a record's
+      -- field by JSONDECODE, which names the form.
+      it "refuses an EITHER input that is not {\"LEFT\": [v]} or {\"RIGHT\": [v]}, at the top and in a record" $ do
+        let diagnosed want row = show (objField row "diagnostics") `shouldSatisfy` (want `isInfixOf`)
+        (code, _, rows) <- rowsOf [batchEitherFixture, "--inputs", batchEitherJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["error", "success", "success", "error", "error"]
+        case rows of
+          [bare, right, left, both, noArray] -> do
+            resultOf bare `shouldBe` Nothing
+            resultOf right `shouldBe` Just (Number 100)
+            resultOf left `shouldBe` Just (Number 50)
+            forM_ [bare, both, noArray] (diagnosed "Field 'the claim': an EITHER is written {")
+          other -> expectationFailure ("expected 5 rows, got " ++ show (length other))
+        (code', _, boxed) <- rowsOf [batchEitherFixture, "-e", "boxed fee", "--inputs", batchEitherBoxedJson]
+        code' `shouldSatisfy` (/= ExitSuccess)
+        map statusAndResult (drop 1 boxed) `shouldBe` [succeeded (Number 100)]
+        forM_ (take 1 boxed) (diagnosed "Expected an EITHER written")
+        (_, _, validated) <- rowsOf [batchEitherFixture, "--inputs", batchEitherJson, "--validate-only"]
+        map (`objField` "status") validated `shouldBe` map (Just . String) ["invalid", "valid", "valid", "invalid", "invalid"]
+
+      -- A constructor that carries data is read as {"Card": {its fields}}, and
+      -- one that carries none as its name (card J1, option A; HATBOX, Meng,
+      -- 2026-11-18). Both forms used to reach the rule without their fields, so
+      -- that no WHEN matched them (review of #779, 2026-11-17).
+      it "reads a constructor that carries data as {\"Card\": {its fields}}, and refuses its bare name" $ do
+        (code, _, rows) <- rowsOf [batchTaggedFixture, "--inputs", batchTaggedJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "success", "error", "error"]
+        case rows of
+          [cash, card, bare, malformed] -> do
+            resultOf cash `shouldBe` Just (Number 0)
+            resultOf card `shouldBe` Just (Number 2)
+            show (objField bare "diagnostics") `shouldSatisfy` ("The constructor `Card` carries fields" `isInfixOf`)
+            show (objField malformed "diagnostics") `shouldSatisfy` ("Expected a `Payment` written as the name of a constructor" `isInfixOf`)
+          other -> expectationFailure ("expected 4 rows, got " ++ show (length other))
+
+      -- A type whose only constructor is named like it is read as a record,
+      -- its fields alone, as the schemas publish it (review of #779,
+      -- 2026-11-19); the tagged form is refused.
+      it "reads a type whose only constructor is named like it as a record" $ do
+        (code, _, rows) <- rowsOf [batchRecordLikeFixture, "--inputs", batchRecordLikeJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "error"]
+        case rows of
+          [fields, tagged] -> do
+            resultOf fields `shouldBe` Just (Number 40)
+            show (objField tagged "diagnostics") `shouldSatisfy` ("Missing required field 'amount'" `isInfixOf`)
+          other -> expectationFailure ("expected 2 rows, got " ++ show (length other))
+
+      -- A type whose only constructor is named like it and carries no fields is
+      -- read as its name, the form the schemas publish, and as {} (assumed, not
+      -- ruled; review of #779, 2026-11-19).
+      it "reads a fieldless type named like its constructor as its name, and as {}" $ do
+        (_, _, rows) <- rowsOf [batchUnitFixture, "--inputs", batchUnitJson]
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "success", "error"]
+        map resultOf (take 2 rows) `shouldBe` [Just (Number 1), Just (Number 1)]
+
+      -- A type that takes a type is read with what it is given in place of its
+      -- parameters, in the form the schemas publish: each of these decoded to
+      -- NOTHING, and the wrapper's input record did not parse with a second
+      -- input after such a type (review of #779, 2026-11-20).
+      -- A result is written as the service answers it: a constructor that
+      -- carries data with its fields' names, which is the form an input of its
+      -- type is read in, so a result can be sent back. It was written
+      -- positionally, {"Injury": [3]}, which no reader takes (review of #779,
+      -- 2026-11-20).
+      it "writes a constructor that carries data with its fields' names, and reads it back" $ do
+        (_, _, out) <- rowsOf [batchTaggedResultFixture, "--inputs", batchTaggedResultJson]
+        let object = Aeson.object
+            (.=) :: Aeson.ToJSON v => Key.Key -> v -> (Key.Key, Value)
+            (.=) = (Aeson..=)
+            injury = object ["Injury" .= object ["days off work" .= (3 :: Int)]]
+        map resultOf out `shouldBe` [Just injury, Just (String "Holiday")]
+        (_, _, back) <- rowsOf [batchTaggedResultFixture, "-e", "days of", "--inputs", batchTaggedResultBackJson]
+        map resultOf back `shouldBe` [Just (Number 3), Just (Number 0)]
+        (_, _, shapes) <- rowsOf [batchTaggedResultFixture, "-e", "shapes", "--inputs", batchTaggedResultJson]
+        take 1 (map resultOf shapes) `shouldBe`
+          [ Just (toJSON
+              [ object ["LEFT" .= [object ["Pair" .= object ["left" .= (3 :: Int), "right" .= (3 :: Int)]]]]
+              , object ["RIGHT" .= [injury]]
+              , object ["RIGHT" .= [Null]]
+              ]) ]
+
+      it "reads a type that takes a type, as the schemas publish it" $ do
+        (code, _, rows) <- rowsOf [batchTypeParamsFixture, "--inputs", batchTypeParamsJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "success", "error"]
+        map resultOf (take 2 rows) `shouldBe` [Just (Number 115), Just (Number 5)]
+        case drop 2 rows of
+          [tagged] -> show (objField tagged "diagnostics") `shouldSatisfy` ("Missing required field 'amount'" `isInfixOf`)
+          other -> expectationFailure ("expected 3 rows, got " ++ show (length other + 2))
+
       -- An input declared through a synonym is the type the synonym stands for
       -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:
       -- it used to look at the name `Year` and judge nothing, so text that is
@@ -4241,7 +4522,7 @@ spec bin = do
             -- and the first row, the text `abc`, is the one refused, with the
             -- message the plain NUMBER gets
             take 1 (map outcome through) `shouldBe` ["refused"]
-            show (map (`objField` "diagnostics") (take 1 through)) `shouldSatisfy` ("Expected JSON number but got: String" `isInfixOf`)
+            show (map (`objField` "diagnostics") (take 1 through)) `shouldSatisfy` ("Expected JSON number but got: \\\"abc\\\"" `isInfixOf`)
 
         it "refuses text that is no boolean, and a number, as for a BOOLEAN, in JSON and in CSV" $ do
           forM_ [batchSynonymFlagJson, batchSynonymFlagCsv] \file -> do

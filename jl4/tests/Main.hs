@@ -7,7 +7,6 @@ import qualified Data.Aeson.Encode.Pretty as AP
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Text.Encoding as TE
 import qualified Data.List as List
-import qualified Data.Map.Strict as Map
 import qualified L4.Annotation as JL4
 import qualified L4.EvaluateLazy as JL4Lazy
 import L4.TracePolicy (lspDefaultPolicy)
@@ -16,12 +15,11 @@ import L4.Export (ExportedFunction (..))
 import qualified L4.Export as Export
 import qualified L4.Export.Document as Doc
 import qualified L4.Export.Render as Render
-import L4.JsonSchema (SchemaContext (..))
+import qualified L4.Export.Shape as Shape
 import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
 import L4.Parser (PError (..), execProgramParserWithHintPass, execProgramParserWithHintPassUnmemoised)
 import qualified L4.Parser.SrcSpan as JL4
-import L4.Syntax
 import qualified L4.TypeCheck as JL4
 
 import qualified Paths_jl4
@@ -76,12 +74,10 @@ main = do
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
   hoverFiles <- sort <$> globDir1 (compile "lsp/hover/**/*.l4") examplesRoot
-  -- Top-level not-ok/ fixtures, missed by the not-ok/tc and not-ok/nlg globs.
-  -- The export-*.l4 files typecheck fine but assert (via their schema golden)
-  -- that an @export in an unsupported position yields no default export.
-  -- (empty.l4 used to live here while warnings still failed typecheck; now
-  -- that only SError blocks 'SuccessfulTypeCheck', it lives in ok/.)
-  exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
+  -- Top-level not-ok/export-*.l4: files that type-check and evaluate, and that
+  -- `l4 check` fails for an @export the export check refuses. ok/ holds only
+  -- files that `l4 check` passes (review of #779, 2026-11-20).
+  exportRefusedFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -92,7 +88,7 @@ main = do
       corpusNonEmpty "nlg-fails"       nlgFailsFiles
       corpusNonEmpty "semantic-tokens" semanticTokenFiles
       corpusNonEmpty "hover"           hoverFiles
-      corpusNonEmpty "export-placement" exportPlacementFiles
+      corpusNonEmpty "export-refused"  exportRefusedFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
     -- The legal examples are what a reader of a rendered document sees. A change
     -- to the wording shows here as a diff, line by line, across all of them.
@@ -108,7 +104,7 @@ main = do
     -- it silently records mangled output — this compares against the verbatim
     -- source and so cannot bless a regression.
     describe "exactprint identity (source round-trips l4 format)" $
-      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+      forM_ (okFiles <> legalFiles <> librariesFiles <> exportRefusedFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ExactPrintIdentity evalConfig inputFile
     -- Invariant: the parser's memo of bracketed groups changes nothing
@@ -122,13 +118,13 @@ main = do
     -- token. jl4-core-test's NestedParenParserSpec does the same on deeper
     -- and broken nests, which the corpus has few of.
     describe "parser memo changes nothing (memo on = memo off; #1017)" $
-      forM_ (okFiles <> legalFiles <> librariesFiles <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles <> exportPlacementFiles) $ \inputFile ->
+      forM_ (okFiles <> legalFiles <> librariesFiles <> tcFailsFiles <> nlgFailsFiles <> semanticTokenFiles <> hoverFiles <> exportRefusedFiles) $ \inputFile ->
         it (makeRelative examplesRoot inputFile) $
           jl4ParserMemoChangesNothing inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
-    describe "export placement (typechecks; no default export)" $
-      tests evalConfig (True, True) exportPlacementFiles examplesRoot
+    describe "export refused (type-checks; l4 check fails)" $
+      tests evalConfig (True, True) exportRefusedFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
     KeywordList.keywordListTests dataDir
@@ -338,8 +334,10 @@ jl4JsonSchemaGolden evalConfig dir inputFile = do
           in case defaultExport of
                Nothing -> "No @export annotations found in file\n"
                Just export ->
-                 let ctx = buildSchemaContext checkResult.module'
-                     schema = JsonSchema.generateJsonSchema ctx export
+                 case JsonSchema.generateJsonSchema (schemaShapeEnv checkResult) export of
+                  Left (input, why) ->
+                    "No schema: the input `" <> Text.unpack input <> "` is " <> Text.unpack (Shape.unsendableWhat why) <> "\n"
+                  Right schema ->
                  -- NOT 'BL.unpack'. 'Data.ByteString.Lazy.Char8.unpack' maps
                  -- each BYTE to a 'Char', and 'AP.encodePretty' returns UTF-8
                  -- bytes — so every non-ASCII character arrived here as its
@@ -354,7 +352,7 @@ jl4JsonSchemaGolden evalConfig dir inputFile = do
                  -- beside it, written from 'Text', held the same source text
                  -- correctly — which is the control that makes this visible.
                  -- smucclaw/l4-ide#962.
-                 in Text.unpack (TE.decodeUtf8 (BL.toStrict (AP.encodePretty schema))) ++ "\n"
+                    Text.unpack (TE.decodeUtf8 (BL.toStrict (AP.encodePretty schema))) ++ "\n"
   pure
     Golden
       { output
@@ -372,22 +370,13 @@ selectDefaultExport exports =
     Just e -> Just e
     Nothing -> listToMaybe exports
 
-buildSchemaContext :: Module Resolved -> SchemaContext
-buildSchemaContext (MkModule _ _ section) =
-  JsonSchema.emptyContext{ctxDeclares = collectDeclares section}
- where
-  collectDeclares :: Section Resolved -> Map.Map Text (Declare Resolved)
-  collectDeclares (MkSection _ _ _ decls) =
-    Map.fromList $ concatMap collectDecl decls
-
-  collectDecl :: TopDecl Resolved -> [(Text, Declare Resolved)]
-  collectDecl = \case
-    Declare _ decl@(MkDeclare _ _ appForm _) ->
-      [(getDeclName appForm, decl)]
-    Section _ sub -> Map.toList $ collectDeclares sub
-    _ -> []
-
-  getDeclName (MkAppForm _ name _ _) = rawNameToText (rawName (getActual name))
+-- | What the export check reads types from, as jl4-schema builds it: the
+-- declarations of the module and of every module it imports.
+schemaShapeEnv :: Rules.TypeCheckResult -> Shape.ShapeEnv
+schemaShapeEnv tc =
+  Shape.shapeEnvFromDeclares
+    (foldMap (Shape.moduleDeclares . (.module')) (tc : Rules.transitiveDependencies tc))
+    tc.entityInfo
 
 -- ----------------------------------------------------------------------------
 -- Test helpers
@@ -470,9 +459,13 @@ checkFile evalConfig isOk file = do
       _        <- lift   $ Shake.addVirtualFileFromFS nfp
       _        <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
       checked  <- MaybeT $ Shake.use SuccessfulTypeCheck uri <* liftIO (Text.putStrLn "Typechecking successful")
+      -- The export check is a rule of its own, not part of the typecheck, so a
+      -- refused @export does not fail the typecheck above (see L4.Export).
+      exports  <- MaybeT $ Shake.use ExportCheck uri
       results' <- MaybeT $ Shake.use EvaluateLazy uri
       when (not (null results')) $ liftIO $ Text.putStrLn "Evaluation successful"
       let msgs  =    map typeErrorToMessage checked.infos
+                  <> map exportErrorToMessage exports
                   <> map evalLazyDirectiveResultToMessage results'
           formatted = foldMap (sanitizeFilePaths . renderMessage) $ sortOn fst msgs
       liftIO $ Text.putStr formatted
@@ -483,6 +476,18 @@ checkFile evalConfig isOk file = do
 
  where
   typeErrorToMessage err = (JL4.rangeOf err, JL4.prettyCheckErrorWithContext err)
+  -- The first line says which kind of problem it is, as the editor's
+  -- diagnostic source ("export") does.
+  exportErrorToMessage err =
+    ( Export.exportErrorRange err
+    , case Export.prettyExportError err of
+        l : ls -> (label <> l) : ls
+        [] -> []
+    )
+   where
+    label = case Export.exportErrorSeverity err of
+      JL4.SError -> "[export error] "
+      _ -> "[export warning] "
   evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _) =
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))
   renderMessage (r, txt) = cliErrorMessage r txt

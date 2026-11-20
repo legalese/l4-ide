@@ -1,0 +1,13 @@
+-- A type whose only constructor is named like it, read by l4 batch (review of
+-- #779, 2026-11-19). JSONDECODE reads it as a record, its fields alone, and
+-- the schemas publish it so; the tagged form is refused.
+
+DECLARE `Deposit Refund` IS ONE OF
+  `Deposit Refund` HAS amount IS A NUMBER
+
+@export default Refund amount
+GIVEN r IS A `Deposit Refund`
+GIVETH A NUMBER
+`refund amount` MEANS
+  CONSIDER r
+  WHEN `Deposit Refund` a THEN a

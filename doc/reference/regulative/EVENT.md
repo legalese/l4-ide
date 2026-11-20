@@ -103,9 +103,10 @@ A type of your own that is also called `EVENT` and takes two parameters is ambig
 
 ## EVENT and @export
 
-A rule published with `@export` cannot take an `EVENT` as an input or give one back as its result, because a request has no way to write one.
+A rule published with `@export` cannot take an `EVENT` as an input or give one back as its result yet, because a request has no way to write one.
 The same goes for a `LIST OF` events or a `MAYBE OF` an event.
-`l4 check` reports an error at the `@export` line and the service will not deploy the file; see [An @export that takes or returns an EVENT](../errors/README.md#an-export-that-takes-or-returns-an-event).
+`l4 check` reports an error at the `@export` line and fails, and the service will not deploy the file; see [An @export with an input or result that cannot be sent yet](../errors/README.md#an-export-with-an-input-or-result-that-cannot-be-sent-yet).
+That error does not stop the rest of the file: it is still checked for type errors, and the editor still shows the results of its `#EVAL`s and `#EVALTRACE`s, this rule's included.
 An `EVENT` that the rule builds or reads inside its body is not affected.
 
 ## Related pages

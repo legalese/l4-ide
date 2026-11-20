@@ -1,0 +1,6 @@
+[
+  { "p": "Cash" },
+  { "p": { "Card": { "card fee": 2 } } },
+  { "p": "Card" },
+  { "p": { "card fee": 2 } }
+]

@@ -1,0 +1,15 @@
+-- l4 run prints what l4 check reports of an @export (review of #779,
+-- 2026-11-20): this one takes a function, which cannot be sent, and the file
+-- is still evaluated.
+
+@export Apply twice
+GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER
+      n IS A NUMBER
+GIVETH A NUMBER
+`apply twice` MEANS f (f n)
+
+GIVEN m IS A NUMBER
+GIVETH A NUMBER
+`double` m MEANS m * 2
+
+#EVAL `apply twice` `double` 3

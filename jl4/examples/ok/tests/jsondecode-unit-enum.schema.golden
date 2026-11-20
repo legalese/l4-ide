@@ -1,0 +1,22 @@
+{
+    "$defs": {
+        "Unit": {
+            "enum": [
+                "Unit"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Takes a unit",
+    "properties": {
+        "u": {
+            "$ref": "#/$defs/Unit"
+        }
+    },
+    "required": [
+        "u"
+    ],
+    "title": "takes unit",
+    "type": "object"
+}

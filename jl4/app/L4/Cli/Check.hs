@@ -49,6 +49,10 @@ checkCmd opts = do
   (errs, diags, mTc) <- runOneshotWithDiagnostics evalConfig opts.checkFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
+    -- An @export that cannot be published is an error of its own rule, not of
+    -- the typecheck: it fails the check through the diagnostics below, while
+    -- @l4 run@ still evaluates the file.
+    _ <- Shake.use Rules.ExportCheck uri
     Shake.use Rules.SuccessfulTypeCheck uri
 
   let typecheckOk = case mTc of

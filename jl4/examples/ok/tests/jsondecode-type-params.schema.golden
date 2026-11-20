@@ -1,0 +1,27 @@
+{
+    "$defs": {
+        "Holding OF NUMBER": {
+            "properties": {
+                "amount": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "amount"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Holding amount",
+    "properties": {
+        "h": {
+            "$ref": "#/$defs/Holding OF NUMBER"
+        }
+    },
+    "required": [
+        "h"
+    ],
+    "title": "holding amount",
+    "type": "object"
+}

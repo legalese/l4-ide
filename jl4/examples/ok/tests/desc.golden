@@ -1,5 +1,8 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+desc.l4:3:1-75:
+  [export warning] `factorial` is published with @export, but its input `x` has no written type.
+  Write one in the GIVEN, so that the schema says what to send.
 desc.l4:27:1-29:43:
   Person OF "Alice", 30, "123 Main St"

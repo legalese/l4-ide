@@ -152,6 +152,7 @@ Result:
 Each `Evaluation[n]` block shows the result of one `#EVAL`, in file order. Results go to standard output; errors and warnings go to standard error.
 
 `l4 run` fails when the file, or a file it imports, has an error, or when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero. The other directives still show their results. Warnings, and an `#ASSERT` that comes out false, don't make it fail.
+An `@export` that cannot be published, such as one that takes a function, is an error that `l4 run` prints and fails on, as `l4 check` does, and the file is still evaluated.
 
 If a `FETCH` or `POST` can't reach its server, `l4 run` fails and shows no results for any directive in the file. To see the other results, move the directives that make requests to a file of their own.
 
@@ -363,6 +364,10 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
+In a `result`, a choice that carries data is written as a deployed rule answers it, an object with one key, the choice's name, holding its fields by name, `{"Card": {"card fee": 2}}`, which is the form a parameter of that type is read in, so such a result can be given back as a case.
+A record is written the same way, `{"Pair": {"left": 5, "right": 6}}`, while a record parameter is read from its fields alone, `{"left": 5, "right": 6}`.
+An `EITHER` is `{"RIGHT": [value]}` or `{"LEFT": [value]}`, a `MAYBE` is its value or `null`, and a choice that carries nothing is its name.
+
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`).
 A value is read as the type its parameter declares, whichever kind of file the case comes from.
 A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.
@@ -372,6 +377,13 @@ A synonym that takes a type, such as `DECLARE Optional OF a IS A MAYBE a` used a
 Every other kind of parameter keeps a non-blank CSV cell exactly as written, however much it looks like a number or a boolean.
 A `STRING` receives `123456`, `018956` and `1.50` as the codes they are, a choice such as `DECLARE Answer IS ONE OF True, False, Unknown` receives the name `True` and not a boolean, and a `DATE` receives `2026-10-13` as text, so a cell that is not a date, such as `20261013`, is an error that names it.
 A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
+An `EITHER` parameter is read only in the form `{"LEFT": [value]}` or `{"RIGHT": [value]}`, the value in an array of one.
+A bare `2000`, an object with both keys, or `{"RIGHT": 2000}` without the array is an error, which names the parameter when it is typed `EITHER` itself, and does not when the `EITHER` is inside a record or a list.
+A parameter whose type has a choice that carries data, such as ``DECLARE Payment IS ONE OF Cash, Card HAS `card fee` IS A NUMBER``, is read as the name of a choice that carries nothing, `"Cash"`, or as an object with one key, the choice's name, holding its fields, `{"Card": {"card fee": 2}}`.
+The bare name of a choice that carries data, `"Card"`, or its fields without its name, `{"card fee": 2}`, is an error.
+A type whose only choice is named like the type, such as ``DECLARE `Deposit Refund` IS ONE OF `Deposit Refund` HAS amount IS A NUMBER``, is a record, and is read from its fields alone, `{"amount": 40}`.
+A CSV cell is read as text for these, so it cannot carry an `EITHER` or a choice that carries data: `2000` and `{"RIGHT": [2000]}` in a cell are both errors, and so are `Card` and `{"Card": {"card fee": 2}}`, while a choice that carries nothing, such as `Cash`, can be given in a cell.
+Give such parameters in a JSON or YAML file.
 A blank CSV cell is not text, for a `STRING` parameter as for any other: an empty cell, a cell holding only spaces and a quoted `""` all leave the fact out, exactly as a column missing from the file does. A fact that has to be given is then missing, which makes the line an error that says `Missing required field` and names it; a `MAYBE` fact is `NOTHING`.
 So a line of nothing but empty cells, such as `,,`, is an error when the rules need any fact, and the run stops there unless you pass `--continue-on-error`.
 A CSV file cannot carry empty text, or text of only spaces, as a value: to give a fact that value, use a JSON or YAML file (`"note": ""`).
@@ -403,9 +415,9 @@ The command exits with status 1 when any case was `error`, and 0 when none was, 
 
 `--validate-only` checks each case against the facts the rules need, and runs nothing. Its lines have three keys, not four: `input`, `status` (`valid` or `invalid`) and `errors`, the list of problems, which is `[]` for a valid case. The command exits with status 1 when any case is `invalid`, and `--continue-on-error` works as it does in a run.
 
-It checks that every fact the rules need, other than a `MAYBE`, is in the case and is not `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`. A synonym that takes a type (`Optional OF NUMBER`) is not: a case can be `valid` that a run refuses, and `invalid` that a run answers.
+It checks that every fact the rules need, other than a `MAYBE`, is in the case and is not `null`, that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does, and that an `EITHER` fact, or a `MAYBE` of one, is written `{"LEFT": [value]}` or `{"RIGHT": [value]}`: a bare value, or a CSV cell, given for one is `invalid`. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`. A synonym that takes a type (`Optional OF NUMBER`) is not: a case can be `valid` that a run refuses, and `invalid` that a run answers.
 
-**It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
+**It judges those types only.** For any other type, such as a `DATE`, a list, a record, a list of choices or a choice that carries data, whatever is given is let through, and a bad value fails only when the case is run: `"Card"` for a `Payment` is `valid`, and so is an `EITHER` given in another form inside a record. With this rule:
 
 ```l4
 @export Echo a date

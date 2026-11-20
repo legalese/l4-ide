@@ -122,7 +122,7 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 | `applied`   | The new bundle is compiled, compatible, and now the live version   |
 | `rejected`  | Breaking change, compile failure, or timeout — `error` has details |
 
-`POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. Terminal jobs are retained for 10 minutes, then pruned.
+`POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. For a `oneOf`, a form (the names, or the tagged object) that is removed is rejected; one that is added is fine on an input and rejected on the return value, as a new enum value there is; a form on both sides is compared by these same rules. The keys of the tagged object are constructors, of which a value holds one, so they are compared as an enum's values are, not as a record's fields: a constructor that carries data added to the return value is rejected ("may now return new values"), one removed from an input is rejected ("no longer accepts"), and the fields of a constructor on both sides are compared as a record's are. A type whose only constructor is named like it is a record, its fields alone; given a second constructor, its form changes to the tagged object, and that is rejected in either direction with "form changed from an object of its fields (amount) to an object keyed by its constructor (Appealed, Outcome)". Terminal jobs are retained for 10 minutes, then pruned.
 
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
 
@@ -185,8 +185,18 @@ A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
 A list is a JSON array, even when it has one element.
 An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
 A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
+A constructor that carries data is written the same way, keyed by its name, `{"Card": {"card fee": 2}}`, and one that carries none is its name, `"Cash"`, in an answer and in an input alike.
+A type whose only constructor is named like the type and carries data (``DECLARE `Deposit Refund` IS ONE OF `Deposit Refund` HAS amount IS A NUMBER``) is a record: it is answered as one, `{"Deposit Refund": {"amount": 40}}`, published as one, and read as its fields alone, `{"amount": 40}`.
+The published schema says so: a type whose constructors all carry data is an object with one key per constructor; one with both kinds is a `oneOf` of a string `enum` of the names and that object, with no `type` of its own; one whose constructors carry nothing is a string `enum` of their names.
+An input that sends the bare name of a constructor that carries data, or an object in another form, is refused with a `422` that names the input, at any depth and on every path, as an `EITHER` in another form is.
+A record input that is not an object, at any depth, is refused the same way: ``Parameter 'p': a `Pair` is an object of its fields (left, right)``.
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
+An `EITHER` answer is `{"RIGHT": [v]}` or `{"LEFT": [v]}`, the value in an array of one, and the published schema describes it so, with both keys optional.
+An `EITHER` input is read in the same form, `{"RIGHT": [5]}` or `{"LEFT": ["x"]}`, and in no other.
+A bare `5`, an object with both keys or neither, or `{"RIGHT": 5}` without the array is refused with a `422` that names the input: `Parameter 'e': an EITHER is written {"LEFT": [value]} or {"RIGHT": [value]}`.
+That holds at any depth (in a record's field, a list's element or a `MAYBE`), on both paths, in a batch case (its `@error`) and in an MCP tool call (`isError`).
+A missing, `null` or `{}` `EITHER` input is missing, as any other is.
 
 A function that reaches a `REFUSE` gives no answer: it declines to, with its author's reason.
 The response is a `200`, as for an answer, with the body `{"tag": "Refused", "contents": {"kind": "refused", "reason": "not modelled"}}`: its `contents` is the refusal, where an answer's `contents` has a `result`. A refusal is how the rules answer that case, so it is not an error: a `422` is only an evaluation that stops with one.
@@ -200,7 +210,7 @@ An input left out of `arguments`, or sent as `null`, is missing.
 Most requests are evaluated directly, and a missing input that is not a `MAYBE` is rejected before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`.
 A synonym at the head of an input's type is read as the type it stands for.
 An input declared through a synonym for `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
-The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
+The function's published schema lists such an input as optional, as it does a plain `MAYBE NUMBER`: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` leave it out of `required`.
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
 On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is rejected with the direct path's message.
@@ -268,6 +278,16 @@ The name is the identifier the rule uses, not the party it stands for: a party w
 A name that exists only inside the rule cannot be sent back: a party that is a `GIVEN` input, or an action the rule never declares, makes the evaluation fail with "I could not find a definition for the identifier" and the name.
 Name the value instead: the value you gave for the input, or a declared action.
 Rule source stays L4, backticks included: an action that carries a value, such as `say "pay now"`, and the reasoning tree and the graphviz source of a trace.
+
+Only a function whose result is a `DEONTIC` itself is a contract.
+A bundle is refused at deploy when an `@export` takes a `DEONTIC` as an input, or returns one inside a `MAYBE`, a `LIST` or an `EITHER`, or through a type you declared as another name for one, with the words `l4 check` uses: `` `the duty` is published with @export, but its result is a MAYBE whose value is a DEONTIC, a contract rule, and @export does not support that yet. ``
+The same goes for any other input or result with no JSON form: an `EVENT`, a function, a type variable, or a record or a constructor with a field of one of those.
+Remove the `@export` from the rule, or return the `DEONTIC` itself, and the bundle deploys.
+The rule still evaluates where it is written, with its `#EVAL` and `#EVALTRACE`, and [the errors reference](../doc/reference/errors/README.md) says what to do instead.
+
+Limits:
+
+- Only `/evaluation` reads `startTime` and `events`. An MCP `tools/call` and `/evaluation/batch` ignore them, with no error, and answer with the contract as it stands before any event: a contract whose events would fulfil it comes back as its opening `OBLIGATION`.
 
 ### Batch Evaluation
 
@@ -420,7 +440,7 @@ A client that asks for a task while the deployment is still compiling gets that 
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
 - **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`.
-- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`.
+- **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`. The service does not read `startTime` and `events` there yet, and answers with the opening obligation ([Deontic (Contract) Evaluation](#deontic-contract-evaluation), limits).
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
 
@@ -563,7 +583,7 @@ Deployments are stored on disk at `{store-path}/{deployment-id}/`:
 
 `metadata-cache.json` is a cache, written after a successful compile; the sources and `metadata.json` are what a deployment is.
 
-On startup, the service scans the store directory and compiles every deployment from its stored sources, the way a deploy compiles them and under the same limits (see Resource Limits), as many at once as it has capabilities, which on this build is one: it runs GHC's non-threaded runtime. A timeout counts wall-clock time, and a compile starts only when one of those places is free, so a deployment is not failed for waiting its turn. The service opens its port only after every deployment has loaded, so a store of k deployments that each time out delays the port by about k times `--compile-timeout`. A deployment that does not finish in `--compile-timeout` stays `failed` until it is redeployed or the service restarts (a PUT to a failed deployment is not checked for compatibility, as before). Nothing is kept from the compile that made the deployment, so a restart serves exactly what a deploy of those sources would serve. A deployment whose stored sources no longer parse or type-check (a file was edited on disk, or the service's checks changed) is `failed`, with the errors a deploy of them would be rejected with; the log has a warning that names the file and prints the errors, and the other deployments load as usual. A `bundle.cbor` that an earlier version of the service left beside the sources is not read and not touched; it is safe to delete. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
+On startup, the service scans the store directory and compiles every deployment from its stored sources, the way a deploy compiles them and under the same limits (see Resource Limits), as many at once as it has capabilities, which on this build is one: it runs GHC's non-threaded runtime. A timeout counts wall-clock time, and a compile starts only when one of those places is free, so a deployment is not failed for waiting its turn. The service opens its port only after every deployment has loaded, so a store of k deployments that each time out delays the port by about k times `--compile-timeout`. A deployment that does not finish in `--compile-timeout` stays `failed` until it is redeployed or the service restarts (a PUT to a failed deployment is not checked for compatibility, as before). Nothing is kept from the compile that made the deployment, so a restart serves exactly what a deploy of those sources would serve. A deployment whose stored sources no longer parse or type-check (a file was edited on disk, or the service's checks changed) is `failed`, with the errors a deploy of them would be rejected with; the log has a warning that names the file and prints the errors, and the other deployments load as usual. A `bundle.cbor` that an earlier version of the service left beside the sources is not read and not touched; it is safe to delete. With `--lazy-load`, deployments are registered as pending and compiled on first evaluation or function access (with a 2-second optimistic timeout). A `PUT` or `POST` to a pending deployment compiles it first, from its stored sources, so the compatibility gate and the version bump compare the new bundle with what this build compiles the old one to, as an eager start does, and not with the metadata an earlier build cached; if the old sources no longer compile, the deployment is failed, as an eager start would leave it, and the gate skips it. File browsing (`list_files`, `read_file`, `search_identifier`, `search_text`) reads directly from disk and works immediately regardless of compilation state.
 
 ## Testing
 

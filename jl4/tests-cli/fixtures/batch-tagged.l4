@@ -1,0 +1,16 @@
+-- A constructor that carries data, read by l4 batch (review of #779, 2026-11-17).
+-- It is written {"Card": {"card fee": 2}}, and one that carries none as its
+-- name, "Cash" (wire-form card J1, option A). Both used to reach the rule
+-- without their fields, so no WHEN matched.
+
+DECLARE Payment IS ONE OF
+  Cash
+  Card HAS `card fee` IS A NUMBER
+
+@export default Fee for a payment
+GIVEN p IS A Payment
+GIVETH A NUMBER
+`fee for` MEANS
+  CONSIDER p
+  WHEN Card f THEN f
+  WHEN Cash THEN 0

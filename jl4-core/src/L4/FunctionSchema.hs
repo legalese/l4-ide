@@ -6,6 +6,8 @@ module L4.FunctionSchema (
   Parameter (..),
   declaresFromModule,
   typeToParameter,
+  shapeToParameter,
+  uncheckedParameter,
   parametersFromDecide,
   parametersFromDecideWithErrors,
 ) where
@@ -15,16 +17,13 @@ import Data.Aeson (FromJSON, ToJSON, (.:), (.:?), (.=), (.!=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamTypes, extractImplicitAssumeParams)
+import L4.Export.Shape (JsonConstructor (..), JsonField (..), JsonShape (..), ShapeEnv, ShapeName (..), Unsendable, jsonShape, moduleDeclares, shapeEnvFromDeclares)
 import L4.TypeSynonym (declaresFromModule, expandSynonyms)
 import L4.Syntax
-import L4.TypeCheck.Environment
-  ( booleanUnique, dateUnique, datetimeUnique, listUnique, maybeUnique
-  , numberUnique, stringUnique, timeUnique
-  )
+import L4.TypeCheck.Environment (maybeUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -45,6 +44,11 @@ data Parameter = Parameter
   , parameterItems :: !(Maybe Parameter) -- Array items schema for array types
   , parameterRequired :: !(Maybe [Text]) -- Required field names for nested object types
   , parameterL4Type :: !(Maybe Text) -- L4 user-declared type name (record/enum) when this node came from a DECLARE; serialised as "x-l4-type"
+  , parameterOneOf :: !(Maybe [Parameter])
+  -- ^ For a type with a constructor that carries fields and one that carries
+  -- none, the two forms its value takes: the names of those that carry none
+  -- (a string enum) and the others tagged (an object, one key each). Only
+  -- such a type has it, and then it has no "type" (MULLET, Meng, 2026-11-18).
   }
   deriving stock (Show, Read, Ord, Eq, Generic)
 
@@ -66,7 +70,7 @@ instance FromJSON Parameters where
 instance ToJSON Parameter where
   toJSON p =
     Aeson.object $
-      [ "type" .= p.parameterType ]
+      (if Text.null p.parameterType then [] else [ "type" .= p.parameterType ])
         ++ (if Text.null p.parameterDescription then [] else ["description" .= p.parameterDescription])
         ++ case p.parameterAlias of
           Nothing -> []
@@ -92,11 +96,14 @@ instance ToJSON Parameter where
         ++ case p.parameterL4Type of
           Nothing -> []
           Just l4ty -> ["x-l4-type" .= l4ty]
+        ++ case p.parameterOneOf of
+          Nothing -> []
+          Just members -> ["oneOf" .= members]
 
 instance FromJSON Parameter where
   parseJSON = Aeson.withObject "Parameter" $ \p ->
     Parameter
-      <$> p .: "type"
+      <$> p .:? "type" .!= ""
       <*> p .:? "alias"
       <*> p .:? "format"
       <*> p .:? "enum" .!= []
@@ -106,121 +113,130 @@ instance FromJSON Parameter where
       <*> p .:? "items"
       <*> p .:? "required"
       <*> p .:? "x-l4-type"
+      <*> p .:? "oneOf"
 
-typeToParameter ::
-  Map Text (Declare Resolved) ->
-  Set.Set Text ->
-  Type' Resolved ->
-  Parameter
-typeToParameter declares visited ty =
-  -- A synonym is decided by what it stands for, as the decoder does: a
-  -- synonym for MAYBE is a MAYBE, one for LIST an array of its element.
-  case expandSynonyms declares ty of
-    Type _ -> emptyParam "object"
-    TyApp _ name [] ->
-      typeNameToParameter name
-    -- By the resolved type, as 'primitiveJsonType' does: a module's own
-    -- one-argument @List@ or @Optional@ is that declared type.
-    TyApp _ name [inner]
-      | getUnique name == listUnique ->
-          (emptyParam "array")
-            { parameterItems = Just (typeToParameter declares visited inner)
-            }
-      | getUnique name == maybeUnique ->
-          typeToParameter declares visited inner
-      | otherwise ->
-          typeNameToParameter name
-    TyApp _ name _ ->
-      typeNameToParameter name
-    Fun{} -> emptyParam "object"
-    Forall _ _ inner -> typeToParameter declares visited inner
-    InfVar{} -> emptyParam "object"
- where
-  emptyParam :: Text -> Parameter
-  emptyParam t =
-    Parameter
-      { parameterType = t
-      , parameterAlias = Nothing
-      , parameterFormat = Nothing
-      , parameterEnum = []
-      , parameterDescription = ""
-      , parameterProperties = Nothing
-      , parameterPropertyOrder = Nothing
-      , parameterItems = Nothing
-      , parameterRequired = Nothing
-      , parameterL4Type = Nothing
+-- | The schema of an input or a result: the shape the export check gives its
+-- type ('jsonShape'), written out as a 'Parameter'. So an @\@export@ that the
+-- check accepts is described as the check sees it, and a type the check gives
+-- no shape has no schema: 'Left' says why.
+typeToParameter :: ShapeEnv -> Type' Resolved -> Either Unsendable Parameter
+typeToParameter env ty = shapeToParameter <$> jsonShape env ty
+
+-- | What a 'Parameter' is for an input the export check did not look at, and
+-- that 'typeToParameter' has no schema for: an untyped GIVEN, an input read
+-- from a name the module never declared, or a rule that is not exported.
+uncheckedParameter :: Parameter
+uncheckedParameter = emptyParam "object"
+
+-- | A shape, written out as a 'Parameter'. A 'Parameter' cannot say @null@, so a
+-- MAYBE is its inner type, and a record's field that is a MAYBE is not in its
+-- @required@. A record is written out on every path to it, and one that is
+-- being written out already is its name only.
+shapeToParameter :: JsonShape -> Parameter
+shapeToParameter = \case
+  JNumber -> emptyParam "number"
+  JString -> emptyParam "string"
+  JBool -> emptyParam "boolean"
+  JDate -> (emptyParam "string") {parameterFormat = Just "date"}
+  JTime -> (emptyParam "string") {parameterFormat = Just "time"}
+  JDateTime -> (emptyParam "string") {parameterFormat = Just "date-time"}
+  JEnum named constructors ->
+    (emptyParam "string")
+      { parameterDescription = Maybe.fromMaybe "" named.shapeTypeDescription
+      , parameterEnum = constructors
+      , parameterL4Type = Just named.shapeTypeName
       }
+  JRecord named fields ->
+    (emptyParam "object")
+      { parameterDescription = Maybe.fromMaybe "" named.shapeTypeDescription
+      , parameterProperties =
+          Just $ Map.fromList
+            [ (f.fieldName, addDesc f.fieldDescription (shapeToParameter f.fieldShape))
+            | f <- fields
+            ]
+      , parameterPropertyOrder = Just [f.fieldName | f <- fields]
+      , parameterRequired = Just [f.fieldName | f <- fields, f.fieldRequired]
+      , parameterL4Type = Just named.shapeTypeName
+      }
+  -- A constructor that carries fields is tagged, {"Card": {"card fee": 2}},
+  -- and one that carries none is its name, "Cash" (wire-form card J1, option
+  -- A; HATBOX, Meng, 2026-11-18). A type whose constructors all carry fields is
+  -- that object alone, one key for each, none required; one that has both is a
+  -- oneOf of the names and that object (MULLET, Meng, 2026-11-18). That the
+  -- object holds exactly one key is not said, as for an EITHER. It has no
+  -- @required@, where a record always has one, and that is how the service's
+  -- compatibility gate tells its keys, which are alternatives, from a record's
+  -- fields ('Compatibility.isAlternatives' in jl4-service): do not give it one.
+  JTagged named constructors ->
+    let bare = [c.constructorName | c <- constructors, null c.constructorFields]
+        withFields = [c | c <- constructors, not (null c.constructorFields)]
+        names = (emptyParam "string") {parameterEnum = bare}
+        tagged =
+          (emptyParam "object")
+            { parameterProperties = Just (Map.fromList [(c.constructorName, recordParam c.constructorFields) | c <- withFields])
+            , parameterPropertyOrder = Just [c.constructorName | c <- withFields]
+            }
+        described q =
+          q
+            { parameterDescription = Maybe.fromMaybe "" named.shapeTypeDescription
+            , parameterL4Type = Just named.shapeTypeName
+            }
+     in described $
+          if null bare
+            then tagged
+            else (emptyParam "") {parameterOneOf = Just [names, tagged]}
+  -- Expansion stops here, to keep the schema finite; the name still lets a
+  -- client render the value as @TypeName WITH …@.
+  JRecursive named -> (emptyParam "object") {parameterL4Type = Just named.shapeTypeName}
+  JArray inner -> (emptyParam "array") {parameterItems = Just (shapeToParameter inner)}
+  JOptional inner -> shapeToParameter inner
+  JEither left right -> eitherParameter (shapeToParameter left) (shapeToParameter right)
+ where
+  -- A constructor's fields, as a record's are written.
+  recordParam fields =
+    (emptyParam "object")
+      { parameterProperties =
+          Just $ Map.fromList
+            [ (f.fieldName, addDesc f.fieldDescription (shapeToParameter f.fieldShape))
+            | f <- fields
+            ]
+      , parameterPropertyOrder = Just [f.fieldName | f <- fields]
+      , parameterRequired = Just [f.fieldName | f <- fields, f.fieldRequired]
+      }
+  addDesc :: Maybe Text -> Parameter -> Parameter
+  addDesc Nothing p = p
+  addDesc (Just d) p = p {parameterDescription = d}
 
-  typeNameToParameter :: Resolved -> Parameter
-  typeNameToParameter name =
-    case primitiveJsonType name of
-      Just (t, fmt) -> (emptyParam t) { parameterFormat = fmt }
-      Nothing ->
-        case Map.lookup (resolvedNameText name) declares of
-          Nothing -> emptyParam "object"
-          Just decl -> declareToParameter (resolvedNameText name) decl
+-- | An EITHER, in the form the encoder writes it: @{"LEFT": [v]}@ or
+-- @{"RIGHT": [v]}@, the value in an array of one (the wire-form bench, card J3,
+-- option B, ruled by Meng on 2026-10-15). A 'Parameter' has no @oneOf@, and
+-- adding one would change the format of the schemas the service stores, so this
+-- is an object with both keys, neither required: that it holds exactly one of
+-- them is not said.
+eitherParameter :: Parameter -> Parameter -> Parameter
+eitherParameter left right =
+  (emptyParam "object")
+    { parameterProperties = Just (Map.fromList [("LEFT", side left), ("RIGHT", side right)])
+    , parameterPropertyOrder = Just ["LEFT", "RIGHT"]
+    }
+ where
+  side p = (emptyParam "array") {parameterItems = Just p}
 
-  -- | Map L4's builtin types to JSON Schema type and optional format. This goes
-  -- by the resolved type, not its name: a `DECLARE Text HAS ...` or an imported
-  -- enum `Time` is that record or enum, and reading its name would publish a
-  -- schema for a JSON string that the service then refuses.
-  primitiveJsonType :: Resolved -> Maybe (Text, Maybe Text)
-  primitiveJsonType name
-    | unique == numberUnique = Just ("number", Nothing)
-    | unique == booleanUnique = Just ("boolean", Nothing)
-    | unique == stringUnique = Just ("string", Nothing)
-    | unique == dateUnique = Just ("string", Just "date")
-    | unique == timeUnique = Just ("string", Just "time")
-    | unique == datetimeUnique = Just ("string", Just "date-time")
-    | otherwise = Nothing
-   where
-    unique = getUnique name
-
-  declareToParameter :: Text -> Declare Resolved -> Parameter
-  declareToParameter typeName (MkDeclare declAnn _ _ typeDecl)
-    | typeName `Set.member` visited =
-        -- Recursive type (e.g. a record whose field is a LIST OF itself):
-        -- we must stop expanding to keep the schema finite, but we still
-        -- carry the L4 type name so chat clients can render the value as
-        -- `TypeName WITH …` rather than raw JSON.
-        (emptyParam "object") { parameterL4Type = Just typeName }
-    | otherwise =
-        case typeDecl of
-          RecordDecl _ _ fields ->
-            let
-              visited' = Set.insert typeName visited
-              fieldOrder = [resolvedNameText fieldName | MkTypedName _ fieldName _ _ <- fields]
-              props =
-                Map.fromList
-                  [ (resolvedNameText fieldName, addDesc fieldDesc (typeToParameter declares visited' fieldTy))
-                  | MkTypedName fieldAnn fieldName fieldTy _ <- fields
-                  , let fieldDesc = fmap getDesc (fieldAnn Optics.^. annDesc)
-                  ]
-              requiredFields =
-                [ resolvedNameText fieldName
-                | MkTypedName _ fieldName fieldTy _ <- fields
-                , not (isMaybeFieldType (expandSynonyms declares fieldTy))
-                ]
-             in
-              (emptyParam "object")
-                { parameterDescription = Maybe.fromMaybe "" (fmap getDesc (declAnn Optics.^. annDesc))
-                , parameterProperties = Just props
-                , parameterPropertyOrder = Just fieldOrder
-                , parameterRequired = Just requiredFields
-                , parameterL4Type = Just typeName
-                }
-          EnumDecl _ constructors ->
-            (emptyParam "string")
-              { parameterDescription = Maybe.fromMaybe "" (fmap getDesc (declAnn Optics.^. annDesc))
-              , parameterEnum = [resolvedNameText c | MkConDecl _ c _ <- constructors]
-              , parameterL4Type = Just typeName
-              }
-          SynonymDecl _ inner ->
-            typeToParameter declares (Set.insert typeName visited) inner
-   where
-    addDesc :: Maybe Text -> Parameter -> Parameter
-    addDesc Nothing p = p
-    addDesc (Just d) p = p {parameterDescription = d}
+emptyParam :: Text -> Parameter
+emptyParam t =
+  Parameter
+    { parameterType = t
+    , parameterAlias = Nothing
+    , parameterFormat = Nothing
+    , parameterEnum = []
+    , parameterDescription = ""
+    , parameterProperties = Nothing
+    , parameterPropertyOrder = Nothing
+    , parameterItems = Nothing
+    , parameterRequired = Nothing
+    , parameterL4Type = Nothing
+    , parameterOneOf = Nothing
+    }
 
 parametersFromDecide :: Module Resolved -> Decide Resolved -> Parameters
 parametersFromDecide resolvedModule decide =
@@ -239,10 +255,13 @@ parametersFromDecideWithErrors
 parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ names) _) _ _) errors =
   let
     declares = declaresFromModule resolvedModule
+    env = shapeEnvFromDeclares (moduleDeclares resolvedModule) Map.empty
+    -- Any DECIDE, exported or not, so one the export check never looked at.
+    schemaOf ty = either (const uncheckedParameter) id (typeToParameter env ty)
     mkOne (MkOptionallyTypedName ann resolved mType) =
       let
         base =
-          Maybe.fromMaybe (emptyParam "object") (typeToParameter declares Set.empty <$> mType)
+          maybe uncheckedParameter schemaOf mType
         desc = Maybe.fromMaybe "" (fmap getDesc (ann Optics.^. annDesc))
        in
         (resolvedNameText resolved, base {parameterDescription = desc, parameterAlias = Nothing})
@@ -254,7 +273,7 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
     implicitParams = extractImplicitAssumeParams errors
 
     mkAssumeParam (name, ty) =
-      let base = typeToParameter declares Set.empty ty
+      let base = schemaOf ty
       in (name, base {parameterDescription = "", parameterAlias = Nothing})
 
     givenParamList = map mkOne names
@@ -274,32 +293,11 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
       { parameterMap = Map.fromList (givenParamList <> allAssumeParams)
       , required = requiredGivenParams <> map fst allAssumeParams
       }
- where
-  emptyParam :: Text -> Parameter
-  emptyParam t =
-    Parameter
-      { parameterType = t
-      , parameterAlias = Nothing
-      , parameterFormat = Nothing
-      , parameterEnum = []
-      , parameterDescription = ""
-      , parameterProperties = Nothing
-      , parameterPropertyOrder = Nothing
-      , parameterItems = Nothing
-      , parameterRequired = Nothing
-      , parameterL4Type = Nothing
-      }
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool
 isMaybeType (Just (TyApp _ name [_inner])) = getUnique name == maybeUnique
 isMaybeType _ = False
-
--- | Is a record field's type the builtin MAYBE (for record field required
--- tracking)? By the resolved type, like 'isMaybeType'.
-isMaybeFieldType :: Type' Resolved -> Bool
-isMaybeFieldType (TyApp _ name [_]) = getUnique name == maybeUnique
-isMaybeFieldType _ = False
 
 resolvedNameText :: Resolved -> Text
 resolvedNameText =

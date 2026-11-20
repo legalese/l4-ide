@@ -31,7 +31,7 @@ What L4 accepts and computes does not change.
 ## Behaviour and rules (read in code)
 
 Library path: if `JL4_LIBRARY_PATH` is unset when the suite starts, it is set to `<jl4-core data dir>/libraries`; an explicit setting is kept.
-Export placement: the glob `not-ok/export-*.l4` runs with the same flags as the ok corpus (parse, check, exact-print, NLG, schema).
+Export placement: these fixtures type-check, so they live in `ok/` and run with it (parse, check, exact-print, NLG, schema), since legalese/l4-ide#779; this change ran them from `not-ok/` under a glob of their own, `not-ok/export-*.l4`, with the same flags.
 Its three files put `@export` after `GIVETH`, between `GIVEN` and `GIVETH`, and just before `DECIDE`; each `.schema.golden` pins `No @export annotations found in file`, i.e. an `@export` in those positions yields no default export.
 Corpus guard: one `it` per glob asserts that the glob matched at least one file.
 It has eight rows: ok, libraries, legal, tc-fails, nlg-fails, semantic-tokens, hover and export-placement.
@@ -62,7 +62,7 @@ The REPL's type lookup (`getExpressionType`, `jl4-repl/app/Main.hs:927`) takes `
 
 ## Tests and fixtures that pin it
 
-- `jl4/examples/not-ok/export-{after-giveth,before-decide,between-given-giveth}.l4`, four goldens each in `jl4/examples/not-ok/tests/` (#67).
+- `jl4/examples/ok/export-{after-giveth,before-decide,between-given-giveth}.l4`, four goldens each in `jl4/examples/ok/tests/` (#67; in `not-ok/` until legalese/l4-ide#779).
 - `jl4/examples/ok/empty.l4` and `jl4/examples/ok/tests/empty.{golden,ep.golden,nlg.golden,schema.golden}` (#82): the golden reads "Typechecking successful" followed by its exhaustiveness and redundancy warnings.
   It records `main`'s checker, which for `xx` lists six missing cases and omits two (`faz bar qux`, `faz baz qux`).
 - `jl4/examples/ok/export-non-ascii.l4` and its four goldens in `jl4/examples/ok/tests/` pin #419's fix.

@@ -1,0 +1,9 @@
+-- l4 run prints the warning l4 check gives for an exported GIVEN with no
+-- written type (review of #779, 2026-11-20), and a warning does not fail it.
+
+@export Echo
+GIVEN x
+GIVETH A NUMBER
+`echo` x MEANS 7
+
+#EVAL `echo` 1

@@ -59,6 +59,23 @@ What `value` holds depends on what the rule gives back:
 | a list                                                 | a JSON array, even when the list has only one item                                                                          |
 | one of a list of choices, such as `` `under review` `` | the name as a string, without backticks: `"under review"`                                                                   |
 | a record, such as a `Pair` of `left` and `right side`  | an object with one key, the record's name, holding its fields: `{"Pair": {"left": 5, "right side": 6}}`                     |
+| a choice that carries data, such as `Card` with a fee  | an object with one key, the choice's name, holding its fields: `{"Card": {"card fee": 2}}`; send it the same way            |
+| `LEFT` or `RIGHT` of a value, from an `EITHER`         | an object with one key, `LEFT` or `RIGHT`, holding the value in an array of one: `{"RIGHT": [5]}`; send it the same way     |
+
+A type with only one choice, named like the type, such as ``DECLARE `Deposit Refund` IS ONE OF `Deposit Refund` HAS amount IS A NUMBER``, is a record: it comes back as a record does, `{"Deposit Refund": {"amount": 40}}`, and you send its fields alone, `{"amount": 40}`.
+
+An input of type `EITHER` is sent as it is answered: `{"the claim": {"RIGHT": [2000]}}` or `{"the claim": {"LEFT": ["withdrawn"]}}`, the value in an array of one.
+Any other form, such as a bare `2000`, `{"RIGHT": 2000}` without the array, or an object with both keys, is refused with status 422 and a message that names the input:
+
+```json
+{
+  "contents": {
+    "contents": "Parameter 'the claim': an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}",
+    "tag": "InterpreterError"
+  },
+  "tag": "Error"
+}
+```
 
 Five things to know:
 

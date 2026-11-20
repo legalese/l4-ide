@@ -29,7 +29,7 @@ import Types
 
 import Control.Applicative ((<|>))
 import Control.Concurrent.Async (async)
-import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
+import Control.Concurrent.STM (atomically, modifyTVar', readTVar, readTVarIO, retry)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (asks)
@@ -158,6 +158,13 @@ postDeploymentHandler multipart = do
   let mDesc = extractDescription multipart
       version = computeVersion sourceMap
 
+  -- A pending deployment (lazy-load) is compiled first, from its stored
+  -- sources, by this binary, as an eager startup would have compiled it, so a
+  -- POST over it is answered as in eager mode: an identical bundle is the
+  -- deployment as it stands, and the version bump compares interfaces of this
+  -- binary, not the cached metadata of the one that wrote the store
+  -- (STALEMENU, Meng, 2026-11-18).
+  settlePending deployId
   registry <- liftIO $ readTVarIO env.deploymentRegistry
   -- The recompile shortcut is keyed on the CONTENT hash, so it must also be
   -- keyed on the requested id. Matching content alone meant that asking for a
@@ -319,6 +326,15 @@ putDeploymentHandler deployIdText multipart = do
 
   -- Must already exist. Capture its description (so a source-only PUT
   -- preserves it) and its current interface (for the compat gate).
+  --
+  -- A pending deployment (lazy-load) is compiled first, from its stored
+  -- sources, by this binary, so the gate compares the new bundle with what the
+  -- old one compiles to now, as in eager mode, and not with the cached metadata
+  -- of the binary that wrote the store (STALEMENU, Meng, 2026-11-18). If the old
+  -- sources no longer compile, the deployment is failed, as an eager startup
+  -- would have left it, and the gate skips it as it skips any failed deployment
+  -- (assumed, not ruled).
+  settlePending deployId
   registry <- liftIO $ readTVarIO env.deploymentRegistry
   (existingDesc, mOldIfaces) <- case Map.lookup deployId registry of
     Nothing -> throwError err404
@@ -615,6 +631,22 @@ stateDescription :: DeploymentState -> Maybe Text
 stateDescription (DeploymentReady _ meta)        = meta.metaDescription
 stateDescription (DeploymentPending (Just meta)) = meta.metaDescription
 stateDescription _                               = Nothing
+
+-- | Compile a pending (lazy-load) deployment from its stored sources, and wait
+-- for one that another request is compiling already, so that what is read from
+-- the registry next is ready or failed, as after an eager startup. Waiting is
+-- bounded by the compile timeout, and a little more.
+settlePending :: DeploymentId -> AppM ()
+settlePending deployId = do
+  env <- asks id
+  triggerCompilationIfPending deployId
+  let limit = (env.options.compileTimeout + 5) * 1_000_000
+  _ <- liftIO $ timeout limit $ atomically $ do
+    reg <- readTVar env.deploymentRegistry
+    case Map.lookup deployId reg of
+      Just DeploymentCompiling -> retry
+      _ -> pure ()
+  pure ()
 
 -- | The currently-deployed interface for the backwards-compatibility
 -- guard. Uses the live in-memory functions when ready (full schema,

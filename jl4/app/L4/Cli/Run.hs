@@ -63,6 +63,13 @@ runCmd opts = do
   (errs, diags, (mTc, mEval)) <- runOneshotWithDiagnostics evalConfig opts.runFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
+    -- The export check publishes what @l4 check@ reports of an @export that
+    -- cannot be published, and the warning for an exported GIVEN with no
+    -- type, so an author who only runs a file sees them too (review of #779,
+    -- 2026-11-20). It is a pass of its own, so the file is still evaluated;
+    -- an error of it is a blocking diagnostic, so it fails the run as a type
+    -- error does, and a warning does not (assumed, not ruled).
+    _     <- Shake.use Rules.ExportCheck uri
     mtc   <- Shake.use Rules.SuccessfulTypeCheck uri
     meval <- Shake.use Rules.EvaluateLazy uri
     pure (mtc, meval)

@@ -55,7 +55,7 @@ This change keeps main's request handling and carries #562's handling of the wra
 - Otherwise the required temporal string the wrapper's own parser rejects is quoted; when several are rejected, the message names them all, without quoting.
   The check uses the parsers `TODATE`, `TOTIME` and `TODATETIME` use, so a string the wrapper read is never blamed: with `"2026/01/31"` and `"2026-02-30"`, the second is named.
   #562 checked with the service's own ISO parsers (`parseIsoDate` and its siblings), which accept `2026-02-30` and reject `2026/01/31`; #570 (`a982e3060`) fixed that on unstable, and this change carries it.
-- A value of the wrong JSON type is not a decline: JSONDECODE stops with its own error (`Expected JSON number but got: String "abc"`), as on main.
+- A value of the wrong JSON type is not a decline: JSONDECODE stops with its own error (`Expected JSON number but got: "abc"`; main wrote the value in Haskell's notation, `String "abc"`).
   JSONDECODE answers `LEFT`, which the wrapper also turns into `NOTHING`, only when the JSON text does not parse (`decodeJsonToValueTyped`, `jl4-core/src/L4/EvaluateLazy/Machine.hs:1373-1377`); the service writes that text itself.
 - A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`. Main answered `"NOTHING"` and `{"JUST": ["NOTHING"]}`.
 - The dedup shortcut is keyed on content hash AND requested id.

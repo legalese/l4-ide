@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+jsondecode-unit-enum.l4:19:1-31:
+  RIGHT OF Unit
+jsondecode-unit-enum.l4:20:1-25:
+  RIGHT OF Unit
+jsondecode-unit-enum.l4:21:1-22:
+  "\"Unit\""
+jsondecode-unit-enum.l4:22:1-38:
+  RIGHT OF Unit
