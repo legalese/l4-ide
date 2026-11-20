@@ -1403,8 +1403,10 @@ heldObligations = \ case
 -- one ('startCompound'), so @x MEANS (Bob MUST never) ROR (Carol MUST tick
 -- WITHIN 1 LEST (x ROR x))@ doubles its waiting residuals every unit of time
 -- with one or two obligations meeting events at any moment; counted this
--- way it stops at the limit (measured: 100,000 open, 3 s), and closed at the
--- end of its events it would run until memory ran out.
+-- way it stops at the limit (measured: 100,000 open, 3 s). Closed at the end
+-- of its events instead, it never counts more than one open, and runs until
+-- memory runs out (measured on a build that did that: a 3 GB heap exhausted
+-- after 77 s, and the run's output lost with it).
 --
 -- So a residual that is thrown away must be closed where it is thrown away
 -- ('noteDropped'). That happens in exactly two places: a compound decided by
