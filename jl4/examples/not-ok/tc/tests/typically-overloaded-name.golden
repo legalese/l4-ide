@@ -1,0 +1,62 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-overloaded-name.l4
+  Hidden: no
+  Range: 22:7-22:48
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      fee
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      fee (defined at typically-overloaded-name.l4:20:1-4) of type FUNCTION FROM NUMBER AND STRING TO NUMBER
+      fee (defined at typically-overloaded-name.l4:15:1-4) of type FUNCTION FROM NUMBER AND STRING AND NUMBER TO NUMBER
+
+File: typically-overloaded-name.l4
+  Hidden: no
+  Range: 22:7-22:48
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    You are giving named inputs to
+
+      fee (defined at typically-overloaded-name.l4:22:7-10) of type fee13
+
+    but it is not a function, so it takes none.
+
+File: typically-overloaded-name.l4
+  Hidden: no
+  Range: 36:7-36:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      scaled
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      scaled (defined at typically-overloaded-name.l4:34:1-7) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+      scaled (defined at typically-overloaded-name.l4:29:1-7) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+
+File: typically-overloaded-name.l4
+  Hidden: no
+  Range: 36:7-36:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    You are giving named inputs to
+
+      scaled (defined at typically-overloaded-name.l4:36:7-13) of type scaled16
+
+    but it is not a function, so it takes none.

@@ -20,13 +20,25 @@
 --     widening its enum (new values a consumer may not handle) is
 --     breaking; adding a new field is safe.
 --
--- New functions are safe; removed functions are breaking. This mirrors
--- the client-side check in the deploy sidebar so both surfaces agree.
+-- New functions are safe; removed functions are breaking. The deploy
+-- sidebar makes the same kind of check on the client, with one difference: it
+-- strips the DEONTIC envelope (@startTime@, @events@) from both sides first,
+-- because the schema its language server builds locally has no envelope. This
+-- check compares the envelope too, so a changed party or action type (under
+-- @events@) is flagged here and not there, and so is a change in how the
+-- service publishes that type: a deployment that was cached by an older run and
+-- has not been loaded since (@--lazy-load@) is compared against the old schema.
+--
+-- A changed default is NOT breaking (U2 option B, bench ruling 2026-11-17: a
+-- redeploy that changes a published default is accepted and reported).
+-- 'detectDefaultChanges' lists those changes as notices, beside the breaking
+-- ones and never among them.
 module Compatibility
   ( FnIface (..)
   , ifaceFromFunction
   , ifaceFromSummary
   , detectBreakingChanges
+  , detectDefaultChanges
   ) where
 
 import Data.Text (Text)
@@ -35,7 +47,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 
 import L4.FunctionSchema (Parameter (..), Parameters (..))
-import Types (Function (..), FunctionSummary (..))
+import Types (DefaultChange (..), Function (..), FunctionSummary (..))
 
 -- | The compatibility-relevant slice of a deployed/incoming function.
 data FnIface = FnIface
@@ -203,3 +215,76 @@ diffObject dir fn loc oldProps oldReq newProps newReq =
     | dir == In && k `elem` newReq =
         [ fn <> " has a new required parameter " <> childLoc loc k ]
     | otherwise = []
+
+-- ----------------------------------------------------------------------------
+-- Changed defaults (non-blocking notices)
+-- ----------------------------------------------------------------------------
+
+-- | Every published default the incoming interface changes, one notice per
+-- changed default. A notice never blocks a deploy and does not move the
+-- BREAKING counter: 'detectBreakingChanges' does not look at defaults at all.
+--
+-- A default is compared only when BOTH sides carry one. A default present on
+-- one side only is not a change: adding one makes the input optional
+-- (compatible), removing one makes it required (breaking by the existing rule,
+-- reported there), and cached metadata written by a service older than the
+-- published @default@ has none, so a missing one is /unknown/, never a change.
+--
+-- Limits, none of which is visible from here:
+--
+--   * Only a default the schema publishes is seen: a literal on a rule's own
+--     input, a section input or a record field. Not one that is another
+--     expression, and not one on a written ASSUME, which stays metadata
+--     ('L4.Export.extractAssumeParamsWithDefaults').
+--   * Two numbers that differ only beyond about 16 significant digits compare
+--     equal, because the schema carries the published value through a 'Double'
+--     (@typicallyToJson@ in "L4.FunctionSchema").
+--   * A rate written in a rule body is not seen: this compares schemas, not
+--     answers.
+--
+-- A node whose type changed is skipped, as 'diffNode' stops there: the type
+-- change is reported as breaking and the defaults of a retyped input are not
+-- comparable. Functions are matched by name; a function present on one side
+-- only has nothing to compare. Notices come out in the old interface's
+-- function order, then by input name.
+detectDefaultChanges
+  :: [FnIface]  -- ^ currently deployed
+  -> [FnIface]  -- ^ incoming
+  -> [DefaultChange]
+detectDefaultChanges old new =
+  let newByName = Map.fromList [(f.ifName, f) | f <- new]
+  in [ c
+     | o <- old
+     , Just n <- [Map.lookup o.ifName newByName]
+     , c <- diffDefaultProps o.ifName ""
+              o.ifParams.parameterMap n.ifParams.parameterMap
+     ]
+
+-- | The inputs two property sets share, each compared at its own path.
+diffDefaultProps
+  :: Text -> Text
+  -> Map.Map Text Parameter -> Map.Map Text Parameter
+  -> [DefaultChange]
+diffDefaultProps fn loc oldProps newProps =
+  concat
+    [ diffDefault fn (childLoc loc k) ov nv
+    | (k, ov) <- Map.toList oldProps
+    , Just nv <- [Map.lookup k newProps]
+    ]
+
+diffDefault :: Text -> Text -> Parameter -> Parameter -> [DefaultChange]
+diffDefault fn loc old new
+  | not (Text.null old.parameterType)
+      && not (Text.null new.parameterType)
+      && old.parameterType /= new.parameterType = []
+  | otherwise = own ++ nested ++ elements
+ where
+  own = case (old.parameterDefault, new.parameterDefault) of
+    (Just od, Just nd) | od /= nd -> [DefaultChange fn loc od nd]
+    _ -> []
+  nested = case (old.parameterProperties, new.parameterProperties) of
+    (Just op, Just np) -> diffDefaultProps fn loc op np
+    _ -> []
+  elements = case (old.parameterItems, new.parameterItems) of
+    (Just oi, Just ni) -> diffDefault fn (loc <> "[]") oi ni
+    _ -> []

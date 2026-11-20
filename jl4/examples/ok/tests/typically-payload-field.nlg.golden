@@ -1,0 +1,6 @@
+`area of` with `Circle` where `radius` is 1 is equal to 3
+`area of` with `Rect` where `height` is 5 and `width` is 2 by default is equal to 10
+`area of` with `Rect` where `width` is 4 and `height` is 5 is equal to 20
+`area of` with `Circle` where `radius` is 1 by default is equal to 3
+`area of` with `Square` where `side` is 3 by default is equal to 9
+`area of` with `Rect` with 2 and 5 is equal to 10

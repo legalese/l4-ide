@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: means-on-alternative-field.l4
+  Hidden: no
+  Range: 8:12-8:18
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `height` is a field of the alternative `Rect` and has a MEANS clause,
+    but only the fields of a record can be computed. An alternative's fields are
+    given when the alternative is built, so the MEANS would never be used.
+    Remove the MEANS, or give the alternative a field whose type is a record
+    that computes it.

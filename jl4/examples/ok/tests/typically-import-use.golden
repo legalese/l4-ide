@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-import-use.l4:7:1-54:
+  assertion satisfied
+typically-import-use.l4:8:1-65:
+  assertion satisfied
+typically-import-use.l4:9:1-68:
+  assertion satisfied
+typically-import-use.l4:14:1-43:
+  assertion satisfied
+typically-import-use.l4:15:1-40:
+  assertion satisfied
+typically-import-use.l4:16:1-19:
+  Paint OF Red, 2, NOTHING

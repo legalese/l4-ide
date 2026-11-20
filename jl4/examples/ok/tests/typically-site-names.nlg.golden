@@ -1,0 +1,7 @@
+`discount` where `price` is 100 and `rate` is 0.1 by default
+`discount` where `price` is 100 and `rate` is 0.2
+`fee` where `price` is 100 and `rate` is 0.2 by default
+`fee` where `price` is 100 and `rate` is 0.5
+`scaled` where `base` is 10 and `rate` is 2
+`Pricing.scaled` where `base` is 10 and `rate` is 3 by default
+`scaled` where `base` is 10 and `rate` is 5

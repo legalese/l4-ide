@@ -76,6 +76,11 @@ jobs:
               # would otherwise reach no job and break the next PR instead.
               - 'jl4/examples/openfisca/**'
               - 'jl4/tests-cli/fixtures/**'
+              # The test cases for the redeploy notice on a changed default
+              # (U2 option B). jl4-service-test reads this file and the deploy
+              # sidebar's TypeScript test reads it too, and it is in no `.hs`
+              # glob, so an edit to it alone would otherwise reach neither job.
+              - 'jl4-service/test/fixtures/default-change-cases.json'
               - '.github/workflows/pr-checks.yml'
             typescript:
               - '**/*.ts'
@@ -94,6 +99,10 @@ jobs:
               - 'package-lock.json'
               - 'ts-apps/**'
               - 'ts-shared/**'
+              # The webview's deploy-review tests read this file; the service's
+              # own check reads it too (U2). An edit to the fixture alone must
+              # reach the job that runs them.
+              - 'jl4-service/test/fixtures/default-change-cases.json'
               # Hosts `prettier --check .`, which is the only gate on this
               # file's own formatting. See the note on the haskell filter.
               - '.github/workflows/pr-checks.yml'
@@ -795,6 +804,14 @@ jobs:
     steps:
       - name: Update repositories
         run: apt update
+      # `nodejs` is for WebMcpParitySpec, which runs the generated WebMCP script
+      # under node to check that it names a rule's inputs as the MCP endpoint
+      # does. This job runs in a bare ubuntu:24.04 container, which has no node
+      # (the runner image's is not in it); the container's own package is node 18
+      # (18.19.1 when this was checked in an ubuntu:24.04 container, 2026-11-18),
+      # which has what the script needs (Unicode property escapes, Array.from,
+      # codePointAt). The test FAILS rather than skips when CI is set and node is
+      # missing, so a node-less run cannot pass unnoticed.
       - name: Install deps
         run: >
           apt install -y
@@ -813,6 +830,7 @@ jobs:
           liblzma-dev
           xz-utils
           z3
+          nodejs
       - name: Update git config
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - uses: actions/checkout@v5

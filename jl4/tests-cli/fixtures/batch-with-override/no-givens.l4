@@ -1,0 +1,12 @@
+-- smucclaw/l4-ide#1000: an export with no GIVEN of its own, whose only input is
+-- a section GIVEN, read once and overridden once.
+
+§ `Rates`
+    GIVEN r IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+inner MEANS r
+
+@export Only a section GIVEN
+GIVETH A NUMBER
+outer MEANS inner PLUS (inner WITH r IS 100)

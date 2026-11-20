@@ -8,6 +8,8 @@ Types are usually inferred, but writing them in `GIVEN` and `GIVETH` makes rules
 
 - [DECLARE](DECLARE.md): records, enumerations, type synonyms, opaque types, parameterised types, `A`/`AN` and type expressions
 - [ASSUME (deprecated)](ASSUME.md): the older spelling of an input, an opaque type or a refusal, and what to write instead
+- [TYPICALLY](TYPICALLY.md): a default (a usual value) for a field or an input, and where it is taken
+- [WITHAL](WITHAL.md): a record built from the default (usual value) of every field
 - [FOR ALL](for-all.md): type variables in the type of a function the section takes in
 - [Coercions](coercions.md): converting between types (`TOSTRING`, `TONUMBER`, `TODATE`, `AS STRING` and others)
 
@@ -36,7 +38,8 @@ These built-in types take another type as a parameter.
 | `MAYBE a`    | `JUST 42` when there is a value, `NOTHING` when there is none | [maybe-example.l4](maybe-example.l4)   |
 | `EITHER a b` | `LEFT "error"` or `RIGHT 42`                                  | [either-example.l4](either-example.l4) |
 
-L4 has no null: a value that may be missing has a `MAYBE` type, and [CONSIDER](../control-flow/CONSIDER.md) handles both cases.
+L4 has no null value inside a rule: a value that may be missing has a `MAYBE` type, and [CONSIDER](../control-flow/CONSIDER.md) handles both cases.
+A case sent to `l4 batch` or to the decision service may carry a `null`, which means "not known": it is refused for a fact that is not a `MAYBE`, and is `NOTHING` for one that is (see [TYPICALLY](TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
 Functions on these types, and the `PAIR` and `Dictionary` types, are in the [prelude](../libraries/prelude.md).
 
 ## Records and enumerations

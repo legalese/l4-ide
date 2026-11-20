@@ -5,17 +5,25 @@
 -- direction-aware diff used by the PUT guard (and mirrored client-side
 -- in the deploy sidebar): inputs vs outputs, nested records, arrays,
 -- enums, required-ness, and whole-function add/remove.
+--
+-- Also the non-blocking notices for a changed default
+-- ('Compatibility.detectDefaultChanges', U2 option B of the bench ruling
+-- 2026-11-17), which run every case of @test\/fixtures\/default-change-cases.json@,
+-- the file the deploy sidebar's own check runs too.
 module CompatibilitySpec (spec) where
 
 import Test.Hspec
 
+import Control.Monad (forM_)
+import qualified Data.Aeson as Aeson
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
 
 import L4.FunctionSchema (Parameter (..), Parameters (..))
-import Compatibility (FnIface (..), detectBreakingChanges)
+import Compatibility (FnIface (..), detectBreakingChanges, detectDefaultChanges, ifaceFromSummary)
 import ControlPlane (nextDeploymentVersion, parseVersionCounts)
+import Types (DefaultChange (..), FunctionSummary (..))
 
 ------------------------------------------------------------------------
 -- Builders
@@ -68,7 +76,10 @@ mentions needle = any (Text.isInfixOf needle)
 ------------------------------------------------------------------------
 
 spec :: Spec
-spec = describe "Compatibility.detectBreakingChanges" do
+spec = breakingSpec >> defaultChangesSpec
+
+breakingSpec :: Spec
+breakingSpec = describe "Compatibility.detectBreakingChanges" do
 
   describe "whole functions" do
     it "identical interface is compatible" do
@@ -228,3 +239,121 @@ spec = describe "Compatibility.detectBreakingChanges" do
 
     it "treats an empty/garbage version as (0, 0)" do
       parseVersionCounts "" `shouldBe` (0, 0)
+
+------------------------------------------------------------------------
+-- Changed defaults: the notices (U2 option B)
+------------------------------------------------------------------------
+
+-- | One case of the shared fixture: the old and the new parameter schema of
+-- one function, and what the redeploy check must answer.
+data DefaultCase = DefaultCase
+  { caseName     :: Text
+  , caseFunction :: Text
+  , caseOld      :: Parameters
+  , caseNew      :: Parameters
+  , caseBreaking :: [Text]
+  , caseNotices  :: [DefaultChange]
+  }
+
+newtype DefaultCases = DefaultCases [DefaultCase]
+
+instance Aeson.FromJSON DefaultCases where
+  parseJSON = Aeson.withObject "cases file" \top -> do
+    cs <- top Aeson..: "cases"
+    DefaultCases <$> traverse parseCase cs
+   where
+    parseCase = Aeson.withObject "case" \o -> do
+      expect <- o Aeson..: "expect"
+      DefaultCase
+        <$> o Aeson..: "name"
+        <*> o Aeson..: "function"
+        <*> o Aeson..: "old"
+        <*> o Aeson..: "new"
+        <*> expect Aeson..: "breaking"
+        <*> expect Aeson..: "notices"
+
+-- | The shared cases. The path is relative to the package directory, where
+-- @cabal test@ runs the suite, as the other fixtures are read.
+loadDefaultCases :: IO [DefaultCase]
+loadDefaultCases = do
+  r <- Aeson.eitherDecodeFileStrict "test/fixtures/default-change-cases.json"
+  case r of
+    Left err -> fail ("test/fixtures/default-change-cases.json: " <> err)
+    Right (DefaultCases cs) -> pure cs
+
+-- | A published default of the given JSON value.
+withDefault :: Aeson.Value -> Parameter -> Parameter
+withDefault v p = p { parameterDefault = Just v }
+
+defaultChangesSpec :: Spec
+defaultChangesSpec = describe "Compatibility.detectDefaultChanges" do
+
+  describe "the shared cases (test/fixtures/default-change-cases.json)" do
+    cases <- runIO loadDefaultCases
+    -- The positive control for the loop below: a fixture that loaded as
+    -- nothing would pass every case it never ran.
+    it "loaded the cases" do
+      length cases `shouldSatisfy` (>= 9)
+    forM_ cases \c -> it (Text.unpack c.caseName) do
+      let old = fn c.caseFunction c.caseOld "" Nothing
+          new = fn c.caseFunction c.caseNew "" Nothing
+      detectBreakingChanges [old] [new] `shouldBe` c.caseBreaking
+      detectDefaultChanges [old] [new] `shouldBe` c.caseNotices
+
+  describe "beyond the shared cases" do
+    let ifaceWith props = fn "f" (ps props []) "BOOLEAN" Nothing
+
+    it "reports a change to or from NOTHING (a null default), which is a default" do
+      let old = ifaceWith [("m", withDefault Aeson.Null (prim "number"))]
+          new = ifaceWith [("m", withDefault (Aeson.Number 1) (prim "number"))]
+      detectDefaultChanges [old] [new]
+        `shouldBe` [DefaultChange "f" "m" Aeson.Null (Aeson.Number 1)]
+
+    -- A deployment restarted and not yet compiled is compared from its cached
+    -- metadata, which is JSON: the default NOTHING is `"default": null` there.
+    it "reports a change from NOTHING read back from the metadata cache" do
+      let summary = FunctionSummary "f" "" (ps [("m", withDefault Aeson.Null (prim "number"))] []) "BOOLEAN" Nothing Nothing False Nothing
+          cached = Aeson.decode (Aeson.encode summary) :: Maybe FunctionSummary
+          new = ifaceWith [("m", withDefault (Aeson.Number 1) (prim "number"))]
+      fmap (\c -> detectDefaultChanges [ifaceFromSummary c] [new]) cached
+        `shouldBe` Just [DefaultChange "f" "m" Aeson.Null (Aeson.Number 1)]
+
+    it "treats a cached summary with no default key as unknown, not as a change" do
+      let summary = FunctionSummary "f" "" (ps [("m", prim "number")] []) "BOOLEAN" Nothing Nothing False Nothing
+          cached = Aeson.decode (Aeson.encode summary) :: Maybe FunctionSummary
+          new = ifaceWith [("m", withDefault (Aeson.Number 1) (prim "number"))]
+      fmap (\c -> detectDefaultChanges [ifaceFromSummary c] [new]) cached `shouldBe` Just []
+
+    it "reports a changed default inside a record held in a list, by its path" do
+      let rec d = arrP (objP [("retries", withDefault (Aeson.Number d) (prim "number"))] [])
+          old = ifaceWith [("jobs", rec 3)]
+          new = ifaceWith [("jobs", rec 5)]
+      detectDefaultChanges [old] [new]
+        `shouldBe` [DefaultChange "f" "jobs[].retries" (Aeson.Number 3) (Aeson.Number 5)]
+
+    it "reports one notice per changed default, in the old function order, then by input" do
+      let g = fn "g" (ps [("b", withDefault (Aeson.Number 0) (prim "number"))] []) "BOOLEAN" Nothing
+          g' = fn "g" (ps [("b", withDefault (Aeson.Number 1) (prim "number"))] []) "BOOLEAN" Nothing
+          f = ifaceWith [ ("x", withDefault (Aeson.Number 1) (prim "number"))
+                        , ("y", withDefault (Aeson.String "a") (prim "string")) ]
+          f' = ifaceWith [ ("x", withDefault (Aeson.Number 2) (prim "number"))
+                         , ("y", withDefault (Aeson.String "b") (prim "string")) ]
+      map (\c -> (c.dcFunction, c.dcInput)) (detectDefaultChanges [g, f] [f', g'])
+        `shouldBe` [("g", "b"), ("f", "x"), ("f", "y")]
+
+    it "says nothing of a function present on one side only" do
+      let f = ifaceWith [("x", withDefault (Aeson.Number 1) (prim "number"))]
+      detectDefaultChanges [f] [] `shouldBe` []
+      detectDefaultChanges [] [f] `shouldBe` []
+
+    it "skips an input whose type changed: the type change is the report" do
+      let old = ifaceWith [("x", withDefault (Aeson.Number 1) (prim "number"))]
+          new = ifaceWith [("x", withDefault (Aeson.String "1") (prim "string"))]
+      detectDefaultChanges [old] [new] `shouldBe` []
+      detectBreakingChanges [old] [new] `shouldSatisfy` mentions "type changed"
+
+    it "does not call a changed default breaking, so the BREAKING counter cannot move" do
+      let old = ifaceWith [("x", withDefault (Aeson.Number 1) (prim "number"))]
+          new = ifaceWith [("x", withDefault (Aeson.Number 2) (prim "number"))]
+      detectBreakingChanges [old] [new] `shouldBe` []
+      length (detectDefaultChanges [old] [new]) `shouldBe` 1

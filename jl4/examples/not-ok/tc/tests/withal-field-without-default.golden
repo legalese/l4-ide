@@ -1,0 +1,75 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: withal-field-without-default.l4
+  Hidden: no
+  Range: 22:7-22:20
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL takes the default of every field, but these fields of
+
+      Person (defined at withal-field-without-default.l4:13:9-15)
+
+    have none:
+
+      name of type STRING
+      colour of type Colour
+      flag of type BOOLEAN
+      note of type MAYBE OF STRING
+      home of type Address
+      born of type DATE
+
+    A default has to be a fixed value written out: a number, a string, TRUE,
+    FALSE, NOTHING or a constructor of an enumeration. These fields hold
+    something else, so they cannot have one:
+
+      home of type Address
+      born of type DATE
+
+    So build the record with WITH and name the fields that have none.
+
+File: withal-field-without-default.l4
+  Hidden: no
+  Range: 31:7-31:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL takes the default of every field, but these fields of
+
+      Tag (defined at withal-field-without-default.l4:24:9-12)
+
+    have none:
+
+      label of type STRING
+      colour of type Colour
+      flag of type BOOLEAN
+      note of type MAYBE OF STRING
+
+    Give each of them a TYPICALLY default where the record is declared,
+    or build the record with WITH and name them.
+
+File: withal-field-without-default.l4
+  Hidden: no
+  Range: 37:7-37:19
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WITHAL takes the default of every field, but these fields of
+
+      Place (defined at withal-field-without-default.l4:33:9-14)
+
+    have none:
+
+      home of type Address
+
+    A default has to be a fixed value written out: a number, a string, TRUE,
+    FALSE, NOTHING or a constructor of an enumeration. These fields hold
+    something else, so they cannot have one:
+
+      home of type Address
+
+    So build the record with WITH and name the fields that have none.

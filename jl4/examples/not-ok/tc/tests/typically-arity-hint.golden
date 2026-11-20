@@ -1,0 +1,68 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-arity-hint.l4
+  Hidden: no
+  Range: 22:7-22:32
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      `last input defaulted` (defined at typically-arity-hint.l4:9:1-23)
+
+    expects 2 inputs,
+    but here it is given 1 input.
+
+    An input that has a TYPICALLY default can be left out of a call that names its inputs,
+    but not of a call that gives its inputs by position. To leave rate to its default, write
+
+      `last input defaulted` WITH base IS <value>
+
+File: typically-arity-hint.l4
+  Hidden: no
+  Range: 26:7-26:25
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      `both defaulted` (defined at typically-arity-hint.l4:14:1-17)
+
+    expects 2 inputs,
+    but here it is given 1 input.
+
+    An input that has a TYPICALLY default can be left out of a call that names its inputs,
+    but not of a call that gives its inputs by position. To give only some of the inputs, name them, as in
+
+      `both defaulted` WITH a IS <value>
+
+File: typically-arity-hint.l4
+  Hidden: no
+  Range: 29:7-29:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      `no defaults` (defined at typically-arity-hint.l4:19:1-14)
+
+    expects 2 inputs,
+    but here it is given 1 input.
+
+File: typically-arity-hint.l4
+  Hidden: no
+  Range: 32:7-32:35
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The function
+
+      `last input defaulted` (defined at typically-arity-hint.l4:9:1-23)
+
+    expects 2 inputs,
+    but here it is given 3 inputs.

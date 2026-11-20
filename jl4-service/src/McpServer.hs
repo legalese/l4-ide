@@ -16,11 +16,12 @@ import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import EvalLimits (withEvalLimits)
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
-import L4.FunctionSchema (Parameters)
-import DeonticTrace (isDeonticFunction, isStrayArgumentsField, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
-import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
+import L4.FunctionSchema (Parameters (..))
+import DeonticTrace (isDeonticFunction, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
+import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, presumptionKey, presumptionSchema, presumptionCollision, inputSanitizedTo, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
 import Types
 
+import Control.Monad (forM)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (asks, ask)
 import Control.Monad.Trans.Except (runExceptT)
@@ -29,6 +30,7 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVar, readTVarIO, writeTVar, TVar)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson.Types
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import Data.Char (isAlphaNum)
@@ -163,6 +165,7 @@ handleMethod vis mScope reqId "tools/call" params = do
           pure $ jsonRpcError reqId (-32602) "Missing 'name' in params"
         Just toolName -> do
           callTool vis mScope reqId toolName tasksRequested
+                   (misplacedPresumption obj)
                    (Maybe.fromMaybe (Aeson.object []) mArguments)
     _ ->
       pure $ jsonRpcError reqId (-32602) "Invalid params for tools/call"
@@ -267,6 +270,20 @@ buildToolList vis mScope = do
       let versionByDep = Map.fromList
             [ (d, m.metaDeploymentVersion) | (d, m) <- metas ]
           toolNames = buildToolNames entries
+      -- A flat tool whose rule has an input named like the reserved
+      -- @presumption@ key is not listed (U3 option A, 2026-11-17).
+      env <- ask
+      listable <- fmap concat $ forM toolNames \t@(tn, deployId, fn) ->
+        case presumptionCollision fn.fsParameters of
+          Just input | not fn.fsIsDeontic -> do
+            liftIO $ logWarn env.logger "MCP tool not listed: an input is named like the reserved presumption key"
+              [ ("toolName", Aeson.toJSON tn)
+              , ("deploymentId", Aeson.toJSON deployId)
+              , ("functionName", Aeson.toJSON fn.fsName)
+              , ("input", Aeson.toJSON input)
+              ]
+            pure []
+          _ -> pure [t]
       pure [ Aeson.object $
         [ "name" .= tn
         , "description" .= ("L4 Rule: " <> fn.fsDescription <> " [" <> deployId <> "/" <> fn.fsName <> "]")
@@ -275,13 +292,24 @@ buildToolList vis mScope = do
         <> case Map.lookup deployId versionByDep of
              Just v | not (Text.null v) -> ["_meta" .= Aeson.object ["version" .= v]]
              _                          -> []
-        | (tn, deployId, fn) <- toolNames
+        | (tn, deployId, fn) <- listable
         ]
     else pure []
 
   let fileTools = if vis.showFiles then fileToolDefinitions else []
 
   pure (fnTools ++ fileTools)
+
+-- | A flat tool's schema with 'presumptionKey' added beside the inputs.
+addPresumption :: Aeson.Value -> Aeson.Value
+addPresumption = \case
+  Aeson.Object o ->
+    let props = case Aeson.KeyMap.lookup "properties" o of
+          Just (Aeson.Object ps) -> ps
+          _ -> Aeson.KeyMap.empty
+    in Aeson.Object $ Aeson.KeyMap.insert "properties"
+         (Aeson.Object (Aeson.KeyMap.insert (Aeson.Key.fromText presumptionKey) presumptionSchema props)) o
+  v -> v
 
 mcpToolSchema :: FunctionSummary -> Aeson.Value
 mcpToolSchema fn
@@ -290,6 +318,7 @@ mcpToolSchema fn
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
             [ "arguments" .= sanitizeParameters fn.fsParameters
+            , Aeson.Key.fromText presumptionKey .= presumptionSchema
             , "startTime" .= Aeson.object
                 [ "type" .= ("number" :: Text)
                 , "description" .= ("Start time for contract simulation" :: Text)
@@ -302,7 +331,7 @@ mcpToolSchema fn
             ]
         , "required" .= (["arguments", "startTime", "events"] :: [Text])
         ]
-  | otherwise = sanitizeParameters fn.fsParameters
+  | otherwise = addPresumption (sanitizeParameters fn.fsParameters)
 
 fileToolDefinitions :: [Aeson.Value]
 fileToolDefinitions =
@@ -384,10 +413,12 @@ fileToolDefinitions =
     ]
   ]
 
--- | Sanitize a name for use as a tool name. Allowed chars match
--- Anthropic's tool-name regex `^[a-zA-Z0-9_-]{1,64}$` exactly — no
--- dots, even though MCP spec is more permissive. Dots in the source
--- name are remapped to hyphens.
+-- | Sanitize a name for use as a tool name. Allowed chars are what
+-- 'isAlphaNum' allows (any Unicode letter or number), @_@ and @-@, which is
+-- wider than Anthropic's tool-name regex `^[a-zA-Z0-9_-]{1,64}$` for a name with
+-- a non-ASCII letter — no dots, even though MCP spec is more permissive. Dots in
+-- the source name are remapped to hyphens. A name may start with a digit here;
+-- the WebMCP script gives such a name a leading @_@.
 sanitizeName :: Int -> Text -> Text
 sanitizeName maxLen name =
   let s = Text.map (\c -> if isAlphaNum c || c == '_' || c == '-' then c else '-') name
@@ -435,22 +466,22 @@ findUniquePrefix dep others = go 1
 -- tools/call dispatch
 -- ----------------------------------------------------------------------------
 
-callTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Aeson.Value -> AppM Aeson.Value
-callTool vis mScope reqId toolName tasksRequested arguments = do
+callTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Bool -> Aeson.Value -> AppM Aeson.Value
+callTool vis mScope reqId toolName tasksRequested presumptionBesideArguments arguments = do
   case toolName of
     "list_files" | vis.showFiles -> callListFiles reqId arguments
     "read_file" | vis.showFiles -> callReadFile reqId arguments
     "search_identifier" | vis.showFiles -> callSearchIdentifier reqId arguments
     "search_text" | vis.showFiles -> callSearchText reqId arguments
-    _ -> callFunctionTool vis mScope reqId toolName tasksRequested arguments
+    _ -> callFunctionTool vis mScope reqId toolName tasksRequested presumptionBesideArguments arguments
 
 -- | Execute a function evaluation tool call.
 -- When the deployment is still compiling AND the client opted in to the
 -- Tasks extension via _meta, we return a task handle and continue work
 -- in the background. Otherwise we fall back to the legacy synchronous
 -- "{status:'compiling'}" text payload that 2025-era clients understand.
-callFunctionTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Aeson.Value -> AppM Aeson.Value
-callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
+callFunctionTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Bool -> Aeson.Value -> AppM Aeson.Value
+callFunctionTool _vis mScope reqId toolName tasksRequested presumptionBesideArguments arguments = do
   env <- ask
   entries <- collectMetadataEntries mScope
   let toolMap = Map.fromList
@@ -471,30 +502,99 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
         , ("tasksRequested", Aeson.toJSON tasksRequested)
         ]
       let reverseMap = buildPropertyReverseMap params
-      let call = buildMcpCall reverseMap params isDeontic arguments
+      -- A refusal is an error RESULT (isError), as every other refusal of a
+      -- call is, and is decided before the deployment is compiled or waited
+      -- for: a call that cannot be honoured is not queued as a task.
+      --
+      -- The message is the server's own and is sent as written: it names the
+      -- rule's inputs as the rule spells them, which the reverse map would
+      -- rewrite to the names the tool lists them under (an input called
+      -- `presumption?` would be reported as 'presumption').
+      let refuse msg = pure $ evalResultToToolResponse reqId Map.empty
+            (Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError msg))))
+      case (presumptionCollision params, buildMcpCall reverseMap params isDeontic arguments) of
+        _ | presumptionBesideArguments -> refuse (presumptionBesideArgumentsMessage isDeontic)
+        (Just input, _) | not isDeontic || not (hasArgumentsObject arguments) ->
+          refuse (presumptionCollisionMessage input)
+        (_, Left msg) -> refuse msg
+        (_, Right call) -> do
+          let did = DeploymentId deployId
+          compResult <- tryCompileWithTimeout did 2_000_000
+          case compResult of
+            CompilationReady fns _meta ->
+              case Map.lookup fnName fns of
+                Just vf -> do
+                  evalResult <- runMcpEvaluation vf call
+                  pure $ evalResultToToolResponse reqId reverseMap evalResult
+                Nothing ->
+                  pure $ jsonRpcError reqId (-32602) ("Function not found: " <> fnName)
+            CompilationInProgress
+              | tasksRequested ->
+                  spawnEvaluationTask reqId did fnName reverseMap call
+              | otherwise ->
+                  pure $ mcpTextResult reqId
+                    "{\"status\":\"compiling\",\"retryAfterMs\":2000}" False
+            CompilationError err ->
+              -- 2026-07-28 reassigns -32002 to MissingResource (JSON-RPC standard
+              -- aliasing). Use -32000 (server-defined) for "deployment failed
+              -- to compile" — this code is in the JSON-RPC server-error band
+              -- and has no protocol meaning attached to it.
+              pure $ jsonRpcError reqId (-32000) ("Deployment failed: " <> err)
 
-      let did = DeploymentId deployId
-      compResult <- tryCompileWithTimeout did 2_000_000
-      case compResult of
-        CompilationReady fns _meta ->
-          case Map.lookup fnName fns of
-            Just vf -> do
-              evalResult <- runMcpEvaluation vf call
-              pure $ evalResultToToolResponse reqId reverseMap evalResult
-            Nothing ->
-              pure $ jsonRpcError reqId (-32602) ("Function not found: " <> fnName)
-        CompilationInProgress
-          | tasksRequested ->
-              spawnEvaluationTask reqId did fnName reverseMap call
-          | otherwise ->
-              pure $ mcpTextResult reqId
-                "{\"status\":\"compiling\",\"retryAfterMs\":2000}" False
-        CompilationError err ->
-          -- 2026-07-28 reassigns -32002 to MissingResource (JSON-RPC standard
-          -- aliasing). Use -32000 (server-defined) for "deployment failed
-          -- to compile" — this code is in the JSON-RPC server-error band
-          -- and has no protocol meaning attached to it.
-          pure $ jsonRpcError reqId (-32000) ("Deployment failed: " <> err)
+-- | Whether a @tools/call@'s params carry a @presumption@ of their own, beside
+-- @arguments@: the shape of the HTTP body, where it is read, and not of a tool
+-- call, where it is an argument of the tool and is dropped here. A null is a key
+-- left out.
+misplacedPresumption :: Aeson.Object -> Bool
+misplacedPresumption obj =
+  case Aeson.KeyMap.lookup (Aeson.Key.fromText presumptionKey) obj of
+    Just v -> v /= Aeson.Null
+    Nothing -> False
+
+-- | Why a call whose params carry a @presumption@ beside @arguments@ is
+-- refused, and where the key goes. A request that asked for @"hard"@ and had the
+-- key dropped would be answered soft with a success.
+presumptionBesideArgumentsMessage :: Bool -> Text
+presumptionBesideArgumentsMessage isDeontic =
+  "presumption was sent beside `arguments` in the request's params, where it is not read. "
+    <> "It is an argument of the tool: put it inside the call's `arguments`"
+    <> if isDeontic
+         then ", beside the rule's own `arguments`: {\"arguments\": {\"arguments\": {...}, \"presumption\": \"hard\"}}."
+         else ", with the rule's inputs: {\"arguments\": {\"presumption\": \"hard\", ...}}."
+
+-- | Why a call to a flat tool with an @arguments@ wrapper is refused, and where
+-- the inputs go. A flat tool's schema lists the rule's inputs at the top level.
+strayArgumentsMessage :: Text
+strayArgumentsMessage =
+  "`arguments` is not an input of this rule, so this call is refused: put the rule's inputs, "
+    <> "and `presumption` if you send it, at the top level of the call, not inside an `arguments` object "
+    <> "(that nesting is for a rule that returns a contract): {\"some input\": ..., \"presumption\": \"hard\"}."
+
+-- | Why a DEONTIC call that has @presumption@ inside its @arguments@, which the
+-- rule has no input of that name for, is refused: the key would be read as an
+-- input the rule does not have and the request answered soft.
+presumptionInsideArgumentsMessage :: Text
+presumptionInsideArgumentsMessage =
+  "presumption is not an input of this rule, so it cannot go inside `arguments`: "
+    <> "put it beside `arguments`, among the tool's own arguments: {\"arguments\": {...}, \"presumption\": \"hard\"}."
+
+-- | Whether a call carries an @arguments@ object, the shape in which a DEONTIC
+-- tool reads its inputs and 'presumptionKey' is a sibling of them.
+hasArgumentsObject :: Aeson.Value -> Bool
+hasArgumentsObject = \case
+  Aeson.Object obj | Just (Aeson.Object _) <- Aeson.KeyMap.lookup "arguments" obj -> True
+  _ -> False
+
+-- | Why a call to a rule with an input named like the reserved key is refused.
+-- Where the key would be read as the switch, the input of that name could
+-- never be given, and where it would be read as the input, a request for
+-- @"hard"@ would be answered softly with no error; so neither is done.
+presumptionCollisionMessage :: Text -> Text
+presumptionCollisionMessage input =
+  "This rule cannot be called through MCP: it has an input named '" <> input
+    <> "', which is the name MCP reserves for the presumption switch (\"soft\" or \"hard\"), "
+    <> "so the switch could be mistaken for the input or the input for the switch. "
+    <> "Rename the input in the rule, or call the rule over HTTP, where the inputs are nested under \"arguments\"."
 
 -- | What a @tools/call@ carries once its arguments are split: the function's
 -- inputs, and the trace fields a DEONTIC export is replayed against.
@@ -508,6 +608,9 @@ data McpCall = McpCall
   { inputs    :: [(Text, Maybe FnLiteral)]
   , startTime :: Maybe Aeson.Value
   , events    :: Maybe Aeson.Value
+  , presumption :: Presumption
+  -- ^ The call's reserved @presumption@ argument ('presumptionKey'); soft when
+  -- the call does not send one, as @/evaluation@ reads it.
   }
 
 -- | Split a tools/call invocation into a 'McpCall'.
@@ -538,35 +641,71 @@ data McpCall = McpCall
 -- a trace unless the function declares an input of that name ('isStrayTraceField'),
 -- in which case it is an input as any other. A stray one is not an input and is
 -- kept in the 'McpCall' so that the call can be refused. An @arguments@ on it is
--- left out unless the function declares an input of that name
--- ('isStrayArgumentsField'), in which case it is an input as any other.
-buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> McpCall
+-- refused ('strayArgumentsMessage') unless the function declares an input of
+-- that name, as the tool lists it ('inputSanitizedTo'), in which case it is an input as any other.
+--
+-- The reserved @presumption@ argument ('presumptionKey') is read on every
+-- function tool and is never an input: beside @arguments@ on a DEONTIC tool, as
+-- in HTTP, and among the arguments on a flat tool, where a rule with an input of
+-- that name is refused before this is called ('presumptionCollision'). It is
+-- @"soft"@ or @"hard"@ and anything else is refused ('Left'), naming what was
+-- sent, rather than read as soft; a @null@ is a key left out, as in HTTP.
+buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> Either Text McpCall
 buildMcpCall reverseMap params isDeontic arguments = case arguments of
-  Aeson.Object obj
-    | isDeontic
-    , Just (Aeson.Object argsObj) <- Aeson.KeyMap.lookup "arguments" obj ->
-        McpCall
-          { inputs = pairs (without traceKeys argsObj)
-          , startTime = present "startTime" obj argsObj
-          , events = remapTraceKeys reverseMap <$> present "events" obj argsObj
-          }
-    | isDeontic ->
-        McpCall
-          { inputs = pairs (without ("arguments" : traceKeys) obj)
-          , startTime = present "startTime" obj Aeson.KeyMap.empty
-          , events = remapTraceKeys reverseMap <$> present "events" obj Aeson.KeyMap.empty
-          }
-    | otherwise ->
-        let strays = filter (isStrayTraceField params) traceKeys
-            wrappers = filter (isStrayArgumentsField params) ["arguments"]
-        in McpCall
-          { inputs = pairs (without (wrappers <> strays) obj)
-          , startTime = if "startTime" `elem` strays then present "startTime" obj Aeson.KeyMap.empty else Nothing
-          , events = if "events" `elem` strays then present "events" obj Aeson.KeyMap.empty else Nothing
-          }
-  _ -> McpCall { inputs = [], startTime = Nothing, events = Nothing }
+  Aeson.Object obj -> do
+    presumption <- readPresumption (present (Aeson.Key.fromText presumptionKey) obj Aeson.KeyMap.empty)
+    -- Inside a DEONTIC tool's `arguments` the key is an input, and a rule that
+    -- has no input of that name has none to read: a hard request put there is
+    -- not read, so it is refused instead of answered soft. A null is a key left
+    -- out, here as everywhere else.
+    case Aeson.KeyMap.lookup "arguments" obj of
+      Just (Aeson.Object argsObj)
+        | isDeontic
+        , Just notNull <- Aeson.KeyMap.lookup (Aeson.Key.fromText presumptionKey) argsObj
+        , notNull /= Aeson.Null
+        , Maybe.isNothing (presumptionCollision params) -> Left presumptionInsideArgumentsMessage
+      -- On a flat tool a key called `arguments` that is not one of the rule's
+      -- inputs is a wrapper put around the inputs, as a DEONTIC tool takes
+      -- them. It used to be dropped and the call answered from what was left:
+      -- a MAYBE read as NOTHING, a defaulted input taking its default, with a
+      -- success. It is refused, saying where the inputs go. A null is a key left
+      -- out, and a rule that has an input of that name reads it as that input.
+      Just v | not isDeontic, v /= Aeson.Null, Maybe.isNothing (inputSanitizedTo "arguments" params) -> Left strayArgumentsMessage
+      _ -> Right ()
+    pure $ case () of
+      _ | isDeontic
+        , Just (Aeson.Object argsObj) <- Aeson.KeyMap.lookup "arguments" obj ->
+            McpCall
+              { inputs = pairs (without (traceKeys <> [ presumptionKey | Maybe.isNothing (presumptionCollision params) ]) argsObj)
+              , startTime = present "startTime" obj argsObj
+              , events = remapTraceKeys reverseMap <$> present "events" obj argsObj
+              , presumption
+              }
+        | isDeontic ->
+            McpCall
+              { inputs = pairs (without ("arguments" : presumptionKey : traceKeys) obj)
+              , startTime = present "startTime" obj Aeson.KeyMap.empty
+              , events = remapTraceKeys reverseMap <$> present "events" obj Aeson.KeyMap.empty
+              , presumption
+              }
+        | otherwise ->
+            let strays = filter (isStrayTraceField params) traceKeys
+            in McpCall
+              { inputs = pairs (without (presumptionKey : strays) obj)
+              , startTime = if "startTime" `elem` strays then present "startTime" obj Aeson.KeyMap.empty else Nothing
+              , events = if "events" `elem` strays then present "events" obj Aeson.KeyMap.empty else Nothing
+              , presumption
+              }
+  _ -> Right McpCall { inputs = [], startTime = Nothing, events = Nothing, presumption = PresumeSoft }
  where
   traceKeys = ["startTime", "events"]
+  readPresumption = \case
+    Nothing -> Right PresumeSoft
+    Just v -> case Aeson.Types.parseEither Aeson.parseJSON v of
+      Right p -> Right p
+      Left _ ->
+        Left $ "presumption must be \"soft\" or \"hard\", not "
+          <> Text.Encoding.decodeUtf8 (LBS.toStrict (Aeson.encode v))
   without keys o = Map.toList (Map.withoutKeys (Aeson.KeyMap.toMapText o) (Set.fromList keys))
   pairs kvs =
     [ (Map.findWithDefault k k reverseMap, remapFnLiteralKeys reverseMap <$> parseFnLiteral v)
@@ -645,7 +784,7 @@ runMcpEvaluationIO cfg vf call
       case traceFromJSON call.startTime call.events of
         Left refusal -> pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError refusal)))
         Right (startTime, events) ->
-          mcpOutcome <$> runDeonticLimited cfg vf call.inputs startTime events TraceNone False PresumeSoft True
+          mcpOutcome <$> runDeonticLimited cfg vf call.inputs startTime events TraceNone False call.presumption True
   | Maybe.isJust call.startTime || Maybe.isJust call.events =
       pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError noTraceForOtherFunctions)))
   | otherwise =
@@ -653,7 +792,7 @@ runMcpEvaluationIO cfg vf call
         Nothing -> pure $ Left "No evaluator available"
         Just runFn ->
           fmap mcpOutcome $ withEvalLimits cfg $
-            runExceptT (runFn.runFunction call.inputs Nothing TraceNone False PresumeSoft)
+            runExceptT (runFn.runFunction call.inputs Nothing TraceNone False call.presumption)
 
 -- | An evaluation's outcome as the (error, result) text of an MCP result.
 mcpOutcome :: Either (LimitHit, Int64) (Either EvaluatorError ResponseWithReason, Int64) -> Either Text Text

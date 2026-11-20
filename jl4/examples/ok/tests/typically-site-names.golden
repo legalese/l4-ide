@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-site-names.l4:23:1-33:
+  10
+typically-site-names.l4:24:1-46:
+  20
+typically-site-names.l4:35:1-28:
+  20
+typically-site-names.l4:36:1-41:
+  50
+typically-site-names.l4:54:1-40:
+  20
+typically-site-names.l4:55:1-39:
+  30
+typically-site-names.l4:56:1-40:
+  50

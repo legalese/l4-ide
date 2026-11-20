@@ -1,0 +1,54 @@
+-- Where two rules of the same name could each take the inputs a named site
+-- writes, a TYPICALLY default does not decide between them. Each site below
+-- is ambiguous, or an arity error, as it was before TYPICALLY, and says so.
+-- (ok/typically-overload-fit.l4 has the sites where the written inputs do
+-- settle the choice.)
+
+-- 1. Each rule completes the site by a default of its own, and both take a
+-- NUMBER for `base`.
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN offset IS A NUMBER TYPICALLY 7
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS offset PLUS base
+
+#EVAL scaled WITH base IS 10
+
+-- 2. A third rule that takes a STRING for `base` cannot take the site, but the
+-- other two still can, and neither is complete as written, so the third rule
+-- does not make the call any less ambiguous. The first rule's default for
+-- `rate` is not taken.
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled2 MEANS rate TIMES base
+
+GIVEN base IS A NUMBER
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled2 MEANS base PLUS factor
+
+GIVEN base IS A STRING
+      other IS A NUMBER
+GIVETH A NUMBER
+scaled2 MEANS other
+
+#EVAL scaled2 WITH base IS 10
+
+-- 3. A call that gives its inputs by position still gives all of them. Another
+-- rule of the same name does not change that.
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled3 MEANS rate TIMES base
+
+GIVEN base IS A STRING
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled3 MEANS factor
+
+#EVAL scaled3 10

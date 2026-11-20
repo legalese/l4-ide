@@ -493,6 +493,14 @@ data AssumeRewrite
   = KeepAssume
   | DropAssume
   | ReplaceAssume (TopDecl Resolved)
+    -- ^ the ASSUME is gone, and so is its section's @GIVEN@ for it, so
+    -- 'L4.Print.prettyLayout' does not re-introduce it
+  | BindAssume (TopDecl Resolved)
+    -- ^ a section @GIVEN@'s elaboration given a value, still a section
+    -- @GIVEN@: its section's heading keeps it, so 'L4.Discharge.dischargeModule'
+    -- still makes every rule that reads it a function of it, and an inner
+    -- @WITH@ that overrides it for one call still has something to override
+    -- (smucclaw/l4-ide#1000). For a module that is evaluated and not printed.
 
 -- | Rewrite every module-level ASSUME (in any section). Used to bind
 -- supplied values for ASSUMEs at evaluation time: the evaluator keeps an
@@ -514,20 +522,39 @@ rewriteModuleAssumes rewrite (MkModule ann uri section) =
   -- has just bound -- which is exactly what @l4 batch@ does, so the wrapper's
   -- definition would then collide with it.
   goSection (MkSection sann name aka mgiven decls) =
-    let binders = sectionGivenNames mgiven
-        decls'  = mapMaybe goDecl decls
-        kept    = [ rawName (getName r)
-                  | d@(Assume _ (MkAssume _ _ (MkAppForm _ r [] _) _ _)) <- decls'
-                  , isSectionBinderElaboration binders d
-                  ]
-    in MkSection sann name aka (filterGivenSigTo kept mgiven) decls'
+    let binders   = sectionGivenNames mgiven
+        rewritten = [ (d, goDecl d) | d <- decls ]
+        decls'    = [ d' | (_, Just (d', _)) <- rewritten ]
+        named fate = [ rawName (getName r)
+                     | (d@(Assume _ (MkAssume _ _ (MkAppForm _ r [] _) _ _)), Just (_, f)) <- rewritten
+                     , f == fate
+                     , isSectionBinderElaboration binders d
+                     ]
+        kept      = named StillBinder
+        valued    = named ValuedBinder
+    in MkSection sann name aka (withoutDefaults valued (filterGivenSigTo (kept <> valued) mgiven)) decls'
+  -- the declaration that results, and what became of the ASSUME
   goDecl = \case
     decl@(Assume _ assume) -> case rewrite assume of
-      KeepAssume          -> Just decl
+      KeepAssume          -> Just (decl, StillBinder)
       DropAssume          -> Nothing
-      ReplaceAssume decl' -> Just decl'
-    Section sann sub -> Just (Section sann (goSection sub))
-    other -> Just other
+      ReplaceAssume decl' -> Just (decl', NotABinder)
+      BindAssume decl'    -> Just (decl', ValuedBinder)
+    Section sann sub -> Just (Section sann (goSection sub), NotABinder)
+    other -> Just (other, NotABinder)
+  -- A binder that was given a value no longer has a default: the section's
+  -- @TYPICALLY@ is what discharge reports as presumed when the binder is read.
+  withoutDefaults names = fmap (\(MkGivenSig gann otns) ->
+    MkGivenSig gann
+      [ if rawName (getName otn) `elem` names then dropDefault otn else otn | otn <- otns ])
+  dropDefault (MkOptionallyTypedName tann r mty _) = MkOptionallyTypedName tann r mty Nothing
+
+-- | What 'rewriteModuleAssumes' made of one declaration.
+data Fate
+  = NotABinder   -- ^ not an ASSUME, or one that is no longer a section @GIVEN@
+  | StillBinder  -- ^ an ASSUME kept as it was
+  | ValuedBinder -- ^ given a value ('BindAssume'), and its heading's default dropped
+  deriving stock (Eq)
 
 -- | Extract ASSUME declarations that are referenced by a DECIDE body, or by
 -- anything it reaches ('assumesReadBy').
@@ -678,10 +705,13 @@ validateExportInputs mod' =
 --   row that provably cannot evaluate;
 -- * a value supplied under that name is accepted into the row and silently
 --   dropped, because nothing binds it; and
--- * @l4 batch@ could not deliver it even if the schema demanded it, since it
---   supplies a binder by rewriting the module's own source and 'L4.Print'
---   re-emits the @IMPORT@ verbatim, so the imported module is re-resolved from
---   disk untouched.
+-- * @l4 batch@ could not deliver it even if the schema demanded it. The call
+--   it generates names only the section @GIVEN@s that THIS module's read-set
+--   ('L4.Discharge.readSets', which does not cross @IMPORT@) says the export
+--   reads, so no @WITH@ it writes reaches a reader in the imported module.
+--   (Until smucclaw/l4-ide#1000 it supplied a binder by rewriting the module's
+--   own source, and 'L4.Print' re-emits the @IMPORT@ verbatim, so the imported
+--   module was re-resolved from disk untouched.)
 --
 -- __Why this refusal comes BEFORE closing the collector over imports.__ Ruled
 -- in @IMPLICIT-PROPS-DESIGN.md@ §11.19: closing the collector on its own turns

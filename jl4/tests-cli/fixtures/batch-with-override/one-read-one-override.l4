@@ -1,0 +1,18 @@
+-- smucclaw/l4-ide#1000: an export overrides a section GIVEN with an inner
+-- WITH. `inner` reads `r`; the second read of it is pinned to 100 for that
+-- call only, so the first read sees the row's value (or the default).
+-- `l4 run` answers 103; `l4 batch` used to refuse the module with
+-- "You are giving named inputs to inner ... of type NUMBER".
+
+§ `Rates`
+    GIVEN r IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+inner MEANS r
+
+@export One read takes the rate, one overrides it
+GIVEN b IS A NUMBER
+GIVETH A NUMBER
+outer b MEANS b PLUS inner PLUS (inner WITH r IS 100)
+
+#EVAL outer 0
