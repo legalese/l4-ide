@@ -58,7 +58,7 @@ import TestData (deonticDeadlineJL4, deonticShapesJL4, deonticValueActionJL4)
 import System.IO.Error (isPermissionError)
 import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, missingBooleanJL4, assumeBooleanJL4, deonticBooleanJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, missingBooleanJL4, assumeBooleanJL4, deonticBooleanJL4, hyphenatedInputsJL4, hyphenatedAssumeJL4, hyphenatedDeonticJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -734,6 +734,65 @@ spec = describe "integration" do
             , "events" Aeson..= ([] :: [Aeson.Value])
             ])
         assertStopsOn resp "is motorway (not supplied)"
+
+  describe "an input name that needs backticks but has no space, on the wrapper path" do
+    -- The wrapper names its own variables after each input (supplied_<name>,
+    -- unwrapped_<name>, converted_<name>) and binds an ASSUME under its own
+    -- name. Each must be backticked whenever it is not a plain identifier,
+    -- not only when it contains a space: `LET supplied_self-employed =` does
+    -- not parse, so every wrapper request to such a rule failed.
+    let uncertain = Aeson.object []
+        taxDue args = Aeson.object [ "arguments" Aeson..= Aeson.object (("unused flag" Aeson..= uncertain) : args) ]
+        income = "net-income" Aeson..= (1000 :: Int)
+        filed = "filing-date" Aeson..= ("2025-01-31" :: Text)
+
+    it "answers when the hyphenated BOOLEAN, NUMBER and DATE are supplied" do
+      withServiceFromSources "hy-all" [("tax.l4", hyphenatedInputsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-all" "tax%20due" $
+          taxDue ["self-employed" Aeson..= True, income, filed]
+        resp `shouldCarry` Answers (Aeson.Number 100)
+
+    it "stops and names a hyphenated BOOLEAN that is left out" do
+      withServiceFromSources "hy-bool" [("tax.l4", hyphenatedInputsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-bool" "tax%20due" $ taxDue [income, filed]
+        assertStopsOn resp "self-employed (not supplied)"
+
+    it "names a hyphenated NUMBER that is left out" do
+      withServiceFromSources "hy-num" [("tax.l4", hyphenatedInputsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-num" "tax%20due" $
+          taxDue ["self-employed" Aeson..= True, filed]
+        resp `shouldCarry` Refuses "Parameter 'net-income': missing required parameter"
+
+    it "stops and names a hyphenated BOOLEAN ASSUME that is left uncertain" do
+      withServiceFromSources "hy-assume" [("eligible.l4", hyphenatedAssumeJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-assume" "eligible" $ Aeson.object
+          [ "arguments" Aeson..= Aeson.object
+              [ "is resident" Aeson..= True, "unused flag" Aeson..= uncertain, "on-record" Aeson..= uncertain ] ]
+        assertStopsOn resp "on-record"
+
+    it "answers a deontic rule whose hyphenated BOOLEAN is supplied" do
+      withServiceFromSources "hy-deontic" [("seatbelt.l4", hyphenatedDeonticJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+                , "on-motorway" Aeson..= True ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        statusCode' resp `shouldBe` 200
+        responseBody resp `shouldSatisfy` (BS8.isInfixOf "wear seatbelt" . LBS.toStrict)
+
+    it "stops a deontic rule whose hyphenated BOOLEAN is left out" do
+      withServiceFromSources "hy-deontic-missing" [("seatbelt.l4", hyphenatedDeonticJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-deontic-missing" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertStopsOn resp "on-motorway (not supplied)"
 
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do

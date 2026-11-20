@@ -24,6 +24,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import L4.Lexer (showStringLit)
+import L4.Print (quoteIfNeeded)
 import L4.Syntax (Type'(..), Resolved, getUnique)
 import L4.TypeCheck.Environment (booleanUnique, dateUnique, timeUnique, datetimeUnique, maybeUnique, contractUnique)
 import Backend.Api (TraceLevel(..), TraceEvent(..), FnLiteral(..))
@@ -52,12 +53,13 @@ isMaybeType :: Type' Resolved -> Bool
 isMaybeType (TyApp _ name [_]) = getUnique name == maybeUnique
 isMaybeType _ = False
 
--- | Quote an identifier with backticks if it contains spaces or special characters
--- L4 requires backticks for identifiers with spaces
+-- | Quote an identifier with backticks unless it is a plain identifier: a
+-- letter followed by letters, digits and underscores, as the lexer reads one.
+-- A space is not the only character that needs them: @self-employed@ unquoted
+-- lexes as @self - employed@. Every name this module generates goes through
+-- here, including the variables it names after an input.
 quoteIdent :: Text -> Text
-quoteIdent name
-  | Text.any (== ' ') name = "`" <> name <> "`"
-  | otherwise = name
+quoteIdent = quoteIfNeeded
 
 -- | Prefix for InputArgs field names to avoid collision with source identifiers.
 -- The generated InputArgs record creates accessor functions, which would otherwise
@@ -71,12 +73,10 @@ inputFieldName name = name <> " (input)"
 quoteInputField :: Text -> Text
 quoteInputField = quoteIdent . inputFieldName
 
--- | Create a safe unwrapped variable name
--- For names with spaces, creates a backtick-quoted identifier like `unwrapped_tranche number`
+-- | Create a safe unwrapped variable name, backtick-quoted unless it is a
+-- plain identifier, like `unwrapped_tranche number` or `unwrapped_net-income`
 unwrappedVar :: Text -> Text
-unwrappedVar name
-  | Text.any (== ' ') name = "`unwrapped_" <> name <> "`"
-  | otherwise = "unwrapped_" <> name
+unwrappedVar name = quoteIdent ("unwrapped_" <> name)
 
 -- | The placeholder for a BOOLEAN input the request did not supply.
 -- It is an assumed term, so it costs nothing unless the rule reads it; if the
@@ -87,9 +87,7 @@ notSuppliedTerm name = quoteIdent (name <> " (not supplied)")
 
 -- | The variable a BOOLEAN input is bound to: its value, or its placeholder.
 suppliedVar :: Text -> Text
-suppliedVar name
-  | Text.any (== ' ') name = "`supplied_" <> name <> "`"
-  | otherwise = "supplied_" <> name
+suppliedVar name = quoteIdent ("supplied_" <> name)
 
 -- | One ASSUME per BOOLEAN input, declaring its placeholder.
 placeholderAssumes :: [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)] -> [Text]
@@ -426,16 +424,12 @@ generateNestedConsiderWithAssumes (((name, _), _, _, convFn, _):rest) functionCa
 
 -- | Create a variable name for converted values (DATE/TIME/DATETIME from string)
 convertedVar :: Text -> Text
-convertedVar name
-  | Text.any (== ' ') name = "`converted_" <> name <> "`"
-  | otherwise = "converted_" <> name
+convertedVar name = quoteIdent ("converted_" <> name)
 
 -- | Create a variable name for MAYBE converted values
 -- Used when the original type is MAYBE DATE/TIME/DATETIME (string->value conversion preserving MAYBE)
 maybeConvertedVar :: Text -> Text
-maybeConvertedVar name
-  | Text.any (== ' ') name = "`maybeConverted_" <> name <> "`"
-  | otherwise = "maybeConverted_" <> name
+maybeConvertedVar name = quoteIdent ("maybeConverted_" <> name)
 
 -- ----------------------------------------------------------------------------
 -- Deontic evaluation support
