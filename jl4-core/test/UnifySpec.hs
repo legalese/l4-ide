@@ -4,7 +4,6 @@ module UnifySpec (spec) where
 
 import Test.Hspec
 import Control.Exception (evaluate)
-import System.CPUTime (getCPUTime)
 import System.Timeout (timeout)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -16,6 +15,7 @@ import L4.Syntax (Name (MkName), RawName (NormalName), Resolved (Def), Type' (..
 import L4.TypeCheck (initialCheckEnv, initialCheckState, prettyCheckErrorWithContext, runWith)
 import L4.TypeCheck.Types (CheckEntity (..), CheckEnv (..), CheckError (..), CheckErrorWithContext (..), runCheck)
 import L4.TypeCheck.Unify (unify)
+import LinearTime (cpuRatio, quadraticControl)
 
 -- | Run the type checker on a snippet under a watchdog: unification bugs
 -- in this area historically caused nontermination, so a hang is reported
@@ -592,11 +592,16 @@ spec = describe "Unification" $ do
     -- once only the head is walked (measured on one machine). Timed by the
     -- ratio of two sizes, not by a bound in seconds, so that a slow machine
     -- does not fail it; and in CPU time, so that time spent waiting for a busy
-    -- machine is not counted. Four times the depth takes about four times as
-    -- long when the cost is linear and sixteen times as long when it is
-    -- quadratic; the test fails above 'deepLimit'.
+    -- machine is not counted (see "LinearTime"). Four times the depth takes
+    -- about four times as long when the cost is linear and sixteen times as
+    -- long when it is quadratic; the test fails above 'deepLimit'.
     it "checks a use of a generic function at a nested type in time linear in the nesting" $
       checksInLinearTime 100 400 deepLimit \ depth -> deepIdentity depth 10
+
+    -- The control: on the same depths and limit, the guard fails work that
+    -- is quadratic in the depth.
+    it "fails work quadratic in the nesting on the same depths (the control)" $
+      quadraticControl 100 400 deepLimit
 
   describe "cost of unifying types nested on the left" $ do
     -- The first difference between @P OF (P OF (... a ...), a), a@ and the
@@ -607,11 +612,19 @@ spec = describe "Unification" $ do
     -- resolution to add their own cost, so that nothing but the descent is
     -- timed (the same shape through `l4 check` is mostly the cost of
     -- everything else, and the square only shows far down). Four times the
-    -- depth takes about four times as long when the descent is linear, up
-    -- to about six when the larger heap makes collection dearer, and about
-    -- fifteen times as long when it is quadratic.
+    -- depth takes about four times as long when the descent is linear (3.35
+    -- to 4.30 in 50 rounds, quiet and under load, with a collection before
+    -- every run; up to about six without one, when the larger heap made
+    -- collection dearer), and about fifteen times as long when it is
+    -- quadratic. The limit is 8, as for the check above, so that the control
+    -- below has room too: it measured as low as 12.14.
     it "unifies a type nested on the left with its instance in time linear in the nesting" $
-      unifiesInLinearTime 4000 16000 10
+      unifiesInLinearTime 4000 16000 8
+
+    -- The control: on the same depths and limit, the guard fails work that
+    -- is quadratic in the depth.
+    it "fails work quadratic in the nesting on the same depths (the control)" $
+      quadraticControl 4000 16000 8
 
   describe "occurs check within one walk" $ do
     it "rejects PAIR OF a, a against PAIR OF b, LIST OF b" $ do
@@ -765,53 +778,37 @@ deepLimit = 8
 
 -- | @checksInLinearTime small large limit program@: checking @program large@
 -- takes less than @limit@ times the CPU time of checking @program small@, and
--- both are accepted. A ratio short of twice the limit is measured again, up
--- to twice, so that one pause does not fail it.
+-- both are accepted. Measured by 'cpuRatio'.
 checksInLinearTime :: Int -> Int -> Double -> (Int -> Text) -> Expectation
 checksInLinearTime smallSize largeSize limit program = do
-  let timeCheck k = do
-        src <- evaluate (program k)
-        _ <- evaluate (Text.length src)
-        t0 <- getCPUTime
-        ok <- checks src
-        t1 <- getCPUTime
-        ok `shouldBe` True
-        pure (fromIntegral (t1 - t0) :: Double)
-      fastest k tries = minimum <$> traverse (const (timeCheck k)) [1 .. tries :: Int]
-  small <- fastest smallSize 3
-  let ratio large = large / max small 1.0e9
-      settle tries = do
-        r <- ratio <$> timeCheck largeSize
-        if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
-  r <- settle 3
+  r <- cpuRatio prepare run smallSize largeSize
   r `shouldSatisfy` (< limit)
+  where
+    prepare k = do
+      src <- evaluate (program k)
+      _ <- evaluate (Text.length src)
+      pure src
+    run src = checks src >>= (`shouldBe` True)
 
 -- | @unifiesInLinearTime small large limit@: unifying a type nested on the
 -- left @large@ deep with its instance at NUMBER takes less than @limit@
--- times the CPU time of doing so @small@ deep. Measured like
--- 'checksInLinearTime'.
+-- times the CPU time of doing so @small@ deep. Measured by 'cpuRatio'.
 unifiesInLinearTime :: Int -> Int -> Double -> Expectation
 unifiesInLinearTime smallSize largeSize limit = do
-  let timeUnify k = do
-        let (t1, t2) = leftNestedPair k
-        _ <- evaluate (typeSize t1 + typeSize t2)
-        t0 <- getCPUTime
-        let (errs, ok) = case runCheck (unify t1 t2) unifyEnv initialCheckState of
-              [(w, _)] -> runWith w
-              _        -> error "expected exactly one result"
-        _ <- evaluate (length errs)
-        _ <- evaluate ok
-        t1' <- getCPUTime
-        (null errs, ok) `shouldBe` (True, True)
-        pure (fromIntegral (t1' - t0) :: Double)
-      fastest k tries = minimum <$> traverse (const (timeUnify k)) [1 .. tries :: Int]
-  small <- fastest smallSize 3
-  let ratio large = large / max small 1.0e9
-      settle tries = do
-        r <- ratio <$> timeUnify largeSize
-        if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
-  r <- settle 3
+  r <- cpuRatio prepare run smallSize largeSize
   r `shouldSatisfy` (< limit)
+  where
+    prepare k = do
+      let (t1, t2) = leftNestedPair k
+      _ <- evaluate (typeSize t1 + typeSize t2)
+      pure (t1, t2)
+    run (t1, t2) = do
+      let (errs, ok) = case runCheck (unify t1 t2) unifyEnv initialCheckState of
+            [(w, _)] -> runWith w
+            _        -> error "expected exactly one result"
+      _ <- evaluate (length errs)
+      _ <- evaluate ok
+      (null errs, ok) `shouldBe` (True, True)
 
 -- | The module the hand-built types below live in.
 unifySpecUri :: NormalizedUri

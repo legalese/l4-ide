@@ -6,15 +6,17 @@
 module PrintLayoutSpec (spec) where
 
 import Control.Exception (evaluate)
+import Control.Monad (replicateM_)
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import qualified Data.Text as Text
 import Prettyprinter
-import System.CPUTime (getCPUTime)
 import Test.Hspec
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck
 
 import L4.Print (docText)
 import L4.Print.Layout (layoutUnboundedLocal)
+import LinearTime (cpuRatio, quadraticWork)
 
 spec :: Spec
 spec = describe "L4.Print.Layout" $ do
@@ -46,36 +48,36 @@ spec = describe "L4.Print.Layout" $ do
   -- 30 prints as one such line of about 1.1 million characters, and spent
   -- 22 of its 23 seconds there.
   --
-  -- Timed as in ConsiderScaleSpec: by a ratio, in CPU time, measured again
-  -- when it is short of clearly quadratic. The same characters are printed
-  -- both ways: one line of n groups, and 16 lines of n/16 groups each,
-  -- whose line breaks stop the library's reading. So linear time gives a
-  -- ratio of about 1 and the library's quadratic time about 16; the test
-  -- fails at 4.
+  -- Timed by a ratio, in CPU time, by "LinearTime"'s 'cpuRatio'. The same
+  -- characters are printed both ways: one line of n groups, and 16 lines of
+  -- n/16 groups each, whose line breaks stop the library's reading. So
+  -- linear time gives a ratio of about 1 and the library's quadratic time
+  -- about 16; the test fails at 4.
   it "prints one long line of groups in time linear in its length" $ do
     let n = 16000 :: Int
         groups is = [group (pretty i <> line <> "RAND") | i <- is]
         oneLine = hsep (groups [1 .. n])
         sixteenLines = vsepHard
           [hsep (groups [k * m + 1 .. (k + 1) * m]) | let m = n `div` 16, k <- [0 .. 15]]
-        time d = do
-          t0 <- getCPUTime
+    lengths <- newIORef []
+    let run d = do
           len <- evaluate (Text.length (docText d))
-          t1 <- getCPUTime
-          pure (fromIntegral (t1 - t0) :: Double, len)
-        fastest d tries = do
-          rs <- traverse (const (time d)) [1 .. tries :: Int]
-          pure (minimum (map fst rs), maximum (map snd rs))
-    (short, lenShort) <- fastest sixteenLines 3
-    let ratio long = long / max short 1.0e9
-        settle tries = do
-          (long, lenLong) <- time oneLine
-          -- The same text either way, bar the 15 line breaks.
-          lenLong `shouldBe` lenShort
-          let r = ratio long
-          if r < 4 || r >= 8 || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
-    r <- settle 3
+          modifyIORef' lengths (len :)
+    r <- cpuRatio pure run sixteenLines oneLine
+    -- The same text either way, bar the 15 line breaks, in every run.
+    ls <- readIORef lengths
+    minimum ls `shouldBe` maximum ls
     r `shouldSatisfy` (< 4)
+
+  -- The control: on the same limit, the guard fails made-up work that is
+  -- quadratic in the length of each line, as the library's layout was, so
+  -- that the same 16,000 groups cost 16 times as much on one line as on 16.
+  it "fails work quadratic in the length of each line (the control)" $ do
+    let work ls = replicateM_ ls (quadraticWork 2000 32000 (16000 `div` ls))
+    r <- cpuRatio pure work 16 1
+    r `shouldSatisfy` (>= 4)
+    -- Far beyond 16 would mean the 16-line runs were not really run.
+    r `shouldSatisfy` (< 64)
 
 -- | 'vsep' with breaks 'group' cannot flatten, as L4.Print's 'vcatHard'.
 vsepHard :: [Doc ann] -> Doc ann
