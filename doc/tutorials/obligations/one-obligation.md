@@ -173,11 +173,11 @@ Result:
   FULFILLED
 ```
 
-**Time can pass with nobody doing anything.** The events you list are the only way the clock moves, so to say "day 8 arrived and nothing had happened" you need an event that is not anybody doing anything. L4 provides one, `WAIT UNTIL`, written in brackets:
+**Time can pass with nobody doing anything.** The events you list are the only way the clock moves, so to say "day 8 arrived and nothing had happened" you need an event that is not anybody doing anything. L4 provides one, `WAITUNTIL`, written in brackets:
 
 ```l4
 #TRACE `the rent is due` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -260,7 +260,7 @@ Thirty days pass and she never comes:
 
 ```l4
 #TRACE `the inspection right` AT 0 WITH
-    (`WAIT UNTIL` 31)
+    (WAITUNTIL 31)
 ```
 
 ```
@@ -307,7 +307,7 @@ A year passes and she never does:
 
 ```l4
 #TRACE `no subletting` AT 0 WITH
-    (`WAIT UNTIL` 366)
+    (WAITUNTIL 366)
 ```
 
 ```
@@ -370,7 +370,7 @@ L4 makes this check wherever it can read from the text who the performer is: a n
 - **An obligation has five parts**, and L4 writes them in order: `PARTY` who, `MUST`/`MAY`/`SHANT` what, `WITHIN` by when, `HENCE` then what if it is done, `LEST` then what if it is not. The five together are one unit, which the reference pages call a Deonton.
 - **Before the clause come the cast and the acts**: `DECLARE Actor IS ONE OF …` for who can act, `DECLARE Action IS ONE OF …` for what can be done. Each act names its doer first.
 - **An obligation is used by playing it forward**: `#TRACE`, a starting time, and a list of who did what, when. The screen then says one of three things: `FULFILLED`, a breach with who and why, or the obligation written back out with the time that is left — what is still owed.
-- **The clock** counts in your unit from the start you name; the deadline day itself is in time; `WAIT UNTIL` lets time pass with nobody acting; an event that does not fit the obligation is passed over but still moves the clock.
+- **The clock** counts in your unit from the start you name; the deadline day itself is in time; `WAITUNTIL` lets time pass with nobody acting; an event that does not fit the obligation is passed over but still moves the clock.
 - **`MAY` cannot be broken** — both outcomes are good. **`SHANT` swaps the triggers**: the act happening is the breach, and the deadline passing quietly is the success.
 - **The party must be the act's own performer**, and L4 checks it in the obligation and in every event.
 

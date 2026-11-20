@@ -1115,7 +1115,7 @@ expand ex node = do
             pure (ran <> map (TriedRefused . refusalFor party raw) refusals)
   where
     tickLabel cand d = case cand.cdHypothetical of
-      Right (Tick t) -> "time passes the deadline " <> prettyRatio d <> " (WAIT UNTIL " <> prettyRatio t <> ")"
+      Right (Tick t) -> "time passes the deadline " <> prettyRatio d <> " (WAITUNTIL " <> prettyRatio t <> ")"
       _              -> "time passes the deadline " <> prettyRatio d
     refusalFor party raw (variable, ty, whole, constructor, why) = MkRefusal
       { rfVariable = variable

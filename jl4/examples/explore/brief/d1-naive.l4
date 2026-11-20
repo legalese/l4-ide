@@ -113,7 +113,7 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES `Alice checks whether dinner is bought` AT 65100
     PARTY World DOES `ledger records Bob's purchase`         AT 65160
     PARTY World DOES `Alice buys dinner`                     AT 65220
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)
 
 -- Sequence A in full: the same three steps, then the message "I bought
 -- it" reaches Alice at 18:08, too late to stop her. Her belief becomes
@@ -124,7 +124,7 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES `Alice buys dinner`                     AT 65220
     PARTY World DOES `Messages delivers the message`         AT 65280
     PARTY World DOES `Alice is done`                         AT 65290
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)
 
 -- Sequence B: Alice buys at 18:05:30, before Bob's purchase is recorded.
 -- Official record: opened, dinner for two, open at acceptance TRUE, taken.
@@ -133,7 +133,7 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES `Alice buys dinner`                     AT 65130
     PARTY World DOES `ledger records Bob's purchase`         AT 65160
     PARTY World DOES `Messages delivers the message`         AT 65280
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)
 
 -- Alice checks after Bob's purchase is recorded: her check says taken, so
 -- the purchase at 18:07 is passed over (its guard is false) and she gives
@@ -143,7 +143,7 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES `Alice checks whether dinner is bought` AT 65190
     PARTY World DOES `Alice buys dinner`                     AT 65220
     PARTY World DOES `Alice gives up`                        AT 65230
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)
 
 -- Guards: a purchase before any check, a second purchase of Bob's, and a
 -- second message are all passed over. Then the message stops Alice before
@@ -155,4 +155,4 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES `Messages delivers the message`         AT 65280
     PARTY World DOES `Messages delivers the message`         AT 65290
     PARTY World DOES `Alice checks whether dinner is bought` AT 65300
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)

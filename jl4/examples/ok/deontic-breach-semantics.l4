@@ -46,7 +46,7 @@ GIVETH A DEONTIC Person Action
 -- Both alternatives definitively breached => single breach (not a residual OR),
 -- naming BOTH failures, left first, each with its own BECAUSE.
 #TRACE `ror both explicit` AT 0 WITH
-    (`WAIT UNTIL` 20)
+    (WAITUNTIL 20)
 
 GIVETH A DEONTIC Person Action
 `rand both explicit` MEANS
@@ -57,7 +57,7 @@ GIVETH A DEONTIC Person Action
 -- RAND over two declared breaches: lost at 5, Alice's, and naming both, each
 -- with its own BECAUSE.
 #TRACE `rand both explicit` AT 0 WITH
-    (`WAIT UNTIL` 20)
+    (WAITUNTIL 20)
 
 GIVETH A DEONTIC Person Action
 `explicit or deadline` MEANS
@@ -74,10 +74,10 @@ GIVETH A DEONTIC Person Action
 -- Mixed kinds, both orders: the ROR is lost at 10, when Bob's delivery is
 -- missed, after Alice's LEST BREACH at 5 — on either side — naming BOTH.
 #TRACE `explicit or deadline` AT 0 WITH
-    (`WAIT UNTIL` 20)
+    (WAITUNTIL 20)
 
 #TRACE `deadline or explicit` AT 0 WITH
-    (`WAIT UNTIL` 20)
+    (WAITUNTIL 20)
 
 GIVETH A DEONTIC Person Action
 `one breached one pending` MEANS
@@ -88,7 +88,7 @@ GIVETH A DEONTIC Person Action
 -- Control: only ONE alternative breached, the other still live => residual
 -- (Bob may still deliver); the compound must NOT breach yet.
 #TRACE `one breached one pending` AT 0 WITH
-    (`WAIT UNTIL` 7)
+    (WAITUNTIL 7)
 
 -- ---------------------------------------------------------------------------
 -- (c) the deadline-revealing event is re-offered to the continuation
@@ -152,8 +152,8 @@ GIVETH A DEONTIC Person Action
 -- printed WITHIN 10 as if it had time left, and the breach waited for the
 -- WAIT at 30.)
 #TRACE `nested peel` AT 0 WITH
-  (`WAIT UNTIL` 20)
-  (`WAIT UNTIL` 30)
+  (WAITUNTIL 20)
+  (WAITUNTIL 30)
   PARTY Bob DOES deliver AT 35
 
 -- Bob's delivery at 12 is past layers 1 and 2 (due 2 and 5) and reaches
@@ -188,11 +188,11 @@ GIVETH A DEONTIC Person Action
 
 -- Clock advanced exactly TO the deadline: not yet expired (residual WITHIN 0).
 #TRACE `pay due` AT 0 WITH
-  (`WAIT UNTIL` 5)
+  (WAITUNTIL 5)
 
 -- Strictly past the deadline: breach, "deadline, which was at 5".
 #TRACE `pay due` AT 0 WITH
-  (`WAIT UNTIL` 6)
+  (WAITUNTIL 6)
 
 `no smoking` MEANS
   PARTY Alice
@@ -206,7 +206,7 @@ GIVETH A DEONTIC Person Action
 
 -- Prohibition respected once the deadline has passed => FULFILLED.
 #TRACE `no smoking` AT 0 WITH
-  (`WAIT UNTIL` 31)
+  (WAITUNTIL 31)
 
 -- ---------------------------------------------------------------------------
 -- (e) a literal pinned in per-argument position (corrected README example)
@@ -253,7 +253,7 @@ GIVETH A DEONTIC Person Action
 
 -- Bare MAY expiry: LEST defaults to FULFILLED (same outcome as before).
 #TRACE `may bare` AT 0 WITH
-  (`WAIT UNTIL` 9)
+  (WAITUNTIL 9)
 
 -- ---------------------------------------------------------------------------
 -- (f) recursive LEST with a non-positive WITHIN terminates

@@ -1516,12 +1516,15 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , _message = Text.unlines (TypeCheck.prettyCheckError checkError.kind)
           -- A deprecation warning is tagged so that editors render the retired
           -- spelling the way they render any other deprecated one (typically
-          -- struck through), on top of the warning squiggle. Two spellings are
-          -- being retired: ASSUME, and EXACTLY in a regulative action (R3 of
-          -- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md).
+          -- struck through), on top of the warning squiggle. The spellings being
+          -- retired: ASSUME, EXACTLY in a regulative action (R3 of
+          -- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md), and the old names of
+          -- two built-ins, `IS INTEGER` and `WAIT UNTIL` (Note [Renamed
+          -- built-ins] in L4.TypeCheck.Environment).
         , _tags = case checkError.kind of
             TypeCheck.CheckWarning (TypeCheck.DeprecatedAssume {}) -> Just [LSP.DiagnosticTag_Deprecated]
             TypeCheck.CheckWarning (TypeCheck.DeprecatedExactly {}) -> Just [LSP.DiagnosticTag_Deprecated]
+            TypeCheck.CheckWarning (TypeCheck.RenamedBuiltin {})    -> Just [LSP.DiagnosticTag_Deprecated]
             _                                                      -> Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing

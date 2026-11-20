@@ -367,7 +367,7 @@ spec = do
       -- the outset's anchor (`closing`, never forced before an event) was
       -- resolved, or the outset would list its tick as untried
       [ t.tnLabel | t <- g.gTransitions, t.tnFrom == 0, t.tnKind == EdgeTick ]
-        `shouldBe` ["time passes the deadline 75600 (WAIT UNTIL 75601)"]
+        `shouldBe` ["time passes the deadline 75600 (WAITUNTIL 75601)"]
 
   describe "the checker's verdicts (WP2): P1 to P4 as BRIEF.md predicts, P5, P6 and the control unknown" $ forM_ expectations \ e ->
     it e.exFile $ do

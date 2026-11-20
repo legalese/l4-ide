@@ -1420,7 +1420,7 @@ spec = do
       -- It went further than that. This node is the COMPLIANCE arm, reached
       -- only by the deadline passing, and with no WITHIN nothing reaches it at
       -- all: measured, `PARTY Alice SHANT notify LEST …` run to
-      -- (`WAIT UNTIL` 1000) leaves the prohibition standing as a residual. So
+      -- (WAITUNTIL 1000) leaves the prohibition standing as a residual. So
       -- both halves of the element have to say that, and they now do — where
       -- once the name said "the act is not performed" and the condition
       -- underneath it said "violation", one element asserting both arms.

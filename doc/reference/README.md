@@ -70,7 +70,7 @@ Obligations, permissions and prohibitions: who must, may or must not do what, by
 | [Deadlines and consequences](regulative/consequences.md) | WITHIN, BEFORE, HENCE and LEST, FULFILLED and BREACH, PROVIDED, what a name in an action means (EXACTLY is deprecated), RAND and ROR |
 | [BECAUSE](regulative/BECAUSE.md)                         | The reason given for a breach                                                                                                        |
 | [DEONTIC](regulative/DEONTIC.md)                         | The type of a regulative rule, and how a rule is evaluated                                                                           |
-| [EVENT](regulative/EVENT.md)                             | What a party did and when; WAIT UNTIL                                                                                                |
+| [EVENT](regulative/EVENT.md)                             | What a party did and when; WAITUNTIL                                                                                                 |
 | [AFTER](regulative/AFTER.md)                             | When the window opens: the opening edge, after WITHIN's closing edge                                                                 |
 | [EVERY](regulative/EVERY.md)                             | An obligation on every member of a group at once                                                                                     |
 | [What is owed now: `l4 lts`](regulative/lts-list.md)     | Given what has happened, what is owed, what would discharge it                                                                       |

@@ -196,7 +196,7 @@ GIVETH A DEONTIC Actor Action
 #TRACE `sale contract` 500 AT 0 WITH
     PARTY Seller DOES `deliver goods` "merchandise" AT 10
     PARTY Buyer DOES `pay invoice` 300 AT 30
-    (`WAIT UNTIL` 41)
+    (WAITUNTIL 41)
 
 -- Test 5: Mutual obligations with RAND
 #TRACE `mutual obligations` AT 0 WITH
@@ -268,14 +268,14 @@ GIVETH A DEONTIC Actor Action
     PARTY Buyer DOES `pay invoice` 499 AT 15
 
 -- ============================================================
--- § Advanced: WAIT UNTIL for Time Advancement
+-- § Advanced: WAITUNTIL for Time Advancement
 -- ============================================================
 
--- WAIT UNTIL advances time without an event
+-- WAITUNTIL advances time without an event
 -- Useful for testing deadline behavior
 
 #TRACE `simple delivery obligation` AT 0 WITH
-    (`WAIT UNTIL` 20)
+    (WAITUNTIL 20)
 
 -- ============================================================
 -- § DEONTIC as Return Values

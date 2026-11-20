@@ -4,11 +4,14 @@ Built-in functions are part of the language, so they work in every file without 
 
 Operators (`+`, `AND`, `EQUALS`, `UNLESS`, `FOLLOWED BY` and the rest) are described under [Operators](../operators/README.md). The conversions `TOSTRING`, `TONUMBER`, `TODATE`, `TOTIME`, `TODATETIME` and `AS STRING` are described under [Coercions](../types/coercions.md).
 
+Every built-in is written as one word. Two used to have a space, and so had to be written in backquotes: `ISINTEGER` was `` `IS INTEGER` `` and `WAITUNTIL` was `` `WAIT UNTIL` ``.
+The old spellings still work and mean the same thing, but each place one is written draws a warning that it has been renamed. Some versions of L4 no longer accept them, so write the new names.
+
 ## Numbers
 
 | Function            | Inputs         | Gives   | What it does                                                                                                                                                   |
 | ------------------- | -------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IS INTEGER`        | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
+| `ISINTEGER`         | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
 | `FLOOR`             | NUMBER         | NUMBER  | Rounds down to a whole number                                                                                                                                  |
 | `CEILING`           | NUMBER         | NUMBER  | Rounds up to a whole number                                                                                                                                    |
 | `ROUND`             | NUMBER         | NUMBER  | Rounds to the nearest whole number; a half goes to the even number, so 2.5 gives 2 and 3.5 gives 4                                                             |
@@ -123,10 +126,10 @@ See `jl4/examples/ok/temporal-pin-deep.l4` and the ruling in `specs/todo/TEMPORA
 
 ## Regulative traces
 
-| Function     | Inputs                                 | Gives       | What it does                                                                                        |
-| ------------ | -------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
-| `WAIT UNTIL` | NUMBER                                 | EVENT a b   | An event that matches no party and no action; in a `#TRACE` it moves time forward to the given time |
-| `EVALTRACE`  | DEONTIC a b, NUMBER, LIST OF EVENT a b | DEONTIC a b | The function behind `#TRACE`: what remains of a rule after the events, starting at the given time   |
+| Function    | Inputs                                 | Gives       | What it does                                                                                        |
+| ----------- | -------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
+| `WAITUNTIL` | NUMBER                                 | EVENT a b   | An event that matches no party and no action; in a `#TRACE` it moves time forward to the given time |
+| `EVALTRACE` | DEONTIC a b, NUMBER, LIST OF EVENT a b | DEONTIC a b | The function behind `#TRACE`: what remains of a rule after the events, starting at the given time   |
 
 See [EVENT](../regulative/EVENT.md) and [Regulative rules](../regulative/README.md).
 

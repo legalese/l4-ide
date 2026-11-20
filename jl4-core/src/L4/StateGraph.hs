@@ -448,7 +448,7 @@ data TransitionType
 --
 -- @
 -- PARTY Alice MUST pay LEST (PARTY Bob MUST refund WITHIN 5)
--- \#TRACE ... AT 0 WITH (\`WAIT UNTIL\` 1000)
+-- \#TRACE ... AT 0 WITH (WAITUNTIL 1000)
 --   ==> PARTY Alice MUST pay HENCE FULFILLED LEST ...   -- residual, not Bob's refund
 -- @
 --
@@ -1206,7 +1206,7 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         -- Measured:
         --
         --   PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)
-        --     (`WAIT UNTIL` 100)          ==> FULFILLED
+        --     (WAITUNTIL 100)          ==> FULFILLED
         --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
         --
         -- so expiry reaches FULFILLED (@fromMaybe fulfilExpr lest@ in
@@ -1254,7 +1254,7 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         -- require it: @Contract5@'s @_ -> case lest of Nothing -> ValBreached@
         -- covers DDo alongside DMust, and measured,
         --
-        --   PARTY Alice DO pay WITHIN 5    (`WAIT UNTIL` 100)  ==> DEONTIC BREACHED
+        --   PARTY Alice DO pay WITHIN 5    (WAITUNTIL 100)  ==> DEONTIC BREACHED
         --
         -- so the graph drew a rule whose only outcome was Fulfilled for a rule
         -- that breaches. It is the same defect as the caption bug one level up —

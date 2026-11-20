@@ -112,4 +112,4 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES `ledger records Bob's purchase`         AT 65160
     PARTY World DOES `Alice cancels the dinner`              AT 65340
     PARTY World DOES `Alice cancels the dinner`              AT 65350
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)

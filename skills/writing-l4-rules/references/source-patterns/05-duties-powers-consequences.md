@@ -244,7 +244,7 @@ GIVETH A DEONTIC `A party under this Act` `An act under this Act`
 ```
 
 _(Probe `d03-may.l4`, exit 0. Two traces: the court grants at 10 → `FULFILLED`; the court never
-acts and the clock is advanced past the deadline with ``(`WAIT UNTIL` 31)`` → `FULFILLED`. A
+acts and the clock is advanced past the deadline with `(WAITUNTIL 31)` → `FULFILLED`. A
 permission cannot be breached by not using it.)_
 
 **Not** `MUST`, on the theory that a court told it "may" act will act. The identical rule written
@@ -640,12 +640,12 @@ GIVETH A DEONTIC `A party under this Act` `An act under this Act`
 
 -- Not yet performed: the duty stands, and the trace prints it back.
 #TRACE `s 12(2) — the probate shall be revoked and a new probate granted` AT 0 WITH
-    (`WAIT UNTIL` 900)
+    (WAITUNTIL 900)
 ```
 
 _(Probe `d08-no-deadline.l4`, exit 0. Performed at 900 → `FULFILLED`; the clock advanced to 900 with
 nothing done → ``PARTY `the court` MUST `revoke the probate …` HENCE FULFILLED``, the standing
-obligation. ``(`WAIT UNTIL` n)`` is how a trace moves the clock without an event.)_
+obligation. `(WAITUNTIL n)` is how a trace moves the clock without an event.)_
 
 **Not** a deadline you supply because the shape looks bare. Add `WITHIN 30` to the rule above and a
 court that acts on day 40 — compliance, on any reading of s 12(2) — is reported as
@@ -771,14 +771,14 @@ two kinds, and they may be mixed freely:
 #TRACE `cl 4 -- the Company must pay each invoice` AT 0 WITH
     PARTY `the Company` DOES `pay the invoice` AT 30
 
--- The clock advanced and nothing done: `WAIT UNTIL` moves time without an act.
+-- The clock advanced and nothing done: WAITUNTIL moves time without an act.
 #TRACE `cl 4 -- the Company must pay each invoice` AT 0 WITH
-    (`WAIT UNTIL` 31)
+    (WAITUNTIL 31)
 
 -- Both kinds in one block, in the order they happen: the deadline passes
 -- un-met, and the reparation is then performed.
 #TRACE `cl 4 -- the Company must pay each invoice` AT 0 WITH
-    (`WAIT UNTIL` 45)
+    (WAITUNTIL 45)
     PARTY `the Company` DOES `pay the unpaid amount with interest` AT 50
 ```
 
@@ -789,15 +789,15 @@ and `FULFILLED` again, the chain discharged on its second rung.
 
 Six facts, all measured on that probe, none of them stated anywhere else:
 
-- **``(`WAIT UNTIL` n)`` is built in.** It is not a prelude name and it needs no `IMPORT`. The
-  parentheses are the house form and what the corpus writes; a bare `` `WAIT UNTIL` n `` on its
+- **`(WAITUNTIL n)` is built in.** It is not a prelude name and it needs no `IMPORT`. The
+  parentheses are the house form and what the corpus writes; a bare `WAITUNTIL n` on its
   own line also parses and gives the same result (measured 2026-09-05, both forms solo and mixed
   with an act).
 - **The two kinds mix, in one block, in authored order.** A clock advance may precede an act, which
   is the only way to show a `LEST` chain fulfilling on its second rung.
   `jl4/examples/ok/deontic-breach-semantics.l4:131-133` stacks two waits and an act in one block.
-- **The deadline is inclusive.** An act `AT 30` against `WITHIN 30` is timely; ``(`WAIT UNTIL` 30)``
-  leaves the duty standing with `WITHIN 0` remaining; ``(`WAIT UNTIL` 31)`` is what expires it.
+- **The deadline is inclusive.** An act `AT 30` against `WITHIN 30` is timely; `(WAITUNTIL 30)`
+  leaves the duty standing with `WITHIN 0` remaining; `(WAITUNTIL 31)` is what expires it.
   Entry [4.3](04-dates-and-periods.md#e4-3) carries this too, because it is the reading a source's
   "within 30 days" leaves you to make.
 - **A rule that takes arguments is applied before `AT`.** `#TRACE rule arg AT 0 WITH` is the one

@@ -144,7 +144,7 @@ breachSrc = Text.unlines
   , ""
   , "#TRACE recordThenBreach AT 0 WITH"
   , "  PARTY Alice DOES deliver AT 2"
-  , "  (`WAIT UNTIL` 100)"
+  , "  (WAITUNTIL 100)"
   ]
 
 -- | A LEST reparation that RECORDs. Alice MUST report within 5; she never does,
@@ -168,7 +168,7 @@ lestRecordSrc = Text.unlines
   , "    RECORD `penalty recorded` IS FULFILLED"
   , ""
   , "#TRACE lestRecordsParty AT 0 WITH"
-  , "  (`WAIT UNTIL` 100)"
+  , "  (WAITUNTIL 100)"
   ]
 
 -- | Is this fully-forced normal form a 'ValBreached'?
@@ -203,7 +203,7 @@ lestUnwindSrc = Text.unlines
   , "    RECORD `penalty` IS `boom deontic`"
   , ""
   , "#TRACE lestExplodes AT 0 WITH"
-  , "  (`WAIT UNTIL` 100)"
+  , "  (WAITUNTIL 100)"
   , ""
   , "#EVAL RECORD `after` IS 1"
   ]

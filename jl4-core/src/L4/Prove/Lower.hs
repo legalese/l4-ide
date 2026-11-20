@@ -709,7 +709,7 @@ lowerApp env cx r args
     | [x] <- args, u == TC.roundUnique = unary x bankers
     | [x] <- args, u == TC.isIntegerUnique = do
         t <- lowerExpr env cx x
-        unless (t.srt == SReal) $ refuse "out of fragment: IS INTEGER of a non-NUMBER"
+        unless (t.srt == SReal) $ refuse "out of fragment: ISINTEGER of a non-NUMBER"
         pure (term (SList [Atom "is_int", t.val]) t.def SBool)
     | u `elem` transcendental =
         refuse ("out of fragment: the transcendental function `" <> nameOf r <> "` (R-V7 refuses it by name)")
@@ -838,7 +838,7 @@ sampleValues ob = samplesOver ob (nubOrd (0 : concat [ [r, r - 1, r + 1] | r <- 
 -- third and a seventh either side of zero, a half either side of each literal, and the midpoint of
 -- each pair of adjacent distinct literals; then the whole numbers
 -- 'sampleValues' uses. For @l4 prove@'s check of an @unsat@ answer, where an
--- all-integer grid is blind to a wrong encoding that an @IS INTEGER@ guard
+-- all-integer grid is blind to a wrong encoding that an @ISINTEGER@ guard
 -- hides (audit of #784: with only 0 and ±1, a wrong @proved@ survived the
 -- check). The fractions come first so that a capped product keeps them (see
 -- @samplePoints@ in "L4.Cli.Prove"). The Catala witness search keeps
@@ -849,7 +849,7 @@ proofSampleValues ob = samplesOver ob (nubOrd (fractions <> whole))
  where
   lits = Set.toAscList (Set.fromList ob.obLiterals)
   fractions =
-    -- thirds and sevenths as well as halves: a bug behind `IS INTEGER (x
+    -- thirds and sevenths as well as halves: a bug behind `ISINTEGER (x
     -- TIMES 2)` (or TIMES 4) passes every multiple of 1/2
     [1 / 2, -1 / 2, 1 / 3, -1 / 3, 1 / 7, -1 / 7]
     <> concat [ [r + 1 / 2, r - 1 / 2] | r <- lits ]

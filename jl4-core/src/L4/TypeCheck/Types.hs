@@ -509,6 +509,11 @@ data CheckWarning
     -- Only fires inside a deontic action. R6 was decided DEONTIC-ONLY, so
     -- @EXACTLY@ remains the /only/ way to pin a value in a
     -- @CONSIDER … WHEN@ and is not deprecated there.
+  | RenamedBuiltin SrcRange Text Text
+    -- ^ A built-in written with its old spelling: the range written, the old
+    -- spelling and the new one (@`WAIT UNTIL`@ is now @WAITUNTIL@). The old
+    -- spelling still resolves to the same built-in, so nothing changes but
+    -- the warning (Note [Renamed built-ins] in "L4.TypeCheck.Environment").
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -933,6 +938,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
+  rangeOf (CheckWarning (RenamedBuiltin r _ _)) = Just r
   rangeOf (CheckWarning (SiblingLedgerRead w)) = w.compound
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b

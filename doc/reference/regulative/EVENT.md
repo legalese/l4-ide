@@ -51,9 +51,9 @@ GIVETH A DEONTIC Person Action
 - An event by another party, or with another action, is skipped; only its time counts.
 - An event after a deadline shows that the deadline has passed, and the rule moves on to `LEST` (or, for `MAY` and `SHANT`, `HENCE`); see [Deadlines and consequences](consequences.md#within).
 
-## WAIT UNTIL
+## WAITUNTIL
 
-`` `WAIT UNTIL` time `` is an event that matches no party and no action. Use it to let time pass without anyone acting, so that a deadline runs out:
+`WAITUNTIL time` is an event that matches no party and no action. Use it to let time pass without anyone acting, so that a deadline runs out:
 
 ```l4
 DECLARE Person IS ONE OF Seller, Buyer
@@ -66,10 +66,12 @@ GIVETH A DEONTIC Person Action
   WITHIN 3
 
 #TRACE `delivery duty` AT 0 WITH
-  (`WAIT UNTIL` 10)
+  (WAITUNTIL 10)
 ```
 
 This gives a breach: the deadline at 3 passed with no delivery.
+
+Older files write it ``(`WAIT UNTIL` 10)``, with a space and backquotes. That spelling still works and means the same thing, with a warning that it has been renamed `WAITUNTIL`; see [Built-in functions](../builtins/README.md).
 
 `EVENT` is both the name of the events' type and the function that makes one. Use it to make events; it cannot be written as the type of a `GIVEN` input.
 

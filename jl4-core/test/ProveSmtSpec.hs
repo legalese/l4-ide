@@ -35,7 +35,7 @@ spec = describe "L4.Prove.Smt" $ do
     duplicateDeclarations [const' "|l4_x|", const' "|l4_x|"] `shouldBe` ["|l4_x|"]
 
   -- Audit of #784: the unsat-side spot check sampled 0 and +-1 only, all
-  -- whole, so an encoding defect behind an IS INTEGER guard passed it.
+  -- whole, so an encoding defect behind an ISINTEGER guard passed it.
   it "samples fractions for the proof check, and keeps the Catala candidates whole" $ do
     let ob = Obligation [] [] Map.empty Nothing [0, 10] Set.empty
         nums xs = [ r | Lit _ (NumericLit _ r) <- xs ]

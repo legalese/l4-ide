@@ -4,6 +4,7 @@ module L4.TypeCheck.Environment where
 
 import qualified Base.Map as Map
 import qualified Data.List as List
+import Data.Text (Text)
 import L4.Annotation
 import L4.Syntax
 import L4.TypeCheck.Types
@@ -38,7 +39,7 @@ mkBuiltins
   , "evalContract" `rename` "EVALTRACE"
   , "event"
   , "eventC" `rename` "EVENT"
-  , "isInteger" `rename` "IS INTEGER"
+  , "isInteger" `rename` "ISINTEGER"
   , "floor" `rename` "FLOOR"
   , "ceiling" `rename` "CEILING"
   , "round" `rename` "ROUND"
@@ -52,7 +53,7 @@ mkBuiltins
   , "acos" `rename` "ACOS"
   , "atan" `rename` "ATAN"
   , "exponent" `rename` "EXPONENT"
-  , "waitUntil" `rename`  "WAIT UNTIL"
+  , "waitUntil" `rename` "WAITUNTIL"
   , "fetch" `rename` "FETCH"
   , "env" `rename` "ENV"
   , "post" `rename` "POST"
@@ -934,6 +935,41 @@ waitUntilInfo = KnownTerm (forall' [a'Def, b'Def] (fun [MkOptionallyNamedType em
 -- term/constructor resolution keeps only 'KnownTerm' ones. @flip List.union@
 -- preserves the source order of this table and does not duplicate a unique
 -- listed twice.
+{- Note [Renamed built-ins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Two built-ins used to be spelled with a space, and so had to be written in
+backquotes: @`IS INTEGER`@ and @`WAIT UNTIL`@. Every other built-in is one
+word (@STRINGLENGTH@, @DATEVALUE@, @EVALTRACE@) or @TYPE_FIELD@
+(@DATE_DAY@), so they are now @ISINTEGER@ and @WAITUNTIL@, as on @main@
+(legalese/l4-ide#719).
+
+Unlike @main@, which kept no alias, the old spellings still resolve here, to
+the same unique, so a file written with them checks and runs exactly as it
+did. Each use draws the 'L4.TypeCheck.Types.RenamedBuiltin' warning, raised
+once per occurrence by 'L4.TypeCheck.warnRenamedBuiltins' after the module
+is checked: it reads what was written ('getActual'), never the definition's
+name, which is the new spelling for both.
+
+'renamedBuiltins' is the one list both of those read; the old spellings are
+not 'mkBuiltins' names, so nothing else prints them.
+-}
+
+-- | The old spelling of 'isIntegerName'. See Note [Renamed built-ins].
+oldIsIntegerSpelling :: Text
+oldIsIntegerSpelling = "IS INTEGER"
+
+-- | The old spelling of 'waitUntilName'. See Note [Renamed built-ins].
+oldWaitUntilSpelling :: Text
+oldWaitUntilSpelling = "WAIT UNTIL"
+
+-- | Each renamed built-in: its unique, its old spelling, and the name it has
+-- now. See Note [Renamed built-ins].
+renamedBuiltins :: [(Unique, Text, Name)]
+renamedBuiltins =
+  [ (isIntegerUnique, oldIsIntegerSpelling, isIntegerName)
+  , (waitUntilUnique, oldWaitUntilSpelling, waitUntilName)
+  ]
+
 initialEnvironment :: Environment
 initialEnvironment =
   Map.fromListWith (flip List.union)
@@ -964,6 +1000,7 @@ initialEnvironment =
     , (rawName evalContractName, [evalContractUnique])
     , (rawName fulfilName,       [fulfilUnique      ])
     , (rawName isIntegerName,    [isIntegerUnique ])
+    , (NormalName oldIsIntegerSpelling, [isIntegerUnique])  -- See Note [Renamed built-ins]
     , (rawName roundName,        [roundUnique     ])
     , (rawName ceilingName,      [ceilingUnique   ])
     , (rawName floorName,        [floorUnique     ])
@@ -1018,6 +1055,7 @@ initialEnvironment =
     , (rawName consName,         [consUnique      ])
     , (rawName equalsName,       [equalsUnique    ])
     , (rawName waitUntilName,    [waitUntilUnique])
+    , (NormalName oldWaitUntilSpelling, [waitUntilUnique])  -- See Note [Renamed built-ins]
     -- String functions
     , (rawName stringLengthName, [stringLengthUnique])
     , (rawName toUpperName,      [toUpperUnique     ])

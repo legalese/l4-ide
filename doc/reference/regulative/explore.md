@@ -49,7 +49,7 @@ s1  depth 1, residual r1
     ledgers: nothing kept
 s2  depth 1, residual r2, terminal
     first reached by:
-      `WAIT UNTIL` OF 4
+      WAITUNTIL OF 4
     ledgers: nothing kept
 s3  depth 2, residual r3, terminal
     first reached by:
@@ -59,24 +59,24 @@ s3  depth 2, residual r3, terminal
 s4  depth 2, residual r4
     first reached by:
       PARTY Seller DOES delivery AT 0
-      `WAIT UNTIL` OF 8
+      WAITUNTIL OF 8
     ledgers: nothing kept
 s5  depth 3, residual r5, terminal
     first reached by:
       PARTY Seller DOES delivery AT 0
-      `WAIT UNTIL` OF 8
-      `WAIT UNTIL` OF 22
+      WAITUNTIL OF 8
+      WAITUNTIL OF 22
     ledgers: nothing kept
 
 Transitions (9):
   s0 -> s1  PARTY Seller DOES delivery
-  s0 -> s2  time passes the deadline 3 (WAIT UNTIL 4)
+  s0 -> s2  time passes the deadline 3 (WAITUNTIL 4)
   s1 -> s3  PARTY Buyer DOES payment OF 100
-  s1 -> s4  time passes the deadline 7 (WAIT UNTIL 8)
+  s1 -> s4  time passes the deadline 7 (WAITUNTIL 8)
   s2 -> s2  terminal
   s3 -> s3  terminal
   s4 -> s3  PARTY Buyer DOES payment OF 120
-  s4 -> s5  time passes the deadline 21 (WAIT UNTIL 22)
+  s4 -> s5  time passes the deadline 21 (WAITUNTIL 22)
   s5 -> s5  terminal
 
 Residuals (6):
@@ -93,7 +93,7 @@ Reading it from the top:
   `depth` is the number of events on the shortest path that reaches it, and `first reached by` is that path, written as a `#TRACE` writes events.
   A state may be reached by other paths too; only the first is printed.
 - **A transition** is one move the contract took: an act by the party who owes it, or time passing.
-  `s0 -> s2` is the seller missing the delivery deadline of day 3: the explorer lets the clock run to just past the deadline (`WAIT UNTIL 4`) with nothing happening, and the contract answers that the seller is in breach.
+  `s0 -> s2` is the seller missing the delivery deadline of day 3: the explorer lets the clock run to just past the deadline (`WAITUNTIL 4`) with nothing happening, and the contract answers that the seller is in breach.
   A deadline passing is a move like any other.
 - **A terminal state** is one where nothing more can happen: here `s2` (the seller is in breach), `s3` (fulfilled) and `s5` (the buyer is in breach).
   The explorer gives each one a self-loop labelled `terminal`, so that a tool reading the graph does not take it for a deadlock.

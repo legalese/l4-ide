@@ -137,7 +137,7 @@ Now for evaluating traces against this provision, there are two ways of doing it
   each of the provisions get sent their own set of events.
 - Contracts never make any progress unless they get sent events. This is especially the case for breaching the contracts:
   a contract never breaches because there's "no events left" because the provision doesn't know that - there may always be 
-  new events later. As a helper, `` `WAIT UNTIL` `` exists which allows you to make some time pass and advance the contract 
+  new events later. As a helper, `WAITUNTIL` exists which allows you to make some time pass and advance the contract 
   until that timestamp.
 - Event traces are assumed to be ordered by time
 - All time stamps in the event traces are assumed to happen after (or at the same time) the starting time of the trace was

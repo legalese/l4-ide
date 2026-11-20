@@ -143,7 +143,7 @@ readCell = readCellBitemporal Nothing Nothing
 -- Order: append/evaluation order ('toList' on a 'DList' yields oldest-first).
 -- This equals @AT@ order ONLY for literal-AT @#TRACE@ events (those are stably
 -- sorted by 'sortByStablePinned'/'eventAtKey' at build time); runtime-AT events
--- such as @WAIT UNTIL@ stay pinned in authored order.
+-- such as @WAITUNTIL@ stay pinned in authored order.
 readCellAll :: Path -> Ledger -> [WHNF]
 readCellAll = readCellAllBitemporal Nothing
 
