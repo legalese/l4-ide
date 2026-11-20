@@ -485,10 +485,11 @@ data EvalState =
       -- ('noteArming'). Reset per directive.
     , closes :: !(IORef Int)
       -- ^ the armed obligations this directive has closed: handed on to a
-      -- HENCE or LEST, or breached with no LEST ('noteClose'). An armed
-      -- obligation that is neither is waiting at the end of its events, so
-      -- @armings - closes@ is the number open. Kept apart from 'armings' so
-      -- that a missed close shows as a count that grows with the trace.
+      -- HENCE or LEST, breached with no LEST ('noteClose'), or thrown away
+      -- still waiting when the compound or barrier holding them was decided
+      -- ('noteDropped'). @armings - closes@ is the number open: Note [What
+      -- the open count counts]. Kept apart from 'armings' so that a missed
+      -- close shows as a count that grows with the trace.
     , applications :: !(IORef Int)
       -- ^ the applications of L4 functions this directive has made
       -- ('noteApplication'). Reset per directive.
@@ -1365,6 +1366,61 @@ noteClose :: Eval ()
 noteClose = do
   closedRef <- asks (.closes)
   liftIO (modifyIORef' closedRef (+ 1))
+
+-- | A compound or a barrier is decided, and throws away a residual that was
+-- still waiting: every obligation in it is no longer open.
+noteDropped :: [WHNF] -> Eval ()
+noteDropped residuals = case sum (map heldObligations residuals) of
+  0 -> pure ()
+  n -> do
+    closedRef <- asks (.closes)
+    liftIO (modifyIORef' closedRef (+ n))
+
+-- | The armed obligations a residual still holds: one for each obligation
+-- waiting at the end of its events, through the operands of a compound that
+-- was waiting on both. A breach or a fulfilment holds none.
+heldObligations :: WHNF -> Int
+heldObligations = \ case
+  ValObligation {} -> 1
+  ValROp _ _ l r -> held l + held r
+  _ -> 0
+  where
+    held = either (const 0) heldObligations
+
+-- Note [What the open count counts]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- smucclaw/l4-ide#1075. Every arming ('noteArming', in 'App1') starts one
+-- chain of contract frames for one obligation, and the chain ends in one of:
+-- a hand-off to its HENCE or LEST ('continueWithFollowup'), a breach with no
+-- LEST (the two 'DeadlineMissed' sites), the end of its events (the 'ValNil'
+-- residual in 'Contract1'), or an exception, which ends the directive and
+-- with it the count. The first two close it ('noteClose').
+--
+-- An obligation waiting at the end of its events is NOT closed there: it
+-- stays open for as long as the residual holding it is kept, because that is
+-- what a runaway piles up when the operands do not run in step. An @ROR@
+-- runs its left operand to the end of the events before it starts its right
+-- one ('startCompound'), so @x MEANS (Bob MUST never) ROR (Carol MUST tick
+-- WITHIN 1 LEST (x ROR x))@ doubles its waiting residuals every unit of time
+-- with one or two obligations meeting events at any moment; counted this
+-- way it stops at the limit (measured: 100,000 open, 3 s), and closed at the
+-- end of its events it would run until memory ran out.
+--
+-- So a residual that is thrown away must be closed where it is thrown away
+-- ('noteDropped'). That happens in exactly two places: a compound decided by
+-- one operand while the other was still waiting ('RBinOp2': an @RAND@ one
+-- side of which is breached, an @ROR@ one side of which is fulfilled), and a
+-- barrier that fails or lapses while members are still waiting
+-- ('barrierFinish'). Until they closed it, an @RAND@ breached on one side
+-- under a repeating @LEST@ added one open obligation per round, and a trace
+-- of 100,010 rounds stopped for no reason (measured on the commit before
+-- this one). The state layer's missed @ONCE … WITHIN@ ('barrierStateMissed')
+-- is reached only once every member has completed, so it drops nothing.
+--
+-- Known over-count, which errs towards stopping: a residual that L4 code
+-- applies to more events (EVALTRACE in a fold) is armed again while its first
+-- arming is still counted, because the machine does not know the value it
+-- applies is a residual. No path inside the machine re-applies one.
 
 -- | A function written in L4 is applied to its arguments. Counted, and
 -- stopped with 'ClosureApplications' past the limit: a function that calls
@@ -3989,6 +4045,7 @@ backwardContractFrame val = \ case
       whenDeonticLog \ _ -> do
         summary <- breachSummary reason
         joinedStep op (JoinBreached summary) (Just LeftSide) False
+      noteDropped [val] -- Note [What the open count counts]
       continueBackward (ValBreached reason)
   RBinOp2 MkRBinOp2 {..}
     | ValRAnd <- op
@@ -3997,6 +4054,7 @@ backwardContractFrame val = \ case
       whenDeonticLog \ _ -> do
         summary <- breachSummary reason
         joinedStep op (JoinBreached summary) (Just RightSide) False
+      noteDropped [rval1] -- Note [What the open count counts]
       continueBackward (ValBreached reason)
 
   -- OR
@@ -4005,6 +4063,7 @@ backwardContractFrame val = \ case
     , ValFulfilled <- val
     -> do
       joinedStep op JoinFulfilled (Just RightSide) False
+      noteDropped [rval1] -- Note [What the open count counts]
       continueBackward ValFulfilled
   -- NOTE: unreachable — a fulfilled LEFT operand of an OR never gets past
   -- the RBinOp1 short-circuit above, which is where that step is logged.
@@ -4014,6 +4073,7 @@ backwardContractFrame val = \ case
     , ValFulfilled <- rval1
     -> do
       joinedStep op JoinFulfilled (Just LeftSide) False
+      noteDropped [val] -- Note [What the open count counts]
       continueBackward ValFulfilled
 
 
@@ -4673,7 +4733,7 @@ barrierNext step = case step.queue of
 -- join cannot fire and the verdict is @FULFILLED@, as before.
 barrierFinish :: BarrierStepFrame -> Machine Config
 barrierFinish step = case reverse step.failures of
-  (f : fs) -> case earliestFailure (f :| fs) of
+  (f : fs) -> noteDropped step.pending >> case earliestFailure (f :| fs) of
     -- the LEST is handed the anchor, the residual stream AND the missed
     -- deadline of the member whose failure anchors it (R-Q7B's THE
     -- DEADLINE under a barrier's LEST is the earliest failer's, by the
@@ -4704,6 +4764,7 @@ barrierFinish step = case reverse step.failures of
         -- P2b: a MAY member lapsed under a barrier with no LEST; the join
         -- can never fire. 'ValFulfilled' carries no time, so no clock.
         tellDeonticStep $ plainStep Nothing Nothing NoEvent step.ctx.norm JoinStalled
+        noteDropped step.pending -- Note [What the open count counts]
         continueBackward ValFulfilled
     | otherwise -> case reverse step.pending of
       -- Some members are still waiting for their event. The barrier has neither

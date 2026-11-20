@@ -125,10 +125,8 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
         `shouldReturn` [Answered]
 
     it "counts a breach with no LEST as closed" $
-      -- Bob's side breaches with no LEST every period, Alice's hands on to
-      -- the next. ROR runs both sides at once, so Bob's is still open when
-      -- Alice's HENCE arms the next period's two: three at once, never more
-      -- (measured: peak 3 at 5, 50 and 500 periods)
+      -- Bob's side breaches with no LEST every period, and Alice's hands on
+      -- to the next (measured: peak 3 at 5, 50 and 500 periods)
       runWith (limits (Just 3) Nothing)
         (deontic
           ["period MEANS (PARTY Bob MUST pay WITHIN 5) ROR (PARTY Alice MUST deliver WITHIN 5 HENCE period)"]
@@ -146,6 +144,86 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
           (concat [ ["PARTY Alice DOES deliver AT " <> tshow (20 * k), "PARTY Bob DOES pay AT " <> tshow (20 * k)]
                   | k <- [1 .. 1000 :: Int] ]))
         `shouldReturn` [Answered]
+
+  describe "a residual thrown away is no longer open" $ do
+    -- Note [What the open count counts]. Each shape below throws away an
+    -- obligation that is still waiting, once a round, and runs for 1,000
+    -- rounds under a limit of 10. Before the machine closed what it threw
+    -- away, each one stopped at the limit within ten rounds.
+    let rounds = [1 .. 1000 :: Int]
+        waitUntil t = "  (`WAIT UNTIL` " <> tshow t <> ")"
+        ticking rule = Text.unlines
+          [ "DECLARE Person IS ONE OF Alice, Bob, Carol"
+          , "DECLARE Action IS ONE OF never, tick"
+          , ""
+          , rule
+          , ""
+          , "#TRACE x AT 0 WITH"
+          , waitUntil (1000 :: Int)
+          ]
+        tenants rule events = Text.unlines $
+          [ "DECLARE Actor IS ONE OF Tenant HAS name IS A STRING"
+          , "DECLARE Action IS ONE OF Sign HAS signer IS AN Actor"
+          , "alice MEANS Tenant OF \"Alice\""
+          , "bob MEANS Tenant OF \"Bob\""
+          , "carol MEANS Tenant OF \"Carol\""
+          , "pair MEANS LIST alice, carol"
+          , "trio MEANS LIST alice, bob, carol"
+          , "GIVEN t IS AN Actor GIVETH A NUMBER"
+          , "allowed t MEANS IF t EQUALS carol THEN 5 ELSE 1000000"
+          , ""
+          , rule
+          , ""
+          , "#TRACE r AT 0 WITH"
+          ] <> events
+    it "closes the waiting side of an RAND breached on its left" $
+      runWith (limits (Just 10) Nothing)
+        (ticking "x MEANS ((PARTY Alice MUST never WITHIN 1) RAND (PARTY Bob MUST never)) ROR (PARTY Carol MUST tick WITHIN 1 LEST x)")
+        `shouldReturn` [Answered]
+
+    it "closes the waiting side of an RAND breached on its right" $
+      runWith (limits (Just 10) Nothing)
+        (ticking "x MEANS ((PARTY Bob MUST never) RAND (PARTY Alice MUST never WITHIN 1)) ROR (PARTY Carol MUST tick WITHIN 1 LEST x)")
+        `shouldReturn` [Answered]
+
+    it "closes the waiting side of an ROR fulfilled on its right" $
+      -- Bob's MUST NOT is kept at once, so the inner ROR is fulfilled while
+      -- his MUST still waits
+      runWith (limits (Just 10) Nothing)
+        (ticking "x MEANS (((PARTY Bob MUST never) ROR (PARTY Bob MUST NOT never WITHIN 0)) RAND (PARTY Alice MUST never WITHIN 0)) ROR (PARTY Carol MUST tick WITHIN 1 LEST x)")
+        `shouldReturn` [Answered]
+
+    it "closes the members still waiting when a barrier fails and goes to its LEST" $
+      runWith (limits (Just 10) Nothing)
+        (tenants "r MEANS EVERY Tenant t IN pair MUST Sign t WITHIN allowed t ONCE ALL HAVE HENCE FULFILLED LEST r"
+          [ waitUntil (6 * k) | k <- rounds ])
+        `shouldReturn` [Answered]
+
+    it "closes the members still waiting when a barrier with no LEST fails" $
+      runWith (limits (Just 10) Nothing)
+        (tenants "r MEANS (EVERY Tenant t IN pair MUST Sign t WITHIN allowed t ONCE ALL HAVE HENCE FULFILLED) ROR (PARTY bob MUST Sign bob WITHIN 6 LEST r)"
+          [ waitUntil (6000 :: Int) ])
+        `shouldReturn` [Answered]
+
+    it "closes the members still waiting when a MAY member lapses" $
+      runWith (limits (Just 10) Nothing)
+        (tenants "r MEANS ((EVERY Tenant t IN pair MAY Sign t WITHIN allowed t ONCE ALL HAVE HENCE FULFILLED) RAND (PARTY bob MUST Sign bob WITHIN 0)) ROR (PARTY bob MUST Sign bob WITHIN 6 LEST r)"
+          [ waitUntil (6000 :: Int) ])
+        `shouldReturn` [Answered]
+
+    it "closes the members still waiting when one member breaks a MUST NOT barrier" $
+      runWith (limits (Just 10) Nothing)
+        (tenants "r MEANS EVERY Tenant t IN trio SHANT Sign t WITHIN 1000000 ONCE ALL HAVE HENCE FULFILLED LEST r"
+          [ "  PARTY alice DOES Sign alice AT " <> tshow k | k <- rounds ])
+        `shouldReturn` [Answered]
+
+    it "still stops an ROR that doubles what it keeps waiting" $
+      -- an ROR runs its left operand to the end of the events before its
+      -- right one, so one or two obligations meet events at any moment while
+      -- the waiting residuals double: what it keeps is what is counted
+      runWith (limits (Just 1000) Nothing)
+        (ticking "x MEANS (PARTY Bob MUST never) ROR (PARTY Carol MUST tick WITHIN 1 LEST (x ROR x))")
+        `shouldReturn` [Over "obligations" 1000 (Just 4)]
 
   describe "function applications" $ do
     let loop = Text.unlines
