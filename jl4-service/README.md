@@ -203,7 +203,7 @@ An input declared through a synonym for `MAYBE` is a `MAYBE`, so it may be left 
 The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 
 Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every batch case or MCP call with a `null` in it; and every request to a `DEONTIC` function.
-On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is rejected with the direct path's message.
+On that path a missing input that is neither a `BOOLEAN` nor a `MAYBE` is rejected with the direct path's message, and a missing `BOOLEAN` is not read as `FALSE` but stops evaluation only if the rule reads it (see below).
 On both paths, an input declared through a synonym for a `MAYBE` is a `MAYBE`: it may be left out, or sent as `null` or `{}`.
 An input declared through any other synonym takes the values of the type the synonym stands for: a record's fields, one of an enum's names, a list, or a date, a time or a date and time as a string. So does a synonym below the head of a type, as in `MAYBE Hue`.
 A synonym that takes no type (`DECLARE Years IS A LIST OF Year`) is answered where the type written out is not: a required `LIST`, `TIME` or `DATETIME` input fails on this path (see the limits below), and a synonym for one does not.
@@ -212,11 +212,24 @@ Two kinds of synonym differ from the type written out when the input is left out
 A required `DATE` string that does not parse is rejected with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
 A batch case rejected this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
 
+A `BOOLEAN` left out on the wrapper path, or sent as `null` in a batch case or an MCP call, is not read as `FALSE`.
+The wrapper puts a placeholder in its place, an assumed term named after the input: `` `has criminal record (not supplied)` ``.
+When the rule does not read the input, the request is answered as usual: `` `is resident` AND NOT `has criminal record` `` answers `false` when `is resident` is `false`.
+When the rule reads the input, evaluation stops with a `422` that names the placeholder: ``I could not continue evaluating, because I needed to know the value of `has criminal record (not supplied)` but it is an assumed term.``
+When the rule's answer is the input itself, the `422` says ``#EVAL produced ASSUME: `b (not supplied)` `` instead, naming the wrapper's own `#EVAL`.
+A batch case stopped this way comes back with that message as its `@error`, and an MCP call with it as its text and `isError: true`.
+A `DEONTIC` function, which always takes this path, stops in the same way rather than taking the branch for `FALSE`.
+Whether the rule reads the input depends on the order it evaluates its inputs in, so a missing input read first stops the request even when a later input would settle the answer.
+For `a OR b`, a request with `a` left out and `b` true fails naming `` `a (not supplied)` ``, and one with `a` true and `b` left out answers `true`.
+Sent without a `{}`, the first takes the direct path and is rejected before evaluation: `Parameter 'a': missing required parameter`.
+
 Limits:
 
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
-- On the wrapper path, a function with a `MAYBE DATE` input fails the request, with an error about the generated code: `incorrect indentation (got 7, should be greater than 7)`, or, when another input is required, a type error about `TODATE`.
-- On the wrapper path, an input declared through a synonym for a `BOOLEAN` that is left out, or sent as `null` in a batch case or an MCP call, is rejected with `Parameter 'b': missing required parameter`, where a `BOOLEAN` written out is `FALSE`.
+- On the wrapper path, a function with a `MAYBE DATE` input fails the request with a type error about the generated code, whether the date is supplied or left out: `The first argument of function TODATE (predefined) is expected to be of type STRING but is here of type DATE`.
+- On the wrapper path, an input declared through a synonym for a `BOOLEAN` that is left out, or sent as `null` in a batch case or an MCP call, is rejected with `Parameter 'b': missing required parameter`, where a `BOOLEAN` written out is given the placeholder described above, so the request is answered when the rule does not read it.
+- On the wrapper path, a value supplied for an input declared with `ASSUME` is not used: a rule that reads the input stops on it, naming the input itself (`` `has criminal record` ``), whatever the request sends for it.
+  This holds for a `NUMBER` as for a `BOOLEAN`, and for a `DEONTIC` function, which always takes this path; the direct path uses the value.
 - On the wrapper path, an input declared through a synonym for a `DATE` whose string does not parse is rejected with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD`, where a `DATE` written out is rejected with `Parameter 'd': could not read "garbage" as a DATE`; a synonym for a `TIME` or a `DATETIME` is rejected with `Could not parse time string …` or `Could not parse datetime string …`, and the type written out fails the wrapper with a type error.
 - On the direct path, a `DATE` string that does not parse is not rejected: the rule receives the text.
 - A list answer of more than 200 elements comes back cut short and ending in two `null`s, with status 200, on the direct path, the wrapper path and in a batch alike.
