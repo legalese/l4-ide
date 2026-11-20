@@ -205,6 +205,7 @@ library
     L4.Prove.Lower
     L4.Prove.Smt
     L4.Print.Columnar
+    L4.Print.Layout
     L4.SmartPunctuation
     L4.Syntax
     L4.TemporalContext
@@ -328,6 +329,7 @@ test-suite jl4-core-test
     TimezoneTimeoutSpec
     ConsiderScaleSpec
     VariadicRescueScaleSpec
+    PrintLayoutSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
@@ -342,6 +344,7 @@ test-suite jl4-core-test
     jl4-core,
     megaparsec,
     optics,
+    prettyprinter,
     QuickCheck,
     text,
     time,
