@@ -58,7 +58,7 @@ import TestData (deonticDeadlineJL4, deonticShapesJL4, deonticValueActionJL4)
 import System.IO.Error (isPermissionError)
 import TestData (inputThenInputJL4, synonymKindsJL4, synonymParamJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticRecordPartyJL4, spacedFieldsJL4, assumeParamJL4, missingBooleanJL4, assumeBooleanJL4, deonticBooleanJL4, hyphenatedInputsJL4, hyphenatedAssumeJL4, hyphenatedDeonticJL4, importedRecordDeclJL4, importedRecordMainJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, lineBreakJL4, clauseGroupEnumJL4, handEnumJL4, letEnumJL4, clauseGroupMixedJL4, handMixedJL4, clauseGroupSingleJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, clauseGroupLetResultJL4, letChainJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, partialClausesJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -669,6 +669,137 @@ spec = describe "integration" do
               , "events" Aeson..= ([] :: [Aeson.Value])
               ])
           resp `shouldCarry` Refuses "Parameter 'driver': missing required parameter"
+
+  describe "a missing BOOLEAN on the wrapper path (smucclaw/l4-ide#992)" do
+    -- A {} anywhere in a request sends it through the generated wrapper,
+    -- which read every missing BOOLEAN as FALSE.
+    let uncertain = Aeson.object []
+
+    it "stops and names a missing BOOLEAN that the rule reads" do
+      withServiceFromSources "w1-read" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-read" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertStopsOn resp "has criminal record (not supplied)"
+
+    it "short-circuits past a missing BOOLEAN that the rule does not read" do
+      withServiceFromSources "w1-skip" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-skip" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool False)
+
+    it "uses a BOOLEAN that is supplied" do
+      withServiceFromSources "w1-given" [("eligible.l4", missingBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-given" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "has criminal record" Aeson..= False
+                , "unused flag" Aeson..= uncertain
+                ]
+            ])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    -- This pins the answer, not the wrapper's binding for the ASSUME, and it
+    -- passes on main too. The wrapper binds an ASSUME with a LET around the
+    -- call, and that LET never reaches the rule's body: the rule reads the
+    -- module's own ASSUME, so evaluation stops on it whatever the LET binds
+    -- (FALSE on main, the placeholder here). A value supplied for an ASSUME
+    -- is ignored on this path for the same reason, on main as well; that is
+    -- not fixed here. 'evaluateDirectAST' in Backend/Jl4.hs explains why the
+    -- direct path binds ASSUMEs around the inlined body instead.
+    it "refuses, naming the rule's own ASSUME, when a BOOLEAN ASSUME is left uncertain" do
+      withServiceFromSources "w1-assume" [("eligible.l4", assumeBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-assume" "eligible"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "is resident" Aeson..= True
+                , "has criminal record" Aeson..= uncertain
+                ]
+            ])
+        assertStopsOn resp "has criminal record"
+        responseBody resp `shouldNotSatisfy` (BS8.isInfixOf "(not supplied)" . LBS.toStrict)
+
+    it "stops a deontic rule instead of taking its ELSE branch" do
+      withServiceFromSources "w1-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "w1-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertStopsOn resp "is motorway (not supplied)"
+
+  describe "an input name that needs backticks but has no space, on the wrapper path" do
+    -- The wrapper names its own variables after each input (supplied_<name>,
+    -- unwrapped_<name>, converted_<name>) and binds an ASSUME under its own
+    -- name. Each must be backticked whenever it is not a plain identifier,
+    -- not only when it contains a space: `LET supplied_self-employed =` does
+    -- not parse, so every wrapper request to such a rule failed.
+    let uncertain = Aeson.object []
+        taxDue args = Aeson.object [ "arguments" Aeson..= Aeson.object (("unused flag" Aeson..= uncertain) : args) ]
+        income = "net-income" Aeson..= (1000 :: Int)
+        filed = "filing-date" Aeson..= ("2025-01-31" :: Text)
+
+    it "answers when the hyphenated BOOLEAN, NUMBER and DATE are supplied" do
+      withServiceFromSources "hy-all" [("tax.l4", hyphenatedInputsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-all" "tax%20due" $
+          taxDue ["self-employed" Aeson..= True, income, filed]
+        resp `shouldCarry` Answers (Aeson.Number 100)
+
+    it "stops and names a hyphenated BOOLEAN that is left out" do
+      withServiceFromSources "hy-bool" [("tax.l4", hyphenatedInputsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-bool" "tax%20due" $ taxDue [income, filed]
+        assertStopsOn resp "self-employed (not supplied)"
+
+    it "names a hyphenated NUMBER that is left out" do
+      withServiceFromSources "hy-num" [("tax.l4", hyphenatedInputsJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-num" "tax%20due" $
+          taxDue ["self-employed" Aeson..= True, filed]
+        resp `shouldCarry` Refuses "Parameter 'net-income': missing required parameter"
+
+    it "stops and names a hyphenated BOOLEAN ASSUME that is left uncertain" do
+      withServiceFromSources "hy-assume" [("eligible.l4", hyphenatedAssumeJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-assume" "eligible" $ Aeson.object
+          [ "arguments" Aeson..= Aeson.object
+              [ "is resident" Aeson..= True, "unused flag" Aeson..= uncertain, "on-record" Aeson..= uncertain ] ]
+        assertStopsOn resp "on-record"
+
+    it "answers a deontic rule whose hyphenated BOOLEAN is supplied" do
+      withServiceFromSources "hy-deontic" [("seatbelt.l4", hyphenatedDeonticJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-deontic" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)]
+                , "on-motorway" Aeson..= True ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        statusCode' resp `shouldBe` 200
+        responseBody resp `shouldSatisfy` (BS8.isInfixOf "wear seatbelt" . LBS.toStrict)
+
+    it "stops a deontic rule whose hyphenated BOOLEAN is left out" do
+      withServiceFromSources "hy-deontic-missing" [("seatbelt.l4", hyphenatedDeonticJL4)] \baseUrl mgr -> do
+        resp <- evalFunction baseUrl mgr "hy-deontic-missing" "seatbelt requirement"
+          (Aeson.object
+            [ "arguments" Aeson..= Aeson.object
+                [ "driver" Aeson..= Aeson.object ["name" Aeson..= ("Alice" :: Text)] ]
+            , "startTime" Aeson..= (0 :: Int)
+            , "events" Aeson..= ([] :: [Aeson.Value])
+            ])
+        assertStopsOn resp "on-motorway (not supplied)"
 
   describe "field name sanitization (hyphen remapping)" do
     it "accepts hyphenated field names and hyphenated function name in URL" do
@@ -4220,6 +4351,15 @@ assertSuccess resp check = do
     Nothing -> expectationFailure ("Failed to decode eval response: " <> show (responseBody resp))
     Just (SimpleResponse r) -> check r
     Just (SimpleError e) -> expectationFailure ("Evaluation error: " <> show e)
+
+-- | Assert an evaluation stopped, with a message that names the given term.
+assertStopsOn :: Response LBS.ByteString -> Text -> IO ()
+assertStopsOn resp term =
+  case Aeson.decode (responseBody resp) :: Maybe SimpleResponse of
+    Just (SimpleError (InterpreterError msg)) ->
+      msg `shouldSatisfy` Text.isInfixOf ("`" <> term <> "`")
+    other ->
+      expectationFailure ("Expected evaluation to stop on " <> show term <> ", got: " <> show other)
 
 -- | Poll a deployment until its status is "ready", with a timeout in seconds.
 pollUntilReady :: String -> Manager -> String -> Int -> IO ()
