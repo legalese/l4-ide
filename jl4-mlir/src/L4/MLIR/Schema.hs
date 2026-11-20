@@ -49,7 +49,7 @@ import Data.Char (isAlphaNum)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.List (sortOn)
-import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
+import Data.Maybe (fromMaybe, isJust, mapMaybe, maybeToList)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -83,7 +83,7 @@ import L4.StateGraph
 import L4.FunctionSchema
   ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter, uncheckedParameter
   )
-import L4.Export.Shape (shapeEnvFromDeclares)
+import L4.Export.Shape (recordLikeConstructor, shapeEnvFromDeclares)
 
 -- ---------------------------------------------------------------------------
 -- Bundle types
@@ -802,11 +802,20 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
       -- HATBOX), nor the oneOf of a type that has both kinds of constructor
       -- (MULLET): such an export is marked unsupported too (assumed, not
       -- ruled).
-      taggedInSignature = signatureHas isTaggedDecl declares ef
+      taggedInSignature = signatureHas (\n d -> isTaggedDecl d && not (isRecordLikeDecl n d)) declares ef
+      -- A type whose only constructor is named like it and carries fields is a
+      -- record on every other surface, its fields alone, and its own reason
+      -- says so. The lowering does not take it for one: measured on
+      -- 2026-11-20, with the mark removed, the runtime stopped on such an
+      -- input ("Cannot read properties of undefined") and answered 0 for such
+      -- a result, where a record declared HAS answers both. So it stays
+      -- unsupported (assumed, not ruled; review of #779, 2026-11-20).
+      recordLikeInSignature = signatureHas isRecordLikeDecl declares ef
       unsupportedReasons =
         [ refuseUnsupportedReason | refuseInBody ]
           <> [ eitherUnsupportedReason | eitherInSignature ]
           <> [ taggedUnsupportedReason | taggedInSignature ]
+          <> [ recordLikeUnsupportedReason | recordLikeInSignature ]
   in FunctionExport
        { apiName     = sanitizeFunctionName name
        , wasmSymbol  = sanitizeWasmSymbol name
@@ -839,6 +848,17 @@ eitherUnsupportedReason = "EITHER in an input or the result is not supported by 
 taggedUnsupportedReason :: Text
 taggedUnsupportedReason = "a constructor that carries data, in an input or the result, is not supported by the WASM backend"
 
+-- | Why an export with a type whose only constructor is named like it and
+-- carries fields, in an input or the result, is unsupported.
+recordLikeUnsupportedReason :: Text
+recordLikeUnsupportedReason = "a type whose only constructor is named like it and carries fields, read as a record, in an input or the result, is not supported by the WASM backend"
+
+-- | A type whose only constructor is named like it and carries fields
+-- ('recordLikeConstructor'), given the type's name as the declarations are
+-- keyed by it.
+isRecordLikeDecl :: Text -> TypeDecl Resolved -> Bool
+isRecordLikeDecl typeName decl = isJust (recordLikeConstructor typeName decl)
+
 -- | A type declared with a constructor that carries fields.
 isTaggedDecl :: TypeDecl Resolved -> Bool
 isTaggedDecl = \case
@@ -850,16 +870,16 @@ isTaggedDecl = \case
 -- field, or behind a synonym? A declared type is looked at once, so a record
 -- that contains itself ends the walk.
 signatureHasEither :: Map Text (Declare Resolved) -> ExportedFunction -> Bool
-signatureHasEither = signatureHasType (\name -> getUnique name == eitherUnique) (const False)
+signatureHasEither = signatureHasType (\name -> getUnique name == eitherUnique) (\_ _ -> False)
 
 -- | Does an input or the result of this export reach a declared type of which
 -- this is true, at any depth, as 'signatureHasEither' walks?
-signatureHas :: (TypeDecl Resolved -> Bool) -> Map Text (Declare Resolved) -> ExportedFunction -> Bool
+signatureHas :: (Text -> TypeDecl Resolved -> Bool) -> Map Text (Declare Resolved) -> ExportedFunction -> Bool
 signatureHas = signatureHasType (const False)
 
 -- | The walk of 'signatureHasEither' and 'signatureHas': a built-in type by
--- its name, a declared type by its declaration.
-signatureHasType :: (Resolved -> Bool) -> (TypeDecl Resolved -> Bool) -> Map Text (Declare Resolved) -> ExportedFunction -> Bool
+-- its name, a declared type by its name and its declaration.
+signatureHasType :: (Resolved -> Bool) -> (Text -> TypeDecl Resolved -> Bool) -> Map Text (Declare Resolved) -> ExportedFunction -> Bool
 signatureHasType builtin declared declares ef =
   any (go Set.empty) (mapMaybe (.paramType) ef.exportParams <> maybeToList ef.exportReturnType)
   where
@@ -871,7 +891,7 @@ signatureHasType builtin declared declares ef =
         | otherwise ->
             let nameText = rawNameToText (rawName (getActual name))
             in not (Set.member nameText seen) && case Map.lookup nameText declares of
-                 Just (MkDeclare _ _ _ decl) -> declared decl || inDecl (Set.insert nameText seen) decl
+                 Just (MkDeclare _ _ _ decl) -> declared nameText decl || inDecl (Set.insert nameText seen) decl
                  Nothing -> False
       Forall _ _ inner -> go seen inner
       _ -> False

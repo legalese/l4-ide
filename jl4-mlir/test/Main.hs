@@ -302,6 +302,16 @@ main = do
         testExportMark taggedMark [] (taggedExport ["GIVEN p IS A Payment"] "GIVETH A NUMBER" "`fee` p MEANS 1")
     , test "a constructor that carries data in a result is unsupported" $
         testExportMark taggedMark [] (taggedExport ["GIVEN n IS A NUMBER"] "GIVETH A Payment" "`fee` n MEANS Cash")
+    -- A type whose only constructor is named like it and carries fields is a
+    -- record everywhere else; the lowering does not take it for one, so it
+    -- stays unsupported, with a reason that names it (review of #779,
+    -- 2026-11-20), and one that carries nothing stays supported.
+    , test "a type whose only constructor is named like it, in an input, is unsupported for itself" $
+        testExportMark recordLikeMark [] (taggedExport ["GIVEN r IS A `Deposit Refund`"] "GIVETH A NUMBER" "`fee` r MEANS r's amount")
+    , test "a type whose only constructor is named like it, as the result, is unsupported for itself" $
+        testExportMark recordLikeMark [] (taggedExport ["GIVEN n IS A NUMBER"] "GIVETH A `Deposit Refund`" "`fee` n MEANS `Deposit Refund` n")
+    , test "a fieldless type whose only constructor is named like it stays supported" $
+        testExportMark Nothing [] (taggedExport ["GIVEN u IS A Unit"] "GIVETH A NUMBER" "`fee` u MEANS 1")
     , test "an enumeration whose constructors carry nothing stays supported" $
         testExportMark Nothing [] (taggedExport ["GIVEN c IS A Colour"] "GIVETH A Colour" "`fee` c MEANS c")
     , test "a called definition with no REFUSE stays supported" $
@@ -811,19 +821,28 @@ theExportMark json = case Aeson.decodeStrict (TE.encodeUtf8 json) of
 taggedMark :: Maybe T.Text
 taggedMark = Just "a constructor that carries data, in an input or the result, is not supported by the WASM backend"
 
--- | A module that declares a type with a constructor that carries data, and an
--- enumeration, then an export with these inputs, this GIVETH and this definition.
+-- | A module that declares a type with a constructor that carries data, an
+-- enumeration, a type whose only constructor is named like it, with fields and
+-- without, then an export with these inputs, this GIVETH and this definition.
 taggedExport :: [T.Text] -> T.Text -> T.Text -> [T.Text]
 taggedExport givens giveth def =
   [ "DECLARE Payment IS ONE OF"
   , "  Cash"
   , "  Card HAS `card fee` IS A NUMBER"
   , "DECLARE Colour IS ONE OF Red, Green"
+  , "DECLARE `Deposit Refund` IS ONE OF"
+  , "  `Deposit Refund` HAS amount IS A NUMBER"
+  , "DECLARE Unit IS ONE OF Unit"
   , ""
   , "@export The fee"
   ]
     <> givens
     <> [giveth, def]
+
+-- | The mark an export with a type whose only constructor is named like it and
+-- carries fields gets.
+recordLikeMark :: Maybe T.Text
+recordLikeMark = Just "a type whose only constructor is named like it and carries fields, read as a record, in an input or the result, is not supported by the WASM backend"
 
 -- | The mark an export with an EITHER in its signature gets.
 eitherMark :: Maybe T.Text
