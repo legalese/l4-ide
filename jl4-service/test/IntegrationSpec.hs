@@ -711,7 +711,15 @@ spec = describe "integration" do
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
 
-    it "stops and names a missing BOOLEAN that is an ASSUME" do
+    -- This pins the answer, not the wrapper's binding for the ASSUME, and it
+    -- passes on main too. The wrapper binds an ASSUME with a LET around the
+    -- call, and that LET never reaches the rule's body: the rule reads the
+    -- module's own ASSUME, so evaluation stops on it whatever the LET binds
+    -- (FALSE on main, the placeholder here). A value supplied for an ASSUME
+    -- is ignored on this path for the same reason, on main as well; that is
+    -- not fixed here. 'evaluateDirectAST' in Backend/Jl4.hs explains why the
+    -- direct path binds ASSUMEs around the inlined body instead.
+    it "refuses, naming the rule's own ASSUME, when a BOOLEAN ASSUME is left uncertain" do
       withServiceFromSources "w1-assume" [("eligible.l4", assumeBooleanJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "w1-assume" "eligible"
           (Aeson.object
@@ -720,9 +728,8 @@ spec = describe "integration" do
                 , "has criminal record" Aeson..= uncertain
                 ]
             ])
-        -- The wrapper binds an ASSUME with a LET, so the message names the
-        -- assumed input itself and not the placeholder behind it.
         assertStopsOn resp "has criminal record"
+        responseBody resp `shouldNotSatisfy` (BS8.isInfixOf "(not supplied)" . LBS.toStrict)
 
     it "stops a deontic rule instead of taking its ELSE branch" do
       withServiceFromSources "w1-deontic" [("seatbelt.l4", deonticBooleanJL4)] \baseUrl mgr -> do

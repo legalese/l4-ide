@@ -1391,8 +1391,8 @@ GIVETH A BOOLEAN
 eligible MEANS `is resident` AND NOT `has criminal record`
 |]
 
--- | A BOOLEAN that is an ASSUME rather than a GIVEN, which the wrapper binds
--- with a LET around the call.
+-- | A BOOLEAN that is an ASSUME rather than a GIVEN. The wrapper binds it with
+-- a LET around the call, which does not reach the rule's body.
 assumeBooleanJL4 :: Text
 assumeBooleanJL4 =
   [i|
