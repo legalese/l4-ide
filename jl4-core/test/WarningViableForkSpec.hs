@@ -26,7 +26,7 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.CPUTime (getCPUTime)
-import System.Mem (disableAllocationLimit, enableAllocationLimit, getAllocationCounter, setAllocationCounter)
+import System.Mem (disableAllocationLimit, enableAllocationLimit, getAllocationCounter, performGC, setAllocationCounter)
 import System.Timeout (timeout)
 import Test.Hspec
 
@@ -409,13 +409,13 @@ spec = describe "A success that carries only a warning" $ do
     -- never ticks gives no ratio, within seconds, so that the test goes
     -- pending and not wrong.
     it "still fails a cost that doubles with each operand" $ do
-      ratio <- growthRatioOn getCPUTime exponentialWork 10 20 growthLimit
+      ratio <- growthRatioOn getCPUTime exponentialWork 10 20
       case ratio of
         Nothing -> pendingWith "the CPU clock did not tick, so there is no ratio to judge"
         Just r -> r `shouldSatisfy` (>= growthLimit)
 
     it "gives no ratio on a clock that never ticks" $ do
-      ratio <- growthRatioOn (pure 0) (const (pure ())) 10 20 growthLimit
+      ratio <- growthRatioOn (pure 0) (const (pure ())) 10 20
       ratio `shouldBe` Nothing
 
 -- ----------------------------------------------------------------------------
@@ -506,7 +506,7 @@ checkSeconds = 120 * 1000000
 -- gave no ratio.
 chainGrowsLinearly :: Text -> Text -> Expectation
 chainGrowsLinearly op arms = do
-  ratio <- growthRatioOn getCPUTime check 10 20 growthLimit
+  ratio <- growthRatioOn getCPUTime check 10 20
   case ratio of
     Nothing -> pendingWith "the CPU clock did not tick while the smaller chain was checked, so there is no ratio to judge"
     Just r -> r `shouldSatisfy` (< growthLimit)
@@ -531,24 +531,27 @@ growthLimit = 8
 -- | A CPU clock, in picoseconds, as 'getCPUTime' reads it.
 type Clock = IO Integer
 
--- | @growthRatioOn clock work small large limit@: the time @work large@ takes
--- over the time @work small@ takes, both as the clock reads them; or 'Nothing'
--- if the clock read no time for the smaller (the fastest of three runs). A
--- ratio short of twice the limit is measured again, up to twice, so that one
--- pause does not fail it.
-growthRatioOn :: Clock -> (Int -> IO ()) -> Int -> Int -> Double -> IO (Maybe Double)
-growthRatioOn clock work small large limit = do
-  smalls <- traverse (const (timed small)) [1 .. 3 :: Int]
-  let smallest = minimum smalls
-  if smallest <= 0
-    then pure Nothing
-    else do
-      let settle tries = do
-            r <- (/ smallest) <$> timed large
-            if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
-      Just <$> settle 3
+-- | @growthRatioOn clock work small large@: the time @work large@ takes over
+-- the time @work small@ takes, both as the clock reads them, as the median of
+-- three back-to-back (small, large) pairs; or 'Nothing' as soon as the clock
+-- reads no time for a smaller run, before the larger is run again. Every run
+-- starts after a major collection, outside the timed span. This is
+-- "LinearTime"'s measure (Note [Measuring a ratio on a busy machine] there),
+-- kept here because this guard takes its clock as a parameter and gives no
+-- ratio when the clock does not tick.
+growthRatioOn :: Clock -> (Int -> IO ()) -> Int -> Int -> IO (Maybe Double)
+growthRatioOn clock work small large = pairs (3 :: Int) []
   where
+    pairs 0 rs = pure (Just (sort rs !! 1))
+    pairs n rs = do
+      s <- timed small
+      if s <= 0
+        then pure Nothing
+        else do
+          l <- timed large
+          pairs (n - 1) (l / s : rs)
     timed k = do
+      performGC
       t0 <- clock
       work k
       t1 <- clock
