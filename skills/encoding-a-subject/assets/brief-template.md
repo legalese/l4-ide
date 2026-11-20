@@ -49,6 +49,9 @@ Name anything deliberately left out, and why.⟩
 3. `NOTES.md`: what is encoded, what is not, a **coverage table** (every provision in scope, with its disposition), a **fork register** (every ambiguity you met, the readings you saw, the one you took and why), and ⟨any answer table the reader will want — e.g. the fee for each service in each vintage, with the regulation cited per cell⟩.
 4. `check.sh`, with `fetch-main-l4.sh` beside it, that runs every module and prints per-module error counts and assertion tallies and, for target `main`, the same counts from a main build.
    Paste its output, main columns included, into `NOTES.md`.
+5. ⟨Delete this item if the subject computes no number and no threshold-driven result.⟩ A claims module, `⟨name⟩-properties.l4`, beside the others: claims about every input for each provision that computes a number or a threshold-driven result, checked with `l4 prove`, as step 6a of the `encoding-a-subject` skill describes (bounds, direction, the step bound, the exact change at each threshold the text names, and, where an official form or calculator is also encoded, the form against the statute in both directions).
+   It needs z3 and an `unstable` `l4`; it is not read by `main`, whatever the target.
+   Copy the verdict lines into `NOTES.md`, and record any claim not proved as a finding or as `unknown`, never as a pass.
 
 ## Rules that matter
 
@@ -71,7 +74,7 @@ Name anything deliberately left out, and why.⟩
 This is the compiler that has to read the deposit, and it is not the compiler you run: running an `unstable` binary does not license `unstable` syntax.
 `main` rejects, or reads differently, much of what the authoring skill teaches, so read `references/dialects.md` in the `writing-l4-rules` skill first, and use only what it says `main` reads.
 Where this brief asks for something that page lists as unavailable on `main`, use its "write instead" column, or leave the provision out and say which in `NOTES.md`.
-`check.sh` runs every module with a main build as well as with yours, and a module that reads differently on main is red.
+`check.sh` runs every module with a main build as well as with yours, and a module that reads differently on main is red (a claims module, deliverable 5, is checked with `l4 prove` instead and is not run on `main`).
 `L4_BIN --version` tells you what you run: a leading version number is `main`, `unstable-` with a date is `unstable`, and `dev` does not say (step 0 of `writing-l4-rules` has the test for it).
 
 The binary is `L4_BIN`, built from ⟨commit or release tag⟩.

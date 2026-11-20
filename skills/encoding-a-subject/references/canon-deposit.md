@@ -29,6 +29,7 @@ subjects/<jurisdiction>/<slug>/
     NOTES.md                scope, coverage table, fork register, answer table, open questions
     SOURCE-LICENSE.md       the terms the quoted source text carries
     *.l4                    the modules
+    *-properties.l4         claims about every input, checked with l4 prove (step 6a); read by unstable only
     check.sh                the self-check from this skill
     fetch-main-l4.sh        beside check.sh: fetches the main build it compares with (target main)
 ```

@@ -52,9 +52,23 @@
 #                    A module that main cannot finish in that time is red: main is the compiler
 #                    that has to read it. Your own l4 is never timed.
 #
+# CLAIMS MODULES (step 6a of the encoding-a-subject skill). A module whose name ends in
+# `-properties.l4` holds claims about every input: #ASSERTs that read a section GIVEN. Neither
+# run below can read it. `l4 run` cannot decide such an assertion and prints "assertion could not
+# be evaluated" at Error severity, which this script would count as a failed assertion; and a
+# main build rejects a section GIVEN and, as of main build 110, has no `prove` command. So such a
+# module is NOT run with `l4 run` and NOT run on main. It is checked with `l4 prove`, which needs
+# z3 (on PATH, or Z3_EXE), and your l4 must be an unstable build. Its row says how many claims
+# were proved, refuted, and unknown. Red means: l4 prove could not run (no z3, a main build, the file does not check, an
+# encoding defect); or it sent nothing to the solver; or refuted + unknown differs from
+# expected_open (zero unless you list the module: a claim recorded as a finding, or an `unknown`
+# you have written up in NOTES.md, stays in the module and is counted there).
+# An `unknown` is never a pass. The solver's version is printed under the row.
+#
 # Exit status: 0 only when no module has an error other than its expected failed
 # assertions, no assertion refused, each module fails exactly as often as
-# expected_failed says, and (target main) every module reads the same on main.
+# expected_failed says, (target main) every module reads the same on main, and every
+# claims module is green as described above.
 # 2 when a step could not be run: no l4, a bad L4_TARGET, or target main and no main binary.
 # A run with a step missing is not a full check, so it does not return 0 or 1.
 set -u
@@ -118,6 +132,16 @@ produced_output() {
 expected_failed() {
   case "$1" in
     # tests-red.l4) echo 3 ;;
+    *) echo 0 ;;
+  esac
+}
+
+# A claims module (`*-properties.l4`) that is MEANT to keep claims the solver does not prove:
+# one refuted, recorded as a finding, or one `unknown` written up in NOTES.md. List it with the
+# exact number of refuted plus unknown claims it keeps; say which and why in NOTES.md.
+expected_open() {
+  case "$1" in
+    # allowance-properties.l4) echo 1 ;;
     *) echo 0 ;;
   esac
 }
@@ -188,6 +212,7 @@ fi
 for f in "$DIR"/*.l4; do
   [ -e "$f" ] || { echo "check.sh: no .l4 files in $DIR" >&2; exit 2; }
   m="$(basename "$f")"
+  case "$m" in *-properties.l4) continue ;; esac   # a claims module: checked with l4 prove, below
   out="$("$L4" run "$f" 2>&1)"; rc=$?
   msgs="$(printf '%s\n' "$out" | grep -A1 -E '^[[:space:]]*Message:')"
   err=$(printf '%s\n' "$out" | grep -c 'DiagnosticSeverity_Error')
@@ -252,6 +277,53 @@ else
   printf '%-40s %7d %9d %7d %8d\n' "TOTAL ($n modules)" "$total_err" "$total_ok" "$total_bad" "$total_ref"
 fi
 echo "(a failed assertion is also an error; any other error, or any refused assertion, makes the run red)"
+
+# --- claims modules: l4 prove, with your l4 only -----------------------------------------------
+claims_n=0
+for f in "$DIR"/*-properties.l4; do
+  [ -e "$f" ] || continue
+  m="$(basename "$f")"
+  if [ "$claims_n" -eq 0 ]; then
+    echo
+    printf '%-40s %7s %8s %8s %9s\n' "claims, checked with l4 prove" proved refuted unknown expected
+  fi
+  claims_n=$((claims_n + 1))
+  cexp=$(expected_open "$m")
+  pout="$("$L4" prove "$f" 2>&1)"; prc=$?
+  cov="$(printf '%s\n' "$pout" | grep -a -E '^coverage: .*obligations: [0-9]+ proved, [0-9]+ refuted, [0-9]+ unknown' | head -n 1)"
+  if [ -z "$cov" ] || { [ "$prc" -ne 0 ] && [ "$prc" -ne 2 ] && [ "$prc" -ne 3 ]; }; then
+    # l4 prove did not run to a verdict: exit 1 (no solver, the file does not check, a main build
+    # with no prove command) or 4 (an encoding defect), or output with no coverage line.
+    printf '%-40s %7s %8s %8s %9d   RED: l4 prove exited %d\n' "$m" "?" "?" "?" "$cexp" "$prc"
+    printf '    l4 prove says: %s\n' "$(printf '%s\n' "$pout" | grep -a -v '^Info' | grep -a -v '^[[:space:]]*$' | head -n 1 | cut -c1-200)"
+    printf '    (l4 prove needs an unstable l4 and z3: `%s prove --help`, and `%s --version` says which build this is)\n' "$L4" "$L4"
+    status=1
+    continue
+  fi
+  cp=$(printf '%s\n' "$cov" | sed -E 's/.*obligations: ([0-9]+) proved, ([0-9]+) refuted, ([0-9]+) unknown.*/\1/')
+  cr=$(printf '%s\n' "$cov" | sed -E 's/.*obligations: ([0-9]+) proved, ([0-9]+) refuted, ([0-9]+) unknown.*/\2/')
+  cu=$(printf '%s\n' "$cov" | sed -E 's/.*obligations: ([0-9]+) proved, ([0-9]+) refuted, ([0-9]+) unknown.*/\3/')
+  copen=$((cr + cu))
+  verdict=""
+  if [ $((cp + copen)) -eq 0 ]; then
+    verdict="RED: no claim was sent to the solver, so nothing was proved"
+  elif [ "$copen" -ne "$cexp" ]; then
+    verdict="RED: $copen claim(s) not proved, expected $cexp"
+  elif [ "$prc" -eq 2 ] && [ "$cr" -eq 0 ]; then
+    verdict="RED: the evaluator found an assertion false or saw it raise (l4 prove exit 2)"
+  fi
+  printf '%-40s %7d %8d %8d %9d' "$m" "$cp" "$cr" "$cu" "$cexp"
+  if [ -n "$verdict" ]; then printf '   %s\n' "$verdict"; status=1; else printf '\n'; fi
+  # The claims that were not proved, with the line under each (a counterexample, or the reason), so that
+  # a red row can be read without running l4 prove again.
+  printf '%s\n' "$pout" | grep -a -A2 -E '^  (refuted|unknown)' | grep -a -v -E '^(--|  (proved|decided)|coverage:|not attempted:|solver:)' | head -n 12 | cut -c1-200 | sed 's/^/    /'
+  csolver="$(printf '%s\n' "$pout" | grep -a -E '^solver:' | head -n 1)"
+  [ -z "$csolver" ] || printf '    %s\n' "$csolver"
+done
+if [ "$claims_n" -gt 0 ]; then
+  echo "(claims modules are not run with l4 run and not run on main: a section GIVEN is rejected by main, and main build 110 has no prove command. An unknown is not a pass; read the verdict lines yourself)"
+fi
+
 if [ "$TARGET" = main ]; then
   if [ "$differ" -eq 0 ]; then
     echo "(target main: every module has the same four counts on the main build. That rules out a module main rejects and a difference an assertion shows; it does not see a different TRACE outcome, or any difference no assertion exercises)"
