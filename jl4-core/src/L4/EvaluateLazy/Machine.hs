@@ -1491,10 +1491,13 @@ maximumStalledReoffers = 1_000
 -- | What the machine says when a re-offered event has walked
 -- 'maximumStalledReoffers' continuations in a row without the deadline
 -- advancing: a continuation that names itself (or reaches itself) and is
--- already past its deadline when it is entered — a LEST with a
--- non-positive @WITHIN@ (its clock is the missed deadline), a kept SHANT's
--- HENCE with a negative one (its clock is the revealing stamp), or an
--- anchored deadline no later than the one just missed.
+-- already past its deadline when it is entered — a LEST, or a kept SHANT's
+-- HENCE, with a non-positive @WITHIN@ (each counts from the missed deadline,
+-- floored at the arming: 'clockR', and for the SHANT card A3 of 2026-10-09),
+-- or an anchored deadline no later than the one just missed. Measured
+-- 2026-11-20: @x MEANS PARTY Alice MUST NOT tick WITHIN 0 HENCE x@ on
+-- @WAIT UNTIL 5@ is refused here (deadlines never past 0), as @MUST tick
+-- WITHIN 0 LEST x@ is; with @WITHIN 1@ it runs to a value.
 stalledChainRefusal :: Rational -> Rational -> Text
 stalledChainRefusal highWater stamp = Text.unwords
   [ "A chain of HENCE or LEST continuations has stalled: the event at " <> prettyRatio stamp
@@ -3207,9 +3210,10 @@ backwardContractFrame val = \ case
       -- performance, and the verdict at an instant depended on how many
       -- events the trace carried). The only chain that does not end is
       -- one that reaches ITSELF without the deadline advancing — a
-      -- self-naming LEST with a non-positive WITHIN, or anchored at an
-      -- instant no later than the deadline just missed — whose every
-      -- incarnation is already past when it is entered. That is an
+      -- self-naming LEST, or a kept SHANT's self-naming HENCE (whose clock
+      -- is the window's end since card A3), with a non-positive WITHIN, or
+      -- anchored at an instant no later than the deadline just missed —
+      -- whose every incarnation is already past when it is entered. That is an
       -- ill-founded contract, and the machine refuses it by name rather
       -- than walking it forever: the copy carries a 'Reoffered' mark
       -- ('markReoffered', read back at Contract1 as 'ev'reoffered') with
