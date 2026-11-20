@@ -231,6 +231,7 @@ Yscript, the one `l4 export` target not in the table (`dmn-md` shares DMN's note
 Its §8 and §9 say what each surface and exporter does; this page will move those rows into the tables above when they land, as §9 says.
 Two of its rows are new silent cases to watch: OpenFisca cannot express `@nonassertable` and refuses `WHERE`, and has no fidelity report; DMN inlines `WHERE` locals, so an assertable one is lifted into its own decision with an input that callers who do not assert send as `null`.
 The unknown binding it asks for extends TU-wire-b's direct-path item to `l4 batch` and every wrapper-path type, which is new scope and open for Meng (its §13).
+_Corrected 2026-10-11:_ it was not new scope (TU-wire-b keeps eager refusal to the direct path only), and Meng accepted it on bench card C1 on 2026-10-10, recorded in CONTRACT §5.4; `REQUEST-BINDER-SPEC.md` §3.2 specifies it as one root assume, slice S3, proposed and not built.
 
 ## 7. Silent failures, then loud ones
 
