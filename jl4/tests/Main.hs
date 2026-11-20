@@ -12,6 +12,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified L4.Annotation as JL4
+import qualified L4.Cycles as Cycles
 import qualified L4.EvaluateLazy as JL4Lazy
 import qualified L4.ExactPrint as ExactPrint
 import L4.TracePolicy (lspDefaultPolicy)
@@ -133,7 +134,9 @@ main = do
   -- @JL4_EVALDIFF@ needs the module itself, which is not what is held, so that
   -- mode takes the unshared path.
   evalDiff <- lookupEnv "JL4_EVALDIFF"
-  let keep = if isJust evalDiff then Set.empty else Set.fromList goldenCorpus
+  -- @JL4_CYCLE_REPORT@ needs the module too, for the same reason.
+  cycleReport <- lookupEnv "JL4_CYCLE_REPORT"
+  let keep = if isJust evalDiff || isJust cycleReport then Set.empty else Set.fromList goldenCorpus
   checkMemo <- newCheckMemo keep
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
@@ -474,6 +477,15 @@ jl4PrettyLayoutRoundTrip memo evalConfig inputFile = do
       mEvalDiff <- lookupEnv "JL4_EVALDIFF"
       for_ (mEvalDiff *> mtc) $ \tc ->
         Text.writeFile (inputFile <> ".evaldiff.l4") (prettyLayout (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
+      -- Third affordance: the cycle report (#1075, layer 2), which is not a
+      -- check yet. `JL4_CYCLE_REPORT=<dir>` writes, for each module, the
+      -- definitions that call themselves and what could be shown about each
+      -- ('L4.Cycles'), as one JSON file in <dir> named from the module's path
+      -- with `/` spelled `%`. Nothing is asserted, so no golden moves.
+      mCycleReport <- lookupEnv "JL4_CYCLE_REPORT"
+      for_ ((,) <$> mCycleReport <*> mtc) $ \(dir, tc) ->
+        BL.writeFile (dir </> concatMap (\c -> if c == '/' then "%" else [c]) inputFile <> ".json")
+          (AP.encodePretty (map Cycles.findingJSON (Cycles.cycleFindings tc.substitution tc.entityInfo tc.module')))
       unless (null leaked) $
         expectationFailure $
           "prettyLayout leaked an inference variable (gensym) for " <> inputFile
