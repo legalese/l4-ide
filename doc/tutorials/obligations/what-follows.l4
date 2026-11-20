@@ -60,7 +60,7 @@ GIVETH A DEONTIC Actor Action
 
 -- Alice never pays: the receipt never becomes due.
 #TRACE `rent, then receipt` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 
 -- ====================================================================
@@ -81,22 +81,22 @@ GIVETH A DEONTIC Actor Action
 
 -- Alice misses day 7, then pays 1550 on day 15.
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY Alice DOES Pay Alice `Ms Ng` 1550 AT 15
 
 -- Day 8 has come with no payment: the second chance is now what is owed.
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 -- Alice pays the plain rent on day 15, without the fee.
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 15
 
 -- Nobody does anything for a month.
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
-    (`WAIT UNTIL` 40)
+    (WAITUNTIL 8)
+    (WAITUNTIL 40)
 
 
 -- ====================================================================
@@ -134,7 +134,7 @@ GIVETH A DEONTIC Actor Action
 #TRACE `rent, receipt for the amount paid` AT 0 WITH
     PARTY Alice   DOES Pay Alice `Ms Ng` 1600     AT 6
     PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 9
-    (`WAIT UNTIL` 12)
+    (WAITUNTIL 12)
 
 -- A payment under the rent does not count; the clock keeps running.
 #TRACE `rent, receipt for the amount paid` AT 0 WITH
@@ -163,7 +163,7 @@ GIVETH A DEONTIC Actor Action
 
 -- Alice misses day 7; Mr Lim pays on day 15.
 #TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY `Mr Lim` DOES Pay `Mr Lim` `Ms Ng` 1500 AT 15
 
 -- Mr Lim pays on day 3, before Alice has missed anything: it does not count.
@@ -176,8 +176,8 @@ GIVETH A DEONTIC Actor Action
 
 -- Neither of them pays.
 #TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
-    (`WAIT UNTIL` 30)
+    (WAITUNTIL 8)
+    (WAITUNTIL 30)
 
 
 -- ====================================================================
@@ -208,11 +208,11 @@ GIVETH A DEONTIC Actor Action
 
 -- Nobody has paid yet.
 #TRACE `rent, Alice or Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 3)
+    (WAITUNTIL 3)
 
 -- Neither pays by day 7.
 #TRACE `rent, Alice or Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 
 -- ====================================================================

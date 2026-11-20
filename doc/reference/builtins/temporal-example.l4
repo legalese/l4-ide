@@ -13,7 +13,7 @@ GIVETH A BOOLEAN
 #EVAL `WHEN LAST` (Date 10 1 2024) `falls on a weekend`
 #EVAL `VALUE AT` (Date 4 7 1776) (GIVEN d YIELD d)
 
--- WAIT UNTIL in a trace: the seller delivers at time 2, then nothing
+-- WAITUNTIL in a trace: the seller delivers at time 2, then nothing
 -- happens until time 10. The buyer has not paid by time 5, so the
 -- trace ends in a breach.
 DECLARE Party IS ONE OF Seller, Buyer
@@ -34,4 +34,4 @@ GIVETH A DEONTIC Party Action
 
 #TRACE `the sale` AT 0 WITH
   PARTY Seller DOES `deliver the goods` AT 2
-  (`WAIT UNTIL` 10)
+  (WAITUNTIL 10)

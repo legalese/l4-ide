@@ -39,7 +39,7 @@ A brief that says the target is `main` means this build or a later one, and this
   - `same-`: reads the same on both (where there are assertions, their counts match);
   - `degrades-`: passes `l4 check` on both and means something else, or less, on `main`;
   - `run-`: passes `l4 check` on both and is read with `l4 run`;
-  - `main-`: `main` accepts it and `unstable` rejects it;
+  - `main-`: `main` accepts it and the measured `unstable` build rejects it (but see "Since measured" under "Build 97 to build 98");
   - `unstable-`: `unstable` rejects it and `main` accepts it.
 
   `main` rejects exactly the 58 numbered files.
@@ -69,6 +69,13 @@ It also made `DO` a modal of its own, so `MUST DO` no longer parses.
 On build 97 the three `EVAL` forms exist and take a `NUMBER` date serial, not a `DATE`.
 The shelf build has none of the new spellings, so for these constructs the two compilers now accept different text; the table gives a portable idiom for `IS INTEGER` and for `WAIT UNTIL`.
 That is the only difference between the builds that the probes found: probes 01 to 53 fail on build 97 with the same first error (but for 38 to 40), probes 54 to 58 pass on it, and `main-isinteger` and `main-waituntil` fail on it.
+
+**Since measured (2026-11-21), on `unstable`'s source:** `unstable` now also reads `ISINTEGER` and `WAITUNTIL`, and still reads `` `IS INTEGER` `` and `` `WAIT UNTIL` `` with a warning that each was renamed.
+It keeps the temporal built-ins and `MUST DO`; only the two names moved.
+A shelf build cut before that change is as measured above, and rejects the new names.
+To tell which you have, run `main-isinteger.l4` and `main-waituntil.l4` with it: if both pass, write `ISINTEGER` and `WAITUNTIL`, which then read the same on both compilers.
+This skill's examples use the new names, so with an older shelf build, write the old spellings or the portable idioms in the table below.
+Probes 54 and 55 keep the old spellings on purpose.
 
 ## Status on `main`
 
@@ -178,8 +185,8 @@ What `main` says depends on what follows the `GIVEN`:
 | The same name defined in two nested `§` sections (35) | Accepted: a use reads the nearest. | **rejects**: ``There are multiple definitions for the identifier `prescribed rate` `` | Give them different names. |
 | `RULES EFFECTIVE DATE` on its own (37) | Accepted: the version date of the rules. | **rejects**: ``I could not find a definition for the identifier `RULES EFFECTIVE DATE` `` | Take the date as a `GIVEN` input of the rule (`alt-rule-date-as-input`). |
 | The temporal built-ins: `` `EVAL UNDER VALID TIME` ``, `` `EVAL AS OF SYSTEM TIME` ``, `` `EVAL UNDER RULES EFFECTIVE AT` `` with a date (38 to 40), `` `VALUE AT` `` (57), `` `EVER BETWEEN` `` (58) | Present; the `EVAL` forms take a `DATE`. | **rejects**: ``I could not find a definition for the identifier `EVAL UNDER VALID TIME` ``: removed in build 98. | Nothing on `main` from build 98: you cannot evaluate a rule at a date there. Take the rule-version date as a `GIVEN` input and give each vintage its own tests (`alt-rule-date-as-input`). |
-| `` `IS INTEGER` `` (54) | Accepted. | **rejects**: ``I could not find a definition for the identifier `IS INTEGER` ``: build 98 spells it `ISINTEGER`, with no alias. | `FLOOR x EQUALS x`, which agrees on both for whole numbers, fractions, negatives and zero (`alt-is-integer-by-floor`). `ISINTEGER` is main's spelling (`main-isinteger`), and `unstable` rejects it. |
-| ``(`WAIT UNTIL` 8)`` in a `#TRACE` (55) | Accepted: the house form in the skills. | **rejects**: ``I could not find a definition for the identifier `WAIT UNTIL` ``: build 98 spells it `WAITUNTIL`, with no alias. | An event at that time by a party the rule does not constrain, such as `PARTY Seller DOES pay AT 8`: the clock moves the same way on both (`alt-wait-by-an-event-of-another-party`). It needs an action that party can perform; where there is none, `WAITUNTIL 8` is main's spelling (`main-waituntil`), and `unstable` rejects it. |
+| `` `IS INTEGER` `` (54) | Accepted. | **rejects**: ``I could not find a definition for the identifier `IS INTEGER` ``: build 98 spells it `ISINTEGER`, with no alias. | `FLOOR x EQUALS x`, which agrees on both for whole numbers, fractions, negatives and zero (`alt-is-integer-by-floor`). `ISINTEGER` is main's spelling (`main-isinteger`), and the measured shelf build rejects it (but see "Since measured" under "Build 97 to build 98"). |
+| ``(`WAIT UNTIL` 8)`` in a `#TRACE` (55) | Accepted. It was the house form in the skills until 2026-11-21, when they moved to `WAITUNTIL`. | **rejects**: ``I could not find a definition for the identifier `WAIT UNTIL` ``: build 98 spells it `WAITUNTIL`, with no alias. | An event at that time by a party the rule does not constrain, such as `PARTY Seller DOES pay AT 8`: the clock moves the same way on both (`alt-wait-by-an-event-of-another-party`). It needs an action that party can perform; where there is none, `WAITUNTIL 8` is main's spelling (`main-waituntil`), and the measured shelf build rejects it (but see "Since measured" under "Build 97 to build 98"). |
 | `MUST DO pay` (56) | Accepted. | **rejects**: `unexpected DO`: from build 98 `DO` is a modal of its own. | Drop the `DO`: `MUST pay`. |
 | A `\[` or `\]` inside an inline `[…]` annotation (44) | Accepted: a literal bracket. | **rejects**: `unexpected %`, because the annotation ended at the first `]` | Put no bracket inside an inline annotation (`alt-inline-bracket`). |
 | A field read in an action's argument: `MAY Take Official (c's measure)` (51) | Accepted. | **rejects**: `unexpected 's` | `MAY Take Official m PROVIDED m EQUALS c's measure` (`run-field-in-guard`). |
@@ -231,7 +238,7 @@ Two kinds of evidence are used.
 - **Nested sections sharing a name (1):** `reference/syntax/sections-example.l4` (probe 35).
 - **An inline annotation with `\[` (1):** `reference/syntax/annotation-example.l4` (probe 44); it also has a section `GIVEN`, hidden behind the parse error.
 - **`` `WAIT UNTIL` `` (5):**
-  `reference/regulative/deontic-example.l4`, `courses/advanced/module-a1-regulatory-examples.l4`, `tutorials/obligations/one-obligation.l4` and `several-parties.l4` (probe 55; rewritten: with `WAITUNTIL n` in place of ``(`WAIT UNTIL` n)`` each passes on build 98);
+  `reference/regulative/deontic-example.l4`, `courses/advanced/module-a1-regulatory-examples.l4`, `tutorials/obligations/one-obligation.l4` and `several-parties.l4` (probe 55; rewritten: with `WAITUNTIL n` in place of ``(`WAIT UNTIL` n)`` each passes on build 98; since 2026-11-21 these files are written that way);
   `concepts/legal-modeling/regulative-layer-whole-example.l4`, which then fails on a rule applied inside `MUST (…)` (probe 42).
 - **An input named in an action, read again in `HENCE` (1):** `courses/advanced/module-a3-contracts-examples.l4` (probe 43).
 

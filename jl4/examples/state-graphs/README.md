@@ -221,7 +221,7 @@ Traditional wedding vows formalized as L4 regulative rules:
 
   ```l4
   PARTY Alice MUST pay LEST (PARTY Bob MUST refund WITHIN 5)
-  #TRACE ... AT 0 WITH (`WAIT UNTIL` 1000)
+  #TRACE ... AT 0 WITH (WAITUNTIL 1000)
   ```
   leaves the *original* obligation outstanding as a residual; Bob's refund never
   becomes current. Add `WITHIN 30` to the same rule and it does. The edge is

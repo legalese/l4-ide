@@ -102,7 +102,7 @@ DECLARE `Prohibited Action` IS ONE OF
 
 -- Test 1: Prohibition complied with (no action taken until the period ends - this is success)
 #TRACE `confidentiality obligation` AT 0 WITH
-  (`WAIT UNTIL` 1826)
+  (WAITUNTIL 1826)
 
 -- Test 2: Prohibition violated (action taken - this should result in breach)
 #TRACE `confidentiality obligation` AT 0 WITH
