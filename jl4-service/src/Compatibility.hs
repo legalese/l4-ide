@@ -20,8 +20,13 @@
 --     widening its enum (new values a consumer may not handle) is
 --     breaking; adding a new field is safe.
 --
--- New functions are safe; removed functions are breaking. This mirrors
--- the client-side check in the deploy sidebar so both surfaces agree.
+-- New functions are safe; removed functions are breaking. The client-side
+-- check in the editor's Deploy panel
+-- (ts-apps/webview/src/lib/breaking-changes.ts, with its tests beside it)
+-- applies the same rules, the ones below for a oneOf, the tagged object and a
+-- change of form included, in the same directions, so that the panel's
+-- warning before a redeploy says what this gate decides. A rule changed here
+-- is changed there.
 --
 -- A type with a constructor that carries fields and one that carries none is
 -- a @oneOf@ of two forms, its names (a string) and its tagged constructors (an
