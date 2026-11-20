@@ -856,6 +856,22 @@ spec bin = do
     it "succeeds on a clean file" $
       expectOk bin ["run", cleanFixture] "Checking succeeded."
 
+    -- l4 run prints what l4 check reports of an @export, on standard error as
+    -- its other diagnostics, and still evaluates the file. An error of the
+    -- check fails the run as a type error does; the warning for a GIVEN with
+    -- no type does not (assumed, not ruled; review of #779, 2026-11-20).
+    it "prints an @export that cannot be published, still evaluates, and fails" $ do
+      Output code sout serr <- runL4 bin ["run", fixtureDir </> "run-export-refused.l4"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("check/export-function-input" `isInfixOf`)
+      serr `shouldSatisfy` ("Source:   export" `isInfixOf`)
+      sout `shouldSatisfy` ("Result:\n  12" `isInfixOf`) . filter (/= '\r')
+    it "prints the warning for an exported GIVEN with no type, and succeeds" $ do
+      Output code sout serr <- runL4 bin ["run", fixtureDir </> "run-export-untyped.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("lint/export-untyped-given" `isInfixOf`)
+      sout `shouldSatisfy` ("Result:\n  7" `isInfixOf`) . filter (/= '\r')
+
     it "emits a well-shaped JSON envelope on a clean file" $ do
       env <- jsonEnvelope bin ["run", cleanFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool True)

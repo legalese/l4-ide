@@ -1092,9 +1092,9 @@ For a result written with such a name, the error says ``its result is written wi
 A rule with no `GIVETH` whose result L4 works out to be such a name gets ``its result is inferred to be `...`, a type name for a DEONTIC``, and the fix is to add a `GIVETH` that writes the `DEONTIC` type out.
 A contract rule that is refused is still evaluated where you write it, so its `#EVAL` and `#EVALTRACE` results still show.
 
-`l4 check` reports the error and fails, with exit status 1, and deploying is refused until you remove the `@export` or change the type.
+`l4 check` and `l4 run` report the error and fail, with exit status 1, and deploying is refused until you remove the `@export` or change the type.
 The editor shows it as an error from `export`.
-The error does not stop the rest of the file: it is still checked for type errors, `l4 run` still runs it, and the editor still shows the results of its `#EVAL`s and `#EVALTRACE`s, the refused rule's own included.
+The error does not stop the rest of the file: it is still checked for type errors, `l4 run` still evaluates it and prints its results, and the editor still shows the results of its `#EVAL`s and `#EVALTRACE`s, the refused rule's own included.
 `@export default` is refused the same way.
 
 **How to fix it:** Take the parts of the event as separate inputs, and build the event inside the rule if it needs one.
@@ -1146,7 +1146,7 @@ GIVETH A BOOLEAN
 
 **What went wrong:** `@export` publishes a rule as a web endpoint, and the schema of that endpoint tells a caller what to send for each input.
 A `GIVEN` with no `IS A` has no written type, so the schema is not told what to send for it.
-This is a warning, not an error: the rule is still published, and the file still checks.
+This is a warning, not an error: the rule is still published, the file still checks, and `l4 check` and `l4 run`, which both print it, do not fail on it.
 
 **How to fix it:** Write the type in the `GIVEN`:
 

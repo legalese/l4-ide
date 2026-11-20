@@ -152,6 +152,7 @@ Result:
 Each `Evaluation[n]` block shows the result of one `#EVAL`, in file order. Results go to standard output; errors and warnings go to standard error.
 
 `l4 run` fails when the file, or a file it imports, has an error, or when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero. The other directives still show their results. Warnings, and an `#ASSERT` that comes out false, don't make it fail.
+An `@export` that cannot be published, such as one that takes a function, is an error that `l4 run` prints and fails on, as `l4 check` does, and the file is still evaluated.
 
 If a `FETCH` or `POST` can't reach its server, `l4 run` fails and shows no results for any directive in the file. To see the other results, move the directives that make requests to a file of their own.
 
