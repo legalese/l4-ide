@@ -4058,15 +4058,15 @@ wireCases =
     -- "Expected JSON number" comes from its JSONDECODE, which the direct path
     -- never runs. Should they stop saying so, the routing has changed, and the
     -- other wrapper rows may be testing the direct path twice.
-  , ("D1", "twice", args ["n" Aeson..= ("abc" :: Text), wrapper], Refuses "Expected JSON number but got: String")
+  , ("D1", "twice", args ["n" Aeson..= ("abc" :: Text), wrapper], Refuses "Expected JSON number but got: \"abc\"")
     -- The direct path does not check that a scalar matches its parameter's
     -- type, so this stops on an internal type error. That is the answer this
     -- change found, pinned as such, not a good one.
   , ("D2", "twice", args ["n" Aeson..= ("abc" :: Text), direct], Refuses "type error")
   , ("D3", "twice", args [wrapper], Refuses "Parameter 'n': missing required parameter")
   , ("D3d", "twice", args [direct], Refuses "Parameter 'n': missing required parameter")
-  , ("D4", "twice", args ["n" Aeson..= [1, 2 :: Int], wrapper], Refuses "Expected JSON number but got: Array")
-  , ("D5", "twice", args ["n" Aeson..= Aeson.object ["a" Aeson..= (1 :: Int)], wrapper], Refuses "Expected JSON number but got: Object")
+  , ("D4", "twice", args ["n" Aeson..= [1, 2 :: Int], wrapper], Refuses "Expected JSON number but got: [1,2]")
+  , ("D5", "twice", args ["n" Aeson..= Aeson.object ["a" Aeson..= (1 :: Int)], wrapper], Refuses "Expected JSON number but got: {\"a\":1}")
     -- A rule's own Nothing and Just are answers, not L4's MAYBE.
   , ("E1", "penalty", args [n 5, direct], Answers (Aeson.String "Nothing"))
   , ("E2", "penalty", args [n 5, wrapper], Answers (Aeson.String "Nothing"))

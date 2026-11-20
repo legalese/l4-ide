@@ -193,7 +193,7 @@ With `batch-declared-text.l4`: the cells `True` and `False` for a choice input a
     A quote that opens a cell and is never closed is refused at the line where it opens, `line 2 of the CSV file is not valid CSV: a quote that opens a cell there is never closed`, and no row is run.
     `main` has a bug here: it reads `"abc` at the end of a file as the text `ab` with status `success`, and takes every row after an unclosed quote in the middle of a file into one cell with a `null` result, also `success`.
 12. **An input declared through a synonym without a type parameter is read, and validated, as the type it stands for (#646).**
-    With `DECLARE Year IS A NUMBER`, text that is no number for a `Year` is refused as for a NUMBER (`Expected JSON number but got: String "abc"`); `main` answered `Internal error: I encountered …` under `success`, and `--validate-only` called it `valid`.
+    With `DECLARE Year IS A NUMBER`, text that is no number for a `Year` is refused as for a NUMBER (`Expected JSON number but got: "abc"`, which the message wrote `String "abc"` until legalese/l4-ide#779); `main` answered `Internal error: I encountered …` under `success`, and `--validate-only` called it `valid`.
     A synonym for a `MAYBE NUMBER` given 25 is accepted; `main` refused it (`The value 25 reached a CONSIDER that has no branch for it`).
     This changes the JSON decoder in `jl4-core` (`Machine.hs`), which `main` shares with the service and with a program's own `JSONDECODE`: a type is expanded at its head, and so is a record field's before it is judged a `MAYBE`.
     A synonym that takes a type parameter is read by this decoder, but not by the CSV cell reader or `--validate-only`: see Limits.

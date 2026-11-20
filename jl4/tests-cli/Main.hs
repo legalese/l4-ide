@@ -4478,7 +4478,7 @@ spec bin = do
             -- and the first row, the text `abc`, is the one refused, with the
             -- message the plain NUMBER gets
             take 1 (map outcome through) `shouldBe` ["refused"]
-            show (map (`objField` "diagnostics") (take 1 through)) `shouldSatisfy` ("Expected JSON number but got: String" `isInfixOf`)
+            show (map (`objField` "diagnostics") (take 1 through)) `shouldSatisfy` ("Expected JSON number but got: \\\"abc\\\"" `isInfixOf`)
 
         it "refuses text that is no boolean, and a number, as for a BOOLEAN, in JSON and in CSV" $ do
           forM_ [batchSynonymFlagJson, batchSynonymFlagCsv] \file -> do

@@ -28,6 +28,8 @@ module L4.EvaluateLazy.Machine
 , parseDateText
 , parseTimeText
 , parseDatetimeText
+-- * A JSON value in an error message, as JSONDECODE's errors write it.
+, jsonForMessage
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -55,6 +57,7 @@ import qualified Base.Set as Set
 import Control.Concurrent
 import System.Environment (lookupEnv)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text.Encoding as TE
 #ifdef HTTP_ENABLED
 import           Network.HTTP.Req ((=:))
@@ -1314,7 +1317,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
             jsonListToWHNFTyped values elementType
           _ -> do
             userException $ UserError $
-              "Expected JSON array to decode to LIST type, but got: " <> Text.pack (show jsonValue)
+              "Expected JSON array to decode to LIST type, but got: " <> jsonForMessage jsonValue
 
     -- Handle MAYBE α
     TyApp _anno maybeRef [innerType]
@@ -1345,7 +1348,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
             pure $ ValConstructor conRef [sideRef]
           Nothing ->
             userException $ UserError $
-              "Expected an EITHER written {\"LEFT\": [value]} or {\"RIGHT\": [value]} but got: " <> Text.pack (show jsonValue)
+              "Expected an EITHER written {\"LEFT\": [value]} or {\"RIGHT\": [value]} but got: " <> jsonForMessage jsonValue
       where
         eitherSide = \case
           Aeson.Object obj
@@ -1373,17 +1376,17 @@ jsonValueToWHNFTyped jsonValue ty0 = do
           case jsonValue of
             Aeson.String s -> pure $ ValString s
             _ -> userException $ UserError $
-                  "Expected JSON string but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string but got: " <> jsonForMessage jsonValue
         "NUMBER" -> do
           case jsonValue of
             Aeson.Number n -> pure $ ValNumber (toRational n)
             _ -> userException $ UserError $
-                  "Expected JSON number but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON number but got: " <> jsonForMessage jsonValue
         "BOOLEAN" -> do
           case jsonValue of
             Aeson.Bool b -> pure $ if b then ValBool True else ValBool False
             _ -> userException $ UserError $
-                  "Expected JSON boolean but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON boolean but got: " <> jsonForMessage jsonValue
         "DATE" -> do
           -- DATE fields in JSON should be ISO-8601 strings (YYYY-MM-DD)
           case jsonValue of
@@ -1393,7 +1396,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                 Nothing -> userException $ UserError $
                   "Could not parse date string '" <> s <> "'. Expected format: YYYY-MM-DD"
             _ -> userException $ UserError $
-                  "Expected JSON string for DATE field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for DATE field but got: " <> jsonForMessage jsonValue
         "TIME" -> do
           -- TIME fields in JSON should be strings (HH:MM:SS or HH:MM)
           case jsonValue of
@@ -1403,7 +1406,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                 Nothing -> userException $ UserError $
                   "Could not parse time string '" <> s <> "'. Expected format: HH:MM:SS or HH:MM"
             _ -> userException $ UserError $
-                  "Expected JSON string for TIME field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for TIME field but got: " <> jsonForMessage jsonValue
         "DATETIME" -> do
           -- DATETIME fields in JSON should be ISO-8601 strings with timezone
           case jsonValue of
@@ -1416,7 +1419,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                 Nothing -> userException $ UserError $
                   "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ"
             _ -> userException $ UserError $
-                  "Expected JSON string for DATETIME field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for DATETIME field but got: " <> jsonForMessage jsonValue
 
         -- Not a primitive, check if it's a custom record type
         _ -> jsonValueToDeclared tyRef [] jsonValue
@@ -1498,7 +1501,7 @@ jsonValueToDeclared tyRef args jsonValue = do
                     _ -> do
                       -- JSON value is not an object, can't decode to record
                       userException $ UserError $
-                        "Expected JSON object to decode to record type, but got: " <> Text.pack (show jsonValue)
+                        "Expected JSON object to decode to record type, but got: " <> jsonForMessage jsonValue
 
 -- | The constructors of a declared type, from the entity info: each one's
 -- unique, name and type.
@@ -1551,7 +1554,7 @@ jsonValueToTagged typeName ctors jsonValue = case jsonValue of
     | Just (u, n, conType) <- byName s ->
         if carriesFields conType
           then userException $ UserError $
-            "The constructor `" <> s <> "` carries fields, so it is written {\"" <> s <> "\": {its fields}}, but got: " <> Text.pack (show jsonValue)
+            "The constructor `" <> s <> "` carries fields, so it is written {\"" <> s <> "\": {its fields}}, but got: " <> jsonForMessage jsonValue
           else pure (ValConstructor (Def u n) [])
   Aeson.Object obj
     | [(key, given)] <- KeyMap.toList obj
@@ -1568,7 +1571,7 @@ jsonValueToTagged typeName ctors jsonValue = case jsonValue of
       <> Text.intercalate ", " [ conText n | (_, n, t) <- ctors, not (carriesFields t) ]
       <> ") or as {\"<constructor>\": {its fields}} for one that does ("
       <> Text.intercalate ", " [ conText n | (_, n, t) <- ctors, carriesFields t ]
-      <> "), but got: " <> Text.pack (show jsonValue)
+      <> "), but got: " <> jsonForMessage jsonValue
  where
   conText n = nameToText (TypeCheck.getName n)
   byName s = listToMaybe [ c | c@(_, n, _) <- ctors, conText n == s ]
@@ -1576,6 +1579,25 @@ jsonValueToTagged typeName ctors jsonValue = case jsonValue of
     Forall _ _ t -> carriesFields t
     Fun {} -> True
     _ -> False
+
+-- | A JSON value as it is written, compactly, for an error message: the value
+-- a reader refused, which the caller sent as JSON and should see as JSON, not
+-- in Haskell's notation (@Object (fromList [...])@; review of #779,
+-- 2026-11-20). A value longer than 'jsonInMessageLimit' characters is cut
+-- there, and the message says so, and how long it was.
+jsonForMessage :: Aeson.Value -> Text
+jsonForMessage v
+  | Text.length t <= jsonInMessageLimit = t
+  | otherwise =
+      Text.take jsonInMessageLimit t
+        <> "... (the first " <> Text.pack (show jsonInMessageLimit)
+        <> " of " <> Text.pack (show (Text.length t)) <> " characters)"
+ where
+  t = TE.decodeUtf8 (BSL.toStrict (Aeson.encode v))
+
+-- | How much of a refused JSON value an error message shows.
+jsonInMessageLimit :: Int
+jsonInMessageLimit = 200
 
 -- | A constructor's fields, read by name from a JSON object, each by its type.
 -- A MAYBE field that is missing is NOTHING; extra keys are ignored.

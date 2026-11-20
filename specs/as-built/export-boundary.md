@@ -59,6 +59,9 @@ Scope: `jl4-core/src/L4/Export/Shape.hs` (new), `jl4-core/src/L4/Export.hs`, the
     In `jl4-schema` it is the same split as a JSON Schema `oneOf`: a string `enum` of the names and, for each constructor that carries fields, an object with that one key, required, holding its fields; one member alone is not wrapped (one object per constructor, so that exactly one constructor is there, is assumed, not ruled).
 - The two checks of the previous change, the function-typed input and the `EVENT`, are gone from the type check (`ExportFunctionTypeInput`, `ExportEventType`) and are cases of the one check.
   So a function-typed input no longer stops the file from checking either.
+- `JSONDECODE`'s errors show the value they refused as JSON, compactly (`jsonForMessage`, `jl4-core/src/L4/EvaluateLazy/Machine.hs`), cut at 200 characters with "... (the first 200 of N characters)" after it: "but got: {"card fee":2}", where they wrote it in Haskell's notation, "but got: Object (fromList [("card fee",Number 2.0)])" (review of 2026-11-20; `jl4/examples/ok/jsondecode-errors.l4`).
+  The quotes of those messages in other specs that record a measurement on a named build are left as measured.
+  The service's "Cannot handle parameter type", which nothing raises, writes its value so too.
 
 ## Where it lives
 
@@ -196,7 +199,7 @@ On a copy of a store that a build of `dc94daa1a` wrote, holding a mixed type, a 
     A bare value, an object with both keys or neither, and `{"RIGHT": 5}` without the array are refused (review of 2026-11-17).
     On `main` and before that review, a bare value reached the rule without its side, so a `CONSIDER` on it found no branch, and a rule ending in `OTHERWISE` answered wrongly with no error: the reviewer's rule answered a bare `2000` with `50`, on the direct and the wrapper path, in a batch case, through MCP and through `l4 batch` (measured on 2026-11-18 with this branch's `l4` and `jl4-service` as built on 2026-11-15, minutes before `7a500185b` was committed, not rebuilt); an object in neither form was `NOTHING` to `JSONDECODE`.
     The service checks every input before it routes a request (`checkEitherForms`, `eitherFormError`, `jl4-service/src/Backend/Jl4.hs`), so each path refuses with a `422` and the direct path's words, which name the input: "Parameter 'the claim': an EITHER is written {"LEFT": [value]} or {"RIGHT": [value]}".
-    `l4 batch` refuses an input typed `EITHER`, behind any `MAYBE` or synonym, by name ("Field 'the claim': ..."), as does `--validate-only` (`eitherFieldErrors`); one deeper in an input, in a record's field or a list, is refused by `JSONDECODE`, whose error ("Expected an EITHER written ... but got: Number 2000.0") does not name the input, as its error for a string sent for a `NUMBER` does not.
+    `l4 batch` refuses an input typed `EITHER`, behind any `MAYBE` or synonym, by name ("Field 'the claim': ..."), as does `--validate-only` (`eitherFieldErrors`); one deeper in an input, in a record's field or a list, is refused by `JSONDECODE`, whose error ("Expected an EITHER written ... but got: 2000") does not name the input, as its error for a string sent for a `NUMBER` does not.
     `JSONDECODE` in a rule's own body refuses alike: the evaluation stops with that error.
     A CSV cell cannot carry an `EITHER`: `l4 batch` reads a cell for one as text, so `2000` and `{"RIGHT": [2000]}` in a cell are both refused by name (measured on 2026-11-18); send such rows as JSON or YAML.
     The reviewer's rule now refuses a bare `2000` on each of those paths, and answers `{"RIGHT": [2000]}` with `100` (measured on 2026-11-18 with a build of this change).

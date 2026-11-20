@@ -80,6 +80,8 @@ DECIDE `alice as JSON` IS JSONENCODE alice
 ## JSONDECODE
 
 `JSONDECODE text` reads JSON text. It gives `RIGHT value`, or `LEFT message` when the text is not valid JSON. JSON that is valid but does not fit the expected type, such as a record with a field missing or a string where a number belongs, stops the evaluation with an error naming the problem.
+The error shows the value it refused as JSON, compactly: `Expected JSON number but got: "abc"`.
+A value longer than 200 characters is cut there, and the message ends by saying how much of it is shown, such as `... (the first 200 of 1834 characters)`.
 
 The type you expect guides the decoding, so say it, with `GIVETH` or by the way the result is used:
 

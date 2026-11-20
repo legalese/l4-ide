@@ -11,7 +11,7 @@ import L4.Annotation
 -- import qualified L4.Evaluate.Value as Eval
 import qualified L4.Evaluate.ValueLazy as Eval
 import qualified L4.EvaluateLazy as Eval
-import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment, parseDateText, parseTimeText, parseDatetimeText)
+import L4.EvaluateLazy.Machine (EvalException, emptyEnvironment, jsonForMessage, parseDateText, parseTimeText, parseDatetimeText)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import L4.EvaluateLazy.Trace
 import L4.Refusal (PlanDecline, planDecline)
@@ -146,7 +146,7 @@ buildCompiledFromShared shared funName = runExceptT $ do
   evalErrorToText (InterpreterError t) = t
   evalErrorToText (RequiredParameterMissing pm) = "Required parameter missing: expected " <> Text.textShow pm.expected <> ", got " <> Text.textShow pm.actual
   evalErrorToText (UnknownArguments args) = "Unknown arguments: " <> Text.intercalate ", " args
-  evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
+  evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> jsonForMessage (Aeson.toJSON lit)
   evalErrorToText CannotHandleUnknownVars = "Cannot handle unknown variables"
   evalErrorToText err@(EvaluatorRefused _) = prettyEvaluatorError err
 
@@ -351,7 +351,7 @@ precompileModule filepath source moduleContext funName = runExceptT $ do
   evalErrorToText (InterpreterError t) = t
   evalErrorToText (RequiredParameterMissing pm) = "Required parameter missing: expected " <> Text.textShow pm.expected <> ", got " <> Text.textShow pm.actual
   evalErrorToText (UnknownArguments args) = "Unknown arguments: " <> Text.intercalate ", " args
-  evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> Text.textShow lit
+  evalErrorToText (CannotHandleParameterType lit) = "Cannot handle parameter type: " <> jsonForMessage (Aeson.toJSON lit)
   evalErrorToText CannotHandleUnknownVars = "Cannot handle unknown variables"
   evalErrorToText err@(EvaluatorRefused _) = prettyEvaluatorError err
 
