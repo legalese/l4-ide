@@ -363,6 +363,10 @@ l4 batch late-fee-export.l4 --inputs invoices.json
 
 `--inputs` accepts `.json`, `.yaml`, or `.csv` (use `--input-format` when reading from stdin with `-`); `--entrypoint FUNCTION` selects which exported function to run when there is more than one.
 
+In a `result`, a choice that carries data is written as a deployed rule answers it, an object with one key, the choice's name, holding its fields by name, `{"Card": {"card fee": 2}}`, which is the form a parameter of that type is read in, so such a result can be given back as a case.
+A record is written the same way, `{"Pair": {"left": 5, "right": 6}}`, while a record parameter is read from its fields alone, `{"left": 5, "right": 6}`.
+An `EITHER` is `{"RIGHT": [value]}` or `{"LEFT": [value]}`, a `MAYBE` is its value or `null`, and a choice that carries nothing is its name.
+
 Natural-language names work too: exported functions and parameters written with backticks and spaces (`` `the base rate` ``) are matched by input keys spelled the same way (`"the base rate": 100`).
 A value is read as the type its parameter declares, whichever kind of file the case comes from.
 A parameter declared as `NUMBER` or `BOOLEAN` that is given as text is read as the number or boolean the text spells: a CSV cell is always text, so a `100` or `true` cell arrives as a number or boolean, and so does `"100"` or `"true"` in a JSON or YAML file.

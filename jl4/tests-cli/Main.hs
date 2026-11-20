@@ -568,6 +568,12 @@ batchTypeParamsFixture, batchTypeParamsJson :: FilePath
 batchTypeParamsFixture = fixtureDir </> "batch-type-params.l4"
 batchTypeParamsJson = fixtureDir </> "batch-type-params.json"
 
+-- | A constructor that carries data, as a result, and that result sent back.
+batchTaggedResultFixture, batchTaggedResultJson, batchTaggedResultBackJson :: FilePath
+batchTaggedResultFixture = fixtureDir </> "batch-tagged-result.l4"
+batchTaggedResultJson = fixtureDir </> "batch-tagged-result.json"
+batchTaggedResultBackJson = fixtureDir </> "batch-tagged-result-back.json"
+
 -- | A constructor that carries data, as an input.
 batchTaggedFixture, batchTaggedJson :: FilePath
 batchTaggedFixture = fixtureDir </> "batch-tagged.l4"
@@ -4448,6 +4454,28 @@ spec bin = do
       -- parameters, in the form the schemas publish: each of these decoded to
       -- NOTHING, and the wrapper's input record did not parse with a second
       -- input after such a type (review of #779, 2026-11-20).
+      -- A result is written as the service answers it: a constructor that
+      -- carries data with its fields' names, which is the form an input of its
+      -- type is read in, so a result can be sent back. It was written
+      -- positionally, {"Injury": [3]}, which no reader takes (review of #779,
+      -- 2026-11-20).
+      it "writes a constructor that carries data with its fields' names, and reads it back" $ do
+        (_, _, out) <- rowsOf [batchTaggedResultFixture, "--inputs", batchTaggedResultJson]
+        let object = Aeson.object
+            (.=) :: Aeson.ToJSON v => Key.Key -> v -> (Key.Key, Value)
+            (.=) = (Aeson..=)
+            injury = object ["Injury" .= object ["days off work" .= (3 :: Int)]]
+        map resultOf out `shouldBe` [Just injury, Just (String "Holiday")]
+        (_, _, back) <- rowsOf [batchTaggedResultFixture, "-e", "days of", "--inputs", batchTaggedResultBackJson]
+        map resultOf back `shouldBe` [Just (Number 3), Just (Number 0)]
+        (_, _, shapes) <- rowsOf [batchTaggedResultFixture, "-e", "shapes", "--inputs", batchTaggedResultJson]
+        take 1 (map resultOf shapes) `shouldBe`
+          [ Just (toJSON
+              [ object ["LEFT" .= [object ["Pair" .= object ["left" .= (3 :: Int), "right" .= (3 :: Int)]]]]
+              , object ["RIGHT" .= [injury]]
+              , object ["RIGHT" .= [Null]]
+              ]) ]
+
       it "reads a type that takes a type, as the schemas publish it" $ do
         (code, _, rows) <- rowsOf [batchTypeParamsFixture, "--inputs", batchTypeParamsJson]
         code `shouldSatisfy` (/= ExitSuccess)

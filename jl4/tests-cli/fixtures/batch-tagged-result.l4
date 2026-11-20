@@ -1,0 +1,27 @@
+-- A result that is a constructor that carries data, written by l4 batch as
+-- the service answers it, with its fields' names, so it reads back as an input
+-- (review of #779, 2026-11-20).
+
+DECLARE Absence IS ONE OF
+  Holiday
+  Injury HAS `days off work` IS A NUMBER
+
+DECLARE Pair HAS left IS A NUMBER, right IS A NUMBER
+
+@export default Absence of
+GIVEN n IS A NUMBER
+GIVETH AN Absence
+`absence of` MEANS IF n > 0 THEN Injury n ELSE Holiday
+
+@export Days of
+GIVEN a IS AN Absence
+GIVETH A NUMBER
+`days of` MEANS
+  CONSIDER a
+  WHEN Holiday THEN 0
+  WHEN Injury d THEN d
+
+@export Shapes
+GIVEN n IS A NUMBER
+GIVETH A LIST OF (EITHER Pair (MAYBE Absence))
+`shapes` MEANS LIST LEFT (Pair n n), RIGHT (JUST (Injury n)), RIGHT NOTHING

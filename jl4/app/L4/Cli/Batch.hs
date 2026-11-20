@@ -77,11 +77,12 @@ import L4.EvaluateLazy
   , EvalDirectiveValue(..)
   , AssertionOutcome(..)
   , ReductionOutcome(..)
+  , evalDirectiveResultToJsonWithFields
   , prettyEvalException
   , prettyRefusal
   )
 import L4.Lexer (showStringLit)
-import L4.Print (prettyLayout)
+import L4.Print (extractConstructorFieldNames, prettyLayout)
 import L4.Syntax
   ( AppForm(..), Declare(..), Module(..), Resolved, Section(..), TopDecl(Declare, Section)
   , Type'(..), TypeDecl(..), Unique, getUnique
@@ -379,12 +380,21 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
       (evalErrs, mEval) <- runOneshot rowConfig virtualPath \nfp -> do
         let uri = normalizedFilePathToUri nfp
         _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) combinedProgram
-        Shake.use Rules.EvaluateLazy uri
-      let (status, outputJson, diags) = case mEval of
+        results <- Shake.use Rules.EvaluateLazy uri
+        tc <- Shake.use Rules.SuccessfulTypeCheck uri
+        pure ((,) <$> results <*> tc)
+      let -- A constructor that carries data is written with its fields' names,
+          -- {"Injury": {"days off work": 3}}, as the service answers it and as
+          -- an input of its type is read, so a result can be sent back
+          -- (review of #779, 2026-11-20); it was written positionally,
+          -- {"Injury": [3]}.
+          encode (evalResults, tc) =
+            Aeson.toJSON (map (evalDirectiveResultToJsonWithFields (extractConstructorFieldNames tc.entityInfo)) evalResults)
+          (status, outputJson, diags) = case mEval of
             Nothing ->
               -- The wrapper failed to typecheck/parse (e.g. a schema mismatch).
               ("error" :: Text, Aeson.Null, Aeson.toJSON evalErrs)
-            Just evalResults ->
+            Just evaluated@(evalResults, _) ->
               -- The wrapper evaluated; a row still "fails" if evaluation raised
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
               -- declared type). Those surface as `Reduction (ReducedErrored …)`.
@@ -395,10 +405,10 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
               let excMsgs = concatMap resultExceptionMsgs evalResults
                   refMsgs = concatMap resultRefusalMsgs evalResults
               in if not (null excMsgs)
-                   then ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                   then ("error",   encode evaluated, Aeson.toJSON excMsgs)
                    else if not (null refMsgs)
-                     then ("refused", Aeson.toJSON evalResults, Aeson.toJSON refMsgs)
-                     else ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
+                     then ("refused", encode evaluated, Aeson.toJSON refMsgs)
+                     else ("success", encode evaluated, Aeson.Array mempty)
           env = Aeson.object
             [ Key.fromString "input"       Aeson..= input
             , Key.fromString "output"      Aeson..= outputJson
