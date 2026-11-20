@@ -12,8 +12,10 @@
 --   act), not by an act, so the trace header is the only line the opening
 --   can be;
 -- * an act, @PARTY p DOES a AT t@;
--- * a tick, @(`WAIT UNTIL` t)@: the clock passing a deadline with nothing
---   done, which has no party.
+-- * a tick, @(WAITUNTIL t)@: the clock passing a deadline with nothing
+--   done, which has no party. A row written before the rename,
+--   @(`WAIT UNTIL` t)@, still reads (Note [Renamed built-ins] in
+--   "L4.TypeCheck.Environment").
 --
 -- Nothing here evaluates L4. "L4.Ledger.Replay" turns rows into a module and
 -- runs it; this module only says what a row is and how it is spelled.
@@ -216,11 +218,12 @@ eventLine ev t = do
       p' <- canonicalExpr p
       a' <- canonicalExpr a
       pure ("PARTY " <> p' <> " DOES " <> a' <> " AT " <> stamp)
-    TickEvent -> pure ("(`WAIT UNTIL` " <> stamp <> ")")
+    TickEvent -> pure ("(WAITUNTIL " <> stamp <> ")")
 
 -- | A @#TRACE@ line read back as a row's event and time: the inverse of
 -- 'eventLine' on canonical texts, and a reader of the hand-written forms
--- the corpus uses (an unparenthesised action, a bare @`WAIT UNTIL` t@).
+-- the corpus uses (an unparenthesised action, a bare @WAITUNTIL t@, and the
+-- old spelling @`WAIT UNTIL` t@).
 -- The texts come back canonical.
 parseEventLine :: Text -> Either Text (RowEvent, Rational)
 parseEventLine line = do
@@ -248,11 +251,11 @@ parseEventLine line = do
               pure (ActEvent p act, t)
             _ -> Left "an act line ends AT time"
           _ -> Left "an act line reads PARTY party DOES action AT time"
-    [w, s] | word w == "`WAIT UNTIL`" -> (TickEvent,) <$> parseStamp (word s)
+    [w, s] | word w `elem` ["WAITUNTIL", "`WAIT UNTIL`"] -> (TickEvent,) <$> parseStamp (word s)
     [g] | Just inner <- Text.stripPrefix "(" (word g) >>= Text.stripSuffix ")" ->
       case parseEventLine inner of
         Right (TickEvent, t) -> Right (TickEvent, t)
-        _ -> Left "a parenthesised line is a tick, (`WAIT UNTIL` time)"
+        _ -> Left "a parenthesised line is a tick, (WAITUNTIL time)"
     _ -> Left "a #TRACE line is an opening, an act or a tick"
   where
     head1 xs = case xs of (x : _) -> x; [] -> MkSegment "" 0 0

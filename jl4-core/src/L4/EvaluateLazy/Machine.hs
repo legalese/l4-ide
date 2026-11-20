@@ -3173,8 +3173,8 @@ backwardContractFrame val = \ case
       --     deadline, and that instant is also THE JOIN there. The
       --     revealing event's stamp would make the clock depend on how
       --     many idle events the trace carried before it (measured:
-      --     @WAIT UNTIL 10@ alone left a @WITHIN 1@ follow-up pending,
-      --     @WAIT UNTIL 6@ then 10 breached it).
+      --     @WAITUNTIL 10@ alone left a @WITHIN 1@ follow-up pending,
+      --     @WAITUNTIL 6@ then 10 breached it).
       --
       -- Both are floored at the obligation's own arming (§2.6 card A2,
       -- built 2026-10-09): an obligation armed after its deadline — an
@@ -7633,12 +7633,12 @@ contractToEvalDirective contract t evs = do
   -- seen" assumption hold.
   --
   -- We only reorder genuine literal-AT 'Event' nodes relative to one another. Entries
-  -- whose AT is not a literal at parse time (e.g. @`WAIT UNTIL` 100@, which is a runtime
+  -- whose AT is not a literal at parse time (e.g. @WAITUNTIL 100@, which is a runtime
   -- @Number -> Event@ application, or an already-desugared event) carry no extractable
   -- key and stay PINNED in their authored positions -- 'sortByStablePinned' never moves
   -- an unkeyed element. This is why we use a comparison that only orders when both keys
   -- are present, rather than a plain @sortOn@ (which would float unkeyed entries to one
-  -- end and scramble positional markers like WAIT UNTIL).
+  -- end and scramble positional markers like WAITUNTIL).
   evListExpr = List emptyAnno $ map eventExpr (sortByStablePinned eventAtKey evs)
 
 -- | Sort key for an authored event: the literal AT timestamp as a 'Rational'.
@@ -7650,7 +7650,7 @@ eventAtKey _ = Nothing
 -- | A stable sort by a partial key that leaves every element whose key is 'Nothing'
 -- pinned at its original index. Keyed elements ('Just') are stably sorted by their key
 -- among themselves and then poured back into the non-pinned slots in that sorted order;
--- equal keys preserve authored order. Unkeyed elements (e.g. @`WAIT UNTIL` 100@, whose
+-- equal keys preserve authored order. Unkeyed elements (e.g. @WAITUNTIL 100@, whose
 -- AT is not a parse-time literal) never move, so positional markers are preserved.
 -- For an all-keyed, already-monotonic list this is the identity.
 sortByStablePinned :: Ord k => (a -> Maybe k) -> [a] -> [a]

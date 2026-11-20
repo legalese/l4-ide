@@ -673,7 +673,7 @@ spec = do
     -- transition the runtime never makes. Measured with jl4:exe:l4 run:
     --
     --   PARTY Alice MUST pay LEST (PARTY Bob MUST refund WITHIN 5)
-    --   #TRACE ... AT 0 WITH (`WAIT UNTIL` 1000)
+    --   #TRACE ... AT 0 WITH (WAITUNTIL 1000)
     --     ==> the ORIGINAL obligation, as a residual. Bob's refund never
     --         becomes current. Adding WITHIN 30 to the same rule yields
     --         "PARTY Bob MUST refund WITHIN 5", i.e. the arm taken.
@@ -721,7 +721,7 @@ spec = do
       -- DO is documented as requiring an explicit LEST, and the extractor used
       -- to believe the documentation and draw nothing — leaving a rule whose
       -- only drawn outcome was Fulfilled. The evaluator disagrees: measured,
-      -- `PARTY Alice DO pay WITHIN 5` run to (`WAIT UNTIL` 100) yields DEONTIC
+      -- `PARTY Alice DO pay WITHIN 5` run to (WAITUNTIL 100) yields DEONTIC
       -- BREACHED. Contract5 lumps DDo in with DMust.
       it "now draws the breach a bare DO reaches by the clock" $
         lestCaptions (defaultLestSrc "DO") `shouldBe` Right ["timeout"]

@@ -426,13 +426,13 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 12
   PARTY theLandlord DOES Deliver theLandlord AT 13
   PARTY alice DOES Sign alice AT 14
-  (`WAIT UNTIL` 30)
+  (WAITUNTIL 30)
 
 #TRACE `a roll read from the arming` AT 0 WITH
   PARTY alice DOES Sign alice AT 4
   PARTY theLandlord DOES Deliver theLandlord AT 13
   PARTY alice DOES Sign alice AT 14
-  (`WAIT UNTIL` 30)
+  (WAITUNTIL 30)
 
 -- The same choice made by a WHO filter over both tenants: the same answers.
 GIVETH A DEONTIC Actor Action
@@ -450,13 +450,13 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 12
   PARTY theLandlord DOES Deliver theLandlord AT 13
   PARTY alice DOES Sign alice AT 14
-  (`WAIT UNTIL` 30)
+  (WAITUNTIL 30)
 
 #TRACE `a filter read from the arming` AT 0 WITH
   PARTY alice DOES Sign alice AT 4
   PARTY theLandlord DOES Deliver theLandlord AT 13
   PARTY alice DOES Sign alice AT 14
-  (`WAIT UNTIL` 30)
+  (WAITUNTIL 30)
 
 -- On a top-level EVERY's act line and join line, THE ARMING is the EVERY's
 -- own arming, here 5. On the act line: each tenant must sign by 5 + 10 =
@@ -534,7 +534,7 @@ GIVETH A DEONTIC Actor Action
 #TRACE `a window opened by a value` AT 0 WITH
   PARTY alice DOES Sign alice AT 4
   PARTY theLandlord DOES Deliver theLandlord AT 6
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 GIVETH A DEONTIC Actor Action
 `a window opened by the anchor` MEANS
@@ -549,4 +549,4 @@ GIVETH A DEONTIC Actor Action
 #TRACE `a window opened by the anchor` AT 0 WITH
   PARTY alice DOES Sign alice AT 4
   PARTY theLandlord DOES Deliver theLandlord AT 6
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)

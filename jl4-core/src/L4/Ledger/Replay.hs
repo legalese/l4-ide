@@ -237,7 +237,7 @@ positionAt cfg bound dep rows =
 -- | The rows' events as the type checker resolved them: the @#TRACE@'s
 -- event expressions, in order (the opening is the directive itself, not an
 -- event). Pure. This is the round trip from a row to what "L4.Lts.WhatIf"
--- replays: a tick row lifts to the @WAIT UNTIL@ application
+-- replays: a tick row lifts to the @WAITUNTIL@ application
 -- 'hypotheticalExpr' builds for a 'Tick'.
 liftEvents :: Deployment -> [(RowEvent, Rational)] -> Either Failure [Expr Resolved]
 liftEvents dep evs = do

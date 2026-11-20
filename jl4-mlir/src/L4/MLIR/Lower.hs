@@ -2055,6 +2055,9 @@ lowerExprCases expr expectedTy = case expr of
             ("ACOS",        [n_])              -> runtimeCall "__l4_acos"       [n_]
             ("ATAN",        [n_])              -> runtimeCall "__l4_atan"       [n_]
             ("TRUNC",       [a_, b_])          -> runtimeCall "__l4_trunc"      [a_, b_]
+            ("ISINTEGER",   [n_])              -> runtimeCall "__l4_is_integer" [n_]
+            -- The old spelling, which unstable still accepts with a warning
+            -- (Note [Renamed built-ins] in L4.TypeCheck.Environment).
             ("IS INTEGER",  [n_])              -> runtimeCall "__l4_is_integer" [n_]
             -- String intrinsics.
             ("STRINGLENGTH",[s_])              -> runtimeCall "__l4_string_length" [s_]

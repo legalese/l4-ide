@@ -36,5 +36,5 @@ DECIDE `substitute` IS REPLACE s a b
 @export Is integer check
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
-DECIDE `whole number` IS `IS INTEGER` n
+DECIDE `whole number` IS ISINTEGER n
 

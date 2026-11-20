@@ -54,8 +54,8 @@ GIVETH A NUMBER
 
 § `1. the last member on the roll fails first: THE DEADLINE is hers`
 
--- Alice signs at 1. Carol misses 5 (revealed by WAIT UNTIL 8); Bob misses
--- 14 (revealed by WAIT UNTIL 20). The LEST is anchored at Carol's failure
+-- Alice signs at 1. Carol misses 5 (revealed by WAITUNTIL 8); Bob misses
+-- 14 (revealed by WAITUNTIL 20). The LEST is anchored at Carol's failure
 -- (revealed at 8, before Bob's at 20), and THE DEADLINE under it is CAROL's,
 -- 5: the refund is due 5 + 5 = 10. A refund at 10 is timely; at 11 the
 -- breach reports 10. Were THE DEADLINE Bob's — first on the roll to fail,
@@ -72,15 +72,15 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 10
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 
 § `2. the roll reversed: the same member, the same deadline`
@@ -88,20 +88,20 @@ GIVETH A DEONTIC Actor Action
 -- Carol is now FIRST on the roll. Same events, same answer: due 10.
 #TRACE `staggered` `tenants, reversed` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 10
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `staggered` `tenants, reversed` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 
 § `3. a tie: both misses revealed by the SAME event`
 
--- Nothing happens between Carol's deadline (5) and Bob's (14): WAIT UNTIL 20
+-- Nothing happens between Carol's deadline (5) and Bob's (14): WAITUNTIL 20
 -- reveals both at once. The residual stream is the same whichever member is
 -- chosen; THE DEADLINE is 5 or 14 depending on it. The earliest failure by
 -- R-Q5 is Carol's (5 < 14) from either roll, and the refund at 21 reports
@@ -114,12 +114,12 @@ GIVETH A DEONTIC Actor Action
 -- measured 2026-09-16 before the tie-break was added.
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
   PARTY theLandlord DOES Refund theLandlord AT 21
 
 #TRACE `staggered` `tenants, reversed` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
   PARTY theLandlord DOES Refund theLandlord AT 21
 
 
@@ -130,9 +130,9 @@ GIVETH A DEONTIC Actor Action
 -- all fail at the deadline), and under a barrier that has a LEST the
 -- expiry is a failure the LEST is anchored at, exactly as a MUST member's
 -- miss is. Alice approves at 1. Carol's permission (window 5) expires
--- unexercised, revealed by WAIT UNTIL 8; Bob's (14) by WAIT UNTIL 20. THE
+-- unexercised, revealed by WAITUNTIL 8; Bob's (14) by WAITUNTIL 20. THE
 -- DEADLINE under the LEST is Carol's 5, so the refund is due 10: at 10
--- FULFILLED, at 11 BREACHED reporting 10, on both rolls. When WAIT UNTIL 20
+-- FULFILLED, at 11 BREACHED reporting 10, on both rolls. When WAITUNTIL 20
 -- reveals both expiries at once the anchor still orders them, 5 < 14 (§5.2:
 -- the anchor is the deadline, not the revealing stamp), and the refund at
 -- 21 reports 10 on both rolls. When everybody approves in time the join
@@ -149,30 +149,30 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `may approve` tenants AT 0 WITH
   PARTY alice DOES Approve alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 10
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `may approve` tenants AT 0 WITH
   PARTY alice DOES Approve alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `may approve` `tenants, reversed` AT 0 WITH
   PARTY alice DOES Approve alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `may approve` tenants AT 0 WITH
   PARTY alice DOES Approve alice AT 1
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
   PARTY theLandlord DOES Refund theLandlord AT 21
 
 #TRACE `may approve` `tenants, reversed` AT 0 WITH
   PARTY alice DOES Approve alice AT 1
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
   PARTY theLandlord DOES Refund theLandlord AT 21
 
 #TRACE `may approve` tenants AT 0 WITH
@@ -185,7 +185,7 @@ GIVETH A DEONTIC Actor Action
 
 -- DO is the bare form, and behaves as MUST does: a DO member's miss is
 -- revealed and ordered exactly as a MUST member's. Carol misses 5,
--- revealed by WAIT UNTIL 8; THE DEADLINE under the LEST is hers, so the
+-- revealed by WAITUNTIL 8; THE DEADLINE under the LEST is hers, so the
 -- refund is due 10: at 10 FULFILLED, at 11 BREACHED reporting 10, on both
 -- rolls.
 GIVEN roll IS A LIST OF Actor
@@ -200,21 +200,21 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `do staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 10
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `do staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `do staggered` `tenants, reversed` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 
 § `4. SHANT: the violating stamp orders, the window's end is THE DEADLINE`
@@ -239,19 +239,19 @@ GIVETH A DEONTIC Actor Action
   PARTY carol DOES Smoke carol AT 3
   PARTY bob   DOES Smoke bob   AT 10
   PARTY theLandlord DOES Refund theLandlord AT 10
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `no smoking` tenants AT 0 WITH
   PARTY carol DOES Smoke carol AT 3
   PARTY bob   DOES Smoke bob   AT 10
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `no smoking` `tenants, reversed` AT 0 WITH
   PARTY carol DOES Smoke carol AT 3
   PARTY bob   DOES Smoke bob   AT 10
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 
 § `4b. SHANT at one stamp: two events, two residuals — the stream orders`
@@ -271,13 +271,13 @@ GIVETH A DEONTIC Actor Action
   PARTY bob   DOES Smoke bob   AT 3
   PARTY theLandlord DOES Refund theLandlord AT 3
   PARTY carol DOES Smoke carol AT 3
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `no smoking` `tenants, reversed` AT 0 WITH
   PARTY bob   DOES Smoke bob   AT 3
   PARTY theLandlord DOES Refund theLandlord AT 3
   PARTY carol DOES Smoke carol AT 3
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- The same two violations with the refund AFTER both. Bob's failure is
 -- still the first in the stream, so THE DEADLINE is 14 and the refund is
@@ -288,7 +288,7 @@ GIVETH A DEONTIC Actor Action
   PARTY bob   DOES Smoke bob   AT 3
   PARTY carol DOES Smoke carol AT 3
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `no smoking` tenants AT 0 WITH
   PARTY bob   DOES Smoke bob   AT 3
@@ -305,7 +305,7 @@ GIVETH A DEONTIC Actor Action
 
 -- Alice signs at 4: the join is 4, THE DEADLINE 10. The landlord's delivery
 -- is due 10 + 5 = 15 (OF THE DEADLINE); Bob's signature 4 + 3 = 7 (OF THE
--- JOIN). Neither happens; WAIT UNTIL 20 reveals both at once. The RAND is
+-- JOIN). Neither happens; WAITUNTIL 20 reveals both at once. The RAND is
 -- lost at the earlier failure, Bob's at 7, whichever operand it is
 -- (EVERY-EACH-QUANTIFIER-SPEC §6.1.2), and it names BOTH failures, left
 -- first, each with the deadline its anchor produced: the landlord's 15,
@@ -319,4 +319,4 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `both anchored` AT 0 WITH
   PARTY alice DOES Sign alice AT 4
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)

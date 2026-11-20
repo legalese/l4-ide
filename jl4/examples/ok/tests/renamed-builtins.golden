@@ -1,0 +1,38 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+renamed-builtins.l4:14:1-15:21:
+  DEONTIC BREACHED:
+    BREACH
+renamed-builtins.l4:15:6-18:
+  `WAIT UNTIL` has been renamed to WAITUNTIL.
+  Nothing is broken: the old spelling still means the same thing, so this
+  file checks and runs as before.
+  
+  Write WAITUNTIL, in one word and without backquotes, as every other
+  built-in is written. Some versions of L4 no longer accept the old spelling.
+renamed-builtins.l4:18:1-19:18:
+  DEONTIC BREACHED:
+    BREACH
+renamed-builtins.l4:24:22-34:
+  `IS INTEGER` has been renamed to ISINTEGER.
+  Nothing is broken: the old spelling still means the same thing, so this
+  file checks and runs as before.
+  
+  Write ISINTEGER, in one word and without backquotes, as every other
+  built-in is written. Some versions of L4 no longer accept the old spelling.
+renamed-builtins.l4:24:41-53:
+  `IS INTEGER` has been renamed to ISINTEGER.
+  Nothing is broken: the old spelling still means the same thing, so this
+  file checks and runs as before.
+  
+  Write ISINTEGER, in one word and without backquotes, as every other
+  built-in is written. Some versions of L4 no longer accept the old spelling.
+renamed-builtins.l4:26:1-21:
+  TRUE
+renamed-builtins.l4:27:1-23:
+  FALSE
+renamed-builtins.l4:30:1-18:
+  TRUE
+renamed-builtins.l4:31:1-20:
+  FALSE

@@ -125,7 +125,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
-import Optics ((%~), (^.), gplate)
+import Optics ((%~), (^.), gplate, toListOf)
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
@@ -429,6 +429,7 @@ checkProgram written = do
     rdecides <- scanFunSigModule module'
     withDecides rdecides do
       (rprog, topEnv) <- inferProgram module'
+      warnRenamedBuiltins rprog
       -- Build the mixfix registry from THIS module's function signatures
       -- so it can be propagated to importing modules
       let localMixfixRegistry = buildMixfixRegistry rdecides
@@ -463,6 +464,29 @@ warnClauseArityChange (MkModule _ _ sec) = goSection sec
       for_ decls \ case
         Section _ sub -> goSection sub
         _ -> pure ()
+
+-- | One 'RenamedBuiltin' warning for each place a renamed built-in is written
+-- with its old spelling (Note [Renamed built-ins] in
+-- "L4.TypeCheck.Environment").
+--
+-- It runs once, over the checked module, rather than where a name is
+-- resolved: overload resolution may check an expression more than once and
+-- keep only one attempt's diagnostics, which would repeat or drop a warning
+-- raised there. A place is counted once even if the tree holds two copies of
+-- its reference, because the warnings are keyed by the range written.
+warnRenamedBuiltins :: Module Resolved -> Check ()
+warnRenamedBuiltins rprog =
+  for_ (Map.toList sites) \ (r, (old, new)) -> addWarning (RenamedBuiltin r old new)
+  where
+    sites =
+      Map.fromList
+        [ (r, (old, nameToText new))
+        | Ref written u _ <- toListOf (gplate @Resolved) rprog
+        , (u', old, new) <- renamedBuiltins
+        , u == u'
+        , rawName written == NormalName old
+        , Just r <- [rangeOf written]
+        ]
 
 -- | Turn each run of clauses that the parser grouped only because their bare
 -- names differ ('L4.Parser.decidePatternMatch') back into the separate
@@ -3766,7 +3790,7 @@ constructorsInScopeFromEntityInfo ei =
 -- was shadowed by its own term constructor in 'initialEnvironment', making
 -- event-typed annotations unwritable. Now that the shadowing is fixed (both
 -- uniques share the one key), @EVENT@ is checked like any other sum type: its
--- scanned set is the sole @event@ constructor (@WAIT UNTIL@ is 'Computable' and
+-- scanned set is the sole @event@ constructor (@WAITUNTIL@ is 'Computable' and
 -- delegates to it), which is COMPLETE, so the check is sound. See issue #905.
 --
 -- @MAYBE@ and @EITHER@ have COMPLETE, all-'Constructor' sets
@@ -8615,6 +8639,14 @@ prettyCheckWarning = \ case
       , "Rename one of the two, so the name means only one thing where you"
       , "write it, and then the keyword can go."
       ]
+  RenamedBuiltin _ old new ->
+    [ "`" <> old <> "` has been renamed to " <> new <> "."
+    , "Nothing is broken: the old spelling still means the same thing, so this"
+    , "file checks and runs as before."
+    , ""
+    , "Write " <> new <> ", in one word and without backquotes, as every other"
+    , "built-in is written. Some versions of L4 no longer accept the old spelling."
+    ]
   SiblingLedgerRead w
     | Just rorSite <- w.unrunRor ->
     [ opening

@@ -71,14 +71,14 @@ GIVETH A DEONTIC Actor Action
     LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `sign or refund` AT 0 WITH
-  (`WAIT UNTIL` 14)
+  (WAITUNTIL 14)
 
 #TRACE `sign or refund` AT 0 WITH
-  (`WAIT UNTIL` 14)
+  (WAITUNTIL 14)
   PARTY theLandlord DOES Refund theLandlord AT 15
 
 #TRACE `sign or refund` AT 0 WITH
-  (`WAIT UNTIL` 14)
+  (WAITUNTIL 14)
   PARTY theLandlord DOES Refund theLandlord AT 18
 
 -- The same clock said out loud: `OF THE DEADLINE` names the instant the
@@ -90,10 +90,10 @@ GIVETH A DEONTIC Actor Action
     LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `sign or refund, anchored` AT 0 WITH
-  (`WAIT UNTIL` 14)
+  (WAITUNTIL 14)
 
 #TRACE `sign or refund, anchored` AT 0 WITH
-  (`WAIT UNTIL` 14)
+  (WAITUNTIL 14)
   PARTY theLandlord DOES Refund theLandlord AT 18
 
 -- The revealing event is still re-offered to the LEST, so a refund that is
@@ -116,7 +116,7 @@ GIVETH A DEONTIC Actor Action
 -- breach reports 15. (Until 2026-09-16 the refund's clock started at 100
 -- and the answer was a residual with five days on it.)
 #TRACE `sign or refund` AT 0 WITH
-  (`WAIT UNTIL` 100)
+  (WAITUNTIL 100)
 
 
 § `3. a barrier: the LEST counts from the earliest-failing member's deadline`
@@ -140,35 +140,35 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 10
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 #TRACE `staggered` `tenants, reversed` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
--- Both misses revealed by one WAIT UNTIL 20: the anchor is Carol's 5, not
+-- Both misses revealed by one WAITUNTIL 20: the anchor is Carol's 5, not
 -- Bob's 14 and not the 20 that revealed them, so the refund was due at 10
 -- on both rolls. The revealing WAIT, re-offered to the LEST, already lies
 -- past that: the breach reports 10, dated at the WAIT (20), and the refund
 -- at 21 is never reached.
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
   PARTY theLandlord DOES Refund theLandlord AT 21
 
 #TRACE `staggered` `tenants, reversed` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
   PARTY theLandlord DOES Refund theLandlord AT 21
 
 -- The anchored twin, on the first trace: the same 10.
@@ -184,9 +184,9 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `staggered, anchored` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 
 § `4. a fork: each member's LEST counts from that member's own deadline`
@@ -206,12 +206,12 @@ GIVETH A DEONTIC Actor Action
         LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `each signs or refund` AT 0 WITH
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 10
   PARTY theLandlord DOES Refund theLandlord AT 19
 
 #TRACE `each signs or refund` AT 0 WITH
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 10
   PARTY theLandlord DOES Refund theLandlord AT 20
 
@@ -273,7 +273,7 @@ GIVETH A DEONTIC Actor Action
   PARTY carol DOES Sign carol AT 3
   PARTY alice DOES Sign alice AT 4
   PARTY bob   DOES Sign bob   AT 12
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- A refund at 11 — after the state deadline, before Bob's late signature —
 -- is in the stream the LEST sees, and discharges it. (The join's own
@@ -284,7 +284,7 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 4
   PARTY theLandlord DOES Refund theLandlord AT 11
   PARTY bob   DOES Sign bob   AT 12
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- Boundary and breach: a refund at 15 is timely, at 16 the breach reports 15.
 #TRACE `bounded` tenants AT 0 WITH
@@ -315,7 +315,7 @@ GIVETH A DEONTIC Actor Action
   PARTY carol DOES Sign carol AT 3
   PARTY alice DOES Sign alice AT 4
   PARTY bob   DOES Sign bob   AT 12
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 
 § `7. MAY and DO: a lapse fails at the deadline, as a MUST does`
@@ -330,14 +330,14 @@ GIVETH A DEONTIC Actor Action
     LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `may approve or refund` AT 0 WITH
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
 
 #TRACE `may approve or refund` AT 0 WITH
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 10
 
 #TRACE `may approve or refund` AT 0 WITH
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 11
 
 -- DO is the bare form and behaves as MUST: at 14 one day remains.
@@ -348,7 +348,7 @@ GIVETH A DEONTIC Actor Action
     LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `do sign or refund` AT 0 WITH
-  (`WAIT UNTIL` 14)
+  (WAITUNTIL 14)
 
 
 § `8. a chain: the second chance runs from the first deadline`
@@ -366,14 +366,14 @@ GIVETH A DEONTIC Actor Action
            LEST BREACH BY alice BECAUSE "the second chance was missed too")
 
 #TRACE `sign, with a second chance` AT 0 WITH
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
 
 #TRACE `sign, with a second chance` AT 0 WITH
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY alice DOES Sign alice AT 21
 
 #TRACE `sign, with a second chance` AT 0 WITH
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY alice DOES Sign alice AT 22
 
 
@@ -399,10 +399,10 @@ GIVETH A DEONTIC Actor Action
     LEST  `sign, or try again`
 
 #TRACE `sign, or try again` AT 0 WITH
-  (`WAIT UNTIL` 100)
+  (WAITUNTIL 100)
 
 #TRACE `sign, or try again` AT 0 WITH
-  (`WAIT UNTIL` 100)
+  (WAITUNTIL 100)
   PARTY alice DOES Sign alice AT 101
 
 -- Three layers, and ONE event past the first two: the signature at 100 is
@@ -439,10 +439,10 @@ GIVETH A DEONTIC Actor Action
                   LEST  BREACH BY alice BECAUSE "all three chances missed"))
 
 #TRACE `three chances` AT 0 WITH
-  (`WAIT UNTIL` 100)
+  (WAITUNTIL 100)
 
 #TRACE `three chances` AT 0 WITH
-  (`WAIT UNTIL` 100)
+  (WAITUNTIL 100)
   PARTY alice DOES Sign alice AT 101
 
 
@@ -464,9 +464,9 @@ GIVETH A DEONTIC Actor Action
            HENCE (PARTY bob MUST Approve bob WITHIN 3 OF THE ARMING))
 
 #TRACE `arming under lest` AT 0 WITH
-  (`WAIT UNTIL` 14)
+  (WAITUNTIL 14)
   PARTY theLandlord DOES Refund theLandlord AT 16
-  (`WAIT UNTIL` 16)
+  (WAITUNTIL 16)
 
 -- Under HENCE nothing moved: the continuation is applied at the act, so
 -- THE ARMING read two levels down under a HENCE is that act's stamp.
@@ -479,7 +479,7 @@ GIVETH A DEONTIC Actor Action
 #TRACE `arming under hence` AT 0 WITH
   PARTY alice DOES Sign alice AT 4
   PARTY theLandlord DOES Refund theLandlord AT 6
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
 
 
 § `11. a layer whose deadline does not advance is walked, not skipped`
@@ -512,21 +512,21 @@ GIVETH A DEONTIC Actor Action
   PARTY theLandlord DOES Refund theLandlord AT 12
 
 #TRACE `stuck in the middle` AT 0 WITH
-  (`WAIT UNTIL` 11)
+  (WAITUNTIL 11)
   PARTY theLandlord DOES Refund theLandlord AT 12
 
 #TRACE `stuck in the middle` AT 0 WITH
   PARTY theLandlord DOES Refund theLandlord AT 20
 
 #TRACE `stuck in the middle` AT 0 WITH
-  (`WAIT UNTIL` 11)
+  (WAITUNTIL 11)
   PARTY theLandlord DOES Refund theLandlord AT 20
 
 #TRACE `stuck in the middle` AT 0 WITH
   PARTY theLandlord DOES Refund theLandlord AT 21
 
 #TRACE `stuck in the middle` AT 0 WITH
-  (`WAIT UNTIL` 11)
+  (WAITUNTIL 11)
   PARTY theLandlord DOES Refund theLandlord AT 21
 
 -- A `WITHIN 0` second chance — sign forthwith — is the same shape with the
@@ -544,7 +544,7 @@ GIVETH A DEONTIC Actor Action
   PARTY theLandlord DOES Refund theLandlord AT 12
 
 #TRACE `forthwith` AT 0 WITH
-  (`WAIT UNTIL` 11)
+  (WAITUNTIL 11)
   PARTY theLandlord DOES Refund theLandlord AT 12
 
 #TRACE `forthwith` AT 0 WITH

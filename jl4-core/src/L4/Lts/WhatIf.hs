@@ -22,7 +22,7 @@
 --   shape, stamped at the position's clock — the party as the machine
 --   forced it, the action pattern instantiated ('patternExpr'); and
 -- * for every distinct live deadline, a clock tick to just past it — a
---   @WAIT UNTIL@, the machine's own no-party event, stamped by 'tickPast'
+--   @WAITUNTIL@, the machine's own no-party event, stamped by 'tickPast'
 --   so that no other live deadline lies between.
 --
 -- An action pattern that BINDS a variable (@pay amount@ with no @EXACTLY@)
@@ -215,7 +215,7 @@ positionFrom rig tr extra (topLevel, mres) = flip fmap mres \ (res, steps) ->
       }
 
 -- | The stamp an authored event carries, when it is a literal: the @AT@ of
--- a @PARTY … DOES … AT n@, the argument of a @WAIT UNTIL n@, or a bare
+-- a @PARTY … DOES … AT n@, the argument of a @WAITUNTIL n@, or a bare
 -- number (the @AT@ itself).
 literalStamp :: Expr Resolved -> Maybe Rational
 literalStamp = \ case
@@ -233,7 +233,7 @@ data Hypothetical
       }
     -- ^ endpoint 22: @PARTY p DOES a AT t@
   | Tick { hyAt :: !Rational }
-    -- ^ endpoint 24: nothing happens until @t@ — a @WAIT UNTIL t@
+    -- ^ endpoint 24: nothing happens until @t@ — a @WAITUNTIL t@
   deriving stock (Eq, Show)
 
 -- | The hypothetical as an authored event would be, ready to append.

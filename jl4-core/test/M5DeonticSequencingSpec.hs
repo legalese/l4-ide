@@ -203,7 +203,7 @@ d5Src = Text.unlines
   , ""
   , "#TRACE d5Chain AT 0 WITH"
   , "  PARTY Alice DOES deliver AT 2"
-  , "  (`WAIT UNTIL` 100)"
+  , "  (WAITUNTIL 100)"
   ]
 
 spec :: Spec
