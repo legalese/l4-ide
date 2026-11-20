@@ -160,6 +160,33 @@ spec = describe "Compatibility.detectBreakingChanges" do
               [result (objP [("reason", prim "string"), ("note", prim "string")] [])]
         `shouldBe` []
 
+  -- A type whose only constructor is named like it is a record, its fields
+  -- alone; given a second constructor, it is an object keyed by constructor.
+  -- The gate says the form changed, naming both, where a key-by-key diff said
+  -- each field was removed (review of #779, 2026-11-20).
+  describe "a type whose only constructor is named like it, given a second" do
+    let amount = objP [("amount", prim "number")] ["amount"]
+        court = objP [("court", prim "string")] ["court"]
+        input p = fn "decide" (ps [("o", p)] ["o"]) "NUMBER" Nothing
+        result p = fn "decide" (ps [] []) "Outcome" (Just p)
+        fieldsToKeyed = "form changed from an object of its fields (amount) to an object keyed by its constructor (Appealed, Outcome)"
+    it "an input's form changed, from its fields to an object keyed by constructor" do
+      changes [input amount] [input (taggedP [("Outcome", amount), ("Appealed", court)])]
+        `shouldBe` ["decide parameter o " <> fieldsToKeyed]
+    it "and one given a second constructor that carries no fields" do
+      changes [input amount] [input (mixedP ["Withdrawn"] [("Outcome", amount)])]
+        `shouldBe` ["decide parameter o form changed from an object of its fields (amount) to an object keyed by its constructor (Outcome)"]
+    it "a result's form changed, and one given a fieldless second may now return a string too" do
+      changes [result amount] [result (taggedP [("Outcome", amount), ("Appealed", court)])]
+        `shouldBe` ["decide return value " <> fieldsToKeyed]
+      changes [result amount] [result (mixedP ["Withdrawn"] [("Outcome", amount)])]
+        `shouldBe`
+          [ "decide return value form changed from an object of its fields (amount) to an object keyed by its constructor (Outcome)"
+          , "decide return value may now return a string" ]
+    it "the other way, an input's form changed from an object keyed by constructor to its fields" do
+      changes [input (taggedP [("Outcome", amount), ("Appealed", court)])] [input amount]
+        `shouldBe` ["decide parameter o form changed from an object keyed by its constructor (Appealed, Outcome) to an object of its fields (amount)"]
+
   describe "whole functions" do
     it "identical interface is compatible" do
       let f = fn "isEligible" (ps [("age", prim "number")] ["age"]) "BOOLEAN" Nothing

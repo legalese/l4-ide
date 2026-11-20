@@ -34,6 +34,11 @@
 -- result is breaking (comparing a matched form by the rules above is assumed,
 -- not ruled).
 --
+-- A record's object (an object of its fields) on one side and an object keyed
+-- by constructor on the other, as when a type whose only constructor is named
+-- like it gains a second, is reported as a change of form, naming both, in
+-- either direction (review of #779, 2026-11-20).
+--
 -- The keys of the tagged object are constructors, alternatives of which a value
 -- holds one, not fields a value holds together, so they are compared as an
 -- enum's names are: one added to a result is breaking ("may now return new
@@ -157,9 +162,22 @@ diffNode dir fn loc old new
       && old.parameterType /= new.parameterType =
       [ subject fn dir loc <> " type changed from "
           <> old.parameterType <> " to " <> new.parameterType ]
+  -- A record's object and an object keyed by constructor are both objects,
+  -- and a key-by-key diff of one against the other reports each field of the
+  -- record as removed (or no longer returned), which is not what changed. A
+  -- type whose only constructor is named like it is a record, its fields
+  -- alone; given a second constructor, it is keyed by constructor. Report
+  -- that the form changed, and stop here (review of #779, 2026-11-20).
+  | formChanged =
+      [ subject fn dir loc <> " form changed from " <> objectForm old <> " to " <> objectForm new ]
   | otherwise =
       formatMsgs ++ enumMsgs ++ objectMsgs ++ itemsMsgs
  where
+  formChanged =
+    (isRecordObject old && isAlternatives new) || (isAlternatives old && isRecordObject new)
+  objectForm p =
+    (if isAlternatives p then "an object keyed by its constructor (" else "an object of its fields (")
+      <> Text.intercalate ", " (maybe [] Map.keys p.parameterProperties) <> ")"
   oldForms = formsOf old
   newForms = formsOf new
   takesOrGives = case dir of In -> "accepts"; Out -> "returns"
@@ -216,6 +234,11 @@ diffNode dir fn loc old new
 -- always has.
 isAlternatives :: Parameter -> Bool
 isAlternatives p = isJust p.parameterProperties && p.parameterRequired == Nothing
+
+-- | A record's object: its schema always has a @required@
+-- ('L4.FunctionSchema.shapeToParameter').
+isRecordObject :: Parameter -> Bool
+isRecordObject p = isJust p.parameterProperties && isJust p.parameterRequired
 
 -- | Diff the keys of two objects of alternatives ('isAlternatives') as an enum's
 -- names are diffed: one added to a result, or removed from an input, is

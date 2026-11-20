@@ -226,6 +226,31 @@ spec = describe "PUT deployment compatibility guard (end-to-end)" do
       (st, _) <- verdict "guard-outcome-same" (outcome appealed) (outcome appealed)
       st `shouldBe` "applied"
 
+  -- A type whose only constructor is named like it is a record, its fields
+  -- alone; given a second constructor, its form changes to an object keyed by
+  -- constructor, and the gate says so (review of #779, 2026-11-20).
+  describe "a type whose only constructor is named like it, given a second" do
+    let verdict deployId old new = withService $ \baseUrl mgr -> do
+          deployApplied baseUrl mgr deployId Nothing old
+          r <- deployPut baseUrl mgr deployId Nothing new
+          uid <- mustUpdateId r
+          pollJob baseUrl mgr deployId uid
+        single = ["Outcome HAS amount IS A NUMBER"]
+        two = single <> ["Appealed HAS court IS A STRING"]
+        takes ctors = outcomeSrc ctors "GIVEN o IS AN Outcome" "GIVETH A NUMBER" "decision MEANS 1"
+        gives ctors = outcomeSrc ctors "GIVEN n IS A NUMBER" "GIVETH AN Outcome" "decision MEANS Outcome n"
+        fieldsToKeyed = "form changed from an object of its fields (amount) to an object keyed by its constructor (Appealed, Outcome)"
+    it "rejects an input whose form changed, naming both forms" do
+      (st, err) <- verdict "guard-self-named-input" (takes single) (takes two)
+      st `shouldBe` "rejected"
+      fromMaybe "" err `shouldSatisfy` Text.isInfixOf ("decision parameter o " <> fieldsToKeyed)
+      fromMaybe "" err `shouldNotSatisfy` Text.isInfixOf "removed"
+    it "rejects a result whose form changed, naming both forms" do
+      (st, err) <- verdict "guard-self-named-result" (gives single) (gives two)
+      st `shouldBe` "rejected"
+      fromMaybe "" err `shouldSatisfy` Text.isInfixOf ("decision return value " <> fieldsToKeyed)
+      fromMaybe "" err `shouldNotSatisfy` Text.isInfixOf "no longer returned"
+
 ------------------------------------------------------------------------
 -- Harness
 ------------------------------------------------------------------------
