@@ -194,7 +194,7 @@ spec = describe "cycle report (#1075 layer 2)" do
   describe "deadlines that do not move with the arming (adversarial pass)" do
     it "a bare WITHIN beside AFTER a fixed instant (stalled at run time)" $
       verdicts (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick AFTER 2 OF 0 WITHIN 1 LEST x")
-        `shouldReturn` [Unproved (Stalled [AnchoredAtInstant])]
+        `shouldReturn` [Unproved (Stalled [OpensAtInstant])]
 
     it "a bare WITHIN beside an AFTER that is not a number written out (stalled at run time at AFTER -5)" $
       verdicts (people <> "back MEANS 0 MINUS 5\n\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick AFTER back WITHIN 1 LEST x")
@@ -202,7 +202,7 @@ spec = describe "cycle report (#1075 layer 2)" do
 
     it "a MUST NOT's HENCE beside AFTER a fixed instant (stalled at run time)" $
       verdicts (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST NOT tick AFTER 2 OF 0 WITHIN 1 HENCE x")
-        `shouldReturn` [Unproved (Stalled [AnchoredAtInstant])]
+        `shouldReturn` [Unproved (Stalled [OpensAtInstant])]
 
     it "WITHIN 1 OF THE DEADLINE of a deadline at a fixed instant (stalled at run time)" $
       verdicts (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST (PARTY Alice MUST tick WITHIN 1 OF THE DEADLINE LEST x)")

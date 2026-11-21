@@ -165,6 +165,11 @@ data Stall
   | OpensNotLiteral
     -- ^ @AFTER@ a date, or a number not written out, beside a bare @WITHIN@:
     -- the window may open at a fixed instant
+  | OpensAtInstant
+    -- ^ @AFTER d OF e@ beside a bare @WITHIN@: the window opens at a fixed
+    -- instant, so the deadline is fixed too
+  | OpensAtJoin
+    -- ^ @AFTER d OF THE JOIN@ beside a bare @WITHIN@: not shown either way
   | BeforeDate
     -- ^ @BEFORE date@: an instant, already past once the trace has passed it
   | RecordHence
@@ -388,6 +393,8 @@ stallReason = \ case
   AnchoredAtJoin -> "one of its deadlines is counted from THE JOIN (WITHIN … OF THE JOIN), and I cannot tell when that is"
   AnchoredAtDeadline -> "one of its deadlines is another duty's deadline (OF THE DEADLINE), taken when that duty hands on, and it may already be past"
   OpensNotLiteral -> "one of its duties opens at a moment that is not a number written out (AFTER …), which may be a fixed moment already past"
+  OpensAtInstant -> "one of its duties opens at a time counted from a fixed moment (AFTER … OF …), so its deadline is fixed too, and once that is past, each new copy is already late"
+  OpensAtJoin -> "one of its duties opens at a time counted from THE JOIN (AFTER … OF THE JOIN), and I cannot tell when that is"
   BeforeDate -> "one of its deadlines is a date (BEFORE …), and once that date is past, each new copy is already late"
   RecordHence -> "the HENCE after a RECORD goes on straight away, without waiting for anything"
   BarrierMayBeEmpty -> "it waits for everyone in a list to act (EVERY … ONCE ALL HAVE), the list may be empty, and over an empty list it goes on straight away"

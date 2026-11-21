@@ -946,8 +946,8 @@ moduleGraph trust through m =
     opening od = \ case
       Nothing -> Relative 0
       Just (MkOpening _ off anchor) -> case anchor of
-        Just AnchorAt {} -> Fixed AnchoredAtInstant
-        Just AnchorJoin {} -> Fixed AnchoredAtJoin
+        Just AnchorAt {} -> Fixed OpensAtInstant
+        Just AnchorJoin {} -> Fixed OpensAtJoin
         Just AnchorDeadline {} -> plus (after off) (outer od)
         _ -> after off
     after off = maybe (Fixed OpensNotLiteral) Relative (number off)

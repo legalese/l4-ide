@@ -81,6 +81,7 @@ When the wait is anything else, the warning says which, and why that may not be 
 | a deadline counted from a fixed moment, `WITHIN … OF …`     | once that moment is past, each new copy is already late                  |
 | a date, `BEFORE …`                                          | once that date is past, each new copy is already late                    |
 | a window that opens `AFTER` something not written out       | it may open at a fixed moment already past                               |
+| a window that opens `AFTER … OF …`, counted from a moment   | its deadline is fixed too, and once past, each new copy is already late  |
 | another duty's deadline, `OF THE DEADLINE`                  | it is taken when that duty hands on, and may already be past             |
 | `OF THE JOIN`                                               | L4 cannot tell when that is                                              |
 | the `HENCE` after a `RECORD`                                | it goes on straight away                                                 |
