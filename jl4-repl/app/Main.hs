@@ -33,11 +33,11 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, EvalLimits(..), applyEvalLimits, withTracedWorkNumber, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
+import L4.EvaluateLazy (EvalConfig (..), EvalLimits(..), applyEvalLimits, withTracedWorkNumber, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.EvaluateLazy.Exceptions (maximumClosureApplications, maximumOpenObligations)
-import L4.TracePolicy (replDefaultPolicy)
+import L4.TracePolicy (fullTracePolicy, replDefaultPolicy)
 import L4.DirectiveFilter (filterIdeDirectives)
 import qualified L4.Print as Print
 import L4.Syntax (Module (..), Resolved, RawName (..), Unique, rawName, rawNameToText, getActual, Name (..), Decide (..), TopDecl (..), Section (..), AppForm (..))
@@ -765,7 +765,7 @@ evalWithTrace st contextFile exprText = do
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
     Just tc -> do
       -- Get evaluation results WITH trace
-      [meval] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.EvaluateLazy replUri]
+      meval <- traceLine st replUri tc
       case meval of
         Nothing -> pure "Evaluation failed"
         Just [] -> pure "(no result)"
@@ -812,13 +812,27 @@ evalWithTraceAscii st contextFile exprText = do
     Just tc | not tc.success -> do
       let errors = tc.infos
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
-    Just _tc -> do
+    Just tc -> do
       -- Get evaluation results WITH trace
-      [meval] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.EvaluateLazy replUri]
+      meval <- traceLine st replUri tc
       case meval of
         Nothing -> pure "Evaluation failed"
         Just [] -> pure "(no result)"
         Just results -> pure $ formatAsciiTraceResults results
+
+-- | A @:trace@ or @:traceascii@ line's results, with every directive in it
+-- traced ('fullTracePolicy'): a plain line collects no trace for its @#EVAL@
+-- ('replDefaultPolicy'), so the line is evaluated again, outside the rule's
+-- cache, under the REPL's configuration with that policy. A line written as
+-- @#EVAL@ or @#ASSERT@ then shows its trace, and an @#ASSERT@ its outcome,
+-- as they did before 2026-11-21 (decided by Claude 2026-11-21, pending Meng's review). A traced directive has the
+-- traced work number ('withTracedWorkNumber'), whichever way it is written.
+traceLine :: ReplState -> NormalizedUri -> Rules.TypeCheckResult -> IO (Maybe [EvalDirectiveResult])
+traceLine st uri tc = do
+  let traced = st.evalConfig {tracePolicy = fullTracePolicy defaultGraphVizOptions}
+  [r] <- shakeRunDatabase st.ideState.shakeDb
+    [ Shake.use Rules.GetImports uri >>= traverse \ imports -> snd <$> Rules.evaluateOn traced imports tc ]
+  pure r
 
 -- | Format evaluation results showing ASCII trace
 formatAsciiTraceResults :: [EvalDirectiveResult] -> Text

@@ -12,14 +12,14 @@
 
 ### Current Implementation Status
 
-| Component            | Status         | Default Behavior          | TracePolicy                               |
-| -------------------- | -------------- | ------------------------- | ----------------------------------------- |
-| **CLI**              | ✅ Operational | No traces (clean output)  | `optionsToTracePolicy` - respects flags   |
-| **REPL**             | ✅ Operational | `:trace` lines only       | `replDefaultPolicy` - #EVALTRACE only     |
-| **LSP**              | ✅ Operational | Only #EVALTRACE traces    | `lspDefaultPolicy` - avoids editor noise  |
-| **Decision Service** | ✅ Operational | No traces (per-request)   | `apiDefaultPolicy` - controlled by params |
-| **Tests**            | ✅ Operational | No traces (automated)     | `apiDefaultPolicy` - clean test output    |
-| **Schema**           | ✅ Operational | No traces (generation)    | `apiDefaultPolicy` - no trace needed      |
+| Component            | Status         | Default Behavior         | TracePolicy                                           |
+| -------------------- | -------------- | ------------------------ | ----------------------------------------------------- |
+| **CLI**              | ✅ Operational | No traces (clean output) | `optionsToTracePolicy` - respects flags               |
+| **REPL**             | ✅ Operational | `:trace` lines only      | `replDefaultPolicy`; `:trace` lines `fullTracePolicy` |
+| **LSP**              | ✅ Operational | Only #EVALTRACE traces   | `lspDefaultPolicy` - avoids editor noise              |
+| **Decision Service** | ✅ Operational | No traces (per-request)  | `apiDefaultPolicy` - controlled by params             |
+| **Tests**            | ✅ Operational | No traces (automated)    | `apiDefaultPolicy` - clean test output                |
+| **Schema**           | ✅ Operational | No traces (generation)   | `apiDefaultPolicy` - no trace needed                  |
 
 ### Key Features Implemented
 
@@ -101,12 +101,12 @@ Destination:   stdout | files | api-response
 
 ### 3. Tool-Specific Defaults
 
-| Tool     | Default Trace             | Default Output | Rationale               |
-| -------- | ------------------------- | -------------- | ----------------------- |
-| **LSP**  | EVAL=none, EVALTRACE=full | diagnostic     | Avoid editor noise      |
-| **CLI**  | both=none                 | stdout text    | Clean terminal output   |
-| **API**  | controlled by request     | API response   | Per-request flexibility |
-| **REPL** | both=full                 | stdout text    | Interactive exploration |
+| Tool     | Default Trace                                        | Default Output | Rationale               |
+| -------- | ---------------------------------------------------- | -------------- | ----------------------- |
+| **LSP**  | EVAL=none, EVALTRACE=full                            | diagnostic     | Avoid editor noise      |
+| **CLI**  | both=none                                            | stdout text    | Clean terminal output   |
+| **API**  | controlled by request                                | API response   | Per-request flexibility |
+| **REPL** | EVAL=none, EVALTRACE=full; a `:trace` line both=full | stdout text    | Interactive exploration |
 
 ## Proposed Architecture
 
@@ -422,7 +422,7 @@ _Core Infrastructure:_
 _Tool Integration:_
 
 - **CLI** (`jl4/app/Main.hs`): Uses `optionsToTracePolicy` - respects command-line flags
-- **REPL** (`jl4-repl/app/Main.hs`): Uses `replDefaultPolicy defaultGraphVizOptions` - traces `#EVALTRACE`, which is how `:trace` and `:traceascii` run a line; a plain line runs as an `#EVAL`, whose trace the REPL never showed, and since 2026-11-21 it is not collected
+- **REPL** (`jl4-repl/app/Main.hs`): Uses `replDefaultPolicy defaultGraphVizOptions` - traces `#EVALTRACE` only: a plain line runs as an `#EVAL`, whose trace the REPL never showed, and since 2026-11-21 it is not collected. `:trace` and `:traceascii` evaluate their line again under `fullTracePolicy` (`traceLine`, through `Rules.evaluateOn`), so a line written as `#EVAL` or `#ASSERT` shows its trace too
 - **Decision Service** (`jl4-decision-service/src/Backend/Jl4.hs`): Uses `apiDefaultPolicy` - no traces
 - **LSP** (`jl4-lsp/app/Server.hs`): Uses `lspDefaultPolicy defaultGraphVizOptions` - only #EVALTRACE
 - **Tests** (`jl4/tests/Main.hs`): Uses `apiDefaultPolicy` - no traces for automated tests

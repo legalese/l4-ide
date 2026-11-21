@@ -13,7 +13,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.Foldable (for_)
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, isPrefixOf, tails)
 import System.Directory (doesFileExist, makeAbsolute)
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode (..))
@@ -195,19 +195,43 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
         let path = takeWhile (`notElem` ("\r\n" :: String)) out
         ok <- doesFileExist path
         pure (if code == ExitSuccess && ok then Just path else Nothing)
-    it "answers a plain line as before, and :trace and :traceascii still show a trace" $ case mRepl of
-      Nothing -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
-      Just repl -> do
-        file <- makeAbsolute replTrace
-        -- in a directory of its own, because the REPL keeps a history file there
-        sout <- withSystemTempDirectory "l4-repl-trace" \ work -> do
-          (_, o, _) <- readCreateProcessWithExitCode (proc repl [file]) {cwd = Just work}
-                         (unlines ["`double` 3", ":trace `double` 3", ":traceascii `double` 3", ":quit"])
-          pure (filter (/= '\r') o)
+    -- the REPL's output for these lines, then :quit, on repl-trace.l4
+    let session queries check = case mRepl of
+          Nothing -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> do
+            file <- makeAbsolute replTrace
+            -- in a directory of its own, because the REPL keeps a history file there
+            sout <- withSystemTempDirectory "l4-repl-trace" \ work -> do
+              (_, o, _) <- readCreateProcessWithExitCode (proc repl [file]) {cwd = Just work}
+                             (unlines (queries <> [":quit"]))
+              pure (filter (/= '\r') o)
+            check sout
+        times needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+    it "answers a plain line as before, and :trace and :traceascii still show a trace" $
+      session ["`double` 3", ":trace `double` 3", ":traceascii `double` 3"] \ sout -> do
         sout `shouldSatisfy` ("jl4> 6\n" `isInfixOf`)
         sout `shouldSatisfy` ("digraph" `isInfixOf`)
         sout `shouldSatisfy` ("double OF 3" `isInfixOf`)
         sout `shouldSatisfy` ("Trace:" `isInfixOf`)
+
+    -- the trace commands pass a line already written as a directive through
+    -- unchanged, so they trace it themselves rather than rely on the policy
+    -- for plain lines (decided by Claude 2026-11-21, pending Meng's review)
+    it ":trace and :traceascii show an #EVAL line's trace, and :traceascii its value" $
+      session [":trace #EVAL `double` 3", ":traceascii #EVAL `double` 3"] \ sout -> do
+        times "digraph" sout `shouldBe` 1
+        sout `shouldSatisfy` ("Result: 6\n\nTrace:\n" `isInfixOf`)
+        sout `shouldNotSatisfy` ("no trace available" `isInfixOf`)
+
+    it ":trace and :traceascii show an #ASSERT line's trace, and :traceascii its outcome" $
+      session [":trace #ASSERT `double` 3 EQUALS 6", ":traceascii #ASSERT `double` 3 EQUALS 7"] \ sout -> do
+        times "digraph" sout `shouldBe` 1
+        sout `shouldSatisfy` ("Result: False (assertion failed)\n\nTrace:\n" `isInfixOf`)
+        sout `shouldNotSatisfy` ("no trace available" `isInfixOf`)
+
+    it "a #CHECK line has nothing to trace, on either command, as before" $
+      session [":trace #CHECK `double` 3", ":traceascii #CHECK `double` 3"] \ sout ->
+        times "jl4> (no result)\n" sout `shouldBe` 2
 
   -- Ruled by Meng 2026-11-21, extending L2: every other command that evaluates
   -- counts too, by default, with the same flags; and none of them reads an
