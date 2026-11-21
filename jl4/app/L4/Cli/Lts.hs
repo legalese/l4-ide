@@ -58,7 +58,7 @@ data LtsOptions = LtsOptions
 ltsOptionsParser :: Parser LtsOptions
 ltsOptionsParser = LtsOptions
   <$> strArgument (metavar "FILE" <> help "Path to the .l4 file with #TRACE directives")
-  <*> switch (long "steps" <> help "Also print the step log: what the contract did with each event, in order")
+  <*> switch (long "steps" <> help "Also print the step log: what the contract did with each event, in order. Its entries are not what --max-steps counts")
   <*> switch (long "json" <> help "Print the same answers as JSON, one object per trace")
   <*> many (strOption
         ( long "contract"
@@ -66,7 +66,7 @@ ltsOptionsParser = LtsOptions
         <> help "List this top-level rule at its outset (as `#TRACE NAME AT 0 WITH` with no events) instead of the file's own #TRACE directives; repeatable"
         ))
   <*> fixedNowParser
-  <*> evalLimitsParser
+  <*> evalLimitsParserNoting ". These steps are units of work, not the entries of the step log that --steps prints"
 
 ----------------------------------------------------------------------------
 -- Entry point

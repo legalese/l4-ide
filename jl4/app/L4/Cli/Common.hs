@@ -11,6 +11,7 @@ module L4.Cli.Common
   , parseFixedNowText
   , EvalLimits(..)
   , evalLimitsParser
+  , evalLimitsParserNoting
   , withEvalLimits
   , guardRunStop
   , langTagReader
@@ -152,7 +153,13 @@ fixedNowParser = fmap FixedNowOpt $ optional $
 -- the run: it is an error naming the limit, and nothing after it is
 -- evaluated.
 evalLimitsParser :: Options.Parser EvalLimits
-evalLimitsParser = EvalLimits
+evalLimitsParser = evalLimitsParserNoting ""
+
+-- | 'evalLimitsParser', with a sentence added to @--max-steps@'s help, for a
+-- command with another flag that a reader could take for it (@l4 lts
+-- --steps@, the step log).
+evalLimitsParserNoting :: String -> Options.Parser EvalLimits
+evalLimitsParserNoting stepsNote = EvalLimits
   <$> optional (option countReader
         ( long "max-open"
         <> metavar "N|none"
@@ -162,7 +169,7 @@ evalLimitsParser = EvalLimits
   <*> optional (option countReader
         ( long "max-steps"
         <> metavar "N|none"
-        <> help ("Stop any one evaluation that takes more than N steps, counting each function applied and each contract handed the events, as an error on that one (default "
+        <> help ("Stop any one evaluation that takes more than N steps, counting each function applied and each contract handed the events, as an error on that one" <> stepsNote <> " (default "
                  <> show maximumClosureApplications <> "; none: no limit)")
         ))
   <*> optional (option positiveIntReader
