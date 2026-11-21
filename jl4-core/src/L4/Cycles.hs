@@ -57,7 +57,8 @@ import Optics (GPlate, gplate, toListOf)
 
 import L4.Annotation (Anno_ (..), HasSrcRange (..), getAnno)
 import L4.Cycles.Warning
-  ( Continuation (..), CycleTrouble (..), CycleWarning (..), Doubt (..), Multiplication (..), Stall (..) )
+  ( Continuation (..), CycleTrouble (..), CycleWarning (..), Doubt (..), Ending (..), MarkNote (..)
+  , MarkOutcome (..), Multiplication (..), Stall (..) )
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
 import L4.TypeCheck.Environment
@@ -429,33 +430,39 @@ findingJSON f = Aeson.object
     , "stepsDown" .= fmap fst x.stepsDown
     ]
 
--- | What the checker says about the module's cycles: the warnings, and the
--- notes of the @\@ends-because@ marks that silence one ('cycleWarningText',
--- 'cycleAcceptedText'). Recursion-limit rulings L3 and L4 and the scope
--- ruling (ii), recorded in @specs\/todo\/GLOBAL-DEPENDENCY-GRAPH-SPEC.md@:
+-- | What the checker says about the module's cycles: the warnings, and one
+-- note for each @\@ends-because@ mark ('cycleWarningText', 'cycleNoteText').
+-- Recursion-limit rulings L3 and L4 and the scope ruling (ii), recorded
+-- in @specs\/todo\/GLOBAL-DEPENDENCY-GRAPH-SPEC.md@:
 --
 -- * a finding draws one warning for each alarm 'alarms' gives it, and a
 --   function cycle draws none;
 -- * "multiplies" and "no time" cannot be silenced;
 -- * "could not check" is silenced by an @\@ends-because@ written on the
---   definition the warning is reported on, the cycle's first in source order
---   (ruling L4: "written on the definition the warning is reported on"), and
---   each mark that silences one leaves a note carrying its reason (ruling L4:
---   "each use emits one information-level message carrying its reason").
---   A mark on another definition of the cycle silences nothing, and the
---   warning says where the mark goes;
--- * a mark on a function cycle, on an obligation cycle shown to end, or on
---   no cycle at all is taken as written, and says nothing (decided by Claude
---   2026-11-22, pending Meng's review).
+--   definition the warning is reported on (ruling L4: "written on the
+--   definition the warning is reported on"). That definition is the cycle's
+--   first in source order (decided by Claude 2026-11-22, pending Meng's review), and so is the one "no time"
+--   is shown on; "multiplies" is shown on, and names, the definition whose
+--   continuation multiplies. A mark on another definition of the cycle
+--   silences nothing, and the warning says where the mark goes;
+-- * every mark leaves one note, at the mark, carrying its reason and saying
+--   what it did ('MarkOutcome'): ruling L4's "each use emits one
+--   information-level message carrying its reason", read as every mark,
+--   including one on a function cycle, on an obligation cycle shown to end,
+--   or on no cycle at all. This follows the printed condition literally
+--   ('each use emits one information-level message'). The narrow reading is
+--   the alternative, for Meng's review: a note only for a mark that silences
+--   a warning. The notes are made by going
+--   through the marks, not the findings, so there is one per mark.
 --
 -- Definitions are matched to marks by 'Unique', not by name. A WHERE or LET
 -- name for an expression is read through ('readThrough') and is never a
 -- member of a cycle, so "on the cycle" is read off the graph that reads
 -- nothing through, where every definition is a node: a mark on such a name
 -- on a lap is on the cycle, and is not the definition it is reported on.
-cycleNotices :: (NormalizedUri -> Maybe Text) -> (Type' Resolved -> Type' Resolved) -> EntityInfo -> Module Resolved -> ([CycleWarning], [CycleWarning])
+cycleNotices :: (NormalizedUri -> Maybe Text) -> (Type' Resolved -> Type' Resolved) -> EntityInfo -> Module Resolved -> ([CycleWarning], [MarkNote])
 cycleNotices library expand info m =
-  (concatMap warnings fs, concatMap accepted fs)
+  (concatMap warnings fs, mapMaybe note marked)
  where
   fs = cycleFindingsWith library expand info m
   decides = sortOn source (moduleDecides m)
@@ -474,41 +481,70 @@ cycleNotices library expand info m =
     | (i, CyclicSCC ns) <- zip [0 :: Int ..] (stronglyConnComp [(n, n, Map.findWithDefault [] n plainNext) | n <- Map.keys byId])
     , n <- ns ]
 
-  notice f = case sortOn source (mapMaybe (`Map.lookup` byId) f.memberIds) of
+  -- a finding's cycle: the definition its warnings are reported on, the
+  -- others in source order, and which definitions are on it
+  cycleOf f = case sortOn source (mapMaybe (`Map.lookup` byId) f.memberIds) of
     [] -> Nothing
     reported : others ->
       let ids = Set.fromList f.memberIds
           component = Map.lookup (idOf reported) plainComponent
           onIt d = Set.member (idOf d) ids || (isJust component && Map.lookup (idOf d) plainComponent == component)
-      in Just
-        ( reported
-        , \ t at' -> MkCycleWarning
-            { rule = decideText reported
-            , at = at'
-            , through = map decideText others
-            , trouble = t
-            , marks = [(decideText d, r) | d <- marked, onIt d, Just r <- [markOf d]]
-            } )
+      in Just (reported, others, onIt)
   -- which mark silences a "could not check": the one on the definition the
   -- warning is reported on (ruling L4)
   silences = isJust . markOf
-  warnings f = case notice f of
+  warnings f = case cycleOf f of
     Nothing -> []
-    Just (reported, base) -> concatMap (warning reported base) (alarms f)
-   where
-    warning reported base = \ case
-      Multiplies | Just x <- f.multiplies -> [base (StartsCopies x) (x.at <|> rangeOf (decideName reported))]
-      Multiplies -> []
-      NoTime -> [base (GivesNoTime [r | Unproved (Stalled ss) <- [f.verdict], NotAfterArming r <- ss]) (rangeOf (decideName reported))]
-      CouldNotCheck
-        | silences reported -> []
-        | Unproved d <- f.verdict -> [base (CouldNotCheckThat d) (rangeOf (decideName reported))]
-        | otherwise -> []
-  accepted f = case notice f of
-    Just (reported, base)
-      | CouldNotCheck `elem` alarms f, silences reported, Unproved d <- f.verdict ->
-          [base (CouldNotCheckThat d) (markAt reported)]
-    _ -> []
+    Just (reported, others, onIt) -> concatMap warning (alarms f)
+     where
+      base t at' = MkCycleWarning
+        { rule = decideText reported
+        , at = at'
+        , through = map decideText others
+        , trouble = t
+        , marks = marksOn
+        }
+      marksOn = [(decideText d, r) | d <- marked, onIt d, Just r <- [markOf d]]
+      -- "multiplies" is shown on the definition whose continuation
+      -- multiplies, and names it; the others are the rest of the cycle
+      onMultiplier x = MkCycleWarning
+        { rule = x.rule
+        , at = x.at <|> rangeOf (decideName reported)
+        , through = [decideText d | d <- reported : others, decideText d /= x.rule]
+        , trouble = StartsCopies x
+        , marks = marksOn
+        }
+      warning = \ case
+        Multiplies | Just x <- f.multiplies -> [onMultiplier x]
+        Multiplies -> []
+        NoTime -> [base (GivesNoTime [r | Unproved (Stalled ss) <- [f.verdict], NotAfterArming r <- ss]) (rangeOf (decideName reported))]
+        CouldNotCheck
+          | silences reported -> []
+          | Unproved d <- f.verdict -> [base (CouldNotCheckThat d) (rangeOf (decideName reported))]
+          | otherwise -> []
+  cycles = mapMaybe (\ f -> (f,) <$> cycleOf f) fs
+  -- one note per mark, its outcome taken in this order: it silences a
+  -- warning; it is on a cycle whose "could not check" it does not count for;
+  -- on a cycle whose warnings it cannot silence; on a cycle with none
+  note d = do
+    r <- markOf d
+    let on = [(f, reported, others) | (f, (reported, others, onIt)) <- cycles, onIt d]
+        couldNot f = CouldNotCheck `elem` alarms f
+        outcome = fromMaybe OnNoCycle $ asum
+          [ listToMaybe [Silenced (map decideText others) doubt | (f, reported, others) <- on, couldNot f, idOf reported == idOf d, Unproved doubt <- [f.verdict]]
+          , listToMaybe [NotWhereReported (decideText reported) (silences reported) | (f, reported, _) <- on, couldNot f]
+          , listToMaybe [CannotSilence (shownOn f reported) | (f, reported, _) <- on, not (null (alarms f))]
+          , listToMaybe [if f.kind == FunctionCycle then NotChecked else ShownToEnd (endingOf f.verdict) | (f, _, _) <- on]
+          , if Map.member (idOf d) plainComponent then Just NotChecked else Nothing
+          ]
+    pure MkMarkNote {rule = decideText d, at = markAt d, reason = r, outcome}
+  -- where a cycle's warnings that a mark cannot silence are shown
+  shownOn f reported = nubOrd
+    ([decideText reported | NoTime `elem` alarms f] <> [x.rule | Multiplies `elem` alarms f, Just x <- [f.multiplies]])
+  endingOf = \ case
+    Proved WaitsEachLap -> WaitsForTime
+    Proved _ -> InputGetsSmaller
+    Unproved _ -> WaitsForTime
 
 ------------------------------------------------------------------------
 -- The graph

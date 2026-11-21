@@ -460,7 +460,7 @@ L4 checks every rule whose `HENCE` or `LEST` leads back to itself, and gives one
 - **"starts itself again with no time passing"** for a deadline of `WITHIN 0` (or before the start) on the way round. `@ends-because` cannot silence it: give the deadline time.
 - **"starts 2 copies of itself at once"** for a `HENCE` or `LEST` that joins two or more calls of the loop's rules with `RAND` or `ROR`. `@ends-because` cannot silence it either.
 
-A rule that uses itself with no duty in between (a countdown, a fold over a list) draws none of these, and an `@ends-because` above it is accepted and changes nothing. So is one above a rule that never leads back to itself. A file with an error gets none of these warnings.
+A rule that uses itself with no duty in between (a countdown, a fold over a list) draws none of these, and an `@ends-because` above it changes nothing; so does one above a rule that never leads back to itself. Every mark still gets one information message carrying its reason and saying what it did. A file with an error gets none of these warnings or messages.
 
 When "could not check" is about a rule that uses itself directly, the warning names that rule, which need not be the one it is shown on.
 

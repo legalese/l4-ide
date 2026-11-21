@@ -29,7 +29,7 @@ import Base (Uri (..), toNormalizedUri)
 import L4.API.EmbeddedLibraries (embeddedLibraries)
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, checkWithImportsAndUri, emptyVFS, vfsFromList)
 import L4.Cycles
-import L4.Cycles.Warning (CycleTrouble (..), CycleWarning (..))
+import L4.Cycles.Warning (CycleTrouble (..), CycleWarning (..), MarkNote (..), MarkOutcome (..))
 import L4.Syntax (DeonticModal (..), Module (..), Resolved)
 import L4.TypeCheck (applyFinalSubstitution, prettyCheckError)
 import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), CheckWarning (..), EntityInfo, Severity (..), Substitution, severity)
@@ -936,7 +936,7 @@ spec = describe "cycle report (#1075 layer 2)" do
   describe "@ends-because (L4)" do
     it "on the rule, silences could not check, and leaves a note at information level carrying its reason" do
       let src = people <> "@ends-because Alice is paid by then\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x"
-      notices src `shouldReturn` [("accepted", "x")]
+      notices src `shouldReturn` [("silenced", "x")]
       sevs <- noticeSeverities src
       sevs `shouldBe` [SInfo]
       t <- noticeText src
@@ -944,13 +944,14 @@ spec = describe "cycle report (#1075 layer 2)" do
 
     it "does not silence no time, and the warning says so" do
       let src = people <> "@ends-because it stops\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 0 LEST x"
-      notices src `shouldReturn` [("no time", "x")]
+      notices src `shouldReturn` [("no time", "x"), ("cannot silence", "x")]
       t <- noticeText src
       t `shouldSatisfy` Text.isInfixOf "@ends-because does not silence this warning"
+      t `shouldSatisfy` Text.isInfixOf "It silences nothing: the warning shown on `x` is about something L4 has checked"
 
     it "does not silence multiplies, and the warning says so" do
       let src = people <> "@ends-because it stops\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST (x RAND x)"
-      notices src `shouldReturn` [("multiplies", "x")]
+      notices src `shouldReturn` [("multiplies", "x"), ("cannot silence", "x")]
       t <- noticeText src
       t `shouldSatisfy` Text.isInfixOf "@ends-because does not silence this warning"
 
@@ -959,32 +960,56 @@ spec = describe "cycle report (#1075 layer 2)" do
             <> mark1 <> "GIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST w3\n\n"
             <> mark3 <> "GIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 1 OF 3 LEST w1"
       notices (cyc "" "") `shouldReturn` [("could not check", "w1")]
-      notices (cyc "@ends-because Bob pays\n" "") `shouldReturn` [("accepted", "w1")]
-      notices (cyc "" "@ends-because Bob pays\n") `shouldReturn` [("could not check", "w1")]
+      notices (cyc "@ends-because Bob pays\n" "") `shouldReturn` [("silenced", "w1")]
+      notices (cyc "" "@ends-because Bob pays\n") `shouldReturn` [("could not check", "w1"), ("not where reported", "w3")]
       t <- noticeText (cyc "" "@ends-because Bob pays\n")
       t `shouldSatisfy` Text.isInfixOf "The @ends-because above `w3` does not count here: it goes above `w1`"
+      t `shouldSatisfy` Text.isInfixOf "It does not count here: the warning it would answer, that L4 could not check that this comes to an end, is shown on `w1`"
+      notices (cyc "@ends-because Alice pays\n" "@ends-because Bob pays\n") `shouldReturn` [("silenced", "w1"), ("not where reported", "w3")]
 
-    it "is taken silently on a function cycle" $
-      notices (people <> "@ends-because n drops by one\nGIVEN n IS A NUMBER GIVETH A NUMBER\ndown n MEANS IF n EQUALS 0 THEN 0 ELSE down (n MINUS 1)")
-        `shouldReturn` []
+    it "on a function cycle, changes nothing and says so, with its reason (the printed condition, read literally)" do
+      let src = people <> "@ends-because n drops by one\nGIVEN n IS A NUMBER GIVETH A NUMBER\ndown n MEANS IF n EQUALS 0 THEN 0 ELSE down (n MINUS 1)"
+      notices src `shouldReturn` [("not checked", "down")]
+      noticeSeverities src `shouldReturn` [SInfo]
+      t <- noticeText src
+      for_ ["n drops by one", "but not through a HENCE or LEST", "So the mark changes nothing."] \ needle ->
+        t `shouldSatisfy` Text.isInfixOf needle
 
-    it "is taken silently on an obligation cycle shown to end" $
-      notices (people <> "@ends-because Alice ticks\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 30 LEST x")
-        `shouldReturn` []
+    it "on an obligation cycle shown to end, changes nothing and says so (the printed condition, read literally)" do
+      let src = people <> "@ends-because Alice ticks\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 30 LEST x"
+      notices src `shouldReturn` [("shown to end", "x")]
+      t <- noticeText src
+      for_ ["Alice ticks", "I could check that it comes to an end: each new copy waits, for an event or for time to pass, so a run over a list of events reaches an answer."] \ needle ->
+        t `shouldSatisfy` Text.isInfixOf needle
 
-    it "is taken silently on a rule that never leads back to itself" $
-      notices (people <> "@ends-because it ends\nGIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS n PLUS 1")
-        `shouldReturn` []
+    it "on a rule that never leads back to itself, changes nothing and says so (the printed condition, read literally)" do
+      let src = people <> "@ends-because it ends\nGIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS n PLUS 1"
+      notices src `shouldReturn` [("on no cycle", "f")]
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "I find no way for `f` to lead back to itself, so the mark changes nothing.\nI cannot see a loop that goes through a rule kept in a record or passed in as an input."
 
     it "on a WHERE name read through, on the lap, is on the cycle, and not the rule reported on" do
       let src = people <> "GIVEN d IS A NUMBER GIVETH A DEONTIC Person Action\nz d MEANS PARTY Alice MUST tick WITHIN d LEST next\n  WHERE\n    @ends-because d halves\n    next MEANS z (d DIVIDED BY 2)"
-      notices src `shouldReturn` [("could not check", "z")]
+      notices src `shouldReturn` [("could not check", "z"), ("not where reported", "next")]
       t <- noticeText src
       t `shouldSatisfy` Text.isInfixOf "The @ends-because above `next` does not count here"
 
-    it "on a WHERE name read through, off any lap, is taken silently" $
+    it "on a WHERE name read through, off any lap, is on no cycle" $
       notices (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS m PLUS 1\n  WHERE\n    @ends-because it ends\n    m MEANS n TIMES 2")
-        `shouldReturn` []
+        `shouldReturn` [("on no cycle", "m")]
+
+    it "leaves exactly one note per mark, each at information level and carrying its reason" $
+      for_
+        [ people <> "@ends-because r1\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x\n\n@ends-because r2\nGIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS n PLUS 1"
+        , people <> "@ends-because r1\nGIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST w3\n\n@ends-because r2\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 1 OF 3 LEST (w1 RAND w1)"
+        , people <> "@ends-because r1\nGIVEN n IS A NUMBER GIVETH A NUMBER\ndown n MEANS IF n EQUALS 0 THEN 0 ELSE down (n MINUS 1)\n\n@ends-because r2\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 0 LEST x\n\n@ends-because r3\nGIVETH A DEONTIC Person Action\ny MEANS PARTY Alice MUST tick WITHIN 30 LEST y"
+        ] \ src -> do
+          ds <- cycleDiagnostics src
+          let notes = [n | MkCheckErrorWithContext {kind = EndsBecauseNoted n} <- ds]
+              marks = length (filter ("@ends-because " `Text.isPrefixOf`) (Text.lines src))
+          length notes `shouldBe` marks
+          map (.reason) notes `shouldBe` ["r" <> Text.pack (show i) | i <- [1 .. marks]]
+          [severity d | d@MkCheckErrorWithContext {kind = EndsBecauseNoted _} <- ds] `shouldBe` map (const SInfo) notes
 
   describe "nodes" do
     it "keeps overloads that share a name apart" $
@@ -1167,8 +1192,15 @@ notices source = map summary <$> cycleDiagnostics source
  where
   summary = \ case
     MkCheckErrorWithContext {kind = CheckWarning (CycleAlarm w)} -> (trouble w.trouble, w.rule)
-    MkCheckErrorWithContext {kind = EndsBecauseAccepted w} -> ("accepted", w.rule)
+    MkCheckErrorWithContext {kind = EndsBecauseNoted n} -> (outcome n.outcome, n.rule)
     _ -> ("other", "")
+  outcome = \ case
+    Silenced _ _ -> "silenced"
+    NotWhereReported _ _ -> "not where reported"
+    CannotSilence _ -> "cannot silence"
+    NotChecked -> "not checked"
+    ShownToEnd _ -> "shown to end"
+    OnNoCycle -> "on no cycle"
   trouble = \ case
     CouldNotCheckThat _ -> "could not check"
     GivesNoTime _ -> "no time"
@@ -1187,7 +1219,7 @@ cycleDiagnostics source = case checkWithImports emptyVFS source of
  where
   isCycle e = case e.kind of
     CheckWarning (CycleAlarm _) -> True
-    EndsBecauseAccepted _ -> True
+    EndsBecauseNoted _ -> True
     _ -> False
 
 walkCheck :: Text -> Expectation

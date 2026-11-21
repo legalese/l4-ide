@@ -1,8 +1,10 @@
 -- | The @\@ends-because <reason>@ annotation: its own token, read only from its
 -- own field, kept by the printer, an error above anything that is not a
 -- definition and when it has no reason, and reaching the definitions in a
--- WHERE or LET. This is the syntax alone; nothing here says what the mark
--- changes.
+-- WHERE or LET. This is the syntax alone; what the mark changes is in
+-- "CyclesSpec". The one thing of that shown here: each mark the checker
+-- accepts leaves an information-level note carrying its reason (ruling L4), so
+-- the "no diagnostics" checks below leave those notes out and name them.
 module EndsBecauseSpec (spec) where
 
 import Data.Foldable (for_, toList)
@@ -21,6 +23,7 @@ import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Print (prettyLayout)
 import L4.Syntax
 import qualified L4.TypeCheck as TC
+import L4.Cycles.Warning (MarkNote (..))
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
 
 -- | Every definition of the module, with its name as written: the top-level
@@ -53,6 +56,18 @@ checked source =
 
 errorTexts :: TypeCheckWithDepsResult -> Text
 errorTexts r = Text.unlines (concatMap TC.prettyCheckErrorWithContext r.tcdErrors)
+
+-- | The rules the checker's notes on accepted marks are about, in order.
+notedRules :: TypeCheckWithDepsResult -> [Text]
+notedRules r = [ n.rule | MkCheckErrorWithContext{kind = EndsBecauseNoted n} <- r.tcdErrors ]
+
+-- | Every diagnostic but those notes.
+otherThanNotes :: TypeCheckWithDepsResult -> [CheckErrorWithContext]
+otherThanNotes r = [ e | e <- r.tcdErrors, not (isNote e.kind) ]
+ where
+  isNote = \ case
+    EndsBecauseNoted _ -> True
+    _ -> False
 
 countOfKind :: (CheckError -> Bool) -> TypeCheckWithDepsResult -> Int
 countOfKind p r = length [ () | MkCheckErrorWithContext{kind = k} <- r.tcdErrors, p k ]
@@ -231,7 +246,8 @@ spec = describe "@ends-because" do
       , ("vouched step", Just "each step is nearer the end")
       , ("described step", Nothing)
       ]
-    r.tcdErrors `shouldBe` []
+    otherThanNotes r `shouldBe` []
+    notedRules r `shouldBe` ["vouched step"]
   it "is not read from a @desc whose first word happens to be the same" do
     r <- checked marked
     lookup "described step" (reasons (decides r.tcdModule)) `shouldBe` Just Nothing
@@ -268,7 +284,8 @@ spec = describe "@ends-because" do
       , ("with let", Nothing)
       , ("bound", Just "the let one")
       ]
-    r.tcdErrors `shouldBe` []
+    otherThanNotes r `shouldBe` []
+    notedRules r `shouldBe` ["inner", "bound"]
   it "keeps a mark on a WHERE or LET local through a re-print" do
     r <- checked locals
     r2 <- checked (prettyLayout r.tcdModule)
@@ -346,7 +363,8 @@ spec = describe "@ends-because" do
       lookup "fact" rs `shouldBe` Just (Just "the number drops by one and stops at zero")
       lookup "inside" rs `shouldBe` Just (Just "under a later clause")
       lookup "later" rs `shouldBe` Just Nothing
-      r.tcdErrors `shouldBe` []
+      otherThanNotes r `shouldBe` []
+      notedRules r `shouldBe` ["fact", "inside"]
       ws <- endsBecauseWarnings groups
       ws `shouldBe` []
     it "keeps each of them through a re-print" do

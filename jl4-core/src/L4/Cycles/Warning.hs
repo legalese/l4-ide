@@ -1,6 +1,6 @@
 -- | What the type checker says about a module's cycles (smucclaw/l4-ide#1075):
--- the warnings, the note an @\@ends-because@ leaves when it silences one, and
--- the words they are made of.
+-- the warnings, the note each @\@ends-because@ leaves, and the words they are
+-- made of.
 --
 -- The cycles are found and judged in "L4.Cycles", which imports the checker's
 -- types; the checker's types import this module, so what a warning carries,
@@ -17,6 +17,10 @@ module L4.Cycles.Warning
   ( -- * What a warning carries
     CycleWarning (..)
   , CycleTrouble (..)
+    -- * What a mark's note carries
+  , MarkNote (..)
+  , MarkOutcome (..)
+  , Ending (..)
     -- * Why a cycle is not shown to end
   , Doubt (..)
   , Stall (..)
@@ -25,7 +29,7 @@ module L4.Cycles.Warning
   , Continuation (..)
     -- * The text
   , cycleWarningText
-  , cycleAcceptedText
+  , cycleNoteText
   ) where
 
 import Base
@@ -35,15 +39,13 @@ import Data.Ratio (denominator, numerator)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax (DeonticModal (..))
 
--- | One warning about one cycle; and, for
--- 'L4.TypeCheck.Types.EndsBecauseAccepted', the note that a mark silenced one.
+-- | One warning about one cycle.
 data CycleWarning = MkCycleWarning
   { rule    :: Text
     -- ^ the definition it is reported on: the cycle's first in source order,
     -- or the one whose continuation multiplies
   , at      :: Maybe SrcRange
-    -- ^ where: that definition's name; the continuation that multiplies; the
-    -- mark, for the note
+    -- ^ where: that definition's name, or the continuation that multiplies
   , through :: [Text]
     -- ^ the cycle's other definitions, in source order
   , trouble :: CycleTrouble
@@ -62,6 +64,58 @@ data CycleTrouble
     -- time: each one's distance after the arming, never above 0
   | StartsCopies Multiplication
     -- ^ a continuation that starts two or more copies of the cycle at once
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | The note one @\@ends-because@ leaves, at the mark, carrying its reason:
+-- ruling L4's "each use emits one information-level message carrying its
+-- reason", read as every mark the checker accepts. This follows the printed
+-- condition literally ('each use emits one information-level message'). The
+-- narrow reading is the alternative, for Meng's review: a note only for a
+-- mark that silences a warning. A mark
+-- the checker refuses (no reason, or not above a definition) is an error and
+-- leaves no note; nor does any mark in a module that does not check.
+data MarkNote = MkMarkNote
+  { rule    :: Text
+    -- ^ the definition the mark is above
+  , at      :: Maybe SrcRange
+    -- ^ the mark
+  , reason  :: Text
+  , outcome :: MarkOutcome
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | What the mark did.
+data MarkOutcome
+  = Silenced [Text] Doubt
+    -- ^ it is on the definition a "could not check" is reported on, and
+    -- silences it: the cycle's other definitions, in source order, and why
+    -- it could not be checked
+  | NotWhereReported Text Bool
+    -- ^ it is on a cycle whose "could not check" is reported on that other
+    -- definition, so it silences nothing; 'True' when that definition's own
+    -- mark silences the warning, so that it is not shown
+  | CannotSilence [Text]
+    -- ^ it is on a cycle whose only warnings, shown on those definitions, are
+    -- ones a mark does not silence ("no time", "multiplies")
+  | NotChecked
+    -- ^ it is on a cycle with no HENCE or LEST on it, which draws no warning
+    -- (the scope ruling (ii))
+  | ShownToEnd Ending
+    -- ^ it is on a cycle whose HENCE or LEST leads back, shown to end, and how
+  | OnNoCycle
+    -- ^ its definition is on no cycle the checker can see
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | How a cycle shown to end comes to an end, in words a reader can check.
+data Ending
+  = WaitsForTime
+    -- ^ every lap waits, for an event or for time to pass ('WaitsEachLap')
+  | InputGetsSmaller
+    -- ^ an input gets smaller every lap, towards a stop ('Structural',
+    -- 'Countdown')
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -156,7 +210,7 @@ data Continuation = HenceOf DeonticModal | LestOf DeonticModal | AfterRecord
 cycleWarningText :: CycleWarning -> [Text]
 cycleWarningText w = case w.trouble of
   CouldNotCheckThat d ->
-    [startsItself w <> "."]
+    [startsItself w.rule w.through <> "."]
     <> couldNotCheck "I could not check that this comes to an end" d
     <> [ ""
        , "If it does come to an end, say why on a line of its own above " <> quoted w.rule <> ", like this:"
@@ -222,28 +276,67 @@ cycleWarningText w = case w.trouble of
           <> " to the power of " <> (if r == 1 then quoted p else "(" <> quoted p <> " divided by " <> numberText r <> ")") <> "."
       ]
 
--- | The note an @\@ends-because@ leaves where it silences a "could not check":
--- ruling L4's "each use emits one information-level message carrying its
--- reason".
-cycleAcceptedText :: CycleWarning -> [Text]
-cycleAcceptedText w = case w.trouble of
-  CouldNotCheckThat d ->
-    couldNotCheck (startsItself w <> ", and I could not check that this comes to an end") d
-    <> [ "Its author says why it does, with the @ends-because above " <> quoted w.rule <> ":"
+-- | The note a mark leaves, an information-level message carrying its reason
+-- (ruling L4). Where it silences a warning, the note says what was silenced
+-- first; everywhere else it gives the reason first, then what the mark did.
+cycleNoteText :: MarkNote -> [Text]
+cycleNoteText n = case n.outcome of
+  Silenced through d ->
+    couldNotCheck (startsItself n.rule through <> ", and I could not check that this comes to an end") d
+    <> [ "Its author says why it does, with the @ends-because above " <> quoted n.rule <> ":"
        , ""
-       ]
-    <> ["  " <> reason | (r, reason) <- w.marks, r == w.rule]
-    <> [ ""
+       , "  " <> n.reason
+       , ""
        , "So L4 does not warn about it. That reason is what a reader should check."
        ]
-  _ -> cycleWarningText w
+  NotWhereReported r answered ->
+    said
+    <> [ if answered
+           then "It does not count here: the warning it would answer, that L4 could not check that this comes to an end, would be shown on "
+             <> quoted r <> ", and the @ends-because above " <> quoted r <> " answers it."
+           else "It does not count here: the warning it would answer, that L4 could not check that this comes to an end, is shown on "
+             <> quoted r <> ", and the mark goes above " <> quoted r <> "."
+       ]
+  CannotSilence rs ->
+    said
+    <> [ "It silences nothing: " <> shownOn rs
+           <> " about something L4 has checked, and the mark answers only the warning that L4 could not check that a rule comes to an end."
+       ]
+  NotChecked ->
+    said
+    <> [ quoted n.rule <> " uses itself again, directly or through other rules, but not through a HENCE or LEST, and L4 gives no warning about whether a rule like that comes to an end."
+       , "So the mark changes nothing. That reason is what a reader should check."
+       ]
+  ShownToEnd e ->
+    said
+    <> [ quoted n.rule <> " can start itself again, but I could check that it comes to an end: " <> ending e <> "."
+       , "So the mark changes nothing."
+       ]
+  OnNoCycle ->
+    said
+    <> [ "I find no way for " <> quoted n.rule <> " to lead back to itself, so the mark changes nothing."
+       , "I cannot see a loop that goes through a rule kept in a record or passed in as an input."
+       ]
+ where
+  shownOn = \ case
+    [r] -> "the warning shown on " <> quoted r <> " is"
+    rs -> "the warnings shown on " <> quotedList rs <> " are"
+  ending = \ case
+    WaitsForTime -> "each new copy waits, for an event or for time to pass, so a run over a list of events reaches an answer"
+    InputGetsSmaller -> "each time round, one of its inputs gets smaller, towards a stop"
+  said =
+    [ "The @ends-because above " <> quoted n.rule <> " says why it comes to an end:"
+    , ""
+    , "  " <> n.reason
+    , ""
+    ]
 
 -- | The opening of a "could not check" and of its note.
-startsItself :: CycleWarning -> Text
-startsItself w
-  | null w.through = quoted w.rule <> " can start itself again: a HENCE or LEST in it leads back to " <> quoted w.rule
-  | otherwise = quoted w.rule <> " can start itself again" <> byWayOf w.through
-      <> ": a HENCE or LEST in one of them leads to another, and back"
+startsItself :: Text -> [Text] -> Text
+startsItself rule through
+  | null through = quoted rule <> " can start itself again: a HENCE or LEST in it leads back to " <> quoted rule
+  | otherwise = quoted rule <> " can start itself again: " <> quotedList (rule : through)
+      <> " lead back to each other, and a HENCE or LEST in one of them starts one of them again"
 
 byWayOf :: [Text] -> Text
 byWayOf = \ case

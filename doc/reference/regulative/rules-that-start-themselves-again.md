@@ -140,7 +140,22 @@ What it does and does not do:
 - It silences "I could not check that this comes to an end" on that rule, and nothing else.
 - It does not change how the rule runs.
 - It does not silence the other two warnings: if one of the rules that lead back to each other carries a mark, those warnings say that it does not silence them.
-- On a rule L4 can already see comes to an end, on a rule that uses itself with no duty in between (a countdown, a total over a list), or on a rule that never uses itself at all, it is taken as written and L4 says nothing about it.
+- On a rule L4 can already see comes to an end, on a rule that uses itself with no duty in between (a countdown, a total over a list), or on a rule that never uses itself at all, it changes nothing.
+
+Every `@ends-because` gets one information message, at the mark, carrying its reason and saying what the mark did, whether or not it silenced anything.
+So a reader can find every reason in a file, and see which ones L4 relied on.
+On the `countdown` in the [syntax reference](../syntax/README.md#ends-because), for example, it says:
+
+```
+The @ends-because above `countdown` says why it comes to an end:
+
+  each step moves one day nearer the end date, and the end date is fixed
+
+`countdown` uses itself again, directly or through other rules, but not through a HENCE or LEST, and L4 gives no warning about whether a rule like that comes to an end.
+So the mark changes nothing. That reason is what a reader should check.
+```
+
+A file with an error gets none of these messages until the error is fixed.
 
 ## "starts itself again with no time passing"
 
@@ -215,6 +230,8 @@ If one copy is what you meant, start it once.
 
 L4 reads that countdown as written: it does not check that `n` really reaches 0.
 When `n` drops by 2 at each step, it says "as many as 2 to the power of (`n` divided by 2)".
+
+When the copies are of several rules that lead back to each other, the warning is shown on the rule whose `HENCE` or `LEST` starts them, and it names the rules on a line of its own.
 
 ## Limits
 

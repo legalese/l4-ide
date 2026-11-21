@@ -9,7 +9,7 @@ import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
-import L4.Cycles.Warning (CycleWarning (..))
+import L4.Cycles.Warning (CycleWarning (..), MarkNote (..))
 import L4.Lexer (PosToken, FixityDirection)
 import L4.Lint.NotReach (NotReachSite (..))
 import L4.Lint.SiblingReads (SiblingRead (..))
@@ -373,12 +373,12 @@ data CheckError =
     -- ^ An @\@ends-because@ with nothing after it, or only spaces. The text
     -- names the definition it is above, when there is one in sight. The reason
     -- is what a reader checks, so a mark without one is refused.
-  | EndsBecauseAccepted CycleWarning
-    -- ^ An @\@ends-because@ that silenced a "could not check"
-    -- ('CycleAlarm'), and the reason it gives: an information-level message,
-    -- one per such mark (recursion-limit ruling L4, 2026-11-20: "each use
-    -- emits one information-level message carrying its reason"). Anchored on
-    -- the mark. See 'L4.Cycles.cycleNotices'.
+  | EndsBecauseNoted MarkNote
+    -- ^ An @\@ends-because@ the checker accepted, its reason, and what it did
+    -- (silenced a "could not check" ('CycleAlarm'), or not, and why): an
+    -- information-level message, one per mark (recursion-limit ruling L4,
+    -- 2026-11-20: "each use emits one information-level message carrying its
+    -- reason"). Anchored on the mark. See 'L4.Cycles.cycleNotices'.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -830,7 +830,7 @@ severity (MkCheckErrorWithContext e _) =
     SuspiciousBinderPattern {} -> SInfo
     SuspiciousClausePattern {} -> SInfo
     ActionPatternReference {}  -> SInfo
-    EndsBecauseAccepted {}     -> SInfo
+    EndsBecauseNoted {}        -> SInfo
     _                          -> SError
 
 -- | The answers to @#CHECK@ directives among a module's diagnostics.
@@ -955,7 +955,7 @@ instance HasSrcRange CheckError where
   rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
   rangeOf (EndsBecauseOnNonDefinition _ _ mr) = mr
   rangeOf (EndsBecauseNeedsReason _ mr) = mr
-  rangeOf (EndsBecauseAccepted w) = w.at
+  rangeOf (EndsBecauseNoted n) = n.at
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   rangeOf (CheckWarning (LifecycleNounHidesName _ mr _ _)) = mr

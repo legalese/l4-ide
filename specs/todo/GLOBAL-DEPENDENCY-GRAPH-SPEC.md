@@ -155,7 +155,14 @@ So `@determines` was considered and declined; it is not an alias, and nothing re
   Which member that is was decided by Claude 2026-11-22, pending Meng's review: the printed condition says only "the definition the warning is reported on".
   A mark above another member does not count, and the warning names that mark and says where it goes.
 - "never "multiplies" or "no time"": both still fire under a mark, and when one of the cycle's members carries a mark, their text says that `@ends-because` does not silence them.
-- "each use emits one information-level message carrying its reason": a mark that silences a "could not check" emits it, at the mark. Departure (decided by Claude 2026-11-22, pending Meng's review): a mark with nothing to silence, on a cycle of functions, on a cycle L4 can see ends, or on no cycle at all, emits nothing.
+  "Multiplies" is reported on the member whose `HENCE` or `LEST` starts the copies, and names it.
+- "each use emits one information-level message carrying its reason": every mark the checker accepts emits one, at the mark, saying what the mark did.
+  It silenced the warning; it did not count, because the warning is shown on another definition; it could not silence "no time" or "multiplies"; or it changed nothing, on a cycle of functions, on a cycle L4 can see ends, or on no cycle L4 can see (`MarkOutcome`, `jl4-core/src/L4/Cycles/Warning.hs`).
+  Reading "each use" as every mark, and not only one that silences a warning, follows the printed condition literally ('each use emits one information-level message'). The narrow reading is the alternative, for Meng's review (keeping the literal reading was decided by Claude 2026-11-22; the commit that builds it lists what the narrow reading would move).
+  A mark the checker refuses is an error and emits nothing.
+  There are two exceptions.
+  A module with any error gets no cycle warnings and no notes at all; an exception decided by Claude 2026-11-21, pending Meng's review, so `jl4/examples/not-ok/tc/ends-because-misplaced.l4` has two accepted marks and no note.
+  And of two marks stacked above one definition, the parser keeps the closer one and warns about the other, which emits no note (decided by Claude 2026-11-22, pending Meng's review).
 - "no effect on runtime limits": met.
   Nothing under `L4.Evaluate*` reads the mark (`git grep annEndsBecause -- 'jl4-core/src/L4/Evaluate*'` finds nothing, 2026-11-22).
 

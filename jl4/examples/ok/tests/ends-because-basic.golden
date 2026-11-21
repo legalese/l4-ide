@@ -1,6 +1,34 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+ends-because-basic.l4:8:1-85:
+  The @ends-because above `countdown` says why it comes to an end:
+  
+    each step moves one day nearer the end date, and the end date is fixed
+  
+  `countdown` uses itself again, directly or through other rules, but not through a HENCE or LEST, and L4 gives no warning about whether a rule like that comes to an end.
+  So the mark changes nothing. That reason is what a reader should check.
+ends-because-basic.l4:24:1-94:
+  The @ends-because above `weeks to go` says why it comes to an end:
+  
+    the number of weeks drops by one each time, and a week count cannot be negative
+  
+  `weeks to go` uses itself again, directly or through other rules, but not through a HENCE or LEST, and L4 gives no warning about whether a rule like that comes to an end.
+  So the mark changes nothing. That reason is what a reader should check.
+ends-because-basic.l4:36:5-71:
+  The @ends-because above `running total` says why it comes to an end:
+  
+    the counter drops by one each step and stops at zero
+  
+  `running total` uses itself again, directly or through other rules, but not through a HENCE or LEST, and L4 gives no warning about whether a rule like that comes to an end.
+  So the mark changes nothing. That reason is what a reader should check.
+ends-because-basic.l4:48:5-86:
+  The @ends-because above `steps` says why it comes to an end:
+  
+    the number halves each step, and a number below one stops the count
+  
+  `steps` uses itself again, directly or through other rules, but not through a HENCE or LEST, and L4 gives no warning about whether a rule like that comes to an end.
+  So the mark changes nothing. That reason is what a reader should check.
 ends-because-basic.l4:52:1-20:
   0
 ends-because-basic.l4:53:1-22:

@@ -135,7 +135,7 @@ import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugar
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 import L4.Lint.SiblingReads (SiblingOperand (..), SiblingRead (..), siblingReads)
 import L4.Cycles (cycleNotices, libraryFile)
-import L4.Cycles.Warning (cycleAcceptedText, cycleWarningText)
+import L4.Cycles.Warning (cycleNoteText, cycleWarningText)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -353,11 +353,11 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 cycleWarns
                   | any ((== SError) . severity) others = []
                   | otherwise =
-                      let (ws, ok) = cycleNotices libraryFile
+                      let (ws, notes) = cycleNotices libraryFile
                             (applyFinalSubstitution s'.substitution (case rprog of MkModule _ u _ -> u))
                             env.entityInfo rprog
                       in [ MkCheckErrorWithContext (CheckWarning (CycleAlarm cw)) None | cw <- ws ]
-                           ++ [ MkCheckErrorWithContext (EndsBecauseAccepted cw) None | cw <- ok ]
+                           ++ [ MkCheckErrorWithContext (EndsBecauseNoted n) None | n <- notes ]
             in MkCheckResult
               { program = rprog
               , implicitReaders =
@@ -8165,7 +8165,7 @@ prettyCheckError (EndsBecauseOnNonDefinition what mname _) =
   why
     | what == "an input" = "which is not a definition. A mark speaks for a whole definition, not for one of its inputs: to speak for the definition that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it."
     | otherwise = "which is not a definition; move it above the definition it is meant for, or remove it."
-prettyCheckError (EndsBecauseAccepted w) = cycleAcceptedText w
+prettyCheckError (EndsBecauseNoted n) = cycleNoteText n
 prettyCheckError (EndsBecauseNeedsReason mname _) =
   [ "@ends-because needs a reason after it, on the same line." <> maybe "" (\ n -> " Here it has none, above `" <> n <> "`.") mname
   , "The reason is what a reader checks: a mark that says the calls end without saying why gives the reader nothing to check, so it is not accepted."
