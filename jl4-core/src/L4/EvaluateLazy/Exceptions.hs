@@ -122,13 +122,24 @@ data Budget
     -- waiting at the end of the events than the limit: a HENCE or LEST that
     -- arms two obligations and leads back to itself doubles this each time
     -- round. The site is the action of the obligation whose arming went over.
+  | JoinedBreaches Int BudgetSite
+    -- ^ a RAND, an ROR or a barrier would join more failures into one breach
+    -- than the limit, which is the same open number as 'OpenObligations''s
+    -- (L2's numbers, ruled by Meng 2026-11-21, amending L5). A breach that is shared
+    -- and joined with itself doubles its list at each join with no new
+    -- work. The site is the compound's operands, or the EVERY
+    -- ('L4.EvaluateLazy.Machine.noteJoin').
   | ClosureApplications Int BudgetSite
-    -- ^ more applications of functions written in L4 than the limit: a
+    -- ^ more work than the limit, counting applications of functions written
+    -- in L4 and deontic hand-offs in one total (L2's numbers, ruled by Meng 2026-11-21): a
     -- function that calls itself with new inputs and never stops pushes no
-    -- frame, so the frame limit never sees it. The site is where the
-    -- application that went over is in the source: its function's body, or
-    -- that function's GIVEN, or the first part of the body that has a place
-    -- ('L4.EvaluateLazy.Machine.noteApplication').
+    -- frame, so the frame limit never sees it, and a HENCE that leads back to
+    -- itself through a shared value applies no function at all. The site is
+    -- where the step that went over is in the source: for an application,
+    -- its function's body, or that function's GIVEN, or the first part of the
+    -- body that has a place ('L4.EvaluateLazy.Machine.noteApplication'); for
+    -- a hand-off, the action, the EVERY, or the compound's operands
+    -- ('L4.EvaluateLazy.Machine.noteHandoff').
   | TimeLimit Int
     -- ^ the directive ran longer than the opt-in @--eval-timeout@, in
     -- seconds of wall-clock time. Not deterministic: it depends on the
@@ -259,10 +270,15 @@ prettyUserEvalException = \ case
     , "A HENCE or LEST that names more than one obligation adds to what is open,"
     , "and a chain of them that leads back to where it started multiplies it each time round."
     , "l4 run and l4 batch take --max-open N to change the limit, and --max-open none to remove it." ]
+  OverBudget (JoinedBreaches limit site) ->
+    [ "I stopped evaluating: a RAND, an ROR or an EVERY would have joined more than " <> Text.textShow limit <> " failures into one breach."
+    , "The join was in " <> siteName site <> "."
+    , "A breach that is shared, and joined with itself again and again, doubles its list of failures at each join."
+    , "l4 run and l4 batch take --max-open N to change the limit, and --max-open none to remove it." ]
   OverBudget (ClosureApplications limit site) ->
-    [ "I stopped evaluating: functions were applied more than " <> Text.textShow limit <> " times."
-    , "The last one applied was in " <> siteName site <> "."
-    , "A function that calls itself with new inputs, and never reaches a case that stops, never ends."
+    [ "I stopped evaluating: it took more than " <> Text.textShow limit <> " steps, counting each function applied and each contract handed the events."
+    , "The last step was in " <> siteName site <> "."
+    , "A function that calls itself with new inputs, or a HENCE or LEST that leads back to itself, never ends unless something stops it."
     , "l4 run and l4 batch take --max-calls N to change the limit, and --max-calls none to remove it." ]
   OverBudget b@(TimeLimit _) ->
     [ "I stopped the run: this took longer than " <> limitText b <> ", so nothing after it was evaluated." ]
@@ -290,7 +306,8 @@ limitText = \ case
   TimeLimit n   -> Text.textShow n <> (if n == 1 then " second" else " seconds") <> " (--eval-timeout)"
   MemoryLimit n -> Text.textShow n <> " MB (--max-eval-memory-mb)"
   OpenObligations n _ -> Text.textShow n <> " obligations open at once (--max-open)"
-  ClosureApplications n _ -> Text.textShow n <> " function applications (--max-calls)"
+  JoinedBreaches n _ -> Text.textShow n <> " failures joined into one breach (--max-open)"
+  ClosureApplications n _ -> Text.textShow n <> " steps (--max-calls)"
 
 -- | A name a 'Stuck' carries, as its message prints it. An input prints
 -- exactly as it always has, so the one-input message is unchanged.
@@ -309,19 +326,24 @@ indentStuckName = \ case
 maximumUnknownSteps :: Int
 maximumUnknownSteps = 250_000
 
--- | How many obligations one directive may have open at once before the
--- machine stops it with 'OpenObligations' (smucclaw/l4-ide#1075). PROVISIONAL:
--- the number waits for the corpus sweep and Meng's ruling on decision 4 of
--- the #1075 design advice. A rent rule that re-arms itself holds one open;
--- #1075's rule holds 16,384 at WAITUNTIL 30.
+-- | The open number (smucclaw/l4-ide#1075; L2's numbers, ruled by Meng 2026-11-21):
+-- how many obligations one directive may have open at once before the
+-- machine stops it with 'OpenObligations', and how many failures one join
+-- may gather before it stops with 'JoinedBreaches'. A level, not a total.
+-- Over the corpus (2026-11-21) the most open at once was 8 and the longest
+-- joined list 9. A rent rule that re-arms itself holds one open; #1075's
+-- rule holds 16,384 at WAITUNTIL 30.
 maximumOpenObligations :: Int
-maximumOpenObligations = 100_000
+maximumOpenObligations = 10_000
 
--- | How many applications of L4 functions one directive may make before the
--- machine stops it with 'ClosureApplications' (smucclaw/l4-ide#1075).
--- PROVISIONAL, as 'maximumOpenObligations' is.
+-- | The work number (L2's numbers, ruled by Meng 2026-11-21): how many function applications and
+-- deontic hand-offs, in all, one directive may make before the machine stops
+-- it with 'ClosureApplications'. A running total. Over the corpus
+-- (2026-11-21) the most was 164,898 (both counts together, in
+-- @ok/closing-the-loop/fristberechnung.l4@); a tight loop makes about ten
+-- million in 12 seconds.
 maximumClosureApplications :: Int
-maximumClosureApplications = 100_000_000
+maximumClosureApplications = 10_000_000
 
 -- | Depth cutoff when converting WHNF results to normal form (deeper parts
 -- of the result are 'Omitted').

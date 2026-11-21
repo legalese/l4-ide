@@ -157,13 +157,13 @@ evalLimitsParser = EvalLimitsOpt
   <$> optional (option countReader
         ( long "max-open"
         <> metavar "N|none"
-        <> help ("Stop any one #EVAL, #ASSERT or #TRACE that has more than N obligations open at once, as an error on that one (default "
+        <> help ("Stop any one #EVAL, #ASSERT or #TRACE that has more than N obligations open at once, or joins more than N failures into one breach, as an error on that one (default "
                  <> show maximumOpenObligations <> "; none: no limit)")
         ))
   <*> optional (option countReader
         ( long "max-calls"
         <> metavar "N|none"
-        <> help ("Stop any one #EVAL, #ASSERT or #TRACE that applies functions more than N times, as an error on that one (default "
+        <> help ("Stop any one #EVAL, #ASSERT or #TRACE that takes more than N steps, counting each function applied and each contract handed the events, as an error on that one (default "
                  <> show maximumClosureApplications <> "; none: no limit)")
         ))
   <*> optional (option positiveIntReader

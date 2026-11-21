@@ -52,11 +52,13 @@ runWith tweak src = map (outcome . (.result)) <$> resultsWith tweak src
       e -> OtherError (Text.unlines (prettyEvalException e))
     budget b = case b of
       OpenObligations n site     -> Over (name b) n (lineOf site.siteRange)
+      JoinedBreaches n site      -> Over (name b) n (lineOf site.siteRange)
       ClosureApplications n site -> Over (name b) n (lineOf site.siteRange)
       TimeLimit n                -> Over (name b) n Nothing
       MemoryLimit n              -> Over (name b) n Nothing
     name = \ case
       OpenObligations {}     -> "obligations"
+      JoinedBreaches {}      -> "breaches"
       ClosureApplications {} -> "applications"
       TimeLimit {}           -> "time"
       MemoryLimit {}         -> "memory"
@@ -73,6 +75,7 @@ rulesNamed tweak src = concatMap named <$> resultsWith tweak src
       _                                                             -> []
     site = \ case
       OpenObligations _ s     -> [s.siteRule]
+      JoinedBreaches _ s      -> [s.siteRule]
       ClosureApplications _ s -> [s.siteRule]
       _                       -> []
 
@@ -329,6 +332,69 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
       -- 6,001 applications each, under a limit of 10,000: together they
       -- would be over it
       runWith (limits Nothing (Just 10000)) countdown `shouldReturn` [Answered, Answered]
+
+  describe "failures joined into one breach (L2's numbers, ruled by Meng 2026-11-21: bounded by the open number)" $ do
+    -- A shared BREACH joined with itself doubles its list at each level with
+    -- one failure built and no obligation open, so only the join's own check
+    -- stops it. d_i is on line 2i + 3. A barrier's join gathers one failure
+    -- per member, and its members are all armed at once, so the open count
+    -- stops it first: its check is a guard, with no case here.
+    let doubling base n = Text.unlines $
+          [ "DECLARE Actor IS ONE OF P, Q"
+          , "DECLARE Action IS ONE OF x, y"
+          , "" ]
+          <> concat
+               [ [ "GIVETH A DEONTIC Actor Action"
+                 , "d" <> tshow i <> " MEANS " <> (if i == 1 then base else "d" <> tshow (i - 1) <> " RAND d" <> tshow (i - 1)) ]
+               | i <- [1 .. n :: Int] ]
+          <> [ "", "#TRACE d" <> tshow n <> " AT 0 WITH", "  (WAITUNTIL 5)", "", "#EVAL 1 PLUS 1" ]
+        breached = "BREACH BY P BECAUSE \"late\""
+    it "stops the join that would gather more failures than the limit, names its rule, and still answers the next directive" $
+      -- d11 joins 512 and 512
+      runWith (limits (Just 1000) Nothing) (doubling breached 12)
+        `shouldReturn` [Over "breaches" 1000 (Just 25), Answered]
+
+    it "names the definition the join is in" $
+      rulesNamed (limits (Just 1000) Nothing) (doubling breached 12)
+        `shouldReturn` [Just "d11"]
+
+    it "lets a join up to the limit through" $
+      -- d11 gathers 1,024, the most this module makes
+      runWith (limits (Just 1024) Nothing) (doubling breached 11)
+        `shouldReturn` [Answered, Answered]
+
+    it "counts a level, not a total: a join of two each round for 1,000 rounds passes a limit of 10" $
+      runWith (limits (Just 10) Nothing) (Text.unlines
+        [ "DECLARE Person IS ONE OF Alice, Bob, Carol"
+        , "DECLARE Action IS ONE OF never, tick"
+        , ""
+        , "x MEANS ((PARTY Alice MUST never WITHIN 1) RAND (PARTY Bob MUST never WITHIN 1)) ROR (PARTY Carol MUST tick WITHIN 1 LEST x)"
+        , ""
+        , "#TRACE x AT 0 WITH"
+        , "  (WAITUNTIL 1000)" ])
+        `shouldReturn` [Answered]
+
+  describe "work: function applications and deontic hand-offs in one total (L2's numbers, ruled by Meng 2026-11-21)" $ do
+    -- A shared FULFILLED joined with itself: 65,535 hand-offs at 16 levels,
+    -- and one function applied in all, so the applications alone never stop it.
+    let fulfilled n = Text.unlines $
+          [ "DECLARE Actor IS ONE OF P, Q"
+          , "DECLARE Action IS ONE OF x, y"
+          , "" ]
+          <> concat
+               [ [ "GIVETH A DEONTIC Actor Action"
+                 , "d" <> tshow i <> " MEANS " <> (if i == 1 then "FULFILLED" else "d" <> tshow (i - 1) <> " RAND d" <> tshow (i - 1)) ]
+               | i <- [1 .. n :: Int] ]
+          <> [ "", "#TRACE d" <> tshow n <> " AT 0 WITH", "  (WAITUNTIL 5)", "", "#EVAL 1 PLUS 1" ]
+        overWork = \ case
+          [Over "applications" 10_000 (Just _), Answered] -> True
+          _                                                -> False
+    it "stops a HENCE-free chain of hand-offs that applies no function, and still answers the next directive" $
+      runWith (limits Nothing (Just 10_000)) (fulfilled 16) >>= (`shouldSatisfy` overWork)
+
+    it "lets the same chain finish with no limit on work" $
+      runWith (limits Nothing Nothing) (fulfilled 16)
+        `shouldReturn` [Answered, Answered]
 
   describe "a stop while what is evaluated waits on an input not yet known" $ do
     -- @x@ is unknown, so the right of the AND is evaluated only in case @x@

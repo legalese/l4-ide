@@ -339,6 +339,8 @@ data LockstepFrame = MkLockstepFrame
     -- ^ the sibling-read check's scope for this application of the compound
   , lsOp      :: RBinOp
   , lsEnv     :: Environment
+  , lsSite    :: Maybe SrcRange
+    -- ^ where the compound is in the source ('operandsSite')
   , lsTime    :: Reference
     -- ^ the compound's own time, every operand's first clock
   , lsType    :: Maybe (Type' Resolved)
@@ -497,14 +499,17 @@ data EvalState =
       -- the open count counts]. Kept apart from 'armings' so that a missed
       -- close shows as a count that grows with the trace.
     , applications :: !(IORef Int)
-      -- ^ the applications of L4 functions this directive has made
-      -- ('noteApplication'). Reset per directive.
+      -- ^ the work this directive has done: applications of L4 functions
+      -- ('noteApplication') and deontic hand-offs ('noteHandoff'), in one
+      -- total. Reset per directive.
     , openLimit :: !(Maybe Int)
-      -- ^ the most obligations a directive may have open at once
-      -- ('OpenObligations'); 'Nothing' sets no limit
+      -- ^ the open number: the most obligations a directive may have open
+      -- at once ('OpenObligations'), and the most failures one join may
+      -- gather ('JoinedBreaches'); 'Nothing' sets no limit
     , applicationLimit :: !(Maybe Int)
-      -- ^ the most function applications a directive may make
-      -- ('ClosureApplications'); 'Nothing' sets no limit
+      -- ^ the work number: the most function applications and deontic
+      -- hand-offs a directive may make, in all ('ClosureApplications');
+      -- 'Nothing' sets no limit
     , budgetRules :: [(SrcRange, Text)]
       -- ^ the module's own definitions, each with its name: what a budget
       -- that goes over names its site by ('budgetSite'). Lazy, so it is
@@ -1465,18 +1470,62 @@ heldObligations = \ case
 -- closures still stops: closures with no place can take the count past the
 -- limit by at most the slack.
 noteApplication :: GivenSig Resolved -> Expr Resolved -> Eval ()
-noteApplication givens body = do
+noteApplication givens body = noteWork (rangeOf body <|> rangeOf givens <|> firstPlaceIn body)
+{-# INLINE noteApplication #-}
+
+-- | A contract value meets its events: an obligation is armed, an EVERY
+-- calls its roll, a RAND or ROR starts on its operands, or a FULFILLED or a
+-- breach is handed on. Counted with the applications, in the same total
+-- (L2's numbers, ruled by Meng 2026-11-21: the WORK number is function applications
+-- plus deontic hand-offs). A HENCE that leads back to itself through a
+-- shared value hands off without applying any function, so the
+-- applications alone never see it: @d MEANS e RAND e@ over a shared
+-- FULFILLED doubles the hand-offs at each level with one application in all
+-- (measured: 4,194,303 hand-offs in 3.4 s at 22 levels). The place is the
+-- action, the EVERY, or the compound's operands; a FULFILLED or a breach has
+-- none, and is reported as an application with none is.
+noteHandoff :: Maybe SrcRange -> Eval ()
+noteHandoff = noteWork
+{-# INLINE noteHandoff #-}
+
+-- | One step of work, at a place in the source when it has one: counted,
+-- and stopped with 'ClosureApplications' past the limit. The place is read
+-- only past the limit.
+noteWork :: Maybe SrcRange -> Eval ()
+noteWork place = do
   appliedRef <- asks (.applications)
   applied <- liftIO (readIORef appliedRef)
   let applied' = applied + 1
   liftIO (writeIORef appliedRef applied')
   asks (.applicationLimit) >>= traverse_ \ limit ->
-    when (applied' > limit) $ do
-      let place = rangeOf body <|> rangeOf givens <|> firstPlaceIn body
+    when (applied' > limit) $
       when (isJust place || applied' > limit + rangelessSlack) $ do
         site <- budgetSite place
         userException (OverBudget (ClosureApplications limit site))
-{-# INLINE noteApplication #-}
+{-# INLINE noteWork #-}
+
+-- | Where a RAND or an ROR is in the source, as its operands place it: the
+-- first operand still an expression. One already a value has no place.
+operandsSite :: MaybeEvaluated -> MaybeEvaluated -> Maybe SrcRange
+operandsSite l r = placeOf l <|> placeOf r
+  where
+    placeOf = either rangeOf (const Nothing)
+
+-- | A RAND, an ROR or a barrier joins the breaches of its parts into one
+-- list of failures: stopped with 'JoinedBreaches' when that list would be
+-- longer than the open number (L2's numbers, ruled by Meng 2026-11-21, amending L5:
+-- the list is bounded by L2's open number). A list is a level, not a total,
+-- so a long run of small joins never adds up to a stop; but a breach that is
+-- shared, and joined with itself again and again, doubles its list at each
+-- join with no new work, so nothing else bounds it: @d MEANS c RAND c@ over
+-- a shared BREACH gives 32,768 failures from one built (measured,
+-- 2026-11-21). Each part is counted only as far as the limit, so a join
+-- costs no more than the limit to check.
+noteJoin :: Maybe SrcRange -> [Blame a] -> Eval ()
+noteJoin place blames = asks (.openLimit) >>= traverse_ \ limit ->
+  when (sum (map (length . take (limit + 1) . toList . blameList) blames) > limit) $ do
+    site <- budgetSite place
+    userException (OverBudget (JoinedBreaches limit site))
 
 -- | The first part of an expression, itself included, that has a place in
 -- the source. Read only past the limit, so its walk costs nothing before.
@@ -2017,6 +2066,7 @@ startCompound env op rexpr1 rexpr2 rs appType = do
         _                      -> False
       (scope, opened) = openScope (MkScope opText (operandLabel "left" rexpr1) (operandLabel "right" rexpr2) fork inStep) clock outer
       outerPath = outer.ssPath
+      rsite = operandsSite rexpr1 rexpr2
   liftIO (writeIORef sref opened)
   case (clock, rs) of
     (Nothing, t : _) -> do
@@ -2029,7 +2079,7 @@ startCompound env op rexpr1 rexpr2 rs appType = do
       liftIO (modifyIORef' sref (setTaken scope 0))
       dyn0 <- captureDyn
       lockstepNext MkLockstepFrame
-        { lsGate = scope, lsScope = scope, lsOp = op, lsEnv = env, lsTime = time, lsType = appType
+        { lsGate = scope, lsScope = scope, lsOp = op, lsEnv = env, lsSite = rsite, lsTime = time, lsType = appType
         , lsStream = events, lsSlots = [SlotPending rexpr1, SlotPending rexpr2]
         , lsRunning = Nothing, lsRound = [0, 1], lsCell = Nothing, lsTaken = 0, lsHead = Nothing
         , lsBase = dyn0 {dyPath = outerPath, dyClock = outer.ssClock} }
@@ -2199,7 +2249,7 @@ lockstepNext ls = case ls.lsRound of
         continueRef ls.lsStream
     | [SlotDone v1, SlotDone v2] <- ls.lsSlots -> do
         setDyn ls.lsBase
-        pushFrame (ContractFrame (RBinOp2 MkRBinOp2 {op = ls.lsOp, rval1 = v1, env = ls.lsEnv}))
+        pushFrame (ContractFrame (RBinOp2 MkRBinOp2 {op = ls.lsOp, rval1 = v1, env = ls.lsEnv, rsite = ls.lsSite}))
         continueBackward v2
     | otherwise -> internalException $ RuntimeTypeError
         "an in-step compound ended its round with an operand neither waiting nor finished"
@@ -2816,6 +2866,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- P2b: this is the ENTRY into the obligation's site — the activation
         -- the step log's key counts. Lazy when the log is off.
         norm <- armNormKey party act
+        noteHandoff (rangeOf act)
         noteArming act
         -- smucclaw/l4-ide#1069: the sibling-read check's clock is the arming
         -- time until an event is taken
@@ -2829,12 +2880,14 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       ValQuantified env deonton -> do
         -- EVERY meets its event stream: this is the arming point, so the roll
         -- call runs here (spec §2.2.7.5 point 5, R-Q6).
+        noteHandoff (rangeOf deonton)
         (time, events) <- case rs of
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
         startRollCall env deonton time events
-      ValROp env op rexpr1 rexpr2 ->
+      ValROp env op rexpr1 rexpr2 -> do
+        noteHandoff (operandsSite rexpr1 rexpr2)
         startCompound env op rexpr1 rexpr2 rs mTy
       ValConnective conn ->
         case (conn, rs) of
@@ -2876,7 +2929,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- We need to evaluate arg1, then arg2, then z
         pushFrame (TernaryBuiltin1 fn arg2 z)
         continueRef arg1
-      ValFulfilled -> continueBackward ValFulfilled
+      ValFulfilled -> noteHandoff Nothing >> continueBackward ValFulfilled
       -- SEESAW (spec §6.1.2): a declared breach takes its effective instant
       -- from the clock of the hand-off that reached it — the deadline (no
       -- earlier than the failed obligation's arming) under a LEST, the
@@ -2888,9 +2941,10 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       -- continuations is one cached thunk, reached at two clocks.
       ValBreached r
         | hasUntimed (breachBlame r), [t, evs] <- rs -> do
+            noteHandoff Nothing
             pushFrame (ContractFrame (StampBreach StampBreachFrame {reason = r, eventsRef = evs}))
             continueRef t
-        | otherwise -> continueBackward (ValBreached r)
+        | otherwise -> noteHandoff Nothing >> continueBackward (ValBreached r)
       -- An assumed function applied is a term (§4.2), keyed by the function
       -- and its arguments' values, read without forcing anything; an
       -- argument that cannot be read so leaves the call Stuck on the
@@ -4109,6 +4163,7 @@ backwardContractFrame val = \ case
       -- first, with duplicates: @PARTY alice MUST x RAND PARTY alice MUST y@
       -- both missed names alice twice, once per way. A breach with no BY is
       -- one entry naming nobody.
+      noteJoin rsite [breachBlame r1, breachBlame r2]
       let (decider, blame) = combineBlame op (breachBlame r1) (breachBlame r2)
           chosen = breachOf blame
       -- P2b: which operand decides the compound's instant (both, on a tie).
@@ -4849,6 +4904,7 @@ barrierFinish step = case reverse step.failures of
        Nothing -> internalException $ RuntimeTypeError
          "a barrier with no LEST recorded a failure that is not a breach"
        Just blames -> do
+        noteJoin (rangeOf step.ctx.deonton) (toList blames)
         let verdict = breachOf (combineAll blames)
         -- P2b: the barrier's own step, logged once the verdict is decided
         -- (every member has run). The clock is the anchoring failure's

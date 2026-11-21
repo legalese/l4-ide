@@ -3,6 +3,7 @@ module L4.EvaluateLazy.ContractFrame where
 import Base (Text)
 import L4.Evaluate.ValueLazy
 import L4.EvaluateLazy.DeonticStep (DeonticStep, NormKey)
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
 
 data ContractFrame
@@ -459,6 +460,9 @@ data RBinOp1 = MkRBinOp1
   , clock :: Maybe Rational
     -- ^ the compound's own time, which is the right operand's clock as it
     -- starts, when it was already evaluated as the compound started
+  , rsite :: Maybe SrcRange
+    -- ^ where the compound is in the source, as its operands place it: what
+    -- a join that goes over the open number names ('noteJoin')
   }
   deriving stock Show
 
@@ -466,6 +470,8 @@ data RBinOp2 = MkRBinOp2
   { op :: RBinOp
   , rval1 :: WHNF
   , env :: Environment
+  , rsite :: Maybe SrcRange
+    -- ^ as 'RBinOp1''s
   }
   deriving stock Show
 

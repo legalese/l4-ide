@@ -47,7 +47,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Unknown annotation](#unknown-annotation)
 - [Malformed annotation](#malformed-annotation)
 - [Infinite loop detected](#infinite-loop-detected)
-- [Functions were applied more than so many times](#functions-were-applied-more-than-so-many-times)
+- [It took more than so many steps](#it-took-more-than-so-many-steps)
 - [Not evaluated because the run stopped](#not-evaluated-because-the-run-stopped)
 
 **Assumed terms and refusals**
@@ -66,6 +66,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 
 - [#EVAL shows the rule instead of an outcome](#eval-shows-the-rule-instead-of-an-outcome)
 - [More obligations were open at once than the limit](#more-obligations-were-open-at-once-than-the-limit)
+- [More failures were joined into one breach than the limit](#more-failures-were-joined-into-one-breach-than-the-limit)
 
 **Export**
 
@@ -1027,7 +1028,7 @@ x MEANS x + 1
 
 To find `x`, L4 needs `x + 1`, which needs `x` again. L4 notices this for a value defined in terms of itself and stops with this error.
 
-A function that calls itself with new inputs, and never reaches a case that stops, is caught differently: see [Functions were applied more than so many times](#functions-were-applied-more-than-so-many-times).
+A function that calls itself with new inputs, and never reaches a case that stops, is caught differently: see [It took more than so many steps](#it-took-more-than-so-many-steps).
 
 **How to fix it:** If you meant recursion, give it a case that stops:
 
@@ -1045,9 +1046,9 @@ If you did not, you probably meant another name on the right-hand side.
 
 ---
 
-### Functions were applied more than so many times
+### It took more than so many steps
 
-**Error:** `I stopped evaluating: functions were applied more than 100000000 times.`, then `The last one applied was in`, the name of the function, and its place in your file; when that place is in a file yours imports, such as the prelude, the message gives the place alone (`the definition at`). In `l4 batch` the place is in the copy of your file that L4 lays out for each row (`myfile.l4.batch2.l4`), so its line numbers are not your file's.
+**Error:** `I stopped evaluating: it took more than 10000000 steps, counting each function applied and each contract handed the events.`, then `The last step was in`, the name of the function or rule, and its place in your file; when that place is in a file yours imports, such as the prelude, the message gives the place alone (`the definition at`). In `l4 batch` the place is in the copy of your file that L4 lays out for each row (`myfile.l4.batch2.l4`), so its line numbers are not your file's.
 
 ```l4
 GIVEN n IS A NUMBER
@@ -1059,13 +1060,13 @@ countDown n MEANS
 #EVAL countDown 5
 ```
 
-`countDown` stops when `n` is 0, but counting down by 2 from 5 goes 3, 1, -1, and never meets 0. Each call starts afresh rather than waiting on the one before, so L4 cannot see a loop the way it does for [Infinite loop detected](#infinite-loop-detected); it counts instead. One `#EVAL`, `#ASSERT` or `#TRACE` may apply functions written in L4 at most 100,000,000 times, and past that it stops with this error.
+`countDown` stops when `n` is 0, but counting down by 2 from 5 goes 3, 1, -1, and never meets 0. Each call starts afresh rather than waiting on the one before, so L4 cannot see a loop the way it does for [Infinite loop detected](#infinite-loop-detected); it counts instead. One `#EVAL`, `#ASSERT` or `#TRACE` may take at most 10,000,000 steps, and past that it stops with this error. A step is a function written in L4 being applied, or a contract (an obligation, an `EVERY`, a `RAND` or `ROR`, a `FULFILLED` or a breach) being handed the events to check, so a `HENCE` or `LEST` that leads back to itself counts too, even when it applies no function.
 
 The count is of steps, not of time, so the same file stops at the same place on every computer. Only the line that went over the limit stops: the lines after it still run, and `l4 run` exits with an error. In `l4 batch` that row fails, as a row with any other error does. `l4 run`, `l4 batch` and the editor count; the other `l4` commands and the REPL do not. `l4 run` and `l4 batch` take `--max-calls N` to set the limit to N, and `--max-calls none` to remove it.
 
 The count limits how long a line runs, not how much memory it uses. A function that passes along a value it never looks at, such as `countUp n MEANS countUp (n + 1)`, where nothing reads `n`, keeps every one of those values, and can run out of memory long before it reaches the limit. The `--max-eval-memory-mb` option of `l4 run` stops it sooner: see [Stopping a line that runs too long](../../tutorials/getting-started/l4-cli.md#stopping-a-line-that-runs-too-long).
 
-**How to fix it:** Make sure the function reaches its stopping case from every input: test with `AT MOST 0` rather than `EQUALS 0` when the input can step past 0. If the function does stop, but only after more than 100,000,000 calls, the work is too big for one evaluation: split it into smaller questions, or raise the limit with `--max-calls`.
+**How to fix it:** Make sure the function reaches its stopping case from every input: test with `AT MOST 0` rather than `EQUALS 0` when the input can step past 0. If the function does stop, but only after more than 10,000,000 steps, the work is too big for one evaluation: split it into smaller questions, or raise the limit with `--max-calls`.
 
 ---
 
@@ -1331,7 +1332,7 @@ This gives `FULFILLED`. See [Regulative rules](../regulative/README.md) and [EVE
 
 ### More obligations were open at once than the limit
 
-**Error:** `I stopped evaluating: more than 100000 obligations were open at once.`, then `The last one was armed in`, the name of the rule, and its place in your file; when that place is in a file yours imports, the message gives the place alone (`the definition at`). In `l4 batch` the place is in the copy of your file that L4 lays out for each row (`myfile.l4.batch2.l4`), so its line numbers are not your file's.
+**Error:** `I stopped evaluating: more than 10000 obligations were open at once.`, then `The last one was armed in`, the name of the rule, and its place in your file; when that place is in a file yours imports, the message gives the place alone (`the definition at`). In `l4 batch` the place is in the copy of your file that L4 lays out for each row (`myfile.l4.batch2.l4`), so its line numbers are not your file's.
 
 ```l4
 DECLARE Person IS ONE OF Alice, Carol
@@ -1344,11 +1345,39 @@ w3 MEANS PARTY Alice MAY smoke WITHIN 2 LEST (w1 RAND w3)
   (WAITUNTIL 60)
 ```
 
-Each time `w1`'s window closes, its `LEST` starts two obligations, `w3` and a new `w1`, and each of those does the same when its own window closes. What is open doubles every two units of time, so by time 60 it would be in the hundreds of millions. L4 counts the obligations a `#TRACE` or `#EVAL` has started and still holds, including any left waiting when the trace ends, and stops at 100,000. An obligation stops counting once it is handed on to its `HENCE` or `LEST`, once it is broken with no `LEST` to go to, or once the `RAND` or `ROR` it belongs to is decided without it, as when the other side of an `RAND` is broken or the other side of an `ROR` is kept. L4 does not decide an `RAND` or `ROR` while either side is still meeting events, so a side that can no longer matter may count until the trace ends.
+Each time `w1`'s window closes, its `LEST` starts two obligations, `w3` and a new `w1`, and each of those does the same when its own window closes. What is open doubles every two units of time, so by time 60 it would be in the hundreds of millions. L4 counts the obligations a `#TRACE` or `#EVAL` has started and still holds, including any left waiting when the trace ends, and stops at 10,000. An obligation stops counting once it is handed on to its `HENCE` or `LEST`, once it is broken with no `LEST` to go to, or once the `RAND` or `ROR` it belongs to is decided without it, as when the other side of an `RAND` is broken or the other side of an `ROR` is kept. L4 does not decide an `RAND` or `ROR` while either side is still meeting events, so a side that can no longer matter may count until the trace ends.
 
 A rule that starts itself again in its `HENCE` or `LEST`, as monthly rent does, holds one obligation open at a time, however long its trace, and never comes near the limit. Only the line that went over the limit stops: the lines after it still run, and `l4 run` exits with an error. In `l4 batch` that row fails, as a row with any other error does. `l4 run`, `l4 batch` and the editor count; the other `l4` commands and the REPL do not. `l4 run` and `l4 batch` take `--max-open N` to set the limit to N, and `--max-open none` to remove it.
 
 **How to fix it:** Make sure that the `HENCE` or `LEST` of a rule that leads back to itself names one obligation, not two. If the rule really does mean that obligations multiply, give the trace fewer steps.
+
+---
+
+### More failures were joined into one breach than the limit
+
+**Error:** `I stopped evaluating: a RAND, an ROR or an EVERY would have joined more than 10000 failures into one breach.`, then `The join was in`, the name of the rule, and its place in your file; when that place is in a file yours imports, the message gives the place alone (`the definition at`).
+
+```l4
+DECLARE Actor IS ONE OF P, Q
+DECLARE Action IS ONE OF x, y
+
+GIVEN n IS A NUMBER
+GIVETH A DEONTIC Actor Action
+late n MEANS
+    IF n EQUALS 0
+    THEN BREACH BY P BECAUSE "late"
+    ELSE half RAND half
+    WHERE half MEANS late (n - 1)
+
+#TRACE late 14 AT 0 WITH
+  (WAITUNTIL 5)
+```
+
+A breach names every failure that caused it, and a breach of a `RAND` or an `ROR` names the failures of both sides. Here each `late n` joins `late (n - 1)` with itself, so the list of failures doubles at each level, to 16,384 at `late 14`, every one of them the same failure, and no obligation is ever open. L4 bounds the list one `RAND`, `ROR` or `EVERY` may gather with the same number that bounds the obligations open at once, 10,000, and stops at the join that would go past it.
+
+Only the line that went over the limit stops: the lines after it still run, and `l4 run` exits with an error. In `l4 batch` that row fails, as a row with any other error does. `--max-open N` sets this limit and the one on obligations open at once together, and `--max-open none` removes both.
+
+**How to fix it:** Joining a breach with itself repeats its failures, so join different obligations instead. If the list really is meant to be that long, raise the limit with `--max-open`.
 
 ---
 

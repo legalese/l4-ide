@@ -292,7 +292,7 @@ l4 run --fixed-now 2025-01-31T15:45:30Z myfile.l4
 ### Stopping a line that runs too long
 
 A rule can be written so that working it out never ends: a function that keeps calling itself, or obligations that keep starting more obligations.
-L4 stops any one `#EVAL`, `#ASSERT` or `#TRACE` that applies functions more than 100,000,000 times, or has more than 100,000 obligations open at once, says which, and names the rule it stopped in and its place (only the place, when that is in a file this one imports, such as the prelude); the [error messages](../../reference/errors/README.md#functions-were-applied-more-than-so-many-times) page explains both.
+L4 stops any one `#EVAL`, `#ASSERT` or `#TRACE` that takes more than 10,000,000 steps (each function applied, and each contract handed the events, is one step), has more than 10,000 obligations open at once, or would join more than 10,000 failures into one breach. It says which, and names the rule it stopped in and its place (only the place, when that is in a file this one imports, such as the prelude); the [error messages](../../reference/errors/README.md#it-took-more-than-so-many-steps) page explains each.
 Those limits count steps, not seconds, so a file stops at the same place on every computer.
 They limit how long a line runs, not how much memory it holds: a function that keeps every value it passes along can run out of memory first.
 Only the line that went over a count stops: the lines after it still run, and `l4 run` exits with an error; in `l4 batch` that row fails, as a row with any other error does.
@@ -305,8 +305,8 @@ To change either count, or turn it off:
 l4 run --max-calls 1000000 --max-open none myfile.l4
 ```
 
-- `--max-calls N` sets the number of function applications, and `--max-calls none` removes the limit.
-- `--max-open N` sets the number of obligations open at once, and `--max-open none` removes the limit.
+- `--max-calls N` sets the number of steps, and `--max-calls none` removes the limit.
+- `--max-open N` sets the number of obligations open at once, and of failures one join may gather, and `--max-open none` removes the limit.
 
 Two more limits are off unless you ask for them:
 
