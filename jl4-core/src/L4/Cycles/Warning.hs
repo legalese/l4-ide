@@ -223,6 +223,14 @@ data Continuation = HenceOf DeonticModal | LestOf DeonticModal | AfterRecord
 cycleWarningText :: CycleWarning -> [Text]
 cycleWarningText w = case w.trouble of
   CouldNotCheckThat d ->
+    -- The opening sentence ('startsItself') assumes a cycle of obligations:
+    -- "a HENCE or LEST in it leads back". Under the scope ruling (ii) a cycle of
+    -- functions never reaches here, because 'L4.Cycles.alarms' gives a
+    -- 'FunctionCycle' no alarm. If cycles of functions are ever given alarms
+    -- again, this sentence must first branch on the cycle's kind, which
+    -- 'CycleWarning' does not carry today: with that gate removed, it tells
+    -- the reader of @ok/fib.l4@ that a HENCE or LEST leads back to
+    -- @fibNaive@, which has none (measured 2026-11-21).
     [startsItself w.rule w.through <> "."]
     <> couldNotCheck "I could not check that this comes to an end" d
     <> [ ""
