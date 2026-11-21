@@ -63,6 +63,7 @@ cliOutcome = ImportOutcome
   , embedTried = EmbedMissing 22
   , caseVariantNames = []
   , ownModuleVariant = Nothing
+  , skippedCaseVariantWarning = Nothing
   }
 
 embedLine :: Text.Text
@@ -121,6 +122,7 @@ spec = do
             , embedTried = EmbedMissing 22
             , caseVariantNames = []
             , ownModuleVariant = Nothing
+            , skippedCaseVariantWarning = Nothing
             }
       got <- triedLocations lspOutcome
       got `shouldBe` [ "project:/zz.l4", asPath "/zz.l4", asPath "/abs/lsp1/zz.l4", embedLine ]

@@ -773,6 +773,14 @@ data ImportOutcome = ImportOutcome
     -- the import did not resolve. With no 'caseVariantNames' to offer, the
     -- not-found diagnostic then says that a module cannot import itself
     -- ('ModuleNameCase.selfImportHint').
+  , skippedCaseVariantWarning :: !(Maybe Text)
+    -- ^ The skipped-variant warning's text ('skippedCaseVariantMessage', or
+    -- 'selfCaseVariantMessage' when the file passed over is the importing
+    -- file itself) when the import resolved but passed a file over, on EVERY
+    -- resolution, where
+    -- the log line is once per session: 'GetImports' publishes it as a
+    -- Warning on the IMPORT, so an editor lists it with the problems
+    -- (smucclaw/l4-ide#1080; assumed (GM, 2026-11-21), for Meng's review).
   }
 
 -- | The embedded-stdlib tier, as the not-found diagnostic needs to describe it.
@@ -1000,7 +1008,8 @@ resolveImportQuietly recorder shadowWarnedRef caseSkipWarnedRef scope rootDirect
       -- Resolved above the library tiers entirely, so the embed was never reached.
       pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, libTried = []
                          , embedTried = EmbedSkipped, caseVariantNames = []
-                         , ownModuleVariant = Nothing }
+                         , ownModuleVariant = Nothing
+                         , skippedCaseVariantWarning = Nothing }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
       res <- liftIO $ resolveLibrary scope rootDirectory mImportingNfp modName
@@ -1052,6 +1061,7 @@ resolveImportQuietly recorder shadowWarnedRef caseSkipWarnedRef scope rootDirect
             , ownModuleVariant =
                 if Maybe.isJust mUri then Nothing else
                   Text.pack . dropExtension <$> res.importerCaseVariant
+            , skippedCaseVariantWarning = snd <$> skipped
             }
 
       case res.winner of
@@ -1460,7 +1470,11 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- truth; the error is already reported here.
         mkImportUri (range, modName, outcome) = case outcome.importUri of
           Just u ->
-            pure ([], Just u)
+            -- The skipped-variant warning (#1080), on the IMPORT that passed
+            -- the file over, so that an editor lists it with the problems;
+            -- the log line reaches only its output channel. Assumed (GM,
+            -- 2026-11-21), for Meng's review.
+            pure (Maybe.maybeToList (skippedVariantDiagnostic range <$> outcome.skippedCaseVariantWarning), Just u)
           Nothing -> do
             -- One line per location, in probe order, deduped by the FILE rather
             -- than by the spelling: see 'dedupeTriedLocations', which is where
@@ -1491,6 +1505,19 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
                       ])
                     (fromSrcRange <$> range)
             pure ([diag], Nothing)
+
+        -- The same text as the log line, at Warning, over the IMPORT.
+        skippedVariantDiagnostic range msg = mkSimpleFileDiagnostic uri Diagnostic
+          { _range = srcSpanToLspRange (fromSrcRange <$> range)
+          , _severity = Just LSP.DiagnosticSeverity_Warning
+          , _code = Nothing
+          , _codeDescription = Nothing
+          , _source = Just "import"
+          , _message = msg
+          , _tags = Nothing
+          , _relatedInformation = Nothing
+          , _data_ = Nothing
+          }
 
         mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], Maybe ImportResult)]
         mkDiagsAndImports = \ case
