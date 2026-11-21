@@ -27,6 +27,7 @@ module L4.Cycles
   , Continuation (..)
   , Alarm (..)
   , cycleFindings
+  , cycleFindingsWith
   , alarms
   , findingClass
   , findingJSON
@@ -35,6 +36,11 @@ module L4.Cycles
   , Slot (..)
   , moduleEdges
   , plainReferences
+    -- * Trusting a callee
+  , libraryFile
+  , apiLibraryFile
+  , trustedLibrary
+  , earnedByBody
   ) where
 
 import Base
@@ -51,7 +57,7 @@ import L4.Annotation (Anno_ (..), getAnno)
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
 import L4.TypeCheck.Environment
-  ( andUnique, consUnique, contractUnique, evalContractUnique, geqUniques, gtUniques, leqUniques
+  ( andUnique, consUnique, contractUnique, emptyUnique, evalContractUnique, geqUniques, gtUniques, leqUniques
   , listUnique, ltUniques, minusUnique, notUnique, orUnique, plusUnique )
 import L4.TypeCheck.Environment.TH (builtinUri)
 import L4.TypeCheck.Types (CheckEntity (..), EntityInfo, substituteType)
@@ -198,8 +204,15 @@ data Fan = Fan Int | Unbounded
 -- records on names still hold inference variables until it is applied. The
 -- entity table is the checker's, for what a type named in one holds.
 cycleFindings :: (Type' Resolved -> Type' Resolved) -> EntityInfo -> Module Resolved -> [Finding]
-cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
+cycleFindings = cycleFindingsWith libraryFile
+
+-- | 'cycleFindings', naming the library files a callee may be trusted from
+-- (Note [Trusting a callee]): 'libraryFile', or 'apiLibraryFile' for the API's
+-- pipeline.
+cycleFindingsWith :: (NormalizedUri -> Maybe Text) -> (Type' Resolved -> Type' Resolved) -> EntityInfo -> Module Resolved -> [Finding]
+cycleFindingsWith library expand info m@(MkModule _ uri _) = map judge sccs
  where
+  trust = moduleTrust library info m
   holds = holdsContract info
   -- may hold an obligation once instantiated: a type variable might be one
   mayHold = maybe False (\ t -> holds t || hasVariable t)
@@ -312,7 +325,7 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
   -- of one function type: a parameter, or a parameter or the result
   takes p args _ = any p args
   touches p args r = any p args || p r
-  (bursts, edges) = moduleGraph (readThrough m) info m
+  (bursts, edges) = moduleGraph trust (readThrough m) m
   targets = Map.fromListWith Set.union [(e.from, Set.singleton e.to) | e <- edges]
   sccOf scc = Set.fromList (map (getUnique . decideName) scc)
 
@@ -388,7 +401,7 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
       | any untracedIn scc = Unproved Untraced
       | null unguardedOnCycle = Proved WaitsEachLap
       | any (\ e -> e.from /= e.to) unguardedOnCycle =
-          maybe (Unproved Mutual) Proved (descent info nullaries scc unguardedOnCycle)
+          maybe (Unproved Mutual) Proved (descent trust info nullaries scc unguardedOnCycle)
       | otherwise = functionVerdict [d | d <- scc, getUnique (decideName d) `elem` map (.from) unguardedOnCycle] unguardedOnCycle
 
   -- the unguarded self-calls of each self-recursive member must all pass one
@@ -399,7 +412,7 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
 
   selfProof es d =
     let calls = [e | e <- es, e.from == getUnique (decideName d)]
-    in asum [descent info nullaries [d] calls, countdown constants d calls]
+    in asum [descent trust info nullaries [d] calls, countdown constants d calls]
   -- the bodies of the definitions that take no argument
   nullaries = Map.fromList [(getUnique (decideName d), bodyOf d) | d <- decides, null (valueParams d)]
   -- the definitions of the module that are a number written out
@@ -691,14 +704,14 @@ clausePart d = isJust (view annPmSynthetic (getAnno d))
 -- Every definition is a node of its own here, the names 'readThrough' gives
 -- included, so that 'plainReferences' is a check of the walk alone.
 moduleEdges :: EntityInfo -> Module Resolved -> [Edge]
-moduleEdges info = snd . moduleGraph Map.empty info
+moduleEdges info m = snd (moduleGraph (moduleTrust libraryFile info m) Map.empty m)
 
 -- | The edges, and every continuation whose expression joins two or more
 -- calls of the module's definitions (Note [What multiplies]). The names in
 -- @through@ are not nodes: each is read, wherever it is named, as its body
 -- (Note [A name for an expression]).
-moduleGraph :: Map Unique (Expr Resolved) -> EntityInfo -> Module Resolved -> ([Burst], [Edge])
-moduleGraph through info m =
+moduleGraph :: Trust -> Map Unique (Expr Resolved) -> Module Resolved -> ([Burst], [Edge])
+moduleGraph trust through m =
   partitionEithers (concatMap edgesOf [d | d <- decides, not (Map.member (getUnique (decideName d)) through)])
  where
   decides = moduleDecides m
@@ -730,7 +743,7 @@ moduleGraph through info m =
       App _ f es ->
         let byName =
               [ (i, g, q, x)
-              | (i, q, j) <- elementParameters info f (length es)
+              | (i, q, j) <- trust.elementsOf f (length es)
               , App _ g [] <- take 1 (drop i es), Set.member (getUnique g) nodes
               , x <- take 1 (drop j es) ]
             named' = Set.fromList [i | (i, _, _, _) <- byName]
@@ -1276,13 +1289,12 @@ mulF _ _ = Unbounded
 --         places around the same names; never the outermost pattern, which
 --         is the whole value, and never a number or text written in one;
 --       - the parameter of a function written in place (@GIVEN c YIELD …@)
---         that is given to a function whose declared type can hand it only
---         elements of a list it is also given, when that list is a part.
---         Read off the callee's type, not its name: in @FOR ALL a@,
---         @(a -> b) -> LIST OF a -> …@ with @a@ written nowhere else, the
---         function has no @a@ to pass but the list's elements, whatever its
---         definition says. So @map@, @any@, @all@ and @filter@ qualify, and
---         a function of the author's own with the same type does too.
+--         that is given to a function trusted to apply it only to elements
+--         of a list it is also given, when that list is a part. The callee's
+--         declared type is where the credit starts, and its body must earn
+--         it (Note [Trusting a callee]): @map@, @any@, @all@ and @filter@
+--         do, and so does a function of the author's own in the same module
+--         whose body does what theirs do.
 --     Each member is tried at every position, up to 4,096 combinations.
 --     It proves the recursion ends on a finite value. A list a cycle builds
 --     from itself (@ones MEANS 1 FOLLOWED BY ones@) is not one, and that
@@ -1299,6 +1311,61 @@ mulF _ _ = Unbounded
 --     parameter that every call passes on unchanged (@range (low + 1) high@
 --     under @IF low > high@). An equality test does not prove it: @n EQUALS
 --     0@ never holds for a negative or fractional @n@. Self-recursion only.
+
+------------------------------------------------------------------------
+-- Note [Trusting a callee]
+------------------------------------------------------------------------
+-- Descent credits a function's parameter as an element of a list, and a
+-- callee's result as a list of a list's elements, from the callee's
+-- declared type ('elementParameters', 'resultSource'): in @FOR ALL a@,
+-- @(a -> b) -> LIST OF a -> …@ with @a@ written nowhere else, the callee
+-- has no @a@ of its own to pass on. That reading is false, because L4 has
+-- values of every type: @REFUSE "…"@, the prelude's @TBD@ and an @ASSUME@
+-- of a type variable are each an @a@. So @smuggle f xs MEANS f (REFUSE
+-- "…")@ has the type of @any@, and @walk t MEANS smuggle (GIVEN c YIELD walk
+-- c) (t's kids)@ was proved while it never ends: laziness carries the
+-- refusal round the loop. Likewise a result built as @LIST (REFUSE "…")@
+-- for a callee of @filter@'s type (2026-11-21 attack round, parametricity
+-- p12, p11, p17, p13). It loops only where the member recurses before it
+-- looks at what it was given; p16, which tests first, ends, and is now
+-- "could not check" too.
+--
+-- So the type is where a credit starts, and a callee keeps it only where
+-- its body is seen to earn it ('earns'):
+--   * the function argument is applied only to names the body bound to the
+--     list's elements (a pattern's @x@ in @WHEN x FOLLOWED BY rest@ over the
+--     list or what remains of it), or handed on, with the list or a list of
+--     its elements, to a callee trusted with both (@map f xs@ in a helper);
+--   * what the callee gives is, along every branch, a list of the list's
+--     elements: the list or a name for what remains of it, @EMPTY@, an
+--     element put before such a list, or what a trusted callee gives of one.
+-- A WHERE/LET helper's parameter counts as such a list when every call of
+-- it passes one there, and the helper's result when its body gives one, so
+-- @foldr@'s @go list@ is read too. The credits of the module's definitions
+-- are settled together: each body is read with the others' and its own
+-- taken as given, and a credit some body fails to earn is dropped until
+-- none is, since @map@ hands its function on to itself.
+--
+-- An imported function's body is not here to read, so it keeps no credit,
+-- with one exception: the library functions 'trustedLibrary' lists. That
+-- list is not a judgement made by hand: CyclesSpec checks each library's
+-- source and asserts that the list is exactly what 'earnedByBody' finds
+-- there. A library is recognised by its URI ('libraryFile'): the copy
+-- compiled into the binary, or a file under a checkout's
+-- @jl4-core/libraries@.
+--
+-- Where this goes wrong, sorted by how it shows:
+--   * Loud, as "could not check": a function that does pass only the list's
+--     elements but that the rule cannot read so (@sortBy@, through
+--     @insertBy@, whose @x IS AN a@ gives it no credit; @nub@, through
+--     @deleteBy@); a helper of the author's own imported from another
+--     module; and every library function in a pipeline that names its
+--     modules @project:/…@, unless it passes 'apiLibraryFile', as the API's
+--     does.
+--   * Silent: a file of the author's own whose path ends in
+--     @jl4-core/libraries/prelude.l4@, and which defines a @map@ of its
+--     own, is taken for the library. The editor's @project:/@ names, which
+--     resolve to the author's own files first, are not trusted.
 
 ------------------------------------------------------------------------
 -- Note [A name for an expression]
@@ -1346,14 +1413,14 @@ mulF _ _ = Unbounded
 data Grade = Strict | Weak
   deriving stock Eq
 
-descent :: EntityInfo -> Map Unique (Expr Resolved) -> [Decide Resolved] -> [Edge] -> Maybe Proof
-descent info nullaries ds es = listToMaybe [Structural (firstPosition a) | a <- assignments, works a]
+descent :: Trust -> EntityInfo -> Map Unique (Expr Resolved) -> [Decide Resolved] -> [Edge] -> Maybe Proof
+descent trust info nullaries ds es = listToMaybe [Structural (firstPosition a) | a <- assignments, works a]
  where
   key = getUnique . decideName
   used = Set.fromList (concat [[e.from, e.to] | e <- es])
   members = [d | d <- ds, Set.member (key d) used]
   choices =
-    [ (key d, [(k, p, partsOf info nullaries d p) | (k, p) <- zip [0 :: Int ..] (valueParams d)])
+    [ (key d, [(k, p, partsOf trust info nullaries d p) | (k, p) <- zip [0 :: Int ..] (valueParams d)])
     | d <- members ]
   assignments
     | null es || product (map (length . snd) choices) > 4096 = []
@@ -1373,7 +1440,7 @@ descent info nullaries ds es = listToMaybe [Structural (firstPosition a) | a <- 
           | strictPart info p s x -> Just Strict
           | partOf info p s x -> Just Weak
         (Nothing, Just xs)
-          | elementsWithin info nullaries p s xs -> Just Strict
+          | elementsWithin trust info nullaries p s xs -> Just Strict
         _ -> Nothing
 
 -- | What a definition's body takes apart of one parameter's value: the names
@@ -1386,8 +1453,8 @@ data Parts = MkParts
 
 -- | The strict parts a definition's body binds of the value of one of its
 -- parameters (Note [The function checks]).
-partsOf :: EntityInfo -> Map Unique (Expr Resolved) -> Decide Resolved -> Resolved -> Parts
-partsOf info nullaries d p = MkParts names shapes
+partsOf :: Trust -> EntityInfo -> Map Unique (Expr Resolved) -> Decide Resolved -> Resolved -> Parts
+partsOf trust info nullaries d p = MkParts names shapes
  where
   everyExpr = universeExpr (bodyOf d)
   names = grow Set.empty
@@ -1405,11 +1472,11 @@ partsOf info nullaries d p = MkParts names shapes
          , MkBranch _ (When _ (PatVar _ b)) _ <- brs ]
       <> [ getUnique c
          | App _ g xs <- everyExpr
-         , (i, q, j) <- elementParameters info g (length xs)
+         , (i, q, j) <- trust.elementsOf g (length xs)
          , Lam _ (MkGivenSig _ otns) _ <- take 1 (drop i xs)
          , c <- take 1 (drop q [n | MkOptionallyTypedName _ n mty _ <- otns, not (isTypeParam mty)])
          , x <- take 1 (drop j xs)
-         , elementsWithin info nullaries p s x ]
+         , elementsWithin trust info nullaries p s x ]
   -- the patterns strictly inside one that matches a part, which bind a name
   -- and are not a bare name: @y FOLLOWED BY rest@ in
   -- @WHEN x FOLLOWED BY (y FOLLOWED BY rest)@
@@ -1470,20 +1537,20 @@ rebuilds q x = case (q, x) of
   _ -> False
 
 -- | Every element of the list is a strict part of the parameter's value: the
--- list is a part; or it is what a function gives whose declared type lets it
--- give only elements of one list it is given (@filter@: see
--- 'resultSource'), when that list's elements are; or it is a definition with
+-- list is a part; or it is what a function gives that is trusted to give
+-- only elements of one list it is given (@filter@: see 'resultSource' and
+-- Note [Trusting a callee]), when that list's elements are; or it is a definition with
 -- no parameters whose body is such a list (@`the stocks` MEANS filter …@).
 -- Read three definitions deep.
-elementsWithin :: EntityInfo -> Map Unique (Expr Resolved) -> Resolved -> Parts -> Expr Resolved -> Bool
-elementsWithin info nullaries p s = go (3 :: Int)
+elementsWithin :: Trust -> EntityInfo -> Map Unique (Expr Resolved) -> Resolved -> Parts -> Expr Resolved -> Bool
+elementsWithin trust info nullaries p s = go (3 :: Int)
  where
   go depth x
     | partOf info p s x = True
     | depth <= 0 = False
     | otherwise = case x of
         App _ v [] | Just b <- Map.lookup (getUnique v) nullaries -> go (depth - 1) b
-        App _ h xs | [j] <- resultSource info h (length xs), y <- xs !! j -> go (depth - 1) y
+        App _ h xs | [j] <- trust.sourceOf h (length xs), y <- xs !! j -> go (depth - 1) y
         _ -> False
 
 -- | For a function of @n@ arguments whose declared type gives a @LIST OF a@
@@ -1491,7 +1558,9 @@ elementsWithin info nullaries p s = go (3 :: Int)
 -- position. @a@ is a type variable of the function's @FOR ALL@, and every
 -- other argument either does not mention it or is a function that only
 -- takes an @a@ (a test, as @filter@'s), so the function has no @a@ to put
--- in what it gives but that list's elements.
+-- in what it gives but that list's elements, or a value of every type:
+-- the credit holds only where 'moduleTrust' keeps it (Note [Trusting a
+-- callee]).
 resultSource :: EntityInfo -> Resolved -> Int -> [Int]
 resultSource info h n = case Map.lookup (getUnique h) info of
   Just (_, KnownTerm (Forall _ vs (Fun _ args (TyApp _ l [TyApp _ a []]))) _)
@@ -1543,7 +1612,9 @@ storedField info f = Selector `elem` kinds && ComputedSelector `notElem` kinds
 -- itself or in a list ('plainIn'): a function that gives back a function
 -- taking an @a@ (@(a -> b) -> LIST OF a -> (a -> b)@), or a record that may
 -- hold one, can hand back the function it was given, and the caller then
--- applies that to anything.
+-- applies that to anything. A value of every type (@REFUSE@, @TBD@) is an
+-- @a@ too, so the credit holds only where 'moduleTrust' keeps it
+-- (Note [Trusting a callee]).
 elementParameters :: EntityInfo -> Resolved -> Int -> [(Int, Int, Int)]
 elementParameters info g n = case Map.lookup (getUnique g) info of
   Just (_, KnownTerm (Forall _ vs (Fun _ args r)) _) | length args == n ->
@@ -1568,6 +1639,248 @@ plainIn u t = occurrences u t == 0 || case t of
   TyApp _ v [] -> getUnique v == u
   TyApp _ l [t'] | getUnique l == listUnique -> plainIn u t'
   _ -> False
+
+-- | What the function checks take on trust of a callee whose body they do
+-- not read where it is called: the credit 'elementParameters' and
+-- 'resultSource' give it from its declared type, kept only where its body is
+-- seen to earn it (Note [Trusting a callee]).
+data Trust = MkTrust
+  { elementsOf :: Resolved -> Int -> [(Int, Int, Int)]
+  , sourceOf :: Resolved -> Int -> [Int]
+  }
+
+-- | A credit a callee's declared type gives: 'elementParameters' ('Left') or
+-- 'resultSource' ('Right').
+type Credit = Either (Int, Int, Int) Int
+
+typeCredits :: EntityInfo -> Resolved -> Int -> [Credit]
+typeCredits info f n = map Left (elementParameters info f n) <> map Right (resultSource info f n)
+
+-- | The module's trust (Note [Trusting a callee]). A definition of the
+-- module keeps a credit its type gives when its body earns it ('earns'),
+-- each body read with the credits of the others and its own taken as given:
+-- a credit some body fails to earn is dropped, and the bodies are read
+-- again, until none is. A library function keeps its credit when the
+-- library is one 'library' names and 'trustedLibrary' lists the function.
+-- Any other function keeps none: its body is not here to read.
+moduleTrust :: (NormalizedUri -> Maybe Text) -> EntityInfo -> Module Resolved -> Trust
+moduleTrust library info m = trustIn honest
+ where
+  defs = Map.fromList [(getUnique (decideName d), d) | d <- moduleDecides m]
+  candidates = Set.fromList
+    [(u, c) | (u, d) <- Map.toList defs, c <- typeCredits info (decideName d) (length (valueParams d))]
+  honest = settle candidates
+  settle s =
+    let s' = Set.filter (\ (u, c) -> maybe False (\ d -> earns (trustIn s) d c) (Map.lookup u defs)) s
+    in if Set.size s' == Set.size s then s else settle s'
+  trustIn s = MkTrust
+    { elementsOf = \ g n -> [t | t <- elementParameters info g n, keeps s g (Left t)]
+    , sourceOf = \ h n -> [j | j <- resultSource info h n, keeps s h (Right j)] }
+  keeps s f c
+    | Map.member (getUnique f) defs = Set.member (getUnique f, c) s
+    | otherwise = trustedIn library f
+
+-- | The module's definitions whose bodies earn every credit their declared
+-- types give, by name: for a library, what 'trustedLibrary' must list.
+earnedByBody :: EntityInfo -> Module Resolved -> [Text]
+earnedByBody info m = nubOrd
+  [ decideText d
+  | d <- moduleTops m
+  , let cs = typeCredits info (decideName d) (length (valueParams d))
+  , not (null cs)
+  , all (kept d) cs ]
+ where
+  trust = moduleTrust (const Nothing) info m
+  kept d c =
+    let n = length (valueParams d)
+    in case c of
+      Left t -> t `elem` trust.elementsOf (decideName d) n
+      Right j -> j `elem` trust.sourceOf (decideName d) n
+
+-- | The body earns the credit: a function argument is applied only to
+-- elements of the list argument, or handed with that list (or a list of its
+-- elements) to a callee trusted with both ('Left'); what it gives is a list
+-- of the list argument's elements ('Right').
+earns :: Trust -> Decide Resolved -> Credit -> Bool
+earns trust d = \ case
+  Left (i, q, j)
+    | Just f <- param i, Just xs <- param j ->
+        let s = listParts trust xs d
+            uses = length [() | App _ v _ <- everyExpr, same f v] + length [() | AppNamed _ v _ _ <- everyExpr, same f v]
+            applied = length [() | App _ v es <- everyExpr, same f v, x <- take 1 (drop q es), item s x]
+            handed = length
+              [ ()
+              | App _ h es <- everyExpr
+              , (i', App _ v []) <- zip [0 ..] es, same f v
+              , or [ onlyItems trust s x
+                   | (i'', q', j') <- trust.elementsOf h (length es), i'' == i', q' == q
+                   , x <- take 1 (drop j' es) ] ]
+        in uses == applied + handed
+  Right j
+    | Just xs <- param j -> givesItems trust (listParts trust xs d) (bodyOf d)
+  _ -> False
+ where
+  param k = listToMaybe (drop k (valueParams d))
+  everyExpr = universeExpr (bodyOf d)
+  same a b = getUnique a == getUnique b
+
+-- | What a body binds of a list parameter's value: the names of lists that
+-- hold only its elements, the names of its elements, and the WHERE\/LET
+-- definitions whose result is such a list.
+data ListParts = MkListParts
+  { lists :: Set Unique
+  , items :: Set Unique
+  , givers :: Set Unique
+  }
+
+-- | The list parameter's 'ListParts' in a definition's body. A parameter of
+-- a WHERE\/LET definition is such a list when every call of it passes one
+-- there, and a WHERE\/LET definition gives one when its body does: both
+-- are taken as given and dropped where a call or a body fails, until none
+-- does, as a helper that walks the list calls itself on what remains of it.
+-- A name bound inside is found as it is everywhere else ('close').
+listParts :: Trust -> Resolved -> Decide Resolved -> ListParts
+listParts trust xs d = settle (Map.keysSet owners) (Map.keysSet locals)
+ where
+  everyExpr = universeExpr (bodyOf d)
+  locals = Map.fromList
+    [ (getUnique (decideName ld), ld)
+    | e <- everyExpr
+    , ld <- case e of
+        Where _ _ ds -> [l | LocalDecide _ l <- ds]
+        LetIn _ ds _ -> [l | LocalDecide _ l <- ds]
+        _ -> [] ]
+  -- each parameter of a WHERE/LET definition: whose it is, and where
+  owners = Map.fromList
+    [ (getUnique p, (u, k))
+    | (u, ld) <- Map.toList locals, (k, p) <- zip [0 :: Int ..] (valueParams ld) ]
+  settle ps rs =
+    let s = close ps rs
+        ps' = Set.filter (passed s) ps
+        rs' = Set.filter (\ u -> maybe False (givesItems trust s . bodyOf) (Map.lookup u locals)) rs
+    in if ps' == ps && rs' == rs then s else settle ps' rs'
+  passed s p = case Map.lookup p owners of
+    Just (u, k) ->
+      let calls = [es | App _ v es <- everyExpr, getUnique v == u]
+      in not (null calls)
+           && null [() | AppNamed _ v _ _ <- everyExpr, getUnique v == u]
+           && all (maybe False (onlyItems trust s) . listToMaybe . drop k) calls
+    Nothing -> False
+  close ps rs = grow (MkListParts (Set.insert (getUnique xs) ps) Set.empty rs)
+  grow s =
+    let s' = step s
+    in if Set.size s'.lists == Set.size s.lists && Set.size s'.items == Set.size s.items then s else grow s'
+  step s = s
+    { lists = Set.union s.lists (Set.fromList (concatMap fst taken))
+    , items = Set.union s.items (Set.fromList (concatMap snd taken <> lambdas)) }
+   where
+    taken =
+      [ listPattern pat
+      | Consider _ x brs <- everyExpr, onlyItems trust s x
+      , MkBranch _ (When _ pat) _ <- brs ]
+    -- a function's parameter, where the function is handed with such a list
+    -- to a callee trusted to apply it only to the list's elements
+    lambdas =
+      [ getUnique c
+      | App _ g es <- everyExpr
+      , (i, q, j) <- trust.elementsOf g (length es)
+      , Lam _ (MkGivenSig _ otns) _ <- take 1 (drop i es)
+      , c <- take 1 (drop q [n | MkOptionallyTypedName _ n mty _ <- otns, not (isTypeParam mty)])
+      , x <- take 1 (drop j es)
+      , onlyItems trust s x ]
+  isTypeParam = \ case
+    Just (Type _) -> True
+    _ -> False
+
+-- | What a pattern over a list binds: names for the list again or what
+-- remains of it, and names for its elements. A pattern inside an element
+-- binds a part of an element, which is neither.
+listPattern :: Pattern Resolved -> ([Unique], [Unique])
+listPattern = \ case
+  PatVar _ n -> ([getUnique n], [])
+  PatCons _ a b -> element a <> listPattern b
+  PatApp _ c [a, b] | getUnique c == consUnique -> element a <> listPattern b
+  _ -> ([], [])
+ where
+  element = \ case
+    PatVar _ n -> ([], [getUnique n])
+    _ -> ([], [])
+
+-- | An element of the list: a name the body bound to one.
+item :: ListParts -> Expr Resolved -> Bool
+item s = \ case
+  App _ v [] -> Set.member (getUnique v) s.items
+  _ -> False
+
+-- | A list that holds only elements of the list: a name for one, @EMPTY@,
+-- a list of elements, an element put before such a list, what a WHERE\/LET
+-- definition that gives one gives, or what a callee trusted to give only
+-- elements of a list gives of such a list.
+onlyItems :: Trust -> ListParts -> Expr Resolved -> Bool
+onlyItems trust s = go
+ where
+  go = \ case
+    App _ v [] | Set.member (getUnique v) s.lists -> True
+    App _ v [] | getUnique v == emptyUnique -> True
+    App _ v _ | Set.member (getUnique v) s.givers -> True
+    List _ es -> all (item s) es
+    Cons _ a b -> item s a && go b
+    App _ c [a, b] | getUnique c == consUnique -> item s a && go b
+    App _ h es -> or [go x | j <- trust.sourceOf h (length es), x <- take 1 (drop j es)]
+    _ -> False
+
+-- | The body gives only a list of the list's elements, along every branch.
+givesItems :: Trust -> ListParts -> Expr Resolved -> Bool
+givesItems trust s = go
+ where
+  go = \ case
+    IfThenElse _ _ t e -> go t && go e
+    MultiWayIf _ gs o -> all go [b | MkGuardedExpr _ _ b <- gs] && go o
+    Consider _ _ brs -> all go [b | MkBranch _ _ b <- brs]
+    Where _ b _ -> go b
+    LetIn _ _ b -> go b
+    x -> onlyItems trust s x
+
+-- | The library functions trusted where they are called, by library file:
+-- each one's body earns every credit its declared type gives
+-- ('earnedByBody'). CyclesSpec reads each library's source and checks that
+-- this is exactly what its bodies earn, so a library edit that changes one
+-- fails there rather than here.
+trustedLibrary :: Map Text (Set Text)
+trustedLibrary = Map.fromList
+  [ ( "prelude.l4"
+    , Set.fromList
+        [ "all", "any", "drop", "dropWhile", "filter", "foldl", "foldr", "map", "mapMaybe"
+        , "reverse", "take", "takeWhile", "zipWith" ] ) ]
+
+-- | The function is a library's, the library is one 'library' names, and
+-- 'trustedLibrary' lists the function.
+trustedIn :: (NormalizedUri -> Maybe Text) -> Resolved -> Bool
+trustedIn library f = case library (getUnique f).moduleUri of
+  Just file -> maybe False (Set.member (unqualifiedNameToText (getOriginal f))) (Map.lookup file trustedLibrary)
+  Nothing -> False
+
+-- | The library file a module is, where no other file can take its place:
+-- the copy compiled into the binary (@jl4-embedded:/prelude.l4@), or a file
+-- in a checkout's @jl4-core/libraries@ (where @JL4_LIBRARY_PATH@ points in
+-- CI). Not @project:/prelude.l4@: the editor resolves that name to the
+-- user's own file first.
+libraryFile :: NormalizedUri -> Maybe Text
+libraryFile u = asum
+  [ Text.stripPrefix "jl4-embedded:/" t
+  , case Text.breakOnEnd marker t of
+      (before, file) | not (Text.null before) -> Just file
+      _ -> Nothing ]
+ where
+  t = (fromNormalizedUri u).getUri
+  marker = "/jl4-core/libraries/"
+
+-- | 'libraryFile' for the API's pipeline ("L4.API.VirtualFS"), which names
+-- every module @project:/<name>.l4@ and looks a name up among the libraries
+-- before the files it is given, so that there @project:/prelude.l4@ is the
+-- library.
+apiLibraryFile :: NormalizedUri -> Maybe Text
+apiLibraryFile u = asum [libraryFile u, Text.stripPrefix "project:/" (fromNormalizedUri u).getUri]
 
 -- | The type of the field a selector gives, read past the record it takes.
 fieldOf :: Type' Resolved -> Type' Resolved

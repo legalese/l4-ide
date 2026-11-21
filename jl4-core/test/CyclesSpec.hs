@@ -23,7 +23,11 @@ import Control.Monad (void)
 import Test.Hspec
 
 import LinearTime (cpuRatio, quadraticControl)
-import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS, vfsFromList)
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import Base (Uri (..), toNormalizedUri)
+import L4.API.EmbeddedLibraries (embeddedLibraries)
+import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, checkWithImportsAndUri, emptyVFS, vfsFromList)
 import L4.Cycles
 import L4.Syntax (DeonticModal (..), Module (..), Resolved)
 import L4.TypeCheck (applyFinalSubstitution)
@@ -686,6 +690,65 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes (tree <> "GIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\nGIVETH A LIST OF a\nkept f xs MEANS filter f xs\n\nGIVEN t IS A Tree GIVETH A NUMBER\nsize t MEANS 1 PLUS sum (map size (kept (GIVEN c YIELD size c GREATER THAN 0) (t's kids)))")
         `shouldReturn` ["function:proved-structural+fans"]
 
+  -- each timed out at run time on a one-node tree, the callee handing the
+  -- function a value of every type (2026-11-21 attack round, parametricity
+  -- p12, p11, p17, p13): Note [Trusting a callee]
+  describe "descent: a callee keeps its type's credit only where its body earns it (attack round)" do
+    it "gives no proof through a callee that applies the function to a refusal" $
+      classes (tree <> smuggling "f (REFUSE \"no such element\")" <> "GIVEN t IS A Tree GIVETH A BOOLEAN\nwalk t MEANS smuggle (GIVEN c YIELD walk c) (t's kids)")
+        `shouldReturn` ["function:unproved-self+fans"]
+
+    it "nor to an ASSUME of a type variable" $
+      classes (tree <> "GIVEN v IS A TYPE\nASSUME anything IS A v\n\n" <> smuggling "f anything" <> "GIVEN t IS A Tree GIVETH A BOOLEAN\nwalk t MEANS smuggle (GIVEN c YIELD walk c) (t's kids)")
+        `shouldReturn` ["function:unproved-self+fans"]
+
+    it "nor to the prelude's TBD, the rule passed by name" $
+      classes (tree <> smuggling "f TBD" <> "GIVEN t IS A Tree GIVETH A BOOLEAN\nwalk t MEANS smuggle walk (t's kids) OR t's label EQUALS 0")
+        `shouldReturn` ["function:unproved-self+fans"]
+
+    it "nor through a callee of filter's type that gives a list of a refusal" $
+      classes (tree <> "GIVEN a IS A TYPE\n      keep IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\nGIVETH A LIST OF a\nchoose keep xs MEANS LIST (REFUSE \"no such element\")\n\nGIVEN t IS A Tree GIVETH A BOOLEAN\nwalk t MEANS all walk (choose (GIVEN c YIELD TRUE) (t's kids))")
+        `shouldReturn` ["function:unproved-self+fans"]
+
+    -- the first finding, here and below, is the helper's own walk
+    it "nor through a helper whose own walk applies the function to a refusal" $
+      classes (tree <> counting "THEN f (REFUSE \"none\")" <> "GIVEN t IS A Tree GIVETH A NUMBER\nsize t MEANS 1 PLUS count (GIVEN c YIELD size c) (t's kids)")
+        `shouldReturn` ["function:proved-structural", "function:unproved-self+fans"]
+
+    it "but a helper that hands the function on to map, with the list, still proves" $
+      classes (tree <> "GIVEN a IS A TYPE\n      b IS A TYPE\n      f IS A FUNCTION FROM a TO b\n      xs IS A LIST OF a\nGIVETH A LIST OF b\neach f xs MEANS map f xs\n\nGIVEN t IS A Tree GIVETH A NUMBER\nsize t MEANS 1 PLUS sum (each size (t's kids))")
+        `shouldReturn` ["function:proved-structural+fans"]
+
+    it "and so does a helper that walks the list itself in a WHERE" $
+      classes (tree <> counting "THEN 0" <> "GIVEN t IS A Tree GIVETH A NUMBER\nsize t MEANS 1 PLUS count (GIVEN c YIELD size c) (t's kids)")
+        `shouldReturn` ["function:proved-structural", "function:proved-structural+fans"]
+
+    it "and the prelude's foldl, whose body walks the list in a WHERE" $
+      classes (tree <> "GIVEN t IS A Tree GIVETH A NUMBER\nsize t MEANS foldl (GIVEN n, c YIELD n PLUS size c) 1 (t's kids)")
+        `shouldReturn` ["function:proved-structural+fans"]
+
+  describe "the library functions taken on trust (Note [Trusting a callee])" do
+    it "are exactly the ones whose bodies earn every credit their types give" $
+      for_ (Map.toList embeddedLibraries) \ (name, source) -> do
+        (_, i, m) <- checkedAs name source
+        sort (earnedByBody i m)
+          `shouldBe` maybe [] (sort . Set.toList) (Map.lookup (name <> ".l4") trustedLibrary)
+
+    it "include map, and leave out a function whose body reads as no more than its type (sortBy)" $ do
+      let listed = Map.findWithDefault Set.empty "prelude.l4" trustedLibrary
+      (Set.member "map" listed, Set.member "sortBy" listed) `shouldBe` (True, False)
+
+    it "are recognised by a library URI no other file can take" $
+      map (libraryFile . toNormalizedUri . Uri)
+        [ "jl4-embedded:/prelude.l4"
+        , "file:///home/ci/l4-ide/jl4-core/libraries/prelude.l4"
+        , "project:/prelude.l4"
+        , "file:///home/someone/prelude.l4" ]
+        `shouldBe` [Just "prelude.l4", Just "prelude.l4", Nothing, Nothing]
+
+    it "and in the API's pipeline, where a project:/ name is looked up among the libraries first" $
+      apiLibraryFile (toNormalizedUri (Uri "project:/prelude.l4")) `shouldBe` Just "prelude.l4"
+
   -- each overflowed the frame-depth guard at run time while the cycle the
   -- graph sees was proved (2026-11-21 attack round, mutual p10, obligations
   -- t2): the loop ran through a function in a field
@@ -755,6 +818,15 @@ spec = describe "cycle report (#1075 layer 2)" do
         ]
 
 ------------------------------------------------------------------------
+
+-- | A function of any's type whose body is @use@.
+smuggling :: Text -> Text
+smuggling use = "GIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\nGIVETH A BOOLEAN\nsmuggle f xs MEANS " <> use <> "\n\n"
+
+-- | A function that adds what @f@ gives for each element, walking the list
+-- in a WHERE, with @onEmpty@ for the empty list's branch.
+counting :: Text -> Text
+counting onEmpty = "GIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO NUMBER\n      xs IS A LIST OF a\nGIVETH A NUMBER\ncount f xs MEANS go xs\n  WHERE\n    go l MEANS\n      CONSIDER l\n      WHEN EMPTY " <> onEmpty <> "\n      WHEN y FOLLOWED BY ys THEN f y PLUS go ys\n\n"
 
 tree :: Text
 tree = "IMPORT prelude\nDECLARE Tree HAS\n  label IS A NUMBER\n  kids IS A LIST OF Tree\n\n"
@@ -868,11 +940,18 @@ checked :: Text -> IO (Substitution, EntityInfo, Module Resolved)
 checked = checkedIn emptyVFS
 
 checkedIn :: VFS -> Text -> IO (Substitution, EntityInfo, Module Resolved)
-checkedIn vfs source = case checkWithImports vfs source of
+checkedIn vfs = checkedResult . checkWithImports vfs
+
+-- | A module checked under its own name, as a library is.
+checkedAs :: Text -> Text -> IO (Substitution, EntityInfo, Module Resolved)
+checkedAs name = checkedResult . checkWithImportsAndUri emptyVFS name
+
+checkedResult :: Either [Text] TypeCheckWithDepsResult -> IO (Substitution, EntityInfo, Module Resolved)
+checkedResult = \ case
   Left errs -> fail ("pipeline failure: " <> show errs)
   Right r
     | r.tcdSuccess -> pure (r.tcdSubstitution, r.tcdEntityInfo, r.tcdModule)
-    | otherwise -> fail ("did not type-check:\n" <> Text.unpack source <> "\n" <> show (errorsOf r.tcdErrors))
+    | otherwise -> fail ("did not type-check:\n" <> show (errorsOf r.tcdErrors))
  where
   errorsOf :: [CheckErrorWithContext] -> [CheckErrorWithContext]
   errorsOf = filter ((== SError) . severity)
@@ -882,7 +961,7 @@ findings = findingsIn emptyVFS
 
 findingsIn :: VFS -> Text -> IO [Finding]
 findingsIn vfs source =
-  (\ (s, i, m@(MkModule _ uri _)) -> cycleFindings (applyFinalSubstitution s uri) i m) <$> checkedIn vfs source
+  (\ (s, i, m@(MkModule _ uri _)) -> cycleFindingsWith apiLibraryFile (applyFinalSubstitution s uri) i m) <$> checkedIn vfs source
 
 classes :: Text -> IO [Text]
 classes source = sort . map findingClass <$> findings source
