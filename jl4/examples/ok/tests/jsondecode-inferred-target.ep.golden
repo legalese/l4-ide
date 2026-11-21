@@ -1,0 +1,215 @@
+-- JSONDECODE decodes into the type the program uses its result at, even
+-- where no GIVETH says that type (smucclaw/l4-ide#1078).
+--
+-- Every decode below is in a position the type checker INFERS rather than
+-- checks: the scrutinee of a CONSIDER, an argument to a polymorphic function,
+-- a WHERE local or a top-level DECIDE with no signature. The type is fixed
+-- only later, by how the result is used. Before the fix the decoder never saw
+-- that type: a JSON object came back as RIGHT OF NOTHING, a string stayed a
+-- STRING where an enumeration or a DATE was expected, and a number was not
+-- wrapped in JUST. Each assertion here failed or stopped the run.
+--
+-- The CONTROLS at the end pin answers that did not change and must not change
+-- by accident: decodes whose type is a type parameter (GIVEN a IS A TYPE),
+-- which is the issue's own repro and is still open, and decodes whose type a
+-- signature already gave.
+
+IMPORT prelude
+
+DECLARE Tree HAS
+  label IS A NUMBER
+  kids IS A LIST OF Tree
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+-- A CONSIDER on the decode: the record type comes from the projection.
+GIVETH A NUMBER
+`decoded label` MEANS
+  CONSIDER JSONDECODE "{\"label\":2,\"kids\":[]}"
+    WHEN RIGHT v THEN v's label
+    WHEN LEFT problem THEN 0 - 1
+
+#ASSERT `decoded label` EQUALS 2
+
+-- An enumeration, with an OTHERWISE that used to catch the undecoded string.
+GIVETH A STRING
+`colour name` MEANS
+  CONSIDER JSONDECODE "\"Red\""
+    WHEN RIGHT c THEN
+      CONSIDER c
+        WHEN Red THEN "it is red"
+        OTHERWISE "not red"
+    WHEN LEFT problem THEN CONCAT "LEFT: ", problem
+
+#ASSERT `colour name` EQUALS "it is red"
+
+-- An argument to the prelude's polymorphic `either`.
+GIVEN t IS A Tree GIVETH A NUMBER
+`label of` t MEANS t's label
+
+GIVEN e IS A STRING GIVETH A NUMBER
+`minus one` e MEANS 0 - 1
+
+GIVETH A NUMBER
+`via either` MEANS either `minus one` `label of` (JSONDECODE "{\"label\":2,\"kids\":[]}")
+
+#ASSERT `via either` EQUALS 2
+
+-- A WHERE local with no signature.
+GIVETH A NUMBER
+`via where` MEANS
+  CONSIDER d
+    WHEN RIGHT t THEN t's label
+    WHEN LEFT problem THEN 0 - 1
+  WHERE
+    d MEANS JSONDECODE "{\"label\":2,\"kids\":[]}"
+
+#ASSERT `via where` EQUALS 2
+
+-- A top-level DECIDE with no signature, fixed by a later definition.
+DECIDE `decoded tree` IS JSONDECODE "{\"label\":2,\"kids\":[]}"
+
+GIVETH A NUMBER
+`label of decoded tree` MEANS
+  CONSIDER `decoded tree`
+    WHEN RIGHT t THEN t's label
+    WHEN LEFT problem THEN 0 - 1
+
+#ASSERT `label of decoded tree` EQUALS 2
+
+-- A DATE.
+GIVETH A NUMBER
+`decoded day` MEANS
+  CONSIDER JSONDECODE "\"2026-03-04\""
+    WHEN RIGHT d THEN DATE_DAY d
+    WHEN LEFT problem THEN 0 - 1
+
+#ASSERT `decoded day` EQUALS 4
+
+-- A MAYBE: a value that is not null decodes to JUST it.
+GIVETH A NUMBER
+`decoded maybe` MEANS
+  CONSIDER JSONDECODE "5"
+    WHEN RIGHT m THEN
+      CONSIDER m
+        WHEN JUST x THEN x
+        WHEN NOTHING THEN 0
+    WHEN LEFT problem THEN 0 - 1
+
+#ASSERT `decoded maybe` EQUALS 5
+
+-- A LIST of records.
+GIVETH A NUMBER
+`decoded labels` MEANS
+  CONSIDER JSONDECODE "[{\"label\":2,\"kids\":[]},{\"label\":3,\"kids\":[]}]"
+    WHEN RIGHT ts THEN sum (map `label of` ts)
+    WHEN LEFT problem THEN 0 - 1
+
+#ASSERT `decoded labels` EQUALS 5
+
+--------------------------------------------------------------------------------
+-- CONTROLS: answers that did not change.
+--------------------------------------------------------------------------------
+
+-- A type parameter: the decode is at `a`, which has no value when the rules
+-- run. A JSON number happens to come out as a NUMBER, so this is TRUE, as
+-- it was before the fix. Whether to refuse a decode at a type parameter is
+-- open (smucclaw/l4-ide#1078).
+GIVEN a IS A TYPE
+      test IS A FUNCTION FROM a TO BOOLEAN
+GIVETH A BOOLEAN
+`decoded passes` test MEANS
+  CONSIDER JSONDECODE "42"
+    WHEN RIGHT v THEN test v
+    WHEN LEFT problem THEN FALSE
+
+GIVEN n IS A NUMBER GIVETH A BOOLEAN
+`is big` n MEANS n > 40
+
+#ASSERT `decoded passes` `is big`
+
+-- The same at a record, with a test that ignores its input: TRUE, as before,
+-- although the value it was handed is not a Tree.
+GIVEN a IS A TYPE
+      test IS A FUNCTION FROM a TO BOOLEAN
+GIVETH A BOOLEAN
+`some of` test MEANS
+  CONSIDER JSONDECODE "{\"label\":2,\"kids\":[]}"
+    WHEN RIGHT v THEN test v
+    WHEN LEFT problem THEN FALSE
+
+GIVEN t IS A Tree GIVETH A BOOLEAN
+`always` t MEANS TRUE
+
+#ASSERT `some of` `always`
+
+-- JSONDECODE as the body of a polymorphic definition, applied at Tree. The
+-- reference is typed at the type parameter `a`; the application is typed at
+-- Tree, and that is what it decodes into, as before.
+GIVEN a IS A TYPE
+GIVETH A FUNCTION FROM STRING TO EITHER STRING a
+`decode any` MEANS JSONDECODE
+
+GIVETH AN EITHER STRING Tree
+`one tree` MEANS `decode any` "{\"label\":2,\"kids\":[]}"
+
+GIVETH A NUMBER
+`label of one tree` MEANS
+  CONSIDER `one tree`
+    WHEN RIGHT t THEN t's label
+    WHEN LEFT problem THEN 0 - 1
+
+#ASSERT `label of one tree` EQUALS 2
+
+-- The same definition passed to `map`: nothing guides this decode, and a
+-- JSON number happens to come out as a NUMBER, as before.
+GIVEN r IS AN EITHER STRING NUMBER GIVETH A NUMBER
+`number in` r MEANS
+  CONSIDER r
+    WHEN RIGHT x THEN x
+    WHEN LEFT problem THEN 0 - 1
+
+GIVETH A LIST OF EITHER STRING NUMBER
+`numbers via map` MEANS map `decode any` (LIST "42")
+
+#ASSERT sum (map `number in` `numbers via map`) EQUALS 42
+
+-- JSONDECODE as the body of a definition whose signature gives the type.
+GIVETH A FUNCTION FROM STRING TO EITHER STRING Tree
+`decode tree` MEANS JSONDECODE
+
+GIVETH A NUMBER
+`label via decode tree` MEANS
+  CONSIDER `decode tree` "{\"label\":7,\"kids\":[]}"
+    WHEN RIGHT t THEN t's label
+    WHEN LEFT problem THEN 0 - 1
+
+#ASSERT `label via decode tree` EQUALS 7
+
+--------------------------------------------------------------------------------
+-- Types declared under a section. This comes last, because everything after a
+-- section heading belongs to that section.
+--------------------------------------------------------------------------------
+
+§ `Part A`
+
+DECLARE Leaf HAS
+  weight IS A NUMBER
+
+DECLARE Shade IS ONE OF Light, Dark
+
+GIVETH A NUMBER
+`decoded weight` MEANS
+  CONSIDER JSONDECODE "{\"weight\":9}"
+    WHEN RIGHT v THEN v's weight
+    WHEN LEFT problem THEN 0 - 1
+
+#ASSERT `decoded weight` EQUALS 9
+
+GIVETH A BOOLEAN
+`decoded shade is dark` MEANS
+  CONSIDER JSONDECODE "\"Dark\""
+    WHEN RIGHT s THEN s EQUALS Dark
+    WHEN LEFT problem THEN FALSE
+
+#ASSERT `decoded shade is dark`

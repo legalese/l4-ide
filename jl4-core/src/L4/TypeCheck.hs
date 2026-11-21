@@ -25,6 +25,9 @@ module L4.TypeCheck
   , quietly
   , settleOneClause
   , speculatively
+  -- The pass over JSONDECODE, run on every module checked; exported to be
+  -- tested for what it costs a module that has none.
+  , zonkDecodeTargets
   )
   where
 
@@ -126,6 +129,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
 import Optics ((%~), (^.), gplate, toListOf)
+import qualified Optics
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
@@ -341,7 +345,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   | sr <- siblingReads rprog
                   ]
             in MkCheckResult
-              { program = rprog
+              { program = zonkDecodeTargets s'.substitution rprog
               , implicitReaders =
                   Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
               , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns)
@@ -355,6 +359,85 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , mixfixRegistry = combinedMixfixRegistry
               , sectionPaths = s'.sectionPaths
               }
+
+-- | Resolve the type each JSONDECODE node decodes into, with this module's
+-- final substitution, wherever that type comes out concrete
+-- (smucclaw/l4-ide#1078).
+--
+-- The evaluator decodes at the type on the annotation of the node that
+-- applies JSONDECODE ('L4.EvaluateLazy.Machine', the 'App' case), and a bare
+-- @JSONDECODE@ passed as a function carries its own. That annotation is
+-- written while the node is checked. In an inferred position (a CONSIDER's
+-- scrutinee, an argument to a polymorphic function, a definition with no
+-- signature) the rest of the definition has not fixed the type yet, so it
+-- holds an inference variable; nothing else applies the substitution to the
+-- module the evaluator runs, and the decoder, handed an inference variable,
+-- decoded untyped, which turns a JSON object into NOTHING inside a RIGHT.
+--
+-- Only JSONDECODE nodes are touched: every other reader of a node's type
+-- applies the substitution itself, when it reads it. A module with no
+-- JSONDECODE is returned as it is, not rebuilt ('mentionsJsonDecode').
+--
+-- The substitution is this module's own. Inference variables are numbered
+-- per module, so an importer's substitution would resolve this module's
+-- variables to unrelated types of its own, with no error.
+--
+-- A type that is not concrete keeps the annotation it had, exactly, and with
+-- it the behaviour it had. Concrete means no inference variable is left, and
+-- no type parameter: a name some @GIVEN a IS A TYPE@ in this module binds,
+-- found from the binders themselves ('isQuantifier'), not from the absence of
+-- a declaration, because a type declared under a @§@ can be absent from a
+-- table too. A decode at a type parameter has no type to decode into when the
+-- rules run; what to do with it is open (smucclaw/l4-ide#1078, option C).
+zonkDecodeTargets :: Substitution -> Module Resolved -> Module Resolved
+zonkDecodeTargets subst m
+  | mentionsJsonDecode m =
+      Optics.over (gplate @(Expr Resolved)) (Optics.transformOf (gplate @(Expr Resolved)) zonkNode) m
+  | otherwise = m
+  where
+    zonkNode e = case e of
+      App ann r es
+        | getUnique r == jsonDecodeUnique
+        , Just (TypeInfo ty k) <- ann ^. annInfo
+        , let ty' = substituteInfVars subst ty
+        , concrete ty' ->
+            App (Optics.set annInfo (Just (TypeInfo ty' k)) ann) r es
+      _ -> e
+    -- Every type parameter of the module, wherever it is bound: a top-level
+    -- or local definition, a lambda, a section's GIVEN. A superset of the
+    -- ones in scope at any one node, which can only make fewer types concrete.
+    typeParams = Set.fromList
+      [ getUnique n
+      | otn <- toListOf (gplate @(OptionallyTypedName Resolved) Optics.% Optics.cosmosOf (gplate @(OptionallyTypedName Resolved))) m
+      , Left n <- [isQuantifier otn]
+      ]
+    concrete = \ case
+      Type _ -> False
+      TyApp _ n ts -> not (Set.member (getUnique n) typeParams) && all concrete ts
+      Fun _ onts t -> all (concrete . optionallyNamedTypeType) onts && concrete t
+      Forall {} -> False
+      InfVar {} -> False
+
+-- | Does the module use JSONDECODE anywhere? 'zonkDecodeTargets'
+-- asks this first and does nothing more when the answer is no, as it is for
+-- nearly every module, the prelude included, because it runs on every module
+-- checked.
+-- The ledger service checks a module per request under a memory limit
+-- (@--ledger-max-eval-memory-mb@, 8192 MB by default) that some of
+-- @jl4-service-test@'s requests come close to, and three of them went over
+-- it while JSONDECODE's passes walked every expression of every module
+-- (smucclaw/l4-ide#1078).
+--
+-- Read from the names alone, as 'warnRenamedBuiltins' reads them. Measured
+-- 2026-11-22 with @l4 check +RTS -s@ on @jl4-core/libraries/prelude.l4@,
+-- over the 1,377 MB that check allocates without them: asking this adds
+-- about 1 MB each time. A walk over every expression added 787 MB through
+-- @Optics.cosmosOf@, and 561 MB through 'cosmosExpr' with the optic bound
+-- once at the top level. Written where it is used, the same 'cosmosExpr'
+-- walk added 41 MB in two builds and 561 MB in a third, so it cannot be
+-- relied on to be cheap: keep this question in front of it.
+mentionsJsonDecode :: Module Resolved -> Bool
+mentionsJsonDecode = Optics.anyOf (gplate @Resolved) (\ r -> getUnique r == jsonDecodeUnique)
 
 -- | Drop diagnostics that are pure fallout from a name-resolution failure that
 -- has already been reported (issue #920).
