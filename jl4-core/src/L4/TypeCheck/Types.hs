@@ -10,6 +10,7 @@ import Codec.Serialise (Serialise)
 import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
 import L4.Lexer (PosToken)
+import L4.Lint.NotReach (NotReachSite (..))
 import L4.Parser.SrcSpan (SrcRange(..), SrcPos)
 import L4.Syntax
 import L4.TypeCheck.With
@@ -136,6 +137,11 @@ data CheckError =
     -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
     -- the exported function's name, and the input's name (Nothing when it is
     -- the result).
+  | NotReachesConnective NotReachSite
+    -- ^ A written @NOT@ whose operand contains a bare @AND@\/@OR@\/@IMPLIES@
+    -- on the @NOT@'s own line: @NOT a AND b@, or @NOT (a) AND b@. Both read
+    -- as @NOT (a AND b)@, which is silently not what most readers take them
+    -- to say (ruling R-NOT-1; specs/as-built/not-reach.md). See 'L4.Lint.NotReach'.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -335,6 +341,7 @@ checkErrorCode = \ case
   SuppliedComputedField {}       -> "check/supplied-computed-field"
   ExportFunctionTypeInput {}     -> "check/export-function-input"
   ExportEventType {}             -> "check/export-event-type"
+  NotReachesConnective {}        -> "check/negation-reaches-over-connective"
 
 -- | The code of a checker warning. See 'checkErrorCode'.
 checkWarningCode :: CheckWarning -> Text
@@ -436,6 +443,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (PatternClauseUnreachable r _ _)) = Just r
   rangeOf (CheckWarning (ClauseAnnotationUnused r _ _ _ _)) = Just r
   rangeOf (CheckWarning (ClauseArityChanged r _ _ _)) = Just r
+  rangeOf (NotReachesConnective site)       = Just site.range
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
