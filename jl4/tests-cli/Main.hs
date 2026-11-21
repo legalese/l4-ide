@@ -3708,7 +3708,7 @@ spec bin = do
         , "the date 1 day before 31 January 2025"
         , "the date 1 day after 31 January 2025"
         , "the date 1 month after 31 January 2025 (capped at the last day of that month)"
-        , "the day before the date 1 month plus one month after 31 January 2025"
+        , "the last day of the month 1 month after the month of 31 January 2025"
         , "the date 1 day after 31 January 2025"
         ])
 

@@ -9,3 +9,55 @@ IMPORT `excel-date`
 #EVAL ExcelEDate `Late Jan 24` -1
 #EVAL ExcelEOMonth `Jan 2024` 0
 #EVAL ExcelEOMonth `Jan 2024` 1
+
+-- EOMONTH is the last day of the month `months` whole months from the start's
+-- month, whatever day of that month the start falls on. It is not the day before
+-- EDATE (months + 1), which agrees only when the start is the 1st.
+#EVAL ExcelEOMonth (Date 15 1 2025) 1         -- 28 Feb 2025; EDATE-minus-a-day gave 14 Mar
+#EVAL ExcelEOMonth (Date 31 1 2025) 0         -- 31 Jan 2025; EDATE-minus-a-day gave 27 Feb
+#EVAL ExcelEOMonth (Date 15 1 2024) 1         -- 29 Feb 2024, a leap year
+#EVAL ExcelEOMonth (Date 30 11 2026) 3        -- 28 Feb 2027, crossing a year end
+#EVAL ExcelEOMonth (Date 15 3 2025) -1        -- 28 Feb 2025, going back
+#EVAL ExcelEOMonth (Date 31 12 2025) -12      -- 31 Dec 2024, a whole year back
+#EVAL ExcelEOMonth (Date 1 1 2025) 1          -- 28 Feb 2025, the one case that was right before
+#EVAL ExcelEOMonth (Date 15 1 2025) 1.5       -- not a whole number of months
+
+-- Excel's own documented examples: EOMONTH(1 Jan 2011, 1) and EOMONTH(1 Jan 2011, -3).
+#ASSERT ExcelEOMonth (Date 1 1 2011) 1      EQUALS RIGHT (Date 28 2 2011)
+#ASSERT ExcelEOMonth (Date 1 1 2011) -3     EQUALS RIGHT (Date 31 10 2010)
+
+-- Start days 1, 15, 28, 29, 30 and 31.
+#ASSERT ExcelEOMonth (Date 1 1 2025) 1      EQUALS RIGHT (Date 28 2 2025)
+#ASSERT ExcelEOMonth (Date 1 3 2025) 0      EQUALS RIGHT (Date 31 3 2025)
+#ASSERT ExcelEOMonth (Date 15 1 2025) 1     EQUALS RIGHT (Date 28 2 2025)
+#ASSERT ExcelEOMonth (Date 15 4 2025) 0     EQUALS RIGHT (Date 30 4 2025)
+#ASSERT ExcelEOMonth (Date 28 2 2025) 0     EQUALS RIGHT (Date 28 2 2025)
+#ASSERT ExcelEOMonth (Date 28 1 2025) 1     EQUALS RIGHT (Date 28 2 2025)
+#ASSERT ExcelEOMonth (Date 29 1 2025) 0     EQUALS RIGHT (Date 31 1 2025)
+#ASSERT ExcelEOMonth (Date 29 2 2024) 12    EQUALS RIGHT (Date 28 2 2025)
+#ASSERT ExcelEOMonth (Date 30 4 2025) 0     EQUALS RIGHT (Date 30 4 2025)
+#ASSERT ExcelEOMonth (Date 30 1 2025) 1     EQUALS RIGHT (Date 28 2 2025)
+#ASSERT ExcelEOMonth (Date 31 1 2025) 0     EQUALS RIGHT (Date 31 1 2025)
+#ASSERT ExcelEOMonth (Date 31 3 2025) 1     EQUALS RIGHT (Date 30 4 2025)
+
+-- Negative months.
+#ASSERT ExcelEOMonth (Date 15 3 2025) -1    EQUALS RIGHT (Date 28 2 2025)
+#ASSERT ExcelEOMonth (Date 31 3 2024) -1    EQUALS RIGHT (Date 29 2 2024)
+#ASSERT ExcelEOMonth (Date 31 12 2025) -12  EQUALS RIGHT (Date 31 12 2024)
+
+-- Year rollover, forwards and back.
+#ASSERT ExcelEOMonth (Date 30 11 2026) 3    EQUALS RIGHT (Date 28 2 2027)
+#ASSERT ExcelEOMonth (Date 15 12 2025) 1    EQUALS RIGHT (Date 31 1 2026)
+#ASSERT ExcelEOMonth (Date 15 1 2025) -1    EQUALS RIGHT (Date 31 12 2024)
+#ASSERT ExcelEOMonth (Date 15 6 2025) -18   EQUALS RIGHT (Date 31 12 2023)
+#ASSERT ExcelEOMonth (Date 15 1 2025) 25    EQUALS RIGHT (Date 28 2 2027)
+
+-- February in leap and common years, including the century rules.
+#ASSERT ExcelEOMonth (Date 15 1 2024) 1     EQUALS RIGHT (Date 29 2 2024)
+#ASSERT ExcelEOMonth (Date 28 1 2024) 1     EQUALS RIGHT (Date 29 2 2024)
+#ASSERT ExcelEOMonth (Date 15 2 2023) 0     EQUALS RIGHT (Date 28 2 2023)
+#ASSERT ExcelEOMonth (Date 15 1 2000) 1     EQUALS RIGHT (Date 29 2 2000)
+#ASSERT ExcelEOMonth (Date 15 1 2100) 1     EQUALS RIGHT (Date 28 2 2100)
+
+-- A month count that is not a whole number is refused.
+#ASSERT ExcelEOMonth (Date 15 1 2025) 1.5   EQUALS LEFT "EOMONTH months must be an integer."
