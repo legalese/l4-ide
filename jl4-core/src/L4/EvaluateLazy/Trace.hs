@@ -321,6 +321,7 @@ printUserEvalExceptionShort (OverBudget b)                  = case b of
   ClosureApplications _ _ -> "stopped: too many function applications"
   TimeLimit _             -> "stopped: time limit"
   MemoryLimit _           -> "stopped: memory limit"
+printUserEvalExceptionShort (NotEvaluated _ _)              = "not evaluated: the run stopped"
 
 -- | This is a stack data structure that is maintained while building an 'EvalPreTrace'.
 type PreTraceStack = [PreTraceFrame]

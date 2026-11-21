@@ -10,6 +10,8 @@ module L4.Cli.Run
   ) where
 
 import Base (for_, toList)
+import Data.IORef (readIORef)
+import Data.Maybe (isNothing)
 import Base.Text (Text)
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
@@ -23,10 +25,10 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
-import L4.EvaluateLazy (EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException, prettyReductionOutcome, undeterminedJson)
-import L4.EvaluateLazy.Exceptions (Budget (..), EvalException (..), UserEvalException (..))
+import L4.EvaluateLazy (EvalConfig (..), EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyAssertionOutcome, prettyEvalException, prettyReductionOutcome, undeterminedJson)
+import L4.EvaluateLazy.Exceptions (Budget (..), EvalException (..), UserEvalException (..), stopsTheRun)
 import L4.Print (termNeedText)
-import L4.Parser.SrcSpan (prettySrcRange)
+import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM)
 
 import L4.Cli.Common
 
@@ -68,13 +70,18 @@ runCmd opts = do
   -- time and memory for a value that is dropped (and put its text into the
   -- diagnostics). So --json asks for none.
   let traceMode = if opts.runJsonOut then TraceTextNone else opts.runTrace
-  evalConfig <- withEvalLimits opts.runLimits <$> makeRunEvalConfig traceMode opts.runFixedNow
+  evalConfig <- withEvalLimits opts.runLimits =<< makeRunEvalConfig traceMode opts.runFixedNow
   (errs, diags, (mTc, mEval)) <- runOneshotWithDiagnostics evalConfig opts.runFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     mtc   <- Shake.use Rules.SuccessfulTypeCheck uri
     meval <- Shake.use Rules.EvaluateLazy uri
     pure (mtc, meval)
+  -- smucclaw/l4-ide#1075, ruling L2: a time or memory stop stops the run.
+  -- When it was an imported file's own #EVAL that went over, no result of
+  -- this file need say so (this file may have none), so the run fails here
+  -- and says where it stopped.
+  stopped <- maybe (pure Nothing) readIORef evalConfig.runStop
 
   let typecheckOk = case mTc of
         Just tc | tc.success -> True
@@ -111,7 +118,13 @@ runCmd opts = do
       -- failed imports, an import cycle) do fail the run — including cycles
       -- whose diagnostic the engine attaches to a transitively-imported file
       -- rather than the entry.
-      overallOk = typecheckOk && not (hasBlockingError diags) && not evalFailed
+      overallOk = typecheckOk && not (hasBlockingError diags) && not evalFailed && isNothing stopped
+      -- the stop, said on stderr unless a result of this file already says it
+      stopUnsaid = case stopped of
+        Just (b, at) | not (any (resultSaysStop . (.result)) evalResults) ->
+          Just ("l4 run: " <> prettySrcRangeM at <> ": "
+                <> Text.unwords (prettyEvalException (UserEvalException (OverBudget b))))
+        _ -> Nothing
 
   if opts.runJsonOut
     then do
@@ -121,6 +134,7 @@ runCmd opts = do
         , Key.fromString "diagnostics" Aeson..= diagnosticsToJson errs
         , Key.fromString "results"     Aeson..= map evalResultToJson evalResults
         ]
+      for_ stopUnsaid (Text.hPutStrLn stderr)
       if overallOk then exitSuccess else exitFailure
     else do
       -- Plain text: diagnostics first (stderr), then eval results (stdout).
@@ -136,11 +150,25 @@ runCmd opts = do
             else pure ()
           exitSuccess
         else do
-          case errs of
-            [] | null evalResults ->
+          case (stopUnsaid, errs) of
+            (Just said, _) -> Text.hPutStrLn stderr said
+            (Nothing, []) | null evalResults ->
                  Text.hPutStrLn stderr "Run failed (file may be empty, unparseable, or not found)"
             _ -> pure ()
           exitFailure
+
+-- | Does this result say that the run stopped: it went over the time or
+-- memory limit, or was not evaluated because an earlier one did?
+resultSaysStop :: EvalDirectiveValue -> Bool
+resultSaysStop = \ case
+  Reduction (ReducedErrored e) -> saysStop e
+  Assertion (Errored e)        -> saysStop e
+  _                            -> False
+  where
+    saysStop = \ case
+      UserEvalException (OverBudget b)     -> stopsTheRun b
+      UserEvalException (NotEvaluated _ _) -> True
+      _                                    -> False
 
 -- | Does this directive fail @l4 run@ (see 'runCmd')? It does if it crashed
 -- during evaluation, if it is undetermined, or if it is an @#ASSERT@ that

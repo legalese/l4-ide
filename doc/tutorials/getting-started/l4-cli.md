@@ -292,9 +292,21 @@ l4 run --fixed-now 2025-01-31T15:45:30Z myfile.l4
 ### Stopping a line that runs too long
 
 A rule can be written so that working it out never ends: a function that keeps calling itself, or obligations that keep starting more obligations.
-L4 stops any one `#EVAL`, `#ASSERT` or `#TRACE` that applies functions more than 100,000,000 times, or has more than 100,000 obligations open at once, and says which; the [error messages](../../reference/errors/README.md#functions-were-applied-more-than-so-many-times) page explains both.
+L4 stops any one `#EVAL`, `#ASSERT` or `#TRACE` that applies functions more than 100,000,000 times, or has more than 100,000 obligations open at once, says which, and names the rule it stopped in and its place (only the place, when that is in a file this one imports, such as the prelude); the [error messages](../../reference/errors/README.md#functions-were-applied-more-than-so-many-times) page explains both.
 Those limits count steps, not seconds, so a file stops at the same place on every computer.
 They limit how long a line runs, not how much memory it holds: a function that keeps every value it passes along can run out of memory first.
+Only the line that went over a count stops: the lines after it still run, and `l4 run` exits with an error; in `l4 batch` that row fails, as a row with any other error does.
+The editor counts the same way.
+The other `l4` commands, such as `l4 trace` and `l4 lts`, and the REPL do not count; jl4-service has limits of its own.
+
+To change either count, or turn it off:
+
+```bash
+l4 run --max-calls 1000000 --max-open none myfile.l4
+```
+
+- `--max-calls N` sets the number of function applications, and `--max-calls none` removes the limit.
+- `--max-open N` sets the number of obligations open at once, and `--max-open none` removes the limit.
 
 Two more limits are off unless you ask for them:
 
@@ -305,9 +317,12 @@ l4 run --eval-timeout 10 --max-eval-memory-mb 500 myfile.l4
 - `--eval-timeout SECONDS` stops any one line that runs longer than that, by the clock on the wall. The same file can stop on a busy computer and finish on an idle one.
 - `--max-eval-memory-mb MB` stops any one line that allocates more than that many megabytes. It counts every byte allocated while working, not only what is kept, so set it well above what the file holds; because what is kept can never be more than what was allocated, it also stops a line before it holds that much.
 
-Either way, only that line stops: it is reported as an error, the lines after it still run, and `l4 run` exits with an error.
-In `--json` output its result carries `"limit"`, which is `"time"`, `"memory"`, `"obligations"` or `"applications"`; no other result has that key.
-`l4 batch` takes the same two flags.
+Either way, the run stops there: that line is reported as an error, each line after it says `I did not evaluate this` and names the line that stopped the run, and `l4 run` exits with an error.
+The line that stops the run can be in a file this one imports: L4 works out an imported file's lines too, though `l4 run` prints only this file's, and when no line of this file says so, `l4 run` says on its error output where the run stopped.
+In `--json` output, the result of a line that went over a limit carries `"limit"`, which is `"time"`, `"memory"`, `"obligations"` or `"applications"`; no other result has that key.
+`l4 batch` takes the same four flags; a row that goes over a time or memory limit fails, so the batch stops there unless you pass `--continue-on-error`, and with it every row after that one is an error that says it was not evaluated.
+An imported file's own lines are worked out with every row, so one of them that goes over a limit fails row 1 already.
+In `l4 batch`, a place reads like `myfile.l4.batch2.l4:23:1`: it is in the copy of the file that L4 lays out afresh for row 2, so its line numbers are not the file's, though a rule's name is the same in both.
 
 What the limits do not cover: they are checked between steps of the evaluation, so one step that is itself a long calculation (raising a number to a huge power) finishes before it is stopped, and printing the answer comes after the line has finished, outside the limits.
 
@@ -490,7 +505,7 @@ Anything else given for such a fact, a name that is not one of its choices, a nu
 Could not decode "Bogus" as Shape for field 's': it names no constructor of Shape; expected a string naming one of: Square. A constructor with fields (Circle) cannot be given as JSON input.
 ```
 
-`--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
+`--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error` (a time or memory limit is different: see [Stopping a line that runs too long](#stopping-a-line-that-runs-too-long)), and `--validate-only` checks rows against the function's inputs without evaluating them.
 
 #### Facts a case leaves out
 
@@ -547,7 +562,7 @@ Every case that is run produces one line, or one item with `--format json`, `yam
 `status` is one of four words:
 
 - `success`: the rules gave an answer.
-- `error`: the rules could not be run on the case, or raised an error. A fact is missing or `null`, a value cannot be read as the type the fact declares, a CSV line has the wrong number of cells, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
+- `error`: the rules could not be run on the case, or raised an error. A fact is missing or `null`, a value cannot be read as the type the fact declares, a CSV line has the wrong number of cells, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`; after a case that goes over a time or memory limit, every later case is an error that says it was not evaluated, even then ([Stopping a line that runs too long](#stopping-a-line-that-runs-too-long)).
 - `undetermined`: the rules need a fact the case does not supply (see [Needed the value of an assumed term](../../reference/errors/README.md#needed-the-value-of-an-assumed-term)). The batch carries on.
 - `refused`: the rules declined to answer this case, and `diagnostics` says why. That is an answer, not a failure, and the batch carries on.
 

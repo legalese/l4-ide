@@ -52,7 +52,7 @@ module L4.Cli.Common
 import Base.Text (Text)
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Time (UTCTime)
 import Options.Applicative (ReadM, eitherReader, long, metavar, help, option, optional)
 import qualified Options.Applicative as Options
@@ -82,13 +82,18 @@ import L4.EvaluateLazy
   ( EvalConfig(..)
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
+  , AssertionOutcome(..)
+  , ReductionOutcome(..)
   , parseFixedNow
   , prettyAssertionOutcome
   , prettyReductionOutcome
   , prettyLedger
   , readFixedNowEnv
   , resolveEvalConfig
+  , withCountedBudgets
+  , withRunStop
   )
+import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz2
 import L4.Parser.SrcSpan (prettySrcRange)
 import L4.Print (prettyLayout)
@@ -124,39 +129,74 @@ fixedNowParser = fmap FixedNowOpt $ optional $
     <> help "Pin evaluation clock (e.g. 2025-01-31T15:45:30Z) so NOW/TODAY stay deterministic"
     )
 
--- | The opt-in limits on each directive's evaluation (smucclaw/l4-ide#1075),
--- named as jl4-service names its own. A directive over either one becomes an
--- error, and the directives after it still run. Neither is deterministic, so
--- both are off unless asked for; the counted budgets ('maximumOpenObligations',
--- 'maximumClosureApplications') are on by default.
+-- | The limits on evaluation that @l4 run@ and @l4 batch@ take
+-- (smucclaw/l4-ide#1075, ruling L2 of the Recursion Limits bench).
+--
+-- The two counts are on by default ('withCountedBudgets'): they count what
+-- the machine does, so they stop the same program at the same place on
+-- every machine, and a directive that goes over one is an error on that
+-- directive alone; the others still answer. A flag changes either one, and
+-- @none@ turns it off. The flag names are PROVISIONAL: what the second one
+-- counts waits on Meng's ruling of the numbers.
+--
+-- Time and memory are off unless asked for, named as jl4-service names its
+-- own, and neither is deterministic. A directive that goes over one stops
+-- the run: it is an error naming the limit, and no directive after it is
+-- evaluated.
 data EvalLimitsOpt = EvalLimitsOpt
-  { limitSeconds   :: Maybe Int
+  { limitOpen      :: Maybe (Maybe Int)
+    -- ^ @--max-open@: 'Nothing' keeps the default, @Just Nothing@ is @none@
+  , limitCalls     :: Maybe (Maybe Int)
+    -- ^ @--max-calls@, read the same way
+  , limitSeconds   :: Maybe Int
   , limitMegabytes :: Maybe Int
   }
 
 evalLimitsParser :: Options.Parser EvalLimitsOpt
 evalLimitsParser = EvalLimitsOpt
-  <$> optional (option positiveIntReader
+  <$> optional (option countReader
+        ( long "max-open"
+        <> metavar "N|none"
+        <> help ("Stop any one #EVAL, #ASSERT or #TRACE that has more than N obligations open at once, as an error on that one (default "
+                 <> show maximumOpenObligations <> "; none: no limit)")
+        ))
+  <*> optional (option countReader
+        ( long "max-calls"
+        <> metavar "N|none"
+        <> help ("Stop any one #EVAL, #ASSERT or #TRACE that applies functions more than N times, as an error on that one (default "
+                 <> show maximumClosureApplications <> "; none: no limit)")
+        ))
+  <*> optional (option positiveIntReader
         ( long "eval-timeout"
         <> metavar "SECONDS"
-        <> help "Stop any one #EVAL, #ASSERT or #TRACE that runs longer than SECONDS of wall-clock time, and go on with the next"
+        <> help "Stop the run when any one #EVAL, #ASSERT or #TRACE runs longer than SECONDS of wall-clock time; nothing after it is evaluated"
         ))
   <*> optional (option positiveIntReader
         ( long "max-eval-memory-mb"
         <> metavar "MB"
-        <> help "Stop any one #EVAL, #ASSERT or #TRACE that allocates more than MB megabytes (every byte allocated, not only what is kept), and go on with the next"
+        <> help "Stop the run when any one #EVAL, #ASSERT or #TRACE allocates more than MB megabytes (every byte allocated, not only what is kept); nothing after it is evaluated"
         ))
   where
     positiveIntReader = eitherReader \ input -> case reads input of
       [(n, "")] | n > (0 :: Int) -> Right n
       _ -> Left ("expected a whole number above 0, got " <> show input)
+    countReader = eitherReader \ case
+      "none" -> Right Nothing
+      input -> case reads input of
+        [(n, "")] | n > (0 :: Int) -> Right (Just n)
+        _ -> Left ("expected a whole number above 0, or none, got " <> show input)
 
--- | Put the opt-in limits into an 'EvalConfig'.
-withEvalLimits :: EvalLimitsOpt -> EvalConfig -> EvalConfig
-withEvalLimits lims cfg = cfg
-  { directiveSeconds   = lims.limitSeconds
-  , directiveMegabytes = lims.limitMegabytes
+-- | The limits @l4 run@ and @l4 batch@ evaluate under: the counted budgets
+-- at their defaults, then whatever the flags say.
+withEvalLimits :: EvalLimitsOpt -> EvalConfig -> IO EvalConfig
+withEvalLimits lims cfg0 = withRunStop $ cfg
+  { maxOpenObligations     = fromMaybe cfg.maxOpenObligations lims.limitOpen
+  , maxClosureApplications = fromMaybe cfg.maxClosureApplications lims.limitCalls
+  , directiveSeconds       = lims.limitSeconds
+  , directiveMegabytes     = lims.limitMegabytes
   }
+  where
+    cfg = withCountedBudgets cfg0
 
 -- | Read a @--lang@ value into a 'LangTag'.
 --
@@ -458,7 +498,13 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
     traceSection = case traceMode of
       TraceTextNone -> Nothing
       TraceTextFull ->
-        let traceBody = maybe "(no trace captured; add #EVALTRACE to the directive)" prettyLayout mTrace
+        let traceBody = case (mTrace, result) of
+              (Just t, _) -> prettyLayout t
+              -- refused because an earlier directive stopped the run: it
+              -- was not evaluated, so there is nothing to trace
+              (Nothing, Reduction (ReducedErrored (UserEvalException (NotEvaluated _ _)))) -> "(not evaluated)"
+              (Nothing, Assertion (Errored (UserEvalException (NotEvaluated _ _)))) -> "(not evaluated)"
+              (Nothing, _) -> "(no trace captured; add #EVALTRACE to the directive)"
         in Just ("Trace:\n" <> indentBlockText traceBody)
 
 renderEvalValue :: EvalDirectiveValue -> Text

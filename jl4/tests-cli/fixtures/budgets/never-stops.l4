@@ -1,7 +1,7 @@
 -- A function whose stopping case is never reached: counting down by 2 from 5
 -- goes 3, 1, -1, and never meets 0. It reads n on every call, so it holds no
--- more memory as it goes. Its #EVAL is stopped by a limit; the #EVAL after it
--- still answers.
+-- more memory as it goes. Its #EVAL is stopped by a limit. After a count, the
+-- #EVAL after it still answers; after a time or memory limit, it is not run.
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
 countDown n MEANS

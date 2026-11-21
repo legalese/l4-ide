@@ -6,6 +6,8 @@ module L4.EvaluateLazy.Exceptions
 , InternalEvalException (..)
 , UserEvalException (..)
 , Budget (..)
+, BudgetSite (..)
+, stopsTheRun
 , Refusal (..)
 , prettyEvalException
 , prettyRefusal
@@ -96,27 +98,37 @@ data UserEvalException =
   | OverBudget Budget
     -- ^ smucclaw/l4-ide#1075: the directive went over one of the machine's
     -- budgets ('Budget'). Raised as any user exception is, so
-    -- 'tryEval' makes it that directive's result and the next directive
-    -- still runs.
+    -- 'tryEval' makes it that directive's result. After a counted budget
+    -- the next directive still runs; after time or memory ('stopsTheRun')
+    -- none does.
+  | NotEvaluated Budget (Maybe SrcRange)
+    -- ^ the directive was not evaluated, because an earlier one went over
+    -- the opt-in time or memory limit, which stops the run (ruling L2 of
+    -- the Recursion Limits bench): the limit, and the directive that went
+    -- over it
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
 -- | Which budget a directive went over, with the limit it went over. The
 -- first two count something the machine does, never time or memory, so the
--- same program stops at the same place on every machine, and they are on by
--- default; they carry the site that took the directive over. The last two
--- are opt-in, and are not (smucclaw/l4-ide#1075).
+-- same program stops at the same place on every machine; @l4 run@, @l4
+-- batch@ and the editor set them ('L4.EvaluateLazy.withCountedBudgets'), and
+-- the shared configuration does not. They carry the site that took the
+-- directive over. The last two are opt-in, are not deterministic, and stop
+-- the run (smucclaw/l4-ide#1075; ruling L2).
 data Budget
-  = OpenObligations Int (Maybe SrcRange)
+  = OpenObligations Int BudgetSite
     -- ^ more obligations armed and not yet handed on, breached or left
     -- waiting at the end of the events than the limit: a HENCE or LEST that
     -- arms two obligations and leads back to itself doubles this each time
     -- round. The site is the action of the obligation whose arming went over.
-  | ClosureApplications Int (Maybe SrcRange)
+  | ClosureApplications Int BudgetSite
     -- ^ more applications of functions written in L4 than the limit: a
     -- function that calls itself with new inputs and never stops pushes no
-    -- frame, so the frame limit never sees it. The site is the body of the
-    -- function whose application went over.
+    -- frame, so the frame limit never sees it. The site is where the
+    -- application that went over is in the source: its function's body, or
+    -- that function's GIVEN, or the first part of the body that has a place
+    -- ('L4.EvaluateLazy.Machine.noteApplication').
   | TimeLimit Int
     -- ^ the directive ran longer than the opt-in @--eval-timeout@, in
     -- seconds of wall-clock time. Not deterministic: it depends on the
@@ -126,6 +138,24 @@ data Budget
     -- in megabytes: every byte allocated while working, not what is held.
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | Where a counted budget went over: the source of the obligation armed or
+-- the function applied, and the name of the definition that source is in,
+-- when it is one of the module's own (ruling L2: the hit names the rule).
+data BudgetSite = MkBudgetSite
+  { siteRange :: Maybe SrcRange
+  , siteRule :: Maybe Text
+  }
+  deriving stock (Generic, Show)
+  deriving anyclass NFData
+
+-- | Whether going over this budget stops the whole run: time and memory do,
+-- the counted budgets stop only their own directive (ruling L2).
+stopsTheRun :: Budget -> Bool
+stopsTheRun = \ case
+  TimeLimit {}   -> True
+  MemoryLimit {} -> True
+  _              -> False
 
 prettyEvalException :: EvalException -> [Text]
 prettyEvalException (InternalEvalException exc) = wrapInternal (prettyInternalEvalException exc)
@@ -222,21 +252,45 @@ prettyUserEvalException = \ case
       <> Text.textShow maximumUnknownSteps <> " steps." ]
   UserError msg ->
     [ msg ]
-  -- Wording decided by Claude 2026-11-20, pending Meng's review.
+  -- Wording decided by Claude 2026-11-21, pending Meng's review; the flag names are provisional.
   OverBudget (OpenObligations limit site) ->
     [ "I stopped evaluating: more than " <> Text.textShow limit <> " obligations were open at once."
-    , "The last one was armed by the rule at " <> prettySrcRangeM site <> "."
+    , "The last one was armed in " <> siteName site <> "."
     , "A HENCE or LEST that names more than one obligation adds to what is open,"
-    , "and a chain of them that leads back to where it started multiplies it each time round." ]
+    , "and a chain of them that leads back to where it started multiplies it each time round."
+    , "l4 run and l4 batch take --max-open N to change the limit, and --max-open none to remove it." ]
   OverBudget (ClosureApplications limit site) ->
     [ "I stopped evaluating: functions were applied more than " <> Text.textShow limit <> " times."
-    , "The last one applied was the function at " <> prettySrcRangeM site <> "."
-    , "A function that calls itself with new inputs, and never reaches a case that stops, never ends." ]
-  OverBudget (TimeLimit limit) ->
-    [ "I stopped evaluating: this took longer than " <> Text.textShow limit <> " seconds (--eval-timeout)." ]
-  OverBudget (MemoryLimit limit) ->
-    [ "I stopped evaluating: this allocated more than " <> Text.textShow limit <> " MB (--max-eval-memory-mb)."
+    , "The last one applied was in " <> siteName site <> "."
+    , "A function that calls itself with new inputs, and never reaches a case that stops, never ends."
+    , "l4 run and l4 batch take --max-calls N to change the limit, and --max-calls none to remove it." ]
+  OverBudget b@(TimeLimit _) ->
+    [ "I stopped the run: this took longer than " <> limitText b <> ", so nothing after it was evaluated." ]
+  OverBudget b@(MemoryLimit _) ->
+    [ "I stopped the run: this allocated more than " <> limitText b <> ", so nothing after it was evaluated."
     , "That counts every byte allocated while working it out, not only what is kept." ]
+  NotEvaluated b at ->
+    [ "I did not evaluate this: the run stopped at " <> prettySrcRangeM at <> ", which "
+      <> (case b of
+            MemoryLimit _ -> "allocated more than "
+            TimeLimit _   -> "took longer than "
+            _             -> "went over ")
+      <> limitText b <> "." ]
+
+-- | A budget's site as its message prints it: the definition by name, then
+-- where in the source.
+siteName :: BudgetSite -> Text
+siteName site = case site.siteRule of
+  Just rule -> rule <> ", at " <> prettySrcRangeM site.siteRange
+  Nothing   -> "the definition at " <> prettySrcRangeM site.siteRange
+
+-- | An opt-in limit with its flag.
+limitText :: Budget -> Text
+limitText = \ case
+  TimeLimit n   -> Text.textShow n <> (if n == 1 then " second" else " seconds") <> " (--eval-timeout)"
+  MemoryLimit n -> Text.textShow n <> " MB (--max-eval-memory-mb)"
+  OpenObligations n _ -> Text.textShow n <> " obligations open at once (--max-open)"
+  ClosureApplications n _ -> Text.textShow n <> " function applications (--max-calls)"
 
 -- | A name a 'Stuck' carries, as its message prints it. An input prints
 -- exactly as it always has, so the one-input message is unchanged.

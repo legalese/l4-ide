@@ -26,8 +26,10 @@
 --
 -- Error handling follows the spec: batch processing stops at the first
 -- failing row by default; pass @--continue-on-error@ to process every row
--- and aggregate failures. Either way the process exits non-zero if any row
--- failed.
+-- and aggregate failures. A row that goes over the opt-in time or memory
+-- limit stops the run (smucclaw/l4-ide#1075, ruling L2): it fails, and under
+-- @--continue-on-error@ every row after it is an error that says it was not
+-- evaluated. Either way the process exits non-zero if any row failed.
 module L4.Cli.Batch
   ( BatchOptions(..)
   , OutputFormat(..)
@@ -252,7 +254,7 @@ batchOptionsParser = BatchOptions
 
 batchCmd :: BatchOptions -> IO ()
 batchCmd opts = do
-  evalConfig0 <- withEvalLimits opts.batchLimits <$> makeEvalConfig opts.batchFixedNow
+  evalConfig0 <- withEvalLimits opts.batchLimits =<< makeEvalConfig opts.batchFixedNow
   -- T4: one switch for the whole evaluation. The JSON decoder reads it for
   -- every input and record field it fills; discharge reads it for a section
   -- binder (which batch supplies through the decoder anyway, see below).

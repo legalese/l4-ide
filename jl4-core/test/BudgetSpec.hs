@@ -2,12 +2,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | smucclaw/l4-ide#1075: the machine's counted budgets, which stop a
 -- directive that opens obligations without end or applies functions without
--- end, and the opt-in time and allocation limits on one directive. A stop
--- is that directive's result; the next directive still runs.
+-- end, and the opt-in time and allocation limits. A counted stop is that
+-- directive's result, and the next directive still runs; a time or memory
+-- stop ends the run, and the directives after it are not evaluated (ruling
+-- L2 of the Recursion Limits bench).
 --
--- The limits below are set small, through 'EvalConfig', so that each case
--- runs in well under a second. The defaults are 'maximumOpenObligations' and
--- 'maximumClosureApplications'.
+-- The counts below are set small, through 'EvalConfig', so that each case
+-- under one runs in well under a second; a case under the time limit takes
+-- the second that limit allows. The shared configuration sets none;
+-- 'withCountedBudgets' sets 'maximumOpenObligations' and
+-- 'maximumClosureApplications', which @l4 run@, @l4 batch@ and the editor
+-- evaluate under.
 module BudgetSpec (spec) where
 
 import qualified Data.Text as Text
@@ -17,7 +22,7 @@ import Test.Hspec
 
 import L4.API.VirtualFS (checkWithImports, vfsFromList)
 import L4.EvaluateLazy
-import L4.EvaluateLazy.Exceptions (Budget (..), EvalException (..), UserEvalException (..))
+import L4.EvaluateLazy.Exceptions (Budget (..), BudgetSite (..), EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations)
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
@@ -29,12 +34,50 @@ fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
 -- | What a directive came to, reduced to what these cases compare.
 data Outcome
   = Over Text.Text Int (Maybe Int)   -- ^ the budget, its limit, and the line of its site
+  | NotRun Text.Text                 -- ^ not evaluated: an earlier directive stopped the run on this limit
   | Answered
   | OtherError Text.Text
   deriving stock (Eq, Show)
 
 runWith :: (EvalConfig -> EvalConfig) -> Text.Text -> IO [Outcome]
-runWith tweak src = do
+runWith tweak src = map (outcome . (.result)) <$> resultsWith tweak src
+  where
+    outcome = \ case
+      Reduction (ReducedErrored e) -> errored e
+      Assertion (Errored e)        -> errored e
+      _                            -> Answered
+    errored = \ case
+      UserEvalException (OverBudget b)     -> budget b
+      UserEvalException (NotEvaluated b _) -> NotRun (name b)
+      e -> OtherError (Text.unlines (prettyEvalException e))
+    budget b = case b of
+      OpenObligations n site     -> Over (name b) n (lineOf site.siteRange)
+      ClosureApplications n site -> Over (name b) n (lineOf site.siteRange)
+      TimeLimit n                -> Over (name b) n Nothing
+      MemoryLimit n              -> Over (name b) n Nothing
+    name = \ case
+      OpenObligations {}     -> "obligations"
+      ClosureApplications {} -> "applications"
+      TimeLimit {}           -> "time"
+      MemoryLimit {}         -> "memory"
+    lineOf = fmap (\ s -> s.start.line)
+
+-- | The name of the definition each counted stop names, for the directives
+-- that went over a counted budget.
+rulesNamed :: (EvalConfig -> EvalConfig) -> Text.Text -> IO [Maybe Text.Text]
+rulesNamed tweak src = concatMap named <$> resultsWith tweak src
+  where
+    named r = case r.result of
+      Reduction (ReducedErrored (UserEvalException (OverBudget b))) -> site b
+      Assertion (Errored (UserEvalException (OverBudget b)))        -> site b
+      _                                                             -> []
+    site = \ case
+      OpenObligations _ s     -> [s.siteRule]
+      ClosureApplications _ s -> [s.siteRule]
+      _                       -> []
+
+resultsWith :: (EvalConfig -> EvalConfig) -> Text.Text -> IO [EvalDirectiveResult]
+resultsWith tweak src = do
   r <- case checkWithImports (vfsFromList []) src of
     Left errs -> fail ("typecheck failed: " <> show errs)
     Right r   -> pure r
@@ -43,21 +86,7 @@ runWith tweak src = do
   mres <- timeout 60_000_000 (execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule)
   case mres of
     Nothing           -> fail "the module did not finish within 60 s: a limit did not fire"
-    Just (_, results) -> pure (map (outcome . (.result)) results)
-  where
-    outcome = \ case
-      Reduction (ReducedErrored e) -> errored e
-      Assertion (Errored e)        -> errored e
-      _                            -> Answered
-    errored = \ case
-      UserEvalException (OverBudget b) -> budget b
-      e -> OtherError (Text.unlines (prettyEvalException e))
-    budget = \ case
-      OpenObligations n site     -> Over "obligations" n (lineOf site)
-      ClosureApplications n site -> Over "applications" n (lineOf site)
-      TimeLimit n                -> Over "time" n Nothing
-      MemoryLimit n              -> Over "memory" n Nothing
-    lineOf = fmap (\ s -> s.start.line)
+    Just (_, results) -> pure results
 
 limits :: Maybe Int -> Maybe Int -> EvalConfig -> EvalConfig
 limits open applied cfg = cfg {maxOpenObligations = open, maxClosureApplications = applied}
@@ -93,14 +122,29 @@ deontic rules start events = Text.unlines $
 
 spec :: Spec
 spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
+  describe "where they are on (ruling L2)" $ do
+    it "the shared configuration sets no count, so jl4-service evaluates as it did" $ do
+      cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+      safe <- resolveEvalConfigWithSafeMode (Just fixedNow) apiDefaultPolicy True
+      [ (c.maxOpenObligations, c.maxClosureApplications, c.directiveSeconds, c.directiveMegabytes) | c <- [cfg, safe] ]
+        `shouldBe` replicate 2 (Nothing, Nothing, Nothing, Nothing)
+
+    it "withCountedBudgets, which l4 run, l4 batch and the editor apply, sets both counts, and no time or memory limit" $ do
+      cfg <- withCountedBudgets <$> resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+      (cfg.maxOpenObligations, cfg.maxClosureApplications, cfg.directiveSeconds, cfg.directiveMegabytes)
+        `shouldBe` (Just maximumOpenObligations, Just maximumClosureApplications, Nothing, Nothing)
+
   describe "obligations open at once" $ do
     it "stops #1075's rule at the limit, names the rule, and still answers the next directive" $
       -- the arming that goes over is w3's, on line 5
       runWith (limits (Just 1000) Nothing) (runaway 60)
         `shouldReturn` [Over "obligations" 1000 (Just 5), Answered]
 
+    it "names the definition the obligation that went over is in" $
+      rulesNamed (limits (Just 1000) Nothing) (runaway 60) `shouldReturn` [Just "w3"]
+
     it "lets #1075's rule run where it opens fewer than the default limit" $
-      runWith id (runaway 22) `shouldReturn` [Answered, Answered]
+      runWith withCountedBudgets (runaway 22) `shouldReturn` [Answered, Answered]
 
     -- The counter is armings less closes. A close it missed would make the
     -- count grow with the trace, so each chain below runs under a limit of
@@ -246,12 +290,37 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
       runWith (limits Nothing (Just 10000)) loop
         `shouldReturn` [Over "applications" 10000 (Just 2), Answered]
 
+    it "names the function" $
+      rulesNamed (limits Nothing (Just 10000)) loop `shouldReturn` [Just "f"]
+
     it "counts each directive afresh" $
       -- 6,001 applications each, under a limit of 10,000: together they
       -- would be over it
       runWith (limits Nothing (Just 10000)) countdown `shouldReturn` [Answered, Answered]
 
-  describe "the opt-in limits on one directive" $ do
+  describe "a stop while what is evaluated waits on an input not yet known" $ do
+    -- @x@ is unknown, so the right of the AND is evaluated only in case @x@
+    -- turns out TRUE; an error there is reported as needing @x@. A budget is
+    -- not: it is an error on the directive, and a time or memory one still
+    -- stops the run (ruling L2)
+    let speculative = Text.unlines
+          [ "ASSUME x IS A BOOLEAN"
+          , "GIVEN n IS A NUMBER GIVETH A BOOLEAN"
+          , "loop n MEANS loop (n PLUS 1)"
+          , ""
+          , "#EVAL x AND loop 0"
+          , ""
+          , "#EVAL 1 PLUS 1"
+          ]
+    it "reports a count's hit as the count's, not as needing the input" $
+      runWith (limits Nothing (Just 10000)) speculative
+        `shouldReturn` [Over "applications" 10000 (Just 3), Answered]
+
+    it "stops the run on a memory hit" $
+      runWith (\ c -> (limits Nothing Nothing c) {directiveMegabytes = Just 1}) speculative
+        `shouldReturn` [Over "memory" 1 Nothing, NotRun "memory"]
+
+  describe "the opt-in time and memory limits, which stop the run" $ do
     -- reads n on every call, so it holds no more memory as it runs
     let loop = Text.unlines
           [ "GIVEN n IS A NUMBER GIVETH A NUMBER"
@@ -260,14 +329,34 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
           , "#EVAL f 5"
           , ""
           , "#EVAL 1 PLUS 1"
+          , ""
+          , "#ASSERT TRUE"
           ]
-    it "stops a directive past its wall-clock limit and still answers the next one" $
+        early = Text.unlines
+          [ "#EVAL 1 PLUS 1"
+          , ""
+          , "GIVEN n IS A NUMBER GIVETH A NUMBER"
+          , "f n MEANS IF n EQUALS 0 THEN 0 ELSE f (n MINUS 2)"
+          , ""
+          , "#EVAL f 5"
+          ]
+    it "stops the run at a directive past its wall-clock limit: nothing after it is evaluated" $
       runWith (\ c -> (limits Nothing Nothing c) {directiveSeconds = Just 1}) loop
-        `shouldReturn` [Over "time" 1 Nothing, Answered]
+        `shouldReturn` [Over "time" 1 Nothing, NotRun "time", NotRun "time"]
 
-    it "stops a directive past its allocation limit and still answers the next one" $
+    it "stops the run at a directive past its allocation limit: nothing after it is evaluated" $
       runWith (\ c -> (limits Nothing Nothing c) {directiveMegabytes = Just 50}) loop
-        `shouldReturn` [Over "memory" 50 Nothing, Answered]
+        `shouldReturn` [Over "memory" 50 Nothing, NotRun "memory", NotRun "memory"]
+
+    it "keeps what the directives before the stop answered" $
+      runWith (\ c -> (limits Nothing Nothing c) {directiveSeconds = Just 1}) early
+        `shouldReturn` [Answered, Over "time" 1 Nothing]
+
+    it "lets the directives after a counted stop answer, under a time limit too" $
+      -- a counted stop is not a time or memory stop, whatever else is set
+      runWith (\ c -> (limits Nothing (Just 10000) c) {directiveSeconds = Just 3600})
+        (Text.unlines ["GIVEN n IS A NUMBER GIVETH A NUMBER", "f n MEANS f (n PLUS 1)", "", "#EVAL f 0", "", "#EVAL 1 PLUS 1"])
+        `shouldReturn` [Over "applications" 10000 (Just 2), Answered]
 
     it "measures from the start of each directive, so generous limits stop nothing" $
       -- the clock and the allocation counter are read from the directive's

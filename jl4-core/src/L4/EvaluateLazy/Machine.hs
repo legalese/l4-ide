@@ -20,6 +20,9 @@ module L4.EvaluateLazy.Machine
 , resetUnknownSteps
 , resetBudget
 , budgetSpent
+, moduleRules
+, runStoppedAt
+, noteRunStopped
 , tickLimits
 , DirectiveLimits (..)
 , LimitClock (..)
@@ -131,7 +134,10 @@ import L4.Evaluate.Ledger
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (CtxReads (..), EvalClause (..), ReadObs (..), TemporalContext (..), applyEvalClauses, hasReads, noReads, validFor)
-import L4.Parser.SrcSpan (SrcRange, prettySrcRangeM)
+import Control.Applicative ((<|>))
+import Data.Ord (comparing)
+import qualified Optics
+import L4.Parser.SrcSpan (SrcRange (..), prettySrcRangeM)
 import L4.Print hiding (tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
@@ -499,6 +505,17 @@ data EvalState =
     , applicationLimit :: !(Maybe Int)
       -- ^ the most function applications a directive may make
       -- ('ClosureApplications'); 'Nothing' sets no limit
+    , budgetRules :: [(SrcRange, Text)]
+      -- ^ the module's own definitions, each with its name: what a budget
+      -- that goes over names its site by ('budgetSite'). Lazy, so it is
+      -- built only for a directive that goes over. Empty where the caller
+      -- has no module ('runEvalAction').
+    , runStopped :: !(IORef (Maybe (Budget, Maybe SrcRange)))
+      -- ^ set when a directive goes over the opt-in time or memory limit,
+      -- which stops the run (ruling L2): the limit, and that directive.
+      -- Every later directive is refused ('runStoppedAt'). The caller's
+      -- ('EvalConfig.runStop') where it gives one, so that it spans every
+      -- module of the run, imports included; otherwise this module's own.
     , directiveLimits :: !(Maybe DirectiveLimits)
       -- ^ the opt-in time and allocation limits on each directive
       -- (@--eval-timeout@, @--max-eval-memory-mb@); 'Nothing' when neither
@@ -1130,11 +1147,18 @@ raiseException e0 = loop e0
 -- resumes. A built-in's 'RuntimeTypeError', which is how one reports an
 -- argument it cannot take (FETCH of a string that is no https URL), is
 -- rewritten the same way; the machine's own invariant failures, the other
--- internal errors, propagate as they are.
+-- internal errors, propagate as they are. So does a budget (smucclaw/l4-ide#1075):
+-- going over one stops the directive whatever it was evaluating, and ruling L2
+-- of the Recursion Limits bench makes the hit an error on that directive that
+-- names the limit, so it is never turned into 'Stuck'. Rewritten, a time or
+-- memory hit under @x AND …@ with @x@ unknown read as "needs x", and did not
+-- stop the run (review of 2026-11-21).
 rewriteUnwinding :: Frame -> EvalException -> EvalException
 rewriteUnwinding f e = case speculativeLeft f of
   Nothing -> e
   Just p  -> case e of
+    UserEvalException (OverBudget _)     -> e
+    UserEvalException (NotEvaluated _ _) -> e
     UserEvalException (Stuck ns) -> stuckException (termNames p <> toList ns)
     UserEvalException _          -> stuckException (termNames p)
     RefusalException _           -> stuckException (termNames p)
@@ -1357,8 +1381,9 @@ noteArming act = do
   liftIO (writeIORef armedRef armed')
   asks (.openLimit) >>= traverse_ \ limit -> do
     closed <- liftIO . readIORef =<< asks (.closes)
-    when (armed' - closed > limit) $
-      userException (OverBudget (OpenObligations limit (rangeOf act)))
+    when (armed' - closed > limit) $ do
+      site <- budgetSite (rangeOf act)
+      userException (OverBudget (OpenObligations limit site))
 
 -- | An armed obligation is handed on to its HENCE or LEST, or breached
 -- with no LEST to go to: it is no longer open.
@@ -1427,16 +1452,88 @@ heldObligations = \ case
 -- | A function written in L4 is applied to its arguments. Counted, and
 -- stopped with 'ClosureApplications' past the limit: a function that calls
 -- itself with new inputs pushes no frame, so nothing else stops it.
-noteApplication :: Expr Resolved -> Eval ()
-noteApplication body = do
+--
+-- The site is the function's body, or, where the body has no place in the
+-- source, its @GIVEN@, or else the first part of the body that has one: the
+-- body of a definition written as clauses is a generated @CONSIDER@ or @LET@
+-- with no place, and so is its @GIVEN@, but each clause's own body has one.
+-- A closure with none of these, such as a record field's selector, is not
+-- where the hit is reported: past the limit, the count goes on to the next
+-- application that has a place, which is the next function written in L4 to
+-- be applied (not necessarily the one that read the field), and stops at
+-- 'rangelessSlack' past the limit at the latest, so that a run of such
+-- closures still stops: closures with no place can take the count past the
+-- limit by at most the slack.
+noteApplication :: GivenSig Resolved -> Expr Resolved -> Eval ()
+noteApplication givens body = do
   appliedRef <- asks (.applications)
   applied <- liftIO (readIORef appliedRef)
   let applied' = applied + 1
   liftIO (writeIORef appliedRef applied')
   asks (.applicationLimit) >>= traverse_ \ limit ->
-    when (applied' > limit) $
-      userException (OverBudget (ClosureApplications limit (rangeOf body)))
+    when (applied' > limit) $ do
+      let place = rangeOf body <|> rangeOf givens <|> firstPlaceIn body
+      when (isJust place || applied' > limit + rangelessSlack) $ do
+        site <- budgetSite place
+        userException (OverBudget (ClosureApplications limit site))
 {-# INLINE noteApplication #-}
+
+-- | The first part of an expression, itself included, that has a place in
+-- the source. Read only past the limit, so its walk costs nothing before.
+firstPlaceIn :: Expr Resolved -> Maybe SrcRange
+firstPlaceIn = listToMaybe . mapMaybe rangeOf . Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved)))
+
+-- | How far past the limit on applications the count may go while it looks
+-- for an application with a place in the source ('noteApplication').
+rangelessSlack :: Int
+rangelessSlack = 1_000
+
+-- | A budget's site, with the name of the module's own definition it is in
+-- (ruling L2: the hit names the rule). A site in an imported module, or in
+-- none, keeps only its place in the source.
+budgetSite :: Maybe SrcRange -> Eval BudgetSite
+budgetSite mRange = do
+  rules <- asks (.budgetRules)
+  pure MkBudgetSite
+    { siteRange = mRange
+    , siteRule = mRange >>= \ r -> innermost [ (d, name) | (d, name) <- rules, d `encloses` r ]
+    }
+  where
+    -- the definitions that hold a site nest (overloads split from one run
+    -- of clauses keep the run's range on the first), so the innermost, the
+    -- one that starts last, is the one the site is in
+    innermost = \ case
+      [] -> Nothing
+      ds -> Just (snd (maximumBy (comparing (\ (d, _) -> d.start)) ds))
+    -- 'SrcPos' orders by line, then column
+    encloses :: SrcRange -> SrcRange -> Bool
+    encloses d r = d.moduleUri == r.moduleUri && d.start <= r.start && r.end <= d.end
+
+-- | Every definition of a module, at any depth of its sections, with its
+-- name as the source writes it, without the @\@nlg@ text a head may carry
+-- ('bareName'). Definitions may nest ('budgetSite' takes the innermost).
+moduleRules :: Module Resolved -> [(SrcRange, Text)]
+moduleRules (MkModule _ _ top) = inSection top
+  where
+    inSection (MkSection _ _ _ _ decls) = concatMap inDecl decls
+    inDecl = \ case
+      Decide _ d@(MkDecide _ _ (MkAppForm _ name _ _) _)
+        | Just r <- rangeOf d -> [(r, docText (bareName name))]
+      Section _ sec -> inSection sec
+      _ -> []
+
+-- | Whether an earlier directive stopped the run, and if so on which limit
+-- and where: the directive boundary refuses the next one without starting
+-- it, so that it records no trace ('L4.EvaluateLazy.nfDirectiveWith').
+runStoppedAt :: Eval (Maybe (Budget, Maybe SrcRange))
+runStoppedAt = liftIO . readIORef =<< asks (.runStopped)
+
+-- | A directive went over a limit that stops the run: remember which, and
+-- where, for the directives after it.
+noteRunStopped :: Budget -> Maybe SrcRange -> Eval ()
+noteRunStopped b at = do
+  stoppedRef <- asks (.runStopped)
+  liftIO (writeIORef stoppedRef (Just (b, at)))
 
 -- | Start a directive with nothing armed, closed or applied, and its time
 -- and allocation counted from now.
@@ -1473,7 +1570,8 @@ limitCheckInterval = 4_096
 -- | One machine step under the opt-in limits: every 'limitCheckInterval'
 -- steps, stop the directive if it has run longer or allocated more than
 -- its limit. The stop is an ordinary evaluation exception, so the stack
--- unwinds as for any other and the next directive runs. The allocation is
+-- unwinds as for any other; the directive boundary then stops the run, and
+-- no directive after it is evaluated (ruling L2). The allocation is
 -- read from the counter of the thread that runs the machine, which is the
 -- thread doing the work, whichever thread the caller is on (#1018). A step
 -- that runs one long Haskell computation (a huge power of a number) is not
@@ -2705,7 +2803,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
   Just f@(App1 rs mTy) -> do
     case val of
       ValClosure givens e env' -> do
-        noteApplication e
+        noteApplication givens e
         env'' <- matchGivens env' givens f rs
         continueExpr (Map.union env'' env') e
       ValUnappliedConstructor r ->
