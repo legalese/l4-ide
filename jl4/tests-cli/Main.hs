@@ -879,6 +879,37 @@ spec bin = do
     it "runs a file whose @lang has no language" $
       expectOk bin ["run", malformedLangFixture] "Result:\n  2\n"
 
+    -- Each time a file's diagnostics change, the pipeline logs all of them
+    -- again, and l4 run and l4 check printed every list: l4 run printed a
+    -- type checker's warning three times and an export error and the
+    -- untyped-GIVEN warning twice, l4 check the type checker's warning twice
+    -- (review of #779, 2026-11-21). Only the last list of a file is printed.
+    --
+    -- Ported to unstable from the #779 line (af1a0bcca). Unstable has no
+    -- diagnostic codes ("Code: <none>") and no untyped-GIVEN warning, and its
+    -- export error fails the type check, so nothing is evaluated: the
+    -- assertions name each diagnostic by its message instead, and there is no
+    -- Result to check. On unstable this file's diagnostics were published once
+    -- even before the fix, so here these two are guards; the repeat is pinned
+    -- under "l4 check" below (smucclaw/l4-ide#1082).
+    it "prints each diagnostic once, on l4 run and l4 check, and in --json" $ do
+      let file = fixtureDir </> "run-diagnostics-once.l4"
+          occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+          messages = ["The following branches still need to be considered", "Function type inputs are not supported for @export"]
+      Output runCode _ runErr <- runL4 bin ["run", file]
+      runCode `shouldBe` ExitFailure 1
+      map (`occurrences` runErr) messages `shouldBe` [1, 1]
+      Output checkCode _ checkErr <- runL4 bin ["check", file]
+      checkCode `shouldBe` ExitFailure 1
+      map (`occurrences` checkErr) messages `shouldBe` [1, 1]
+      Output _ runJson _ <- runL4 bin ["run", "--json", file]
+      map (`occurrences` runJson) messages `shouldBe` [1, 1]
+    it "still prints a type error once, on l4 run and l4 check" $
+      forM_ ["run", "check"] \cmd -> do
+        Output code _ serr <- runL4 bin [cmd, errorFixture]
+        code `shouldBe` ExitFailure 1
+        length (filter ("The type of this definition must match its type signature" `isPrefixOf`) (tails serr)) `shouldBe` 1
+
     it "emits a well-shaped JSON envelope on a clean file" $ do
       env <- jsonEnvelope bin ["run", cleanFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool True)
