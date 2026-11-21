@@ -31,7 +31,7 @@ Now an operand is bracketed when it is itself a connective, a `NOT`, or has an o
 - Left bare: a bare `BREACH`, literals, variables, projections, and every other operator, including comparisons (`EQUALS`, `GREATER THAN`, …), which bracket their own operands or bind tighter.
 - `scanOp` matches on `carameliseNode e` at every level, so a chain the checker left as `App __AND__ [a, b]` still flattens fully; without that, `a AND b AND c AND d` printed as `a AND (b AND (c AND d))`.
 - An associative chain of one connective is therefore flattened and printed without brackets, and only a genuinely different nested operand reaches `parensIfOpenTailed`.
-- `NOT` prints its own operand with plain `printWithLayout` (`Print.hs:351-352`). That is safe because the parser reads `NOT x AND y` as `NOT (x AND y)`.
+- `NOT` prints its own operand through `parensIfOpenTailed` (`Print.hs:503-504`), so `Not (And x y)` prints as `NOT (x AND y)`. Until the one-line refusal was ported (`specs/as-built/not-reach.md`) it printed the operand with plain `printWithLayout`, as `NOT x AND y`, which the parser reads the same way; the checker now refuses that spelling, so the printed module would not check.
 
 ## Diagnostics
 
