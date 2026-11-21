@@ -18,7 +18,7 @@ GIVETH A BOOLEAN
 @ref SG-c-2025-sghcf-14
 DECIDE xor x y IS
      <<SG-c-2025-sghcf-12>> x AND NOT y
-  OR NOT x AND y
+  OR (NOT x) AND y
 
 -- A literal `>>` inside an inline citation needs `\>`, because the annotation
 -- would otherwise terminate at the first `>>` and leave the remainder to fail

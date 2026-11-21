@@ -172,7 +172,7 @@ GIVETH A BOOLEAN
 @ref SG-c-2025-sghcf-14
 DECIDE xor x y IS
      <<SG-c-2025-sghcf-12>> x AND NOT y
-  OR NOT x AND y @nlg Locally overwrite the annotation for %y%
+  OR (NOT x) AND y @nlg Locally overwrite the annotation for %y%
 ```
 
 Citation files can be loaded via the `@ref-src` annotation at any toplevel location of an L4 file.
