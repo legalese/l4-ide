@@ -39,13 +39,18 @@ import Data.Ratio (denominator, numerator)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax (DeonticModal (..))
 
--- | One warning about one cycle.
+-- | One warning about one cycle, or about one @\@ends-because@ that is on no
+-- cycle.
 data CycleWarning = MkCycleWarning
   { rule    :: Text
-    -- ^ the definition it is reported on: the cycle's first in source order,
-    -- or the one whose continuation multiplies
+    -- ^ the definition it is shown on and names: for "could not check" and
+    -- "no time", the cycle's first in source order (decided by Claude
+    -- 2026-11-22, pending Meng's review: ruling L4 says only "the definition the warning is reported on"); for
+    -- "multiplies", the one whose continuation multiplies; for a stray mark,
+    -- the one the mark is above
   , at      :: Maybe SrcRange
-    -- ^ where: that definition's name, or the continuation that multiplies
+    -- ^ where: that definition's name; the continuation that multiplies; the
+    -- mark, for a stray mark
   , through :: [Text]
     -- ^ the cycle's other definitions, in source order
   , trouble :: CycleTrouble
@@ -64,6 +69,9 @@ data CycleTrouble
     -- time: each one's distance after the arming, never above 0
   | StartsCopies Multiplication
     -- ^ a continuation that starts two or more copies of the cycle at once
+  | NothingToExplain
+    -- ^ an @\@ends-because@ above a definition that is on no cycle (decided by Claude
+    -- 2026-11-22, pending Meng's review)
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -239,6 +247,13 @@ cycleWarningText w = case w.trouble of
        , "If one copy is what you meant, start it once."
        ]
     <> cannotSilence "the copies multiply"
+  NothingToExplain ->
+    [ "@ends-because is above " <> quoted w.rule <> ", but I find no way for " <> quoted w.rule
+        <> " to lead back to itself, so I see nothing for the mark to explain."
+    , "The mark goes above a rule that uses itself again, directly or through other rules, or whose HENCE or LEST starts it again."
+    , "I cannot see a loop that goes through a rule kept in a record or passed in as an input: if "
+        <> quoted w.rule <> " leads back to itself that way, the mark is where it belongs, and if not, move it to the rule it explains."
+    ]
  where
   copiesOf
     | null w.through = "of itself"

@@ -456,11 +456,22 @@ The `HENCE` branch reduces the balance; the `LEST` branch increases it with a pe
 
 L4 checks every rule whose `HENCE` or `LEST` leads back to itself, and gives one of three warnings (`doc/reference/regulative/rules-that-start-themselves-again.md` quotes each):
 
-- **"I could not check that this comes to an end"** when it cannot see that each new copy waits, for an event or for a deadline written as a number above 0. The example above draws it unless `` `next due date` `` is a number written out in the same file: `` `next due date` MEANS 30 `` checks clean, and `` `next due date` MEANS 15 PLUS 15 `` warns (measured 2026-11-21). If the rule does come to an end, write `@ends-because <reason>` on a line of its own above the rule the warning is shown on (the first, in the file, of rules that lead back to each other). That silences this warning only, and L4 shows the reason in an information message instead. A mark above another rule of the loop does not count.
-- **"starts itself again with no time passing"** for a deadline of `WITHIN 0` (or before the start) on the way round. `@ends-because` cannot silence it: give the deadline time.
-- **"starts 2 copies of itself at once"** for a `HENCE` or `LEST` that joins two or more calls of the loop's rules with `RAND` or `ROR`. `@ends-because` cannot silence it either.
+- **"I could not check that this comes to an end"** when it cannot see that each new copy waits, for an event or for a deadline written as a number above 0.
+  The example above draws it unless `` `next due date` `` is a number written out in the same file: `` `next due date` MEANS 30 `` checks clean, and `` `next due date` MEANS 15 PLUS 15 `` warns (measured 2026-11-21), because L4 reads only a number written out there.
+  If the rule does come to an end, write `@ends-because <reason>` on a line of its own above the rule the warning is shown on (the first, in the file, of rules that lead back to each other).
+  That silences this warning only, and L4 shows the reason in an information message instead.
+  A mark above another rule of the loop does not count.
+- **"starts itself again with no time passing"** for a deadline of `WITHIN 0` (or before the start) on the way round.
+  `@ends-because` cannot silence it: give the deadline time.
+- **"starts 2 copies of itself at once"** for a `HENCE` or `LEST` that joins two or more uses of the loop's rules with `RAND` or `ROR`.
+  It is shown on the rule whose `HENCE` or `LEST` starts the copies.
+  `@ends-because` cannot silence it either.
 
-A rule that uses itself with no duty in between (a countdown, a fold over a list) draws none of these, and an `@ends-because` above it changes nothing; so does one above a rule that never leads back to itself. Every mark still gets one information message carrying its reason and saying what it did. A file with an error gets none of these warnings or messages.
+A rule that uses itself only directly, with no `HENCE` or `LEST` that leads back to it (a countdown, a fold over a list), draws none of these, and an `@ends-because` above it changes nothing.
+One that uses itself directly and also has a `HENCE` or `LEST` back to itself is checked, direct uses and all, and can draw "could not check".
+L4 cannot see a loop through a rule kept in a record or passed in as an input: such an obligation draws no warning, and an `@ends-because` above it draws a warning that L4 finds no way back to itself from the rule, though the mark may be right.
+Every mark still gets one information message carrying its reason and saying what it did.
+A file with an error gets none of these warnings or messages.
 
 When "could not check" is about a rule that uses itself directly, the warning names that rule, which need not be the one it is shown on.
 

@@ -163,6 +163,8 @@ So `@determines` was considered and declined; it is not an alias, and nothing re
   There are two exceptions.
   A module with any error gets no cycle warnings and no notes at all; an exception decided by Claude 2026-11-21, pending Meng's review, so `jl4/examples/not-ok/tc/ends-because-misplaced.l4` has two accepted marks and no note.
   And of two marks stacked above one definition, the parser keeps the closer one and warns about the other, which emits no note (decided by Claude 2026-11-22, pending Meng's review).
+- A mark above a definition L4 finds no way back to itself from also draws a warning that it sees nothing for the mark to explain, beside its note (decided by Claude 2026-11-22, pending Meng's review).
+  L4 cannot see a cycle through a rule kept in a record or passed in as an input, so the warning says that the mark may still be right.
 - "no effect on runtime limits": met.
   Nothing under `L4.Evaluate*` reads the mark (`git grep annEndsBecause -- 'jl4-core/src/L4/Evaluate*'` finds nothing, 2026-11-22).
 

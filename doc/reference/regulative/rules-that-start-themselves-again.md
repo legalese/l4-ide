@@ -140,7 +140,22 @@ What it does and does not do:
 - It silences "I could not check that this comes to an end" on that rule, and nothing else.
 - It does not change how the rule runs.
 - It does not silence the other two warnings: if one of the rules that lead back to each other carries a mark, those warnings say that it does not silence them.
-- On a rule L4 can already see comes to an end, on a rule that uses itself with no duty in between (a countdown, a total over a list), or on a rule that never uses itself at all, it changes nothing.
+- On a rule L4 can already see comes to an end, or on a rule that uses itself only directly, with no `HENCE` or `LEST` that leads back to it (a countdown, a total over a list), it changes nothing.
+- On a rule L4 finds no way back to itself from, L4 sees nothing for it to explain, and warns about it.
+  L4 cannot see a loop that goes through a rule kept in a record or passed in as an input, so the warning says that the mark may still be right there.
+
+```l4
+@ends-because it is only arithmetic
+GIVEN rent IS A NUMBER
+GIVETH A NUMBER
+`late fee` rent MEANS rent TIMES 0.05
+```
+
+```
+@ends-because is above `late fee`, but I find no way for `late fee` to lead back to itself, so I see nothing for the mark to explain.
+The mark goes above a rule that uses itself again, directly or through other rules, or whose HENCE or LEST starts it again.
+I cannot see a loop that goes through a rule kept in a record or passed in as an input: if `late fee` leads back to itself that way, the mark is where it belongs, and if not, move it to the rule it explains.
+```
 
 Every `@ends-because` gets one information message, at the mark, carrying its reason and saying what the mark did, whether or not it silenced anything.
 So a reader can find every reason in a file, and see which ones L4 relied on.

@@ -3,8 +3,10 @@
 -- definition and when it has no reason, and reaching the definitions in a
 -- WHERE or LET. This is the syntax alone; what the mark changes is in
 -- "CyclesSpec". The one thing of that shown here: each mark the checker
--- accepts leaves an information-level note carrying its reason (ruling L4), so
--- the "no diagnostics" checks below leave those notes out and name them.
+-- accepts leaves an information-level note carrying its reason (ruling L4), and
+-- a mark on a rule the checker finds no way back to itself from is also a
+-- warning that it sees nothing for the mark to explain (decided by Claude 2026-11-22, pending Meng's review), so the "no
+-- diagnostics" checks below leave both out and name them.
 module EndsBecauseSpec (spec) where
 
 import Data.Foldable (for_, toList)
@@ -23,8 +25,8 @@ import L4.Import.Resolution (TypeCheckWithDepsResult(..))
 import L4.Print (prettyLayout)
 import L4.Syntax
 import qualified L4.TypeCheck as TC
-import L4.Cycles.Warning (MarkNote (..))
-import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..))
+import L4.Cycles.Warning (CycleTrouble (..), CycleWarning (..), MarkNote (..))
+import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckWarning (..))
 
 -- | Every definition of the module, with its name as written: the top-level
 -- and section-level ones, then those in a WHERE or LET, at any depth.
@@ -61,12 +63,17 @@ errorTexts r = Text.unlines (concatMap TC.prettyCheckErrorWithContext r.tcdError
 notedRules :: TypeCheckWithDepsResult -> [Text]
 notedRules r = [ n.rule | MkCheckErrorWithContext{kind = EndsBecauseNoted n} <- r.tcdErrors ]
 
--- | Every diagnostic but those notes.
+-- | The rules a "nothing to explain" warning is about, in order.
+strays :: TypeCheckWithDepsResult -> [Text]
+strays r = [ w.rule | MkCheckErrorWithContext{kind = CheckWarning (CycleAlarm w)} <- r.tcdErrors, w.trouble == NothingToExplain ]
+
+-- | Every diagnostic but those notes and those warnings.
 otherThanNotes :: TypeCheckWithDepsResult -> [CheckErrorWithContext]
 otherThanNotes r = [ e | e <- r.tcdErrors, not (isNote e.kind) ]
  where
   isNote = \ case
     EndsBecauseNoted _ -> True
+    CheckWarning (CycleAlarm w) -> w.trouble == NothingToExplain
     _ -> False
 
 countOfKind :: (CheckError -> Bool) -> TypeCheckWithDepsResult -> Int
@@ -248,6 +255,7 @@ spec = describe "@ends-because" do
       ]
     otherThanNotes r `shouldBe` []
     notedRules r `shouldBe` ["vouched step"]
+    strays r `shouldBe` ["vouched step"]
   it "is not read from a @desc whose first word happens to be the same" do
     r <- checked marked
     lookup "described step" (reasons (decides r.tcdModule)) `shouldBe` Just Nothing
@@ -286,6 +294,7 @@ spec = describe "@ends-because" do
       ]
     otherThanNotes r `shouldBe` []
     notedRules r `shouldBe` ["inner", "bound"]
+    strays r `shouldBe` ["inner", "bound"]
   it "keeps a mark on a WHERE or LET local through a re-print" do
     r <- checked locals
     r2 <- checked (prettyLayout r.tcdModule)
@@ -365,6 +374,7 @@ spec = describe "@ends-because" do
       lookup "later" rs `shouldBe` Just Nothing
       otherThanNotes r `shouldBe` []
       notedRules r `shouldBe` ["fact", "inside"]
+      strays r `shouldBe` ["inside"]
       ws <- endsBecauseWarnings groups
       ws `shouldBe` []
     it "keeps each of them through a re-print" do

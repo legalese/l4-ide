@@ -514,7 +514,8 @@ data CheckWarning
     -- ^ smucclaw/l4-ide#1075: a rule whose HENCE or LEST leads back to
     -- itself, and that is not shown to come to an end ("could not check"),
     -- gives no time each time round ("no time"), or starts two or more
-    -- copies of itself at once ("multiplies"). Rulings L3, L4 and the scope
+    -- copies of itself at once ("multiplies"); or an @\@ends-because@ above
+    -- a rule the checker finds no way back to itself from. Rulings L3, L4 and the scope
     -- ruling (ii), recorded in @specs\/todo\/GLOBAL-DEPENDENCY-GRAPH-SPEC.md@; which
     -- finding draws which is 'L4.Cycles.cycleNotices'. Only on a module with
     -- no error: a module that does not check has no findings to trust.

@@ -1,0 +1,18 @@
+-- @ends-because above a rule L4 finds no way back to itself from: the mark
+-- draws a warning that it sees nothing to explain, beside the note every mark
+-- leaves. Beside it, the same mark above a rule that does use itself again,
+-- which draws no such warning. Described in
+-- doc/reference/regulative/rules-that-start-themselves-again.md.
+
+-- Warns: nothing for the mark to explain.
+@ends-because it is only arithmetic
+GIVEN rent IS A NUMBER
+GIVETH A NUMBER
+`late fee` rent MEANS rent TIMES 0.05
+
+-- No such warning: the rule uses itself again.
+@ends-because each step moves one day nearer the end date
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`days left` d MEANS
+    IF d AT MOST 0 THEN 0 ELSE `days left` (d MINUS 1)

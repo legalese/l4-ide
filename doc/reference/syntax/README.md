@@ -126,8 +126,8 @@ Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the reque
 The author of a rule that calls itself writes `@ends-because` above it to vouch that the calls come to an end, and to say why.
 What it changes is described with the warnings about rules that start themselves again, in [Rules that start themselves again](../regulative/rules-that-start-themselves-again.md).
 In short: it silences the warning L4 gives when it cannot check that a rule whose `HENCE` or `LEST` leads back to itself comes to an end, written on the rule that warning is shown on, and L4 then shows the reason in an information message instead.
-On a rule like `countdown` below, which uses itself with no duty in between, L4 gives no such warning, so the mark changes nothing and records why the rule ends.
-Either way, L4 shows the reason of every `@ends-because` in an information message that says what the mark did.
+On a rule like `countdown` below, which uses itself only directly, with no `HENCE` or `LEST` that leads back to it, L4 gives no such warning, so the mark changes nothing and records why the rule ends.
+Either way, L4 shows the reason of every `@ends-because` in an information message that says what the mark did; above a rule L4 finds no way back to itself from, the mark also draws a warning that L4 sees nothing for it to explain.
 Write it on a line of its own above a `MEANS` or `DECIDE` definition, followed by the reason: above the definition's `GIVEN`, or directly above the line that names it.
 It goes on a definition at the top level of a file, inside a section, or inside a `WHERE` or `LET` block.
 

@@ -453,7 +453,9 @@ findingJSON f = Aeson.object
 --   ('each use emits one information-level message'). The narrow reading is
 --   the alternative, for Meng's review: a note only for a mark that silences
 --   a warning. The notes are made by going
---   through the marks, not the findings, so there is one per mark.
+--   through the marks, not the findings, so there is one per mark;
+-- * a mark on a definition that is on no cycle is also a warning of its own
+--   (decided by Claude 2026-11-22, pending Meng's review).
 --
 -- Definitions are matched to marks by 'Unique', not by name. A WHERE or LET
 -- name for an expression is read through ('readThrough') and is never a
@@ -462,7 +464,7 @@ findingJSON f = Aeson.object
 -- on a lap is on the cycle, and is not the definition it is reported on.
 cycleNotices :: (NormalizedUri -> Maybe Text) -> (Type' Resolved -> Type' Resolved) -> EntityInfo -> Module Resolved -> ([CycleWarning], [MarkNote])
 cycleNotices library expand info m =
-  (concatMap warnings fs, mapMaybe note marked)
+  (concatMap warnings fs <> map stray strays, mapMaybe note marked)
  where
   fs = cycleFindingsWith library expand info m
   decides = sortOn source (moduleDecides m)
@@ -545,6 +547,20 @@ cycleNotices library expand info m =
     Proved WaitsEachLap -> WaitsForTime
     Proved _ -> InputGetsSmaller
     Unproved _ -> WaitsForTime
+  -- a mark on a definition that is on no cycle, in either graph
+  members = Set.fromList (concatMap (.memberIds) fs)
+  strays =
+    [ (d, r)
+    | d <- marked, Just r <- [markOf d]
+    , not (Set.member (idOf d) members)
+    , not (Map.member (idOf d) plainComponent) ]
+  stray (d, r) = MkCycleWarning
+    { rule = decideText d
+    , at = markAt d
+    , through = []
+    , trouble = NothingToExplain
+    , marks = [(decideText d, r)]
+    }
 
 ------------------------------------------------------------------------
 -- The graph

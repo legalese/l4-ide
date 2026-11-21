@@ -982,11 +982,33 @@ spec = describe "cycle report (#1075 layer 2)" do
       for_ ["Alice ticks", "I could check that it comes to an end: each new copy waits, for an event or for time to pass, so a run over a list of events reaches an answer."] \ needle ->
         t `shouldSatisfy` Text.isInfixOf needle
 
-    it "on a rule that never leads back to itself, changes nothing and says so (the printed condition, read literally)" do
+    it "on a rule L4 finds no way back to itself from, is a warning of its own, beside its note (decided by Claude 2026-11-22, pending Meng's review)" do
       let src = people <> "@ends-because it ends\nGIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS n PLUS 1"
-      notices src `shouldReturn` [("on no cycle", "f")]
+      notices src `shouldReturn` [("nothing to explain", "f"), ("on no cycle", "f")]
+      noticeSeverities src `shouldReturn` [SWarn, SInfo]
       t <- noticeText src
       t `shouldSatisfy` Text.isInfixOf "I find no way for `f` to lead back to itself, so the mark changes nothing.\nI cannot see a loop that goes through a rule kept in a record or passed in as an input."
+      for_ [ "I see nothing for the mark to explain"
+           , "if `f` leads back to itself that way, the mark is where it belongs"
+           ] \ needle ->
+        t `shouldSatisfy` Text.isInfixOf needle
+      t `shouldSatisfy` (not . Text.isInfixOf "remove it")
+
+    it "on a rule whose loop goes through a rule kept in a record, says the mark may be right, and not to remove it" do
+      let src = people
+            <> "DECLARE Box HAS run IS A FUNCTION FROM Box TO DEONTIC Person Action\n\n"
+            <> "GIVEN g IS A FUNCTION FROM Box TO DEONTIC Person Action\n      b IS A Box\nGIVETH A DEONTIC Person Action\napply g b MEANS g b\n\n"
+            <> "@ends-because Alice ticks before the second deadline\nGIVEN b IS A Box\nGIVETH A DEONTIC Person Action\nx b MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST apply (b's run) b\n\n"
+            <> "GIVETH A DEONTIC Person Action\nstart MEANS x (Box x)"
+      notices src `shouldReturn` [("nothing to explain", "x"), ("on no cycle", "x")]
+      t <- noticeText src
+      for_ [ "@ends-because is above `x`, but I find no way for `x` to lead back to itself, so I see nothing for the mark to explain."
+           , "I cannot see a loop that goes through a rule kept in a record or passed in as an input: if `x` leads back to itself that way, the mark is where it belongs, and if not, move it to the rule it explains."
+           , "I find no way for `x` to lead back to itself, so the mark changes nothing."
+           , "I cannot see a loop that goes through a rule kept in a record or passed in as an input."
+           ] \ needle ->
+        t `shouldSatisfy` Text.isInfixOf needle
+      t `shouldSatisfy` (not . Text.isInfixOf "remove")
 
     it "on a WHERE name read through, on the lap, is on the cycle, and not the rule reported on" do
       let src = people <> "GIVEN d IS A NUMBER GIVETH A DEONTIC Person Action\nz d MEANS PARTY Alice MUST tick WITHIN d LEST next\n  WHERE\n    @ends-because d halves\n    next MEANS z (d DIVIDED BY 2)"
@@ -994,9 +1016,9 @@ spec = describe "cycle report (#1075 layer 2)" do
       t <- noticeText src
       t `shouldSatisfy` Text.isInfixOf "The @ends-because above `next` does not count here"
 
-    it "on a WHERE name read through, off any lap, is on no cycle" $
+    it "on a WHERE name read through, off any lap, is a stray" $
       notices (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS m PLUS 1\n  WHERE\n    @ends-because it ends\n    m MEANS n TIMES 2")
-        `shouldReturn` [("on no cycle", "m")]
+        `shouldReturn` [("nothing to explain", "m"), ("on no cycle", "m")]
 
     it "leaves exactly one note per mark, each at information level and carrying its reason" $
       for_
@@ -1205,6 +1227,7 @@ notices source = map summary <$> cycleDiagnostics source
     CouldNotCheckThat _ -> "could not check"
     GivesNoTime _ -> "no time"
     StartsCopies _ -> "multiplies"
+    NothingToExplain -> "nothing to explain"
 
 noticeText :: Text -> IO Text
 noticeText source = Text.unlines . concatMap (\ e -> prettyCheckError e.kind) <$> cycleDiagnostics source
