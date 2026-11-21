@@ -734,6 +734,14 @@ spec = describe "cycle report (#1075 layer 2)" do
         sort (earnedByBody i m)
           `shouldBe` maybe [] (sort . Set.toList) (Map.lookup (name <> ".l4") trustedLibrary)
 
+    it "and leave out a name one of whose definitions does not earn its credit" $ do
+      -- both helpers walk the list themselves, as a library's must: the
+      -- check reads a library with no other library trusted
+      let walk name = name <> " f xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN TRUE\n  WHEN y FOLLOWED BY ys THEN f y AND " <> name <> " f ys\n\n"
+          sig = "GIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\n"
+      (_, i, m) <- checked ("IMPORT prelude\n\n" <> sig <> "GIVETH A BOOLEAN\n" <> walk "holds" <> sig <> "      n IS A NUMBER\nGIVETH A BOOLEAN\nholds f xs n MEANS f TBD\n\n" <> sig <> "GIVETH A BOOLEAN\n" <> walk "kept")
+      earnedByBody i m `shouldBe` ["kept"]
+
     it "include map, and leave out a function whose body reads as no more than its type (sortBy)" $ do
       let listed = Map.findWithDefault Set.empty "prelude.l4" trustedLibrary
       (Set.member "map" listed, Set.member "sortBy" listed) `shouldBe` (True, False)

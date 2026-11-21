@@ -1689,15 +1689,16 @@ moduleTrust library info m = trustIn honest
     | otherwise = trustedIn library f
 
 -- | The module's definitions whose bodies earn every credit their declared
--- types give, by name: for a library, what 'trustedLibrary' must list.
+-- types give, by name: for a library, what 'trustedLibrary' must list. A
+-- name is listed only when every top-level definition of it that has a
+-- credit earns all of it, since 'trustedIn' trusts the name.
 earnedByBody :: EntityInfo -> Module Resolved -> [Text]
-earnedByBody info m = nubOrd
-  [ decideText d
-  | d <- moduleTops m
-  , let cs = typeCredits info (decideName d) (length (valueParams d))
-  , not (null cs)
-  , all (kept d) cs ]
+earnedByBody info m = [name | (name, verdicts) <- Map.toList byName, not (null verdicts), and verdicts]
  where
+  byName = Map.fromListWith (<>)
+    [ (decideText d, [all (kept d) cs | not (null cs)])
+    | d <- moduleTops m
+    , let cs = typeCredits info (decideName d) (length (valueParams d)) ]
   trust = moduleTrust (const Nothing) info m
   kept d c =
     let n = length (valueParams d)
