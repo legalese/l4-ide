@@ -485,7 +485,7 @@ jl4PrettyLayoutRoundTrip memo evalConfig inputFile = do
       mCycleReport <- lookupEnv "JL4_CYCLE_REPORT"
       for_ ((,) <$> mCycleReport <*> mtc) $ \(dir, tc) ->
         BL.writeFile (dir </> concatMap (\c -> if c == '/' then "%" else [c]) inputFile <> ".json")
-          (AP.encodePretty (map Cycles.findingJSON (Cycles.cycleFindings tc.substitution tc.entityInfo tc.module')))
+          (AP.encodePretty (map Cycles.findingJSON (Cycles.cycleFindings (JL4.applyFinalSubstitution tc.substitution (case tc.module' of MkModule _ u _ -> u)) tc.entityInfo tc.module')))
       unless (null leaked) $
         expectationFailure $
           "prettyLayout leaked an inference variable (gensym) for " <> inputFile

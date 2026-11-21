@@ -23,7 +23,11 @@ module L4.Cycles
   , Doubt (..)
   , Stall (..)
   , Fan (..)
+  , Multiplication (..)
+  , Continuation (..)
+  , Alarm (..)
   , cycleFindings
+  , alarms
   , findingClass
   , findingJSON
     -- * The graph, for the walk check
@@ -37,6 +41,7 @@ import Base
 import qualified Base.Text as Text
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
+import Data.Either (partitionEithers)
 import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -47,10 +52,9 @@ import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
 import L4.TypeCheck.Environment
   ( andUnique, contractUnique, evalContractUnique, geqUniques, gtUniques, leqUniques
-  , ltUniques, minusUnique, notUnique, orUnique, plusUnique )
-import L4.TypeCheck (applyFinalSubstitution)
+  , listUnique, ltUniques, minusUnique, notUnique, orUnique, plusUnique )
 import L4.TypeCheck.Environment.TH (builtinUri)
-import L4.TypeCheck.Types (CheckEntity (..), EntityInfo, Substitution)
+import L4.TypeCheck.Types (CheckEntity (..), EntityInfo)
 
 ------------------------------------------------------------------------
 -- Findings
@@ -67,8 +71,52 @@ data Finding = MkFinding
     -- again (see Note [Fan-out])
   , nests   :: Bool
     -- ^ a lap can start another cycle of obligations (see Note [Fan-out])
+  , multiplies :: Maybe Multiplication
+    -- ^ a continuation that, firing once, starts two or more copies of the
+    -- cycle at once (see Note [What multiplies])
   }
   deriving stock (Eq, Show)
+
+-- | A @HENCE@, @LEST@ or @RECORD … HENCE@ whose expression joins two or more
+-- direct calls of the cycle's members with @RAND@ or @ROR@.
+data Multiplication = MkMultiplication
+  { rule      :: Text
+    -- ^ the member whose body holds the continuation
+  , at        :: Maybe SrcRange
+    -- ^ the continuation's expression
+  , operator  :: Text
+    -- ^ @RAND@, @ROR@, or @RAND and ROR@
+  , copies    :: Int
+    -- ^ how many calls of members the expression joins
+  , via       :: Continuation
+  , stepsDown :: Maybe (Text, Rational)
+    -- ^ when every copy is the rule itself, passed one parameter less a
+    -- number written out: that parameter and the number. As written, not a
+    -- proof that the parameter reaches a stop
+  }
+  deriving stock (Eq, Show)
+
+-- | Which continuation, with the modal of the obligation it belongs to.
+data Continuation = HenceOf DeonticModal | LestOf DeonticModal | AfterRecord
+  deriving stock (Eq, Show)
+
+-- | The three warnings a finding can draw (smucclaw/l4-ide#1075, recursion-limit
+-- ruling L3, 2026-11-20). Only a proof feeds the two that cannot be
+-- silenced: 'Multiplies' needs a 'Multiplication', 'NoTime' a lap whose every
+-- stall is a deadline that gives no time. 'CouldNotCheck' is everything else
+-- left unproved, and is the one @\@ends-because@ silences (ruling L4).
+data Alarm = Multiplies | NoTime | CouldNotCheck
+  deriving stock (Eq, Show)
+
+alarms :: Finding -> [Alarm]
+alarms f = [Multiplies | isJust f.multiplies] <> case f.verdict of
+  Unproved (Stalled ss) | all isNotPositive ss -> [NoTime]
+  Unproved _ -> [CouldNotCheck]
+  Proved _ -> []
+ where
+  isNotPositive = \ case
+    NotAfterArming _ -> True
+    _ -> False
 
 data CycleKind
   = FunctionCycle
@@ -85,7 +133,8 @@ data Proof
     -- ^ every lap round the cycle passes a continuation that waits for an
     -- event, which it consumes, or for a deadline later than the last one
   | Structural Int
-    -- ^ self-recursion on a shorter list: the parameter at this position
+    -- ^ every call passes a part of what it was given: the parameter at this
+    -- position of the first member (see Note [The function checks])
   | Countdown Int
     -- ^ self-recursion on a number that moves by a positive literal towards
     -- a literal bound it is tested against: the parameter at this position
@@ -142,13 +191,12 @@ data Fan = Fan Int | Unbounded
 
 -- | Every cycle in the module, with its verdict. Definitions are told apart by
 -- their resolved 'Unique', so overloads that share a name are separate nodes.
--- The substitution is the module's final one: the types the checker records
--- on names still hold inference variables until it is applied. The entity
--- table is the checker's, for what a type named in one holds.
-cycleFindings :: Substitution -> EntityInfo -> Module Resolved -> [Finding]
-cycleFindings subst info m@(MkModule _ uri _) = map judge sccs
+-- @expand@ applies the module's final substitution: the types the checker
+-- records on names still hold inference variables until it is applied. The
+-- entity table is the checker's, for what a type named in one holds.
+cycleFindings :: (Type' Resolved -> Type' Resolved) -> EntityInfo -> Module Resolved -> [Finding]
+cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
  where
-  expand = applyFinalSubstitution subst uri
   holds = holdsContract info
   -- may hold an obligation once instantiated: a type variable might be one
   mayHold = maybe False (\ t -> holds t || hasVariable t)
@@ -214,7 +262,7 @@ cycleFindings subst info m@(MkModule _ uri _) = map judge sccs
   -- of one function type: a parameter, or a parameter or the result
   takes p args _ = any p args
   touches p args r = any p args || p r
-  edges = moduleEdges m
+  (bursts, edges) = moduleGraph info m
   targets = Map.fromListWith Set.union [(e.from, Set.singleton e.to) | e <- edges]
   sccOf scc = Set.fromList (map (getUnique . decideName) scc)
 
@@ -239,6 +287,7 @@ cycleFindings subst info m@(MkModule _ uri _) = map judge sccs
     , verdict = v
     , fan = maximum (Fan 0 : accumulates : [fanOf mode defs 3 (Map.fromSet (const (Fan 1)) ids) (bodyOf d) | d <- scc])
     , nests = arms && any (\ other -> other /= ids && not (Set.disjoint other (reachable ids))) arming
+    , multiplies = listToMaybe (mapMaybe (multiplication defs ids) bursts)
     }
    where
     ids = sccOf scc
@@ -283,7 +332,8 @@ cycleFindings subst info m@(MkModule _ uri _) = map judge sccs
       | not (null stalledOnCycle) = Unproved (Stalled stalledOnCycle)
       | null unguardedOnCycle, restartsHere = Unproved (Stalled [OwnTrace])
       | null unguardedOnCycle = Proved WaitsEachLap
-      | any (\ e -> e.from /= e.to) unguardedOnCycle = Unproved Mutual
+      | any (\ e -> e.from /= e.to) unguardedOnCycle =
+          maybe (Unproved Mutual) Proved (descent info nullaries scc unguardedOnCycle)
       | otherwise = functionVerdict [d | d <- scc, getUnique (decideName d) `elem` map (.from) unguardedOnCycle] unguardedOnCycle
 
   -- the unguarded self-calls of each self-recursive member must all pass one
@@ -294,7 +344,12 @@ cycleFindings subst info m@(MkModule _ uri _) = map judge sccs
 
   selfProof es d =
     let calls = [e | e <- es, e.from == getUnique (decideName d)]
-    in asum [structural d calls, countdown d calls]
+    in asum [descent info nullaries [d] calls, countdown constants d calls]
+  -- the bodies of the definitions that take no argument
+  nullaries = Map.fromList [(getUnique (decideName d), bodyOf d) | d <- decides, null (valueParams d)]
+  -- the definitions of the module that are a number written out
+  constants = Set.fromList
+    [getUnique (decideName d) | d <- decides, null (valueParams d), Lit _ NumericLit {} <- [bodyOf d]]
 
 -- | Does this edge lie on a cycle of the given edges: does its target reach
 -- its source?
@@ -311,8 +366,14 @@ onCycle es e = reach Set.empty [e.to]
 -- | A short label to count findings by.
 findingClass :: Finding -> Text
 findingClass f =
-  base <> (if f.fan >= Fan 2 then "+multiplies" else "") <> (if f.nests then "+nests" else "")
+  base <> times <> (if f.nests then "+nests" else "")
  where
+  -- "+fans" is the fan count alone, high on purpose, which feeds no warning
+  -- (Note [Fan-out]); "+multiplies" is the proof (Note [What multiplies])
+  times
+    | isJust f.multiplies = "+multiplies"
+    | f.fan >= Fan 2 = "+fans"
+    | otherwise = ""
   k = case f.kind of
     FunctionCycle -> "function"
     ObligationCycle -> "obligation"
@@ -338,7 +399,18 @@ findingJSON f = Aeson.object
       Fan n -> Aeson.toJSON n
       Unbounded -> Aeson.String "unbounded"
   , "nests" .= f.nests
+  , "warnings" .= map (Text.textShow) (alarms f)
+  , "multiplies" .= fmap multiplicationJSON f.multiplies
   ]
+ where
+  multiplicationJSON x = Aeson.object
+    [ "rule" .= x.rule
+    , "line" .= fmap (\ r -> r.start.line) x.at
+    , "operator" .= x.operator
+    , "copies" .= x.copies
+    , "via" .= Text.textShow x.via
+    , "stepsDown" .= fmap fst x.stepsDown
+    ]
 
 ------------------------------------------------------------------------
 -- The graph
@@ -417,12 +489,87 @@ data Edge = MkEdge
     -- ^ the arguments, by the callee's parameter position
   , conds :: [(Bool, Expr Resolved)]
     -- ^ the IF tests the reference sits under, each with the branch taken
+  , elements :: [(Int, Expr Resolved)]
+    -- ^ for a definition passed by name to a function that can hand it only
+    -- the elements of a list (@map `the child and his descendants` xs@): the
+    -- parameter position the elements go to, and the list
   }
 
+-- | A continuation whose expression joins two or more calls of the module's
+-- definitions with @RAND@ or @ROR@ (Note [What multiplies]).
+data Burst = MkBurst
+  { from     :: Unique
+  , via      :: Continuation
+  , operator :: Text
+  , calls    :: [(Unique, [(Int, Expr Resolved)])]
+    -- ^ each call, with its arguments by the callee's parameter position
+  , at       :: Maybe SrcRange
+  }
+
+-- | The operands an expression joins with @RAND@ and @ROR@, and the operators
+-- that join them.
+operands :: Expr Resolved -> (Text, [Expr Resolved])
+operands x = (spell (nubOrd (ops x)), leaves x)
+ where
+  ops = \ case
+    RAnd _ a b -> "RAND" : ops a <> ops b
+    ROr _ a b -> "ROR" : ops a <> ops b
+    _ -> []
+  leaves = \ case
+    RAnd _ a b -> leaves a <> leaves b
+    ROr _ a b -> leaves a <> leaves b
+    e -> [e]
+  spell = \ case
+    [o] -> o
+    _ -> "RAND and ROR"
+
+-- | An operand that is a call: the name called, and its arguments by the
+-- callee's parameter position.
+directCall :: Expr Resolved -> Maybe (Resolved, [(Int, Expr Resolved)])
+directCall = \ case
+  App _ f es -> Just (f, zip [0 ..] es)
+  AppNamed _ f nes order -> Just (f, named nes order)
+  _ -> Nothing
+
+-- | A continuation of a member that starts two or more copies of the cycle at
+-- once: two or more of the calls it joins are of members.
+multiplication :: Map Unique (Decide Resolved) -> Set Unique -> Burst -> Maybe Multiplication
+multiplication defs ids b
+  | Set.member b.from ids, length inCycle >= 2, Just d <- Map.lookup b.from defs =
+      Just MkMultiplication
+        { rule = decideText d
+        , at = b.at
+        , operator = b.operator
+        , copies = length inCycle
+        , via = b.via
+        , stepsDown = steps d
+        }
+  | otherwise = Nothing
+ where
+  inCycle = [c | c@(u, _) <- b.calls, Set.member u ids]
+  -- every copy is the rule itself, passed one parameter less the same
+  -- positive number written out
+  steps d = case nubOrd (map (step d) inCycle) of
+    [Just (k, r)] | Just p <- listToMaybe (drop k (valueParams d)) ->
+      Just (unqualifiedNameToText (getOriginal p), r)
+    _ -> Nothing
+  step d (u, as)
+    | u /= b.from = Nothing
+    | otherwise = listToMaybe
+        [ (k, r)
+        | (k, p) <- zip [0 ..] (valueParams d)
+        , Just x <- [lookup k as]
+        , Just (OpMinus, App _ v [], Lit _ (NumericLit _ r)) <- [binary x]
+        , getUnique v == getUnique p, r > 0 ]
+
 -- | Every definition of the module: top-level, in sections, and every
--- WHERE\/LET definition inside them.
+-- WHERE\/LET definition inside them but the ones a definition written as
+-- clauses is compiled to (@the result of clause 2@, marked 'PmSynthetic').
+-- Those are part of the definition they were written in: the walk reads each
+-- one's body where it is bound, so a definition written as clauses is one
+-- node, as it is one rule to its author.
 moduleDecides :: Module Resolved -> [Decide Resolved]
-moduleDecides (MkModule _ _ sec) = tops <> concatMap locals tops
+moduleDecides (MkModule _ _ sec) = tops <> filter (not . clausePart) (concatMap locals tops)
  where
   tops = sectionDecides sec
   sectionDecides (MkSection _ _ _ _ tds) = concatMap topDecides tds
@@ -436,11 +583,20 @@ moduleDecides (MkModule _ _ sec) = tops <> concatMap locals tops
     LetIn _ ds _ -> [d | LocalDecide _ d <- ds]
     _ -> []
 
+-- | A binding a definition written as clauses was compiled to.
+clausePart :: Decide Resolved -> Bool
+clausePart d = isJust (view annPmSynthetic (getAnno d))
+
 -- | Every reference from a definition of the module to another (or itself),
 -- each labelled. A WHERE\/LET definition's body is walked as its own node, not
 -- as part of the body that holds it.
-moduleEdges :: Module Resolved -> [Edge]
-moduleEdges m = concatMap edgesOf decides
+moduleEdges :: EntityInfo -> Module Resolved -> [Edge]
+moduleEdges info = snd . moduleGraph info
+
+-- | The edges, and every continuation whose expression joins two or more
+-- calls of the module's definitions (Note [What multiplies]).
+moduleGraph :: EntityInfo -> Module Resolved -> ([Burst], [Edge])
+moduleGraph info m = partitionEithers (concatMap edgesOf decides)
  where
   decides = moduleDecides m
   nodes = Set.fromList (map (getUnique . decideName) decides)
@@ -461,9 +617,18 @@ moduleEdges m = concatMap edgesOf decides
     -- own result: IF and CONSIDER branches, a WHERE or LET body, RAND and ROR
     -- operands. Anywhere else (an argument, a scrutinee, a function value) the
     -- obligation is handed on by whatever receives it, so it is Nothing.
-    go :: Maybe When -> [Slot] -> [(Bool, Expr Resolved)] -> Expr Resolved -> [Edge]
+    go :: Maybe When -> [Slot] -> [(Bool, Expr Resolved)] -> Expr Resolved -> [Either Burst Edge]
     go od ss cs e = case e of
-      App _ f es -> ref f (zip [0 ..] es) <> concatMap (go Nothing ss cs) es
+      App _ f es ->
+        let byName =
+              [ (i, g, q, x)
+              | (i, q, j) <- elementParameters info f (length es)
+              , App _ g [] <- take 1 (drop i es), Set.member (getUnique g) nodes
+              , x <- take 1 (drop j es) ]
+            named' = Set.fromList [i | (i, _, _, _) <- byName]
+        in ref f (zip [0 ..] es)
+             <> concat [refElements g [(q, x)] | (_, g, q, x) <- byName]
+             <> concat [go Nothing ss cs x | (i, x) <- zip [0 ..] es, not (Set.member i named')]
       AppNamed _ f nes order ->
         ref f (named nes order) <> concat [go Nothing ss cs x | MkNamedExpr _ _ x <- nes]
       -- a projection onto a computed field calls the selector the field's
@@ -487,19 +652,39 @@ moduleEdges m = concatMap edgesOf decides
       Record _ recipient cell value _ mhence ->
         concatMap (go Nothing ss cs) (maybeToList recipient <> [cell, value])
           <> foldMap (go Nothing (ss <> [Stalls RecordHence]) cs) mhence
+          <> foldMap (burst (Stalls RecordHence) AfterRecord) mhence
       Where _ body _ -> go od ss cs body
-      LetIn _ _ body -> go od ss cs body
+      -- the bindings a clause group was compiled to are read where they are
+      -- bound: each stands for the clauses after one, so its value is this
+      -- expression's own result
+      LetIn _ ds body ->
+        concat [go od ss cs (bodyOf ld) | LocalDecide _ ld <- ds, clausePart ld] <> go od ss cs body
       _ -> concatMap (go Nothing ss cs) (kids e)
      where
       ref f xs
         | Set.member (getUnique f) nodes =
-            [MkEdge {from = self, to = getUnique f, slots = ss, args = xs, conds = cs}]
+            [Right MkEdge {from = self, to = getUnique f, slots = ss, args = xs, conds = cs, elements = []}]
         | otherwise = []
+      refElements g xs =
+        [Right MkEdge {from = self, to = getUnique g, slots = ss, args = [], conds = cs, elements = xs}]
+
+    -- a continuation that runs at all, whose expression joins two or more
+    -- calls of the module's definitions
+    burst slot via x = case operands x of
+      (ops, xs)
+        | NeverRuns <- slot -> []
+        | length calls >= 2 ->
+            [Left MkBurst {from = self, via = via, operator = ops, calls = calls, at = (getAnno x).range}]
+        | otherwise -> []
+       where
+        calls = [(getUnique f, as) | o <- xs, Just (f, as) <- [directCall o], Set.member (getUnique f) nodes]
 
     deonton od ss cs (MkDeonton _ subj act opens due jn hence lest) =
       concatMap (go Nothing ss cs) (kids subj <> kids act <> kids opens <> kids due <> kids jn)
         <> foldMap (go (Just deadline) (ss <> [henceSlot]) cs) hence
         <> foldMap (go (Just deadline) (ss <> [lestSlot]) cs) lest
+        <> foldMap (burst henceSlot (HenceOf act.modal)) hence
+        <> foldMap (burst lestSlot (LestOf act.modal)) lest
      where
       -- a barrier's join can carry its own deadline beside its members': the
       -- earlier one fires the continuation
@@ -723,7 +908,9 @@ plainReferences m@(MkModule _ _ sec) =
 -- takes the larger of its HENCE and LEST; an UPON EACH continuation that
 -- reaches the cycle counts as unbounded, one copy per member. ROR is counted
 -- like RAND although only one side may matter, so the count may be high, never
--- low. Fan-out of two or more is reported as "+multiplies".
+-- low. It is a count for the report and feeds no warning: it is high on
+-- purpose, and a warning that cannot be silenced needs a proof (Note [What
+-- multiplies]).
 --
 -- An obligation runs once for every place it is used, so in a cycle whose laps
 -- arm obligations (an obligation cycle, or a function cycle that returns one,
@@ -889,60 +1076,127 @@ mulF (Fan a) (Fan b) = Fan (a * b)
 mulF _ _ = Unbounded
 
 ------------------------------------------------------------------------
+-- Note [What multiplies]
+------------------------------------------------------------------------
+-- A cycle multiplies when one firing of one of its continuations starts two
+-- or more copies of it at once: a @HENCE@, a @LEST@ or a @RECORD … HENCE@
+-- whose expression, read through @RAND@ and @ROR@, has two or more operands
+-- that are calls of the cycle's members (#1075's @LEST (w1 RAND w3)@, or
+-- @LEST (b (n MINUS 1) RAND b (n MINUS 1))@). Under @ROR@ every side is open
+-- until one is taken, so it counts as @RAND@ does. A continuation that never
+-- runs ('NeverRuns') starts nothing.
+--
+-- What this does not count, on purpose, so that what it does count is a
+-- proof:
+--   * calls in different continuations. @rent still owed@
+--     (doc/tutorials/obligations/several-parties.l4) is three alternatives
+--     joined by @ROR@, each calling the rule again from its own @HENCE@: one
+--     payment fires one @HENCE@ and starts one copy, so the open alternatives
+--     grow by a fixed number per event, not by a factor;
+--   * calls through a helper (@twice k MEANS k RAND k@, then @LEST (twice
+--     x)@), and calls under an @IF@ or @CONSIDER@ inside the operand. The
+--     run-time count of open obligations stops those;
+--   * function recursion that fans out (@fib@, a walk over a tree), which
+--     starts no obligation.
+-- 'stepsDown' says when every copy passes one parameter less a number
+-- written out, as the text is written; it does not prove that the parameter
+-- reaches a stop (@b n@ above stops at @n EQUALS 0@ only for a whole @n@ from
+-- 0 up).
+
+------------------------------------------------------------------------
 -- Note [The function checks]
 ------------------------------------------------------------------------
--- A cycle that passes no continuation is ordinary recursion. Two checks, both
--- for a definition that calls itself; definitions that call each other are not
--- tried (v1):
+-- A cycle that passes no continuation is ordinary recursion. Two checks:
 --
---   * structural: a COPY of the TERMINATES check in 'L4.Dmn.Analysis'
---     (selfRecursionIssues, a local there and so not importable): some
---     parameter position where every call passes a tail bound by a
---     @FOLLOWED BY@ pattern of a CONSIDER on that parameter (or on a tail of
---     it). Widened here in three ways: named application; a constructor's
---     fields (@WHEN Suc p@) and a list's head count as well as its tail, being
---     parts of the value matched; and a type parameter (@GIVEN a IS A TYPE@)
---     takes no position, since a call does not pass one. When this report
---     becomes a warning, the two copies should become one function, guarded
---     by the DMN tests, so they cannot drift.
+--   * descent: each member has a parameter position such that every call
+--     round the cycle passes, at the callee's position, a PART of what the
+--     caller was given at its own, or the very value; and every lap round the
+--     cycle passes a strict part at least once (the calls that pass the very
+--     value form no cycle of their own). A strict part of a parameter is:
+--       - a name a pattern binds inside the value a CONSIDER matches, when
+--         that value is itself a part: both sides of @FOLLOWED BY@ and the
+--         fields of a constructor (@WHEN Suc p@), but not a pattern that is a
+--         bare name for the whole value;
+--       - a stored field of a part (@t's children@): a 'Selector', never a
+--         computed field, whose MEANS can give anything;
+--       - the parameter of a function written in place (@GIVEN c YIELD …@)
+--         that is given to a function whose declared type can hand it only
+--         elements of a list it is also given, when that list is a part.
+--         Read off the callee's type, not its name: in @FOR ALL a@,
+--         @(a -> b) -> LIST OF a -> …@ with @a@ written nowhere else, the
+--         function has no @a@ to pass but the list's elements, whatever its
+--         definition says. So @map@, @any@, @all@ and @filter@ qualify, and
+--         a function of the author's own with the same type does too.
+--     Each member is tried at every position, up to 4,096 combinations.
 --     It proves the recursion ends on a finite value. A list a cycle builds
 --     from itself (@ones MEANS 1 FOLLOWED BY ones@) is not one, and that
 --     cycle is reported on its own.
+--     'L4.Dmn.Analysis' keeps its own, narrower TERMINATES check (a tail
+--     bound by @FOLLOWED BY@, on self-recursion), which decides what the DMN
+--     export will lower; this one decides only what is reported.
 --   * countdown: some parameter position where every call passes the
 --     parameter MINUS a positive number written out, under an IF that tests
 --     the parameter against a number written out from below (GREATER THAN, AT
 --     LEAST, or the negation of AT MOST or LESS THAN) — or PLUS, tested from
---     above. The bound may also be another parameter that every call passes
---     on unchanged (@range (low + 1) high@ under @IF low > high@). An equality
---     test does not prove it: @n EQUALS 0@ never holds for a negative or
---     fractional @n@.
+--     above. The bound may also be a definition of the module that is a
+--     number written out (@`Months in a year` MEANS 12@), or another
+--     parameter that every call passes on unchanged (@range (low + 1) high@
+--     under @IF low > high@). An equality test does not prove it: @n EQUALS
+--     0@ never holds for a negative or fractional @n@. Self-recursion only.
 
-structural :: Decide Resolved -> [Edge] -> Maybe Proof
-structural d calls = Structural <$> find positionOk positions
+data Grade = Strict | Weak
+  deriving stock Eq
+
+descent :: EntityInfo -> Map Unique (Expr Resolved) -> [Decide Resolved] -> [Edge] -> Maybe Proof
+descent info nullaries ds es = listToMaybe [Structural (firstPosition a) | a <- assignments, works a]
  where
-  params = valueParams d
-  positions = [0 .. length params - 1]
-  everyExpr = universeExpr (bodyOf d)
-  positionOk k = not (null calls) && all (decreases k) calls
-  decreases k e = case lookup k e.args of
-    Just (App _ v []) ->
-      Set.member (getUnique v) (Set.delete (getUnique p) (shrinking (getUnique p)))
-    _ -> False
+  key = getUnique . decideName
+  used = Set.fromList (concat [[e.from, e.to] | e <- es])
+  members = [d | d <- ds, Set.member (key d) used]
+  choices =
+    [ (key d, [(k, p, partsOf info nullaries d p) | (k, p) <- zip [0 :: Int ..] (valueParams d)])
+    | d <- members ]
+  assignments
+    | null es || product (map (length . snd) choices) > 4096 = []
+    | otherwise = map Map.fromList (traverse (\ (u, cs) -> [(u, c) | c <- cs]) choices)
+  firstPosition a = case members of
+    d : _ | Just (k, _, _) <- Map.lookup (key d) a -> k
+    _ -> 0
+  works a = all isJust grades && not (any (onCycle weak) weak)
    where
-    p = params !! k
-  -- the parameter, then the tails of every CONSIDER on something already in
-  -- the set, to a fixpoint
-  shrinking u = grow (Set.singleton u)
+    grades = map grade es
+    weak = [e | (e, Just Weak) <- zip es grades]
+    grade e = do
+      (_, p, s) <- Map.lookup e.from a
+      (k', _, _) <- Map.lookup e.to a
+      case (lookup k' e.args, lookup k' e.elements) of
+        (Just x, _)
+          | strictPart info p s x -> Just Strict
+          | partOf info p s x -> Just Weak
+        (Nothing, Just xs)
+          | elementsWithin info nullaries p s xs -> Just Strict
+        _ -> Nothing
+
+-- | The names a definition's body binds to a strict part of the value of one
+-- of its parameters (Note [The function checks]).
+partsOf :: EntityInfo -> Map Unique (Expr Resolved) -> Decide Resolved -> Resolved -> Set Unique
+partsOf info nullaries d p = grow Set.empty
+ where
+  everyExpr = universeExpr (bodyOf d)
   grow s =
-    let s' = Set.union s (Set.fromList (tailsOf s))
+    let s' = Set.union s (Set.fromList (step s))
     in if Set.size s' == Set.size s then s else grow s'
-  tailsOf s =
-    [ getUnique tb
-    | Consider _ (App _ v []) brs <- everyExpr
-    , Set.member (getUnique v) s
-    , MkBranch _ (When _ pat) _ <- brs
-    , tb <- parts pat
-    ]
+  step s =
+    [ getUnique b
+    | Consider _ x brs <- everyExpr, partOf info p s x
+    , MkBranch _ (When _ pat) _ <- brs, b <- parts pat ]
+      <> [ getUnique c
+         | App _ g xs <- everyExpr
+         , (i, q, j) <- elementParameters info g (length xs)
+         , Lam _ (MkGivenSig _ otns) _ <- take 1 (drop i xs)
+         , c <- take 1 (drop q [n | MkOptionallyTypedName _ n mty _ <- otns, not (isTypeParam mty)])
+         , x <- take 1 (drop j xs)
+         , elementsWithin info nullaries p s x ]
   -- what a pattern binds strictly inside the value it matches: both sides of
   -- a FOLLOWED BY, and the fields of a constructor, but not a pattern that is
   -- a bare name for the whole value
@@ -950,6 +1204,108 @@ structural d calls = Structural <$> find positionOk positions
     PatCons _ a b -> patBinders a <> patBinders b
     PatApp _ _ ps -> concatMap patBinders ps
     _ -> []
+  isTypeParam = \ case
+    Just (Type _) -> True
+    _ -> False
+
+-- | The parameter's value, or a part of it.
+partOf :: EntityInfo -> Resolved -> Set Unique -> Expr Resolved -> Bool
+partOf info p s = \ case
+  App _ v [] | getUnique v == getUnique p -> True
+  x -> strictPart info p s x
+
+-- | A strict part of the parameter's value.
+strictPart :: EntityInfo -> Resolved -> Set Unique -> Expr Resolved -> Bool
+strictPart info p s = \ case
+  App _ v [] -> Set.member (getUnique v) s
+  Proj _ x l -> storedField info l && partOf info p s x
+  App _ f [x] -> storedField info f && partOf info p s x
+  _ -> False
+
+-- | Every element of the list is a strict part of the parameter's value: the
+-- list is a part; or it is what a function gives whose declared type lets it
+-- give only elements of one list it is given (@filter@: see
+-- 'resultSource'), when that list's elements are; or it is a definition with
+-- no parameters whose body is such a list (@`the stocks` MEANS filter …@).
+-- Read three definitions deep.
+elementsWithin :: EntityInfo -> Map Unique (Expr Resolved) -> Resolved -> Set Unique -> Expr Resolved -> Bool
+elementsWithin info nullaries p s = go (3 :: Int)
+ where
+  go depth x
+    | partOf info p s x = True
+    | depth <= 0 = False
+    | otherwise = case x of
+        App _ v [] | Just b <- Map.lookup (getUnique v) nullaries -> go (depth - 1) b
+        App _ h xs | [j] <- resultSource info h (length xs), y <- xs !! j -> go (depth - 1) y
+        _ -> False
+
+-- | For a function of @n@ arguments whose declared type gives a @LIST OF a@
+-- that can hold only elements of one argument, a @LIST OF a@: that argument's
+-- position. @a@ is a type variable of the function's @FOR ALL@, and every
+-- other argument either does not mention it or is a function that only
+-- takes an @a@ (a test, as @filter@'s), so the function has no @a@ to put
+-- in what it gives but that list's elements.
+resultSource :: EntityInfo -> Resolved -> Int -> [Int]
+resultSource info h n = case Map.lookup (getUnique h) info of
+  Just (_, KnownTerm (Forall _ vs (Fun _ args (TyApp _ l [TyApp _ a []]))) _)
+    | length args == n, getUnique l == listUnique, getUnique a `elem` map getUnique vs ->
+        let u = getUnique a
+            tys = [t | MkOptionallyNamedType _ _ t <- args]
+            listOfA = \ case
+              TyApp _ l' [TyApp _ a' []] -> getUnique l' == listUnique && getUnique a' == u
+              _ -> False
+            onlyTakes = \ case
+              Fun _ largs r ->
+                occurrences u r == 0
+                  && and [isBare t || occurrences u t == 0 | MkOptionallyNamedType _ _ t <- largs]
+              t -> occurrences u t == 0
+            isBare = \ case
+              TyApp _ _ [] -> True
+              _ -> False
+        in case [j | (j, t) <- zip [0 ..] tys, listOfA t] of
+             [j] | and [onlyTakes t | (k, t) <- zip [0 ..] tys, k /= j] -> [j]
+             _ -> []
+  _ -> []
+
+-- | How often a type variable is written in a type.
+occurrences :: Unique -> Type' Resolved -> Int
+occurrences u = \ case
+  TyApp _ v ts -> (if getUnique v == u then 1 else 0) + sum (map (occurrences u) ts)
+  Fun _ as r -> sum [occurrences u t | MkOptionallyNamedType _ _ t <- as] + occurrences u r
+  Forall _ _ t -> occurrences u t
+  _ -> 0
+
+-- | A field a constructor stores, not a computed one.
+storedField :: EntityInfo -> Resolved -> Bool
+storedField info f = Selector `elem` kinds && ComputedSelector `notElem` kinds
+ where
+  kinds = catMaybes
+    [ case infoOf f of
+        Just (TypeInfo _ k) -> k
+        _ -> Nothing
+    , case Map.lookup (getUnique f) info of
+        Just (_, KnownTerm _ k) -> Just k
+        _ -> Nothing ]
+
+-- | For a function of @n@ arguments whose declared type can hand a function
+-- argument only the elements of a list argument: the function argument's
+-- position, its parameter's, and the list's. The type is @FOR ALL@ some @a@,
+-- the function argument takes an @a@, another argument is a @LIST OF a@, and
+-- @a@ is written nowhere else among the arguments, so the function has no @a@
+-- to pass but the list's elements.
+elementParameters :: EntityInfo -> Resolved -> Int -> [(Int, Int, Int)]
+elementParameters info g n = case Map.lookup (getUnique g) info of
+  Just (_, KnownTerm (Forall _ vs (Fun _ args _)) _) | length args == n ->
+    let tys = [t | MkOptionallyNamedType _ _ t <- args]
+        vars = Set.fromList (map getUnique vs)
+    in [ (i, q, j)
+       | (i, Fun _ largs _) <- zip [0 ..] tys
+       , (q, TyApp _ a []) <- zip [0 ..] [t | MkOptionallyNamedType _ _ t <- largs]
+       , Set.member (getUnique a) vars
+       , (j, TyApp _ l [TyApp _ a' []]) <- zip [0 ..] tys
+       , getUnique l == listUnique, getUnique a' == getUnique a
+       , sum (map (occurrences (getUnique a)) tys) == 2 ]
+  _ -> []
 
 -- | Every name a pattern binds.
 patBinders :: Pattern Resolved -> [Resolved]
@@ -960,8 +1316,8 @@ patBinders = \ case
   PatExpr _ _ -> []
   PatLit _ _ -> []
 
-countdown :: Decide Resolved -> [Edge] -> Maybe Proof
-countdown d calls = Countdown <$> find positionOk positions
+countdown :: Set Unique -> Decide Resolved -> [Edge] -> Maybe Proof
+countdown constants d calls = Countdown <$> find positionOk positions
  where
   params = valueParams d
   positions = [0 .. length params - 1]
@@ -985,11 +1341,11 @@ countdown d calls = Countdown <$> find positionOk positions
     isU = \ case
       App _ v [] -> getUnique v == u
       _ -> False
-    -- a bound that does not move: a number written out, or another parameter
-    -- that every call passes on unchanged
+    -- a bound that does not move: a number written out, a definition that is
+    -- one, or another parameter that every call passes on unchanged
     isLit = \ case
       Lit _ NumericLit {} -> True
-      App _ v [] -> Set.member (getUnique v) fixed
+      App _ v [] -> Set.member (getUnique v) fixed || Set.member (getUnique v) constants
       _ -> False
     fixed = Set.fromList
       [ getUnique p
