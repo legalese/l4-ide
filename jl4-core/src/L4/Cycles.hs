@@ -1059,7 +1059,10 @@ plainReferences m@(MkModule _ _ sec) =
 --     lambda that is.
 --
 -- Decided by Claude 2026-11-21, pending Meng's review, on the attack
--- round's report. Its cost in proofs over the corpus: not yet measured.
+-- round's report. Its cost in proofs, measured on 2026-11-21 by `l4 check` over
+-- every tracked .l4 file (1,584 modules, the libraries included) with this
+-- rule and with it switched off: none. No cycle there changes class; the
+-- attack round's p10 does, as a control that the switch took.
 
 ------------------------------------------------------------------------
 -- Note [Fan-out]
@@ -1353,6 +1356,11 @@ mulF _ _ = Unbounded
 -- there. A library is recognised by its URI ('libraryFile'): the copy
 -- compiled into the binary, or a file under a checkout's
 -- @jl4-core/libraries@.
+--
+-- Its cost in proofs, measured on 2026-11-21 by `l4 check` over every
+-- tracked .l4 file (1,584 modules, the libraries included) with this rule
+-- and without it: none. No cycle there changes class; the attack round's
+-- p12 does, as a control that the switch took.
 --
 -- Where this goes wrong, sorted by how it shows:
 --   * Loud, as "could not check": a function that does pass only the list's
