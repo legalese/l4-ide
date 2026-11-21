@@ -49,6 +49,7 @@ could-not-check.l4:71:1-42:
 could-not-check.l4:85:1-14:
   `instalments` can start itself again: a HENCE or LEST in it leads back to `instalments`.
   I could not check that this comes to an end, because `instalments` also uses itself directly, with no duty in between, and there I could not find an input that gets smaller each time, towards a stop.
+  The doubt is about that direct use of itself, not about a HENCE or LEST.
   
   If it does come to an end, say why on a line of its own above `instalments`, like this:
   

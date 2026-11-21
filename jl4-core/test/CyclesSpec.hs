@@ -865,6 +865,15 @@ spec = describe "cycle report (#1075 layer 2)" do
       t <- noticeText (people <> "GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\na n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE b (n MINUS 1)) RAND a (n MINUS 1)\n\nGIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)")
       t `shouldSatisfy` Text.isInfixOf "I could not check that this comes to an end, because `a` and `b` also use themselves directly, with no duty in between"
 
+    it "could not check, on a rule that uses itself directly: the doubt is about that direct use, not about a HENCE or LEST (decided by Claude 2026-11-21, pending Meng's review)" do
+      for_ [ ("GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nmix n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE mix (n MINUS 1)) RAND mix (n MINUS 1)", "The doubt is about that direct use of itself, not about a HENCE or LEST.")
+           , ("GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\na n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)\n\nGIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE a (n MINUS 1)", "The doubt is about those direct uses of each other, not about a HENCE or LEST.")
+           , ("GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\na n MEANS PARTY Alice MUST tick WITHIN 1 HENCE b n\n\nGIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)", "The doubt is about that direct use of itself, not about a HENCE or LEST.")
+           , ("GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\na n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE b (n MINUS 1)) RAND a (n MINUS 1)\n\nGIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)", "The doubt is about those direct uses, not about a HENCE or LEST.")
+           ] \ (rules, doubt) -> do
+        t <- noticeText (people <> rules)
+        t `shouldSatisfy` Text.isInfixOf doubt
+
     it "no time: WITHIN 0 LEST its own rule, and the text names no annotation when there is none" do
       notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 0 LEST x")
         `shouldReturn` [("no time", "x")]

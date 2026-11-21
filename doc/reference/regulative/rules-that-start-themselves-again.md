@@ -89,6 +89,7 @@ When the wait is anything else, the warning says which, and why that may not be 
 | the file may run a contract with `EVALTRACE`                | on a trace that starts again, no wait limits how many times it can start |
 
 It can also say that a rule on the loop uses itself directly, with no duty in between, in a way it cannot check, and it names that rule, which need not be the one the warning is shown on.
+Then the doubt is about that direct use, not about a `HENCE` or `LEST`, and the warning says so; `@ends-because` answers it as it answers any other "could not check".
 Or it can say that the rule uses another rule passed in as an input or kept in a record, which it cannot follow.
 
 If the rule should not go on like this, change it so that each copy waits: here, `WITHIN 7` instead of `WITHIN days`.

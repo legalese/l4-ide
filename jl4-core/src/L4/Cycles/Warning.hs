@@ -377,17 +377,24 @@ couldNotCheck :: Text -> Doubt -> [Text]
 couldNotCheck opening = \ case
   Stalled [s] -> [opening <> ", because " <> stallReason s <> "."]
   Stalled ss -> (opening <> ", because:") : ["  - " <> stallReason s | s <- ss]
+  -- Reached only when no lap through a HENCE or LEST stalls (the verdict's
+  -- guards in "L4.Cycles" report a stall first), so the doubt is about the
+  -- direct uses alone, and each reason's second line says so (decided by Claude
+  -- 2026-11-21, pending Meng's review).
   Mutual ->
     [ opening <> ", because two or more of them also use each other directly, with no duty in between, and I do not check that kind of loop."
+    , "The doubt is about those direct uses of each other, not about a HENCE or LEST."
     ]
   -- The rules that use themselves are named, never "it": the warning is
   -- shown on the cycle's first rule, which may only hand on to them by a
   -- HENCE or LEST.
   NoMeasure [r] ->
     [ opening <> ", because " <> quoted r <> " also uses itself directly, with no duty in between, and there I could not find an input that gets smaller each time, towards a stop."
+    , "The doubt is about that direct use of itself, not about a HENCE or LEST."
     ]
   NoMeasure rs ->
     [ opening <> ", because " <> quotedList rs <> " also use themselves directly, with no duty in between, and there I could not find an input that gets smaller each time, towards a stop."
+    , "The doubt is about those direct uses, not about a HENCE or LEST."
     ]
   Untraced -> [opening <> ", because it uses a rule kept in a record field or passed in as an input, which I cannot follow, so there may be another way round that I cannot see."]
 

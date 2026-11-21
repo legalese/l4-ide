@@ -474,6 +474,7 @@ Every mark still gets one information message carrying its reason and saying wha
 A file with an error gets none of these warnings or messages.
 
 When "could not check" is about a rule that uses itself directly, the warning names that rule, which need not be the one it is shown on.
+The doubt is then about that direct use, not about a `HENCE` or `LEST`, and the warning says so; a mark answers it as it answers any other "could not check".
 
 ---
 
