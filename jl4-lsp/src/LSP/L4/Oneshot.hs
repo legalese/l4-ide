@@ -3,7 +3,7 @@ module LSP.L4.Oneshot where
 import qualified LSP.Core.FileStore as Store
 import qualified LSP.Core.Shake as Shake
 import LSP.Core.Types.Location (normalizeFilePath)
-import LSP.Logger (Pretty, Recorder, WithPriority, cmapWithPrio, makeRefRecorder, pretty)
+import LSP.Logger (Pretty, Recorder, WithPriority, cmapWithPrio, makeKeyedRefRecorder, pretty)
 
 import qualified LSP.L4.Rules as Rules
 
@@ -56,9 +56,11 @@ oneshotL4ActionAndErrors = oneshotL4ActionAndErrorsIn Rules.AmbientLibraries
 -- that nothing on the host can stand in for the stdlib.
 oneshotL4ActionAndErrorsIn :: Rules.LibraryScope -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO ([Text], b)
 oneshotL4ActionAndErrorsIn scope evalConfig fp act = do
-  (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
+  -- Only the last list of each file's diagnostics, where it falls in the log,
+  -- as the CLI prints it ('latestDiagnostics'; smucclaw/l4-ide#1082).
+  (getLog, recorder) <- makeKeyedRefRecorder diagnosticsOf pretty
   (_diags, res) <- oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act
-  errs <- getLog
+  errs <- latestDiagnostics <$> getLog
   pure (errs, res)
 
 -- | 'oneshotL4ActionAndErrors' plus the structured diagnostics.
@@ -90,9 +92,10 @@ oneshotL4ActionAndDiagnosticsIn
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], [FileDiagnostic], b)
 oneshotL4ActionAndDiagnosticsIn scope evalConfig fp act = do
-  (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
+  -- as in 'oneshotL4ActionAndErrorsIn'
+  (getLog, recorder) <- makeKeyedRefRecorder diagnosticsOf pretty
   (diags, res) <- oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act
-  errs <- getLog
+  errs <- latestDiagnostics <$> getLog
   pure (errs, diags, res)
 
 oneshotL4Action :: Recorder (WithPriority Log) -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO b

@@ -178,6 +178,7 @@ test-suite jl4-lsp-test
     LadderAtomIdSpec
     LadderCallExpansionSpec
     LadderTermKeySpec
+    LatestDiagnosticsSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
     ProvisionEditorSpec
