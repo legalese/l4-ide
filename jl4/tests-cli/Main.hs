@@ -876,6 +876,30 @@ spec bin = do
       serr `shouldSatisfy` ("lint/export-untyped-given" `isInfixOf`)
       sout `shouldSatisfy` ("Result:\n  7" `isInfixOf`) . filter (/= '\r')
 
+    -- Each time a file's diagnostics change, the pipeline logs all of them
+    -- again, and l4 run and l4 check printed every list: l4 run printed a
+    -- type checker's warning three times and an export error and the
+    -- untyped-GIVEN warning twice, l4 check the type checker's warning twice
+    -- (review of #779, 2026-11-21). Only the last list of a file is printed.
+    it "prints each diagnostic once, on l4 run and l4 check, and in --json" $ do
+      let file = fixtureDir </> "run-diagnostics-once.l4"
+          occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+          codes = ["Code:     lint/non-exhaustive-match", "Code:     check/export-function-input", "Code:     lint/export-untyped-given"]
+      Output runCode runOut runErr <- runL4 bin ["run", file]
+      runCode `shouldBe` ExitFailure 1
+      map (`occurrences` runErr) codes `shouldBe` [1, 1, 1]
+      runOut `shouldSatisfy` ("Result:\n  1" `isInfixOf`) . filter (/= '\r')
+      Output checkCode _ checkErr <- runL4 bin ["check", file]
+      checkCode `shouldBe` ExitFailure 1
+      map (`occurrences` checkErr) codes `shouldBe` [1, 1, 1]
+      Output _ runJson _ <- runL4 bin ["run", "--json", file]
+      map (`occurrences` runJson) codes `shouldBe` [1, 1, 1]
+    it "still prints a type error once, on l4 run and l4 check" $
+      forM_ ["run", "check"] \cmd -> do
+        Output code _ serr <- runL4 bin [cmd, errorFixture]
+        code `shouldBe` ExitFailure 1
+        length (filter ("Code:     check/type-mismatch" `isPrefixOf`) (tails serr)) `shouldBe` 1
+
     it "emits a well-shaped JSON envelope on a clean file" $ do
       env <- jsonEnvelope bin ["run", cleanFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool True)
