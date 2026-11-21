@@ -53,7 +53,7 @@ Flattened into one boolean expression:
 -- Correct, but the structure is lost
 DECIDE `may drive (flattened)` IF
     `holds licence`
-    AND (NOT `licence suspended` OR `suspension stayed by court order`)
+    AND ((NOT `licence suspended`) OR `suspension stayed by court order`)
 ```
 
 This is correct, but the drafting structure is gone. Nothing in the code corresponds to "the suspension provision"; the exception-to-the-exception has been absorbed into a `NOT … OR …` that has to be mentally re-derived to check against the text. When the legislature adds a second stay condition, there is no obvious place to put it.
