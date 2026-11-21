@@ -1,0 +1,39 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+jsondecode-temporal-forms.l4:26:1-35:
+  RIGHT OF (DATE OF 5, 1, 2026)
+jsondecode-temporal-forms.l4:27:1-47:
+  RIGHT OF (DATE OF 31, 1, 2026)
+jsondecode-temporal-forms.l4:28:1-43:
+  RIGHT OF (DATE OF 31, 1, 2026)
+jsondecode-temporal-forms.l4:29:1-30:
+  RIGHT OF (TIME OF 1, 5, 0.0)
+jsondecode-temporal-forms.l4:30:1-36:
+  RIGHT OF (TIME OF 10, 30, 0.0)
+jsondecode-temporal-forms.l4:31:1-41:
+  RIGHT OF (TIME OF 10, 30, 15.5)
+jsondecode-temporal-forms.l4:32:1-41:
+  RIGHT OF (TIME OF 10, 30, 0.0)
+jsondecode-temporal-forms.l4:33:1-50:
+  RIGHT OF (TIME OF 10, 30, 0.0)
+jsondecode-temporal-forms.l4:34:1-54:
+  RIGHT OF (2026-01-31T10:30:00+0000)
+jsondecode-temporal-forms.l4:35:1-47:
+  RIGHT OF (2026-01-31T10:30:00+0000)
+jsondecode-temporal-forms.l4:36:1-52:
+  RIGHT OF (2026-01-31T10:30:00+0000)
+jsondecode-temporal-forms.l4:37:1-65:
+  RIGHT OF (2026-01-31T10:30:00+0800)
+jsondecode-temporal-forms.l4:38:1-57:
+  RIGHT OF "Asia/Singapore"
+jsondecode-temporal-forms.l4:39:1-24:
+  NOTHING
+jsondecode-temporal-forms.l4:41:1-40:
+  Could not parse date string '2026-01-31xyz'. Expected format: YYYY-MM-DD
+jsondecode-temporal-forms.l4:42:1-39:
+  Could not parse time string '10:30:00 xyz'. Expected format: HH:MM:SS or HH:MM
+jsondecode-temporal-forms.l4:43:1-62:
+  Could not parse datetime string '2026-01-31 10:30 Asia/Singapore'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ
+jsondecode-temporal-forms.l4:44:1-46:
+  Could not parse datetime string '2026-01-3110:30'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ

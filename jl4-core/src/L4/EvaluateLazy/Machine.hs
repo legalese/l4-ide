@@ -28,6 +28,11 @@ module L4.EvaluateLazy.Machine
 , parseDateText
 , parseTimeText
 , parseDatetimeText
+-- * The string readers JSONDECODE reads a DATE, a TIME and a DATETIME with,
+-- for callers that must read what it reads (jl4-service's direct path).
+, jsonDateText
+, jsonTimeText
+, jsonDatetimeText
 -- * A JSON value in an error message, as JSONDECODE's errors write it.
 , jsonForMessage
 , Config (..)
@@ -73,6 +78,7 @@ import qualified Data.Char as Char
 import Data.Fixed (Pico)
 import Data.Time (UTCTime)
 import qualified Data.Time as Time
+import Control.Applicative ((<|>))
 import Data.Time.LocalTime (TimeOfDay(..), LocalTime(..), timeToTimeOfDay, timeOfDayToTime)
 import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
@@ -1391,7 +1397,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
           -- DATE fields in JSON should be ISO-8601 strings (YYYY-MM-DD)
           case jsonValue of
             Aeson.String s -> do
-              case parseDateText s of
+              case jsonDateText s of
                 Just day -> pure $ ValDate day
                 Nothing -> userException $ UserError $
                   "Could not parse date string '" <> s <> "'. Expected format: YYYY-MM-DD"
@@ -1401,7 +1407,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
           -- TIME fields in JSON should be strings (HH:MM:SS or HH:MM)
           case jsonValue of
             Aeson.String s -> do
-              case parseTimeText s of
+              case jsonTimeText s of
                 Just tod -> pure $ ValTime tod
                 Nothing -> userException $ UserError $
                   "Could not parse time string '" <> s <> "'. Expected format: HH:MM:SS or HH:MM"
@@ -1411,8 +1417,11 @@ jsonValueToWHNFTyped jsonValue ty0 = do
           -- DATETIME fields in JSON should be ISO-8601 strings with timezone
           case jsonValue of
             Aeson.String s -> do
-              case parseDatetimeText s of
-                Just utc -> do
+              case jsonDatetimeText s of
+                -- a zone named in the string is the value's; otherwise the
+                -- document's, as for one written with Z or an offset
+                Just (utc, Just (zone, _)) -> pure $ ValDateTime utc zone
+                Just (utc, Nothing) -> do
                   tc <- getTemporalContext
                   let tzName = fromMaybe "Etc/UTC" tc.tcDocumentTimezone
                   pure $ ValDateTime utc tzName
@@ -3306,6 +3315,109 @@ parseDatetimeText raw =
        | fmt <- formats
        , Just utc <- [TimeFormat.parseTimeM True TimeFormat.defaultTimeLocale fmt (Text.unpack trimmed)]
        ]
+
+-- | A DATE as JSONDECODE reads it: what TODATE reads ('parseDateText'), a
+-- year, month and day whose month and day may have one digit
+-- (@"2026-1-5"@), or the date as written of a string 'jsonDatetimeText'
+-- reads (@"2026-01-31T10:30:00Z"@).
+--
+-- The forms beyond TODATE's are those jl4-service's direct path read before
+-- it read inputs as JSONDECODE does, so that no input it read is refused now,
+-- and so that both paths read the same values (assumed, not ruled; review of
+-- #779, 2026-11-21). A string with anything else after its date, which that
+-- path also read, is not one of them.
+jsonDateText :: Text -> Maybe Time.Day
+jsonDateText s =
+  parseDateText s
+    <|> looseYmd s
+    <|> (jsonDatetimeText s *> looseYmd (Text.take 10 s))
+
+-- | A TIME as JSONDECODE reads it: what TOTIME reads ('parseTimeText'), or
+-- hours, minutes and optionally seconds, each of one or two digits, with a
+-- fraction of a second, followed by nothing, @Z@, @" UTC"@, an offset
+-- (@"+08:00"@) or the name of a zone (@" Asia/Singapore"@). A TIME has no
+-- zone, so the clock is read as written and the zone left out, as the direct
+-- path read it (see 'jsonDateText').
+jsonTimeText :: Text -> Maybe TimeOfDay
+jsonTimeText s = parseTimeText s <|> do
+  (tod, _, rest) <- looseClock s
+  if rest `elem` ["", "Z", " UTC"] || isOffset rest || isZoneName rest
+    then Just tod
+    else Nothing
+ where
+  isOffset r = case Text.uncons r of
+    Just ('+', o) -> isHhMm o
+    _ -> False
+  isHhMm o = case Text.splitOn ":" o of
+    [h, m] -> twoDigits h && twoDigits m
+    [hm] -> Text.length hm == 4 && Text.all Char.isDigit hm
+    _ -> False
+  twoDigits t = Text.length t == 2 && Text.all Char.isDigit t
+  isZoneName r = case Text.uncons r of
+    Just (' ', name) -> isJust (tryLoadTZPure name)
+    _ -> False
+
+-- | A DATETIME as JSONDECODE reads it: the instant, and the zone the string
+-- names by name, with the time as written there. What TODATETIME reads
+-- ('parseDatetimeText') has no zone name. So does a date and a time
+-- (@"2026-01-31 10:30"@, @"2026-01-31T10:30:00.5"@) followed by nothing, @Z@
+-- or @UTC@, which is read in UTC; one whose time has seconds and is followed
+-- by the name of a zone (@"2026-01-31 10:30:00 Asia/Singapore"@) is read in
+-- that zone (see 'jsonDateText').
+jsonDatetimeText :: Text -> Maybe (UTCTime, Maybe (Text, LocalTime))
+jsonDatetimeText s = ((, Nothing) <$> parseDatetimeText s) <|> do
+  day <- strictYmd (Text.take 10 s)
+  (sep, afterDate) <- Text.uncons (Text.drop 10 s)
+  if sep == 'T' || sep == ' ' then Just () else Nothing
+  (tod, hasSeconds, zone) <- looseClock afterDate
+  let written = LocalTime day tod
+  if zone `elem` ["", "Z", " UTC", "UTC"]
+    then Just (Time.UTCTime day (timeOfDayToTime tod), Nothing)
+    else case Text.uncons zone of
+      Just (' ', name)
+        | hasSeconds, Just tz <- tryLoadTZPure name ->
+            Just (TZ.localTimeToUTCTZ tz written, Just (name, written))
+      _ -> Nothing
+ where
+  strictYmd t = case Text.splitOn "-" t of
+    [_, m, d] | Text.length m == 2, Text.length d == 2 -> looseYmd t
+    _ -> Nothing
+
+-- | A year of four digits, and a month and a day of one or two, separated by
+-- hyphens, that make a date.
+looseYmd :: Text -> Maybe Time.Day
+looseYmd t = case Text.splitOn "-" t of
+  [y, m, d]
+    | Text.length y == 4
+    , all (\x -> not (Text.null x) && Text.all Char.isDigit x) [y, m, d]
+    , Text.length m <= 2
+    , Text.length d <= 2 ->
+        Time.fromGregorianValid (read (Text.unpack y)) (read (Text.unpack m)) (read (Text.unpack d))
+  _ -> Nothing
+
+-- | A clock at the start of a string: hours and minutes, and optionally
+-- seconds with a fraction, each of one or two digits, separated by colons,
+-- that make a time of day; whether it had seconds; and what follows it.
+looseClock :: Text -> Maybe (TimeOfDay, Bool, Text)
+looseClock t = do
+  (h, r1) <- field t
+  r1' <- Text.stripPrefix ":" r1
+  (m, r2) <- field r1'
+  (sec, hasSeconds, rest) <- case Text.stripPrefix ":" r2 of
+    Just r2' -> do
+      (whole, r3) <- field r2'
+      case Text.stripPrefix "." r3 of
+        Just r3' | (frac, r4) <- Text.span Char.isDigit r3', not (Text.null frac) ->
+          Just (fromIntegral whole + read ("0." <> Text.unpack frac), True, r4)
+        _ -> Just (fromIntegral whole, True, r3)
+    Nothing -> Just (0, False, r2)
+  tod <- Time.makeTimeOfDayValid h m sec
+  pure (tod, hasSeconds, rest)
+ where
+  field :: Text -> Maybe (Int, Text)
+  field x = case Text.span Char.isDigit x of
+    (ds, rest) | not (Text.null ds), Text.length ds <= 2 -> Just (read (Text.unpack ds), rest)
+    _ -> Nothing
 
 -- | Format a TimeOfDay as HH:MM:SS
 formatTimeOfDay :: TimeOfDay -> Text
