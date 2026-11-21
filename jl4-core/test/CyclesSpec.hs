@@ -18,8 +18,11 @@ import qualified Data.Text.IO as Text
 import System.Directory (listDirectory)
 import System.Environment (lookupEnv)
 import System.FilePath (takeBaseName, takeDirectory, takeExtension, takeFileName, (</>))
+import Control.Exception (evaluate)
+import Control.Monad (void)
 import Test.Hspec
 
+import LinearTime (cpuRatio, quadraticControl)
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS, vfsFromList)
 import L4.Cycles
 import L4.Syntax (DeonticModal (..), Module (..), Resolved)
@@ -646,6 +649,26 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes (tree <> "GIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\nGIVETH A LIST OF a\nkept f xs MEANS filter f xs\n\nGIVEN t IS A Tree GIVETH A NUMBER\nsize t MEANS 1 PLUS sum (map size (kept (GIVEN c YIELD size c GREATER THAN 0) (t's kids)))")
         `shouldReturn` ["function:proved-structural+fans"]
 
+  -- Reading names through multiplies the edges: a name used k times for a
+  -- body with 10 calls is 10k edges. Testing each edge by a search of its
+  -- own was quadratic in them: 150 uses took 18.4 s of report where the
+  -- check took 0.08 s, and 300 did not finish in 60 s (2026-11-21 attack
+  -- round, names d13, d14). The edges are counted, not the source's size.
+  describe "the report takes time near-linear in the edges of a cycle" $ do
+    it "judges a cycle of 1,000 and of 4,000 edges in near the ratio of the edges" $ do
+      let prepare k = do
+            r@(_, _, m) <- checked (namedTenTimes k)
+            void (evaluate m)
+            pure r
+          run (s, i, m@(MkModule _ uri _)) = do
+            let fs = cycleFindings (applyFinalSubstitution s uri) i m
+            -- the run happened, and judged the one cycle it was built for
+            map findingClass fs `shouldBe` ["function:unproved-mutual+fans"]
+      r <- cpuRatio prepare run 100 400
+      r `shouldSatisfy` (< 8)
+
+    it "fails work quadratic in the edges on the same sizes (the control)" $
+      quadraticControl 100 400 8
 
   describe "nodes" do
     it "keeps overloads that share a name apart" $
@@ -670,6 +693,19 @@ spec = describe "cycle report (#1075 layer 2)" do
 
 tree :: Text
 tree = "IMPORT prelude\nDECLARE Tree HAS\n  label IS A NUMBER\n  kids IS A LIST OF Tree\n\n"
+
+-- | Two definitions that call each other, one naming @k@ times a WHERE name
+-- whose body calls the other ten times: @10 k@ edges in one cycle.
+namedTenTimes :: Int -> Text
+namedTenTimes k = Text.unlines
+  [ "GIVEN n IS A NUMBER GIVETH A NUMBER"
+  , "f n MEANS IF n > 100 THEN 0 ELSE " <> Text.intercalate " PLUS " (replicate k "t")
+  , "  WHERE t MEANS " <> Text.intercalate " PLUS " ["g " <> Text.pack (show i) | i <- [1 .. 10 :: Int]]
+  , ""
+  , "GIVEN n IS A NUMBER GIVETH A NUMBER"
+  , "g n MEANS f (n PLUS 1)"
+  ]
+
 -- | A function of @all@'s argument types that gives back the function it was
 -- given, and one that applies a function: together they apply the function
 -- to a value that is not an element of the list.

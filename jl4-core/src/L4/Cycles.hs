@@ -327,8 +327,8 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
     open = filter (not . any cuts . (.slots)) internal
     unguarded = filter (null . (.slots)) open
     stalledOnCycle =
-      nubOrd [s | e <- open, not (null e.slots), onCycle open e, Stalls s <- e.slots]
-    unguardedOnCycle = filter (onCycle unguarded) unguarded
+      nubOrd [s | e <- onCycles open, not (null e.slots), Stalls s <- e.slots]
+    unguardedOnCycle = onCycles unguarded
     -- a lap that may run on a trace of its own waits on a clock that starts
     -- again, so no wait proves it. The function checks do not use time, so
     -- they prove only a cycle with no lap that waits: beside a self-call
@@ -358,17 +358,21 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
   constants = Set.fromList
     [getUnique (decideName d) | d <- decides, null (valueParams d), Lit _ NumericLit {} <- [bodyOf d]]
 
--- | Does this edge lie on a cycle of the given edges: does its target reach
--- its source?
-onCycle :: [Edge] -> Edge -> Bool
-onCycle es e = reach Set.empty [e.to]
+-- | The edges that lie on a cycle of the given edges: those whose target
+-- reaches their source, which is a self-call or an edge inside one strongly
+-- connected component. One pass over the edges; a search from each edge
+-- would be quadratic in them, and reading names through multiplies the
+-- edges (a name used 300 times for 300 calls is 90,000).
+onCycles :: [Edge] -> [Edge]
+onCycles es = filter on es
  where
-  next = Map.fromListWith (<>) [(x.from, [x.to]) | x <- es]
-  reach _ [] = False
-  reach seen (n : ns)
-    | n == e.from = True
-    | Set.member n seen = reach seen ns
-    | otherwise = reach (Set.insert n seen) (Map.findWithDefault [] n next <> ns)
+  nodes = nubOrd (concat [[e.from, e.to] | e <- es])
+  next = Map.fromListWith (<>) [(e.from, [e.to]) | e <- es]
+  component = Map.fromList
+    [ (n, i)
+    | (i, CyclicSCC ns) <- zip [0 :: Int ..] (stronglyConnComp [(n, n, Map.findWithDefault [] n next) | n <- nodes])
+    , n <- ns ]
+  on e = e.from == e.to || maybe False (\ i -> Map.lookup e.to component == Just i) (Map.lookup e.from component)
 
 -- | A short label to count findings by.
 findingClass :: Finding -> Text
@@ -1272,7 +1276,7 @@ descent info nullaries ds es = listToMaybe [Structural (firstPosition a) | a <- 
   firstPosition a = case members of
     d : _ | Just (k, _, _) <- Map.lookup (key d) a -> k
     _ -> 0
-  works a = all isJust grades && not (any (onCycle weak) weak)
+  works a = all isJust grades && null (onCycles weak)
    where
     grades = map grade es
     weak = [e | (e, Just Weak) <- zip es grades]
