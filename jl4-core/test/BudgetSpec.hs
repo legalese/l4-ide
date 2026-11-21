@@ -293,6 +293,38 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
     it "names the function" $
       rulesNamed (limits Nothing (Just 10000)) loop `shouldReturn` [Just "f"]
 
+    it "names a function whose head carries @nlg text, without the text" $
+      rulesNamed (limits Nothing (Just 10000)) (Text.unlines
+        [ "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "DECIDE countDown @nlg counting down"
+        , "  IS IF n EQUALS 0 THEN 0 ELSE countDown (n - 2)"
+        , ""
+        , "#EVAL countDown 5"
+        ]) `shouldReturn` [Just "countDown"]
+
+    it "names a function written as clauses, whose generated body has no place" $
+      rulesNamed (limits Nothing (Just 10000)) (Text.unlines
+        [ "@nlg counting down %n%"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A NUMBER"
+        , "DECIDE countDown 0 IS 0"
+        , "DECIDE countDown n IS countDown (n - 2)"
+        , ""
+        , "#EVAL countDown 5"
+        ]) `shouldReturn` [Just "countDown"]
+
+    it "names the function, not a field's selector, when each round reads a record field" $
+      rulesNamed (limits Nothing (Just 10000)) (Text.unlines
+        [ "DECLARE Box HAS count IS A NUMBER"
+        , ""
+        , "GIVEN b IS A Box"
+        , "GIVETH A NUMBER"
+        , "spin b MEANS spin (Box WITH count IS b's count PLUS 1)"
+        , ""
+        , "#EVAL spin (Box WITH count IS 1)"
+        ]) `shouldReturn` [Just "spin"]
+
     it "counts each directive afresh" $
       -- 6,001 applications each, under a limit of 10,000: together they
       -- would be over it

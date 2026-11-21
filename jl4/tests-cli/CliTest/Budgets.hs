@@ -135,6 +135,12 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
     serr `shouldSatisfy` ("l4 run: stoplib.l4:8:" `isInfixOf`)
     serr `shouldSatisfy` ("I stopped the run" `isInfixOf`)
 
+  it "l4 run --json says ok false when the run stopped in an imported file and this file has no #EVAL, and gives the place on stderr" $ do
+    Output code sout serr <- within bin ["run", "--json", "--eval-timeout", "1", stopOnly]
+    code `shouldBe` ExitFailure 1
+    (do Aeson.Object o <- Aeson.decode (BSL8.pack sout); KeyMap.lookup "ok" o) `shouldBe` Just (Aeson.Bool False)
+    serr `shouldSatisfy` ("l4 run: stoplib.l4:8:" `isInfixOf`)
+
   it "l4 run --eval-timeout: an #EVALTRACE after the stop says it was not evaluated, not that its trace failed" $ do
     Output code sout _ <- within bin ["run", "--eval-timeout", "1", stopThenTrace]
     code `shouldBe` ExitFailure 1
