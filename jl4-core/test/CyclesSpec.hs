@@ -648,6 +648,20 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes "GIVEN xs IS A LIST OF NUMBER GIVETH A BOOLEAN\nloop xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN TRUE\n  WHEN y FOLLOWED BY rest THEN loop (y FOLLOWED BY rest)"
         `shouldReturn` ["function:unproved-self"]
 
+    -- each ended at run time and was "could not check" (2026-11-21 attack
+    -- round, patterns m1, m2)
+    it "proves a walk that names the tail with a bare pattern of an inner CONSIDER" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A NUMBER\nm xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN 0\n  WHEN y FOLLOWED BY ys THEN\n    CONSIDER ys\n    WHEN EMPTY THEN 1\n    WHEN other THEN 1 PLUS m other"
+        `shouldReturn` ["function:proved-structural"]
+
+    it "and one that rebuilds the whole pattern of an inner CONSIDER over the tail" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A NUMBER\nm xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN 0\n  WHEN y FOLLOWED BY ys THEN\n    CONSIDER ys\n    WHEN EMPTY THEN 1\n    WHEN z FOLLOWED BY zs THEN 1 PLUS m (z FOLLOWED BY zs)"
+        `shouldReturn` ["function:proved-structural"]
+
+    it "but not a bare pattern over the very value" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A NUMBER\nm xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN 0\n  WHEN other THEN 1 PLUS m other"
+        `shouldReturn` ["function:unproved-self"]
+
     it "and not names from different patterns put together" $
       classes "GIVEN xs IS A LIST OF NUMBER GIVETH A BOOLEAN\nsorted xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN TRUE\n  WHEN x FOLLOWED BY EMPTY THEN TRUE\n  WHEN x FOLLOWED BY (y FOLLOWED BY rest) THEN x <= y AND sorted (x FOLLOWED BY rest)"
         `shouldReturn` ["function:unproved-self"]

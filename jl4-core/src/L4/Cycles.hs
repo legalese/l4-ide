@@ -1398,6 +1398,11 @@ partsOf info nullaries d p = MkParts names shapes
     [ getUnique b
     | Consider _ x brs <- everyExpr, partOf info p s x
     , MkBranch _ (When _ pat) _ <- brs, b <- parts pat ]
+      -- a bare name for what a CONSIDER takes apart is that value: a strict
+      -- part when the value is (@WHEN other@ over the tail @ys@)
+      <> [ getUnique b
+         | Consider _ x brs <- everyExpr, strictPart info p s x
+         , MkBranch _ (When _ (PatVar _ b)) _ <- brs ]
       <> [ getUnique c
          | App _ g xs <- everyExpr
          , (i, q, j) <- elementParameters info g (length xs)
@@ -1412,6 +1417,11 @@ partsOf info nullaries d p = MkParts names shapes
     [ q
     | Consider _ x brs <- everyExpr, partOf info p (MkParts names []) x
     , MkBranch _ (When _ pat) _ <- brs, q <- inside pat, isShape q, not (null (patBinders q)) ]
+      -- and the whole pattern of a CONSIDER that takes apart a strict part
+      -- (@WHEN z FOLLOWED BY zs@ over the tail @ys@), which matched that part
+      <> [ pat
+         | Consider _ x brs <- everyExpr, strictPart info p (MkParts names []) x
+         , MkBranch _ (When _ pat) _ <- brs, isShape pat, not (null (patBinders pat)) ]
   inside = \ case
     PatCons _ a b -> [a, b] <> inside a <> inside b
     PatApp _ _ ps -> ps <> concatMap inside ps
