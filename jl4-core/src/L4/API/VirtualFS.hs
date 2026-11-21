@@ -52,7 +52,7 @@ import L4.Import.Resolution
   ( ModuleLookup
   , extractImportNames
   , moduleNameToProjectUri
-  , typecheckWithDependencies
+  , typecheckWithDependenciesKnowing
   , TypeCheckWithDepsResult(..)
   , ResolvedImport(..)
   )
@@ -123,5 +123,17 @@ checkWithImportsAndUri :: VFS -> Text -> Text -> Either [Text] TypeCheckWithDeps
 checkWithImportsAndUri vfs moduleName source =
   let uri = moduleNameToProjectUri moduleName
       lookup' = apiModuleLookup vfs
-      Identity result = typecheckWithDependencies lookup' uri source
+      -- The module being checked is never offered as a spelling of what it
+      -- imports: it would import itself. Its name is passed on its own, so
+      -- that the error can say so ('selfImportHint').
+      known = filter (/= moduleName) (apiKnownModuleNames vfs)
+      Identity result = typecheckWithDependenciesKnowing known (Just moduleName) lookup' uri source
   in result
+
+-- | Every module name 'apiModuleLookup' can find: the embedded stdlib's and the
+-- VFS's, each without its @.l4@. They feed only the not-found hint, which names
+-- the ones that differ from a missing import only in capital letters
+-- (smucclaw/l4-ide#1080); lookups stay exact.
+apiKnownModuleNames :: VFS -> [Text]
+apiKnownModuleNames vfs =
+  embeddedLibraryNames <> [ fromMaybe k (Text.stripSuffix ".l4" k) | k <- vfsKeys vfs ]

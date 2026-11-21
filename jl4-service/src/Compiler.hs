@@ -37,7 +37,9 @@ import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import Logging (Logger, logInfo, logWarn)
 import qualified LSP.L4.Rules as Rules
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
-import System.FilePath (takeBaseName, takeExtension)
+import System.FilePath (normalise, takeBaseName, takeDirectory, takeExtension)
+import Control.Applicative ((<|>))
+import L4.Import.ModuleNameCase (caseVariantHint, selfImportHint)
 
 -- | Say, at WARN, which files of a bundle have the name of a standard library
 -- module and a different text.
@@ -72,13 +74,38 @@ logStdlibStandIns logger deployId l4Files =
 -- module. Until this was logged nothing in the service said so, on a compile or
 -- on a restart (ruled 2026-10-12, bench "Main Wave Rulings", card R5: a WARN
 -- now, a refusal only by a later ruling).
-logUnresolvedImports :: Logger -> Text -> [(FilePath, Text)] -> IO ()
-logUnresolvedImports logger deployId unresolved =
+--
+-- When a module the import could have found differs from it only in capital
+-- letters, the line also carries a @hint@ field, the sentence the command line
+-- prints (smucclaw/l4-ide#1080, ruling 2: every surface gives the hint,
+-- assumed (GM, 2026-11-21), for Meng's review). The modules it could have
+-- found are the built-in stdlib's and the bundle's @.l4@ files in the two
+-- folders the resolver probes for this importer: its own, and the session
+-- root, which 'Jl4.typecheckAndEvalBundle' takes from the bundle's first
+-- path. The importing file itself is never offered: @Foo.l4@ that writes
+-- @IMPORT foo@ would otherwise be told to import itself. Lookups were always
+-- exact here; only the hint is new.
+logUnresolvedImports :: Logger -> Text -> [FilePath] -> [(FilePath, Text)] -> IO ()
+logUnresolvedImports logger deployId bundlePaths unresolved =
   forM_ unresolved $ \(path, modName) ->
-    logWarn logger "Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name"
+    logWarn logger "Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name" $
       [ ("deploymentId", toJSON deployId)
       , ("file", toJSON path)
       , ("module", toJSON modName)
+      ]
+      <> [ ("hint", toJSON h)
+         | Just h <- [ caseVariantHint modName (EmbeddedLibraries.embeddedLibraryNames <> reachableFrom path)
+                         <|> selfImportHint modName (Text.pack (takeBaseName path)) ] ]
+  where
+    rootDir = case bundlePaths of
+      (firstPath : _) -> [normalise (takeDirectory firstPath)]
+      [] -> []
+    reachableFrom importer =
+      [ Text.pack (takeBaseName f)
+      | f <- bundlePaths
+      , takeExtension f == ".l4"
+      , normalise f /= normalise importer
+      , normalise (takeDirectory f) `elem` (normalise (takeDirectory importer) : rootDir)
       ]
 
 -- | Compile an in-memory source map into a deployment-ready function registry.
@@ -111,7 +138,7 @@ compileBundle logger deployId sources = do
       -- exports from the typecheck results, then only the eval envs for those
       -- files will actually be used.
       (errs, tcMap, evalMap, unresolved, ignored) <- typecheckAndEvalBundle moduleContext allPaths
-      logUnresolvedImports logger deployId unresolved
+      logUnresolvedImports logger deployId (Map.keys moduleContext) unresolved
 
       -- Phase 2: Process typecheck results per file
       results <- forM l4Files $ \(filepath, content) ->
