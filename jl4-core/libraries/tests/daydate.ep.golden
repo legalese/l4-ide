@@ -379,10 +379,10 @@ GIVEN month IS A NUMBER
 GIVETH A NUMBER
 @nlg the number of days in %year% before month %month%
 `Months since year start to days` MEANS
-    IF    m LESS THAN 1
+    IF    month LESS THAN 2
     THEN  0
     ELSE  `Days in month` m year
-              PLUS `Months since year start to days` m year -- Recursively add all days of months that year
+              PLUS `Months since year start to days` (month MINUS 1) year -- Recursively add all days of months that year
     WHERE
         m MEANS FLOOR month MINUS 1
 
