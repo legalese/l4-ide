@@ -29,9 +29,10 @@ import Base (Uri (..), toNormalizedUri)
 import L4.API.EmbeddedLibraries (embeddedLibraries)
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, checkWithImportsAndUri, emptyVFS, vfsFromList)
 import L4.Cycles
+import L4.Cycles.Warning (CycleTrouble (..), CycleWarning (..))
 import L4.Syntax (DeonticModal (..), Module (..), Resolved)
-import L4.TypeCheck (applyFinalSubstitution)
-import L4.TypeCheck.Types (CheckErrorWithContext, EntityInfo, Severity (..), Substitution, severity)
+import L4.TypeCheck (applyFinalSubstitution, prettyCheckError)
+import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), CheckWarning (..), EntityInfo, Severity (..), Substitution, severity)
 
 spec :: Spec
 spec = describe "cycle report (#1075 layer 2)" do
@@ -806,6 +807,185 @@ spec = describe "cycle report (#1075 layer 2)" do
     it "fails work quadratic in the edges on the same sizes (the control)" $
       quadraticControl 100 400 8
 
+  -- What the checker says (recursion-limit rulings L3 and L4, and the
+  -- scope ruling (ii); 'cycleNotices'). Each warning that fires has a fixture where
+  -- it fires and one where it does not (ruling L3's condition).
+  describe "a function cycle draws no warning (the scope ruling (ii))" do
+    it "a self-call not shown to end stays in the report and draws no alarm" do
+      fs <- findings (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\ndown n MEANS IF n EQUALS 0 THEN 0 ELSE down (n MINUS 1)")
+      map findingClass fs `shouldBe` ["function:unproved-self"]
+      map alarms fs `shouldBe` [[]]
+
+    it "nor does it draw a warning from the checker" $
+      notices (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\ndown n MEANS IF n EQUALS 0 THEN 0 ELSE down (n MINUS 1)")
+        `shouldReturn` []
+
+    it "nor do two functions that call each other" $
+      notices (people <> "GIVEN n IS A NUMBER GIVETH A BOOLEAN\nev n MEANS IF n EQUALS 0 THEN TRUE ELSE od (n MINUS 1)\n\nGIVEN n IS A NUMBER GIVETH A BOOLEAN\nod n MEANS IF n EQUALS 0 THEN FALSE ELSE ev (n MINUS 1)")
+        `shouldReturn` []
+
+  describe "an obligation cycle draws its alarms (the scope ruling (ii), L3)" do
+    it "could not check: a LEST whose deadline is counted from a fixed instant" do
+      fs <- findings (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x")
+      map alarms fs `shouldBe` [[CouldNotCheck]]
+      notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x")
+        `shouldReturn` [("could not check", "x")]
+
+    it "but not a LEST under a positive WITHIN, which waits" $
+      notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 30 LEST x")
+        `shouldReturn` []
+
+    it "could not check: a rule that uses itself directly and through a HENCE (obligation:unproved-self)" do
+      let src = people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nmix n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE mix (n MINUS 1)) RAND mix (n MINUS 1)"
+      classes src `shouldReturn` ["obligation:unproved-self+fans"]
+      notices src `shouldReturn` [("could not check", "mix")]
+      marked <- notices (people <> "@ends-because n drops by one\n" <> Text.drop (Text.length people) src)
+      map fst marked `shouldSatisfy` notElem "could not check"
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "because `mix` also uses itself directly, with no duty in between, and there I could not find an input that gets smaller each time, towards a stop."
+
+    it "could not check: two rules that use each other directly, and one a HENCE back to itself (obligation:unproved-mutual)" do
+      let src = people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\na n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)\n\nGIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE a (n MINUS 1)"
+      classes src `shouldReturn` ["obligation:unproved-mutual+fans"]
+      notices src `shouldReturn` [("could not check", "a")]
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "because two or more of them also use each other directly, with no duty in between, and I do not check that kind of loop."
+
+    it "could not check, shown on a rule that only hands on by a HENCE: names the rule that uses itself directly" do
+      let rules = "GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\na n MEANS PARTY Alice MUST tick WITHIN 1 HENCE b n\n\nGIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)"
+      notices (people <> rules) `shouldReturn` [("could not check", "a")]
+      t <- noticeText (people <> rules)
+      t `shouldSatisfy` Text.isInfixOf "I could not check that this comes to an end, because `b` also uses itself directly, with no duty in between"
+      t `shouldSatisfy` (not . Text.isInfixOf "`a` also uses itself")
+      t `shouldSatisfy` (not . Text.isInfixOf "its HENCE")
+      marked <- notices (people <> "@ends-because n drops by one\n" <> rules)
+      map fst marked `shouldSatisfy` notElem "could not check"
+
+    it "could not check, on two rules that each use themselves directly: names both" do
+      t <- noticeText (people <> "GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\na n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE b (n MINUS 1)) RAND a (n MINUS 1)\n\nGIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)")
+      t `shouldSatisfy` Text.isInfixOf "I could not check that this comes to an end, because `a` and `b` also use themselves directly, with no duty in between"
+
+    it "no time: WITHIN 0 LEST its own rule, and the text names no annotation when there is none" do
+      notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 0 LEST x")
+        `shouldReturn` [("no time", "x")]
+      t <- noticeText (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 0 LEST x")
+      t `shouldSatisfy` Text.isInfixOf "its deadline falls at the very moment each copy starts"
+      t `shouldSatisfy` (not . Text.isInfixOf "@ends-because")
+
+    it "multiplies: a LEST that starts two copies of its own rule, per missed deadline" do
+      notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST (x RAND x)")
+        `shouldReturn` [("multiplies", "x")]
+      t <- noticeText (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST (x RAND x)")
+      for_ ["starts 2 copies of itself at once", "joins them with RAND", "every time a deadline is missed", "doubles", "Nothing written limits"] \ needle ->
+        t `shouldSatisfy` Text.isInfixOf needle
+
+    it "but not a LEST that hands its rule to a helper that uses it once" $
+      notices (people <> "GIVEN k IS A DEONTIC Person Action GIVETH A DEONTIC Person Action\nonce k MEANS k RAND (PARTY Bob MUST tick)\n\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST (once x)")
+        `shouldReturn` []
+
+    it "multiplies: the #1075 shape, reported on the rule that holds the RAND" $
+      notices (people <> "GIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 2 LEST (w3 RAND w1)\n\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 3 LEST w1")
+        `shouldReturn` [("multiplies", "w1")]
+
+    it "but not two rules that hand on to each other one copy at a time" $
+      notices (people <> "GIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 2 LEST w3\n\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 3 LEST w1")
+        `shouldReturn` []
+
+    it "multiplies: a HENCE that starts two copies, each time the duty is done" do
+      notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 HENCE (x RAND x)")
+        `shouldReturn` [("multiplies", "x")]
+      t <- noticeText (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 HENCE (x RAND x)")
+      t `shouldSatisfy` Text.isInfixOf "every time the duty is done"
+
+    it "but not a HENCE that starts its rule once" $
+      notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 HENCE x")
+        `shouldReturn` []
+
+    it "multiplies, bounded by a countdown as written: the text says so" do
+      let src = people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE PARTY Alice MUST tick WITHIN 1 LEST (b (n MINUS 1) RAND b (n MINUS 1))"
+      notices src `shouldReturn` [("multiplies", "b")]
+      t <- noticeText src
+      for_ ["is given `n` less 1", "as many as 2 to the power of `n`"] \ needle ->
+        t `shouldSatisfy` Text.isInfixOf needle
+      t `shouldSatisfy` (not . Text.isInfixOf "Nothing written limits")
+
+    it "but not a countdown that starts one copy at a time" $
+      notices (people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE PARTY Alice MUST tick WITHIN 1 LEST b (n MINUS 1)")
+        `shouldReturn` []
+
+    it "multiplies and could not check: T6, a barrier HENCE over an empty roll, doubling" $
+      notices (tenants <> "GIVETH A DEONTIC Actor Action\nx MEANS EVERY Tenant t IN nobody MUST Sign t WITHIN 5 ONCE ALL HAVE HENCE (x RAND x)")
+        `shouldReturn` [("multiplies", "x"), ("could not check", "x")]
+
+    it "but a barrier HENCE over an empty roll that starts one copy only could not be checked" $
+      notices (tenants <> "GIVETH A DEONTIC Actor Action\nx MEANS EVERY Tenant t IN nobody MUST Sign t WITHIN 5 ONCE ALL HAVE HENCE x")
+        `shouldReturn` [("could not check", "x")]
+
+    it "multiplies: a RECORD whose HENCE starts two copies" $
+      notices (people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nr n MEANS RECORD `a` IS n HENCE (r (n PLUS 1) RAND r (n PLUS 1))")
+        `shouldReturn` [("multiplies", "r"), ("could not check", "r")]
+
+    it "but a RECORD whose HENCE starts one copy only could not be checked" $
+      notices (people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nr n MEANS RECORD `a` IS n HENCE r (n PLUS 1)")
+        `shouldReturn` [("could not check", "r")]
+
+    it "nothing, on a module that does not check" $
+      notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x\n\ny MEANS 1 PLUS TRUE")
+        `shouldReturn` []
+
+  describe "@ends-because (L4)" do
+    it "on the rule, silences could not check, and leaves a note at information level carrying its reason" do
+      let src = people <> "@ends-because Alice is paid by then\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x"
+      notices src `shouldReturn` [("accepted", "x")]
+      sevs <- noticeSeverities src
+      sevs `shouldBe` [SInfo]
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "Alice is paid by then"
+
+    it "does not silence no time, and the warning says so" do
+      let src = people <> "@ends-because it stops\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 0 LEST x"
+      notices src `shouldReturn` [("no time", "x")]
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "@ends-because does not silence this warning"
+
+    it "does not silence multiplies, and the warning says so" do
+      let src = people <> "@ends-because it stops\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST (x RAND x)"
+      notices src `shouldReturn` [("multiplies", "x")]
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "@ends-because does not silence this warning"
+
+    it "counts only on the rule the warning is reported on, the first of the cycle" do
+      let cyc mark1 mark3 = people
+            <> mark1 <> "GIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST w3\n\n"
+            <> mark3 <> "GIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 1 OF 3 LEST w1"
+      notices (cyc "" "") `shouldReturn` [("could not check", "w1")]
+      notices (cyc "@ends-because Bob pays\n" "") `shouldReturn` [("accepted", "w1")]
+      notices (cyc "" "@ends-because Bob pays\n") `shouldReturn` [("could not check", "w1")]
+      t <- noticeText (cyc "" "@ends-because Bob pays\n")
+      t `shouldSatisfy` Text.isInfixOf "The @ends-because above `w3` does not count here: it goes above `w1`"
+
+    it "is taken silently on a function cycle" $
+      notices (people <> "@ends-because n drops by one\nGIVEN n IS A NUMBER GIVETH A NUMBER\ndown n MEANS IF n EQUALS 0 THEN 0 ELSE down (n MINUS 1)")
+        `shouldReturn` []
+
+    it "is taken silently on an obligation cycle shown to end" $
+      notices (people <> "@ends-because Alice ticks\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 30 LEST x")
+        `shouldReturn` []
+
+    it "is taken silently on a rule that never leads back to itself" $
+      notices (people <> "@ends-because it ends\nGIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS n PLUS 1")
+        `shouldReturn` []
+
+    it "on a WHERE name read through, on the lap, is on the cycle, and not the rule reported on" do
+      let src = people <> "GIVEN d IS A NUMBER GIVETH A DEONTIC Person Action\nz d MEANS PARTY Alice MUST tick WITHIN d LEST next\n  WHERE\n    @ends-because d halves\n    next MEANS z (d DIVIDED BY 2)"
+      notices src `shouldReturn` [("could not check", "z")]
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "The @ends-because above `next` does not count here"
+
+    it "on a WHERE name read through, off any lap, is taken silently" $
+      notices (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS m PLUS 1\n  WHERE\n    @ends-because it ends\n    m MEANS n TIMES 2")
+        `shouldReturn` []
+
   describe "nodes" do
     it "keeps overloads that share a name apart" $
       classes (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS IF n GREATER THAN 0 THEN f (n MINUS 1) ELSE 0\n\nGIVEN s IS A STRING GIVETH A NUMBER\nf s MEANS 1")
@@ -979,6 +1159,36 @@ classesIn vfs source = sort . map findingClass <$> findingsIn vfs source
 
 verdicts :: Text -> IO [Verdict]
 verdicts source = map (.verdict) <$> findings source
+
+-- | The cycle warnings and notes the checker gives a module, each as what it
+-- is and the rule it is reported on.
+notices :: Text -> IO [(Text, Text)]
+notices source = map summary <$> cycleDiagnostics source
+ where
+  summary = \ case
+    MkCheckErrorWithContext {kind = CheckWarning (CycleAlarm w)} -> (trouble w.trouble, w.rule)
+    MkCheckErrorWithContext {kind = EndsBecauseAccepted w} -> ("accepted", w.rule)
+    _ -> ("other", "")
+  trouble = \ case
+    CouldNotCheckThat _ -> "could not check"
+    GivesNoTime _ -> "no time"
+    StartsCopies _ -> "multiplies"
+
+noticeText :: Text -> IO Text
+noticeText source = Text.unlines . concatMap (\ e -> prettyCheckError e.kind) <$> cycleDiagnostics source
+
+noticeSeverities :: Text -> IO [Severity]
+noticeSeverities source = map severity <$> cycleDiagnostics source
+
+cycleDiagnostics :: Text -> IO [CheckErrorWithContext]
+cycleDiagnostics source = case checkWithImports emptyVFS source of
+  Left errs -> fail ("pipeline failure: " <> show errs)
+  Right r -> pure (filter isCycle r.tcdErrors)
+ where
+  isCycle e = case e.kind of
+    CheckWarning (CycleAlarm _) -> True
+    EndsBecauseAccepted _ -> True
+    _ -> False
 
 walkCheck :: Text -> Expectation
 walkCheck source = do

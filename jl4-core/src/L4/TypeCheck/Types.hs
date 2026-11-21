@@ -9,6 +9,7 @@ import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
+import L4.Cycles.Warning (CycleWarning (..))
 import L4.Lexer (PosToken, FixityDirection)
 import L4.Lint.NotReach (NotReachSite (..))
 import L4.Lint.SiblingReads (SiblingRead (..))
@@ -372,6 +373,12 @@ data CheckError =
     -- ^ An @\@ends-because@ with nothing after it, or only spaces. The text
     -- names the definition it is above, when there is one in sight. The reason
     -- is what a reader checks, so a mark without one is refused.
+  | EndsBecauseAccepted CycleWarning
+    -- ^ An @\@ends-because@ that silenced a "could not check"
+    -- ('CycleAlarm'), and the reason it gives: an information-level message,
+    -- one per such mark (recursion-limit ruling L4, 2026-11-20: "each use
+    -- emits one information-level message carrying its reason"). Anchored on
+    -- the mark. See 'L4.Cycles.cycleNotices'.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -503,6 +510,14 @@ data CheckWarning
     -- the elaborations 'L4.Desugar.desugarSectionGivens' prepends for a
     -- section @GIVEN@ reach the same code and never draw it
     -- ('L4.Names.isSectionBinderElaboration').
+  | CycleAlarm CycleWarning
+    -- ^ smucclaw/l4-ide#1075: a rule whose HENCE or LEST leads back to
+    -- itself, and that is not shown to come to an end ("could not check"),
+    -- gives no time each time round ("no time"), or starts two or more
+    -- copies of itself at once ("multiplies"). Rulings L3, L4 and the scope
+    -- ruling (ii), recorded in @specs\/todo\/GLOBAL-DEPENDENCY-GRAPH-SPEC.md@; which
+    -- finding draws which is 'L4.Cycles.cycleNotices'. Only on a module with
+    -- no error: a module that does not check has no findings to trust.
   | SiblingLedgerRead SiblingRead
     -- ^ smucclaw/l4-ide#1069: two operands of a @RAND@, @ROR@ or
     -- @EVERY … UPON EACH@ can reach a read and a write of one ledger cell
@@ -815,6 +830,7 @@ severity (MkCheckErrorWithContext e _) =
     SuspiciousBinderPattern {} -> SInfo
     SuspiciousClausePattern {} -> SInfo
     ActionPatternReference {}  -> SInfo
+    EndsBecauseAccepted {}     -> SInfo
     _                          -> SError
 
 -- | The answers to @#CHECK@ directives among a module's diagnostics.
@@ -939,6 +955,7 @@ instance HasSrcRange CheckError where
   rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
   rangeOf (EndsBecauseOnNonDefinition _ _ mr) = mr
   rangeOf (EndsBecauseNeedsReason _ mr) = mr
+  rangeOf (EndsBecauseAccepted w) = w.at
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   rangeOf (CheckWarning (LifecycleNounHidesName _ mr _ _)) = mr
@@ -952,6 +969,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (RenamedBuiltin r _ _)) = Just r
   rangeOf (CheckWarning (SiblingLedgerRead w)) = w.compound
+  rangeOf (CheckWarning (CycleAlarm w)) = w.at
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (SuspiciousClausePattern _ _ b _) = rangeOf b

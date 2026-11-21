@@ -377,14 +377,15 @@ On its own line, an annotation applies to the **following** definition; trailing
 `@nlg` follows that rule with two twists — a rule takes it only on the line above, and inside a field list or a `GIVEN` list an own-line annotation describes the field or input **above** it — which the next section measures.
 Read it before writing one:
 
-| Annotation | Purpose                                                            |
-| ---------- | ------------------------------------------------------------------ |
-| `@desc`    | Human-readable description (internal unless paired with `@export`) |
-| `@export`  | Mark function for deployment via `jl4-service`                     |
-| `@nlg`     | Natural-language-generation hint (for rendering the rule as prose) |
-| `@ref`     | Cross-reference to a legal source                                  |
-| `@ref-src` | Accepted and ignored (the CSV loading it did was removed)          |
-| `@ref-map` | Mapping table for references                                       |
+| Annotation      | Purpose                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `@desc`         | Human-readable description (internal unless paired with `@export`)                                               |
+| `@export`       | Mark function for deployment via `jl4-service`                                                                   |
+| `@nlg`          | Natural-language-generation hint (for rendering the rule as prose)                                               |
+| `@ref`          | Cross-reference to a legal source                                                                                |
+| `@ref-src`      | Accepted and ignored (the CSV loading it did was removed)                                                        |
+| `@ref-map`      | Mapping table for references                                                                                     |
+| `@ends-because` | Why a rule whose `HENCE` or `LEST` leads back to itself ends ([regulative](regulative.md#recursive-obligations)) |
 
 `@ref` and `@ref-map` are the "link this rule to §3.2 of the statute" annotations — use them whenever the source document has stable citations.
 An `@ref` on its own line binds to the next syntax node, whatever it is, so it goes above the rule it cites.

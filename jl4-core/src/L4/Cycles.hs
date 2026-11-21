@@ -29,6 +29,7 @@ module L4.Cycles
   , cycleFindings
   , cycleFindingsWith
   , alarms
+  , cycleNotices
   , findingClass
   , findingJSON
     -- * The graph, for the walk check
@@ -48,12 +49,15 @@ import qualified Base.Text as Text
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import Data.Either (partitionEithers)
+import Control.Applicative ((<|>))
 import Data.Graph (SCC (..), stronglyConnComp)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Optics (GPlate, gplate, toListOf)
 
-import L4.Annotation (Anno_ (..), getAnno)
+import L4.Annotation (Anno_ (..), HasSrcRange (..), getAnno)
+import L4.Cycles.Warning
+  ( Continuation (..), CycleTrouble (..), CycleWarning (..), Doubt (..), Multiplication (..), Stall (..) )
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
 import L4.TypeCheck.Environment
@@ -80,30 +84,11 @@ data Finding = MkFinding
   , multiplies :: Maybe Multiplication
     -- ^ a continuation that, firing once, starts two or more copies of the
     -- cycle at once (see Note [What multiplies])
+  , memberIds :: [Unique]
+    -- ^ each definition in the cycle, in the order of 'members', by the
+    -- 'Unique' the checker gave it: what 'cycleNotices' matches an
+    -- @\@ends-because@ by, since overloads share a name
   }
-  deriving stock (Eq, Show)
-
--- | A @HENCE@, @LEST@ or @RECORD … HENCE@ whose expression joins two or more
--- direct calls of the cycle's members with @RAND@ or @ROR@.
-data Multiplication = MkMultiplication
-  { rule      :: Text
-    -- ^ the member whose body holds the continuation
-  , at        :: Maybe SrcRange
-    -- ^ the continuation's expression
-  , operator  :: Text
-    -- ^ @RAND@, @ROR@, or @RAND and ROR@
-  , copies    :: Int
-    -- ^ how many calls of members the expression joins
-  , via       :: Continuation
-  , stepsDown :: Maybe (Text, Rational)
-    -- ^ when every copy is the rule itself, passed one parameter less a
-    -- number written out: that parameter and the number. As written, not a
-    -- proof that the parameter reaches a stop
-  }
-  deriving stock (Eq, Show)
-
--- | Which continuation, with the modal of the obligation it belongs to.
-data Continuation = HenceOf DeonticModal | LestOf DeonticModal | AfterRecord
   deriving stock (Eq, Show)
 
 -- | The three warnings a finding can draw (smucclaw/l4-ide#1075, recursion-limit
@@ -114,7 +99,14 @@ data Continuation = HenceOf DeonticModal | LestOf DeonticModal | AfterRecord
 data Alarm = Multiplies | NoTime | CouldNotCheck
   deriving stock (Eq, Show)
 
+-- | Which warnings a finding draws. A cycle of rules that call each other
+-- with no @HENCE@ or @LEST@ on it draws none (the scope ruling (ii),
+-- 2026-11-21): it stays in the report ('findingJSON'), and the ruling leaves
+-- stopping one that does not end to the run (ruling L2). Here, and not where
+-- the checker reads the alarms ('cycleNotices'), so that the report's
+-- @warnings@ and the checker agree.
 alarms :: Finding -> [Alarm]
+alarms f | f.kind == FunctionCycle = []
 alarms f = [Multiplies | isJust f.multiplies] <> case f.verdict of
   Unproved (Stalled ss) | all isNotPositive ss -> [NoTime]
   Unproved _ -> [CouldNotCheck]
@@ -145,55 +137,6 @@ data Proof
     -- ^ self-recursion on a number that moves by a positive literal towards
     -- a literal bound it is tested against: the parameter at this position
   deriving stock (Eq, Show)
-
-data Doubt
-  = NoMeasure
-    -- ^ self-recursion, and neither function check applies
-  | Mutual
-    -- ^ definitions that call each other with no continuation between: v1
-    -- does not try
-  | Stalled [Stall]
-    -- ^ some lap passes only continuations that need not wait; these are why
-  | Untraced
-    -- ^ a member uses a function no edge follows (Note [What the graph
-    -- cannot see]), so the cycle the graph shows may not be the only one
-  deriving stock (Eq, Show)
-
--- | Why a continuation on a lap cannot be shown to wait.
-data Stall
-  = NotAfterArming Rational
-    -- ^ the deadline falls this long after the arming, which is not after it:
-    -- @WITHIN 0@ or less, an @AFTER@ below 0 beside a bare @WITHIN@, or @OF
-    -- THE DEADLINE@ of such a deadline. It does not move
-  | WithinNotLiteral
-    -- ^ a @WITHIN@ that is not a number written out: it may shrink (a Zeno
-    -- chain) or be zero
-  | AnchoredAtInstant
-    -- ^ @WITHIN d OF e@: counted from a fixed instant, so already past once
-    -- the trace has passed it
-  | AnchoredAtJoin
-    -- ^ @WITHIN d OF THE JOIN@: not shown either way
-  | AnchoredAtDeadline
-    -- ^ @OF THE DEADLINE@ where the obligation that will hand this one on is
-    -- not the one written around it: the deadline is the hand-off's, read
-    -- when it hands on (see Note [What makes a lap wait])
-  | OpensNotLiteral
-    -- ^ @AFTER@ a date, or a number not written out, beside a bare @WITHIN@:
-    -- the window may open at a fixed instant
-  | BeforeDate
-    -- ^ @BEFORE date@: an instant, already past once the trace has passed it
-  | RecordHence
-    -- ^ a @RECORD@'s @HENCE@ runs at once
-  | BarrierMayBeEmpty
-    -- ^ an @EVERY … ONCE ALL HAVE@ @HENCE@ whose roll is not shown to have a
-    -- member: a list written out (or a name for one) holding a member built
-    -- by the cast's constructor, with no @WHO@ or @WHOSE@ filter. Over an
-    -- empty roll it runs at once
-  | OwnTrace
-    -- ^ the module may run a contract inside an @EVALTRACE@, which runs it on
-    -- a trace of its own from that trace's start: no wait, on either trace,
-    -- bounds how deep the runs nest (Note [What makes a lap wait])
-  deriving stock (Eq, Ord, Show)
 
 data Fan = Fan Int | Unbounded
   deriving stock (Eq, Ord, Show)
@@ -351,6 +294,7 @@ cycleFindingsWith library expand info m@(MkModule _ uri _) = map judge sccs
     , fan = maximum (Fan 0 : accumulates : [fanOf mode defs 3 (Map.fromSet (const (Fan 1)) ids) (bodyOf d) | d <- scc])
     , nests = arms && any (\ other -> other /= ids && not (Set.disjoint other (reachable ids))) arming
     , multiplies = listToMaybe (mapMaybe (multiplication defs ids) bursts)
+    , memberIds = [getUnique (decideName d) | d <- scc]
     }
    where
     ids = sccOf scc
@@ -408,7 +352,7 @@ cycleFindingsWith library expand info m@(MkModule _ uri _) = map judge sccs
   -- check at one parameter position; the verdict names the first member's
   functionVerdict ds es = case mapMaybe (selfProof es) ds of
     proofs | length proofs == length ds, (p : _) <- proofs -> Proved p
-    _ -> Unproved NoMeasure
+    _ -> Unproved (NoMeasure [decideText d | d <- ds, isNothing (selfProof es d)])
 
   selfProof es d =
     let calls = [e | e <- es, e.from == getUnique (decideName d)]
@@ -453,7 +397,7 @@ findingClass f =
     Proved WaitsEachLap -> "proved-waits"
     Proved (Structural _) -> "proved-structural"
     Proved (Countdown _) -> "proved-countdown"
-    Unproved NoMeasure -> "unproved-self"
+    Unproved (NoMeasure _) -> "unproved-self"
     Unproved Mutual -> "unproved-mutual"
     Unproved (Stalled ss)
       | all isNotPositive ss -> "no-time"
@@ -484,6 +428,87 @@ findingJSON f = Aeson.object
     , "via" .= Text.textShow x.via
     , "stepsDown" .= fmap fst x.stepsDown
     ]
+
+-- | What the checker says about the module's cycles: the warnings, and the
+-- notes of the @\@ends-because@ marks that silence one ('cycleWarningText',
+-- 'cycleAcceptedText'). Recursion-limit rulings L3 and L4 and the scope
+-- ruling (ii), recorded in @specs\/todo\/GLOBAL-DEPENDENCY-GRAPH-SPEC.md@:
+--
+-- * a finding draws one warning for each alarm 'alarms' gives it, and a
+--   function cycle draws none;
+-- * "multiplies" and "no time" cannot be silenced;
+-- * "could not check" is silenced by an @\@ends-because@ written on the
+--   definition the warning is reported on, the cycle's first in source order
+--   (ruling L4: "written on the definition the warning is reported on"), and
+--   each mark that silences one leaves a note carrying its reason (ruling L4:
+--   "each use emits one information-level message carrying its reason").
+--   A mark on another definition of the cycle silences nothing, and the
+--   warning says where the mark goes;
+-- * a mark on a function cycle, on an obligation cycle shown to end, or on
+--   no cycle at all is taken as written, and says nothing (decided by Claude
+--   2026-11-22, pending Meng's review).
+--
+-- Definitions are matched to marks by 'Unique', not by name. A WHERE or LET
+-- name for an expression is read through ('readThrough') and is never a
+-- member of a cycle, so "on the cycle" is read off the graph that reads
+-- nothing through, where every definition is a node: a mark on such a name
+-- on a lap is on the cycle, and is not the definition it is reported on.
+cycleNotices :: (NormalizedUri -> Maybe Text) -> (Type' Resolved -> Type' Resolved) -> EntityInfo -> Module Resolved -> ([CycleWarning], [CycleWarning])
+cycleNotices library expand info m =
+  (concatMap warnings fs, concatMap accepted fs)
+ where
+  fs = cycleFindingsWith library expand info m
+  decides = sortOn source (moduleDecides m)
+  source = fmap (.start) . rangeOf . decideName
+  idOf = getUnique . decideName
+  byId = Map.fromList [(idOf d, d) | d <- decides]
+  markOf d = getEndsBecauseReason <$> view annEndsBecause (getAnno d)
+  markAt d = rangeOf =<< view annEndsBecause (getAnno d)
+  marked = filter (isJust . markOf) decides
+  -- the strongly connected components of the graph that reads nothing
+  -- through; computed only when the module has a mark
+  plainEdges = snd (moduleGraph (moduleTrust library info m) Map.empty m)
+  plainNext = Map.fromListWith (<>) [(e.from, [e.to]) | e <- plainEdges]
+  plainComponent = Map.fromList
+    [ (n, i)
+    | (i, CyclicSCC ns) <- zip [0 :: Int ..] (stronglyConnComp [(n, n, Map.findWithDefault [] n plainNext) | n <- Map.keys byId])
+    , n <- ns ]
+
+  notice f = case sortOn source (mapMaybe (`Map.lookup` byId) f.memberIds) of
+    [] -> Nothing
+    reported : others ->
+      let ids = Set.fromList f.memberIds
+          component = Map.lookup (idOf reported) plainComponent
+          onIt d = Set.member (idOf d) ids || (isJust component && Map.lookup (idOf d) plainComponent == component)
+      in Just
+        ( reported
+        , \ t at' -> MkCycleWarning
+            { rule = decideText reported
+            , at = at'
+            , through = map decideText others
+            , trouble = t
+            , marks = [(decideText d, r) | d <- marked, onIt d, Just r <- [markOf d]]
+            } )
+  -- which mark silences a "could not check": the one on the definition the
+  -- warning is reported on (ruling L4)
+  silences = isJust . markOf
+  warnings f = case notice f of
+    Nothing -> []
+    Just (reported, base) -> concatMap (warning reported base) (alarms f)
+   where
+    warning reported base = \ case
+      Multiplies | Just x <- f.multiplies -> [base (StartsCopies x) (x.at <|> rangeOf (decideName reported))]
+      Multiplies -> []
+      NoTime -> [base (GivesNoTime [r | Unproved (Stalled ss) <- [f.verdict], NotAfterArming r <- ss]) (rangeOf (decideName reported))]
+      CouldNotCheck
+        | silences reported -> []
+        | Unproved d <- f.verdict -> [base (CouldNotCheckThat d) (rangeOf (decideName reported))]
+        | otherwise -> []
+  accepted f = case notice f of
+    Just (reported, base)
+      | CouldNotCheck `elem` alarms f, silences reported, Unproved d <- f.verdict ->
+          [base (CouldNotCheckThat d) (markAt reported)]
+    _ -> []
 
 ------------------------------------------------------------------------
 -- The graph

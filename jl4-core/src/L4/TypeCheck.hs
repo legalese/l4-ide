@@ -134,6 +134,8 @@ import Text.Read (readMaybe)
 import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 import L4.Lint.SiblingReads (SiblingOperand (..), SiblingRead (..), siblingReads)
+import L4.Cycles (cycleNotices, libraryFile)
+import L4.Cycles.Warning (cycleAcceptedText, cycleWarningText)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -340,11 +342,27 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   [ MkCheckErrorWithContext (CheckWarning (SiblingLedgerRead sr)) None
                   | sr <- siblingReads rprog
                   ]
+                others = substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns
+                -- smucclaw/l4-ide#1075: the rules that start themselves again
+                -- ('L4.Cycles.cycleNotices'). Only on a module with no error:
+                -- the cycles of one that does not check are not worth a
+                -- warning, and its types, which the walk reads, are not
+                -- settled. 'libraryFile', not 'L4.Cycles.apiLibraryFile':
+                -- in the editor @project:/prelude.l4@ may be the author's own
+                -- file (decided by Claude 2026-11-22, pending Meng's review).
+                cycleWarns
+                  | any ((== SError) . severity) others = []
+                  | otherwise =
+                      let (ws, ok) = cycleNotices libraryFile
+                            (applyFinalSubstitution s'.substitution (case rprog of MkModule _ u _ -> u))
+                            env.entityInfo rprog
+                      in [ MkCheckErrorWithContext (CheckWarning (CycleAlarm cw)) None | cw <- ws ]
+                           ++ [ MkCheckErrorWithContext (EndsBecauseAccepted cw) None | cw <- ok ]
             in MkCheckResult
               { program = rprog
               , implicitReaders =
                   Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
-              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns)
+              , errors = suppressResolutionCascade (others ++ cycleWarns)
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -8147,6 +8165,7 @@ prettyCheckError (EndsBecauseOnNonDefinition what mname _) =
   why
     | what == "an input" = "which is not a definition. A mark speaks for a whole definition, not for one of its inputs: to speak for the definition that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it."
     | otherwise = "which is not a definition; move it above the definition it is meant for, or remove it."
+prettyCheckError (EndsBecauseAccepted w) = cycleAcceptedText w
 prettyCheckError (EndsBecauseNeedsReason mname _) =
   [ "@ends-because needs a reason after it, on the same line." <> maybe "" (\ n -> " Here it has none, above `" <> n <> "`.") mname
   , "The reason is what a reader checks: a mark that says the calls end without saying why gives the reader nothing to check, so it is not accepted."
@@ -8705,6 +8724,7 @@ prettyCheckWarning = \ case
     , "Write " <> new <> ", in one word and without backquotes, as every other"
     , "built-in is written. Some versions of L4 no longer accept the old spelling."
     ]
+  CycleAlarm w -> cycleWarningText w
   SiblingLedgerRead w
     | Just rorSite <- w.unrunRor ->
     [ opening

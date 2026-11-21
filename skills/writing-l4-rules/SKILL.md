@@ -786,6 +786,7 @@ that back typechecks and evaluates. See [Record construction and access](#record
 - `@ref`, `@ref-map` — cross-reference to a legal source.
   An `@ref` on its own line binds to the next syntax node, so it goes above the rule it cites.
   To tie an `@ref` to lines of a raw source text with `src:` locators that a script can check, see [`source-locators.md`](../encoding-a-subject/references/source-locators.md) in the `encoding-a-subject` skill.
+- `@ends-because <reason>` — on its own line above a rule whose `HENCE` or `LEST` leads back to itself, to say why it comes to an end. It silences only the "could not check that this comes to an end" warning, only on the rule that warning is shown on, and L4 shows the reason as an information message instead. The reason is required. [regulative](references/regulative.md#recursive-obligations) has the three warnings.
 - `@ref-src` — accepted and ignored.
   It once loaded a CSV of citation links, and that loading was removed; `@ref-src missing.csv` passes `l4 check` without a message.
   [gotchas](references/gotchas.md) has the evidence.

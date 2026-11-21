@@ -65,6 +65,8 @@ Run Tarjan's algorithm (or `Data.Graph.stronglyConnComp`) on the graph. Any SCC 
 
 Report cycles involving at least one computed field as errors. Cycles involving only top-level functions are already possible in L4 (mutual recursion is valid) — only flag cycles that pass through computed fields, since those indicate non-terminating derived attributes.
 
+That stays true after the scope ruling (ii): the checker for cycles of rules gives no warning on a cycle of functions, and lists it only in its report; see [Cycles of rules: rulings L3, L4 and the scope ruling](#cycles-of-rules-rulings-l3-l4-and-the-scope-ruling).
+
 **Open question:** Should mutual recursion between top-level functions that happens to pass through a computed field projection always be an error? Or only when the cycle is "tight" (every node in the SCC is a computed field)?
 
 ### Pass 3: Reachability / Dead Code
@@ -125,6 +127,52 @@ New module `L4.DependencyGraph` in `jl4-core`. Depends on the resolved AST (`Mod
 | Dead code warnings                           | Small — BFS from entry points                 |
 | LSP integration (grey-out)                   | Medium — wire into diagnostics                |
 | Tree-shaking for JSON schema                 | Small — filter by reachable set               |
+
+## Cycles of rules: rulings L3, L4 and the scope ruling
+
+Status, 2026-11-22: proposed, not landed: this branch must not merge before `fix/runaway-lest-1075` lands L2's run-time stop, because ruling L3 ships only "after card L2’s run-time stop exists" (below).
+It is built on `feat/cycle-report-1075`, which is not merged.
+This is not the computed-field pass sketched above.
+`L4.Cycles` (`jl4-core/src/L4/Cycles.hs`) finds the cycles among one module's definitions, top level and `WHERE`/`LET` alike, and asks of each whether it comes to an end, not only whether it exists (smucclaw/l4-ide#1075).
+Its warnings are raised in `doCheckProgramWithDependencies` (`jl4-core/src/L4/TypeCheck.hs`), only on a module with no error; their text is in `jl4-core/src/L4/Cycles/Warning.hs`.
+The page for a first-time reader is `doc/reference/regulative/rules-that-start-themselves-again.md`.
+
+**"Multiplies" is a warning nobody can silence.**
+Card L3: option A, accepted by Meng on 2026-11-20 at 22:49:58Z, with no note; bench "Recursion Limits", https://claude.ai/artifact/GaRTioL8pgDR5sHbEe8fKY (collection `l4-recursion-1120`); printed: "Accept option A. A warning with its own text that cannot be silenced; it names the rule and the operator that starts two copies, and says whether the growth is per missed deadline or bounded by a countdown." "Conditions: it ships only after the report-only pass over every tracked `.l4` file and after card L2’s run-time stop exists; each shape it fires on has a positive and a negative fixture."
+
+- The report-only pass: met. It was measured before the scope ruling was given: 67 warnings and 23 goldens moved with every cycle in scope, against 2 and 3 with obligation cycles only. Re-measured on this branch on 2026-11-21: all 1,602 tracked `.l4` files checked with the binary before and after, with identical exit codes and cycle warnings in exactly three files, none of them "multiplies".
+- L2's run-time stop: **not met on this branch.**
+  It is on `fix/runaway-lest-1075`, which has not landed in `unstable` (`git merge-base --is-ancestor` says so, 2026-11-21), so this branch must not merge before it.
+- The fixtures: `jl4-core/test/CyclesSpec.hs`, "an obligation cycle draws its alarms", has a positive and a negative case for each shape: a `LEST`, the #1075 shape over two rules, a `HENCE`, a countdown, a barrier's `HENCE` and a `RECORD`'s `HENCE`.
+
+**`@ends-because` silences "could not check", and nothing else.**
+Card L4: accepted by Meng on 2026-11-20 at 22:50:17Z, with no note on the mark; bench "Recursion Limits", https://claude.ai/artifact/GaRTioL8pgDR5sHbEe8fKY (collection `l4-recursion-1120`); printed: "Accept, in principle now, built after the report-only count. One annotation, its name your choice (`@ends-because` suggested), with a mandatory reason." "Conditions: it silences only “could not check”, never “multiplies” or “no time”; only for the cycle containing the annotated definition, written on the definition the warning is reported on; each use emits one information-level message carrying its reason; no effect on runtime limits; the ruling is recorded in `GLOBAL-DEPENDENCY-GRAPH-SPEC.md`."
+
+The name, as Meng wrote at 2026-11-20T22:55:57Z: "`@ends-because` sounds fine to me. Note an archaic alternative could have been `@determines` from contract language but we should probably resist the temptation."
+So `@determines` was considered and declined; it is not an alias, and nothing reads it.
+
+- "only for the cycle containing the annotated definition, written on the definition the warning is reported on": a cycle's "could not check" warning is reported on its first member in source order, and only a mark there silences it.
+  Which member that is was decided by Claude 2026-11-22, pending Meng's review: the printed condition says only "the definition the warning is reported on".
+  A mark above another member does not count, and the warning names that mark and says where it goes.
+- "never "multiplies" or "no time"": both still fire under a mark, and when one of the cycle's members carries a mark, their text says that `@ends-because` does not silence them.
+- "each use emits one information-level message carrying its reason": a mark that silences a "could not check" emits it, at the mark. Departure (decided by Claude 2026-11-22, pending Meng's review): a mark with nothing to silence, on a cycle of functions, on a cycle L4 can see ends, or on no cycle at all, emits nothing.
+- "no effect on runtime limits": met.
+  Nothing under `L4.Evaluate*` reads the mark (`git grep annEndsBecause -- 'jl4-core/src/L4/Evaluate*'` finds nothing, 2026-11-22).
+
+**The scope ruling (ii): a cycle of functions draws no warning.**
+Answer (ii), given by Meng on 2026-11-21 at 09:03:09Z, with no note, as written: "RULING (ii) on the cycle checker's scope: the "could not check" warning fires only on obligation cycles (HENCE/LEST loops), not on plain function recursion; "multiplies" and "no time" unchanged; @ends-because still silences "could not check" on its own cycle." The same ruling: "function recursion stays in the report-only pass and is stopped at run time by L2's counts".
+
+- Built in `L4.Cycles.alarms`, which returns no alarm for a `FunctionCycle`, so the checker and the report (`findingJSON`, written by `JL4_CYCLE_REPORT`) agree; the report still lists every cycle of functions.
+- "stopped at run time by L2's counts": **not true on this branch.**
+  The counts are on `fix/runaway-lest-1075`, not landed.
+  Until they land, a function that calls itself forever without a blackhole keeps running, as `doc/reference/errors/README.md` ("Infinite loop detected") says.
+- No warning text names a limit, a number of steps or a flag, since L2's are not on this branch.
+- A mixed cycle, a rule that uses itself directly and also has a `HENCE` or `LEST` back to itself, is an obligation cycle under the literal reading of (ii): "could not check" fires on it, and a mark above it silences it.
+  Decided by Claude 2026-11-21, pending Meng's review.
+  Pinned by the mixed-cycle cases in `jl4-core/test/CyclesSpec.hs`: one rule (`obligation:unproved-self+fans`), two that use each other (`obligation:unproved-mutual+fans`), and a rule that only hands on by a `HENCE` to one that uses itself, where the warning names the rule that uses itself.
+- Measured on this branch: three goldens move, `ok/deontic-breach-semantics` ("could not check" on `recursive lest`), `ok/every/run-after` ("could not check" on `retry`) and `ok/every/run-lest` ("no time" on `forthwith, forever`); none is under `jl4/examples/canon/`.
+
+What review changed: the plan for this build said a mark on any member of the cycle silences its warning; the printed L4 condition says the definition the warning is reported on, and that is what was built.
 
 ## Open Questions
 

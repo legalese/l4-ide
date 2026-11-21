@@ -63,6 +63,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Regulative rules**
 
 - [#EVAL shows the rule instead of an outcome](#eval-shows-the-rule-instead-of-an-outcome)
+- [A rule that starts itself again](#a-rule-that-starts-itself-again)
 
 **Export**
 
@@ -1289,6 +1290,19 @@ GIVETH A DEONTIC Party Action
 ```
 
 This gives `FULFILLED`. See [Regulative rules](../regulative/README.md) and [EVENT](../regulative/EVENT.md).
+
+### A rule that starts itself again
+
+**Warning:** one of
+
+- `` `reminder` can start itself again: a HENCE or LEST in it leads back to `reminder`. I could not check that this comes to an end, because ... ``
+- `` `pay at once` starts itself again with no time passing: ... ``
+- `` `chaser` starts 2 copies of itself at once: its LEST joins them with RAND. ``
+
+A rule whose `HENCE` or `LEST` leads back to itself, directly or through other rules, has to come to an end when it is run over a list of events: each new copy of the duty has to wait, for an event or for some time to pass.
+These warnings say that L4 cannot see that it waits, that it can see it does not, or that it can see the number of duties open grows each time round.
+
+**How to fix it:** see [Rules that start themselves again](../regulative/rules-that-start-themselves-again.md), which takes each warning in turn, says when `@ends-because` is the answer, and says when it is not.
 
 ---
 

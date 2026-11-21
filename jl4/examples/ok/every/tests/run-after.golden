@@ -672,6 +672,15 @@ run-after.l4:710:1-712:31:
   NOTE: This window closes at 30, before it opens at 40: the join line's WITHIN bounds each member from the arming, and the member's AFTER opens later than that, so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
   NOTE: PARTY Tenant OF "Alice" did Sign t at 2, before the window opened at 40: the act does not count as performance. The obligation stays live, but its window closes at 30, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
   NOTE: PARTY Tenant OF "Bob" did Sign t at 4, before the window opened at 40: the act does not count as performance. The obligation stays live, but its window closes at 30, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:720:1-6:
+  `retry` can start itself again: a HENCE or LEST in it leads back to `retry`.
+  I could not check that this comes to an end, because one of its deadlines is counted from a fixed moment (WITHIN … OF …), and once that moment is past, each new copy is already late.
+  
+  If it does come to an end, say why on a line of its own above `retry`, like this:
+  
+    @ends-because <your reason>
+  
+  A reader can then check your reason, and L4 stops warning about it.
 run-after.l4:721:28-33:
   I found a problem while checking the definition of `retry`:
     In this action, `buyer` refers to

@@ -621,6 +621,12 @@ run-lest.l4:550:1-551:50:
       MUST Refund theLandlord
     before their deadline, which was at
       15
+run-lest.l4:564:1-21:
+  `forthwith, forever` starts itself again with no time passing: its deadline falls at the very moment each copy starts.
+  So the time of each copy is up the moment it starts, and the next copy starts straight away.
+  Waiting does not help, because no time passes between one copy and the next, so it does not stop by itself.
+  
+  To give each copy time, make its deadline fall after the moment it starts.
 run-lest.l4:565:27-32:
   I found a problem while checking the definition of `forthwith, forever`:
     In this action, `alice` refers to
