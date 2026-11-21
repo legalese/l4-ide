@@ -1,6 +1,6 @@
 -- Level 6: Reactive Relevance Changes
 -- Tests that parameters can become relevant/irrelevant as user provides input
--- Formula: (switch AND option_a) OR (NOT switch AND option_b)
+-- Formula: (switch AND option_a) OR ((NOT switch) AND option_b)
 --
 -- This is the if-then-else pattern: if switch then option_a else option_b
 --
@@ -32,4 +32,4 @@ GIVEN
   @desc Option B - only relevant when switch is false
   option_b IS A BOOLEAN
 GIVETH A BOOLEAN
-DECIDE `if-then-else result` IF (switch AND option_a) OR (NOT switch AND option_b)
+DECIDE `if-then-else result` IF (switch AND option_a) OR ((NOT switch) AND option_b)
