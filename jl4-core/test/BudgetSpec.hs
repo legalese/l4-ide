@@ -59,7 +59,7 @@ runWith tweak src = map (outcome . (.result)) <$> resultsWith tweak src
     name = \ case
       OpenObligations {}     -> "obligations"
       JoinedBreaches {}      -> "breaches"
-      ClosureApplications {} -> "applications"
+      ClosureApplications {} -> "steps"
       TimeLimit {}           -> "time"
       MemoryLimit {}         -> "memory"
     lineOf = fmap (\ s -> s.start.line)
@@ -291,7 +291,7 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
           ]
     it "stops a function that calls itself with new inputs, names it, and still answers the next directive" $
       runWith (limits Nothing (Just 10000)) loop
-        `shouldReturn` [Over "applications" 10000 (Just 2), Answered]
+        `shouldReturn` [Over "steps" 10000 (Just 2), Answered]
 
     it "names the function" $
       rulesNamed (limits Nothing (Just 10000)) loop `shouldReturn` [Just "f"]
@@ -388,7 +388,7 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
                | i <- [1 .. n :: Int] ]
           <> [ "", "#TRACE d" <> tshow n <> " AT 0 WITH", "  (WAITUNTIL 5)", "", "#EVAL 1 PLUS 1" ]
         overWork = \ case
-          [Over "applications" 10_000 (Just _), Answered] -> True
+          [Over "steps" 10_000 (Just _), Answered] -> True
           _                                                -> False
     it "stops a HENCE-free chain of hand-offs that applies no function, and still answers the next directive" $
       runWith (limits Nothing (Just 10_000)) (fulfilled 16) >>= (`shouldSatisfy` overWork)
@@ -413,7 +413,7 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
           ]
     it "reports a count's hit as the count's, not as needing the input" $
       runWith (limits Nothing (Just 10000)) speculative
-        `shouldReturn` [Over "applications" 10000 (Just 3), Answered]
+        `shouldReturn` [Over "steps" 10000 (Just 3), Answered]
 
     it "stops the run on a memory hit" $
       runWith (\ c -> (limits Nothing Nothing c) {directiveMegabytes = Just 1}) speculative
@@ -455,7 +455,7 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
       -- a counted stop is not a time or memory stop, whatever else is set
       runWith (\ c -> (limits Nothing (Just 10000) c) {directiveSeconds = Just 3600})
         (Text.unlines ["GIVEN n IS A NUMBER GIVETH A NUMBER", "f n MEANS f (n PLUS 1)", "", "#EVAL f 0", "", "#EVAL 1 PLUS 1"])
-        `shouldReturn` [Over "applications" 10000 (Just 2), Answered]
+        `shouldReturn` [Over "steps" 10000 (Just 2), Answered]
 
     it "measures from the start of each directive, so generous limits stop nothing" $
       -- the clock and the allocation counter are read from the directive's

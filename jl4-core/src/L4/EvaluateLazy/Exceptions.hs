@@ -279,7 +279,7 @@ prettyUserEvalException = \ case
     [ "I stopped evaluating: it took more than " <> Text.textShow limit <> " steps, counting each function applied and each contract handed the events."
     , "The last step was in " <> siteName site <> "."
     , "A function that calls itself with new inputs, or a HENCE or LEST that leads back to itself, never ends unless something stops it."
-    , "l4 run and l4 batch take --max-calls N to change the limit, and --max-calls none to remove it." ]
+    , "l4 run and l4 batch take --max-steps N to change the limit, and --max-steps none to remove it." ]
   OverBudget b@(TimeLimit _) ->
     [ "I stopped the run: this took longer than " <> limitText b <> ", so nothing after it was evaluated." ]
   OverBudget b@(MemoryLimit _) ->
@@ -307,7 +307,7 @@ limitText = \ case
   MemoryLimit n -> Text.textShow n <> " MB (--max-eval-memory-mb)"
   OpenObligations n _ -> Text.textShow n <> " obligations open at once (--max-open)"
   JoinedBreaches n _ -> Text.textShow n <> " failures joined into one breach (--max-open)"
-  ClosureApplications n _ -> Text.textShow n <> " steps (--max-calls)"
+  ClosureApplications n _ -> Text.textShow n <> " steps (--max-steps)"
 
 -- | A name a 'Stuck' carries, as its message prints it. An input prints
 -- exactly as it always has, so the one-input message is unchanged.

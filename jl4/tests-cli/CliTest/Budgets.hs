@@ -84,10 +84,10 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
     fmap (map fst) (results sout) `shouldBe` Just [Just (Aeson.String "obligations"), Nothing]
     sout `shouldSatisfy` ("more than 5 obligations" `isInfixOf`)
 
-  it "l4 run --max-calls stops a function that calls itself, names it, and answers the #EVAL after it" $ do
-    Output code sout _ <- within bin ["run", "--json", "--max-calls", "1000", neverStops]
+  it "l4 run --max-steps stops a function that calls itself, names it, and answers the #EVAL after it" $ do
+    Output code sout _ <- within bin ["run", "--json", "--max-steps", "1000", neverStops]
     code `shouldBe` ExitFailure 1
-    fmap (map fst) (results sout) `shouldBe` Just [Just (Aeson.String "applications"), Nothing]
+    fmap (map fst) (results sout) `shouldBe` Just [Just (Aeson.String "steps"), Nothing]
     fmap (map snd . drop 1) (results sout) `shouldBe` Just [Just (Aeson.String "4")]
     sout `shouldSatisfy` ("in countDown, at never-stops.l4:" `isInfixOf`)
 
@@ -111,15 +111,15 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
     serr `shouldSatisfy` ("expected a whole number above 0" `isInfixOf`)
 
   it "l4 run refuses a count of 0" $ do
-    Output code _ serr <- within bin ["run", "--max-calls", "0", neverStops]
+    Output code _ serr <- within bin ["run", "--max-steps", "0", neverStops]
     code `shouldNotBe` ExitSuccess
     serr `shouldSatisfy` ("expected a whole number above 0, or none" `isInfixOf`)
 
-  it "l4 run takes none for either count: a function stopped at --max-calls 1000 answers under none" $ do
-    Output code1 sout1 _ <- within bin ["run", "--json", "--max-calls", "1000", ends]
+  it "l4 run takes none for either count: a function stopped at --max-steps 1000 answers under none" $ do
+    Output code1 sout1 _ <- within bin ["run", "--json", "--max-steps", "1000", ends]
     code1 `shouldBe` ExitFailure 1
-    fmap (map fst) (results sout1) `shouldBe` Just [Just (Aeson.String "applications")]
-    Output code2 sout2 _ <- within bin ["run", "--json", "--max-calls", "none", "--max-open", "none", ends]
+    fmap (map fst) (results sout1) `shouldBe` Just [Just (Aeson.String "steps")]
+    Output code2 sout2 _ <- within bin ["run", "--json", "--max-steps", "none", "--max-open", "none", ends]
     code2 `shouldBe` ExitSuccess
     fmap (map snd) (results sout2) `shouldBe` Just [Just (Aeson.String "0")]
 
@@ -156,7 +156,7 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
 
   it "l4 batch goes on past a row stopped by a count, under --continue-on-error" $ do
     Output code sout _ <- within bin
-      ["batch", "--continue-on-error", "--max-calls", "1000", "--format", "ndjson", batchNeverStops, "--inputs", batchRows]
+      ["batch", "--continue-on-error", "--max-steps", "1000", "--format", "ndjson", batchNeverStops, "--inputs", batchRows]
     code `shouldBe` ExitFailure 1
     map status (lines (filter (/= '\r') sout)) `shouldBe` map (Just . Aeson.String) ["success", "error", "success"]
 
@@ -171,4 +171,4 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
     sout `shouldSatisfy` ("--eval-timeout" `isInfixOf`)
     sout `shouldSatisfy` ("--max-eval-memory-mb" `isInfixOf`)
     sout `shouldSatisfy` ("--max-open" `isInfixOf`)
-    sout `shouldSatisfy` ("--max-calls" `isInfixOf`)
+    sout `shouldSatisfy` ("--max-steps" `isInfixOf`)

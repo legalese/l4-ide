@@ -146,8 +146,8 @@ fixedNowParser = fmap FixedNowOpt $ optional $
 data EvalLimitsOpt = EvalLimitsOpt
   { limitOpen      :: Maybe (Maybe Int)
     -- ^ @--max-open@: 'Nothing' keeps the default, @Just Nothing@ is @none@
-  , limitCalls     :: Maybe (Maybe Int)
-    -- ^ @--max-calls@, read the same way
+  , limitSteps     :: Maybe (Maybe Int)
+    -- ^ @--max-steps@, read the same way
   , limitSeconds   :: Maybe Int
   , limitMegabytes :: Maybe Int
   }
@@ -161,7 +161,7 @@ evalLimitsParser = EvalLimitsOpt
                  <> show maximumOpenObligations <> "; none: no limit)")
         ))
   <*> optional (option countReader
-        ( long "max-calls"
+        ( long "max-steps"
         <> metavar "N|none"
         <> help ("Stop any one #EVAL, #ASSERT or #TRACE that takes more than N steps, counting each function applied and each contract handed the events, as an error on that one (default "
                  <> show maximumClosureApplications <> "; none: no limit)")
@@ -191,7 +191,7 @@ evalLimitsParser = EvalLimitsOpt
 withEvalLimits :: EvalLimitsOpt -> EvalConfig -> IO EvalConfig
 withEvalLimits lims cfg0 = withRunStop $ cfg
   { maxOpenObligations     = fromMaybe cfg.maxOpenObligations lims.limitOpen
-  , maxClosureApplications = fromMaybe cfg.maxClosureApplications lims.limitCalls
+  , maxClosureApplications = fromMaybe cfg.maxClosureApplications lims.limitSteps
   , directiveSeconds       = lims.limitSeconds
   , directiveMegabytes     = lims.limitMegabytes
   }

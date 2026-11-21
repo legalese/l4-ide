@@ -275,6 +275,6 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes 
     budgetName = \ case
       OpenObligations {}     -> "obligations"
       JoinedBreaches {}      -> "breaches"
-      ClosureApplications {} -> "applications"
+      ClosureApplications {} -> "steps"
       TimeLimit {}           -> "time"
       MemoryLimit {}         -> "memory"
