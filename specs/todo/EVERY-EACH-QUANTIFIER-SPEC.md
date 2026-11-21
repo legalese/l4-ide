@@ -3320,6 +3320,11 @@ parties, deduplicated by ledger key, beside ONE anchoring action and deadline); 
 pass found it (eleven blockers from three checkers, eight of them this one defect and three the
 written claims that went with it) and replaced it.
 
+**The same rule on both sides.**
+Recursion Limits bench, card L1, **RULED 2026-11-20, option A** (Meng; note: none; bench https://claude.ai/artifact/GaRTioL8pgDR5sHbEe8fKY): when the same rule, armed at the same moment on the same events, is on both sides of an `RAND` or `ROR`, the breach report names it twice, on every surface, as unstable does today (`entries = ls ++ rs`, `jl4-core/src/L4/Evaluate/ValueLazy.hs`).
+Conditions: legalese/l4-ide#842 states #817's single count (both `sameRule` and the memo merge) as a known divergence from this ruling; main drops both collapses only after it has a runtime budget or sharing that keeps the count; any later sharing on unstable keeps the count, with an on/off differential.
+Consequence accepted with it: until printing is fixed and budgets exist, smucclaw/l4-ide#1075 ends in a named limit rather than an answer.
+
 **The representation is a non-empty list of failures, not `Set`.** Meng, 2026-09-15: _"did we
 consider a NonEmpty list?"_ The sketch said `Set Party`, and a non-empty list had not been
 considered. It was built as a non-empty list, for three reasons. (1) A failed barrier has at least
