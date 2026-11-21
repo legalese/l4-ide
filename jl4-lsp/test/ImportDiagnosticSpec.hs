@@ -59,6 +59,8 @@ cliOutcome = ImportOutcome
       , FileCandidate "VSCode bundle"     "/opt/l4/bin/../../libraries/zz-nope-971.l4"
       ]
   , embedTried = EmbedMissing 22
+  , caseVariantNames = []
+  , ownModuleVariant = Nothing
   }
 
 embedLine :: Text.Text
@@ -115,6 +117,8 @@ spec = do
                 , EmbeddedCandidate
                 ]
             , embedTried = EmbedMissing 22
+            , caseVariantNames = []
+            , ownModuleVariant = Nothing
             }
       got <- triedLocations lspOutcome
       got `shouldBe` [ "project:/zz.l4", asPath "/zz.l4", asPath "/abs/lsp1/zz.l4", embedLine ]

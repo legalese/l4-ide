@@ -56,6 +56,7 @@ import qualified Data.Text.Encoding as TextEncoding
 import System.Directory
 import System.Environment (getExecutablePath, lookupEnv)
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
+import qualified L4.Import.ModuleNameCase as ModuleNameCase
 import qualified L4.Utils.IntervalMap as IV
 
 type instance RuleResult GetLexTokens = ([PosToken], Text)
@@ -433,7 +434,73 @@ data LibraryResolution = LibraryResolution
   , hasExplicitPath :: !Bool
     -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted). Always
     -- False under 'EmbeddedStdlibOnly', which does not read the variable.
+  , caseVariantsFound :: ![(Int, LibraryCandidate, [FilePath])]
+    -- ^ The file tiers whose folder holds the module's file only under other
+    -- capitals (smucclaw/l4-ide#1080): the tier's 1-based index into
+    -- 'candidates', the tier, and the names of those entries. Such a file is
+    -- never a copy of the module, so it is in neither 'winner' nor 'existing'.
+    --
+    -- Collected for every file tier ranked ABOVE the winner, and for every
+    -- file tier when nothing won, by listing the folder WHATEVER the existence
+    -- probe said: a case-sensitive disk says no for @dayDate.l4@ beside
+    -- @daydate.l4@, and the not-found hint and the skipped-variant warning
+    -- must not depend on the disk. A variant below the winner could not have
+    -- won under any rule, so it is not collected, and neither is the
+    -- importing file itself: see 'importerCaseVariant'.
+  , importerCaseVariant :: !(Maybe FilePath)
+    -- ^ The importing file's own name as its folder lists it (@Foo.l4@), when
+    -- a tier that 'caseVariantsFound' looks at lists it as the asked module
+    -- under other capitals (@IMPORT foo@). Kept out of 'caseVariantsFound',
+    -- because offering a file its own name tells it to import itself, and kept
+    -- here so the messages can say what is true instead: the name is the
+    -- file's own, and a module cannot import itself (review finding A, as
+    -- revised by GM on 2026-11-21; assumed, not ruled).
+  , embeddedCaseVariants :: ![Text]
+    -- ^ Embedded stdlib modules whose names differ from the asked one only in
+    -- capitals. Empty when the embedded tier was not probed (JL4_LIBRARY_PATH
+    -- is set), because suggesting a module the run cannot see would mislead.
+  , unlistedFolders :: ![FilePath]
+    -- ^ Folders where the existence probe found the module's file but whose
+    -- entries could not be listed, so the capitals could not be checked. The
+    -- existence answer stands there, as it did before the case rule: refusing
+    -- would break a setup that works for a check that could not be made.
   }
+
+-- | How 'resolveLibraryWith' looks at the disk.
+--
+-- Separate from the resolver so a test can stand in for a case-insensitive
+-- disk (the macOS and Windows defaults) on a case-sensitive one: PR CI runs
+-- @jl4-lsp-test@ on Linux only, where a real disk already refuses
+-- @dayDate.l4@ beside @daydate.l4@, so a test that used the real disk there
+-- would pass with or without the case rule.
+data LibraryProbe = LibraryProbe
+  { probeExists  :: FilePath -> IO Bool
+    -- ^ does a file exist at this path (the operating system's answer, which
+    -- ignores capitals on a case-insensitive disk)
+  , probeListing :: FilePath -> IO (Maybe [FilePath])
+    -- ^ the entries of a folder, 'Nothing' when it cannot be listed
+  }
+
+-- | The real disk.
+realLibraryProbe :: LibraryProbe
+realLibraryProbe = LibraryProbe
+  { probeExists  = doesFileExist
+  , probeListing = \ dir -> either (\ (_ :: SomeException) -> Nothing) Just <$> tryAny (listDirectory dir)
+  }
+
+-- | What the existence probe and the folder's listing said about one file tier.
+data FileTierAnswer
+  = TierPresent
+    -- ^ the file exists, spelled as asked (or the listing could not tell)
+  | TierAbsent
+    -- ^ no file, under any capitals the operating system would accept
+  | TierCaseOnly [FilePath]
+    -- ^ the operating system said yes, but the folder holds the file only
+    -- under these other capitals: refused
+  | TierUnlisted
+    -- ^ the operating system said yes and the folder could not be listed:
+    -- kept, see 'unlistedFolders'
+  deriving stock (Eq, Show)
 
 -- | Resolve a library module across the filesystem and the embedded stdlib.
 -- Candidates are probed in order of priority (first existing wins):
@@ -457,8 +524,27 @@ data LibraryResolution = LibraryResolution
 --
 -- Under 'EmbeddedStdlibOnly' the ladder is the embedded copy alone, whatever the
 -- environment and the working directory hold.
+--
+-- __Capitals count__ (smucclaw/l4-ide#1080; rulings assumed (GM, 2026-11-21),
+-- for Meng's review). A file tier holds the module only when its folder has an
+-- entry spelled exactly @<modName>.l4@. The embedded tier and every in-memory
+-- map already compared names exactly; the file tiers asked 'doesFileExist',
+-- which a case-insensitive disk answers yes for any capitalisation, and the
+-- hit was then loaded under the asked spelling. So on a Mac
+-- @IMPORT dayDate@ found @daydate.l4@ through @JL4_LIBRARY_PATH@ or the XDG
+-- store (outranking the embedded copy and its shadow warning), loaded a second
+-- copy beside an @IMPORT daydate@, and fooled the exporters' "is this the
+-- stdlib" checks; on Linux, in the web playground and in jl4-service the same
+-- line failed. The rule is stated once, in "L4.Import.ModuleNameCase": a file
+-- the disk reports is refused only on a positive sighting of a case variant
+-- ('ModuleNameCase.CaseVariantEntries'), never on a name the listing merely
+-- spells in another Unicode normal form.
 resolveLibrary :: LibraryScope -> FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
-resolveLibrary EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
+resolveLibrary = resolveLibraryWith realLibraryProbe
+
+-- | 'resolveLibrary' against a chosen 'LibraryProbe'.
+resolveLibraryWith :: LibraryProbe -> LibraryScope -> FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
+resolveLibraryWith _probe EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
   pure LibraryResolution
     { winner = Maybe.listToMaybe present
     , existing = present
@@ -466,11 +552,15 @@ resolveLibrary EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
     , searchedPaths = []
     , tiersInOrder = [EmbeddedCandidate]
     , hasExplicitPath = False
+    , caseVariantsFound = []
+    , importerCaseVariant = Nothing
+    , embeddedCaseVariants = ModuleNameCase.caseVariants (Text.pack modName) EmbeddedLibraries.embeddedLibraryNames
+    , unlistedFolders = []
     }
   where
     present = [ (1, EmbeddedCandidate)
               | Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName)) ]
-resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
+resolveLibraryWith probe AmbientLibraries rootDirectory mImportingFile modName = do
   mEnvPath <- lookupEnv "JL4_LIBRARY_PATH"
   xdgDataDir <- getXdgDirectory XdgData "jl4"
   exePath <- getExecutablePath
@@ -495,16 +585,73 @@ resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
            <> [EmbeddedCandidate]
            <> [xdgCand, bundledCand]
       cands = [ c | c <- tiers, not (hasExplicit && c == EmbeddedCandidate) ]
+      indexed = zip [1 :: Int ..] cands
 
-      probe (i, c) = case c of
+  -- Each folder is listed at most once per resolution: from the CLI the
+  -- project root and the importer-relative tier are the same folder.
+  listingCache <- UnliftIO.newIORef (Map.empty :: Map.Map FilePath (Maybe [FilePath]))
+  let listingOf dir = do
+        cached <- Map.lookup dir <$> UnliftIO.readIORef listingCache
+        case cached of
+          Just l -> pure l
+          Nothing -> do
+            l <- probe.probeListing dir
+            UnliftIO.modifyIORef' listingCache (Map.insert dir l)
+            pure l
+      matchOf p =
+        fmap (\ entries -> ModuleNameCase.classifyEntry entries (takeFileName p))
+          <$> listingOf (takeDirectory p)
+
+      -- Pass 1, the copies: what the operating system reports, minus the
+      -- files whose folder spells them only with other capitals.
+      answer c = case c of
         FileCandidate _ p -> do
-          ok <- doesFileExist p
-          pure $ if ok then Just (i, c) else Nothing
+          ok <- probe.probeExists p
+          if not ok then pure TierAbsent else do
+            m <- matchOf p
+            pure $ case m of
+              Nothing -> TierUnlisted
+              Just (ModuleNameCase.CaseVariantEntries vs) -> TierCaseOnly vs
+              -- 'NoEntry' with a yes from the disk is a name listed in another
+              -- Unicode normal form (HFS+ decomposes): the file IS there.
+              Just _ -> TierPresent
         EmbeddedCandidate ->
           pure $ if Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName))
-                   then Just (i, c) else Nothing
+                   then TierPresent else TierAbsent
 
-  present <- catMaybes <$> traverse probe (zip [1 :: Int ..] cands)
+  answers <- traverse (\ (i, c) -> (i, c,) <$> answer c) indexed
+  let present = [ (i, c) | (i, c, a) <- answers, a `elem` [TierPresent, TierUnlisted] ]
+      aboveWinner i = maybe True (\ (w, _) -> i < w) (Maybe.listToMaybe present)
+
+  -- The importing file is never a near miss of what it imports: @Foo.l4@
+  -- that writes @IMPORT foo@ would otherwise be told to import @Foo@, which is
+  -- itself, or to rename itself to @foo.l4@, which makes it import itself
+  -- (CLAUDE.md §5). It is still refused above, as any variant is, and it is
+  -- set apart in 'importerCaseVariant' so that the messages can say so.
+  -- Compared by canonical path, because the two spellings of one file
+  -- differ: from @l4 check Zzself.l4@ the importer is the relative
+  -- @Zzself.l4@ and the folder's entry is @./Zzself.l4@, two strings that are
+  -- not equal (measured 2026-11-21 on nye, HFS+ and APFS).
+  let canonical f = either (\ (_ :: SomeException) -> normalise f) id <$> tryAny (canonicalizePath f)
+  importerSelf <- traverse (canonical . fromNormalizedFilePath) mImportingFile
+  let nearMisses i c p vs = do
+        marked <- case importerSelf of
+          Nothing -> pure [ (False, e) | e <- vs ]
+          Just self -> traverse (\ e -> (, e) . (== self) <$> canonical (takeDirectory p </> e)) vs
+        let others = [ e | (False, e) <- marked ]
+        pure ([ e | (True, e) <- marked ], if null others then Nothing else Just (i, c, others))
+
+  -- Pass 2, the near misses: every file tier above the winner, listed whatever
+  -- the existence probe said (see 'caseVariantsFound').
+  nearMissesByTier <- forM [ x | x@(i, _, _) <- answers, aboveWinner i ] $ \ case
+    (i, c@(FileCandidate _ p), TierCaseOnly vs) -> nearMisses i c p vs
+    (i, c@(FileCandidate _ p), TierAbsent) -> do
+      m <- matchOf p
+      case m of
+        Just (ModuleNameCase.CaseVariantEntries vs) -> nearMisses i c p vs
+        _ -> pure ([], Nothing)
+    _ -> pure ([], Nothing)
+  let variants = catMaybes (map snd nearMissesByTier)
 
   pure LibraryResolution
     { winner = Maybe.listToMaybe present
@@ -513,6 +660,13 @@ resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
     , searchedPaths = [ p | FileCandidate _ p <- cands ]
     , tiersInOrder = tiers
     , hasExplicitPath = hasExplicit
+    , caseVariantsFound = variants
+    , importerCaseVariant = Maybe.listToMaybe (concatMap fst nearMissesByTier)
+    , embeddedCaseVariants =
+        if EmbeddedCandidate `elem` cands
+          then ModuleNameCase.caseVariants (Text.pack modName) EmbeddedLibraries.embeddedLibraryNames
+          else []
+    , unlistedFolders = [ takeDirectory p | (_, FileCandidate _ p, TierUnlisted) <- answers ]
     }
 
 -- | Fetch a candidate's content for the shadow check ('warnOnLibraryShadow').
@@ -606,6 +760,18 @@ data ImportOutcome = ImportOutcome
     -- not-found diagnostic listed only paths, so the one tier that can silently
     -- be empty was the one tier the error could not mention. See
     -- 'renderEmbedStatus'.
+  , caseVariantNames :: ![Text]
+    -- ^ Module names that differ from the asked one only in capitals and that
+    -- an IMPORT could load: the base names of the @.l4@ entries in
+    -- 'caseVariantsFound', then 'embeddedCaseVariants'. What the not-found
+    -- diagnostic's hint names ('ModuleNameCase.caseVariantHint'); empty when
+    -- the import resolved, and when nothing is that close.
+  , ownModuleVariant :: !(Maybe Text)
+    -- ^ The importing file's own module name (@Foo@) when its folder lists it
+    -- as the asked module under other capitals ('importerCaseVariant'), and
+    -- the import did not resolve. With no 'caseVariantNames' to offer, the
+    -- not-found diagnostic then says that a module cannot import itself
+    -- ('ModuleNameCase.selfImportHint').
   }
 
 -- | The embedded-stdlib tier, as the not-found diagnostic needs to describe it.
@@ -829,10 +995,19 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
         "Found in VFS: " <> (fromNormalizedUri vfsUri).getUri
       -- Resolved above the library tiers entirely, so the embed was never reached.
       pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, libTried = []
-                         , embedTried = EmbedSkipped }
+                         , embedTried = EmbedSkipped, caseVariantNames = []
+                         , ownModuleVariant = Nothing }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
       res <- liftIO $ resolveLibrary scope rootDirectory mImportingNfp modName
+
+      -- Only when a file was found and its folder could not be listed, which
+      -- no ordinary run meets, so the logs the golden suite captures are
+      -- unchanged.
+      forM_ res.unlistedFolders $ \ dir ->
+        logWith recorder Debug $ LogImportResolution $
+          "Could not list " <> Text.pack dir <> " to check the capitals of "
+          <> Text.pack (modName <.> "l4") <> "; using the file the disk reports"
 
       -- Detailed candidate accounting + the shadow warning run only when
       -- JL4_LIBRARY_PATH is unset: with the env var set the operator has
@@ -858,7 +1033,16 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
             where n = Map.size EmbeddedLibraries.embeddedLibraries
           outcome mUri = ImportOutcome
             { importUri = mUri, vfsTried = vfsUris, libTried = res.tiersInOrder
-            , embedTried = embedStatus }
+            , embedTried = embedStatus
+            , caseVariantNames =
+                if Maybe.isJust mUri then [] else
+                  [ Text.pack (dropExtension e)
+                  | (_, _, es) <- res.caseVariantsFound, e <- es, takeExtension e == ".l4" ]
+                  <> res.embeddedCaseVariants
+            , ownModuleVariant =
+                if Maybe.isJust mUri then Nothing else
+                  Text.pack . dropExtension <$> res.importerCaseVariant
+            }
 
       case res.winner of
         Just (ix, FileCandidate _ fp) -> do
@@ -1104,12 +1288,23 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
             -- appended after everything else as it was until 2026-09-21: a list
             -- that says it is in the order things were tried has to be.
             allPaths <- liftIO $ triedLocations outcome
-            let diag = mkSimpleFileDiagnostic uri
+            -- The case hint (#1080), second because it is the line that says
+            -- what to type; present only when a module of nearly that name
+            -- exists, so every other not-found message is byte-for-byte as
+            -- before.
+            -- When the only near match is the importing file itself, the line
+            -- says that instead of offering it (review finding A, as revised by
+            -- GM on 2026-11-21; assumed, not ruled).
+            let caseHint = Maybe.maybeToList $
+                  ModuleNameCase.caseVariantHint (Text.pack modName) outcome.caseVariantNames
+                    <|> (ModuleNameCase.selfImportHint (Text.pack modName) =<< outcome.ownModuleVariant)
+                diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
                     (fromNormalizedUri uri).getUri
-                    (Text.unlines
-                      [ "I could not find a module with this name: " <> Text.pack modName
-                      , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
+                    (Text.unlines $
+                      [ "I could not find a module with this name: " <> Text.pack modName ]
+                      <> caseHint <>
+                      [ "Nothing it defines is in scope here; names you expected from it are reported as undefined."
                       , "I have tried the following locations:"
                       , Text.intercalate ",\n" allPaths
                       ])
