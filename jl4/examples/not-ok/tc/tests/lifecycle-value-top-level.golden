@@ -6,7 +6,7 @@ File: lifecycle-value-top-level.l4
   Range: 22:24-22:37
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/lifecycle-unavailable
   Message:
     THE JOIN is the join of the obligation this expression sits in the HENCE or
     LEST of — but it is not WRITTEN inside any HENCE or LEST: it is at the top
@@ -22,7 +22,7 @@ File: lifecycle-value-top-level.l4
   Range: 26:27-26:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -35,7 +35,7 @@ File: lifecycle-value-top-level.l4
   Range: 27:19-27:31
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/lifecycle-unavailable
   Message:
     THE DEADLINE is the deadline of the obligation this expression sits in the HENCE or
     LEST of — but it is not WRITTEN inside any HENCE or LEST: it is at the top

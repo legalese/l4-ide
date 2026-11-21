@@ -6,7 +6,7 @@ File: after-empty-window-value.l4
   Range: 22:42-22:64
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/empty-window
   Message:
     This window closes before it opens: the WITHIN closes it 5 after its anchor,
     and the AFTER opens it 30 after that same anchor, or later still — so
@@ -23,7 +23,7 @@ File: after-empty-window-value.l4
   Range: 28:56-28:78
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/empty-window
   Message:
     This window closes before it opens: the WITHIN closes it 5 after its anchor,
     and the AFTER opens it 30 after that same anchor, or later still — so
@@ -40,7 +40,7 @@ File: after-empty-window-value.l4
   Range: 34:54-34:76
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/empty-window
   Message:
     This window closes before it opens: the WITHIN closes it 5 after its anchor,
     and the AFTER opens it 30 after that same anchor, or later still — so
@@ -57,7 +57,7 @@ File: after-empty-window-value.l4
   Range: 41:40-41:66
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/empty-window
   Message:
     This window closes before it opens: the WITHIN closes it 2 after its anchor,
     and the AFTER opens it 3 after that same anchor, or later still — so
@@ -74,7 +74,7 @@ File: after-empty-window-value.l4
   Range: 47:42-47:66
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/empty-window
   Message:
     This window closes before it opens: the WITHIN closes it 5 after its anchor,
     and the AFTER opens it 30 after that same anchor, or later still — so

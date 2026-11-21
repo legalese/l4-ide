@@ -22,7 +22,7 @@ l4 --help
 
 ### Web editor
 
-To try L4 without installing anything, open the web editor at [jl4.legalese.com](https://jl4.legalese.com/).
+To try L4 without installing anything, open the web editor at [play.legalese.com](https://play.legalese.com/).
 
 Developers can also build `l4` from source; see [Using the l4 CLI](l4-cli.md).
 

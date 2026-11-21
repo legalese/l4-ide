@@ -7,3 +7,5 @@ not (`FALSE` and `not modelled (boolean)`)
 `TRUE` or `not modelled (boolean)`
 the following must refuse: `let over a refusal`
 the following must refuse: `where over a refusal`
+`not modelled (boolean)`
+not `not modelled (boolean)`

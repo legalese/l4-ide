@@ -6,7 +6,7 @@ File: same-name-type-mismatch.l4
   Range: 27:9-27:11
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The type of this definition must match its type signature at same-name-type-mismatch.l4:26:8-17, namely
 

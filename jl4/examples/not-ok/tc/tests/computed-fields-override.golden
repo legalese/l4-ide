@@ -6,7 +6,7 @@ File: computed-fields-override.l4
   Range: 9:18-11:14
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/supplied-computed-field
   Message:
     The field `y` is a computed field
     and cannot be supplied in a record constructor.
@@ -19,7 +19,7 @@ File: computed-fields-override.l4
   Range: 11:5-11:8
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 

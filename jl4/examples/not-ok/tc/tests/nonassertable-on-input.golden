@@ -6,7 +6,7 @@ File: nonassertable-on-input.l4
   Range: 7:1-7:15
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/nonassertable-on-non-definition
   Message:
     @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
     Here it is on `Person`, a declaration, which cannot be asserted in any case; move it above the definition it is meant for, or remove it.
@@ -16,7 +16,7 @@ File: nonassertable-on-input.l4
   Range: 10:1-10:15
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/nonassertable-on-non-definition
   Message:
     @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
     Here it is on `is adult`, an input, which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it.
@@ -26,7 +26,7 @@ File: nonassertable-on-input.l4
   Range: 11:8-11:18
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/deprecated-assume
   Message:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
@@ -51,7 +51,7 @@ File: nonassertable-on-input.l4
   Range: 16:1-16:15
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/nonassertable-on-non-definition
   Message:
     @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
     Here it is on a section heading or its inputs, which cannot be asserted in any case; move it above the definition it is meant for, or remove it.
@@ -61,7 +61,7 @@ File: nonassertable-on-input.l4
   Range: 23:1-23:15
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/nonassertable-on-non-definition
   Message:
     @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
     Here it is on a directive, which cannot be asserted in any case; move it above the definition it is meant for, or remove it.
@@ -71,7 +71,7 @@ File: nonassertable-on-input.l4
   Range: 26:22-26:36
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/nonassertable-on-non-definition
   Message:
     @nonassertable marks a named step, a definition written with MEANS or DECIDE, as one a request may not assert.
     Here it is on `x`, an input, which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it.

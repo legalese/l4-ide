@@ -1,6 +1,6 @@
 # datetime
 
-Absolute points in time: a date, a time of day and a time zone together, for deadlines that fall at a particular moment and for comparisons across time zones. Import it with `IMPORT datetime`. Import `daydate` and `time` as well if you also build `DATE` or `TIME` values with `Date` and `Time`.
+Absolute points in time: a date, a time of day and a time zone together, for deadlines that fall at a particular moment and for comparisons across time zones. Import it with `IMPORT datetime`; that also gives you [daydate](daydate.md) (for `Date`) and `date-compat`. Import `time` as well if you build `TIME` values with `Time`.
 
 A DATETIME is stored as a moment in UTC together with its IANA time zone name. The functions that read it give local values in that time zone.
 

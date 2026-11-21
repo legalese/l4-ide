@@ -1,0 +1,30 @@
+-- A synonym is decided by what it stands for, in both schema generators as in
+-- the JSON decoder: a synonym for MAYBE may be left out or be null, and a
+-- synonym for LIST is an array of its element. The schema golden is
+-- jl4-schema's; each JSONDECODE below is what the decoder accepts.
+
+IMPORT prelude
+
+DECLARE Optional OF a IS A MAYBE a
+DECLARE List OF a IS A LIST OF a
+DECLARE OptNum IS A MAYBE NUMBER
+
+DECLARE Holder HAS
+  o IS AN Optional NUMBER
+  p IS AN OptNum
+  xs IS A List NUMBER
+  n IS A NUMBER
+
+@export default reads a holder
+GIVEN h IS A Holder
+      extra IS AN Optional NUMBER
+GIVETH A NUMBER
+total h extra MEANS h's n + sum (h's xs)
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Holder
+decode s MEANS JSONDECODE s
+
+#EVAL decode "{\"o\": 5, \"p\": 6, \"xs\": [1, 2], \"n\": 1}"
+#EVAL decode "{\"o\": null, \"p\": null, \"xs\": [], \"n\": 1}"
+#EVAL decode "{\"xs\": [], \"n\": 1}"

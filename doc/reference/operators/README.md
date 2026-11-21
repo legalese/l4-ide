@@ -40,6 +40,10 @@ From the tightest-binding to the loosest:
 | 8     | `IMPLIES`, `UNLESS`                                                            | to the right  |
 
 - `2 + 3 * 4` is `14`, and `10 - 4 - 3` is `3`.
+- A call of a user-defined infix function binds tighter than the operators in levels 2 to 8 of the table, so it needs no parentheses next to one.
+  ``a AND n `exceeds by at least` x`` means ``a AND (n `exceeds by at least` x)``.
+  For a function written `x SCALEDBY y`, `10 PLUS 2 SCALEDBY 3` means `10 PLUS (2 SCALEDBY 3)`.
+  See [Mixfix functions](../functions/README.md#mixfix-functions).
 - `NOT` is not in the table: it reaches forward over everything after it on its line, so `NOT a AND b` would mean `NOT (a AND b)`, and L4 refuses that spelling. Write `NOT (a AND b)` for the wide reading or `(NOT a) AND b` for the narrow one. See [How far does NOT reach?](logical.md#how-far-does-not-reach).
 - Parentheses override precedence: `(2 + 3) * 4` is `20`.
 - When an expression spans several lines, an operator written further left than the lines above it applies to all of them together. See [Several lines](logical.md#several-lines).

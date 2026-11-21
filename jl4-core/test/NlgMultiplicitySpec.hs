@@ -21,8 +21,8 @@ import L4.Annotation (getAnno)
 import L4.Lexer (LangTag (..), PosToken, execLexer)
 import L4.Nlg (simpleLinearizer)
 import L4.Parser (execProgramParserWithHintPass, redundantLangEnRanges)
-import L4.Parser.ResolveAnnotation (Warning (..))
-import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
+import L4.Parser.ResolveAnnotation (Warning (..), WithSpan (..))
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..), SrcSpan (..))
 import L4.Syntax
   ( Module
   , Name
@@ -79,6 +79,16 @@ lexed src = do
 ambiguities :: [Warning] -> [Maybe Text]
 ambiguities ws = [ fmap (\ (MkLangTag t) -> t) mtag | Ambiguous _ mtag _ <- ws ]
 
+-- | The overridden @\@lang@ lines a parse reports, each as
+-- @(line, its tag, the line that wins, the winning tag)@.
+overridden :: [Warning] -> [(Int, Text, Int, Text)]
+overridden ws =
+  [ (o.range.start.line, tagText o.payload, w.range.start.line, tagText w.payload)
+  | LangOverridden o w <- ws
+  ]
+ where
+  tagText (MkLangTag t) = t
+
 -- | Two renderings of one rule, written the way an author writes them: the
 -- second herald on the continuation line under the first.
 bilingual :: Text
@@ -106,6 +116,43 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
     -- has not reached yet, not a hole.
     selectedFor "is large" (Just "fr") m `shouldBe` Just "the amount is large"
     selectedFor "is large" Nothing m `shouldBe` Just "the amount is large"
+
+  -- A request names a language, and a wording's tag may add a region to it,
+  -- or the request may: `--lang he` reads a file whose Hebrew is tagged
+  -- `he-IL`, and `--lang he-IL` reads one whose Hebrew is tagged `he`.
+  describe "selects across a region or script the request or the tag adds" $ do
+    let regional =
+          "GIVEN amount IS A NUMBER\n\
+          \GIVETH A BOOLEAN\n\
+          \DECIDE `is large` @nlg the amount is large\n\
+          \                  @nlg:he-IL ha-sechum gadol\n\
+          \  IF amount > 100\n"
+    it "picks a wording tagged he-IL for a request for he" $ do
+      (m, _) <- parsed regional
+      selectedFor "is large" (Just "he") m `shouldBe` Just "ha-sechum gadol"
+      selectedFor "is large" (Just "he-IL") m `shouldBe` Just "ha-sechum gadol"
+
+    it "picks a wording tagged he for a request for he-IL" $ do
+      (m, _) <- parsed bilingual
+      selectedFor "is large" (Just "he-IL") m `shouldBe` Just "ha-sechum gadol"
+
+    it "prefers the exact tag, then the tag the request extends" $ do
+      (m, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg the amount is large\n\
+        \                  @nlg:he-XX ha-sechum gadol mi-XX\n\
+        \                  @nlg:he ha-sechum gadol\n\
+        \                  @nlg:he-IL ha-sechum gadol be-yisrael\n\
+        \  IF amount > 100\n"
+      selectedFor "is large" (Just "he-IL") m `shouldBe` Just "ha-sechum gadol be-yisrael"
+      selectedFor "is large" (Just "he-YY") m `shouldBe` Just "ha-sechum gadol"
+      selectedFor "is large" (Just "he") m `shouldBe` Just "ha-sechum gadol"
+
+    it "does not match another language, or another case" $ do
+      (m, _) <- parsed regional
+      selectedFor "is large" (Just "hei") m `shouldBe` Just "the amount is large"
+      selectedFor "is large" (Just "HE") m `shouldBe` Just "the amount is large"
 
   -- Which one is the DEFAULT. An untagged rendering carries the MODULE's
   -- language — its `@lang`, or `en` when it declares none (R-M2) — so in a
@@ -341,3 +388,34 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
       case redundantLangEnRanges ts of
         [r] -> (r.start.line, r.start.column, r.end.line) `shouldBe` (1, 1, 1)
         other -> expectationFailure ("expected one range, got " <> show other)
+
+  ----------------------------------------------------------------------------
+  -- Two different `@lang` lines in one module: the last one wins, and the
+  -- others are told so. A line that repeats the winning tag is not.
+  ----------------------------------------------------------------------------
+  describe "two different @lang lines in one module" $ do
+    let body = "GIVEN x IS A BOOLEAN\nGIVETH A BOOLEAN\nDECIDE echo x IS x\n"
+        overriddenIn src = overridden . snd <$> parsed src
+
+    it "reports the earlier line, naming both languages and the line that wins" $
+      overriddenIn ("@lang en\n@lang he\n" <> body)
+        `shouldReturn` [(1, "en", 2, "he")]
+
+    it "reports it the other way round too: the last line wins whichever it says" $
+      overriddenIn ("@lang he\n@lang en\n" <> body)
+        `shouldReturn` [(1, "he", 2, "en")]
+
+    it "reports every line that differs from the winner, and none that repeats it" $
+      overriddenIn ("@lang he\n@lang en\n@lang he\n" <> body)
+        `shouldReturn` [(2, "en", 3, "he")]
+
+    it "says nothing when every line names the same language" $
+      overriddenIn ("@lang he\n@lang he\n" <> body) `shouldReturn` []
+
+    it "says nothing for a single line, or for none" $ do
+      overriddenIn ("@lang he\n" <> body) `shouldReturn` []
+      overriddenIn body `shouldReturn` []
+
+    it "compares the tags exactly, as the pipeline does" $
+      overriddenIn ("@lang en\n@lang EN\n" <> body)
+        `shouldReturn` [(1, "en", 2, "EN")]

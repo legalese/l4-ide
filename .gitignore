@@ -50,7 +50,6 @@ result*
 **/.svelte-kit/
 # Testing
 ## test setup
-ts-apps/jl4-web/src/generated/
 tsconfig.tsbuildinfo
 .turbo
 # Turbo

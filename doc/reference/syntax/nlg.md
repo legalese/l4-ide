@@ -23,7 +23,7 @@ Text in square brackets after a name is a short form: ``DECIDE `the limit` [the 
 `%name%` is filled with the call's argument.
 
 - An input with spaces in its name keeps its backticks: ``%`the amount`%``.
-- A slot has no spaces inside. `% amount %` is not a slot, and nothing warns.
+- A slot has no spaces inside. `% amount %` is plain text, and L4 warns.
 - An input with no slot is not dropped. It follows the sentence: "the threshold is passed with 5".
 
 To write `%` or `]` as itself, put a backslash before it:
@@ -179,16 +179,18 @@ $ l4 nlg --lang he mymodule.l4
 $ l4 render --format html --lang he mymodule.l4 -o mymodule.he.html
 ```
 
+The Render tab in VS Code has a language menu when a file has wordings in more than one language.
+
 - **L4 does not translate.** It picks among the wordings you wrote.
-- **A tag is matched as written.** `--lang he` does not read a `he-IL` wording, and `--lang he-IL` does not read a `he` one.
+- **Regions match.** `--lang he` reads a `he-IL` wording, and `--lang he-IL` reads a `he` one. An exact match comes first.
 - **A missing wording falls back** to the rule's default: the one in the module's language, otherwise the first in the file.
 - **The square-bracket form cannot be tagged.**
-- **A word glued to the colon is a tag.** `@nlg:the employee pays` has the tag `the` and reads "employee pays", and nothing warns. Leave a space after the colon to keep it as text.
+- **A word glued to the colon is a tag.** `@nlg:the employee pays` has the tag `the`. L4 warns when nothing backs a tag as a language. Leave a space after the colon to keep it as text.
 
 **`@lang he`** on a line of its own means every untagged `@nlg` in the module is Hebrew. It applies to the whole file.
 
 - A module that declares nothing is `en`, so `@lang en` is not needed, and L4 hints that it can go.
 - Declare the language of a module that is not English: it sets `<html lang=…>`, right-to-left `dir` and the Akoma Ntoso language.
-- If two `@lang` lines disagree, the last one is used, and nothing warns.
+- If two `@lang` lines disagree, the last one is used, and L4 warns.
 
 **L4's own words,** such as "is equal to", "if" and "with", follow `--lang` where L4 has a table for the language. Hebrew is the only one. It is small and keeps English word order, so have a Hebrew speaker read the output. A word with no entry stays English, and `l4 nlg` names it on stderr.

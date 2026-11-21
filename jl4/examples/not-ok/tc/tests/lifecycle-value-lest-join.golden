@@ -6,7 +6,7 @@ File: lifecycle-value-lest-join.l4
   Range: 16:27-16:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -19,7 +19,7 @@ File: lifecycle-value-lest-join.l4
   Range: 17:33-17:38
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -32,7 +32,7 @@ File: lifecycle-value-lest-join.l4
   Range: 17:51-17:65
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/lifecycle-unavailable
   Message:
     THE JOIN cannot be read under LEST.
 
