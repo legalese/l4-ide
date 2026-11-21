@@ -55,6 +55,38 @@ Three rules of thumb fall out of the table:
   consulted _at all_ — the operator has taken full control of the library
   store. (The ambient tiers are still searched after it, for extras.)
 
+**Capitals count on every tier.**
+A tier holds `<mod>` only when it has a file spelled exactly `<mod>.l4`, so `IMPORT dayDate` does not find `daydate.l4` in any folder, on any disk, in any host.
+The embedded tier and the in-memory one always compared names exactly, and so did the web playground and `jl4-service`.
+The folder tiers (1, 2, 3, 5 and 6) asked the operating system whether the file exists, and a case-insensitive disk, the default on macOS and Windows, answers yes for any capitals; the file was then loaded under the spelling the `IMPORT` used.
+So on a Mac, `IMPORT dayDate` found `daydate.l4` through `JL4_LIBRARY_PATH`, or in the XDG store with no shadow warning (the built-in copy, compared exactly, did not match); and beside an `IMPORT daydate` it loaded the same file a second time, which made every name in it ambiguous.
+Now each folder tier also reads the folder's list of files, and refuses a file the operating system reports when the list spells it only with other capitals.
+The same goes for a few differences that are not capitals but that the default Mac disk also ignores, such as `ß` for `ss`: `IMPORT strasse` does not load `straße.l4`.
+
+When nothing matches, the not-found error names any module whose name differs only in capitals ([When only the capitals differ](#when-only-the-capitals-differ)).
+When something lower down matches, but a folder tier above it held the name in other capitals, the import uses the lower copy and a warning names the file it passed over ([Reading the resolver's output](#reading-the-resolvers-output)).
+Both come from the folder's list, not from the operating system's answer, so they read the same on Linux as on a Mac.
+
+What has been run, and what is reasoned: the rule was checked on a Mac, on an HFS+ volume (every example in the specification's probe table, and the test suites) and on the APFS internal disk (a file that imports a variant of its own name); which spellings each disk treats as one file, such as `straße` and `strasse`, was measured on both.
+On Linux and Windows it is reasoned from the code, and from tests that stand in for each kind of disk; it has not been run on those systems by hand.
+The web playground and Legalese Cloud compare names in memory, so no disk is involved there.
+
+The limits of the rule, each accepted rather than fixed:
+
+- **Unicode normal forms.**
+  The comparison does not normalise Unicode.
+  Mac OS Extended (HFS+) stores an accented letter taken apart, as a plain letter followed by a combining accent, while the `IMPORT` spells it as one character; the two spellings of `café` match neither exactly nor by capitals, so for such a name L4 keeps the operating system's answer, as before.
+  A correctly spelled `` IMPORT `café` `` therefore still works on HFS+, and the cost is that `` IMPORT `CAFÉ` `` is also accepted there.
+  Closing that would need a Unicode normalisation library, which L4 does not depend on.
+- **A folder L4 cannot list.**
+  When the operating system says the file exists but the folder's list of files cannot be read, L4 cannot check the capitals, so it uses the file under any capitals, as before.
+  It notes this only in a Debug line, which the command line does not print.
+- **A file ending in `.L4`.**
+  A file such as `daydate.L4` is refused, because a module's file must end in `.l4`, but the not-found error does not suggest it: no spelling of the `IMPORT` would reach it.
+  When it is passed over for a copy lower down, the warning names it and says to rename it.
+- **Unsaved changes in the editor.**
+  The not-found error in the editor names only modules saved on disk or built in; a module that exists only in an unsaved editor tab is not suggested.
+
 **`jl4-service` uses a shorter ladder.** A service that runs bundles other
 people uploaded cannot let its own machine stand in for the standard library.
 So a deployment's `IMPORT`s are resolved against the bundle's own files (tier 0)
@@ -89,12 +121,15 @@ defined fails. The service logs a `WARN` for each one, naming the deployment, th
 importing file and the module (`Bundle IMPORT resolves to nothing`), when the
 bundle is compiled, which a restart does again from the stored sources. A refusal at
 deploy time is not made; it would need a ruling of its own.
+When the module's name differs only in capitals from a standard library module, or from a bundle `.l4` file other than the importing one in a directory the importing file can import from (its own, or the bundle's root as above), that `WARN` also carries a `hint` field with the sentence the command line prints, such as ``Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?``.
+When the only near match is the importing file's own name (`Foo.l4` that writes `IMPORT foo`), the `hint` says that a module cannot import itself, as the command line does (see [When only the capitals differ](#when-only-the-capitals-differ)).
 
 This ordering is pinned by tests: `jl4-lsp/test/LibraryResolutionSpec.hs`
 (unit, table-driven), the `l4 library resolution shadow (B′)` group in
 `jl4/tests-cli/Main.hs` (black-box CLI), and, for the service's shorter ladder,
 `jl4-service/test/StdlibResolutionSpec.hs` and
 `jl4-service/test/UnresolvedImportSpec.hs`.
+The capitals rule is pinned by `jl4-core/test/ModuleNameCaseSpec.hs` (the comparison and the sentence), the "the case rule (#1080)" group of `LibraryResolutionSpec.hs`, the `l4 IMPORT: capitals count in a module name (#1080)` group in `jl4/tests-cli/Main.hs`, `jl4-core/test/ImportResolutionSpec.hs` (the library's checker) and `jl4-service/test/UnresolvedImportSpec.hs` (the `hint` field).
 
 ---
 
@@ -176,9 +211,10 @@ any module sits there you'll get a warning (next section).
 
 ## Reading the resolver's output
 
-All of the following appears only when `JL4_LIBRARY_PATH` is **unset** (in the
-env-pinned regime you have explicitly chosen your store, and the logs keep the
-historical one-line form).
+The winner's line in this form, the candidate table and the shadow warning
+appear only when `JL4_LIBRARY_PATH` is **unset** (in the env-pinned regime you
+have explicitly chosen your store, and the logs keep the historical one-line
+form). The skipped-file warning, last below, appears in both.
 
 **The winner**, at Info priority, with its position in the candidate order and
 — when the path is a symlink — its real target:
@@ -216,6 +252,36 @@ stderr; Info/Debug lines are visible in the LSP log channel only.
 `l4 check --json` and `l4 run --json` carry the same Warning lines in the
 `diagnostics` array of their output, so a program that reads that array sees a
 shadow warning there too.
+
+**The skipped-file warning**, at Warning priority, when a folder tier ranked above the copy that was used holds the module's file only under other capitals.
+Unlike the lines above, it is printed whether or not `JL4_LIBRARY_PATH` is set, because the file passed over is your own; it names files by name and their place in words, never by path:
+
+```
+Warning | [Import Resolution] `IMPORT math` did not use `Math.l4` beside the importing file, because capital letters count in a module name: `Math` and `math` are different names.
+It used the standard library's `math` instead.
+To use that file, change the IMPORT to `Math`, or rename the file to `math.l4`.
+```
+
+The reason and the fix depend on how the file's name differs:
+
+- by more than capitals, such as `straße.l4` for `IMPORT strasse`: the reason is ``module names must match exactly, letter for letter: `straße` and `strasse` are different names``, and the fixes are the same two;
+- in its ending, such as `prelude.L4` for `IMPORT prelude`: the reason is ``a module's file name must end in `.l4`, in small letters``, and the only fix is ``rename it to `prelude.l4` ``, because an `IMPORT` names no ending, so no spelling of it reaches that file.
+
+When several files are passed over, the first line says `did not use these files`, and each follows on its own line.
+A file with other capitals ranked _below_ the copy used is not mentioned: it could not have been chosen under any rule.
+Nor is an `IMPORT` written inside the standard library: the library's `currency` writes `IMPORT jurisdiction`, and a `Jurisdiction.l4` of yours in the project root is not used for it, but you are not told to change an `IMPORT` you did not write.
+With `JL4_LIBRARY_PATH` set, the folder it names ranks above the project, so a `math.l4` there is used and a `Math.l4` beside your file is not passed over, and nothing is printed.
+
+The importing file itself is never offered either fix, because either one would make the file import itself.
+When it is the file passed over, as for `Math.l4` that writes `IMPORT math`, the warning says what is true instead:
+
+```
+Warning | [Import Resolution] `IMPORT math` did not use `Math.l4`, which is the importing file itself: `math` differs from `Math`, the name of this file's own module, only in its capitals.
+It used the standard library's `math` instead.
+If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT. If you meant the standard library's `math`, nothing needs to change.
+```
+
+If you meant the standard library's `math`, the warning appears on every check until the file has another name, one that is not `math` in any capitals.
 
 An `IMPORT` that resolves to nothing is an error, not a shadow warning: see [When nothing resolves](#when-nothing-resolves).
 
@@ -260,9 +326,46 @@ The embedded stdlib sits at its own rank too — tier 4 in the table above — r
 
 The same mistake is also announced once, at Warning priority, as `Module not found: myhelpers`: once for each importing file, however many of the toolchain's rules go looking for the import. (`l4 ast`, which never typechecks, prints that one line on stderr and exits 0.)
 
-The second line of the message is there because this is usually not the first error you see.
+The line `Nothing it defines is in scope here` is there because this is usually not the first error you see.
 A failed import produces one `I could not find a definition for the identifier` for every name it was supposed to supply, and those read like broken source rather than like a failed import.
 So if you are looking at a screen full of undefined identifiers, read the top of it.
+
+### When only the capitals differ
+
+Capital letters count in a module name ([the resolution order](#the-resolution-order) says why), so `IMPORT dayDate` does not find `daydate.l4`.
+When a module's name differs from the one asked for only in its capitals, the message gains a second line that names it:
+
+```
+I could not find a module with this name: dayDate
+Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?
+Nothing it defines is in scope here; names you expected from it are reported as undefined.
+I have tried the following locations:
+...
+```
+
+When several modules differ from it only in capitals, the line names them all: ``Did you mean one of: `DayDate`, `daydate`?``.
+The names come from every folder tier that was tried, read from the folder's list of files, and from the built-in standard library when it was consulted (not when `JL4_LIBRARY_PATH` is set).
+They are module names, never paths, so the line is the same on every computer.
+The file that writes the `IMPORT` is never offered, since importing itself would fail.
+When that file's own name is the only near match, as for `IMPORT foo` written in `Foo.l4`, the line says so instead:
+
+```
+`foo` differs from `Foo`, the name of this file's own module, only in its capitals. If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT.
+```
+
+Everything a file defines can already be used in that file, so an `IMPORT` of its own name is never needed.
+When the difference is more than capitals, the line says `only in how its letters are written` instead of `only in its capitals`.
+
+A name can also differ by more than capitals in a way the default Mac disk ignores, such as `ß` for `ss`; that name is offered too, but the line says why without blaming capitals:
+
+```
+Module names must match exactly, letter for letter: `strasse` and `straße` are different names. Did you mean `straße`?
+```
+
+The web playground gives the same sentence.
+Connected to a language server, it shows the message above.
+Checking in the browser, it shows its own one-line message, `Module not found: dayDate (searched: embedded libraries, project VFS)`, with the sentence on a line of its own after it; so does the checker a program calls through the library (`checkWithImports`).
+On Legalese Cloud the sentence is the `hint` field of the service's `WARN` (see [the resolution order](#the-resolution-order), under the service's shorter ladder).
 
 ### Which commands fail on it
 

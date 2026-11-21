@@ -594,9 +594,26 @@ This is an error, not a warning: it fails `l4 check` and `l4 run` even when noth
 
 An `IMPORT` names a module that is neither a standard library nor a file `helpers.l4` in your project's root folder or beside the importing file.
 
+Capital letters count in a module name, so `IMPORT dayDate` does not find `daydate.l4`, on any computer.
+When the name you wrote differs only in its capitals from a module L4 can see, the error has one more line, second, which names the spelling to use:
+
+```
+I could not find a module with this name: dayDate
+Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?
+Nothing it defines is in scope here; names you expected from it are reported as undefined.
+I have tried the following locations:
+...
+```
+
+When several modules differ from your spelling only in capitals, the line lists them all: ``Did you mean one of: `DayDate`, `daydate`?``.
+When a name differs by more than capitals, in a way some disks ignore, such as `ß` for `ss`, the line begins `Module names must match exactly, letter for letter:` instead.
+The line never suggests the file you are in, and never a file whose name ends in `.L4` rather than `.l4`: no `IMPORT` can reach such a file until it is renamed.
+When the only near match is the file you are in, as for `IMPORT foo` written in `Foo.l4`, the line says so instead: ```foo` differs from `Foo`, the name of this file's own module, only in its capitals. If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT.``
+
 **How to fix it:**
 
 - Check the name. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output. A name with a hyphen needs backticks: ``IMPORT `legal-persons` ``. `IMPORT` takes a module name, not a path: a folder in front of the name is ignored.
+- Check the capitals, and write the name exactly as the file spells it: `IMPORT daydate` for `daydate.l4`. A file that checked on a Mac or a Windows computer before this rule may stop checking there now; it already failed on Linux, in the web playground and on Legalese Cloud.
 - Put your own module in the project's root folder or beside the file that imports it.
 - If `JL4_LIBRARY_PATH` is set, the built-in standard library is not used at all, so that folder must hold every library you import, `prelude.l4` included.
 

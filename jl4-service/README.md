@@ -82,6 +82,9 @@ The service logs three `WARN` lines about this:
 - `JL4_LIBRARY_PATH is set and ignored`, at start-up, with the path, when the variable is set.
 - `Bundle file stands in for a standard library module`, each time a bundle is compiled that ships a file named like a standard library module with different text. It names the deployment, the file and the module.
 - `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422.
+  When the module's name differs only in capital letters from a built-in standard library module, or from a bundle `.l4` file the importing file could have reached (other than itself), the line also has a `hint` field: ``Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?``.
+  When the only near match is the importing file itself (`Foo.l4` that writes `IMPORT foo`), the `hint` is ```foo` differs from `Foo`, the name of this file's own module, only in its capitals. If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT.``
+  For a name that differs by more than capitals in a way some disks ignore, such as `ß` for `ss`, the field begins `Module names must match exactly, letter for letter:` instead.
 
 [Library Resolution](../doc/reference/libraries/resolution.md) has the whole order for the `l4` command and the editor.
 

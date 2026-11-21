@@ -532,7 +532,8 @@ data FileTierAnswer
 -- which a case-insensitive disk answers yes for any capitalisation, and the
 -- hit was then loaded under the asked spelling. So on a Mac
 -- @IMPORT dayDate@ found @daydate.l4@ through @JL4_LIBRARY_PATH@ or the XDG
--- store (outranking the embedded copy and its shadow warning), loaded a second
+-- store (there with no shadow warning, because the embedded tier, compared
+-- exactly, missed), loaded a second
 -- copy beside an @IMPORT daydate@, and fooled the exporters' "is this the
 -- stdlib" checks; on Linux, in the web playground and in jl4-service the same
 -- line failed. The rule is stated once, in "L4.Import.ModuleNameCase": a file
