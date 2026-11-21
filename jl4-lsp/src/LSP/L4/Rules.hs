@@ -545,7 +545,15 @@ resolveLibrary = resolveLibraryWith realLibraryProbe
 
 -- | 'resolveLibrary' against a chosen 'LibraryProbe'.
 resolveLibraryWith :: LibraryProbe -> LibraryScope -> FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
-resolveLibraryWith _probe EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
+resolveLibraryWith probe scope rootDirectory mImportingFile =
+  resolveLibraryFor probe scope rootDirectory mImportingFile mImportingFile
+
+-- | 'resolveLibraryWith', told which file counts as the importing one when that
+-- is not the file that wrote the IMPORT ('ImporterStandIns'). It decides only
+-- which file is set apart in 'importerCaseVariant'; the folders searched are
+-- still those of the file that wrote the IMPORT.
+resolveLibraryFor :: LibraryProbe -> LibraryScope -> FilePath -> Maybe NormalizedFilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
+resolveLibraryFor _probe EmbeddedStdlibOnly _rootDirectory _mImportingFile _mSelf modName =
   pure LibraryResolution
     { winner = Maybe.listToMaybe present
     , existing = present
@@ -561,7 +569,7 @@ resolveLibraryWith _probe EmbeddedStdlibOnly _rootDirectory _mImportingFile modN
   where
     present = [ (1, EmbeddedCandidate)
               | Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName)) ]
-resolveLibraryWith probe AmbientLibraries rootDirectory mImportingFile modName = do
+resolveLibraryFor probe AmbientLibraries rootDirectory mImportingFile mSelf modName = do
   mEnvPath <- lookupEnv "JL4_LIBRARY_PATH"
   xdgDataDir <- getXdgDirectory XdgData "jl4"
   exePath <- getExecutablePath
@@ -634,7 +642,7 @@ resolveLibraryWith probe AmbientLibraries rootDirectory mImportingFile modName =
   -- @Zzself.l4@ and the folder's entry is @./Zzself.l4@, two strings that are
   -- not equal (measured 2026-11-21 on nye, HFS+ and APFS).
   let canonical f = either (\ (_ :: SomeException) -> normalise f) id <$> tryAny (canonicalizePath f)
-  importerSelf <- traverse (canonical . fromNormalizedFilePath) mImportingFile
+  importerSelf <- traverse (canonical . fromNormalizedFilePath) mSelf
   let nearMisses i c p vs = do
         marked <- case importerSelf of
           Nothing -> pure [ (False, e) | e <- vs ]
@@ -943,6 +951,15 @@ resolveImportShared recorder shadowWarnedRef caseSkipWarnedRef notFoundWarnedRef
           _            -> "Module not found: " <> Text.pack modName
   pure outcome
 
+-- | Files that stand in for another as the importer of what they IMPORT, keyed
+-- by the stand-in. jl4-repl checks each expression in an in-memory file beside
+-- the loaded one, holding a copy of its text, and registers that file here, so
+-- an IMPORT of the loaded file's own name under other capitals is still told
+-- that a module cannot import itself (smucclaw/l4-ide#1080; assumed, not
+-- ruled). 'jl4RulesIn' registers it empty, and no other host writes to it.
+newtype ImporterStandIns = ImporterStandIns (IORef (Map.Map NormalizedFilePath NormalizedFilePath))
+instance IsIdeGlobal ImporterStandIns
+
 -- | 'resolveImportShared' without the not-found announcement.
 resolveImportQuietly
   :: Recorder (WithPriority Log)
@@ -1012,7 +1029,10 @@ resolveImportQuietly recorder shadowWarnedRef caseSkipWarnedRef scope rootDirect
                          , skippedCaseVariantWarning = Nothing }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
-      res <- liftIO $ resolveLibrary scope rootDirectory mImportingNfp modName
+      ImporterStandIns standInsRef <- getIdeGlobalAction
+      standIns <- UnliftIO.readIORef standInsRef
+      let mSelf = (\ nfp -> Map.findWithDefault nfp nfp standIns) <$> mImportingNfp
+      res <- liftIO $ resolveLibraryFor realLibraryProbe scope rootDirectory mImportingNfp mSelf modName
 
       -- Only when a file was found and its folder could not be listed, which
       -- no ordinary run meets, so the logs the golden suite captures are
@@ -1337,6 +1357,8 @@ jl4Rules = jl4RulesIn AmbientLibraries
 
 jl4RulesIn :: LibraryScope -> EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
 jl4RulesIn scope evalConfig rootDirectory recorder = do
+  -- The files a host has made stand in for another importer (jl4-repl's).
+  addIdeGlobal . ImporterStandIns =<< UnliftIO.newIORef Map.empty
   -- Session-scoped memory for 'resolveImportShared''s shadow warning, so a
   -- given shadow configuration is reported once, not on every re-resolution.
   shadowWarnedRef <- UnliftIO.newIORef Set.empty
