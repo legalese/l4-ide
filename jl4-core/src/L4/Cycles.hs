@@ -1369,7 +1369,10 @@ mulF _ _ = Unbounded
 --     @deleteBy@); a helper of the author's own imported from another
 --     module; and every library function in a pipeline that names its
 --     modules @project:/…@, unless it passes 'apiLibraryFile', as the API's
---     does.
+--     does; and every library function wherever the libraries are found
+--     somewhere else (the XDG store, the bundle beside the binary, or a
+--     @JL4_LIBRARY_PATH@ that does not end in @jl4-core/libraries@). The
+--     measurement above resolved the prelude to the compiled-in copy.
 --   * Silent: a file of the author's own whose path ends in
 --     @jl4-core/libraries/prelude.l4@, and which defines a @map@ of its
 --     own, is taken for the library. The editor's @project:/@ names, which
