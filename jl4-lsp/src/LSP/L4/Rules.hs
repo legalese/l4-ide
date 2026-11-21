@@ -910,6 +910,8 @@ resolveImportShared
   :: Recorder (WithPriority Log)
   -> IORef (Set.Set (String, [Text]))
      -- ^ shadow configurations already warned about this session (warn-once)
+  -> IORef (Set.Set (String, [Text]))
+     -- ^ skipped case variants already warned about this session (warn-once)
   -> IORef (Set.Set (Text, String))
      -- ^ (importing module, module name) pairs already announced as not found
   -> LibraryScope
@@ -917,8 +919,8 @@ resolveImportShared
   -> NormalizedUri     -- ^ importing module
   -> String            -- ^ bare module name
   -> Action ImportOutcome
-resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory importerUri modName = do
-  outcome <- resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName
+resolveImportShared recorder shadowWarnedRef caseSkipWarnedRef notFoundWarnedRef scope rootDirectory importerUri modName = do
+  outcome <- resolveImportQuietly recorder shadowWarnedRef caseSkipWarnedRef scope rootDirectory importerUri modName
   let key = ((fromNormalizedUri importerUri).getUri, modName)
   case outcome.importUri of
     Just _ ->
@@ -936,12 +938,13 @@ resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirecto
 resolveImportQuietly
   :: Recorder (WithPriority Log)
   -> IORef (Set.Set (String, [Text]))
+  -> IORef (Set.Set (String, [Text]))
   -> LibraryScope
   -> FilePath
   -> NormalizedUri
   -> String
   -> Action ImportOutcome
-resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName = do
+resolveImportQuietly recorder shadowWarnedRef caseSkipWarnedRef scope rootDirectory importerUri modName = do
   logWith recorder Info $ LogImportResolution $
     "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri importerUri).getUri
 
@@ -1008,6 +1011,12 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
         logWith recorder Debug $ LogImportResolution $
           "Could not list " <> Text.pack dir <> " to check the capitals of "
           <> Text.pack (modName <.> "l4") <> "; using the file the disk reports"
+
+      -- Not gated on JL4_LIBRARY_PATH, unlike the shadow warning below, and
+      -- never said about an IMPORT inside the embedded library: see
+      -- 'skippedCaseVariants'.
+      skipped <- liftIO $ skippedCaseVariants res
+      warnOnSkippedCaseVariant skipped
 
       -- Detailed candidate accounting + the shadow warning run only when
       -- JL4_LIBRARY_PATH is unset: with the env var set the operator has
@@ -1108,6 +1117,175 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
                    <> ".l4 in the project root or beside the importing file."
                  ]
 
+    -- The skipped-variant warning (smucclaw/l4-ide#1080, ruling 3, assumed
+    -- (GM, 2026-11-21), for Meng's review). The import resolved, but a file
+    -- ranked above the copy it used has the module's name in other capitals
+    -- (design probe P12: @Math.l4@ beside a file that writes @IMPORT math@).
+    -- Before the case rule a Mac used that file and the shadow warning said
+    -- so; under the rule the file is not a copy, and without this nothing
+    -- would say it was passed over. On Linux nothing ever did.
+    --
+    -- Unlike the shadow warning it is printed whether or not JL4_LIBRARY_PATH
+    -- is set: the file passed over is the user's own, not ambient machine
+    -- state, and the message names files by their name and the tier in words,
+    -- never by path, so it is the same on every machine and cannot make a
+    -- golden machine-dependent (assumed, not ruled). Warned once per
+    -- configuration per session, as the shadow warning is, because two rules
+    -- resolve every import.
+    --
+    -- Not said about an IMPORT written inside the embedded library (review
+    -- finding B; assumed, not ruled): @currency@'s @IMPORT jurisdiction@
+    -- would otherwise tell a user with a @Jurisdiction.l4@ in the project
+    -- root to change an IMPORT they cannot see and did not write. The library
+    -- is still kept from loading that file; it is only not reported. A
+    -- library loaded from a folder tier (the XDG store, the editor bundle)
+    -- has a @file:@ URI and is not recognised as one.
+    --
+    -- When the only file passed over is the importing file itself (@Math.l4@
+    -- that writes @IMPORT math@), the warning says that, and that a module
+    -- cannot import itself, rather than offer the file its own name (review
+    -- finding A, as revised by GM on 2026-11-21; assumed, not ruled). A file
+    -- whose name differs from the IMPORT only in its extension's capitals
+    -- (@math.L4@) is not a near match of its own module name, so for it
+    -- nothing is said, as for any file passed over that the IMPORT could
+    -- never have named.
+    skippedCaseVariants res
+      | embeddedImporter = pure Nothing
+      | otherwise = case res.winner of
+          Nothing -> pure Nothing
+          Just (_, chosen) -> do
+            let found = [ (lbl, takeDirectory p </> e) | (_, FileCandidate lbl p, es) <- res.caseVariantsFound, e <- es ]
+                asked = Text.pack modName
+                ownName = Text.pack . dropExtension . takeFileName
+            if null found then pure $ case res.importerCaseVariant of
+                Just own | not (null (ModuleNameCase.caseVariants asked [ownName own])) ->
+                  Just ( ["the importing file " <> Text.pack own, candidateDisplay chosen]
+                       , selfCaseVariantMessage asked chosen own )
+                _ -> Nothing
+            else do
+              -- One entry per file: from the CLI the project root and the
+              -- importer-relative tier are one folder.
+              keyed <- traverse
+                (\ (lbl, f) -> (,(lbl, f)) . either (\ (_ :: SomeException) -> normalise f) id <$> tryAny (canonicalizePath f))
+                found
+              let firsts = List.nubBy (\ a b -> fst a == fst b) keyed
+                  files = [ ([ l | (k', (l, _)) <- keyed, k' == k ], f) | (k, (_, f)) <- firsts ]
+                  key = map (Text.pack . fst) firsts <> [candidateDisplay chosen]
+              pure (Just (key, skippedCaseVariantMessage asked chosen files))
+
+    embeddedImporter =
+      (Shake.embeddedLibraryUriScheme <> ":") `Text.isPrefixOf` (fromNormalizedUri importerUri).getUri
+
+    warnOnSkippedCaseVariant = \ case
+      Nothing -> pure ()
+      Just (key, msg) -> do
+        fresh <- UnliftIO.atomicModifyIORef' caseSkipWarnedRef $ \ s ->
+          if Set.member (modName, key) s then (s, False) else (Set.insert (modName, key) s, True)
+        when fresh $
+          logWith recorder Warning $ LogImportResolution msg
+
+-- | The text of the skipped-variant warning ('resolveImportQuietly'): the
+-- module asked for, the copy that was used, and each file passed over, with
+-- the labels of the tiers that name it. Wording assumed, not ruled.
+--
+-- The reason and the fix depend on how the file's name differs, so that each
+-- sentence is true (review findings C and D; wordings assumed, not ruled):
+--
+--   * only in capitals, and it ends in @.l4@ (@Math.l4@ for @math@): "capital
+--     letters count", and either fix works;
+--   * by more than capitals (@straße.l4@ for @strasse@): "letter for letter",
+--     and either fix works;
+--   * in its extension (@prelude.L4@, @Math.L4@): an IMPORT names no
+--     extension, so no spelling of it reaches the file; only a rename does.
+skippedCaseVariantMessage :: Text -> LibraryCandidate -> [([Text], FilePath)] -> Text
+skippedCaseVariantMessage modName chosen files = Text.unlines $ case files of
+  [(lbls, f)]
+    | not (endsInL4 f) && stem f == modName ->
+        [ "`IMPORT " <> modName <> "` did not use " <> mention lbls f
+            <> ", because a module's file name must end in `.l4`, in small letters."
+        , "It used " <> used <> " instead."
+        , "To use that file, rename it to `" <> modName <> ".l4`."
+        ]
+    | not (endsInL4 f) ->
+        [ "`IMPORT " <> modName <> "` did not use " <> mention lbls f
+            <> ", because a module's file must be named exactly `" <> modName
+            <> ".l4`, and capitals count."
+        , "It used " <> used <> " instead."
+        , "To use that file, rename it to `" <> modName <> ".l4`."
+        ]
+    | otherwise ->
+        [ "`IMPORT " <> modName <> "` did not use " <> mention lbls f
+            <> ", because " <> reason f <> ": `" <> stem f
+            <> "` and `" <> modName <> "` are different names."
+        , "It used " <> used <> " instead."
+        , "To use that file, change the IMPORT to `" <> stem f <> "`, or rename the file to `"
+            <> modName <> ".l4`."
+        ]
+  _ ->
+    [ if all (\ (_, f) -> endsInL4 f && capitalsOnly f) files
+        then "`IMPORT " <> modName <> "` did not use these files, because capital letters count"
+               <> " in a module name and none of them is spelled `" <> modName <> "`:"
+        else "`IMPORT " <> modName <> "` did not use these files, because a module's file must be"
+               <> " named exactly `" <> modName <> ".l4`, and none of them is:" ]
+    <> [ "  " <> mention lbls f | (lbls, f) <- files ]
+    <> [ "It used " <> used <> " instead."
+       , case (all (endsInL4 . snd) files, any (endsInL4 . snd) files) of
+           (True, _) ->
+             "To use one of them, change the IMPORT to that file's spelling, or rename the file to `"
+               <> modName <> ".l4`."
+           (False, True) ->
+             "To use one of them, rename it to `" <> modName
+               <> ".l4`, or, if its name ends in `.l4`, change the IMPORT to its spelling."
+           (False, False) ->
+             "To use one of them, rename it to `" <> modName <> ".l4`."
+       ]
+  where
+    stem = Text.pack . dropExtension . takeFileName
+    endsInL4 f = takeExtension f == ".l4"
+    capitalsOnly f = ModuleNameCase.differsOnlyInCapitals (stem f) modName
+    reason f
+      | capitalsOnly f = "capital letters count in a module name"
+      | otherwise = "module names must match exactly, letter for letter"
+    mention = fileInWords
+    used = copyInWords modName chosen
+
+-- | The skipped-variant warning when the file passed over is the importing
+-- file itself (@Math.l4@ that writes @IMPORT math@): what is true, instead of
+-- advice that would make the file import itself (review finding A, as revised
+-- by GM on 2026-11-21; wording assumed, not ruled).
+selfCaseVariantMessage :: Text -> LibraryCandidate -> FilePath -> Text
+selfCaseVariantMessage modName chosen own = Text.unlines
+  [ "`IMPORT " <> modName <> "` did not use `" <> Text.pack (takeFileName own)
+      <> "`, which is the importing file itself: "
+      <> ModuleNameCase.ownModuleDifference modName (Text.pack (dropExtension (takeFileName own)))
+  , "It used " <> used <> " instead."
+  , ModuleNameCase.selfImportAdvice <> " If you meant " <> used <> ", nothing needs to change."
+  ]
+  where
+    used = copyInWords modName chosen
+
+-- | A file, by its name and its place in words, never by its path.
+fileInWords :: [Text] -> FilePath -> Text
+fileInWords lbls f = "`" <> Text.pack (takeFileName f) <> "` " <> wherePhrase
+  where
+    -- The tier in words. When two tiers name one file, which from the CLI the
+    -- project root and the importer-relative tier do, "beside the importing
+    -- file" is the one a reader recognises.
+    wherePhrase
+      | "importer-relative" `elem` lbls = "beside the importing file"
+      | otherwise = case lbls of
+          ("$JL4_LIBRARY_PATH" : _) -> "in the folder JL4_LIBRARY_PATH names"
+          ("project root" : _)      -> "in the project's root folder"
+          ("XDG data dir" : _)      -> "in your personal library folder (the XDG data dir)"
+          ("VSCode bundle" : _)     -> "in the libraries folder of the editor extension"
+          _                         -> "in " <> Text.intercalate ", " lbls
+
+-- | The copy an IMPORT used, in words.
+copyInWords :: Text -> LibraryCandidate -> Text
+copyInWords modName = \ case
+  EmbeddedCandidate -> "the standard library's `" <> modName <> "`"
+  FileCandidate lbl p -> fileInWords [lbl] p
+
 -- | The modules a file imports that resolved to nothing, by bare name, in the
 -- order they are written, each once.
 --
@@ -1151,10 +1329,12 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
   -- Session-scoped memory for 'resolveImportShared''s shadow warning, so a
   -- given shadow configuration is reported once, not on every re-resolution.
   shadowWarnedRef <- UnliftIO.newIORef Set.empty
+  -- ...for the skipped-variant warning, likewise (smucclaw/l4-ide#1080)...
+  caseSkipWarnedRef <- UnliftIO.newIORef Set.empty
   -- ...and for its not-found warning, which two rules would otherwise each print.
   notFoundWarnedRef <- UnliftIO.newIORef Set.empty
   let resolveImport :: NormalizedUri -> String -> Action ImportOutcome
-      resolveImport = resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory
+      resolveImport = resolveImportShared recorder shadowWarnedRef caseSkipWarnedRef notFoundWarnedRef scope rootDirectory
 
   define shakeRecorder $ \GetLexTokens uri -> do
     mRope <- runMaybeT $

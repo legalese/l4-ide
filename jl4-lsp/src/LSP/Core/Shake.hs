@@ -57,6 +57,7 @@ module LSP.Core.Shake(
     actionLogger,
     getVirtualFile, addVirtualFile, addVirtualFileUri, addVirtualFileFromFS, getVirtualFileText,
     embeddedLibraryUri,
+    embeddedLibraryUriScheme,
     embeddedLibraryText,
     FileVersion(..),
     updatePositionMapping,

@@ -3570,6 +3570,59 @@ spec bin = do
         serr `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
         occurrences helperHint serr `shouldSatisfy` (>= 1)
 
+    -- The skipped-variant warning (design probe P12). Linux: this resolved to
+    -- the embedded `math` silently before, so the warning is the evidence;
+    -- macOS and Windows: `Math.l4` was used, with the shadow warning.
+    it "warns, once, when a file is passed over because of its capitals" $
+      sandbox "l4-1080-skipped" [("Math.l4", "DECIDE siblingMarker IS 11\n"), ("main.l4", "IMPORT math\n#EVAL 1 PLUS 1\n")] \dir -> do
+        Output code _ serr <- checkIn dir
+        code `shouldBe` ExitSuccess
+        -- The log line, counted with its prefix: "once" is about the log.
+        let first = "Warning | [Import Resolution] `IMPORT math` did not use `Math.l4` beside the importing file, because capital letters count in a module name: `Math` and `math` are different names."
+        occurrences first serr `shouldBe` 1
+        serr `shouldSatisfy` ("It used the standard library's `math` instead." `isInfixOf`)
+        serr `shouldSatisfy` (not . ("Multiple differing copies" `isInfixOf`))
+
+    -- The control for it: a variant ranked BELOW the copy used could not have
+    -- won under any rule, so nothing was passed over and nothing is said.
+    it "says nothing about a variant below the copy it used" $
+      sandbox "l4-1080-below" [("zzmod.l4", "DECIDE zzValue IS 1\n"), ("main.l4", "IMPORT zzmod\n#EVAL zzValue\n")] \dir -> do
+        absDir <- makeAbsolute dir
+        let store = absDir </> "xdg" </> "jl4" </> "libraries"
+        createDirectoryIfMissing True store
+        writeFile (store </> "Zzmod.l4") "DECIDE zzValue IS 2\n"
+        Output code _ serr <- runL4WithXdgHomeIn (Just absDir) (absDir </> "xdg") bin ["check", "main.l4"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` (not . ("did not use" `isInfixOf`))
+
+    -- Review finding A, for the warning, as revised by GM (2026-11-21):
+    -- `Math.l4` that writes `IMPORT math` passes over only itself. It is told
+    -- that, and that a module cannot import itself, and is never told to
+    -- change the IMPORT to `Math` or to rename itself to `math.l4`. macOS: an
+    -- `l4` from before the rule loaded the file as its own import and failed
+    -- with a GraphException (measured 2026-11-21 UTC on HFS+). Linux: the
+    -- warning is the evidence.
+    it "tells a file that imports its own name under other capitals what is true" $
+      sandbox "l4-1080-self-warn" [("Math.l4", "IMPORT math\n#EVAL 1 PLUS 1\n")] \dir -> do
+        absDir <- makeAbsolute dir
+        Output code _ serr <- runL4EmbeddedOnlyIn (Just absDir) bin ["check", "Math.l4"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("Warning | [Import Resolution] `IMPORT math` did not use `Math.l4`, which is the importing file itself: `math` differs from `Math`, the name of this file's own module, only in its capitals." `isInfixOf`)
+        serr `shouldSatisfy` ("It used the standard library's `math` instead." `isInfixOf`)
+        serr `shouldSatisfy` ("If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT. If you meant the standard library's `math`, nothing needs to change." `isInfixOf`)
+        serr `shouldSatisfy` (not . ("change the IMPORT to" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("rename the file" `isInfixOf`))
+
+    -- Review finding B: `currency`, in the embedded library, writes `IMPORT
+    -- jurisdiction`. A user's `Jurisdiction.l4` in the project root is kept
+    -- from that import, and nothing tells the user to change an IMPORT they
+    -- did not write.
+    it "says nothing about an IMPORT written inside the standard library" $
+      sandbox "l4-1080-stdlib-import" [("Jurisdiction.l4", "DECIDE userMarker IS 1\n"), ("main.l4", "IMPORT currency\n#EVAL 1 PLUS 1\n")] \dir -> do
+        Output code _ serr <- checkIn dir
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` (not . ("did not use" `isInfixOf`))
+
     -- The control: a name with no near twin gets the message it always had.
     it "adds nothing to the message when no module is that close" $
       sandbox "l4-1080-control" [("main.l4", "IMPORT zzNothingLikeIt\n")] \dir -> do
