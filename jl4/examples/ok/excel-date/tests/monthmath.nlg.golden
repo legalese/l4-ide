@@ -1,4 +1,40 @@
 the date 1 month after `Late Jan 24` (capped at the last day of that month)
 the date -1 months after `Late Jan 24` (capped at the last day of that month)
-the day before the date 0 months plus one month after `Jan 2024`
-the day before the date 1 month plus one month after `Jan 2024`
+the last day of the month 0 months after the month of `Jan 2024`
+the last day of the month 1 month after the month of `Jan 2024`
+the last day of the month 1 month after the month of 15 January 2025
+the last day of the month 0 months after the month of 31 January 2025
+the last day of the month 1 month after the month of 15 January 2024
+the last day of the month 3 months after the month of 30 November 2026
+the last day of the month -1 months after the month of 15 March 2025
+the last day of the month -12 months after the month of 31 December 2025
+the last day of the month 1 month after the month of 1 January 2025
+the last day of the month 1.5 months after the month of 15 January 2025
+the last day of the month 1 month after the month of 1 January 2011 is equal to `RIGHT` with 28 February 2011
+the last day of the month -3 months after the month of 1 January 2011 is equal to `RIGHT` with 31 October 2010
+the last day of the month 1 month after the month of 1 January 2025 is equal to `RIGHT` with 28 February 2025
+the last day of the month 0 months after the month of 1 March 2025 is equal to `RIGHT` with 31 March 2025
+the last day of the month 1 month after the month of 15 January 2025 is equal to `RIGHT` with 28 February 2025
+the last day of the month 0 months after the month of 15 April 2025 is equal to `RIGHT` with 30 April 2025
+the last day of the month 0 months after the month of 28 February 2025 is equal to `RIGHT` with 28 February 2025
+the last day of the month 1 month after the month of 28 January 2025 is equal to `RIGHT` with 28 February 2025
+the last day of the month 0 months after the month of 29 January 2025 is equal to `RIGHT` with 31 January 2025
+the last day of the month 12 months after the month of 29 February 2024 is equal to `RIGHT` with 28 February 2025
+the last day of the month 0 months after the month of 30 April 2025 is equal to `RIGHT` with 30 April 2025
+the last day of the month 1 month after the month of 30 January 2025 is equal to `RIGHT` with 28 February 2025
+the last day of the month 0 months after the month of 31 January 2025 is equal to `RIGHT` with 31 January 2025
+the last day of the month 1 month after the month of 31 March 2025 is equal to `RIGHT` with 30 April 2025
+the last day of the month -1 months after the month of 15 March 2025 is equal to `RIGHT` with 28 February 2025
+the last day of the month -1 months after the month of 31 March 2024 is equal to `RIGHT` with 29 February 2024
+the last day of the month -12 months after the month of 31 December 2025 is equal to `RIGHT` with 31 December 2024
+the last day of the month 3 months after the month of 30 November 2026 is equal to `RIGHT` with 28 February 2027
+the last day of the month 1 month after the month of 15 December 2025 is equal to `RIGHT` with 31 January 2026
+the last day of the month -1 months after the month of 15 January 2025 is equal to `RIGHT` with 31 December 2024
+the last day of the month -18 months after the month of 15 June 2025 is equal to `RIGHT` with 31 December 2023
+the last day of the month 25 months after the month of 15 January 2025 is equal to `RIGHT` with 28 February 2027
+the last day of the month 1 month after the month of 15 January 2024 is equal to `RIGHT` with 29 February 2024
+the last day of the month 1 month after the month of 28 January 2024 is equal to `RIGHT` with 29 February 2024
+the last day of the month 0 months after the month of 15 February 2023 is equal to `RIGHT` with 28 February 2023
+the last day of the month 1 month after the month of 15 January 2000 is equal to `RIGHT` with 29 February 2000
+the last day of the month 1 month after the month of 15 January 2100 is equal to `RIGHT` with 28 February 2100
+the last day of the month 1.5 months after the month of 15 January 2025 is equal to `LEFT` with EOMONTH months must be an integer.

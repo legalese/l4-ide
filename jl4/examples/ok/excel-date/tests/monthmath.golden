@@ -9,3 +9,75 @@ monthmath.l4:10:1-32:
   RIGHT OF (DATE OF 31, 1, 2024)
 monthmath.l4:11:1-32:
   RIGHT OF (DATE OF 29, 2, 2024)
+monthmath.l4:16:1-38:
+  RIGHT OF (DATE OF 28, 2, 2025)
+monthmath.l4:17:1-38:
+  RIGHT OF (DATE OF 31, 1, 2025)
+monthmath.l4:18:1-38:
+  RIGHT OF (DATE OF 29, 2, 2024)
+monthmath.l4:19:1-39:
+  RIGHT OF (DATE OF 28, 2, 2027)
+monthmath.l4:20:1-39:
+  RIGHT OF (DATE OF 28, 2, 2025)
+monthmath.l4:21:1-41:
+  RIGHT OF (DATE OF 31, 12, 2024)
+monthmath.l4:22:1-37:
+  RIGHT OF (DATE OF 28, 2, 2025)
+monthmath.l4:23:1-40:
+  LEFT OF "EOMONTH months must be an integer."
+monthmath.l4:26:1-74:
+  assertion satisfied
+monthmath.l4:27:1-75:
+  assertion satisfied
+monthmath.l4:30:1-74:
+  assertion satisfied
+monthmath.l4:31:1-74:
+  assertion satisfied
+monthmath.l4:32:1-74:
+  assertion satisfied
+monthmath.l4:33:1-74:
+  assertion satisfied
+monthmath.l4:34:1-74:
+  assertion satisfied
+monthmath.l4:35:1-74:
+  assertion satisfied
+monthmath.l4:36:1-74:
+  assertion satisfied
+monthmath.l4:37:1-74:
+  assertion satisfied
+monthmath.l4:38:1-74:
+  assertion satisfied
+monthmath.l4:39:1-74:
+  assertion satisfied
+monthmath.l4:40:1-74:
+  assertion satisfied
+monthmath.l4:41:1-74:
+  assertion satisfied
+monthmath.l4:44:1-74:
+  assertion satisfied
+monthmath.l4:45:1-74:
+  assertion satisfied
+monthmath.l4:46:1-75:
+  assertion satisfied
+monthmath.l4:49:1-74:
+  assertion satisfied
+monthmath.l4:50:1-74:
+  assertion satisfied
+monthmath.l4:51:1-75:
+  assertion satisfied
+monthmath.l4:52:1-75:
+  assertion satisfied
+monthmath.l4:53:1-74:
+  assertion satisfied
+monthmath.l4:56:1-74:
+  assertion satisfied
+monthmath.l4:57:1-74:
+  assertion satisfied
+monthmath.l4:58:1-74:
+  assertion satisfied
+monthmath.l4:59:1-74:
+  assertion satisfied
+monthmath.l4:60:1-74:
+  assertion satisfied
+monthmath.l4:63:1-93:
+  assertion satisfied
