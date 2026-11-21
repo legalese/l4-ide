@@ -548,6 +548,35 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST ((IF TRUE THEN x ELSE FULFILLED) RAND x)")
         `shouldReturn` ["obligation:proved-waits+fans"]
 
+  describe "a name for an expression is read where it is named (step 3)" do
+    it "proves a countdown through a LET name (doc/reference/functions/let-example.l4)" $
+      classes "GIVEN n IS A NUMBER GIVETH A NUMBER\nfact n MEANS\n  IF n <= 1\n  THEN 1\n  ELSE LET prev IS fact (n MINUS 1)\n       IN n TIMES prev"
+        `shouldReturn` ["function:proved-countdown"]
+
+    it "and a walk down a list through a WHERE name (doc/reference/functions/where-example.l4)" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A NUMBER\ntotal xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN 0\n  WHEN y FOLLOWED BY ys THEN y PLUS rest\n    WHERE\n      rest MEANS total ys"
+        `shouldReturn` ["function:proved-structural"]
+
+    it "but credits the call to the function that names it, not to where it is bound" $
+      classes "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS h n\n  WHERE\n    GIVEN m IS A NUMBER GIVETH A NUMBER\n    h m MEANS again\n    again MEANS h n"
+        `shouldReturn` ["function:unproved-self"]
+
+    it "and keeps a name that names itself, so its loop is still reported" $
+      classes "GIVEN n IS A NUMBER GIVETH A LIST OF NUMBER\nf n MEANS ones\n  WHERE\n    ones MEANS n FOLLOWED BY ones"
+        `shouldReturn` ["function:unproved-self"]
+
+    it "and two names that name each other" $
+      classes "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS a\n  WHERE\n    a MEANS b PLUS n\n    b MEANS a PLUS 1"
+        `shouldReturn` ["function:unproved-mutual"]
+
+    it "and still counts the copies a LEST starts through two such names" $
+      classes (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST (a RAND b)\n  WHERE\n    a MEANS x\n    b MEANS x")
+        `shouldReturn` ["obligation:proved-waits+multiplies"]
+
+    it "but does not open a name whose body is the RAND, which was not counted before either" $ do
+      fs <- findings (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST both\n  WHERE\n    both MEANS x RAND x")
+      [m | f <- fs, Just m <- [f.multiplies]] `shouldSatisfy` null
+
   describe "nodes" do
     it "keeps overloads that share a name apart" $
       classes (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS IF n GREATER THAN 0 THEN f (n MINUS 1) ELSE 0\n\nGIVEN s IS A STRING GIVETH A NUMBER\nf s MEANS 1")

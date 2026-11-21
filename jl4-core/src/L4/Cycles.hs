@@ -262,7 +262,7 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
   -- of one function type: a parameter, or a parameter or the result
   takes p args _ = any p args
   touches p args r = any p args || p r
-  (bursts, edges) = moduleGraph info m
+  (bursts, edges) = moduleGraph (readThrough m) info m
   targets = Map.fromListWith Set.union [(e.from, Set.singleton e.to) | e <- edges]
   sccOf scc = Set.fromList (map (getUnique . decideName) scc)
 
@@ -569,19 +569,56 @@ multiplication defs ids b
 -- one's body where it is bound, so a definition written as clauses is one
 -- node, as it is one rule to its author.
 moduleDecides :: Module Resolved -> [Decide Resolved]
-moduleDecides (MkModule _ _ sec) = tops <> filter (not . clausePart) (concatMap locals tops)
+moduleDecides m = moduleTops m <> moduleLocals m
+
+-- | The top-level definitions, in sections or not.
+moduleTops :: Module Resolved -> [Decide Resolved]
+moduleTops (MkModule _ _ sec) = sectionDecides sec
  where
-  tops = sectionDecides sec
   sectionDecides (MkSection _ _ _ _ tds) = concatMap topDecides tds
   topDecides = \ case
     Decide _ d -> [d]
     Section _ s -> sectionDecides s
     _ -> []
+
+-- | Every WHERE\/LET definition inside a top-level one, at any depth, but the
+-- bindings a clause group was compiled to.
+moduleLocals :: Module Resolved -> [Decide Resolved]
+moduleLocals m = filter (not . clausePart) (concatMap locals (moduleTops m))
+ where
   locals d = [ld | e <- universeExpr (bodyOf d), ld <- localDecides e]
   localDecides = \ case
     Where _ _ ds -> [d | LocalDecide _ d <- ds]
     LetIn _ ds _ -> [d | LocalDecide _ d <- ds]
     _ -> []
+
+-- | The WHERE and LET definitions that take no argument, each with its body:
+-- the cycle check reads each one wherever it is named (Note [A name for an
+-- expression]). Left out, and so kept as a definition of its own, whose
+-- cycle is reported as it is written: one that reaches itself through
+-- others of its kind (@ones MEANS 1 FOLLOWED BY ones@, or two that name each
+-- other); and one that, with the names in it read through in turn, is
+-- longer than 'readThroughLimit' expressions.
+readThrough :: Module Resolved -> Map Unique (Expr Resolved)
+readThrough m = Map.filterWithKey (\ u _ -> Map.findWithDefault (readThroughLimit + 1) u sizes <= readThroughLimit) acyclic
+ where
+  candidates = Map.fromList [(getUnique (decideName d), bodyOf d) | d <- moduleLocals m, null (valueParams d)]
+  namedIn b = [u | r@Ref {} <- toList b, let u = getUnique r, Map.member u candidates]
+  -- dependencies first ('stronglyConnComp' sorts in reverse topological
+  -- order), so each size is known before a name that reads it
+  order = stronglyConnComp [(u, u, namedIn b) | (u, b) <- Map.toList candidates]
+  acyclic = Map.restrictKeys candidates (Set.fromList [u | AcyclicSCC u <- order])
+  sizes = foldl' measure Map.empty [u | AcyclicSCC u <- order]
+  measure done u = case Map.lookup u candidates of
+    Just b -> Map.insert u (min (readThroughLimit + 1)
+      (length (universeExpr b) + sum [Map.findWithDefault (readThroughLimit + 1) v done | v <- namedIn b])) done
+    Nothing -> done
+
+-- | How long, in expressions, a name read through may be, with the names in
+-- it read through in turn: a bound on the walk, which reads a name's body
+-- once for every place it is named.
+readThroughLimit :: Int
+readThroughLimit = 2000
 
 -- | A binding a definition written as clauses was compiled to.
 clausePart :: Decide Resolved -> Bool
@@ -590,16 +627,22 @@ clausePart d = isJust (view annPmSynthetic (getAnno d))
 -- | Every reference from a definition of the module to another (or itself),
 -- each labelled. A WHERE\/LET definition's body is walked as its own node, not
 -- as part of the body that holds it.
+--
+-- Every definition is a node of its own here, the names 'readThrough' gives
+-- included, so that 'plainReferences' is a check of the walk alone.
 moduleEdges :: EntityInfo -> Module Resolved -> [Edge]
-moduleEdges info = snd . moduleGraph info
+moduleEdges info = snd . moduleGraph Map.empty info
 
 -- | The edges, and every continuation whose expression joins two or more
--- calls of the module's definitions (Note [What multiplies]).
-moduleGraph :: EntityInfo -> Module Resolved -> ([Burst], [Edge])
-moduleGraph info m = partitionEithers (concatMap edgesOf decides)
+-- calls of the module's definitions (Note [What multiplies]). The names in
+-- @through@ are not nodes: each is read, wherever it is named, as its body
+-- (Note [A name for an expression]).
+moduleGraph :: Map Unique (Expr Resolved) -> EntityInfo -> Module Resolved -> ([Burst], [Edge])
+moduleGraph through info m =
+  partitionEithers (concatMap edgesOf [d | d <- decides, not (Map.member (getUnique (decideName d)) through)])
  where
   decides = moduleDecides m
-  nodes = Set.fromList (map (getUnique . decideName) decides)
+  nodes = Set.fromList [u | d <- decides, let u = getUnique (decideName d), not (Map.member u through)]
   numbers = Map.fromList
     [ (getUnique (decideName d), r)
     | d <- decides, null (valueParams d), Lit _ (NumericLit _ r) <- [bodyOf d] ]
@@ -619,6 +662,11 @@ moduleGraph info m = partitionEithers (concatMap edgesOf decides)
     -- obligation is handed on by whatever receives it, so it is Nothing.
     go :: Maybe When -> [Slot] -> [(Bool, Expr Resolved)] -> Expr Resolved -> [Either Burst Edge]
     go od ss cs e = case e of
+      -- a name for an expression is read where it is named, under the tests
+      -- and continuations around that place
+      App _ f es
+        | Just b <- Map.lookup (getUnique f) through ->
+            go (if null es then od else Nothing) ss cs b <> concatMap (go Nothing ss cs) es
       App _ f es ->
         let byName =
               [ (i, g, q, x)
@@ -677,7 +725,13 @@ moduleGraph info m = partitionEithers (concatMap edgesOf decides)
             [Left MkBurst {from = self, via = via, operator = ops, calls = calls, at = (getAnno x).range}]
         | otherwise -> []
        where
-        calls = [(getUnique f, as) | o <- xs, Just (f, as) <- [directCall o], Set.member (getUnique f) nodes]
+        calls = [(getUnique f, as) | o <- xs, Just (f, as) <- [directCall (readName o)], Set.member (getUnique f) nodes]
+        -- an operand that is a name read through is the call its body is,
+        -- as it was when the name was a member of the cycle of its own; the
+        -- RAND or ROR inside such a body is not read (Note [What multiplies])
+        readName = \ case
+          App _ v [] | Just b <- Map.lookup (getUnique v) through -> readName b
+          o -> o
 
     deonton od ss cs (MkDeonton _ subj act opens due jn hence lest) =
       concatMap (go Nothing ss cs) (kids subj <> kids act <> kids opens <> kids due <> kids jn)
@@ -1143,6 +1197,49 @@ mulF _ _ = Unbounded
 --     parameter that every call passes on unchanged (@range (low + 1) high@
 --     under @IF low > high@). An equality test does not prove it: @n EQUALS
 --     0@ never holds for a negative or fractional @n@. Self-recursion only.
+
+------------------------------------------------------------------------
+-- Note [A name for an expression]
+------------------------------------------------------------------------
+-- A WHERE or LET definition that takes no argument is a name for an
+-- expression, and the cycle check reads it as one: wherever it is named, the
+-- walk reads its body there, under the tests and continuations around that
+-- place, and it is not a node of the graph ('readThrough', 'moduleGraph').
+-- So
+--
+--     `factorial of` n MEANS IF n <= 1 THEN 1
+--       ELSE LET `previous factorial` IS `factorial of` (n MINUS 1)
+--            IN n TIMES `previous factorial`
+--
+-- is one rule that calls itself with @n MINUS 1@ under @NOT n <= 1@, which
+-- the countdown check proves, and not two definitions calling each other,
+-- which no check could.
+--
+-- Read where it is NAMED, not where it is bound. A function written beside
+-- the name may be the one that names it:
+--
+--     f n MEANS h n
+--       WHERE
+--         h m MEANS again
+--         again MEANS h n
+--
+-- loops in @h@, and reading @again@ where it is bound would credit its call
+-- of @h@ to @f@ and lose the cycle. Where it is named, it is @h@ calling @h@
+-- with @n@, which nothing proves.
+--
+-- Two are left as definitions of their own, so that their cycle is reported
+-- as written: a name that reaches itself through names of its kind alone
+-- (@ones MEANS 1 FOLLOWED BY ones@), which would otherwise vanish from the
+-- graph with its loop, and one longer than 'readThroughLimit' expressions
+-- once the names in it are read in turn, which bounds the walk.
+--
+-- The multiplies check reads an operand that is such a name as its body, so
+-- @LEST (a RAND b)@ with @a@ and @b@ each a name for a call of the rule counts
+-- two copies, as it did when they were members of the cycle. A name whose
+-- body is itself a RAND is not opened up: it was not counted before either.
+--
+-- 'moduleEdges' reads no name through, so that 'plainReferences' still
+-- checks the walk and nothing else.
 
 data Grade = Strict | Weak
   deriving stock Eq
