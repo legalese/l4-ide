@@ -405,6 +405,25 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes (people <> "GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nc n MEANS IF n GREATER THAN 0 THEN EVALTRACE (c (n MINUS 1)) 0 (LIST) ELSE FULFILLED")
         `shouldReturn` ["function:proved-countdown"]
 
+    -- each stopped by frame depth at run time (2026-11-21 attack round,
+    -- countdown p13, p14, p15, p18): the countdown proves the self-call, but
+    -- the lap through the HENCE starts a new run at instant 0
+    it "and a countdown beside a lap that EVALTRACE starts again is not proved" $
+      classes (people <> "GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nc n MEANS\n  IF n > 0\n  THEN c (n MINUS 1)\n  ELSE EVALTRACE (PARTY Alice MUST tick WITHIN 5 HENCE c 1) 0 (LIST EVENT Alice tick 1)")
+        `shouldReturn` ["obligation:unproved-stall"]
+
+    it "nor a walk down a list beside such a lap" $
+      classes (people <> "GIVEN xs IS A LIST OF NUMBER\nGIVETH A DEONTIC Person Action\nc xs MEANS\n  CONSIDER xs\n  WHEN y FOLLOWED BY ys THEN c ys\n  WHEN EMPTY THEN EVALTRACE (PARTY Alice MUST tick WITHIN 5 HENCE c (LIST 1)) 0 (LIST EVENT Alice tick 1)")
+        `shouldReturn` ["obligation:unproved-stall"]
+
+    it "nor when the EVALTRACE is supplied for a function parameter" $
+      classes (people <> "GIVEN n IS A NUMBER\n      run IS A FUNCTION FROM DEONTIC Person Action TO DEONTIC Person Action\nGIVETH A DEONTIC Person Action\nc n run MEANS\n  IF n > 0\n  THEN c (n MINUS 1) run\n  ELSE run (PARTY Alice MUST tick WITHIN 5 HENCE c 1 run)")
+        `shouldReturn` ["obligation:unproved-stall+fans"]
+
+    it "but the same countdown with no lap is still proved" $
+      classes (people <> "GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nc n MEANS\n  IF n > 0\n  THEN c (n MINUS 1)\n  ELSE EVALTRACE (PARTY Alice MUST tick WITHIN 5 HENCE FULFILLED) 0 (LIST EVENT Alice tick 1)")
+        `shouldReturn` ["function:proved-countdown"]
+
   -- each ran past the size ratio at run time, or into layer 1's limit on open
   -- obligations (2026-11-20, second adversarial pass)
   describe "work that multiplies behind a type or a name (second adversarial pass)" do

@@ -327,10 +327,14 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
       nubOrd [s | e <- open, not (null e.slots), onCycle open e, Stalls s <- e.slots]
     unguardedOnCycle = filter (onCycle unguarded) unguarded
     -- a lap that may run on a trace of its own waits on a clock that starts
-    -- again, so no wait proves it; the function checks do not use time
+    -- again, so no wait proves it. The function checks do not use time, so
+    -- they prove only a cycle with no lap that waits: beside a self-call
+    -- that counts down, a lap through a HENCE under EVALTRACE is not
+    -- discharged by the countdown (every edge of the cycle lies on one of
+    -- its laps)
     v
       | not (null stalledOnCycle) = Unproved (Stalled stalledOnCycle)
-      | null unguardedOnCycle, restartsHere = Unproved (Stalled [OwnTrace])
+      | restartsHere, any (not . null . (.slots)) internal = Unproved (Stalled [OwnTrace])
       | null unguardedOnCycle = Proved WaitsEachLap
       | any (\ e -> e.from /= e.to) unguardedOnCycle =
           maybe (Unproved Mutual) Proved (descent info nullaries scc unguardedOnCycle)
