@@ -27,9 +27,9 @@
 -- Error handling follows the spec: batch processing stops at the first
 -- failing row by default; pass @--continue-on-error@ to process every row
 -- and aggregate failures. A row that goes over the opt-in time or memory
--- limit stops the run (smucclaw/l4-ide#1075, ruling L2): it fails, and under
--- @--continue-on-error@ every row after it is an error that says it was not
--- evaluated. Either way the process exits non-zero if any row failed.
+-- limit stops the batch even then (smucclaw/l4-ide#1075, ruling L2: such a
+-- hit stops the run). Either way the process exits non-zero if any row
+-- failed.
 module L4.Cli.Batch
   ( BatchOptions(..)
   , OutputFormat(..)
@@ -60,6 +60,7 @@ import qualified Data.Set as Set
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
 import Control.Monad (void)
+import Data.IORef (readIORef)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word8)
 import Data.Char (isAlpha, isAlphaNum)
@@ -71,6 +72,7 @@ import System.IO
   ( Handle
   , IOMode(WriteMode)
   , hFlush
+  , stderr
   , stdin
   , stdout
   , withFile
@@ -92,6 +94,8 @@ import L4.Export
   , rewriteModuleAssumes
   )
 import L4.DirectiveFilter (filterIdeDirectives)
+import L4.Parser.SrcSpan (prettySrcRangeM)
+import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), stopsTheRun)
 import L4.EvaluateLazy
   ( EvalConfig(..)
   , EvalDirectiveResult(..)
@@ -232,7 +236,7 @@ batchOptionsParser = BatchOptions
   <*> switch
         ( long "continue-on-error"
         <> short 'c'
-        <> help "Process every row and aggregate failures (default: stop at the first failing row)"
+        <> help "Process every row and aggregate failures (default: stop at the first failing row); a row over --eval-timeout or --max-eval-memory-mb stops the batch even so"
         )
   <*> switch
         ( long "validate-only"
@@ -360,13 +364,13 @@ batchCmd opts = do
       -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
       -- each envelope, let it become garbage, and never build the row list.
       FmtNdjson -> do
-        outcome <- streamRows opts.batchContinueOnErr inputs process
+        outcome <- streamRows (stoppedAt evalConfig) opts.batchContinueOnErr inputs process
           (\env -> BSL8.hPutStrLn h (Aeson.encode env) >> hFlush h)
         finish outcome
       -- The buffered formats must see every row before they can render, so
       -- here (and only here) we retain the whole list of envelopes.
       _ -> do
-        (envs, outcome) <- bufferRows opts.batchContinueOnErr inputs process
+        (envs, outcome) <- bufferRows (stoppedAt evalConfig) opts.batchContinueOnErr inputs process
         writeBuffered h opts.batchOutputFormat envs
         finish outcome
   where
@@ -378,6 +382,7 @@ batchCmd opts = do
       RowFine         -> exitSuccess
       RowUndetermined -> exitFailure
       RowFailed       -> exitFailure
+      RowStopped      -> exitFailure
 
 -- | Open the requested output sink (a file, or stdout) and run an action
 -- against its handle.
@@ -396,48 +401,73 @@ withOutputHandle (Just path) act = withFile path WriteMode \h -> do
 -- is handed to @emit@ as soon as it is produced and then dropped, so the fold
 -- carries only a strict 'Bool' (any-row-failed) accumulator — never the list
 -- of envelopes. This is what keeps NDJSON output memory-flat for huge batches.
--- Stops at the first failing row unless @continueOnErr@ is set.
+-- Stops at the first failing row unless @continueOnErr@ is set, and at a row
+-- that stopped the run whether or not it is ('RowStopped').
 streamRows
-  :: Bool
+  :: (Int -> IO ())
+  -> Bool
   -> [row]
   -> (Int -> row -> IO (Aeson.Value, RowOutcome))
   -> (Aeson.Value -> IO ())
   -> IO RowOutcome
-streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) RowFine
+streamRows stoppedAfter continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) RowFine
   where
     go [] !worst = pure worst
     go ((idx, input) : rest) !worst = do
       (env, outcome) <- process idx input
       emit env
       let !worst' = max worst outcome
-      if outcome == RowFailed && not continueOnErr
+      if outcome == RowStopped
+        then stoppedAfter idx >> pure RowStopped   -- a time or memory limit
+      else if outcome == RowFailed && not continueOnErr
         then pure RowFailed              -- stop-on-error (the default)
         else go rest worst'
 
 -- | What a row came to, for the batch's exit code, worst last. Only a failed
--- row trips stop-on-error; an undetermined one does not (U7b).
-data RowOutcome = RowFine | RowUndetermined | RowFailed
+-- row trips stop-on-error; an undetermined one does not (U7b). A row that
+-- went over the opt-in time or memory limit stops the batch even under
+-- @--continue-on-error@ (smucclaw/l4-ide#1075, ruling L2: such a hit stops
+-- the run).
+data RowOutcome = RowFine | RowUndetermined | RowFailed | RowStopped
   deriving stock (Eq, Ord, Show)
 
 -- | Fold over the input rows for the buffered formats (json/yaml/csv), which
 -- genuinely need every row in hand before they can render. Returns the
 -- collected envelopes (in input order) and whether any row failed. Stops at
--- the first failing row unless @continueOnErr@ is set.
+-- the first failing row unless @continueOnErr@ is set, and at a row that
+-- stopped the run whether or not it is ('RowStopped').
 bufferRows
-  :: Bool
+  :: (Int -> IO ())
+  -> Bool
   -> [row]
   -> (Int -> row -> IO (Aeson.Value, RowOutcome))
   -> IO ([Aeson.Value], RowOutcome)
-bufferRows continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] RowFine
+bufferRows stoppedAfter continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] RowFine
   where
     go [] acc worst = pure (reverse acc, worst)
     go ((idx, input) : rest) acc worst = do
       (env, outcome) <- process idx input
       let acc'   = env : acc
           worst' = max worst outcome
-      if outcome == RowFailed && not continueOnErr
+      if outcome == RowStopped
+        then stoppedAfter idx >> pure (reverse acc', RowStopped)
+      else if outcome == RowFailed && not continueOnErr
         then pure (reverse acc', RowFailed)  -- stop-on-error (the default)
         else go rest acc' worst'
+
+-- | Say on stderr that a time or memory limit stopped the batch, at which
+-- row, and where the run stopped: the envelopes carry the row's own message,
+-- but not that the rows after it were never read. The place matters because
+-- the directive that went over need not be the row's: an imported file's own
+-- #EVAL is evaluated with every row, and stops the batch at the first.
+stoppedAt :: EvalConfig -> Int -> IO ()
+stoppedAt cfg idx = do
+  stopped <- maybe (pure Nothing) readIORef cfg.runStop
+  TIO.hPutStrLn stderr
+    ("l4 batch: stopped at row " <> Text.pack (show idx) <> case stopped of
+       Just (_, at) -> ": the run stopped at " <> prettySrcRangeM at
+                         <> ", which went over the time or memory limit; no row after it was evaluated"
+       Nothing      -> ", which went over the time or memory limit; no row after it was evaluated")
 
 -- | Process a single input row into a result envelope, returning the
 -- envelope and whether the row failed.
@@ -530,7 +560,8 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
             , Key.fromString "diagnostics" Aeson..= diags
             ]
       pure (env, case status of
-        "error"        -> RowFailed
+        "error" | any stoppedTheRun (concat mEval) -> RowStopped
+                | otherwise -> RowFailed
         "undetermined" -> RowUndetermined
         _              -> RowFine)
   where
@@ -549,6 +580,18 @@ rowPresumed presumption schema results =
   requestPresumed (presumption == PresumeSoft) id inputs (concatMap (.presumed) results)
   where
     inputs = Set.fromList [ x.paramName | x <- schema ]
+
+-- | Did this result go over a limit that stops the run (time or memory)?
+stoppedTheRun :: EvalDirectiveResult -> Bool
+stoppedTheRun (MkEvalDirectiveResult _ res _ _ _ _) = case res of
+  Reduction (ReducedErrored exc) -> stops exc
+  Assertion (Errored exc)        -> stops exc
+  _                              -> False
+  where
+    stops = \ case
+      UserEvalException (OverBudget b)     -> stopsTheRun b
+      UserEvalException (NotEvaluated _ _) -> True
+      _                                    -> False
 
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.

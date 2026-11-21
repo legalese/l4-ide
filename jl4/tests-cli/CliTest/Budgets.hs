@@ -22,7 +22,7 @@ import CliTest.Common
 dir :: FilePath
 dir = "tests-cli" </> "fixtures" </> "budgets"
 
-runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace :: FilePath
+runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows :: FilePath
 runaway = dir </> "runaway.l4"
 neverStops = dir </> "never-stops.l4"
 ends = dir </> "ends.l4"
@@ -30,13 +30,21 @@ stopMain = dir </> "stopmain.l4"
 stopLib = dir </> "stoplib.l4"
 stopOnly = dir </> "stoponly.l4"
 stopThenTrace = dir </> "stop-then-trace.l4"
+batchNeverStops = dir </> "batch-never-stops.l4"
+batchImportsStop = dir </> "batch-imports-stop.l4"
+batchRows = dir </> "batch-never-stops.json"
 
 fixtures :: [FilePath]
-fixtures = [runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace]
+fixtures = [runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows]
 
 -- | Each result of @l4 run --json@, as its "limit" (if any) and its "value".
 results :: String -> Maybe [(Maybe Aeson.Value, Maybe Aeson.Value)]
 results = resultsBy \ r -> (KeyMap.lookup "limit" r, KeyMap.lookup "value" r)
+
+-- | Each result's "evaluated" key: present, and false, only on a directive
+-- the run stopped before.
+evaluated :: String -> Maybe [Maybe Aeson.Value]
+evaluated = resultsBy (KeyMap.lookup "evaluated")
 
 resultsBy :: (Aeson.Object -> a) -> String -> Maybe [a]
 resultsBy pick out = do
@@ -46,6 +54,12 @@ resultsBy pick out = do
               Aeson.Object r -> Just (pick r)
               _ -> Nothing)
            (foldr (:) [] rs)
+
+-- | The "status" of one envelope of @l4 batch --format ndjson@.
+status :: String -> Maybe Aeson.Value
+status line = do
+  Aeson.Object env <- Aeson.decode (BSL8.pack line)
+  KeyMap.lookup "status" env
 
 -- | Run, giving up after a minute: every case here ends in a few seconds.
 within :: FilePath -> [String] -> IO Output
@@ -80,14 +94,15 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
   it "l4 run --eval-timeout stops the run at a function that never stops: the #EVAL after it is not evaluated" $ do
     Output code sout _ <- within bin ["run", "--json", "--eval-timeout", "1", neverStops]
     code `shouldBe` ExitFailure 1
-    fmap (map fst) (results sout) `shouldBe` Just [Just (Aeson.String "time"), Nothing]
+    fmap (map fst) (results sout) `shouldBe` Just [Just (Aeson.String "time"), Just (Aeson.String "time")]
+    evaluated sout `shouldBe` Just [Nothing, Just (Aeson.Bool False)]
     sout `shouldSatisfy` ("I did not evaluate this: the run stopped at never-stops.l4:11:" `isInfixOf`)
 
   it "l4 run --max-eval-memory-mb stops the run too, and says what it counts" $ do
     Output code sout _ <- within bin ["run", "--json", "--max-eval-memory-mb", "100", neverStops]
     code `shouldBe` ExitFailure 1
-    fmap (map fst) (results sout) `shouldBe` Just [Just (Aeson.String "memory"), Nothing]
-    sout `shouldSatisfy` ("I did not evaluate this" `isInfixOf`)
+    fmap (map fst) (results sout) `shouldBe` Just [Just (Aeson.String "memory"), Just (Aeson.String "memory")]
+    evaluated sout `shouldBe` Just [Nothing, Just (Aeson.Bool False)]
     sout `shouldSatisfy` ("not only what is kept" `isInfixOf`)
 
   it "l4 run refuses a limit of 0" $ do
@@ -125,6 +140,25 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
     code `shouldBe` ExitFailure 1
     sout `shouldSatisfy` ("(not evaluated)" `isInfixOf`)
     sout `shouldNotSatisfy` ("internal error" `isInfixOf`)
+
+  it "l4 batch stops at a row past the time limit, even with --continue-on-error, and says so" $ do
+    Output code sout serr <- within bin
+      ["batch", "--continue-on-error", "--eval-timeout", "1", "--format", "ndjson", batchNeverStops, "--inputs", batchRows]
+    code `shouldBe` ExitFailure 1
+    map status (lines (filter (/= '\r') sout)) `shouldBe` [Just (Aeson.String "success"), Just (Aeson.String "error")]
+    serr `shouldSatisfy` ("stopped at row 2" `isInfixOf`)
+
+  it "l4 batch goes on past a row stopped by a count, under --continue-on-error" $ do
+    Output code sout _ <- within bin
+      ["batch", "--continue-on-error", "--max-calls", "1000", "--format", "ndjson", batchNeverStops, "--inputs", batchRows]
+    code `shouldBe` ExitFailure 1
+    map status (lines (filter (/= '\r') sout)) `shouldBe` map (Just . Aeson.String) ["success", "error", "success"]
+
+  it "l4 batch says where the run stopped when an imported file's #EVAL stops it, at row 1" $ do
+    Output code _ serr <- within bin
+      ["batch", "--continue-on-error", "--eval-timeout", "1", "--format", "ndjson", batchImportsStop, "--inputs", batchRows]
+    code `shouldBe` ExitFailure 1
+    serr `shouldSatisfy` ("stopped at row 1: the run stopped at stoplib.l4:8:" `isInfixOf`)
 
   it "l4 batch takes the same four flags" $ do
     Output _ sout _ <- within bin ["batch", "--help"]

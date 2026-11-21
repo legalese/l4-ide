@@ -261,12 +261,16 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes 
     -- smucclaw/l4-ide#1075: a directive the machine stopped for going over
     -- a budget says which one, as jl4-service's "@limit" does, so that a
     -- consumer can tell "stopped" from "wrong" without reading the text.
-    -- Only such a directive has the key. The names of the counted budgets
-    -- are decided by Claude 2026-11-20, pending Meng's review.
+    -- One that was not evaluated, because an earlier one stopped the run,
+    -- names that limit too, and says it was not evaluated (decided by
+    -- Claude 2026-11-21, pending Meng's review). Only such directives have the keys. The names of the counted
+    -- budgets are decided by Claude 2026-11-21, pending Meng's review.
     limitField :: EvalException -> [(Key.Key, Aeson.Value)]
     limitField = \ case
-      UserEvalException (OverBudget b) -> [Key.fromString "limit" Aeson..= budgetName b]
-      _                                -> []
+      UserEvalException (OverBudget b)     -> [Key.fromString "limit" Aeson..= budgetName b]
+      UserEvalException (NotEvaluated b _) ->
+        [Key.fromString "limit" Aeson..= budgetName b, Key.fromString "evaluated" Aeson..= False]
+      _                                    -> []
     budgetName :: Budget -> Text
     budgetName = \ case
       OpenObligations {}     -> "obligations"
