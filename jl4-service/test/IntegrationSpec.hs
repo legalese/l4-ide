@@ -3520,6 +3520,57 @@ spec = describe "integration" do
         held (Aeson.String "x") >>= (`shouldCarry` Refuses "Parameter 'h': a `Pair` is an object of its fields (left, right)")
         held (Aeson.object ["left" Aeson..= (2 :: Int), "right" Aeson..= (3 :: Int)]) >>= (`shouldCarry` Answers (Aeson.Number 5))
 
+  -- An enumeration, a type none of whose constructors carries fields, is the
+  -- name of one of them. A name it does not have was refused on the direct
+  -- path only, and a number or a boolean reached the rule as it stood on both,
+  -- which answered it from its OTHERWISE; it is refused before routing now,
+  -- naming the input, on both paths (review of #779, 2026-11-21).
+  describe "refuses a value of an enumeration that is not one of its names" do
+    aroundAll (\k -> withServiceFromSources "enum-form" [("party.l4", enumFormJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "enum-form" fn (Aeson.object ["arguments" Aeson..= args])
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          notParty input = "Parameter '" <> input <> "': a `Party` is one of the strings \"Landlord\", \"Tenant\", the names of its constructors"
+          refused = [Aeson.String "Lodger", Aeson.Number 5, Aeson.Bool True, Aeson.object ["x" Aeson..= (1 :: Int)]]
+      it "answers each of its names, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra -> do
+          let given input v = Aeson.object ((input Aeson..= v) : extra)
+          call baseUrl mgr "who pays" (given "p" (Aeson.String "Landlord")) >>= (`shouldCarry` Answers (Aeson.Number 1))
+          call baseUrl mgr "who pays" (given "p" (Aeson.String "Tenant")) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          -- JSONDECODE, on the wrapper path, took Tone for a type with one
+          -- constructor named like it, and refused "Loud"
+          call baseUrl mgr "tone" (given "t" (Aeson.String "Tone")) >>= (`shouldCarry` Answers (Aeson.Number 1))
+          call baseUrl mgr "tone" (given "t" (Aeson.String "Loud")) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          call baseUrl mgr "waiver" (given "w" (Aeson.String "Signed Waiver")) >>= (`shouldCarry` Answers (Aeson.Number 1))
+      it "refuses a name it does not have, a number, a boolean and an object, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra -> do
+          let given input v = Aeson.object ((input Aeson..= v) : extra)
+          forM_ refused \v ->
+            call baseUrl mgr "who pays" (given "p" v) >>= (`shouldCarry` Refuses (notParty "p"))
+          forM_ [Aeson.String "Quiet", Aeson.Number 5] \v ->
+            call baseUrl mgr "tone" (given "t" v)
+              >>= (`shouldCarry` Refuses "Parameter 't': a `Tone` is one of the strings \"Tone\", \"Loud\", the names of its constructors")
+          forM_ [Aeson.String "Unsigned", Aeson.Number 5] \v ->
+            call baseUrl mgr "waiver" (given "w" v)
+              >>= (`shouldCarry` Refuses "Parameter 'w': a `Signed Waiver` is the string \"Signed Waiver\", the name of its constructor")
+      it "in a record's field, a list's element and a MAYBE, on both paths" \(baseUrl, mgr) -> do
+        forM_ [[], wrapped] \extra -> do
+          let given input v = Aeson.object ((input Aeson..= v) : extra)
+          call baseUrl mgr "lease payer" (given "l" (Aeson.object ["payer" Aeson..= ("Tenant" :: Text)])) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          forM_ refused \v -> do
+            call baseUrl mgr "lease payer" (given "l" (Aeson.object ["payer" Aeson..= v])) >>= (`shouldCarry` Refuses (notParty "l"))
+            call baseUrl mgr "first party" (given "ps" (Aeson.toJSON [Aeson.String "Landlord", v])) >>= (`shouldCarry` Refuses (notParty "ps"))
+            call baseUrl mgr "maybe party" (given "mp" v) >>= (`shouldCarry` Refuses (notParty "mp"))
+          call baseUrl mgr "maybe party" (given "mp" (Aeson.String "Tenant")) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          call baseUrl mgr "maybe party" (given "mp" Aeson.Null) >>= (`shouldCarry` Answers (Aeson.Number 0))
+        -- a LIST input fails on the wrapper path whatever its elements (a
+        -- limit of the wrapper, in the design note), so it is answered on the
+        -- direct path only
+        call baseUrl mgr "first party" (Aeson.object ["ps" Aeson..= [Aeson.String "Tenant", Aeson.String "Landlord"]]) >>= (`shouldCarry` Answers (Aeson.Number 2))
+      it "refuses a name a type with a constructor that carries fields does not have, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "payment" (Aeson.object (("pay" Aeson..= Aeson.String "Cheque") : extra))
+            >>= (`shouldCarry` Refuses "Parameter 'pay': a `Payment` is the name of a constructor that carries no fields (Cash) or {\"<constructor>\": {its fields}} for one that does (Card)")
+
   -- A type whose only constructor is named like it and carries fields is what
   -- DECLARE T HAS declares, to the evaluator, so JSONDECODE reads it as a
   -- record; the schemas and the direct path read it so too, and every path
@@ -4947,6 +4998,78 @@ recordFormJL4 = Text.unlines
   , "GIVEN h IS A Holder"
   , "GIVETH A NUMBER"
   , "`held sum` MEANS h's q's left + h's q's right"
+  ]
+
+enumFormJL4 :: Text
+enumFormJL4 = Text.unlines
+  [ "DECLARE Party IS ONE OF Landlord, Tenant"
+  , "DECLARE Lease HAS payer IS A Party"
+  , "DECLARE Tone IS ONE OF Tone, Loud"
+  , "DECLARE `Signed Waiver` IS ONE OF `Signed Waiver`"
+  , "DECLARE Payment IS ONE OF"
+  , "  Cash"
+  , "  Card HAS fee IS A NUMBER"
+  , ""
+  , "GIVEN p IS A Party"
+  , "GIVETH A NUMBER"
+  , "`payer number` p MEANS"
+  , "  CONSIDER p"
+  , "  WHEN Landlord THEN 1"
+  , "  OTHERWISE 2"
+  , ""
+  , "@export Who pays"
+  , "GIVEN p IS A Party"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`who pays` MEANS `payer number` p"
+  , ""
+  , "@export Lease payer"
+  , "GIVEN l IS A Lease"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`lease payer` MEANS `payer number` (l's payer)"
+  , ""
+  , "@export First party"
+  , "GIVEN ps IS A LIST OF Party"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`first party` MEANS"
+  , "  CONSIDER ps"
+  , "  WHEN EMPTY THEN 0"
+  , "  WHEN x FOLLOWED BY rest THEN `payer number` x"
+  , ""
+  , "@export Maybe party"
+  , "GIVEN mp IS A MAYBE Party"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`maybe party` MEANS"
+  , "  CONSIDER mp"
+  , "  WHEN NOTHING THEN 0"
+  , "  WHEN JUST x THEN `payer number` x"
+  , ""
+  , "@export Tone"
+  , "GIVEN t IS A Tone"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`tone` MEANS"
+  , "  CONSIDER t"
+  , "  WHEN Tone THEN 1"
+  , "  WHEN Loud THEN 2"
+  , ""
+  , "@export Waiver"
+  , "GIVEN w IS A `Signed Waiver`"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`waiver` MEANS 1"
+  , ""
+  , "@export Payment"
+  , "GIVEN pay IS A Payment"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`payment` MEANS"
+  , "  CONSIDER pay"
+  , "  WHEN Cash THEN 1"
+  , "  OTHERWISE 2"
   ]
 
 typeParamsJL4 :: Text

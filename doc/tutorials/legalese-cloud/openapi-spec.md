@@ -64,6 +64,9 @@ What `value` holds depends on what the rule gives back:
 
 A type with only one choice, named like the type, such as ``DECLARE `Deposit Refund` IS ONE OF `Deposit Refund` HAS amount IS A NUMBER``, is a record: it comes back as a record does, `{"Deposit Refund": {"amount": 40}}`, and you send its fields alone, `{"amount": 40}`.
 
+An input that is one of a list of choices is sent as one of its names.
+Any other value, such as a name the type does not have, a number or `true`, is refused with status 422 and a message that names the input and the names it takes: ``Parameter 'payer': a `Party` is one of the strings "Landlord", "Tenant", the names of its constructors``.
+
 An input of type `EITHER` is sent as it is answered: `{"the claim": {"RIGHT": [2000]}}` or `{"the claim": {"LEFT": ["withdrawn"]}}`, the value in an array of one.
 Any other form, such as a bare `2000`, `{"RIGHT": 2000}` without the array, or an object with both keys, is refused with status 422 and a message that names the input:
 

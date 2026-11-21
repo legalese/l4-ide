@@ -568,6 +568,10 @@ batchTypeParamsFixture, batchTypeParamsJson :: FilePath
 batchTypeParamsFixture = fixtureDir </> "batch-type-params.l4"
 batchTypeParamsJson = fixtureDir </> "batch-type-params.json"
 
+batchEnumerationFixture, batchEnumerationJson :: FilePath
+batchEnumerationFixture = fixtureDir </> "batch-enumeration.l4"
+batchEnumerationJson = fixtureDir </> "batch-enumeration.json"
+
 -- | A constructor that carries data, as a result, and that result sent back.
 batchTaggedResultFixture, batchTaggedResultJson, batchTaggedResultBackJson :: FilePath
 batchTaggedResultFixture = fixtureDir </> "batch-tagged-result.l4"
@@ -4500,6 +4504,21 @@ spec bin = do
         case drop 2 rows of
           [tagged] -> show (objField tagged "diagnostics") `shouldSatisfy` ("Missing required field 'amount'" `isInfixOf`)
           other -> expectationFailure ("expected 3 rows, got " ++ show (length other + 2))
+
+      -- An enumeration is read as the name of one of its constructors, and
+      -- anything else is refused, in an input and in a record's field: a name
+      -- it does not have, a number and a boolean reached the rule as they
+      -- stood, and the rule, which ends in OTHERWISE, answered each 2 (review
+      -- of #779, 2026-11-21).
+      it "refuses a value of an enumeration that is not one of its names" $ do
+        forM_ ["who pays", "lease payer"] \entry -> do
+          (code, _, rows) <- rowsOf [batchEnumerationFixture, "-e", entry, "--inputs", batchEnumerationJson]
+          code `shouldSatisfy` (/= ExitSuccess)
+          map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "success", "error", "error", "error"]
+          map resultOf (take 2 rows) `shouldBe` [Just (Number 1), Just (Number 2)]
+          forM_ (zip ["\\\"Lodger\\\"", "5", "true"] (drop 2 rows)) \(given, row) ->
+            show (objField row "diagnostics") `shouldSatisfy`
+              (("Expected a `Party` written as one of the strings \\\"Landlord\\\", \\\"Tenant\\\", the names of its constructors, but got: " <> given) `isInfixOf`)
 
       -- An input declared through a synonym is the type the synonym stands for
       -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:

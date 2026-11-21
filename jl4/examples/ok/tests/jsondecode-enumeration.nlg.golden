@@ -1,0 +1,20 @@
+`decode party` with "Landlord"
+`decode party` with "Tenant"
+`answer` with "Tenant"
+`decode lease` with {"payer": "Tenant"}
+`decode parties` with ["Landlord", "Tenant"]
+`decode maybe party` with null
+`decode maybe party` with "Tenant"
+`decode tone` with "Tone"
+`decode tone` with "Loud"
+`decode party` with "Lodger"
+`answer` with "Lodger"
+`decode party` with 5
+`decode party` with true
+`decode party` with {"Landlord": {}}
+`decode party` with null
+`decode lease` with {"payer": "Lodger"}
+`decode parties` with ["Landlord", 5]
+`decode maybe party` with "Lodger"
+`decode tone` with "Quiet"
+`decode tone` with {}

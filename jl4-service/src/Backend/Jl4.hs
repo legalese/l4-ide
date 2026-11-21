@@ -669,18 +669,47 @@ wireFormError mi ty0 val = case val of
     -- A constructor that carries fields is written {"Card": {its fields}}, and
     -- one that carries none its name (card J1, option A; HATBOX).
     | Just tagged@(_, ctors) <- lookupTagged mi ty -> case val of
-        FnLitString s
-          | Just (_, _, _ : _) <- findCtor s ctors -> Just (bareConstructorMessage s)
-          | otherwise -> Nothing
+        FnLitString s -> case findCtor s ctors of
+          Just (_, _, []) -> Nothing
+          Just (_, _, _ : _) -> Just (bareConstructorMessage s)
+          -- a name the type does not have: JSONDECODE refuses it, and the
+          -- direct path did, as an "unknown enum variant", both without the
+          -- form the type is written in
+          Nothing -> Just (taggedFormMessage tagged)
         FnObject [(k, inner)]
           | Just (_, _, decl@(_ : _)) <- findCtor k ctors
           , Just fields <- constructorFieldsOf inner ->
               listToMaybe
                 [ e | (fname, fty) <- decl, Just v <- [lookup fname fields], Just e <- [wireFormError mi fty v] ]
         _ -> Just (taggedFormMessage tagged)
+    -- An enumeration, a type none of whose constructors carries fields, is
+    -- the name of one of them. A name it does not have was refused on the
+    -- direct path alone, as an "unknown enum variant", and a number or a
+    -- boolean reached the rule as it stood on both paths, so a CONSIDER on it
+    -- found no branch, and one that ends in OTHERWISE answered it (review of
+    -- #779, 2026-11-21). A record-like type is among the records, above, and a
+    -- type with a constructor that carries fields among the tagged ones.
+    | Just variants <- lookupEnum mi ty -> case val of
+        FnLitString s | isJust (lookup s variants) -> Nothing
+        _ -> Just (enumFormMessage ty variants)
     | otherwise -> Nothing
   where
     ty = expandSyn mi ty0
+
+-- | What a request is told when it sends a value of an enumeration that is not
+-- the name of one of its constructors. The words are those of JSONDECODE's
+-- error for it ('L4.EvaluateLazy.Machine.jsonValueToEnumeration').
+enumFormMessage :: Type' Resolved -> [(Text, Resolved)] -> Text
+enumFormMessage ty variants =
+  "a `" <> tyName <> "` is " <> theNames
+  where
+    tyName = case ty of
+      TyApp _ name _ -> rawNameToText (rawName (getActual name))
+      _ -> "enumeration"
+    quoted = [ "\"" <> n <> "\"" | (n, _) <- variants ]
+    theNames = case quoted of
+      [one] -> "the string " <> one <> ", the name of its constructor"
+      _ -> "one of the strings " <> Text.intercalate ", " quoted <> ", the names of its constructors"
 
 -- | What a request is told when it sends a value of a record type that is not
 -- an object.

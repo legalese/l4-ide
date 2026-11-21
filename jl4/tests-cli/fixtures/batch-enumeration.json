@@ -1,0 +1,7 @@
+[
+  { "p": "Landlord", "l": { "payer": "Landlord" } },
+  { "p": "Tenant", "l": { "payer": "Tenant" } },
+  { "p": "Lodger", "l": { "payer": "Lodger" } },
+  { "p": 5, "l": { "payer": 5 } },
+  { "p": true, "l": { "payer": true } }
+]

@@ -1448,6 +1448,20 @@ jsonValueToDeclared tyRef args jsonValue = do
               , any (\(_, _, conType) -> not (isNullaryConstructorReturning conType tyRef)) ctors
               , not (isRecordShaped typeNameRef ctors) ->
                   jsonValueToTagged typeNameRef ctors jsonValue
+            -- A type none of whose constructors carries fields, other than a
+            -- type with one constructor named like it (DECLARE Unit IS ONE OF
+            -- Unit, read below), is an enumeration: it is written as the name
+            -- of one of its constructors, "Landlord", as both schemas publish
+            -- it and JSONENCODE writes it. Anything else, a name it does not
+            -- have or a value that is not a string, is refused, as it is for
+            -- every other kind of type. It reached the rule as it stood, so a
+            -- CONSIDER on it found no branch, and one that ends in OTHERWISE
+            -- answered it (review of #779, 2026-11-21).
+            Just (typeNameRef, _checkEntity)
+              | ctors@(_ : _) <- constructorsOf entityInfo tyRef
+              , all (\(_, _, conType) -> isNullaryConstructorReturning conType tyRef) ctors
+              , not (isRecordShaped typeNameRef ctors) ->
+                  jsonValueToEnumeration typeNameRef ctors jsonValue
             Just (typeNameRef, _checkEntity) -> do
               -- Now look for a constructor with the same name
               let constructors = Map.toList entityInfo
@@ -1459,29 +1473,11 @@ jsonValueToDeclared tyRef args jsonValue = do
                     & fmap (\(u, n, t) -> (u, n, instantiate args t))
 
               case matchingConstructor of
-                Nothing -> do
-                  -- No record constructor found. Check if this is an enum type
-                  -- by looking for nullary constructors that return this type.
-                  case jsonValue of
-                    Aeson.String enumName -> do
-                      -- Look for a nullary constructor with this name that returns tyRef
-                      let enumConstructor = listToMaybe
-                            [ (unique, name)
-                            | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
-                            , nameToText (TypeCheck.getName name) == enumName
-                            , isNullaryConstructorReturning conType tyRef
-                            ]
-                      case enumConstructor of
-                        Just (enumUnique, enumConName) -> do
-                          -- Found a matching enum constructor
-                          let enumRef = Def enumUnique enumConName
-                          pure $ ValConstructor enumRef []
-                        Nothing ->
-                          -- No matching enum constructor, fall back to generic decoding
-                          jsonValueToWHNF jsonValue
-                    _ ->
-                      -- Not a string, fall back to generic decoding
-                      jsonValueToWHNF jsonValue
+                -- No constructor named like the type, and, after the cases
+                -- above, none of its own: a type declared with no body, or one
+                -- the table does not know. It is read as JSON is read without
+                -- a type, as it was (assumed, not ruled).
+                Nothing -> jsonValueToWHNF jsonValue
                 Just (conUnique, conName, conType) -> do
                   -- Construct a Resolved reference for the constructor
                   let conRef = Def conUnique conName
@@ -1560,6 +1556,22 @@ instantiate args conType = case conType of
   resultOf = \case
     Fun _ _ t -> resultOf t
     t -> t
+
+-- | A value of an enumeration (see 'jsonValueToDeclared'): the name of one of
+-- its constructors.
+jsonValueToEnumeration :: Name -> [(Unique, Name, Type' Resolved)] -> Aeson.Value -> Machine WHNF
+jsonValueToEnumeration typeName ctors jsonValue = case jsonValue of
+  Aeson.String s
+    | (u, n, _) : _ <- [ c | c@(_, n, _) <- ctors, conText n == s ] ->
+        pure (ValConstructor (Def u n) [])
+  _ -> userException $ UserError $
+    "Expected a `" <> conText typeName <> "` written as " <> theNames <> ", but got: " <> jsonForMessage jsonValue
+ where
+  conText n = nameToText (TypeCheck.getName n)
+  quoted = [ "\"" <> conText n <> "\"" | (_, n, _) <- ctors ]
+  theNames = case quoted of
+    [one] -> "the string " <> one <> ", the name of its constructor"
+    _ -> "one of the strings " <> Text.intercalate ", " quoted <> ", the names of its constructors"
 
 -- | A value of a type written tagged (see 'jsonValueToWHNFTyped').
 jsonValueToTagged :: Name -> [(Unique, Name, Type' Resolved)] -> Aeson.Value -> Machine WHNF
