@@ -559,6 +559,19 @@ spec = describe "integration" do
           resp <- evalFunction baseUrl mgr "wire" (Text.replace " " "%20" fn) (Aeson.object ["arguments" Aeson..= args])
           resp `shouldCarry` expected
 
+      -- A pad of {} takes the wrapper, which reads its inputs with decodeArgs,
+      -- and a pad of 1 the direct path, which does not: so the wrapper rows
+      -- above test the wrapper. Its trace says so.
+      it "a pad of {} takes the wrapper, and a pad of 1 does not" \(baseUrl, mgr) -> do
+        let traced pad = do
+              req <- buildJsonPost (baseUrl <> "/deployments/wire/functions/twice/evaluation?trace=full")
+                (Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (5 :: Int), "pad" Aeson..= pad]])
+              httpLbs req mgr
+        throughWrapper <- traced (Aeson.object [])
+        onDirect <- traced (Aeson.Number 1)
+        map (Text.isInfixOf "decodeArgs" . Text.Encoding.decodeUtf8 . LBS.toStrict . responseBody) [throughWrapper, onDirect] `shouldBe` [True, False]
+        map statusCode' [throughWrapper, onDirect] `shouldBe` [200, 200]
+
       -- Under trace=full the wrapper's directive is #EVALTRACE rather than #EVAL.
       it "trace=full, wrapper path: cap and single" \(baseUrl, mgr) -> do
         let traced fn = do
@@ -621,12 +634,10 @@ spec = describe "integration" do
           declined <- call "2026/01/31" "2026-02-30"
           declined `shouldCarry` Refuses "Parameter 'd two': could not read \"2026-02-30\" as a DATE"
 
-      -- On batch a null takes the wrapper, which refuses "garbage" as a DATE.
-      -- The direct path would answer it as text, so an errored case shows the
-      -- wrapper ran. The case comes back with the wrapper's message as its
-      -- @error, where it used to be dropped and only counted. A single request
-      -- gets that message only on the wrapper path, with a {} in an input; with
-      -- this null it stays direct and answers "garbage".
+      -- A DATE that does not parse is refused before the request is routed
+      -- now (review of #779, 2026-11-21), where the wrapper refused it and the
+      -- direct path answered it as text. The case comes back with the message
+      -- as its @error, where it used to be dropped and only counted.
       it "returns a batch case the wrapper declines with its @error, and counts it" do
         withServiceFromSources "decline-batch" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
           req <- buildJsonPost (baseUrl <> "/deployments/decline-batch/functions/date%20first/evaluation/batch")
@@ -643,12 +654,12 @@ spec = describe "integration" do
           wireAt resp ["summary", "casesProcessed"] `shouldBe` Right (Aeson.Number 1)
           caseKeys resp ["@id", "@error", "value"] `shouldBe`
             Just [ [ Just (Aeson.Number 1)
-                   , Just (Aeson.String "Parameter 'end date': could not read \"garbage\" as a DATE")
+                   , Just (Aeson.String "Parameter 'end date': could not read \"garbage\" as a DATE, a string such as \"2026-01-31\"")
                    , Nothing ]
                  , [Just (Aeson.Number 2), Nothing, Just (Aeson.String "2026-01-31")] ]
           -- and a client decoding the body reads the same outcomes
           fmap (map (.outcome) . (.cases)) (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
-            `shouldBe` Just [CaseErrored "Parameter 'end date': could not read \"garbage\" as a DATE", CaseAnswered]
+            `shouldBe` Just [CaseErrored "Parameter 'end date': could not read \"garbage\" as a DATE, a string such as \"2026-01-31\"", CaseAnswered]
 
       it "names a missing ASSUME as the direct path does" do
         withServiceFromSources "decline-assume" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
@@ -3571,6 +3582,81 @@ spec = describe "integration" do
           call baseUrl mgr "payment" (Aeson.object (("pay" Aeson..= Aeson.String "Cheque") : extra))
             >>= (`shouldCarry` Refuses "Parameter 'pay': a `Payment` is the name of a constructor that carries no fields (Cash) or {\"<constructor>\": {its fields}} for one that does (Card)")
 
+  -- A value of a basic type that JSONDECODE refuses, which the wrapper path
+  -- reads its inputs with, is refused before routing, naming the input: the
+  -- direct path passed it to the rule as it stood, so "TRUE" for a BOOLEAN
+  -- stopped on an internal type error and 5 for a STRING was answered 5. What
+  -- JSONDECODE reads the direct path reads the same way (assumed, not ruled;
+  -- review of #779, 2026-11-21).
+  describe "refuses a value of a basic type that JSONDECODE refuses" do
+    aroundAll (\k -> withServiceFromSources "scalar-form" [("scalars.l4", scalarFormJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "scalar-form" fn (Aeson.object ["arguments" Aeson..= args])
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          paths = [[], wrapped]
+          given extra input v = Aeson.object ((input Aeson..= v) : extra)
+          str :: Text -> Aeson.Value
+          str = Aeson.String
+          notBoolean input = "Parameter '" <> input <> "': a BOOLEAN is true or false"
+          notNumber input = "Parameter '" <> input <> "': a NUMBER is a number, such as 5 or 2.5"
+          notString input = "Parameter '" <> input <> "': a STRING is a string, in quotes"
+      it "at the top level, on both paths" \(baseUrl, mgr) ->
+        forM_ paths \extra -> do
+          forM_ [str "TRUE", Aeson.Number 1, Aeson.object ["x" Aeson..= (1 :: Int)]] \v ->
+            call baseUrl mgr "flag" (given extra "b" v) >>= (`shouldCarry` Refuses (notBoolean "b"))
+          forM_ [str "5", Aeson.Bool True] \v ->
+            call baseUrl mgr "plus one" (given extra "n" v) >>= (`shouldCarry` Refuses (notNumber "n"))
+          forM_ [Aeson.Number 5, Aeson.Bool True] \v ->
+            call baseUrl mgr "echo" (given extra "s" v) >>= (`shouldCarry` Refuses (notString "s"))
+          call baseUrl mgr "day of" (given extra "d" (Aeson.Number 20260131))
+            >>= (`shouldCarry` Refuses "Parameter 'd': a DATE is a string such as \"2026-01-31\"")
+          call baseUrl mgr "day of" (given extra "d" (str "2026-13-45"))
+            >>= (`shouldCarry` Refuses "Parameter 'd': could not read \"2026-13-45\" as a DATE, a string such as \"2026-01-31\"")
+          call baseUrl mgr "clock" (given extra "t" (Aeson.Number 1030))
+            >>= (`shouldCarry` Refuses "Parameter 't': a TIME is a string such as \"14:30:00\" or \"14:30\"")
+          call baseUrl mgr "clock" (given extra "t" (str "25:99"))
+            >>= (`shouldCarry` Refuses "Parameter 't': could not read \"25:99\" as a TIME")
+          call baseUrl mgr "when" (given extra "w" (Aeson.Number 1))
+            >>= (`shouldCarry` Refuses "Parameter 'w': a DATETIME is a string such as \"2026-01-31T14:30:00Z\"")
+          call baseUrl mgr "when" (given extra "w" (str "2026-01-3110:30"))
+            >>= (`shouldCarry` Refuses "Parameter 'w': could not read \"2026-01-3110:30\" as a DATETIME")
+      it "in a record's field, a list's element and a MAYBE, and a LIST that is not an array, on both paths" \(baseUrl, mgr) ->
+        forM_ paths \extra -> do
+          call baseUrl mgr "held flag" (given extra "h" (Aeson.object ["f" Aeson..= str "TRUE", "t" Aeson..= str "10:30", "w" Aeson..= str "2026-01-31T10:30:00Z"]))
+            >>= (`shouldCarry` Refuses (notBoolean "h"))
+          call baseUrl mgr "total" (given extra "ns" (Aeson.toJSON [Aeson.Number 1, str "2"])) >>= (`shouldCarry` Refuses (notNumber "ns"))
+          call baseUrl mgr "maybe echo" (given extra "m" (Aeson.Number 5)) >>= (`shouldCarry` Refuses (notString "m"))
+          forM_ [Aeson.Number 5, Aeson.object ["x" Aeson..= (1 :: Int)]] \v ->
+            call baseUrl mgr "total" (given extra "ns" v) >>= (`shouldCarry` Refuses "Parameter 'ns': a LIST is an array")
+      it "answers what JSONDECODE reads, the same on both paths" \(baseUrl, mgr) -> do
+        forM_ paths \extra -> do
+          call baseUrl mgr "flag" (given extra "b" (Aeson.Bool True)) >>= (`shouldCarry` Answers (Aeson.Number 1))
+          call baseUrl mgr "plus one" (given extra "n" (Aeson.Number 2.5)) >>= (`shouldCarry` Answers (Aeson.Number 3.5))
+          call baseUrl mgr "echo" (given extra "s" (str "a")) >>= (`shouldCarry` Answers (str "a"))
+          -- the direct path read "31/01/2026" as the text, and the wrapper as a DATE
+          call baseUrl mgr "day of" (given extra "d" (str "31/01/2026")) >>= (`shouldCarry` Answers (str "2026-01-31"))
+          call baseUrl mgr "maybe echo" (given extra "m" Aeson.Null) >>= (`shouldCarry` Answers (str "none"))
+          -- a TIME and a DATETIME in a record's field, as the wrapper path
+          -- cannot take one at the top level (a limit in the design note): the
+          -- direct path dropped the half second, and stopped on the offset as
+          -- an unknown timezone
+          let held = Aeson.object ["f" Aeson..= True, "t" Aeson..= str "10:30:15.5", "w" Aeson..= str "2026-01-31T10:30:00+08:00"]
+          call baseUrl mgr "held time" (given extra "h" held) >>= (`shouldCarry` Answers (str "10:30:15.5"))
+          call baseUrl mgr "held when" (given extra "h" held) >>= (`shouldCarry` Answers (str "2026-01-31 02:30:00 UTC"))
+        call baseUrl mgr "total" (Aeson.object ["ns" Aeson..= [1, 2 :: Int]]) >>= (`shouldCarry` Answers (Aeson.Number 3))
+      -- JSONDECODE reads the forms the direct path read with parsers of its
+      -- own, so none of them is refused, among them the service's own answer
+      -- for a DATETIME; the wrapper reads a DATE at the top level with TODATE,
+      -- so it is given the date as JSONDECODE reads it (assumed, not ruled;
+      -- review of #779, 2026-11-21)
+      it "reads the forms the direct path read, the same on both paths" \(baseUrl, mgr) ->
+        forM_ paths \extra -> do
+          call baseUrl mgr "day of" (given extra "d" (str "2026-1-5")) >>= (`shouldCarry` Answers (str "2026-01-05"))
+          call baseUrl mgr "day of" (given extra "d" (str "2026-01-31T10:30:00Z")) >>= (`shouldCarry` Answers (str "2026-01-31"))
+          let held t w = Aeson.object ["f" Aeson..= True, "t" Aeson..= str t, "w" Aeson..= str w]
+          call baseUrl mgr "held time" (given extra "h" (held "10:30:00Z" "2026-01-31 10:30:00 UTC")) >>= (`shouldCarry` Answers (str "10:30:00"))
+          forM_ ["2026-01-31 10:30:00 UTC", "2026-01-31 10:30", "2026-01-31T10:30:00", "2026-01-31 18:30:00 Asia/Singapore"] \w ->
+            call baseUrl mgr "held when" (given extra "h" (held "10:30" w)) >>= (`shouldCarry` Answers (str "2026-01-31 10:30:00 UTC"))
+
   -- A type whose only constructor is named like it and carries fields is what
   -- DECLARE T HAS declares, to the evaluator, so JSONDECODE reads it as a
   -- record; the schemas and the direct path read it so too, and every path
@@ -4105,19 +4191,18 @@ wireCases =
   , ("C8", "big", args [n 15, wrapper], Answers (Aeson.Bool True))
   , ("C9", "twice", args [n 5, direct], Answers (num 10))
   , ("C10", "twice", args [n 5, wrapper], Answers (num 10))
-    -- D1, D4 and D5 show that a pad of {} really takes the wrapper: their
-    -- "Expected JSON number" comes from its JSONDECODE, which the direct path
-    -- never runs. Should they stop saying so, the routing has changed, and the
-    -- other wrapper rows may be testing the direct path twice.
-  , ("D1", "twice", args ["n" Aeson..= ("abc" :: Text), wrapper], Refuses "Expected JSON number but got: \"abc\"")
-    -- The direct path does not check that a scalar matches its parameter's
-    -- type, so this stops on an internal type error. That is the answer this
-    -- change found, pinned as such, not a good one.
-  , ("D2", "twice", args ["n" Aeson..= ("abc" :: Text), direct], Refuses "type error")
+    -- A value of a basic type that JSONDECODE refuses is refused before the
+    -- request is routed, so both paths give the same words and name the input
+    -- (assumed, not ruled; review of #779, 2026-11-21). D1, D4 and D5 used to
+    -- show that a pad of {} takes the wrapper, by JSONDECODE's own words; the
+    -- trace=full test below shows it now. D2, on the direct path, stopped on an
+    -- internal type error.
+  , ("D1", "twice", args ["n" Aeson..= ("abc" :: Text), wrapper], Refuses notNumber)
+  , ("D2", "twice", args ["n" Aeson..= ("abc" :: Text), direct], Refuses notNumber)
   , ("D3", "twice", args [wrapper], Refuses "Parameter 'n': missing required parameter")
   , ("D3d", "twice", args [direct], Refuses "Parameter 'n': missing required parameter")
-  , ("D4", "twice", args ["n" Aeson..= [1, 2 :: Int], wrapper], Refuses "Expected JSON number but got: [1,2]")
-  , ("D5", "twice", args ["n" Aeson..= Aeson.object ["a" Aeson..= (1 :: Int)], wrapper], Refuses "Expected JSON number but got: {\"a\":1}")
+  , ("D4", "twice", args ["n" Aeson..= [1, 2 :: Int], wrapper], Refuses notNumber)
+  , ("D5", "twice", args ["n" Aeson..= Aeson.object ["a" Aeson..= (1 :: Int)], wrapper], Refuses notNumber)
     -- A rule's own Nothing and Just are answers, not L4's MAYBE.
   , ("E1", "penalty", args [n 5, direct], Answers (Aeson.String "Nothing"))
   , ("E2", "penalty", args [n 5, wrapper], Answers (Aeson.String "Nothing"))
@@ -4131,6 +4216,7 @@ wireCases =
   direct = "pad" Aeson..= (1 :: Int)
   wrapper = "pad" Aeson..= uncertain
   uncertain = Aeson.object []
+  notNumber = "Parameter 'n': a NUMBER is a number, such as 5 or 2.5"
   num :: Int -> Aeson.Value
   num = Aeson.toJSON
   nums :: [Int] -> Aeson.Value
@@ -4998,6 +5084,85 @@ recordFormJL4 = Text.unlines
   , "GIVEN h IS A Holder"
   , "GIVETH A NUMBER"
   , "`held sum` MEANS h's q's left + h's q's right"
+  ]
+
+scalarFormJL4 :: Text
+scalarFormJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE Held HAS"
+  , "  f IS A BOOLEAN"
+  , "  t IS A TIME"
+  , "  w IS A DATETIME"
+  , ""
+  , "@export Flag"
+  , "GIVEN b IS A BOOLEAN"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`flag` MEANS IF b THEN 1 ELSE 0"
+  , ""
+  , "@export Plus one"
+  , "GIVEN n IS A NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`plus one` MEANS n + 1"
+  , ""
+  , "@export Echo"
+  , "GIVEN s IS A STRING"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A STRING"
+  , "`echo` MEANS s"
+  , ""
+  , "@export Day of"
+  , "GIVEN d IS A DATE"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A DATE"
+  , "`day of` MEANS d"
+  , ""
+  , "@export Clock"
+  , "GIVEN t IS A TIME"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A TIME"
+  , "`clock` MEANS t"
+  , ""
+  , "@export When"
+  , "GIVEN w IS A DATETIME"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A DATETIME"
+  , "`when` MEANS w"
+  , ""
+  , "@export Held flag"
+  , "GIVEN h IS A Held"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`held flag` MEANS IF h's f THEN 1 ELSE 0"
+  , ""
+  , "@export Held time"
+  , "GIVEN h IS A Held"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A TIME"
+  , "`held time` MEANS h's t"
+  , ""
+  , "@export Held when"
+  , "GIVEN h IS A Held"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A DATETIME"
+  , "`held when` MEANS h's w"
+  , ""
+  , "@export Total"
+  , "GIVEN ns IS A LIST OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`total` MEANS sum ns"
+  , ""
+  , "@export Maybe echo"
+  , "GIVEN m IS A MAYBE STRING"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A STRING"
+  , "`maybe echo` MEANS"
+  , "  CONSIDER m"
+  , "  WHEN JUST x THEN x"
+  , "  WHEN NOTHING THEN \"none\""
   ]
 
 enumFormJL4 :: Text

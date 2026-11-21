@@ -6,6 +6,7 @@ module Backend.CodeGen
   , GeneratedCode(..)
   , AnswerShape(..)
   , RequiredInput(..)
+  , stringConversionFn
   -- Exported for testing
   , inputFieldName
   , transformJsonKeys

@@ -218,20 +218,29 @@ On both paths, an input declared through a synonym for a `MAYBE` is a `MAYBE`: i
 An input declared through any other synonym takes the values of the type the synonym stands for: a record's fields, one of an enum's names, a list, or a date, a time or a date and time as a string. So does a synonym below the head of a type, as in `MAYBE Hue`.
 A synonym that takes no type (`DECLARE Years IS A LIST OF Year`) is answered where the type written out is not: a required `LIST`, `TIME` or `DATETIME` input fails on this path (see the limits below), and a synonym for one does not.
 A synonym that takes a type (`DECLARE Many OF a IS A LIST OF a`, used as `Many OF NUMBER`) fails with a parser error.
-Two kinds of synonym differ from the type written out when the input is left out or the value is wrong; the limits below say how.
-A required `DATE` string that does not parse is rejected with a message that quotes it: `Parameter 'end date': could not read "garbage" as a DATE`; when more than one does, the message names them all, without quoting.
-A batch case rejected this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
+One kind of synonym differs from the type written out when the input is left out; the limits below say how.
 
 Limits:
 
 - On the wrapper path, a function with a required `LIST`, `TIME` or `DATETIME` input fails the request with a type error.
-- On the wrapper path, a function with a `MAYBE DATE` input fails the request, with an error about the generated code: `incorrect indentation (got 7, should be greater than 7)`, or, when another input is required, a type error about `TODATE`.
+- On the wrapper path, a function with a `MAYBE DATE`, `MAYBE TIME` or `MAYBE DATETIME` input fails the request, with an error about the generated code: `incorrect indentation (got 7, should be greater than 7)`, or, when another input is required, a type error about `TODATE`.
 - On the wrapper path, an input declared through a synonym for a `BOOLEAN` that is left out, or sent as `null` in a batch case or an MCP call, is rejected with `Parameter 'b': missing required parameter`, where a `BOOLEAN` written out is `FALSE`.
-- On the wrapper path, an input declared through a synonym for a `DATE` whose string does not parse is rejected with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD`, where a `DATE` written out is rejected with `Parameter 'd': could not read "garbage" as a DATE`; a synonym for a `TIME` or a `DATETIME` is rejected with `Could not parse time string …` or `Could not parse datetime string …`, and the type written out fails the wrapper with a type error.
-- On the direct path, a `DATE` string that does not parse is not rejected: the rule receives the text.
 - A list answer of more than 200 elements comes back cut short and ending in two `null`s, with status 200, on the direct path, the wrapper path and in a batch alike.
   Each constructor around the list takes one element of that depth: a list inside the rule's own `JUST`, or in a record's field, is cut one element sooner, and a list in a record inside a record two sooner.
   So a `MAYBE` list of 200 elements comes back as 199 elements and two `null`s.
+
+#### Values of the wrong form
+
+Every input is checked before the request is evaluated, on both paths, and a value that does not have the form its type is sent in is rejected with status 422 and a message that names the input.
+A `BOOLEAN` is `true` or `false`, a `NUMBER` a number, and a `STRING` a string: `Parameter 'b': a BOOLEAN is true or false`, `Parameter 'n': a NUMBER is a number, such as 5 or 2.5`, `Parameter 's': a STRING is a string, in quotes`.
+A `DATE`, a `TIME` or a `DATETIME` is a string that reads as one: a value that is not a string is rejected with `Parameter 'd': a DATE is a string such as "2026-01-31"`, and a string that does not read with a message that quotes it, `Parameter 'end date': could not read "garbage" as a DATE, a string such as "2026-01-31"`.
+Each is read as `JSONDECODE` reads one (see [JSON](../doc/reference/builtins/http-json.md)): a `DATE` such as `"2026-01-31"`, `"2026-1-5"` or `"31/01/2026"`; a `TIME` such as `"14:30"`, `"14:30:15.5"` or `"14:30:00Z"`; a `DATETIME` such as `"2026-01-31T14:30:00Z"`, `"2026-01-31T14:30:00+08:00"`, `"2026-01-31 14:30"` or `"2026-01-31 14:30:00 Asia/Singapore"`.
+An answer can be sent back as it is: a `DATETIME` is answered as `"2026-01-31 14:30:00 UTC"`, which is read as that instant.
+A `DATETIME` that names no zone by name is given `UTC` as its zone on the direct path and the document's timezone on the wrapper path: the instant is the same, and `DATETIME_TZ` and `DATETIME_TIME` of it differ in a document that declares another timezone.
+A `LIST` is an array, a record an object of its fields, an enumeration the name of one of its constructors, and an `EITHER` `{"LEFT": [value]}` or `{"RIGHT": [value]}`.
+These are checked inside a record, a list and a `MAYBE` too, and the message names the input that holds the value; a `null` inside a record is passed to the generated wrapper, which rejects it in its own words, without the input's name.
+Only the first input with a value of the wrong form is named.
+A batch case rejected this way comes back in `cases` with the same message as its `@error`, and is counted in `summary.casesIgnored` (see [Batch Evaluation](#batch-evaluation)).
 
 #### Trace Output
 
@@ -329,7 +338,7 @@ The response has one entry per case, in the order the cases were sent, each unde
 An answered case carries the function's result under `value`.
 A case that refused carries `@refused`, the refusal as a single request's `200` carries it, `{"kind": "refused", "reason": "…"}`, has no `value`, and is counted in `casesProcessed`: a refusal is how the rules answer that case.
 A case that failed carries `@error`, the message its evaluation stopped with, has no `value`, and is counted in `casesIgnored`; the other cases keep their answers, and the batch is still a `200`.
-That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)): a `DATE` input sent as `"garbage"` beside a `null` is rejected in a batch and answered as text in a single request.
+That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing inputs](#missing-inputs)); a value of the wrong form is rejected in the same words by both (see [Values of the wrong form](#values-of-the-wrong-form)).
 A case that runs past `--eval-timeout` or `--max-eval-memory-mb` is not returned this way: it fails the whole batch with `500`, and no case comes back.
 Every case of a batch starts at once on one core, so each case's clock also counts the other cases' work, and a large batch of quick cases can fail this way: measured 2026-10-07 with `--eval-timeout 3`, 10 cases of a rule that answers a single request in about 0.12 s all answer, and 40 fail the batch.
 Unstable returns such a case with `@error` and `@limit` and keeps the others (legalese/l4-ide#549, commits `0765fef5d` and `a09544dd6`); this version does not carry that.
