@@ -57,6 +57,7 @@ module L4.Cli.Verify
   , verifyOptionsParser
   , verifyCmd
   , propositionalBound
+  , verifyLimitsNote
   ) where
 
 import Base
@@ -99,6 +100,21 @@ import L4.EvaluateLazy (EvalConfig)
 --
 -- Every sentence here is a limitation somebody would otherwise have to discover
 -- by being wrong in public.
+-- | The @--help@ footer's note on the four limit flags (decided by Claude
+-- 2026-11-21, pending Meng's review). The command takes them, as every command
+-- that evaluates does (ruled by Meng 2026-11-21, extending L2), but it only type-checks and reads
+-- the ladder: nothing here applies a function, so no count can fire.
+verifyLimitsNote :: String
+verifyLimitsNote =
+  unlines
+    [ "THE LIMIT FLAGS"
+    , ""
+    , "  --max-open, --max-steps, --eval-timeout and --max-eval-memory-mb are"
+    , "  accepted here as on the l4 commands that work out values, but they"
+    , "  never stop anything here: this command reads each rule's AND/OR"
+    , "  shape and works out no values."
+    ]
+
 propositionalBound :: String
 propositionalBound =
   unlines
