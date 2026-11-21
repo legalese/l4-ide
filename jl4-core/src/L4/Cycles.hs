@@ -1369,10 +1369,21 @@ mulF _ _ = Unbounded
 --     @deleteBy@); a helper of the author's own imported from another
 --     module; and every library function in a pipeline that names its
 --     modules @project:/…@, unless it passes 'apiLibraryFile', as the API's
---     does; and every library function wherever the libraries are found
---     somewhere else (the XDG store, the bundle beside the binary, or a
---     @JL4_LIBRARY_PATH@ that does not end in @jl4-core/libraries@). The
---     measurement above resolved the prelude to the compiled-in copy.
+--     does; and every library function whose prelude comes from a file
+--     this cannot recognise. @resolveLibrary@ (jl4-lsp's Rules.hs) ranks
+--     three tiers above the compiled-in copy: @JL4_LIBRARY_PATH@, the project
+--     root, and the importing file's directory. So that happens when
+--     @JL4_LIBRARY_PATH@ names a directory not ending in
+--     @jl4-core/libraries@, or when a @prelude.l4@ of the author's own sits
+--     at the project root or beside the importer. The XDG store and the
+--     bundle rank below the compiled-in copy, which is skipped only when
+--     @JL4_LIBRARY_PATH@ is set, so they supply the prelude only when that
+--     variable names a directory holding none. The measurement above
+--     resolved the prelude to the compiled-in copy. The same pass with
+--     @JL4_LIBRARY_PATH@ at a copy of the libraries elsewhere (2026-11-21)
+--     loses eleven proofs to "could not check": the four walks in
+--     @hierarchy.l4@, and seven in canon's Singapore succession files. None
+--     of the 30 obligation findings moved.
 --   * Silent: a file of the author's own whose path ends in
 --     @jl4-core/libraries/prelude.l4@, and which defines a @map@ of its
 --     own, is taken for the library. The editor's @project:/@ names, which
