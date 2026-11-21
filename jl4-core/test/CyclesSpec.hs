@@ -609,6 +609,28 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST (a RAND b)\n  WHERE\n    a MEANS x\n    b MEANS x")
         `shouldReturn` ["obligation:proved-waits+multiplies"]
 
+    -- each ended at run time and was "could not check" (2026-11-21 attack
+    -- round, names q07, q02, q08; patterns m3)
+    it "proves a countdown whose argument is a name for the smaller number" $
+      classes "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS IF n > 0 THEN f next PLUS 1 ELSE 0\n  WHERE next MEANS n MINUS 1"
+        `shouldReturn` ["function:proved-countdown"]
+
+    it "and one whose test is a name for the comparison" $
+      classes "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS IF big THEN f (n MINUS 1) ELSE 0\n  WHERE big MEANS n > 0"
+        `shouldReturn` ["function:proved-countdown"]
+
+    it "and a walk whose argument is a name for the tail" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A NUMBER\ntotal xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN 0\n  WHEN y FOLLOWED BY ys THEN y PLUS total rest\n    WHERE rest MEANS ys"
+        `shouldReturn` ["function:proved-structural"]
+
+    it "but not a name for the very value" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A NUMBER\ntotal xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN 0\n  WHEN y FOLLOWED BY ys THEN y PLUS total same\n    WHERE same MEANS xs"
+        `shouldReturn` ["function:unproved-self"]
+
+    it "nor a name for a number that does not move" $
+      classes "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS IF n > 0 THEN f next PLUS 1 ELSE 0\n  WHERE next MEANS n PLUS 0"
+        `shouldReturn` ["function:unproved-self"]
+
     it "but does not open a name whose body is the RAND, which was not counted before either" $ do
       fs <- findings (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST both\n  WHERE\n    both MEANS x RAND x")
       [m | f <- fs, Just m <- [f.multiplies]] `shouldSatisfy` null

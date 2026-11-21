@@ -769,12 +769,16 @@ moduleGraph through info m =
         concat [go od ss cs (bodyOf ld) | LocalDecide _ ld <- ds, clausePart ld] <> go od ss cs body
       _ -> concatMap (go Nothing ss cs) (kids e)
      where
+      -- what the checks read of a call, its arguments and the tests above
+      -- it, is read through the names in it, as the walk reads them
       ref f xs
         | Set.member (getUnique f) nodes =
-            [Right MkEdge {from = self, to = getUnique f, slots = ss, args = xs, conds = cs, elements = []}]
+            [Right MkEdge {from = self, to = getUnique f, slots = ss, args = readArgs xs, conds = readConds, elements = []}]
         | otherwise = []
       refElements g xs =
-        [Right MkEdge {from = self, to = getUnique g, slots = ss, args = [], conds = cs, elements = xs}]
+        [Right MkEdge {from = self, to = getUnique g, slots = ss, args = [], conds = readConds, elements = readArgs xs}]
+      readArgs xs = [(k, expandNames through x) | (k, x) <- xs]
+      readConds = [(b, expandNames through c) | (b, c) <- cs]
 
     -- a continuation that runs at all, whose expression joins two or more
     -- calls of the module's definitions
@@ -1851,3 +1855,16 @@ kids = toListOf (gplate @(Expr Resolved))
 
 universeExpr :: Expr Resolved -> [Expr Resolved]
 universeExpr e = e : concatMap universeExpr (toListOf (gplate @(Expr Resolved)) e)
+
+-- | The expression with each name for an expression in the map replaced by
+-- what it names, however deep (Note [A name for an expression]): @f next@
+-- with @next MEANS n MINUS 1@ is read as @f (n MINUS 1)@. The names in the
+-- map name no cycle among themselves, so this ends.
+expandNames :: Map Unique (Expr Resolved) -> Expr Resolved -> Expr Resolved
+expandNames through
+  | Map.null through = id
+  | otherwise = go
+ where
+  go = \ case
+    App _ v [] | Just b <- Map.lookup (getUnique v) through -> go b
+    e -> over (gplate @(Expr Resolved)) go e
