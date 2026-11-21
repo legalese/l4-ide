@@ -14,8 +14,12 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.Foldable (for_)
 import Data.List (isInfixOf)
+import System.Directory (doesFileExist, makeAbsolute)
+import System.Environment (lookupEnv)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
+import System.IO.Temp (withSystemTempDirectory)
+import System.Process (CreateProcess (..), proc, readCreateProcessWithExitCode)
 import Test.Hspec
 
 import CliTest.Common
@@ -23,7 +27,7 @@ import CliTest.Common
 dir :: FilePath
 dir = "tests-cli" </> "fixtures" </> "budgets"
 
-runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps :: FilePath
+runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps, replTrace :: FilePath
 runaway = dir </> "runaway.l4"
 neverStops = dir </> "never-stops.l4"
 ends = dir </> "ends.l4"
@@ -36,9 +40,10 @@ batchImportsStop = dir </> "batch-imports-stop.l4"
 batchRows = dir </> "batch-never-stops.json"
 proveSteps = dir </> "prove-steps.l4"
 coverageSteps = dir </> "coverage-steps.l4"
+replTrace = dir </> "repl-trace.l4"
 
 fixtures :: [FilePath]
-fixtures = [runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps]
+fixtures = [runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps, replTrace]
 
 -- | Each result of @l4 run --json@, as its "limit" (if any) and its "value".
 results :: String -> Maybe [(Maybe Aeson.Value, Maybe Aeson.Value)]
@@ -175,6 +180,34 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
     sout `shouldSatisfy` ("--max-eval-memory-mb" `isInfixOf`)
     sout `shouldSatisfy` ("--max-open" `isInfixOf`)
     sout `shouldSatisfy` ("--max-steps" `isInfixOf`)
+
+  -- The REPL ran each plain line as an #EVAL and collected its trace, about
+  -- 10 KB a step, then printed only the answer. It now collects a trace only
+  -- for a :trace or :traceascii line, which shows it (decided by Claude 2026-11-21, pending Meng's review). What
+  -- the REPL keeps is pinned in jl4-core's BudgetSpec; this pins what it shows.
+  describe "the REPL keeps a trace only where it shows one (decided by Claude 2026-11-21, pending Meng's review)" $ do
+    mRepl <- runIO $ lookupEnv "L4_REPL_BIN" >>= \ case
+      Just p -> do
+        ok <- doesFileExist p
+        pure (if ok then Just p else Nothing)
+      Nothing -> do
+        (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+        let path = takeWhile (`notElem` ("\r\n" :: String)) out
+        ok <- doesFileExist path
+        pure (if code == ExitSuccess && ok then Just path else Nothing)
+    it "answers a plain line as before, and :trace and :traceascii still show a trace" $ case mRepl of
+      Nothing -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+      Just repl -> do
+        file <- makeAbsolute replTrace
+        -- in a directory of its own, because the REPL keeps a history file there
+        sout <- withSystemTempDirectory "l4-repl-trace" \ work -> do
+          (_, o, _) <- readCreateProcessWithExitCode (proc repl [file]) {cwd = Just work}
+                         (unlines ["`double` 3", ":trace `double` 3", ":traceascii `double` 3", ":quit"])
+          pure (filter (/= '\r') o)
+        sout `shouldSatisfy` ("jl4> 6\n" `isInfixOf`)
+        sout `shouldSatisfy` ("digraph" `isInfixOf`)
+        sout `shouldSatisfy` ("double OF 3" `isInfixOf`)
+        sout `shouldSatisfy` ("Trace:" `isInfixOf`)
 
   -- Ruled by Meng 2026-11-21, extending L2: every other command that evaluates
   -- counts too, by default, with the same flags; and none of them reads an

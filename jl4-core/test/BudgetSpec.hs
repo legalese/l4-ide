@@ -15,6 +15,7 @@
 -- the REPL and the editor evaluate under.
 module BudgetSpec (spec) where
 
+import Data.Maybe (isJust)
 import qualified Data.Text as Text
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import System.Timeout (timeout)
@@ -26,7 +27,8 @@ import L4.EvaluateLazy.Exceptions (Budget (..), BudgetSite (..), EvalException (
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
-import L4.TracePolicy (apiDefaultPolicy)
+import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
+import L4.TracePolicy (apiDefaultPolicy, fullTracePolicy, replDefaultPolicy)
 
 fixedNow :: UTCTime
 fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
@@ -125,6 +127,23 @@ deontic rules start events = Text.unlines $
 
 spec :: Spec
 spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
+  -- A trace holds about 10 KB per step, so the REPL, which collected one for
+  -- every line and showed none of them, ran out of memory where `l4 run` did
+  -- not (measured 2026-11-21: 10.6 GB against 55 MB at 1,000,000 steps).
+  describe "the REPL keeps a trace only where it shows one (decided by Claude 2026-11-21, pending Meng's review)" $ do
+    let src = Text.unlines ["#EVAL 1 PLUS 1", "#EVALTRACE 1 PLUS 1"]
+        traced policy = do
+          r <- case checkWithImports (vfsFromList []) src of
+            Left errs -> fail ("typecheck failed: " <> show errs)
+            Right r   -> pure r
+          cfg <- resolveEvalConfig (Just fixedNow) policy
+          (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+          pure [ isJust res.trace | res <- results ]
+    it "collects none for a plain line, which the REPL runs as an #EVAL, and one for a :trace line, an #EVALTRACE" $
+      traced (replDefaultPolicy defaultGraphVizOptions) `shouldReturn` [False, True]
+    it "a control: the policy that traces everything collects both" $
+      traced (fullTracePolicy defaultGraphVizOptions) `shouldReturn` [True, True]
+
   describe "where they are on (ruling L2)" $ do
     it "the shared configuration sets no count, so jl4-service evaluates as it did" $ do
       cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy

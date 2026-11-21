@@ -15,7 +15,7 @@
 | Component            | Status         | Default Behavior          | TracePolicy                               |
 | -------------------- | -------------- | ------------------------- | ----------------------------------------- |
 | **CLI**              | ✅ Operational | No traces (clean output)  | `optionsToTracePolicy` - respects flags   |
-| **REPL**             | ✅ Operational | Full traces (exploration) | `replDefaultPolicy` - always traces       |
+| **REPL**             | ✅ Operational | `:trace` lines only       | `replDefaultPolicy` - #EVALTRACE only     |
 | **LSP**              | ✅ Operational | Only #EVALTRACE traces    | `lspDefaultPolicy` - avoids editor noise  |
 | **Decision Service** | ✅ Operational | No traces (per-request)   | `apiDefaultPolicy` - controlled by params |
 | **Tests**            | ✅ Operational | No traces (automated)     | `apiDefaultPolicy` - clean test output    |
@@ -422,7 +422,7 @@ _Core Infrastructure:_
 _Tool Integration:_
 
 - **CLI** (`jl4/app/Main.hs`): Uses `optionsToTracePolicy` - respects command-line flags
-- **REPL** (`jl4-repl/app/Main.hs`): Uses `replDefaultPolicy defaultGraphVizOptions` - enables traces
+- **REPL** (`jl4-repl/app/Main.hs`): Uses `replDefaultPolicy defaultGraphVizOptions` - traces `#EVALTRACE`, which is how `:trace` and `:traceascii` run a line; a plain line runs as an `#EVAL`, whose trace the REPL never showed, and since 2026-11-21 it is not collected
 - **Decision Service** (`jl4-decision-service/src/Backend/Jl4.hs`): Uses `apiDefaultPolicy` - no traces
 - **LSP** (`jl4-lsp/app/Server.hs`): Uses `lspDefaultPolicy defaultGraphVizOptions` - only #EVALTRACE
 - **Tests** (`jl4/tests/Main.hs`): Uses `apiDefaultPolicy` - no traces for automated tests
