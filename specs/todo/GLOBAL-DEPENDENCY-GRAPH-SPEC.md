@@ -146,7 +146,10 @@ Card L3: option A, accepted by Meng on 2026-11-20 at 22:49:58Z, with no note; be
   Re-measured on this branch on 2026-11-21: all 1,602 tracked `.l4` files checked with the binary before and after, with identical exit codes and cycle warnings in exactly three files, none of them "multiplies".
 - L2's run-time stop: **not met on this branch.**
   It is on `fix/runaway-lest-1075`, which has not landed in `unstable` (`git merge-base --is-ancestor` says so, 2026-11-21), so this branch must not merge before it.
-- The fixtures: `jl4-core/test/CyclesSpec.hs`, "an obligation cycle draws its alarms", has a positive and a negative case for each shape: a `LEST`, the #1075 shape over two rules, a `HENCE`, a countdown, a barrier's `HENCE` and a `RECORD`'s `HENCE`.
+- The fixtures: met.
+  `jl4/examples/ok/cycles/` has a file for each warning a cycle of rules can draw, `multiplies.l4`, `no-time.l4` and `could-not-check.l4`, each with rules that draw it beside rules of the same shape that do not, and `marks.l4`, with an `@ends-because` above rules where it changes nothing.
+  Their goldens pin the text of each warning and each note.
+  `jl4-core/test/CyclesSpec.hs`, "an obligation cycle draws its alarms", has a positive and a negative case for each shape "multiplies" fires on: a `LEST`, the #1075 shape over two rules, a `HENCE`, a countdown, a barrier's `HENCE` and a `RECORD`'s `HENCE`.
 
 **`@ends-because` silences "could not check", and nothing else.**
 Card L4: accepted by Meng on 2026-11-20 at 22:50:17Z, with no note on the mark; bench "Recursion Limits", https://claude.ai/artifact/GaRTioL8pgDR5sHbEe8fKY (collection `l4-recursion-1120`); printed: "Accept, in principle now, built after the report-only count. One annotation, its name your choice (`@ends-because` suggested), with a mandatory reason." "Conditions: it silences only “could not check”, never “multiplies” or “no time”; only for the cycle containing the annotated definition, written on the definition the warning is reported on; each use emits one information-level message carrying its reason; no effect on runtime limits; the ruling is recorded in `GLOBAL-DEPENDENCY-GRAPH-SPEC.md`."

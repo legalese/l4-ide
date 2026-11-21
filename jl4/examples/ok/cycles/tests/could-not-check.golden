@@ -1,0 +1,57 @@
+Parsing successful
+Typechecking successful
+could-not-check.l4:15:1-11:
+  `reminder` can start itself again: a HENCE or LEST in it leads back to `reminder`.
+  I could not check that this comes to an end, because the time one of its duties allows (its WITHIN) is not a number written out, and I read only a number written out there, so I cannot tell how long that time is, or whether it is more than 0 each time round.
+  
+  If it does come to an end, say why on a line of its own above `reminder`, like this:
+  
+    @ends-because <your reason>
+  
+  A reader can then check your reason, and L4 stops warning about it.
+could-not-check.l4:30:1-89:
+  `final reminders` can start itself again: a HENCE or LEST in it leads back to `final reminders`, and I could not check that this comes to an end, because the time one of its duties allows (its WITHIN) is not a number written out, and I read only a number written out there, so I cannot tell how long that time is, or whether it is more than 0 each time round.
+  Its author says why it does, with the @ends-because above `final reminders`:
+  
+    tries drops by one at every reminder, and at 0 there are no more reminders
+  
+  So L4 does not warn about it. That reason is what a reader should check.
+could-not-check.l4:45:1-15:
+  `first notice` can start itself again: `first notice` and `second notice` lead back to each other, and a HENCE or LEST in one of them starts one of them again.
+  I could not check that this comes to an end, because the time one of its duties allows (its WITHIN) is not a number written out, and I read only a number written out there, so I cannot tell how long that time is, or whether it is more than 0 each time round.
+  
+  If it does come to an end, say why on a line of its own above `first notice`, like this:
+  
+    @ends-because <your reason>
+  
+  A reader can then check your reason, and L4 stops warning about it.
+  
+  The @ends-because above `second notice` does not count here: it goes above `first notice`, the rule this warning is shown on, which comes first of the rules that lead back to each other.
+could-not-check.l4:51:1-57:
+  The @ends-because above `second notice` says why it comes to an end:
+  
+    Sam pays before the second notice runs out
+  
+  It does not count here: the warning it would answer, that L4 could not check that this comes to an end, is shown on `first notice`, and the mark goes above `first notice`.
+could-not-check.l4:62:1-42:
+  `call one` can start itself again: `call one` and `call two` lead back to each other, and a HENCE or LEST in one of them starts one of them again, and I could not check that this comes to an end, because the time one of its duties allows (its WITHIN) is not a number written out, and I read only a number written out there, so I cannot tell how long that time is, or whether it is more than 0 each time round.
+  Its author says why it does, with the @ends-because above `call one`:
+  
+    Alex pays by the third call
+  
+  So L4 does not warn about it. That reason is what a reader should check.
+could-not-check.l4:71:1-42:
+  The @ends-because above `call two` says why it comes to an end:
+  
+    Alex pays by the third call
+  
+  It does not count here: the warning it would answer, that L4 could not check that this comes to an end, would be shown on `call one`, and the @ends-because above `call one` answers it.
+could-not-check.l4:85:1-14:
+  `instalments` can start itself again: a HENCE or LEST in it leads back to `instalments`.
+  I could not check that this comes to an end, because `instalments` also uses itself directly, with no duty in between, and there I could not find an input that gets smaller each time, towards a stop.
+  
+  If it does come to an end, say why on a line of its own above `instalments`, like this:
+  
+    @ends-because <your reason>
+  
+  A reader can then check your reason, and L4 stops warning about it.
