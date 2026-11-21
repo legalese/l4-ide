@@ -362,6 +362,16 @@ data CheckError =
     -- ^ An @\@nonassertable@ carried text after it that is not a comment.
     -- The mark takes no words: @\@nonassertable \`alpha\` MEANS TRUE@ would
     -- otherwise swallow the definition into the annotation and mark the next.
+  | EndsBecauseOnNonDefinition Text (Maybe Text) (Maybe SrcRange)
+    -- ^ An @\@ends-because@ annotation sits above something that is not a
+    -- definition: the first text says what (a declaration, an assumption, an
+    -- input, a section heading or its inputs, a directive, an import, a
+    -- timezone), the second names it when it has a name. Only a definition can
+    -- carry a reason for its recursion to end.
+  | EndsBecauseNeedsReason (Maybe Text) (Maybe SrcRange)
+    -- ^ An @\@ends-because@ with nothing after it, or only spaces. The text
+    -- names the definition it is above, when there is one in sight. The reason
+    -- is what a reader checks, so a mark without one is refused.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -927,6 +937,8 @@ instance HasSrcRange CheckError where
   rangeOf (BeforeOnJoinLine d)              = rangeOf d
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
+  rangeOf (EndsBecauseOnNonDefinition _ _ mr) = mr
+  rangeOf (EndsBecauseNeedsReason _ mr) = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   rangeOf (CheckWarning (LifecycleNounHidesName _ mr _ _)) = mr

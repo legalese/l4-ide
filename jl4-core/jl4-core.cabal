@@ -274,6 +274,7 @@ test-suite jl4-core-test
     ExportReadSetSpec
     ExportValidationSpec
     NonassertableSpec
+    EndsBecauseSpec
     CatalaLowerSpec
     ProveSmtSpec
     DisambiguationWarningsSpec

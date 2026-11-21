@@ -1608,6 +1608,14 @@ prettyNlgResolveWarning = \ case
     "This @nonassertable shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
   Resolve.NonassertableAnnotationNoLocation _ ->
     "A @nonassertable annotation has no source location. This might be an internal compiler error."
+  Resolve.EndsBecauseAnnotationMisplaced _ ->
+    "This @ends-because sits inside a definition's body without being directly above a definition in a WHERE or LET block, or after the last construct of the file, so no definition carries it. Write it on a line of its own above the definition's GIVEN, or directly above its MEANS or DECIDE."
+  Resolve.EndsBecauseAnnotationSuperseded _ ->
+    "Two or more @ends-because marks sit above one construct; this one is an earlier one and is ignored, since the closest to the construct is the one that counts. One mark is enough."
+  Resolve.EndsBecauseAnnotationSameLine _ ->
+    "This @ends-because shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
+  Resolve.EndsBecauseAnnotationNoLocation _ ->
+    "An @ends-because annotation has no source location. This might be an internal compiler error."
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1645,6 +1653,14 @@ rangeOfResolveWarning = \ case
   Resolve.NonassertableAnnotationSuperseded na ->
     srcSpanToLspRange $ Just na.range
   Resolve.NonassertableAnnotationNoLocation _ ->
+    srcSpanToLspRange Nothing
+  Resolve.EndsBecauseAnnotationMisplaced eb ->
+    srcSpanToLspRange $ Just eb.range
+  Resolve.EndsBecauseAnnotationSameLine eb ->
+    srcSpanToLspRange $ Just eb.range
+  Resolve.EndsBecauseAnnotationSuperseded eb ->
+    srcSpanToLspRange $ Just eb.range
+  Resolve.EndsBecauseAnnotationNoLocation _ ->
     srcSpanToLspRange Nothing
 
 -- ----------------------------------------------------------------------------

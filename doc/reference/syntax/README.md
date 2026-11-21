@@ -121,6 +121,29 @@ A mark at the end of the line that names a definition, or inside its body, is a 
 A `@desc` whose text begins with the word `nonassertable` is a description, not the mark.
 Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the request-side assertion the mark closes; both are designed in `specs/todo/presumption-assertion/CONTRACT.md` and not built.
 
+### @ends-because
+
+The author of a rule that calls itself writes `@ends-because` above it to vouch that the calls come to an end, and to say why.
+What it changes is described with the warnings about rules that call themselves.
+Write it on a line of its own above a `MEANS` or `DECIDE` definition, followed by the reason: above the definition's `GIVEN`, or directly above the line that names it.
+It goes on a definition at the top level of a file, inside a section, or inside a `WHERE` or `LET` block.
+
+```l4
+@ends-because each step moves one day nearer the end date, and the end date is fixed
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`countdown` d MEANS
+  IF d EQUALS 0 THEN 0 ELSE `countdown` (d MINUS 1)
+```
+
+The reason is free text, it is required, and it is the rest of the line, so a `--` comment after the mark is part of the reason.
+A mark with no reason, or only spaces after it, is an error that says a reason is needed: the reason is what a reader checks.
+On anything that is not a definition, above it or among its lines, it is an error that names what it sits on: a `DECLARE`, an `ASSUME`, a section heading or the `GIVEN` under it, a directive, an `IMPORT`, a `TIMEZONE`.
+On one of a definition's own `GIVEN` lines it is an error too, one per mark, naming the input on that line (or the next one, for a mark on a line of its own among them); a mark above the same definition still counts.
+A mark at the end of the line that names a definition, or inside its body but not above a definition in a `WHERE` or `LET` block, is a warning and carries nothing; one at the end of the `GIVETH` line is above the name line and counts; two marks above one definition are one mark and a warning.
+The mark survives a re-print: `l4 batch` and the REPL, which re-print a module before running it, keep it, and its reason.
+A `@desc` whose text begins with the words `ends-because` is a description, not the mark.
+
 ### @nlg
 
 `@nlg` gives a definition its wording in natural language, with `%name%` slots for its inputs.

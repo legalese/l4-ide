@@ -1225,9 +1225,11 @@ resolveSectionGiven rdecls (MkGivenSig gann otns) =
 -- names it, which need not be the one this local was written under.
 inferLocalDecl :: LocalDecl Name -> Check (LocalDecl Resolved, [CheckInfo])
 inferLocalDecl (LocalDecide ann decide) = asValue do
+  checkEndsBecauseOnDecide decide
   (rdecide, extends) <- softprune $ inferDecide decide
   pure (LocalDecide ann rdecide, extends)
-inferLocalDecl (LocalAssume ann assume) = asValue do
+inferLocalDecl (LocalAssume ann assume@(MkAssume _ _ (MkAppForm _ an _ _) _ _)) = asValue do
+  rejectEndsBecause "an assumption" (Just (rawNameToText (rawName an))) ann
   (rassume, extends) <- softprune $ inferAssume WrittenLocalAssume assume
   pure (LocalAssume ann rassume, extends)
 
@@ -1258,31 +1260,38 @@ ownSlots = local \ env -> env { inOwnSlots = True }
 inferTopDecl :: AssumeOrigin -> TopDecl Name -> Check (TopDecl Resolved, [CheckInfo])
 inferTopDecl _ (Declare ann declare@(MkDeclare _ _ (MkAppForm _ dn _ _) _)) = do
   rejectNonassertable "a declaration" (Just (rawNameToText (rawName dn))) ann
+  rejectEndsBecause "a declaration" (Just (rawNameToText (rawName dn))) ann
   (rdeclare, extends) <- prune $ inferDeclare declare
   pure (Declare ann rdeclare, extends)
 inferTopDecl _ (Decide ann decide) = do
   rejectNonassertableOnInput decide
+  checkEndsBecauseOnDecide decide
   refuseExportedClausesWithoutGiven decide
   (rdecide, extends) <- prune $ inferDecide decide
   pure (Decide ann rdecide, extends)
 inferTopDecl origin (Assume ann assume@(MkAssume _ _ (MkAppForm _ an _ _) _ _)) = do
   rejectNonassertable "an input" (Just (rawNameToText (rawName an))) ann
+  rejectEndsBecause "an assumption" (Just (rawNameToText (rawName an))) ann
   (rassume, extends) <- prune $ inferAssume origin assume
   pure (Assume ann rassume, extends)
 inferTopDecl _ (Directive ann directive) = do
   rejectNonassertable "a directive" Nothing ann
+  rejectEndsBecause "a directive" Nothing ann
   rdirective <- inferDirective directive
   pure (Directive ann rdirective, [])
 inferTopDecl _ (Import ann import_) = do
   rejectNonassertable "an import" Nothing ann
+  rejectEndsBecause "an import" Nothing ann
   rimport_ <- inferImport import_
   pure (Import ann rimport_, [])
 inferTopDecl _ (Section ann sec) = do
   rejectNonassertable "a section heading or its inputs" Nothing (getAnno sec)
+  rejectEndsBecause "a section heading or its inputs" Nothing (getAnno sec)
   (sec', extends) <- inferSection sec
   pure (Section ann sec', extends)
 inferTopDecl _ (Timezone ann tzExpr) = errorContext (WhileCheckingExpression tzExpr) do
   rejectNonassertable "a timezone" Nothing ann
+  rejectEndsBecause "a timezone" Nothing ann
   -- Both the 'errorContext' and the 'prune' are load-bearing (mirrors LazyEval):
   -- 'prune' collapses ambiguous candidates into an 'AmbiguousTermError' diagnostic
   -- (instead of crashing in 'runCheckUnique'), and the context supplies the
@@ -1318,6 +1327,39 @@ rejectNonassertableOnInput decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ inputs)
           ([], lastInput : _) -> Just (inputName lastInput)
           ([], []) -> Nothing
     addError (NonassertableOnNonDefinition "an input" mname (rangeOf na))
+
+-- | @\@ends-because@ vouches for a definition; on anything else, above it or
+-- among its lines, it is an error named for what it sits on, at the
+-- annotation's own range ('L4.Parser.ResolveAnnotation' gives every mark on
+-- such a construct to it). Unlike @\@nonassertable@ it is also refused for an
+-- assumption written in a WHERE or LET.
+rejectEndsBecause :: Text -> Maybe Text -> Anno -> Check ()
+rejectEndsBecause what mname ann =
+  for_ (ann ^. annEndsBecause) \ eb ->
+    addError (EndsBecauseOnNonDefinition what mname (rangeOf eb))
+
+-- | What is wrong with the @\@ends-because@ marks of a definition, top-level
+-- or local: one on one of its GIVEN lines is an error each, naming the input
+-- on the mark's line, or the next one when the mark has a line of its own
+-- among them; and a mark above it with no reason is an error. Neither stops
+-- the definition being checked.
+checkEndsBecauseOnDecide :: Decide Name -> Check ()
+checkEndsBecauseOnDecide decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ inputs) _) appForm _) = do
+  for_ (getAnno decide ^. annEndsBecauseOnInputs) \ eb -> do
+    let lineOf :: Maybe SrcRange -> Maybe Int
+        lineOf = fmap (\ r -> r.start.line)
+        markLine = lineOf (rangeOf eb)
+        inputName (MkOptionallyTypedName _ n _ _) = rawNameToText (rawName n)
+        atOrAfter :: OptionallyTypedName Name -> Bool
+        atOrAfter (MkOptionallyTypedName _ n _ _) = lineOf (rangeOf n) >= markLine
+        mname = case (filter atOrAfter inputs, reverse inputs) of
+          (next : _, _) -> Just (inputName next)
+          ([], lastInput : _) -> Just (inputName lastInput)
+          ([], []) -> Nothing
+    addError (EndsBecauseOnNonDefinition "an input" mname (rangeOf eb))
+  for_ (getAnno decide ^. annEndsBecause) \ eb ->
+    when (Text.null (Text.strip (getEndsBecauseReason eb))) $
+      addError (EndsBecauseNeedsReason (Just (rawNameToText (rawName (getName appForm)))) (rangeOf eb))
 
 -- TODO: Somewhere near the top we should do dependency analysis. Note that
 -- there is a potential problem. If we use type-directed name resolution but
@@ -8094,6 +8136,22 @@ prettyCheckError (NonassertableOnNonDefinition what mname _) =
   why
     | what == "an input" = "which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it."
     | otherwise = "which cannot be asserted in any case; move it above the definition it is meant for, or remove it."
+prettyCheckError (EndsBecauseOnNonDefinition what mname _) =
+  [ "@ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's calls to itself come to an end."
+  , "Here it is on " <> maybe what (\ n -> "`" <> n <> "`, " <> what) mname <> ", " <> why
+  ]
+ where
+  -- An input is what a caller supplies, so say that the mark speaks for a
+  -- whole definition, and where it would have to go to speak for the one that
+  -- reads this input.
+  why
+    | what == "an input" = "which is not a definition. A mark speaks for a whole definition, not for one of its inputs: to speak for the definition that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it."
+    | otherwise = "which is not a definition; move it above the definition it is meant for, or remove it."
+prettyCheckError (EndsBecauseNeedsReason mname _) =
+  [ "@ends-because needs a reason after it, on the same line." <> maybe "" (\ n -> " Here it has none, above `" <> n <> "`.") mname
+  , "The reason is what a reader checks: a mark that says the calls end without saying why gives the reader nothing to check, so it is not accepted."
+  , "Write the reason after the mark, for example: @ends-because each step moves one day nearer the end date, and the end date is fixed"
+  ]
 prettyCheckError (FixityAnnotationMalformed _ raw) =
   [ "I could not parse this fixity annotation:"
   , ""

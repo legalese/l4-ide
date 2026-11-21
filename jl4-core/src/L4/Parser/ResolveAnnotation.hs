@@ -19,6 +19,12 @@ module L4.Parser.ResolveAnnotation (
   NonassertableS(..),
   NonassertableWarning(..),
   NonassertableWithSpan,
+  HasEndsBecause(..),
+  addEndsBecauseCommentsToAst,
+  renderEndsBecauseWarning,
+  EndsBecauseS(..),
+  EndsBecauseWarning(..),
+  EndsBecauseWithSpan,
   HasRef(..),
   addRefCommentsToAst,
   TrailingRefs,
@@ -115,6 +121,18 @@ data Warning
     -- earlier ones, and the closest attaches.
   | NonassertableAnnotationNoLocation Nonassertable
     -- ^ An @\@nonassertable@ had no source location. That's a bug.
+  | EndsBecauseAnnotationMisplaced EndsBecauseWithSpan
+    -- ^ An @\@ends-because@ sits inside a definition's body but not above one
+    -- of its WHERE\/LET locals, or after the last construct, so no definition
+    -- claims it.
+  | EndsBecauseAnnotationSameLine EndsBecauseWithSpan
+    -- ^ An @\@ends-because@ is on the same line as the construct before it
+    -- (at the end of a definition's line), so nothing carries it.
+  | EndsBecauseAnnotationSuperseded EndsBecauseWithSpan
+    -- ^ Two or more marks sit above one construct; this is one of the
+    -- earlier ones, and the closest attaches.
+  | EndsBecauseAnnotationNoLocation EndsBecause
+    -- ^ An @\@ends-because@ had no source location. That's a bug.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -2987,3 +3005,373 @@ claimNonassertableUpTo he ann = do
 
 warnNa :: [NonassertableWarning] -> State NonassertableS ()
 warnNa ws = modify' (\ st -> st { nonassertableWarnings = ws <> st.nonassertableWarnings })
+
+-- ----------------------------------------------------------------------------
+-- @ends-because attachment
+-- ----------------------------------------------------------------------------
+
+-- Modelled on the @nonassertable pass above, and differing from it in one way:
+-- it reaches the definitions in a WHERE or LET.
+--
+-- A mark is attached to the nearest following top-level, section-level or
+-- local construct, whatever it is: a definition honours it, and the
+-- typechecker reports it on anything else ('L4.TypeCheck', EndsBecauseOnNonDefinition),
+-- so a misplaced one is loud rather than a warning CI never sees.
+--
+-- Where "above a definition" ends: at the definition's NAME line, as for
+-- @nonassertable. A mark among the GIVEN lines is kept apart
+-- ('annEndsBecauseOnInputs') for the typechecker to refuse, on every surface.
+--
+-- A top-level definition claims the marks above its name line, and then its
+-- body is searched for WHERE and LET layers, in the order of the concrete
+-- syntax. A local claims the marks written after whatever precedes it in its
+-- layer (the body, for the first local of a WHERE; the LET keyword, for the
+-- first of a LET; the previous local, for the rest) and before its own name
+-- line, so a mark inside a body that is not above a local is never taken by a
+-- local that happens to follow it. What no local claims is a parser warning
+-- when the definition ends, as is a mark on the same line as the construct
+-- before it, one after the last construct, and all but the closest of several
+-- stacked above one construct.
+--
+-- The bindings a clause group was compiled to are not definitions the drafter
+-- wrote, and claim nothing; a mark above a later clause is inside the group.
+
+type EndsBecauseWithSpan = WithSpan EndsBecause
+
+data EndsBecauseWarning
+  = EndsBecauseMissingLocation EndsBecause
+  | EndsBecauseMisplaced EndsBecauseWithSpan
+  | EndsBecauseSameLine EndsBecauseWithSpan
+  | EndsBecauseSuperseded EndsBecauseWithSpan
+  deriving stock (Generic, Eq, Show)
+  deriving anyclass (SOP.Generic)
+
+data EndsBecauseS = EndsBecauseS
+  { endsBecauses :: ![EndsBecauseWithSpan]
+  , endsBecauseWarnings :: ![EndsBecauseWarning]
+  , endsBecauseLastEnd :: !(Maybe SrcPos)
+    -- ^ Where the previous top-level construct ended, for the same-line check.
+  }
+  deriving stock (Generic, Eq, Show)
+  deriving anyclass (SOP.Generic)
+
+addEndsBecauseCommentsToAst :: HasEndsBecause a => [EndsBecause] -> a -> (a, EndsBecauseS)
+-- No mark, no work: nearly every file, and the descent would rebuild every body.
+addEndsBecauseCommentsToAst [] ast = (ast, EndsBecauseS [] [] Nothing)
+addEndsBecauseCommentsToAst ebs ast =
+  let
+    (withSpan, missing) = foldl' go ([], []) ebs
+    go (located, miss) eb = case rangeOf eb of
+      Nothing -> (located, eb : miss)
+      Just r  -> (WithSpan (fromSrcRange r) eb : located, miss)
+    initialS =
+      EndsBecauseS
+        { endsBecauses = List.sortOn (.range.start) withSpan
+        , endsBecauseWarnings = fmap EndsBecauseMissingLocation missing
+        , endsBecauseLastEnd = Nothing
+        }
+    (ast', s) = runState (addEndsBecause ast) initialS
+  in
+    ( ast'
+    , s { endsBecauses = []
+        , endsBecauseWarnings = fmap EndsBecauseMisplaced s.endsBecauses <> s.endsBecauseWarnings
+        }
+    )
+
+renderEndsBecauseWarning :: EndsBecauseWarning -> Warning
+renderEndsBecauseWarning = \ case
+  EndsBecauseMissingLocation eb -> EndsBecauseAnnotationNoLocation eb
+  EndsBecauseMisplaced eb       -> EndsBecauseAnnotationMisplaced eb
+  EndsBecauseSameLine eb        -> EndsBecauseAnnotationSameLine eb
+  EndsBecauseSuperseded eb      -> EndsBecauseAnnotationSuperseded eb
+
+class HasEndsBecause a where
+  addEndsBecause :: a -> State EndsBecauseS a
+
+instance HasSrcRange n => HasEndsBecause (Module n) where
+  addEndsBecause (MkModule uri ann sect) =
+    MkModule uri ann <$> addEndsBecause sect
+
+instance HasSrcRange n => HasEndsBecause (Section n) where
+  addEndsBecause (MkSection ann lbl maka mgiven decls) = do
+    -- As for @nonassertable: a headed section claims everything up to the end
+    -- of its heading, or of its GIVEN when it has one, on its own Anno, which
+    -- the typechecker rejects. The module's root section has neither.
+    let headerEnd = latestPos (mapMaybe (fmap (.end) . nodeSpan) [SomeSpan lbl, SomeSpan maka, SomeSpan mgiven])
+    ann' <- case headerEnd of
+      Nothing -> pure ann
+      Just he -> claimEndsBecauseUpTo he ann
+    decls' <- traverse addEndsBecause decls
+    pure $ MkSection ann' lbl maka mgiven decls'
+
+-- | The latest of some positions.
+latestPos :: [SrcPos] -> Maybe SrcPos
+latestPos = \ case
+  [] -> Nothing
+  p : ps -> Just (foldl' (\ a b -> if posLt a b then b else a) p ps)
+
+instance HasSrcRange n => HasEndsBecause (TopDecl n) where
+  -- Every construct claims the marks before it, so that none leaks past to a
+  -- later definition; which constructs may carry one is the typechecker's
+  -- question. A definition carries the mark on its OWN Anno; the others carry
+  -- it on the wrapper's, which the typechecker inspects.
+  addEndsBecause = \ case
+    Declare ann decl  -> (\ a -> Declare a decl) <$> claimAll (nodeSpan decl) ann
+    Decide ann decide -> Decide ann <$> claimTopDecide decide
+    Assume ann asm    -> (\ a -> Assume a asm) <$> claimAll (nodeSpan asm) ann
+    Directive ann dir -> (\ a -> Directive a dir) <$> claimAll (nodeSpan dir) ann
+    Import ann imp    -> (\ a -> Import a imp) <$> claimAll (nodeSpan imp) ann
+    Section ann sect  -> Section ann <$> addEndsBecause sect
+    Timezone ann e    -> (\ a -> Timezone a e) <$> claimAll (nodeSpan e) ann
+   where
+    claimAll mspan ann = case mspan of
+      Nothing -> pure ann
+      Just r -> do
+        s <- get
+        ann' <- claimEndsBecause Nothing s.endsBecauseLastEnd r.end Nothing ann
+        modify' (\ st -> st { endsBecauseLastEnd = Just r.end })
+        pure ann'
+
+-- | A top-level definition: the marks above its name line, then its body, for
+-- the locals in it, then a warning for each mark inside it that no local took.
+claimTopDecide :: HasSrcRange n => Decide n -> State EndsBecauseS (Decide n)
+claimTopDecide decide@(MkDecide dann tySig@(MkTypeSig _ givenSig _) appForm expr) =
+  case nodeSpan decide of
+    Nothing -> pure decide
+    Just r -> do
+      s <- get
+      dann' <- claimEndsBecause Nothing s.endsBecauseLastEnd (nameLinePos r appForm) (nodeSpan givenSig) dann
+      expr' <- addEndsBecause expr
+      modify' \ st ->
+        let (inside, rest) = List.partition (\ eb -> posLt eb.range.start r.end) st.endsBecauses
+        in st { endsBecauses = rest
+              , endsBecauseLastEnd = Just r.end
+              , endsBecauseWarnings = fmap EndsBecauseMisplaced inside <> st.endsBecauseWarnings
+              }
+      pure (MkDecide dann' tySig appForm expr')
+
+-- | Where a definition's name line begins: the lead of its application form.
+nameLinePos :: HasSrcRange n => SrcSpan -> AppForm n -> SrcPos
+nameLinePos r appForm = maybe r.start (.start) (nodeSpan appForm)
+
+-- | Claim the marks that end at or before @headPos@ and start at or after
+-- @mlower@ (when there is one). Of these, any on the line where the previous
+-- construct ended (@msameLine@) is not on a line of its own and is reported
+-- as such; any among a definition's GIVEN lines is kept apart
+-- ('annEndsBecauseOnInputs'); the closest of the rest attaches and the
+-- earlier ones are superseded.
+claimEndsBecause :: Maybe SrcPos -> Maybe SrcPos -> SrcPos -> Maybe SrcSpan -> Anno -> State EndsBecauseS Anno
+claimEndsBecause mlower msameLine headPos mgiven ann = do
+  s <- get
+  let above :: EndsBecauseWithSpan -> Bool
+      above eb = posLe eb.range.end headPos && maybe True (\ l -> posLe l eb.range.start) mlower
+      (leading, rest) = List.partition above s.endsBecauses
+      notOwnLine :: EndsBecauseWithSpan -> Bool
+      notOwnLine eb = maybe False (\ e -> eb.range.start.line == e.line) msameLine
+      -- On one of the GIVEN's lines: from its first token to the end of its
+      -- last line. A mark on its own line after the GIVEN, or between GIVETH
+      -- and the name line, is above the definition.
+      inSignature :: EndsBecauseWithSpan -> Bool
+      inSignature eb = case mgiven of
+        Just g -> posLe g.start eb.range.start && eb.range.start.line <= g.end.line
+        Nothing -> False
+      (sameLine, leading0) = List.partition notOwnLine leading
+      (onInput, leading') = List.partition inSignature leading0
+  put s { endsBecauses = rest }
+  warnEb (fmap EndsBecauseSameLine sameLine)
+  let ann' = addEndsBecauseOnInputs (fmap (.payload) onInput) ann
+  case reverse leading' of
+    closest : superseded -> do
+      warnEb (fmap EndsBecauseSuperseded superseded)
+      pure (setEndsBecause closest.payload ann')
+    [] -> pure ann'
+
+-- | A section's claim: every mark before the end of its header.
+claimEndsBecauseUpTo :: SrcPos -> Anno -> State EndsBecauseS Anno
+claimEndsBecauseUpTo he ann = do
+  s <- get
+  -- A mark at the end of the header's last line is on the header too.
+  let (claimed, rest) = List.partition (\ eb -> posLt eb.range.start he || eb.range.start.line == he.line) s.endsBecauses
+  put s { endsBecauses = rest, endsBecauseLastEnd = Just he }
+  case reverse claimed of
+    closest : superseded -> do
+      warnEb (fmap EndsBecauseSuperseded superseded)
+      pure (setEndsBecause closest.payload ann)
+    [] -> pure ann
+
+warnEb :: [EndsBecauseWarning] -> State EndsBecauseS ()
+warnEb ws = modify' (\ st -> st { endsBecauseWarnings = ws <> st.endsBecauseWarnings })
+
+-- | The locals of one WHERE or LET layer, each given the marks written above
+-- it. @mbase@ is where the layer's first local can begin to be claimed from:
+-- the end of the body for a WHERE, the start of the LET for a LET. Each local
+-- also starts after every local before it, whatever order they are listed in.
+claimLocals :: HasSrcRange n => Maybe SrcPos -> [LocalDecl n] -> State EndsBecauseS [LocalDecl n]
+claimLocals mbase ds =
+  for (zip ds spans) \ (ld, mspan) -> case mspan of
+    Nothing -> pure ld
+    Just r ->
+      let earlierEnds = [ e.end | Just e <- spans, posLt e.start r.start ]
+      in case latestPos (maybeToList mbase <> earlierEnds) of
+           Nothing -> pure ld
+           Just lower -> claimLocal lower ld
+ where
+  spans = fmap nodeSpan ds
+
+claimLocal :: HasSrcRange n => SrcPos -> LocalDecl n -> State EndsBecauseS (LocalDecl n)
+claimLocal lower = \ case
+  LocalDecide ann decide@(MkDecide dann tySig@(MkTypeSig _ givenSig _) appForm expr)
+    | isJust (view annPmSynthetic dann) -> pure (LocalDecide ann decide)
+    | Just r <- nodeSpan decide -> do
+        dann' <- claimEndsBecause (Just lower) (Just lower) (nameLinePos r appForm) (nodeSpan givenSig) dann
+        pure (LocalDecide ann (MkDecide dann' tySig appForm expr))
+  LocalAssume ann asm
+    | Just r <- nodeSpan asm -> do
+        ann' <- claimEndsBecause (Just lower) (Just lower) r.end Nothing ann
+        pure (LocalAssume ann' asm)
+  ld -> pure ld
+
+-- | Below a local's own marks: its body, which may hold layers of its own.
+descendLocal :: HasSrcRange n => LocalDecl n -> State EndsBecauseS (LocalDecl n)
+descendLocal = \ case
+  LocalDecide ann (MkDecide dann tySig appForm expr) ->
+    LocalDecide ann . MkDecide dann tySig appForm <$> addEndsBecause expr
+  LocalAssume ann asm -> pure (LocalAssume ann asm)
+
+-- | The descent is /structural and exhaustive/, mirroring 'HasDesc' @(Expr n)@
+-- (see the note there on why a wildcard is not allowed): a WHERE or LET can
+-- sit anywhere an expression can, and one nested inside an @IF@ arm must not
+-- drop its locals' marks without a word.
+instance HasSrcRange n => HasEndsBecause (Expr n) where
+  addEndsBecause = \ case
+    And        ann e1 e2 -> And        ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Or         ann e1 e2 -> Or         ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    RAnd       ann e1 e2 -> RAnd       ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    ROr        ann e1 e2 -> ROr        ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Implies    ann e1 e2 -> Implies    ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Equals     ann e1 e2 -> Equals     ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Plus       ann e1 e2 -> Plus       ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Minus      ann e1 e2 -> Minus      ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Times      ann e1 e2 -> Times      ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    DividedBy  ann e1 e2 -> DividedBy  ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Modulo     ann e1 e2 -> Modulo     ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Cons       ann e1 e2 -> Cons       ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Leq        ann e1 e2 -> Leq        ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Geq        ann e1 e2 -> Geq        ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Lt         ann e1 e2 -> Lt         ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Gt         ann e1 e2 -> Gt         ann <$> addEndsBecause e1 <*> addEndsBecause e2
+    Not        ann e     -> Not        ann <$> addEndsBecause e
+    Proj       ann e n   -> (\ e' -> Proj ann e' n) <$> addEndsBecause e
+    Lam        ann sig b -> Lam        ann sig <$> addEndsBecause b
+    App        ann n es  -> App        ann n <$> traverse addEndsBecause es
+    AppNamed   ann n es o -> (\ es' -> AppNamed ann n es' o) <$> traverse addEndsBecause es
+    IfThenElse ann c t e -> IfThenElse ann <$> addEndsBecause c <*> addEndsBecause t <*> addEndsBecause e
+    MultiWayIf ann gs e  -> MultiWayIf ann <$> traverse addEndsBecause gs <*> addEndsBecause e
+    Regulative ann d     -> Regulative ann <$> addEndsBecause d
+    Consider   ann e bs  -> Consider   ann <$> addEndsBecause e <*> traverse addEndsBecause bs
+    Lit        ann lit   -> pure (Lit ann lit)
+    Percent    ann e     -> Percent    ann <$> addEndsBecause e
+    List       ann es    -> List       ann <$> traverse addEndsBecause es
+    Where ann b ds -> do
+      b' <- addEndsBecause b
+      ds' <- claimLocals (fmap (.end) (nodeSpan b)) ds
+      ds'' <- traverse descendLocal ds'
+      pure (Where ann b' ds'')
+    expr@(LetIn ann ds b)
+      -- A group of clauses lowered to a LET has no definition the drafter
+      -- wrote among its bindings ('bindsLaterClauses'), so none claims a mark.
+      | bindsLaterClauses ds -> do
+          ds' <- traverse descendLocal ds
+          b' <- addEndsBecause b
+          pure (LetIn ann ds' b')
+      | otherwise -> do
+          ds' <- claimLocals (fmap (.start) (nodeSpan expr)) ds
+          ds'' <- traverse descendLocal ds'
+          b' <- addEndsBecause b
+          pure (LetIn ann ds'' b')
+    Event      ann e     -> Event      ann <$> addEndsBecause e
+    Fetch      ann e     -> Fetch      ann <$> addEndsBecause e
+    Env        ann e     -> Env        ann <$> addEndsBecause e
+    Post       ann u h b -> Post       ann <$> addEndsBecause u <*> addEndsBecause h <*> addEndsBecause b
+    Record     ann mp c v off mh ->
+      Record ann <$> traverse addEndsBecause mp <*> addEndsBecause c <*> addEndsBecause v
+             <*> pure off <*> traverse addEndsBecause mh
+    ReadCell   ann mp off mode c ->
+      (\ mp' c' -> ReadCell ann mp' off mode c')
+        <$> traverse addEndsBecause mp <*> addEndsBecause c
+    Concat     ann es    -> Concat     ann <$> traverse addEndsBecause es
+    AsString   ann e     -> AsString   ann <$> addEndsBecause e
+    Breach     ann mp mr -> Breach     ann <$> traverse addEndsBecause mp <*> traverse addEndsBecause mr
+    Refuse     ann msg   -> Refuse     ann <$> addEndsBecause msg
+    Inert      ann t c   -> pure (Inert ann t c)
+    Lifecycle  ann p     -> pure (Lifecycle ann p)
+
+instance HasSrcRange n => HasEndsBecause (GuardedExpr n) where
+  addEndsBecause (MkGuardedExpr ann g r) = MkGuardedExpr ann <$> addEndsBecause g <*> addEndsBecause r
+
+instance HasSrcRange n => HasEndsBecause (Branch n) where
+  addEndsBecause (MkBranch ann lhs e) = MkBranch ann <$> addEndsBecause lhs <*> addEndsBecause e
+
+instance HasSrcRange n => HasEndsBecause (BranchLhs n) where
+  addEndsBecause = \ case
+    When      ann p -> When ann <$> addEndsBecause p
+    Otherwise ann   -> pure (Otherwise ann)
+
+instance HasSrcRange n => HasEndsBecause (Pattern n) where
+  addEndsBecause = \ case
+    PatVar  ann n     -> pure (PatVar ann n)
+    PatApp  ann n ps  -> PatApp ann n <$> traverse addEndsBecause ps
+    PatCons ann h t   -> PatCons ann <$> addEndsBecause h <*> addEndsBecause t
+    PatExpr ann e     -> PatExpr ann <$> addEndsBecause e
+    PatLit  ann lit   -> pure (PatLit ann lit)
+
+instance HasSrcRange n => HasEndsBecause (NamedExpr n) where
+  addEndsBecause (MkNamedExpr ann n e) = MkNamedExpr ann n <$> addEndsBecause e
+
+instance HasSrcRange n => HasEndsBecause (Deonton n) where
+  addEndsBecause (MkDeonton ann subj act opens due mjoin hence lest) =
+    MkDeonton ann
+      <$> addEndsBecause subj
+      <*> addEndsBecause act
+      <*> traverse addEndsBecause opens
+      <*> traverse addEndsBecause due
+      <*> traverse addEndsBecause mjoin
+      <*> traverse addEndsBecause hence
+      <*> traverse addEndsBecause lest
+
+instance HasSrcRange n => HasEndsBecause (Join n) where
+  addEndsBecause = \ case
+    JoinOnce ann th due -> JoinOnce ann th <$> traverse addEndsBecause due
+    JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addEndsBecause due
+
+instance HasSrcRange n => HasEndsBecause (Deadline n) where
+  addEndsBecause = \ case
+    MkDeadline ann d ma -> MkDeadline ann <$> addEndsBecause d <*> traverse addEndsBecause ma
+    MkBefore ann e      -> MkBefore ann <$> addEndsBecause e
+
+instance HasSrcRange n => HasEndsBecause (Opening n) where
+  addEndsBecause (MkOpening ann d ma) = MkOpening ann <$> addEndsBecause d <*> traverse addEndsBecause ma
+
+instance HasSrcRange n => HasEndsBecause (Filter n) where
+  addEndsBecause (Who ann e)   = Who ann <$> addEndsBecause e
+  addEndsBecause (Whose ann e) = Whose ann <$> addEndsBecause e
+
+instance HasSrcRange n => HasEndsBecause (Anchor n) where
+  addEndsBecause = \ case
+    AnchorAt ann e -> AnchorAt ann <$> addEndsBecause e
+    a              -> pure a
+
+instance HasSrcRange n => HasEndsBecause (Subject n) where
+  addEndsBecause = \ case
+    Party ann party -> Party ann <$> addEndsBecause party
+    Every ann mCast v mRoll mFilter ->
+      Every ann mCast v <$> traverse addEndsBecause mRoll <*> traverse addEndsBecause mFilter
+
+instance HasSrcRange n => HasEndsBecause (RAction n) where
+  addEndsBecause (MkAction ann modal act provided) =
+    MkAction ann modal <$> addEndsBecause act <*> traverse addEndsBecause provided
+
+instance HasSrcRange n => HasEndsBecause (Event n) where
+  addEndsBecause (MkEvent ann party act timestamp atFirst) =
+    (\ party' act' timestamp' -> MkEvent ann party' act' timestamp' atFirst)
+      <$> addEndsBecause party <*> addEndsBecause act <*> addEndsBecause timestamp
