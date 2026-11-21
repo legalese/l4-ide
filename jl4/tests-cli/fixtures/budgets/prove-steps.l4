@@ -1,0 +1,21 @@
+-- Ruled by Meng 2026-11-21, extending L2 (smucclaw/l4-ide#1075): l4 prove counts. Each #ASSERT
+-- below applies three functions when the evaluator checks it at a point, so
+-- under --max-steps 1 that check stops at the limit, and the answer is
+-- unknown: not proved, which the first would be, and not refuted, which the
+-- second would be.
+§ `Arithmetic`
+    GIVEN x IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`twice` n MEANS n PLUS n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`four times` n MEANS `twice` (`twice` n)
+
+-- proved, when nothing stops the evaluator's check
+#ASSERT `four times` x EQUALS 4 TIMES x
+
+-- refuted, when nothing stops the evaluator's check
+#ASSERT `four times` x EQUALS 3 TIMES x

@@ -88,6 +88,7 @@ import L4.Print (prettyLayout)
 import L4.Syntax
 
 import L4.Cli.Common
+import L4.EvaluateLazy (EvalConfig)
 
 ----------------------------------------------------------------------------
 -- The honest bound
@@ -182,6 +183,7 @@ data VerifyOptions = VerifyOptions
   , verifyCoalesce  :: Bool
   , verifyMaxNodes  :: Int
   , verifyFixedNow  :: FixedNowOpt
+  , verifyLimits    :: EvalLimits
   }
 
 verifyFormatReader :: ReadM VerifyFormat
@@ -228,6 +230,7 @@ verifyOptionsParser = VerifyOptions
        <> help "Skip a decision whose ladder exceeds N nodes. The AND/OR normal form is exponential in the width of a disjunction of conjunctions, so this is a refusal, not a tuning knob"
         )
   <*> fixedNowParser
+  <*> evalLimitsParser
 
 ----------------------------------------------------------------------------
 -- Result types
@@ -310,7 +313,12 @@ reportFindings d = either (const []) (.anFindings) d.drResult
 
 verifyCmd :: VerifyOptions -> IO ()
 verifyCmd opts = do
-  evalConfig <- makeEvalConfig opts.verifyFixedNow
+  evalConfig <- withEvalLimits opts.verifyLimits =<< makeEvalConfig opts.verifyFixedNow
+  guardRunStop "l4 verify" evalConfig (verifyWith opts evalConfig)
+
+-- | 'verifyCmd' under the limits its flags set (ruled by Meng 2026-11-21, extending L2).
+verifyWith :: VerifyOptions -> EvalConfig -> IO ()
+verifyWith opts evalConfig = do
   (errs, mTc) <- runOneshot evalConfig opts.verifyFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp

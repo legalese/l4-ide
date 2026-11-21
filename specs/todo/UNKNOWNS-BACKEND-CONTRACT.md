@@ -178,7 +178,7 @@ An undetermined answer names every input it waits on (`x AND y` with both unknow
 
 How the connectives get there: `AND`, `OR`, `IMPLIES` and `NOT` are frames of their own (`ConnectiveLeft`, `ConnectiveRight`; `connectiveLeft` and `connectiveRight`, `Machine.hs`), which is UES's build step 2 (U2, U2b), and no longer a rewrite to `IF`.
 An error or a `REFUSE` in the right operand under an unknown left is reported as stuck on the left's inputs, not as the error (UES §4.3, U13's interim; `rewriteUnwinding`; `x AND (1 DIVIDED BY 0 EQUALS 0)` and `x AND REFUSE "no"` both come back undetermined and name `x`, _measured_).
-In `l4 run`, `l4 batch` and the editor, the error of a count, time or memory limit there is the exception since ruling L2 (UES §4.13, C4 as amended): it is reported as itself; jl4-service sets none of those limits in the evaluator, so it is unaffected.
+In the `l4` commands that evaluate, the REPL and the editor, the error of a count, time or memory limit there is the exception since ruling L2 (extended by Meng 2026-11-21) (UES §4.13, C4 as amended): it is reported as itself; jl4-service sets none of those limits in the evaluator, so it is unaffected.
 
 **What a caller gets back.**
 

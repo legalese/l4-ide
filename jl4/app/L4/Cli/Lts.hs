@@ -40,6 +40,7 @@ import L4.Print (prettyLayout)
 import L4.Syntax (Module, Resolved)
 
 import L4.Cli.Common
+import L4.EvaluateLazy (EvalConfig)
 
 ----------------------------------------------------------------------------
 -- Options
@@ -51,6 +52,7 @@ data LtsOptions = LtsOptions
   , ltsJson      :: Bool
   , ltsContracts :: [Text.Text]
   , ltsFixedNow  :: FixedNowOpt
+  , ltsLimits    :: EvalLimits
   }
 
 ltsOptionsParser :: Parser LtsOptions
@@ -64,6 +66,7 @@ ltsOptionsParser = LtsOptions
         <> help "List this top-level rule at its outset (as `#TRACE NAME AT 0 WITH` with no events) instead of the file's own #TRACE directives; repeatable"
         ))
   <*> fixedNowParser
+  <*> evalLimitsParser
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -71,7 +74,12 @@ ltsOptionsParser = LtsOptions
 
 ltsCmd :: LtsOptions -> IO ()
 ltsCmd opts = do
-  evalConfig <- makeEvalConfig opts.ltsFixedNow
+  evalConfig <- withEvalLimits opts.ltsLimits =<< makeEvalConfig opts.ltsFixedNow
+  guardRunStop "l4 lts" evalConfig (ltsWith opts evalConfig)
+
+-- | 'ltsCmd' under the limits its flags set (ruled by Meng 2026-11-21, extending L2).
+ltsWith :: LtsOptions -> EvalConfig -> IO ()
+ltsWith opts evalConfig = do
   (errs, mRig) <- runOneshot evalConfig opts.ltsFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp

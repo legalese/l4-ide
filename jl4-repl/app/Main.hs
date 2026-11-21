@@ -33,9 +33,10 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
+import L4.EvaluateLazy (EvalConfig, EvalLimits(..), applyEvalLimits, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
+import L4.EvaluateLazy.Exceptions (maximumClosureApplications, maximumOpenObligations)
 import L4.TracePolicy (replDefaultPolicy)
 import L4.DirectiveFilter (filterIdeDirectives)
 import qualified L4.Print as Print
@@ -52,12 +53,54 @@ import qualified L4.Decision.QueryPlan as QP
 data Options = Options
   { files   :: [FilePath]
   , verbose :: Bool
+  , limits  :: EvalLimits
   }
 
 optionsParser :: Parser Options
 optionsParser = Options
   <$> many (strArgument (metavar "FILES..." <> help "L4 files to load"))
   <*> switch (long "verbose" <> short 'v' <> help "Verbose output")
+  <*> limitsParser
+
+-- | The limits on evaluation, with the flags and defaults of the @l4@
+-- commands (ruled by Meng 2026-11-21, extending L2). A copy of
+-- @L4.Cli.Common.evalLimitsParser@, kept in step with it by hand: the REPL
+-- cannot import the @l4@ executable's modules, and the parser is kept out
+-- of the libraries so that no library takes on optparse-applicative.
+-- Here a time or memory stop ends the line that went over, not the session.
+limitsParser :: Parser EvalLimits
+limitsParser = EvalLimits
+  <$> optional (option countReader
+        ( long "max-open"
+        <> metavar "N|none"
+        <> help ("Stop any one line's evaluation that has more than N obligations open at once, or joins more than N failures into one breach (default "
+                 <> show maximumOpenObligations <> "; none: no limit)")
+        ))
+  <*> optional (option countReader
+        ( long "max-steps"
+        <> metavar "N|none"
+        <> help ("Stop any one line's evaluation that takes more than N steps, counting each function applied and each contract handed the events (default "
+                 <> show maximumClosureApplications <> "; none: no limit)")
+        ))
+  <*> optional (option positiveIntReader
+        ( long "eval-timeout"
+        <> metavar "SECONDS"
+        <> help "Stop any one line's evaluation that runs longer than SECONDS of wall-clock time"
+        ))
+  <*> optional (option positiveIntReader
+        ( long "max-eval-memory-mb"
+        <> metavar "MB"
+        <> help "Stop any one line's evaluation that allocates more than MB megabytes (every byte allocated, not only what is kept)"
+        ))
+  where
+    positiveIntReader = eitherReader \ input -> case reads input of
+      [(n, "")] | n > (0 :: Int) -> Right n
+      _ -> Left ("expected a whole number above 0, got " <> show input)
+    countReader = eitherReader \ case
+      "none" -> Right Nothing
+      input -> case reads input of
+        [(n, "")] | n > (0 :: Int) -> Right (Just n)
+        _ -> Left ("expected a whole number above 0, or none, got " <> show input)
 
 optionsInfo :: ParserInfo Options
 optionsInfo = info (helper <*> optionsParser)
@@ -89,7 +132,9 @@ main = do
   curDir <- getCurrentDirectory
   -- REPL default: enable traces for exploration (TRACE-GRAPHVIZ-ARCHITECTURE.md)
   let tracePolicy = replDefaultPolicy defaultGraphVizOptions
-  evalConfig <- resolveEvalConfig Nothing tracePolicy
+  -- the counts on by default, and the flags; no run stop, so a stop ends
+  -- only the line that went over (each line is evaluated as its own module)
+  evalConfig <- applyEvalLimits opts.limits <$> resolveEvalConfig Nothing tracePolicy
   baseRecorder <- cmapWithPrio pretty <$> makeDefaultStderrRecorder Nothing
   let recorder = if opts.verbose
                  then baseRecorder

@@ -12,6 +12,7 @@ module CliTest.Budgets (spec, fixtures) where
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import Data.Foldable (for_)
 import Data.List (isInfixOf)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
@@ -22,7 +23,7 @@ import CliTest.Common
 dir :: FilePath
 dir = "tests-cli" </> "fixtures" </> "budgets"
 
-runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows :: FilePath
+runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps :: FilePath
 runaway = dir </> "runaway.l4"
 neverStops = dir </> "never-stops.l4"
 ends = dir </> "ends.l4"
@@ -33,9 +34,11 @@ stopThenTrace = dir </> "stop-then-trace.l4"
 batchNeverStops = dir </> "batch-never-stops.l4"
 batchImportsStop = dir </> "batch-imports-stop.l4"
 batchRows = dir </> "batch-never-stops.json"
+proveSteps = dir </> "prove-steps.l4"
+coverageSteps = dir </> "coverage-steps.l4"
 
 fixtures :: [FilePath]
-fixtures = [runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows]
+fixtures = [runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps]
 
 -- | Each result of @l4 run --json@, as its "limit" (if any) and its "value".
 results :: String -> Maybe [(Maybe Aeson.Value, Maybe Aeson.Value)]
@@ -172,3 +175,56 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
     sout `shouldSatisfy` ("--max-eval-memory-mb" `isInfixOf`)
     sout `shouldSatisfy` ("--max-open" `isInfixOf`)
     sout `shouldSatisfy` ("--max-steps" `isInfixOf`)
+
+  -- Ruled by Meng 2026-11-21, extending L2: every other command that evaluates
+  -- counts too, by default, with the same flags; and none of them reads an
+  -- answer off an evaluation a limit stopped.
+  describe "every command that evaluates (ruled by Meng 2026-11-21, extending L2)" $ do
+    it "l4 trace names a directive a count stopped, and fails, where it used to draw nothing and exit 0" $ do
+      Output code _ serr <- within bin ["trace", "--max-steps", "1000", neverStops]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("l4 trace: I stopped evaluating: it took more than 1000 steps" `isInfixOf`)
+
+    it "l4 lts stops the issue's #TRACE at the default open number, where it used to run out of memory" $ do
+      Output _ sout _ <- within bin ["lts", runaway]
+      sout `shouldSatisfy` ("more than 10000 obligations were open at once" `isInfixOf`)
+
+    it "l4 lts takes --max-open" $ do
+      Output _ sout _ <- within bin ["lts", "--max-open", "100", runaway]
+      sout `shouldSatisfy` ("more than 100 obligations were open at once" `isInfixOf`)
+
+    it "l4 explore refuses a contract whose outset a count stopped, and says why" $ do
+      Output code sout serr <- within bin ["explore", "--max-steps", "1", runaway, "--contract", "w1"]
+      code `shouldBe` ExitFailure 1
+      (sout <> serr) `shouldSatisfy` ("could not be run at its outset: I stopped evaluating: it took more than 1 steps" `isInfixOf`)
+
+    it "l4 coverage covers the decision under the default limits" $ do
+      Output code sout _ <- within bin ["coverage", coverageSteps]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("1 decision covered" `isInfixOf`)
+
+    it "l4 coverage does not cover a decision whose inputs a count stopped, and says why, rather than read them as raising" $ do
+      Output code sout _ <- within bin ["coverage", "--max-steps", "1", coverageSteps]
+      code `shouldBe` ExitFailure 3
+      sout `shouldSatisfy` ("NOT COVERED: the evaluator stopped at a limit at an input it tried: I stopped evaluating" `isInfixOf`)
+      sout `shouldNotSatisfy` ("raises" `isInfixOf`)
+
+    it "l4 prove proves the first assertion and refutes the second under the default limits" $ withZ3 $ do
+      Output code sout _ <- within bin ["prove", proveSteps]
+      code `shouldBe` ExitFailure 2
+      sout `shouldSatisfy` ("proved   prove-steps.l4:18:" `isInfixOf`)
+      sout `shouldSatisfy` ("refuted  prove-steps.l4:21:" `isInfixOf`)
+
+    it "l4 prove calls both unknown when a count stopped the evaluator, neither proved nor refuted" $ withZ3 $ do
+      Output code sout _ <- within bin ["prove", "--max-steps", "1", proveSteps]
+      code `shouldBe` ExitFailure 3
+      sout `shouldSatisfy` ("unknown  prove-steps.l4:18:" `isInfixOf`)
+      sout `shouldSatisfy` ("unknown  prove-steps.l4:21:" `isInfixOf`)
+      sout `shouldSatisfy` ("the evaluator stopped at a limit before it could decide it" `isInfixOf`)
+      sout `shouldNotSatisfy` ("refuted  prove-steps" `isInfixOf`)
+
+    it "each of them takes the same four flags" $
+      for_ ["trace", "lts", "explore", "coverage", "prove", "verify"] \ verb -> do
+        Output _ sout _ <- within bin [verb, "--help"]
+        for_ ["--max-open", "--max-steps", "--eval-timeout", "--max-eval-memory-mb"] \ flag ->
+          (verb, sout) `shouldSatisfy` ((flag `isInfixOf`) . snd)

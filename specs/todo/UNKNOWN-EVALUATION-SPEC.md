@@ -375,7 +375,7 @@ The connective table, for `AND`; `OR` is dual, and `IMPLIES` and `NOT` build the
 
 The last three rows need the leaves of §4.5, which build step 5 builds; step 3 carries the counter, with a limit measured on its own branch (§7).
 Until then, an error, a refusal or running out of steps in the right operand under a term on the left is re-raised as `Stuck` naming the left's inputs, which is today's answer for those directives except that it names every input of the left, as U7b's default report does, where today's names only the first it reaches (U13's interim for a refusal; assumed, not ruled, for the other two; §8 step 3).
-The exception, since ruling L2 (§4.13, C4 as amended): the error of a count, time or memory limit set by `l4 run`, `l4 batch` or the editor is left as it is (`rewriteUnwinding`), so the directive ends in that error, not undetermined.
+The exception, since ruling L2 (§4.13, C4 as amended and extended): the error of a count, time or memory limit set by an `l4` command, the REPL or the editor is left as it is (`rewriteUnwinding`), so the directive ends in that error, not undetermined.
 `IMPLIES` with a term `p` on the left takes the same three rows, guarded by `p`, because the two-valued run reaches its right operand only where `p` holds; `OR`'s guard is `NOT p` (row 22).
 Nothing inside the evaluator decides a residual beyond these tables, the identity rule of §4.6 and the agreeing-arms rule of §4.5.
 In particular no tautology is recognised mid-evaluation (U3): `IF (x OR NOT x) THEN 1 ELSE 2` builds the join `(x OR NOT x) ? 1 : 2`.
@@ -835,6 +835,12 @@ The alternative ruling, which kept L5 as C inside a work number of 1,000,000, wa
 The measurement behind it (2026-11-21, every tracked `.l4` file, network denied): the most open at once 8, the longest joined list 9, and the most work 164,898 (applications and hand-offs together, `jl4/examples/ok/closing-the-loop/fristberechnung.l4`).
 Hand-offs count because a `HENCE` that leads back to itself through a shared `FULFILLED` applies one function and hands off 4,194,303 times in 3.4 s at 22 levels; the list is bounded at each join because a shared `BREACH` joined with itself builds one failure and gathers 32,768 at 16 levels, with nothing open (`noteHandoff` and `noteJoin`, `jl4-core/src/L4/EvaluateLazy/Machine.hs`).
 Built on `fix/runaway-lest-1075` (2026-11-21), local, not pushed.
+**EXTENDED 2026-11-21** by Meng (at 2026-11-21T09:03:09Z, with no note on it; the ruling as it was written): every l4 verb that evaluates directives (l4 trace, l4 lts, explore, coverage, prove, verify) and the REPL apply the same withEvalLimits as l4 run, l4 batch and the editor (open + work counts on by default, same flags; --eval-timeout and --max-eval-memory-mb stay opt-in); jl4-service and jl4-mlir unchanged.
+Built on `fix/runaway-lest-1075` (2026-11-21), local, not pushed, with three choices made in building it, decided by Claude 2026-11-21, pending Meng's review.
+(1) The REPL applies the limits without the run stop (`applyEvalLimits`, not `withRunStop`), so a time or memory stop ends that line and not the session, because `withRunStop`'s own comment forbids a run stop on a configuration that outlives one run.
+(2) No command reads an answer off an evaluation a limit stopped (`isLimitStop`): `l4 prove` calls the assertion unknown rather than refuted or decided, `l4 coverage` leaves the decision uncovered rather than read the input as raising, `l4 explore` refuses when it could not work out the outset or a deadline's anchor rather than leave that deadline out, and `l4 trace` names the stop and fails rather than draw nothing and exit 0.
+(3) `l4 lts` keeps its exit status of 0 for a trace it could not work out, as before, and lists the stop as that trace's standing.
+Measured on the build: the REPL keeps a record of every step, so 1,000,000 steps there took 14.5 s and 10.6 GB, against 1.0 s and 55 MB under `l4 run`; at the default work number a runaway REPL line runs out of memory before the count stops it (reported for review, not decided).
 U4: "a cumulative step counter, explore mode only".
 U7b: "Every evaluation is lifted; there is no evaluation mode."
 A counter that runs from the first step of every evaluation would turn a long but fully supplied computation into a `gave-up`, which breaks §4.3's conservativity.

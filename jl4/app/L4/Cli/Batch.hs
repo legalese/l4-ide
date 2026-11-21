@@ -183,7 +183,7 @@ data BatchOptions = BatchOptions
   , batchValidateOnly   :: Bool
   , batchFixedNow       :: FixedNowOpt
   , batchPresumption    :: Presumption
-  , batchLimits         :: EvalLimitsOpt
+  , batchLimits         :: EvalLimits
   }
 
 outputFormatReader :: ReadM OutputFormat

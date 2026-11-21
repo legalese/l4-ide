@@ -5,6 +5,8 @@ module L4.EvaluateLazy
 , resolveEvalConfig
 , resolveEvalConfigWithSafeMode
 , withCountedBudgets
+, EvalLimits (..)
+, applyEvalLimits
 , withRunStop
 , parseFixedNow
 , readFixedNowEnv
@@ -185,21 +187,47 @@ resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO Eval
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
   pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True Nothing Nothing Nothing Nothing Nothing)
 
--- | The counted budgets at their defaults: what @l4 run@, @l4 batch@ and the
--- editor (jl4-lsp, and the browser's through "L4.API") evaluate under. Ruling
--- L2 of the Recursion Limits bench (2026-11-20) puts the count on by default
--- there, and sets it in their configuration rather than the shared one, so
--- that jl4-service is unchanged. A flag on @l4 run@ and @l4 batch@ changes it.
+-- | The counted budgets at their defaults: what every @l4@ command that
+-- evaluates, the REPL and the editor (jl4-lsp, and the browser's through
+-- "L4.API") evaluate under. Ruling L2 of the Recursion Limits bench
+-- (2026-11-20) puts the count on by default in @l4 run@, @l4 batch@ and the
+-- editor, and Meng's ruling of 2026-11-21 in the other commands and the REPL; it
+-- is set in their configuration rather than the shared one, so that
+-- jl4-service is unchanged. A flag changes it ('applyEvalLimits').
 withCountedBudgets :: EvalConfig -> EvalConfig
 withCountedBudgets cfg = cfg
   { maxOpenObligations = Just maximumOpenObligations
   , maxClosureApplications = Just maximumClosureApplications
   }
 
+-- | The limits a command or the REPL was given on its command line
+-- (@--max-open@, @--max-steps@, @--eval-timeout@, @--max-eval-memory-mb@).
+data EvalLimits = EvalLimits
+  { limitOpen      :: Maybe (Maybe Int)
+    -- ^ @--max-open@: 'Nothing' keeps the default, @Just Nothing@ is @none@
+  , limitSteps     :: Maybe (Maybe Int)
+    -- ^ @--max-steps@, read the same way
+  , limitSeconds   :: Maybe Int
+  , limitMegabytes :: Maybe Int
+  }
+
+-- | The counted budgets at their defaults, then whatever the flags say.
+-- This sets no run stop: a command that runs once adds one ('withRunStop');
+-- the REPL does not, so that a stop ends only the line that went over.
+applyEvalLimits :: EvalLimits -> EvalConfig -> EvalConfig
+applyEvalLimits lims cfg0 = cfg
+  { maxOpenObligations     = fromMaybe cfg.maxOpenObligations lims.limitOpen
+  , maxClosureApplications = fromMaybe cfg.maxClosureApplications lims.limitSteps
+  , directiveSeconds       = lims.limitSeconds
+  , directiveMegabytes     = lims.limitMegabytes
+  }
+  where
+    cfg = withCountedBudgets cfg0
+
 -- | One run: a time or memory stop in any module evaluated under the
 -- configuration this returns, an import's directive included, stops every
 -- directive after it, in that module and in the modules after it. For one
--- invocation of @l4 run@ or @l4 batch@; a configuration that lives longer
+-- invocation of an @l4@ command; a configuration that lives longer
 -- (an editor's, a service's) must not carry one, or one stop would refuse
 -- everything evaluated after it.
 withRunStop :: EvalConfig -> IO EvalConfig

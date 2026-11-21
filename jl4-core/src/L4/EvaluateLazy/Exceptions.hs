@@ -8,6 +8,8 @@ module L4.EvaluateLazy.Exceptions
 , Budget (..)
 , BudgetSite (..)
 , stopsTheRun
+, isLimitStop
+, LimitStopped (..)
 , Refusal (..)
 , prettyEvalException
 , prettyRefusal
@@ -111,9 +113,10 @@ data UserEvalException =
 
 -- | Which budget a directive went over, with the limit it went over. The
 -- first two count something the machine does, never time or memory, so the
--- same program stops at the same place on every machine; @l4 run@, @l4
--- batch@ and the editor set them ('L4.EvaluateLazy.withCountedBudgets'), and
--- the shared configuration does not. They carry the site that took the
+-- same program stops at the same place on every machine; every @l4@
+-- command that evaluates, the REPL and the editor set them
+-- ('L4.EvaluateLazy.withCountedBudgets'), and the shared configuration does
+-- not. They carry the site that took the
 -- directive over. The last two are opt-in, are not deterministic, and stop
 -- the run (smucclaw/l4-ide#1075; ruling L2).
 data Budget
@@ -167,6 +170,27 @@ stopsTheRun = \ case
   TimeLimit {}   -> True
   MemoryLimit {} -> True
   _              -> False
+
+-- | Whether an evaluation ended at a limit (a count, time or memory), or
+-- was not done because the run had stopped at one, rather than in an error
+-- of the program's own. A command that reads an answer off an evaluation
+-- must not read one off this: it says nothing about the program's answer
+-- (ruled by Meng 2026-11-21, extending L2).
+isLimitStop :: EvalException -> Bool
+isLimitStop = \ case
+  UserEvalException (OverBudget _)     -> True
+  UserEvalException (NotEvaluated _ _) -> True
+  _                                    -> False
+
+-- | Raised out of a command that tries many inputs or traces (@l4
+-- explore@, @l4 coverage@) when the evaluator stopped one of them at a
+-- limit and the command has no honest way to go on without it: it carries
+-- the stop's message, and the command reports that instead of an answer
+-- read off the stopped evaluation.
+newtype LimitStopped = LimitStopped Text
+  deriving stock Show
+
+instance Exception LimitStopped
 
 prettyEvalException :: EvalException -> [Text]
 prettyEvalException (InternalEvalException exc) = wrapInternal (prettyInternalEvalException exc)
@@ -269,17 +293,17 @@ prettyUserEvalException = \ case
     , "The last one was armed in " <> siteName site <> "."
     , "A HENCE or LEST that names more than one obligation adds to what is open,"
     , "and a chain of them that leads back to where it started multiplies it each time round."
-    , "l4 run and l4 batch take --max-open N to change the limit, and --max-open none to remove it." ]
+    , "The l4 commands that evaluate, and the REPL, take --max-open N to change the limit, and --max-open none to remove it." ]
   OverBudget (JoinedBreaches limit site) ->
     [ "I stopped evaluating: a RAND, an ROR or an EVERY would have joined more than " <> Text.textShow limit <> " failures into one breach."
     , "The join was in " <> siteName site <> "."
     , "A breach that is shared, and joined with itself again and again, doubles its list of failures at each join."
-    , "l4 run and l4 batch take --max-open N to change the limit, and --max-open none to remove it." ]
+    , "The l4 commands that evaluate, and the REPL, take --max-open N to change the limit, and --max-open none to remove it." ]
   OverBudget (ClosureApplications limit site) ->
     [ "I stopped evaluating: it took more than " <> Text.textShow limit <> " steps, counting each function applied and each contract handed the events."
     , "The last step was in " <> siteName site <> "."
     , "A function that calls itself with new inputs, or a HENCE or LEST that leads back to itself, never ends unless something stops it."
-    , "l4 run and l4 batch take --max-steps N to change the limit, and --max-steps none to remove it." ]
+    , "The l4 commands that evaluate, and the REPL, take --max-steps N to change the limit, and --max-steps none to remove it." ]
   OverBudget b@(TimeLimit _) ->
     [ "I stopped the run: this took longer than " <> limitText b <> ", so nothing after it was evaluated." ]
   OverBudget b@(MemoryLimit _) ->

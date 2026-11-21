@@ -297,7 +297,12 @@ Those limits count steps, not seconds, so a file stops at the same place on ever
 They limit how long a line runs, not how much memory it holds: a function that keeps every value it passes along can run out of memory first.
 Only the line that went over a count stops: the lines after it still run, and `l4 run` exits with an error; in `l4 batch` that row fails, as a row with any other error does.
 The editor counts the same way.
-The other `l4` commands, such as `l4 trace` and `l4 lts`, and the REPL do not count; jl4-service has limits of its own.
+So do the other `l4` commands that work out values (`l4 trace`, `l4 lts`, `l4 explore`, `l4 coverage`, `l4 prove` and `l4 verify`) and the REPL, and each takes the same four flags as `l4 run`.
+None of them reads an answer off a line a limit stopped: `l4 trace` names the stop on its error output and fails, `l4 lts` lists that trace with the stop as its standing, `l4 explore` lists that try as untried, or refuses the contract when it could not work out the outset or a deadline it needed, `l4 coverage` leaves that decision uncovered and says why, and `l4 prove` calls that assertion unknown.
+`l4 verify` works out no values, so its limits never fire.
+In the REPL a time or memory stop ends only the line that went over, though its message says nothing after it was evaluated: the next line still runs.
+The REPL keeps a record of every step it takes, so a line there can run out of memory long before 10,000,000 steps (1,000,000 steps used about 10 GB on one machine); give it a lower `--max-steps`, or `--max-eval-memory-mb`.
+jl4-service has limits of its own.
 
 To change either count, or turn it off:
 

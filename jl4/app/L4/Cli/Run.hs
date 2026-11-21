@@ -41,7 +41,7 @@ data RunOptions = RunOptions
   , runJsonOut   :: Bool
   , runTrace     :: TraceTextMode
   , runFixedNow  :: FixedNowOpt
-  , runLimits    :: EvalLimitsOpt
+  , runLimits    :: EvalLimits
   }
 
 runOptionsParser :: Parser RunOptions

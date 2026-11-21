@@ -11,8 +11,8 @@
 -- under one runs in well under a second; a case under the time limit takes
 -- the second that limit allows. The shared configuration sets none;
 -- 'withCountedBudgets' sets 'maximumOpenObligations' and
--- 'maximumClosureApplications', which @l4 run@, @l4 batch@ and the editor
--- evaluate under.
+-- 'maximumClosureApplications', which every @l4@ command that evaluates,
+-- the REPL and the editor evaluate under.
 module BudgetSpec (spec) where
 
 import qualified Data.Text as Text
@@ -132,7 +132,7 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
       [ (c.maxOpenObligations, c.maxClosureApplications, c.directiveSeconds, c.directiveMegabytes) | c <- [cfg, safe] ]
         `shouldBe` replicate 2 (Nothing, Nothing, Nothing, Nothing)
 
-    it "withCountedBudgets, which l4 run, l4 batch and the editor apply, sets both counts, and no time or memory limit" $ do
+    it "withCountedBudgets, which every l4 command that evaluates, the REPL and the editor apply, sets both counts, and no time or memory limit" $ do
       cfg <- withCountedBudgets <$> resolveEvalConfig (Just fixedNow) apiDefaultPolicy
       (cfg.maxOpenObligations, cfg.maxClosureApplications, cfg.directiveSeconds, cfg.directiveMegabytes)
         `shouldBe` (Just maximumOpenObligations, Just maximumClosureApplications, Nothing, Nothing)

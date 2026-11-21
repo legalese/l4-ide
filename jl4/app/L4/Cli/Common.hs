@@ -9,9 +9,10 @@ module L4.Cli.Common
     FixedNowOpt(..)
   , fixedNowParser
   , parseFixedNowText
-  , EvalLimitsOpt(..)
+  , EvalLimits(..)
   , evalLimitsParser
   , withEvalLimits
+  , guardRunStop
   , langTagReader
   , langOption
 
@@ -52,11 +53,14 @@ module L4.Cli.Common
 import Base.Text (Text)
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes)
+import Data.IORef (readIORef)
 import Data.Time (UTCTime)
 import Options.Applicative (ReadM, eitherReader, long, metavar, help, option, optional)
 import qualified Options.Applicative as Options
 import System.IO (hPutStrLn, stderr)
+import Control.Exception (throwIO, try)
+import System.Exit (ExitCode, exitFailure)
 import Control.Applicative ((<|>))
 
 import LSP.Core.Types.Diagnostics (FileDiagnostic(..))
@@ -90,12 +94,13 @@ import L4.EvaluateLazy
   , prettyLedger
   , readFixedNowEnv
   , resolveEvalConfig
-  , withCountedBudgets
+  , EvalLimits(..)
+  , applyEvalLimits
   , withRunStop
   )
-import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations)
+import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations, prettyEvalException)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz2
-import L4.Parser.SrcSpan (prettySrcRange)
+import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM)
 import L4.Print (prettyLayout)
 import qualified L4.TracePolicy as TracePolicy
 import L4.TracePolicy
@@ -129,52 +134,46 @@ fixedNowParser = fmap FixedNowOpt $ optional $
     <> help "Pin evaluation clock (e.g. 2025-01-31T15:45:30Z) so NOW/TODAY stay deterministic"
     )
 
--- | The limits on evaluation that @l4 run@ and @l4 batch@ take
--- (smucclaw/l4-ide#1075, ruling L2 of the Recursion Limits bench).
+-- | The limits on evaluation that every @l4@ command that evaluates takes
+-- (smucclaw/l4-ide#1075: ruling L2 of the Recursion Limits bench for @l4
+-- run@ and @l4 batch@, Meng's ruling of 2026-11-21 for @l4 trace@, @l4 lts@, @l4 explore@,
+-- @l4 coverage@, @l4 prove@ and @l4 verify@). The REPL takes the same
+-- flags from its own copy of this parser (@jl4-repl/app/Main.hs@), which is
+-- kept in step with this one.
 --
--- The two counts are on by default ('withCountedBudgets'): they count what
--- the machine does, so they stop the same program at the same place on
--- every machine, and a directive that goes over one is an error on that
--- directive alone; the others still answer. A flag changes either one, and
--- @none@ turns it off. The flag names are PROVISIONAL: what the second one
--- counts waits on Meng's ruling of the numbers.
+-- The two counts are on by default ('L4.EvaluateLazy.withCountedBudgets'):
+-- they count what the machine does, so they stop the same program at the
+-- same place on every machine, and an evaluation that goes over one is an
+-- error on that one alone; the others still answer. A flag changes either
+-- one, and @none@ turns it off.
 --
 -- Time and memory are off unless asked for, named as jl4-service names its
--- own, and neither is deterministic. A directive that goes over one stops
--- the run: it is an error naming the limit, and no directive after it is
+-- own, and neither is deterministic. An evaluation that goes over one stops
+-- the run: it is an error naming the limit, and nothing after it is
 -- evaluated.
-data EvalLimitsOpt = EvalLimitsOpt
-  { limitOpen      :: Maybe (Maybe Int)
-    -- ^ @--max-open@: 'Nothing' keeps the default, @Just Nothing@ is @none@
-  , limitSteps     :: Maybe (Maybe Int)
-    -- ^ @--max-steps@, read the same way
-  , limitSeconds   :: Maybe Int
-  , limitMegabytes :: Maybe Int
-  }
-
-evalLimitsParser :: Options.Parser EvalLimitsOpt
-evalLimitsParser = EvalLimitsOpt
+evalLimitsParser :: Options.Parser EvalLimits
+evalLimitsParser = EvalLimits
   <$> optional (option countReader
         ( long "max-open"
         <> metavar "N|none"
-        <> help ("Stop any one #EVAL, #ASSERT or #TRACE that has more than N obligations open at once, or joins more than N failures into one breach, as an error on that one (default "
+        <> help ("Stop any one evaluation (an #EVAL, #ASSERT or #TRACE, or one input or trace the command tries) that has more than N obligations open at once, or joins more than N failures into one breach, as an error on that one (default "
                  <> show maximumOpenObligations <> "; none: no limit)")
         ))
   <*> optional (option countReader
         ( long "max-steps"
         <> metavar "N|none"
-        <> help ("Stop any one #EVAL, #ASSERT or #TRACE that takes more than N steps, counting each function applied and each contract handed the events, as an error on that one (default "
+        <> help ("Stop any one evaluation that takes more than N steps, counting each function applied and each contract handed the events, as an error on that one (default "
                  <> show maximumClosureApplications <> "; none: no limit)")
         ))
   <*> optional (option positiveIntReader
         ( long "eval-timeout"
         <> metavar "SECONDS"
-        <> help "Stop the run when any one #EVAL, #ASSERT or #TRACE runs longer than SECONDS of wall-clock time; nothing after it is evaluated"
+        <> help "Stop the run when any one evaluation runs longer than SECONDS of wall-clock time; nothing after it is evaluated"
         ))
   <*> optional (option positiveIntReader
         ( long "max-eval-memory-mb"
         <> metavar "MB"
-        <> help "Stop the run when any one #EVAL, #ASSERT or #TRACE allocates more than MB megabytes (every byte allocated, not only what is kept); nothing after it is evaluated"
+        <> help "Stop the run when any one evaluation allocates more than MB megabytes (every byte allocated, not only what is kept); nothing after it is evaluated"
         ))
   where
     positiveIntReader = eitherReader \ input -> case reads input of
@@ -186,17 +185,29 @@ evalLimitsParser = EvalLimitsOpt
         [(n, "")] | n > (0 :: Int) -> Right (Just n)
         _ -> Left ("expected a whole number above 0, or none, got " <> show input)
 
--- | The limits @l4 run@ and @l4 batch@ evaluate under: the counted budgets
--- at their defaults, then whatever the flags say.
-withEvalLimits :: EvalLimitsOpt -> EvalConfig -> IO EvalConfig
-withEvalLimits lims cfg0 = withRunStop $ cfg
-  { maxOpenObligations     = fromMaybe cfg.maxOpenObligations lims.limitOpen
-  , maxClosureApplications = fromMaybe cfg.maxClosureApplications lims.limitSteps
-  , directiveSeconds       = lims.limitSeconds
-  , directiveMegabytes     = lims.limitMegabytes
-  }
-  where
-    cfg = withCountedBudgets cfg0
+-- | The limits one invocation of an @l4@ command evaluates under: the
+-- counted budgets at their defaults, then whatever the flags say, and one
+-- run stop for the whole invocation ('withRunStop').
+withEvalLimits :: EvalLimits -> EvalConfig -> IO EvalConfig
+withEvalLimits lims cfg = withRunStop (applyEvalLimits lims cfg)
+
+-- | Do a command's work under its configuration's run stop, and when a time
+-- or memory limit stopped the run, say so on the error output, naming the
+-- limit and where, and fail, whatever the work's own exit. A command that
+-- evaluates many inputs or traces reports each one after the stop as not
+-- evaluated; this is what says why, and makes sure the command does not
+-- exit 0 on an answer that was cut short (ruled by Meng 2026-11-21, extending L2).
+guardRunStop :: Text -> EvalConfig -> IO a -> IO a
+guardRunStop command cfg work = do
+  outcome <- try @ExitCode work
+  stopped <- maybe (pure Nothing) readIORef cfg.runStop
+  case stopped of
+    Just (b, at) -> do
+      hPutStrLn stderr $ Text.unpack $
+        command <> ": " <> prettySrcRangeM at <> ": "
+          <> Text.unwords (prettyEvalException (UserEvalException (OverBudget b)))
+      exitFailure
+    Nothing -> either throwIO pure outcome
 
 -- | Read a @--lang@ value into a 'LangTag'.
 --
