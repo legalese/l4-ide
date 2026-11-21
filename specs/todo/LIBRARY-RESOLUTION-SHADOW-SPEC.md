@@ -540,6 +540,8 @@ A name listed in another Unicode normal form is "neither", not a variant, so for
   Because the command line runs the same rule and prints every diagnostic, `l4 check` prints it too, after the log line, and `--json` carries one more `diagnostics` entry (measured on P12); keeping it out of the command line would need the rule to know its host (assumed, not ruled).
   The log line is kept, once per session (assumed, not ruled), because `jl4-repl` by default shows log lines and not diagnostics; the cost is that `l4 check` prints the warning more than once (§11.7).
 
+**C8 = the case rule in the `writing-l4-rules` skill**: one paragraph under "Imports" in `skills/writing-l4-rules/SKILL.md`, saying that a module name is written with its file's exact capitals, that the error names the spelling when the capitals are all that is wrong, and which `l4` and language-server binaries that holds for; in this repository only, on the condition that the `legalese/l4-plugin` bundle is not regenerated here and `etc/build-plugin-bundle.mjs` is not run, since GM takes the regeneration to Meng separately. Ruled (GM, 2026-11-21), not assumed.
+
 ### 11.4 Choices made in building, assumed, not ruled
 
 - The hint names only `.l4` variants: a `daydate.L4` is refused, but not suggested.

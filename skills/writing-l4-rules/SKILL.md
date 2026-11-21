@@ -805,6 +805,11 @@ Twenty-two libraries ship: `prelude`, `daydate`, `time`, `datetime`, `timezone`,
 
 **Filenames with hyphens, spaces, or other non-identifier characters must be backtick-quoted.**
 
+**Write a module name with its file's exact capitals:** `IMPORT daydate` for `daydate.l4`; `IMPORT dayDate` finds nothing.
+When the capitals are all that is wrong, the error names the spelling to use: ``Did you mean `daydate`?``.
+This holds for `l4` and the language server from the fix for smucclaw/l4-ide#1080 on.
+An older binary on a Mac or Windows computer can still find a file under other capitals in some folders, so a line that checks there may fail on Linux, in the web playground and on Legalese Cloud: match the capitals anyway.
+
 ---
 
 `IMPORT currency` is a table of currency codes and their decimal places, not a money type: amounts stay `NUMBER`s, and the unit lives in a name or a comment.
