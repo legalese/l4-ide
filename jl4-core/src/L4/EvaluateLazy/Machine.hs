@@ -4904,6 +4904,12 @@ barrierFinish step = case reverse step.failures of
        Nothing -> internalException $ RuntimeTypeError
          "a barrier with no LEST recorded a failure that is not a breach"
        Just blames -> do
+        -- A guard: no test reaches it. Each failed member gives one
+        -- failure, its own missed deadline, and every member is armed when
+        -- the barrier is, so a join longer than the open number was
+        -- already stopped by 'OpenObligations' at arming (measured
+        -- 2026-11-21: twelve members answer under an open number of 12,
+        -- naming twelve failures, and stop as obligations under 11).
         noteJoin (rangeOf step.ctx.deonton) (toList blames)
         let verdict = breachOf (combineAll blames)
         -- P2b: the barrier's own step, logged once the verdict is decided

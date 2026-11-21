@@ -338,7 +338,8 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
     -- one failure built and no obligation open, so only the join's own check
     -- stops it. d_i is on line 2i + 3. A barrier's join gathers one failure
     -- per member, and its members are all armed at once, so the open count
-    -- stops it first: its check is a guard, with no case here.
+    -- stops it first: its check is a guard, with no case here (see
+    -- 'barrierFinish').
     let doubling base n = Text.unlines $
           [ "DECLARE Actor IS ONE OF P, Q"
           , "DECLARE Action IS ONE OF x, y"

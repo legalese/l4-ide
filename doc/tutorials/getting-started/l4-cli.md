@@ -319,7 +319,7 @@ l4 run --eval-timeout 10 --max-eval-memory-mb 500 myfile.l4
 
 Either way, the run stops there: that line is reported as an error, each line after it says `I did not evaluate this` and names the line that stopped the run, and `l4 run` exits with an error.
 The line that stops the run can be in a file this one imports: L4 works out an imported file's lines too, though `l4 run` prints only this file's, and when no line of this file says so, `l4 run` says on its error output where the run stopped.
-In `--json` output, the result of a line that went over a limit carries `"limit"`, which is `"time"`, `"memory"`, `"obligations"` or `"applications"`; the result of a line that was not evaluated carries `"limit"` too, with `"evaluated": false`; no other result has either key.
+In `--json` output, the result of a line that went over a limit carries `"limit"`, which is `"time"`, `"memory"`, `"obligations"`, `"breaches"` or `"applications"`; the result of a line that was not evaluated carries `"limit"` too, with `"evaluated": false`; no other result has either key.
 `l4 batch` takes the same four flags; a row that goes over a time or memory limit stops the batch, even with `--continue-on-error`, and the batch says on its error output at which row, and where the run stopped.
 An imported file's own lines are worked out with every row, so one of them that goes over a limit stops the batch at row 1.
 In `l4 batch`, a place reads like `myfile.l4.batch2.l4:23:1`: it is in the copy of the file that L4 lays out afresh for row 2, so its line numbers are not the file's, though a rule's name is the same in both.
