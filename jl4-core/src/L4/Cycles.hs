@@ -1433,10 +1433,14 @@ storedField info f = Selector `elem` kinds && ComputedSelector `notElem` kinds
 -- position, its parameter's, and the list's. The type is @FOR ALL@ some @a@,
 -- the function argument takes an @a@, another argument is a @LIST OF a@, and
 -- @a@ is written nowhere else among the arguments, so the function has no @a@
--- to pass but the list's elements.
+-- to pass but the list's elements. What it gives holds an @a@ only as
+-- itself or in a list ('plainIn'): a function that gives back a function
+-- taking an @a@ (@(a -> b) -> LIST OF a -> (a -> b)@), or a record that may
+-- hold one, can hand back the function it was given, and the caller then
+-- applies that to anything.
 elementParameters :: EntityInfo -> Resolved -> Int -> [(Int, Int, Int)]
 elementParameters info g n = case Map.lookup (getUnique g) info of
-  Just (_, KnownTerm (Forall _ vs (Fun _ args _)) _) | length args == n ->
+  Just (_, KnownTerm (Forall _ vs (Fun _ args r)) _) | length args == n ->
     let tys = [t | MkOptionallyNamedType _ _ t <- args]
         vars = Set.fromList (map getUnique vs)
     in [ (i, q, j)
@@ -1445,8 +1449,19 @@ elementParameters info g n = case Map.lookup (getUnique g) info of
        , Set.member (getUnique a) vars
        , (j, TyApp _ l [TyApp _ a' []]) <- zip [0 ..] tys
        , getUnique l == listUnique, getUnique a' == getUnique a
-       , sum (map (occurrences (getUnique a)) tys) == 2 ]
+       , sum (map (occurrences (getUnique a)) tys) == 2
+       , plainIn (getUnique a) r ]
   _ -> []
+
+-- | The type holds the type variable only as itself or as what a list
+-- holds, however deep: no @a@ at all, @a@, @LIST OF a@, @LIST OF LIST OF a@.
+-- Anything else that names it (a function, a pair, a record) might hold a
+-- function that takes one.
+plainIn :: Unique -> Type' Resolved -> Bool
+plainIn u t = occurrences u t == 0 || case t of
+  TyApp _ v [] -> getUnique v == u
+  TyApp _ l [t'] | getUnique l == listUnique -> plainIn u t'
+  _ -> False
 
 -- | Every name a pattern binds.
 patBinders :: Pattern Resolved -> [Resolved]

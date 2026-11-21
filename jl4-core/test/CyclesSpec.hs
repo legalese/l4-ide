@@ -594,6 +594,26 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes "GIVEN xs IS A LIST OF NUMBER GIVETH A BOOLEAN\nsorted xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN TRUE\n  WHEN x FOLLOWED BY EMPTY THEN TRUE\n  WHEN x FOLLOWED BY (y FOLLOWED BY rest) THEN x <= y AND sorted (x FOLLOWED BY rest)"
         `shouldReturn` ["function:unproved-self"]
 
+  -- each timed out at run time on a one-node tree (2026-11-21 attack round,
+  -- parametricity p01, p02, p07, p20; mutual p08leaf, p09tail)
+  describe "descent: a function that can hand back the function it was given (attack round)" do
+    it "gives no proof through a callee whose result is a function taking an a" $
+      classes (tree <> handBack <> "GIVEN t IS A Tree GIVETH A BOOLEAN\nwalk t MEANS apply (holds (GIVEN c YIELD walk c) (t's kids)) t")
+        `shouldReturn` ["function:unproved-self+fans"]
+
+    it "nor when the rule is passed by name, round two definitions" $
+      classes (tree <> handBack <> "GIVEN t IS A Tree GIVETH A BOOLEAN\nbelow t MEANS k t\n  WHERE\n    k MEANS holds here (t's kids)\n\nGIVEN t IS A Tree GIVETH A BOOLEAN\nhere t MEANS t's label EQUALS 0 OR below t")
+        `shouldReturn` ["function:unproved-mutual+fans"]
+
+    it "nor through a record that holds a function taking an a" $
+      classes (tree <> "DECLARE Holder a HAS run IS A FUNCTION FROM a TO BOOLEAN\n\nGIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\nGIVETH A Holder a\nkeep f xs MEANS Holder OF f\n\nGIVEN t IS A Tree GIVETH A BOOLEAN\nwalk t MEANS r t\n  WHERE\n    r MEANS (keep (GIVEN c YIELD walk c) (t's kids))'s run")
+        `shouldReturn` ["function:unproved-self+fans"]
+
+    it "but a callee that gives a list of a, as filter does, still proves" $
+      classes (tree <> "GIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\nGIVETH A LIST OF a\nkept f xs MEANS filter f xs\n\nGIVEN t IS A Tree GIVETH A NUMBER\nsize t MEANS 1 PLUS sum (map size (kept (GIVEN c YIELD size c GREATER THAN 0) (t's kids)))")
+        `shouldReturn` ["function:proved-structural+fans"]
+
+
   describe "nodes" do
     it "keeps overloads that share a name apart" $
       classes (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS IF n GREATER THAN 0 THEN f (n MINUS 1) ELSE 0\n\nGIVEN s IS A STRING GIVETH A NUMBER\nf s MEANS 1")
@@ -617,6 +637,23 @@ spec = describe "cycle report (#1075 layer 2)" do
 
 tree :: Text
 tree = "IMPORT prelude\nDECLARE Tree HAS\n  label IS A NUMBER\n  kids IS A LIST OF Tree\n\n"
+-- | A function of @all@'s argument types that gives back the function it was
+-- given, and one that applies a function: together they apply the function
+-- to a value that is not an element of the list.
+handBack :: Text
+handBack = Text.unlines
+  [ "GIVEN a IS A TYPE"
+  , "      f IS A FUNCTION FROM a TO BOOLEAN"
+  , "      xs IS A LIST OF a"
+  , "GIVETH A FUNCTION FROM a TO BOOLEAN"
+  , "holds f xs MEANS f"
+  , ""
+  , "GIVEN g IS A FUNCTION FROM Tree TO BOOLEAN"
+  , "      t IS A Tree"
+  , "GIVETH A BOOLEAN"
+  , "apply g t MEANS g t"
+  , ""
+  ]
 
 people :: Text
 people = Text.unlines
