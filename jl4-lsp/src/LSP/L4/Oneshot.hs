@@ -11,7 +11,8 @@ import Base.Text (Text)
 import Control.Concurrent.STM (atomically)
 import Development.IDE.Graph (Action)
 import Development.IDE.Graph.Database (shakeRunDatabase)
-import Language.LSP.Protocol.Types (NormalizedFilePath)
+import Language.LSP.Protocol.Types (NormalizedFilePath, NormalizedUri)
+import qualified Data.Set as Set
 import LSP.Core.Types.Diagnostics (FileDiagnostic)
 import System.FilePath
 
@@ -27,6 +28,25 @@ instance Pretty Log where
     ShakeLog l -> pretty l
     RulesLog l -> pretty l
     StoreLog l -> pretty l
+
+-- | The file whose diagnostics a message lists, for a message that lists them
+-- ('Shake.LogDiagsDiffButNoLspEnv'); 'Nothing' for every other message.
+diagnosticsOf :: Log -> Maybe NormalizedUri
+diagnosticsOf = \case
+  ShakeLog (Shake.LogDiagsDiffButNoLspEnv uri _) -> Just uri
+  -- the rules log the store's messages through their own recorder
+  RulesLog (Rules.ShakeLog (Shake.LogDiagsDiffButNoLspEnv uri _)) -> Just uri
+  _ -> Nothing
+
+-- | A log with each list of a file's diagnostics dropped that a later list of
+-- the same file's replaces; every other message is kept, in order.
+latestDiagnostics :: [(Maybe NormalizedUri, Text)] -> [Text]
+latestDiagnostics = snd . foldr step (Set.empty, [])
+ where
+  step (Nothing, t) (seen, kept) = (seen, t : kept)
+  step (Just uri, t) (seen, kept)
+    | uri `Set.member` seen = (seen, kept)
+    | otherwise = (Set.insert uri seen, t : kept)
 
 oneshotL4ActionAndErrors :: EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO ([Text], b)
 oneshotL4ActionAndErrors = oneshotL4ActionAndErrorsIn Rules.AmbientLibraries

@@ -67,9 +67,7 @@ import LSP.Logger
   , makeKeyedRefRecorder
   , pretty
   )
-import qualified LSP.Core.Shake as Shake
-import qualified Data.Set as Set
-import Language.LSP.Protocol.Types (NormalizedFilePath, NormalizedUri, Diagnostic(..), DiagnosticSeverity(..))
+import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
@@ -304,30 +302,13 @@ runOneshotWithDiagnostics evalConfig fp act = do
 -- warning three times and an error of the export check twice, and @l4 check@
 -- a type checker's warning twice (review of #779, 2026-11-21). Each list
 -- holds all of the file's diagnostics, so only the last one of each file is
--- kept, where it falls in the log ('latestDiagnostics'); it is printed as it
+-- kept, where it falls in the log ('Oneshot.latestDiagnostics'); it is printed as it
 -- was.
 makeCliRecorder :: IO (IO [Text], Recorder (WithPriority Oneshot.Log))
 makeCliRecorder = do
-  (getLog, refRecorder) <- makeKeyedRefRecorder diagnosticsOf pretty
+  (getLog, refRecorder) <- makeKeyedRefRecorder Oneshot.diagnosticsOf pretty
   let keep wp = wp.priority /= Debug
-  pure (latestDiagnostics <$> getLog, cfilter keep refRecorder)
- where
-  diagnosticsOf :: Oneshot.Log -> Maybe NormalizedUri
-  diagnosticsOf = \case
-    Oneshot.ShakeLog (Shake.LogDiagsDiffButNoLspEnv uri _) -> Just uri
-    -- the rules log the store's messages through their own recorder
-    Oneshot.RulesLog (Rules.ShakeLog (Shake.LogDiagsDiffButNoLspEnv uri _)) -> Just uri
-    _ -> Nothing
-
--- | A log with each list of a file's diagnostics dropped that a later list of
--- the same file's replaces; every other message is kept, in order.
-latestDiagnostics :: [(Maybe NormalizedUri, Text)] -> [Text]
-latestDiagnostics = snd . foldr step (Set.empty, [])
- where
-  step (Nothing, t) (seen, kept) = (seen, t : kept)
-  step (Just uri, t) (seen, kept)
-    | uri `Set.member` seen = (seen, kept)
-    | otherwise = (Set.insert uri seen, t : kept)
+  pure (Oneshot.latestDiagnostics <$> getLog, cfilter keep refRecorder)
 
 -- | Does the diagnostics set contain an error that should make a CLI command
 -- fail (exit non-zero)?
