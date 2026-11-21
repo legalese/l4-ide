@@ -577,6 +577,23 @@ spec = describe "cycle report (#1075 layer 2)" do
       fs <- findings (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 LEST both\n  WHERE\n    both MEANS x RAND x")
       [m | f <- fs, Just m <- [f.multiplies]] `shouldSatisfy` null
 
+  describe "descent: a pattern rebuilt from what it bound (step 3)" do
+    it "proves a walk that passes on the tail it took apart (ok/list-nested-cons-exhaustive.l4)" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A BOOLEAN\nsorted xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN TRUE\n  WHEN x FOLLOWED BY EMPTY THEN TRUE\n  WHEN x FOLLOWED BY (y FOLLOWED BY rest) THEN x <= y AND sorted (y FOLLOWED BY rest)"
+        `shouldReturn` ["function:proved-structural"]
+
+    it "and a constructor's field rebuilt the same way" $
+      classes "DECLARE Nat IS ONE OF\n  Zero\n  Suc HAS pred IS A Nat\n\nGIVEN n IS A Nat GIVETH A NUMBER\nhalf n MEANS\n  CONSIDER n\n  WHEN Zero THEN 0\n  WHEN Suc Zero THEN 0\n  WHEN Suc (Suc m) THEN 1 PLUS half (Suc m)"
+        `shouldReturn` ["function:proved-structural"]
+
+    it "but not the outermost pattern, which is the whole value again" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A BOOLEAN\nloop xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN TRUE\n  WHEN y FOLLOWED BY rest THEN loop (y FOLLOWED BY rest)"
+        `shouldReturn` ["function:unproved-self"]
+
+    it "and not names from different patterns put together" $
+      classes "GIVEN xs IS A LIST OF NUMBER GIVETH A BOOLEAN\nsorted xs MEANS\n  CONSIDER xs\n  WHEN EMPTY THEN TRUE\n  WHEN x FOLLOWED BY EMPTY THEN TRUE\n  WHEN x FOLLOWED BY (y FOLLOWED BY rest) THEN x <= y AND sorted (x FOLLOWED BY rest)"
+        `shouldReturn` ["function:unproved-self"]
+
   describe "nodes" do
     it "keeps overloads that share a name apart" $
       classes (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\nf n MEANS IF n GREATER THAN 0 THEN f (n MINUS 1) ELSE 0\n\nGIVEN s IS A STRING GIVETH A NUMBER\nf s MEANS 1")

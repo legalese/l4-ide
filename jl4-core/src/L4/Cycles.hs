@@ -51,7 +51,7 @@ import L4.Annotation (Anno_ (..), getAnno)
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
 import L4.TypeCheck.Environment
-  ( andUnique, contractUnique, evalContractUnique, geqUniques, gtUniques, leqUniques
+  ( andUnique, consUnique, contractUnique, evalContractUnique, geqUniques, gtUniques, leqUniques
   , listUnique, ltUniques, minusUnique, notUnique, orUnique, plusUnique )
 import L4.TypeCheck.Environment.TH (builtinUri)
 import L4.TypeCheck.Types (CheckEntity (..), EntityInfo)
@@ -1173,6 +1173,12 @@ mulF _ _ = Unbounded
 --         bare name for the whole value;
 --       - a stored field of a part (@t's children@): a 'Selector', never a
 --         computed field, whose MEANS can give anything;
+--       - an expression that builds again, from the names a pattern bound,
+--         a pattern nested inside one that matches a part: under @WHEN x
+--         FOLLOWED BY (y FOLLOWED BY rest)@, @y FOLLOWED BY rest@ is the very
+--         tail the match took apart. The same constructors in the same
+--         places around the same names; never the outermost pattern, which
+--         is the whole value, and never a number or text written in one;
 --       - the parameter of a function written in place (@GIVEN c YIELD …@)
 --         that is given to a function whose declared type can hand it only
 --         elements of a list it is also given, when that list is a part.
@@ -1274,14 +1280,23 @@ descent info nullaries ds es = listToMaybe [Structural (firstPosition a) | a <- 
           | elementsWithin info nullaries p s xs -> Just Strict
         _ -> Nothing
 
--- | The names a definition's body binds to a strict part of the value of one
--- of its parameters (Note [The function checks]).
-partsOf :: EntityInfo -> Map Unique (Expr Resolved) -> Decide Resolved -> Resolved -> Set Unique
-partsOf info nullaries d p = grow Set.empty
+-- | What a definition's body takes apart of one parameter's value: the names
+-- it binds to strict parts, and the patterns nested inside a pattern that
+-- matches a part, each of which matched a strict part as a whole.
+data Parts = MkParts
+  { partNames :: Set Unique
+  , partShapes :: [Pattern Resolved]
+  }
+
+-- | The strict parts a definition's body binds of the value of one of its
+-- parameters (Note [The function checks]).
+partsOf :: EntityInfo -> Map Unique (Expr Resolved) -> Decide Resolved -> Resolved -> Parts
+partsOf info nullaries d p = MkParts names shapes
  where
   everyExpr = universeExpr (bodyOf d)
+  names = grow Set.empty
   grow s =
-    let s' = Set.union s (Set.fromList (step s))
+    let s' = Set.union s (Set.fromList (step (MkParts s [])))
     in if Set.size s' == Set.size s then s else grow s'
   step s =
     [ getUnique b
@@ -1294,6 +1309,21 @@ partsOf info nullaries d p = grow Set.empty
          , c <- take 1 (drop q [n | MkOptionallyTypedName _ n mty _ <- otns, not (isTypeParam mty)])
          , x <- take 1 (drop j xs)
          , elementsWithin info nullaries p s x ]
+  -- the patterns strictly inside one that matches a part, which bind a name
+  -- and are not a bare name: @y FOLLOWED BY rest@ in
+  -- @WHEN x FOLLOWED BY (y FOLLOWED BY rest)@
+  shapes =
+    [ q
+    | Consider _ x brs <- everyExpr, partOf info p (MkParts names []) x
+    , MkBranch _ (When _ pat) _ <- brs, q <- inside pat, isShape q, not (null (patBinders q)) ]
+  inside = \ case
+    PatCons _ a b -> [a, b] <> inside a <> inside b
+    PatApp _ _ ps -> ps <> concatMap inside ps
+    _ -> []
+  isShape = \ case
+    PatCons {} -> True
+    PatApp {} -> True
+    _ -> False
   -- what a pattern binds strictly inside the value it matches: both sides of
   -- a FOLLOWED BY, and the fields of a constructor, but not a pattern that is
   -- a bare name for the whole value
@@ -1306,17 +1336,31 @@ partsOf info nullaries d p = grow Set.empty
     _ -> False
 
 -- | The parameter's value, or a part of it.
-partOf :: EntityInfo -> Resolved -> Set Unique -> Expr Resolved -> Bool
+partOf :: EntityInfo -> Resolved -> Parts -> Expr Resolved -> Bool
 partOf info p s = \ case
   App _ v [] | getUnique v == getUnique p -> True
   x -> strictPart info p s x
 
 -- | A strict part of the parameter's value.
-strictPart :: EntityInfo -> Resolved -> Set Unique -> Expr Resolved -> Bool
-strictPart info p s = \ case
-  App _ v [] -> Set.member (getUnique v) s
-  Proj _ x l -> storedField info l && partOf info p s x
-  App _ f [x] -> storedField info f && partOf info p s x
+strictPart :: EntityInfo -> Resolved -> Parts -> Expr Resolved -> Bool
+strictPart info p s x = case x of
+  App _ v [] | Set.member (getUnique v) s.partNames -> True
+  Proj _ y l | storedField info l && partOf info p s y -> True
+  App _ f [y] | storedField info f && partOf info p s y -> True
+  _ -> any (`rebuilds` x) s.partShapes
+
+-- | The expression builds again, from the names a pattern bound, the value
+-- the pattern matched: the same constructors, in the same places, around the
+-- same names. A number or text in the pattern is never rebuilt.
+rebuilds :: Pattern Resolved -> Expr Resolved -> Bool
+rebuilds q x = case (q, x) of
+  (PatVar _ n, App _ v []) -> getUnique n == getUnique v
+  -- the checker turns an expression's FOLLOWED BY into a call of the builtin
+  -- cons, and leaves a pattern's as it is
+  (PatCons _ a b, App _ c [ea, eb]) | getUnique c == consUnique -> rebuilds a ea && rebuilds b eb
+  (PatCons _ a b, Cons _ ea eb) -> rebuilds a ea && rebuilds b eb
+  (PatApp _ k ps, App _ k' es) ->
+    getUnique k == getUnique k' && length ps == length es && and (zipWith rebuilds ps es)
   _ -> False
 
 -- | Every element of the list is a strict part of the parameter's value: the
@@ -1325,7 +1369,7 @@ strictPart info p s = \ case
 -- 'resultSource'), when that list's elements are; or it is a definition with
 -- no parameters whose body is such a list (@`the stocks` MEANS filter …@).
 -- Read three definitions deep.
-elementsWithin :: EntityInfo -> Map Unique (Expr Resolved) -> Resolved -> Set Unique -> Expr Resolved -> Bool
+elementsWithin :: EntityInfo -> Map Unique (Expr Resolved) -> Resolved -> Parts -> Expr Resolved -> Bool
 elementsWithin info nullaries p s = go (3 :: Int)
  where
   go depth x
