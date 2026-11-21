@@ -8,7 +8,7 @@ File: ends-because-misplaced.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's calls to itself come to an end.
+    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on `Person`, a declaration, which is not a definition; move it above the definition it is meant for, or remove it.
 
 File: ends-because-misplaced.l4
@@ -18,7 +18,7 @@ File: ends-because-misplaced.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's calls to itself come to an end.
+    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on `is adult`, an assumption, which is not a definition; move it above the definition it is meant for, or remove it.
 
 File: ends-because-misplaced.l4
@@ -53,7 +53,7 @@ File: ends-because-misplaced.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's calls to itself come to an end.
+    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on a section heading or its inputs, which is not a definition; move it above the definition it is meant for, or remove it.
 
 File: ends-because-misplaced.l4
@@ -63,7 +63,7 @@ File: ends-because-misplaced.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's calls to itself come to an end.
+    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on a directive, which is not a definition; move it above the definition it is meant for, or remove it.
 
 File: ends-because-misplaced.l4
@@ -73,7 +73,7 @@ File: ends-because-misplaced.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's calls to itself come to an end.
+    @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on `x`, an input, which is not a definition. A mark speaks for a whole definition, not for one of its inputs: to speak for the definition that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it.
 
 File: ends-because-misplaced.l4

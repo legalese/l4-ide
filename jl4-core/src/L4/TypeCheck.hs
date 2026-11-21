@@ -8155,7 +8155,7 @@ prettyCheckError (NonassertableOnNonDefinition what mname _) =
     | what == "an input" = "which the request supplies. A mark closes a whole definition: to close the one that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it."
     | otherwise = "which cannot be asserted in any case; move it above the definition it is meant for, or remove it."
 prettyCheckError (EndsBecauseOnNonDefinition what mname _) =
-  [ "@ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's calls to itself come to an end."
+  [ "@ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end."
   , "Here it is on " <> maybe what (\ n -> "`" <> n <> "`, " <> what) mname <> ", " <> why
   ]
  where

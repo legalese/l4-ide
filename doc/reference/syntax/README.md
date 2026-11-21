@@ -123,7 +123,7 @@ Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the reque
 
 ### @ends-because
 
-The author of a rule that calls itself writes `@ends-because` above it to vouch that the calls come to an end, and to say why.
+The author of a rule that uses itself again writes `@ends-because` above it to vouch that it comes to an end, and to say why.
 What it changes is described with the warnings about rules that start themselves again, in [Rules that start themselves again](../regulative/rules-that-start-themselves-again.md).
 In short: it silences the warning L4 gives when it cannot check that a rule whose `HENCE` or `LEST` leads back to itself comes to an end, written on the rule that warning is shown on, and L4 then shows the reason in an information message instead.
 On a rule like `countdown` below, which uses itself only directly, with no `HENCE` or `LEST` that leads back to it, L4 gives no such warning, so the mark changes nothing and records why the rule ends.
@@ -330,7 +330,7 @@ The other is a file written for a newer version of L4 that has an annotation thi
 That file still opens, checks and is highlighted in the older version, which reads past what it does not know.
 An annotation that changes what a rule means is not applied by a version that does not know it, so the warning is the only sign that it was left out.
 
-The annotations this version knows are `@desc`, `@export`, `@infix`, `@infixl`, `@infixr`, `@lang`, `@nlg`, `@nonassertable`, `@nonexhaustive`, `@ref`, `@ref-map` and `@ref-src`.
+The annotations this version knows are `@desc`, `@ends-because`, `@export`, `@infix`, `@infixl`, `@infixr`, `@lang`, `@nlg`, `@nonassertable`, `@nonexhaustive`, `@ref`, `@ref-map` and `@ref-src`.
 
 - **What counts as a name.** A letter, then letters, digits and underscores, with hyphens between them, as in `@ref-src`. An `@` followed by anything else, a space or a digit or a symbol, is still an error.
 - **A name that begins with a known annotation's is that annotation.** `@exports default x` is `@export` followed by the text `s default x`, and `@descr` is `@desc` followed by `r`, as they always have been. They are not unknown, so they are not warned about, and the stray text is the annotation's own: `@exports` publishes nothing, because the first word of an export's text must be `export`. The lexer ignores only a name it used to refuse.
