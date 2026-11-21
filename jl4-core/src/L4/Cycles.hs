@@ -54,7 +54,7 @@ import L4.TypeCheck.Environment
   ( andUnique, consUnique, contractUnique, evalContractUnique, geqUniques, gtUniques, leqUniques
   , listUnique, ltUniques, minusUnique, notUnique, orUnique, plusUnique )
 import L4.TypeCheck.Environment.TH (builtinUri)
-import L4.TypeCheck.Types (CheckEntity (..), EntityInfo)
+import L4.TypeCheck.Types (CheckEntity (..), EntityInfo, substituteType)
 
 ------------------------------------------------------------------------
 -- Findings
@@ -203,8 +203,11 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
   hasVariable = variableIn (\ n -> Set.member (getUnique n) typeParams || isTypeVariable n)
   isTypeVariable n = case Map.lookup (getUnique n) info of
     Just (_, KnownTypeVariable) -> True
-    _ -> False
+    _ -> Set.member (getUnique n) declarationParams
   typeParams = Set.fromList [getUnique n | d <- decides, (n, Just (Type _)) <- decideParams d]
+  -- the parameters of the types declared in scope: a selector's type, read
+  -- past its record (@a -> a@ for @run@ of @Wrap a@), still names them
+  declarationParams = Set.fromList [getUnique p | (_, KnownType _ ps _) <- Map.elems info, p <- ps]
   nameType b = asum
     [ expand <$> inferredType b
     , case Map.lookup (getUnique b) info of
@@ -1626,28 +1629,37 @@ carriesFunction info p = lookInto info \ case
 
 -- | Does any part of a type pass the test: the type, the types in it, and the
 -- body of a synonym or the fields of the constructors of a type it names,
--- read through the checker's table (each named type looked into once).
+-- read through the checker's table. The type's arguments are put for the
+-- declaration's parameters, so the function in @Endo (DEONTIC …)@, with
+-- @DECLARE Endo a IS FUNCTION FROM a TO a@, takes an obligation. A named
+-- type is looked into once on each path into it, with the arguments it was
+-- first met with; the arguments it is met with again are looked into where
+-- they are written.
 lookInto :: EntityInfo -> (Type' Resolved -> Bool) -> Type' Resolved -> Bool
 lookInto info here = go Set.empty
  where
   fields = Map.fromListWith (<>)
-    [ (getUnique h, args)
+    [ (getUnique h, [(params, args)])
     | (_, KnownTerm cty Constructor) <- Map.elems info
-    , (args, TyApp _ h _) <- [split cty] ]
+    , (args, TyApp _ h params) <- [split cty] ]
   split = \ case
     Forall _ _ t -> split t
     Fun _ args r -> ([t | MkOptionallyNamedType _ _ t <- args], r)
     t -> ([], t)
   go seen t = here t || case t of
-    TyApp _ n ts -> any (go seen) ts || declared seen (getUnique n)
+    TyApp _ n ts -> any (go seen) ts || declared seen (getUnique n) ts
     Fun _ args r -> any (go seen) [a | MkOptionallyNamedType _ _ a <- args] || go seen r
     Forall _ _ t' -> go seen t'
     _ -> False
-  declared seen u
+  declared seen u ts
     | Set.member u seen = False
     | otherwise = case Map.lookup u info of
-        Just (_, KnownType _ _ (Just body)) -> go seen' body
-        _ -> any (go seen') (Map.findWithDefault [] u fields)
+        Just (_, KnownType _ params (Just body)) ->
+          go seen' (substituteType (Map.fromList (zip (map getUnique params) ts)) body)
+        _ ->
+          or [ any (go seen' . substituteType s) args
+             | (params, args) <- Map.findWithDefault [] u fields
+             , let s = Map.fromList [(getUnique v, t) | (TyApp _ v [], t) <- zip params ts] ]
    where
     seen' = Set.insert u seen
 

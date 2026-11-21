@@ -387,6 +387,20 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes ("IMPORT prelude\n" <> people <> "DECLARE Box a HAS v IS AN a\n\nGIVEN b IS A Box (FUNCTION FROM DEONTIC Person Action TO DEONTIC Person Action)\n      n IS A NUMBER\nGIVETH A DEONTIC Person Action\nx b n MEANS PARTY Alice MUST tick WITHIN 1 LEST (maybe (b's v) FULFILLED (JUST (x b (n PLUS 1))))")
         `shouldReturn` ["obligation:unproved-stall+fans"]
 
+    -- each stopped by frame depth at run time when supplied with EVALTRACE
+    -- (2026-11-21 attack round, obligations t6, t4)
+    it "a function parameter typed by a synonym with a parameter" $
+      classes (people <> "DECLARE Endo a IS FUNCTION FROM a TO a\n\nGIVEN f IS AN Endo (DEONTIC Person Action)\n      n IS A NUMBER\nGIVETH A DEONTIC Person Action\nx f n MEANS PARTY Alice MUST tick WITHIN 1 LEST (f (x f (n PLUS 1)))")
+        `shouldReturn` ["obligation:unproved-stall+fans"]
+
+    it "a function in a field of a record with a parameter" $
+      classes ("IMPORT prelude\n" <> people <> "DECLARE Wrap a HAS run IS A FUNCTION FROM a TO a\n\nGIVEN w IS A Wrap (DEONTIC Person Action)\n      n IS A NUMBER\nGIVETH A DEONTIC Person Action\nx w n MEANS PARTY Alice MUST tick WITHIN 1 LEST (maybe (w's run) FULFILLED (JUST (x w (n PLUS 1))))")
+        `shouldReturn` ["obligation:unproved-stall+fans"]
+
+    it "but a synonym with a parameter that gives no obligation still lets the wait prove it" $
+      classes (people <> "DECLARE Endo a IS FUNCTION FROM a TO a\n\nGIVEN f IS AN Endo NUMBER\n      n IS A NUMBER\nGIVETH A DEONTIC Person Action\nx f n MEANS PARTY Alice MUST tick WITHIN 1 LEST (x f (f n))")
+        `shouldReturn` ["obligation:proved-waits"]
+
     it "a function from another module whose type is a synonym" $
       classesIn importedHelpers "IMPORT helpers\n\nGIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nx n MEANS PARTY Alice MUST tick WITHIN 1 LEST (runner (x n))"
         `shouldReturn` ["obligation:unproved-stall+fans"]
