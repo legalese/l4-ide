@@ -18,17 +18,24 @@ GIVETH A BOOLEAN
 #EVAL `may access` 30 FALSE
 #EVAL `may access` 30 TRUE
 
--- On one line, NOT applies to everything after it
+-- On one line, NOT applies to everything after it, so
+--
+--     `not both` a b MEANS NOT a AND b
+--
+-- would mean NOT (a AND b). L4 refuses that line, and NOT (a) AND b too,
+-- and asks for brackets that say which reading is meant.
 
 GIVEN a IS A BOOLEAN
       b IS A BOOLEAN
 GIVETH A BOOLEAN
-`not both` a b MEANS NOT a AND b
--- means NOT (a AND b)
+`not both` a b MEANS NOT (a AND b)
+-- brackets around the whole group: NOT (a AND b)
 
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
 GIVETH A BOOLEAN
 `not a, and b` a b MEANS (NOT a) AND b
--- parentheses limit NOT to a
+-- brackets around the NOT: only a is negated
 
 #EVAL `not both` TRUE FALSE
 #EVAL `not a, and b` TRUE FALSE

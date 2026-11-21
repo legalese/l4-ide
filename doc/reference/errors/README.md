@@ -17,6 +17,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Arguments on the lines below a function](#arguments-on-the-lines-below-a-function)
 - [Field access as an argument](#field-access-as-an-argument)
 - [Double equals sign](#double-equals-sign)
+- [NOT followed by AND, OR or IMPLIES on one line](#not-followed-by-and-or-or-implies-on-one-line)
 
 **Types**
 
@@ -237,6 +238,54 @@ GIVEN x IS A NUMBER
 GIVETH A BOOLEAN
 result x MEANS x = 5
 ```
+
+---
+
+<a id="check-negation-reaches-over-connective"></a>
+
+### NOT followed by AND, OR or IMPLIES on one line
+
+**Error:**
+
+```
+On one line, NOT reaches to the end of the line, so this reads as
+
+  NOT (`has a permit` AND `paid the fee`)
+
+If that is the meaning, write those brackets in. If only
+
+  `has a permit`
+
+is negated, put the brackets around the NOT and that alone:
+
+  (NOT `has a permit`) AND `paid the fee`
+
+or move the AND to a line of its own, starting in the same
+column as the NOT or further left.
+```
+
+```l4
+GIVEN `has a permit` IS A BOOLEAN
+      `paid the fee` IS A BOOLEAN
+DECIDE `must apply` IF NOT `has a permit` AND `paid the fee`
+```
+
+`NOT` takes everything after it on its line, so this would mean "not (has a permit and paid the fee)", while most people read it as "has no permit, and paid the fee".
+The two give different answers for anyone who did not pay the fee, so L4 asks which was meant instead of choosing.
+Brackets around the first operand alone, ``NOT (`has a permit`) AND `paid the fee` ``, are refused too: the bracket closes around `has a permit`, not around the `NOT`.
+
+**How to fix it:** write the brackets for the reading you mean.
+
+```l4
+-- the whole of "has a permit and paid the fee" is negated
+DECIDE `must apply` IF NOT (`has a permit` AND `paid the fee`)
+
+-- only "has a permit" is negated
+DECIDE `must apply` IF (NOT `has a permit`) AND `paid the fee`
+```
+
+Or move the `AND` to a line of its own: over several lines nothing is refused, and an `AND` that starts in the same column as the `NOT`, or further left, ends what the `NOT` negates.
+See [NOT](../operators/logical.md#not).
 
 ---
 

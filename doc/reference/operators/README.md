@@ -44,7 +44,7 @@ From the tightest-binding to the loosest:
   ``a AND n `exceeds by at least` x`` means ``a AND (n `exceeds by at least` x)``.
   For a function written `x SCALEDBY y`, `10 PLUS 2 SCALEDBY 3` means `10 PLUS (2 SCALEDBY 3)`.
   See [Mixfix functions](../functions/README.md#mixfix-functions).
-- `NOT` is not in the table: it applies to everything after it on its line. See [NOT](logical.md#not).
+- `NOT` is not in the table: it applies to everything after it on its line, so L4 refuses `NOT a AND b` on one line and asks for `NOT (a AND b)` or `(NOT a) AND b`. See [NOT](logical.md#not).
 - Parentheses override precedence: `(2 + 3) * 4` is `20`.
 - When an expression spans several lines, an operator written further left than the lines above it applies to all of them together. See [Several lines](logical.md#several-lines).
 
