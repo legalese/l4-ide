@@ -33,10 +33,10 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig (..), EvalLimits(..), applyEvalLimits, withTracedWorkNumber, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
+import L4.EvaluateLazy (EvalConfig (..), EvalLimits(..), applyEvalLimits, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
-import L4.EvaluateLazy.Exceptions (maximumClosureApplications, maximumOpenObligations)
+import L4.EvaluateLazy.Exceptions (maximumClosureApplications, maximumOpenObligations, maximumTracedClosureApplications)
 import L4.TracePolicy (fullTracePolicy, replDefaultPolicy)
 import L4.DirectiveFilter (filterIdeDirectives)
 import qualified L4.Print as Print
@@ -68,8 +68,8 @@ optionsParser = Options
 -- cannot import the @l4@ executable's modules, and the parser is kept out
 -- of the libraries so that no library takes on optparse-applicative.
 -- Here a time or memory stop ends the line that went over, not the session.
--- The one default that differs is the work number of a @:trace@ or
--- @:traceascii@ line: 'replTraceSteps'.
+-- A @:trace@ or @:traceascii@ line has the lower work number of every
+-- evaluation that collects a trace ('maximumTracedClosureApplications').
 limitsParser :: Parser EvalLimits
 limitsParser = EvalLimits
   <$> optional (option countReader
@@ -82,7 +82,7 @@ limitsParser = EvalLimits
         ( long "max-steps"
         <> metavar "N|none"
         <> help ("Stop any one line's evaluation that takes more than N steps, counting each function applied and each contract handed the events (default "
-                 <> show maximumClosureApplications <> ", and " <> show replTraceSteps <> " for a :trace or :traceascii line; none: no limit)")
+                 <> show maximumClosureApplications <> ", and " <> show maximumTracedClosureApplications <> " for a :trace or :traceascii line, which keeps a record of every step; this sets both, and none removes both)")
         ))
   <*> optional (option positiveIntReader
         ( long "eval-timeout"
@@ -103,21 +103,6 @@ limitsParser = EvalLimits
       input -> case reads input of
         [(n, "")] | n > (0 :: Int) -> Right (Just n)
         _ -> Left ("expected a whole number above 0, or none, got " <> show input)
-
--- | The default work number of a @:trace@ or @:traceascii@ line: 100,000
--- steps (decided by Claude 2026-11-21, pending Meng's review). Such a line keeps a
--- record of every step, about 10 KB each: measured 2026-11-21, 1,000,000 steps
--- took 10.6 GB. A plain line keeps none ('replDefaultPolicy'), and has the
--- commands' 'maximumClosureApplications'. @--max-steps@ sets both.
-replTraceSteps :: Int
-replTraceSteps = 100000
-
--- | The work number for traced lines: 'replTraceSteps' unless @--max-steps@
--- was given, which then sets it as it sets every other line's.
-replTracedWork :: EvalLimits -> Maybe (Maybe Int)
-replTracedWork (EvalLimits _ steps _ _) = case steps of
-  Nothing -> Just (Just replTraceSteps)
-  Just _  -> Nothing
 
 optionsInfo :: ParserInfo Options
 optionsInfo = info (helper <*> optionsParser)
@@ -151,7 +136,7 @@ main = do
   let tracePolicy = replDefaultPolicy defaultGraphVizOptions
   -- the counts on by default, and the flags; no run stop, so a stop ends
   -- only the line that went over (each line is evaluated as its own module)
-  evalConfig <- withTracedWorkNumber (replTracedWork opts.limits) . applyEvalLimits opts.limits <$> resolveEvalConfig Nothing tracePolicy
+  evalConfig <- applyEvalLimits opts.limits <$> resolveEvalConfig Nothing tracePolicy
   baseRecorder <- cmapWithPrio pretty <$> makeDefaultStderrRecorder Nothing
   let recorder = if opts.verbose
                  then baseRecorder

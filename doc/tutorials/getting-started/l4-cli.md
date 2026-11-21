@@ -301,8 +301,9 @@ So do the other `l4` commands that work out values (`l4 trace`, `l4 lts`, `l4 ex
 None of them reads an answer off a line a limit stopped: `l4 trace` names the stop on its error output and fails, `l4 lts` lists that trace with the stop as its standing, `l4 explore` lists that try as untried, or refuses the contract when it could not work out the outset or a deadline it needed, `l4 coverage` leaves that decision uncovered and says why, and `l4 prove` calls that assertion unknown.
 `l4 verify` works out no values, so its limits never fire.
 In the REPL a time or memory stop ends only the line that went over, though its message says nothing after it was evaluated: the next line still runs.
-In the REPL a plain line has the same 10,000,000 steps, and a `:trace` or `:traceascii` line has 100,000, because it keeps a record of every step it takes: on one machine 1,000,000 such steps used about 10 GB.
-`--max-steps` sets both.
+A line that collects a trace has 100,000 steps instead, because a trace keeps a record of every step: on one machine 1,000,000 such steps used about 7 GB under `l4 run`.
+That is an `#EVALTRACE` under `l4 run` (unless you give it `--trace none`, when it collects none) and `l4 trace` and in the editor, and a `:trace` or `:traceascii` line in the REPL; a plain REPL line has the usual 10,000,000.
+Its message says that its limit is the lower one.
 `--max-eval-memory-mb` stops a line by the memory it takes.
 jl4-service has limits of its own.
 
@@ -312,7 +313,7 @@ To change either count, or turn it off:
 l4 run --max-steps 1000000 --max-open none myfile.l4
 ```
 
-- `--max-steps N` sets the number of steps, and `--max-steps none` removes the limit.
+- `--max-steps N` sets the number of steps, for a line that collects a trace too, and `--max-steps none` removes the limit.
 - `--max-open N` sets the number of obligations open at once, and of failures one join may gather, and `--max-open none` removes the limit.
 
 Two more limits are off unless you ask for them:

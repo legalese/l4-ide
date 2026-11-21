@@ -849,6 +849,12 @@ Fixed in the commit that adds this note, a later one ("REPL: :trace and :traceas
 Measured: the runaway plain line takes 58 MB both at the 100,000 default (1.7 s) and with `--max-steps 1000000` (1.1 s), against 1.3 GB and 10.6 GB before.
 **AMENDED 2026-11-21**, decided by Claude 2026-11-21, pending Meng's review, replacing the REPL's single 100,000 default above: a plain REPL line has the commands' 10,000,000 steps, and a `:trace` or `:traceascii` line has 100,000 (`replTraceSteps`, through `withTracedWorkNumber`, which gives a directive that collects a trace a work number of its own; every other caller leaves it unset); `--max-steps` sets both.
 Measured with no flags: the runaway plain line stops at 10,000,000 steps in 14.4 s with 58 MB, and as a `:traceascii` line at 100,000 in 4.7 s with 1.2 GB; with `--max-steps 1000` both stop at 1,000.
+**AMENDED 2026-11-21**, decided by Claude 2026-11-21, pending Meng's review: the traced number is the default wherever the counts are on, not only in the REPL.
+`withCountedBudgets` sets `maxTracedClosureApplications` to `maximumTracedClosureApplications` (100,000), so an `#EVALTRACE` that collects its trace stops there under `l4 run`, `l4 trace` and the editor too, and the REPL takes it from there (`replTraceSteps` is gone); `--max-steps` sets both numbers, and jl4-service, which does not apply `withCountedBudgets`, is unchanged.
+A traced stop at its own number carries the usual one (`ClosureApplications`' third field), and its message says that its limit is lower and that `--max-steps` sets both.
+Measured on a runaway `#EVALTRACE` before: under `l4 run` 978 MB at `--max-steps 100000` and 7.0 GB at 1,000,000, so at the 10,000,000 default it ran out of memory first.
+After, with no flags: `l4 run` and `l4 trace` stop it at 100,000 in 1.5 s with 974 MB and 978 MB, and a `:traceascii` line in 3.2 s with 918 MB; with `--max-steps 1000`, at 1,000 with 64 MB and the usual message.
+No `#EVALTRACE` in the corpus, the docs or the CLI fixtures (15 files, each under `l4 run` and `l4 trace`) is stopped by it.
 U4: "a cumulative step counter, explore mode only".
 U7b: "Every evaluation is lifted; there is no evaluation mode."
 A counter that runs from the first step of every evaluation would turn a long but fully supplied computation into a `gave-up`, which breaks §4.3's conservativity.

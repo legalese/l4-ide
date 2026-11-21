@@ -168,7 +168,9 @@ data EvalConfig = EvalConfig
   , maxTracedClosureApplications :: !(Maybe (Maybe Int))
     -- ^ the work number for a directive that collects a trace, where it is
     -- not 'maxClosureApplications' ('withTracedWorkNumber'). 'Nothing' (the
-    -- default) uses 'maxClosureApplications'; @Just Nothing@ sets no limit.
+    -- shared default, so jl4-service's) uses 'maxClosureApplications';
+    -- @Just Nothing@ sets no limit. 'withCountedBudgets' sets
+    -- 'maximumTracedClosureApplications'.
   }
 
 -- | A cap, in bytes, on what an evaluation may allocate.
@@ -198,11 +200,15 @@ resolveEvalConfigWithSafeMode mTime tracePolicy safe =
 -- (2026-11-20) puts the count on by default in @l4 run@, @l4 batch@ and the
 -- editor, and Meng's ruling of 2026-11-21 in the other commands and the REPL; it
 -- is set in their configuration rather than the shared one, so that
--- jl4-service is unchanged. A flag changes it ('applyEvalLimits').
+-- jl4-service is unchanged. A flag changes it ('applyEvalLimits'). A
+-- directive that collects a trace has a lower work number of its own,
+-- 'maximumTracedClosureApplications' (decided by Claude 2026-11-21, pending Meng's
+-- review).
 withCountedBudgets :: EvalConfig -> EvalConfig
 withCountedBudgets cfg = cfg
   { maxOpenObligations = Just maximumOpenObligations
   , maxClosureApplications = Just maximumClosureApplications
+  , maxTracedClosureApplications = Just (Just maximumTracedClosureApplications)
   }
 
 -- | The limits a command or the REPL was given on its command line
@@ -218,19 +224,20 @@ data EvalLimits = EvalLimits
 
 -- | A work number of its own for a directive that collects a trace. A trace
 -- holds about 10 KB a step (measured 2026-11-21: 10.6 GB at 1,000,000 steps),
--- so the REPL's @:trace@ lines get a lower number than its plain lines,
--- which collect none (decided by Claude 2026-11-21, pending Meng's review).
--- 'Nothing' takes 'maxClosureApplications', as every other caller does.
+-- so 'withCountedBudgets' gives such a directive a lower number than one
+-- that collects none. 'Nothing' takes 'maxClosureApplications'.
 withTracedWorkNumber :: Maybe (Maybe Int) -> EvalConfig -> EvalConfig
 withTracedWorkNumber n cfg = cfg {maxTracedClosureApplications = n}
 
 -- | The counted budgets at their defaults, then whatever the flags say.
+-- @--max-steps@ sets the traced work number too, so that it is one number.
 -- This sets no run stop: a command that runs once adds one ('withRunStop');
 -- the REPL does not, so that a stop ends only the line that went over.
 applyEvalLimits :: EvalLimits -> EvalConfig -> EvalConfig
 applyEvalLimits lims cfg0 = cfg
   { maxOpenObligations     = fromMaybe cfg.maxOpenObligations lims.limitOpen
   , maxClosureApplications = fromMaybe cfg.maxClosureApplications lims.limitSteps
+  , maxTracedClosureApplications = maybe cfg.maxTracedClosureApplications (const Nothing) lims.limitSteps
   , directiveSeconds       = lims.limitSeconds
   , directiveMegabytes     = lims.limitMegabytes
   }
@@ -1067,6 +1074,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , openLimit = evalConfig.maxOpenObligations
     , applicationLimit = evalConfig.maxClosureApplications
     , tracedApplicationLimit = fromMaybe evalConfig.maxClosureApplications evalConfig.maxTracedClosureApplications
+    , usualApplicationLimit = Nothing
     , directiveLimits = case (evalConfig.directiveSeconds, evalConfig.directiveMegabytes) of
         (Nothing, Nothing) -> Nothing
         (secs, mbs)        -> Just MkDirectiveLimits {seconds = secs, megabytes = mbs}

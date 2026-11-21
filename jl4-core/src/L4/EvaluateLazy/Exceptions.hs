@@ -18,6 +18,7 @@ module L4.EvaluateLazy.Exceptions
 , maximumUnknownSteps
 , maximumOpenObligations
 , maximumClosureApplications
+, maximumTracedClosureApplications
 )
 where
 
@@ -132,7 +133,7 @@ data Budget
     -- and joined with itself doubles its list at each join with no new
     -- work. The site is the compound's operands, or the EVERY
     -- ('L4.EvaluateLazy.Machine.noteJoin').
-  | ClosureApplications Int BudgetSite
+  | ClosureApplications Int BudgetSite (Maybe (Maybe Int))
     -- ^ more work than the limit, counting applications of functions written
     -- in L4 and deontic hand-offs in one total (L2's numbers, ruled by Meng 2026-11-21): a
     -- function that calls itself with new inputs and never stops pushes no
@@ -142,7 +143,11 @@ data Budget
     -- its function's body, or that function's GIVEN, or the first part of the
     -- body that has a place ('L4.EvaluateLazy.Machine.noteApplication'); for
     -- a hand-off, the action, the EVERY, or the compound's operands
-    -- ('L4.EvaluateLazy.Machine.noteHandoff').
+    -- ('L4.EvaluateLazy.Machine.noteHandoff'). The last field is the usual
+    -- work number, set only where the directive collected a trace and
+    -- stopped at a number of its own that is not the usual one
+    -- ('L4.EvaluateLazy.withTracedWorkNumber'); @Just Nothing@ when the
+    -- usual one sets no limit.
   | TimeLimit Int
     -- ^ the directive ran longer than the opt-in @--eval-timeout@, in
     -- seconds of wall-clock time. Not deterministic: it depends on the
@@ -299,11 +304,21 @@ prettyUserEvalException = \ case
     , "The join was in " <> siteName site <> "."
     , "A breach that is shared, and joined with itself again and again, doubles its list of failures at each join."
     , "The l4 commands that evaluate, and the REPL, take --max-open N to change the limit, and --max-open none to remove it." ]
-  OverBudget (ClosureApplications limit site) ->
+  OverBudget (ClosureApplications limit site usual) ->
     [ "I stopped evaluating: it took more than " <> Text.textShow limit <> " steps, counting each function applied and each contract handed the events."
     , "The last step was in " <> siteName site <> "."
-    , "A function that calls itself with new inputs, or a HENCE or LEST that leads back to itself, never ends unless something stops it."
-    , "The l4 commands that evaluate, and the REPL, take --max-steps N to change the limit, and --max-steps none to remove it." ]
+    , "A function that calls itself with new inputs, or a HENCE or LEST that leads back to itself, never ends unless something stops it." ]
+    <> case usual of
+      Nothing ->
+        [ "The l4 commands that evaluate, and the REPL, take --max-steps N to change the limit, and --max-steps none to remove it." ]
+      Just other ->
+        -- decided by Claude 2026-11-21, pending Meng's review
+        [ "This one collects a trace, which keeps a record of every step, so it has "
+          <> (case other of
+                Just n | limit < n -> "a lower limit than the " <> Text.textShow n <> " steps of one that collects none."
+                Just n             -> "a limit of its own: one that collects none has " <> Text.textShow n <> " steps."
+                Nothing            -> "a limit of its own: one that collects none has no limit.")
+        , "The l4 commands that evaluate, and the REPL, take --max-steps N to set both limits to N, and --max-steps none to remove both." ]
   OverBudget b@(TimeLimit _) ->
     [ "I stopped the run: this took longer than " <> limitText b <> ", so nothing after it was evaluated." ]
   OverBudget b@(MemoryLimit _) ->
@@ -331,7 +346,7 @@ limitText = \ case
   MemoryLimit n -> Text.textShow n <> " MB (--max-eval-memory-mb)"
   OpenObligations n _ -> Text.textShow n <> " obligations open at once (--max-open)"
   JoinedBreaches n _ -> Text.textShow n <> " failures joined into one breach (--max-open)"
-  ClosureApplications n _ -> Text.textShow n <> " steps (--max-steps)"
+  ClosureApplications n _ _ -> Text.textShow n <> " steps (--max-steps)"
 
 -- | A name a 'Stuck' carries, as its message prints it. An input prints
 -- exactly as it always has, so the one-input message is unchanged.
@@ -368,6 +383,18 @@ maximumOpenObligations = 10_000
 -- million in 12 seconds.
 maximumClosureApplications :: Int
 maximumClosureApplications = 10_000_000
+
+-- | The work number for a directive that collects a trace: an @#EVALTRACE@
+-- under @l4 run@, @l4 trace@ and the editor, and a @:trace@ or @:traceascii@
+-- line in the REPL (decided by Claude 2026-11-21, pending Meng's review). A trace
+-- keeps a record of every step, about 10 KB each (measured 2026-11-21: an
+-- @#EVALTRACE@ under @l4 run@ used 978 MB by 100,000 steps and 7.0 GB by
+-- 1,000,000), so at 'maximumClosureApplications' a runaway one runs out of
+-- memory before the count stops it. Over the corpus no directive takes more
+-- than 164,898 steps, and none of those is traced. Set by
+-- 'L4.EvaluateLazy.withCountedBudgets'; @--max-steps@ sets both numbers.
+maximumTracedClosureApplications :: Int
+maximumTracedClosureApplications = 100_000
 
 -- | Depth cutoff when converting WHNF results to normal form (deeper parts
 -- of the result are 'Omitted').

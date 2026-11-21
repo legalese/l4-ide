@@ -99,7 +99,7 @@ import L4.EvaluateLazy
   , applyEvalLimits
   , withRunStop
   )
-import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations, prettyEvalException)
+import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations, maximumTracedClosureApplications, prettyEvalException)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz2
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM)
 import L4.Print (prettyLayout)
@@ -170,7 +170,7 @@ evalLimitsParserNoting stepsNote = EvalLimits
         ( long "max-steps"
         <> metavar "N|none"
         <> help ("Stop any one evaluation that takes more than N steps, counting each function applied and each contract handed the events, as an error on that one" <> stepsNote <> " (default "
-                 <> show maximumClosureApplications <> "; none: no limit)")
+                 <> show maximumClosureApplications <> ", and " <> show maximumTracedClosureApplications <> " for one that collects a trace, such as an #EVALTRACE, which keeps a record of every step; this sets both, and none removes both)")
         ))
   <*> optional (option positiveIntReader
         ( long "eval-timeout"

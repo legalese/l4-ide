@@ -23,7 +23,7 @@ import Test.Hspec
 
 import L4.API.VirtualFS (checkWithImports, vfsFromList)
 import L4.EvaluateLazy
-import L4.EvaluateLazy.Exceptions (Budget (..), BudgetSite (..), EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations)
+import L4.EvaluateLazy.Exceptions (Budget (..), BudgetSite (..), EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations, maximumTracedClosureApplications)
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
@@ -59,7 +59,7 @@ runUnder policy tweak src = map (outcome . (.result)) <$> resultsUnder policy tw
     budget b = case b of
       OpenObligations n site     -> Over (name b) n (lineOf site.siteRange)
       JoinedBreaches n site      -> Over (name b) n (lineOf site.siteRange)
-      ClosureApplications n site -> Over (name b) n (lineOf site.siteRange)
+      ClosureApplications n site _ -> Over (name b) n (lineOf site.siteRange)
       TimeLimit n                -> Over (name b) n Nothing
       MemoryLimit n              -> Over (name b) n Nothing
     name = \ case
@@ -82,7 +82,7 @@ rulesNamed tweak src = concatMap named <$> resultsWith tweak src
     site = \ case
       OpenObligations _ s     -> [s.siteRule]
       JoinedBreaches _ s      -> [s.siteRule]
-      ClosureApplications _ s -> [s.siteRule]
+      ClosureApplications _ s _ -> [s.siteRule]
       _                       -> []
 
 resultsWith :: (EvalConfig -> EvalConfig) -> Text.Text -> IO [EvalDirectiveResult]
@@ -172,17 +172,44 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
       stops cliDefaultPolicy (withTracedWorkNumber (Just (Just 100)) . limits Nothing (Just 1000))
         `shouldReturn` [Just ("steps", 1000), Just ("steps", 1000)]
 
+    -- the stop's message says the traced limit is lower, and names the flag
+    -- that sets both (decided by Claude 2026-11-21, pending Meng's review)
+    let messages tweak = map (\ r -> case r.result of
+          Reduction (ReducedErrored e@(UserEvalException (OverBudget (ClosureApplications _ _ usual)))) -> Just (usual, Text.unlines (prettyEvalException e))
+          _ -> Nothing) <$> resultsUnder repl tweak src
+    it "a traced stop at its own number carries the usual one, and its message says it is lower" $ do
+      [untraced, traced] <- messages (withTracedWorkNumber (Just (Just 100)) . limits Nothing (Just 1000))
+      fmap fst untraced `shouldBe` Just Nothing
+      fmap fst traced `shouldBe` Just (Just (Just 1000))
+      fmap snd untraced `shouldSatisfy` maybe False (not . Text.isInfixOf "collects a trace")
+      fmap snd traced `shouldSatisfy` maybe False (Text.isInfixOf "This one collects a trace, which keeps a record of every step, so it has a lower limit than the 1000 steps of one that collects none.")
+      fmap snd traced `shouldSatisfy` maybe False (Text.isInfixOf "--max-steps N to set both limits to N")
+    it "a traced stop at the usual number carries none, and has the usual message" $ do
+      [_, traced] <- messages (limits Nothing (Just 1000))
+      fmap fst traced `shouldBe` Just Nothing
+
   describe "where they are on (ruling L2)" $ do
     it "the shared configuration sets no count, so jl4-service evaluates as it did" $ do
       cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
       safe <- resolveEvalConfigWithSafeMode (Just fixedNow) apiDefaultPolicy True
       [ (c.maxOpenObligations, c.maxClosureApplications, c.directiveSeconds, c.directiveMegabytes) | c <- [cfg, safe] ]
         `shouldBe` replicate 2 (Nothing, Nothing, Nothing, Nothing)
+      map (.maxTracedClosureApplications) [cfg, safe] `shouldBe` [Nothing, Nothing]
 
     it "withCountedBudgets, which every l4 command that evaluates, the REPL and the editor apply, sets both counts, and no time or memory limit" $ do
       cfg <- withCountedBudgets <$> resolveEvalConfig (Just fixedNow) apiDefaultPolicy
       (cfg.maxOpenObligations, cfg.maxClosureApplications, cfg.directiveSeconds, cfg.directiveMegabytes)
         `shouldBe` (Just maximumOpenObligations, Just maximumClosureApplications, Nothing, Nothing)
+
+    it "withCountedBudgets gives a directive that collects a trace 100,000 steps, and --max-steps sets both (decided by Claude 2026-11-21, pending Meng's review)" $ do
+      cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+      maximumTracedClosureApplications `shouldBe` 100_000
+      (withCountedBudgets cfg).maxTracedClosureApplications `shouldBe` Just (Just maximumTracedClosureApplications)
+      let flagged steps = applyEvalLimits (EvalLimits Nothing steps Nothing Nothing) cfg
+      [ ((flagged s).maxClosureApplications, (flagged s).maxTracedClosureApplications) | s <- [Nothing, Just (Just 5), Just Nothing] ]
+        `shouldBe` [ (Just maximumClosureApplications, Just (Just maximumTracedClosureApplications))
+                   , (Just 5, Nothing)
+                   , (Nothing, Nothing) ]
 
   describe "obligations open at once" $ do
     it "stops #1075's rule at the limit, names the rule, and still answers the next directive" $

@@ -1066,7 +1066,9 @@ The count is of steps, not of time, so the same file stops at the same place on 
 
 The count limits how long a line runs, not how much memory it uses. A function that passes along a value it never looks at, such as `countUp n MEANS countUp (n + 1)`, where nothing reads `n`, keeps every one of those values, and can run out of memory long before it reaches the limit. The `--max-eval-memory-mb` option of `l4 run` stops it sooner: see [Stopping a line that runs too long](../../tutorials/getting-started/l4-cli.md#stopping-a-line-that-runs-too-long).
 
-**How to fix it:** Make sure the function reaches its stopping case from every input: test with `AT MOST 0` rather than `EQUALS 0` when the input can step past 0. If the function does stop, but only after more than 10,000,000 steps, the work is too big for one evaluation: split it into smaller questions, or raise the limit with `--max-steps`.
+An `#EVALTRACE`, and a `:trace` or `:traceascii` line in the REPL, keeps a record of every step for its trace, so it may take at most 100,000 steps: `#EVALTRACE countDown 5` stops at `more than 100000 steps`, and its message adds `This one collects a trace, which keeps a record of every step, so it has a lower limit than the 10000000 steps of one that collects none.` `--max-steps N` sets both limits to N.
+
+**How to fix it:** Make sure the function reaches its stopping case from every input: test with `AT MOST 0` rather than `EQUALS 0` when the input can step past 0. If the function does stop, but only after more than 10,000,000 steps (100,000 for one that collects a trace), the work is too big for one evaluation: split it into smaller questions, or raise the limit with `--max-steps`.
 
 ---
 

@@ -1,0 +1,8 @@
+-- An #EVALTRACE that never ends. A directive that collects a trace keeps a
+-- record of every step, so it has a lower work number of its own, 100,000
+-- steps (decided by Claude 2026-11-21, pending Meng's review), and its stop says so.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+countDown n MEANS IF n EQUALS 0 THEN 0 ELSE countDown (n - 2)
+
+#EVALTRACE countDown 5

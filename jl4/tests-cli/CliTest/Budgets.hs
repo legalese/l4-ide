@@ -27,7 +27,7 @@ import CliTest.Common
 dir :: FilePath
 dir = "tests-cli" </> "fixtures" </> "budgets"
 
-runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps, replTrace :: FilePath
+runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps, replTrace, neverStopsTraced :: FilePath
 runaway = dir </> "runaway.l4"
 neverStops = dir </> "never-stops.l4"
 ends = dir </> "ends.l4"
@@ -41,9 +41,10 @@ batchRows = dir </> "batch-never-stops.json"
 proveSteps = dir </> "prove-steps.l4"
 coverageSteps = dir </> "coverage-steps.l4"
 replTrace = dir </> "repl-trace.l4"
+neverStopsTraced = dir </> "never-stops-traced.l4"
 
 fixtures :: [FilePath]
-fixtures = [runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps, replTrace]
+fixtures = [runaway, neverStops, ends, stopMain, stopLib, stopOnly, stopThenTrace, batchNeverStops, batchImportsStop, batchRows, proveSteps, coverageSteps, replTrace, neverStopsTraced]
 
 -- | Each result of @l4 run --json@, as its "limit" (if any) and its "value".
 results :: String -> Maybe [(Maybe Aeson.Value, Maybe Aeson.Value)]
@@ -232,6 +233,28 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
     it "a #CHECK line has nothing to trace, on either command, as before" $
       session [":trace #CHECK `double` 3", ":traceascii #CHECK `double` 3"] \ sout ->
         times "jl4> (no result)\n" sout `shouldBe` 2
+
+  -- A trace keeps a record of every step, so a directive that collects one
+  -- has a lower work number of its own (decided by Claude 2026-11-21, pending
+  -- Meng's review). Each stop at 100,000 holds about 1 GB.
+  describe "a directive that collects a trace" $ do
+    it "l4 run stops a runaway #EVALTRACE at 100,000 steps, and says its limit is the lower one" $ do
+      Output code sout serr <- within bin ["run", neverStopsTraced]
+      code `shouldBe` ExitFailure 1
+      (sout <> serr) `shouldSatisfy` ("more than 100000 steps" `isInfixOf`)
+      (sout <> serr) `shouldSatisfy` ("so it has a lower limit than the 10000000 steps of one that collects none" `isInfixOf`)
+      (sout <> serr) `shouldSatisfy` ("--max-steps N to set both limits to N" `isInfixOf`)
+
+    it "l4 trace stops it at the same number" $ do
+      Output code _ serr <- within bin ["trace", neverStopsTraced]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("more than 100000 steps" `isInfixOf`)
+
+    it "--max-steps sets it too, and then the message is the usual one" $ do
+      Output code sout serr <- within bin ["run", "--max-steps", "1000", neverStopsTraced]
+      code `shouldBe` ExitFailure 1
+      (sout <> serr) `shouldSatisfy` ("more than 1000 steps" `isInfixOf`)
+      (sout <> serr) `shouldNotSatisfy` ("collects a trace" `isInfixOf`)
 
   -- Ruled by Meng 2026-11-21, extending L2: every other command that evaluates
   -- counts too, by default, with the same flags; and none of them reads an

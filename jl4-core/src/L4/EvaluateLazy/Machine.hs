@@ -516,6 +516,10 @@ data EvalState =
       -- 'withTracedWorkLimit' puts in 'applicationLimit''s place. The same
       -- as 'applicationLimit' unless the configuration says otherwise
       -- ('L4.EvaluateLazy.withTracedWorkNumber')
+    , usualApplicationLimit :: !(Maybe (Maybe Int))
+      -- ^ while a directive that collects a trace runs under a work number
+      -- of its own that is not the usual one ('withTracedWorkLimit'), the
+      -- usual one, which its stop's message names; 'Nothing' otherwise
     , budgetRules :: [(SrcRange, Text)]
       -- ^ the module's own definitions, each with its name: what a budget
       -- that goes over names its site by ('budgetSite'). Lazy, so it is
@@ -1494,15 +1498,19 @@ noteHandoff :: Maybe SrcRange -> Eval ()
 noteHandoff = noteWork
 {-# INLINE noteHandoff #-}
 
+-- | Run with the work number for a directive that collects a trace: a trace
+-- holds about 10 KB a step, so it has a lower number by default
+-- ('tracedApplicationLimit'; decided by Claude 2026-11-21, pending Meng's review). Where that number is not the
+-- usual one, the usual one is kept for the stop's message.
+withTracedWorkLimit :: Eval a -> Eval a
+withTracedWorkLimit (MkEval f) = MkEval \ s -> f s
+  { applicationLimit = s.tracedApplicationLimit
+  , usualApplicationLimit = if s.tracedApplicationLimit == s.applicationLimit then Nothing else Just s.applicationLimit
+  }
+
 -- | One step of work, at a place in the source when it has one: counted,
 -- and stopped with 'ClosureApplications' past the limit. The place is read
 -- only past the limit.
--- | Run with the work number for a directive that collects a trace: a trace
--- holds about 10 KB a step, so a caller may want a lower number there
--- ('tracedApplicationLimit'; the REPL's @:trace@ lines, decided by Claude 2026-11-21, pending Meng's review).
-withTracedWorkLimit :: Eval a -> Eval a
-withTracedWorkLimit (MkEval f) = MkEval \ s -> f s {applicationLimit = s.tracedApplicationLimit}
-
 noteWork :: Maybe SrcRange -> Eval ()
 noteWork place = do
   appliedRef <- asks (.applications)
@@ -1513,7 +1521,8 @@ noteWork place = do
     when (applied' > limit) $
       when (isJust place || applied' > limit + rangelessSlack) $ do
         site <- budgetSite place
-        userException (OverBudget (ClosureApplications limit site))
+        usual <- asks (.usualApplicationLimit)
+        userException (OverBudget (ClosureApplications limit site usual))
 {-# INLINE noteWork #-}
 
 -- | Where a RAND or an ROR is in the source, as its operands place it: the

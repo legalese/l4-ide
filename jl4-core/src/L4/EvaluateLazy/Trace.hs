@@ -319,7 +319,7 @@ printUserEvalExceptionShort (UserError _)                   = "user error"
 printUserEvalExceptionShort (OverBudget b)                  = case b of
   OpenObligations _ _     -> "stopped: too many obligations open"
   JoinedBreaches _ _      -> "stopped: too many failures joined"
-  ClosureApplications _ _ -> "stopped: too many steps"
+  ClosureApplications {}  -> "stopped: too many steps"
   TimeLimit _             -> "stopped: time limit"
   MemoryLimit _           -> "stopped: memory limit"
 printUserEvalExceptionShort (NotEvaluated _ _)              = "not evaluated: the run stopped"
