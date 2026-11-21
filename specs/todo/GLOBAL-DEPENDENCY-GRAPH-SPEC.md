@@ -140,7 +140,10 @@ The page for a first-time reader is `doc/reference/regulative/rules-that-start-t
 **"Multiplies" is a warning nobody can silence.**
 Card L3: option A, accepted by Meng on 2026-11-20 at 22:49:58Z, with no note; bench "Recursion Limits", https://claude.ai/artifact/GaRTioL8pgDR5sHbEe8fKY (collection `l4-recursion-1120`); printed: "Accept option A. A warning with its own text that cannot be silenced; it names the rule and the operator that starts two copies, and says whether the growth is per missed deadline or bounded by a countdown." "Conditions: it ships only after the report-only pass over every tracked `.l4` file and after card L2’s run-time stop exists; each shape it fires on has a positive and a negative fixture."
 
-- The report-only pass: met. It was measured before the scope ruling was given: 67 warnings and 23 goldens moved with every cycle in scope, against 2 and 3 with obligation cycles only. Re-measured on this branch on 2026-11-21: all 1,602 tracked `.l4` files checked with the binary before and after, with identical exit codes and cycle warnings in exactly three files, none of them "multiplies".
+- The report-only pass: met.
+  It was measured before the scope ruling was given: 67 warnings and 23 goldens moved with every cycle in scope, against 2 and 3 with obligation cycles only.
+  The 2 are "could not check" warnings; the third golden moves for a "no time" warning, which the scope ruling left as it was.
+  Re-measured on this branch on 2026-11-21: all 1,602 tracked `.l4` files checked with the binary before and after, with identical exit codes and cycle warnings in exactly three files, none of them "multiplies".
 - L2's run-time stop: **not met on this branch.**
   It is on `fix/runaway-lest-1075`, which has not landed in `unstable` (`git merge-base --is-ancestor` says so, 2026-11-21), so this branch must not merge before it.
 - The fixtures: `jl4-core/test/CyclesSpec.hs`, "an obligation cycle draws its alarms", has a positive and a negative case for each shape: a `LEST`, the #1075 shape over two rules, a `HENCE`, a countdown, a barrier's `HENCE` and a `RECORD`'s `HENCE`.
@@ -172,6 +175,7 @@ So `@determines` was considered and declined; it is not an alias, and nothing re
 Answer (ii), given by Meng on 2026-11-21 at 09:03:09Z, with no note, as written: "RULING (ii) on the cycle checker's scope: the "could not check" warning fires only on obligation cycles (HENCE/LEST loops), not on plain function recursion; "multiplies" and "no time" unchanged; @ends-because still silences "could not check" on its own cycle." The same ruling: "function recursion stays in the report-only pass and is stopped at run time by L2's counts".
 
 - Built in `L4.Cycles.alarms`, which returns no alarm for a `FunctionCycle`, so the checker and the report (`findingJSON`, written by `JL4_CYCLE_REPORT`) agree; the report still lists every cycle of functions.
+- Guarded by tests: with that line removed (2026-11-21), four `jl4-core-test` cases fail (the three under "a function cycle draws no warning", and the note on a function cycle), and so do 21 `jl4-test` goldens: 20 that would gain a warning, three of them under `jl4/examples/canon/`, which with the three above make (i)'s 23, and `ok/ends-because-basic`, whose notes change.
 - "stopped at run time by L2's counts": **not true on this branch.**
   The counts are on `fix/runaway-lest-1075`, not landed.
   Until they land, a function that calls itself forever without a blackhole keeps running, as `doc/reference/errors/README.md` ("Infinite loop detected") says.
@@ -182,6 +186,7 @@ Answer (ii), given by Meng on 2026-11-21 at 09:03:09Z, with no note, as written:
 - Measured on this branch: three goldens move, `ok/deontic-breach-semantics` ("could not check" on `recursive lest`), `ok/every/run-after` ("could not check" on `retry`) and `ok/every/run-lest` ("no time" on `forthwith, forever`); none is under `jl4/examples/canon/`.
 
 What review changed: the plan for this build said a mark on any member of the cycle silences its warning; the printed L4 condition says the definition the warning is reported on, and that is what was built.
+A second review (2026-11-22) found texts that said more than L4 checks, and they were changed to say what L4 read: that it finds no way back, not that a rule never leads back; that it reads only a number written out, not that a time may be 0; and that a mixed cycle, which uses itself directly and through a `HENCE` or `LEST`, can draw "could not check".
 
 ## Open Questions
 
