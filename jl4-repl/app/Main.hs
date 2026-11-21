@@ -8,6 +8,7 @@ import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef
 import Data.List (sortOn, isPrefixOf)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
@@ -36,7 +37,7 @@ import qualified LSP.L4.Viz.VizExpr as VizExpr
 import L4.EvaluateLazy (EvalConfig, EvalLimits(..), applyEvalLimits, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
-import L4.EvaluateLazy.Exceptions (maximumClosureApplications, maximumOpenObligations)
+import L4.EvaluateLazy.Exceptions (maximumOpenObligations)
 import L4.TracePolicy (replDefaultPolicy)
 import L4.DirectiveFilter (filterIdeDirectives)
 import qualified L4.Print as Print
@@ -68,6 +69,7 @@ optionsParser = Options
 -- cannot import the @l4@ executable's modules, and the parser is kept out
 -- of the libraries so that no library takes on optparse-applicative.
 -- Here a time or memory stop ends the line that went over, not the session.
+-- The one default that differs is the work number: 'replMaximumSteps'.
 limitsParser :: Parser EvalLimits
 limitsParser = EvalLimits
   <$> optional (option countReader
@@ -80,7 +82,7 @@ limitsParser = EvalLimits
         ( long "max-steps"
         <> metavar "N|none"
         <> help ("Stop any one line's evaluation that takes more than N steps, counting each function applied and each contract handed the events (default "
-                 <> show maximumClosureApplications <> "; none: no limit)")
+                 <> show replMaximumSteps <> "; none: no limit)")
         ))
   <*> optional (option positiveIntReader
         ( long "eval-timeout"
@@ -101,6 +103,22 @@ limitsParser = EvalLimits
       input -> case reads input of
         [(n, "")] | n > (0 :: Int) -> Right (Just n)
         _ -> Left ("expected a whole number above 0, or none, got " <> show input)
+
+-- | The REPL's default work number: 100,000 steps, not the @l4@ commands'
+-- 'maximumClosureApplications' (decided by Claude 2026-11-21, pending Meng's review).
+-- The REPL keeps a record of every step for its traces, so it holds far more
+-- per step than @l4 run@ does: measured 2026-11-21, 1,000,000 steps there took
+-- 14.5 s and 10.6 GB, against 1.0 s and 55 MB under @l4 run@, so at the
+-- commands' default a runaway line ran out of memory before the count stopped
+-- it. @--max-steps@ still overrides this.
+replMaximumSteps :: Int
+replMaximumSteps = 100000
+
+-- | The limits a REPL line runs under: the flags, with 'replMaximumSteps' in
+-- place of the commands' work number when @--max-steps@ is not given.
+replLimits :: EvalLimits -> EvalLimits
+replLimits (EvalLimits open steps seconds megabytes) =
+  EvalLimits open (Just (fromMaybe (Just replMaximumSteps) steps)) seconds megabytes
 
 optionsInfo :: ParserInfo Options
 optionsInfo = info (helper <*> optionsParser)
@@ -134,7 +152,7 @@ main = do
   let tracePolicy = replDefaultPolicy defaultGraphVizOptions
   -- the counts on by default, and the flags; no run stop, so a stop ends
   -- only the line that went over (each line is evaluated as its own module)
-  evalConfig <- applyEvalLimits opts.limits <$> resolveEvalConfig Nothing tracePolicy
+  evalConfig <- applyEvalLimits (replLimits opts.limits) <$> resolveEvalConfig Nothing tracePolicy
   baseRecorder <- cmapWithPrio pretty <$> makeDefaultStderrRecorder Nothing
   let recorder = if opts.verbose
                  then baseRecorder

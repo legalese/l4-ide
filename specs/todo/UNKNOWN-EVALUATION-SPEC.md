@@ -841,6 +841,8 @@ Built on `fix/runaway-lest-1075` (2026-11-21), local, not pushed, with three cho
 (2) No command reads an answer off an evaluation a limit stopped (`isLimitStop`): `l4 prove` calls the assertion unknown rather than refuted or decided, `l4 coverage` leaves the decision uncovered rather than read the input as raising, `l4 explore` refuses when it could not work out the outset or a deadline's anchor rather than leave that deadline out, and `l4 trace` names the stop and fails rather than draw nothing and exit 0.
 (3) `l4 lts` keeps its exit status of 0 for a trace it could not work out, as before, and lists the stop as that trace's standing.
 Measured on the build: the REPL keeps a record of every step, so 1,000,000 steps there took 14.5 s and 10.6 GB, against 1.0 s and 55 MB under `l4 run`; at the default work number a runaway REPL line runs out of memory before the count stops it (reported for review, not decided).
+**AMENDED 2026-11-21**, decided by Claude 2026-11-21, pending Meng's review: the REPL's default work number is 100,000 steps (`replMaximumSteps`, `jl4-repl/app/Main.hs`), and `--max-steps` still overrides it; the `l4` commands keep 10,000,000.
+Measured on the build: the runaway line above then stops in 3.3 s with 1.3 GB resident, and the next line runs.
 U4: "a cumulative step counter, explore mode only".
 U7b: "Every evaluation is lifted; there is no evaluation mode."
 A counter that runs from the first step of every evaluation would turn a long but fully supplied computation into a `gave-up`, which breaks §4.3's conservativity.
