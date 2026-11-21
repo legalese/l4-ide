@@ -175,6 +175,8 @@ So `@determines` was considered and declined; it is not an alias, and nothing re
   Nothing under `L4.Evaluate*` reads the mark (`git grep annEndsBecause -- 'jl4-core/src/L4/Evaluate*'` finds nothing, 2026-11-22).
 - The printer keeps the mark through a re-print (`L4.Print`), and the evaluation differential of `CLAUDE.md` §3.2.1 found no change of meaning (2026-11-21): 481 round-trip files ran on both sides, 323 of them with `Result:` blocks, 6,784 per side; 321 are byte-identical, and the other 2 differ only in a file name inside a `Result:` body; `ok/ends-because-basic.l4` keeps its 4 marks and its 4 notes.
 
+These conditions are tested in `jl4-core/test/CyclesSpec.hs`, each with a case that fails if the rule is broken: a mark silences "could not check" and leaves "multiplies" on the same cycle; a helper declared before a cycle does not become the member the warning is reported on (with the source-order sort removed, that case fails, 2026-11-22); a mark is matched to its definition and not to another of the same name; a module with an error gets no note for a mark it accepts; and a note starts at its mark and a warning at its rule's name.
+
 **The scope ruling (ii): a cycle of functions draws no warning.**
 Answer (ii), given by Meng on 2026-11-21 at 09:03:09Z, with no note, as written: "RULING (ii) on the cycle checker's scope: the "could not check" warning fires only on obligation cycles (HENCE/LEST loops), not on plain function recursion; "multiplies" and "no time" unchanged; @ends-because still silences "could not check" on its own cycle." The same ruling: "function recursion stays in the report-only pass and is stopped at run time by L2's counts".
 

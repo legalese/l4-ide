@@ -30,6 +30,7 @@ import L4.API.EmbeddedLibraries (embeddedLibraries)
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, checkWithImportsAndUri, emptyVFS, vfsFromList)
 import L4.Cycles
 import L4.Cycles.Warning (CycleTrouble (..), CycleWarning (..), MarkNote (..), MarkOutcome (..))
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax (DeonticModal (..), Module (..), Resolved)
 import L4.TypeCheck (applyFinalSubstitution, prettyCheckError)
 import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), CheckWarning (..), EntityInfo, Severity (..), Substitution, severity)
@@ -896,6 +897,13 @@ spec = describe "cycle report (#1075 layer 2)" do
       notices (people <> "GIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 2 LEST (w3 RAND w1)\n\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 3 LEST w1")
         `shouldReturn` [("multiplies", "w1")]
 
+    it "multiplies: shown on, and naming, the rule that holds the RAND when it is not the first" do
+      let src = people <> "GIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 2 LEST w3\n\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 3 LEST (w1 RAND w1)"
+      notices src `shouldReturn` [("multiplies", "w3")]
+      t <- noticeText src
+      for_ ["`w3` starts 2 copies of rules that lead back to it at once", "The rules that lead back to each other are `w3` and `w1`."] \ needle ->
+        t `shouldSatisfy` Text.isInfixOf needle
+
     it "but not two rules that hand on to each other one copy at a time" $
       notices (people <> "GIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 2 LEST w3\n\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 3 LEST w1")
         `shouldReturn` []
@@ -917,6 +925,12 @@ spec = describe "cycle report (#1075 layer 2)" do
       for_ ["is given `n` less 1", "as many as 2 to the power of `n`"] \ needle ->
         t `shouldSatisfy` Text.isInfixOf needle
       t `shouldSatisfy` (not . Text.isInfixOf "Nothing written limits")
+
+    it "multiplies, counting down by a number other than 1: the bound is bracketed, and the number written as a reader writes it" do
+      let src = people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nb n MEANS IF n AT MOST 0 THEN FULFILLED ELSE PARTY Alice MUST tick WITHIN 1 LEST (b (n MINUS 0.001) RAND b (n MINUS 0.001))"
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "as many as 2 to the power of (`n` divided by 0.001)."
+      t `shouldSatisfy` (not . Text.isInfixOf "e-")
 
     it "but not a countdown that starts one copy at a time" $
       notices (people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE PARTY Alice MUST tick WITHIN 1 LEST b (n MINUS 1)")
@@ -942,6 +956,10 @@ spec = describe "cycle report (#1075 layer 2)" do
       notices (people <> "GIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x\n\ny MEANS 1 PLUS TRUE")
         `shouldReturn` []
 
+    it "nor a note, on a module that does not check, for a mark it accepts" $
+      notices (people <> "@ends-because Alice ticks\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x\n\ny MEANS 1 PLUS TRUE")
+        `shouldReturn` []
+
   describe "@ends-because (L4)" do
     it "on the rule, silences could not check, and leaves a note at information level carrying its reason" do
       let src = people <> "@ends-because Alice is paid by then\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST x"
@@ -964,6 +982,28 @@ spec = describe "cycle report (#1075 layer 2)" do
       t <- noticeText src
       t `shouldSatisfy` Text.isInfixOf "@ends-because does not silence this warning"
 
+    it "silences could not check, and leaves multiplies on the same cycle standing (ruling L4: never multiplies)" do
+      let src = people <> "@ends-because it stops\nGIVETH A DEONTIC Person Action\nx MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST (x RAND x)"
+      notices src `shouldReturn` [("multiplies", "x"), ("silenced", "x")]
+      noticeSeverities src `shouldReturn` [SWarn, SInfo]
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "@ends-because does not silence this warning: L4 has checked that the copies multiply, and the mark answers only the warning that L4 could not check that a rule comes to an end."
+
+    it "on a cycle whose multiplies is shown on another rule, names that rule" do
+      let src = people <> "@ends-because Bob pays\nGIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 2 LEST w3\n\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 3 LEST (w1 RAND w1)"
+      notices src `shouldReturn` [("multiplies", "w3"), ("cannot silence", "w1")]
+      t <- noticeText src
+      t `shouldSatisfy` Text.isInfixOf "It silences nothing: the warning shown on `w3` is about something L4 has checked"
+
+    it "silences could not check on a mixed cycle, on the rule the warning is shown on, which need not be the rule that uses itself" do
+      let mark = "@ends-because n drops by one\n"
+      notices (people <> mark <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nmix n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE mix (n MINUS 1)) RAND mix (n MINUS 1)") `shouldReturn` [("silenced", "mix")]
+      notices (people <> mark <> "GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\na n MEANS PARTY Alice MUST tick WITHIN 1 HENCE b n\n\nGIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)") `shouldReturn` [("silenced", "a")]
+      t <- noticeText (people <> mark <> "GIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\na n MEANS PARTY Alice MUST tick WITHIN 1 HENCE b n\n\nGIVEN n IS A NUMBER\nGIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)")
+      t `shouldSatisfy` Text.isInfixOf "because `b` also uses itself directly"
+      t2 <- noticeText (people <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\na n MEANS IF n EQUALS 0 THEN FULFILLED ELSE (PARTY Alice MUST tick WITHIN 1 HENCE a (n MINUS 1)) RAND b (n MINUS 1)\n\nGIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nb n MEANS IF n EQUALS 0 THEN FULFILLED ELSE a (n MINUS 1)")
+      t2 `shouldSatisfy` Text.isInfixOf "`a` can start itself again: `a` and `b` lead back to each other, and a HENCE or LEST in one of them starts one of them again."
+
     it "counts only on the rule the warning is reported on, the first of the cycle" do
       let cyc mark1 mark3 = people
             <> mark1 <> "GIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST w3\n\n"
@@ -975,6 +1015,33 @@ spec = describe "cycle report (#1075 layer 2)" do
       t `shouldSatisfy` Text.isInfixOf "The @ends-because above `w3` does not count here: it goes above `w1`"
       t `shouldSatisfy` Text.isInfixOf "It does not count here: the warning it would answer, that L4 could not check that this comes to an end, is shown on `w1`"
       notices (cyc "@ends-because Alice pays\n" "@ends-because Bob pays\n") `shouldReturn` [("silenced", "w1"), ("not where reported", "w3")]
+      t2 <- noticeText (cyc "@ends-because Alice pays\n" "@ends-because Bob pays\n")
+      t2 `shouldSatisfy` Text.isInfixOf "would be shown on `w1`, and the @ends-because above `w1` answers it."
+      t2 `shouldSatisfy` (not . Text.isInfixOf "is shown on `w1`")
+
+    it "is reported on the first of the cycle in the file, even when another rule is declared before it" $
+      notices (people <> "GIVEN n IS A NUMBER GIVETH A NUMBER\nh n MEANS n PLUS 1\n\nGIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST w3\n\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN (h 1) OF 3 LEST w1")
+        `shouldReturn` [("could not check", "w1")]
+
+    it "is matched to its rule, not to another rule of the same name" do
+      let overloads markNumber markString = people
+            <> markNumber <> "GIVEN n IS A NUMBER GIVETH A DEONTIC Person Action\nr n MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST r n\n\n"
+            <> markString <> "GIVEN s IS A STRING GIVETH A NUMBER\nr s MEANS 1"
+      notices (overloads "@ends-because Alice ticks\n" "") `shouldReturn` [("silenced", "r")]
+      -- Which rule the mark is matched to, read off the notes alone: whether a
+      -- mark off every cycle also draws a warning is another commit's
+      -- (decided by Claude 2026-11-22, pending Meng's review), and this case must not pin it.
+      marked <- notices (overloads "" "@ends-because Alice ticks\n")
+      filter ((/= "nothing to explain") . fst) marked `shouldBe` [("could not check", "r"), ("on no cycle", "r")]
+
+    it "leaves its note at the mark, and the warning at the rule's name" do
+      let src = people <> "@ends-because Bob pays\nGIVETH A DEONTIC Person Action\nw1 MEANS PARTY Alice MUST tick WITHIN 1 OF 2 LEST w3\n\n@ends-because Bob pays\nGIVETH A DEONTIC Person Action\nw3 MEANS PARTY Bob MUST tick WITHIN 1 OF 3 LEST (w1 RAND w1)"
+          firstLine = 1 + length (Text.lines people)
+      noticeStarts src `shouldReturn`
+        [ ("multiplies", Just (firstLine + 6, 49))
+        , ("silenced", Just (firstLine, 1))
+        , ("not where reported", Just (firstLine + 4, 1))
+        ]
 
     it "on a function cycle, changes nothing and says so, with its reason (the printed condition, read literally)" do
       let src = people <> "@ends-because n drops by one\nGIVEN n IS A NUMBER GIVETH A NUMBER\ndown n MEANS IF n EQUALS 0 THEN 0 ELSE down (n MINUS 1)"
@@ -1237,6 +1304,20 @@ notices source = map summary <$> cycleDiagnostics source
     GivesNoTime _ -> "no time"
     StartsCopies _ -> "multiplies"
     NothingToExplain -> "nothing to explain"
+
+-- | Each warning and note, and where it starts: line and column.
+noticeStarts :: Text -> IO [(Text, Maybe (Int, Int))]
+noticeStarts source = do
+  ds <- cycleDiagnostics source
+  named <- notices source
+  pure (zip (map fst named) (map startOf ds))
+ where
+  startOf = \ case
+    MkCheckErrorWithContext {kind = CheckWarning (CycleAlarm w)} -> fmap pos w.at
+    MkCheckErrorWithContext {kind = EndsBecauseNoted n} -> fmap pos n.at
+    _ -> Nothing
+  pos :: SrcRange -> (Int, Int)
+  pos r = (r.start.line, r.start.column)
 
 noticeText :: Text -> IO Text
 noticeText source = Text.unlines . concatMap (\ e -> prettyCheckError e.kind) <$> cycleDiagnostics source
