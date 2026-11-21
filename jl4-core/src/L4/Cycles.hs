@@ -148,6 +148,9 @@ data Doubt
     -- does not try
   | Stalled [Stall]
     -- ^ some lap passes only continuations that need not wait; these are why
+  | Untraced
+    -- ^ a member uses a function no edge follows (Note [What the graph
+    -- cannot see]), so the cycle the graph shows may not be the only one
   deriving stock (Eq, Show)
 
 -- | Why a continuation on a lap cannot be shown to wait.
@@ -262,6 +265,50 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
       Forall _ _ t -> afterRecord t
       Fun _ _ t -> t
       t -> t
+  -- a member that uses a function no edge follows (Note [What the graph
+  -- cannot see]): the value of a field that holds a function (a projection,
+  -- a selector applied, a name a constructor's pattern binds); and, where
+  -- some type in scope holds a function that takes or gives that type again,
+  -- any function the body names that is not a definition (a parameter, or a
+  -- name a lambda or a pattern binds), since it may be such a field's value
+  -- handed in
+  untracedIn d = any fieldFunction body || (selfHolding && any localFunction body)
+   where
+    body = universeExpr (bodyOf d)
+  fieldFunction = \ case
+    Proj _ _ l -> heldFunction l
+    App _ l (_ : _) -> heldFunction l
+    Consider _ _ brs -> any carries (catMaybes [nameType b | MkBranch _ (When _ pat) _ <- brs, b <- fieldBinders pat])
+    _ -> False
+  heldFunction l = storedField info l && maybe False (carries . fieldOf) (nameType l)
+  localFunction = \ case
+    App _ v _ -> isLocalName v && maybe False carries (nameType v)
+    AppNamed _ v _ _ -> isLocalName v && maybe False carries (nameType v)
+    _ -> False
+  isLocalName v =
+    let u = getUnique v
+    in u.moduleUri == uri && Map.notMember u defs
+         && termKind v `notElem` map Just [Constructor, Selector, ComputedSelector, Assumed]
+  termKind v = asum
+    [ case infoOf v of
+        Just (TypeInfo _ k) -> k
+        _ -> Nothing
+    , case Map.lookup (getUnique v) info of
+        Just (_, KnownTerm _ k) -> Just k
+        _ -> Nothing ]
+  carries = carriesFunction info (\ _ _ -> True)
+  -- some type the module can see holds a function whose parameters or
+  -- result hold that type again: the only way to build a loop that names
+  -- no definition is to apply such a function to such a value
+  selfHolding = or
+    [ lookIntoDeclaration info (holdsAgain u) u
+    | (u, (_, KnownType {})) <- Map.toList info ]
+  holdsAgain u = \ case
+    Fun _ args r -> any (lookInto info (mentions u)) (r : [t | MkOptionallyNamedType _ _ t <- args])
+    _ -> False
+  mentions u = \ case
+    TyApp _ n _ -> getUnique n == u
+    _ -> False
   -- of one function type: a parameter, or a parameter or the result
   takes p args _ = any p args
   touches p args r = any p args || p r
@@ -338,6 +385,7 @@ cycleFindings expand info m@(MkModule _ uri _) = map judge sccs
     v
       | not (null stalledOnCycle) = Unproved (Stalled stalledOnCycle)
       | restartsHere, any (not . null . (.slots)) internal = Unproved (Stalled [OwnTrace])
+      | any untracedIn scc = Unproved Untraced
       | null unguardedOnCycle = Proved WaitsEachLap
       | any (\ e -> e.from /= e.to) unguardedOnCycle =
           maybe (Unproved Mutual) Proved (descent info nullaries scc unguardedOnCycle)
@@ -397,6 +445,7 @@ findingClass f =
     Unproved (Stalled ss)
       | all isNotPositive ss -> "no-time"
       | otherwise -> "unproved-stall"
+    Unproved Untraced -> "unproved-untraced"
   isNotPositive = \ case
     NotAfterArming _ -> True
     _ -> False
@@ -929,10 +978,20 @@ plainReferences m@(MkModule _ _ sec) =
 -- BOOLEAN@, and @g n MEANS (EVALTRACE (x g n) 0 …) EQUALS FULFILLED@ supplied
 -- for it from a module that imports @x@'s, @x@'s module proves @x@ by waiting
 -- and the run is stopped by the frame-depth guard (2026-11-20). The loop is
--- @g@'s: @g@ must name itself to recur, and the importing module reports it
+-- @g@'s, and where @g@ names itself to recur, the importing module reports it
 -- as an unproved cycle; in the one-module form, the run failed with the same
 -- counters when @x@'s call to itself was removed. (In one module the
--- module-wide rule above catches it.)
+-- module-wide rule above catches it.) But @g@ need not name itself: through
+-- a function held in a field of a type that holds a function of itself, no
+-- module reports a cycle. With @DECLARE Box HAS check IS A FUNCTION FROM Box
+-- AND NUMBER TO BOOLEAN@, @x b n MEANS … LEST (IF c b n THEN FULFILLED ELSE
+-- FULFILLED) WHERE c MEANS b's check@ (which does not call itself), and, in
+-- the importing module, @h bx n MEANS (EVALTRACE (x bx n) 0 …) EQUALS
+-- FULFILLED@ with @theBox MEANS Box OF h@ traced from @x theBox 0@, neither
+-- module has a cycle and the run is stopped by the frame-depth guard
+-- (2026-11-21 attack round, obligations t8). Where such a cycle has a member
+-- that uses the field, the cycle is not proved (Note [What the graph cannot
+-- see]); where it has none, as here, nothing reports it.
 --
 -- The module-wide rule is a backstop, not something a finding forced: in
 -- each shape the fourth pass confirmed, the cycle's own member names the
@@ -962,6 +1021,28 @@ plainReferences m@(MkModule _ _ sec) =
 -- stall guard in under a second; the function forms ran to a 30-second
 -- timeout. The run-time guards (layer 1, the stall guard, the frame-depth
 -- guard) are what stop these.
+--
+-- Such a loop can run beside a cycle the graph does see, and then a proof of
+-- that cycle is a false one: with @f n w MEANS CONSIDER n WHEN Zero THEN 0
+-- WHEN Suc k THEN (apply (w's run) w) PLUS f k w@ and @w@ built as @Wrap
+-- WITH run IS (GIVEN v YIELD f one v)@, the call @f k w@ descends, and the
+-- run overflows the frame-depth guard through @w's run@ (2026-11-21 attack
+-- round, mutual p10; likewise a cycle proved by waiting whose member calls a
+-- function held in a record of a type that holds a function of itself,
+-- obligations t2). So a cycle is not proved ('Untraced', which warns "could
+-- not check") when one of its members uses
+--
+--   * the value of a field that holds a function: a projection onto it, its
+--     selector applied, or a name a constructor's pattern binds to it; or
+--   * where some type in scope holds a function whose parameters or result
+--     hold that type again, any function the body names that is not a
+--     definition: a parameter, or a name a lambda or a pattern binds. That
+--     is the only way to build a loop that names no definition, and the
+--     field's value can be handed in from outside the cycle, or caught in a
+--     lambda that is.
+--
+-- Decided by Claude 2026-11-21, pending Meng's review, on the attack
+-- round's report. Its cost in proofs over the corpus: not yet measured.
 
 ------------------------------------------------------------------------
 -- Note [Fan-out]
@@ -1474,6 +1555,20 @@ plainIn u t = occurrences u t == 0 || case t of
   TyApp _ l [t'] | getUnique l == listUnique -> plainIn u t'
   _ -> False
 
+-- | The type of the field a selector gives, read past the record it takes.
+fieldOf :: Type' Resolved -> Type' Resolved
+fieldOf = \ case
+  Forall _ _ t -> fieldOf t
+  Fun _ _ t -> t
+  t -> t
+
+-- | The names a pattern binds to a constructor's fields, however deep.
+fieldBinders :: Pattern Resolved -> [Resolved]
+fieldBinders = \ case
+  PatApp _ _ ps -> [n | PatVar _ n <- ps] <> concatMap fieldBinders ps
+  PatCons _ a b -> fieldBinders a <> fieldBinders b
+  _ -> []
+
 -- | Every name a pattern binds.
 patBinders :: Pattern Resolved -> [Resolved]
 patBinders = \ case
@@ -1640,7 +1735,17 @@ carriesFunction info p = lookInto info \ case
 -- first met with; the arguments it is met with again are looked into where
 -- they are written.
 lookInto :: EntityInfo -> (Type' Resolved -> Bool) -> Type' Resolved -> Bool
-lookInto info here = go Set.empty
+lookInto info here = fst (lookers info here) Set.empty
+
+-- | Does any part of a declared type pass the test: its synonym's body, or
+-- its constructors' fields, with its parameters as they are written.
+lookIntoDeclaration :: EntityInfo -> (Type' Resolved -> Bool) -> Unique -> Bool
+lookIntoDeclaration info here u = snd (lookers info here) Set.empty u []
+
+lookers
+  :: EntityInfo -> (Type' Resolved -> Bool)
+  -> (Set Unique -> Type' Resolved -> Bool, Set Unique -> Unique -> [Type' Resolved] -> Bool)
+lookers info here = (go, declared)
  where
   fields = Map.fromListWith (<>)
     [ (getUnique h, [(params, args)])

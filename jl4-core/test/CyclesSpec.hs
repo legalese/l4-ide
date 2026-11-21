@@ -641,13 +641,42 @@ spec = describe "cycle report (#1075 layer 2)" do
       classes (tree <> handBack <> "GIVEN t IS A Tree GIVETH A BOOLEAN\nbelow t MEANS k t\n  WHERE\n    k MEANS holds here (t's kids)\n\nGIVEN t IS A Tree GIVETH A BOOLEAN\nhere t MEANS t's label EQUALS 0 OR below t")
         `shouldReturn` ["function:unproved-mutual+fans"]
 
+    -- "untraced" as well: the member reads a field that holds a function
     it "nor through a record that holds a function taking an a" $
       classes (tree <> "DECLARE Holder a HAS run IS A FUNCTION FROM a TO BOOLEAN\n\nGIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\nGIVETH A Holder a\nkeep f xs MEANS Holder OF f\n\nGIVEN t IS A Tree GIVETH A BOOLEAN\nwalk t MEANS r t\n  WHERE\n    r MEANS (keep (GIVEN c YIELD walk c) (t's kids))'s run")
-        `shouldReturn` ["function:unproved-self+fans"]
+        `shouldReturn` ["function:unproved-untraced+fans"]
 
     it "but a callee that gives a list of a, as filter does, still proves" $
       classes (tree <> "GIVEN a IS A TYPE\n      f IS A FUNCTION FROM a TO BOOLEAN\n      xs IS A LIST OF a\nGIVETH A LIST OF a\nkept f xs MEANS filter f xs\n\nGIVEN t IS A Tree GIVETH A NUMBER\nsize t MEANS 1 PLUS sum (map size (kept (GIVEN c YIELD size c GREATER THAN 0) (t's kids)))")
         `shouldReturn` ["function:proved-structural+fans"]
+
+  -- each overflowed the frame-depth guard at run time while the cycle the
+  -- graph sees was proved (2026-11-21 attack round, mutual p10, obligations
+  -- t2): the loop ran through a function in a field
+  describe "a function no edge follows (attack round)" do
+    it "gives no proof to a descent whose member applies a function held in a field" $
+      classes ("DECLARE Nat IS ONE OF\n  Zero\n  Suc HAS pred IS A Nat\nDECLARE Wrap HAS run IS A FUNCTION FROM Wrap TO NUMBER\n\nGIVEN g IS A FUNCTION FROM Wrap TO NUMBER\n      x IS A Wrap\nGIVETH A NUMBER\napply g x MEANS g x\n\nGIVEN n IS A Nat\n      w IS A Wrap\nGIVETH A NUMBER\nf n w MEANS\n  CONSIDER n\n  WHEN Zero THEN 0\n  WHEN Suc k THEN (apply (w's run) w) PLUS f k w")
+        `shouldReturn` ["function:unproved-untraced"]
+
+    it "nor to a wait whose member calls a function held in a record of a type that holds itself" $
+      classes (people <> "DECLARE Box HAS check IS A FUNCTION FROM Box AND NUMBER TO BOOLEAN\n\nGIVEN b IS A Box\n      n IS A NUMBER\nGIVETH A DEONTIC Person Action\nx b n MEANS PARTY Alice MUST tick WITHIN 1 LEST (IF c b n THEN x b (n PLUS 1) ELSE FULFILLED)\n  WHERE\n    c MEANS b's check")
+        `shouldReturn` ["obligation:unproved-untraced"]
+
+    it "nor when the field is taken apart by a pattern" $
+      classes ("DECLARE Nat IS ONE OF\n  Zero\n  Suc HAS pred IS A Nat\nDECLARE Wrap HAS run IS A FUNCTION FROM Wrap TO NUMBER\n\nGIVEN n IS A Nat\n      w IS A Wrap\nGIVETH A NUMBER\nf n w MEANS\n  CONSIDER w\n  WHEN Wrap r THEN\n    CONSIDER n\n    WHEN Zero THEN 0\n    WHEN Suc k THEN r w PLUS f k w")
+        `shouldReturn` ["function:unproved-untraced"]
+
+    it "nor when such a field's value is handed in as a function, beside a type that holds itself" $
+      classes ("DECLARE Nat IS ONE OF\n  Zero\n  Suc HAS pred IS A Nat\nDECLARE Wrap HAS run IS A FUNCTION FROM Wrap TO NUMBER\n\nGIVEN n IS A Nat\n      g IS A FUNCTION FROM NUMBER TO NUMBER\nGIVETH A NUMBER\nf n g MEANS\n  CONSIDER n\n  WHEN Zero THEN 0\n  WHEN Suc k THEN g 0 PLUS f k g")
+        `shouldReturn` ["function:unproved-untraced"]
+
+    it "but a function parameter is followed where no type holds a function of itself" $
+      classes ("DECLARE Nat IS ONE OF\n  Zero\n  Suc HAS pred IS A Nat\n\nGIVEN n IS A Nat\n      g IS A FUNCTION FROM NUMBER TO NUMBER\nGIVETH A NUMBER\nf n g MEANS\n  CONSIDER n\n  WHEN Zero THEN 0\n  WHEN Suc k THEN g 0 PLUS f k g")
+        `shouldReturn` ["function:proved-structural"]
+
+    it "and a field that holds no function does not count" $
+      classes ("DECLARE Nat IS ONE OF\n  Zero\n  Suc HAS pred IS A Nat\nDECLARE Wrap HAS size IS A NUMBER\n\nGIVEN n IS A Nat\n      w IS A Wrap\nGIVETH A NUMBER\nf n w MEANS\n  CONSIDER n\n  WHEN Zero THEN 0\n  WHEN Suc k THEN w's size PLUS f k w")
+        `shouldReturn` ["function:proved-structural"]
 
   -- Reading names through multiplies the edges: a name used k times for a
   -- body with 10 calls is 10k edges. Testing each edge by a search of its
