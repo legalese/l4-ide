@@ -3,7 +3,7 @@
 -- counted limit (open obligations, function applications) the directives
 -- after it still run; after the opt-in time or memory limit none does, and
 -- each says so (ruling L2 of the Recursion Limits bench). Before the fix the issue's file at
--- @WAIT UNTIL 60@ ran until the machine ran out of memory, and a function
+-- @WAITUNTIL 60@ ran until the machine ran out of memory, and a function
 -- that calls itself with new inputs ran forever; each test here is run
 -- under a timeout so that a limit that never fires fails the test instead
 -- of hanging the suite.

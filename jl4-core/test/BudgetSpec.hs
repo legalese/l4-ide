@@ -102,7 +102,7 @@ runaway t = Text.unlines
   , "w3 MEANS PARTY Alice MAY smoke WITHIN 2 LEST (w1 RAND w3)"
   , ""
   , "#TRACE w1 AT 0 WITH"
-  , "  (`WAIT UNTIL` " <> tshow t <> ")"
+  , "  (WAITUNTIL " <> tshow t <> ")"
   , ""
   , "#EVAL 1 PLUS 1"
   ]
@@ -165,7 +165,7 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
     it "counts one open for a MUST NOT kept window after window" $
       runWith (limits (Just 1) Nothing)
         (deontic ["quiet MEANS PARTY Alice MUST NOT smoke WITHIN 10 HENCE quiet"] "quiet"
-          ["(`WAIT UNTIL` 1000)"])
+          ["(WAITUNTIL 1000)"])
         `shouldReturn` [Answered]
 
     it "counts a breach with no LEST as closed" $
@@ -195,7 +195,7 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
     -- rounds under a limit of 10. Before the machine closed what it threw
     -- away, each one stopped at the limit within ten rounds.
     let rounds = [1 .. 1000 :: Int]
-        waitUntil t = "  (`WAIT UNTIL` " <> tshow t <> ")"
+        waitUntil t = "  (WAITUNTIL " <> tshow t <> ")"
         ticking rule = Text.unlines
           [ "DECLARE Person IS ONE OF Alice, Bob, Carol"
           , "DECLARE Action IS ONE OF never, tick"

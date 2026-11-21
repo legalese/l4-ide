@@ -1341,7 +1341,7 @@ w1 MEANS PARTY Carol MUST deliver WITHIN 2 LEST (w3 ROR w1)
 w3 MEANS PARTY Alice MAY smoke WITHIN 2 LEST (w1 RAND w3)
 
 #TRACE w1 AT 0 WITH
-  (`WAIT UNTIL` 60)
+  (WAITUNTIL 60)
 ```
 
 Each time `w1`'s window closes, its `LEST` starts two obligations, `w3` and a new `w1`, and each of those does the same when its own window closes. What is open doubles every two units of time, so by time 60 it would be in the hundreds of millions. L4 counts the obligations a `#TRACE` or `#EVAL` has started and still holds, including any left waiting when the trace ends, and stops at 100,000. An obligation stops counting once it is handed on to its `HENCE` or `LEST`, once it is broken with no `LEST` to go to, or once the `RAND` or `ROR` it belongs to is decided without it, as when the other side of an `RAND` is broken or the other side of an `ROR` is kept. L4 does not decide an `RAND` or `ROR` while either side is still meeting events, so a side that can no longer matter may count until the trace ends.

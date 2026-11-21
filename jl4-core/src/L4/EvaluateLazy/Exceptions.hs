@@ -313,7 +313,7 @@ maximumUnknownSteps = 250_000
 -- machine stops it with 'OpenObligations' (smucclaw/l4-ide#1075). PROVISIONAL:
 -- the number waits for the corpus sweep and Meng's ruling on decision 4 of
 -- the #1075 design advice. A rent rule that re-arms itself holds one open;
--- #1075's rule holds 16,384 at WAIT UNTIL 30.
+-- #1075's rule holds 16,384 at WAITUNTIL 30.
 maximumOpenObligations :: Int
 maximumOpenObligations = 100_000
 
