@@ -7,6 +7,7 @@ module L4.EvaluateLazy
 , withCountedBudgets
 , EvalLimits (..)
 , applyEvalLimits
+, withTracedWorkNumber
 , withRunStop
 , parseFixedNow
 , readFixedNowEnv
@@ -164,6 +165,10 @@ data EvalConfig = EvalConfig
     -- under this configuration ('withRunStop'), so that a stop in an
     -- imported module's directive stops the importing module's too.
     -- 'Nothing' (the default) gives each module's evaluation its own.
+  , maxTracedClosureApplications :: !(Maybe (Maybe Int))
+    -- ^ the work number for a directive that collects a trace, where it is
+    -- not 'maxClosureApplications' ('withTracedWorkNumber'). 'Nothing' (the
+    -- default) uses 'maxClosureApplications'; @Just Nothing@ sets no limit.
   }
 
 -- | A cap, in bytes, on what an evaluation may allocate.
@@ -185,7 +190,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 -- the budgets existed.
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True Nothing Nothing Nothing Nothing Nothing)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True Nothing Nothing Nothing Nothing Nothing Nothing)
 
 -- | The counted budgets at their defaults: what every @l4@ command that
 -- evaluates, the REPL and the editor (jl4-lsp, and the browser's through
@@ -210,6 +215,14 @@ data EvalLimits = EvalLimits
   , limitSeconds   :: Maybe Int
   , limitMegabytes :: Maybe Int
   }
+
+-- | A work number of its own for a directive that collects a trace. A trace
+-- holds about 10 KB a step (measured 2026-11-21: 10.6 GB at 1,000,000 steps),
+-- so the REPL's @:trace@ lines get a lower number than its plain lines,
+-- which collect none (decided by Claude 2026-11-21, pending Meng's review).
+-- 'Nothing' takes 'maxClosureApplications', as every other caller does.
+withTracedWorkNumber :: Maybe (Maybe Int) -> EvalConfig -> EvalConfig
+withTracedWorkNumber n cfg = cfg {maxTracedClosureApplications = n}
 
 -- | The counted budgets at their defaults, then whatever the flags say.
 -- This sets no run stop: a command that runs once adds one ('withRunStop');
@@ -415,7 +428,7 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
     Just (b, at) -> pure ((Left (UserEvalException (NotEvaluated b at)), Nothing), [])
     Nothing -> captureSteps $
       if traced
-        then second Just <$> do
+        then second Just <$> withTracedWorkLimit do
           captureTrace $ tryEval $ do
             whnf <- runConfig $ ForwardMachine env expr
             nf whnf
@@ -1053,6 +1066,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , armings, closes, applications
     , openLimit = evalConfig.maxOpenObligations
     , applicationLimit = evalConfig.maxClosureApplications
+    , tracedApplicationLimit = fromMaybe evalConfig.maxClosureApplications evalConfig.maxTracedClosureApplications
     , directiveLimits = case (evalConfig.directiveSeconds, evalConfig.directiveMegabytes) of
         (Nothing, Nothing) -> Nothing
         (secs, mbs)        -> Just MkDirectiveLimits {seconds = secs, megabytes = mbs}

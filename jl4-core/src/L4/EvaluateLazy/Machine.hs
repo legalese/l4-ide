@@ -19,6 +19,7 @@ module L4.EvaluateLazy.Machine
 , tickUnknownSteps
 , resetUnknownSteps
 , resetBudget
+, withTracedWorkLimit
 , budgetSpent
 , moduleRules
 , runStoppedAt
@@ -510,6 +511,11 @@ data EvalState =
       -- ^ the work number: the most function applications and deontic
       -- hand-offs a directive may make, in all ('ClosureApplications');
       -- 'Nothing' sets no limit
+    , tracedApplicationLimit :: !(Maybe Int)
+      -- ^ the work number for a directive that collects a trace, which
+      -- 'withTracedWorkLimit' puts in 'applicationLimit''s place. The same
+      -- as 'applicationLimit' unless the configuration says otherwise
+      -- ('L4.EvaluateLazy.withTracedWorkNumber')
     , budgetRules :: [(SrcRange, Text)]
       -- ^ the module's own definitions, each with its name: what a budget
       -- that goes over names its site by ('budgetSite'). Lazy, so it is
@@ -1491,6 +1497,12 @@ noteHandoff = noteWork
 -- | One step of work, at a place in the source when it has one: counted,
 -- and stopped with 'ClosureApplications' past the limit. The place is read
 -- only past the limit.
+-- | Run with the work number for a directive that collects a trace: a trace
+-- holds about 10 KB a step, so a caller may want a lower number there
+-- ('tracedApplicationLimit'; the REPL's @:trace@ lines, decided by Claude 2026-11-21, pending Meng's review).
+withTracedWorkLimit :: Eval a -> Eval a
+withTracedWorkLimit (MkEval f) = MkEval \ s -> f s {applicationLimit = s.tracedApplicationLimit}
+
 noteWork :: Maybe SrcRange -> Eval ()
 noteWork place = do
   appliedRef <- asks (.applications)

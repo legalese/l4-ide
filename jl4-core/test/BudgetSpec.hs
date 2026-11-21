@@ -28,7 +28,7 @@ import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
-import L4.TracePolicy (apiDefaultPolicy, fullTracePolicy, replDefaultPolicy)
+import L4.TracePolicy (TracePolicy, apiDefaultPolicy, cliDefaultPolicy, fullTracePolicy, replDefaultPolicy)
 
 fixedNow :: UTCTime
 fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
@@ -42,7 +42,11 @@ data Outcome
   deriving stock (Eq, Show)
 
 runWith :: (EvalConfig -> EvalConfig) -> Text.Text -> IO [Outcome]
-runWith tweak src = map (outcome . (.result)) <$> resultsWith tweak src
+runWith = runUnder apiDefaultPolicy
+
+-- | 'runWith' under another trace policy.
+runUnder :: TracePolicy -> (EvalConfig -> EvalConfig) -> Text.Text -> IO [Outcome]
+runUnder policy tweak src = map (outcome . (.result)) <$> resultsUnder policy tweak src
   where
     outcome = \ case
       Reduction (ReducedErrored e) -> errored e
@@ -82,11 +86,14 @@ rulesNamed tweak src = concatMap named <$> resultsWith tweak src
       _                       -> []
 
 resultsWith :: (EvalConfig -> EvalConfig) -> Text.Text -> IO [EvalDirectiveResult]
-resultsWith tweak src = do
+resultsWith = resultsUnder apiDefaultPolicy
+
+resultsUnder :: TracePolicy -> (EvalConfig -> EvalConfig) -> Text.Text -> IO [EvalDirectiveResult]
+resultsUnder policy tweak src = do
   r <- case checkWithImports (vfsFromList []) src of
     Left errs -> fail ("typecheck failed: " <> show errs)
     Right r   -> pure r
-  cfg <- tweak <$> resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  cfg <- tweak <$> resolveEvalConfig (Just fixedNow) policy
   -- every case ends well inside this; a limit that never fired would hang
   mres <- timeout 60_000_000 (execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule)
   case mres of
@@ -143,6 +150,27 @@ spec = describe "the machine's budgets (smucclaw/l4-ide#1075)" $ do
       traced (replDefaultPolicy defaultGraphVizOptions) `shouldReturn` [False, True]
     it "a control: the policy that traces everything collects both" $
       traced (fullTracePolicy defaultGraphVizOptions) `shouldReturn` [True, True]
+
+  -- So the REPL's plain lines keep the commands' work number and its :trace
+  -- lines, which keep about 10 KB a step, get a lower one.
+  describe "a work number of its own for a directive that collects a trace (decided by Claude 2026-11-21, pending Meng's review)" $ do
+    let src = Text.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "DECIDE countDown IS IF n EQUALS 0 THEN 0 ELSE countDown (n - 2)"
+          , "#EVAL countDown 5"
+          , "#EVALTRACE countDown 5"
+          ]
+        stops policy tweak = map (\ case Over b n _ -> Just (b, n); _ -> Nothing) <$> runUnder policy tweak src
+        repl = replDefaultPolicy defaultGraphVizOptions
+    it "a traced directive stops at its own number, the untraced one at the usual number" $
+      stops repl (withTracedWorkNumber (Just (Just 100)) . limits Nothing (Just 1000))
+        `shouldReturn` [Just ("steps", 1000), Just ("steps", 100)]
+    it "with no number of its own, a traced directive stops at the usual number" $
+      stops repl (limits Nothing (Just 1000))
+        `shouldReturn` [Just ("steps", 1000), Just ("steps", 1000)]
+    it "the number is for collecting a trace: an #EVALTRACE that collects none keeps the usual number" $
+      stops cliDefaultPolicy (withTracedWorkNumber (Just (Just 100)) . limits Nothing (Just 1000))
+        `shouldReturn` [Just ("steps", 1000), Just ("steps", 1000)]
 
   describe "where they are on (ruling L2)" $ do
     it "the shared configuration sets no count, so jl4-service evaluates as it did" $ do

@@ -301,8 +301,9 @@ So do the other `l4` commands that work out values (`l4 trace`, `l4 lts`, `l4 ex
 None of them reads an answer off a line a limit stopped: `l4 trace` names the stop on its error output and fails, `l4 lts` lists that trace with the stop as its standing, `l4 explore` lists that try as untried, or refuses the contract when it could not work out the outset or a deadline it needed, `l4 coverage` leaves that decision uncovered and says why, and `l4 prove` calls that assertion unknown.
 `l4 verify` works out no values, so its limits never fire.
 In the REPL a time or memory stop ends only the line that went over, though its message says nothing after it was evaluated: the next line still runs.
-The REPL's work number is 100,000 steps by default, not 10,000,000, because a `:trace` or `:traceascii` line keeps a record of every step it takes: on one machine 1,000,000 such steps used about 10 GB.
-`--max-steps` changes it there too, and `--max-eval-memory-mb` stops a line by the memory it takes.
+In the REPL a plain line has the same 10,000,000 steps, and a `:trace` or `:traceascii` line has 100,000, because it keeps a record of every step it takes: on one machine 1,000,000 such steps used about 10 GB.
+`--max-steps` sets both.
+`--max-eval-memory-mb` stops a line by the memory it takes.
 jl4-service has limits of its own.
 
 To change either count, or turn it off:

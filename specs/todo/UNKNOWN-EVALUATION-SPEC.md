@@ -845,6 +845,8 @@ Measured on the build: the REPL keeps a record of every step, so 1,000,000 steps
 Measured on the build: the runaway line above then stops in 3.3 s with 1.3 GB resident, and the next line runs.
 **AMENDED 2026-11-21** (decided by Claude 2026-11-21, pending Meng's review; the REPL never showed the trace it dropped): a plain REPL line runs as an `#EVAL`, whose trace `formatResult` (`jl4-repl/app/Main.hs`) throws away unread, so `replDefaultPolicy` (`jl4-core/src/L4/TracePolicy.hs`) no longer collects one; `:trace` and `:traceascii` run the line as an `#EVALTRACE`, which still collects.
 Measured: the runaway plain line takes 58 MB both at the 100,000 default (1.7 s) and with `--max-steps 1000000` (1.1 s), against 1.3 GB and 10.6 GB before.
+**AMENDED 2026-11-21**, decided by Claude 2026-11-21, pending Meng's review, replacing the REPL's single 100,000 default above: a plain REPL line has the commands' 10,000,000 steps, and a `:trace` or `:traceascii` line has 100,000 (`replTraceSteps`, through `withTracedWorkNumber`, which gives a directive that collects a trace a work number of its own; every other caller leaves it unset); `--max-steps` sets both.
+Measured with no flags: the runaway plain line stops at 10,000,000 steps in 14.4 s with 58 MB, and as a `:traceascii` line at 100,000 in 4.7 s with 1.2 GB; with `--max-steps 1000` both stop at 1,000.
 U4: "a cumulative step counter, explore mode only".
 U7b: "Every evaluation is lifted; there is no evaluation mode."
 A counter that runs from the first step of every evaluation would turn a long but fully supplied computation into a `gave-up`, which breaks §4.3's conservativity.
