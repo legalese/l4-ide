@@ -124,6 +124,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import L4.Desugar (desugarComputedFields, detectComputedFieldCycles, extractComputedFieldNames)
+import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
 mkInitialCheckState substitution =
@@ -180,6 +181,16 @@ doCheckProgramWithDependencies checkState checkEnv program =
   let cycleErrors =
         [ MkCheckErrorWithContext (CyclicComputedFields recName cycleFlds) (WhileCheckingDeclare recName None)
         | (recName, cycleFlds) <- detectComputedFieldCycles program
+        ]
+        ++
+        -- R-NOT-1 (specs/as-built/not-reach.md): a NOT that reaches over a
+        -- connective on its own line -- `NOT a AND b`, `NOT (a) AND b` --
+        -- parses, checks and returns the wrong BOOLEAN for every reader who
+        -- took it as `(NOT a) AND b`. Refused here rather than in the
+        -- parser so that the rest of the module is still checked and the
+        -- message can show both readings spelled out.
+        [ MkCheckErrorWithContext (NotReachesConnective site) None
+        | site <- detectSameLineNotReach program
         ]
       checkEnv' = checkEnv { computedFields = extractComputedFieldNames program }
   in case runCheckUnique (checkProgram (desugarComputedFields program)) checkEnv' checkState of
@@ -4938,6 +4949,22 @@ prettyCheckErrorContext (WhileCheckingPattern _p ctx)    e = prettyCheckErrorCon
 prettyCheckErrorContext (WhileCheckingType _t ctx)       e = prettyCheckErrorContext ctx e
 
 prettyCheckError :: CheckError -> [Text]
+prettyCheckError (NotReachesConnective site)               =
+  [ "On one line, NOT reaches to the end of the line, so this reads as"
+  , ""
+  , "  " <> prettyLayout (Not emptyAnno site.operand)
+  , ""
+  , "If that is the meaning, write those brackets in. If only"
+  , ""
+  , "  " <> prettyLayout site.unit
+  , ""
+  , "is negated, put the brackets around the NOT and that alone:"
+  , ""
+  , "  " <> prettyLayout site.narrowed
+  , ""
+  , "or move the " <> site.connective <> " to a line of its own, starting in the same"
+  , "column as the NOT or further left."
+  ]
 prettyCheckError (OutOfScopeError n t)                     =
   [ "I could not find a definition for the identifier"
   , ""

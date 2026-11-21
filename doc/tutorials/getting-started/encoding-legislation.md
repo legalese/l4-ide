@@ -152,7 +152,7 @@ The inputs and the tests stay the same, so the tests from Step 3 confirm that th
 
 **Read "or" carefully.** In legislation, "A, B or C" usually means any one or more of them: `A OR B OR C`.
 
-**Watch negations.** "Not a public house or hotel" normally means neither: `NOT (pub OR hotel)`. The other reading, `NOT pub OR NOT hotel`, is true for almost everyone and is rarely intended. When the text is ambiguous, write down which reading you chose, in a comment or a test.
+**Watch negations.** "Not a public house or hotel" normally means neither: `NOT (pub OR hotel)`. The other reading, `(NOT pub) OR (NOT hotel)`, is true for almost everyone and is rarely intended. When the text is ambiguous, write down which reading you chose, in a comment or a test.
 
 **Keep the source next to the code.** The complete example puts the text of section 3 in a `{- ... -}` comment above the rule and marks each condition with its paragraph number.
 

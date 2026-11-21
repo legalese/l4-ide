@@ -64,4 +64,4 @@ excel-date-tests.l4:60:1-48:
 excel-date-tests.l4:61:1-48:
   RIGHT OF -23
 excel-date-tests.l4:62:1-62:
-  RIGHT OF 23
+  RIGHT OF 22

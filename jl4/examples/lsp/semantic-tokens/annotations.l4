@@ -8,5 +8,5 @@ GIVETH A BOOLEAN
 @ref SG-c-2025-sghcf-14
 DECIDE xor x y IS
      <<SG-c-2025-sghcf-12>> x AND NOT y
-  OR NOT x AND y @nlg Locally overwrite the annotation for %y%
+  OR (NOT x) AND y @nlg Locally overwrite the annotation for %y%
 

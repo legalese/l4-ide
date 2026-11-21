@@ -1,0 +1,33 @@
+§ `NOT reaching over a same-line connective is refused (SET-OPERATORS-SPEC §18.1, R-NOT-1)`
+
+-- On one line NOT takes everything after it, so each rule below reads as
+-- NOT (… AND …) — the opposite of what the words say to most readers. The
+-- checker refuses the spelling rather than returning the wrong BOOLEAN; the
+-- golden pins the message, which shows both readings spelled out. The
+-- NOT-REACH-OK markers are for the text checker (etc/check-not-precedence.mjs),
+-- which sweeps this directory too and would otherwise report these on purpose.
+
+-- the plain form, once per connective
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+notAnd a b MEANS NOT a AND b -- NOT-REACH-OK: the refused spelling, on purpose
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+notOr a b MEANS NOT a OR b -- NOT-REACH-OK
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+notImplies a b MEANS NOT a IMPLIES b -- NOT-REACH-OK
+
+-- NOT in the middle of a line: it still reaches to the end, so this is
+-- a AND (NOT (b AND c)), not a AND (NOT b) AND c
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+middle a b c MEANS a AND NOT b AND c -- NOT-REACH-OK
+
+-- a connective on the NOT's line and another on the next: refused for the
+-- AND, which is the one that shares the NOT's line
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+mixed a b c MEANS
+  NOT a AND b -- NOT-REACH-OK
+      OR c
+
+-- in a directive, the same
+#EVAL NOT TRUE AND FALSE -- NOT-REACH-OK

@@ -45,20 +45,44 @@ GIVETH A BOOLEAN
 
 ## NOT
 
-`NOT` negates everything after it on its line, and any lines below that are indented further than the `NOT`:
+`NOT` negates everything after it on its line, and any lines below that are indented further than the `NOT`.
+So on one line `NOT a AND b` would mean `NOT (a AND b)`, though most people read it as `(NOT a) AND b`.
+Because the two readings give different answers, L4 refuses a `NOT` followed on its own line by `AND`, `OR` or `IMPLIES`, and the message shows both:
 
-| Written             | Means                 |
-| ------------------- | --------------------- |
-| `NOT a AND b`       | `NOT (a AND b)`       |
-| `a AND NOT b AND c` | `a AND NOT (b AND c)` |
-| `NOT n EQUALS 0`    | `NOT (n EQUALS 0)`    |
+```
+On one line, NOT reaches to the end of the line, so this reads as
+
+  NOT (a AND b)
+
+If that is the meaning, write those brackets in. If only
+
+  a
+
+is negated, put the brackets around the NOT and that alone:
+
+  (NOT a) AND b
+
+or move the AND to a line of its own, starting in the same
+column as the NOT or further left.
+```
+
+| Written                        | Means                                                 |
+| ------------------------------ | ----------------------------------------------------- |
+| `NOT a AND b` (one line)       | refused                                               |
+| `NOT (a) AND b` (one line)     | refused: the bracket closes around `a`, not the `NOT` |
+| `a AND NOT b AND c` (one line) | refused                                               |
+| `NOT (a AND b)`                | `NOT (a AND b)`                                       |
+| `(NOT a) AND b`                | `(NOT a) AND b`                                       |
+| `a AND NOT b`                  | `a AND (NOT b)`                                       |
+| `NOT n EQUALS 0`               | `NOT (n EQUALS 0)`                                    |
 
 To negate only one operand on a line, put the `NOT` and its operand in parentheses: `(NOT a) AND b`.
+A `NOT` last on its line, as in `a AND NOT b`, has nothing after it to reach over, and a comparison such as `NOT n EQUALS 0` has only one sensible reading, so neither is refused.
 In the vertical layout below, each line is a separate operand, so `NOT` applies to its own line only.
 
 ## IMPLIES
 
-`A IMPLIES B` is FALSE only when `A` is TRUE and `B` is FALSE. It means the same as `NOT A OR B`: "if A, then B".
+`A IMPLIES B` is FALSE only when `A` is TRUE and `B` is FALSE. It means the same as `(NOT A) OR B`: "if A, then B".
 
 ```l4
 GIVEN age IS A NUMBER

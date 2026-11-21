@@ -152,17 +152,25 @@ DECIDE `the rule holds` IF `has a permit` IMPLIES `paid the fee`
 
 From highest to lowest precedence:
 
-1. `NOT` (tightest)
-2. `AND`
-3. `OR`
-4. `IMPLIES` (loosest)
+1. `AND`
+2. `OR`
+3. `IMPLIES` (loosest)
 
 This means:
 
 ```l4
 a OR b AND c        -- means: a OR (b AND c)
-NOT a AND b         -- means: (NOT a) AND b
 ```
+
+`NOT` is not on that list. It negates everything after it on its line, so `NOT a AND b` would mean `NOT (a AND b)`, though most people read it as "not a, and b".
+L4 refuses that line, and asks you to put the brackets in:
+
+```l4
+NOT (a AND b)       -- the whole of "a and b" is negated
+(NOT a) AND b       -- only a is negated
+```
+
+`NOT (a) AND b` is refused too: the bracket closes around `a`, not around the `NOT`.
 
 Use parentheses to make precedence explicit:
 

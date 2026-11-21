@@ -1,0 +1,24 @@
+§ `Bracketing the operand does not narrow NOT (SET-OPERATORS-SPEC §18.1, R-NOT-1)`
+
+-- The closing bracket ends `a`; it does not end the NOT's reach, so these
+-- still read as NOT (a AND b) and are refused for the same reason as the
+-- unbracketed spelling. The form that narrows is (NOT a) AND b, with the
+-- bracket closing around the NOT itself. NOT-REACH-OK is for the text
+-- checker, which sweeps this directory too.
+
+-- the form that looks maximally careful, and is exactly as wide
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+looksCareful a b MEANS NOT (a) AND b -- NOT-REACH-OK: the refused spelling, on purpose
+
+-- a bracketed group followed by a connective on the NOT's line: the group
+-- is one thing, and the AND after it is still reached over
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+groupThenAnd a b MEANS NOT (a OR b) AND b -- NOT-REACH-OK
+
+-- a bracketed call, likewise
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+flip x MEANS NOT x
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+callThenOr a b MEANS NOT (flip a) OR b -- NOT-REACH-OK

@@ -13,14 +13,14 @@
 #EVAL TRUE => FALSE
 #EVAL FALSE => TRUE
 
--- Equivalence to NOT A OR B
+-- Equivalence to (NOT A) OR B
 
 GIVEN a IS A BOOLEAN
       b IS A BOOLEAN
 
 -- These are logically equivalent
 `implies version` a b MEANS a IMPLIES b
-`or version` a b MEANS NOT a OR b
+`or version` a b MEANS (NOT a) OR b
 
 -- Test equivalence
 #EVAL `implies version` TRUE TRUE
