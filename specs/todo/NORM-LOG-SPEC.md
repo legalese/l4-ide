@@ -616,7 +616,7 @@ The phase column is the build plan of the status header (decided by Claude 2026-
 | **N19** | the refusal of two sides' records of one cell, not the snapshot rule                                                                                                                                                                                          | P6                                                 |
 | **N20** | nothing of the settle-first round or the backward-stamp run note                                                                                                                                                                                              | P6                                                 |
 
-### 6.3 What P1's gate measured (2026-11-23, on `lhs`, at `d438f73e0`)
+### 6.3 What P1's gate measured (2026-11-23, on `lhs`, at `16c5e4b53`)
 
 Read from the run logs, not recalled.
 
@@ -635,8 +635,8 @@ The test shows the mutant's printed result differs from the writer-off result, a
 Both mutants are values of a test-only field of `EvalConfig` (`normLogMutant`); nothing reads it outside a test, and the `jl4-test` run with the forcing mutant (`JL4_TEST_NORM_LOG=mutant-force`) was not made.
 
 **Overhead (N6).**
-Wall time of `jl4-test` on `lhs`, writer forced on: 1,291 s; writer off: 1,301 s on the run of 2026-11-22, before the carrier fix below.
-That is no measurable difference, and it is the whole corpus: the suite is dominated by parsing and type-checking, so the figure bounds the cost of the writer over a corpus, not over one long trace.
+Wall time of `jl4-test` on `lhs`: writer off 1,301 s (the run of 2026-11-22); writer forced on 1,291 s at `d438f73e0` and 1,312 s at `16c5e4b53`, the commit this section describes.
+The two forced-on runs differ from each other by more than either differs from the off run, so that is no measurable difference, and it is the whole corpus: the suite is dominated by parsing and type-checking, so the figure bounds the cost of the writer over a corpus, not over one long trace.
 Allocations were not measured, and neither was a deontic-heavy trace by itself.
 Both are owed before the writer is turned on for anything but a test, and N6's fallback (on only when a module in the import closure has a fate read) is the plan if either is material; P2 adds that reader.
 
