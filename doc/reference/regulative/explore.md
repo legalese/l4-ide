@@ -119,7 +119,8 @@ Two positions are **the same state** when four things agree:
    A cell nothing reads is dropped from the state and named on the coverage line.
 3. **The answer of any rule with no inputs that reads a ledger**, if it has been asked.
    L4 keeps such a rule's first answer, so it is part of where the run stands.
-4. **Which of the live deadlines the clock has already passed.** The clock itself is not kept (unless you ask for `--grid`, below).
+4. **Which of the live deadlines the clock has already passed, and which of the live deadlines and window openings comes first.** The clock itself is not kept (unless you ask for `--grid`, below), and a clock at a deadline is the same state as one before it.
+   The order of the deadlines and openings is kept because the printed contract does not always say it: a deadline anchored to another (`WITHIN 3 OF THE DEADLINE`) prints the same wherever it falls.
 
 Two positions that agree on all four are merged into one, and that is what makes the exploration stop.
 A contract that renews itself would otherwise never finish: each lap would be a new position.
@@ -409,7 +410,7 @@ These are all in the output, on the coverage line or the property's own line, an
   If Bob's purchase is not written into the contract, no exploration varies it, and no line says it was left out.
   The cure is to write it in, as `explore-example.l4` does.
 - **The times in a counterexample.** See above: the order is real and the clock times are the outset's.
-- **Where the region scheme stops being exact.** Positions that differ only in the clock are merged under `time by regions`, and an act is tried only at the instants where something can change.
+- **Where the region scheme stops being exact.** Positions that differ only in the clock are merged under `time by regions` when the same deadlines have passed and the deadlines and openings come in the same order, and an act is tried only at the instants where something can change.
   Both are right while no guard reads the clock arithmetically, or compares it against a value the contract recorded, and the explorer does not check that none does.
   The line names the scheme and that is all it does.
   What it does say, loudly (exit 2): a tie that needs a chain of acts (above), a deadline or stamp that is not a whole number, and a state that needs more instants than the cap.

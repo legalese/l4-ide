@@ -586,8 +586,17 @@ data StateKey = MkStateKey
   deriving stock (Eq, Ord, Show)
 
 data ClockKey
-  = ClockDropped ![Bool]
-    -- ^ for each live deadline whose instant is known: has the clock passed it
+  = ClockDropped ![Bool] ![Maybe Int] ![Maybe Int]
+    -- ^ for each live deadline whose instant is known: has the clock passed it;
+    -- and the rank of each live deadline and each window opening among one
+    -- another ('ranksOf'), ties equal. The clock itself is not kept, and a
+    -- clock AT a deadline is the same state as one before it (the contract
+    -- does not say them apart, and a deadline that is not in the residual's
+    -- text, being anchored (@WITHIN 3 OF THE DEADLINE@), prints the same at
+    -- every clock). But which of two deadlines comes first is part of where
+    -- the position stands, and the printed residual does not say it for an
+    -- anchored one: two positions that differ only in that were one state
+    -- (smucclaw/l4-ide, the explorer's X1)
   | ClockKept !Rational
   deriving stock (Eq, Ord, Show)
 
@@ -674,8 +683,10 @@ stateKey ex pos = do
       WHNF v -> answerText v
       WHNFWhen _ v _ _ -> answerText v
   deadlines <- liveDeadlines ex pos
-  let clock = case ex.exOptions.eoTime of
-        Regions -> ClockDropped [ pos.posClock > d | (_, Just (Right d)) <- deadlines ]
+  openings <- for (maybe [] liveObligations pos.posResidual) (openingOf pos.posClock)
+  let (dueRanks, openRanks) = ranksOf [ d | (_, d) <- deadlines ] openings
+      clock = case ex.exOptions.eoTime of
+        Regions -> ClockDropped [ pos.posClock > d | (_, Just (Right d)) <- deadlines ] dueRanks openRanks
         Grid _  -> ClockKept pos.posClock
   pure ( MkStateKey {skResidual = residual, skLedger = cells, skCafs = map (second fst) cafs, skClock = clock}
        , MkKeyNotes
@@ -711,8 +722,8 @@ keyText ex pos = textShow . fst <$> stateKey ex pos
 --
 -- Its parts: the standing, or the residual with each live obligation's
 -- remaining due and opening taken out; the ledgers as the state keeps them;
--- and the rank of the clock, of every known deadline and of every known
--- opening among one another, ties equal.
+-- whether the clock has passed each deadline, and the rank of every known
+-- deadline and of every known opening among one another, ties equal.
 timeSignature :: Explorer -> Position -> IO Text
 timeSignature ex pos = do
   (residual, _) <- case pos.posResidual of
@@ -721,16 +732,13 @@ timeSignature ex pos = do
   (cells, _, _) <- projectLedger ex.exSites pos.posResult.ledger
   deadlines <- liveDeadlines ex pos
   openings <- for (maybe [] liveObligations pos.posResidual) (openingOf pos.posClock)
-  let dueOf = [ either (const Nothing) Just =<< d | (_, d) <- deadlines ]
-      openOf = [ either (const Nothing) Just =<< o | o <- openings ]
-      instants = sort (nubOrd (pos.posClock : catMaybes dueOf <> catMaybes openOf))
-      rank x = fmap fst (find ((== x) . snd) (zip [0 :: Int ..] instants))
+  let (dueRanks, openRanks) = ranksOf [ d | (_, d) <- deadlines ] openings
   pure (Text.unlines
     [ residual
     , textShow cells
-    , "clock rank " <> textShow (rank pos.posClock)
-    , "opening ranks " <> textShow (map (>>= rank) openOf)
-    , "deadline ranks " <> textShow (map (>>= rank) dueOf)
+    , "passed " <> textShow [ pos.posClock > d | (_, Just (Right d)) <- deadlines ]
+    , "opening ranks " <> textShow openRanks
+    , "deadline ranks " <> textShow dueRanks
     ])
   where
     withoutTimes = \ case
@@ -740,6 +748,18 @@ timeSignature ex pos = do
     side = \ case
       Left e  -> Left e
       Right x -> Right (withoutTimes x)
+
+-- | The rank of every known deadline and of every known opening among one
+-- another (dense, ties equal); 'Nothing' for one whose instant is not known.
+-- The clock is not among them.
+ranksOf :: [Maybe (Either Text Rational)] -> [Maybe (Either Text Rational)] -> ([Maybe Int], [Maybe Int])
+ranksOf dues opens = (map (>>= rank) dueOf, map (>>= rank) openOf)
+  where
+    known x = either (const Nothing) Just =<< x
+    dueOf = map known dues
+    openOf = map known opens
+    instants = sort (nubOrd (catMaybes dueOf <> catMaybes openOf))
+    rank x = fmap fst (find ((== x) . snd) (zip [0 :: Int ..] instants))
 
 -- | What a result that is not a residual says, for a state key.
 standingText :: EvalDirectiveResult -> Text
