@@ -1,0 +1,19 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1087, the issue's own contract: the seller SHANT resell. The
+-- buyer's breach does not lift the prohibition: `resell` at 4 after the buyer's
+-- deadline adds the seller's blame (`l4 run` gives `BREACH BY Buyer BY Seller`),
+-- and so does `resell` at 3, which arrives as the clock passes the buyer's
+-- deadline of 2.
+
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay, resell
+
+GIVETH A DEONTIC Person Action
+`the sale` MEANS
+  (PARTY Buyer MUST pay WITHIN 2 LEST BREACH BY Buyer)
+  RAND
+  (PARTY Seller SHANT resell LEST BREACH BY Seller)
+
+#TRACE `the sale` AT 0 WITH
+  PARTY Buyer DOES pay AT 0

@@ -28,10 +28,16 @@ brief = "examples" </> "explore" </> "brief"
 instants :: FilePath
 instants = "tests-cli" </> "fixtures" </> "explore-instants"
 
+-- | The fixtures of smucclaw/l4-ide#1087, a breached position that still has a
+-- part waiting.
+breached :: FilePath
+breached = "tests-cli" </> "fixtures" </> "explore-breached"
+
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4"] ]
+  <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -90,6 +96,42 @@ reachedBy bin fixture name events = withSystemTempDirectory "l4-explore-reach" \
   Output rcode rout _ <- runL4 bin ["run", dir </> "t.l4"]
   rcode `shouldBe` ExitSuccess
   pure (unwords (words (filter (/= '\r') (unlines (takeWhile (not . null) (drop 1 (dropWhile (/= "Result:") (lines rout))))))))
+
+-- | The states of @explore@'s text, each as its id, its residual's id, whether
+-- it is marked terminal, and the events by which it is first reached. A state
+-- reads @sN  depth D, residual rK[, terminal]@, then @first reached by:@ and the
+-- events, then @ledgers:@.
+statesOf :: String -> [(String, String, Bool, [String])]
+statesOf out = go (lines out)
+  where
+    go (l : rest)
+      | "s" `isPrefixOf` l, "  depth " `isInfixOf` l =
+          let ws = words (map (\ c -> if c == ',' then ' ' else c) l)
+              sid = case ws of { (w : _) -> w; [] -> "" }
+              rid = case dropWhile (/= "residual") ws of { (_ : r : _) -> r; _ -> "" }
+              events = map (drop 6) (takeWhile (not . ("    ledgers:" `isPrefixOf`)) (drop 1 rest))
+          in (sid, rid, "terminal" `elem` ws, events) : go rest
+      | otherwise = go rest
+    go [] = []
+
+-- | The residuals of @explore@'s text by id, each on one line: a residual that
+-- is printed over several lines continues on lines indented past its id.
+residualTexts :: String -> [(String, String)]
+residualTexts out = collect (takeWhile (not . null) (drop 1 (dropWhile (not . ("Residuals (" `isPrefixOf`)) (lines out))))
+  where
+    collect [] = []
+    collect (l : rest) =
+      let (more, rest') = span (isPrefixOf "      ") rest
+      in case words l of
+           (rid : ws) -> (rid, unwords (ws <> concatMap words more)) : collect rest'
+           [] -> collect rest'
+
+-- | The transitions of @explore@'s text: from, to, label.
+edgesOf :: String -> [(String, String, String)]
+edgesOf out =
+  [ (a, b, unwords label)
+  | l <- takeWhile (not . null) (drop 1 (dropWhile (not . ("Transitions (" `isPrefixOf`)) (lines out)))
+  , (a : "->" : b : label) <- [words l] ]
 
 lastLine :: String -> String
 lastLine = \ s -> case lines s of
@@ -371,6 +413,59 @@ spec bin = describe "l4 explore" $ do
         code' `shouldBe` ExitFailure 1
         serr' `shouldSatisfy` ("needs --emit" `isInfixOf`)
 
+  -- smucclaw/l4-ide#1087: a breached position that still has a part waiting.
+  describe "a breached position that still has a part waiting (#1087)" $ do
+    it "sale.l4: after the buyer's breach the state waits on the seller, is not terminal, offers the seller's act and the seller's deadline, and the position `l4 run` reaches by the tick is in the graph" $ do
+      Output code sout _ <- runL4 bin ["explore", breached </> "sale.l4"]
+      code `shouldBe` ExitSuccess
+      lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      case [ (sid, rid, term) | (sid, rid, term, ["WAITUNTIL OF 3"]) <- statesOf sout ] of
+        [(sid, rid, term)] -> do
+          term `shouldBe` False
+          lookup rid (residualTexts sout) `shouldSatisfy` maybe False ("[still waiting on: Seller MUST deliver WITHIN 2]" `isInfixOf`)
+          [ l | (a, _, l) <- edgesOf sout, a == sid ] `shouldBe`
+            ["PARTY Seller DOES deliver", "time passes the deadline 5 (WAITUNTIL 6)"]
+          let towards = [ b | (a, b, l) <- edgesOf sout, a == sid, "WAITUNTIL 6" `isInfixOf` l ]
+              residualOf b = lookup b [ (sid', rid') | (sid', rid', _, _) <- statesOf sout ] >>= \ r -> lookup r (residualTexts sout)
+          got <- reachedBy bin (breached </> "sale.l4") "sale" ["(WAITUNTIL 3)", "(WAITUNTIL 6)"]
+          map residualOf towards `shouldBe` [Just got]
+        other -> expectationFailure ("expected one state first reached by WAITUNTIL OF 3, got " <> show (length other))
+
+    it "sale.l4: the breach with the seller still waiting and the breach with nothing waiting are two states, and the second is terminal" $ do
+      Output _ sout _ <- runL4 bin ["explore", breached </> "sale.l4"]
+      let blamedBuyer = [ (term, r) | (_, rid, term, _) <- statesOf sout, Just r <- [lookup rid (residualTexts sout)]
+                        , "DEONTIC BREACHED" `isPrefixOf` r, "BY Buyer" `isInfixOf` r, not ("BY Seller" `isInfixOf` r) ]
+      sort [ term | (term, r) <- blamedBuyer, "still waiting" `isInfixOf` r ] `shouldBe` [False]
+      sort [ term | (term, r) <- blamedBuyer, not ("still waiting" `isInfixOf` r) ] `shouldBe` [True]
+
+    it "resell.l4: the issue's contract: the buyer's breach does not lift the seller's prohibition, and resell after it adds the seller's blame" $ do
+      Output code sout _ <- runL4 bin ["explore", breached </> "resell.l4"]
+      -- exit 2 for what it always was: a SHANT with no WITHIN offers no tick, and says so
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("UNTRIED 1: time runs out on resell (no WITHIN" `isInfixOf`)
+      lastLine sout `shouldSatisfy` (not . ("(unread)" `isInfixOf`))
+      case [ (sid, rid, term) | (sid, rid, term, ["WAITUNTIL OF 3"]) <- statesOf sout ] of
+        [(sid, rid, term)] -> do
+          term `shouldBe` False
+          lookup rid (residualTexts sout) `shouldSatisfy` maybe False ("[still waiting on: Seller SHANT resell]" `isInfixOf`)
+          let towards = [ b | (a, b, l) <- edgesOf sout, a == sid, "resell" `isInfixOf` l ]
+              residualOf b = lookup b [ (sid', rid') | (sid', rid', _, _) <- statesOf sout ] >>= \ r -> lookup r (residualTexts sout)
+          -- the same position the evaluator reaches by the tick and the act, and by the act alone at 3
+          later <- reachedBy bin (breached </> "resell.l4") "`the sale`" ["(WAITUNTIL 3)", "PARTY Seller DOES resell AT 3"]
+          alone <- reachedBy bin (breached </> "resell.l4") "`the sale`" ["PARTY Seller DOES resell AT 3"]
+          map residualOf towards `shouldBe` [Just later]
+          alone `shouldBe` later
+        other -> expectationFailure ("expected one state first reached by WAITUNTIL OF 3, got " <> show (length other))
+
+    it "continuation.l4: an obligation armed after the breach is named as untried (exit 2), and its state is not called terminal" $ do
+      Output code sout _ <- runL4 bin ["explore", breached </> "continuation.l4"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("UNTRIED 1: (unread) Seller" `isInfixOf`)
+      lastLine sout `shouldSatisfy` ("armed after the breach" `isInfixOf`)
+      case [ term | (_, rid, term, _) <- statesOf sout, Just r <- [lookup rid (residualTexts sout)], "(unread)" `isInfixOf` r ] of
+        [term] -> term `shouldBe` False
+        other -> expectationFailure ("expected one state that waits on an unread norm, got " <> show (length other))
+
   -- smucclaw/l4-ide#1081: which instants an act is tried at.
   describe "the instants an act is tried at (#1081)" $ do
     it "clocks.l4: the position in which both deadlines fall together is in the graph, nothing is untried, and l4 run reaches the same position by the printed path" $
@@ -439,22 +534,26 @@ spec bin = describe "l4 explore" $ do
     it "room.l4: a tie that needs a chain of acts is named and not searched by default (exit 2), and --chains searches it" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "room.l4"]
       code `shouldBe` ExitFailure 2
-      lastLine sout `shouldSatisfy` ("UNTRIED 1: ties through chains of acts, for " `isInfixOf`)
+      lastLine sout `shouldSatisfy` ("ties through chains of acts, for " `isInfixOf`)
       lastLine sout `shouldSatisfy` ("--chains tries them" `isInfixOf`)
       -- and what --chains does not reach, with the way that does
       lastLine sout `shouldSatisfy` ("--grid 1 tries every whole instant up to a deadline or --until" `isInfixOf`)
       lastLine sout `shouldSatisfy` (not . ("nothing untried" `isInfixOf`))
       Output ccode csout _ <- runL4 bin ["explore", instants </> "room.l4", "--chains"]
-      ccode `shouldBe` ExitSuccess
-      lastLine csout `shouldSatisfy` ("frontier exhausted; nothing refused; nothing untried" `isInfixOf`)
+      -- exit 2 still: the norms armed after a breach (#1087) are named and cannot be read; the chain is not
+      ccode `shouldBe` ExitFailure 2
+      lastLine csout `shouldSatisfy` ("(unread)" `isInfixOf`)
+      lastLine csout `shouldSatisfy` (not . ("ties through chains" `isInfixOf`))
       -- the chain made the graph larger, not smaller
       let states l = read (takeWhile (/= ' ') (drop (length ("Coverage: " :: String)) l)) :: Int
       states (lastLine csout) `shouldSatisfy` (> states (lastLine sout))
 
     it "lapse-fixed.l4: a lapse of a deadline that no act started is tied with the acts of its state, and the position it reaches is in the graph" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "lapse-fixed.l4"]
-      code `shouldBe` ExitSuccess
-      lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf` )
+      -- exit 2 for the norms armed after a breach (#1087), which are named and cannot be read; not for a tie
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("(unread)" `isInfixOf`)
+      lastLine sout `shouldSatisfy` (not . ("ties through chains" `isInfixOf`))
       got <- reachedBy bin (instants </> "lapse-fixed.l4") "lapsef" ["PARTY P DOES a AT 5", "(WAITUNTIL 7)"]
       unwords (words (filter (/= '\r') sout)) `shouldSatisfy` (got `isInfixOf`)
 
@@ -462,9 +561,9 @@ spec bin = describe "l4 explore" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "cap-re.l4", "--max-instants", "3"]
       code `shouldBe` ExitFailure 2
       lastLine sout `shouldSatisfy` ("past the instant cap" `isInfixOf`)
-      Output wide wout _ <- runL4 bin ["explore", instants </> "cap-re.l4", "--max-instants", "4"]
-      wide `shouldBe` ExitSuccess
-      lastLine wout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      -- with room for one more instant the cap names nothing (exit 2 stays, for the norms armed after a breach)
+      Output _ wout _ <- runL4 bin ["explore", instants </> "cap-re.l4", "--max-instants", "4"]
+      lastLine wout `shouldSatisfy` (not . ("past the instant cap" `isInfixOf`))
 
     it "own-lapse.l4: the act whose own lapse arms a cure is tied with it in the chain note, a loud false alarm that --chains clears (exit 2, then exit 0)" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "own-lapse.l4"]
@@ -479,8 +578,10 @@ spec bin = describe "l4 explore" $ do
       code `shouldBe` ExitFailure 2
       lastLine sout `shouldSatisfy` ("ties through chains of acts, for PARTY T DOES t" `isInfixOf`)
       Output ccode csout _ <- runL4 bin ["explore", instants </> "succ4.l4", "--chains"]
-      ccode `shouldBe` ExitSuccess
-      lastLine csout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      -- exit 2 for the cure armed behind a breach (#1087), named and not readable: not for a chain
+      ccode `shouldBe` ExitFailure 2
+      lastLine csout `shouldSatisfy` ("(unread)" `isInfixOf`)
+      lastLine csout `shouldSatisfy` (not . ("ties through chains" `isInfixOf`))
       let tAtTwo = [ l | l <- lines (filter (/= '\r') csout), "PARTY T DOES t AT 2" `isInfixOf` l ]
       tAtTwo `shouldSatisfy` (not . null)
 
@@ -495,8 +596,10 @@ spec bin = describe "l4 explore" $ do
       c3 `shouldBe` ExitFailure 2
       l3 `shouldSatisfy` ("it needs 2 more instants than the instant cap of 3 allows" `isInfixOf`)
       (c5, l5) <- need 5
-      c5 `shouldBe` ExitSuccess
-      l5 `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      -- exit 2 for what is armed behind a breach (#1087), and no cap note any more
+      c5 `shouldBe` ExitFailure 2
+      l5 `shouldSatisfy` ("(unread)" `isInfixOf`)
+      l5 `shouldSatisfy` (not . ("instant cap" `isInfixOf`))
 
     it "frac-re.l4: a state reached again names its fraction once, not once for each fraction its visits find" $ do
       Output _ sout _ <- runL4 bin ["explore", instants </> "frac-re.l4"]
@@ -505,8 +608,10 @@ spec bin = describe "l4 explore" $ do
 
     it "succ2.l4: an act that re-arms its own lapse is tried at the tie with the cure the lapse arms: t at 3 is in the graph" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "succ2.l4"]
-      code `shouldBe` ExitSuccess
-      lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      -- exit 2 for the cure armed behind a breach (#1087), named and not readable; not for a missing tie
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("(unread)" `isInfixOf`)
+      lastLine sout `shouldSatisfy` (not . ("ties through chains" `isInfixOf`))
       let tAtThree = [ l | l <- lines (filter (/= '\r') sout), "PARTY T DOES t AT 3" `isInfixOf` l ]
       tAtThree `shouldSatisfy` (not . null)
 
@@ -525,15 +630,19 @@ spec bin = describe "l4 explore" $ do
     it "fx-fork.l4, fx-barrier.l4: a lapse of a deadline fixed at the outset, inside an EVERY, ties the act of its state with the cure: pia's act at 5 is in the graph" $
       forM_ ["fx-fork.l4", "fx-barrier.l4"] \ f -> do
         Output code sout _ <- runL4 bin ["explore", instants </> f]
-        code `shouldBe` ExitSuccess
-        lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+        -- exit 2 for the refund armed after a breach (#1087), named and not readable; not for a missing tie
+        code `shouldBe` ExitFailure 2
+        lastLine sout `shouldSatisfy` ("(unread)" `isInfixOf`)
+        lastLine sout `shouldSatisfy` (not . ("ties through chains" `isInfixOf`))
         let piaAtFive = [ l | l <- lines (filter (/= '\r') sout), "pia" `isInfixOf` l || "Pia" `isInfixOf` l, " AT 5" `isSuffixOf` l ]
         piaAtFive `shouldSatisfy` (not . null)
 
     it "merged.l4 --chains --max-states 20: the states the bound keeps out are counted as states, no more than the graph has past the bound" $ do
       Output _ full _ <- runL4 bin ["explore", instants </> "merged.l4", "--chains"]
       Output code cut _ <- runL4 bin ["explore", instants </> "merged.l4", "--chains", "--max-states", "20"]
-      code `shouldBe` ExitFailure 3
+      -- the state bound is named whatever the exit status (2 outranks 3 when something is also untried)
+      code `shouldSatisfy` (/= ExitSuccess)
+      lastLine cut `shouldSatisfy` ("frontier NOT exhausted" `isInfixOf`)
       let states l = read (takeWhile (/= ' ') (drop (length ("Coverage: " :: String)) l)) :: Int
           notAdded l = case words (snd (breakOn "frontier NOT exhausted:" l)) of
             (_ : _ : _ : n : _) -> read n :: Int
@@ -552,10 +661,12 @@ spec bin = describe "l4 explore" $ do
     it "lapse.l4: a deadline started by a lapse is named by default (exit 2), and --chains holds the positions the evaluator reaches by it" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "lapse.l4"]
       code `shouldBe` ExitFailure 2
-      lastLine sout `shouldSatisfy` ("UNTRIED 1: ties through chains of acts, for PARTY P DOES a" `isInfixOf`)
+      lastLine sout `shouldSatisfy` ("ties through chains of acts, for PARTY P DOES a" `isInfixOf`)
       Output ccode csout _ <- runL4 bin ["explore", instants </> "lapse.l4", "--chains"]
-      ccode `shouldBe` ExitSuccess
-      lastLine csout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      -- exit 2 still, for the norms armed after a breach (#1087), which are named and cannot be read; the chain is not
+      ccode `shouldBe` ExitFailure 2
+      lastLine csout `shouldSatisfy` ("(unread)" `isInfixOf`)
+      lastLine csout `shouldSatisfy` (not . ("ties through chains" `isInfixOf`))
       forM_ [ ["PARTY P DOES a AT 2", "(WAITUNTIL 6)"], ["PARTY P DOES a AT 3", "(WAITUNTIL 7)"] ] \ events -> do
         got <- reachedBy bin (instants </> "lapse.l4") "lapse" events
         unwords (words (filter (/= '\r') csout)) `shouldSatisfy` (got `isInfixOf`)

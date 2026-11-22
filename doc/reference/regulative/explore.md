@@ -97,6 +97,7 @@ Reading it from the top:
   A deadline passing is a move like any other.
 - **A terminal state** is one where nothing more can happen: here `s2` (the seller is in breach), `s3` (fulfilled) and `s5` (the buyer is in breach).
   The explorer gives each one a self-loop labelled `terminal`, so that a tool reading the graph does not take it for a deadlock.
+  A breach is terminal only when nothing is still waiting behind it: [one side of a `RAND` can be breached while the other is still being held to what happens next](#a-breach-with-a-part-still-waiting).
 - **Positions, not paths.** `s3` is reached by paying 100 on time and by paying 120 late.
   The two histories differ, and the position they leave is the same one: `FULFILLED`.
   So the graph has one `s3`, with two arrows into it.
@@ -125,6 +126,46 @@ Two positions are **the same state** when four things agree:
 Two positions that agree on all four are merged into one, and that is what makes the exploration stop.
 A contract that renews itself would otherwise never finish: each lap would be a new position.
 The merge is also the one place the graph can quietly be wrong, and [the failures below](#loud-and-silent-failures) are mostly about it.
+
+## A breach with a part still waiting
+
+`A RAND B` is breached as soon as `A` is, and the contract is then decided: it can no longer be fulfilled.
+But `B` is still held to everything that happens after, and what happens to `B` changes who is blamed.
+In `jl4/tests-cli/fixtures/explore-breached/sale.l4` the buyer must pay within 2 days and the seller must deliver within 5, as the two sides of a `RAND`.
+When the clock passes day 2 with no payment, the buyer is in breach, and `l4 run` shows the contract is still watching the seller: with the clock then passing day 5 as well, the blame is `BY Buyer BY Seller`.
+
+The explorer used to call the state after the buyer's breach terminal, so that the path from it to the seller's blame was not in the graph, and a property about who is blamed afterwards was checked against a graph that did not contain the path.
+It now keeps what is still waiting, and prints it with the state:
+
+```text
+r7  DEONTIC BREACHED:
+      BREACH
+      BY Buyer
+      [still waiting on: Seller MUST deliver WITHIN 2]
+```
+
+That state is not terminal.
+It has the seller's act and the tick past the seller's deadline as moves, and each is run on the evaluator like any other: the act leaves the same breach with nothing waiting (terminal), and the tick leaves `BY Buyer BY Seller`.
+The remaining time is counted from the state's own clock (day 3, so 2 days left), and the deadline keeps its place among the other deadlines in the state's key, like any live one.
+Two breached states that blame the same party are two states when one has a part waiting and the other has not.
+On the fixture the graph grows from 11 states and 24 transitions to 12 and 26 (measured 2026-11-23); `resell.l4`, the contract of smucclaw/l4-ide#1087 (the seller SHANT resell), from 4 and 6 to 8 and 15.
+
+**What it cannot read.**
+The explorer carries the obligations the contract held before the breach.
+A part that was armed only after the breach, by the continuation of one that was then taken, was never held: a breached value keeps its blame and nothing of the other side.
+The same note also names a part of the contract that the evaluator is waiting on and that the explorer cannot match to anything it held before: on `jl4/examples/ok/every/run-lest.l4` it names the members of an `EVERY` (measured 2026-11-23), where the cause is not a continuation, and the sentence says "usually" for that reason.
+`jl4/tests-cli/fixtures/explore-breached/continuation.l4` is the seller's delivery with an invoice due 3 days after it.
+After the buyer's breach and the delivery, the evaluator is waiting on the invoice, and a later tick adds the seller's blame (`l4 run` on `(WAITUNTIL 3)`, the delivery at 4, `(WAITUNTIL 8)` gives `BY Buyer BY Seller`).
+The explorer names that state and says so, and exits 2:
+
+```text
+UNTRIED 1: (unread) Seller (as written) MUST (at continuation.l4:19:32-44) (it is waiting behind a breach and is not one the explorer held before it: usually armed after the breach, by the continuation of a part that was then taken (a breached value keeps only its blame), so what it asks and when cannot be read back)
+```
+
+The state is listed, is not marked terminal, and has no moves, because none can be built for it.
+So for a contract whose seller's side has a continuation, the graph is not complete after a breach on the other side, and the line says it is not.
+Completing it needs the evaluator to hand over the other side's residual, which is a change to the evaluator's value type and is not made here.
+Of the 78 files measured, 7 name such a norm, and all 7 already exited 2 for another reason; no file changed its exit status for this (2026-11-23).
 
 ## What the explorer tries
 
@@ -167,13 +208,14 @@ The note also says what `--chains` does not reach and that `--grid 1` tries ever
 It says so only for an act that a later act's offset could reach, so a contract with no chain says nothing about chains.
 `--chains` searches them as well: the explorer runs again with what the acts that can follow each one were found to do, up to three times, until that stops growing.
 It costs a larger graph, so it is not the default.
-Measured on the 78 files in this repository's examples and docs that carry a `#TRACE` (2026-11-23, against `unstable` before this change):
+Measured on the 78 files in this repository's examples and docs that carry a `#TRACE` (2026-11-23, against `unstable` before the instants and the breached-position changes, with both in):
 
 - by default, 3 files exit 2 where they exited 0 before.
-  `jl4/examples/ok/every/run-in.l4` and `run-modals.l4` name a chain, and `--chains` finds what they left out (795 states become 2086, and 58 become 153, in the larger graphs of each file).
+  `jl4/examples/ok/every/run-in.l4` and `run-modals.l4` name a chain, and `--chains` finds what they left out (1068 states become 3138, and 68 become 203, in the larger graphs of each file), and `run-in.l4` still exits 2 under it, for the norms behind a breach that [the section above](#a-breach-with-a-part-still-waiting) names.
   `doc/reference/regulative/must-example.l4` names a chain that adds nothing: `--chains` explores the same 8 states and exits 0, because the line says what _could_ put a tie in reach and does not know that it does.
   `jl4/examples/explore/ledger/d3-reopen.l4` takes about five minutes before and after, at the 300 second limit the sweep ran under (it ended at that limit before and at the state bound in one run after), so its exit status is not a comparison;
-- of the 405 graphs those files explore (leaving out the one that timed out), 354 have the same number of states as before, 42 have more and 9 have fewer.
+- of the 405 graphs those files explore (leaving out the one that timed out), 342 have the same number of states as before, 58 have more and 5 have fewer.
+  The five that have fewer are in three files (`breach-clocks.l4`, `deontic-breach-semantics.l4` and `every/run-lest.l4`), and none of the three changed its exit status;
   The largest growth is a block of `run-after.l4`, `EVERY Tenant t IN tenants MUST Sign t AFTER 3 WITHIN 30`, from 1 state to 11: the old explorer passed both acts over at every instant it tried and stopped at the outset, and the new one tries them at the instant the window opens;
 - `--chains` costs states, and some time: the wall-clock figures this machine gave were too noisy to quote (the whole set took 505 and 593 seconds on two runs by default and 720 and 1169 on two under `--chains`, four files at a time, under a load that changed between them; `run-in.l4` under `--chains` took 254 seconds on one and ran past the sweep's 300 second limit on the other), so read the states and not the seconds.
   `run-modals.l4` still exits 2 under it, because the offsets kept growing after three passes, and the line says so.
@@ -184,14 +226,14 @@ Measured on the 78 files in this repository's examples and docs that carry a `#T
 
 **What the cap and the window mean for a long deadline.**
 Take `room.l4` with its numbers changed to deadlines of 365, 400 and 400 days (R, `a` and `u`) and acts that start deadlines of 30 and 14 days (Q and V), measured 2026-11-23.
-Under regions it has 342 states and exits 2 with a chain named, in about 7 seconds; with `--chains` it has 553 states and exits 0, in about 15 seconds.
-`--grid 1` on the same contract tries every day of every window, so each act in each state needs more than the cap of 256 instants, the clock tells states apart, and the run was stopped by the state bound (10000 states, 423,356 more not added) after 18 minutes, with the instant cap named for three acts.
+Under regions it has 503 states and exits 2, in about 6 seconds; with `--chains` it has 818 states and exits 2, in about 16 seconds (measured 2026-11-23; the exit is 2 under both because of the norms behind a breach, and under regions also because of the chain).
+`--grid 1` on the same contract tries every day of every window, so each act in each state needs more than the cap of 256 instants, the clock tells states apart, and the run was stopped by the state bound (10000 states, 423,356 more not added) after 18 minutes, with the instant cap named for three acts (measured before the breached-position change and not run again: it is the one measurement here that takes that long).
 A long deadline is therefore cheap under regions and expensive under a grid: `--grid` is for a contract that is short, or for the one rule that reads the clock arithmetically.
 
 **What the regions graph is.**
 It is an abstraction of contract time, and it says what it skipped.
 Two positions with the same order of deadlines and different gaps between them have different futures, so the order alone is not enough, and the only exact abstraction is the graph of every whole instant: `--grid 1`, below.
-Regions is the cheaper graph that tries to find every position the evaluator can reach, and where it knows it may not have (a chain tie, a fraction, the instant cap) the line says "UNTRIED" and never "nothing untried".
+Regions is the cheaper graph that tries to find every position the evaluator can reach, and where it knows it may not have (a chain tie, a fraction, the instant cap, a norm waiting behind a breach) the line says "UNTRIED" and never "nothing untried".
 What `nothing untried` promises is narrower than that: every move the contract offers in a state was tried at every instant the scheme chose, and whatever was not tried is named.
 It does not promise that the graph holds every position the evaluator can reach: the scheme tries a sample of the instants and its state does not hold the clock, and the cases it is known to miss without saying so are listed under "Where the region scheme stops being exact".
 `--grid 1 --until N` is the graph of every whole instant up to a deadline or `N`, for a contract small enough.
@@ -350,6 +392,8 @@ These are sorted by which signal carries them.
   A move whose run stopped because the two sides of a compound read each other's records in an order L4 cannot settle is untried too, and the reason in brackets is that error, naming the record and both sides ([Deadlines and consequences](consequences.md)).
   On `jl4/tests-cli/fixtures/sibling-reads/one-event.l4`, a `RAND` whose two sides take one event, one side making a record and the other reading it at the same instant, `--until 20` gave 2 states, `UNTRIED 3` (three `PARTY P DOES go` moves) and exited 2 (measured 2026-11-13).
   The two sides of a `RAND` that read each other's records at different events are run in step and explored like any other contract: on `jl4/tests-cli/fixtures/sibling-reads/dinner-ab.l4`, Alice and Bob as the two sides of a `RAND`, `--until 100 --always "every dinner was accepted while open"` gave 18 states, `violated after 3 events` with Alice checking, Bob buying and Alice buying, and exited 4 (measured 2026-11-13).
+- **A norm armed behind a breach (exit 2).** The coverage line has `UNTRIED` and `(unread)`, as above: a part of the contract that the evaluator is still waiting on after a breach, and that the explorer holds no obligation for.
+  Nothing was explored from it, and the state is not called terminal.
 - **A bound stopped it (exit 3).** `frontier NOT exhausted`, with the number of states left.
   `--max-states 5` on `jl4/examples/explore/brief/d1-naive.l4`, a 20-state graph, printed `frontier NOT exhausted: 6 new states past the state bound 5 not added` and exited 3 (measured 2026-11-23).
   The number is of states the bound kept out, each once; before that date the same run printed 12, because the code added one for each move that reached such a state.
@@ -361,8 +405,8 @@ These are sorted by which signal carries them.
     `--grid 1` with no `--until` used to exit 0 on such a contract; it now exits 2, which is a change to say plainly (2026-11-22).
   - _a tie through a chain of acts_: an act that starts a deadline sets the limit for the next act, so where the first act falls decides whether the second can tie with a deadline already fixed.
     The line names the acts and the instants that could put such a tie in reach (`ties through chains of acts, for PARTY U DOES u, …`), and says `--chains` tries them.
-    `jl4/tests-cli/fixtures/explore-instants/room.l4` gives 194 states and `UNTRIED 1` by default and 233 states with nothing untried under `--chains` (measured 2026-11-23).
-    This is a change to say plainly: the explorer before this change printed `nothing untried` and exited 0 on that file (244 states, measured 2026-11-23).
+    `jl4/tests-cli/fixtures/explore-instants/room.l4` gives 308 states and `UNTRIED 5` by default (the chain, and four norms behind a breach) and 366 states and `UNTRIED 4` under `--chains` (measured 2026-11-23).
+    This is a change to say plainly: the explorer before these changes printed `nothing untried` and exited 0 on that file (244 states, measured 2026-11-23).
 - **A property is violated (exit 4)**, or **unknown (exit 5)**: every liveness property, and any path that fails its replay.
 - **An option names nothing (exit 1).** A property that is not a rule in the file or its imports; one that takes no inputs, or that reads a ledger itself (a `RECALL` inside it would read nothing, outside a run); a `--contract` that is not a rule with no inputs; a `--fair` that names no act; an `--until` earlier than the outset (`--until 0 is before the outset at 64800, so no act could fire`); a property, `--emit` or `--fair` asked of a file with no `#TRACE` and no `--contract`.
 - **A property input is named for a cell nothing writes (exit 1).**
