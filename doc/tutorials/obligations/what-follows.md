@@ -93,7 +93,7 @@ And if Alice never pays, the receipt never becomes due, because the chain never 
 
 ```l4
 #TRACE `rent, then receipt` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -130,7 +130,7 @@ Alice misses the seventh, then pays $1,550 on day 15:
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY Alice DOES Pay Alice `Ms Ng` 1550 AT 15
 ```
 
@@ -143,7 +143,7 @@ Look at what is owed on day 8, when the miss has just come to light:
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -151,13 +151,13 @@ Result:
   PARTY Alice MUST Pay Alice `Ms Ng` 1550 WITHIN 13 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
 ```
 
-The original obligation is gone; the second chance is what stands, with thirteen days left on its clock. **Where does the second clock start?** At day 7 — the deadline Alice missed — and not at day 8, the day the miss came to light. Fourteen days from day 7 is day 21, which is what a lease saying "fourteen more days from the seventh" means; on day 8, one of those days has already gone. L4 only _learns_ that a deadline has passed when the next event arrives, but the second obligation is counted from the deadline regardless of when that is, so a tenant who misses the seventh and then goes quiet does not gain a day for every day of silence. The ``(`WAIT UNTIL` 8)`` that every miss on this page begins with is there to show the miss on the screen before anything else happens; it does not set the clock.
+The original obligation is gone; the second chance is what stands, with thirteen days left on its clock. **Where does the second clock start?** At day 7 — the deadline Alice missed — and not at day 8, the day the miss came to light. Fourteen days from day 7 is day 21, which is what a lease saying "fourteen more days from the seventh" means; on day 8, one of those days has already gone. L4 only _learns_ that a deadline has passed when the next event arrives, but the second obligation is counted from the deadline regardless of when that is, so a tenant who misses the seventh and then goes quiet does not gain a day for every day of silence. The `(WAITUNTIL 8)` that every miss on this page begins with is there to show the miss on the screen before anything else happens; it does not set the clock.
 
 Alice pays the plain rent on day 15, forgetting the fee:
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 15
 ```
 
@@ -170,8 +170,8 @@ Not the payment the second chance asks for, so it is passed over, and she has si
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
-    (`WAIT UNTIL` 40)
+    (WAITUNTIL 8)
+    (WAITUNTIL 40)
 ```
 
 ```
@@ -255,7 +255,7 @@ A receipt for $1,500 is not the receipt that is owed, and by day 12 Ms Ng is in 
 #TRACE `rent, receipt for the amount paid` AT 0 WITH
     PARTY Alice   DOES Pay Alice `Ms Ng` 1600     AT 6
     PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 9
-    (`WAIT UNTIL` 12)
+    (WAITUNTIL 12)
 ```
 
 ```
@@ -320,7 +320,7 @@ Alice misses the seventh; Mr Lim pays on day 15:
 
 ```l4
 #TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY `Mr Lim` DOES Pay `Mr Lim` `Ms Ng` 1500 AT 15
 ```
 
@@ -355,14 +355,14 @@ Result:
   FULFILLED
 ```
 
-His payment on day 20 is the event that reveals Alice's default, and it is then offered to the obligation that the default brings into being — his own — which it satisfies. Step 2's rule about the second clock is at work here: Mr Lim's fourteen days begin at day 7, the deadline Alice missed, and end on day 21, so his payment on day 20 is on time by one day. Had he paid on day 22 instead, the same payment would have revealed Alice's default _and_ his own, and the breach would be his. The day a deadline passed does not have to be written down for the clock to be right; this page's other examples do it with `WAIT UNTIL` so that the miss is visible on the screen before the next thing happens.
+His payment on day 20 is the event that reveals Alice's default, and it is then offered to the obligation that the default brings into being — his own — which it satisfies. Step 2's rule about the second clock is at work here: Mr Lim's fourteen days begin at day 7, the deadline Alice missed, and end on day 21, so his payment on day 20 is on time by one day. Had he paid on day 22 instead, the same payment would have revealed Alice's default _and_ his own, and the breach would be his. The day a deadline passed does not have to be written down for the clock to be right; this page's other examples do it with `WAITUNTIL` so that the miss is visible on the screen before the next thing happens.
 
 And if neither of them pays, the breach is Mr Lim's, because the last obligation standing was his:
 
 ```l4
 #TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
-    (`WAIT UNTIL` 30)
+    (WAITUNTIL 8)
+    (WAITUNTIL 30)
 ```
 
 ```
@@ -415,7 +415,7 @@ Alice paying on day 5 settles it just the same. With nothing paid yet, both obli
 
 ```l4
 #TRACE `rent, Alice or Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 3)
+    (WAITUNTIL 3)
 ```
 
 ```
@@ -429,7 +429,7 @@ And if neither pays by the seventh:
 
 ```l4
 #TRACE `rent, Alice or Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```

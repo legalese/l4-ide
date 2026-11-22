@@ -1,7 +1,7 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-blame.l4:49:1-51:20:
+run-blame.l4:49:1-51:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -32,7 +32,7 @@ run-blame.l4:49:1-51:20:
           MUST Sign t
         before their deadline, which was at
           14
-run-blame.l4:63:1-65:20:
+run-blame.l4:63:1-65:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -70,7 +70,7 @@ run-blame.l4:86:47-58:
       theLandlord (at run-blame.l4:30:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-blame.l4:88:1-92:20:
+run-blame.l4:88:1-92:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -84,7 +84,7 @@ run-blame.l4:88:1-92:20:
       MUST Refund theLandlord
     before their deadline, which was at
       8
-run-blame.l4:106:1-109:20:
+run-blame.l4:106:1-109:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -123,7 +123,7 @@ run-blame.l4:118:28-31:
       bob (at run-blame.l4:32:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-blame.l4:120:1-121:20:
+run-blame.l4:120:1-121:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -168,7 +168,7 @@ run-blame.l4:131:30-35:
       alice (at run-blame.l4:31:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-blame.l4:133:1-134:20:
+run-blame.l4:133:1-134:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -206,7 +206,7 @@ run-blame.l4:142:23-34:
       theLandlord (at run-blame.l4:30:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-blame.l4:146:1-147:20:
+run-blame.l4:146:1-147:17:
   DEONTIC BREACHED:
     BREACH
     BY Tenant OF "Alice" BECAUSE "the tenants carry it"
@@ -219,9 +219,9 @@ run-blame.l4:159:23-34:
       theLandlord (at run-blame.l4:30:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-blame.l4:163:1-164:20:
+run-blame.l4:163:1-164:17:
   BREACH BY names an empty list, at run-blame.l4:161:16-47. A breach blames at least one party: give BY a party, or a LIST with someone in it, or leave BY out to blame nobody. (EVERY-EACH-QUANTIFIER-SPEC section 6.1, R-T3.)
-run-blame.l4:176:1-179:20:
+run-blame.l4:176:1-179:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -235,12 +235,12 @@ run-blame.l4:176:1-179:20:
       MUST Sign t
     before their deadline, which was at
       14
-run-blame.l4:193:1-194:20:
+run-blame.l4:193:1-194:17:
   DEONTIC BREACHED:
     BREACH
     BY LIST "a", "b"
     BECAUSE "the pair did not deliver"
-run-blame.l4:208:1-209:20:
+run-blame.l4:208:1-209:17:
   DEONTIC BREACHED:
     BREACH
     BY LIST "a", "b" BECAUSE "declared against the pair"

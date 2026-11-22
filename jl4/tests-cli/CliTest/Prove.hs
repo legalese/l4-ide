@@ -107,7 +107,7 @@ spec bin = describe "l4 prove" $ do
     verdictOf 17 sout `shouldBe` "ENCODING"
     unwords (rowFor 17 sout) `shouldSatisfy` ("fails at p = 0, but the evaluator says it holds there" `isInfixOf`)
 
-  -- Soundness: a guard such as IS INTEGER is a hypothesis of its own
+  -- Soundness: a guard such as ISINTEGER is a hypothesis of its own
   -- obligation and never changes a NUMBER's sort, or the unguarded assertion
   -- below would be "proved" over the integers.
   it "keeps a NUMBER Real whatever guard an assertion carries" $ withZ3 $ do

@@ -6,7 +6,7 @@ File: value-actor-duplex.l4
   Range: 16:19-16:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/regulative-actor-mismatch
   Message:
     An actor may only perform its own actions.
 

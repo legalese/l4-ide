@@ -185,8 +185,15 @@ pureSpec = describe "L4.Ledger.Row" do
         `shouldBe` Right (ActEvent "World" "(`Alice buys dinner` TRUE)", 65220)
       parseEventLine "PARTY World DOES `Alice buys dinner` TRUE AT 65220"
         `shouldBe` Right (ActEvent "World" "(`Alice buys dinner` TRUE)", 65220)
-      parseEventLine "(`WAIT UNTIL` 75601)" `shouldBe` Right (TickEvent, 75601)
+      parseEventLine "(WAITUNTIL 75601)" `shouldBe` Right (TickEvent, 75601)
       parseEventLine "#TRACE `the arrangement` AT 64800 WITH" `shouldBe` Right (OpeningEvent "`the arrangement`", 64800)
+
+    -- Note [Renamed built-ins] in L4.TypeCheck.Environment: a row written
+    -- before WAIT UNTIL became WAITUNTIL still reads, bare or in brackets.
+    it "reads a tick written with the old spelling" do
+      parseEventLine "(`WAIT UNTIL` 75601)" `shouldBe` Right (TickEvent, 75601)
+      parseEventLine "`WAIT UNTIL` 75601" `shouldBe` Right (TickEvent, 75601)
+      parseEventLine "WAITUNTIL 75601" `shouldBe` Right (TickEvent, 75601)
 
     it "refuses a text that would make its line say something else" do
       let refused t = either (const True) (const False) (canonicalExpr t)
@@ -211,7 +218,7 @@ pureSpec = describe "L4.Ledger.Row" do
 
     it "writes a trace whose first line is the opening, and refuses any other" do
       traceBlock [(OpeningEvent "`the arrangement`", 64800), (ActEvent "World" check, 65100), (TickEvent, 75601)]
-        `shouldBe` Right "#TRACE `the arrangement` AT 64800 WITH\n    PARTY World DOES `Alice checks whether dinner is bought` AT 65100\n    (`WAIT UNTIL` 75601)\n"
+        `shouldBe` Right "#TRACE `the arrangement` AT 64800 WITH\n    PARTY World DOES `Alice checks whether dinner is bought` AT 65100\n    (WAITUNTIL 75601)\n"
       either (const True) (const False) (traceBlock [(ActEvent "World" check, 65100)]) `shouldBe` True
 
   describe "the two times of a row (§3.4)" do
@@ -570,8 +577,8 @@ timeSpec deps = describe "ticks (WPO1)" do
     -- the instance is FULFILLED, so no deadline is left and nothing more is due
     atClock env 75800 (appendDueTicks l inst) >>= \ r -> either (const [-1]) (map (.seqNo)) r `shouldBe` []
 
-  it "a tick row lifts to the WAIT UNTIL that the what-if builds for a tick (D-O3)" do
-    eventLine TickEvent 75601 `shouldBe` Right "(`WAIT UNTIL` 75601)"
+  it "a tick row lifts to the WAITUNTIL that the what-if builds for a tick (D-O3)" do
+    eventLine TickEvent 75601 `shouldBe` Right "(WAITUNTIL 75601)"
     case liftEvents deps.dinner [(OpeningEvent "`the arrangement`", 64800), (ActEvent "World" check, 65100), (TickEvent, 75601)] of
       Right [_, lifted] -> sameTick lifted (hypotheticalExpr (Tick 75601)) `shouldBe` True
       other -> expectationFailure ("two events, got " <> either show (show . length) other)

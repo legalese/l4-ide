@@ -44,7 +44,7 @@ GIVETH A DEONTIC Party Action
 - To count from something else, anchor the deadline with `OF` ([below](#anchoring-a-deadline-with-of)), or name a date with [`BEFORE`](#before).
 - As events are read, the time left shrinks: after an event at 12, what was `WITHIN 14` from 0 has 2 left.
 - A rule without `WITHIN` has no deadline. It waits for its action however long it takes, and time alone never takes it to `LEST`.
-- L4 finds that a deadline has passed when it reads an event, or a `` `WAIT UNTIL` `` (see [EVENT](EVENT.md)), with a later time. That event only shows that time has moved on: it is offered in turn to the rule that follows, so a late payment that is the first thing recorded can still discharge the `LEST` reparation it was written for.
+- L4 finds that a deadline has passed when it reads an event, or a `WAITUNTIL` (see [EVENT](EVENT.md)), with a later time. That event only shows that time has moved on: it is offered in turn to the rule that follows, so a late payment that is the first thing recorded can still discharge the `LEST` reparation it was written for.
 
 ### Anchoring a deadline with OF
 
@@ -607,7 +607,7 @@ DEONTIC BREACHED:
       ...
 ```
 
-That is `(PARTY P MUST x WITHIN 5) RAND (PARTY Q MUST y WITHIN 5)` with one event at 10. Written the other way round, it reports the same instant and the same two decisive failures; only the order of the lists follows the rule, and the first line names Q. The `at` is when the breach came to light; `NEVERMATCHESPARTY` and `NEVERMATCHESACT` are how a `` `WAIT UNTIL` `` event prints.
+That is `(PARTY P MUST x WITHIN 5) RAND (PARTY Q MUST y WITHIN 5)` with one event at 10. Written the other way round, it reports the same instant and the same two decisive failures; only the order of the lists follows the rule, and the first line names Q. The `at` is when the breach came to light; `NEVERMATCHESPARTY` and `NEVERMATCHESACT` are how a `WAITUNTIL` event prints.
 
 `l4 batch` gives the same answer as data: each object in `failures` has `effective` and `observed`, and the breach has the compound's `effective` and `observed` instants and `decisive`, the positions in `failures` of the decisive ones. `anchor` is the position of the one the scalars describe.
 

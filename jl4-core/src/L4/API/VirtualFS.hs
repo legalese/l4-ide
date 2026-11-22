@@ -31,6 +31,7 @@ module L4.API.VirtualFS
   , lookupEmbeddedLibrary
     -- * Type Checking with Imports
   , checkWithImports
+  , checkWithImportsLocated
   , checkWithImportsAndUri
     -- * Re-exports from shared resolution
   , TypeCheckWithDepsResult(..)
@@ -43,6 +44,7 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import Control.Applicative ((<|>))
+import L4.Parser.SrcSpan (SrcRange)
 
 -- Re-export embedded libraries
 import L4.API.EmbeddedLibraries (embeddedLibraries, embeddedLibraryNames, lookupEmbeddedLibrary)
@@ -53,6 +55,7 @@ import L4.Import.Resolution
   , extractImportNames
   , moduleNameToProjectUri
   , typecheckWithDependencies
+  , typecheckWithDependenciesLocated
   , TypeCheckWithDepsResult(..)
   , ResolvedImport(..)
   )
@@ -117,6 +120,14 @@ apiModuleLookup vfs modName = Identity $
 checkWithImports :: VFS -> Text -> Either [Text] TypeCheckWithDepsResult
 checkWithImports vfs source =
   checkWithImportsAndUri vfs "main" source
+
+-- | 'checkWithImports', where an import error also carries the range of the
+-- @IMPORT@ it belongs to, when that is known.
+checkWithImportsLocated :: VFS -> Text -> Either (Maybe SrcRange, [Text]) TypeCheckWithDepsResult
+checkWithImportsLocated vfs source =
+  let Identity result =
+        typecheckWithDependenciesLocated (apiModuleLookup vfs) (moduleNameToProjectUri "main") source
+  in result
 
 -- | Type-check with a specific module name.
 checkWithImportsAndUri :: VFS -> Text -> Text -> Either [Text] TypeCheckWithDepsResult

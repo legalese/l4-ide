@@ -6,7 +6,7 @@ File: every-roll-not-list.l4
   Range: 13:23-13:25
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The IN clause of an EVERY is the list the group is drawn from, so it is
     expected to be of type
@@ -22,7 +22,7 @@ File: every-roll-not-list.l4
   Range: 17:23-17:37
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The IN clause of an EVERY is the list the group is drawn from, so it is
     expected to be of type

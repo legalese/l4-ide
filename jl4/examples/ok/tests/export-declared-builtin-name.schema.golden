@@ -1,0 +1,27 @@
+{
+    "$defs": {
+        "Text": {
+            "properties": {
+                "body": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "body"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "the body of a text",
+    "properties": {
+        "t": {
+            "$ref": "#/$defs/Text"
+        }
+    },
+    "required": [
+        "t"
+    ],
+    "title": "body of",
+    "type": "object"
+}

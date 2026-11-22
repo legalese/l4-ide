@@ -6,7 +6,7 @@ File: every-join-deadline-not-number.l4
   Range: 12:53-12:59
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The WITHIN on a join line (the deadline on the whole) is expected to be of type
 

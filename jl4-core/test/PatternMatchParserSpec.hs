@@ -16,6 +16,7 @@ import L4.Annotation (HasSrcRange (..))
 import L4.ExactPrint (exactprint)
 import GHC.Clock (getMonotonicTime)
 import System.CPUTime (getCPUTime)
+import System.Mem (performGC)
 import L4.Parser (execProgramParser)
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax
@@ -114,8 +115,9 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
   -- process's CPU time, not wall-clock time, so that time spent waiting for a
   -- busy machine is not counted. Eight times the lines take about eight times
   -- as long when parsing is linear, and sixty-four times as long when it is
-  -- quadratic; the test fails above three times linear. A ratio short of
-  -- clearly quadratic is measured again, so that one pause does not fail it.
+  -- quadratic; the test fails above three times linear. The ratio is the
+  -- median of three back-to-back pairs, so that a slowdown partway through
+  -- does not fail it ('linearTimeRatioOn').
   it "parses a run of same-headed definitions in time linear in its length" $
     parsesInLinearTime 250 2000 24 \ i -> "f x MEANS " <> T.pack (show i)
 
@@ -162,7 +164,7 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
   -- quadratic in the lines is still failed (the work is made up, so that the
   -- test does not depend on the parser).
   it "still fails a quadratic parse on that clock" $ do
-    ratio <- linearTimeRatioOn (steppedClock windowsClockStep getCPUTime) quadraticParse 250 2000 24 (const "x")
+    ratio <- linearTimeRatioOn (steppedClock windowsClockStep getCPUTime) quadraticParse 250 2000 (const "x")
     case ratio of
       Nothing -> pendingWith "the clock did not tick, so there is no ratio to judge"
       Just r -> r `shouldSatisfy` (>= 24)
@@ -172,7 +174,7 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
   -- minutes (found by the refutation of the guard above).
   it "gives no ratio within seconds on a clock that never ticks" $ do
     t0 <- getMonotonicTime
-    ratio <- linearTimeRatioOn (pure 0) parseDecides 250 2000 24 \ i -> "f x MEANS " <> T.pack (show i)
+    ratio <- linearTimeRatioOn (pure 0) parseDecides 250 2000 \ i -> "f x MEANS " <> T.pack (show i)
     t1 <- getMonotonicTime
     ratio `shouldBe` Nothing
     (t1 - t0) `shouldSatisfy` (< 30)
@@ -184,9 +186,8 @@ spec = describe "Pattern-matching DECIDE desugaring (parser)" $ do
 
 -- | @parsesInLinearTime small large limit line@: parsing @large@ lines made
 -- by @line@ (one definition each) takes less than @limit@ times the CPU time
--- of parsing @small@ lines. A ratio short of twice the limit is measured
--- again, up to twice, so that one pause does not fail it. See the comments
--- at its uses.
+-- of parsing @small@ lines, as 'linearTimeRatioOn' measures them. See the
+-- comments at its uses.
 parsesInLinearTime :: Int -> Int -> Double -> (Int -> T.Text) -> Expectation
 parsesInLinearTime = parsesInLinearTimeWith parseDecides
 
@@ -212,7 +213,7 @@ steppedClock step clock = (\ t -> t `div` step * step) <$> clock
 -- failed.
 parsesInLinearTimeOn :: Clock -> (T.Text -> IO [a]) -> Int -> Int -> Double -> (Int -> T.Text) -> Expectation
 parsesInLinearTimeOn clock parse smallSize largeSize limit line = do
-  ratio <- linearTimeRatioOn clock parse smallSize largeSize limit line
+  ratio <- linearTimeRatioOn clock parse smallSize largeSize line
   case ratio of
     Nothing -> pendingWith "the CPU clock did not tick enough while the small file was parsed, so there is no ratio to judge"
     Just r -> r `shouldSatisfy` (< limit)
@@ -234,15 +235,26 @@ measurableSearchSeconds = 2.0
 -- once, since it is at least several times longer. The ratio is of two
 -- non-zero times. If no stretch spans ten steps within
 -- 'measurableSearchSeconds' (a clock that never ticks, say) or 4,096 parses,
--- there is no ratio. A ratio short of twice the limit is measured again, up to
--- twice, so that one pause does not fail it.
-linearTimeRatioOn :: Clock -> (T.Text -> IO [a]) -> Int -> Int -> Double -> (Int -> T.Text) -> IO (Maybe Double)
-linearTimeRatioOn clock parse smallSize largeSize limit line = do
+-- there is no ratio, and the large file is never parsed.
+--
+-- Once the search has found how many parses fill a stretch, the ratio is the
+-- median of three back-to-back pairs, each a stretch of small parses and then
+-- one large parse, so that a slowdown that starts or stops partway spoils at
+-- most one pair. The search starts after a major collection, and so does each
+-- stretch and large parse of the pairs, outside the timed span, so that none
+-- pays for garbage an earlier one left; the search's own stretches do not, so
+-- that collections cannot use up its 'measurableSearchSeconds'. This is
+-- "LinearTime"'s measure (Note [Measuring a ratio on a busy machine] there),
+-- kept here because this guard takes its clock as a parameter.
+linearTimeRatioOn :: Clock -> (T.Text -> IO [a]) -> Int -> Int -> (Int -> T.Text) -> IO (Maybe Double)
+linearTimeRatioOn clock parse smallSize largeSize line = do
   let file k = T.unlines (map line [1 .. k])
-      -- The CPU time of @reps@ parses of a file of @k@ lines, in picoseconds.
-      timeParses k reps = do
+      -- The CPU time of @reps@ parses of a file of @k@ lines, in picoseconds,
+      -- after a major collection if @collect@.
+      timeParses collect k reps = do
         src <- evaluate (file k)
         _ <- evaluate (T.length src)
+        when collect performGC
         t0 <- clock
         replicateM_ reps do
           n <- length <$> parse src
@@ -251,10 +263,11 @@ linearTimeRatioOn clock parse smallSize largeSize limit line = do
         pure (fromIntegral (t1 - t0) :: Double)
       measurable = fromIntegral (10 * windowsClockStep) :: Double
       maxReps = 4096 :: Int
+  performGC
   start <- getMonotonicTime
   let -- The number of parses of the small file that fills a measurable stretch.
       repsFor reps = do
-        t <- timeParses smallSize reps
+        t <- timeParses False smallSize reps
         now <- getMonotonicTime
         if t >= measurable
           then pure (Just (reps, t))
@@ -264,13 +277,13 @@ linearTimeRatioOn clock parse smallSize largeSize limit line = do
   found <- repsFor 1
   case found of
     Nothing -> pure Nothing
-    Just (reps, firstStretch) -> do
-      moreStretches <- traverse (const (timeParses smallSize reps)) [2 .. 3 :: Int]
-      let small = minimum (firstStretch : moreStretches) / fromIntegral reps
-          settle tries = do
-            r <- (/ small) <$> timeParses largeSize 1
-            if r < limit || r >= 2 * limit || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
-      if small <= 0 then pure Nothing else Just <$> settle 3
+    Just (reps, _) -> do
+      let pair = do
+            small <- (/ fromIntegral reps) <$> timeParses True smallSize reps
+            large <- timeParses True largeSize 1
+            pure (small, large)
+      pairs <- traverse (const pair) [1 .. 3 :: Int]
+      pure (if any ((<= 0) . fst) pairs then Nothing else Just (sort [l / s | (s, l) <- pairs] !! 1))
 
 -- | A parse of no real file: it takes time quadratic in the number of lines
 -- and finds one "definition" for each.

@@ -484,7 +484,15 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
       let wrapperCode     = generateBatchWrapper exportFn.exportName givenParams assumeParams defaults input
           combinedProgram = filteredSource <> wrapperCode
           virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
-      (evalErrs, mEval) <- runOneshot evalConfig virtualPath \nfp -> do
+          -- A function with inputs is asked for as JUST (f args). That JUST
+          -- is the wrapper's, so the answer inside it is read as deep as
+          -- `l4 run` reads an #EVAL of the call.
+          -- (The wrapper asks for JUST (f args) exactly when it has inputs,
+          -- given or assumed: see 'generateBatchWrapper'.)
+          rowConfig
+            | null givenParams && null assumeParams = evalConfig
+            | otherwise   = evalConfig { answerInJust = True }
+      (evalErrs, mEval) <- runOneshot rowConfig virtualPath \nfp -> do
         let uri = normalizedFilePathToUri nfp
         _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) combinedProgram
         Shake.use Rules.EvaluateLazy uri
@@ -498,7 +506,11 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
             Just evalResults ->
               -- The wrapper evaluated; a row still "fails" if evaluation raised
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
-              -- declared type). Those surface as `Reduction (Left …)`.
+              -- declared type). Those surface as `Reduction (ReducedErrored …)`.
+              -- A row that reached a REFUSE is neither an answer nor a failure:
+              -- it is "refused", its reason sits under the result and in the
+              -- diagnostics, and the batch carries on (it is not counted as an
+              -- error).
               let excMsgs = concatMap resultExceptionMsgs evalResults
                   undMsgs = concatMap resultUndeterminedMsgs evalResults
                   refMsgs = concatMap resultRefusalMsgs evalResults

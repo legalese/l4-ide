@@ -6,7 +6,7 @@ File: lifecycle-arming-outside-obligation.l4
   Range: 24:27-24:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -19,7 +19,7 @@ File: lifecycle-arming-outside-obligation.l4
   Range: 25:19-25:29
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/arming-unavailable
   Message:
     THE ARMING cannot be read here: no obligation has been entered where this
     is written.
@@ -39,7 +39,7 @@ File: lifecycle-arming-outside-obligation.l4
   Range: 31:28-31:43
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/arming-unavailable
   Message:
     THE ARMING cannot be read here: no obligation has been entered where this
     is written.
@@ -59,7 +59,7 @@ File: lifecycle-arming-outside-obligation.l4
   Range: 35:20-35:30
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/arming-unavailable
   Message:
     THE ARMING cannot be read here: no obligation has been entered where this
     is written.
@@ -79,7 +79,7 @@ File: lifecycle-arming-outside-obligation.l4
   Range: 41:27-41:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 

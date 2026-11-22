@@ -5,10 +5,10 @@ File: assert-refused-computed-because.l4
   Range: 18:32-18:46
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-identifier
   Message:
        |
     18 | #ASSERT REFUSED `nope` BECAUSE `wrong reason`
        |                                ^^^^^^^^^^^^^^
     unexpected `wrong reason`
-    expecting Float Literal, Numeric Literal, String Literal, or space token
+    expecting String Literal or space token

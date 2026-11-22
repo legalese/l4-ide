@@ -8,13 +8,13 @@ import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import System.CPUTime (getCPUTime)
 import System.Mem (getAllocationCounter)
 import Test.Hspec
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.TypeCheck (prettyCheckErrorWithContext)
+import LinearTime (cpuRatio, quadraticControl)
 
 spec :: Spec
 spec = describe "CONSIDER over many numbers" $ do
@@ -26,35 +26,32 @@ spec = describe "CONSIDER over many numbers" $ do
   -- Timed by the ratio of two sizes, not by a bound in seconds, so that a
   -- slow machine does not fail it; and in the process's CPU time, not
   -- wall-clock time, so that time spent waiting for a busy machine is not
-  -- counted. The sizes are 16 times apart, so linear time gives a ratio of
-  -- about 16 and quadratic time about 256; the test fails at three times
-  -- linear, and a ratio short of clearly quadratic is measured again, so
-  -- that one pause does not fail it. Sizes 4 times apart would not do:
-  -- checking each arm costs enough that the old cost only came to a ratio
-  -- of 11 between 1,000 and 4,000 arms. Measured on the change that made it
-  -- near-linear: 17 with it, 67 to 69 without it.
+  -- counted (see "LinearTime"). The sizes are 16 times apart, so linear time
+  -- gives a ratio of about 16 and quadratic time about 256; the test fails
+  -- at three times linear. Sizes 4 times apart would not do: checking each
+  -- arm costs enough that the old cost only came to a ratio of 11 between
+  -- 1,000 and 4,000 arms. Measured on the change that made it near-linear:
+  -- 17 with it, 67 to 69 without it.
   it "is checked in time near-linear in its arms" $ do
-    let timeCheck k = do
+    let prepare k = do
           src <- evaluate (considerOfNumbers k)
           _ <- evaluate (Text.length src)
-          t0 <- getCPUTime
+          pure src
+        run src = do
           ws <- case checkWithImports emptyVFS src of
             Left errs -> fail ("the module failed to check: " <> show errs)
             Right r -> pure r.tcdErrors
           rendered <- evaluate (sum (map (sum . map Text.length . prettyCheckErrorWithContext) ws))
-          t1 <- getCPUTime
           -- The one warning, asking for an OTHERWISE, so the check of the
           -- arms ran to its end.
           (length ws, rendered > 0) `shouldBe` (1, True)
-          pure (fromIntegral (t1 - t0) :: Double)
-        fastest k tries = minimum <$> traverse (const (timeCheck k)) [1 .. tries :: Int]
-    small <- fastest 250 3
-    let ratio large = large / max small 1.0e9
-        settle tries = do
-          r <- ratio <$> timeCheck 4000
-          if r < 48 || r >= 96 || tries <= (1 :: Int) then pure r else min r <$> settle (tries - 1)
-    r <- settle 3
+    r <- cpuRatio prepare run 250 4000
     r `shouldSatisfy` (< 48)
+
+  -- The control: on the same sizes and limit, the guard fails work that is
+  -- quadratic in the number of arms.
+  it "fails work quadratic in the arms on the same sizes (the control)" $
+    quadraticControl 250 4000 48
 
   -- A diagnostic carries in its context the syntax it was raised in, as
   -- written: the warning that asks this CONSIDER for an OTHERWISE carries

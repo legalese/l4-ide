@@ -5,7 +5,7 @@
 -- report keeps, checked over a few hundred generated contracts.
 --
 -- Each case is a tree of @RAND@ / @ROR@ over single obligations, every leaf a
--- different party and action, and a trace of idle @WAIT UNTIL@ events and
+-- different party and action, and a trace of idle @WAITUNTIL@ events and
 -- acts. The generator is a fixed linear congruential sequence, so a failure
 -- reproduces exactly; the case number is in the test's name.
 --
@@ -18,7 +18,7 @@
 --     the same two instants and the same decisive failures. (A compound
 --     still waiting prints its operands in the order they are written, so
 --     two of those are compared only as still waiting.)
---   * L3 — an idle event decides nothing: adding a @WAIT UNTIL@ between two
+--   * L3 — an idle event decides nothing: adding a @WAITUNTIL@ between two
 --     events leaves the verdict, the effective instant and the decisive
 --     failures as they were. (The generator writes only @MUST@s; a kept
 --     @SHANT@'s @HENCE@, where an idle event used to move the clock, is
@@ -132,7 +132,7 @@ renderLedger = \ case
 
 traceLines :: [Ev] -> [Text.Text]
 traceLines = map \ case
-  Tick t  -> "  (`WAIT UNTIL` " <> Text.pack (show t) <> ")"
+  Tick t  -> "  (WAITUNTIL " <> Text.pack (show t) <> ")"
   Act i t -> "  PARTY P" <> Text.pack (show i) <> " DOES a" <> Text.pack (show i) <> " AT " <> Text.pack (show t)
 
 -- | A module with one rule per tree and one #TRACE per (tree, trace) pair.
@@ -153,7 +153,7 @@ moduleWith render' cs = Text.unlines $
       , "`c" <> Text.pack (show n) <> "` MEANS " <> render' t
       , ""
       , "#TRACE `c" <> Text.pack (show n) <> "` AT 0 WITH" ]
-      <> (if null evs then ["  (`WAIT UNTIL` 0)"] else traceLines evs)
+      <> (if null evs then ["  (WAITUNTIL 0)"] else traceLines evs)
       <> [""]
     | (n, (t, evs)) <- zip [0 :: Int ..] cs ]
 

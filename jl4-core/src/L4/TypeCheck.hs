@@ -125,11 +125,11 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple.Extra (firstM)
 import Data.List.Split (splitWhen)
-import Optics ((%~), (^.), gplate)
+import Optics ((%~), (^.), gplate, toListOf)
 import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
-import Data.Char (isPrint)
+import Data.Char (isAlpha, isPrint)
 import Text.Read (readMaybe)
 import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
@@ -175,6 +175,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , sectionStack = []
     , localBindings = Set.empty
     , actionPatternPos = NotInActionPattern
+    , unlessOperand = Nothing
     }
 
 -- | Main entry point for scope- and type-checking.
@@ -286,8 +287,13 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- Combine mixfix registry from imports with this module's local definitions
                 -- so importing modules can use mixfix functions defined here
                 combinedMixfixRegistry = unionMixfixRegistry localMixfixRegistry env.mixfixRegistry
+                -- The entity info still holds the inference variables that the
+                -- substitution solves, and the result of a definition with no
+                -- GIVETH is one of them. Nothing is zonked unless an @export
+                -- has to read an inferred result.
                 exportErrs =
-                  Export.validateExportInputs rprog
+                  Export.validateExportInputs
+                    (applyFinalSubstitution s'.substitution checkEnv.moduleUri env.entityInfo) rprog
                   ++
                   -- §11.19 / OF-7: the refusal comes BEFORE the closure. An
                   -- export that reaches an imported reader validates rows it
@@ -344,7 +350,7 @@ doCheckProgramWithDependencies checkState checkEnv program =
               { program = rprog
               , implicitReaders =
                   Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
-              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns)
+              , errors = substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -355,62 +361,6 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , mixfixRegistry = combinedMixfixRegistry
               , sectionPaths = s'.sectionPaths
               }
-
--- | Drop diagnostics that are pure fallout from a name-resolution failure that
--- has already been reported (issue #920).
---
--- When 'resolveType' \/ 'resolveTerm'' cannot pick a binding, they report the
--- real error ('OutOfScopeError', 'AmbiguousTermError', 'AmbiguousTypeError')
--- and hand back an 'OutOfScope' sentinel so that checking can continue. Any
--- type built on such a sentinel is poisoned: it unifies with nothing, so every
--- 'expect' against it fails and emits a 'TypeMismatch' that tells the user
--- nothing they were not already told — classically rendered as the useless
--- "must match ... namely Verdict but is here of type Verdict".
---
--- Why filter here, at the boundary, instead of not raising the error in
--- 'expect'? Because @addError@ is what makes a candidate of the backtracking
--- 'Check' monad a failure. Silencing 'expect' would turn failing overload
--- candidates into successes, and a set of poisoned candidates that all succeed
--- is reported as 'InternalAmbiguityError' — trading one internal-error-grade
--- message for another. Filtering the finished list leaves resolution, pruning
--- and overload selection bit-for-bit unchanged and only removes the message.
---
--- Two properties keep this from hiding genuine errors:
---
--- * We only drop a 'TypeMismatch' that a sentinel /accounts for/: one whose two
---   sides agree everywhere except at or under a sentinel
---   ('sameModuloOutOfScope'). Merely /mentioning/ a sentinel is not enough, and
---   deliberately so. @GIVEN xs IS A LIST OF Typo@ \/ @GIVETH A NUMBER@ \/
---   @h MEANS xs@ mismatches NUMBER against @LIST OF ⊥@; both heads are
---   resolved, they genuinely differ, and that error survives verbatim once
---   @Typo@ is declared — so it is news, and it stays. Likewise
---   @FUNCTION FROM ⊥ TO BOOLEAN@ against @FUNCTION FROM ⊥ TO NUMBER@: the
---   poisoned argument matches, the BOOLEAN\/NUMBER return does not, and the
---   mismatch is reported. What we drop is only the contentless kind: @⊥@
---   against anything, @LIST OF ⊥@ against @LIST OF NUMBER@.
---
--- * We only filter at all when a resolution failure is present in the same
---   list, and resolution failures are themselves never dropped. So the error
---   list can never be emptied by this function: a file that failed to check
---   still fails to check, and still says why.
-suppressResolutionCascade :: [CheckErrorWithContext] -> [CheckErrorWithContext]
-suppressResolutionCascade errs
-  | any (isResolutionFailure . (.kind)) errs = filter (not . isCascade . (.kind)) errs
-  | otherwise                                = errs
-  where
-    isResolutionFailure :: CheckError -> Bool
-    isResolutionFailure = \ case
-      OutOfScopeError    {} -> True
-      AmbiguousTermError {} -> True
-      AmbiguousTypeError {} -> True
-      _                     -> False
-
-    isCascade :: CheckError -> Bool
-    isCascade = \ case
-      TypeMismatch _ec expected given ->
-        (mentionsOutOfScope expected || mentionsOutOfScope given)
-          && sameModuloOutOfScope expected given
-      _ -> False
 
 -- | Returns: (resolved module, top-level CheckInfo, mixfix registry from this module)
 checkProgram :: Module Name -> Check (Module Resolved, [CheckInfo], MixfixRegistry)
@@ -429,6 +379,7 @@ checkProgram written = do
     rdecides <- scanFunSigModule module'
     withDecides rdecides do
       (rprog, topEnv) <- inferProgram module'
+      warnRenamedBuiltins rprog
       -- Build the mixfix registry from THIS module's function signatures
       -- so it can be propagated to importing modules
       let localMixfixRegistry = buildMixfixRegistry rdecides
@@ -463,6 +414,29 @@ warnClauseArityChange (MkModule _ _ sec) = goSection sec
       for_ decls \ case
         Section _ sub -> goSection sub
         _ -> pure ()
+
+-- | One 'RenamedBuiltin' warning for each place a renamed built-in is written
+-- with its old spelling (Note [Renamed built-ins] in
+-- "L4.TypeCheck.Environment").
+--
+-- It runs once, over the checked module, rather than where a name is
+-- resolved: overload resolution may check an expression more than once and
+-- keep only one attempt's diagnostics, which would repeat or drop a warning
+-- raised there. A place is counted once even if the tree holds two copies of
+-- its reference, because the warnings are keyed by the range written.
+warnRenamedBuiltins :: Module Resolved -> Check ()
+warnRenamedBuiltins rprog =
+  for_ (Map.toList sites) \ (r, (old, new)) -> addWarning (RenamedBuiltin r old new)
+  where
+    sites =
+      Map.fromList
+        [ (r, (old, nameToText new))
+        | Ref written u _ <- toListOf (gplate @Resolved) rprog
+        , (u', old, new) <- renamedBuiltins
+        , u == u'
+        , rawName written == NormalName old
+        , Just r <- [rangeOf written]
+        ]
 
 -- | Turn each run of clauses that the parser grouped only because their bare
 -- names differ ('L4.Parser.decidePatternMatch') back into the separate
@@ -560,8 +534,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd ir ne eo jl os h i lb apos) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd ir ne eo jl os h i lb apos
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd ir ne eo jl os h i lb apos uo) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd ir ne eo jl os h i lb apos uo
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -687,7 +661,7 @@ applyFinalSubstitution subst moduleUri t =
 -- forking consumers are all pruned: the scan phases prune per declaration
 -- ('scanTyDeclDeclare', 'inferTyDeclDeclare', 'scanFunSigDecide'),
 -- 'inferTopDecl' prunes Declare/Decide/Assume/Timezone, and 'inferDirective'
--- prunes LazyEval/LazyEvalTrace/Check/Contract/Assert; Import/Section name
+-- prunes LazyEval/LazyEvalTrace/Check/Contract/Assert/AssertRefused; Import/Section name
 -- handling is deterministic ('def'/'ref'). The other two callers of this
 -- function only run 'applySubst', which never forks.
 --
@@ -2381,7 +2355,11 @@ inferType g = softprune $ do
     Type ann -> pure (Type ann)
     TyApp ann n ts -> do
       (rn, kind) <- resolveType n
-      checkKind kind ts
+      -- A name that failed to resolve has no kind to count the arguments
+      -- against: 'resolveType' hands back kind 0 for it so that checking can
+      -- go on, and comparing the arguments with that would report "expected 0
+      -- arguments" for a type that takes two. The failure has been reported.
+      unless (isOutOfScope rn) $ checkKind kind ts
       rts <- traverse inferType ts
       pure (TyApp ann rn rts)
     Fun ann onts t -> do
@@ -3766,7 +3744,7 @@ constructorsInScopeFromEntityInfo ei =
 -- was shadowed by its own term constructor in 'initialEnvironment', making
 -- event-typed annotations unwritable. Now that the shadowing is fixed (both
 -- uniques share the one key), @EVENT@ is checked like any other sum type: its
--- scanned set is the sole @event@ constructor (@WAIT UNTIL@ is 'Computable' and
+-- scanned set is the sole @event@ constructor (@WAITUNTIL@ is 'Computable' and
 -- delegates to it), which is COMPLETE, so the check is sound. See issue #905.
 --
 -- @MAYBE@ and @EITHER@ have COMPLETE, all-'Constructor' sets
@@ -3917,8 +3895,28 @@ checkConsider ec ann e branches t = do
 -- fall-through). Together with a partial mixfix match diagnosed below
 -- ('MixfixMatchErrorCheck'), it forces the ambiguity fallback in overload
 -- resolution — see the CAVEAT on 'forkWithLazyFallback'.
-inferFlatApp :: Bool -> Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
-inferFlatApp preambleErr ann n es = do
+-- | Infer an application. A type error in an argument names the argument by
+-- the given context ('inferOperatorApp'), or else as an input of the function
+-- applied.
+--
+-- If this is a flat chain of fixity-declared binary operators, first
+-- re-associate it into nested binary applications and infer the result; see
+-- 'tryReassociateFixityChain' (a no-op for anything else). Otherwise fall
+-- through to the ordinary application logic (including the route-α
+-- variadic-construction rescue), which lives in 'inferFlatApp'. The 'Bool'
+-- reports whether the pre-pass emitted an Error-severity diagnostic
+-- ('FixityConflict') on the fall-through route; it must reach overload
+-- resolution so that the ambiguity fallback is not skipped (see
+-- 'forkWithLazyFallback').
+inferApp :: Maybe (Int -> ExpectationContext) -> Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
+inferApp argContext ann n es = asValue do
+  (fixityErrEmitted, mReassociated) <- tryReassociateFixityChain ann n es
+  case mReassociated of
+    Just reassociated -> inferExpr reassociated
+    Nothing -> inferFlatApp argContext fixityErrEmitted ann n es
+
+inferFlatApp :: Maybe (Int -> ExpectationContext) -> Bool -> Anno -> Name -> [Expr Name] -> Check (Expr Resolved, Type' Resolved)
+inferFlatApp argContext preambleErr ann n es = do
       (initialFuncName, initialArgs, rewrotePostfix) <- reinterpretPostfixAppIfNeeded n es
       -- We want good type error messages. Therefore, we pursue the
       -- following strategy:
@@ -3987,7 +3985,7 @@ inferFlatApp preambleErr ann n es = do
             let preambleDiag = preambleErr || isJust mMixfixError
             resolveTermFiltered preambleDiag (const True) viab actualFuncName \ (rn, pt) -> do
               t <- instantiate pt
-              (res, rt) <- matchFunTy False rn t actualArgs
+              (res, rt) <- matchFunTy (fromMaybe (ExpectAppArgContext False rn) argContext) rn t actualArgs
               let finalAnn = if needsAnnoRebuild
                              then rebuildMixfixAppAnno ann actualFuncName actualArgs
                              else ann
@@ -4009,10 +4007,10 @@ inferFlatApp preambleErr ann n es = do
                   -- the typechecked AST (highlighting-only; exactprint reads
                   -- the parsed AST and is unaffected).
                   let collected = [collectIntoListLiteral actualArgs]
-                  (res, rt) <- matchFunTy False rn t collected
+                  (res, rt) <- matchFunTy (fromMaybe (ExpectAppArgContext False rn) argContext) rn t collected
                   pure (App (rebuildMixfixAppAnno ann actualFuncName collected) rn res, rt)
               _ -> do
-                  (res, rt) <- matchFunTy False rn t actualArgs
+                  (res, rt) <- matchFunTy (fromMaybe (ExpectAppArgContext False rn) argContext) rn t actualArgs
                   pure (App ann rn res, rt)
 
       -- The rescue is asked for only when the head could be such a
@@ -4782,13 +4780,18 @@ inferExpr' g =
       let e1' = setInertContext InertCtxAnd e1
           e2' = setInertContext InertCtxAnd e2
       dsFun <- desugarBinOpToFunction (rawName andName) (And ann e1' e2') ann e1' e2'
-      inferExpr' dsFun
+      -- @l UNLESS r@ is parsed as @l AND (NOT r)@ ('L4.Parser.infixUnless'),
+      -- and that NOT has no keyword of its own: tell it which operand is @r@.
+      let withUnlessOperand = case e2 of
+            Not _ r | operatorAsWritten ann == Just "UNLESS" -> local (set #unlessOperand (rangeOf r))
+            _ -> id
+      withUnlessOperand $ inferOperatorApp (binaryOperands ann) dsFun
     Or ann e1 e2 -> do
       -- Set inert context to OR for subexpressions before desugaring
       let e1' = setInertContext InertCtxOr e1
           e2' = setInertContext InertCtxOr e2
       dsFun <- desugarBinOpToFunction (rawName orName) (Or ann e1' e2') ann e1' e2'
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     RAnd ann e1 e2 -> do
       -- nothing says the compound's type: a fresh DEONTIC, which the LEFT
       -- operand then fixes for the right (see 'checkRegulativeBinOp')
@@ -4801,43 +4804,50 @@ inferExpr' g =
       regulativeBinOpAt (contract partyT actT) "OR" ROr InertCtxOr ann e1 e2
     Implies ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName impliesName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Equals ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName equalsName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Leq ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName leqName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Geq ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName geqName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Lt ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName ltName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Gt ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName gtName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Not ann e -> do
       dsFun <- desugarUnaryOpToFunction (rawName notName) g ann e
-      inferExpr' dsFun
+      -- The NOT of @l UNLESS r@ (see the 'And' case) names @r@ as the second
+      -- operand of UNLESS.
+      unlessOperand <- asks (.unlessOperand)
+      let operand
+            | isJust unlessOperand, rangeOf e == unlessOperand =
+                Just (const (ExpectOperatorArgContext "UNLESS" (Just 2)))
+            | otherwise = prefixOperand ann
+      inferOperatorApp operand dsFun
     Plus ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName plusName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Minus ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName minusName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Times ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName timesName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     DividedBy ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName divideName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Modulo ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName moduloName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Cons ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName consName) g ann e1 e2
-      inferExpr' dsFun
+      inferOperatorApp (binaryOperands ann) dsFun
     Proj ann e l -> do
       -- Try to resolve as a qualified name (for section dereferencing), but only
       -- if the base is not a local binding. This ensures `r's f` prefers record
@@ -4928,7 +4938,7 @@ inferExpr' g =
           t <- instantiate pt
 
           -- 2. - 5.
-          (res, rt) <- matchFunTy True rl t [projE]
+          (res, rt) <- matchFunTy (ExpectAppArgContext True rl) rl t [projE]
 
           re <-
             case res of
@@ -4965,20 +4975,7 @@ inferExpr' g =
     -- The arguments of an application are VALUES ('asValue'): a deonton
     -- among them is handed to the function, which may attach it anywhere.
     -- The function itself is a name, so the whole node is checked that way.
-    App ann n es -> asValue do
-      -- If this is a flat chain of fixity-declared binary operators, first
-      -- re-associate it into nested binary applications and infer the result;
-      -- see 'tryReassociateFixityChain' (a no-op for anything else). Otherwise
-      -- fall through to the ordinary application logic (including the route-α
-      -- variadic-construction rescue), which lives in 'inferFlatApp'. The
-      -- 'Bool' reports whether the pre-pass emitted an Error-severity
-      -- diagnostic ('FixityConflict') on the fall-through route; it must
-      -- reach overload resolution so that the ambiguity fallback is not
-      -- skipped (see 'forkWithLazyFallback').
-      (fixityErrEmitted, mReassociated) <- tryReassociateFixityChain ann n es
-      case mReassociated of
-        Just reassociated -> inferExpr reassociated
-        Nothing -> inferFlatApp fixityErrEmitted ann n es
+    App ann n es -> inferApp Nothing ann n es
     AppNamed ann n nes _morder -> asValue do
       (rn, pt) <- resolveTerm n
       t <- instantiate pt
@@ -5044,10 +5041,10 @@ inferExpr' g =
       pure (Percent ann e', number)
     Fetch ann e -> do
       dsFun <- desugarUnaryOpToFunction (rawName fetchName) g ann e
-      inferExpr' dsFun
+      inferOperatorApp (prefixOperand ann) dsFun
     Env ann e -> do
       dsFun <- desugarUnaryOpToFunction (rawName envName) g ann e
-      inferExpr' dsFun
+      inferOperatorApp (prefixOperand ann) dsFun
     Post ann e1 e2 e3 -> do
       e1' <- checkExpr ExpectPostUrlContext e1 string
       e2' <- checkExpr ExpectPostHeadersContext e2 string
@@ -6033,10 +6030,13 @@ inferLit (StringLit _ _) =
 -- NOTE that if there are *no* arguments, we are not expecting a function,
 -- and are trivially done.
 --
-matchFunTy :: Bool -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr Resolved], Type' Resolved)
-matchFunTy _isProjection _r t []   =
+-- The first argument gives the context each argument is checked in, by its
+-- 1-based position.
+--
+matchFunTy :: (Int -> ExpectationContext) -> Resolved -> Type' Resolved -> [Expr Name] -> Check ([Expr Resolved], Type' Resolved)
+matchFunTy _argContext _r t []   =
   pure ([], t)
-matchFunTy  isProjection r t0 args =
+matchFunTy  argContext r t0 args =
   -- The fuel bounds the synonym-expansion chain so that a cyclic type
   -- synonym (which evades declaration-time detection when it arrives via
   -- imports) cannot make us loop; when it runs out, we report the current
@@ -6065,7 +6065,7 @@ matchFunTy  isProjection r t0 args =
                 let tf = fun_ argts rt
                 bindInfVar i tf
 
-                rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args argts)
+                rargs <- traverse (\ (j, e, t') -> checkExpr (argContext j) e t') (zip3 [1 ..] args argts)
                 pure (rargs, rt)
 
               Just t' -> go fuel t'
@@ -6075,7 +6075,7 @@ matchFunTy  isProjection r t0 args =
             -- and then check the arguments against their expected result
             -- types.
             | nonts == nargs -> do
-              rargs <- traverse (\ (j, e, t') -> checkExpr (ExpectAppArgContext isProjection r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
+              rargs <- traverse (\ (j, e, t') -> checkExpr (argContext j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
               pure (rargs, rt)
 
             | otherwise -> do
@@ -7482,6 +7482,40 @@ desugarUnaryOpToFunction name g ann e  = do
         , payload = [mkHoleWithSrcRangeHint Nothing, mkHoleWithSrcRange as]
         }
 
+-- | Infer the call that 'desugarBinOpToFunction' or 'desugarUnaryOpToFunction'
+-- made of an operator expression. The given contexts ('binaryOperands',
+-- 'prefixOperand') name its operands in a type error after the operator the
+-- author wrote, not after the function it is checked as, such as @__PLUS__@
+-- for @+@ (predefined, or an overload the source defines).
+inferOperatorApp :: Maybe (Int -> ExpectationContext) -> Expr Name -> Check (Expr Resolved, Type' Resolved)
+inferOperatorApp argContext = \ case
+  App ann n es -> inferApp argContext ann n es
+  e            -> inferExpr' e
+
+-- | The operands of a binary operator expression with this annotation, by
+-- position. 'Nothing' if the operator is not written in the source.
+binaryOperands :: Anno -> Maybe (Int -> ExpectationContext)
+binaryOperands ann = (\ op i -> ExpectOperatorArgContext op (Just i)) <$> operatorAsWritten ann
+
+-- | The operand of a prefix operator expression, such as NOT, with this
+-- annotation. 'Nothing' if the operator is not written in the source.
+prefixOperand :: Anno -> Maybe (Int -> ExpectationContext)
+prefixOperand ann = (\ op _ -> ExpectOperatorArgContext op Nothing) <$> operatorAsWritten ann
+
+-- | An operator as its author wrote it, such as @+@, @PLUS@ or @AT LEAST@: the
+-- tokens in the annotation of the operator expression, without parentheses
+-- written around the expression. 'Nothing' if there are none, as for the NOT
+-- of @l UNLESS r@.
+operatorAsWritten :: Anno -> Maybe Text
+operatorAsWritten ann =
+  case [ Lexer.displayPosToken t
+       | AnnoCsn _ cluster <- ann.payload
+       , t <- cluster.payload.tokens
+       , t.payload `notElem` [Lexer.TSymbols Lexer.TPOpen, Lexer.TSymbols Lexer.TPClose]
+       ] of
+    []  -> Nothing
+    ops -> Just (Text.unwords ops)
+
 -- | Set the inert context for Inert nodes and convert string literals to Inert.
 -- String literals are only converted when they appear as direct operands of
 -- boolean operators (AND/OR/RAnd/ROr), not inside other expressions.
@@ -8434,6 +8468,15 @@ prettyCheckError (RegulativeActorMismatch party performer actionName) =
       <> " is performed by " <> quotedName (getActual performer)
       <> ", not by " <> quotedName (getActual party) <> "."
   ]
+prettyCheckError (ExportEventType _ fnName (Just paramName)) =
+  [ quotedName (getActual fnName) <> " is published with @export, but its input "
+      <> quotedName (getActual paramName) <> " has a type that is or contains an EVENT."
+  , "@export does not support an EVENT as an input yet."
+  ]
+prettyCheckError (ExportEventType _ fnName Nothing) =
+  [ quotedName (getActual fnName) <> " is published with @export, but its result has a type that is or contains an EVENT."
+  , "@export does not support an EVENT as a result yet."
+  ]
 
 -- | Pretty print mixfix match errors with helpful suggestions.
 prettyMixfixMatchError :: Name -> MixfixMatchError -> [Text]
@@ -8615,6 +8658,14 @@ prettyCheckWarning = \ case
       , "Rename one of the two, so the name means only one thing where you"
       , "write it, and then the keyword can go."
       ]
+  RenamedBuiltin _ old new ->
+    [ "`" <> old <> "` has been renamed to " <> new <> "."
+    , "Nothing is broken: the old spelling still means the same thing, so this"
+    , "file checks and runs as before."
+    , ""
+    , "Write " <> new <> ", in one word and without backquotes, as every other"
+    , "built-in is written. Some versions of L4 no longer accept the old spelling."
+    ]
   SiblingLedgerRead w
     | Just rorSite <- w.unrunRor ->
     [ opening
@@ -8811,10 +8862,15 @@ prettyMissingPattern = go
 -- ('litKeyToLit').
 --
 -- A piece of text prints as L4 writes it: every printable character as it
--- is, @"@ and @\\@ escaped. A text with a character that does not print (a
--- tab, a newline) is written with Haskell-style escapes instead
--- ('L4.Lexer.showStringLit'), which L4 reads back, so that the suggested
--- clause stays on one line.
+-- is, @"@ and @\\@ escaped ('L4.Print.escapeStringLiteral'). It is not read
+-- off the token: the token's text is the source slice, quotes and escapes
+-- as written, which for a text spelled across lines, or with a tab or a
+-- zero-width space typed in, holds that character raw and would break the
+-- suggested clause over two lines or hide the character. (Before the
+-- token kept the slice its display was 'L4.Lexer.showStringLit' of the
+-- decoded text, which would write @"São Paulo"@ as @"S\227o Paulo"@.) A text
+-- with a character that does not print is written with Haskell-style
+-- escapes instead ('L4.Lexer.showStringLit'), which L4 reads back.
 literalAsWritten :: Lit -> Text
 literalAsWritten lit = case lit of
   StringLit _ t
@@ -8861,8 +8917,16 @@ prettyNonDistinctContext NonDistinctTermAppForm =
 prettyTypeMismatch :: ExpectationContext -> Type' Resolved -> Type' Resolved -> [Text]
 prettyTypeMismatch ExpectIfConditionContext expected given =
   standardTypeMismatch [ "The condition in IF-THEN-ELSE and BRANCH-IF-THEN-OTHERWISE constructs is expected to be of type" ] expected given
-prettyTypeMismatch ExpectNotArgumentContext expected given =
-  standardTypeMismatch [ "The input to NOT is expected to be of type" ] expected given
+prettyTypeMismatch (ExpectOperatorArgContext op i) expected given =
+  standardTypeMismatch
+    [ maybe "The input" (\ n -> "The " <> prettyOrdinal n <> " input") i
+        <> " of " <> operator <> " is expected to be of type"
+    ] expected given
+  where
+    -- A keyword as it is, a symbol quoted, as in "The input of '%'".
+    operator
+      | Text.any isAlpha op = op
+      | otherwise           = "'" <> op <> "'"
 prettyTypeMismatch ExpectPercentArgumentContext expected given =
   standardTypeMismatch [ "The input to '%' is expected to be of type" ] expected given
 prettyTypeMismatch ExpectPostUrlContext expected given =
@@ -9114,10 +9178,9 @@ standardTypeMismatch prefix expected given =
 -- user-defined names it is built from were declared. Predefined names carry no
 -- range and are skipped, so @LIST OF Verdict@ is annotated with @Verdict@ only;
 -- if nothing can be said we fall back to the plain rendering rather than emit
--- an empty parenthesis. Sentinels from failed resolution are skipped too: their
--- 'getOriginal' is the *reference* site, so labelling it "defined at" would lie
--- (those mismatches are normally suppressed by 'suppressResolutionCascade'
--- anyway).
+-- an empty parenthesis. Placeholders from failed resolution are skipped too:
+-- their 'getOriginal' is the *reference* site, so labelling it "defined at"
+-- would lie.
 prettyMismatchedTypes :: Type' Resolved -> Type' Resolved -> (Text, Text)
 prettyMismatchedTypes expected given
   | e /= g    = (e, g)

@@ -82,7 +82,7 @@ Only Alice pays, and day 8 arrives:
 ```l4
 #TRACE `each pays a share` AT 0 WITH
     PARTY Alice DOES Pay Alice `Ms Ng` 500 AT 2
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -202,7 +202,7 @@ Not the rent, so nothing is discharged, and all three alternatives stand with fo
 
 ```l4
 #TRACE `any one pays the rent` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -276,7 +276,7 @@ The right-hand side of the `OR` is what you expect: Alice must repay Bob $750 wi
 ```l4
 #TRACE `one pays, the other repays` AT 0 WITH
     PARTY Bob DOES Pay Bob `Ms Ng` 1500 AT 3
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -389,7 +389,7 @@ L4 says the rent was paid in time. It was not: two-thirds of it arrived after th
 
 ```l4
 #TRACE `rent still owed` 1500 AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```

@@ -101,7 +101,7 @@ This models a simple sale: the seller must deliver within 14 days, then the buye
 You can write L4 in three places:
 
 - **VS Code** (recommended): install the [L4 extension](https://marketplace.visualstudio.com/items?itemName=Legalese.l4-vscode) and create a file ending in `.l4`. You get syntax highlighting, errors as you type, hover documentation and visualisations.
-- **The web editor**: [jl4.legalese.com](https://jl4.legalese.com/) runs L4 in your browser, with nothing to install.
+- **The web editor**: [play.legalese.com](https://play.legalese.com/) runs L4 in your browser, with nothing to install.
 - **The command line**: `l4 run myfile.l4` checks a file and prints its results.
 
 [Install L4 and write your first rule](../../tutorials/getting-started/first-l4-file.md) walks through each option step by step.

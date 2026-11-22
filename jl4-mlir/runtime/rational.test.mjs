@@ -390,7 +390,7 @@ ok(
     -1.5,
   );
 
-  // IS INTEGER
+  // ISINTEGER
   eq("ABI: is_integer(7) -> 1", env.__l4_is_integer(parse("7")), 1);
   eq("ABI: is_integer(7/2) -> 0", env.__l4_is_integer(parse("7/2")), 0);
 }

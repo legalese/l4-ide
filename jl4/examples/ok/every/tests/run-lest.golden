@@ -15,7 +15,7 @@ run-lest.l4:71:42-53:
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:73:1-74:20:
+run-lest.l4:73:1-74:17:
   PARTY Landlord OF "Ms Ng" MUST Refund theLandlord WITHIN 1 HENCE FULFILLED
 run-lest.l4:76:1-78:50:
   FULFILLED
@@ -47,7 +47,7 @@ run-lest.l4:90:42-53:
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:92:1-93:20:
+run-lest.l4:92:1-93:17:
   PARTY Landlord OF "Ms Ng" MUST Refund theLandlord WITHIN 1 HENCE FULFILLED
 run-lest.l4:95:1-97:50:
   DEONTIC BREACHED:
@@ -79,7 +79,7 @@ run-lest.l4:108:1-109:50:
       MUST Refund theLandlord
     before their deadline, which was at
       15
-run-lest.l4:118:1-119:21:
+run-lest.l4:118:1-119:18:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -100,9 +100,9 @@ run-lest.l4:139:47-58:
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:141:1-145:20:
+run-lest.l4:141:1-145:17:
   FULFILLED
-run-lest.l4:147:1-151:20:
+run-lest.l4:147:1-151:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -116,7 +116,7 @@ run-lest.l4:147:1-151:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-lest.l4:153:1-157:20:
+run-lest.l4:153:1-157:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -165,7 +165,7 @@ run-lest.l4:183:47-58:
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:185:1-189:20:
+run-lest.l4:185:1-189:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -255,7 +255,7 @@ run-lest.l4:269:47-58:
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:271:1-276:20:
+run-lest.l4:271:1-276:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -269,7 +269,7 @@ run-lest.l4:271:1-276:20:
       MUST Refund theLandlord
     before their deadline, which was at
       15
-run-lest.l4:282:1-287:20:
+run-lest.l4:282:1-287:17:
   FULFILLED
 run-lest.l4:290:1-294:50:
   FULFILLED
@@ -294,7 +294,7 @@ run-lest.l4:311:47-58:
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:313:1-318:20:
+run-lest.l4:313:1-318:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -322,7 +322,7 @@ run-lest.l4:330:42-53:
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:332:1-333:19:
+run-lest.l4:332:1-333:16:
   PARTY Landlord OF "Ms Ng" MUST Refund theLandlord WITHIN 2 HENCE FULFILLED
 run-lest.l4:335:1-337:50:
   FULFILLED
@@ -354,7 +354,7 @@ run-lest.l4:348:42-53:
       theLandlord (at run-lest.l4:45:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:350:1-351:20:
+run-lest.l4:350:1-351:17:
   PARTY Landlord OF "Ms Ng" MUST Refund theLandlord WITHIN 1 HENCE FULFILLED
 run-lest.l4:362:27-32:
   I found a problem while checking the definition of `sign, with a second chance`:
@@ -370,7 +370,7 @@ run-lest.l4:364:34-39:
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:368:1-369:19:
+run-lest.l4:368:1-369:16:
   PARTY Tenant OF "Alice" MUST Sign alice WITHIN 13 HENCE FULFILLED LEST (BREACH BY alice BECAUSE "the second chance was missed too")
 run-lest.l4:371:1-373:36:
   FULFILLED
@@ -386,7 +386,7 @@ run-lest.l4:397:27-32:
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:401:1-402:21:
+run-lest.l4:401:1-402:18:
   PARTY Tenant OF "Alice" MUST Sign alice WITHIN 2 HENCE FULFILLED LEST `sign, or try again`
 run-lest.l4:404:1-406:37:
   FULFILLED
@@ -436,7 +436,7 @@ run-lest.l4:437:41-46:
       alice (at run-lest.l4:46:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:441:1-442:21:
+run-lest.l4:441:1-442:18:
   DEONTIC BREACHED:
     BREACH
     BY Tenant OF "Alice"
@@ -467,7 +467,7 @@ run-lest.l4:464:42-45:
       bob (at run-lest.l4:47:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:466:1-469:20:
+run-lest.l4:466:1-469:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -505,7 +505,7 @@ run-lest.l4:477:42-45:
       bob (at run-lest.l4:47:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-lest.l4:479:1-482:19:
+run-lest.l4:479:1-482:16:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY

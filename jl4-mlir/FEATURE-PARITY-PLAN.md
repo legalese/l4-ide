@@ -16,7 +16,7 @@ path must return JSON **byte-identical** to `jl4-service` for:
 - DEONTIC functions (with `startTime` + `events`).
 - `metadata-cache.json` shape (functions[] with `returnSchema`,
   `x-sanitized-name`, `isDeontic`; files[] with exports) — this is the contract
-  the auth-proxy readmodel already consumes.
+  that readers of the cache already rely on.
 
 Anything we cannot make byte-identical, we either (a) fix, or (b) **detect at
 compile time and refuse**, so the system never silently returns a wrong legal
@@ -61,10 +61,10 @@ decision, not a detail (see "Decisions required").
 Generalize `scripts/batch-compile.sh` (which today only reports compile
 success) into a **differential evaluation tester**.
 
-- Corpus: all `.l4` in the monorepo + the auth-proxy `validation/test.l4`
+- Corpus: all `.l4` in the monorepo + the `test/fixtures/test.l4`
   fixture (12 exports, the existing 11/12 byte-identical baseline).
 - For each exported function: generate/seed sample inputs (start from the
-  fixtures already used in auth-proxy validation), POST to both
+  existing fixtures), POST to both
   `jl4-service` and the WASM HTTP wrapper (`scripts/wasm-server.mjs`), diff the
   JSON responses.
 - Report a matrix: `byte-identical | differs | jl4-mlir-error | service-error |
@@ -76,7 +76,7 @@ below moves cells from "differs/error" to "byte-identical" (or, legitimately,
 to "refused-unsupported").
 
 Files: `scripts/` (new differential runner), reuse `scripts/wasm-server.mjs`,
-auth-proxy `validation/`.
+`test/fixtures/`.
 
 **DONE.** `scripts/parity-harness.mjs` compiles each `.l4` to WASM, deploys the
 same source to a live `jl4-service`, and evaluates identical (schema-generated
@@ -86,7 +86,7 @@ service-error | both-error | refused-unsupported`. The gate fails only on
 `differs`/`wasm-error`; `ulp-differs` is the tracked f64-vs-rational gap (M4),
 not a regression.
 
-First run (auth-proxy `test.l4`, 12 functions, + the deontic `ceo` file):
+First run (`test.l4`, 12 functions, + the deontic `ceo` file):
 **11 byte-identical, 1 ulp-differs, 1 refused-unsupported → gate PASS.** The
 `ulp-differs` is `total-interest-paid`: `0.016583333333333332` (service, exact
 rational) vs `…335` (WASM, f64) — exactly the M4 signature, now caught
@@ -1268,7 +1268,8 @@ Lands the schema/runtime/HTTP plumbing on the canonical
 - **Schema** — new `DeonticContract` ADT (`OBLIGATION` / `FULFILLED` /
   `BREACH`) baked under `FunctionExport.deonticContract`; party / action
   / deadline pre-rendered via `L4.Print.prettyLayout` so the runtime
-  never re-runs the pretty-printer. `extractDeonticContract` walks
+  never re-runs the pretty-printer. (A bare party or action name is
+  no longer baked this way; see Slice 7.) `extractDeonticContract` walks
   `Regulative` / nested HENCE-LEST / bare FULFILLED / `Breach`.
 - **Lower** — `Regulative{}` / `Breach{}` stop `markUnsupported`-ing
   (they emit an `arith.constant 0.0` placeholder). The wasm body is
@@ -1462,6 +1463,35 @@ Net: 3 more trace-byte-identical cells. Full corpus is now
 is hidden behind `?trace=full`, so it adds zero cost to the
 default `M0` value path.
 
+### Slice 7 — party and action names spelled as jl4-service answers them
+
+jl4-service answers a party and an action in the structured fields
+(`party`, `action`, `eventParty`, `eventAction`, `obligationAction`,
+and the `party` of a `BREACH` from an explicit `BREACH BY`) as the
+plain name, without backticks: `the seller`, not `` `the seller` ``.
+The schema now bakes them the same way.
+
+- **Schema** — `DeonticExpr` gains `DEName` beside `DELiteral` and
+  `DEParam`. A bare name (an obligation's party or action, or the
+  party of `BREACH BY`) is baked as its plain name; anything more
+  than a name (an action that carries a value, `say "pay now"`)
+  stays rule source from `prettyLayout`. On the wire a `DEName` is
+  the same bare string as a `DELiteral`; the difference travels in a
+  sibling key, `partyKind` / `actionKind` on an `OBLIGATION` and
+  `byKind` on a `BREACH`, each `"name"` when present. A bundle
+  compiled before these keys existed has none, and the runtime
+  prints its strings as given.
+- **Runtime** — the trace's source text backticks a name the way
+  L4's printer does, so ``PARTY `the seller` MUST ...`` still parses.
+
+Known divergences from jl4-service, both predating this slice:
+
+- A `BREACH BY` whose party is a `GIVEN` input answers the input's
+  name (`debtor`) here and its value (`the borrower`) in jl4-service.
+- A breach reached through a `HENCE` gets an extra
+  `BREACH BY … BECAUSE …` clause node in the WASM trace that
+  jl4-service does not print.
+
 ---
 
 ## Milestone 7 — Runtime hardening (lands with the proxy work)
@@ -1473,7 +1503,7 @@ default `M0` value path.
 - Single warm instantiation per module per worker (cold GHC-wasm RTS / module
   instantiation cost amortized across requests).
 
-This milestone is the seam to the auth-proxy integration and can proceed in
+This milestone is the seam to the service integration and can proceed in
 parallel once M1 lands.
 
 ### Slice 1 — memory cap, trap recovery, peak telemetry

@@ -281,7 +281,7 @@ The principles above lead to a few habits that make a rule easy to check against
 
 **Prefer words in legal contexts.** `AND`, `OR`, `NOT`, `AT LEAST` and `PLUS` read better to a lawyer than `&&`, `||`, `>=` and `+`.
 
-**Lay it out consistently.** Indent with spaces, never tabs, and align related items vertically. `l4 format` lays a file out for you; run it in a change of its own, so that reformatting never hides a change of meaning.
+**Lay it out consistently.** Indent with spaces, never tabs, and align related items vertically. Make layout changes, such as re-indenting a rule, in a change of their own, so that they never hide a change of meaning.
 
 **Keep tests beside the rules.** Put a rule's `#EVAL`, `#ASSERT` and `#TRACE` checks in a `§§ Tests` section of the same file ([Test your rules](../../tutorials/getting-started/testing-your-rules.md)).
 

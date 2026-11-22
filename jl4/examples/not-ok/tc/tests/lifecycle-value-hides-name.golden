@@ -1,12 +1,12 @@
 Parsing successful
 Typechecking successful
-Info | [Import Resolution] Resolving import: prelude from lifecycle-value-hides-name.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from lifecycle-value-hides-name.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+Info | [Import Resolution] Resolving import: prelude from lifecycle-value-hides-name.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from lifecycle-value-hides-name.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from lifecycle-value-hides-name.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: lifecycle-value-hides-name.l4
   Hidden: no
   Range: 35:29-35:34
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -19,7 +19,7 @@ File: lifecycle-value-hides-name.l4
   Range: 40:27-40:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -32,7 +32,7 @@ File: lifecycle-value-hides-name.l4
   Range: 41:47-41:55
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/lifecycle-noun-hides-name
   Message:
     THE JOIN here is the lifecycle position, not `JOIN`.
 
@@ -49,7 +49,7 @@ File: lifecycle-value-hides-name.l4
   Range: 46:27-46:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -62,7 +62,7 @@ File: lifecycle-value-hides-name.l4
   Range: 54:23-54:35
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/lifecycle-unavailable
   Message:
     THE DEADLINE is the deadline of the obligation this expression sits in the HENCE or
     LEST of — but it is not WRITTEN inside any HENCE or LEST: it is at the top
@@ -78,7 +78,7 @@ File: lifecycle-value-hides-name.l4
   Range: 54:23-54:35
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/lifecycle-noun-hides-name
   Message:
     THE DEADLINE here is the lifecycle position, not `DEADLINE`.
 

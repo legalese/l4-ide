@@ -58,7 +58,7 @@
     "events": [
       "PARTY S DOES delivery AT 2",
       "PARTY B DOES payment OF 21 AT 4",
-      "`WAIT UNTIL` OF 10"
+      "WAITUNTIL OF 10"
     ],
     "format": 1,
     "line": 23,

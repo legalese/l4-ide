@@ -6,7 +6,7 @@ File: anchor-lest-join.l4
   Range: 19:47-19:58
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/anchor-unavailable
   Message:
     OF THE JOIN cannot anchor a WITHIN under LEST.
 

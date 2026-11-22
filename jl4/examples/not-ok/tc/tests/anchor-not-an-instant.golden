@@ -6,7 +6,7 @@ File: anchor-not-an-instant.l4
   Range: 14:44-14:58
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/anchor-not-an-instant
   Message:
     The anchor after OF in a WITHIN is expected to be an instant — a NUMBER on
     the trace's own clock, or a DATE — but is here of type

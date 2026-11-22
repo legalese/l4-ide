@@ -6,7 +6,7 @@ File: anchor-top-level-join.l4
   Range: 19:41-19:52
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/anchor-unavailable
   Message:
     OF THE JOIN names a position in the life of the obligation this one
     is the continuation of — but this obligation is not WRITTEN inside any
@@ -25,7 +25,7 @@ File: anchor-top-level-join.l4
   Range: 22:48-22:63
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/anchor-unavailable
   Message:
     OF THE DEADLINE names a position in the life of the obligation this one
     is the continuation of — but this obligation is not WRITTEN inside any

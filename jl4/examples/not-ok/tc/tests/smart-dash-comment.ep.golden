@@ -4,7 +4,7 @@ File: smart-dash-comment.l4
   Range: 18:1-18:2
   Source: lexer
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
     This is – (En Dash, U+2013). It looks like `-`, but L4 only understands the plain one.
 

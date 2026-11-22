@@ -187,6 +187,7 @@ evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes 
     (kindText, valueJson, errorField) = case result of
       Assertion Holds         -> ("assertion" :: Text, Aeson.Bool True, [])
       Assertion Fails         -> ("assertion", Aeson.Bool False, [])
+      -- A failed #ASSERT REFUSED is a false assertion that says why.
       Assertion a@(FailsBecause _) ->
         ("assertion", Aeson.Bool False, [Key.fromString "error" Aeson..= prettyAssertionOutcome a])
       -- A REFUSED assertion keeps kind "assertion" with a null value, and its

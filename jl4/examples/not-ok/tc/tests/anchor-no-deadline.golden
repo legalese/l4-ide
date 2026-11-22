@@ -6,7 +6,7 @@ File: anchor-no-deadline.l4
   Range: 17:47-17:62
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/anchor-unavailable
   Message:
     OF THE DEADLINE names the deadline of the obligation this one is the
     continuation of, but that obligation has no closing edge — no WITHIN or

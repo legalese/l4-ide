@@ -1,0 +1,31 @@
+-- A type error in an operand names the operator as it is written.
+
+GIVEN `the applicant is a resident` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the applicant may apply` IF
+         `the applicant is a resident`
+  UNLESS 18
+
+GIVETH A BOOLEAN
+DECIDE `a number before UNLESS` IF 18 UNLESS FALSE
+
+GIVETH A BOOLEAN
+DECIDE `an exception that is itself negated` IF TRUE UNLESS NOT 4
+
+GIVETH A BOOLEAN
+DECIDE `a number after NOT` IF NOT 3
+
+GIVETH A BOOLEAN
+DECIDE `a conjunction in parentheses` IS (TRUE AND 5)
+
+GIVETH A BOOLEAN
+DECIDE `a conjunction written as a symbol` IS TRUE && 5
+
+GIVETH A NUMBER
+DECIDE `a sum written as a symbol` IS 1 + TRUE
+
+GIVETH A NUMBER
+DECIDE `a sum written as a word` IS TRUE PLUS 1
+
+GIVETH A LIST OF NUMBER
+DECIDE `a list with a number for its tail` IS 1 FOLLOWED BY 2

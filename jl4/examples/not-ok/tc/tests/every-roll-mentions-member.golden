@@ -6,7 +6,7 @@ File: every-roll-mentions-member.l4
   Range: 28:32-28:33
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 

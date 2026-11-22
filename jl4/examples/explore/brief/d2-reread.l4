@@ -116,7 +116,7 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES `Alice buys dinner`                      AT 65225
     PARTY World DOES `Alice gives up`                         AT 65230
     PARTY World DOES `Messages delivers the message`          AT 65280
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)
 
 -- The window: Alice re-reads at 18:05:50 and finds dinner open; Bob's
 -- purchase is recorded at 18:06; Alice buys at 18:06:10 on what the
@@ -127,7 +127,7 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES (`Alice reads the ledger again` TRUE)    AT 65150
     PARTY World DOES `ledger records Bob's purchase`          AT 65160
     PARTY World DOES `Alice buys dinner`                      AT 65170
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)
 
 -- The ledger does not answer twice (the pause, which changes nothing),
 -- then answers open, and Alice buys before Bob. Official record: opened,
@@ -139,4 +139,4 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES (`Alice reads the ledger again` TRUE)    AT 65125
     PARTY World DOES `Alice buys dinner`                      AT 65130
     PARTY World DOES `Alice is done`                          AT 65140
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)

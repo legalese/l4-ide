@@ -67,7 +67,7 @@ GIVETH A DEONTIC Actor Action
 
 -- Day 8 arrives and nobody has done anything.
 #TRACE `the rent is due` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 -- Something else happens first: Ms Ng inspects on day 2. Alice's
 -- obligation is untouched, but the clock has moved on.
@@ -101,7 +101,7 @@ GIVETH A DEONTIC Actor Action
 
 -- Thirty days pass and Ms Ng never comes: nobody is in breach.
 #TRACE `the inspection right` AT 0 WITH
-    (`WAIT UNTIL` 31)
+    (WAITUNTIL 31)
 
 
 -- ====================================================================
@@ -122,7 +122,7 @@ GIVETH A DEONTIC Actor Action
 
 -- A year passes and Alice never sublets: the prohibition was kept.
 #TRACE `no subletting` AT 0 WITH
-    (`WAIT UNTIL` 366)
+    (WAITUNTIL 366)
 
 -- Nothing has happened yet.
 #TRACE `no subletting` AT 0 WITH

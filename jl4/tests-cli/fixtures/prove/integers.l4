@@ -7,4 +7,4 @@
 #ASSERT x EQUALS FLOOR x
 
 -- proved: under the guard, and only there
-#ASSERT `IS INTEGER` x IMPLIES x EQUALS FLOOR x
+#ASSERT ISINTEGER x IMPLIES x EQUALS FLOOR x

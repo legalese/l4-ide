@@ -81,3 +81,12 @@ GIVETH A NUMBER
 `note on` r [see s.3\q here] MEANS r TIMES 1
 
 #EVAL `note on` 7
+
+-- An open bracket never needs an escape, but an escaped one is accepted and
+-- decodes to the same `[`: an author who escapes the close of a citation
+-- escapes its open in the same keystroke.
+GIVEN k IS A NUMBER
+GIVETH A NUMBER
+`the fee on` k [see note \[3\] here] MEANS k TIMES 2
+
+#EVAL `the fee on` 5

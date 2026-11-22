@@ -1,4 +1,19 @@
 the date 1 month after `Late Jan 24` (capped at the last day of that month)
 the date -1 months after `Late Jan 24` (capped at the last day of that month)
-the day before the date 0 months plus one month after `Jan 2024`
-the day before the date 1 month plus one month after `Jan 2024`
+the last day of the month 0 months after the month of `Jan 2024`
+the last day of the month 1 month after the month of `Jan 2024`
+the last day of the month 1 month after the month of 15 January 2025
+the last day of the month 0 months after the month of 31 January 2025
+the last day of the month 1 month after the month of 15 January 2024
+the last day of the month 3 months after the month of 30 November 2026
+the last day of the month -1 months after the month of 15 March 2025
+the last day of the month -12 months after the month of 31 December 2025
+the last day of the month 1 month after the month of 1 January 2025
+the last day of the month 1.5 months after the month of 15 January 2025
+the last day of the month 1 month after the month of 15 January 2025 is equal to `RIGHT` with 28 February 2025
+the last day of the month 0 months after the month of 31 January 2025 is equal to `RIGHT` with 31 January 2025
+the last day of the month 1 month after the month of 15 January 2024 is equal to `RIGHT` with 29 February 2024
+the last day of the month 3 months after the month of 30 November 2026 is equal to `RIGHT` with 28 February 2027
+the last day of the month -1 months after the month of 15 March 2025 is equal to `RIGHT` with 28 February 2025
+the last day of the month -12 months after the month of 31 December 2025 is equal to `RIGHT` with 31 December 2024
+the last day of the month 1 month after the month of 1 January 2025 is equal to `RIGHT` with 28 February 2025

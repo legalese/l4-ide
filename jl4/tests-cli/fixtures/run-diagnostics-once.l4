@@ -1,0 +1,28 @@
+-- l4 run and l4 check print each diagnostic once: a type checker's warning
+-- (the CONSIDER below misses Green and Blue), an error of the export check (an
+-- @export that takes a function) and its warning for a GIVEN with no type.
+-- They printed every one again each time the file's diagnostics changed
+-- (review of #779, 2026-11-21).
+-- On unstable, which has no untyped-GIVEN warning, the file carries the first
+-- two only, and its export error stops evaluation.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+`shade` c MEANS
+  CONSIDER c
+  WHEN Red THEN 1
+
+@export Apply twice
+GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER
+      n IS A NUMBER
+GIVETH A NUMBER
+`apply twice` MEANS f (f n)
+
+@export Echo
+GIVEN x
+GIVETH A NUMBER
+`echo` x MEANS 7
+
+#EVAL `shade` Red

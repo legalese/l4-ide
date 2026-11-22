@@ -6,7 +6,7 @@ File: lifecycle-value-no-deadline.l4
   Range: 17:27-17:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -19,7 +19,7 @@ File: lifecycle-value-no-deadline.l4
   Range: 18:47-18:65
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/lifecycle-unavailable
   Message:
     THE DEADLINE is the deadline of the obligation this expression sits in the
     HENCE or LEST of, but that obligation has no closing edge — no WITHIN or

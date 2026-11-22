@@ -53,15 +53,27 @@ excel-date-tests.l4:53:1-32:
   RIGHT OF (DATE OF 31, 1, 2024)
 excel-date-tests.l4:54:1-32:
   RIGHT OF (DATE OF 29, 2, 2024)
-excel-date-tests.l4:56:1-33:
+excel-date-tests.l4:55:1-38:
+  RIGHT OF (DATE OF 28, 2, 2025)
+excel-date-tests.l4:56:1-38:
+  RIGHT OF (DATE OF 31, 1, 2025)
+excel-date-tests.l4:57:1-38:
+  RIGHT OF (DATE OF 29, 2, 2024)
+excel-date-tests.l4:58:1-39:
+  RIGHT OF (DATE OF 28, 2, 2027)
+excel-date-tests.l4:59:1-39:
+  RIGHT OF (DATE OF 28, 2, 2025)
+excel-date-tests.l4:60:1-41:
+  RIGHT OF (DATE OF 31, 12, 2024)
+excel-date-tests.l4:62:1-33:
   RIGHT OF (DATE OF 15, 1, 2024)
-excel-date-tests.l4:57:1-36:
+excel-date-tests.l4:63:1-36:
   RIGHT OF (DATE OF 24, 1, 2024)
-excel-date-tests.l4:58:1-47:
+excel-date-tests.l4:64:1-47:
   RIGHT OF (DATE OF 15, 1, 2024)
-excel-date-tests.l4:60:1-48:
+excel-date-tests.l4:66:1-48:
   RIGHT OF 23
-excel-date-tests.l4:61:1-48:
+excel-date-tests.l4:67:1-48:
   RIGHT OF -23
-excel-date-tests.l4:62:1-62:
+excel-date-tests.l4:68:1-62:
   RIGHT OF 22

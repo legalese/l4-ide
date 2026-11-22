@@ -630,7 +630,7 @@ traceText start comment events = Text.unlines $
   <> [ "    " <> eventText e | e <- events ]
   where
     -- an event of a party is written as it prints; any other event (the
-    -- tick, a `WAIT UNTIL`) in brackets, as an authored trace writes it
+    -- tick, a WAITUNTIL) in brackets, as an authored trace writes it
     eventText e = case e of
       Event {} -> oneLine (prettyLayout e)
       _        -> "(" <> oneLine (prettyLayout e) <> ")"
