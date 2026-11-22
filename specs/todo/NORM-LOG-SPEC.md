@@ -470,7 +470,9 @@ Its commits run from 2026-10-24 to 2026-10-27 (solutions `81f5803` to `4041f63`)
 **Does this ruling interfere with delivering it? No**, on two grounds, both read from the files at solutions `4041f63`, neither run.
 First, every `RECALL` in them sits in a contract continuation, in an `explore` property's `WHEN … THEN` row, or as an argument handed to a rule as an input (`(RECALL ALL OFFICIAL's …)`); none is in a rule with no inputs, which is the only shape D changes, and `laptop-party-properties.l4:25-29` says that is deliberate.
 Second, the norm log writes into a ledger of its own that `RECALL` cannot see (N5), so no answer a `RECALL` gives these files can change when it lands.
-What can change is their printed output: the new ledger is not printed unless the writer is on, and N5's printer fix changes the verb that a `NOTIFY` or `ATTEST` entry prints with (`RECORD` today).
+What can change is their printed output: the new ledger is not printed unless the writer is on, and N5's printer fix changes the verb that a `NOTIFY` entry prints with (`RECORD` before it).
+An `ATTEST` entry prints as `COMMIT` and still does: the write node carries one official-or-own flag, so nothing tells `ATTEST` from `COMMIT` (read 2026-11-23: the `ATTEST` line of `jl4/examples/ok/ledger/tests/record-flat.golden`, unchanged by P1).
+An earlier version of this document, and the design note behind it, said the fix would also change `ATTEST`; that was wrong.
 So each phase's gate compares `l4 run` over these five files, before and after, on a snapshot binary, and a difference in answers or exit codes, or in anything in the existing listing blocks except that verb, fails the phase.
 
 **N13 — ANSWERED 2026-10-14 (in chat, word HINDSIGHT): "not satisfied" means outstanding, not failed.**
@@ -613,6 +615,40 @@ The phase column is the build plan of the status header (decided by Claude 2026-
 | **N18** | nothing                                                                                                                                                                                                                                                       | P3 (the tag has no setter until P5)                |
 | **N19** | the refusal of two sides' records of one cell, not the snapshot rule                                                                                                                                                                                          | P6                                                 |
 | **N20** | nothing of the settle-first round or the backward-stamp run note                                                                                                                                                                                              | P6                                                 |
+
+### 6.3 What P1's gate measured (2026-11-23, on `lhs`, at `d438f73e0`)
+
+Read from the run logs, not recalled.
+
+**What the writer is.**
+It is off unless `EvalConfig.normLog` is set, and only tests set it (`NormLogSpec`, and `jl4-test` when `JL4_TEST_NORM_LOG` is in the environment).
+No syntax, CLI flag or printed output of `l4 run` depends on it, which is why P1 has no `doc/` page: a user cannot invoke it (`CLAUDE.md` §6 applies from P2, which adds the read).
+
+**The observer property (N6).**
+`jl4-test` with `JL4_TEST_NORM_LOG=1` reproduces every golden once the "Norm log:" block is removed from the output: 5,031 examples, 0 failures.
+The first such run found one real difference, in `ok/every/run-lifecycle-values.l4`: the carrier of N8's parent link took an address from the evaluation's supply, which moved the heap address that a ledger listing prints for a party with an unforced field.
+The carrier now takes none, and `NormLogSpec` has the shape as a fixture.
+The same run with `JL4_TEST_NORM_LOG=mutant`, a deliberately wrong writer that also writes the official record, fails 38 goldens, so the differential can go red.
+The mutant is a test-only field of `EvalConfig` (`normLogMutant`); nothing reads it outside a test.
+
+**Overhead (N6).**
+Wall time of `jl4-test` on `lhs`, writer forced on: 1,291 s; writer off: 1,301 s on the run of 2026-11-22, before the carrier fix below.
+That is no measurable difference, and it is the whole corpus: the suite is dominated by parsing and type-checking, so the figure bounds the cost of the writer over a corpus, not over one long trace.
+Allocations were not measured, and neither was a deontic-heavy trace by itself.
+Both are owed before the writer is turned on for anything but a test, and N6's fallback (on only when a module in the import closure has a fate read) is the plan if either is material; P2 adds that reader.
+
+**The laptop files.**
+`l4 run` on the five agent-shopping laptop files and the `shopping-rules` module they import (`legalese/solutions` @ `4041f63`), with `JL4_FIXED_NOW` pinned, before (unstable @ `a12991789`) and after, on snapshot binaries: every run exits 0 on both, and the output differs only in the verb of a `NOTIFY` line, in two files.
+The check normalises that verb in the new output and requires the rest to be byte-identical; it ran, and did not just find no difference, because each old output is between 178 and 530 lines.
+
+**The gate.**
+`etc/verify-branch.sh` passed on `lhs`: build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `jl4-service-test`, `check-corpus-goldens`, `check-canon-citations`, the canon mirror, `doc/test-docs.sh`, prettier and the commit trailers.
+It did not run `jl4-lsp-test`, `jl4-mlir-test`, `jl4-websessions-test`, the proleg suites, the DMN harnesses, WASM or TypeScript, and a green run is not a green CI.
+
+**What an entry cannot say yet.**
+A norm armed on a trace that never forces its clock (no events at all) has no instants: `neEffective` and `neObserved` are `Nothing` (`NormLogSpec` example 7).
+A compound's join outcome (`FateJoinedFulfilled`, `FateJoinedBreached`) carries no instants, because a `FULFILLED` value carries no time; N7's rule (4) makes a time-windowed read of one an error when the reader lands in P2.
+A party the machine never forced is stored as written (`WrittenBearer`), and N7's rule (3) waits for N12's instants.
 
 ---
 
