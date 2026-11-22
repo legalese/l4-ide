@@ -1,0 +1,17 @@
+-- l4 batch over an enum input with no default, and one whose type is a
+-- synonym for MAYBE. null on the first is "not known" and is refused, naming
+-- it (T3); it used to decode to NOTHING and answer FALSE with status success.
+-- null on the second is NOTHING: a synonym for MAYBE is a MAYBE.
+
+DECLARE Colour IS ONE OF Red, Green
+DECLARE `optional colour` IS MAYBE Colour
+
+@export Is red
+GIVEN shade IS A Colour
+      second IS AN `optional colour`
+GIVETH A BOOLEAN
+`is red` MEANS
+      (shade EQUALS Red)
+  AND (CONSIDER second
+         WHEN JUST Green THEN FALSE
+         OTHERWISE TRUE)

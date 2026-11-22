@@ -27,6 +27,7 @@ IMPORT `actus-daycount`
 GIVEN date IS A DATE
       days IS A NUMBER
 GIVETH A DATE
+@nlg the date %days% days after %date%
 `add days` MEANS
     DATE_FROM_SERIAL ((DATE_SERIAL date) PLUS days)
 
@@ -37,6 +38,7 @@ GIVETH A DATE
 GIVEN startDate IS A DATE
       numMonths IS A NUMBER
 GIVETH A LIST OF DATE
+@nlg the %numMonths% monthly dates beginning with %startDate%
 `monthly schedule` MEANS
     `monthly schedule helper` startDate numMonths 0
 
@@ -44,6 +46,7 @@ GIVEN startDate IS A DATE
       numMonths IS A NUMBER
       current IS A NUMBER
 GIVETH A LIST OF DATE
+@nlg the monthly dates from %current% months up to but excluding %numMonths% months after %startDate%
 `monthly schedule helper` MEANS
     IF current EQUALS numMonths
     THEN EMPTY
@@ -56,6 +59,7 @@ GIVETH A LIST OF DATE
 
 GIVEN schedule IS A LIST OF DATE
 GIVETH A NUMBER
+@nlg the number of dates in %schedule%
 `schedule length` MEANS
     CONSIDER schedule
     WHEN EMPTY THEN 0
@@ -65,4 +69,5 @@ GIVETH A NUMBER
 §§ `Version Information`
 -- =============================================================================
 
+@nlg the version of the ACTUS schedule library
 `ACTUS Schedule Library Version` MEANS "1.0.0"

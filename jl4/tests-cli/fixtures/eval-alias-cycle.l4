@@ -1,0 +1,10 @@
+-- A name bound to itself, or to a cycle of names, under an assumed input.
+-- Reading the term for the unknown must stop, not follow the names for ever.
+ASSUME f IS A FUNCTION FROM NUMBER TO NUMBER
+
+GIVETH A NUMBER
+DECIDE one IS two
+GIVETH A NUMBER
+DECIDE two IS one
+
+#EVAL f one

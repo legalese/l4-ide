@@ -33,7 +33,7 @@ the shape docassemble wants. Compiling to it means:
 ## The command
 
 ```
-l4 docassemble FILE
+l4 export docassemble FILE
 ```
 
 Compiles the decision-rule subset of `FILE` to a docassemble interview in YAML, and prints it to

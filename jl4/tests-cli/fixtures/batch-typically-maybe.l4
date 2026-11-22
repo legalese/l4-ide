@@ -1,0 +1,13 @@
+-- l4 batch over a MAYBE input with no default, followed by another input
+-- (T3c's MAYBE paragraph, specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md). An
+-- empty CSV cell is a left-out input: NOTHING while presumption is soft,
+-- missing while it is hard.
+
+@export Premium
+GIVEN premium IS A MAYBE NUMBER
+      flag IS A BOOLEAN
+GIVETH A NUMBER
+`premium due` MEANS
+  CONSIDER premium
+    WHEN JUST p THEN p
+    WHEN NOTHING THEN 0

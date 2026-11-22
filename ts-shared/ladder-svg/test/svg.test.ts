@@ -10,6 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sceneToSvg } from "../src/index.js";
+import { layout, defaultViewSpec, estimateMetrics } from "@repo/ladder-core";
 import type { Scene, ScenePrim } from "@repo/ladder-core";
 
 const scene = (...prims: ScenePrim[]): Scene => ({
@@ -325,7 +326,7 @@ test("a FALSE box and an UNKNOWN box do not render the same ink", () => {
     dunno,
     "known-false must not render identically to unknown",
   );
-  assert.match(no, /stroke="#4a5560"/);
+  assert.match(no, /stroke="#a8483e"/);
   assert.match(dunno, /stroke="#9aa0a6"/);
 });
 
@@ -366,7 +367,7 @@ test("a dead break is drawn firmly; an eliminable break stays a ghost", () => {
         state,
       }),
     );
-  assert.match(brk("dead"), /stroke="#4a5560" stroke-width="2"/);
+  assert.match(brk("dead"), /stroke="#a8483e" stroke-width="2"/);
   assert.match(brk("eliminable"), /stroke="#b9bdc2" stroke-width="1.6"/);
   assert.equal(
     brk(),
@@ -507,4 +508,39 @@ test("a head box draws like a leaf and is never advertised as clickable", () => 
   // same ink as a leaf in the same state — only the absent click affordance differs
   assert.equal(head, box("leaf"));
   assert.match(box("leaf", { t: "value", id: 1 }), /lad-clickable/);
+});
+
+test("a click on a box's WORDS resolves to the box: the label text carries data-value", () => {
+  // The rect and its label are siblings, so the controller's
+  // `closest("[data-value],[data-fold]")` only reaches the box from the words if the text
+  // element carries the attribute itself. End to end, through the real layout.
+  const svg = sceneToSvg(
+    layout(
+      {
+        id: 1,
+        name: "r",
+        params: [],
+        body: {
+          $type: "And",
+          id: 2,
+          args: [
+            { $type: "UBoolVar", id: 3, label: "alpha" },
+            { $type: "UBoolVar", id: 4, label: "beta" },
+          ],
+        },
+      },
+      defaultViewSpec(),
+      estimateMetrics,
+    ),
+  );
+  for (const [id, word] of [
+    [3, "alpha"],
+    [4, "beta"],
+  ] as const)
+    assert.match(
+      svg,
+      new RegExp(
+        `<text data-fnid="${id}" data-value="${id}" class="lad-clickable"[^>]*>${word}</text>`,
+      ),
+    );
 });

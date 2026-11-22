@@ -9,7 +9,9 @@
 > goldens cite them; read §D4, §5, §6 Phase 2, §9.5, and §10.5 together with §16.
 > **§18 (added 2026-09-05) carries the rulings.** §18.1 rules `NOT`'s reach — layout scope kept,
 > single-line form refused — and **corrects §0's rung-2 remedy**, which named a fix this language
-> does not use. §18.1 is RULED and NOT BUILT.
+> does not use. §18.1 is RULED and BUILT: #341 (merged 2026-09-05, `febcf251a`) and #356 (merged
+> 2026-09-06, `05a706519`); the "NOT BUILT" this line said until 2026-10-07 was stale.
+> **§18.4 (2026-10-07) proposes R-NOT-2**, Python's precedence for `NOT`; it is proposed, not ruled.
 > **Seed:** [`specs/roadmap/future-features.md:17`](../roadmap/future-features.md) — _"Set-theoretic syntax for UNION and INTERSECT. Sometimes set-and means logical-or."_
 > That one-liner is the whole of the prior writing on this topic. This spec expands it.
 
@@ -2425,8 +2427,9 @@ help.
 > PR did, the parser-based census §18.1 said was owed, one row the boundary table did not have, and
 > the linter decision.
 >
-> **Status: BUILT on branch `props/not-single-line`, not landed.** Everything in the present tense
-> below describes that branch's tree.
+> **Status: landed as #356 (merged 2026-09-06, `05a706519`).** Until 2026-10-07 this line said
+> "BUILT on branch `props/not-single-line`, not landed", which was true when written; the present
+> tense below described that branch's tree, and was not re-checked against `unstable` when corrected.
 
 **What fires, and where.** A written `NOT` whose operand contains a bare `AND`, `OR` or `IMPLIES`
 whose keyword sits on the `NOT`'s own line is a **check error** — severity `SError`, so it blocks
@@ -2567,3 +2570,118 @@ the XOR snippet (`OR NOT x AND y`) in a fenced block; `jl4/app/L4/Cli/Verify.hs`
 
 **Still owed.** The canon mirror site (§18.2, unchanged). Closing smucclaw/l4-ide#943 by hand when
 this lands, and the note on #910, are the general manager's (§18.1, `CLAUDE.md` §1.1).
+
+### 18.4 R-NOT-2 — `NOT` binds tighter than `AND` and `OR`, and looser than comparisons. PROPOSED 2026-10-07, NOT RULED.
+
+> **Status: proposed, not ruled, not built.**
+> Nothing in the language has changed.
+> This section reopens the half of R-NOT-1 that §18.1 declined (option A, "flip the precedence") in a narrower form, because the measurement behind it on 2026-09-05 has changed.
+> It is ruled when Meng marks it; until then §18.1–§18.3 describe the language.
+
+**The proposal, in one line: Python's rule.**
+`NOT` binds tighter than `AND`, `OR`, `IMPLIES`, `UNLESS`, `RAND` and `ROR`, and looser than the comparisons (`EQUALS`, `<`, `>`, `AT LEAST`, `AT MOST`, …), arithmetic and function application.
+So:
+
+| written                         | today                      | proposed                                     |
+| ------------------------------- | -------------------------- | -------------------------------------------- |
+| `NOT a AND b` (one line)        | refused (§18.3)            | `(NOT a) AND b`                              |
+| `a AND NOT b AND c`             | refused                    | `a AND (NOT b) AND c`                        |
+| `NOT a` ⏎ `····AND b` (deeper)  | `NOT (a AND b)`, by layout | `(NOT a) AND b` — **the silent change**      |
+| `NOT a` ⏎ `AND b` (same column) | `(NOT a) AND b`            | unchanged                                    |
+| `NOT (a AND b)`                 | `NOT (a AND b)`            | unchanged                                    |
+| `NOT n EQUALS 0`                | `NOT (n EQUALS 0)`         | unchanged                                    |
+| `NOT f x`                       | `NOT (f x)`                | unchanged                                    |
+| `a OR b UNLESS c`               | `(a OR b) AND NOT c`       | unchanged: `UNLESS` stays the loose negation |
+| `NOT "(3)" ... x`               | `NOT ("(3)" AND x)`        | ill-typed unless Q2 says otherwise — loud    |
+
+Python puts `not` exactly there: below the comparisons and above `and` and `or` ([Python language reference, "Operator precedence"](https://docs.python.org/3/reference/expressions.html#operator-precedence)).
+C's `!` binds tighter than `==` as well, which would make `NOT n EQUALS 0` mean `(NOT n) EQUALS 0`: ill-typed for a number, and a silent flip when both sides are `BOOLEAN`.
+Python's placement is proposed because it leaves every comparison site alone (measured below).
+`UNLESS` already is the low-precedence negation this proposal leaves in place: it sits at precedence 1, below `OR` (`jl4-core/src/L4/Parser.hs:1821` @ `3bce21d7d`), and `A OR B OR C UNLESS D` means `(A OR B OR C) AND (NOT D)` (`:1917-1920`).
+
+**Why reopen it: what decided §18.1 has moved.**
+§18.1 declined the flip in one sentence: _"option A converts eleven loud-once-you-look wrong answers into eight silent ones."_
+Both halves of that have changed.
+
+- **The eleven are gone.** #341 rewrote the same-line sites, and #356 (merged 2026-09-06, `05a706519`) made the one-line form a check error.
+  Since then no program `unstable` accepts writes `NOT a AND b` on one line, so giving that spelling a meaning changes no accepted program.
+- **The eight are now measured, and bounded.** §18.1 counted 8 continuation sites in 7 files by hand, noting that "a real census needs the parser"; §18.3 recorded the count as still unmeasured.
+  The parser census below finds the same 8 in this repository, plus 3 pins of the current rule written since and 1 copy.
+  Over the 1009 files of `legalese/commons`, the main body of encoded law, it finds none.
+- **Readers, writers and the released docs already expect the tight reading.**
+  The one file in commons that wrote `NOT` before a connective on one line meant the narrow reading at every one of its 46 sites (`tools/comply4/laws/acd-cases.l4`, legalese/commons#6).
+  And `main`, which the VS Code extension ships from, still says on `doc/reference/operators/NOT.md:45` that "NOT binds tighter than AND and OR", over a binary that does the opposite.
+
+**The census.**
+A throwaway variant of `L4.Lint.NotReach` reports every written `NOT` whose unbracketed operand's top node would bind differently: an `AND`/`OR`/`IMPLIES` on the `NOT`'s line (S), one on a later, deeper line (M), a comparison (C), or the label idiom (L).
+A `NOT` the parser synthesised for `UNLESS` carries no keyword and is not counted.
+A control file with one site of each kind and six accepted spellings scored exactly 1/1/1/1 before each run.
+The patch, the runner and the per-site results are kept outside the tree and are not committed.
+
+| corpus                                  | files                  | S                          | M (silent)         | C              | L                              |
+| --------------------------------------- | ---------------------- | -------------------------- | ------------------ | -------------- | ------------------------------ |
+| legalese/commons `b8dc0bb`              | 1009                   | 46 in 1 file               | **0**              | 72 in 44 files | 78 in 26 files                 |
+| this repository, `unstable` `3bce21d7d` | 1208 (41 do not parse) | 9 in 2 files, all fixtures | **12 in 11 files** | 34 in 16 files | 7 in 1 file (the canon mirror) |
+
+Commons, in detail:
+
+- **M = 0.** A text scan for `NOT` with a deeper connective on the next line found 103 candidates. 92 are inside the `NOT`'s own open bracket, and in the other 11 the connective sits at or left of the `NOT`'s column. That means authors were using the layout rule to get the **narrow** reading, which this proposal keeps.
+- **S = 46**, all generated by `tools/comply4/build.js` as `AND NOT met AND NOT pending`. legalese/commons#6 brackets them. Every one of the file's 1976 assertions holds under either reading, so the 46 now assert what the case says instead of something weaker.
+- **C = 72.** All 72 were read. None compares two `BOOLEAN`s: they compare an enum, a string, a number or a `MAYBE`. They are unchanged under this proposal, and under C's rule each would be a type error.
+- **L = 78.** These are `NOT "(3)" ... x`, which the parser builds as `NOT (And "(3)" x)`. Under any tight `NOT`, each would be `NOT` applied to a string: ill-typed, so loud. See Q2.
+- Two files timed out at 600 s and are not counted: `subjects/sg/penal-code-1871/encodings/legalese-aswathy/agent-cases.l4` and `agent-compliance.l4`.
+
+This repository, in detail:
+
+- **S = 9**, all in `not-ok/tc/not-same-line-connective.l4` and `not-ok/tc/not-bracketed-operand.l4`. These fixtures exist to pin §18.3's refusal. No other file in the tree writes the one-line form.
+- **M = 12 sites in 11 files.** 10 come from the parser census. The other 2 are in files that do not parse, found by a text scan, and the scan was calibrated first: on the files that do parse it found 9 of the parser's 10 sites, with 2 false hits. The sites fall into three groups:
+
+  - **Pins and documentation of the current rule, rewritten along with it (3):** `ok/not-reach-accepted.l4:26` (the `swallowed` row) and `:44`, and `doc/reference/operators/not-example.l4:63`.
+  - **Test formulas in `ok/logic.l4` (2):** `:52` and `:56` (`formula9`, `formula10`). These are layout cases and the intended reading cannot be told from the text. Neither is evaluated (the file's one `#EVAL` is `formula11`), so a flip here would show in no golden.
+  - **Real group negation, all written for the wide reading (7):**
+    - `ok/inert/grounding-variants.l4:138`, under a decision named `perm3 — negation over a group`;
+    - the rodents-and-vermin exclusion, one pattern in four copies (`docassemble/rodents-and-vermin.l4:21`, `ok/rodentsAndVermin.l4:20`, `experiments/classic/vermin_and_rodent.l4:20`, `p4-design/scratch/probe-orig.l4:20`);
+    - `experiments/jerseyAlcohol.l4:19` and `experiments/seatbelt.l4:16`, which do not parse today (a `$` at `jerseyAlcohol.l4:111`).
+
+  §18.1's hand count of 8 sites in 7 files turns out to have been complete for real sites. The census adds only the 3 pins written since (#356) and the `p4-design` copy.
+
+- **C = 34 sites in 16 files**, 28 of them in `jl4/experiments/`, and 3 in the standard libraries (`currency.l4:153`, `daydate.l4:573`, `legal-persons.l4:371`). One compares two `BOOLEAN`s: `experiments/jerseyCharities2.l4:229`, `… EQUALS TRUE`. That site is unchanged under this proposal, and would flip under C's rule.
+- **L = 7**, all in the canon mirror's `regcf-denovo.l4`. These are the same 7 lines as in commons.
+- 41 files do not lex or parse with prerelease `unstable-20261006-9c56c0e`: 17 `not-ok/tc` fixtures that fail on purpose, 15 `jl4/experiments/` files, and others. The parser census cannot see inside them; the text scan above found the 2 M sites there and no `NOT` ending a line.
+
+**What it would cost, failures sorted.**
+
+_Silent:_
+
+- Every M site flips from `NOT (a AND b)` to `(NOT a) AND b`, with no diagnostic. The in-repo ones are listed above and would be rewritten as `NOT (…)` in the same PR, found by the parser rather than by text.
+- Programs outside these two corpora that use layout to negate a group cannot be counted. Commons, the main body of encoded law, has none.
+- A transition diagnostic is the guard. For one release, a written `NOT` whose operand would have reached over a deeper-indented connective under the old rule is a warning that names the new reading. The parser can see exactly that case; the census is that check.
+
+_Loud:_
+
+- Each L site becomes a type error until rewritten (Q2).
+- `prettyLayout` already brackets a negated connective (`parensIfOpenTailed`, §18.3), so the printer needs no change to stay correct under either rule. That is from reading the code, not measured under the new rule.
+
+_Cross-track:_
+
+- `main` never received #356's refusal. So `NOT a AND b` on one line still means `NOT (a AND b)` in the released extension, and would change meaning when the extension next ships from a tree with this proposal.
+- That change runs toward what `main`'s own documentation already says, but it is silent. If the order matters, it is: port the refusal to `main` and release it first, so that every such site is an error for one release before it changes meaning (§1 of `CLAUDE.md` on the two tracks).
+
+**Open questions (Meng's).**
+
+1. **Python's placement or C's?** Recommended: Python's. C's rule makes 72 commons sites ill-typed and buys nothing: `NOT n EQUALS 0` has one sensible reading.
+2. **The label idiom.** (a) Rewrite the 78 commons sites, and any in-repo ones, to `NOT ("(3)" ... x)`. (b) A parser rule: a string label directly after `NOT` stays inside its operand, together with the node it labels. Recommended: (b). The idiom is house style (`doc/concepts/reviewing/reviewing-encoded-law.md`), and (a) asks every encoder to remember a bracket that exists only to satisfy precedence.
+3. **The transition.** The one-release warning described above, or none. Recommended: the warning.
+4. **Order across the two release tracks.** The refusal on `main` first, or not. Recommended: first, since it is the one way the released track's silent change becomes loud.
+
+**What would make this true, in order**, once ruled:
+
+1. Rewrite the in-repo M sites.
+2. Apply the Q2 choice.
+3. Make the parser change, with the transition warning.
+4. Retire `L4.Lint.NotReach`'s refusal, since a one-line `NOT a AND b` would now have exactly one reading.
+5. Rewrite `ok/not-reach-accepted.l4`'s `swallowed` row and the two `not-ok/tc/` fixtures.
+6. Reword `doc/reference/operators/NOT.md`.
+7. Close the loop with commons.
+
+None of this is built.

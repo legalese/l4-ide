@@ -1,0 +1,47 @@
+-- The rules of fix-wording-before.l4, with their wording fixed.
+
+IMPORT daydate
+
+DECLARE Employee
+    HAS `the start date`               IS A NUMBER
+          @nlg start date
+        `I am or have been married`    IS A BOOLEAN
+          @nlg the employee is or has been married
+        `a member of a pension scheme` IS A BOOLEAN
+          @nlg the employee is a member of a pension scheme
+        `the section engaged`          IS A NUMBER
+          @nlg section engaged
+        `is aged 16 or over`           IS A BOOLEAN
+        `is on leave`                  IS A BOOLEAN
+
+GIVEN `the employee` IS AN Employee
+GIVETH A BOOLEAN
+@nlg %`the employee`% is authorised
+`is authorised` MEANS `the employee`'s `the start date` AT LEAST 1
+
+GIVEN `the section` IS A NUMBER
+GIVETH A BOOLEAN
+@nlg %`the section`% is one of sections 9 to 14
+`is one of sections 9 to 14` MEANS
+    `the section` AT LEAST 9 AND `the section` AT MOST 14
+
+GIVEN `the employee` IS AN Employee
+GIVETH A BOOLEAN
+@nlg %`the employee`% is not on leave
+`is at work` MEANS NOT `the employee`'s `is on leave`
+
+GIVEN `the employee` IS AN Employee
+GIVETH A BOOLEAN
+`may opt out` MEANS
+      `is authorised` `the employee`
+  AND `the employee`'s `is aged 16 or over`
+  AND NOT `the employee`'s `I am or have been married`
+  AND NOT `the employee`'s `a member of a pension scheme`
+  AND `is at work` `the employee`
+  AND NOT (`is one of sections 9 to 14` (`the employee`'s `the section engaged`) AND `is authorised` `the employee`)
+
+GIVEN `the last change` IS A DATE, `the next change` IS A DATE, `the employer agrees` IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %`the next change`% is at least 92 days after %`the last change`%, or %`the employer agrees`%
+DECIDE `the change is far enough apart` `the last change` `the next change` `the employer agrees` IF
+    `the employer agrees` OR Day `the next change` MINUS Day `the last change` AT LEAST 92

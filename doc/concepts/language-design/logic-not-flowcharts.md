@@ -105,7 +105,7 @@ a AND b IMPLIES c OR d
 That is not a cosmetic convenience. The whole argument of this page is that the
 statute's shape is `P → Q` over two Boolean trees — so the language had better be
 able to _say_ `→`, rather than make you re-encode it as a branch. See
-[IMPLIES](../../reference/operators/IMPLIES.md).
+[IMPLIES](../../reference/operators/logical.md#implies).
 
 It also gets the boundary of the rule right for free. A ground-floor window makes
 the antecedent false, so the conditional is **vacuously true** — the window
@@ -446,7 +446,7 @@ includes "legal engineers building automated systems," and it took formalising t
 regulation to see it.
 
 The contrast is not that we are more careful. It is that the question does not arise.
-In the Reg CF mirror corpus (`jl4/examples/legal/regcf/regcf.l4`)
+In the Reg CF mirror corpus (`jl4/examples/canon/us/regcf/regcf.l4`)
 the figure is **bound once**, as `income or net worth cut point`, and read by both the
 investor-limit rule and the financial-statement tier. Name resolution — not editorial
 diligence — is what guarantees the two agree; a divergence is not a thing you can write

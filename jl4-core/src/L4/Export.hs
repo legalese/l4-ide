@@ -2,11 +2,15 @@
 module L4.Export (
   ExportedFunction (..),
   ExportedParam (..),
+  ParamSource (..),
+  honouredDefault,
+  isRequiredInput,
   DescFlags (..),
   ParsedDesc (..),
   TypeDescMap,
   parseDescText,
   getExportedFunctions,
+  expandRequired,
   getDefaultFunction,
   enrichReturnTypes,
   enrichParamTypes,
@@ -29,6 +33,7 @@ module L4.Export (
   collectExportedDecides,
   isExportedDecide,
   isNonexhaustiveDecide,
+  isNonassertableDecide,
 ) where
 
 import Base
@@ -42,10 +47,12 @@ import Data.Char (isSpace)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import L4.Annotation (getAnno)
+import L4.Annotation (getAnno, rangeOf)
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
 import L4.Names (filterGivenSigTo, getName, isSectionBinderElaboration, sectionGivenNames)
-import L4.TypeCheck.Environment (maybeUnique)
+import L4.TypeSynonym (declaresFromModule, expandSynonyms)
+import L4.TypeCheck.Environment (eventUnique, maybeUnique)
 import L4.TypeCheck.Types (CheckErrorWithContext(..), CheckError(..), CheckEntity(..), CheckErrorContext(..), EntityInfo)
 import Optics
 
@@ -70,11 +77,42 @@ data ExportedParam = ExportedParam
   , paramDescription :: !(Maybe Text)
   , paramRequired :: !Bool
   , paramDefault :: !(Maybe (Expr Resolved)) -- ^ TYPICALLY default value, if declared
+  , paramSource :: !ParamSource -- ^ how the input was declared
   }
   deriving stock (Eq, Show, Generic)
 #if defined(SERIALISE_ENABLED)
   deriving anyclass (Serialise)
 #endif
+
+-- | How an export's input was declared. It decides whether a @TYPICALLY@ on
+-- it is a default anything honours yet ('honouredDefault').
+data ParamSource
+  = GivenInput         -- ^ the export's own @GIVEN@
+  | SectionGivenInput  -- ^ a section @GIVEN@ the export reads
+  | AssumeInput        -- ^ an @ASSUME@ the export reads
+  deriving stock (Eq, Show, Generic)
+#if defined(SERIALISE_ENABLED)
+  deriving anyclass (Serialise)
+#endif
+
+-- | The default a caller may leave this input out for, if any: a @TYPICALLY@
+-- on a rule or section @GIVEN@ (W2, W3 of TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
+--
+-- Not on a written @ASSUME@: @#EVAL@ does not honour that default either
+-- (§2, p6), and honouring it is W6 (ruling T2), which lands the schema half
+-- after this. Until then it is published as no default, so that the schema,
+-- @l4 batch@ and the service agree with @#EVAL@ about it.
+honouredDefault :: ExportedParam -> Maybe (Expr Resolved)
+honouredDefault p = case p.paramSource of
+  AssumeInput -> Nothing
+  _           -> p.paramDefault
+
+-- | Whether a request must supply this input while presumption is on (the
+-- default, T4): a @MAYBE@ input may be left out and is @NOTHING@, and one
+-- with an honoured default may be left out and takes it. With presumption
+-- off, every input is required (T1b, T3c).
+isRequiredInput :: ExportedParam -> Bool
+isRequiredInput p = p.paramRequired && isNothing (honouredDefault p)
 
 data DescFlags = DescFlags
   { isDefault :: !Bool
@@ -136,7 +174,12 @@ getExportedFunctions :: Module Resolved -> [ExportedFunction]
 getExportedFunctions mod'@(MkModule _ _ section) =
   let typeDescMap = buildTypeDescMap mod'
       assumes = assumesFromModule mod'
-      explicitExports = collectSection typeDescMap assumes section
+      declares = declaresFromModule mod'
+      -- An input typed with a synonym for MAYBE may be left out, as the
+      -- service's wrapper and the decoder treat it ('maybeSynonymHeads' in
+      -- jl4-service), so it is not required.
+      expanded ef = ef { exportParams = map (expandRequired declares) ef.exportParams }
+      explicitExports = map expanded (collectSection typeDescMap assumes section)
   in case explicitExports of
     -- No explicit exports: return nothing (only explicit @export annotations count)
     [] -> []
@@ -172,16 +215,17 @@ enrichReturnTypes entInfo = map enrich
     | Just _ <- ef.exportReturnType = ef  -- already has a return type
     | otherwise =
         let MkDecide _ _ (MkAppForm _ name _ _) _ = ef.exportDecide
-        in ef { exportReturnType = inferReturnType name }
+        in ef { exportReturnType = inferredReturnType entInfo name }
 
-  inferReturnType :: Resolved -> Maybe (Type' Resolved)
-  inferReturnType name =
-    case Map.lookup (getUnique name) entInfo of
-      Just (_, KnownTerm ty _) ->
-        Just $ case ty of
-          Fun _ _ ret -> ret
-          other       -> other
-      _ -> Nothing
+-- | The return type the type checker inferred for a definition.
+inferredReturnType :: EntityInfo -> Resolved -> Maybe (Type' Resolved)
+inferredReturnType entInfo name =
+  case Map.lookup (getUnique name) entInfo of
+    Just (_, KnownTerm ty _) ->
+      Just $ case ty of
+        Fun _ _ ret -> ret
+        other       -> other
+    _ -> Nothing
 
 -- | Fill in missing parameter types using type-checker entity info — the
 -- parameter-side sibling of 'enrichReturnTypes'. A bare-head DECIDE
@@ -242,6 +286,7 @@ buildExportedFunction mod' typeDescMap assumes decide@(MkDecide _ tySig appForm 
   guard (parsed.flags.isExport)
   let givenParams = extractParams typeDescMap tySig
       assumedParams = extractAssumedDependencies mod' typeDescMap assumes decide
+                        (sectionBinderUniques mod')
   pure
     ExportedFunction
       { exportName = resolvedToText (extractAppFormName appForm)
@@ -268,7 +313,21 @@ extractParams typeDescMap (MkTypeSig _ (MkGivenSig _ names) _) =
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
       , paramDefault = mTypically
+      , paramSource = GivenInput
       }
+
+-- | The ASSUMEs that are a section @GIVEN@'s elaboration
+-- ('L4.Desugar.desugarSectionGivens'), as opposed to written ones.
+sectionBinderUniques :: Module Resolved -> Set.Set Unique
+sectionBinderUniques (MkModule _ _ sect) = go sect
+ where
+  go (MkSection _ _ _ mgiven decls) =
+    Set.fromList
+      [ getUnique r
+      | d@(Assume _ (MkAssume _ _ (MkAppForm _ r [] _) _ _)) <- decls
+      , isSectionBinderElaboration (sectionGivenNames mgiven) d
+      ]
+    <> foldMap go [ s | Section _ s <- decls ]
 
 extractReturnType :: TypeSig Resolved -> Maybe (Type' Resolved)
 extractReturnType (MkTypeSig _ _ giveth) =
@@ -339,10 +398,30 @@ collectTypeSynonyms (MkModule _ _ section) =
 -- @\@export@ cannot accept any such parameter because functions can't be
 -- passed over JSON regardless of their wrapper.
 isFunctionTypeExpanded :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Bool
-isFunctionTypeExpanded synonyms = go Set.empty
+isFunctionTypeExpanded = typeContains \case
+  Fun {} -> True
+  _      -> False
+
+-- | Check if a type /contains/ the EVENT type anywhere, the same way:
+-- expanding type synonyms and recursing into the arguments of a
+-- parameterised type (@LIST OF EVENT …@). A type of the user's own that is
+-- called EVENT is a different type and does not count. The fields of a
+-- record type are not looked into.
+mentionsEvent :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Bool
+mentionsEvent = typeContains \case
+  TyApp _ name _ -> getUnique name == eventUnique
+  _              -> False
+
+-- | Does any part of a type satisfy the predicate? The walk is shared by
+-- 'isFunctionTypeExpanded' and 'mentionsEvent'.
+typeContains
+  :: (Type' Resolved -> Bool)
+  -> Map.Map Unique (Type' Resolved)
+  -> Type' Resolved
+  -> Bool
+typeContains p synonyms = go Set.empty
  where
-  go visited ty = case ty of
-    Fun {} -> True
+  go visited ty = p ty || case ty of
     Forall _ _ inner -> go visited inner
     TyApp _ name args ->
       let u = getUnique name
@@ -487,13 +566,14 @@ extractAssumedDependencies
   -> TypeDescMap
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
+  -> Set.Set Unique
   -> [ExportedParam]
-extractAssumedDependencies mod' typeDescMap assumes decide =
-  map (assumeToParam typeDescMap) (assumesReadBy mod' assumes decide)
+extractAssumedDependencies mod' typeDescMap assumes decide binders =
+  map (assumeToParam typeDescMap binders) (assumesReadBy mod' assumes decide)
 
 -- | Convert an ASSUME declaration to an ExportedParam
-assumeToParam :: TypeDescMap -> Assume Resolved -> ExportedParam
-assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType mTypically) =
+assumeToParam :: TypeDescMap -> Set.Set Unique -> Assume Resolved -> ExportedParam
+assumeToParam typeDescMap binders (MkAssume ann _ (MkAppForm _ name _ _) mType mTypically) =
   let
     paramDesc = fmap getDesc (ann ^. annDesc)
     fallbackDesc = mType >>= getTypeDesc typeDescMap
@@ -504,7 +584,19 @@ assumeToParam typeDescMap (MkAssume ann _ (MkAppForm _ name _ _) mType mTypicall
       , paramDescription = paramDesc <|> fallbackDesc
       , paramRequired = not (isMaybeType mType)
       , paramDefault = mTypically
+      , paramSource =
+          if getUnique name `Set.member` binders then SectionGivenInput else AssumeInput
       }
+
+-- | Decide whether an input is required from its type with synonyms expanded
+-- from these declarations. 'getExportedFunctions' has the module's own; a
+-- caller that has the imported modules' too, as jl4-service does, applies it
+-- again with all of them, so that an input and a record field typed with the
+-- same imported synonym are decided alike.
+expandRequired :: Map.Map Text (Declare Resolved) -> ExportedParam -> ExportedParam
+expandRequired declares p = case p.paramType of
+  Just ty -> p { paramRequired = not (isMaybeType (Just (expandSynonyms declares ty))) }
+  Nothing -> p
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool
@@ -520,9 +612,10 @@ extractAssumeParamTypes
 extractAssumeParamTypes mod' decide =
   [ (resolvedToText r, ty) | (r, ty) <- extractAssumeParamResolveds mod' decide ]
 
--- | Like 'extractAssumeParamTypes' but also returns the TYPICALLY default
--- value (if any) declared on each ASSUME, and the ASSUME's own @\@desc@
--- text (if any). Used by the function schema to expose defaults and
+-- | Like 'extractAssumeParamTypes' but also returns the default a request may
+-- leave the input out for (a section @GIVEN@'s @TYPICALLY@; a written
+-- ASSUME's is not honoured yet, see 'honouredDefault'), and the ASSUME's own
+-- @\@desc@ text (if any). Used by the function schema to expose defaults and
 -- descriptions to API consumers.
 extractAssumeParamsWithDefaults
   :: Module Resolved
@@ -531,9 +624,11 @@ extractAssumeParamsWithDefaults
 extractAssumeParamsWithDefaults mod' decide =
   mapMaybe assumeInfo (assumesReadBy mod' (assumesFromModule mod') decide)
  where
+  binders = sectionBinderUniques mod'
   assumeInfo :: Assume Resolved -> Maybe (Text, Type' Resolved, Maybe (Expr Resolved), Maybe Text)
   assumeInfo (MkAssume ann _ (MkAppForm _ name _ _) (Just ty) mTypically) =
-    Just (resolvedToText name, ty, mTypically, getDesc <$> ann ^. annDesc)
+    let honoured = if getUnique name `Set.member` binders then mTypically else Nothing
+    in Just (resolvedToText name, ty, honoured, getDesc <$> ann ^. annDesc)
   assumeInfo _ = Nothing
 
 -- | Like 'extractAssumeParamTypes' but returns the 'Resolved' name instead of
@@ -602,11 +697,16 @@ extractImplicitAssumeParams errors =
 -- Function-typed inputs can't be evaluated end-to-end: GIVENs can't be
 -- passed over JSON, and function-typed ASSUMEs stay 'ValAssumed' at
 -- runtime, causing a stuck "assumed term" error when the body invokes them.
-validateExportInputs :: Module Resolved -> [CheckErrorWithContext]
-validateExportInputs mod' =
+--
+-- It also refuses an EVENT among the inputs or as the result: no request can
+-- supply one, and the schema would publish it as a bare @object@. The type
+-- checker's entity info supplies the result of a definition that has no
+-- GIVETH.
+validateExportInputs :: EntityInfo -> Module Resolved -> [CheckErrorWithContext]
+validateExportInputs entInfo mod' =
   let synonyms = collectTypeSynonyms mod'
       assumes  = allAssumesFromModule mod'
-  in concatMap (checkOneExport mod' synonyms assumes) (collectExportedDecides mod')
+  in concatMap (checkOneExport entInfo mod' synonyms assumes) (collectExportedDecides mod')
 
 -- | Refuse an @\@export@ whose read-set crosses an @IMPORT@.
 --
@@ -672,7 +772,10 @@ collectExportedDecides (MkModule _ _ section) = goSection section
     Section _ sub -> goSection sub
     _ -> []
 
-isExportedDecide :: Decide Resolved -> Bool
+-- | Is this definition published with @\@export@ (or @\@export default@,
+-- or a @\@desc@ that starts @export@ or @default@)? Polymorphic in the pass
+-- so the type checker can consult it before resolution.
+isExportedDecide :: Decide n -> Bool
 isExportedDecide decide =
   case getAnno decide ^. annDesc of
     Just desc -> (parseDescText (getDesc desc)).flags.isExport
@@ -686,6 +789,12 @@ isNonexhaustiveDecide decide =
   case getAnno decide ^. annDesc of
     Just desc -> (parseDescText (getDesc desc)).flags.isNonexhaustive
     Nothing   -> False
+
+-- | Whether the definition carries @\@nonassertable@ (its own annotation,
+-- never read from a @\@desc@): a request may not assert this node
+-- (specs/todo/presumption-assertion/CONTRACT.md §6).
+isNonassertableDecide :: Decide n -> Bool
+isNonassertableDecide decide = isJust (getAnno decide ^. annNonassertable)
 
 -- | Like 'assumesFromModule' but WITHOUT the function-type filter —
 -- so the validator sees every ASSUME and can flag function-typed ones.
@@ -701,15 +810,17 @@ allAssumesFromModule (MkModule _ _ section) =
     _ -> []
 
 checkOneExport
-  :: Module Resolved
+  :: EntityInfo
+  -> Module Resolved
   -> Map.Map Unique (Type' Resolved)
   -> Map.Map Unique (Assume Resolved)
   -> Decide Resolved
   -> [CheckErrorWithContext]
-checkOneExport mod' synonyms assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
+checkOneExport entInfo mod' synonyms assumes decide@(MkDecide _ tySig (MkAppForm _ fnName _ _) _) =
   checkGivenFunctionInputs synonyms fnName tySig
   ++ checkAssumeFunctionInputs synonyms readAssumes fnName
   ++ checkAssumeNameClash readAssumes fnName tySig
+  ++ checkEventTypes entInfo synonyms readAssumes decide
  where
   readAssumes = assumesReadBy mod' assumes decide
 
@@ -827,6 +938,45 @@ checkAssumeNameClash readAssumes fnName (MkTypeSig _ (MkGivenSig _ names) _) =
  where
   assumeNames = Set.fromList
     [ resolvedToText name | MkAssume _ _ (MkAppForm _ name _ _) _ _ <- readAssumes ]
+
+-- | An EVENT among the inputs (a GIVEN, or an ASSUME the export reads) or as
+-- the result, one error each, at the @\@export@.
+--
+-- The ASSUMEs are the export's read-set ('assumesReadBy'), as the other gates
+-- here take them, so an EVENT that a helper reads is refused too; and an
+-- assumed name's type is read from either spelling (@IS A …@ or a @GIVETH@),
+-- as 'checkAssumeFunctionInputs' reads it.
+checkEventTypes
+  :: EntityInfo
+  -> Map.Map Unique (Type' Resolved)
+  -> [Assume Resolved]
+  -> Decide Resolved
+  -> [CheckErrorWithContext]
+checkEventTypes entInfo synonyms readAssumes decide@(MkDecide _ tySig@(MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm _ fnName _ _) _) =
+  [ mkExportEventErr exportAt fnName (Just paramName)
+  | MkOptionallyTypedName _ paramName (Just ty) _ <- names
+  , mentionsEvent synonyms ty
+  ]
+  ++
+  [ mkExportEventErr exportAt fnName (Just paramName)
+  | MkAssume _ aSig (MkAppForm _ paramName _ _) mty _ <- readAssumes
+  , Just ty <- [mty <|> extractReturnType aSig]
+  , mentionsEvent synonyms ty
+  ]
+  ++
+  [ mkExportEventErr exportAt fnName Nothing
+  | Just ty <- [extractReturnType tySig <|> inferredReturnType entInfo fnName]
+  , mentionsEvent synonyms ty
+  ]
+ where
+  exportAt = getAnno decide ^. annDesc >>= rangeOf
+
+mkExportEventErr :: Maybe SrcRange -> Resolved -> Maybe Resolved -> CheckErrorWithContext
+mkExportEventErr exportAt fnName paramName =
+  MkCheckErrorWithContext
+    { kind    = ExportEventType exportAt fnName paramName
+    , context = WhileCheckingDecide (getActual fnName) None
+    }
 
 mkExportFunErr :: Resolved -> Resolved -> CheckErrorWithContext
 mkExportFunErr fnName paramName =

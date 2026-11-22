@@ -11,21 +11,21 @@ receipts — before anything has happened, the clock stands at 0
 
   What would move things along (neither ends nor breaches it):
     - Tenant OF "Alice" does Pay OF (Tenant OF "Alice"), theLandlord, amount, with any `amount` now (at 0) → then:
-          · theLandlord MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) — due within 5 from now
-          · Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
-          · Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · theLandlord MUST Receipt theLandlord t amount — due within 5 from now
+          · Tenant OF "Bob" MUST Pay t theLandlord amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · Tenant OF "Carol" MUST Pay t theLandlord amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
       this obligation's pattern matches any `amount`: the rule binds it and does not test it
       the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
     - Tenant OF "Bob" does Pay OF (Tenant OF "Bob"), theLandlord, amount, with any `amount` now (at 0) → then:
-          · Tenant OF "Alice" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
-          · theLandlord MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) — due within 5 from now
-          · Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · Tenant OF "Alice" MUST Pay t theLandlord amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · theLandlord MUST Receipt theLandlord t amount — due within 5 from now
+          · Tenant OF "Carol" MUST Pay t theLandlord amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
       this obligation's pattern matches any `amount`: the rule binds it and does not test it
       the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
     - Tenant OF "Carol" does Pay OF (Tenant OF "Carol"), theLandlord, amount, with any `amount` now (at 0) → then:
-          · Tenant OF "Alice" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
-          · Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
-          · theLandlord MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) — due within 5 from now
+          · Tenant OF "Alice" MUST Pay t theLandlord amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · Tenant OF "Bob" MUST Pay t theLandlord amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · theLandlord MUST Receipt theLandlord t amount — due within 5 from now
       this obligation's pattern matches any `amount`: the rule binds it and does not test it
       the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
 

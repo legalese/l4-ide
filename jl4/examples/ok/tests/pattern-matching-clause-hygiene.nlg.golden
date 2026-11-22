@@ -1,0 +1,7 @@
+`consider in clause two` with `NOTHING` and `Green`
+`matches anything first` with `Red`
+`fresh name in the middle` with `Green`
+`repeated clause` with `Red`
+`two clauses` with `Blue`
+`one clause` with `NOTHING`
+`__pm_fallthrough_0` with `Blue`

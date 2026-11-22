@@ -1,0 +1,22 @@
+-- A call that passes a value for the callee's own input. In OpenFisca that
+-- input is a variable of its own, read from the situation, so the value
+-- passed here would be ignored. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export Salary times a rate
+GIVEN p      IS A Person
+      period IS A STRING
+      rate   IS A NUMBER
+GIVETH A NUMBER
+`scaled` p period rate MEANS p's salary TIMES rate
+
+@export Scaled at a fixed half
+GIVEN p      IS A Person
+      period IS A STRING
+      rate   IS A NUMBER
+GIVETH A NUMBER
+`half` p period rate MEANS `scaled` p period 0.5
+
+#ASSERT (`half` OF (Person WITH salary IS 100), "2026-01", 7) EQUALS 50

@@ -8,7 +8,7 @@
 --   equals (Decimal.sum of (map each item_double among xs
 --             to (output of Double with { -- n: item_double }).double))
 --
--- Measured on the pristine tree at 6e9b57bb: `l4 catala` exited 0 and printed
+-- Measured on the pristine tree at 6e9b57bb: `l4 export catala` exited 0 and printed
 -- nothing, and `catala typecheck` then rejected that line with "Scope calls are
 -- not allowed outside of a scope". The combinator arm carried no context check
 -- at all, so a fix to the direct-call path alone would have left this open.

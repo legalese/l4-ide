@@ -1,0 +1,15 @@
+-- A decision whose result is a DATE. OpenFisca variables in this export hold
+-- NUMBER, BOOLEAN, STRING or an enum; the result used to be declared a float.
+-- The export must REFUSE it.
+IMPORT prelude
+IMPORT daydate
+
+DECLARE Person HAS born IS A DATE
+
+@export Birth date
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A DATE
+`birth date` p period MEANS p's born
+
+#ASSERT (`birth date` OF (Person WITH born IS (Date 1 1 2000)), "2026-01") EQUALS (Date 1 1 2000)

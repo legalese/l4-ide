@@ -38,6 +38,55 @@ if (fs.existsSync(skillSrc)) {
   )
 }
 
+// Vendor the PvRecorder native audio module into static/ so chat
+// dictation can record the microphone (see src/ai/dictation.ts). The
+// package locates its prebuilt binary relative to its own folder, so it
+// is copied whole and loaded by path at runtime — never bundled. All
+// platforms' binaries ship in every .vsix (a few MB); the extension
+// only offers dictation where one matches.
+const pvrecorderSrc = path.dirname(
+  fileURLToPath(import.meta.resolve('@picovoice/pvrecorder-node/package.json'))
+)
+const pvrecorderDest = path.join(extensionRoot, 'static', 'pvrecorder')
+fs.rmSync(pvrecorderDest, { recursive: true, force: true })
+fs.mkdirSync(pvrecorderDest, { recursive: true })
+fs.cpSync(
+  path.join(pvrecorderSrc, 'package.json'),
+  path.join(pvrecorderDest, 'package.json')
+)
+fs.cpSync(path.join(pvrecorderSrc, 'lib'), path.join(pvrecorderDest, 'lib'), {
+  recursive: true,
+  // Raspberry Pi builds target specific CPUs VSCode doesn't ship for.
+  filter: (src) => !src.includes('raspberry-pi'),
+})
+fs.cpSync(path.join(pvrecorderSrc, 'dist'), path.join(pvrecorderDest, 'dist'), {
+  recursive: true,
+  filter: (src) => !src.endsWith('.map') && !src.endsWith('.d.ts'),
+})
+fs.writeFileSync(
+  path.join(pvrecorderDest, 'NOTICE'),
+  'PvRecorder (@picovoice/pvrecorder-node) — Copyright Picovoice Inc.\n' +
+    'Licensed under the Apache License, Version 2.0; see the LICENSE file\n' +
+    'at the root of this extension for the license text.\n' +
+    'https://github.com/Picovoice/pvrecorder\n'
+)
+console.log(`Bundled PvRecorder from ${pvrecorderSrc}`)
+
+// The dictation capture loop runs in a worker thread, so it needs to be
+// a script of its own next to extension.js.
+esbuild
+  .build({
+    entryPoints: ['./src/ai/dictation-worker.ts'],
+    bundle: true,
+    minify: true,
+    sourcemap: true,
+    platform: 'node',
+    target: 'es2020',
+    format: 'cjs',
+    outfile: 'out/dictation-worker.js',
+  })
+  .catch(() => process.exit(1))
+
 esbuild
   .build({
     entryPoints: ['./src/extension.mts'],

@@ -1,0 +1,18 @@
+-- The frame words around a herald: `l4 nlg --lang he` renders the words the
+-- linearizer supplies ("is equal to", "not", month names) from the Hebrew
+-- phrasebook, and names on stderr any it has no entry for.
+--
+-- `AS STRING` is used because "as string" has no Hebrew entry: it is the
+-- fixture's deliberate gap, so the report has something to report.
+IMPORT daydate
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the claim of %amount% exceeds the threshold
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+
+#EVAL `is large` 150 EQUALS TRUE
+#EVAL NOT `is large` 5
+#EVAL YMD 2025 7 16
+#EVAL 150 AS STRING

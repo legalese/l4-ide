@@ -33,6 +33,7 @@ IMPORT `actus-schedule`
 GIVEN terms IS AN `ACTUS Contract Terms`
       state IS A `Contract State`
 GIVETH A NUMBER
+@nlg the holder's payoff from the initial exchange of the notional principal in %terms%, whatever %state% is
 `POF_IED` MEANS
     (`role sign` (terms's contractRole)) TIMES (0 MINUS 1) TIMES
         (terms's notionalPrincipal)
@@ -42,6 +43,7 @@ GIVETH A NUMBER
 GIVEN terms IS AN `ACTUS Contract Terms`
       state IS A `Contract State`
 GIVETH A NUMBER
+@nlg the holder's payoff from an interest payment under %terms% of the interest accrued in %state%
 `POF_IP` MEANS
     (`role sign` (terms's contractRole)) TIMES (state's accruedInterest)
 
@@ -50,6 +52,7 @@ GIVETH A NUMBER
 GIVEN terms IS AN `ACTUS Contract Terms`
       state IS A `Contract State`
 GIVETH A NUMBER
+@nlg the holder's payoff at maturity under %terms% of the notional principal and accrued interest in %state%
 `POF_MD` MEANS
     (`role sign` (terms's contractRole)) TIMES
         ((state's notionalPrincipal) PLUS (state's accruedInterest))
@@ -60,6 +63,7 @@ GIVEN terms IS AN `ACTUS Contract Terms`
       state IS A `Contract State`
       amount IS A NUMBER
 GIVETH A NUMBER
+@nlg the holder's payoff from a principal redemption of %amount% under %terms%, whatever %state% is
 `POF_PR` MEANS
     (`role sign` (terms's contractRole)) TIMES amount
 
@@ -75,6 +79,7 @@ GIVEN terms IS AN `ACTUS Contract Terms`
       preState IS A `Contract State`
       eventDate IS A DATE
 GIVETH A `Contract State`
+@nlg %preState% after the initial exchange on %eventDate%, with notional principal and nominal rate from %terms% and accrued interest at zero
 `STF_IED` MEANS
     `Contract State` WITH
         statusDate          IS eventDate,
@@ -89,6 +94,7 @@ GIVETH A `Contract State`
 GIVEN preState IS A `Contract State`
       eventDate IS A DATE
 GIVETH A `Contract State`
+@nlg %preState% after an interest payment on %eventDate%, with accrued interest at zero
 `STF_IP` MEANS
     `Contract State` WITH
         statusDate          IS eventDate,
@@ -103,6 +109,7 @@ GIVETH A `Contract State`
 GIVEN preState IS A `Contract State`
       eventDate IS A DATE
 GIVETH A `Contract State`
+@nlg %preState% after maturity on %eventDate%, with notional principal and accrued interest at zero, its performance status unchanged
 `STF_MD` MEANS
     `Contract State` WITH
         statusDate          IS eventDate,
@@ -118,6 +125,7 @@ GIVEN preState IS A `Contract State`
       eventDate IS A DATE
       amount IS A NUMBER
 GIVETH A `Contract State`
+@nlg %preState% after a principal redemption on %eventDate%, with notional principal reduced by %amount% and accrued interest at zero
 `STF_PR` MEANS
     `Contract State` WITH
         statusDate          IS eventDate,
@@ -136,6 +144,7 @@ GIVEN terms IS AN `ACTUS Contract Terms`
       state IS A `Contract State`
       toDate IS A DATE
 GIVETH A `Contract State`
+@nlg %state% with simple interest accrued to %toDate% under the day count convention in %terms%, using actual/365 fixed unless that is actual/360
 `accrue interest to` MEANS
     `Contract State` WITH
         statusDate          IS toDate,
@@ -161,6 +170,7 @@ GIVETH A `Contract State`
 -- Create FX pay event
 GIVEN fxTerms IS AN `FXOUT Terms`
 GIVETH A `Contract Event`
+@nlg the initial exchange event paying the first amount of %fxTerms% on its value date, reversed for a negatively signed role
 `FXOUT pay event` MEANS
     `make event`
         IED
@@ -174,6 +184,7 @@ GIVETH A `Contract Event`
 -- Create FX receive event
 GIVEN fxTerms IS AN `FXOUT Terms`
 GIVETH A `Contract Event`
+@nlg the initial exchange event receiving the second amount of %fxTerms% on its value date, reversed for a negatively signed role
 `FXOUT receive event` MEANS
     `make event`
         IED
@@ -192,6 +203,7 @@ GIVETH A `Contract Event`
 -- Sum all cash flows from events
 GIVEN events IS A LIST OF `Contract Event`
 GIVETH A NUMBER
+@nlg the net cash flow of %events%, summing their payoffs regardless of currency
 `net cash flow` MEANS
     `total payoff` events
 
@@ -199,5 +211,7 @@ GIVETH A NUMBER
 §§ `Version Information`
 -- =============================================================================
 
+@nlg the version of the ACTUS library
 `ACTUS Library Version` MEANS "1.0.0"
+@nlg the date of the ACTUS library
 `ACTUS Library Date` MEANS "2025-01-28"

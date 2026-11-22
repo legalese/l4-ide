@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import type { Messenger } from 'vscode-messenger'
 import type { WebviewTypeMessageParticipant } from 'vscode-messenger-common'
 import {
+  cloudSessionIdOf,
   AiActiveFile,
   AiAuthStatus,
   AiChatAbort,
@@ -18,6 +19,7 @@ import {
   AiChatStarted,
   AiChatTextDelta,
   AiChatThinkingDelta,
+  AiChatTitle,
   AiChatToolActivity,
   AiChatToolCall,
   AiChatTurnSpawn,
@@ -25,6 +27,11 @@ import {
   AiConversationList,
   AiConversationLoad,
   AiConversationNew,
+  AiConversationRename,
+  AiDictationCancel,
+  AiDictationStart,
+  AiDictationStatus,
+  AiDictationStop,
   AiFileOpen,
   AiFileOpenDiff,
   AiGetActiveFileSelection,
@@ -33,7 +40,9 @@ import {
   AiMcpServerAdd,
   AiMcpServerImport,
   AiMcpServerSetEnabled,
+  AiMcpServersChanged,
   AiMcpServersGet,
+  type AiMcpServersState,
   AiMcpToolSetEnabled,
   AiMentionSearch,
   AiPermissionsGet,
@@ -54,24 +63,34 @@ import {
 import * as nodePath from 'path'
 import * as os from 'os'
 import { promises as fsPromises } from 'fs'
-import type { AuthManager } from '../auth.js'
-import { isLocalMode } from './ai-proxy-client.js'
-import type { AiProxyClient } from './ai-proxy-client.js'
-import type { ServiceClient } from '../service-client.js'
-import type { ChatService, ChatServiceEvent } from './chat-service.js'
-import type { ConversationStore } from './conversation-store.js'
-import type { AiLogger } from './logger.js'
-import { MCP_L4_RULES_PREFIX } from './mcp-client.js'
-import type { McpToolClient } from './mcp-client.js'
-import type { VsCodeMcpTools } from './vscode-mcp.js'
 import {
+  AiError,
+  MCP_L4_RULES_PREFIX,
+  categoriesForCall,
+  proposedChange,
   categoryForTool,
-  getPermission,
-  setPermission,
+  type AiClient,
+  type AppliedEditSnapshot,
+  type ChatService,
+  type ChatServiceEvent,
+  type ConversationStore,
+  type McpToolClient,
   type PermissionCategory,
-} from './permissions.js'
-import { resolveFileUri } from './tools/fs.js'
-import type { ToolDispatcher } from './tool-dispatcher.js'
+  type PermissionPolicy,
+  type ToolDispatcher,
+} from '@repo/legalese-agent'
+import type { AuthManager } from '../auth.js'
+import type { ServiceClient } from '../service-client.js'
+import { isLocalMode } from './ai-endpoint.js'
+import type { AiLogger } from './logger.js'
+import { DeploymentVersionCache } from './deployment-version-cache.js'
+import {
+  DICTATION_MAX_SECONDS,
+  DictationError,
+  DictationRecorder,
+} from './dictation.js'
+import type { VsCodeMcpTools } from './vscode-mcp.js'
+import type { WebviewUserInteraction } from './vscode-user-interaction.js'
 
 /**
  * Wire every AI-chat RPC into the sidebar messenger. Called after
@@ -96,33 +115,15 @@ export function registerAiChatHandlers(deps: {
   store: ConversationStore
   /** Stateless one-shot LLM calls (summize). Used here to draft the
    *  deployment "Intended use" text from the exported function schemas. */
-  proxy: AiProxyClient
+  aiClient: AiClient
   logger: AiLogger
-  /** Map of pending approval promises keyed by callId. Populated by
-   * the tool dispatcher; drained by the webview's approve/deny message. */
-  approvalPending: Map<string, (decision: 'allow' | 'deny') => void>
-  /** Decisions clicked before the dispatcher registered a resolver
-   *  (the buttons appear while the stream is still running). Written
-   *  here, consumed by the dispatcher's requestApproval. */
-  earlyToolDecisions: Map<string, 'allow' | 'deny'>
-  /** Map of pending meta__ask_user promises keyed by callId. Resolves
-   * with the user's answer (empty string = skipped). */
-  askUserPending: Map<string, (answer: string) => void>
-  /** Mutable channel the dispatcher uses to emit status updates for
-   * each tool call. We fill in the `emit` function here so the
-   * dispatcher can forward to the webview via the same messenger. */
-  toolStatusChannel: {
-    emit: (
-      callId: string,
-      status: 'pending-approval' | 'running' | 'done' | 'error',
-      detail?: { result?: string; error?: string }
-    ) => void
-  }
-  /** Channel the dispatcher uses to push a meta__ask_user question to
-   *  the webview. We fill in the `ask` function here. */
-  askUserChannel: {
-    ask: (callId: string, question: string, choices?: string[]) => void
-  }
+  /** The chat service's UserInteraction port. We plug the webview
+   *  senders into its sinks, and resolve / cancel its pending
+   *  approvals and questions from webview messages. */
+  interaction: WebviewUserInteraction
+  /** Settings-backed permission policy (sidebar settings section,
+   *  "always allow"). */
+  permissions: PermissionPolicy
   /** Used to recover pre-edit snapshots for the applied-diff viewer. */
   dispatcher: ToolDispatcher
   /** Sidebar webview visibility. When the user switches activity-bar
@@ -142,6 +143,9 @@ export function registerAiChatHandlers(deps: {
    *  endpoint (`/deployments/{id}/functions/{fn}`) for chat tool-call
    *  rendering. */
   serviceClient: ServiceClient
+  /** `ExtensionContext.extensionPath` — locates the bundled dictation
+   *  recorder (worker script + native audio module). */
+  extensionPath: string
 }): vscode.Disposable {
   const {
     messenger,
@@ -149,13 +153,11 @@ export function registerAiChatHandlers(deps: {
     auth,
     service,
     store,
-    proxy,
+    aiClient,
     logger,
-    approvalPending,
-    earlyToolDecisions,
-    askUserPending,
-    toolStatusChannel,
-    askUserChannel,
+    interaction,
+    permissions,
+    extensionPath,
     dispatcher,
     visibility,
     mcp,
@@ -182,7 +184,7 @@ export function registerAiChatHandlers(deps: {
 
   /** Per-conversation set of "tool activity has fired this turn".
    *  Used to suppress `thinking-delta` events that arrive AFTER tool
-   *  activity in non-local mode — production OpenRouter presets emit
+   *  activity in non-local mode — production models emit
    *  reasoning blocks between every tool round, which clutters the
    *  chat log without adding insight (the model has already chosen
    *  its next move by the time the user reads the reasoning). Local
@@ -227,7 +229,7 @@ export function registerAiChatHandlers(deps: {
         // message-assistant.svelte.
         //
         // Suppress when we've already seen tool activity this turn
-        // and we're talking to the prod proxy — keeps the chat log
+        // and we're talking to the production service — keeps the chat log
         // focused on actions taken instead of running commentary
         // between tool rounds. Local mode (dev) bypasses the gate so
         // operators can inspect every reasoning chunk end-to-end.
@@ -237,6 +239,12 @@ export function registerAiChatHandlers(deps: {
         messenger.sendNotification(AiChatThinkingDelta, frontend, {
           conversationId: event.conversationId,
           text: event.text,
+        })
+        break
+      case 'title':
+        messenger.sendNotification(AiChatTitle, frontend, {
+          conversationId: event.conversationId,
+          title: event.title,
         })
         break
       case 'done':
@@ -327,7 +335,7 @@ export function registerAiChatHandlers(deps: {
     }
     sendNow(event)
   }
-  service.setEmitter(emit)
+  interaction.emitSink = emit
   // Drain on the visible-transition. Subscribing unconditionally
   // (not only on `visible=true`) is cheap and avoids a window where
   // a rapid hidden→visible→hidden sequence leaves events stuck.
@@ -345,7 +353,7 @@ export function registerAiChatHandlers(deps: {
   // can forward them to the webview as AiChatToolCall notifications
   // with matching callId. One tool call may fire multiple updates
   // (running → done) — the webview merges by callId.
-  askUserChannel.ask = (callId, question, choices) => {
+  interaction.askSink = (callId, question, choices) => {
     // Carry the conversationId so the webview can attach the question
     // card to the right conversation even if the user has flipped to a
     // different one in the history panel while the tool call was in
@@ -361,7 +369,7 @@ export function registerAiChatHandlers(deps: {
     })
   }
 
-  toolStatusChannel.emit = (callId, status, detail) => {
+  interaction.statusSink = (callId, status, detail) => {
     // Route through the same buffered emitter the chat-service uses
     // so dispatcher-side status updates (running → done / error) are
     // visibility-aware. Going direct via messenger.sendNotification
@@ -382,36 +390,20 @@ export function registerAiChatHandlers(deps: {
     })
   }
 
-  /** Drain every outstanding approval resolver as `deny`. Called on
-   *  stop/new-message: the user's implicit "no" to any tool request
-   *  still on screen. Safe to call when the map is empty. */
-  const denyAllPendingApprovals = (reason: string): void => {
-    // Also drop any not-yet-consumed early decisions: the turn they
-    // belonged to is being torn down, and a stale "allow" must not
-    // leak into a future call that happens to reuse nothing but is
-    // still keyed in this map.
-    earlyToolDecisions.clear()
-    if (approvalPending.size === 0) return
-    logger.info(
-      `denying ${approvalPending.size} pending approval(s) (${reason})`
-    )
-    for (const [callId, resolver] of approvalPending) {
-      resolver('deny')
-      approvalPending.delete(callId)
-    }
-  }
-
-  /** Resolve every pending ask-user with an empty answer (= skipped).
-   *  Mirrors denyAllPendingApprovals for the meta__ask_user path so
-   *  a stop/new-message doesn't leave the dispatcher hanging forever. */
-  const skipAllPendingQuestions = (reason: string): void => {
-    if (askUserPending.size === 0) return
-    logger.info(
-      `skipping ${askUserPending.size} pending meta__ask_user question(s) (${reason})`
-    )
-    for (const [callId, resolver] of askUserPending) {
-      resolver('')
-      askUserPending.delete(callId)
+  /** Deny outstanding approvals and skip outstanding meta__ask_user
+   *  questions in ONE conversation — the user's implicit "no" to any
+   *  tool request still on screen there when they send a new message.
+   *  Other conversations' pending interactions are left alone. */
+  const cancelPendingInConversation = (
+    conversationId: string | undefined,
+    reason: string
+  ): void => {
+    if (!conversationId) return
+    const n = interaction.pending.cancelConversation(conversationId)
+    if (n > 0) {
+      logger.info(
+        `cancelled ${n} pending approval(s)/question(s) in ${conversationId} (${reason})`
+      )
     }
   }
 
@@ -428,10 +420,9 @@ export function registerAiChatHandlers(deps: {
     } catch (logErr) {
       logger.error('chat/start log-line failed', logErr)
     }
-    // Any pending approval from a previous turn is implicitly rejected
-    // when the user starts a new one.
-    denyAllPendingApprovals('new message')
-    skipAllPendingQuestions('new message')
+    // Any pending approval from a previous turn in this conversation is
+    // implicitly rejected when the user starts a new one there.
+    cancelPendingInConversation(params?.conversationId, 'new message')
     void service.start(params).catch((err) => {
       logger.error('chat/start failed', err)
     })
@@ -439,10 +430,13 @@ export function registerAiChatHandlers(deps: {
 
   messenger.onNotification(AiChatAbort, ({ turnId }) => {
     logger.info(`chat/abort received (turn=${turnId})`)
-    // Resolve any pending approval as 'deny' so the dispatcher can
-    // unblock and the outer loop can observe the abort signal.
-    denyAllPendingApprovals('abort')
-    skipAllPendingQuestions('abort')
+    // Resolve this turn's pending approvals as 'deny' (and questions as
+    // skipped) so the dispatcher can unblock and the outer loop can
+    // observe the abort signal.
+    const n = interaction.pending.cancelTurn(turnId)
+    if (n > 0) {
+      logger.info(`cancelled ${n} pending approval(s)/question(s) (abort)`)
+    }
     service.abort(turnId)
   })
 
@@ -465,13 +459,9 @@ export function registerAiChatHandlers(deps: {
   // Empty `answer` = skip (the dispatcher treats this as "use your
   // best guess" per the tool contract).
   messenger.onNotification(AiChatAnswerUser, ({ callId, answer }) => {
-    const resolver = askUserPending.get(callId)
-    askUserPending.delete(callId)
-    if (!resolver) {
+    if (!interaction.pending.answer(callId, answer ?? '')) {
       logger.warn(`meta__ask_user: no pending question for ${callId}`)
-      return
     }
-    resolver(answer ?? '')
   })
 
   // Tool approval: resolve the pending promise the dispatcher is
@@ -487,9 +477,21 @@ export function registerAiChatHandlers(deps: {
     if (decision === 'alwaysAllow') {
       const meta = callArgs.get(callId)
       if (meta) {
-        const category = categoryForTool(meta.name)
-        if (category) {
-          void setPermission(category, 'always').catch((err) =>
+        // The categories that asked. A move's delete isn't among them:
+        // deletes stay guarded unless allowed for fs__delete_file itself
+        // or in settings.
+        const asked = categoriesForCall(
+          meta.name,
+          argsOf(meta.argsJson)
+        ).filter(
+          (c) =>
+            permissions.getPermission(c) === 'ask' &&
+            (c !== 'fs.delete' || categoryForTool(meta.name) === 'fs.delete')
+        )
+        for (const category of asked) {
+          void (
+            permissions.setPermission?.(category, 'always') ?? Promise.resolve()
+          ).catch((err) =>
             logger.warn(
               `tool/approve: failed to persist always-allow for ${category}: ${err instanceof Error ? err.message : String(err)}`
             )
@@ -500,33 +502,58 @@ export function registerAiChatHandlers(deps: {
       }
     }
     const resolved: 'allow' | 'deny' = decision === 'deny' ? 'deny' : 'allow'
-    const resolver = approvalPending.get(callId)
-    if (!resolver) {
-      // The webview shows the buttons as soon as the tool-call frame
-      // streams in, but the dispatcher registers its resolver only
-      // when it dispatches that call (after the stream ends, and
-      // sequentially per call). Stash the decision so requestApproval
-      // can consume it instead of prompting into the void.
-      earlyToolDecisions.set(callId, resolved)
+    // The webview shows the buttons as soon as the tool-call frame
+    // streams in, but the dispatcher registers its resolver only when
+    // it dispatches that call (after the stream ends, and sequentially
+    // per call). `decide` stashes such an early decision so
+    // requestApproval can consume it instead of prompting into the void.
+    if (
+      !interaction.pending.decide(
+        callId,
+        resolved,
+        callArgs.get(callId)?.conversationId
+      )
+    ) {
       logger.info(`tool/approve: stashed early decision for ${callId}`)
-      return
     }
-    approvalPending.delete(callId)
-    resolver(resolved)
   })
 
   // Plain open — for fs__read_file and fs__create_file. Shows the
-  // current on-disk file in the editor. For a create that hasn't
-  // landed yet the file won't exist; we silently no-op in that case.
+  // current on-disk file in the editor, or for a write that hasn't run
+  // yet, what it would write.
   messenger.onNotification(AiFileOpen, async ({ callId }) => {
     const meta = callArgs.get(callId)
-    if (!meta) return
+    // A cloud session's paths name files in the cloud, not here (the
+    // webview renders them as plain text).
+    if (!meta || cloudSessionIdOf(meta.conversationId)) return
     try {
-      const args = JSON.parse(meta.argsJson) as { path?: string }
-      if (!args.path) return
-      const uri = resolveFileUri(args.path)
+      // Still waiting for approval: show what would be written, which
+      // may be a file that doesn't exist yet.
+      const proposed = dispatcher.snapshotFor(callId)
+        ? null
+        : proposedChange(meta.name, argsOf(meta.argsJson))
+      if (proposed) {
+        const doc = await vscode.workspace.openTextDocument({
+          content: proposed.text,
+          language: proposed.language,
+        })
+        await vscode.window.showTextDocument(doc, { preview: true })
+        return
+      }
+      const uri = dispatcher.resolveFile({
+        callId,
+        name: meta.name,
+        argsJson: meta.argsJson,
+      })
       if (!uri) return
-      await vscode.commands.executeCommand('vscode.open', uri)
+      const target = vscode.Uri.parse(uri)
+      // A folder read or search has no editor to open.
+      const stat = await vscode.workspace.fs.stat(target)
+      const opens =
+        stat.type & vscode.FileType.Directory
+          ? 'revealInExplorer'
+          : 'vscode.open'
+      await vscode.commands.executeCommand(opens, target)
     } catch (err) {
       logger.warn(
         `file/open failed: ${err instanceof Error ? err.message : String(err)}`
@@ -539,6 +566,7 @@ export function registerAiChatHandlers(deps: {
   // reflects the actual delta the tool wrote to disk, not a
   // speculative preview.
   messenger.onNotification(AiFileOpenDiff, async ({ callId }) => {
+    if (cloudSessionIdOf(callArgs.get(callId)?.conversationId)) return
     const snapshot = dispatcher.snapshotFor(callId)
     if (!snapshot) {
       // Fallback: no snapshot means the tool didn't run (yet). Just
@@ -550,7 +578,12 @@ export function registerAiChatHandlers(deps: {
         name: meta.name,
         argsJson: meta.argsJson,
       })
-      if (uri) await vscode.commands.executeCommand('vscode.open', uri)
+      if (uri) {
+        await vscode.commands.executeCommand(
+          'vscode.open',
+          vscode.Uri.parse(uri)
+        )
+      }
       return
     }
     try {
@@ -572,10 +605,30 @@ export function registerAiChatHandlers(deps: {
     return { conversation }
   })
 
+  messenger.onRequest(AiConversationRename, async ({ id, title }) => {
+    const next = title.trim().slice(0, 80)
+    if (!next) return { ok: false }
+    try {
+      await store.setTitle(id, next)
+      return { ok: true }
+    } catch (err) {
+      logger.warn(
+        `conversations/rename failed: ${err instanceof Error ? err.message : String(err)}`
+      )
+      return { ok: false }
+    }
+  })
   messenger.onRequest(AiConversationDelete, async ({ id }) => {
+    const del = 'Delete'
+    const choice = await vscode.window.showWarningMessage(
+      'Delete this conversation?',
+      { modal: true, detail: "It can't be restored." },
+      del
+    )
+    if (choice !== del) return { ok: false, cancelled: true }
     const localOk = await store.delete(id)
     // Server-side delete is best-effort; the UI doesn't block on it.
-    void deleteServerConversation(auth, id, logger)
+    void deleteServerConversation(aiClient, id, logger)
     return { ok: localOk }
   })
 
@@ -591,7 +644,7 @@ export function registerAiChatHandlers(deps: {
       return { notSignedIn: true as const }
     }
     try {
-      const text = await proxy.describeIntendedUse(
+      const text = await aiClient.describeIntendedUse(
         JSON.stringify(functions, null, 2)
       )
       if (!text) {
@@ -622,6 +675,7 @@ export function registerAiChatHandlers(deps: {
     'l4.refactor',
     'mcp.l4Rules',
     'mcp.vscode',
+    'web.fetch',
     'meta.askUser',
   ]
   messenger.onRequest(AiPermissionsGet, async () => {
@@ -634,19 +688,22 @@ export function registerAiChatHandlers(deps: {
       'l4.refactor': 'always',
       'mcp.l4Rules': 'always',
       'mcp.vscode': 'ask',
+      'web.fetch': 'always',
       'meta.askUser': 'always',
     }
     for (const cat of ALL_PERMISSION_CATEGORIES) {
-      values[cat as AiPermissionCategory] = getPermission(
+      values[cat as AiPermissionCategory] = permissions.getPermission(
         cat
       ) as AiPermissionValue
     }
     return { values }
   })
   messenger.onNotification(AiPermissionsSet, ({ category, value }) => {
-    void setPermission(
-      category as PermissionCategory,
-      value as 'never' | 'ask' | 'always'
+    void (
+      permissions.setPermission?.(
+        category as PermissionCategory,
+        value as 'never' | 'ask' | 'always'
+      ) ?? Promise.resolve()
     ).catch((err) =>
       logger.warn(
         `permissions/set: ${category}=${value} failed: ${err instanceof Error ? err.message : String(err)}`
@@ -655,7 +712,9 @@ export function registerAiChatHandlers(deps: {
   })
 
   // ── MCP servers (sidebar settings section) ──────────────────────
-  messenger.onRequest(AiMcpServersGet, async () => {
+  // States only: why something failed is a VS Code notification
+  // (vscode-mcp.ts), never text in the sidebar.
+  const mcpState = (): AiMcpServersState => {
     try {
       return {
         servers: vsMcp.listServers(),
@@ -668,14 +727,26 @@ export function registerAiChatHandlers(deps: {
       )
       return { servers: [], candidates: [], allEnabled: true }
     }
+  }
+  messenger.onRequest(AiMcpServersGet, async () => mcpState())
+  // Push every change; a burst (connect start + end) sends once.
+  let mcpPush: ReturnType<typeof setTimeout> | undefined
+  const mcpChangeSub = vsMcp.onDidChange(() => {
+    if (mcpPush) return
+    mcpPush = setTimeout(() => {
+      mcpPush = undefined
+      messenger.sendNotification(AiMcpServersChanged, frontend, mcpState())
+    }, 50)
   })
-  messenger.onRequest(AiMcpServerImport, async ({ id }) => {
+  messenger.onRequest(AiMcpServerImport, async () => {
     try {
-      return await vsMcp.importCandidate(id)
+      await vsMcp.importFromVsCode()
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      logger.warn(`mcp-servers/import ${id} failed: ${msg}`)
-      return { ok: false, error: msg }
+      logger.warn(`mcp-servers/import failed: ${msg}`)
+      void vscode.window.showErrorMessage(
+        `Importing MCP servers failed: ${msg}`
+      )
     }
   })
   messenger.onNotification(AiMcpAllSetEnabled, ({ enabled }) => {
@@ -698,11 +769,11 @@ export function registerAiChatHandlers(deps: {
   })
   messenger.onRequest(AiMcpServerAction, async ({ id, action }) => {
     try {
-      return await vsMcp.runAction(id, action)
+      await vsMcp.runAction(id, action)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn(`mcp-servers/action ${action} ${id} failed: ${msg}`)
-      return { ok: false, error: msg }
+      void vscode.window.showErrorMessage(`MCP server action failed: ${msg}`)
     }
   })
   messenger.onNotification(
@@ -722,12 +793,17 @@ export function registerAiChatHandlers(deps: {
       const res = await vsMcp.addServer(input)
       if (res.ok) {
         logger.info(`mcp-servers/add: added "${input.name}"`)
+      } else if (res.error) {
+        void vscode.window.showErrorMessage(res.error)
       }
-      return res
+      return { ok: res.ok, ...(res.cancelled ? { cancelled: true } : {}) }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       logger.warn(`mcp-servers/add failed: ${msg}`)
-      return { ok: false, error: msg }
+      void vscode.window.showErrorMessage(
+        `Adding the MCP server failed: ${msg}`
+      )
+      return { ok: false }
     }
   })
 
@@ -804,6 +880,13 @@ export function registerAiChatHandlers(deps: {
       }
     | { kind: 'unavailable' }
   const renderMetaInFlight = new Map<string, Promise<RenderMetaResult>>()
+  // The deployment version behind the cache above, checked at most once a
+  // minute per deployment: otherwise every rule row in a conversation asks
+  // for the deployment's status, though the cached schema answers them all.
+  const deploymentVersions = new DeploymentVersionCache(async (deployId) => {
+    const status = await serviceClient.getDeploymentStatus(deployId)
+    return (status.metadata as { version?: string } | undefined)?.version ?? ''
+  })
   // Fetch + cache one function's schema, keyed by (deployId, fnName)
   // and invalidated on redeploy via the deployment version SHA. Shared
   // by both the MCP-target path and the direct deployment path.
@@ -817,9 +900,7 @@ export function registerAiChatHandlers(deps: {
     if (existing) return existing
     const work = (async (): Promise<RenderMetaResult> => {
       try {
-        const status = await serviceClient.getDeploymentStatus(deployId)
-        const version =
-          (status.metadata as { version?: string } | undefined)?.version ?? ''
+        const version = await deploymentVersions.version(deployId)
         const cached = renderMetaCache.get(cacheKey)
         if (cached && cached.version === version) {
           return { kind: 'meta' as const, ...cached.meta }
@@ -882,15 +963,70 @@ export function registerAiChatHandlers(deps: {
     return { items }
   })
 
+  // ── Voice dictation ────────────────────────────────────────────────
+  // The webview can't open a microphone, so it asks us to record. Only
+  // offered in a local desktop window: in a remote workspace (SSH, WSL,
+  // dev container, Codespaces) this code runs on the remote machine,
+  // which has no microphone to listen to, and the webview then shows no
+  // dictation UI at all.
+  const dictation = new DictationRecorder({
+    extensionPath,
+    log: (m) => logger.info(m),
+  })
+  const dictationAvailable =
+    vscode.env.remoteName === undefined &&
+    vscode.env.uiKind === vscode.UIKind.Desktop &&
+    dictation.isSupported()
+
+  messenger.onRequest(AiDictationStatus, () => ({
+    available: dictationAvailable,
+    maxSeconds: DICTATION_MAX_SECONDS,
+  }))
+
+  messenger.onRequest(AiDictationStart, async () => {
+    if (!dictationAvailable) {
+      return { error: 'Dictation isn’t available.' }
+    }
+    try {
+      // A recording orphaned by a webview reload must not block the
+      // next one.
+      dictation.cancel()
+      await dictation.start()
+      return {}
+    } catch (err) {
+      return { error: dictationErrorMessage(err, logger) }
+    }
+  })
+
+  messenger.onRequest(AiDictationStop, async ({ apiBaseUrl }) => {
+    try {
+      const wav = await dictation.stop()
+      const text = await aiClient.transcribe(wav, apiBaseUrl)
+      return { text }
+    } catch (err) {
+      return { error: dictationErrorMessage(err, logger) }
+    }
+  })
+
+  messenger.onNotification(AiDictationCancel, () => {
+    dictation.cancel()
+  })
+
+  // Never keep listening where the user can't see the recording
+  // indicator: switching away from the chat drops an in-progress clip.
+  const dictationVisibilitySub = visibility.onDidChangeVisibility((visible) => {
+    if (!visible) dictation.cancel()
+  })
+
   // Usage polling. Subscribing starts a 30s timer that hits
   // /v1/usage and forwards the result to the webview. The server
-  // caches the result for 10s inside TokenQuota, so a 30s cadence
+  // caches the result briefly, so a 30s cadence
   // is cheap and catches bursts quickly enough for the gauge UX.
   let usageTimer: NodeJS.Timeout | undefined
   messenger.onNotification(AiUsageSubscribe, () => {
     if (usageTimer) return
     const tick = (): void =>
-      void fetchUsage(auth, logger).then((u) => {
+      void fetchUsage(aiClient, logger).then((u) => {
         if (u) {
           messenger.sendNotification(AiUsageUpdate, frontend, u)
         }
@@ -932,12 +1068,7 @@ export function registerAiChatHandlers(deps: {
     proposedProvider
   )
 
-  async function openAppliedDiff(snapshot: {
-    callId: string
-    uri: vscode.Uri
-    relativePath: string
-    before: string
-  }): Promise<void> {
+  async function openAppliedDiff(snapshot: AppliedEditSnapshot): Promise<void> {
     // "Before" side: the virtual doc holds the pre-edit snapshot so
     // VSCode's diff gutter paints red/green against the now-current
     // on-disk file.
@@ -949,7 +1080,7 @@ export function registerAiChatHandlers(deps: {
     await vscode.commands.executeCommand(
       'vscode.diff',
       beforeUri,
-      snapshot.uri,
+      vscode.Uri.parse(snapshot.uri),
       `Legalese AI — ${snapshot.relativePath}`
     )
   }
@@ -1058,6 +1189,10 @@ export function registerAiChatHandlers(deps: {
   return {
     dispose(): void {
       if (usageTimer) clearInterval(usageTimer)
+      dictation.cancel()
+      dictationVisibilitySub.dispose()
+      mcpChangeSub.dispose()
+      if (mcpPush) clearTimeout(mcpPush)
       authSub.dispose()
       aiKeyConfigSub.dispose()
       activeFileSub.dispose()
@@ -1158,7 +1293,7 @@ export class ChatEventBuffer {
 }
 
 /**
- * Best-effort DELETE /v1/conversations/{id} on the ai-proxy. Errors are
+ * Best-effort DELETE /v1/conversations/{id} on the AI service. Errors are
  * logged but never surfaced — the UI already treats local delete as the
  * source of truth for display.
  */
@@ -1170,10 +1305,9 @@ export class ChatEventBuffer {
  *  Size caps are tighter than the providers' hard network limits
  *  because the real bottleneck is the model's context window, not the
  *  upload size:
- *   - Images: Anthropic's 5 MB per-image hard cap (OpenAI allows more).
+ *   - Images: a 5 MB per-image hard cap.
  *   - PDFs: hard cap 10 MB (providers accept up to 32 MB / 100 pages,
- *     but Anthropic's own token estimates are ~1500–3000 tokens per
- *     page — a 100-page PDF fills or blows through a 200k context).
+ *     but at ~1500–3000 tokens per page a 100-page PDF fills or blows through a 200k context).
  *     A soft warning fires past 2 MB to nudge the user toward
  *     splitting. */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -1228,7 +1362,7 @@ function mediaTypeForExtension(ext: string): string | null {
     case 'html':
     case 'htm':
       return 'text/html'
-    // L4 source. Not an IANA type; the AI SDK's inline-text path in
+    // L4 source. Not an IANA type; the inline-text path in
     // chat-service classifies by `text/` prefix, so use `text/plain`
     // and let the filename attribute in the <attached-file> wrapper
     // tell the model it's L4.
@@ -1237,6 +1371,25 @@ function mediaTypeForExtension(ext: string): string | null {
     default:
       return null
   }
+}
+
+/** Turn a dictation failure into the short line the chat input shows
+ *  above the mic. Kept deliberately plain — no addresses, status codes
+ *  or advice the user can't act on; the specifics go to the log. */
+function dictationErrorMessage(err: unknown, logger: AiLogger): string {
+  const message = err instanceof Error ? err.message : String(err)
+  const detail = err instanceof DictationError ? err.detail : undefined
+  logger.warn(`dictation: ${detail ?? message}`)
+  if (err instanceof DictationError) return message
+  if (err instanceof AiError) {
+    if (err.code === 'network_error') return 'Couldn’t reach the AI service.'
+    if (err.status === 429) return 'Daily limit reached.'
+    if (err.status === 413) return 'Keep it short.'
+    if (err.status === 401 || err.status === 403) {
+      return 'Sign in to use dictation.'
+    }
+  }
+  return 'Couldn’t transcribe that.'
 }
 
 async function handlePickAttachment(
@@ -1334,7 +1487,7 @@ async function handlePickAttachment(
       note:
         kind === 'pdf'
           ? `${name} is ${sizeMb} MB — PDFs are capped at ${capMb} MB here so they don't blow through the model's context window. Split or compress first.`
-          : `${name} is ${sizeMb} MB — images are capped at ${capMb} MB (Anthropic's per-image limit). Resize or recompress first.`,
+          : `${name} is ${sizeMb} MB — images are capped at ${capMb} MB. Resize or recompress first.`,
     }
   }
   // Soft warning: big PDF still fits the hard cap but will chew up a
@@ -1394,21 +1547,29 @@ async function previewAttachment(
   }
 }
 
+/** A tool call's arguments, or null when they don't parse. */
+function argsOf(json: string): unknown {
+  try {
+    return json.trim() ? JSON.parse(json) : {}
+  } catch {
+    return null
+  }
+}
+
 async function deleteServerConversation(
-  auth: AuthManager,
+  aiClient: AiClient,
   id: string,
   logger: AiLogger
 ): Promise<void> {
   try {
-    const { getAiEndpoint, isLocalMode } = await import('./ai-proxy-client.js')
-    const headers = await auth.getAiAuthHeaders()
-    if (!headers.Authorization && isLocalMode()) {
-      headers.Authorization = 'Bearer dev-local'
-    }
-    const res = await fetch(`${getAiEndpoint()}/v1/conversations/${id}`, {
-      method: 'DELETE',
-      headers,
-    })
+    const headers = await aiClient.getAuthHeaders()
+    const res = await fetch(
+      `${aiClient.getEndpoint().url}/v1/conversations/${id}`,
+      {
+        method: 'DELETE',
+        headers,
+      }
+    )
     if (!res.ok && res.status !== 404) {
       logger.warn(`server delete returned ${res.status}`)
     }
@@ -1451,7 +1612,7 @@ async function searchMentions(query: string): Promise<AiMentionCandidate[]> {
 }
 
 /**
- * GET /v1/usage on the ai-proxy. Returns the calling org's
+ * GET /v1/usage on the AI service. Returns the calling org's
  * current-day token total, effective daily limit, and whether
  * blockOnOverage is set. Failures return null — the webview's
  * gauge gracefully sits at zero rather than disrupting the chat
@@ -1459,7 +1620,7 @@ async function searchMentions(query: string): Promise<AiMentionCandidate[]> {
  * refresh.
  */
 async function fetchUsage(
-  auth: AuthManager,
+  aiClient: AiClient,
   logger: AiLogger
 ): Promise<{
   used: number
@@ -1467,13 +1628,9 @@ async function fetchUsage(
   blockOnOverage: boolean
 } | null> {
   try {
-    const headers = await auth.getAiAuthHeaders()
-    const { getAiEndpoint, isLocalMode } = await import('./ai-proxy-client.js')
-    if (!headers.Authorization && isLocalMode()) {
-      headers.Authorization = 'Bearer dev-local'
-    }
+    const headers = await aiClient.getAuthHeaders()
     if (!headers.Authorization) return null
-    const res = await fetch(`${getAiEndpoint()}/v1/usage`, {
+    const res = await fetch(`${aiClient.getEndpoint().url}/v1/usage`, {
       method: 'GET',
       headers,
       signal: AbortSignal.timeout(8000),

@@ -1,0 +1,18 @@
+-- A ledger read is not a function of its operands: `x is recorded as 7` is FALSE
+-- before the RECORD and TRUE after it, in ONE evaluation of `top`, which is TRUE.
+-- Keyed by its term alone, both reads were one atom, and `l4 verify` reported
+-- `NOT A AND A`: unsatisfiable (found by adversarial review of
+-- smucclaw/l4-ide#1013). Each occurrence of a leaf that reads the ledger, or calls
+-- a rule that does, is now its own atom.
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `x is recorded as` n IF (RECALL `x`) EQUALS JUST n
+
+GIVETH A BOOLEAN
+DECIDE `top` IF
+        NOT `x is recorded as` 7
+    AND (RECORD `x` IS 7) EQUALS 7
+    AND `x is recorded as` 7
+
+#EVAL `top`

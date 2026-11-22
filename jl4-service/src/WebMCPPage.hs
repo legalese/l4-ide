@@ -5,13 +5,20 @@ module WebMCPPage (
   RawJs (..),
   HTML,
   JavaScript,
+  OriginTrialToken,
+  mkOriginTrialToken,
   renderOrgWebMCPScript,
 ) where
 
+import qualified Data.ByteString.Char8 as BS8
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.Aeson as Aeson
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
+import SearchPattern (identifierSyntax, noMatchHint, patternSyntax, rulesQuerySyntax)
 import Network.HTTP.Media ((//), (/:))
 import Servant (Accept (..), MimeRender (..))
 
@@ -39,24 +46,44 @@ newtype RawJs = RawJs { unRawJs :: ByteString }
 instance MimeRender JavaScript RawJs where
   mimeRender _ (RawJs bs) = bs
 
+-- | A Chrome origin-trial token that is safe to write into the script.
+newtype OriginTrialToken = OriginTrialToken Text
+
+-- | Accept a token only if it is non-empty, no longer than
+-- 'maxOriginTrialTokenLength', and made of base64 characters. The token is
+-- written into a quoted JavaScript string, so anything else is refused
+-- rather than escaped.
+mkOriginTrialToken :: BS8.ByteString -> Maybe OriginTrialToken
+mkOriginTrialToken raw
+  | BS8.null raw = Nothing
+  | BS8.length raw > maxOriginTrialTokenLength = Nothing
+  | BS8.all isBase64Char raw = Just (OriginTrialToken (Text.Encoding.decodeLatin1 raw))
+  | otherwise = Nothing
+ where
+  isBase64Char c = isAsciiUpper c || isAsciiLower c || isDigit c || c == '+' || c == '/' || c == '='
+
+-- | Far above the size of a real token, which is a few hundred characters.
+-- | The text as a JavaScript string literal (JSON is valid JavaScript).
+jsString :: Text -> Text
+jsString = Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode
+
+maxOriginTrialTokenLength :: Int
+maxOriginTrialTokenLength = 4096
+
 -- | Render the org-wide WebMCP JavaScript.
 -- Fetches all deployments, applies scope filtering, registers tools.
 -- Visibility flags control which tool categories are registered.
-renderOrgWebMCPScript :: RawJs
-renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text.unlines
+-- Given an origin-trial token, the script adds it to the embedding page;
+-- given none, it adds no token.
+renderOrgWebMCPScript :: Maybe OriginTrialToken -> RawJs
+renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text.unlines $
   [ "(function() {"
   , "  'use strict';"
   , ""
-  , "  // Inject the WebMCP origin-trial token so the modelContext API is available"
-  , "  // on third-party origins where this script is embedded."
-  , "  try {"
-  , "    var otMeta = document.createElement('meta');"
-  , "    otMeta.httpEquiv = 'origin-trial';"
-  , "    otMeta.content = 'A0e5+EqX/z+LG2Y3IU+Unetiy0UAUMwZ1w/WFZL7L69Z9N7XH7FR0i3kSjP2CMLTL1jR6R2yOMDGloIQeR5JxA8AAAB1eyJvcmlnaW4iOiJodHRwczovL2xlZ2FsZXNlLmNsb3VkOjQ0MyIsImZlYXR1cmUiOiJXZWJNQ1AiLCJleHBpcnkiOjE3OTQ4NzM2MDAsImlzU3ViZG9tYWluIjp0cnVlLCJpc1RoaXJkUGFydHkiOnRydWV9';"
-  , "    (document.head || document.documentElement).appendChild(otMeta);"
-  , "  } catch (e) {}"
-  , ""
-  , "  var scriptTag = document.currentScript || document.querySelector('script[src*=\"embed.js\"]');"
+  ]
+  <> maybe [] originTrialLines originTrialToken
+  <>
+  [ "  var scriptTag = document.currentScript || document.querySelector('script[src*=\"embed.js\"]');"
   , "  var apiKey = scriptTag && scriptTag.getAttribute('data-api-key');"
   , "  var scope = scriptTag && scriptTag.getAttribute('data-scope');"
   , "  // data-tools: comma-separated list of tool categories to register."
@@ -84,6 +111,10 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "    return fetch(url, Object.assign({}, fetchOpts, { headers: Object.assign({}, authHeaders, (opts && opts.headers) || {}) }, opts || {}));"
   , "  }"
   , ""
+  , "  // As of Chrome 153, execute() is called as execute(input, { signal })."
+  , "  // Forward the signal to fetch() so a cancelled tool call aborts its"
+  , "  // backend request. Older builds pass no second argument, hence the guards."
+  , "  function execSignal(ctx) { return (ctx && ctx.signal) || undefined; }"
   , ""
   , "  // Allowed chars match Anthropic's tool / property name regex"
   , "  // ^[a-zA-Z0-9_-]{1,64}$ — no dots, even though the MCP spec is"
@@ -196,6 +227,10 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "    return result;"
   , "  }"
   , ""
+  , "  // Every tool below is annotated readOnlyHint: true. Rule evaluation is a"
+  , "  // pure function call and the discovery/file tools only read, so agents"
+  , "  // can call them without asking the user to confirm a side effect."
+  , ""
   , "  // Track all registered tool names to avoid collisions"
   , "  var registeredNames = {};"
   , ""
@@ -275,6 +310,7 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "            name: fn.name,"
   , "            description: fn.description || '',"
   , "            returnType: fn.returnType || 'unknown',"
+  , "            isDeontic: fn.isDeontic === true,"
   , "            section: fn.section || null,"
   , "            parameters: fn.parameters,"
   , "            parameterNames: Object.keys((fn.parameters && fn.parameters.properties) || {})"
@@ -323,15 +359,19 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , ""
   , "    regTool({"
   , "      name: 'search_rules',"
-  , "      description: 'Tooling: Search ' + fns.length + ' available legal rules by keyword. Returns matching deployment, name, description, return type, and parameter names.',"
-  , "      inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Search keyword' } }, required: ['query'] },"
+  , "      description: 'Tooling: Search ' + fns.length + ' available legal rules by keyword. Words match the start of a word in a rule\\'s name, description, deployment or parameter names. Returns matching deployment, name, description, return type, and parameter names.',"
+  , "      inputSchema: { type: 'object', properties: { query: { type: 'string', description: " <> jsString rulesQuerySyntax <> " } }, required: ['query'] },"
+  , "      annotations: { readOnlyHint: true },"
   , "      execute: function(args) {"
-  , "        var words = (args.query || '').toLowerCase().split(/\\s+/).filter(Boolean);"
-  , "        var matches = index.filter(function(fn) {"
-  , "          var hay = (fn.name + ' ' + fn.description + ' ' + fn.deployment + ' ' + fn.parameterNames.join(' ')).toLowerCase();"
-  , "          return words.every(function(w) { return hay.split(/\\s+/).some(function(t) { return t.indexOf(w) === 0 || w.indexOf(t) === 0; }); });"
-  , "        });"
-  , "        return { content: [{ type: 'text', text: JSON.stringify(matches, null, 2) }] };"
+  , "        var words = Array.from(new Set(((args.query || '').toLowerCase().match(/[\\p{L}\\p{N}][\\p{L}\\p{N}_'-]*/gu) || []).filter(function(w) { return w.length >= 2; })));"
+  , "        var scored = index.map(function(fn) {"
+  , "          var tokens = (fn.name + ' ' + fn.description + ' ' + fn.deployment + ' ' + fn.parameterNames.join(' ')).toLowerCase().split(/\\s+/).filter(Boolean);"
+  , "          var score = words.filter(function(w) { return tokens.some(function(t) { return t.indexOf(w) === 0 || (t.length >= 4 && w.indexOf(t) === 0); }); }).length;"
+  , "          return { fn: fn, score: score };"
+  , "        }).filter(function(s) { return s.score > 0; }).sort(function(a, b) { return b.score - a.score; });"
+  , "        var content = [{ type: 'text', text: JSON.stringify(scored.map(function(s) { return s.fn; }), null, 2) }];"
+  , "        if (scored.length === 0) content.push({ type: 'text', text: " <> jsString ("No rule matched. " <> rulesQuerySyntax <> " Try other words: synonyms, or a shorter form (\"tax\" for \"taxation\").") <> " });"
+  , "        return { content: content };"
   , "      }"
   , "    });"
   , ""
@@ -339,8 +379,9 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "      name: 'get_rule_schema',"
   , "      description: 'Tooling: Get the full parameter schema for a specific rule.',"
   , "      inputSchema: { type: 'object', properties: { deployment: { type: 'string', description: 'Deployment ID' }, function_name: { type: 'string', description: 'Function name' } }, required: ['deployment', 'function_name'] },"
-  , "      execute: function(args) {"
-  , "        return doFetch(baseUrl + '/deployments/' + encodeURIComponent(args.deployment) + '/functions/' + encodeURIComponent(args.function_name))"
+  , "      annotations: { readOnlyHint: true },"
+  , "      execute: function(args, ctx) {"
+  , "        return doFetch(baseUrl + '/deployments/' + encodeURIComponent(args.deployment) + '/functions/' + encodeURIComponent(args.function_name), { signal: execSignal(ctx) })"
   , "          .then(function(r) { return r.json(); })"
   , "          .then(function(data) { return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] }; });"
   , "      }"
@@ -350,14 +391,16 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "      name: 'evaluate_rule',"
   , "      description: 'Tooling: Evaluate a legal rule with arguments. Use get_rule_schema first to understand required inputs. For DEONTIC rules, also pass startTime (number) and events (array of {party, action, at}).',"
   , "      inputSchema: { type: 'object', properties: { deployment: { type: 'string', description: 'Deployment ID' }, function_name: { type: 'string', description: 'Function name' }, arguments: { type: 'object', description: 'Key-value pairs matching the function parameters' }, startTime: { type: 'number', description: 'Start time for DEONTIC contract simulation' }, events: { type: 'array', description: 'Events for DEONTIC contract simulation', items: { type: 'object' } } }, required: ['deployment', 'function_name', 'arguments'] },"
-  , "      execute: function(args) {"
+  , "      annotations: { readOnlyHint: true },"
+  , "      execute: function(args, ctx) {"
   , "        var body = { arguments: args.arguments };"
   , "        if (args.startTime !== undefined) body.startTime = args.startTime;"
   , "        if (args.events !== undefined) body.events = args.events;"
   , "        return doFetch(baseUrl + '/deployments/' + encodeURIComponent(args.deployment) + '/functions/' + encodeURIComponent(args.function_name) + '/evaluation', {"
   , "          method: 'POST',"
   , "          headers: { 'Content-Type': 'application/json' },"
-  , "          body: JSON.stringify(body)"
+  , "          body: JSON.stringify(body),"
+  , "          signal: execSignal(ctx)"
   , "        }).then(function(r) { return r.json().then(function(data) { return { status: r.status, ok: r.ok, data: data }; }); })"
   , "          .then(function(res) {"
   , "            var text = JSON.stringify(res.data, null, 2);"
@@ -378,9 +421,10 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "      name: 'list_files',"
   , "      description: 'Tooling: List .l4 files and their exports in a deployment',"
   , "      inputSchema: { type: 'object', properties: { deployment: { type: 'string', description: 'Omit for all deployments' } } },"
-  , "      execute: function(args) {"
+  , "      annotations: { readOnlyHint: true },"
+  , "      execute: function(args, ctx) {"
   , "        if (args.deployment) {"
-  , "          return doFetch(baseUrl + '/deployments/' + encodeURIComponent(args.deployment) + '/files')"
+  , "          return doFetch(baseUrl + '/deployments/' + encodeURIComponent(args.deployment) + '/files', { signal: execSignal(ctx) })"
   , "            .then(function(r) { return r.json(); })"
   , "            .then(function(data) { return { content: [{ type: 'text', text: JSON.stringify(data.files || [], null, 2) }] }; });"
   , "        }"
@@ -398,39 +442,50 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "      name: 'read_file',"
   , "      description: 'Tooling: Read .l4 source file content, optionally a line range',"
   , "      inputSchema: { type: 'object', properties: { deployment: { type: 'string' }, path: { type: 'string', description: 'e.g. rules/main.l4' }, lines: { type: 'string', description: 'start:end (e.g. 85:89)' } }, required: ['deployment', 'path'] },"
-  , "      execute: function(args) {"
+  , "      annotations: { readOnlyHint: true },"
+  , "      execute: function(args, ctx) {"
   , "        var url = baseUrl + '/deployments/' + encodeURIComponent(args.deployment) + '/files/' + args.path;"
   , "        if (args.lines) url += '?lines=' + encodeURIComponent(args.lines);"
-  , "        return doFetch(url).then(function(r) { return r.text(); })"
+  , "        return doFetch(url, { signal: execSignal(ctx) }).then(function(r) { return r.text(); })"
   , "          .then(function(text) { return { content: [{ type: 'text', text: text }] }; });"
   , "      }"
   , "    });"
   , ""
   , "    regTool({"
   , "      name: 'search_identifier',"
-  , "      description: 'Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments.',"
-  , "      inputSchema: { type: 'object', properties: { identifier: { type: 'string' }, deployment: { type: 'string', description: 'Omit for all deployments' }, file: { type: 'string', description: 'Scope to one file' } }, required: ['identifier'] },"
-  , "      execute: function(args) {"
+  , "      description: " <> jsString ("Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments. " <> identifierSyntax) <> ","
+  , "      inputSchema: { type: 'object', properties: { identifier: { type: 'string', description: 'One L4 name as written, e.g. `the greater of`' }, deployment: { type: 'string', description: 'Omit for all deployments' }, file: { type: 'string', description: 'Scope to one file' } }, required: ['identifier'] },"
+  , "      annotations: { readOnlyHint: true },"
+  , "      execute: function(args, ctx) {"
   , "        var dep = args.deployment || (deployments[0] && deployments[0].id) || '';"
   , "        var url = baseUrl + '/deployments/' + encodeURIComponent(dep) + '/files?identifier=' + encodeURIComponent(args.identifier);"
   , "        if (args.file) url += '&file=' + encodeURIComponent(args.file);"
-  , "        return doFetch(url).then(function(r) { return r.json(); })"
-  , "          .then(function(data) { return { content: [{ type: 'text', text: JSON.stringify(data.matches || [], null, 2) }] }; });"
+  , "        return doFetch(url, { signal: execSignal(ctx) }).then(function(r) { return r.json(); })"
+  , "          .then(function(data) { return searchResult(data, " <> jsString ("No definitions or references. " <> identifierSyntax) <> "); });"
   , "      }"
   , "    });"
   , ""
   , "    regTool({"
   , "      name: 'search_text',"
-  , "      description: 'Tooling: Search text in .l4 source files (case-insensitive)',"
-  , "      inputSchema: { type: 'object', properties: { query: { type: 'string' }, deployment: { type: 'string', description: 'Omit for all deployments' }, file: { type: 'string', description: 'Scope to one file' } }, required: ['query'] },"
-  , "      execute: function(args) {"
+  , "      description: 'Tooling: Search .l4 source files line by line, like grep -E -i. Returns matching lines with context.',"
+  , "      inputSchema: { type: 'object', properties: { query: { type: 'string', description: " <> jsString patternSyntax <> " }, deployment: { type: 'string', description: 'Omit for all deployments' }, file: { type: 'string', description: 'Scope to one file' } }, required: ['query'] },"
+  , "      annotations: { readOnlyHint: true },"
+  , "      execute: function(args, ctx) {"
   , "        var dep = args.deployment || (deployments[0] && deployments[0].id) || '';"
   , "        var url = baseUrl + '/deployments/' + encodeURIComponent(dep) + '/files?search=' + encodeURIComponent(args.query);"
   , "        if (args.file) url += '&file=' + encodeURIComponent(args.file);"
-  , "        return doFetch(url).then(function(r) { return r.json(); })"
-  , "          .then(function(data) { return { content: [{ type: 'text', text: JSON.stringify(data.matches || [], null, 2) }] }; });"
+  , "        return doFetch(url, { signal: execSignal(ctx) }).then(function(r) { return r.json(); })"
+  , "          .then(function(data) { return searchResult(data, " <> jsString (noMatchHint "drop `file` to search the whole deployment, or name another `deployment`") <> "); });"
   , "      }"
   , "    });"
+  , ""
+  , "    // The matches, and after them the hint when there are none."
+  , "    function searchResult(data, hint) {"
+  , "      var matches = data.matches || [];"
+  , "      var content = [{ type: 'text', text: JSON.stringify(matches, null, 2) }];"
+  , "      if (matches.length === 0) content.push({ type: 'text', text: hint });"
+  , "      return { content: content };"
+  , "    }"
   , ""
   , "    return promises;"
   , "  }"
@@ -443,15 +498,17 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "      return registerToolAsync({"
   , "        name: entry.toolName,"
   , "        description: 'L4 Rule: ' + (fn.description || fn.name) + ' [' + fn.deployment + '/' + fn.name + ']',"
-  , "        inputSchema: (fn.returnType || '').startsWith('DEONTIC') ? { type: 'object', properties: { arguments: sanitized.schema, startTime: { type: 'number', description: 'Start time for contract simulation' }, events: { type: 'array', description: 'Events for contract simulation (each: {party, action, at})', items: { type: 'object' } } }, required: ['arguments', 'startTime', 'events'] } : sanitized.schema,"
-  , "        execute: function(args) {"
-  , "          var originalArgs = (fn.returnType || '').startsWith('DEONTIC') ? remapArgs(args.arguments || {}, sanitized.reverseMap) : remapArgs(args, sanitized.reverseMap);"
+  , "        inputSchema: fn.isDeontic ? { type: 'object', properties: { arguments: sanitized.schema, startTime: { type: 'number', description: 'Start time for contract simulation' }, events: { type: 'array', description: 'Events for contract simulation (each: {party, action, at})', items: { type: 'object' } } }, required: ['arguments', 'startTime', 'events'] } : sanitized.schema,"
+  , "        annotations: { readOnlyHint: true },"
+  , "        execute: function(args, ctx) {"
+  , "          var originalArgs = fn.isDeontic ? remapArgs(args.arguments || {}, sanitized.reverseMap) : remapArgs(args, sanitized.reverseMap);"
   , "          var body = { arguments: originalArgs };"
-  , "          if ((fn.returnType || '').startsWith('DEONTIC')) { body.startTime = args.startTime; body.events = args.events; }"
+  , "          if (fn.isDeontic) { body.startTime = args.startTime; body.events = args.events; }"
   , "          return doFetch(baseUrl + '/deployments/' + encodeURIComponent(fn.deployment) + '/functions/' + encodeURIComponent(fn.name) + '/evaluation', {"
   , "            method: 'POST',"
   , "            headers: { 'Content-Type': 'application/json' },"
-  , "            body: JSON.stringify(body)"
+  , "            body: JSON.stringify(body),"
+  , "            signal: execSignal(ctx)"
   , "          }).then(function(r) { return r.json().then(function(data) { return { status: r.status, ok: r.ok, data: data }; }); })"
   , "            .then(function(res) {"
   , "              var text = sanitizeErrorText(JSON.stringify(res.data, null, 2), sanitized.reverseMap);"
@@ -463,4 +520,20 @@ renderOrgWebMCPScript = RawJs $ LBS.fromStrict $ Text.Encoding.encodeUtf8 $ Text
   , "    });"
   , "  }"
   , "})();"
+  ]
+
+-- | The part of the script that adds an origin-trial token to the embedding
+-- page, so that the browser offers the modelContext API there while WebMCP
+-- is an origin trial.
+originTrialLines :: OriginTrialToken -> [Text]
+originTrialLines (OriginTrialToken token) =
+  [ "  // Add the WebMCP origin-trial token so the modelContext API is available"
+  , "  // on the page this script is embedded in."
+  , "  try {"
+  , "    var otMeta = document.createElement('meta');"
+  , "    otMeta.httpEquiv = 'origin-trial';"
+  , "    otMeta.content = '" <> token <> "';"
+  , "    (document.head || document.documentElement).appendChild(otMeta);"
+  , "  } catch (e) {}"
+  , ""
   ]

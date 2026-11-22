@@ -1,0 +1,23 @@
+-- THE JOIN and THE DEADLINE as values in a join line's WITHIN (refusal 3 of
+-- §5.1.1.1, ratified for the value by §2.6 card B1): that WITHIN is the
+-- group's deadline, so it is what THE DEADLINE would name, and the group's
+-- join has not fired when it is read. Refused in the duration and in the
+-- anchor alike, even nested under an obligation that has both.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+    Pay  HAS amount IS A NUMBER
+
+alice MEANS Tenant OF "Alice"
+
+GIVETH A DEONTIC Actor Action
+`in the anchor` MEANS
+    EVERY Tenant t MUST Sign t ONCE ALL HAVE WITHIN 0 OF (THE JOIN PLUS 14) HENCE FULFILLED
+
+GIVETH A DEONTIC Actor Action
+`in the duration, nested` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (EVERY Tenant t MUST Sign t ONCE ALL HAVE WITHIN THE DEADLINE MINUS 3 HENCE FULFILLED)

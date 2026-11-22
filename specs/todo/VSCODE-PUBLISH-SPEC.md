@@ -1,9 +1,8 @@
 # VS Code Sidebar — Marketplace Publish Implementation Spec
 
 Implementation spec for the l4-ide changes that let a publisher take a cloud
-deployment to the marketplace from the sidebar. Refines
-[PROVABLE-MARKETPLACE-SPEC.md](PROVABLE-MARKETPLACE-SPEC.md) §8; companion to
-[PROVABLE-SITE-SPEC.md](PROVABLE-SITE-SPEC.md).
+deployment to the marketplace from the sidebar. The marketplace platform and
+site specs it refines are kept outside this repo.
 
 **Ground truth as of 2026-08-04:** the platform endpoints are live
 (`legalese.cloud/marketplace/publish|unpublish`, both `l4:deploy` with
@@ -41,7 +40,7 @@ Changes:
    - Published + pending review: `Pending review` at 0.6 opacity; popover in
      manage mode explains the review step.
    - State arrives WITH the deployment list: the sidebar's existing
-     `GET /deployments?functions=full` (served by the proxy read-model on
+     `GET /deployments?functions=full` (served on
      `api.legalese.cloud/{slug}`) gains a `marketplace` block per entry —
      no extra round trip, no separate status fetch (§4).
 
@@ -192,10 +191,9 @@ conventions as `service-client.ts`.
   switches its target to `provable.legalese.com/api/.../publish`, which
   forwards the bearer onward — one URL swap, no shape change).
 - **Unpublish**: `POST {cloudUrl}/marketplace/unpublish?org={orgSlug}`.
-- **Status**: none needed here. The auth-proxy read-model list
-  (`buildDeploymentList` / `buildDeploymentStatus`, served on
+- **Status**: none needed here. The deployment list served on
   `api.legalese.cloud/{slug}` — exactly what the sidebar already calls via
-  `ServiceClient`) gains a per-deployment block for OWNER callers (unscoped
+  `ServiceClient` — gains a per-deployment block for OWNER callers (unscoped
   same-org results only; marketplace-scoped callers can't reach the list):
 
   ```jsonc
@@ -208,12 +206,10 @@ conventions as `service-client.ts`.
   }
   ```
 
-  Omitted entirely when unpublished. One in-memory `MarketplaceStore`
-  lookup (raw intent for `published`/`mode`, trust-checked view for `live`)
-  per deployment — the same store the auth path reads (v1: mtime-cached EFS
-  files; post-1a: the Postgres snapshot, main spec §5.3 — this spec is
-  unaffected by that migration), so the sidebar can never disagree with what
-  the marketplace actually serves.
+  Omitted entirely when unpublished. `published`/`mode` report the
+  publisher's recorded intent and `live` whether it is being served, both
+  from the same record the marketplace itself serves from, so the sidebar can
+  never disagree with it.
 
   **Visibility rule for account-naming fields:** any field that names
   specific accounts — today `allowedOrgs`, the unlisted partner list — is
@@ -229,10 +225,9 @@ conventions as `service-client.ts`.
 - Map failures: 422 → "add an Intended use description"; 403 → "your role
   can't publish (needs deploy rights)"; 404 → "deployment not found".
 
-The read-model enrichment lands in `jl4-auth-proxy` in the same PR as this
-extension change (it needs a `getDeploymentIntent` variant on
-`MarketplaceStore` that returns the raw entry regardless of trust, so
-"pending review" is representable).
+The deployment list has to carry this block before the extension change
+ships, and it has to report the intent regardless of review state, so
+"pending review" is representable.
 
 ---
 
@@ -248,7 +243,7 @@ when the deployment is published:
 
 - In `public` mode, append: "Anonymous traffic stops immediately."
 - Once install/review counts exist (site Phase 3), interpolate "_N_ installs,
-  _M_ reviews" (counts would extend the read-model `marketplace` block or
+  _M_ reviews" (counts would extend the `marketplace` block or
   come from the site API — decide then).
 - Undeploy proceeds normally; the platform side already treats a vanished
   deployment as dead (metadata gone → 404), and the site's registry sync
@@ -258,8 +253,8 @@ when the deployment is published:
 
 ## 6. Build order
 
-1. RPC messages + `deployment-publish.ts` + read-model `marketplace` block
-   (auth-proxy, tiny) — testable headless.
+1. RPC messages + `deployment-publish.ts` + the `marketplace` block in the
+   deployment list — testable headless.
 2. Row rework (`Integrate` → menu, `Publish` button + states).
 3. Popover (steps 1–4 + manage mode + result states).
 4. Undeploy warning block.

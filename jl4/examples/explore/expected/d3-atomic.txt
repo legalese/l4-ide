@@ -1,0 +1,118 @@
+`the arrangement`, explored from its outset at 64800: 10 states, 21 transitions
+
+s0  depth 0, residual r0
+    at the outset
+    OFFICIAL's `dinner status record`: opened
+s1  depth 1, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s2  depth 1, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): checked
+    OFFICIAL's `dinner status record`: opened
+s3  depth 2, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Messages delivers the message` AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): stopped
+    Messages's `message` (latest): delivered
+    OFFICIAL's `dinner status record`: opened, taken
+s4  depth 2, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): checked
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s5  depth 2, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): checked
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s6  depth 2, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice buys dinner` OF TRUE AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): bought
+    OFFICIAL's `dinner status record`: opened
+    OFFICIAL's `dinners bought`: `dinner for two`
+    OFFICIAL's `open at acceptance`: TRUE
+s7  depth 3, residual r0
+    first reached by:
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice buys dinner` OF TRUE AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): stopped
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+s8  depth 3, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice buys dinner` OF TRUE AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+    Alice's `belief` (latest): opened
+    Alice's `plan` (latest): bought
+    Messages's `message` (latest): `in transit`
+    OFFICIAL's `dinner status record`: opened, taken
+    OFFICIAL's `dinners bought`: `dinner for two`
+    OFFICIAL's `open at acceptance`: TRUE
+s9  depth 4, residual r0
+    first reached by:
+      PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+      PARTY World DOES `Alice buys dinner` OF TRUE AT 64800
+      PARTY World DOES `ledger records Bob's purchase` AT 64800
+      PARTY World DOES `Messages delivers the message` AT 64800
+    Alice's `belief` (latest): taken
+    Alice's `plan` (latest): bought
+    Messages's `message` (latest): delivered
+    OFFICIAL's `dinner status record`: opened, taken
+    OFFICIAL's `dinners bought`: `dinner for two`
+    OFFICIAL's `open at acceptance`: TRUE
+
+Transitions (21):
+  s0 -> s1  PARTY World DOES `ledger records Bob's purchase`
+  s0 -> s2  PARTY World DOES `Alice checks whether dinner is bought`
+  s1 -> s3  PARTY World DOES `Messages delivers the message`
+  s1 -> s4  PARTY World DOES `Alice checks whether dinner is bought`
+  s2 -> s5  PARTY World DOES `ledger records Bob's purchase`
+  s2 -> s6  PARTY World DOES `Alice buys dinner` OF TRUE
+  s2 -> s2  PARTY World DOES `Alice buys dinner` OF FALSE
+  s3 -> s3  PARTY World DOES `Alice is done`
+  s4 -> s3  PARTY World DOES `Messages delivers the message`
+  s4 -> s7  PARTY World DOES `Alice buys dinner` OF TRUE
+  s4 -> s4  PARTY World DOES `Alice buys dinner` OF FALSE
+  s5 -> s3  PARTY World DOES `Messages delivers the message`
+  s5 -> s7  PARTY World DOES `Alice buys dinner` OF TRUE
+  s5 -> s5  PARTY World DOES `Alice buys dinner` OF FALSE
+  s6 -> s8  PARTY World DOES `ledger records Bob's purchase`
+  s6 -> s6  PARTY World DOES `Alice is done`
+  s7 -> s3  PARTY World DOES `Messages delivers the message`
+  s7 -> s7  PARTY World DOES `Alice is done`
+  s8 -> s9  PARTY World DOES `Messages delivers the message`
+  s8 -> s8  PARTY World DOES `Alice is done`
+  s9 -> s9  PARTY World DOES `Alice is done`
+
+Residuals (1):
+  r0  PARTY World
+        MAY act PROVIDED (`the brief allows` OF act)
+        WITHIN 0 OF closing
+        HENCE (CONSIDER act
+                 WHEN `ledger records Bob's purchase` THEN COMMIT "dinner status record" IS taken HENCE RECORD Messages's "message" IS `in transit` HENCE `the evening`
+                 WHEN `Messages delivers the message` THEN RECORD Messages's "message" IS delivered HENCE RECORD Alice's "belief" IS taken HENCE `Alice stops unless she has bought` OF (RECALL Alice's "plan")
+                 WHEN `Alice checks whether dinner is bought` THEN RECORD Alice's "belief" IS `the ledger's status` OF (RECALL ALL OFFICIAL's "dinner status record") HENCE RECORD Alice's "plan" IS checked HENCE `the evening`
+                 WHEN `Alice is done` THEN `the evening`
+                 WHEN `Alice buys dinner` answered THEN IF (NOT answered) THEN `the evening` ELSE (`the ledger answers the purchase` OF (RECALL ALL OFFICIAL's "dinner status record")))
+        LEST FULFILLED
+
+Coverage: 10 states, 21 transitions; frontier exhausted; nothing refused; nothing untried; 39 acts passed over; 10 ticks past the clock bound not taken; no write-only cell dropped; time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state), clock bounded at 75600

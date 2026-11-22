@@ -1,5 +1,5 @@
 `past`
-`DATE_SERIAL` with `DATE_FROM_DMY` with 31, 1 and 2025
+`DATE_SERIAL` with 31 January 2025
 `EVAL AS OF SYSTEM TIME` with `past` and `b1`
 `b1`
 `b1b`

@@ -1,0 +1,14 @@
+-- A decision that returns an enum value. The export compiles enums only as
+-- inputs matched by CONSIDER. The export must REFUSE it, and say so.
+IMPORT prelude
+
+DECLARE Band IS ONE OF Low, High
+DECLARE Person HAS salary IS A NUMBER
+
+@export Band of the person
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A Band
+`band` p period MEANS IF p's salary > 1000 THEN High ELSE Low
+
+#ASSERT (`band` OF (Person WITH salary IS 2000), "2026-01") EQUALS High

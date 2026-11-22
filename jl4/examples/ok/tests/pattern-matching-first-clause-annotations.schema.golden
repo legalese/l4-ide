@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "the steps of a number",
+    "properties": {
+        "n": {
+            "type": "number"
+        }
+    },
+    "required": [
+        "n"
+    ],
+    "title": "steps",
+    "type": "object"
+}

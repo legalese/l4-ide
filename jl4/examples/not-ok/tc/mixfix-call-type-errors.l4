@@ -1,0 +1,14 @@
+-- A type error in a mixfix call is reported over the whole call, from its
+-- first argument to its last.
+GIVEN a IS A NUMBER, b IS A NUMBER
+GIVETH A NUMBER
+a `plus` b MEANS a + b
+
+-- four inputs for a rule of two
+tooMany MEANS 1 `plus` 2 `plus` 3
+
+-- a number where a condition is needed
+notACondition MEANS IF 1 `plus` 2 THEN 1 ELSE 2
+
+-- four inputs for a rule of two, one of them a string
+wrongKind MEANS 1 `plus` "x" `plus` 3

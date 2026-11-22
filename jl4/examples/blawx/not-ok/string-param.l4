@@ -8,7 +8,7 @@
 -- not attribute-shaped falls through to `PCUndeclared` — rules only, no block —
 -- and so was never asked what its parameters were sorted at.
 --
--- Measured on this module before the fix (2026-09-02): `l4 blawx` exited 0 and
+-- Measured on this module before the fix (2026-09-02): `l4 export blawx` exited 0 and
 -- wrote an s(CASP) dump containing
 --
 --     according_to(sec_1_section,throws_named,P,S) :- player(P), S = zebra.

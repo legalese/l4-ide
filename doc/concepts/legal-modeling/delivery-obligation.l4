@@ -1,0 +1,34 @@
+-- How a regulative rule plays out against events.
+-- Times are numbers on one timeline; read them as days.
+
+DECLARE Party IS ONE OF
+    `the seller`
+    `the buyer`
+
+DECLARE Action IS ONE OF
+    `deliver the goods`
+    `pay the invoice`
+
+GIVETH A DEONTIC Party Action
+`the delivery obligation` MEANS
+    PARTY  `the seller`
+    MUST   `deliver the goods`
+    WITHIN 14
+    HENCE  FULFILLED
+    LEST   BREACH BY `the seller` BECAUSE "did not deliver within 14 days"
+
+-- 1. The seller delivers on day 10: FULFILLED
+#TRACE `the delivery obligation` AT 0 WITH
+    PARTY `the seller` DOES `deliver the goods` AT 10
+
+-- 2. The next event comes on day 20, after the deadline: BREACH BY `the seller`
+#TRACE `the delivery obligation` AT 0 WITH
+    PARTY `the seller` DOES `deliver the goods` AT 20
+
+-- 3. The wrong party acts on day 10: the event does not match and is skipped.
+--    The result is a residual obligation: the seller must still deliver, WITHIN 4.
+#TRACE `the delivery obligation` AT 0 WITH
+    PARTY `the buyer` DOES `deliver the goods` AT 10
+
+-- 4. No events at all: the result is the obligation itself, still waiting.
+#TRACE `the delivery obligation` AT 0 WITH

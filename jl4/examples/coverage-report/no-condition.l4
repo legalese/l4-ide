@@ -1,0 +1,5 @@
+-- A file with nothing to cover: its one rule branches on no condition, so
+-- `l4 coverage` has no cover point to report and must say so, not exit 0.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`double` x MEANS x TIMES 2

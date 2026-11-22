@@ -1,0 +1,15 @@
+-- Two sides of a RAND take one event: `writer` records `x` and `reader` reads
+-- it, both at the event's own instant. The trace gives the two no order, so
+-- evaluation stops with an error, and `l4 explore` lists such a move as
+-- untried. (smucclaw/l4-ide#1069)
+
+DECLARE Party IS ONE OF P
+DECLARE Act IS ONE OF go
+GIVETH A DEONTIC Party Act
+`writer` MEANS PARTY P MAY go WITHIN 10 HENCE COMMIT `x` IS TRUE HENCE FULFILLED LEST FULFILLED
+GIVETH A DEONTIC Party Act
+`reader` MEANS PARTY P MAY go PROVIDED (RECALL OFFICIAL's `x`) EQUALS NOTHING WITHIN 10 HENCE COMMIT `first` IS TRUE HENCE FULFILLED LEST FULFILLED
+GIVETH A DEONTIC Party Act
+`both` MEANS `writer` RAND `reader`
+#TRACE `both` AT 0 WITH
+    PARTY P DOES go AT 1

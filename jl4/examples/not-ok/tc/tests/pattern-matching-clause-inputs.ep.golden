@@ -1,0 +1,60 @@
+-- =============================================================================
+-- A multi-clause DECIDE takes its inputs from the GIVEN above it, one per
+-- pattern. When the counts differ, the error says so in clause terms, at the
+-- first clause, and names no input the drafter did not write (review of
+-- legalese/l4-ide#545). An earlier build reported `_pm_arg_2` as an unknown
+-- name at 1:1, and `_pm_arg_1` "at <no location>".
+-- =============================================================================
+DECLARE Colour IS ONE OF Red, Green, Blue
+DECLARE Shape IS ONE OF
+  Circle HAS colour IS A Colour
+  Square
+
+-- More patterns than the GIVEN names inputs.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `too many patterns` Red   Red IS 1
+DECIDE `too many patterns` Green c   IS 2
+
+-- Fewer.
+GIVEN c IS A Colour
+      d IS A Colour
+GIVETH A NUMBER
+DECIDE `too few patterns` Red   IS 1
+DECIDE `too few patterns` Green IS 2
+
+-- A pattern variable and a GIVEN input with the same name are both in scope
+-- in the first clause's body, so `c` there is ambiguous, as it would be in a
+-- CONSIDER written by hand. The message gives the GIVEN input's location; an
+-- earlier build called it "predefined", and reported a second ambiguity at
+-- 1:1 for the generated test of the second input, which is now never
+-- ambiguous.
+GIVEN s IS A Shape
+      c IS A Colour
+GIVETH A Colour
+DECIDE tint (Circle c) Red IS c
+DECIDE tint s          c   IS c
+
+-- A GIVEN that declares only a type names no inputs, so it does not name one
+-- per pattern either. An earlier build reported the made-up `input 1` as
+-- unknown, twice, at 1:1.
+GIVEN a IS A TYPE
+GIVETH A NUMBER
+DECIDE `type only` Red   IS 1
+DECIDE `type only` Green IS 2
+
+-- A clause body that reads an input the GIVEN names, as the type the GIVEN
+-- declares, draws no second error. An earlier build reported `c` as unknown.
+GIVEN c IS A Colour
+GIVETH A Colour
+DECIDE `reads the given` Red   Red IS c
+DECIDE `reads the given` Green d   IS Blue
+
+-- ... and is checked against the type the GIVEN declares, so a body that
+-- uses it as something else is reported as that. An earlier build gave it a
+-- type nothing constrained: `c + 1` passed, and the IF below reported `c`
+-- as a NUMBER, the type it took from the clause above.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `misreads the given` Red   Red IS c + 1
+DECIDE `misreads the given` Green d   IS IF c THEN 1 ELSE 2

@@ -1,0 +1,33 @@
+-- A mixfix call whose first operand is itself a call. Before 2026-11-01 such a
+-- call reached `l4 render` under its bare keyword, with no slots, so the rule
+-- was read as an ordinary function: the operands went after the keyword and
+-- the subject was lost, "is on or before the day x plus days 12 and the day y".
+-- The same call with a plain name first read correctly. Now every mixfix call
+-- is laid out by the pattern its definition declares.
+
+DECLARE Day HAS n IS A NUMBER
+
+GIVEN a IS A Day
+      b IS A Day
+GIVETH A BOOLEAN
+a `is on or before` b MEANS a's n <= b's n
+
+GIVEN a IS A Day
+      b IS A Day
+GIVETH A BOOLEAN
+a `precedes` b MEANS a's n < b's n
+
+GIVEN a IS A Day
+      k IS A NUMBER
+GIVETH A Day
+a `plus days` k MEANS Day (a's n + k)
+
+GIVEN x IS A Day
+      y IS A Day
+GIVETH A BOOLEAN
+`in time` x y MEANS
+       (x `is on or before` y)
+   AND ((x `plus days` 12) `is on or before` y)
+   AND (y `is on or before` (x `plus days` 12))
+   AND ((y `plus days` 1) `is on or before` (x `plus days` 12))
+   AND (`precedes` (x `plus days` 2) y)

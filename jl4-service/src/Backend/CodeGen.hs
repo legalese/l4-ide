@@ -4,10 +4,13 @@ module Backend.CodeGen
   , generateDeonticEvalWrapper
   , isDeonticType
   , GeneratedCode(..)
+  , AnswerShape(..)
+  , RequiredInput(..)
   -- Exported for testing
   , inputFieldName
   , transformJsonKeys
   , escapeAsL4String
+  , clientName
   , fnLiteralToL4Expr
   , fnLiteralToL4ExprWithType
   ) where
@@ -16,14 +19,17 @@ import Base
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Aeson.KeyMap as AesonKeyMap
+import Data.Char (isPrint)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import L4.Lexer (showStringLit)
+import L4.Presumption (requestRecordName)
+import L4.Print (prettyLayout)
 import L4.Syntax (Type'(..), Resolved, getUnique)
-import L4.TypeCheck.Environment (booleanUnique, dateUnique, timeUnique, datetimeUnique, maybeUnique, contractUnique)
+import L4.TypeCheck.Environment (booleanUnique, dateUnique, timeUnique, datetimeUnique, maybeUnique, isContractType)
 import Backend.Api (TraceLevel(..), TraceEvent(..), FnLiteral(..))
 import qualified Base.Text as BaseText
 import Backend.MaybeLift (liftTypeToMaybe)
@@ -52,10 +58,32 @@ isMaybeType _ = False
 
 -- | Quote an identifier with backticks if it contains spaces or special characters
 -- L4 requires backticks for identifiers with spaces
+--
+-- For names that come from the deployed source only. Such a name was read by the
+-- lexer, so it already fits inside quotes. A name that comes from a request goes
+-- through 'clientName' instead.
 quoteIdent :: Text -> Text
 quoteIdent name
   | Text.any (== ' ') name = "`" <> name <> "`"
   | otherwise = name
+
+-- | A name taken from a request, written as a quoted L4 name.
+--
+-- It is always quoted, and it is refused when L4 cannot quote it: the lexer
+-- reads a quoted name as one or more printable characters up to the next
+-- backtick, with no escape ('L4.Lexer.quoted'), so a name that is empty, holds a
+-- backtick, or holds a character that is not printable has no spelling.
+clientName :: Text -> Either Text Text
+clientName name
+  | Text.null name = Left "a name in the request is empty, and L4 cannot write an empty name"
+  | Just c <- Text.find unquotable name =
+      Left $ "the name " <> excerpt <> " in the request holds the character "
+        <> BaseText.textShow c <> ", which L4 cannot write inside a quoted name"
+  | otherwise = Right ("`" <> name <> "`")
+  where
+    unquotable c = c == '`' || not (isPrint c)
+    -- The refusal quotes at most the first 40 characters of the name.
+    excerpt = BaseText.textShow (Text.take 40 name) <> (if Text.length name > 40 then "..." else "")
 
 -- | Prefix for InputArgs field names to avoid collision with source identifiers.
 -- The generated InputArgs record creates accessor functions, which would otherwise
@@ -76,36 +104,179 @@ unwrappedVar name
   | Text.any (== ' ') name = "`unwrapped_" <> name <> "`"
   | otherwise = "unwrapped_" <> name
 
+-- | The placeholder for a BOOLEAN input the request did not supply.
+-- It is an assumed term, so it costs nothing unless the rule reads it; if the
+-- rule does read it, evaluation stops and names it. It used to be FALSE, which
+-- answered the question for the caller (smucclaw/l4-ide#992;
+-- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W1, §5 T3).
+notSuppliedTerm :: Text -> Text
+notSuppliedTerm name = quoteIdent (name <> " (not supplied)")
+
+-- | The variable a BOOLEAN input is bound to: its value, or its placeholder.
+suppliedVar :: Text -> Text
+suppliedVar name
+  | Text.any (== ' ') name = "`supplied_" <> name <> "`"
+  | otherwise = "supplied_" <> name
+
+-- | One ASSUME per BOOLEAN input, declaring its placeholder.
+placeholderAssumes :: [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)] -> [Text]
+placeholderAssumes paramInfo =
+  [ "ASSUME " <> notSuppliedTerm name <> " IS A BOOLEAN"
+  | ((name, _), True, _, _, _) <- paramInfo
+  ]
+
+-- | The expression passed for one input, once the LET bindings and the
+-- nested CONSIDER are in scope.
+paramValueExpr :: (Text, Bool, Maybe Text, Bool) -> Text
+paramValueExpr (name, isBoolean, convFn, isM)
+  | isBoolean = suppliedVar name
+  -- Originally MAYBE: pass field value directly (it's already MAYBE X)
+  | isM, Just _ <- convFn = maybeConvertedVar name
+  | isM       = "(args's " <> quoteInputField name <> ")"
+  | Just _ <- convFn = convertedVar name
+  | otherwise = unwrappedVar name
+
+-- | The LET bindings an input needs before the call: a BOOLEAN binds its value
+-- or its placeholder, and a MAYBE DATE/TIME/DATETIME binds its converted value.
+-- Each right-hand side is given relative to its LET.
+inputLetBindings :: [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)] -> [(Text, [Text])]
+inputLetBindings = mapMaybe binding
+  where
+    binding ((name, _), isB, _, convFn, isM)
+      | isB =
+          Just ( suppliedVar name
+               , [ "CONSIDER args's " <> quoteInputField name
+                 , "  WHEN JUST " <> unwrappedVar name <> " THEN " <> unwrappedVar name
+                 , "  WHEN NOTHING THEN " <> notSuppliedTerm name
+                 ] )
+      | isM, Just fn <- convFn =
+          Just ( maybeConvertedVar name
+               , [ "CONSIDER args's " <> quoteInputField name
+                 , "  WHEN JUST " <> unwrappedVar name <> " THEN " <> fn <> " " <> unwrappedVar name
+                 , "  WHEN NOTHING THEN NOTHING"
+                 ] )
+      | otherwise = Nothing
+
+-- | Nest LET bindings around a body, each body one level deeper than its LET.
+-- L4's layout rule rejects a body at its LET's own column, so a flat chain does
+-- not parse.
+nestLets :: Int -> [(Text, [Text])] -> (Int -> [Text]) -> [Text]
+nestLets level [] body = body level
+nestLets level ((var, rhs) : rest) body =
+  let indentStr = Text.replicate level "  "
+  in [indentStr <> "LET " <> var <> " ="]
+     ++ map ((indentStr <> "  ") <>) rhs
+     ++ [indentStr <> "IN"]
+     ++ nestLets (level + 1) rest body
+
+-- | The call to the target function. A section GIVEN is supplied at a root
+-- only by name, with WITH, and a WITH cannot follow positional arguments, so a
+-- function that reads one gets every input by name. A LET of the section's
+-- name around the call would never reach the rules that read it.
+functionCallExpr
+  :: Text
+  -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]  -- ^ GIVEN params
+  -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]  -- ^ section GIVEN params
+  -> Text
+functionCallExpr funName givenParamInfo binderParamInfo
+  | null binderParamInfo =
+      if null givenParamInfo
+        then quotedFunName
+        else quotedFunName <> " " <> Text.unwords (map valueOf givenParamInfo)
+  | otherwise =
+      quotedFunName <> " WITH " <> Text.intercalate ", "
+        [ quoteIdent name <> " IS " <> valueOf p
+        | p@((name, _), _, _, _, _) <- givenParamInfo <> binderParamInfo
+        ]
+  where
+    quotedFunName = quoteIdent funName
+    valueOf ((name, _), isB, _, convFn, isM) = paramValueExpr (name, isB, convFn, isM)
+
 -- | Result of code generation
 data GeneratedCode = GeneratedCode
   { generatedWrapper :: Text
     -- ^ The L4 code to append after the filtered source
-  , decodeFailedSentinel :: Text
-    -- ^ The sentinel value to check for decode failure
+  , answerShape :: AnswerShape
+    -- ^ How the wrapper's #EVAL delivers the function's answer
+  , requiredInputs :: [RequiredInput]
+    -- ^ The inputs the wrapper cannot go on without, in the order it unwraps
+    -- them: see 'isRequiredInput'. When one of them is absent, or is a DATE,
+    -- TIME or DATETIME string that does not parse, the wrapper answers NOTHING
+    -- without calling the function.
   }
   deriving (Show, Eq)
+
+-- | How a generated wrapper's #EVAL delivers the function's answer.
+data AnswerShape
+  = WrappedInJust
+    -- ^ @JUST answer@; or @NOTHING@, without calling the function, for the
+    -- reasons given at 'requiredInputs'
+  | Bare
+    -- ^ the answer itself: a function with no inputs has nothing to decode
+  deriving (Show, Eq)
+
+-- | An input the wrapper cannot go on without.
+data RequiredInput = RequiredInput
+  { inputName :: Text
+  , isWrittenAssume :: Bool
+    -- ^ an ASSUME the author wrote; a rule GIVEN or a section GIVEN is a
+    -- parameter of the function, as the schema publishes it
+  , parsedAs :: Maybe Text
+    -- ^ DATE, TIME or DATETIME, when the wrapper parses the input from a string
+  }
+  deriving (Show, Eq)
+
+-- | Whether the wrapper unwraps an input with a nested CONSIDER, and so answers
+-- NOTHING when it is absent: every input that is neither a BOOLEAN nor a MAYBE.
+-- An input decoded as its own type ('inputParamInfo') counts as a MAYBE here:
+-- it is passed straight through, and JSONDECODE refuses it by name instead.
+isRequiredInput :: ((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool) -> Bool
+isRequiredInput (_, isB, _, _, isM) = not isB && not isM
+
+-- | The inputs for which 'isRequiredInput' holds.
+requiredInputsOf
+  :: Bool  -- ^ whether these are ASSUMEs the author wrote
+  -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]
+  -> [RequiredInput]
+requiredInputsOf written ps =
+  [ RequiredInput name written (Text.drop 2 <$> convFn)  -- "TODATE" parses a DATE
+  | p@((name, _), _, _, convFn, _) <- ps, isRequiredInput p ]
 
 -- | Generate L4 wrapper code for JSONDECODE-based evaluation
 --
 -- Uses deep Maybe lifting: ALL parameters are wrapped in MAYBE types,
 -- allowing JSON null/missing values to decode to NOTHING.
 --
--- For BOOLEAN parameters, uses fromMaybe FALSE to enable short-circuit
--- evaluation (if the boolean isn't needed, the default doesn't matter).
+-- A BOOLEAN parameter that decodes to NOTHING is bound to its placeholder
+-- assumed term ('notSuppliedTerm'): a rule that never reads it still
+-- short-circuits to an answer, and a rule that does read it stops and names it.
 --
 -- For non-BOOLEAN parameters, NOTHING propagates as an omitted/unknown value.
 --
+-- Section GIVENs the function reads are supplied by name with WITH, which is
+-- the one way to supply them at a root (see 'functionCallExpr').
+--
 -- ASSUME params are injected as LET bindings before the function call,
 -- shadowing any global ASSUME declarations with the provided values.
+--
+-- An input in @fields@ is NOT lifted: its InputArgs field has the input's own
+-- type, carrying its TYPICALLY (given as source text) if it has one, so the
+-- JSON decoder fills it when the request leaves it out and reports it when it
+-- is forced, and refuses it by name when it is missing or @null@ (W3, T3 of
+-- specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md). The caller decides which
+-- inputs those are ('Backend.Jl4.wrapperPlan'); a section GIVEN that
+-- discharge fills is simply not passed in.
 generateEvalWrapper
   :: Text                         -- ^ Target function name
   -> [(Text, Type' Resolved)]     -- ^ GIVEN parameter names and types (passed as function args)
+  -> [(Text, Type' Resolved)]     -- ^ section GIVEN names and types (supplied with WITH)
   -> [(Text, Type' Resolved)]     -- ^ ASSUME parameter names and types (injected as LET bindings)
+  -> Map Text (Maybe Text)        -- ^ inputs decoded as their own type, with their TYPICALLY
   -> Aeson.Value                  -- ^ Input arguments as JSON object
   -> TraceLevel                   -- ^ Whether to generate EVAL or EVALTRACE
   -> Either Text GeneratedCode
-generateEvalWrapper funName givenParams assumeParams inputJson traceLevel = do
-  let allParams = givenParams <> assumeParams
+generateEvalWrapper funName givenParams binderParams assumeParams fields inputJson traceLevel = do
+  let allParams = givenParams <> binderParams <> assumeParams
   -- Handle zero-parameter functions: no wrapper needed, just eval directly
   if null allParams
     then Right GeneratedCode
@@ -115,7 +286,8 @@ generateEvalWrapper funName givenParams assumeParams inputJson traceLevel = do
           , ""
           , generateSimpleEval funName traceLevel
           ]
-      , decodeFailedSentinel = "DECODE_FAILED"
+      , answerShape = Bare
+      , requiredInputs = []
       }
     else
       -- Deep Maybe lifting: all parameters get MAYBE types
@@ -125,29 +297,30 @@ generateEvalWrapper funName givenParams assumeParams inputJson traceLevel = do
           isBooleanType (TyApp _ name []) = getUnique name == booleanUnique
           isBooleanType _ = False
           -- Annotate GIVEN params with (type info, isBoolean, isGiven, convFn, isMaybe)
-          givenParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, True, stringConversionFn ty, isMaybeType ty)) givenParams
+          givenParamInfo = map (inputParamInfo fields isBooleanType True) givenParams
+          binderParamInfo = map (inputParamInfo fields isBooleanType False) binderParams
           -- Annotate ASSUME params with (type info, isBoolean, isGiven, convFn, isMaybe)
-          assumeParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, False, stringConversionFn ty, isMaybeType ty)) assumeParams
-          allParamInfo = givenParamInfo <> assumeParamInfo
-          -- We always need prelude for fromMaybe (all booleans use it)
-          hasBooleans = any (\(_, isB, _, _, _) -> isB) allParamInfo
+          assumeParamInfo = map (inputParamInfo fields isBooleanType False) assumeParams
+          allParamInfo = givenParamInfo <> binderParamInfo <> assumeParamInfo
       in Right GeneratedCode
       { generatedWrapper = Text.unlines $
           [ ""
           , "-- ========== GENERATED WRAPPER (Deep Maybe Lifting) =========="
           ] ++
-          -- Import prelude for fromMaybe if we have any booleans
-          (if hasBooleans then ["IMPORT prelude  -- for fromMaybe"] else []) ++
+          placeholderAssumes allParamInfo ++
           [ ""
-          , generateInputRecordLifted allParams
+          , generateInputRecordLifted fields allParams
           , ""
           , generateDecoder
           , ""
           , generateJsonPayload inputJson
           , ""
-          , generateEvalDirectiveLiftedWithAssumes funName givenParamInfo assumeParamInfo traceLevel
+          , generateEvalDirectiveLiftedWithAssumes funName givenParamInfo binderParamInfo assumeParamInfo traceLevel
           ]
-      , decodeFailedSentinel = "DECODE_FAILED"
+      , answerShape = WrappedInJust
+      , requiredInputs =
+          requiredInputsOf False (givenParamInfo <> binderParamInfo)
+            <> requiredInputsOf True assumeParamInfo
       }
 
 -- | Generate simple EVAL/EVALTRACE for zero-parameter functions
@@ -157,26 +330,51 @@ generateSimpleEval funName traceLevel =
     TraceNone -> "#EVAL " <> funName
     TraceFull -> "#EVALTRACE " <> funName
 
+-- | The parameter info of an input. One decoded as its own type ('fields')
+-- is passed as its field's value directly: there is nothing to unwrap and no
+-- placeholder to bind, which is the shape of an originally-MAYBE input.
+inputParamInfo
+  :: Map Text (Maybe Text)
+  -> (Type' Resolved -> Bool)
+  -> Bool
+  -> (Text, Type' Resolved)
+  -> ((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)
+inputParamInfo fields isBooleanType isGiven (name, ty)
+  | Map.member name fields = ((name, ty), False, isGiven, Nothing, True)
+  | otherwise = ((name, ty), isBooleanType ty, isGiven, stringConversionFn ty, isMaybeType ty)
+
 -- | Generate DECLARE for input record with ALL parameters lifted to MAYBE
 -- This enables uniform handling of null/missing JSON values
-generateInputRecordLifted :: [(Text, Type' Resolved)] -> Text
-generateInputRecordLifted params = Text.unlines $
-  ["DECLARE InputArgs HAS"] ++
-  map formatField (zip [0::Int ..] params)
+--
+-- Except an input decoded as its own type ('fields'): its field keeps the
+-- input's own type and carries its TYPICALLY, which is what the JSON decoder
+-- fills an absent field from (T1b), and refuses a missing or @null@ one by
+-- name (T3).
+--
+-- One field per line, each indented, with no separating commas: a leading
+-- @, @ after a field whose type is an application (@MAYBE OF NUMBER@) does
+-- not parse ("incorrect indentation"), which failed every request to a
+-- function with a MAYBE input before another input. @l4 batch@'s record had
+-- the same layout and the same failure.
+generateInputRecordLifted :: Map Text (Maybe Text) -> [(Text, Type' Resolved)] -> Text
+generateInputRecordLifted fields params = Text.unlines $
+  ["DECLARE " <> requestRecordName <> " HAS"] ++
+  map formatField params
   where
-    formatField (idx, (name, ty)) =
-      let indent = if idx == 0 then "  " else ", "
-          -- Lift ALL types to MAYBE
-          tyText = liftTypeToMaybe ty
+    formatField (name, ty) =
+      let -- Lift ALL types to MAYBE, but for one decoded as itself
+          tyText = case Map.lookup name fields of
+            Just mDefault -> prettyLayout ty <> maybe "" (" TYPICALLY " <>) mDefault
+            Nothing       -> liftTypeToMaybe ty
           -- Use prefixed field names to avoid collision with source identifiers
           quotedFieldName = quoteInputField name
-      in indent <> quotedFieldName <> " IS A " <> tyText
+      in "  " <> quotedFieldName <> " IS A " <> tyText
 
 -- | Generate typed decoder function
 generateDecoder :: Text
 generateDecoder = Text.unlines
   [ "GIVEN jsn IS A STRING"
-  , "GIVETH AN EITHER STRING InputArgs"
+  , "GIVETH AN EITHER STRING " <> requestRecordName
   , "decodeArgs jsn MEANS JSONDECODE jsn"
   ]
 
@@ -217,43 +415,23 @@ escapeAsL4String val =
 generateEvalDirectiveLiftedWithAssumes
   :: Text
   -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]  -- ^ GIVEN params: ((name, type), isBoolean, isGiven=True, convFn, isMaybe)
+  -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]  -- ^ section GIVEN params, supplied with WITH
   -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]  -- ^ ASSUME params: ((name, type), isBoolean, isGiven=False, convFn, isMaybe)
   -> TraceLevel
   -> Text
-generateEvalDirectiveLiftedWithAssumes funName givenParamInfo assumeParamInfo traceLevel =
+generateEvalDirectiveLiftedWithAssumes funName givenParamInfo binderParamInfo assumeParamInfo traceLevel =
   let directive = case traceLevel of
         TraceNone -> "#EVAL"
         TraceFull -> "#EVALTRACE"
 
       -- All params for unwrapping
-      allParams = givenParamInfo <> assumeParamInfo
+      allParams = givenParamInfo <> binderParamInfo <> assumeParamInfo
 
       -- Params that need CONSIDER unwrapping:
       -- non-boolean AND not originally-MAYBE (isMaybe=False)
-      needsUnwrap (_, isB, _, _, isM) = not isB && not isM
-      nonBoolNonMaybeParams = filter needsUnwrap allParams
+      nonBoolNonMaybeParams = filter isRequiredInput allParams
 
-      -- Generate the value expression for a single parameter
-      paramValueExpr :: (Text, Bool, Maybe Text, Bool) -> Text
-      paramValueExpr (name, isBoolean, convFn, isM)
-        | isBoolean = "(fromMaybe FALSE (args's " <> quoteInputField name <> "))"
-        -- Originally MAYBE: pass field value directly (it's already MAYBE X)
-        | isM, Just _ <- convFn = maybeConvertedVar name
-        | isM       = "(args's " <> quoteInputField name <> ")"
-        | Just _ <- convFn = convertedVar name
-        | otherwise = unwrappedVar name
-
-      -- Generate argument expressions for GIVEN params only (in original order)
-      givenArgExprs = map snd $ sortOn fst $
-        [(idx, paramValueExpr (name, isB, convFn, isM))
-        | (idx, ((name, _), isB, _, convFn, isM)) <- zip [0 :: Int ..] givenParamInfo]
-
-      -- Build function call with only GIVEN params as arguments
-      -- Quote function name if it contains spaces
-      quotedFunName = quoteIdent funName
-      functionCall = if null givenArgExprs
-        then quotedFunName
-        else quotedFunName <> " " <> Text.unwords givenArgExprs
+      functionCall = functionCallExpr funName givenParamInfo binderParamInfo
 
       -- Wrap function call with LET bindings for ASSUME params
       wrapWithAssumes :: Text -> Text
@@ -267,51 +445,20 @@ generateEvalDirectiveLiftedWithAssumes funName givenParamInfo assumeParamInfo tr
       -- The innermost expression (wrapped function call in JUST)
       innerCall = "JUST (" <> wrapWithAssumes functionCall <> ")"
 
-      -- Generate LET bindings for MAYBE params that need string->value conversion
-      -- (e.g. MAYBE DATE, MAYBE TIME, MAYBE DATETIME)
-      -- These are placed before the nested CONSIDER but after the decode
-      maybeConvParams = filter isMaybeConv allParams
-        where isMaybeConv (_, _, _, Just _, True) = True
-              isMaybeConv _ = False
-      maybeConvLetBindings = concatMap genMaybeConvLet maybeConvParams
-      genMaybeConvLet ((name, _), _, _, Just fn, _) =
-        [ "      LET " <> maybeConvertedVar name <> " ="
-        , "        CONSIDER args's " <> quoteInputField name
-        , "          WHEN JUST " <> unwrappedVar name <> " THEN " <> fn <> " " <> unwrappedVar name
-        , "          WHEN NOTHING THEN NOTHING"
-        , "      IN"
-        ]
-      genMaybeConvLet _ = []
+      -- After the decode: LET bindings for BOOLEAN and MAYBE DATE/TIME/DATETIME
+      -- params, then a nested CONSIDER for params that need unwrapping, then the call.
+      body level
+        | null nonBoolNonMaybeParams = [Text.replicate level "  " <> innerCall]
+        | otherwise = generateNestedConsiderWithAssumes nonBoolNonMaybeParams functionCall assumeParamInfo level
 
-  in if null nonBoolNonMaybeParams && null maybeConvParams
-     then -- All booleans/passthrough: simple case, no nested CONSIDER needed
-       Text.unlines
-         [ directive
-         , "  CONSIDER decodeArgs inputJson"
-         , "    WHEN RIGHT args THEN " <> innerCall
-         , "    WHEN LEFT error THEN NOTHING"
-         ]
-     else if null nonBoolNonMaybeParams
-     then -- Only MAYBE conversion params need LET bindings, no CONSIDER unwrapping
-       Text.unlines $
-         [ directive
-         , "  CONSIDER decodeArgs inputJson"
-         , "    WHEN RIGHT args THEN"
-         ] ++
-         maybeConvLetBindings ++
-         [ "      " <> innerCall
-         , "    WHEN LEFT error THEN NOTHING"
-         ]
-     else -- Has params that need CONSIDER unwrapping
-       Text.unlines $
-         [ directive
-         , "  CONSIDER decodeArgs inputJson"
-         , "    WHEN RIGHT args THEN"
-         ] ++
-         maybeConvLetBindings ++
-         generateNestedConsiderWithAssumes nonBoolNonMaybeParams functionCall assumeParamInfo (3 + if null maybeConvParams then 0 else 1) ++
-         [ "    WHEN LEFT error THEN NOTHING"
-         ]
+  in Text.unlines $
+       [ directive
+       , "  CONSIDER decodeArgs inputJson"
+       , "    WHEN RIGHT args THEN"
+       ] ++
+       nestLets 3 (inputLetBindings allParams) body ++
+       [ "    WHEN LEFT error THEN NOTHING"
+       ]
 
 -- | Generate nested CONSIDER for unwrapping non-boolean, non-MAYBE values,
 -- with LET bindings for ASSUME params at the innermost level.
@@ -331,12 +478,7 @@ generateNestedConsiderWithAssumes [] functionCall assumeParamInfo indent =
         where
           wrapOne ((name, _), isB, _, convFn, isM) expr =
             let quotedName = quoteIdent name
-                valueExpr
-                  | isB       = "(fromMaybe FALSE (args's " <> quoteInputField name <> "))"
-                  | isM, Just _ <- convFn = maybeConvertedVar name
-                  | isM       = "(args's " <> quoteInputField name <> ")"
-                  | Just _ <- convFn = convertedVar name
-                  | otherwise = unwrappedVar name
+                valueExpr = paramValueExpr (name, isB, convFn, isM)
             in "LET " <> quotedName <> " = " <> valueExpr <> " IN " <> expr
   in [indentStr <> "JUST (" <> wrapWithAssumes functionCall <> ")"]
 generateNestedConsiderWithAssumes (((name, _), _, _, convFn, _):rest) functionCall assumeParamInfo indent =
@@ -380,46 +522,64 @@ maybeConvertedVar name
 -- Deontic evaluation support
 -- ----------------------------------------------------------------------------
 
--- | Check if a type is DEONTIC a b (contract type with two type parameters)
+-- | Check if a type is DEONTIC a b (contract type with two type parameters).
+-- 'isContractType', so that the service and the editor ask the same question.
 isDeonticType :: Type' Resolved -> Bool
-isDeonticType (TyApp _ name [_, _]) = getUnique name == contractUnique
-isDeonticType _ = False
+isDeonticType = isContractType
 
 -- | Convert an FnLiteral to inline L4 source text.
 -- Used for generating EVENT expressions in deontic wrappers.
-fnLiteralToL4Expr :: FnLiteral -> Text
+--
+-- Every name taken from the request, a string standing for a constructor, a
+-- constructor name, a record key, goes through 'clientName': it is always
+-- quoted, and a name L4 cannot quote is refused.
+fnLiteralToL4Expr :: FnLiteral -> Either Text Text
 fnLiteralToL4Expr = \case
-  FnLitString s -> "`" <> s <> "`"
-  FnLitInt i -> BaseText.textShow i
-  FnLitDouble d -> BaseText.textShow d
-  FnLitBool True -> "TRUE"
-  FnLitBool False -> "FALSE"
-  FnArray xs -> "(LIST " <> Text.intercalate ", " (map fnLiteralToL4Expr xs) <> ")"
-  FnObject [(conName, FnObject fields)] ->
+  FnLitString s -> clientName s
+  FnLitInt i -> Right (BaseText.textShow i)
+  FnLitDouble d -> Right (BaseText.textShow d)
+  FnLitBool True -> Right "TRUE"
+  FnLitBool False -> Right "FALSE"
+  FnArray xs -> do
+    elems <- traverse fnLiteralToL4Expr xs
+    Right ("(LIST " <> Text.intercalate ", " elems <> ")")
+  FnObject [(conName, FnObject fields)] -> do
     -- Record constructor: `Constructor` WITH field1 IS val1, field2 IS val2
-    quoteIdent conName <> " WITH " <>
-      Text.intercalate ", " [quoteIdent k <> " IS " <> fnLiteralToL4Expr v | (k, v) <- fields]
+    con <- clientName conName
+    assignments <- traverse (\(k, v) -> assignment k =<< fnLiteralToL4Expr v) fields
+    Right (con <> " WITH " <> Text.intercalate ", " assignments)
   FnObject [(conName, FnArray [])] ->
     -- Nullary constructor
-    quoteIdent conName
-  FnObject [(conName, FnArray [singleVal])] ->
+    clientName conName
+  FnObject [(conName, FnArray [singleVal])] -> do
     -- Unary constructor with positional arg
-    quoteIdent conName <> " " <> fnLiteralToL4Expr singleVal
+    con <- clientName conName
+    arg <- fnLiteralToL4Expr singleVal
+    Right (con <> " " <> arg)
   FnObject [("tag", val)] ->
     -- Tagged union encoding: {"tag": "ConstructorName"} → just the value
     fnLiteralToL4Expr val
-  FnObject [(conName, val)] ->
+  FnObject [(conName, val)] -> do
     -- Single-key object: constructor applied to argument
-    quoteIdent conName <> " " <> fnLiteralToL4Expr val
-  FnObject _ -> "NOTHING"  -- Fallback for unexpected shapes
-  FnUncertain -> "NOTHING"
-  FnUnknown -> "NOTHING"
+    con <- clientName conName
+    arg <- fnLiteralToL4Expr val
+    Right (con <> " " <> arg)
+  FnObject _ -> Right "NOTHING"  -- Fallback for unexpected shapes
+  FnUncertain -> Right "NOTHING"
+  FnUnknown -> Right "NOTHING"
+
+-- | One @key IS value@ assignment of a record. The key is from the request;
+-- the value is already rendered.
+assignment :: Text -> Text -> Either Text Text
+assignment key value = do
+  k <- clientName key
+  Right (k <> " IS " <> value)
 
 -- | Convert FnLiteral to L4 source, using the type name to wrap record values.
 -- The type name is only needed for record types (bare FnObject with multiple fields).
 -- For enums (FnLitString) and tagged unions (FnObject with single key), the existing
 -- fnLiteralToL4Expr already produces correct L4 because the constructor info is in the value.
-fnLiteralToL4ExprWithType :: Maybe Text -> FnLiteral -> Text
+fnLiteralToL4ExprWithType :: Maybe Text -> FnLiteral -> Either Text Text
 fnLiteralToL4ExprWithType Nothing lit = fnLiteralToL4Expr lit
 fnLiteralToL4ExprWithType (Just typeName) lit = case lit of
   -- FnObject with any fields → record type, needs constructor wrapper
@@ -428,9 +588,10 @@ fnLiteralToL4ExprWithType (Just typeName) lit = case lit of
   -- Note: field VALUES use fnLiteralToL4Value (strings as "quoted literals")
   -- rather than fnLiteralToL4Expr (strings as `backtick identifiers`).
   -- This is critical because record field values are data, not constructor references.
-  FnObject fields@(_:_) ->
-    quoteIdent typeName <> " WITH " <>
-      Text.intercalate ", " [quoteIdent k <> " IS " <> fnLiteralToL4Value v | (k, v) <- fields]
+  FnObject fields@(_:_) -> do
+    -- The type name comes from the deployed source, the keys from the request.
+    assignments <- traverse (\(k, v) -> assignment k =<< fnLiteralToL4Value v) fields
+    Right (quoteIdent typeName <> " WITH " <> Text.intercalate ", " assignments)
   -- FnLitString → enum constructor (existing logic handles this)
   -- Everything else → delegate to existing function
   other -> fnLiteralToL4Expr other
@@ -439,13 +600,17 @@ fnLiteralToL4ExprWithType (Just typeName) lit = case lit of
 -- Unlike fnLiteralToL4Expr (which treats strings as constructor references
 -- using backtick quoting), this formats strings as double-quoted string literals.
 -- Used for record field values where strings represent data, not constructors.
-fnLiteralToL4Value :: FnLiteral -> Text
+--
+-- A string is written by the lexer's own 'showStringLit', the function that
+-- writes the request payload ('escapeAsL4String'), so both are read back by the
+-- lexer as the text they were written from.
+fnLiteralToL4Value :: FnLiteral -> Either Text Text
 fnLiteralToL4Value = \case
-  FnLitString s -> "\"" <> escapeL4String s <> "\""
-  FnArray xs -> "(LIST " <> Text.intercalate ", " (map fnLiteralToL4Value xs) <> ")"
+  FnLitString s -> Right (showStringLit s)
+  FnArray xs -> do
+    elems <- traverse fnLiteralToL4Value xs
+    Right ("(LIST " <> Text.intercalate ", " elems <> ")")
   other -> fnLiteralToL4Expr other
-  where
-    escapeL4String = Text.replace "\\" "\\\\" . Text.replace "\"" "\\\""
 
 -- | Prepare events for EVALTRACE by generating MEANS definitions for record-typed
 -- party/action values and a formatted event list expression.
@@ -460,8 +625,8 @@ fnLiteralToL4Value = \case
 --   ... EVENT (`event party 0`) (`wear seatbelt`) 1
 prepareEvents
   :: Maybe Text -> Maybe Text -> [TraceEvent]
-  -> ([Text], Text)  -- ^ (MEANS definitions, event list expression)
-prepareEvents mPartyType mActionType events =
+  -> Either Text ([Text], Text)  -- ^ (MEANS definitions, event list expression)
+prepareEvents mPartyType mActionType events = do
   let isRecordLit (FnObject (_:_)) = True
       isRecordLit _ = False
 
@@ -480,41 +645,48 @@ prepareEvents mPartyType mActionType events =
             $ Set.toList $ Set.fromList [ev.action | ev <- events, isRecordLit ev.action]
         ]
 
-      -- MEANS definitions for record values
-      meansDefns =
-        [ quoteIdent name <> " MEANS " <> fnLiteralToL4ExprWithType mPartyType lit
-        | (lit, name) <- Map.toList uniquePartyRecords
-        ] ++
-        [ quoteIdent name <> " MEANS " <> fnLiteralToL4ExprWithType mActionType lit
-        | (lit, name) <- Map.toList uniqueActionRecords
-        ]
-
       -- Format a single event, using binding names for records
-      fmtEvent ev =
-        let partyExpr = case Map.lookup ev.party uniquePartyRecords of
-              Just name -> quoteIdent name
-              Nothing   -> fnLiteralToL4ExprWithType mPartyType ev.party
-            actionExpr = case Map.lookup ev.action uniqueActionRecords of
-              Just name -> quoteIdent name
-              Nothing   -> fnLiteralToL4ExprWithType mActionType ev.action
-        in "EVENT (" <> partyExpr <> ") (" <> actionExpr <> ") " <> formatScientific ev.at
+      fmtEvent ev = do
+        partyExpr <- case Map.lookup ev.party uniquePartyRecords of
+          Just name -> Right (quoteIdent name)
+          Nothing   -> fnLiteralToL4ExprWithType mPartyType ev.party
+        actionExpr <- case Map.lookup ev.action uniqueActionRecords of
+          Just name -> Right (quoteIdent name)
+          Nothing   -> fnLiteralToL4ExprWithType mActionType ev.action
+        Right ("EVENT (" <> partyExpr <> ") (" <> actionExpr <> ") " <> formatScientific ev.at)
 
-      eventExprs = map fmtEvent events
-      eventListExpr = "(LIST " <> Text.intercalate ", " eventExprs <> ")"
-  in (meansDefns, eventListExpr)
+  -- MEANS definitions for record values
+  partyDefns <- for (Map.toList uniquePartyRecords) $ \(lit, name) ->
+    (\rhs -> quoteIdent name <> " MEANS " <> rhs) <$> fnLiteralToL4ExprWithType mPartyType lit
+  actionDefns <- for (Map.toList uniqueActionRecords) $ \(lit, name) ->
+    (\rhs -> quoteIdent name <> " MEANS " <> rhs) <$> fnLiteralToL4ExprWithType mActionType lit
+  eventExprs <- traverse fmtEvent events
+  let eventListExpr = "(LIST " <> Text.intercalate ", " eventExprs <> ")"
+  Right (partyDefns ++ actionDefns, eventListExpr)
 
--- | Format a Scientific number as L4 source
+-- | Format a Scientific number as L4 source: in decimal notation and never with
+-- an exponent, which L4's lexer does not read, and as the digits the client
+-- sent, not as the Double nearest to them.
+--
+-- A number the client writes with trailing zeros (@0.0@, @1.0@, @2.00@) arrives
+-- as a coefficient and a negative exponent that are not normalised. 'floor' of
+-- an integral number is its value; multiplying the coefficient by @10 ^ exponent@
+-- throws "Negative exponent" for it, and printing the Double of a fraction below
+-- @0.1@ or of a number from @1e7@ up (@5.0e-2@, @1.23456785e7@) gives text the
+-- lexer cannot read.
 formatScientific :: Scientific.Scientific -> Text
 formatScientific n
-  | Scientific.isInteger n = BaseText.textShow (Scientific.coefficient n * (10 ^ Scientific.base10Exponent n))
-  | otherwise = BaseText.textShow (Scientific.toRealFloat n :: Double)
+  | Scientific.isInteger n = BaseText.textShow (floor n :: Integer)
+  | otherwise = Text.pack (Scientific.formatScientific Scientific.Fixed Nothing n)
 
 -- | Generate L4 wrapper code for deontic evaluation with EVALTRACE.
 -- Extends generateEvalWrapper by wrapping the function call in EVALTRACE.
 generateDeonticEvalWrapper
   :: Text                         -- ^ Target function name
   -> [(Text, Type' Resolved)]     -- ^ GIVEN parameter names and types
+  -> [(Text, Type' Resolved)]     -- ^ section GIVEN names and types (supplied with WITH)
   -> [(Text, Type' Resolved)]     -- ^ ASSUME parameter names and types
+  -> Map Text (Maybe Text)        -- ^ inputs decoded as their own type, with their TYPICALLY
   -> Aeson.Value                  -- ^ Input arguments as JSON object
   -> Scientific.Scientific        -- ^ Start time
   -> [TraceEvent]                 -- ^ Events (may be empty for initial state)
@@ -522,12 +694,14 @@ generateDeonticEvalWrapper
   -> Maybe Text                   -- ^ Action type name (for formatting events)
   -> TraceLevel                   -- ^ Whether to generate EVAL or EVALTRACE
   -> Either Text GeneratedCode
-generateDeonticEvalWrapper funName givenParams assumeParams inputJson startTime events mPartyType mActionType traceLevel = do
-  let allParams = givenParams <> assumeParams
+generateDeonticEvalWrapper funName givenParams binderParams assumeParams fields inputJson startTime events mPartyType mActionType traceLevel = do
+  let allParams = givenParams <> binderParams <> assumeParams
 
-  -- Build event list expression with MEANS bindings for record-typed values
-  let (recordMeansDefns, eventListExpr) = prepareEvents mPartyType mActionType events
-      startTimeExpr = formatScientific startTime
+  -- Build event list expression with MEANS bindings for record-typed values.
+  -- A name in the events that L4 cannot quote is refused here, before any
+  -- source is written.
+  (recordMeansDefns, eventListExpr) <- prepareEvents mPartyType mActionType events
+  let startTimeExpr = formatScientific startTime
 
   -- Handle zero-parameter functions: wrap direct call in EVALTRACE
   if null allParams
@@ -540,25 +714,26 @@ generateDeonticEvalWrapper funName givenParams assumeParams inputJson startTime 
           [ ""
           , generateSimpleDeonticEval funName startTimeExpr eventListExpr traceLevel
           ]
-      , decodeFailedSentinel = "DECODE_FAILED"
+      , answerShape = Bare
+      , requiredInputs = []
       }
     else
       -- Deep Maybe lifting: all parameters get MAYBE types (same as generateEvalWrapper)
       let isBooleanType :: Type' Resolved -> Bool
           isBooleanType (TyApp _ name []) = getUnique name == booleanUnique
           isBooleanType _ = False
-          givenParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, True, stringConversionFn ty, isMaybeType ty)) givenParams
-          assumeParamInfo = map (\(name, ty) -> ((name, ty), isBooleanType ty, False, stringConversionFn ty, isMaybeType ty)) assumeParams
-          allParamInfo = givenParamInfo <> assumeParamInfo
-          hasBooleans = any (\(_, isB, _, _, _) -> isB) allParamInfo
+          givenParamInfo = map (inputParamInfo fields isBooleanType True) givenParams
+          binderParamInfo = map (inputParamInfo fields isBooleanType False) binderParams
+          assumeParamInfo = map (inputParamInfo fields isBooleanType False) assumeParams
+          allParamInfo = givenParamInfo <> binderParamInfo <> assumeParamInfo
       in Right GeneratedCode
       { generatedWrapper = Text.unlines $
           [ ""
           , "-- ========== GENERATED DEONTIC WRAPPER (Deep Maybe Lifting) =========="
           ] ++
-          (if hasBooleans then ["IMPORT prelude  -- for fromMaybe"] else []) ++
+          placeholderAssumes allParamInfo ++
           [ ""
-          , generateInputRecordLifted allParams
+          , generateInputRecordLifted fields allParams
           , ""
           , generateDecoder
           , ""
@@ -566,9 +741,12 @@ generateDeonticEvalWrapper funName givenParams assumeParams inputJson startTime 
           ] ++
           (if null recordMeansDefns then [] else "" : recordMeansDefns) ++
           [ ""
-          , generateDeonticEvalDirectiveLifted funName givenParamInfo assumeParamInfo startTimeExpr eventListExpr traceLevel
+          , generateDeonticEvalDirectiveLifted funName givenParamInfo binderParamInfo assumeParamInfo startTimeExpr eventListExpr traceLevel
           ]
-      , decodeFailedSentinel = "DECODE_FAILED"
+      , answerShape = WrappedInJust
+      , requiredInputs =
+          requiredInputsOf False (givenParamInfo <> binderParamInfo)
+            <> requiredInputsOf True assumeParamInfo
       }
 
 -- | Generate simple EVALTRACE for zero-parameter deontic functions
@@ -583,37 +761,22 @@ generateSimpleDeonticEval funName startTimeExpr eventListExpr traceLevel =
 generateDeonticEvalDirectiveLifted
   :: Text
   -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]  -- ^ GIVEN params
+  -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]  -- ^ section GIVEN params, supplied with WITH
   -> [((Text, Type' Resolved), Bool, Bool, Maybe Text, Bool)]  -- ^ ASSUME params
   -> Text                                                       -- ^ Start time expression
   -> Text                                                       -- ^ Event list expression
   -> TraceLevel
   -> Text
-generateDeonticEvalDirectiveLifted funName givenParamInfo assumeParamInfo startTimeExpr eventListExpr traceLevel =
+generateDeonticEvalDirectiveLifted funName givenParamInfo binderParamInfo assumeParamInfo startTimeExpr eventListExpr traceLevel =
   let directive = case traceLevel of
         TraceNone -> "#EVAL"
         TraceFull -> "#EVALTRACE"
 
-      allParams = givenParamInfo <> assumeParamInfo
+      allParams = givenParamInfo <> binderParamInfo <> assumeParamInfo
 
-      needsUnwrap (_, isB, _, _, isM) = not isB && not isM
-      nonBoolNonMaybeParams = filter needsUnwrap allParams
+      nonBoolNonMaybeParams = filter isRequiredInput allParams
 
-      paramValueExpr :: (Text, Bool, Maybe Text, Bool) -> Text
-      paramValueExpr (name, isBoolean, convFn, isM)
-        | isBoolean = "(fromMaybe FALSE (args's " <> quoteInputField name <> "))"
-        | isM, Just _ <- convFn = maybeConvertedVar name
-        | isM       = "(args's " <> quoteInputField name <> ")"
-        | Just _ <- convFn = convertedVar name
-        | otherwise = unwrappedVar name
-
-      givenArgExprs = map snd $ sortOn fst $
-        [(idx, paramValueExpr (name, isB, convFn, isM))
-        | (idx, ((name, _), isB, _, convFn, isM)) <- zip [0 :: Int ..] givenParamInfo]
-
-      quotedFunName = quoteIdent funName
-      functionCall = if null givenArgExprs
-        then quotedFunName
-        else quotedFunName <> " " <> Text.unwords givenArgExprs
+      functionCall = functionCallExpr funName givenParamInfo binderParamInfo
 
       -- Wrap function call with LET bindings for ASSUME params
       wrapWithAssumes :: Text -> Text
@@ -628,44 +791,16 @@ generateDeonticEvalDirectiveLifted funName givenParamInfo assumeParamInfo startT
       evalTraceCall = "EVALTRACE (" <> wrapWithAssumes functionCall <> ") " <> startTimeExpr <> " " <> eventListExpr
       innerCall = "JUST (" <> evalTraceCall <> ")"
 
-      -- LET bindings for MAYBE params that need string->value conversion
-      maybeConvParams = filter isMaybeConv allParams
-        where isMaybeConv (_, _, _, Just _, True) = True
-              isMaybeConv _ = False
-      maybeConvLetBindings = concatMap genMaybeConvLet maybeConvParams
-      genMaybeConvLet ((name, _), _, _, Just fn, _) =
-        [ "      LET " <> maybeConvertedVar name <> " ="
-        , "        CONSIDER args's " <> quoteInputField name
-        , "          WHEN JUST " <> unwrappedVar name <> " THEN " <> fn <> " " <> unwrappedVar name
-        , "          WHEN NOTHING THEN NOTHING"
-        , "      IN"
-        ]
-      genMaybeConvLet _ = []
+      body level
+        | null nonBoolNonMaybeParams = [Text.replicate level "  " <> innerCall]
+        | otherwise = generateNestedConsiderDeontic nonBoolNonMaybeParams evalTraceCall assumeParamInfo level
 
-  in if null nonBoolNonMaybeParams && null maybeConvParams
-     then Text.unlines
-       [ directive
-       , "  CONSIDER decodeArgs inputJson"
-       , "    WHEN RIGHT args THEN " <> innerCall
-       , "    WHEN LEFT error THEN NOTHING"
-       ]
-     else if null nonBoolNonMaybeParams
-     then Text.unlines $
+  in Text.unlines $
        [ directive
        , "  CONSIDER decodeArgs inputJson"
        , "    WHEN RIGHT args THEN"
        ] ++
-       maybeConvLetBindings ++
-       [ "      " <> innerCall
-       , "    WHEN LEFT error THEN NOTHING"
-       ]
-     else Text.unlines $
-       [ directive
-       , "  CONSIDER decodeArgs inputJson"
-       , "    WHEN RIGHT args THEN"
-       ] ++
-       maybeConvLetBindings ++
-       generateNestedConsiderDeontic nonBoolNonMaybeParams evalTraceCall assumeParamInfo (3 + if null maybeConvParams then 0 else 1) ++
+       nestLets 3 (inputLetBindings allParams) body ++
        [ "    WHEN LEFT error THEN NOTHING"
        ]
 

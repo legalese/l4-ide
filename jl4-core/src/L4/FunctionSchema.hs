@@ -21,8 +21,13 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 
 import L4.Export (extractAssumeParamsWithDefaults, extractImplicitAssumeParams)
+import L4.TypeSynonym (declaresFromModule, expandSynonyms)
 import L4.Syntax
-import L4.TypeCheck.Environment (falseUnique, maybeUnique, trueUnique)
+import L4.TypeCheck.Environment
+  ( booleanUnique, dateUnique, datetimeUnique, falseUnique, listUnique
+  , maybeUnique, nothingUnique, numberUnique, stringUnique, timeUnique
+  , trueUnique
+  )
 import L4.TypeCheck.Types (CheckErrorWithContext)
 import qualified Optics
 
@@ -110,43 +115,29 @@ instance FromJSON Parameter where
       <*> p .:? "x-l4-type"
       <*> p .:? "default"
 
-declaresFromModule :: Module Resolved -> Map Text (Declare Resolved)
-declaresFromModule (MkModule _ _ section) =
-  Map.fromList (collectSection section)
- where
-  collectSection (MkSection _ _ _ _ decls) =
-    decls >>= collectDecl
-
-  collectDecl = \case
-    Declare _ decl@(MkDeclare _ _ (MkAppForm _ name _ _) _) ->
-      [(resolvedNameText name, decl)]
-    Section _ sub ->
-      collectSection sub
-    _ ->
-      []
-
 typeToParameter ::
   Map Text (Declare Resolved) ->
   Set.Set Text ->
   Type' Resolved ->
   Parameter
 typeToParameter declares visited ty =
-  case ty of
+  -- A synonym is decided by what it stands for, as the decoder does: a
+  -- synonym for MAYBE is a MAYBE, one for LIST an array of its element.
+  case expandSynonyms declares ty of
     Type _ -> emptyParam "object"
     TyApp _ name [] ->
       typeNameToParameter name
-    TyApp _ name [inner] ->
-      let lowered = Text.toLower (resolvedNameText name)
-       in
-        if lowered `elem` ["list", "listof"]
-          then
-            (emptyParam "array")
-              { parameterItems = Just (typeToParameter declares visited inner)
-              }
-          else
-            if lowered `elem` ["maybe", "optional"]
-              then typeToParameter declares visited inner
-              else typeNameToParameter name
+    -- By the resolved type, as 'primitiveJsonType' does: a module's own
+    -- one-argument @List@ or @Optional@ is that declared type.
+    TyApp _ name [inner]
+      | getUnique name == listUnique ->
+          (emptyParam "array")
+            { parameterItems = Just (typeToParameter declares visited inner)
+            }
+      | getUnique name == maybeUnique ->
+          typeToParameter declares visited inner
+      | otherwise ->
+          typeNameToParameter name
     TyApp _ name _ ->
       typeNameToParameter name
     Fun{} -> emptyParam "object"
@@ -178,23 +169,21 @@ typeToParameter declares visited ty =
           Nothing -> emptyParam "object"
           Just decl -> declareToParameter (resolvedNameText name) decl
 
-  -- | Map L4 primitive type names to JSON Schema type and optional format.
+  -- | Map L4's builtin types to JSON Schema type and optional format. This goes
+  -- by the resolved type, not its name: a `DECLARE Text HAS ...` or an imported
+  -- enum `Time` is that record or enum, and reading its name would publish a
+  -- schema for a JSON string that the service then refuses.
   primitiveJsonType :: Resolved -> Maybe (Text, Maybe Text)
-  primitiveJsonType name =
-    case Text.toLower (resolvedNameText name) of
-      "number" -> Just ("number", Nothing)
-      "int" -> Just ("number", Nothing)
-      "integer" -> Just ("number", Nothing)
-      "float" -> Just ("number", Nothing)
-      "double" -> Just ("number", Nothing)
-      "boolean" -> Just ("boolean", Nothing)
-      "bool" -> Just ("boolean", Nothing)
-      "string" -> Just ("string", Nothing)
-      "text" -> Just ("string", Nothing)
-      "date" -> Just ("string", Just "date")
-      "time" -> Just ("string", Just "time")
-      "datetime" -> Just ("string", Just "date-time")
-      _ -> Nothing
+  primitiveJsonType name
+    | unique == numberUnique = Just ("number", Nothing)
+    | unique == booleanUnique = Just ("boolean", Nothing)
+    | unique == stringUnique = Just ("string", Nothing)
+    | unique == dateUnique = Just ("string", Just "date")
+    | unique == timeUnique = Just ("string", Just "time")
+    | unique == datetimeUnique = Just ("string", Just "date-time")
+    | otherwise = Nothing
+   where
+    unique = getUnique name
 
   declareToParameter :: Text -> Declare Resolved -> Parameter
   declareToParameter typeName (MkDeclare declAnn _ _ typeDecl)
@@ -216,10 +205,13 @@ typeToParameter declares visited ty =
                   | MkTypedName fieldAnn fieldName fieldTy mTypically _mMeans <- fields
                   , let fieldDesc = fmap getDesc (fieldAnn Optics.^. annDesc)
                   ]
+              -- A field with a TYPICALLY may be left out: the JSON decoders
+              -- fill it from this DECLARE (T1b of TYPICALLY-ONE-BEHAVIOUR-SPEC.md).
               requiredFields =
                 [ resolvedNameText fieldName
-                | MkTypedName _ fieldName fieldTy _ _ <- fields
-                , not (isMaybeFieldType fieldTy)
+                | MkTypedName _ fieldName fieldTy mTypically _ <- fields
+                , not (isMaybeFieldType (expandSynonyms declares fieldTy))
+                , Maybe.isNothing mTypically
                 ]
              in
               (emptyParam "object")
@@ -293,13 +285,18 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
 
     givenParamList = map mkOne names
     givenNames = map fst givenParamList
-    -- Track which GIVEN params have MAYBE/Optional types (these are not required)
+    -- Required as the service publishes it ('L4.Export.isRequiredInput'): an
+    -- input with a MAYBE type or a default a request may omit is not.
     requiredGivenParams =
       [ resolvedNameText resolved
-      | MkOptionallyTypedName _ resolved mType _ <- names
-      , not (isMaybeType mType)
+      | MkOptionallyTypedName _ resolved mType mTypically <- names
+      , not (isMaybeType (expandSynonyms declares <$> mType))
+      , Maybe.isNothing mTypically
       ]
     assumeParamList = map mkAssumeParam assumeParams
+    -- a section GIVEN with a default ('extractAssumeParamsWithDefaults' gives
+    -- a default for no other ASSUME) may be omitted
+    defaultedAssumes = [ n | (n, _, Just _, _) <- assumeParams ]
     implicitParamList = map (\ (n, ty) -> mkAssumeParam (n, ty, Nothing, Nothing)) implicitParams
 
     -- Combine all params, avoiding duplicates (explicit ASSUMEs take precedence)
@@ -313,7 +310,8 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
    in
     MkParameters
       { parameterMap = Map.fromList (givenParamList <> distinctAssumeParams)
-      , required = requiredGivenParams <> map fst distinctAssumeParams
+      , required = requiredGivenParams
+          <> [ n | (n, _) <- distinctAssumeParams, n `notElem` defaultedAssumes ]
       }
  where
   emptyParam :: Text -> Parameter
@@ -333,30 +331,34 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
       }
 
 -- | Convert a TYPICALLY default value to a JSON value for the function schema.
--- Only simple literals (numbers, strings) and the TRUE/FALSE constructors are
--- representable; anything else yields Nothing (no "default" key emitted).
+-- A default is a literal ('L4.TypeCheck.isTypicallyLiteral'): a number, a
+-- string, or a nullary constructor. TRUE and FALSE are JSON booleans, NOTHING
+-- is null, and any other nullary constructor is an enum value, which the wire
+-- spells as its name. Anything else yields Nothing (no "default" key emitted).
 typicallyToJson :: Expr Resolved -> Maybe Aeson.Value
 typicallyToJson = \case
   Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
   Lit _ (StringLit _ t) -> Just (Aeson.String t)
-  App _ r [] -> nullaryToJson r
+  App _ r [] -> Just (nullaryToJson r)
   _ -> Nothing
  where
   nullaryToJson r
-    | getUnique r == trueUnique = Just (Aeson.Bool True)
-    | getUnique r == falseUnique = Just (Aeson.Bool False)
-    | otherwise = Nothing
+    | getUnique r == trueUnique = Aeson.Bool True
+    | getUnique r == falseUnique = Aeson.Bool False
+    | getUnique r == nothingUnique = Aeson.Null
+    -- the constructor's own name, as a request spells the value: a
+    -- section-qualified reference (`Light`.Red) is still "Red"
+    | otherwise = Aeson.String (unqualifiedRawNameToText (rawName (getActual r)))
 
 -- | Check if a type annotation is MAYBE (i.e., the parameter is optional).
 isMaybeType :: Maybe (Type' Resolved) -> Bool
 isMaybeType (Just (TyApp _ name [_inner])) = getUnique name == maybeUnique
 isMaybeType _ = False
 
--- | Check if a field type is MAYBE or Optional (for record field required tracking).
+-- | Is a record field's type the builtin MAYBE (for record field required
+-- tracking)? By the resolved type, like 'isMaybeType'.
 isMaybeFieldType :: Type' Resolved -> Bool
-isMaybeFieldType (TyApp _ name [_]) =
-  let lowered = Text.toLower (resolvedNameText name)
-   in lowered `elem` ["maybe", "optional"]
+isMaybeFieldType (TyApp _ name [_]) = getUnique name == maybeUnique
 isMaybeFieldType _ = False
 
 resolvedNameText :: Resolved -> Text

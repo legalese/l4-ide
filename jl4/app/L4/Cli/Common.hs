@@ -14,16 +14,18 @@ module L4.Cli.Common
 
     -- * Evaluation config
   , makeEvalConfig
+  , makeRunEvalConfig
   , makeTracePolicyForEval
+  , makeTracePolicyForRun
   , makeTracePolicyForTrace
 
     -- * Running the LSP pipeline
   , runOneshot
   , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , hasBlockingError
   , transitiveDeps
   , dedupModules
-  , hasBlockingError
 
     -- * Rendering
   , TraceTextMode(..)
@@ -55,6 +57,7 @@ import System.IO (hPutStrLn, stderr)
 import Control.Applicative ((<|>))
 
 import LSP.Core.Types.Diagnostics (FileDiagnostic(..))
+import LSP.L4.BlockingErrors (hasBlockingError)
 import LSP.L4.Oneshot (oneshotL4Action)
 import qualified LSP.L4.Oneshot as Oneshot
 import LSP.Logger
@@ -62,11 +65,10 @@ import LSP.Logger
   , Recorder
   , WithPriority(..)
   , cfilter
-  , cmapWithPrio
-  , makeRefRecorder
+  , makeKeyedRefRecorder
   , pretty
   )
-import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
+import Language.LSP.Protocol.Types (NormalizedFilePath)
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
@@ -183,18 +185,44 @@ langOption what = optional $
 ----------------------------------------------------------------------------
 
 -- | Build an `EvalConfig` honoring either the `--fixed-now` flag or the
--- `L4_NOW` environment variable. Use this for `run`, `check`, `batch`.
+-- `L4_NOW` environment variable. Use this for the verbs that never print a
+-- trace (`check`, `batch`, the exporters); `l4 run` uses 'makeRunEvalConfig'.
 makeEvalConfig :: FixedNowOpt -> IO EvalConfig
 makeEvalConfig (FixedNowOpt mClock) = do
   envFixed <- readFixedNowEnv
   resolveEvalConfig (mClock <|> envFixed) makeTracePolicyForEval
 
+-- | The `EvalConfig` for `l4 run`. Same clock handling as 'makeEvalConfig';
+-- the trace policy follows the @--trace@ mode, see 'makeTracePolicyForRun'.
+makeRunEvalConfig :: TraceTextMode -> FixedNowOpt -> IO EvalConfig
+makeRunEvalConfig traceMode (FixedNowOpt mClock) = do
+  envFixed <- readFixedNowEnv
+  resolveEvalConfig (mClock <|> envFixed) (makeTracePolicyForRun traceMode)
+
+-- | No trace for anything: the policy of every verb that prints only results.
 makeTracePolicyForEval :: TracePolicy
 makeTracePolicyForEval =
   TracePolicy
     { evalDirectiveTrace = NoTrace
     , evaltraceDirectiveTrace = NoTrace
     }
+
+-- | Trace policy used by `l4 run`. Collecting a trace costs time and memory, so
+-- it is collected for @#EVALTRACE@ directives only, and only when @--trace@ is
+-- @full@. A plain @#EVAL@ (or @#ASSERT@) never collects one, whatever the mode,
+-- and keeps its "no trace captured" line.
+--
+-- The policy is global, not per module. 'LSP.L4.Rules' evaluates every module
+-- in the import closure with the one 'EvalConfig', and @l4 run@ prints only the
+-- entry module's results, so an @#EVALTRACE@ inside an IMPORTed module is
+-- collected and then discarded: its cost is paid and its trace shown nowhere.
+-- (Measured on a 100000-step @#EVALTRACE@ in a library: 0.57 s and 205 MB
+-- before this policy, 2.59 s and 1.4 GB after.) A policy that depends on the
+-- module is the real fix; it is not built.
+makeTracePolicyForRun :: TraceTextMode -> TracePolicy
+makeTracePolicyForRun = \case
+  TraceTextNone -> makeTracePolicyForEval
+  TraceTextFull -> TracePolicy.withTextTrace GraphViz2.defaultGraphVizOptions
 
 -- | Trace policy used by `l4 trace`. `#EVAL` stays silent so the user can
 -- still author `#EVAL` directives without being drowned in trace output;
@@ -234,69 +262,70 @@ runOneshot
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], b)
 runOneshot evalConfig fp act = do
-  (getLog, refRecorder) <- makeRefRecorder
-  let prettyRecorder = cmapWithPrio pretty refRecorder
-      -- Drop Debug-priority messages (very verbose Shake internals) but
-      -- keep Info/Warning/Error: real parse/type diagnostics come through
-      -- at Info priority via the LSP publishDiagnostics hook, so we can't
-      -- just filter by priority alone.  We scrub progress chatter out of
-      -- the rendered Text list below with `isProgressChatter`.
-      keep wp = wp.priority /= Debug
-      filteredRec = cfilter keep prettyRecorder
+  -- Debug-priority messages (very verbose Shake internals) are dropped, and
+  -- Info/Warning/Error kept: real parse/type diagnostics come through at Info
+  -- priority via the LSP publishDiagnostics hook, so we can't just filter by
+  -- priority alone.  We scrub progress chatter out of the rendered Text list
+  -- below with `isProgressChatter`.
+  (getLog, filteredRec) <- makeCliRecorder
   res <- oneshotL4Action filteredRec evalConfig fp act
   rawErrs <- getLog
   -- Post-filter: drop lines matching known progress-chatter prefixes.
   pure (filter (not . isProgressChatter) rawErrs, res)
 
 -- | Like 'runOneshot', but additionally returns the structured diagnostics
--- published to the Shake store during the run (across every file in the
--- import closure, not just the entry file).
+-- published to the Shake store during the run, across every file in the import
+-- closure and not just the entry file.
 --
 -- The rendered @[Text]@ is still returned for display; the @[FileDiagnostic]@
--- is what callers should consult for a severity-aware pass/fail verdict, since
--- some structural errors (notably an import cycle) attach their diagnostic to a
--- transitively-imported module rather than the entry file — so the entry
--- file's own typecheck result can spuriously look successful.
+-- is what a caller consults for a verdict that knows severity. An import cycle
+-- is the case that needs it: a module on a ring has no typecheck, so a file that
+-- imports one is checked without it, and its own result can look successful.
 runOneshotWithDiagnostics
   :: EvalConfig
   -> FilePath
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], [FileDiagnostic], b)
 runOneshotWithDiagnostics evalConfig fp act = do
-  (getLog, refRecorder) <- makeRefRecorder
-  let prettyRecorder = cmapWithPrio pretty refRecorder
-      keep wp = wp.priority /= Debug
-      filteredRec = cfilter keep prettyRecorder
+  (getLog, filteredRec) <- makeCliRecorder
   (diags, res) <- Oneshot.oneshotL4ActionWithDiags filteredRec evalConfig fp act
   rawErrs <- getLog
   pure (filter (not . isProgressChatter) rawErrs, diags, res)
 
--- | Does the diagnostics set contain an error that should make a CLI command
--- fail (exit non-zero)?
+-- | The recorder a command collects the pipeline's log with, as text, without
+-- its Debug-priority messages.
 --
--- An Error-severity diagnostic from any source /except/ @\"eval\"@ counts as
--- blocking: parse errors, type errors, unresolved/failed imports, and the raw
--- engine cycle exception all qualify. @#EVAL@ directive outcomes are tagged
--- with source @\"eval\"@ and are excluded /here/, so that this predicate speaks
--- only about structural diagnostics and stays usable by commands that never
--- evaluate (notably @l4 check@).
+-- With no editor to publish to, the pipeline logs every diagnostic of a file
+-- each time that file's diagnostics change ('Shake.LogDiagsDiffButNoLspEnv'),
+-- so a command that printed the log printed each diagnostic once for every
+-- later change to its file's diagnostics: @l4 run@ printed a type checker's
+-- warning three times and an error of the export check twice, and @l4 check@
+-- a type checker's warning twice (review of #779, 2026-11-21). Each list
+-- holds all of the file's diagnostics, so only the last one of each file is
+-- kept, where it falls in the log ('Oneshot.latestDiagnostics'); it is printed as it
+-- was.
+makeCliRecorder :: IO (IO [Text], Recorder (WithPriority Oneshot.Log))
+makeCliRecorder = do
+  (getLog, refRecorder) <- makeKeyedRefRecorder Oneshot.diagnosticsOf pretty
+  let keep wp = wp.priority /= Debug
+  pure (Oneshot.latestDiagnostics <$> getLog, cfilter keep refRecorder)
+
+-- 'hasBlockingError' (re-exported) is the rule for whether a diagnostics set
+-- should make a CLI command exit non-zero. It lives in jl4-lsp so that the
+-- editor's Deploy buttons refuse exactly what @l4 check@ and @l4 deploy@ do.
+-- It leaves out the evaluator's diagnostics (source @\"eval\"@), so that it
+-- speaks only about structural diagnostics and stays usable by commands that
+-- never evaluate (notably @l4 check@).
 --
 -- That exclusion is NOT the whole exit-code contract for @l4 run@. Ruled by
 -- Meng 2026-08-01: a @#EVAL@ that CRASHES during evaluation must be loud — it
--- exits non-zero. @l4 run@ therefore applies its own crash check on the
--- directive results ('L4.Cli.Run.evalDirectiveCrashed') in addition to calling
--- this predicate. An earlier version of this comment claimed an
--- evaluation-time exception never changes the exit code; that was the
--- pre-ruling behaviour and is no longer true.
+-- exits non-zero; ruled 2026-09-29: so must an @#ASSERT@ that evaluates to
+-- false. @l4 run@ therefore applies its own check on the directive results
+-- ('L4.Cli.Run.evalDirectiveFailsRun') in addition to calling this predicate.
 --
 -- If silencing is ever wanted, add a @-q@ \/ @--quiet-eval@ option to @l4 run@
 -- that restores exit 0 for a crashed directive — rather than flipping the
 -- default back.
-hasBlockingError :: [FileDiagnostic] -> Bool
-hasBlockingError = any isBlocking
-  where
-    isBlocking FileDiagnostic{fdLspDiagnostic = Diagnostic{_severity, _source}} =
-      _severity == Just DiagnosticSeverity_Error && _source /= Just "eval"
 
 -- | Returns True for rendered log lines that represent internal
 -- bookkeeping (import resolution, VFS lookups, Shake db progress) rather
@@ -308,7 +337,7 @@ hasBlockingError = any isBlocking
 --
 -- Import-resolution lines at Warning/Error priority are NOT chatter: they
 -- carry the library-shadow warning (multiple differing copies of a module
--- visible; see LIBRARY-RESOLUTION-SHADOW-SPEC) and module-not-found notices,
+-- visible; see specs/as-built/import-resolution.md) and module-not-found notices,
 -- which a CLI user must see.
 isProgressChatter :: Text -> Bool
 isProgressChatter txt =
@@ -454,12 +483,14 @@ putDiagnostics = mapM_ (hPutStrLn stderr . Text.unpack)
 diagnosticsToJson :: [Text] -> Aeson.Value
 diagnosticsToJson = Aeson.toJSON
 
--- | Every module the checked one reaches through @IMPORT@, transitively, in
--- dependency order; a diamond appears once per path, so 'dedupModules' it.
+-- | Every module the checked one reaches through @IMPORT@, transitively, once
+-- each, in the order a depth-first walk of the imports first meets it
+-- ('Rules.transitiveDependencies'). This used to recurse into each
+-- dependency's own list, which is already transitive, so it listed a module
+-- once per import path and took time exponential in the depth of the imports
+-- (smucclaw\/l4-ide#1008). 'dedupModules' is now a no-op on it.
 transitiveDeps :: Rules.TypeCheckResult -> [Module Resolved]
-transitiveDeps tc = go tc.dependencies
- where
-  go = concatMap (\d -> d.module' : go d.dependencies)
+transitiveDeps tc = map (.module') (Rules.transitiveDependencies tc)
 
 dedupModules :: [Module Resolved] -> [Module Resolved]
 dedupModules = List.nubBy (\a b -> muri a == muri b)

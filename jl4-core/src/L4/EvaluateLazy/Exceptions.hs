@@ -6,10 +6,12 @@ module L4.EvaluateLazy.Exceptions
 , InternalEvalException (..)
 , UserEvalException (..)
 , Refusal (..)
+, evalExceptionCode
 , prettyEvalException
 , prettyRefusal
 , maximumStackSize
 , maximumFrameDepth
+, maximumUnknownSteps
 )
 where
 
@@ -19,6 +21,7 @@ import Control.Exception (Exception)
 import L4.Evaluate.ValueLazy
 import L4.Evaluate.Operators
 import L4.Print
+import L4.Annotation (emptyAnno)
 import L4.Syntax
 import L4.Utils.Ratio
 
@@ -48,9 +51,11 @@ newtype Refusal =
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
--- | Render a refusal for a user. Deliberately does NOT say \"error\".
+-- | Render a refusal for a user. Deliberately does NOT say "error". Every line
+-- of the reason is indented under the heading, and an empty reason is one
+-- line that holds only the indent.
 prettyRefusal :: Refusal -> [Text]
-prettyRefusal r = [ "The model refuses to answer:", indentSingle r.message ]
+prettyRefusal r = "The model refuses to answer:" : map indentSingle (Text.splitOn "\n" r.message)
 
 -- | Thrown as a (synchronous) IO exception by the evaluation machine and
 -- caught at directive boundaries; see 'L4.EvaluateLazy.Machine'.
@@ -68,14 +73,59 @@ data InternalEvalException =
 data UserEvalException =
     BlackholeForced (Expr Resolved)
   | EqualityOnUnsupportedType WHNF WHNF
-  | NonExhaustivePatterns (Either Reference WHNF) -- ^ 'Right' the forced scrutinee value when available, 'Left' the raw reference otherwise
-  | StackOverflow
+  | NonExhaustivePatterns (Maybe PmGroup) (Either Reference WHNF)
+    -- ^ A CONSIDER had no branch for its scrutinee. The group, when the
+    -- CONSIDER was generated from the clauses of a multi-clause definition
+    -- ('PmConsider'), so that the message is about the clauses the drafter
+    -- wrote. 'Right' the forced scrutinee value when available, 'Left' the
+    -- raw reference otherwise.
+  | StackOverflow Int
+    -- ^ The frame limit that was reached: 'maximumFrameDepth', unless
+    -- @JL4_MAX_FRAME_DEPTH@ set another.
   | DivisionByZero BinOp
   | NotAnInteger BinOp Rational
-  | Stuck Resolved -- ^ stores the term we got stuck on
+  | Stuck (NonEmpty Term)
+    -- ^ what evaluation needed and nobody supplied: each input, or field of
+    -- one, once, in the order evaluation reached it (UNKNOWN-EVALUATION-SPEC
+    -- §4.7.4's default report names every one, U7b)
+  | RanOutOfSteps
+    -- ^ evaluation over an unknown took more steps than the limit allows
+    -- (§4.5, build step 3). Never reported as such: the connective whose
+    -- right operand ran out, or the directive boundary, rewrites it into
+    -- 'Stuck' naming the inputs that started the count.
   | UserError Text -- ^ general user-facing error (e.g. missing TIMEZONE declaration)
+  | ValueTooDeep
+    -- ^ An @#ASSERT REFUSED@ of a value that goes deeper than a directive
+    -- reads ('maximumStackSize'): whether it refuses below that depth is not
+    -- known, so the assertion is undecided.
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | The stable diagnostic code of an exception that stopped a directive. See
+-- 'L4.TypeCheck.Types.checkErrorCode' for what a code promises. No wildcard, so
+-- that a new exception has to be given a code.
+evalExceptionCode :: EvalException -> Text
+evalExceptionCode = \ case
+  InternalEvalException internal -> case internal of
+    RuntimeScopeError {}  -> "eval/internal-error"
+    RuntimeTypeError {}   -> "eval/internal-error"
+    PrematureGC           -> "eval/internal-error"
+    DanglingPointer       -> "eval/internal-error"
+    UnhandledPatternMatch -> "eval/internal-error"
+  UserEvalException user -> case user of
+    BlackholeForced {}           -> "eval/infinite-loop"
+    EqualityOnUnsupportedType {} -> "eval/unsupported-equality"
+    NonExhaustivePatterns {}     -> "eval/non-exhaustive-patterns"
+    StackOverflow _              -> "eval/stack-overflow"
+    DivisionByZero {}            -> "eval/division-by-zero"
+    NotAnInteger {}              -> "eval/not-an-integer"
+    Stuck {}                     -> "eval/stuck"
+    -- rewritten into an undetermined outcome before it is reported, which
+    -- is what eval/stuck reports
+    RanOutOfSteps                -> "eval/stuck"
+    UserError {}                 -> "eval/user-error"
+    ValueTooDeep                 -> "eval/value-too-deep"
+  RefusalException {} -> "eval/refused"
 
 prettyEvalException :: EvalException -> [Text]
 prettyEvalException (InternalEvalException exc) = wrapInternal (prettyInternalEvalException exc)
@@ -118,16 +168,32 @@ prettyUserEvalException = \ case
     , "These were the values you tried to compare:" ]
     <> indentMany v1
     <> indentMany v2
-  NonExhaustivePatterns val ->
+  NonExhaustivePatterns Nothing val ->
     [ "The value" ]
     <> either indentMany indentMany val
     <> [ "reached a CONSIDER that has no branch for it."
        , "Add a WHEN branch for this case, or a catch-all OTHERWISE branch."
        , "The typechecker's exhaustiveness warning lists all missing branches."
        ]
-  StackOverflow ->
+  -- Only the last clause's generated CONSIDERs have no OTHERWISE, so a
+  -- generated CONSIDER that runs out of branches is always in the last
+  -- clause, after every earlier clause has failed to match.
+  NonExhaustivePatterns (Just g) val
+    | g.clauseCount == 1 ->
+        [ "The only clause of " <> h <> " does not match these inputs."
+        , "The value it could not match is" ]
+        <> either indentMany indentMany val
+        <> [ "Add a clause for this case." ]
+    | otherwise ->
+        [ "No clause of " <> h <> " matches these inputs."
+        , "The value that the last clause could not match is" ]
+        <> either indentMany indentMany val
+        <> [ "Add a clause for this case, or end the clauses with one that matches every input." ]
+    where
+      h = quotedName (MkName emptyAnno g.groupHead)
+  StackOverflow depth ->
     [ "Stack overflow: "
-    , "Recursion depth of " <> Text.textShow maximumFrameDepth
+    , "Recursion depth of " <> Text.textShow depth
     , "exceeded." ]
   DivisionByZero op ->
     [ "Division by zero in the operation:"
@@ -139,12 +205,42 @@ prettyUserEvalException = \ case
     <> [ "During the evaluation of the operation:"
        , prettyLayout op
        ]
-  Stuck r ->
+  Stuck (t :| []) ->
     [ "I could not continue evaluating, because I needed to know the value of" ]
-    <> indentMany r
+    <> indentStuckName t
     <> [ "but it is an assumed term." ]
+  -- Several names: the same message, in the plural (decided by Claude
+  -- overnight 2026-10-03, pending Meng's review; UNKNOWN-EVALUATION-SPEC §8
+  -- step 3). The one-name message above is unchanged, so every page that
+  -- quotes it stays true.
+  Stuck ts ->
+    [ "I could not continue evaluating, because I needed to know the values of" ]
+    <> concatMap indentStuckName (toList ts)
+    <> [ "but they are assumed terms." ]
+  RanOutOfSteps ->
+    [ "I gave up evaluating: working this out over an unknown took more than "
+      <> Text.textShow maximumUnknownSteps <> " steps." ]
   UserError msg ->
     [ msg ]
+  ValueTooDeep ->
+    [ "The value goes deeper than a directive reads, so whether it refuses below that depth is not known." ]
+
+-- | A name a 'Stuck' carries, as its message prints it. An input prints
+-- exactly as it always has, so the one-input message is unchanged.
+indentStuckName :: Term -> [Text]
+indentStuckName = \ case
+  TInput r _ -> indentMany r
+  t          -> indentMany t
+
+-- | The step limit of UNKNOWN-EVALUATION-SPEC §4.5: once a site has received
+-- a term, evaluation may take this many more machine steps before it gives
+-- up. Set from §7's measurement on build step 3's branch (2026-10-03): the
+-- most any directive of the workload took was 59; a machine step allocates
+-- about 290 bytes, so this many is about 73 MB, under the service's default
+-- 256 MB per evaluation, and takes about 10 ms. Build step 5, whose joins can
+-- take far more, measures it again.
+maximumUnknownSteps :: Int
+maximumUnknownSteps = 250_000
 
 -- | Depth cutoff when converting WHNF results to normal form (deeper parts
 -- of the result are 'Omitted').
@@ -155,6 +251,7 @@ maximumStackSize = 200
 -- against runaway recursion. (The historical 200-frame limit was never
 -- actually enforced due to an accounting bug, so legitimate deeply-recursive
 -- programs relied on an effectively unbounded stack; this bound is therefore
--- deliberately generous.)
+-- deliberately generous.) The environment variable @JL4_MAX_FRAME_DEPTH@
+-- sets another, so that a test can reach the limit without a million frames.
 maximumFrameDepth :: Int
 maximumFrameDepth = 1_000_000

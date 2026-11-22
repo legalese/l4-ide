@@ -15,7 +15,7 @@
     {#if auth.phase === 'loading'}
       <span class="spinner"></span>
     {:else if auth.phase === 'unauthenticated'}
-      <p>Sign in to access your deployment chats.</p>
+      <p class="signin-note">Sign in to access your deployment chats.</p>
       <button class="btn" onclick={() => auth.login()}>Sign in</button>
     {:else}
       <p>
@@ -31,11 +31,13 @@
     display: grid;
     place-items: center;
     height: 100vh;
+    height: 100dvh;
     background: var(--chat-bg);
   }
   .card {
     text-align: center;
     color: var(--vscode-foreground);
+    padding: 0 1.5rem;
   }
   .brand {
     font-weight: 600;
@@ -45,6 +47,9 @@
   }
   p {
     color: var(--vscode-descriptionForeground);
+  }
+  .signin-note {
+    margin-bottom: 2.25rem;
   }
   code {
     background: var(--vscode-list-hoverBackground);

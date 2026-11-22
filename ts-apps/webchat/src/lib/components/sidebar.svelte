@@ -6,6 +6,7 @@
     onNewChat,
     onSelect,
     onDelete,
+    onClose,
     items = [],
     currentId = null,
     streamingIds = [],
@@ -13,6 +14,8 @@
     onNewChat?: () => void
     onSelect?: (id: string) => void
     onDelete?: (id: string) => void
+    /** Mobile only: dismiss the full-screen drawer this sidebar renders as. */
+    onClose?: () => void
     items?: AiConversationSummary[]
     currentId?: string | null
     streamingIds?: string[]
@@ -42,6 +45,15 @@
 <svelte:window onclick={closeMenu} />
 
 <aside class="sidebar">
+  <!-- Only rendered visible on mobile, where the sidebar is a full-screen
+       drawer and needs an explicit way back to the chat. -->
+  <div class="drawer-head">
+    <span class="drawer-title">Chats</span>
+    <button class="drawer-close" onclick={() => onClose?.()} aria-label="Close">
+      ✕
+    </button>
+  </div>
+
   <div class="top">
     <button class="new-chat" onclick={() => onNewChat?.()}>
       <!-- Compose icon — same glyph the VSCode extension uses for "New
@@ -191,6 +203,43 @@
     box-sizing: border-box;
   }
 
+  .drawer-head {
+    display: none;
+  }
+
+  /* Mobile: the page hosts this sidebar inside a full-screen fixed drawer,
+     so it stretches edge-to-edge and gains a close header. */
+  @media (max-width: 768px) {
+    .sidebar {
+      width: 100%;
+      flex: 1 1 auto;
+      border-right: none;
+    }
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex: 0 0 auto;
+      padding: 0.75rem 0.75rem 0;
+    }
+    .drawer-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--vscode-descriptionForeground);
+    }
+    .drawer-close {
+      border: none;
+      background: transparent;
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+      padding: 0.5rem;
+    }
+  }
+
   .top {
     flex: 1 1 auto;
     min-height: 0;
@@ -215,8 +264,10 @@
     text-align: left;
     transition: background-color 0.1s ease-out;
   }
-  .new-chat:hover {
-    background: var(--vscode-list-hoverBackground);
+  @media (hover: hover) {
+    .new-chat:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
   }
   .new-chat-icon {
     flex: 0 0 auto;
@@ -237,9 +288,6 @@
     display: flex;
     align-items: center;
     border-radius: 6px;
-  }
-  .hist-row:hover {
-    background: var(--vscode-list-hoverBackground);
   }
   .hist-row.active {
     background: var(--vscode-list-activeSelectionBackground);
@@ -269,14 +317,27 @@
     font-size: 1rem;
     line-height: 1;
     padding: 0.25rem 0.5rem;
-    opacity: 0;
-  }
-  .hist-row:hover .hist-del {
+    /* Visible by default; the hover-capable block below hides it until
+       the row is hovered. Touch devices keep it always-on — and get NO
+       :hover rules at all, because iOS Safari spends the first tap
+       applying hover styles that change appearance, forcing a second
+       tap to actually click. */
     opacity: 0.8;
   }
-  .hist-del:hover {
-    color: var(--vscode-errorForeground);
-    opacity: 1;
+  @media (hover: hover) {
+    .hist-row:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+    .hist-del {
+      opacity: 0;
+    }
+    .hist-row:hover .hist-del {
+      opacity: 0.8;
+    }
+    .hist-del:hover {
+      color: var(--vscode-errorForeground);
+      opacity: 1;
+    }
   }
   .hist-title {
     overflow: hidden;
@@ -321,8 +382,10 @@
     cursor: pointer;
     text-align: left;
   }
-  .profile:hover {
-    background: var(--vscode-list-hoverBackground);
+  @media (hover: hover) {
+    .profile:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
   }
 
   .avatar {
@@ -402,8 +465,10 @@
     cursor: pointer;
     box-sizing: border-box;
   }
-  .menu-item:hover {
-    background: var(--vscode-list-hoverBackground);
+  @media (hover: hover) {
+    .menu-item:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
   }
   .menu-item.danger {
     color: var(--vscode-errorForeground);

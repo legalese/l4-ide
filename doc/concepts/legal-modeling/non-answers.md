@@ -56,7 +56,7 @@ GIVETH A NUMBER
     WHEN NOTHING THEN 0
 ```
 
-Alex Tan's household, with no spouse, assesses at 30000. Bina Lim's, with a spouse earning 12000, assesses at 42000. Nothing failed in either case; the absence was one of the two ordinary things that could happen. See [MAYBE](../../reference/types/README.md#maybe-and-nullability).
+Alex Tan's household, with no spouse, assesses at 30000. Bina Lim's, with a spouse earning 12000, assesses at 42000. Nothing failed in either case; the absence was one of the two ordinary things that could happen. See [MAYBE](../../reference/types/README.md#lists-optional-values-and-choices).
 
 ---
 
@@ -91,7 +91,7 @@ Result:
   "returned for correction: a month must be between 1 and 12"
 ```
 
-The failure travelled as a value from the rule that detected it to the rule that had to say something about it. The test for this row: **can a later rule act on the reason?** See [EITHER](../../reference/types/README.md#either-for-errors).
+The failure travelled as a value from the rule that detected it to the rule that had to say something about it. The test for this row: **can a later rule act on the reason?** See [EITHER](../../reference/types/README.md#lists-optional-values-and-choices).
 
 ---
 
@@ -361,7 +361,7 @@ Decide the row before reading on.
 - [When a Rule Cannot Answer](../../tutorials/refuse/when-a-rule-cannot-answer.md) — the `REFUSE` tutorial
 - [What a Section Needs to Know](../../tutorials/section-given/what-a-section-needs-to-know.md) — naming the blanks a rule leaves open
 - [REFUSE Reference](../../reference/control-flow/REFUSE.md) — how to write it and how it behaves
-- [Types Reference](../../reference/types/README.md#maybe-and-nullability) — `MAYBE` and [`EITHER`](../../reference/types/README.md#either-for-errors)
+- [Types Reference](../../reference/types/README.md#lists-optional-values-and-choices) — `MAYBE` and [`EITHER`](../../reference/types/README.md#lists-optional-values-and-choices)
 - [Default Reasoning and Exceptions](default-reasoning.md) — overriding a conclusion
 - [Regulative Rules](regulative-rules.md) — `LEST`, breach, and the three outcomes of an obligation
 - [Constitutive vs Regulative Rules](constitutive-vs-regulative.md) — which layer a non-answer comes from

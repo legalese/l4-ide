@@ -1,0 +1,269 @@
+/**
+ * Directive-result cache + per-tool snapshot store.
+ *
+ * The L4 LSP broadcasts every directive result (#EVAL / #CHECK / type-check
+ * infos) via `l4/directiveResultsUpdated`. The host's {@link L4Language}
+ * adapter mirrors the latest per-URI payload into a
+ * {@link DirectiveResultsCache} (one per language-server connection). Tool
+ * implementations (`l4__evaluate`, `fs__edit_file`) read it on demand and
+ * diff the current rows against a *private* per-tool snapshot store, owned
+ * by the session's {@link BuiltinTools} instance, so each tool reports
+ * "what changed since I last spoke" without polluting the other tool's view
+ * — or another session's.
+ *
+ * Identity key for diffing: `body\0prettyText`. `body` carries the
+ * directive's full source span (multi-line possible) — two textually
+ * identical leading lines with different bodies stay distinct. The
+ * model-facing output is collapsed to the first line at render time;
+ * the body only participates in the key.
+ *
+ * Diff semantics are pure multiset:
+ *   - `added`   = rows in the new set with no remaining match in the prior
+ *   - `removedCount` = count of rows the prior set had that the new set
+ *                     doesn't (e.g. a coding error wiped all directives).
+ *   - `unchangedCount` = rows that matched a prior row by content key.
+ * A "value changed" directive shows up as one removed + one added — no
+ * separate `changed` channel is needed.
+ */
+
+import type { DirectiveResultRow } from '../ports.js'
+
+export type { DirectiveResultRow }
+
+export interface DirectiveOut {
+  /** 1-indexed source line of the directive. Directives sit at column 1
+   *  by convention, so we drop the column from the model-facing row. */
+  line: number
+  value: string
+  success: boolean | null
+}
+
+export interface DirectiveDiff {
+  added: DirectiveOut[]
+  removedCount: number
+  unchangedCount: number
+}
+
+/**
+ * Latest directive results per URI, plus waiters for the next push.
+ * Owned by an {@link L4Language} adapter: feed it from the
+ * `l4/directiveResultsUpdated` notification with {@link record}.
+ */
+export class DirectiveResultsCache {
+  private readonly cache = new Map<string, DirectiveResultRow[]>()
+  private readonly waiters = new Map<string, Array<() => void>>()
+
+  /** Store the latest rows for `uri` and wake anyone awaiting them. */
+  record(uri: string, results: DirectiveResultRow[]): void {
+    this.cache.set(uri, results)
+    const list = this.waiters.get(uri)
+    if (list) {
+      this.waiters.delete(uri)
+      for (const fn of list) fn()
+    }
+  }
+
+  get(uri: string): DirectiveResultRow[] | undefined {
+    return this.cache.get(uri)
+  }
+
+  has(uri: string): boolean {
+    return this.cache.has(uri)
+  }
+
+  /** Await the next push of results for `uri`, or resolve on timeout. */
+  waitForNext(uri: string, timeoutMs: number): Promise<void> {
+    return new Promise((resolve) => {
+      const list = this.waiters.get(uri) ?? []
+      list.push(resolve)
+      this.waiters.set(uri, list)
+      setTimeout(() => {
+        const still = this.waiters.get(uri)
+        if (still) {
+          this.waiters.set(
+            uri,
+            still.filter((fn) => fn !== resolve)
+          )
+        }
+        resolve()
+      }, timeoutMs)
+    })
+  }
+}
+
+/** Collapse `body` (the directive's full source span) to its first
+ *  non-blank source line for one-line headers. The full body is
+ *  preserved internally for the diff key but never leaves the
+ *  extension verbatim. */
+export function firstLineOfBody(body: string): string {
+  for (const line of body.split(/\r?\n/)) {
+    const t = line.trim()
+    if (t.length > 0) return t
+  }
+  return ''
+}
+
+function toOut(r: DirectiveResultRow): DirectiveOut {
+  // Model-facing rows carry only the line + result. The directive's
+  // body text never escapes the extension — the model already has the
+  // file in context, and the line pins it to a source-line anchor.
+  return {
+    line: parseLineFromDirectiveId(r.directiveId),
+    value: r.prettyText,
+    success: r.success,
+  }
+}
+
+/** Pull the 1-indexed line number out of a `"line:col"` directiveId.
+ *  Falls back to 0 on malformed input so a bad row can't crash the
+ *  diff render. */
+export function parseLineFromDirectiveId(directiveId: string): number {
+  const head = directiveId.split(':', 1)[0]
+  const n = Number(head)
+  return Number.isFinite(n) ? n : 0
+}
+
+function keyOf(r: DirectiveResultRow): string {
+  // `body` (full directive source span) + `prettyText` (rendered
+  // value). Two visually identical leading lines with different
+  // bodies remain distinct; a body-only edit that leaves the value
+  // unchanged surfaces as removed+added (acceptable cost — the
+  // directive genuinely changed).
+  return `${r.body}\u0000${r.prettyText}`
+}
+
+export interface DirectiveSnapshotStore {
+  /** Multiset-diff `results` against the prior snapshot for `uri`, then
+   *  replace the snapshot with the new contents. Returns added rows
+   *  verbose, removed count, and unchanged count. */
+  diff(uri: string, results: DirectiveResultRow[]): DirectiveDiff
+  /** Whether a snapshot exists for `uri` (cold-cache detection). */
+  hasSnapshot(uri: string): boolean
+  /** Drop the snapshot for a URI (e.g. on document close). */
+  forget(uri: string): void
+}
+
+export type RenderDirectivesMode = 'changed' | 'full'
+
+export interface RenderDirectivesOpts {
+  /** Latest directive rows pulled from the LSP cache. */
+  results: DirectiveResultRow[]
+  /** Per-tool snapshot store. Pass the tool's own instance so each
+   *  tool keeps its private "what did I last report" baseline — calls
+   *  to one tool don't blind the other's `changed` diff. */
+  store: DirectiveSnapshotStore
+  /** URI key for the snapshot store. */
+  uri: string
+  /** Output mode. `changed` = added rows verbose + counts; `full` =
+   *  every row verbose + total. */
+  mode: RenderDirectivesMode
+}
+
+/**
+ * Render the compact directives block both `l4__evaluate` and the
+ * post-edit auto-append (`fs__edit_file` / `fs__create_file`) emit.
+ * Shape:
+ *
+ *     --- L4 directives: <summary> ---
+ *     <rows>
+ *
+ * Where `<summary>` is one of:
+ *   - `no directives`                                   (total === 0)
+ *   - `<total> (full)`                                  (mode === 'full')
+ *   - `<total> unchanged`                               (nothing moved)
+ *   - `<N> changed[, <M> removed][, <K> unchanged]`     (otherwise)
+ *
+ * Row shape: `<marker> <line> → <value>` with `!` marking failed
+ * directives, otherwise a space. Multi-line values collapse to one
+ * line — callers can re-query verbose form if needed.
+ *
+ * ALWAYS refreshes the snapshot for `uri` (regardless of `mode`) so
+ * subsequent `changed` queries diff against the latest baseline.
+ */
+export function renderDirectiveResults(opts: RenderDirectivesOpts): string {
+  const { results, store, uri, mode } = opts
+  const diff = store.diff(uri, results)
+  const total = results.length
+
+  let summary: string
+  if (total === 0) {
+    summary = 'no directives'
+  } else if (mode === 'full') {
+    summary = `${total} (full)`
+  } else if (diff.added.length === 0 && diff.removedCount === 0) {
+    summary = `${total} unchanged`
+  } else {
+    const parts: string[] = []
+    if (diff.added.length > 0) parts.push(`${diff.added.length} changed`)
+    if (diff.removedCount > 0) parts.push(`${diff.removedCount} removed`)
+    if (diff.unchangedCount > 0) parts.push(`${diff.unchangedCount} unchanged`)
+    summary = parts.join(', ')
+  }
+
+  const header = `--- L4 directives: ${summary} ---`
+
+  if (total === 0) return header
+
+  const rows =
+    mode === 'full'
+      ? results.map((r) => formatDirectiveRow(toOut(r)))
+      : diff.added.map(formatDirectiveRow)
+
+  if (rows.length === 0) return header
+  return `${header}\n${rows.join('\n')}`
+}
+
+function formatDirectiveRow(d: DirectiveOut): string {
+  // `!` marks a failure, `~` a refusal, which is neither a success nor a
+  // failure and comes with a null success.
+  const marker = d.success === false ? '!' : d.success === null ? '~' : ' '
+  // Collapse multi-line values (e.g. a record body) to a single line
+  // so each directive stays on one row.
+  const value = d.value.replace(/\s*\n+\s*/g, ' ').trim()
+  return `${marker} ${d.line} → ${value}`
+}
+
+export function createDirectiveSnapshotStore(): DirectiveSnapshotStore {
+  // Per-URI multiset (key → count) of the last reported rows.
+  const snapshots: Map<string, Map<string, number>> = new Map()
+
+  return {
+    diff(uri, results) {
+      const prior = snapshots.get(uri) ?? new Map<string, number>()
+      const current: Map<string, number> = new Map()
+      for (const r of results) {
+        const k = keyOf(r)
+        current.set(k, (current.get(k) ?? 0) + 1)
+      }
+      const added: DirectiveOut[] = []
+      let unchangedCount = 0
+      const seen: Map<string, number> = new Map()
+      for (const r of results) {
+        const k = keyOf(r)
+        const have = prior.get(k) ?? 0
+        const idx = seen.get(k) ?? 0
+        seen.set(k, idx + 1)
+        // First `have` occurrences of this key are "unchanged" (paired
+        // off against the prior snapshot's count); any extra is added.
+        if (idx < have) {
+          unchangedCount++
+        } else {
+          added.push(toOut(r))
+        }
+      }
+      let removedCount = 0
+      for (const [k, have] of prior) {
+        const want = current.get(k) ?? 0
+        if (have > want) removedCount += have - want
+      }
+      snapshots.set(uri, current)
+      return { added, removedCount, unchangedCount }
+    },
+    hasSnapshot(uri) {
+      return snapshots.has(uri)
+    },
+    forget(uri) {
+      snapshots.delete(uri)
+    },
+  }
+}

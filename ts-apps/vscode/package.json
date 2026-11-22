@@ -35,7 +35,7 @@
     ]
   },
   "engines": {
-    "vscode": "^1.95.0"
+    "vscode": "^1.106.0"
   },
   "repository": {
     "type": "git",
@@ -67,10 +67,10 @@
         "title": "L4 Language Server",
         "properties": {
           "jl4.serverExecutablePath": {
-            "scope": "machine-overridable",
+            "scope": "machine",
             "type": "string",
             "default": "",
-            "markdownDescription": "Path to the `jl4-lsp` executable. Leave empty to use the bundled binary or find `jl4-lsp` on your PATH."
+            "markdownDescription": "Path to the `jl4-lsp` executable. Leave empty to use the bundled binary or find `jl4-lsp` on your PATH. Only user settings apply: a workspace can't choose which program runs."
           },
           "jl4.trace.server": {
             "scope": "resource",
@@ -129,6 +129,7 @@
             "description": "Show the model's reasoning (\"Thinking\" blocks) in the Legalese AI chat."
           },
           "legaleseAi.methodology": {
+            "scope": "application",
             "type": "string",
             "default": "",
             "description": "Guidance the Legalese AI follows when encoding natural language rules in L4."
@@ -229,10 +230,25 @@
             "default": "always",
             "description": "Legalese AI permission: call tools from the user's MCP servers. Which servers/tools are reachable at all is controlled by the toggles in the sidebar's MCP servers section."
           },
+          "legaleseAi.permissions.fetchWebPages": {
+            "type": "string",
+            "enum": [
+              "never",
+              "ask",
+              "always"
+            ],
+            "default": "always",
+            "description": "Legalese AI permission: read web pages through VS Code's fetch tool. VS Code still asks before fetching from a domain you haven't trusted."
+          },
           "legaleseAi.mcp.enabled": {
             "type": "boolean",
             "default": true,
             "description": "Master switch: expose the user's MCP servers to Legalese AI at all."
+          },
+          "legaleseAi.cloudSessions.enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Preview: run Legalese AI conversations as cloud sessions."
           },
           "legaleseAi.permissions.askUser": {
             "type": "string",
@@ -394,6 +410,8 @@
   },
   "prettier": "@repo/prettier-config",
   "dependencies": {
+    "@picovoice/pvrecorder-node": "1.2.9",
+    "@repo/legalese-agent": "*",
     "@repo/viz-expr": "*",
     "@repo/state-graph-render": "*",
     "@repo/webview": "*",
@@ -411,7 +429,7 @@
     "@types/fs-extra": "^11.0.4",
     "@types/minimatch": "^5.1.2",
     "@types/node": "^24.0.0",
-    "@types/vscode": "^1.95.0",
+    "@types/vscode": "^1.106.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "@vscode/test-cli": "^0.0.12",

@@ -1,0 +1,16 @@
+-- DUMBWAITER (ruled 2026-09-21): a right single quotation mark (’, U+2019)
+-- pasted in from Word/Pages/Google Docs, standing in for the plain `'s`
+-- genitive dereference. The lexer grammar itself stays strict -- `TGenitive`
+-- has no payload and always exactprints as `'s`, so teaching it to also
+-- accept the curly spelling would break the `exactprint identity` law --
+-- so this fails to lex, with a diagnostic naming the glyph and the fix
+-- rather than megaparsec's raw "unexpected" dump.
+--
+-- See doc/reference/errors/README.md, "Curly quotes and dashes from a word
+-- processor".
+
+DECLARE Person
+  HAS age IS A NUMBER
+
+GIVEN p IS A Person
+DECIDE `is adult` IF p’s age >= 18

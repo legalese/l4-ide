@@ -1,0 +1,157 @@
+IMPORT prelude
+
+-- The dinner race: the ledgers every fixture in this directory keeps, and
+-- the brief's properties P1 to P6 as boolean decisions over them
+-- (REGULATIVE-LOWERING-SPEC.md section 5.1).
+--
+-- The fixtures d1-naive.l4, d2-reread.l4 and d3-atomic.l4 IMPORT this
+-- file, so a property here is evaluated on the same types the contract
+-- writes. Each of the brief's six variables lives in one ledger cell:
+--
+--   brief variable  ledger cell                                   read by
+--   ledger          OFFICIAL's `dinner status record`             RECALL ALL
+--   dinners         OFFICIAL's `dinners bought`, less             RECALL ALL
+--                   OFFICIAL's `dinners cancelled`
+--   okAtBuy         OFFICIAL's `open at acceptance`               RECALL ALL
+--   belief          Alice's `belief`  (NOTHING is Unknown)        RECALL
+--   alice           Alice's `plan`    (NOTHING is Planning)       RECALL
+--   message         Messages's `message` (NOTHING is None)        RECALL
+--
+-- The dinner ledger's own records are COMMITs, to the official record,
+-- because they bind every party; what Alice knows and where she is are
+-- RECORDs in her own ledger, and the message's progress is a RECORD in
+-- the ledger of Messages.
+--
+-- Every input of a property below is named for the cell it reads: a LIST
+-- input takes that cell's RECALL ALL, a MAYBE input takes its RECALL (the
+-- latest entry). A cell read only by RECALL is single-valued: its history
+-- is not part of the brief's state, and an explorer that kept it would
+-- split the brief's states (README.md, "What the explorer must know").
+--
+-- No rule here reads a ledger itself. A rule with no inputs is evaluated
+-- once and its value kept, so one that did RECALL would answer every
+-- later question with the record as it stood the first time it was asked
+-- (README.md, "Traps").
+
+DECLARE Party IS ONE OF
+    World      -- the one party that acts (option C): each act names its actor
+    Alice      -- whose own ledger holds what she believes and where she is
+    Messages   -- whose own ledger holds the message "I bought it"
+
+-- What the dinner ledger has recorded: the arrangement opened with dinner
+-- unbought, and then, perhaps, Bob's purchase took it.
+DECLARE Status IS ONE OF
+    opened
+    taken
+
+-- Where Alice is: planning to buy, has checked, is re-reading (D2 only),
+-- has bought, has stopped.
+DECLARE Plan IS ONE OF
+    planning
+    checked
+    reading
+    bought
+    stopped
+
+-- The message "I bought it", from Bob to Alice.
+DECLARE `Message state` IS ONE OF
+    `in transit`
+    delivered
+
+DECLARE Dinner IS ONE OF
+    `dinner for two`
+
+§ `Reading the ledgers`
+
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A Status
+`the ledger's status` MEANS
+    IF elem taken `dinner status record` THEN taken ELSE opened
+
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A BOOLEAN
+`the ledger is open` MEANS `the ledger's status` `dinner status record` EQUALS opened
+
+GIVEN `dinners bought`    IS A LIST OF Dinner
+      `dinners cancelled` IS A LIST OF Dinner
+GIVETH A NUMBER
+`dinners` MEANS count `dinners bought` - count `dinners cancelled`
+
+GIVEN plan IS A MAYBE Plan
+GIVETH A Plan
+`where Alice is` MEANS fromMaybe planning plan
+
+§ `The properties`
+
+-- P1, safety (always): a dinner is bought only if the ledger's record said
+-- open at the instant the purchase took effect. The fixtures COMMIT one
+-- `open at acceptance` per purchase, at the moment it takes effect.
+GIVEN `open at acceptance` IS A LIST OF BOOLEAN
+GIVETH A BOOLEAN
+`every dinner was accepted while open` MEANS all (GIVEN ok YIELD ok) `open at acceptance`
+
+-- P2, safety (always): Alice buys at most one dinner.
+GIVEN `dinners bought`    IS A LIST OF Dinner
+      `dinners cancelled` IS A LIST OF Dinner
+GIVETH A BOOLEAN
+`at most one dinner is bought` MEANS `dinners` `dinners bought` `dinners cancelled` <= 1
+
+-- P3, reachability (some reachable state): Alice believes dinner is still
+-- open after Bob's purchase has taken it. A reachable state is the expected
+-- answer.
+GIVEN belief                 IS A MAYBE Status
+      `dinner status record` IS A LIST OF Status
+GIVETH A BOOLEAN
+`Alice's belief is stale` MEANS
+    belief EQUALS JUST opened AND `the ledger's status` `dinner status record` EQUALS taken
+
+-- P4, safety over steps: once one dinner is bought, it stays bought. This
+-- is the state label; the property is that no step goes from a state where
+-- it holds to one where it does not.
+GIVEN `dinners bought`    IS A LIST OF Dinner
+      `dinners cancelled` IS A LIST OF Dinner
+GIVETH A BOOLEAN
+`one dinner is bought` MEANS `dinners` `dinners bought` `dinners cancelled` EQUALS 1
+
+-- P5, liveness (eventually): Alice buys or stops. Liveness needs a model
+-- checker and a fairness assumption (spec section 5.3); this is the label.
+GIVEN plan IS A MAYBE Plan
+GIVETH A BOOLEAN
+`Alice has bought or stopped` MEANS
+    `where Alice is` plan EQUALS bought OR `where Alice is` plan EQUALS stopped
+
+-- P6, liveness: if the ledger stays open (Bob never buys), Alice eventually
+-- buys: always `the ledger is open` implies eventually `one dinner is
+-- bought`. Both labels are above.
+
+-- The non-vacuity control of spec section 6.3: under every fairness
+-- assumption used, "eventually Bob has bought" must be VIOLATED, or P6 has
+-- passed on an empty set of runs.
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A BOOLEAN
+`Bob has bought` MEANS NOT (`the ledger is open` `dinner status record`)
+
+§ `The properties on ledgers written out by hand`
+
+-- The initial state: the arrangement has opened, nothing else is recorded.
+#ASSERT `every dinner was accepted while open` EMPTY
+#ASSERT `at most one dinner is bought` EMPTY EMPTY
+#ASSERT NOT (`Alice's belief is stale` NOTHING (LIST opened))
+#ASSERT NOT (`one dinner is bought` EMPTY EMPTY)
+#ASSERT NOT (`Alice has bought or stopped` NOTHING)
+#ASSERT `the ledger is open` (LIST opened)
+
+-- Sequence A under D1: Alice checked while open, Bob's purchase was
+-- recorded, and Alice's purchase took effect after it.
+#ASSERT NOT (`every dinner was accepted while open` (LIST FALSE))
+#ASSERT `Alice's belief is stale` (JUST opened) (LIST opened, taken)
+#ASSERT `Bob has bought` (LIST opened, taken)
+
+-- Sequence B: Alice's purchase took effect before Bob's.
+#ASSERT `every dinner was accepted while open` (LIST TRUE)
+#ASSERT `one dinner is bought` (LIST `dinner for two`) EMPTY
+#ASSERT `Alice has bought or stopped` (JUST bought)
+
+-- The mutants: a cancelled dinner, and a purchase recorded twice.
+#ASSERT NOT (`one dinner is bought` (LIST `dinner for two`) (LIST `dinner for two`))
+#ASSERT NOT (`at most one dinner is bought` (LIST `dinner for two`, `dinner for two`) EMPTY)

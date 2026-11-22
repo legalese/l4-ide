@@ -1,0 +1,139 @@
+-- =============================================================================
+-- A CONSIDER written by hand reads numbers, pieces of text and EXACTLY as the
+-- clauses of a multi-clause group do (pattern-matching-literal-clauses.l4), so
+-- a rule warns alike written either way (GANDER, 2026-10-09). A missing case
+-- over a number or a piece of text is suggested as OTHERWISE; a keyed one as a
+-- WHEN, with the key as the arms spell it.
+-- =============================================================================
+
+IMPORT daydate
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+DECLARE Tier IS ONE OF Basic, Premium
+DECLARE Rate HAS level IS A NUMBER
+                 tier IS A Tier
+DECLARE Entry HAS amount IS A NUMBER
+                  memo IS A STRING
+
+-- Two numbers and no OTHERWISE: OTHERWISE is suggested, and `describe 2` fails
+-- at run time.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+describe n MEANS
+  CONSIDER n
+    WHEN 0 THEN "zero"
+    WHEN 1 THEN "one"
+
+#EVAL describe 2   -- no branch matches
+
+-- The same with the OTHERWISE: silent.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+`describe with otherwise` n MEANS
+  CONSIDER n
+    WHEN 0 THEN "zero"
+    WHEN 1 THEN "one"
+    OTHERWISE "many"
+
+-- Two pieces of text and no OTHERWISE.
+GIVEN s IS A STRING
+GIVETH A NUMBER
+code s MEANS
+  CONSIDER s
+    WHEN "red" THEN 1
+    WHEN "green" THEN 2
+
+-- EXACTLY of a value of the scrutinee's type is that value: Green is reached
+-- (it used to be called redundant on main), and Blue is missing.
+GIVEN c IS A Colour
+GIVETH A NUMBER
+pick c MEANS
+  CONSIDER c
+    WHEN EXACTLY Red THEN 1
+    WHEN Green THEN 2
+    OTHERWISE 3
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+only c MEANS
+  CONSIDER c
+    WHEN EXACTLY Red THEN 1
+
+#EVAL pick Green   -- 2
+
+-- 1 and 1.0 are the same number, and so are 0.10 and 0.1: the second and the
+-- fourth arms are redundant.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+h n MEANS
+  CONSIDER n
+    WHEN 1 THEN "one"
+    WHEN 1.0 THEN "one point zero"
+    WHEN 0.10 THEN "tenth"
+    WHEN 0.1 THEN "tenth again"
+    OTHERWISE "other"
+
+-- A record keyed by a number: the gap under the key, spelled as the arm spells
+-- it, and then every other level.
+GIVEN r IS A Rate
+GIVETH A NUMBER
+`rate charge` r MEANS
+  CONSIDER r
+    WHEN Rate 1.50 Basic THEN 10
+    WHEN Rate 2 t THEN 20
+
+-- EXACTLY of a constant over a number counts for nothing: OTHERWISE.
+zero MEANS 0
+
+GIVEN n IS A NUMBER
+GIVETH A STRING
+`constant only` n MEANS
+  CONSIDER n
+    WHEN EXACTLY zero THEN "zero"
+
+-- EXACTLY of a constant over an enumeration stands the CONSIDER down: silent.
+someColour MEANS Red
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+`enum constant` c MEANS
+  CONSIDER c
+    WHEN EXACTLY someColour THEN 1
+
+-- An EXACTLY that mentions the scrutinee stands it down: silent.
+GIVEN n IS A NUMBER
+GIVETH A STRING
+`plus zero` n MEANS
+  CONSIDER n
+    WHEN EXACTLY (n PLUS 0) THEN "any"
+    WHEN 0 THEN "zero"
+
+-- With an arm left out, only what the arms without a number or a piece of text
+-- leave open is listed: here everything, so OTHERWISE, and not the keyed
+-- `Entry 2 _`, which the second arm covers.
+two MEANS 2
+
+GIVEN e IS AN Entry
+GIVETH A STRING
+`left out` e MEANS
+  CONSIDER e
+    WHEN Entry 2 "b" THEN "a"
+    WHEN Entry (EXACTLY two) m THEN "two"
+    WHEN Entry 1 m THEN "one"
+
+-- A number inside a MAYBE.
+GIVEN m IS A MAYBE NUMBER
+GIVETH A STRING
+show m MEANS
+  CONSIDER m
+    WHEN NOTHING THEN "none"
+    WHEN JUST 0 THEN "zero"
+
+-- A date is matched only through EXACTLY of a date, which counts for nothing.
+d1 MEANS Date 2024 1 1
+
+GIVEN d IS A DATE
+GIVETH A NUMBER
+`by date` d MEANS
+  CONSIDER d
+    WHEN EXACTLY d1 THEN 1

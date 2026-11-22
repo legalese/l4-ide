@@ -10,7 +10,9 @@ IMPORT jurisdiction
 
 §§ `Version`
 
+@nlg the version of the Currency Library
 `Currency Library Version` MEANS "1.0.0"
+@nlg the version date of the Currency Library
 `Currency Library Date` MEANS "2024-12-16"
 
 
@@ -18,84 +20,148 @@ IMPORT jurisdiction
 
 -- Format: Currency name, code, numeric code, decimal places (minor units)
 
+@nlg the ISO 4217 code for the US Dollar
 `US Dollar code` MEANS "USD"
+@nlg the ISO 4217 numeric code for the US Dollar
 `US Dollar numeric` MEANS 840
+@nlg the number of decimal places of the US Dollar
 `US Dollar decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the US Dollar
 `US Dollar country` MEANS `United States alpha-2`
 
+@nlg the ISO 4217 code for the Euro
 `Euro code` MEANS "EUR"
+@nlg the ISO 4217 numeric code for the Euro
 `Euro numeric` MEANS 978
+@nlg the number of decimal places of the Euro
 `Euro decimals` MEANS 2
+@nlg the code for the European Union as the region of the Euro
 `Euro region` MEANS `European Union code`
 
+@nlg the ISO 4217 code for the Pound Sterling
 `British Pound code` MEANS "GBP"
+@nlg the ISO 4217 numeric code for the Pound Sterling
 `British Pound numeric` MEANS 826
+@nlg the number of decimal places of the Pound Sterling
 `British Pound decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Pound Sterling
 `British Pound country` MEANS `United Kingdom alpha-2`
 
+@nlg the ISO 4217 code for the Japanese Yen
 `Japanese Yen code` MEANS "JPY"
+@nlg the ISO 4217 numeric code for the Japanese Yen
 `Japanese Yen numeric` MEANS 392
+@nlg the number of decimal places of the Japanese Yen
 `Japanese Yen decimals` MEANS 0
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Japanese Yen
 `Japanese Yen country` MEANS `Japan alpha-2`
 
+@nlg the ISO 4217 code for the Swiss Franc
 `Swiss Franc code` MEANS "CHF"
+@nlg the ISO 4217 numeric code for the Swiss Franc
 `Swiss Franc numeric` MEANS 756
+@nlg the number of decimal places of the Swiss Franc
 `Swiss Franc decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Swiss Franc
 `Swiss Franc country` MEANS `Switzerland alpha-2`
 
+@nlg the ISO 4217 code for the Canadian Dollar
 `Canadian Dollar code` MEANS "CAD"
+@nlg the ISO 4217 numeric code for the Canadian Dollar
 `Canadian Dollar numeric` MEANS 124
+@nlg the number of decimal places of the Canadian Dollar
 `Canadian Dollar decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Canadian Dollar
 `Canadian Dollar country` MEANS `Canada alpha-2`
 
+@nlg the ISO 4217 code for the Australian Dollar
 `Australian Dollar code` MEANS "AUD"
+@nlg the ISO 4217 numeric code for the Australian Dollar
 `Australian Dollar numeric` MEANS 36
+@nlg the number of decimal places of the Australian Dollar
 `Australian Dollar decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Australian Dollar
 `Australian Dollar country` MEANS `Australia alpha-2`
 
+@nlg the ISO 4217 code for the Yuan Renminbi
 `Chinese Yuan code` MEANS "CNY"
+@nlg the ISO 4217 numeric code for the Yuan Renminbi
 `Chinese Yuan numeric` MEANS 156
+@nlg the number of decimal places of the Yuan Renminbi
 `Chinese Yuan decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Yuan Renminbi
 `Chinese Yuan country` MEANS `China alpha-2`
 
+@nlg the ISO 4217 code for the Hong Kong Dollar
 `Hong Kong Dollar code` MEANS "HKD"
+@nlg the ISO 4217 numeric code for the Hong Kong Dollar
 `Hong Kong Dollar numeric` MEANS 344
+@nlg the number of decimal places of the Hong Kong Dollar
 `Hong Kong Dollar decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing territory of the Hong Kong Dollar
 `Hong Kong Dollar country` MEANS `Hong Kong alpha-2`
 
+@nlg the ISO 4217 code for the Singapore Dollar
 `Singapore Dollar code` MEANS "SGD"
+@nlg the ISO 4217 numeric code for the Singapore Dollar
 `Singapore Dollar numeric` MEANS 702
+@nlg the number of decimal places of the Singapore Dollar
 `Singapore Dollar decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Singapore Dollar
 `Singapore Dollar country` MEANS `Singapore alpha-2`
 
+@nlg the ISO 4217 code for the Indian Rupee
 `Indian Rupee code` MEANS "INR"
+@nlg the ISO 4217 numeric code for the Indian Rupee
 `Indian Rupee numeric` MEANS 356
+@nlg the number of decimal places of the Indian Rupee
 `Indian Rupee decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Indian Rupee
 `Indian Rupee country` MEANS `India alpha-2`
 
+@nlg the ISO 4217 code for the Brazilian Real
 `Brazilian Real code` MEANS "BRL"
+@nlg the ISO 4217 numeric code for the Brazilian Real
 `Brazilian Real numeric` MEANS 986
+@nlg the number of decimal places of the Brazilian Real
 `Brazilian Real decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Brazilian Real
 `Brazilian Real country` MEANS `Brazil alpha-2`
 
+@nlg the ISO 4217 code for the Mexican Peso
 `Mexican Peso code` MEANS "MXN"
+@nlg the ISO 4217 numeric code for the Mexican Peso
 `Mexican Peso numeric` MEANS 484
+@nlg the number of decimal places of the Mexican Peso
 `Mexican Peso decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Mexican Peso
 `Mexican Peso country` MEANS `Mexico alpha-2`
 
+@nlg the ISO 4217 code for the Swedish Krona
 `Swedish Krona code` MEANS "SEK"
+@nlg the ISO 4217 numeric code for the Swedish Krona
 `Swedish Krona numeric` MEANS 752
+@nlg the number of decimal places of the Swedish Krona
 `Swedish Krona decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the Swedish Krona
 `Swedish Krona country` MEANS `Sweden alpha-2`
 
+@nlg the ISO 4217 code for the New Zealand Dollar
 `New Zealand Dollar code` MEANS "NZD"
+@nlg the ISO 4217 numeric code for the New Zealand Dollar
 `New Zealand Dollar numeric` MEANS 554
+@nlg the number of decimal places of the New Zealand Dollar
 `New Zealand Dollar decimals` MEANS 2
+@nlg the ISO 3166 alpha-2 code for the issuing country of the New Zealand Dollar
 `New Zealand Dollar country` MEANS `New Zealand alpha-2`
 
+@nlg the ISO 4217 code for the South Korean Won
 `South Korean Won code` MEANS "KRW"
+@nlg the ISO 4217 numeric code for the South Korean Won
 `South Korean Won numeric` MEANS 410
+@nlg the number of decimal places of the South Korean Won
 `South Korean Won decimals` MEANS 0
+@nlg the ISO 3166 alpha-2 code for the issuing country of the South Korean Won
 `South Korean Won country` MEANS `South Korea alpha-2`
 
 
@@ -103,6 +169,7 @@ IMPORT jurisdiction
 
 GIVEN currencyCode IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the number of decimal places of %currencyCode%
 `decimal places for currency` MEANS
     BRANCH
         IF currencyCode EQUALS `US Dollar code` THEN RIGHT `US Dollar decimals`
@@ -128,6 +195,7 @@ GIVETH AN EITHER STRING NUMBER
 
 GIVEN exponent IS A NUMBER
 GIVETH A NUMBER
+@nlg 10 to the power of %exponent% if that is 0, 1, 2 or 3, otherwise 100
 `power of 10` MEANS
     BRANCH
         IF exponent EQUALS 0 THEN 1
@@ -145,6 +213,7 @@ GIVETH A NUMBER
 GIVEN minorUnits IS A NUMBER
       currencyCode IS A STRING
 GIVETH AN EITHER STRING STRING
+@nlg the written amount of %minorUnits% minor units of %currencyCode%
 `Money` MEANS
     CONSIDER `decimal places for currency` currencyCode
     WHEN LEFT err THEN LEFT err
@@ -188,6 +257,7 @@ GIVETH AN EITHER STRING STRING
 GIVEN majorUnits IS A NUMBER
       currencyCode IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the minor units in %majorUnits% major units of %currencyCode%, rounded down
 `major to minor units` MEANS
     CONSIDER `decimal places for currency` currencyCode
     WHEN LEFT err THEN LEFT err
@@ -198,6 +268,7 @@ GIVETH AN EITHER STRING NUMBER
 GIVEN minorUnits IS A NUMBER
       currencyCode IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the major units in %minorUnits% minor units of %currencyCode%
 `minor to major units` MEANS
     CONSIDER `decimal places for currency` currencyCode
     WHEN LEFT err THEN LEFT err
@@ -212,6 +283,7 @@ GIVEN amount1 IS A NUMBER
       amount2 IS A NUMBER
       currencyCode IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg the sum of %amount1% and %amount2% in %currencyCode%
 `add money` MEANS
     CONSIDER `decimal places for currency` currencyCode
     WHEN LEFT err THEN LEFT err
@@ -222,6 +294,7 @@ GIVEN amount1 IS A NUMBER
       amount2 IS A NUMBER
       currencyCode IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg %amount1% less %amount2% in %currencyCode%
 `subtract money` MEANS
     CONSIDER `decimal places for currency` currencyCode
     WHEN LEFT err THEN LEFT err
@@ -232,6 +305,7 @@ GIVEN amount IS A NUMBER
       factor IS A NUMBER
       currencyCode IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg %amount% multiplied by %factor% in %currencyCode%, rounded down
 `multiply money` MEANS
     CONSIDER `decimal places for currency` currencyCode
     WHEN LEFT err THEN LEFT err
@@ -243,6 +317,7 @@ GIVEN amount IS A NUMBER
       divisor IS A NUMBER
       currencyCode IS A STRING
 GIVETH AN EITHER STRING NUMBER
+@nlg %amount% divided by %divisor% in %currencyCode%, rounded down
 `divide money` MEANS
     BRANCH
         IF divisor EQUALS 0
@@ -259,30 +334,35 @@ GIVETH AN EITHER STRING NUMBER
 GIVEN amount1 IS A NUMBER
       amount2 IS A NUMBER
 GIVETH A BOOLEAN
+@nlg %amount1% equals %amount2%
 `money equal` MEANS
     amount1 EQUALS amount2
 
 GIVEN amount1 IS A NUMBER
       amount2 IS A NUMBER
 GIVETH A BOOLEAN
+@nlg %amount1% is more than %amount2%
 `money greater than` MEANS
     amount1 GREATER THAN amount2
 
 GIVEN amount1 IS A NUMBER
       amount2 IS A NUMBER
 GIVETH A BOOLEAN
+@nlg %amount1% is less than %amount2%
 `money less than` MEANS
     amount1 LESS THAN amount2
 
 GIVEN amount1 IS A NUMBER
       amount2 IS A NUMBER
 GIVETH A BOOLEAN
+@nlg %amount1% is at least %amount2%
 `money at least` MEANS
     amount1 AT LEAST amount2
 
 GIVEN amount1 IS A NUMBER
       amount2 IS A NUMBER
 GIVETH A BOOLEAN
+@nlg %amount1% is at most %amount2%
 `money at most` MEANS
     amount1 AT MOST amount2
 
@@ -291,16 +371,19 @@ GIVETH A BOOLEAN
 
 GIVEN code IS A STRING
 GIVETH A BOOLEAN
+@nlg %code% has three characters and no lower-case letters, like an ISO 4217 code
 `is valid currency code` MEANS
     STRINGLENGTH code EQUALS 3
     AND code EQUALS TOUPPER code
 
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
+@nlg %amount% is zero or more
 `is non-negative` MEANS
     amount AT LEAST 0
 
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
+@nlg %amount% is more than zero
 `is positive` MEANS
     amount GREATER THAN 0

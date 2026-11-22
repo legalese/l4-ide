@@ -1,0 +1,38 @@
+-- `l4 render` leaves out a definition that is only test data: a constant that
+-- an #EVAL or #ASSERT names and no rule uses. A rule with no GIVEN of its own
+-- whose body is a call has the shape of such a constant, and until 2026-11-01
+-- that was enough: the rule vanished from the document when a directive named
+-- it, with no message. Now a definition whose value depends on an input is
+-- never test data.
+--
+-- A rule under a section GIVEN has no GIVEN of its own and reads the
+-- section's inputs, so every such rule that calls another one was exposed.
+-- `may vote` was rendered on unstable 8e19faa0d and dropped once the port of
+-- legalese/l4-ide#802 gave the own-line @nlg to the rule below it.
+
+§ `Eligibility`
+    GIVEN age IS A NUMBER
+@nlg the person is an adult
+`is adult` MEANS age AT LEAST 18
+
+@nlg the person may vote
+`may vote` MEANS `is adult`
+
+`may stand` MEANS `is adult`
+
+§ `Outside a section GIVEN`
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`twice` n MEANS n TIMES 2
+
+-- The controls: a call whose arguments are all constants, and a bare literal,
+-- depend on no input. Only a directive names them, so they are test data, and
+-- are still left out.
+`the doubled fee` MEANS `twice` 21
+
+`the test age` MEANS 20
+
+#EVAL `may vote` WITH age IS `the test age`
+#EVAL `may stand` WITH age IS 20
+#EVAL `the doubled fee`

@@ -200,13 +200,23 @@ instance ToSemTokens Context PosToken (AppForm Name) where
       CType -> genericToSemTokens a
       CValue -> genericToSemTokens a
 
+-- The holes follow the source order of the clauses, which depends on
+-- 'atFirst': @AT ts PARTY p DOES d@ (atFirst) puts the timestamp first,
+-- @PARTY p DOES d AT ts@ puts it last. Same order as the 'Event Resolved'
+-- instance below and the 'ToConcreteNodes' instances in "L4.Syntax".
 instance ToSemTokens Context PosToken (Event Name) where
   toSemTokens (MkEvent ann p a t atFirst) = traverseCsnWithHoles ann $ map toSemTokens
-    if atFirst then [p, a, t] else [t, p, a]
+    if atFirst then [t, p, a] else [p, a, t]
 
 
 
+-- A lifecycle value's words (THE JOIN, §2.6 B1) live in its own Anno, and
+-- the noun is an identifier token shown as the keyword it acts as, exactly
+-- as in the anchor ('Anchor' below).
 instance ToSemTokens Context PosToken (Expr Name) where
+  toSemTokens e = case e of
+    Lifecycle{} -> withTokenType identIsKeyword $ genericToSemTokens e
+    _           -> genericToSemTokens e
 instance ToSemTokens Context PosToken (GuardedExpr Name) where
 instance ToSemTokens Context PosToken (Deonton Name) where
 instance ToSemTokens Context PosToken (Subject Name) where
@@ -217,6 +227,10 @@ instance ToSemTokens Context PosToken (Threshold Name) where
 -- keyword it acts as.
 instance ToSemTokens Context PosToken UponEach where
   toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
+-- WHO and WHOSE are keyword tokens of the filter node's own Anno, so the
+-- derived instance places them without help (§13.6, 2026-09-21).
+instance ToSemTokens Context PosToken (Filter Name)
+
 instance ToSemTokens Context PosToken (Deadline Name) where
 -- AFTER is a keyword token of the node's own Anno, so the derived instance
 -- places it like WITHIN's (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, 2026-09-16).
@@ -233,6 +247,10 @@ instance ToSemTokens Context PosToken DeonticModal where
   toSemTokens _ = pure []
 -- InertContext has no tokens to highlight (derived during desugaring)
 instance ToSemTokens Context PosToken InertContext where
+  toSemTokens _ = pure []
+-- LifecyclePoint has no tokens to highlight (THE and the noun are in the
+-- Lifecycle node's Anno)
+instance ToSemTokens Context PosToken LifecyclePoint where
   toSemTokens _ = pure []
 -- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
 instance ToSemTokens Context PosToken RecallMode where
@@ -352,6 +370,8 @@ instance ToSemTokens () PosToken (Threshold Resolved) where
 instance ToSemTokens () PosToken UponEach where
   toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
 instance ToSemTokens () PosToken (Deadline Resolved) where
+instance ToSemTokens () PosToken (Filter Resolved)
+
 instance ToSemTokens () PosToken (Opening Resolved) where
 -- See the Name-phase instance above.
 instance ToSemTokens () PosToken (Anchor Resolved) where
@@ -364,6 +384,9 @@ instance ToSemTokens () PosToken DeonticModal where
 -- InertContext has no tokens to highlight (derived during desugaring)
 instance ToSemTokens () PosToken InertContext where
   toSemTokens _ = pure []
+-- LifecyclePoint has no tokens to highlight (see the Name-phase instance)
+instance ToSemTokens () PosToken LifecyclePoint where
+  toSemTokens _ = pure []
 -- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
 instance ToSemTokens () PosToken RecallMode where
   toSemTokens _ = pure []
@@ -371,7 +394,11 @@ instance ToSemTokens () PosToken (RAction Resolved) where
 instance ToSemTokens () PosToken (Event Resolved) where
   toSemTokens (MkEvent ann p a t atFirst) = traverseCsnWithHoles ann $ map toSemTokens
     if atFirst then [t, p, a] else [p, a, t]
+-- See the Name-phase instance above.
 instance ToSemTokens () PosToken (Expr Resolved) where
+  toSemTokens e = case e of
+    Lifecycle{} -> withTokenType identIsKeyword $ genericToSemTokens e
+    _           -> genericToSemTokens e
 instance ToSemTokens () PosToken (GuardedExpr Resolved) where
 instance ToSemTokens () PosToken (LocalDecl Resolved) where
 instance ToSemTokens () PosToken (Assume Resolved) where

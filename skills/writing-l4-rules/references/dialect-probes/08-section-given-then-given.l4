@@ -1,0 +1,8 @@
+§ `Articles`
+    GIVEN age IS A NUMBER
+          name IS A STRING
+
+GIVEN x IS A NUMBER
+double x MEANS x TIMES 2
+
+#EVAL double 21

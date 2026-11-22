@@ -2,5 +2,5 @@
 `strs`
 `negItems`
 `exprItems`
-`render outline` with `body scheme` and `nested`
-`render outline` with `body scheme` and `deeperNested`
+the numbered lines of `nested` under the numbering of paragraphs inside a clause (a, i, A)
+the numbered lines of `deeperNested` under the numbering of paragraphs inside a clause (a, i, A)

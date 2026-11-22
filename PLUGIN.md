@@ -5,6 +5,7 @@ A Claude Code plugin for writing **L4 rules-as-code** — a statically-typed, pu
 ## Features
 
 - **L4 authoring skill** — expert guidance for formalising legal text as typed decision functions and regulative rules (`MUST` / `MAY` / `SHANT` / `DO`, with deadlines, `HENCE` / `LEST` consequences, and `BREACH` semantics).
+- **Encoding workflow skill** — the work around the L4 when you encode a whole Act, regulation or contract: a brief that pins scope, a coverage table so nothing is silently skipped, the shared nouns before the rules, tests taken from the source, a self-check that reads diagnostics rather than exit codes, an independent test pass, and filing the result in [legalese/canon](https://github.com/legalese/canon).
 - **Deploy to Legalese Cloud** — annotate functions with `@export` and `@desc`, deploy from the VS Code extension's Deploy tab, and your rules are instantly available as:
   - **REST** endpoints (`POST /deployments/{id}/functions/{fn}/evaluation`)
   - **MCP** JSON-RPC 2.0 tools for LLM agent tool-use (`POST /deployments/{id}/.mcp`)
@@ -27,7 +28,7 @@ A Claude Code plugin for writing **L4 rules-as-code** — a statically-typed, pu
    /plugin install l4-computational-law@legalese
    ```
 
-Once installed, Claude Code auto-loads the `writing-l4-rules` skill whenever the plugin is active.
+Once installed, Claude Code auto-loads the `writing-l4-rules` and `encoding-a-subject` skills whenever the plugin is active.
 
 ## Usage
 
@@ -40,6 +41,7 @@ The skill activates when you:
 ### Example prompts
 
 - "Formalise this insurance policy clause in L4"
+- "Encode the whole of this Act in L4 and file it in canon" (the encoding workflow skill)
 - "Draft an L4 rule for a 30-day payment obligation with breach reparation"
 - "Model this statute as L4 with `#TRACE` test cases"
 - "Export this decision function and deploy it to Legalese Cloud"
@@ -109,6 +111,12 @@ Inside the plugin ([skills/writing-l4-rules/](skills/writing-l4-rules/)):
 - [references/regulative.md](skills/writing-l4-rules/references/regulative.md) — obligations, `#TRACE`, and the `MUST` / `HENCE` / `LEST` / `BREACH` machinery
 - [references/builtins.md](skills/writing-l4-rules/references/builtins.md) — coercions, HTTP/JSON, temporal globals, and the library index
 - [references/gotchas.md](skills/writing-l4-rules/references/gotchas.md) — ditto `^`, asyndetic `...` / `..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix
+
+And [skills/encoding-a-subject/](skills/encoding-a-subject/), for encoding a whole body of law:
+
+- [SKILL.md](skills/encoding-a-subject/SKILL.md) — the workflow, from gathering sources to filing in canon
+- [assets/brief-template.md](skills/encoding-a-subject/assets/brief-template.md) and [assets/check.sh](skills/encoding-a-subject/assets/check.sh) — the brief to fill in, and the self-check to copy
+- [references/canon-deposit.md](skills/encoding-a-subject/references/canon-deposit.md) — where an encoding goes in legalese/canon, and what goes with it
 
 External:
 

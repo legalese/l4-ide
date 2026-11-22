@@ -203,9 +203,10 @@ storing, **packing for shipment or distribution of**" certain foods. Delivery dr
 but did not pack. So: is the last item **one** activity (packing, for either shipment or
 distribution) or **two** (packing-for-shipment, and distribution)?
 
-The First Circuit found it genuinely ambiguous, construed the exemption narrowly against the
-employer, and the drivers won. The case settled for a reported $5 million. Judge Barron opened the
-opinion: "For want of a comma, we have this case."
+The First Circuit found it genuinely ambiguous, adopted the drivers' narrower reading because Maine
+construes its wage laws liberally, and sent the case back to the district court. The dairy then
+settled with the drivers for a reported $5 million. Judge Barron opened the opinion: "For want of a
+comma, we have this case."
 
 This is a **leaf-count** question, and it is the one that hides best, because both readings look
 identical until you count:
@@ -229,6 +230,59 @@ disjunction inside a field name, nobody audits it — not your reviewer, not you
 wizard. Lift the disjuncts out and let the scaffolding carry the words. Maine later amended the
 statute to use semicolons; the encoding would have forced the question on day one.
 
+### Oakhurst — _grouping_
+
+**The defect, seen a second way:** the same words in the same order, and nothing to say where the last "or" attaches.
+
+Follow the advice above and lift the disjuncts out, so that every activity and every destination is a leaf of its own, in the statute's own order.
+The drivers did not dispute that they handle perishable foods, so the list of goods is left out.
+What remains can be indented two ways:
+
+```l4
+DECIDE `exempt, as the drivers read it` IF
+        `canning`
+    ..  `processing`
+    ..  `preserving`
+    ..  `freezing`
+    ..  `drying`
+    ..  `marketing`
+    ..  `storing`
+    ..  `packing` ... "for"
+        ...     `shipment`
+            OR  `distribution`
+
+DECIDE `exempt, as the dairy read it` IF
+        `canning`
+    ..  `processing`
+    ..  `preserving`
+    ..  `freezing`
+    ..  `drying`
+    ..  `marketing`
+    ..  `storing`
+    ..  `packing` ... "for"
+        ...     `shipment`
+    OR  `distribution`
+```
+
+The two differ in one line: how far `OR distribution` is indented.
+Under `shipment`, distribution is a second destination for packing; back at the margin, it is a ninth activity of its own.
+
+![Oakhurst, as the drivers read it](figures/grouping-oakhurst-drivers.svg)
+
+![Oakhurst, as the dairy read it](figures/grouping-oakhurst-dairy.svg)
+
+Asked for every way a worker can be exempt, the two agree on eight and differ on the ninth: "packing for distribution" against "distribution".
+For a driver who distributes and does nothing else on the list, they disagree:
+
+```l4
+#EVAL `exempt, as the drivers read it` FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE TRUE   -- FALSE
+#EVAL `exempt, as the dairy read it`   FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE TRUE   -- TRUE
+```
+
+Overtime owed on the first reading; exempt on the second.
+Now type the last two lines at the margin, the way the statute is punctuated, and you are back in [the warning above](#l4-will-tell-you-when-you-have-not-decided): `AND` and `OR` share column 5.
+Ignore the warning and `AND` binds tighter, which gives the dairy's reading: the one the court declined to adopt, chosen by default and recorded nowhere.
+
 ### Rogers — _attachment_
 
 **The defect:** a comma that is _present_, scoping a trailing proviso further than one party
@@ -240,22 +294,25 @@ in writing by either party." Does the termination right attach only to the **suc
 to the **initial** term as well?
 
 The CRTC first read the comma as scoping both, letting the counterparty terminate early. Rogers then
-pointed at the **French-language version** of the same agreement, which was unambiguous — and the
-Commission reversed itself. (CRTC Telecom Decision 2006-45, reversed by 2007-75. The cost is
-variously reported; verify against the decisions before citing a figure.)
+pointed at the **French-language version** of the model agreement the Commission had approved, whose
+form theirs followed. Bell Aliant objected that this was a form of words in a language the parties
+had not used; but the French could be read only one way, the Commission held it equally
+authoritative, and it reversed itself. (Telecom Decision CRTC 2006-45, 28 July 2006, reversed by
+Telecom Decision CRTC 2007-75, 20 August 2007.)
 
 The two readings, again as depth:
 
 ```l4
--- The notice right attaches to the renewal terms only.
-    ..      "for a period of five (5) years"        ... `initial term is running`
-        ..  "and thereafter for successive terms"   ... `a renewal term is running`
-            ... NOT `one year notice has been given`
+DECIDE `in force — notice binds renewals only` IF
+            "for a period of five (5) years"      ... `initial term is running`
+        OR      "and thereafter for successive terms"
+                ... `a renewal term is running`
+                AND NOT `one year notice has been given`
 
--- The notice right attaches to both.
-    ...     "for a period of five (5) years"        ... `initial term is running`
-        ..  "and thereafter for successive terms"   ... `a renewal term is running`
-    ... NOT `one year notice has been given`
+DECIDE `in force — notice binds both` IF
+            "for a period of five (5) years"      ... `initial term is running`
+        OR  "and thereafter for successive terms" ... `a renewal term is running`
+    AND NOT `one year notice has been given`
 ```
 
 ![Rogers, notice binds renewals only](figures/grouping-rogers-renewals.svg)
@@ -265,7 +322,7 @@ The two readings, again as depth:
 **Rogers is the case that argues for this whole approach**, and it does so from the bench rather
 than from a manifesto. What resolved it was a _second, parallel, authoritative text_ that could not
 express the ambiguity. That is exactly what an L4 encoding is. The regulator accepted the argument
-in 2006.
+in 2007.
 
 ---
 
@@ -282,9 +339,10 @@ the mistake; it is the size of what the mistake reaches. A comma that decides wh
 term can be terminated reaches the entire value of the contract. You cannot be a little bit
 pregnant.
 
-**And the empirical record is one-sided.** Oakhurst: reportedly $5 million. Rogers: a
-multi-million-dollar contract reopened. Chew: a criminal conviction, in the High Court, on the
-meaning of a clause. If this were trivia it would not keep arriving at final courts of appeal.
+**And the empirical record is one-sided.** Oakhurst: reportedly $5 million. Rogers: two decisions
+by a national regulator, a year apart, on a comma first reported to cost about $2.13 million; Rogers
+won the second and, by a report after it, still had about $700,000 extra to pay. Chew: a criminal
+conviction, in the High Court, on the meaning of a clause. If this were trivia it would not keep arriving at final courts of appeal.
 
 The house on the sand and the house on the rock are, above ground, the same house. They differ only
 in the part nobody looks at. Rain fell, the floods came, the winds blew and beat upon that house —

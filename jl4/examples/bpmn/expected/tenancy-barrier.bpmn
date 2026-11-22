@@ -32,8 +32,8 @@
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:task id="Task_0" name="MUST Sign ...">
-      <bpmn:documentation>EVERY Tenant t IN tenants MUST Sign ... WITHIN 14 ONCE ALL HAVE — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
+    <bpmn:task id="Task_0" name="MUST Sign t">
+      <bpmn:documentation>EVERY Tenant t IN tenants MUST Sign t WITHIN 14 ONCE ALL HAVE — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
       <bpmn:ioSpecification id="IoSpec_Task_0">
         <bpmn:dataInput id="DataInput_Task_0" name="the_tenancy_t_cast" itemSubjectRef="Item_the_tenancy_t_cast" isCollection="true" />
         <bpmn:inputSet id="InputSet_Task_0">
@@ -56,8 +56,8 @@
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P14D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:task id="Task_1" name="MUST Deliver ...">
-      <bpmn:documentation>PARTY theLandlord MUST Deliver ... WITHIN 5</bpmn:documentation>
+    <bpmn:task id="Task_1" name="MUST Deliver theLandlord">
+      <bpmn:documentation>PARTY theLandlord MUST Deliver theLandlord WITHIN 5</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_1" name="after P5D" attachedToRef="Task_1" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 5</bpmn:documentation>

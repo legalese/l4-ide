@@ -10,17 +10,23 @@
 -- against small wording changes; this suite checks *structure* instead.
 module Main where
 
+import Control.Applicative ((<|>))
 import Control.Concurrent (forkIO)
-import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import Control.Monad (unless, when)
-import Data.List (findIndex, isInfixOf, isPrefixOf, nub, sort)
-import Data.Maybe (fromMaybe)
+import Control.Exception (IOException, finally, try)
+import Control.Monad (forM, forM_, unless, void, when)
+import qualified Data.Char as Char
+import Data.Char (isAlpha, isDigit, isSpace, toLower)
+import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, stripPrefix, tails)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Data.Aeson (Value(..), eitherDecode)
-import Data.Foldable (toList)
+import qualified Data.Aeson as Aeson
+import Data.Aeson (Value(..), eitherDecode, toJSON)
+import Data.Foldable (toList, traverse_)
+import Data.IORef (atomicModifyIORef', newIORef)
+import Data.Maybe (fromMaybe)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
@@ -28,475 +34,322 @@ import System.Directory
   , copyFile
   , createDirectoryIfMissing
   , createFileLink
-  , doesDirectoryExist
   , doesFileExist
+  , emptyPermissions
+  , findExecutable
   , getTemporaryDirectory
-  , listDirectory
   , makeAbsolute
-  , removeFile
   , removePathForcibly
+  , setOwnerReadable
+  , setOwnerSearchable
+  , setOwnerWritable
+  , setPermissions
   )
 import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath ((</>), isAbsolute, normalise)
-import System.IO (hClose, hSetBinaryMode)
+import System.FilePath ((</>), isAbsolute, normalise, takeFileName)
+import qualified System.Info as Info
+import System.IO (Handle, hClose, hFlush, hPutStr, hSetBinaryMode)
+import System.IO.Temp (withSystemTempDirectory)
 import System.Process
   ( CreateProcess(..)
   , StdStream(..)
   , createProcess
   , proc
   , readCreateProcessWithExitCode
+  , terminateProcess
   , waitForProcess
   )
+import System.Timeout (timeout)
 import Test.Hspec
+import qualified Language.LSP.Protocol.Types as LSP
 
-import qualified L4.Docassemble.Emit as DAEmit
+import CliTest.Common
+import qualified CliTest.Blawx as Blawx
+import qualified CliTest.BuildIdentity as BuildIdentity
+import qualified CliTest.BuildVersion as BuildVersion
+import qualified CliTest.Catala as Catala
+import qualified CliTest.Coverage as Coverage
+import qualified CliTest.DmnBpmn as DmnBpmn
+import qualified CliTest.Ledger as Ledger
+import qualified CliTest.Explore as Explore
+import qualified CliTest.SiblingReads as SiblingReads
+import qualified CliTest.Docassemble as Docassemble
+import qualified CliTest.OpenFisca as OpenFisca
+import qualified CliTest.Prove as Prove
+import qualified CliTest.Yscript as Yscript
 
 ----------------------------------------------------------------------------
--- Locating the l4 binary
+-- Helpers carried from main (sync of 2026-11-22)
 ----------------------------------------------------------------------------
 
--- | Find the @l4@ binary to test against.
---
--- Priority:
---
--- 1. @L4_BIN@ environment variable (useful in CI and for manual runs).
--- 2. @cabal list-bin exe:l4@ output (when running under cabal).
--- 3. Walk up from the test binary's path to @dist-newstyle/.../l4@.
---
--- The result is always absolute: some tests run the binary from a different
--- working directory (to exercise the @l4 check main.l4@ invocation form), and a
--- relative binary path would not survive that.
-locateL4Binary :: IO FilePath
-locateL4Binary = makeAbsolute =<< locateL4Binary'
+-- | Assert the CLI exited with status 1, which is what a failed check or run
+-- gives on every platform.
+expectExit1 :: FilePath -> [String] -> IO ()
+expectExit1 bin args = do
+  Output code _ _ <- runL4 bin args
+  code `shouldBe` ExitFailure 1
 
-locateL4Binary' :: IO FilePath
-locateL4Binary' = do
-  fromEnv <- lookupEnv "L4_BIN"
+-- | Assert a command run with @--json@ reports @ok: false@ and says why: the
+-- envelope must carry at least one diagnostic.
+expectJsonNotOk :: FilePath -> [String] -> IO ()
+expectJsonNotOk bin args = do
+  env <- jsonEnvelope bin (args ++ ["--json"])
+  objField env "ok" `shouldBe` Just (Bool False)
+  case objField env "diagnostics" of
+    Just (Array ds) -> length ds `shouldSatisfy` (> 0)
+    other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+-- | The text of the @Evaluation[n]@ block in the output of @l4 run@: from its
+-- header up to the next block's header, or to the end. Empty when there is no
+-- such block. Written against text whose carriage returns are already gone.
+evalBlockIn :: Int -> String -> T.Text
+evalBlockIn n out =
+  let marker = T.pack ("Evaluation[" <> show n <> "]")
+      (_, fromHere) = T.breakOn marker (T.pack out)
+  in fst (T.breakOn "Evaluation[" (T.drop (T.length marker) fromHere))
+
+-- | The diagnostic that @l4 run@ printed on standard error against a range
+-- starting at column 1 of the given line: from its @Range:@ row to the next
+-- @File:@ row. Empty when none starts there.
+diagnosticAtLine :: Int -> String -> T.Text
+diagnosticAtLine line err =
+  fst $ T.breakOn "File:" $ T.drop 1 $
+    snd $ T.breakOn (T.pack ("Range:    " <> show line <> ":1-")) (T.pack err)
+
+-- | @l4 run FILE@ on a three-directive file whose middle directive, on the given
+-- line, cannot be evaluated: the run fails, and the other two directives still
+-- print their results (2 and 4). The middle one's message is in its own
+-- @Evaluation[2]@ block and is also printed on standard error against its line,
+-- as an error.
+expectMiddleLostInText :: FilePath -> FilePath -> Int -> [String] -> IO ()
+expectMiddleLostInText bin fixture midLine messages = do
+  Output code sout0 serr0 <- runL4 bin ["run", fixture]
+  let sout = filter (/= '\r') sout0
+      serr = filter (/= '\r') serr0
+  code `shouldBe` ExitFailure 1
+  evalBlockIn 1 sout `shouldSatisfy` T.isInfixOf "Result:\n  2\n"
+  evalBlockIn 3 sout `shouldSatisfy` T.isInfixOf "Result:\n  4\n"
+  forM_ messages \m -> do
+    evalBlockIn 2 sout `shouldSatisfy` T.isInfixOf (T.pack m)
+    diagnosticAtLine midLine serr `shouldSatisfy` T.isInfixOf "DiagnosticSeverity_Error"
+    diagnosticAtLine midLine serr `shouldSatisfy` T.isInfixOf (T.pack m)
+
+-- | The same file with @--json@: @ok@ is false, there are three results, and the
+-- two outer ones are 2 and 4. The middle one carries the message, as its @value@
+-- or, for an @#ASSERT@, its @error@.
+expectMiddleLostInJson :: FilePath -> FilePath -> [String] -> IO ()
+expectMiddleLostInJson bin fixture messages = do
+  expectExit1 bin ["run", "--json", fixture]
+  env <- jsonEnvelope bin ["run", "--json", fixture]
+  objField env "ok" `shouldBe` Just (Bool False)
+  case [ r | Array rs <- maybe [] pure (objField env "results"), r <- toList rs ] of
+    [first, middle, final] -> do
+      objField first "value" `shouldBe` Just (String "2")
+      objField final "value" `shouldBe` Just (String "4")
+      let said = T.concat [ s | k <- ["value", "error"], Just (String s) <- [objField middle k] ]
+      forM_ messages \m -> said `shouldSatisfy` T.isInfixOf (T.pack m)
+    other -> expectationFailure ("Expected three results, got " ++ show (length other))
+
+-- | Rules for the query planners, one of which reads a helper it imports.
+queryPlanDeclineDir :: FilePath
+queryPlanDeclineDir = fixtureDir </> "refuse-queryplan"
+
+-- | doc/test-docs.sh's check of what @l4 run@ printed, relative to @jl4/@.
+checkRunOutputScript :: FilePath
+checkRunOutputScript = "../doc/check-l4-run-output.sh"
+
+-- | Find the @jl4-lsp@ binary: @JL4_LSP_BIN@, else the one Cabal built for this
+-- test suite (@build-tool-depends@ makes sure it is built).
+locateLspBinary :: IO (Maybe FilePath)
+locateLspBinary = do
+  fromEnv <- lookupEnv "JL4_LSP_BIN"
   case fromEnv of
     Just p -> do
       ok <- doesFileExist p
-      if ok then pure p else failWith ("L4_BIN set but not a file: " ++ p)
+      if ok then Just <$> makeAbsolute p else pure Nothing
     Nothing -> do
-      tryCabal <- cabalListBin
-      case tryCabal of
-        Just p -> pure p
-        Nothing -> failWith
-          "Could not find the l4 binary. Set L4_BIN or run via 'cabal test'."
-  where
-    failWith msg = do
-      putStrLn ("ERROR: " ++ msg)
-      exitFailure
+      (code, out, _err) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-lsp"]) ""
+      let path = reverse (dropWhile Char.isSpace (reverse (dropWhile Char.isSpace out)))
+      ok <- if code == ExitSuccess then doesFileExist path else pure False
+      if ok then Just <$> makeAbsolute path else pure Nothing
 
-    -- Best-effort: try `cabal list-bin exe:l4` from cwd.
-    cabalListBin :: IO (Maybe FilePath)
-    cabalListBin = do
-      (code, out, _err) <- readCreateProcessWithExitCode
-        (proc "cabal" ["list-bin", "exe:l4"]) ""
-      case code of
-        ExitSuccess ->
-          let path = trim out
-          in do
-            ok <- doesFileExist path
-            pure (if ok then Just path else Nothing)
-        _ -> pure Nothing
+-- | Find the @jl4-repl@ binary: @L4_REPL_BIN@, else the one Cabal built for
+-- this test suite.
+locateReplBinary :: IO (Maybe FilePath)
+locateReplBinary = do
+  fromEnv <- lookupEnv "L4_REPL_BIN"
+  case fromEnv of
+    Just p -> do
+      ok <- doesFileExist p
+      pure (if ok then Just p else Nothing)
+    Nothing -> do
+      (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+      let path = takeWhile (`notElem` ("\r\n" :: String)) out
+      ok <- doesFileExist path
+      pure (if code == ExitSuccess && ok then Just path else Nothing)
 
-    trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
-    isSpace c = c == ' ' || c == '\n' || c == '\r' || c == '\t'
-
-----------------------------------------------------------------------------
--- Helpers for running the CLI
-----------------------------------------------------------------------------
-
-notInfixOf :: String -> String -> Bool
-notInfixOf needle hay = not (needle `isInfixOf` hay)
-
-data Output = Output
-  { outExit   :: ExitCode
-  , outStdout :: String
-  , outStderr :: String
-  } deriving (Eq, Show)
-
--- | Run the l4 binary and capture its stdout + stderr.
---
--- Reads both streams as raw bytes and decodes them as UTF-8 leniently,
--- bypassing @readCreateProcessWithExitCode@'s reliance on the system
--- locale encoding. On Windows CI runners the locale is typically CP1252,
--- which rejects the UTF-8 lead bytes (0xC2, 0xE2, …) that @l4.exe@
--- writes for section markers (§) and en/em-dashes in help text — that
--- is the @hGetContents: cannot decode byte sequence starting from 194@
--- failure we saw on the first Windows build.
-runL4 :: FilePath -> [String] -> IO Output
-runL4 = runL4WithEnv Nothing
-
--- | Like 'runL4', but run the child process with an explicit environment.
---
--- @Nothing@ inherits the parent environment (the default). @Just env@ replaces
--- it wholesale, which lets a test force a particular library-resolution regime
--- (e.g. dropping @JL4_LIBRARY_PATH@ to exercise the embedded-library fallback)
--- regardless of what CI happens to export into the parent process.
-runL4WithEnv :: Maybe [(String, String)] -> FilePath -> [String] -> IO Output
-runL4WithEnv = runL4In Nothing
-
--- | Like 'runL4WithEnv', but also lets a test choose the child's working
--- directory.
---
--- This matters for library resolution: the CLI derives its root directory from
--- @takeDirectory@ of the entry path, so @l4 check main.l4@ run from inside the
--- project (root directory @"."@) exercises a different resolution path than
--- @l4 check some/dir/main.l4@ run from the package root. Every fixture path in
--- this suite carries a directory component, so without this the @"."@ case is
--- never covered — which is how the embedded stdlib came to outrank
--- project-local libraries for a whole release without a red test.
-runL4In :: Maybe FilePath -> Maybe [(String, String)] -> FilePath -> [String] -> IO Output
-runL4In mCwd mEnv bin args = do
-  let cp = (proc bin args)
-        { std_in  = CreatePipe
-        , std_out = CreatePipe
-        , std_err = CreatePipe
-        , env     = mEnv
-        , cwd     = mCwd
-        }
-  (Just hin, Just hout, Just herr, ph) <- createProcess cp
+-- | The REPL's reply to each query, with the file loaded, run in @work@
+-- because the REPL keeps a history file in the directory it is in.
+replRepliesFor :: FilePath -> FilePath -> FilePath -> [String] -> IO [T.Text]
+replRepliesFor work repl file queries = do
+  absFile <- makeAbsolute file
+  (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+    { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+  hPutStr hin (unlines (queries <> [":quit"]))
   hClose hin
   hSetBinaryMode hout True
   hSetBinaryMode herr True
-  -- Drain the two pipes CONCURRENTLY. 'BS.hGetContents' is strict, so reading
-  -- stdout to EOF and only then reading stderr deadlocks the moment the child
-  -- writes more to stderr than the pipe buffer holds (~16 KB on macOS): the
-  -- child blocks on the stderr write, so it never closes stdout, so the parent
-  -- never returns. That is not hypothetical — `l4 blawx` on a seed whose
-  -- assumed predicates are refused for publication emits ~22 KB of diagnostics
-  -- on a run that exits 0, and it hung this suite until it was killed, with no
-  -- output and no failure to point at.
-  serrVar <- newEmptyMVar
-  _ <- forkIO (BS.hGetContents herr >>= putMVar serrVar)
   soutBytes <- BS.hGetContents hout
-  serrBytes <- takeMVar serrVar
-  code <- waitForProcess ph
-  pure Output
-    { outExit   = code
-    , outStdout = T.unpack (TE.decodeUtf8Lenient soutBytes)
-    , outStderr = T.unpack (TE.decodeUtf8Lenient serrBytes)
-    }
+  _ <- BS.hGetContents herr
+  _ <- waitForProcess ph
+  let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+  pure (map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
 
--- | Run l4 with @XDG_DATA_HOME@ pointed at a caller-controlled directory and
--- @JL4_LIBRARY_PATH@ dropped (so 'resolveLibrary' reports
--- @hasExplicitPath = False@ and the resolver consults the embedded stdlib and
--- the ambient tiers). This is the dev regime the LIBRARY-RESOLUTION-SHADOW
--- tests exercise — CI normally exports @JL4_LIBRARY_PATH@, which hides it.
-runL4WithXdgHome :: FilePath -> FilePath -> [String] -> IO Output
-runL4WithXdgHome = runL4WithXdgHomeIn Nothing
+-- | Start @jl4-lsp@, initialize it and open the file in it, then hand the
+-- action the file's URI, a way to send a notification, and a way to send a
+-- request and wait for its answer, which is 'Nothing' if none came within two
+-- minutes. A request from the server in the meantime is answered with @null@.
+withOpenDocument :: FilePath -> FilePath -> (T.Text -> (T.Text -> Value -> IO ()) -> (T.Text -> Value -> IO (Maybe Value)) -> IO a) -> IO a
+withOpenDocument lsp file act = do
+  absFile <- makeAbsolute file
+  source <- TE.decodeUtf8 <$> BS.readFile absFile
+  let uri = LSP.getUri (LSP.filePathToUri absFile)
+  (Just hin, Just hout, Just herr, ph) <-
+    createProcess (proc lsp []) {std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
+  mapM_ (`hSetBinaryMode` True) [hin, hout, herr]
+  _ <- forkIO (void (BS.hGetContents herr))
+  nextId <- newIORef (1 :: Int)
+  let send v = do
+        let body = BSL8.toStrict (Aeson.encode v)
+        BS.hPut hin (BS8.pack ("Content-Length: " ++ show (BS.length body) ++ "\r\n\r\n") <> body)
+        hFlush hin
+      notify :: T.Text -> Value -> IO ()
+      notify method params =
+        send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "method" Aeson..= method, "params" Aeson..= params])
+      request :: T.Text -> Value -> IO (Maybe Value)
+      request method params = do
+        n <- atomicModifyIORef' nextId (\k -> (k + 1, k))
+        send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "id" Aeson..= n, "method" Aeson..= method, "params" Aeson..= params])
+        let await = readLspMessage hout >>= \case
+              Nothing -> pure Nothing
+              Just msg -> case Aeson.decodeStrict msg of
+                Just v
+                  | Just _ <- v `objField` "method", Just rid <- v `objField` "id" -> do
+                      send (Aeson.object ["jsonrpc" Aeson..= ("2.0" :: T.Text), "id" Aeson..= rid, "result" Aeson..= Null])
+                      await
+                  | Just rid <- v `objField` "id", rid == toJSON n -> pure (Just v)
+                _ -> await
+        fromMaybe Nothing <$> timeout 120000000 await
+      stop = do
+        terminateProcess ph
+        void (waitForProcess ph)
+        void (try (hClose hin) :: IO (Either IOException ()))
+  flip finally stop $ do
+    _ <- request "initialize" (Aeson.object ["processId" Aeson..= Null, "rootUri" Aeson..= Null, "capabilities" Aeson..= Aeson.object []])
+    notify "initialized" (Aeson.object [])
+    notify "textDocument/didOpen" (Aeson.object
+      [ "textDocument" Aeson..= Aeson.object
+          [ "uri" Aeson..= uri, "languageId" Aeson..= ("l4" :: T.Text), "version" Aeson..= (1 :: Int), "text" Aeson..= source ]
+      ])
+    act uri notify request
 
-runL4WithXdgHomeIn :: Maybe FilePath -> FilePath -> FilePath -> [String] -> IO Output
-runL4WithXdgHomeIn mCwd xdgHome bin args = do
-  parentEnv <- getEnvironment
-  let childEnv =
-        ("XDG_DATA_HOME", xdgHome)
-          : filter (\(k, _) -> k /= "JL4_LIBRARY_PATH" && k /= "XDG_DATA_HOME")
-                   parentEnv
-  runL4In mCwd (Just childEnv) bin args
+-- | One @Content-Length@-framed LSP message from a handle, or 'Nothing' at end
+-- of input.
+readLspMessage :: Handle -> IO (Maybe BS.ByteString)
+readLspMessage h = go BS.empty
+  where
+    go acc
+      | "\r\n\r\n" `BS.isSuffixOf` acc = body acc
+      | otherwise = do
+          c <- BS.hGet h 1
+          if BS.null c then pure Nothing else go (acc <> c)
+    body header =
+      case [ BS8.readInt (BS8.dropWhile Char.isSpace (BS.drop 1 (BS8.dropWhile (/= ':') l)))
+           | l <- BS8.lines header, "content-length" `BS.isPrefixOf` BS8.map toLowerAscii l ] of
+        Just (n, _) : _ -> Just <$> BS.hGet h n
+        _ -> pure Nothing
+    toLowerAscii c = if c >= 'A' && c <= 'Z' then toEnum (fromEnum c + 32) else c
 
--- | Run l4 with library resolution forced onto the embedded-library fallback:
--- no @JL4_LIBRARY_PATH@, and an /empty/ XDG store (so no user-level
--- @~/.local/share/jl4/libraries@ on the runner interferes). This is the exact
--- regime issue #906 is about.
-runL4EmbeddedOnly :: FilePath -> [String] -> IO Output
-runL4EmbeddedOnly = runL4EmbeddedOnlyIn Nothing
+bilingualFramesRegionFixture :: FilePath
+bilingualFramesRegionFixture = fixtureDir </> "bilingual-frames-region.l4"
 
--- | 'runL4EmbeddedOnly' from a caller-chosen working directory. Used to run the
--- CLI the way a user does — @l4 check main.l4@ from inside the project — which
--- makes the resolver's root directory @"."@.
-runL4EmbeddedOnlyIn :: Maybe FilePath -> FilePath -> [String] -> IO Output
-runL4EmbeddedOnlyIn mCwd bin args = do
-  tmp <- getTemporaryDirectory
-  let emptyXdg = tmp </> "l4-embedded-only-xdg"
-  createDirectoryIfMissing True emptyXdg
-  runL4WithXdgHomeIn mCwd emptyXdg bin args
+langTagCaseFixture :: FilePath
+langTagCaseFixture = fixtureDir </> "lang-tag-case.l4"
 
-----------------------------------------------------------------------------
--- The DMN engine harnesses
-----------------------------------------------------------------------------
+traceOverflowFixture, traceLoopFixture :: FilePath
+traceOverflowFixture = fixtureDir </> "trace-overflow.l4"
+traceLoopFixture     = fixtureDir </> "trace-loop.l4"
 
--- | Run one of the committed engine checkers over the shipped DMN golden.
---
--- __Why this is opt-in.__ @cabal test all@ must stay hermetic and network-free:
--- these harnesses need a JDK and Maven, and on a cold cache Maven reaches the
--- network. So the block runs only under @L4_DMN_ENGINE_CHECK=1@, which makes it
--- a deliberate choice rather than an accident of what happens to be installed.
---
--- __Why the assertion is on the banner and not on the exit code.__ A checker
--- that cannot run exits 0 — that is the skip contract, and it is the right
--- behaviour on a laptop without Java. But "exit 0" is then ambiguous between
--- \"the engine looked at the file and was happy\" and \"nothing happened\". The
--- harnesses print a @VERDICT@ line only when they actually ran, so asserting the
--- banner closes that gap. A skip is reported through 'pendingWith', which hspec
--- renders as @# PENDING@ and counts separately from a pass.
---
--- __Why an unset @*_CHECK_REQUIRED@ still cannot pass silently.__ Setting
--- @KIE_CHECK_REQUIRED=1@ / @CAMUNDA_CHECK_REQUIRED=1@ turns every skip path
--- inside the scripts into exit 1. When they are /not/ set — which is the case
--- for anyone running @cabal test l4-cli-test@ by hand — a skip lands in the
--- @pendingWith@ branch below and is reported as @UNEXERCISED@, naming the
--- variable that would make it fatal.
---
--- __What CI actually does, which is not this function.__ The @dmn-engines@ job
--- in @.github\/workflows\/pr-checks.yml@ runs the two scripts /directly/, with
--- both @*_CHECK_REQUIRED@ variables set, and greps their banners. It does not
--- invoke @l4-cli-test@, and the Haskell job does not set
--- @L4_DMN_ENGINE_CHECK@ — so in CI this function always takes the outer
--- @pendingWith@. It is the developer-facing entry point (one command, the same
--- harnesses, the same assertions); the gate is the job. Neither pretends to be
--- the other. (An earlier version of this comment claimed CI reached the inner
--- branch. It does not, and saying so was the same class of error as a check
--- that reports a version it never loaded.)
---
--- __Why a missing script is a failure even locally.__ Absent /tooling/ is a fact
--- about the machine; an absent /harness/ is a fact about the repo, and would
--- mean this test has silently stopped testing anything.
-dmnEngineCheck :: String -> FilePath -> String -> (String -> Expectation) -> Expectation
-dmnEngineCheck label script requiredVar =
-  dmnEngineCheckOn label script requiredVar HarnessMustPass
-    dmnGolden [dmnGolden, "--cases", dmnEngineCases]
-
--- | Which way round the harness's own exit code is being asserted.
---
--- 'HarnessMustFail' exists for the negative fixtures: a file that the gate is
--- supposed to REJECT. Without it the suite could only ever show the gate
--- staying green, which is not evidence that it is connected to anything —
--- see 'dmnXsdOrderNegative' and DMN-EXPORT-PROGRAM-MODEL-SPEC.md §9.
-data HarnessOutcome = HarnessMustPass | HarnessMustFail
-  deriving (Eq, Show)
-
--- | For probe leg titles.
-outcomeWord :: HarnessOutcome -> String
-outcomeWord = \case
-  HarnessMustPass -> "MustPass"
-  HarnessMustFail -> "MustFail"
-
--- | The general form: run one committed engine harness over one file and
--- assert its VERDICT banner, under the same opt-in/skip contract as
--- 'dmnEngineCheck'.
---
--- The banner is still the liveness signal in BOTH directions. A harness that
--- died before running also exits non-zero, so \"exited 1\" on its own would let
--- a broken harness masquerade as a caught defect — exactly the confusion the
--- banner was introduced to prevent, only mirrored.
-dmnEngineCheckOn
-  :: String -> FilePath -> String -> HarnessOutcome
-  -> FilePath -> [String] -> (String -> Expectation) -> Expectation
-dmnEngineCheckOn label script requiredVar outcome subject args assertBanner = do
-  enabled <- lookupEnv "L4_DMN_ENGINE_CHECK"
-  case enabled of
-    Just "1" -> do
-      haveScript <- doesFileExist script
-      unless haveScript $
-        expectationFailure (label ++ " harness missing from the repo: " ++ script)
-      Output code sout serr <- runL4In Nothing Nothing script args
-      let banner = "VERDICT:"
-      if banner `isInfixOf` sout
-        then do
-          case outcome of
-            HarnessMustPass ->
-              unless (code == ExitSuccess) $
-                expectationFailure
-                  (label ++ " reported a problem in " ++ subject
-                     ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
-            HarnessMustFail ->
-              when (code == ExitSuccess) $
-                expectationFailure
-                  (label ++ " ACCEPTED " ++ subject
-                     ++ ", which is committed precisely because it must be rejected."
-                     ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
-          assertBanner sout
-        else
-          -- No banner: the harness skipped, or died before running.
-          pendingWith
-            (label ++ " UNEXERCISED: the checker did not run (set " ++ requiredVar
-               ++ "=1 to make this a failure). " ++ oneLineOf serr)
-    _ ->
-      pendingWith
-        (label ++ " UNEXERCISED: set L4_DMN_ENGINE_CHECK=1 to run the engine checks")
- where
-  oneLineOf = unwords . words
-
--- | Assert the CLI exited 0 with a given substring on stdout.
-expectOk :: FilePath -> [String] -> String -> IO ()
-expectOk bin args expectedSubstring = do
-  Output code sout serr <- runL4 bin args
-  case code of
-    ExitSuccess ->
-      unless (expectedSubstring `isInfixOf` sout) $
-        expectationFailure $
-          "Expected stdout to contain " ++ show expectedSubstring
-          ++ "\n--- stdout ---\n" ++ sout
-          ++ "\n--- stderr ---\n" ++ serr
-    ExitFailure n -> expectationFailure $
-      "Expected success but exited " ++ show n
-      ++ "\n--- stdout ---\n" ++ sout
-      ++ "\n--- stderr ---\n" ++ serr
-
--- | Assert the CLI exited non-zero.
-expectFail :: FilePath -> [String] -> IO ()
-expectFail bin args = do
-  Output code _ _ <- runL4 bin args
-  case code of
-    ExitFailure _ -> pure ()
-    ExitSuccess   -> expectationFailure "Expected non-zero exit; got success"
-
--- | Assert @l4 verify@ exits 1 on a fixture AND names the expected finding
--- kind. Both halves are needed: exit 1 alone would be satisfied by a fixture
--- that fails to typecheck, which would make the negative control a control over
--- nothing.
-expectVerifyFinding :: FilePath -> FilePath -> String -> IO ()
-expectVerifyFinding bin fixture kind = do
-  Output code sout serr <- runL4 bin ["verify", fixture, "--format", "json"]
-  case code of
-    ExitFailure 1 -> pure ()
-    other -> expectationFailure $
-      "Expected exit 1 (findings present) but got " ++ show other
-      ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr
-  unless (("\"" ++ kind ++ "\"") `isInfixOf` sout) $
-    expectationFailure $
-      "Expected a " ++ show kind ++ " finding in the JSON envelope"
-      ++ "\n--- stdout ---\n" ++ sout
-
--- | Assert the CLI exits 0 and its stdout exactly matches a committed golden
--- file. Used for the OpenFisca backend, whose emit is fully deterministic.
-expectGolden :: FilePath -> [String] -> FilePath -> IO ()
-expectGolden bin args goldenPath = do
-  Output code sout serr <- runL4 bin args
-  goldenBytes <- BS.readFile goldenPath
-  let golden = T.unpack (TE.decodeUtf8Lenient goldenBytes)
-  case code of
-    ExitSuccess ->
-      unless (sout == golden) $
-        expectationFailure $
-          "Generated output does not match golden " ++ goldenPath
-          ++ "\n(to update: l4 " ++ unwords args ++ " -o " ++ goldenPath ++ ")"
-          ++ "\n--- got ---\n" ++ sout
-          ++ "\n--- golden ---\n" ++ golden
-    ExitFailure n -> expectationFailure $
-      "Expected success but exited " ++ show n ++ "\n--- stderr ---\n" ++ serr
-
--- | Read a file as UTF-8 regardless of the ambient locale — same reasoning as
--- 'runL4': the fidelity goldens are full of em-dashes and typographic quotes,
--- which a CP1252 Windows runner cannot decode through 'readFile'.
-readUtf8 :: FilePath -> IO String
-readUtf8 fp = T.unpack . TE.decodeUtf8Lenient <$> BS.readFile fp
-
--- | R12's sharpest failure mode: a @.blawx@ row whose @xml_content@ is empty
--- while its @scasp_encoding@ is not.
---
--- Blawx draws a workspace only @if (output_object.xml_content)@
--- (@buttons.js:444@; a falsy value leaves the canvas cleared by @:441@) and
--- its Save writes @sCASP.workspaceToCode(demoWorkspace)@ straight back
--- (@:22-24@) — so opening such a row and saving DELETES the rule. The
--- headless fixpoint harness (@etc\/blawx-fixpoint-harness.mjs@) fails on the
--- same condition, but it is optional-when-present; this is the copy that runs
--- in CI on every event.
---
--- Both halves are asserted: the pairing in the emitted stream, and the
--- absence of the emitter's own stderr diagnostic for it.
-noBlankedBlawxRow :: FilePath -> String -> IO ()
-noBlankedBlawxRow bin stem = do
-  Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4"]
-  code `shouldBe` ExitSuccess
-  (stem, "no Blockly image" `isInfixOf` serr) `shouldBe` (stem, False)
-  let fields = [f | l <- lines sout, Just f <- [blawxStoredField l]]
-      traps =
-        [ stem
-        | (("xml_content", "''"), ("scasp_encoding", v)) <- zip fields (drop 1 fields)
-        , v /= "''"
-        ]
-  traps `shouldBe` []
-
--- | An @ASSUME@-shaped seed and its record-spelled semantic twin must emit the
--- SAME s(CASP): same ontology, same rule stack, byte for byte, apart from the
--- first line — the generator's provenance comment, which names the source file
--- and is expected to differ.
---
--- This is the load-bearing property behind the tier-1 oracle for an
--- @ASSUME@-shaped module. Such a module has no evaluable directive at all
--- (@ASSUME@ is uninterpreted, and @lowerQuery@ builds a scenario only out of a
--- record-literal query argument), so the harness takes its expectations from the
--- twin, whose @#EVAL@s DO run under @l4 run@, and replays the twin's fact rows
--- against the @ASSUME@ seed's own workspaces. That replay only means anything
--- while the two spellings share their atoms — otherwise every replayed query
--- finds no model and every FALSE expectation "passes". Asserting it here makes
--- a drifting field name a red test rather than a quietly weaker harness.
-twinsAgree :: FilePath -> (String, String) -> IO ()
-twinsAgree bin (seed, twin) = do
-  Output codeA soutA _ <- runL4 bin ["blawx", "examples/blawx/" ++ seed ++ ".l4", "--scasp"]
-  Output codeB soutB _ <- runL4 bin ["blawx", "examples/blawx/" ++ twin ++ ".l4", "--scasp"]
-  codeA `shouldBe` ExitSuccess
-  codeB `shouldBe` ExitSuccess
-  let body = drop 1 . lines
-  (seed, body soutA) `shouldBe` (seed, body soutB)
-
--- | @    xml_content: |-@ → @Just ("xml_content","|-")@. Four-space indent
--- exactly, so the six-space block-scalar content lines (which are full of
--- colons — @xmlns=\"http:\/\/…\"@) cannot masquerade as fields.
-blawxStoredField :: String -> Maybe (String, String)
-blawxStoredField l
-  | not ("    " `isPrefixOf` l) || "     " `isPrefixOf` l = Nothing
-  | otherwise = case break (== ':') (drop 4 l) of
-      (k, ':' : v) | k `elem` ["xml_content", "scasp_encoding"] ->
-        Just (k, dropWhile (== ' ') v)
-      _ -> Nothing
-
--- | Index of the first line containing a needle.
---
--- An ABSENT needle yields 'maxBound' rather than a negative sentinel, so it
--- sorts LAST: a fixture that lost its @\<itemDefinition\>@ altogether then
--- fails the \"before\" assertion instead of vacuously satisfying it.
-firstLineWith :: String -> String -> Int
-firstLineWith needle = fromMaybe maxBound . findIndex (needle `isInfixOf`) . lines
-
--- | Parse the stdout of a --json run as a JSON envelope.
---
--- Re-encodes as UTF-8 rather than using @BSL8.pack@, which truncates each Char
--- to eight bits: an em-dash in a decision name (regcf is full of them) came back
--- as byte 0x14 and aeson rejected it as a control character inside a string
--- literal. Every envelope this suite parsed before was ASCII, so the bug was
--- latent until a JSON mode started echoing corpus identifiers.
-jsonEnvelope :: FilePath -> [String] -> IO Value
-jsonEnvelope bin args = do
-  Output _ sout _ <- runL4 bin args
-  case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
-    Right v  -> pure v
-    Left err -> do
-      expectationFailure ("JSON parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
-      error "unreachable"
-
-objField :: Value -> String -> Maybe Value
-objField (Object km) k = KeyMap.lookup (Key.fromString k) km
-objField _ _ = Nothing
+nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden :: FilePath
+nlgPromissorySource = "examples/legal/promissory-note.l4"
+nlgPromissoryGolden = "examples/legal/tests/promissory-note.nlg.golden"
+nlgShowcaseSource   = "examples/legal/directive-showcase.l4"
+nlgShowcaseGolden   = "examples/legal/tests/directive-showcase.nlg.golden"
 
 ----------------------------------------------------------------------------
 -- Fixtures
 ----------------------------------------------------------------------------
 
-fixtureDir :: FilePath
-fixtureDir = "tests-cli/fixtures"
-
 bilingualFixture :: FilePath
 bilingualFixture = fixtureDir </> "bilingual.l4"
 
-cleanFixture, evalFixture, errorFixture, garbageFixture :: FilePath
-cleanFixture   = fixtureDir </> "clean.l4"
-evalFixture    = fixtureDir </> "eval.l4"
-errorFixture   = fixtureDir </> "typecheck-error.l4"
-garbageFixture = fixtureDir </> "garbage.l4"
+bilingualFramesFixture :: FilePath
+bilingualFramesFixture = fixtureDir </> "bilingual-frames.l4"
+
+-- | Eight shapes whose @l4 state-graph@ caption said something false in
+-- September 2026, each cut down to the four or five lines that draw it.
+--
+-- It is a CLI fixture and not a corpus example because NO golden captures
+-- state-graph DOT output — measured 2026-09-22,
+-- @grep -rl digraph jl4\/examples --include=*.golden@ is empty — so a corpus
+-- file would pin the type checker on these rules and nothing about the
+-- drawing. @tests-cli\/fixtures@ is also in no goldened glob
+-- (@jl4\/tests\/Main.hs@\'s list, kept in step by
+-- @etc\/check-corpus-goldens.mjs@), so it ships no @tests\/@ directory.
+captionFixture :: FilePath
+captionFixture = fixtureDir </> "state-graph-captions.l4"
+
+-- | A module whose first line is an annotation this version does not know.
+-- A CLI fixture because what is under test is the exit status and the one
+-- diagnostic the command prints.
+unknownAnnotationFixture :: FilePath
+unknownAnnotationFixture = fixtureDir </> "unknown-annotation.l4"
+
+-- | `l4 batch` over a module with a misspelt @\@export@: one beside a correct
+-- @\@export@, and one alone. Batch shows no checker warnings, so the lexer's
+-- (an annotation line this version ignores) is said on stderr by the command
+-- itself; without that, the second reads "no @export functions found" and
+-- nothing says why.
+batchIgnoredAnnotation, batchIgnoredAnnotationOnly, batchIgnoredAnnotationJson :: FilePath
+batchIgnoredAnnotation     = fixtureDir </> "batch-ignored-annotation.l4"
+batchIgnoredAnnotationOnly = fixtureDir </> "batch-ignored-annotation-only.l4"
+batchIgnoredAnnotationJson = fixtureDir </> "batch-ignored-annotation.json"
+
+-- | A module whose first line is @\@lang@ with no language after it: a KNOWN
+-- annotation that does not have the form it needs. Ignored with a warning, as
+-- an unknown one is, and not a lexer error.
+malformedLangFixture :: FilePath
+malformedLangFixture = fixtureDir </> "malformed-lang.l4"
 
 -- | Typechecks cleanly, then THROWS when its @#EVAL@ is evaluated.
 evalCrashFixture :: FilePath
 evalCrashFixture = fixtureDir </> "eval-crash.l4"
 
+-- | One @#EVAL@ and one @#EVALTRACE@ over the same call: the "Trace:" section
+-- of @l4 run@ must show a trace under the second and say none was captured
+-- under the first.
+runEvalTraceFixture :: FilePath
+runEvalTraceFixture = fixtureDir </> "run-evaltrace.l4"
+
 -- | A @#TRACE@ whose act lands before its @AFTER@ window opens: a nullity the
 -- run REPORTS (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6) beside a live residual.
 earlyActFixture :: FilePath
 earlyActFixture = fixtureDir </> "early-act.l4"
+
+-- | Two multi-clause groups, for how @l4 render@ and a trace name their parts.
+multiClauseRenderFixture :: FilePath
+multiClauseRenderFixture = fixtureDir </> "multi-clause-render.l4"
 
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
@@ -517,6 +370,37 @@ refuseBatchJson    = fixtureDir </> "refuse-batch.json"
 assertAssumedFixture :: FilePath
 assertAssumedFixture = fixtureDir </> "assert-assumed.l4"
 
+-- | Typechecks cleanly; one @#EVAL@ whose result is a bare assumed BOOLEAN.
+evalAssumedFixture :: FilePath
+evalAssumedFixture = fixtureDir </> "eval-assumed.l4"
+
+-- | Typechecks cleanly; one @#EVAL@ decided whatever its input is, and one
+-- that waits on two.
+evalUndeterminedFixture :: FilePath
+evalUndeterminedFixture = fixtureDir </> "eval-undetermined.l4"
+
+evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture :: FilePath
+evalAliasLoopFixture     = fixtureDir </> "eval-alias-loop.l4"
+evalAliasLoopListFixture = fixtureDir </> "eval-alias-loop-list.l4"
+evalAliasCycleFixture    = fixtureDir </> "eval-alias-cycle.l4"
+
+-- | A module that declares @\@lang en@, which a module that declares nothing
+-- already is; and one that declares @en@ and then @he@, so is not redundant.
+langEnHintFixture, langEnThenHeFixture :: FilePath
+langEnHintFixture   = fixtureDir </> "lang-en-hint.l4"
+langEnThenHeFixture = fixtureDir </> "lang-en-then-he.l4"
+
+-- | A module with BOTH a redundant @\@lang en@ and an annotation this version
+-- ignores. The two diagnostics are made side by side in the same rule; each is
+-- said once, the hint stays a hint, and the ignored annotation stays the
+-- module's only warning.
+langEnAndUnknownFixture :: FilePath
+langEnAndUnknownFixture = fixtureDir </> "lang-en-and-unknown-annotation.l4"
+
+-- | Typechecks cleanly; one @#ASSERT@ holds and one evaluates to FALSE.
+assertFailsFixture :: FilePath
+assertFailsFixture = fixtureDir </> "assert-fails.l4"
+
 breachTraceFixture, breachInputsFixture :: FilePath
 breachTraceFixture  = fixtureDir </> "breach-trace.l4"
 breachInputsFixture = fixtureDir </> "breach-inputs.json"
@@ -531,11 +415,98 @@ batchMixfixSharedHead, batchMixfixSharedHeadJson :: FilePath
 batchMixfixSharedHead     = fixtureDir </> "batch-mixfix-shared-head.l4"
 batchMixfixSharedHeadJson = fixtureDir </> "batch-mixfix-shared-head.json"
 
-batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
+-- | Multi-clause groups whose compiled form, printed, met a drafter's name
+-- (review of legalese/l4-ide#545); see the fixtures.
+batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans :: FilePath
+batchClauses         = fixtureDir </> "batch-multi-clause.l4"
+batchClausesCapture  = fixtureDir </> "batch-multi-clause-capture.l4"
+batchClausesColours  = fixtureDir </> "batch-multi-clause-colours.json"
+batchClausesBooleans = fixtureDir </> "batch-multi-clause-booleans.json"
+
+-- | Groups whose clauses, printed from the source text, meant something
+-- else in the printed module (review of legalese/l4-ide#545, round 2).
+batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs, batchClausesString, batchClausesB, batchClausesCatchAll :: FilePath
+batchClausesCatchAll  = fixtureDir </> "batch-multi-clause-catch-all.l4"
+batchClausesDitto     = fixtureDir </> "batch-multi-clause-ditto.l4"
+batchClausesDittoHead = fixtureDir </> "batch-multi-clause-ditto-head.l4"
+batchClausesFixity    = fixtureDir </> "batch-multi-clause-fixity.l4"
+batchClausesTabs      = fixtureDir </> "batch-multi-clause-tabs.l4"
+batchClausesString    = fixtureDir </> "batch-multi-clause-string.l4"
+batchClausesB         = fixtureDir </> "batch-multi-clause-b.json"
+
+batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson, batchMaybeTextJson :: FilePath
 batchCodeFixture  = fixtureDir </> "batch-code.l4"
 batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
 batchMaybeFixture = fixtureDir </> "batch-maybe.l4"
 batchMaybeBadJson = fixtureDir </> "batch-maybe-bad.json"
+batchMaybeTextJson = fixtureDir </> "batch-maybe-text.json"
+
+-- | A CSV with columns no input declares, run against 'batchEligFixture'.
+batchUndeclaredColumnCsv :: FilePath
+batchUndeclaredColumnCsv = fixtureDir </> "batch-undeclared-column.csv"
+
+-- | Payloads the wrapper has to carry to the rule and back unchanged, echoed
+-- through 'batchCodeFixture'.
+batchEscapeRoundtripJson :: FilePath
+batchEscapeRoundtripJson = fixtureDir </> "batch-escape-roundtrip.json"
+
+-- | Cases that send text for a NUMBER or BOOLEAN input (@"25"@, @"false"@) or a
+-- CSV cell for a STRING input, run against 'batchEligFixture' and
+-- 'batchCodeFixture'.
+batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv, batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson :: FilePath
+batchDeclaredStringsJson           = fixtureDir </> "batch-declared-strings.json"
+batchDeclaredStringsYaml           = fixtureDir </> "batch-declared-strings.yaml"
+batchDeclaredStringCellsCsv        = fixtureDir </> "batch-declared-string-cells.csv"
+batchDeclaredBadNumberJson         = fixtureDir </> "batch-declared-bad-number.json"
+batchDeclaredNumberForStringJson   = fixtureDir </> "batch-declared-number-for-string.json"
+
+-- | CSV cells for inputs that are neither a NUMBER nor a BOOLEAN: a choice
+-- (@DECLARE Answer IS ONE OF True, False, Unknown@), a @MAYBE@ choice, a DATE,
+-- and synonyms of a NUMBER and a BOOLEAN, which are still read as those.
+batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional, batchDeclaredTextDates, batchDeclaredTextSynonyms :: FilePath
+batchDeclaredText         = fixtureDir </> "batch-declared-text.l4"
+batchDeclaredTextAnswers  = fixtureDir </> "batch-declared-text-answers.csv"
+batchDeclaredTextOptional = fixtureDir </> "batch-declared-text-optional.csv"
+batchDeclaredTextDates    = fixtureDir </> "batch-declared-text-dates.csv"
+batchDeclaredTextSynonyms = fixtureDir </> "batch-declared-text-synonyms.csv"
+
+-- | Inputs declared through a type synonym (@DECLARE Year IS A NUMBER@, a
+-- BOOLEAN, a MAYBE), with the plain types beside them as the control, and the
+-- cases for each; and two CSV files that cannot be read.
+batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
+  , batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof :: FilePath
+batchSynonym         = fixtureDir </> "batch-synonym.l4"
+batchSynonymYearJson = fixtureDir </> "batch-synonym-year.json"
+batchSynonymFlagJson = fixtureDir </> "batch-synonym-flag.json"
+batchSynonymYearCsv  = fixtureDir </> "batch-synonym-year.csv"
+batchSynonymFlagCsv  = fixtureDir </> "batch-synonym-flag.csv"
+batchCsvBadQuote     = fixtureDir </> "batch-csv-bad-quote.csv"
+batchCsvEmpty        = fixtureDir </> "batch-csv-empty.csv"
+batchCsvOpenQuoteEof     = fixtureDir </> "batch-csv-open-quote-eof.csv"
+batchCsvOpenQuoteMid     = fixtureDir </> "batch-csv-open-quote-mid.csv"
+batchCsvOpenQuoteCrlf    = fixtureDir </> "batch-csv-open-quote-crlf.csv"
+batchCsvOpenQuoteDoubled = fixtureDir </> "batch-csv-open-quote-doubled.csv"
+batchCsvOpenQuoteHeader  = fixtureDir </> "batch-csv-open-quote-header.csv"
+batchCsvQuoteClosesAtEof = fixtureDir </> "batch-csv-quote-closes-at-eof.csv"
+
+-- | A choice type with one constructor that has a field and one that has
+-- none. Only the second can be given as JSON input; every other value is
+-- refused by name rather than passed on as NOTHING or as itself
+-- (smucclaw/l4-ide#1012).
+batchChoiceFixture, batchChoiceJson :: FilePath
+batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
+batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
+
+-- | A choice type declared under a § section (smucclaw/l4-ide#947).
+batchSectionEnumFixture, batchSectionEnumJson :: FilePath
+batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
+batchSectionEnumJson    = fixtureDir </> "batch-section-enum.json"
+
+-- | A string literal holding a line break and a tab (smucclaw/l4-ide#1028).
+batchLineBreakFixture, batchLineBreakJson :: FilePath
+batchLineBreakFixture = fixtureDir </> "batch-string-line-break.l4"
+batchLineBreakJson    = fixtureDir </> "batch-string-line-break.json"
 
 -- | An @export reading a module-level ASSUME: directly, or only through a
 -- helper it calls. The rows either supply the ASSUME (@x@) or omit it.
@@ -544,6 +515,67 @@ batchAssumeDirectFixture = fixtureDir </> "batch-assume-direct.l4"
 batchAssumeHelperFixture = fixtureDir </> "batch-assume-helper.l4"
 batchAssumeFullJson      = fixtureDir </> "batch-assume-full.json"
 batchAssumeMissingJson   = fixtureDir </> "batch-assume-missing.json"
+
+-- | @TYPICALLY@ defaults in @l4 batch@ (W3 of
+-- @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@). No golden captures batch
+-- output, so these are the guard; the S-numbers in the tests are the success
+-- criteria the W2+W3 slice was given.
+batchTySection, batchTyRule, batchTyRecord, batchTyMaybe, batchTyImported, batchTyImportedTypes
+  , batchTyOneCol, batchTyTwo, batchTyString, batchTyOwnDecode, batchTyEnum, batchTyExact :: FilePath
+batchTySection = fixtureDir </> "batch-typically-section.l4"
+batchTyRule    = fixtureDir </> "batch-typically-rule.l4"
+batchTyRecord  = fixtureDir </> "batch-typically-record.l4"
+batchTyMaybe   = fixtureDir </> "batch-typically-maybe.l4"
+batchTyImported      = fixtureDir </> "batch-typically-imported.l4"
+batchTyImportedTypes = fixtureDir </> "batch-typically-config-types.l4"
+batchTyOneCol        = fixtureDir </> "batch-typically-onecol.l4"
+batchTyTwo           = fixtureDir </> "batch-typically-two.l4"
+batchTyString        = fixtureDir </> "batch-typically-string.l4"
+batchTyOwnDecode     = fixtureDir </> "batch-typically-own-decode.l4"
+batchTyEnum          = fixtureDir </> "batch-typically-enum.l4"
+batchTyExact         = fixtureDir </> "batch-typically-exact.l4"
+
+batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
+  , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv, batchTyImportedJson
+  , batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
+  , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson
+  , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson :: FilePath
+batchTyOmitted    = fixtureDir </> "batch-typically-omitted.json"
+batchTySupplied   = fixtureDir </> "batch-typically-supplied.json"
+batchTyNull       = fixtureDir </> "batch-typically-null.json"
+batchTyUnread     = fixtureDir </> "batch-typically-unread.json"
+batchTyYaml       = fixtureDir </> "batch-typically-omitted.yaml"
+batchTyNoCol      = fixtureDir </> "batch-typically-nocol.csv"
+batchTyEmpty      = fixtureDir </> "batch-typically-empty.csv"
+batchTyRecordJson = fixtureDir </> "batch-typically-record.json"
+batchTyMaybeCsv   = fixtureDir </> "batch-typically-maybe.csv"
+batchTyImportedJson = fixtureDir </> "batch-typically-imported.json"
+batchTyOneColCsv    = fixtureDir </> "batch-typically-onecol.csv"
+batchTyEmptyRow     = fixtureDir </> "batch-typically-emptyrow.json"
+batchTyUncertain    = fixtureDir </> "batch-typically-uncertain.json"
+batchTyBomCsv        = fixtureDir </> "batch-typically-bom.csv"
+batchTyCrlfCsv       = fixtureDir </> "batch-typically-crlf.csv"
+batchTyStringCsv     = fixtureDir </> "batch-typically-string.csv"
+batchTyOwnDecodeJson = fixtureDir </> "batch-typically-own-decode.json"
+batchTyEnumJson      = fixtureDir </> "batch-typically-enum.json"
+batchTyExactJson     = fixtureDir </> "batch-typically-exact.json"
+batchTyRaggedCsv     = fixtureDir </> "batch-typically-ragged.csv"
+batchTyTypoCsv       = fixtureDir </> "batch-typically-typo.csv"
+batchTyTypoJson      = fixtureDir </> "batch-typically-typo.json"
+batchTyRecordTypoJson  = fixtureDir </> "batch-typically-record-typo.json"
+batchTyRecordEmptyJson = fixtureDir </> "batch-typically-record-empty.json"
+
+-- | The @output@ result and @presumed@ list of one batch envelope.
+resultAndPresumed :: Value -> (Maybe Value, Maybe Value)
+resultAndPresumed env =
+  ( case objField env "output" of
+      Just (Array rs) | [r] <- toList rs -> objField r "result"
+      _                                  -> Nothing
+  , objField env "presumed"
+  )
+
+presumedOf :: [String] -> Maybe Value
+presumedOf = Just . Array . foldr (\ x acc -> pure (String (T.pack x)) <> acc) mempty
 
 -- | Decode stdout as a single JSON array (for @l4 batch --format json@).
 decodeArray :: String -> IO [Value]
@@ -557,254 +589,25 @@ decodeArray sout =
       expectationFailure ("JSON array parse failed: " ++ err ++ "\nstdout:\n" ++ sout)
       error "unreachable"
 
+-- | A JSON array field's elements, if the field is an array.
+arrayField :: Value -> String -> Maybe [Value]
+arrayField v k = case objField v k of
+  Just (Array a) -> Just (toList a)
+  _              -> Nothing
+
 -- | Count non-blank lines (each NDJSON row is one line).
 nonBlankLines :: String -> Int
 nonBlankLines = length . filter (not . all (`elem` (" \t\r" :: String))) . lines
 
-batchEscapeFixture, batchEscapeInput, evalTraceFixture :: FilePath
+batchEscapeFixture, batchEscapeInput, evalTraceFixture, evalTraceLineBreakFixture :: FilePath
 batchEscapeFixture = fixtureDir </> "batch-escape.l4"
 batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
+evalTraceLineBreakFixture = fixtureDir </> "evaltrace-line-break.l4"
 
-----------------------------------------------------------------------------
--- `l4 docassemble` (M2): the package tree, citations and the glossary
---
--- Everything in this section pins DOCASSEMBLE-EXPORT-SPEC.md §10 (M2) and the
--- two rulings it leans on, R11 (§8.11, artifact shape) and R9 (§8.9, emission
--- hygiene). The M1 surface — six byte-golden examples plus the not-ok/
--- refusals — is pinned separately, in `describe "l4 docassemble"`, and must
--- stay green through M2: packaging is an ADDITIONAL artifact shape, not a
--- change to the bare one.
-----------------------------------------------------------------------------
-
-daExampleDir :: FilePath
-daExampleDir = "examples/docassemble"
-
--- | The M2 example: three sub-decisions, each with a statutory @\@ref@,
--- conjoined by AND so a FALSE first conjunct short-circuits the other two
--- away. Its second citation uses the inline @\<\< \>\>@ ref form and its third
--- is deliberately Mako-hostile.
-daCitationsSource :: FilePath
-daCitationsSource = daExampleDir </> "citations.l4"
-
--- | Every example with a committed @.yml@ and @.fidelity.txt@ golden under
--- @examples/docassemble/expected/@: the six from M1, @citations@ from M2, and
--- the six M4 examples. Each RED phase deliberately left its own goldens
--- unwritten (\"writing a golden before the feature exists would force the
--- implementer to match formatting choices I have no basis to decide\") and each
--- GREEN phase supplied them once the shape was settled.
-daBareExamples :: [String]
-daBareExamples =
-  [ "rodents-and-vermin", "seam", "enum-triage"
-  , "defaults", "computed-and-shadow", "assume-via-fn", "citations"
-  , "tenant-list", "payload-enum", "maybe-scalars", "statutory-age"
-  , "review-checklist", "notice-letter"
-  ]
-
--- | The M4 examples (spec §10: breadth). The assertions below are about SHAPE
--- (which keys, which guards, which idiom) or about BEHAVIOUR (through the R10
--- harness); the byte goldens the GREEN phase added pin the FORMATTING, which
--- shape assertions cannot.
---
--- Each file typechecks and evaluates in L4 (its @#EVAL@s are the oracle).
-daListSource, daPayloadSource, daMaybeSource, daDateSource,
-  daReviewSource, daLetterSource, daLetterTemplate :: FilePath
-daListSource     = daExampleDir </> "tenant-list.l4"
-daPayloadSource  = daExampleDir </> "payload-enum.l4"
-daMaybeSource    = daExampleDir </> "maybe-scalars.l4"
-daDateSource     = daExampleDir </> "statutory-age.l4"
-daReviewSource   = daExampleDir </> "review-checklist.l4"
-daLetterSource   = daExampleDir </> "notice-letter.l4"
-daLetterTemplate = daExampleDir </> "notice-letter.letter.md"
-
--- | The @not-ok/@ fixtures M4 does NOT own, paired with the diagnostic each
--- must keep. M4 flips exactly two refusals (@maybe-number@ and
--- @just-payload-pattern@, both folded into @maybe-scalars.l4@); these four are
--- out of its scope and a change to any of them is a regression, not progress.
-daStillRefused :: [(FilePath, String)]
-daStillRefused =
-  [ ( "deontic-body.l4"
-    , "deontic/regulative rule (PARTY MUST/MAY/SHANT) has no docassemble form" )
-  , ( "name-collision.l4"
-    , "name collision: `t.notice_period`" )
-  , ( "higher-order.l4"
-    , "higher-order use of function `is positive`" )
-  , ( "seam-ref-via-fn.l4"
-    , "seam-shaped export (top-level IMPLIES) is referenced by another decision" )
-  ]
-
--- | The @not-ok/@ fixtures the 2026-08-17 repair pass ADDED, each pinning a
--- refusal that replaced a silently wrong emission. Kept apart from
--- 'daStillRefused', which is the out-of-scope set: these two are M4's own, and
--- both are required to be reported in L4 terms rather than as an internal id
--- collision.
-daM4Refused :: [(FilePath, String)]
-daM4Refused =
-  [ ( "maybe-empty-string.l4"
-    , "`WHEN JUST \"\"` on a MAYBE STRING is refused" )
-  , ( "payload-name-collision.l4"
-    , "name collision: `d.the_reason` is produced by two different question blocks" )
-  ]
-
--- | Emit an M4 example, reporting the refusal VERBATIM when it is still
--- refused. Written fail-first, when every one of these exited 1 with prose
--- naming the milestone that owed the answer; they all emit now, and the
--- verbatim stderr is what makes a REGRESSION legible rather than merely red.
-daEmit :: FilePath -> FilePath -> IO String
-daEmit bin src = do
-  Output code sout serr <- runL4 bin ["docassemble", src]
-  case code of
-    ExitSuccess   -> pure sout
-    ExitFailure n -> do
-      expectationFailure $
-        "`l4 docassemble " ++ src ++ "` exited " ++ show n
-        ++ ": the M4 construct this example exists for is still refused."
-        ++ "\n--- stderr ---\n" ++ serr
-      pure ""
-
--- | Assert at least one of several spellings is present. Used where more than
--- one emission is defensible and the RED phase declines to pick — the gather
--- control questions, for instance, where a @target_number@ shape and a
--- @there_are_any@ + @there_is_another@ shape were both probed working.
-shouldContainAny :: String -> String -> [String] -> IO ()
-shouldContainAny what haystack needles =
-  unless (any (`isInfixOf` haystack) needles) $
-    expectationFailure $
-      what ++ " contains none of " ++ show needles
-      ++ "\n--- got ---\n" ++ haystack
-
--- | Fixtures for the docassemble repair cases, which are CLI shape probes
--- rather than corpus exhibits and so live beside the other @tests-cli@
--- fixtures, not in @examples/docassemble/@.
-daGlossLossSource, daRuntimeCollisionSource, descAttachmentFixture :: FilePath
-daGlobalShadowSource, daGatheredMaybeSource :: FilePath
-daGlossLossSource        = fixtureDir </> "docassemble-glossary-losses.l4"
-daRuntimeCollisionSource = fixtureDir </> "docassemble-runtime-collision.l4"
--- The other two thirds of the same namespace hazard (repair pass, 2026-08-17):
--- Python's builtins and `docassemble.base.util`'s star-import.
-daGlobalShadowSource     = fixtureDir </> "docassemble-global-shadow.l4"
--- A paired `MAYBE NUMBER` inside a gathered element: the one place the
--- changed-answer repair does NOT reach, declared rather than silent.
-daGatheredMaybeSource    = fixtureDir </> "docassemble-gathered-maybe.l4"
+-- The fixture for the "@desc attachment to WHERE/LET bindings" describe.
+descAttachmentFixture :: FilePath
 descAttachmentFixture    = fixtureDir </> "desc-attachment.l4"
-
--- | The four citations carried by @citations.l4@, herald-stripped: L4's own
--- @\@ref @ prefix and the inline @\<\< \>\>@ delimiters are L4 syntax and must
--- never reach a user-facing docassemble screen.
-daCite1, daCite2, daCite3Tail, daCiteGoal :: String
-daCite1 = "17 CFR 227.100(a)(1) — offering maximum"
-daCite2 = "17 CFR 227.100(a)(3) — sales through one intermediary only"
--- The third citation begins with @%@ and contains a literal @${ … }@, so its
--- emitted spelling depends on which escape the emitter applies; only its
--- stable tail is asserted verbatim, and the hostile halves get their own
--- assertions (see the R9 escaping example).
-daCite3Tail = "17 CFR 227.300(a)"
--- The fourth rides on the EXPORTED decide, and therefore on the goal @code:@
--- block. It is what makes the emitted ORDER observable: the emitter puts
--- @explain()@ after the assignment, and the goal's assignment is what pulls on
--- the sub-rules, so the goal completes last and its citation prints last. On
--- the three sub-rules alone the placement is unobservable — moving every
--- @explain()@ above its assignment left the round-trip harness fully green
--- until this citation existed.
-daCiteGoal = "17 CFR 227.100 — the crowdfunding exemption"
-
--- | The generated Python package directory inside a @--package@ tree for
--- @citations.l4@: @docassemble/l4citations@ (R11: @docassemble.l4\<slug\>@).
-daPkgInner :: FilePath
-daPkgInner = "docassemble" </> "l4citations"
-
--- | Every regular file under @root@, as sorted paths relative to @root@.
-treeFiles :: FilePath -> IO [FilePath]
-treeFiles root = sort <$> go ""
- where
-  go rel = do
-    entries <- sort <$> listDirectory (root </> rel)
-    concat <$> mapM (child rel) entries
-  child rel e = do
-    let r = if null rel then e else rel </> e
-    isDir <- doesDirectoryExist (root </> r)
-    if isDir then go r else pure [r]
-
--- | Directories under @root@ (relative paths) holding nothing at all. R11:
--- \"every emitted @data/@ subdirectory carries at least one real file (empty
--- directories survive neither git nor zip)\".
-emptyTreeDirs :: FilePath -> IO [FilePath]
-emptyTreeDirs root = sort <$> go ""
- where
-  go rel = do
-    entries <- sort <$> listDirectory (root </> rel)
-    let here = [rel | null entries, not (null rel)]
-    subs <- concat <$> mapM (child rel) entries
-    pure (here ++ subs)
-  child rel e = do
-    let r = if null rel then e else rel </> e
-    isDir <- doesDirectoryExist (root </> r)
-    if isDir then go r else pure []
-
--- | Run @l4 docassemble FILE --package DIR@ into a FRESH directory and return
--- the written tree's sorted file list.
---
--- The failure message names the milestone deliberately: until M2 lands the
--- option does not exist, and an \"Invalid option\" exit is the honest RED
--- signal, not a broken test.
-expectPackage :: FilePath -> FilePath -> FilePath -> IO [FilePath]
-expectPackage bin src outDir = do
-  removePathForcibly outDir
-  Output code sout serr <- runL4 bin ["docassemble", src, "--package", outDir]
-  unless (code == ExitSuccess) $
-    expectationFailure $
-      "`l4 docassemble " ++ src ++ " --package " ++ outDir ++ "` did not succeed: exited "
-      ++ show code
-      ++ "\n(M2/R11: --package DIR must write an installable PEP 420 package tree)"
-      ++ "\n--- stdout ---\n" ++ sout
-      ++ "\n--- stderr ---\n" ++ serr
-  isDir <- doesDirectoryExist outDir
-  unless isDir $
-    expectationFailure ("no package tree was written at " ++ outDir)
-  treeFiles outDir
-
--- | Split an emitted docassemble interview into its @---@-separated blocks.
--- docassemble itself splits on the whole-line regex @^--- *$@ before YAML ever
--- sees the file (@parse.py:138@), so this is the same unit the engine reasons
--- about.
-yamlBlocks :: String -> [String]
-yamlBlocks = map unlines . splitBlocks . lines
- where
-  splitBlocks ls = case break isSep ls of
-    (chunk, [])       -> [chunk]
-    (chunk, _ : rest) -> chunk : splitBlocks rest
-  isSep ln = "---" `isPrefixOf` ln && all (== ' ') (drop 3 ln)
-
--- | The single emitted block whose @id:@ is exactly @wanted@.
-blockWithId :: String -> String -> IO String
-blockWithId sout wanted =
-  case [ b | b <- yamlBlocks sout, ("id: " ++ wanted) `elem` lines b ] of
-    [b] -> pure b
-    []  -> do
-      expectationFailure $
-        "no emitted block carries `id: " ++ wanted ++ "`"
-        ++ "\n--- emitted interview ---\n" ++ sout
-      pure ""
-    bs  -> do
-      expectationFailure $
-        "expected exactly one block with `id: " ++ wanted
-        ++ "`, found " ++ show (length bs)
-      pure ""
-
--- | Assert a needle occurs in a haystack, reporting the haystack on failure.
-shouldContain' :: String -> String -> String -> IO ()
-shouldContain' what haystack needle =
-  unless (needle `isInfixOf` haystack) $
-    expectationFailure $
-      what ++ " does not contain " ++ show needle ++ "\n--- got ---\n" ++ haystack
-
--- | Assert a needle does NOT occur — the half that catches a citation
--- attributed to the wrong rule.
-shouldNotContain' :: String -> String -> String -> IO ()
-shouldNotContain' what haystack needle =
-  when (needle `isInfixOf` haystack) $
-    expectationFailure $
-      what ++ " unexpectedly contains " ++ show needle ++ "\n--- got ---\n" ++ haystack
 
 -- | How many (possibly overlapping) times a needle occurs in a haystack.
 countInfix :: String -> String -> Int
@@ -812,23 +615,6 @@ countInfix needle = go
  where
   go [] = 0
   go s@(_ : rest) = (if needle `isPrefixOf` s then 1 else 0) + go rest
-
--- | Assert that @a@ occurs before @b@ inside @haystack@, and that both occur.
--- The half of an ordering claim a pair of @shouldContain'@s cannot make.
-shouldPrecede :: String -> String -> String -> String -> IO ()
-shouldPrecede what haystack a b =
-  case (findSub a, findSub b) of
-    (Just i, Just j)
-      | i < j     -> pure ()
-      | otherwise -> expectationFailure $
-          what ++ ": expected " ++ show a ++ " to come before " ++ show b
-              ++ ", but it does not\n--- got ---\n" ++ haystack
-    _ -> expectationFailure $
-      what ++ ": expected both " ++ show a ++ " and " ++ show b
-          ++ " to occur\n--- got ---\n" ++ haystack
- where
-  findSub n = findIndex (n `isPrefixOf`) (tails' haystack)
-  tails' s = s : case s of { [] -> []; (_ : r) -> tails' r }
 
 -- Import-cycle fixtures (entry points of small multi-file rings) and a clean
 -- multi-file import used as a guard against the cycle check over-firing.
@@ -838,284 +624,15 @@ cycle2Entry      = fixtureDir </> "cycle2"     </> "dua.l4"
 selfImportEntry  = fixtureDir </> "selfimport" </> "solo.l4"
 cleanImportEntry = fixtureDir </> "imports-ok" </> "main.l4"
 
+-- Diamond whose bottom module (d.l4) has a type error: top imports a, b and d;
+-- a and b import d. Regression fixture for smucclaw/l4-ide#1008.
+dupDiagDiamondEntry :: FilePath
+dupDiagDiamondEntry = fixtureDir </> "dup-diag-diamond" </> "top.l4"
+
 -- Diamond over the embedded-library fallback (issue #906): main imports two
 -- embedded siblings that share the embedded 'daydate' bottom.
 embeddedDiamondEntry :: FilePath
 embeddedDiamondEntry = fixtureDir </> "embedded-diamond" </> "main.l4"
-
--- `l4 export` (track S0). The two golden-bearing exhibits live under
--- examples/, alongside the openfisca ones; the refusal and severity fixtures
--- are local.
---
--- The two --fail-on fixtures are a matched pair, and both are needed: the
--- `export-blocking-only` DMN report is blocking-ONLY and the
--- `export-advisory-only` DMN report is advisory-ONLY, so between them every
--- @FidelityGate@ value has both a case that must trip and a case that must
--- not. (`export-two-rules` used to play the blocking-only role, until Phase
--- 4's population filter correctly routed its two uncalled regulative bodies
--- out of the DRG — it keeps its BPMN rule-selection role, and its DMN export
--- now refuses with an EMPTY model, which its own test below pins.)
-exportTwoRulesFixture, exportNothingFixture :: FilePath
-exportBlockingOnlyFixture, exportAdvisoryOnlyFixture :: FilePath
-exportTwoRulesFixture     = fixtureDir </> "export-two-rules.l4"
-exportNothingFixture      = fixtureDir </> "export-nothing.l4"
-exportBlockingOnlyFixture = fixtureDir </> "export-blocking-only.l4"
-exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
-
--- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
--- that imports it backticked (the only legal spelling for a hyphenated name)
--- and references `statute`.
-importViewFixture :: FilePath
-importViewFixture = fixtureDir </> "import-view" </> "interp-common.l4"
-
-bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity :: FilePath
-bpmnOfferingSource   = "examples/bpmn/offering.l4"
-bpmnOfferingGolden   = "examples/bpmn/expected/offering.bpmn"
-bpmnOfferingFidelity = "examples/bpmn/expected/offering.fidelity.txt"
-
-dmnSource, dmnGolden, dmnMarkdownGolden :: FilePath
-dmnSource         = "examples/dmn/reg-cf.l4"
-dmnGolden         = "examples/dmn/expected/reg-cf.dmn"
-dmnMarkdownGolden = "examples/dmn/expected/reg-cf.dmn.md"
-
--- The model name the DMN goldens were generated under. `lowerModule` takes it
--- as a parameter precisely so the emitted bytes do not depend on where the file
--- lives, so passing it here reproduces the suite's output exactly.
-dmnModelName :: String
-dmnModelName = "Regulation Crowdfunding"
-
--- The two committed engine harnesses, and the CASES they evaluate the golden
--- against. These paths are relative to jl4/, which is this suite's working
--- directory.
---
--- Each case is a context plus the value EVERY decision must produce under it.
--- Checking only that a decision "ran" is not enough, and that is measured
--- rather than assumed: given a model declaring `annual income` = 100000,
--- `annual` = 5 and `come` = [1,2,5], Camunda 8.7.6 answers `true` to the
--- expression `annual income` — identically to `annual in come` — where KIE
--- 8.44 answers 100000. A wrong NON-null value, so a harness reading statuses
--- and nulls alone passes the very file it exists to catch (§13.2).
---
--- The contexts' KEYS ARE FEEL NAMES, not L4 names: `annual_income`, not
--- `annual income`. That is not a detail of the harness, it is the thing being
--- checked — see specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md §5.2 and §13.2.
-kieCheckScript, camundaCheckScript, dmnEngineCases :: FilePath
-kieCheckScript     = ".." </> "etc" </> "kie-dmn-check" </> "run.sh"
-camundaCheckScript = ".." </> "etc" </> "camunda-dmn-check" </> "run.sh"
-dmnEngineCases     = "examples/dmn/reg-cf.cases.json"
-
--- The XSD SEQUENCE-ORDER pair (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §4.3, §9).
---
--- Two hand-written DMN 1.3 files holding the same lines and differing only in
--- where the @\<itemDefinition\>@ block sits. @tDefinitions@ is a sequence, so
--- the one that puts it after @\<inputData\>@ is schema-INVALID; the other is
--- the positive control that says so is the only difference.
---
--- __Why a hand-written file and not a mutated golden.__ The emitter cannot
--- produce the negative case — that is the property under test — so there is
--- nothing to generate it from. These are fixtures, never regenerated.
-dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases :: FilePath
-dmnXsdOrderPositive = dmnXsdOrderDir </> "M1-itemdef-before-inputdata.dmn"
-dmnXsdOrderNegative = dmnXsdOrderDir </> "M1-itemdef-after-inputdata.dmn"
-dmnXsdOrderCases    = dmnXsdOrderDir </> "M1-itemdef.cases.json"
-
-dmnXsdOrderDir :: FilePath
-dmnXsdOrderDir = fixtureDir </> "dmn-xsd-order"
-
--- The LAW-TIME date axis (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15).
---
--- `gstGolden` is EMITTED (jl4/tests/DmnExport.hs owns the golden); the two
--- chains inside it lower to single-column UNIQUE tables over
--- `RULES_EFFECTIVE_DATE` with half-open date intervals, and `gstEngineCases`
--- FEEDS DATES -- `{"$date": "YYYY-MM-DD"}` -- so both engines are made to
--- answer differently for different rule dates. `GST rate percent` has THREE
--- seams and every one is straddled by a day-of/day-before pair, which is what
--- pins the closed-low/open-high convention; straddling only the newest seam
--- (which an earlier version did) leaves an off-by-one on the middle interval
--- or on the floor row invisible.
---
--- `dateProbe*` is HAND-WRITTEN and never regenerated, for the same reason
--- `dmn-xsd-order` is: it asks the questions the emitter's own output cannot
--- ask -- does Xerces accept <annotation>/<annotationEntry> where DMN13.xsd's
--- sequences put them, and does each engine evaluate a date-interval cell at
--- all. §15.6 records what it returned. `dateProbeNegative` is its NEGATIVE
--- CONTROL, and it is not optional: the positive on its own shows that a valid
--- file validates, which is equally consistent with Xerces ignoring the
--- annotation elements entirely.
-gstGolden, gstEngineCases, dateProbeModel, dateProbeCases, dateProbeNegative :: FilePath
-gstGolden         = "examples/dmn/expected/gst-rate.dmn"
-gstEngineCases    = "examples/dmn/gst-rate.cases.json"
-dateProbeModel    = dmnDateProbeDir </> "date-axis.dmn"
-dateProbeCases    = dmnDateProbeDir </> "date-axis.cases.json"
-dateProbeNegative = dmnDateProbeDir </> "date-axis-badannotation.dmn"
-
--- The Reg CF CORPUS leg (R12/R13, DMN-EXPORT-PROGRAM-MODEL-SPEC.md §15.12/§16):
--- the statute corpus, 70 decisions, evaluated end to end. The cases
--- file's own header records how each pin was anchored (L4 + the documented
--- transform, never the engine's own output).
-corpusGolden, corpusEngineCases :: FilePath
-corpusGolden      = "examples/dmn/expected/regcf-corpus.dmn"
-corpusEngineCases = "examples/dmn/regcf-corpus.cases.json"
-
-dmnDateProbeDir :: FilePath
-dmnDateProbeDir = fixtureDir </> "dmn-date-probe"
-
--- The DATE ARITHMETIC axis, added 2026-08-05. `dmn-date-probe` above settled
--- date LITERALS and date COMPARISONS; this pair settles date ARITHMETIC, which
--- is what an anniversary needs and what the corpus's Rule 501(a) now uses.
---
--- Hand-written and never regenerated, same rule as its sibling. The load-bearing
--- claim is an EQUIVALENCE the emitter cannot state about itself: `daydate`'s
--- `add months`\/`add years` CLAMP to the target month's last day, the exporter
--- lowers them to FEEL's @date + duration(...)@, and that is sound only if FEEL
--- clamps identically. DMN 1.3's own formula does NOT clamp -- it preserves the
--- day component -- so the spec and the engines had to be assumed to disagree
--- until measured. They clamp. All six cases agree with L4.
---
--- `dateArithNegative` is the NEGATIVE CONTROL and is driven 'HarnessMustFail':
--- the same anniversary written by reconstructing components, @date(y + 1, m,
--- d)@, which is null on both engines for a 29 February issuance. Without it the
--- positive would show only that one idiom works, not that the other cannot --
--- and "cannot" is the whole reason `add years` exists.
-dateArithModel, dateArithCases, dateArithNegative, dateArithNegativeCases :: FilePath
-dateArithModel         = dmnDateArithDir </> "clamp.dmn"
-dateArithCases         = dmnDateArithDir </> "clamp.cases.json"
-dateArithNegative      = dmnDateArithDir </> "reconstruct-refused.dmn"
-dateArithNegativeCases = dmnDateArithDir </> "reconstruct-refused.cases.json"
-
-dmnDateArithDir :: FilePath
-dmnDateArithDir = fixtureDir </> "dmn-date-arith"
-
--- The ENGINE-INTERSECTION triple (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §6,
--- measured note of 2026-07-30). One statute-shaped predicate — "either spouse
--- earns under $100,000 or is a Qualifying Candidate" — spelled three ways
--- over one shared cases file: inline in the quantifier's @satisfies@, as a
--- decision table bound in a boxed-context entry, and as the same table in a
--- BKM. Hand-written, never regenerated: the emitter produces none of the
--- three shapes today, and the middle one exists precisely because only half
--- the market can read it.
-spouseInlineDmn, spouseContextTableDmn, spouseBkmTableDmn, spouseCases :: FilePath
-spouseInlineDmn       = dmnIntersectionDir </> "spouse-inline.dmn"
-spouseContextTableDmn = dmnIntersectionDir </> "spouse-context-table.dmn"
-spouseBkmTableDmn     = dmnIntersectionDir </> "spouse-bkm-table.dmn"
-spouseCases           = dmnIntersectionDir </> "spouse.cases.json"
-
-dmnIntersectionDir :: FilePath
-dmnIntersectionDir = fixtureDir </> "dmn-engine-intersection"
-
--- The HYDRATION probe (H4). Hand-written for the same reason `dateProbe*` is:
--- it pins the portability of the boxed-context idiom ITSELF, independently of
--- whether the emitter currently produces it. Unlike the date and xsd-order
--- pairs there is no negative control, and the fixture's own header says why:
--- those two ask whether a gate REJECTS, which needs a negative; this one asks
--- whether an idiom EVALUATES, which the positive answers on its own.
-hydrationProbeModel, hydrationProbeCases :: FilePath
-hydrationProbeModel = dmnHydrationProbeDir </> "hydration-context.dmn"
-hydrationProbeCases = dmnHydrationProbeDir </> "hydration.cases.json"
-
-dmnHydrationProbeDir :: FilePath
-dmnHydrationProbeDir = fixtureDir </> "dmn-hydration-probe"
-
--- The 23 Phase 5 BKM/service probes (spec §6.2, §13.3-§13.5;
--- DMN-PHASE5-BUILD-PLAN.md §1 holds the full matrix). Hand-written, never
--- regenerated: they pin the IDIOMS (BKM invocation, knowledgeRequirement
--- topology, decisionService shapes, name-collision semantics) independently
--- of the emitter — a red run on a probe isolates the ENGINE, a red run on
--- the emitted goldens isolates the LOWERING, exactly the hydration split.
---
--- Each row: (label, fixture stem, KIE outcome, Camunda outcome), the
--- outcomes transcribed from each fixture's own MEASURED header (2026-07-31)
--- and re-run here. THE ASYMMETRY IS THE FLAVOR AXIS: the seven fixtures that
--- fail on KIE and pass on Camunda (C4, D5, E4, E5, E6, and with C3/D3's null
--- degradations beside them) are, without exception, cases where CAMUNDA'S
--- SILENCE IS THE DANGER — KIE refuses at validator/compile where zeebe-dmn
--- parses and answers something. A FLIP on any row means an engine changed
--- its mind across an upgrade: re-read the fixture's header and the spec
--- section it names before touching the row (e.g. C4 going green on KIE
--- would relax §6.2's name==variable invariant; E4 agreeing would demote
--- §5.2's BKM-in-scope-1 requirement).
-dmnBkmProbeDir :: FilePath
-dmnBkmProbeDir = fixtureDir </> "dmn-bkm-probe"
-
-bkmProbeMatrix :: [(String, String, HarnessOutcome, HarnessOutcome)]
-bkmProbeMatrix =
-  [ ("A1", "bkm-multiparam",               HarnessMustPass, HarnessMustPass)
-  , ("A2", "bkm-named-args",               HarnessMustPass, HarnessMustPass)
-  , ("A3", "bkm-table-multiparam",         HarnessMustPass, HarnessMustPass)
-  , ("B1", "bkm-in-context",               HarnessMustPass, HarnessMustPass)
-  , ("B2", "bkm-in-context-sibling",       HarnessMustPass, HarnessMustPass)
-  , ("B3", "bkm-null",                     HarnessMustPass, HarnessMustPass)
-  , ("C1", "bkm-chain",                    HarnessMustPass, HarnessMustPass)
-  , ("C2", "bkm-chain-flat",               HarnessMustFail, HarnessMustFail)
-  , ("C3", "bkm-chain-nokr",               HarnessMustFail, HarnessMustFail)
-  , ("C4", "bkm-name-mismatch",            HarnessMustFail, HarnessMustPass)
-  , ("D1", "svc-grouping",                 HarnessMustPass, HarnessMustPass)
-  , ("D2", "svc-invoked",                  HarnessMustPass, HarnessMustFail)
-  , ("D3", "svc-invoked-minus-kr",         HarnessMustFail, HarnessMustFail)
-  , ("D4", "svc-plus-bkm",                 HarnessMustPass, HarnessMustPass)
-  , ("D5", "svc-no-output",                HarnessMustFail, HarnessMustPass)
-  , ("D6", "svc-cycle",                    HarnessMustFail, HarnessMustFail)
-  , ("E1", "collide-param-input",          HarnessMustPass, HarnessMustPass)
-  , ("E2", "collide-param-param",          HarnessMustPass, HarnessMustPass)
-  , ("E3", "collide-param-decision",       HarnessMustFail, HarnessMustFail)
-  , ("E4", "collide-bkm-decision",         HarnessMustFail, HarnessMustPass)
-  , ("E5", "collide-svc-decision",         HarnessMustFail, HarnessMustPass)
-  , ("E6", "collide-svc-svc",              HarnessMustFail, HarnessMustPass)
-  , ("E7", "collide-param-shadow-visible", HarnessMustPass, HarnessMustPass)
-  ]
-
--- The EMITTER'S OWN hydration output, and its cases. Strictly stronger than the
--- hand-written probe above: that one pins that the boxed-context idiom
--- evaluates, this one pins that jl4-core/src/L4/Dmn/Lower.hs emits it. A red run
--- there isolates the ENGINE; a red run here isolates the LOWERING.
---
--- It is also the file that carries the two-engine measurement `sumtype.dmn`
--- cannot: sumtype exists to exhibit REFUSALS, and one of them (`stated term`,
--- R4-a) emits L4 source no engine can compile.
-hydrationGolden, hydrationEngineCases :: FilePath
-hydrationGolden      = "examples/dmn/expected/hydration.dmn"
-hydrationEngineCases = "examples/dmn/hydration.cases.json"
-
--- The data-model exhibit, driven through KIE as a MustFail. There is no cases
--- file: the point is that the model does not BUILD, which is settled before any
--- case runs.
-sumtypeGolden :: FilePath
-sumtypeGolden = "examples/dmn/expected/sumtype.dmn"
-
--- The Phase 5 exhibits (spec §6.2, §2.3, §13.5, §13.6). `bkm` is
--- flavor-identical and MustPass on BOTH engines; `svc` is the one subject
--- whose goldens SPLIT by flavor — its kie golden MustPass on KIE (the service
--- invocation executes) and its camunda golden MustFail on Camunda (the §13.5
--- refusal keeps the call site raw L4, which zeebe-dmn rejects at parse).
-bkmSource, bkmDmnGolden, bkmEngineCases :: FilePath
-bkmSource      = "examples/dmn/bkm.l4"
-bkmDmnGolden   = "examples/dmn/expected/bkm.dmn"
-bkmEngineCases = "examples/dmn/bkm.cases.json"
-
-svcSource, svcGolden, svcKieDmnGolden, svcEngineCases :: FilePath
-svcSource       = "examples/dmn/svc.l4"
-svcGolden       = "examples/dmn/expected/svc.dmn"
-svcKieDmnGolden = "examples/dmn/expected/svc.kie.dmn"
-svcEngineCases  = "examples/dmn/svc.cases.json"
-
--- The NULL probe (R8-d′). Written and measured BEFORE the MAYBE→null lowering,
--- because the whole ruling rests on FEEL's `=` against null being a proper
--- boolean; if it were not, `if x != null then a else b` would take the else
--- branch on a non-boolean condition and the absence-test half of R8-d′ would
--- have been an ANSWER CHANGE. It is a boolean on both engines, so it shipped.
---
--- `nullAbsent*` is split out because it is the one question the two engines
--- ANSWER DIFFERENTLY: an unbound name is null on zeebe-dmn and a model error on
--- KIE. It is therefore MustPass on one and MustFail on the other, and each leg
--- asserts that engine's own words.
-nullProbeModel, nullProbeCases, nullAbsentModel, nullAbsentCases :: FilePath
-nullProbeModel  = dmnNullProbeDir </> "null-semantics.dmn"
-nullProbeCases  = dmnNullProbeDir </> "null-semantics.cases.json"
-nullAbsentModel = dmnNullProbeDir </> "null-absent.dmn"
-nullAbsentCases = dmnNullProbeDir </> "null-absent.cases.json"
-
-dmnNullProbeDir :: FilePath
-dmnNullProbeDir = fixtureDir </> "dmn-null-probe"
 
 -- LIBRARY-RESOLUTION-SHADOW-SPEC fixtures: a bare `IMPORT prelude` with no
 -- project-scoped copy (embedded must win over a poisoned XDG store), and a
@@ -1129,7 +646,9 @@ dmnNullProbeDir = fixtureDir </> "dmn-null-probe"
 -- five files prove the checker is capable of going red — and going red for the
 -- REASON claimed, which is why each test asserts the finding KIND and not just
 -- the exit code.
-verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture :: FilePath
+verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture :: FilePath
+verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture :: FilePath
+verifyClauseTableLargeFixture :: FilePath
 verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture :: FilePath
 verifyCleanFixture        = fixtureDir </> "verify-clean.l4"
 verifyUnsatFixture        = fixtureDir </> "verify-unsat.l4"
@@ -1137,6 +656,12 @@ verifyDeadBranchFixture   = fixtureDir </> "verify-dead-branch.l4"
 verifyVacuousGuardFixture = fixtureDir </> "verify-vacuous-guard.l4"
 verifySeamFixture         = fixtureDir </> "verify-seam.l4"
 verifyNestedFixture       = fixtureDir </> "verify-nested.l4"
+verifyClauseGroupFixture  = fixtureDir </> "verify-clause-group.l4"
+verifyClauseGroupCallFixture = fixtureDir </> "verify-clause-group-call.l4"
+verifyClauseGroupWhereFixture = fixtureDir </> "verify-clause-group-where.l4"
+verifyClauseTableFixture = fixtureDir </> "verify-clause-table.l4"
+verifyClauseGroupMaybeFixture = fixtureDir </> "verify-clause-group-maybe.l4"
+verifyClauseTableLargeFixture = fixtureDir </> "verify-clause-table-large.l4"
 
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
@@ -1145,23 +670,195 @@ verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
 verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
 verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
 
+-- Two read-through copies of a recursive WHERE local, one per call, with
+-- different arguments: two atoms, not one (smucclaw/l4-ide#1013).
+verifyRecursiveLocalCopiesFixture :: FilePath
+verifyRecursiveLocalCopiesFixture = fixtureDir </> "verify-recursive-local-copies.l4"
+
+-- A ledger read before and after a RECORD: two atoms, not one.
+verifyLedgerReadsFixture :: FilePath
+verifyLedgerReadsFixture = fixtureDir </> "verify-ledger-reads.l4"
+
+verifyFieldReadsFixture :: FilePath
+verifyFieldReadsFixture = fixtureDir </> "verify-field-reads.l4"
+
+-- Reading through calls to other rules (WHERE-INLINING-SPEC.md §9): a call to a
+-- boolean DECIDE, in the file or imported, is unfolded before analysis. Each file
+-- carries its own control; see its header.
+verifyUnfoldCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture :: FilePath
+verifyUnfoldRecursiveFixture, verifyUnfoldNamedCallsFixture :: FilePath
+verifyUnfoldCallsFixture     = fixtureDir </> "verify-unfold-calls.l4"
+verifyUnfoldImportsFixture   = fixtureDir </> "verify-unfold-imports.l4"
+verifyUnfoldRulesFixture     = fixtureDir </> "verify-unfold-rules.l4"
+verifyUnfoldRecursiveFixture = fixtureDir </> "verify-unfold-recursive.l4"
+verifyUnfoldNamedCallsFixture = fixtureDir </> "verify-unfold-named-calls.l4"
+
 -- The `l4 nlg` differential pair. These goldens are written by
 -- jl4-test's `jl4NlgAnnotationsGolden`, and `l4 nlg` must reproduce them BYTE
 -- FOR BYTE — that equality is the whole reason the orchestrator's p7-tnr leg
 -- can carry a `differential` oracle instead of reporting NOT-REGENERATED.
 -- If this pair ever diverges, p7-tnr silently stops measuring what it says.
 nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden :: FilePath
-nlgRegcfSource  = "examples/legal/regcf/regcf.l4"
-nlgRegcfGolden  = "examples/legal/regcf/tests/regcf.nlg.golden"
-nlgWizardSource = "examples/legal/regcf/regcf-wizard.l4"
-nlgWizardGolden = "examples/legal/regcf/tests/regcf-wizard.nlg.golden"
+nlgRegcfSource  = "examples/canon/us/regcf/regcf.l4"
+nlgRegcfGolden  = "examples/canon/us/regcf/tests/regcf.nlg.golden"
+nlgWizardSource = "examples/canon/us/regcf/regcf-wizard.l4"
+nlgWizardGolden = "examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
 
--- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
--- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
--- the tree, so the tests below are the only thing pinning that the two
--- projections agree (smucclaw/l4-ide#972).
+-- The placement rows for an @nlg on a rule's head, and under a GIVEN list's
+-- last input. Its `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no
+-- golden anywhere in the tree, so the tests below are the only thing pinning
+-- that the two projections agree (smucclaw/l4-ide#972).
 nlgHeadPlacementSource :: FilePath
 nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
+
+-- An @nlg on its own line above a rule under a section GIVEN, which has no
+-- GIVEN of its own (assumed, not ruled, 2026-11-01, porting legalese/l4-ide#802).
+nlgOwnLineSectionGivenFixture :: FilePath
+nlgOwnLineSectionGivenFixture = fixtureDir </> "nlg-own-line-section-given.l4"
+
+-- Rules whose meaning a flat rendering would change, one per case.
+renderMeaningFixture :: FilePath
+renderMeaningFixture = fixtureDir </> "render-meaning.l4"
+
+-- Rules whose rendering needs the renderer's own connecting words.
+renderHebrewWordsFixture :: FilePath
+renderHebrewWordsFixture = fixtureDir </> "render-hebrew-words.l4"
+
+-- A module that checks, importing one that does not.
+renderBrokenImportFixture, renderBrokenImportLib :: FilePath
+renderBrokenImportFixture = fixtureDir </> "render-broken-import.l4"
+renderBrokenImportLib     = fixtureDir </> "render-broken-import-lib.l4"
+
+-- The shape of a document, as `l4 render` lays it out.
+renderHouseStyleFixture :: FilePath
+renderHouseStyleFixture = fixtureDir </> "render-house-style.l4"
+
+-- An @nlg on its own line above a rule that has no GIVEN.
+nlgOwnLineFixture :: FilePath
+nlgOwnLineFixture = fixtureDir </> "nlg-own-line.l4"
+
+-- The constructs unstable has and main does not, which the prose pass ported
+-- from legalese/l4-ide#802 had no words for.
+renderUnstableConstructsFixture :: FilePath
+renderUnstableConstructsFixture = fixtureDir </> "render-unstable-constructs.l4"
+
+-- A rule with no GIVEN of its own whose body calls another rule, under a
+-- section GIVEN and named by an #EVAL: a provision, not test data.
+renderSectionGivenEvalFixture :: FilePath
+renderSectionGivenEvalFixture = fixtureDir </> "render-section-given-eval.l4"
+
+-- A rule that reaches a rule under another section GIVEN by a named call.
+sectionGivenBridgeSource :: FilePath
+sectionGivenBridgeSource = "examples/ok/section-given-bridge.l4"
+
+-- A mixfix call whose first operand is itself a call.
+renderMixfixOperandFixture :: FilePath
+renderMixfixOperandFixture = fixtureDir </> "render-mixfix-operand.l4"
+
+-- Two mixfix calls, nested on the left and on the right.
+renderMixfixNestedFixture :: FilePath
+renderMixfixNestedFixture = fixtureDir </> "render-mixfix-nested.l4"
+
+-- A section GIVEN's input in a slot of a pattern and of a sentence.
+renderSectionGivenBlanksFixture :: FilePath
+renderSectionGivenBlanksFixture = fixtureDir </> "render-section-given-blanks.l4"
+
+-- An obligation whose action is an input.
+regulativeActionParamSource :: FilePath
+regulativeActionParamSource = "examples/ok/regulative-action-param-reference.l4"
+
+-- An EVERY under RAND and ROR.
+everyRandSource :: FilePath
+everyRandSource = "examples/ok/every/rand.l4"
+
+-- An @nlg on a MIXFIX definition, read at a call site in the same module, and
+-- across an IMPORT. The importing fixture makes the same calls, row for row,
+-- as the local one (less one row it says it leaves out), so one expected list
+-- serves both.
+nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib :: FilePath
+nlgMixfixLocalFixture  = fixtureDir </> "nlg-mixfix-local.l4"
+nlgMixfixImportFixture = fixtureDir </> "nlg-mixfix-import.l4"
+nlgMixfixImportLib     = fixtureDir </> "nlg-mixfix-import-lib.l4"
+
+-- A rule imported through two levels: top imports mid, which imports deep.
+-- `mid rule` makes a WITH call to a function in deep and is shown in top's
+-- document under "Imported definitions".
+nlgTransTop, nlgTransMid, nlgTransDeep :: FilePath
+nlgTransTop  = fixtureDir </> "nlg-trans-top.l4"
+nlgTransMid  = fixtureDir </> "nlg-trans-mid.l4"
+nlgTransDeep = fixtureDir </> "nlg-trans-deep.l4"
+
+-- A herald belongs to the definition a call resolved to. The main module reuses
+-- the names of definitions that carry heralds, in the library next to it and in
+-- the prelude, for definitions of its own.
+-- A rule named but not called: passed on as a value, or named with no inputs.
+nlgBareReference :: FilePath
+nlgBareReference = fixtureDir </> "nlg-bare-reference.l4"
+
+-- Nested arithmetic, each #EVAL commented with its value.
+nlgArithGrouping :: FilePath
+nlgArithGrouping = fixtureDir </> "nlg-arith-grouping.l4"
+
+-- Arithmetic whose operand is a call, a rule's sentence or an IF.
+nlgArithOperands, renderArithOperands :: FilePath
+nlgArithOperands    = fixtureDir </> "nlg-arith-operands.l4"
+renderArithOperands = fixtureDir </> "render-arith-operands.l4"
+
+-- A NOT beside AND or OR, in each shape that denies with more than one word.
+renderNotScope :: FilePath
+renderNotScope = fixtureDir </> "render-not-scope.l4"
+
+-- A condition that fills a slot of a rule's sentence.
+slotScope :: FilePath
+slotScope = fixtureDir </> "slot-scope.l4"
+
+-- A slot that another slot comes after, and a sentence that fills a slot.
+slotScopeSentence :: FilePath
+slotScopeSentence = fixtureDir </> "slot-scope-sentence.l4"
+
+-- Where #804's slot and operand brackets meet the port's mixfix holes and
+-- unstable's ledger and refusal constructs.
+renderHoleAndClause :: FilePath
+renderHoleAndClause = fixtureDir </> "render-hole-and-clause.l4"
+
+renderLedgerWriteOperand :: FilePath
+renderLedgerWriteOperand = fixtureDir </> "render-ledger-write-operand.l4"
+
+-- Which rule a HENCE or LEST belongs to (smucclaw/l4-ide#1068).
+lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest :: FilePath
+lestLayoutRepro = fixtureDir </> "lest-layout-1068.l4"
+lestLayoutFixture = fixtureDir </> "lest-layout.l4"
+lestLayoutHanging = fixtureDir </> "lest-layout-hanging.l4"
+lestLayoutHenceAfterLest = fixtureDir </> "lest-layout-hence-after-lest.l4"
+
+-- Library sentences at a call site, and library aliases used at two types.
+nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting :: FilePath
+nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
+libraryAliasTwoTypes = fixtureDir </> "library-alias-two-types.l4"
+renderDeepNesting = fixtureDir </> "render-deep-nesting.l4"
+
+nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload :: FilePath
+nlgOwnerMain     = fixtureDir </> "nlg-owner-main.l4"
+nlgOwnerLib      = fixtureDir </> "nlg-owner-lib.l4"
+nlgOwnerOverload = fixtureDir </> "nlg-owner-overload.l4"
+
+-- A positional call is a record construction only if its head is the record's
+-- constructor. The main module has records named like a function in the library
+-- (no herald) and like a function in the prelude (with one).
+nlgPositionalMain, nlgPositionalLib :: FilePath
+nlgPositionalMain = fixtureDir </> "nlg-positional-main.l4"
+nlgPositionalLib  = fixtureDir </> "nlg-positional-lib.l4"
+
+-- The example the syntax reference links for this: one mixfix function with a
+-- herald, and a rule that calls it. The test that reads it pins the page's
+-- claim, not just the output.
+nlgMixfixDocExample :: FilePath
+nlgMixfixDocExample = "../doc/reference/syntax/nlg-mixfix-example.l4"
+
+-- The reference page whose placement table describes that fixture row by row.
+-- The test that reads it pins the page, not just the output.
+placementReadme :: FilePath
+placementReadme = "../doc/reference/syntax/nlg.md"
 
 shadowEmbeddedEntry, shadowSiblingEntry, shadowExtraEntry :: FilePath
 shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "main.l4"
@@ -1180,6 +877,63 @@ shadowImporterDir = fixtureDir </> "library-shadow" </> "embedded-importer"
 shadowImporterEntry :: FilePath
 shadowImporterEntry = shadowImporterDir </> "main.l4"
 
+-- | A @\@ref@ that trails its code (line 4) and one with nothing after it
+-- (line 8): two warnings, no error.
+refTrailingFixture :: FilePath
+refTrailingFixture = fixtureDir </> "ref-trailing.l4"
+
+-- | A cases file that holds one object, not an array.
+batchSingleObjectJson :: FilePath
+batchSingleObjectJson = fixtureDir </> "batch-single-object.json"
+
+-- | Blank CSV cells (T3c): one STRING input that has to be given and one MAYBE
+-- STRING input that need not be, and an income column left blank.
+batchBlankFixture, batchBlankCsv, batchBlankIncomeCsv :: FilePath
+batchBlankFixture   = fixtureDir </> "batch-blank.l4"
+batchBlankCsv       = fixtureDir </> "batch-blank.csv"
+batchBlankIncomeCsv = fixtureDir </> "batch-blank-income.csv"
+
+-- | CSV cells that carry a quote, a backslash, a tab or a line break.
+batchEscapeCellsCsv :: FilePath
+batchEscapeCellsCsv = fixtureDir </> "batch-escape-cells.csv"
+
+-- | Run one row through @l4 batch@ and return its result, failing the test
+-- unless the row's status is @success@.
+batchAnswer :: FilePath -> FilePath -> FilePath -> String -> IO Value
+batchAnswer bin file inputs entry = do
+  Output code sout serr <- runL4 bin ["batch", file, "-i", inputs, "-e", entry]
+  unless (code == ExitSuccess) $
+    expectationFailure ("l4 batch exited " ++ show code ++ "\nstdout:\n" ++ sout ++ "\nstderr:\n" ++ serr)
+  row <- case lines sout of
+    (l : _) -> either (\err -> expectationFailure ("NDJSON parse failed: " ++ err ++ "\n" ++ l) >> error "unreachable")
+                      pure (eitherDecode (BSL8.pack l))
+    []      -> expectationFailure "l4 batch printed no rows" >> error "unreachable"
+  objField row "status" `shouldBe` Just (String "success")
+  case objField row "output" of
+    Just (Array outs) | (o : _) <- foldr (:) [] outs, Just r <- objField o "result" -> pure r
+    other -> expectationFailure ("no result in batch output: " ++ show other) >> error "unreachable"
+
+-- Import-cycle fixtures beside unstable's (cycle3Entry, cycle2Entry,
+-- selfImportEntry and cleanImportEntry are defined above): an entry file that
+-- imports a ring without being part of it.
+cycle3OutsideEntry :: FilePath
+cycle3OutsideEntry = fixtureDir </> "cycle3" </> "outside.l4"
+
+-- Multi-file imports that are not rings: one whose imported module only warns,
+-- and four that cannot be loaded cleanly: an imported module with a type error,
+-- with a syntax error, and with a string that is never closed, and an IMPORT of
+-- a module that does not exist. In each of those the entry file is itself fine,
+-- and never uses anything from the import. The warning one is a guard against
+-- the import check over-firing, as cleanImportEntry is.
+warningImportEntry, brokenImportEntry :: FilePath
+warningImportEntry = fixtureDir </> "imports-warning" </> "main.l4"
+brokenImportEntry  = fixtureDir </> "imports-error"   </> "main.l4"
+
+syntaxImportEntry, lexImportEntry, missingImportEntry :: FilePath
+syntaxImportEntry  = fixtureDir </> "imports-syntax"  </> "main.l4"
+lexImportEntry     = fixtureDir </> "imports-lex"     </> "main.l4"
+missingImportEntry = fixtureDir </> "imports-missing" </> "main.l4"
+
 ----------------------------------------------------------------------------
 -- Tests
 ----------------------------------------------------------------------------
@@ -1189,34 +943,21 @@ main = do
   bin <- locateL4Binary
   putStrLn ("Using l4 binary: " ++ bin)
   -- Sanity check fixtures exist (test suite must be run from repo root).
-  for_ [ cleanFixture, evalFixture, errorFixture, garbageFixture
-       , evalCrashFixture
-       , breachTraceFixture, breachInputsFixture
-       , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
-       , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson
-       , batchEscapeFixture, batchEscapeInput, evalTraceFixture
-       , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
-       , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
-       , shadowExtraEntry, shadowImporterEntry
-       , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture
-       , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
-       , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
-       , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
-       , nlgHeadPlacementSource
-       , exportTwoRulesFixture, exportNothingFixture
-       , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
-       , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
-       , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
-       , dmnXsdOrderPositive, dmnXsdOrderNegative, dmnXsdOrderCases
-       , gstGolden, gstEngineCases, dateProbeModel, dateProbeCases
-       , dateProbeNegative
-       , spouseInlineDmn, spouseContextTableDmn, spouseBkmTableDmn, spouseCases
-       , hydrationProbeModel, hydrationProbeCases
-       , nullProbeModel, nullProbeCases, nullAbsentModel, nullAbsentCases
-       , hydrationGolden, hydrationEngineCases, sumtypeGolden
-       , bkmSource, bkmDmnGolden, bkmEngineCases
-       , svcSource, svcGolden, svcKieDmnGolden, svcEngineCases
-       , daCitationsSource, assertRaisesFixture, assertAssumedFixture ] \fp -> do
+  for_ (concat
+         [ coreFixtures
+         , DmnBpmn.fixtures
+         , OpenFisca.fixtures
+         , Yscript.fixtures
+         , Blawx.fixtures
+         , Docassemble.fixtures
+         , Catala.fixtures
+         , Coverage.fixtures
+         , Explore.fixtures
+         , SiblingReads.fixtures
+         , Prove.fixtures
+         , BuildIdentity.fixtures
+         , Ledger.fixtures
+         ]) \fp -> do
     ok <- doesFileExist fp
     unless ok $ do
       putStrLn ("Missing fixture: " ++ fp)
@@ -1225,6 +966,77 @@ main = do
   hspec (spec bin)
   where
     for_ xs f = mapM_ f xs
+
+-- | The files the core tests need. Each backend module exports its own
+-- 'fixtures' list, and 'main' checks all of them before hspec runs anything.
+coreFixtures :: [FilePath]
+coreFixtures =
+  [ cleanFixture, evalFixture, errorFixture, garbageFixture
+  , evalCrashFixture, runEvalTraceFixture
+  , breachTraceFixture, breachInputsFixture
+  , batchEligFixture, batchDataJson, batchDataCsv, batchMixedJson
+  , batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson, batchMaybeTextJson
+  , batchIgnoredAnnotation, batchIgnoredAnnotationOnly, batchIgnoredAnnotationJson
+  , langEnAndUnknownFixture
+  , batchUndeclaredColumnCsv, batchEscapeRoundtripJson
+  , batchDeclaredStringsJson, batchDeclaredStringsYaml, batchDeclaredStringCellsCsv
+  , batchDeclaredBadNumberJson, batchDeclaredNumberForStringJson
+  , batchSynonym, batchSynonymYearJson, batchSynonymFlagJson, batchSynonymYearCsv, batchSynonymFlagCsv
+  , batchCsvBadQuote, batchCsvEmpty, batchCsvOpenQuoteEof, batchCsvOpenQuoteMid, batchCsvOpenQuoteCrlf
+  , batchCsvOpenQuoteDoubled, batchCsvOpenQuoteHeader, batchCsvQuoteClosesAtEof
+  , batchDeclaredText, batchDeclaredTextAnswers, batchDeclaredTextOptional
+  , batchDeclaredTextDates, batchDeclaredTextSynonyms
+  , batchEscapeFixture, batchEscapeInput, evalTraceFixture, evalTraceLineBreakFixture
+  , batchTySection, batchTyRule, batchTyRecord, batchTyMaybe
+  , batchTyImported, batchTyImportedTypes, batchTyImportedJson
+  , batchTyOneCol, batchTyTwo, batchTyOneColCsv, batchTyEmptyRow, batchTyUncertain
+  , batchTyString, batchTyOwnDecode, batchTyEnum, batchTyExact
+  , batchTyBomCsv, batchTyCrlfCsv, batchTyStringCsv, batchTyOwnDecodeJson, batchTyEnumJson, batchTyExactJson
+  , batchTyRaggedCsv, batchTyTypoCsv, batchTyTypoJson, batchTyRecordTypoJson, batchTyRecordEmptyJson
+  , batchTyOmitted, batchTySupplied, batchTyNull, batchTyUnread, batchTyYaml
+  , batchTyNoCol, batchTyEmpty, batchTyRecordJson, batchTyMaybeCsv
+  , cycle3Entry, cycle2Entry, selfImportEntry, cleanImportEntry
+  , cycle3OutsideEntry, warningImportEntry, brokenImportEntry
+  , syntaxImportEntry, lexImportEntry, missingImportEntry
+  , dupDiagDiamondEntry
+  , embeddedDiamondEntry, shadowEmbeddedEntry, shadowSiblingEntry
+  , shadowExtraEntry, shadowImporterEntry
+  , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
+  , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
+  , verifyClauseTableLargeFixture
+  , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
+  , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
+  , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture, verifyFieldReadsFixture
+  , verifyUnfoldCallsFixture, verifyUnfoldNamedCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
+  , verifyUnfoldRecursiveFixture
+  , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
+  , nlgPromissorySource, nlgPromissoryGolden, nlgShowcaseSource, nlgShowcaseGolden
+  , traceOverflowFixture, traceLoopFixture, langTagCaseFixture, bilingualFramesRegionFixture
+  , nlgHeadPlacementSource, placementReadme, nlgOwnLineSectionGivenFixture
+  , renderMeaningFixture, renderHouseStyleFixture, nlgOwnLineFixture, renderUnstableConstructsFixture
+  , renderBrokenImportFixture, renderBrokenImportLib, renderHebrewWordsFixture
+  , renderSectionGivenEvalFixture, sectionGivenBridgeSource
+  , renderMixfixOperandFixture, renderMixfixNestedFixture, renderSectionGivenBlanksFixture
+  , regulativeActionParamSource
+  , everyRandSource
+  , nlgMixfixLocalFixture, nlgMixfixImportFixture, nlgMixfixImportLib, nlgMixfixDocExample
+  , nlgTransTop, nlgTransMid, nlgTransDeep
+  , nlgOwnerMain, nlgOwnerLib, nlgOwnerOverload, nlgBareReference
+  , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
+  , nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
+  , slotScope, slotScopeSentence, renderHoleAndClause, renderLedgerWriteOperand
+  , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest
+  , nlgPositionalMain, nlgPositionalLib
+  , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
+  , multiClauseRenderFixture
+  , batchClauses, batchClausesCapture, batchClausesColours, batchClausesBooleans
+  , batchClausesDitto, batchClausesDittoHead, batchClausesFixity, batchClausesTabs
+  , batchClausesString, batchClausesB, batchClausesCatchAll
+  , evalUndeterminedFixture
+  , evalAliasLoopFixture, evalAliasLoopListFixture, evalAliasCycleFixture
+  , refTrailingFixture, batchSingleObjectJson
+  , batchBlankFixture, batchBlankCsv, batchBlankIncomeCsv, batchEscapeCellsCsv
+  ]
 
 spec :: FilePath -> Spec
 spec bin = do
@@ -1240,14 +1052,111 @@ spec bin = do
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
       sout `shouldSatisfy` ("export" `isInfixOf`)
-      sout `shouldSatisfy` ("openfisca" `isInfixOf`)
-      sout `shouldSatisfy` ("blawx" `isInfixOf`)
+      sout `shouldSatisfy` ("import" `isInfixOf`)
       sout `shouldSatisfy` ("nlg" `isInfixOf`)
       sout `shouldSatisfy` ("verify" `isInfixOf`)
+      sout `shouldSatisfy` ("explore" `isInfixOf`)
+
+  -- CLI-SURFACE-SPEC C1: every foreign notation is a subcommand of `export`
+  -- or `import`, and those two help screens are the catalogue. The old
+  -- top-level verbs are gone, not aliased: an unknown first word is read as a
+  -- FILENAME by the bare `l4 FILE` form, so the assertion is that each one
+  -- fails, not what it says.
+  describe "l4 export / l4 import" $ do
+    it "`l4 export --help` lists every format" $ do
+      Output code sout _ <- runL4 bin ["export", "--help"]
+      code `shouldBe` ExitSuccess
+      for_ ["dmn", "dmn-md", "bpmn", "openfisca", "blawx", "catala", "docassemble", "yscript"] \fmt ->
+        sout `shouldSatisfy` (("\n  " <> fmt <> " ") `isInfixOf`)
+
+    it "`l4 import --help` lists blawx" $ do
+      Output code sout _ <- runL4 bin ["import", "--help"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\n  blawx " `isInfixOf`)
+
+    it "requires a format" $
+      expectFail bin ["export"]
+
+    it "no longer has a top-level verb per backend" $
+      for_ ["openfisca", "blawx", "catala", "docassemble", "yscript"] \verb ->
+        expectFail bin [verb, "x.l4"]
+
+  describe "l4 deploy / redeploy / undeploy / deployments (no network)" $ do
+    let expectStderr args mEnv needle = do
+          Output code _ serr <- runL4In Nothing mEnv bin args
+          code `shouldNotBe` ExitSuccess
+          unless (needle `isInfixOf` serr) $
+            expectationFailure ("Expected stderr to contain " ++ show needle ++ "\n--- stderr ---\n" ++ serr)
+        -- Nothing listens on the discard port; every case below must stop
+        -- before connecting.
+        noServer = ["--server", "http://127.0.0.1:9"]
+
+    it "are listed in --help, and each takes --help" $ do
+      Output _ sout _ <- runL4 bin ["--help"]
+      mapM_ (\c -> sout `shouldSatisfy` (c `isInfixOf`)) ["deploy", "redeploy", "undeploy", "deployments", "install"]
+      expectOk bin ["deploy", "--help"] "--name"
+      expectOk bin ["install", "legalese", "--help"] "--dir"
+
+    it "refuses a deployment name the service would reject" $
+      expectStderr (["deploy", cleanFixture, "--name", "bad name!"] ++ noServer) Nothing "may only contain"
+
+    it "refuses to deploy a file that doesn't typecheck" $
+      expectStderr (["deploy", errorFixture] ++ noServer) Nothing "doesn't typecheck"
+
+    it "only takes --api-key-file with --server" $
+      expectStderr ["deployments", "--api-key-file", cleanFixture] Nothing "--api-key-file only applies with --server"
+
+    it "won't send an API key over plain http to another host" $
+      expectStderr ["deployments", "--server", "http://example.com"] (Just [("L4_API_KEY", "k")]) "over plain http"
+
+    it "needs the legalese CLI for Legalese Cloud" $
+      withSystemTempDirectory "l4-cli-test-empty-path" \emptyPath ->
+        expectStderr ["deployments"] (Just [("PATH", emptyPath)]) "l4 install legalese"
+
+    it "won't undeploy without a terminal unless --yes" $
+      expectStderr (["undeploy", "anything"] ++ noServer) Nothing "Pass --yes"
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
       expectOk bin ["run", cleanFixture] "Checking succeeded."
+
+    -- The line is ignored as a comment is: the file runs and gives its answer.
+    it "runs a file with an unknown annotation" $
+      expectOk bin ["run", unknownAnnotationFixture] "Result:\n  2\n"
+
+    it "runs a file whose @lang has no language" $
+      expectOk bin ["run", malformedLangFixture] "Result:\n  2\n"
+
+    -- Each time a file's diagnostics change, the pipeline logs all of them
+    -- again, and l4 run and l4 check printed every list: l4 run printed a
+    -- type checker's warning three times and an export error and the
+    -- untyped-GIVEN warning twice, l4 check the type checker's warning twice
+    -- (review of #779, 2026-11-21). Only the last list of a file is printed.
+    --
+    -- Ported to unstable from the #779 line (af1a0bcca). Unstable has no
+    -- diagnostic codes ("Code: <none>") and no untyped-GIVEN warning, and its
+    -- export error fails the type check, so nothing is evaluated: the
+    -- assertions name each diagnostic by its message instead, and there is no
+    -- Result to check. On unstable this file's diagnostics were published once
+    -- even before the fix, so here these two are guards; the repeat is pinned
+    -- under "l4 check" below (smucclaw/l4-ide#1082).
+    it "prints each diagnostic once, on l4 run and l4 check, and in --json" $ do
+      let file = fixtureDir </> "run-diagnostics-once.l4"
+          occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+          messages = ["The following branches still need to be considered", "Function type inputs are not supported for @export"]
+      Output runCode _ runErr <- runL4 bin ["run", file]
+      runCode `shouldBe` ExitFailure 1
+      map (`occurrences` runErr) messages `shouldBe` [1, 1]
+      Output checkCode _ checkErr <- runL4 bin ["check", file]
+      checkCode `shouldBe` ExitFailure 1
+      map (`occurrences` checkErr) messages `shouldBe` [1, 1]
+      Output _ runJson _ <- runL4 bin ["run", "--json", file]
+      map (`occurrences` runJson) messages `shouldBe` [1, 1]
+    it "still prints a type error once, on l4 run and l4 check" $
+      forM_ ["run", "check"] \cmd -> do
+        Output code _ serr <- runL4 bin [cmd, errorFixture]
+        code `shouldBe` ExitFailure 1
+        length (filter ("The type of this definition must match its type signature" `isPrefixOf`) (tails serr)) `shouldBe` 1
 
     it "emits a well-shaped JSON envelope on a clean file" $ do
       env <- jsonEnvelope bin ["run", cleanFixture, "--json"]
@@ -1338,15 +1247,23 @@ spec bin = do
       env <- jsonEnvelope bin ["run", assertRaisesFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool False)
       case objField env "results" of
-        Just (Array v) -> do
-          length v `shouldBe` 2
-          mapM_ (\r -> do
-                   objField r "kind"  `shouldBe` Just (String "assertion")
-                   objField r "value" `shouldBe` Just Null
-                   case objField r "error" of
-                     Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
-                     other -> expectationFailure ("Expected an error string, got " ++ show other))
-                (toList v)
+        Just (Array v) -> case toList v of
+          [raised, waiting] -> do
+            objField raised "kind"  `shouldBe` Just (String "assertion")
+            objField raised "value" `shouldBe` Just Null
+            case objField raised "error" of
+              Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+              other -> expectationFailure ("Expected an error string, got " ++ show other)
+            -- One stuck on an input nobody supplied did not raise an error: it
+            -- is undetermined, still an assertion, and says what it waits on
+            -- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3).
+            objField waiting "kind"  `shouldBe` Just (String "assertion")
+            objField waiting "value" `shouldBe` Just Null
+            objField waiting "error" `shouldBe` Nothing
+            case objField waiting "undetermined" of
+              Just und -> arrayField und "needs" `shouldBe` Just [String "x"]
+              other    -> expectationFailure ("Expected an undetermined field, got " ++ show other)
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
         other -> expectationFailure ("Expected results array, got " ++ show other)
 
     it "still typechecks the raising fixture — l4 check succeeds on it" $
@@ -1413,8 +1330,231 @@ spec bin = do
     it "fails the run when an #ASSERT is stuck on a bare assumed BOOLEAN" $
       expectFail bin ["run", assertAssumedFixture]
 
+    -- The same bare term as an #EVAL's result is no value either. It used to
+    -- print as one, with exit 0, while #ASSERT on it was stuck
+    -- (UNKNOWN-EVALUATION-SPEC row 52).
+    it "fails the run when an #EVAL's result is a bare assumed term" $
+      expectFail bin ["run", evalAssumedFixture]
+
+    it "reports a bare assumed #EVAL result as undetermined, never as a value" $ do
+      env <- jsonEnvelope bin ["run", evalAssumedFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [r] -> do
+            -- its own kind, from build step 3 (UNKNOWN-EVALUATION-SPEC row 52)
+            objField r "kind"  `shouldBe` Just (String "undetermined")
+            objField r "value" `shouldBe` Just Null
+            arrayField r "needs" `shouldBe` Just [String "x"]
+            case objField r "message" of
+              Just (String e) -> e `shouldSatisfy` ("assumed term" `T.isInfixOf`)
+              other -> expectationFailure ("Expected the default report's text, got " ++ show other)
+          other -> expectationFailure ("Expected 1 result, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Found in review of the step-3 rebase: reading the term an unknown
+    -- stands for followed a name bound to itself (or to a cycle of names)
+    -- without spending any of its budget, so these never answered. The run is
+    -- killed after 20 s, which fails the test where an in-process test would
+    -- hang the suite.
+    describe "a name that is bound to itself, under an unknown" $
+      mapM_
+        (\(label, fixture, needed) ->
+          it ("answers, naming the unknown it is stuck on: " ++ label) $ do
+            r <- runL4Within 20 bin ["run", fixture, "--json"]
+            case r of
+              Nothing -> expectationFailure "l4 run did not answer within 20 s"
+              Just out -> do
+                out.outExit `shouldBe` ExitFailure 1
+                out.outStdout `shouldSatisfy` (("\"" ++ needed ++ "\"") `isInfixOf`))
+        [ ("a rule that is its own value", evalAliasLoopFixture, "f")
+        , ("the same inside a list", evalAliasLoopListFixture, "x")
+        , ("two names bound to each other", evalAliasCycleFixture, "f")
+        ]
+
+    -- A residual: two inputs, both named, in the order evaluation reached
+    -- them, and the run fails (§4.12 row 23).
+    it "names every input an undetermined #EVAL waits on, and fails the run" $ do
+      env <- jsonEnvelope bin ["run", evalUndeterminedFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case toList v of
+          [decided, waiting] -> do
+            objField decided "kind"  `shouldBe` Just (String "value")
+            objField waiting "kind"  `shouldBe` Just (String "undetermined")
+            arrayField waiting "needs" `shouldBe` Just [String "x", String "y"]
+          other -> expectationFailure ("Expected 2 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- Ruled by Meng 2026-09-29: an #ASSERT that evaluates cleanly to FALSE is a
+    -- failed test, and fails the run. Without this, no script or CI job could
+    -- catch a failing assertion by exit status.
+    it "fails the run when an #ASSERT evaluates to false" $ do
+      Output code sout _ <- runL4 bin ["run", assertFailsFixture]
+      code `shouldBe` ExitFailure 1
+      sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
+
+    it "returns ok=false in JSON when an #ASSERT evaluates to false" $ do
+      env <- jsonEnvelope bin ["run", assertFailsFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> map (`objField` "value") (toList v) `shouldBe` [Just (Bool True), Just (Bool False)]
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    it "still typechecks the failing fixture — l4 check succeeds on it" $
+      expectOk bin ["check", assertFailsFixture] "Check succeeded."
+
+    it "reports an evaluation error in JSON in the drafter's terms, not as Haskell" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "multi-clause-no-match.l4", "--json"]
+      case objField env "results" of
+        Just (Array v) | [Object r] <- foldr (:) [] v -> case KeyMap.lookup (Key.fromString "value") r of
+          Just (String msg) -> do
+            T.unpack msg `shouldSatisfy` ("No clause of `price` matches" `isInfixOf`)
+            T.unpack msg `shouldSatisfy` (not . ("MkPmGroup" `isInfixOf`))
+            T.unpack msg `shouldSatisfy` (not . ("NonExhaustivePatterns" `isInfixOf`))
+          other -> expectationFailure ("Expected an error string, got " ++ show other)
+        other -> expectationFailure ("Expected one result, got " ++ show other)
+
     it "falls through from a bare positional argument (backward-compat)" $
       expectOk bin [cleanFixture] "Checking succeeded."
+
+  -- The "Trace:" section of `l4 run`. `--trace full` is the default, and its
+  -- help says it is "for #EVALTRACE", yet for a long time the policy behind
+  -- `l4 run` collected no trace at all, so even an #EVALTRACE printed the
+  -- placeholder that tells you to add an #EVALTRACE.
+  describe "l4 run --trace" $ do
+    let placeholder = "(no trace captured; add #EVALTRACE to the directive)"
+        -- one Text per directive: everything from one "Evaluation[" to the next
+        directiveBlocks sout = drop 1 (T.splitOn "Evaluation[" (T.pack sout))
+        withBlocks args k = do
+          Output code sout serr <- runL4 bin args
+          unless (code == ExitSuccess) $
+            expectationFailure ("Expected success, got " ++ show code
+              ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr)
+          case directiveBlocks sout of
+            [evalBlock, traceBlock] -> k evalBlock traceBlock
+            other -> expectationFailure
+              ("Expected two Evaluation blocks, got " ++ show (length other)
+                ++ "\n--- stdout ---\n" ++ sout)
+
+    it "shows an #EVALTRACE directive's trace by default, and leaves a plain #EVAL's placeholder alone" $
+      withBlocks ["run", runEvalTraceFixture] \evalBlock traceBlock -> do
+        -- the #EVAL: unchanged, placeholder included
+        evalBlock `shouldSatisfy` ("Trace:" `T.isInfixOf`)
+        evalBlock `shouldSatisfy` (T.pack placeholder `T.isInfixOf`)
+        -- the #EVALTRACE: the trace itself, in the layout the goldens use
+        traceBlock `shouldSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` (T.pack placeholder `T.isInfixOf`)
+        traceBlock `shouldSatisfy` ("┌ doubleNot OF TRUE" `T.isInfixOf`)
+
+    it "`--trace full` says the same as the default" $ do
+      Output _ dflt _ <- runL4 bin ["run", runEvalTraceFixture]
+      Output _ full _ <- runL4 bin ["run", "--trace", "full", runEvalTraceFixture]
+      full `shouldBe` dflt
+
+    it "`--trace none` prints no Trace: section for either directive" $
+      withBlocks ["run", "--trace", "none", runEvalTraceFixture] \evalBlock traceBlock -> do
+        evalBlock `shouldNotSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` ("Trace:" `T.isInfixOf`)
+        traceBlock `shouldNotSatisfy` ("┌" `T.isInfixOf`)
+
+    it "still reports both directives in --json" $ do
+      env <- jsonEnvelope bin ["run", runEvalTraceFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> length v `shouldBe` 2
+        other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The trace does not only reach stdout. The directive's own diagnostic
+    -- carries it too ("TRUE", then a line of ─────, then the trace), and `l4 run`
+    -- writes diagnostics to stderr and puts them in the JSON "diagnostics". So
+    -- "no trace under --trace none / --json" has to be pinned in those two places
+    -- as well as in the Trace: section, or a trace collected and not shown would
+    -- leak there unseen. The first case is the positive control: it shows the
+    -- marker really does reach stderr when a trace is collected, so the two
+    -- cases after it are not vacuous.
+    it "puts the trace into stderr too, by default (the control for the next two)" $ do
+      Output _ _ serr <- runL4 bin ["run", runEvalTraceFixture]
+      serr `shouldSatisfy` ("─────" `isInfixOf`)
+
+    it "`--trace none` leaves the trace out of stderr as well" $ do
+      Output _ _ serr <- runL4 bin ["run", "--trace", "none", runEvalTraceFixture]
+      -- the diagnostics are still there; only the trace is not
+      serr `shouldSatisfy` ("DiagnosticSeverity_Information" `isInfixOf`)
+      serr `shouldNotSatisfy` ("─────" `isInfixOf`)
+
+    it "`--json` keeps the trace out of its diagnostics" $ do
+      env <- jsonEnvelope bin ["run", runEvalTraceFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array v) -> do
+          let diags = [t | String t <- toList v]
+          -- the diagnostics are still there; only the trace is not
+          length diags `shouldSatisfy` (> 0)
+          diags `shouldSatisfy` any ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          diags `shouldNotSatisfy` any ("─────" `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+  -- A step of a trace is printed as source, and a string literal in source is
+  -- spelled with escapes: a line break as \n, a tab as \t. #595 made the printer
+  -- do that so that `l4 batch` keeps a string that holds a line break; it also
+  -- changed every other surface that prints a step: the Trace: block of
+  -- `l4 run`, the trace `l4 trace` reports, and the `exampleCode` of the
+  -- jl4-service reasoning tree (pinned in jl4-service-test). Before it, a step
+  -- broke across lines inside the literal. A string VALUE, such as the one a
+  -- trace ends in or the Result: block shows, is not source and keeps its
+  -- line break.
+  -- Ruled 2026-10-12 (bench "Main Wave Rulings", card R2, option A): the escaped
+  -- form stays on every surface; recorded in specs/done/BATCH-PROCESSING-SPEC.md.
+  describe "a string literal in a trace step" $ do
+    let escapedStep = "IF (x GREATER THAN 0) THEN \"line\\nnext\" ELSE \"tab\\there\""
+
+    it "is spelled as source in `l4 run`'s Trace: block, and the value keeps its line break" $ do
+      Output code sout _ <- runL4 bin ["run", evalTraceLineBreakFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any (escapedStep `isInfixOf`)
+      -- no step ends inside a literal
+      out `shouldNotSatisfy` any ("THEN \"line" `isSuffixOf`)
+      -- the value does: the Result: block holds it on two lines
+      out `shouldSatisfy` ([ "Result:", "  \"line", "  next\"" ] `isInfixOf`)
+
+    it "is spelled as source in the trace `l4 trace` reports" $ do
+      Output code _ serr <- runL4 bin ["trace", evalTraceLineBreakFixture]
+      code `shouldBe` ExitSuccess
+      let err = map (filter (/= '\r')) (lines serr)
+      err `shouldSatisfy` any (escapedStep `isInfixOf`)
+      err `shouldNotSatisfy` any ("THEN \"line" `isSuffixOf`)
+
+  -- The names a multi-clause group is compiled to are spelled so that no
+  -- source can write them ('L4.Parser.generatedName'), and say what they are.
+  describe "multi-clause groups: the names they are compiled to" $ do
+    let generatedSpellings = ["_pm_", "__pm_", "pm arg", "pm_fallthrough"]
+        mentionsOldName out = any (`isInfixOf` out) generatedSpellings
+
+    it "reads the clauses as one list of cases in l4 render" $ do
+      Output code sout0 _ <- runL4 bin ["render", "--format", "text", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      -- Windows ends lines with a carriage return, as in the l4 format test.
+      let sout = filter (/= '\r') sout0
+      -- the third clause, which an earlier build left out altogether
+      sout `shouldSatisfy` ("| Green      | 2      |\n    | otherwise  | 3      |" `isInfixOf`)
+      sout `shouldSatisfy` ("depends on input 1:" `isInfixOf`)
+      sout `shouldSatisfy` ("(b) Otherwise: the result of clause 2." `isInfixOf`)
+      sout `shouldSatisfy` ("The result of clause 2 depends on input 1:" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+    it "names no generated input in the HTML rendering either" $ do
+      Output code sout _ <- runL4 bin ["render", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("input 1" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
+
+    it "names the later clauses by the clauses they hold in a trace" $ do
+      Output code sout _ <- runL4 bin ["run", multiClauseRenderFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("OTHERWISE `the result of clauses 2 to 3`" `isInfixOf`)
+      sout `shouldNotSatisfy` mentionsOldName
 
   describe "l4 check" $ do
     it "succeeds on a clean file" $
@@ -1435,17 +1575,1240 @@ spec bin = do
       Output code _ _ <- runL4 bin ["check", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
 
+    -- The two warnings of the @ref pass, as the LSP renders them (their text is
+    -- quoted in doc/reference/syntax/README.md, which is the page to change
+    -- with it). They are warnings, so the check still succeeds.
+    it "warns about a @ref after code and a @ref with nothing after it, and still succeeds" $ do
+      Output code sout serr <- runL4 bin ["check", refTrailingFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      let err = filter (/= '\r') serr
+      err `shouldSatisfy` isInfixOf "Range:    4:18-4:49"
+      err `shouldSatisfy` isInfixOf
+        "This @ref (`Section 4(1)(a) of the Act`) follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above `GIVETH A BOOLEAN`."
+      err `shouldSatisfy` isInfixOf "Range:    8:1-8:15"
+      err `shouldSatisfy` isInfixOf
+        "This @ref (`Section 9`) is at the end of the file, so there is nothing after it to attach to."
+      length (filter (isInfixOf "Severity: DiagnosticSeverity_Warning") (lines err)) `shouldBe` 2
+
+    -- smucclaw/l4-ide#1082: the parser publishes the warning, then the checker
+    -- publishes again with its own Information note added. The pipeline logs
+    -- each publish whole, and the CLI printed both, so the parser's warning was
+    -- printed once per stage. Only the last list of the file is printed now.
+    it "prints a parser warning once when the checker adds a diagnostic of its own" $ do
+      let fixture = fixtureDir </> "warning-printed-once.l4"
+          warning = "Two or more @nonassertable marks sit above one construct"
+          occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+      Output code sout serr <- runL4 bin ["check", fixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      occurrences warning serr `shouldBe` 1
+      -- Positive control: the checker's note on `#CHECK x` is still printed,
+      -- so the warning is single because the last list, which holds both, is
+      -- the one printed, not because the second publish was dropped.
+      let err = filter (/= '\r') serr
+      err `shouldSatisfy` isInfixOf "Range:    6:1-6:9"
+      length (filter (isInfixOf "Severity: DiagnosticSeverity_Information") (lines err)) `shouldBe` 1
+      -- `--json` carries one string per printed block; the warning is in one.
+      env <- jsonEnvelope bin ["check", fixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array v) ->
+          sum [occurrences warning (T.unpack t) | String t <- toList v] `shouldBe` 1
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+    -- The same across an IMPORT: each file's last list once, where it fell in
+    -- the log, so the imported file's first.
+    it "prints each file's parser warning once when an imported file has one too" $
+      withSystemTempDirectory "l4-warning-printed-once" \dir -> do
+        let marks = "@nonassertable\n@nonassertable\nGIVETH A NUMBER\n"
+            occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+        writeFile (dir </> "warnonce.l4") (marks <> "y MEANS 2\n\n#CHECK y\n")
+        writeFile (dir </> "main.l4") ("IMPORT warnonce\n\n" <> marks <> "x MEANS y\n\n#CHECK x\n")
+        Output code _ serr <- runL4 bin ["check", dir </> "main.l4"]
+        code `shouldBe` ExitSuccess
+        let err = filter (/= '\r') serr
+            files = [ f | l <- lines err, Just f <- [stripPrefix "File:" l] ]
+        occurrences "Two or more @nonassertable marks" err `shouldBe` 2
+        occurrences "Info | updateFileDiagnostics published different" err `shouldBe` 2
+        map (unwords . words) files `shouldBe` ["warnonce.l4", "warnonce.l4", "main.l4", "main.l4"]
+
+    it "warns that a multi-clause DECIDE misses a case, and still succeeds" $ do
+      let fixture = fixtureDir </> "multi-clause-missing.l4"
+      Output code sout serr <- runL4 bin ["check", fixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      serr `shouldSatisfy` ("does not cover all cases" `isInfixOf`)
+      serr `shouldSatisfy` ("DECIDE `price` Blue IS" `isInfixOf`)
+
+    -- An annotation this version of L4 does not know is a warning, not a lexer
+    -- error: the file still checks and runs, and the one diagnostic names it.
+    it "succeeds on a file with an unknown annotation, and warns once" $ do
+      expectOk bin ["check", unknownAnnotationFixture] "Check succeeded."
+      env <- jsonEnvelope bin ["check", unknownAnnotationFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "diagnostics" of
+        Just (Array v) -> do
+          let diags = [t | String t <- toList v]
+          length diags `shouldBe` 1
+          diags `shouldSatisfy` all ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          diags `shouldSatisfy` all ("@future-annotation" `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+    it "succeeds on a file whose @lang has no language, and warns once" $ do
+      expectOk bin ["check", malformedLangFixture] "Check succeeded."
+      env <- jsonEnvelope bin ["check", malformedLangFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "diagnostics" of
+        Just (Array v) -> do
+          let diags = [t | String t <- toList v]
+          length diags `shouldBe` 1
+          diags `shouldSatisfy` all ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          diags `shouldSatisfy` all ("Malformed annotation `@lang`" `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+  -- `@lang en` says what a module that declares nothing already is, so
+  -- `l4 check` hints that the line can go. It is a HINT: the check still
+  -- succeeds, with the same exit code and the same JSON verdict it would give
+  -- without the line. Without the controls below a hint that fired on every
+  -- module would pass the first case, so they are the half that matters.
+  describe "l4 check: a redundant @lang en" $ do
+    let hintText = "A module that declares nothing is English; this line can go."
+
+    it "hints that the line can go, at Hint severity, and the check still succeeds" $ do
+      Output code sout serr <- runL4 bin ["check", langEnHintFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      serr `shouldSatisfy` (hintText `isInfixOf`)
+      serr `shouldSatisfy` ("DiagnosticSeverity_Hint" `isInfixOf`)
+      -- not a warning, and not anything louder
+      serr `shouldNotSatisfy` ("DiagnosticSeverity_Warning" `isInfixOf`)
+      serr `shouldNotSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
+
+    it "points at the @lang line" $ do
+      Output _ _ serr <- runL4 bin ["check", langEnHintFixture]
+      -- the fixture's third line, from its first column, and it ends on that
+      -- same line: the range is rendered "line:col-line:col"
+      serr `shouldSatisfy` ("3:1-3:" `isInfixOf`)
+
+    it "leaves the JSON verdict at ok=true" $ do
+      env <- jsonEnvelope bin ["check", langEnHintFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "diagnostics" of
+        Just (Array v) -> [t | String t <- toList v] `shouldSatisfy` any (T.pack hintText `T.isInfixOf`)
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+    it "says nothing to a module that declares another language" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/ok/nlg-module-lang.l4"]   -- `@lang he`
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    it "says nothing to a module that declares nothing" $ do
+      Output code _ serr <- runL4 bin ["check", cleanFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    it "says nothing on an `en` line in a module that also declares `he`" $ do
+      Output code _ serr <- runL4 bin ["check", langEnThenHeFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` (hintText `isInfixOf`)
+
+    -- The hint reads `@lang` tokens and the ignored-annotation warning reads
+    -- the lexer's trivia, so neither can take the other's line: a module with
+    -- both gets both, once each, and the exit code is the check's.
+    it "gives the hint and the ignored-annotation warning once each, in one module" $ do
+      Output code _ serr <- runL4 bin ["check", langEnAndUnknownFixture]
+      code `shouldBe` ExitSuccess
+      length (T.breakOnAll (T.pack hintText) (T.pack serr)) `shouldBe` 1
+      length (T.breakOnAll "Unknown annotation `@future-annotation`" (T.pack serr)) `shouldBe` 1
+      -- the hint is a hint and the warning a warning, and nothing is an error
+      serr `shouldSatisfy` ("DiagnosticSeverity_Hint" `isInfixOf`)
+      serr `shouldSatisfy` ("DiagnosticSeverity_Warning" `isInfixOf`)
+      serr `shouldNotSatisfy` ("DiagnosticSeverity_Error" `isInfixOf`)
+
+  describe "l4 run on a definition whose evaluation raised" $ do
+    -- A thunk whose evaluation raised is evaluated again on its next use, and
+    -- raises again. It used to keep the mark of the aborted force, so its
+    -- second use was reported as an infinite loop.
+    it "raises the same error again on a second use" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "raise-twice.l4"]
+      T.count "Division by zero" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("Infinite loop" `isInfixOf`)
+
+    -- The control: the check is still on. A definition that is its own operand,
+    -- and a pair that are each other's, are infinite loops at every use.
+    it "still reports a genuine loop as a loop, at every use" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "loop-twice.l4"]
+      T.count "Infinite loop detected" (T.pack sout) `shouldBe` 4
+      sout `shouldNotSatisfy` ("Division by zero" `isInfixOf`)
+
+  describe "l4 run on an #ASSERT whose expression raises" $ do
+    -- @#ASSERT P@ and @#ASSERT NOT P@ for a @P@ that raises, then one clean
+    -- TRUE and one clean FALSE as controls.
+    let assertRaisesPairFixture = fixtureDir </> "assert-raises-pair.l4"
+        -- Every @#ASSERT@ decides: one holds, one does not.
+        assertCleanFixture = fixtureDir </> "assert-clean.l4"
+
+    -- Alone, so that it cannot be the `NOT b` (which raises either way) that
+    -- fails the run. (Main's test of this name collided with unstable's, which
+    -- reads the two-#ASSERT fixture; renamed when carried.)
+    it "fails the run on a lone #ASSERT stuck on a bare assumed BOOLEAN" $
+      expectFail bin ["run", fixtureDir </> "assert-assumed-bare.l4"]
+
+    -- The second #ASSERT over a definition that raised must say what it raised.
+    it "reports both polarities over one raising definition with what it raised" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "assert-twice.l4"]
+      T.count "assertion could not be evaluated" (T.pack sout) `shouldBe` 2
+      T.count "Division by zero" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldNotSatisfy` ("Infinite loop" `isInfixOf`)
+
+    -- The control: a genuine loop is still a loop at every use.
+    it "reports an #ASSERT over a genuine loop as a loop, at every use" $ do
+      Output _ sout _ <- runL4 bin ["run", fixtureDir </> "assert-loop.l4"]
+      T.count "assertion could not be evaluated" (T.pack sout) `shouldBe` 2
+      T.count "Infinite loop detected" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+
+    it "does not report P and NOT P as failed when P raises, and keeps the clean verdicts" $ do
+      Output _ sout _ <- runL4 bin ["run", assertRaisesPairFixture]
+      let out = T.pack sout
+      T.count "assertion could not be evaluated" out `shouldBe` 2
+      -- the one clean FALSE (boom 2) is the only "failed"
+      T.count "assertion failed" out `shouldBe` 1
+      T.count "assertion satisfied" out `shouldBe` 1
+
+    it "gives P and NOT P a null value and a reason in JSON, and the controls true and false" $ do
+      env <- jsonEnvelope bin ["run", assertRaisesPairFixture, "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> do
+          length v `shouldBe` 4
+          case foldr (:) [] v of
+            [p, notP, holds, fails] -> do
+              mapM_ (\r -> do
+                       objField r "value" `shouldBe` Just Null
+                       case objField r "error" of
+                         Just (String s) -> s `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+                         other -> expectationFailure ("Expected an error string, got " ++ show other))
+                    [p, notP]
+              objField holds "value" `shouldBe` Just (Bool True)
+              objField holds "error" `shouldBe` Nothing
+              objField fails "value" `shouldBe` Just (Bool False)
+              objField fails "error" `shouldBe` Nothing
+            other -> expectationFailure ("Expected four results, got " ++ show other)
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The editor's squiggles come from these diagnostics. A raising #ASSERT is
+    -- an Error that says why, and a satisfied one stays Information.
+    it "publishes a raising #ASSERT as an Error diagnostic that says it could not be evaluated" $ do
+      env <- jsonEnvelope bin ["run", assertRaisesPairFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array ds) -> do
+          let diag = T.intercalate "\n" [ s | String s <- foldr (:) [] ds ]
+              -- the published diagnostic that starts at the given line, column 1
+              at line = fst $ T.breakOn "File:" $
+                T.drop 1 $ snd $ T.breakOn ("Range:    " <> line <> ":1-") diag
+          at "7" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "7" `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("assertion could not be evaluated" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("assertion satisfied" `T.isInfixOf`)
+          at "10" `shouldSatisfy` ("assertion failed" `T.isInfixOf`)
+        other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+    -- The other side of the line: a clean FALSE is a verdict, not a crash.
+    -- Not run on unstable (D4, CONFLICT-DECISIONS.md): main exits 0 on a clean FALSE
+    -- #ASSERT; unstable exits 1 on it, as ruled by Meng 2026-09-29
+    -- ('L4.Cli.Run.evalDirectiveFailsRun').
+    xit "leaves a clean FALSE #ASSERT at exit 0, reported as failed" $ do
+      Output code sout _ <- runL4 bin ["run", assertCleanFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+  -- doc/test-docs.sh runs doc/check-l4-run-output.sh on what `l4 run` prints
+  -- for each example under doc/, and fails an example for which it exits 1:
+  -- one with a diagnostic of error severity, or with a refused #ASSERT, whose
+  -- diagnostic is a warning. A refusing #EVAL passes, also when a later line
+  -- of its reason starts as a refused #ASSERT's result does, or is that
+  -- result's line exactly. It reads output whose lines end in CRLF as it reads
+  -- output whose lines end in LF.
+  describe "doc/check-l4-run-output.sh, on what l4 run prints" $ do
+    let posixOnly act
+          | Info.os == "mingw32" = pendingWith "needs a POSIX shell and awk"
+          | otherwise = act
+        checkRun fixture = do
+          (code, _, _) <- readCreateProcessWithExitCode
+            (proc "bash" ["-c", "\"$0\" run \"$1\" 2>&1 | bash \"$2\"", bin, fixtureDir </> fixture, checkRunOutputScript]) ""
+          pure code
+    it "passes a refusing #EVAL whose reason runs onto a line that starts \"assertion refused:\"" $ posixOnly $
+      checkRun "refuse-multiline-reason.l4" `shouldReturn` ExitSuccess
+    it "passes a refusing #EVAL whose reason has a line that holds only \"assertion refused:\"" $ posixOnly $
+      checkRun "refuse-reason-line-assertion-refused.l4" `shouldReturn` ExitSuccess
+    it "passes a refusing #EVAL beside a satisfied #ASSERT REFUSED" $ posixOnly $
+      checkRun "refuse-eval.l4" `shouldReturn` ExitSuccess
+    it "fails a refused #ASSERT" $ posixOnly $
+      checkRun "refuse-assert.l4" `shouldReturn` ExitFailure 1
+    it "fails a failed #ASSERT REFUSED, by its error diagnostic" $ posixOnly $
+      checkRun "assert-refused-fails.l4" `shouldReturn` ExitFailure 1
+    it "fails a refused #ASSERT when the lines end in CRLF" $ posixOnly $ do
+      (code, _, _) <- readCreateProcessWithExitCode
+        (proc "bash" [checkRunOutputScript])
+        "Result:\r\n  assertion refused:\r\n  not modelled\r\n"
+      code `shouldBe` ExitFailure 1
+
+    -- doc/test-docs.sh runs this check, and no other, over what `l4 run`
+    -- prints for each .l4 file under doc/ that it runs at exit 0: a refused
+    -- #ASSERT there fails the docs, at that file, though `l4 run` exits 0
+    -- for it, and a refusing #EVAL passes them, also when a line of its
+    -- reason reads as a refused #ASSERT's result. A copy of the script and
+    -- of the check, with one linked .l4 file beside them, is a doc/ of its
+    -- own; this build's l4 is first on its PATH.
+    let testDocsWith fixture = withSystemTempDirectory "l4-test-docs" \tmp -> do
+          let doc = tmp </> "doc"
+              binDir = tmp </> "bin"
+          forM_ [doc </> "courses", doc </> "reference", binDir] (createDirectoryIfMissing True)
+          forM_ ["test-docs.sh", "check-l4-run-output.sh"] \f ->
+            copyFile (".." </> "doc" </> f) (doc </> f)
+          copyFile (fixtureDir </> fixture) (doc </> "probe.l4")
+          writeFile (doc </> "README.md") "[the probe](probe.l4)\n"
+          createFileLink bin (binDir </> "l4")
+          parent <- getEnvironment
+          let path = binDir <> ":" <> fromMaybe "" (lookup "PATH" parent)
+              inherited = filter ((/= "PATH") . fst) parent
+          (code, out, err) <- readCreateProcessWithExitCode
+            (proc "bash" [doc </> "test-docs.sh"]) {env = Just (("PATH", path) : inherited)} ""
+          pure (code, out <> err)
+    it "fails doc/test-docs.sh at a file under doc/ that holds a refused #ASSERT" $ posixOnly $ do
+      (code, out) <- testDocsWith "refuse-assert.l4"
+      (code, "Validation failed: probe.l4" `isInfixOf` out) `shouldBe` (ExitFailure 1, True)
+    it "passes doc/test-docs.sh at a file under doc/ that holds a refusing #EVAL beside a satisfied #ASSERT REFUSED" $ posixOnly $ do
+      (code, out) <- testDocsWith "refuse-eval.l4"
+      (code, "Validation failed" `isInfixOf` out) `shouldBe` (ExitSuccess, False)
+    forM_ [ ("runs onto a line that starts", "refuse-multiline-reason.l4")
+          , ("has a line that holds only", "refuse-reason-line-assertion-refused.l4") ] \(how, fixture) ->
+      it ("passes doc/test-docs.sh at a file under doc/ that holds a refusing #EVAL whose reason " <> how <> " \"assertion refused:\"") $ posixOnly $ do
+        (code, out) <- testDocsWith fixture
+        (code, "Validation failed" `isInfixOf` out) `shouldBe` (ExitSuccess, False)
+
+  -- A directive that cannot be evaluated is not always the same failure. A
+  -- CONSIDER with no matching branch, a division by zero and an #ASSERT whose
+  -- expression raises are caught for that one directive: the run fails, but the
+  -- other directives still print. A POST or FETCH that fails throws an HTTP
+  -- exception that nothing catches there, so the whole file loses its results.
+  -- doc/tutorials/getting-started/l4-cli.md and
+  -- doc/reference/builtins/http-json.md say both. The same file used to exit 0
+  -- and print "Checking succeeded." after a failed request.
+  --
+  -- The failing address is 127.0.0.1: it is an address, so nothing is looked
+  -- up, and nothing is expected to listen on its https port. Nothing below
+  -- depends on the operating system's wording of why the connection failed.
+  describe "l4 run on a directive that cannot be evaluated" $ do
+    forM_ [ ("POST", "request-post-fails.l4"), ("FETCH", "request-fetch-fails.l4") ] \(verb, file) -> do
+      let fixture = fixtureDir </> file
+
+      it ("fails the run and prints no result for any directive when a " <> verb <> " cannot connect") $ do
+        Output code sout serr0 <- runL4 bin ["run", fixture]
+        let serr = filter (/= '\r') serr0
+        code `shouldBe` ExitFailure 1
+        sout `shouldNotSatisfy` ("Evaluation[" `isInfixOf`)
+        sout `shouldNotSatisfy` ("Result:" `isInfixOf`)
+        sout `shouldNotSatisfy` ("Checking succeeded." `isInfixOf`)
+        -- one message, which names the host and is against the first line of
+        -- the file, not against the directive (line 6) that made the request
+        T.count "VanillaHttpException" (T.pack serr) `shouldBe` 1
+        serr `shouldSatisfy` ("\"127.0.0.1\"" `isInfixOf`)
+        diagnosticAtLine 1 serr `shouldSatisfy` T.isInfixOf "DiagnosticSeverity_Error"
+        diagnosticAtLine 1 serr `shouldSatisfy` T.isInfixOf "VanillaHttpException"
+        diagnosticAtLine 6 serr `shouldBe` ""
+
+      it ("reports ok=false, no results and one diagnostic in JSON when a " <> verb <> " cannot connect") $ do
+        expectExit1 bin ["run", "--json", fixture]
+        env <- jsonEnvelope bin ["run", "--json", fixture]
+        objField env "ok" `shouldBe` Just (Bool False)
+        objField env "results" `shouldBe` Just (Array mempty)
+        case objField env "diagnostics" of
+          Just (Array ds) -> do
+            length ds `shouldBe` 1
+            T.concat [ s | String s <- toList ds ] `shouldSatisfy` T.isInfixOf "VanillaHttpException"
+          other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+      -- `l4 check` does not evaluate, so it makes no request.
+      it ("does not make the " <> verb <> " under l4 check") $
+        expectOk bin ["check", fixture] "Check succeeded."
+
+    -- The control: take the request out and both results print.
+    it "prints both results and exits 0 for the same file without the request" $ do
+      Output code sout _ <- runL4 bin ["run", fixtureDir </> "request-none.l4"]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      evalBlockIn 1 out `shouldSatisfy` T.isInfixOf "Result:\n  2\n"
+      evalBlockIn 2 out `shouldSatisfy` T.isInfixOf "Result:\n  4\n"
+
+    it "reports ok=true and both results in JSON for the same file without the request" $ do
+      env <- jsonEnvelope bin ["run", "--json", fixtureDir </> "request-none.l4"]
+      objField env "ok" `shouldBe` Just (Bool True)
+      case objField env "results" of
+        Just (Array v) -> length v `shouldBe` 2
+        other          -> expectationFailure ("Expected a results array, got " ++ show other)
+
+    -- These fail the run too, but only for the one directive.
+    forM_ [ ("a CONSIDER with no matching branch", "eval-consider-mid.l4", 14, ["reached a CONSIDER that has no branch for it"])
+          , ("a division by zero",                 "eval-div0-mid.l4",     5, ["Division by zero"])
+          , ("an #ASSERT whose expression raises", "assert-raises-mid.l4", 5, ["assertion could not be evaluated", "Division by zero"])
+          ] \(what, file, midLine, messages) -> do
+      let fixture = fixtureDir </> file
+
+      it ("fails the run but keeps the other directives' results for " <> what) $
+        expectMiddleLostInText bin fixture midLine messages
+
+      it ("reports ok=false and all three results in JSON for " <> what) $
+        expectMiddleLostInJson bin fixture messages
+
+    -- An address that does not start with https:// is not a failed request: the
+    -- evaluator reports it for that directive, and the others keep their results.
+    forM_ [ ("POST", "request-post-http.l4"), ("FETCH", "request-fetch-http.l4") ] \(verb, file) -> do
+      let fixture = fixtureDir </> file
+          messages = ["Internal error", verb <> " only supports https"]
+
+      it ("fails the run but keeps the other directives' results for a " <> verb <> " to an address that is not https") $
+        expectMiddleLostInText bin fixture 6 messages
+
+      it ("reports ok=false and all three results in JSON for a " <> verb <> " to an address that is not https") $
+        expectMiddleLostInJson bin fixture messages
+
+  -- A REFUSE that a directive reaches stops that directive, which reports the
+  -- refusal and its reason. A refusal is an answer the program gives, not a
+  -- failure of the run, so the run exits 0 (a failed #ASSERT exits 1 on unstable);
+  -- an #ASSERT that RAISES still exits 1, and the two must not be conflated.
+  describe "l4 run on a directive that refuses" $ do
+    let refuseEvalFixture = fixtureDir </> "refuse-eval.l4"
+        refuseAssertFixture = fixtureDir </> "refuse-assert.l4"
+
+    it "reports an #EVAL that refuses with its reason, and exits 0" $ do
+      Output code sout _ <- runL4 bin ["run", refuseEvalFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("The model refuses to answer:" `isInfixOf`)
+      sout `shouldSatisfy` ("not modelled" `isInfixOf`)
+      sout `shouldNotSatisfy` ("evaluation exception" `isInfixOf`)
+
+    it "reports an #ASSERT that refuses as refused in either polarity, with the refusal, and exits 0" $ do
+      Output code sout _ <- runL4 bin ["run", refuseAssertFixture]
+      code `shouldBe` ExitSuccess
+      T.count "assertion refused:" (T.pack sout) `shouldBe` 2
+      T.count "The model refuses to answer:" (T.pack sout) `shouldBe` 2
+      sout `shouldNotSatisfy` ("assertion satisfied" `isInfixOf`)
+      sout `shouldNotSatisfy` ("assertion failed" `isInfixOf`)
+      sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+    -- The editor's squiggles come from these diagnostics. A refusal is a
+    -- warning: not the error of a failed or a raising directive, and not the
+    -- information of an answer. A satisfied #ASSERT REFUSED is information.
+    it "publishes a refusing #EVAL and a refused #ASSERT as Warning diagnostics, and a satisfied #ASSERT REFUSED as Information" $ do
+      env <- jsonEnvelope bin ["run", refuseRunFixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array ds) -> do
+          let diag = T.intercalate "\n" [ s' | String s' <- foldr (:) [] ds ]
+              -- the published diagnostic that starts at the given line, column 1
+              at line = fst $ T.breakOn "File:" $
+                T.drop 1 $ snd $ T.breakOn ("Range:    " <> line <> ":1-") diag
+          at "7" `shouldSatisfy` ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          at "7" `shouldSatisfy` ("The model refuses to answer:" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("DiagnosticSeverity_Information" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("assertion satisfied" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("DiagnosticSeverity_Warning" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("assertion refused:" `T.isInfixOf`)
+        other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+    -- #ASSERT REFUSED has three ways to come out other than satisfied, and
+    -- --json keeps them apart: an answer where a refusal was expected, and a
+    -- refusal for a different reason, are both a false assertion that says
+    -- why; an expression that raises is an assertion that could not be decided.
+    it "reports a failed #ASSERT REFUSED as false with its reason, and a raising one as undecided" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-refused-outcomes.l4", "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      case objField env "results" of
+        Just (Array v) -> case foldr (:) [] v of
+          [answered, wrongReason, raised] -> do
+            objField answered "kind"  `shouldBe` Just (String "assertion")
+            objField answered "value" `shouldBe` Just (Bool False)
+            objField answered "error" `shouldBe`
+              Just (String "assertion failed: expected a refusal, but the expression produced a value")
+            objField wrongReason "kind"  `shouldBe` Just (String "assertion")
+            objField wrongReason "value" `shouldBe` Just (Bool False)
+            objField wrongReason "error" `shouldBe`
+              Just (String "assertion failed: expected the refusal \"some other reason\", got \"this case is not modelled\"")
+            objField raised "kind"  `shouldBe` Just (String "assertion")
+            objField raised "value" `shouldBe` Just Null
+            case objField raised "error" of
+              Just (String t) -> t `shouldSatisfy` T.isPrefixOf "assertion could not be evaluated:"
+              other           -> expectationFailure ("Expected an error text, got " ++ show other)
+          other -> expectationFailure ("Expected 3 results, got " ++ show (length other))
+        other -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The editor's squiggles come from these diagnostics: a failed #ASSERT
+    -- REFUSED is an Error that says what failed, as a clean FALSE #ASSERT is.
+    it "publishes a failed #ASSERT REFUSED as an Error diagnostic that says why" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-refused-fails.l4", "--json"]
+      case objField env "diagnostics" of
+        Just (Array ds) -> do
+          let diag = T.intercalate "\n" [ s | String s <- foldr (:) [] ds ]
+              -- the published diagnostic that starts at the given line, column 1
+              at line = fst $ T.breakOn "File:" $
+                T.drop 1 $ snd $ T.breakOn ("Range:    " <> line <> ":1-") diag
+          at "8" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "8" `shouldSatisfy` ("expected a refusal, but the expression produced a value" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("DiagnosticSeverity_Error" `T.isInfixOf`)
+          at "9" `shouldSatisfy` ("expected the refusal \"some other reason\"" `T.isInfixOf`)
+        other -> expectationFailure ("Expected a diagnostics array, got " ++ show other)
+
+    -- A failed #ASSERT REFUSED is a verdict, as a clean FALSE #ASSERT is.
+    -- Not run on unstable (D4): a failed #ASSERT REFUSED exits 1 there, as a clean
+    -- FALSE #ASSERT does ('L4.Cli.Run.evalDirectiveFailsRun').
+    xit "leaves a failed #ASSERT REFUSED at exit 0, with what failed and why" $ do
+      Output code sout _ <- runL4 bin ["run", fixtureDir </> "assert-refused-fails.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("assertion failed: expected a refusal, but the expression produced a value" `isInfixOf`)
+      sout `shouldSatisfy`
+        ("assertion failed: expected the refusal \"some other reason\", got \"this case is not modelled\"" `isInfixOf`)
+      sout `shouldNotSatisfy` ("could not be evaluated" `isInfixOf`)
+
+  -- A refusing batch row has status "refused" and carries the reason under
+  -- its result. Unlike an erroring row it does NOT stop the batch (the row
+  -- after it is still processed, with no -c) and does not make the command
+  -- fail.
+  describe "l4 batch on a row that refuses" $
+    it "gives a refusing batch row the status refused, its reason under its result, and still processes the next row" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", fixtureDir </> "refuse-batch.l4", "--inputs", fixtureDir </> "refuse-batch.json"]
+      code `shouldBe` ExitSuccess
+      case filter (not . null) (lines sout) of
+        [refusedRow, answeredRow] -> do
+          refusedRow `shouldSatisfy` ("\"status\":\"refused\"" `isInfixOf`)
+          refusedRow `shouldSatisfy`
+            ("\"refused\":{\"reason\":\"this schedule is not encoded for years before 2000\"}" `isInfixOf`)
+          -- the reason is also in the diagnostics, as an erroring row's message is
+          refusedRow `shouldSatisfy`
+            ("\"diagnostics\":[\"The model refuses to answer:\"" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"diagnostics\":[]" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          answeredRow `shouldSatisfy` ("\"result\":100" `isInfixOf`)
+          -- the module's #ASSERT REFUSED directives are not run with a row
+          forM_ [refusedRow, answeredRow] $ \row ->
+            case eitherDecode (BSL8.pack row) :: Either String Value of
+              Right v | Just (Array outs) <- objField v "output" -> length outs `shouldBe` 1
+              other -> expectationFailure ("Expected a row with a list of outputs, got " ++ show other)
+        other -> expectationFailure ("Expected 2 rows, got " ++ show (length other))
+
+  -- The REPL says a refusal is one, with its reason, where it would say
+  -- "Error:" for an evaluation that raised: for an expression, for the same
+  -- expression traced, and for an #ASSERT. Its fixture carries an
+  -- #ASSERT REFUSED, which the REPL removes before it answers, so each exact
+  -- reply below is the query's alone.
+  describe "the REPL on an expression that refuses" $ do
+    mRepl <- runIO $ do
+      fromEnv <- lookupEnv "L4_REPL_BIN"
+      case fromEnv of
+        Just p  -> do ok <- doesFileExist p
+                      pure (if ok then Just p else Nothing)
+        Nothing -> do
+          (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+          let path = takeWhile (`notElem` ("\r\n" :: String)) out
+          ok <- doesFileExist path
+          pure (if code == ExitSuccess && ok then Just path else Nothing)
+    let refuseFile = fixtureDir </> "refuse-eval.l4"
+        -- one reply per query, loading the file first, in a directory of its own
+        -- because the REPL keeps a history file in the one it is in
+        replReplies repl queries = withSystemTempDirectory "l4-repl-refuse" \work ->
+          replRepliesIn work repl queries
+        replRepliesIn work repl queries = do
+          absFile <- makeAbsolute refuseFile
+          (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+            { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+          BS.hPut hin (TE.encodeUtf8 (T.pack (unlines (queries <> [":quit"]))))
+          hClose hin
+          hSetBinaryMode hout True
+          hSetBinaryMode herr True
+          soutBytes <- BS.hGetContents hout
+          _ <- BS.hGetContents herr
+          _ <- waitForProcess ph
+          let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+          pure (map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+        withRepl act = case mRepl of
+          Nothing   -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> act repl
+
+    it "answers Refused: and the reason, for an expression and an #ASSERT, plain and traced" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ "`not modelled` PLUS 1"
+        , ":traceascii `not modelled` PLUS 1"
+        , "#ASSERT `not modelled` EQUALS 1"
+        , ":traceascii #ASSERT `not modelled` EQUALS 1"
+        ]
+      case replies of
+        [plain, traced, asserted, tracedAsserted] -> do
+          plain `shouldBe` "Refused: not modelled"
+          traced `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          asserted `shouldBe` "Refused: not modelled"
+          tracedAsserted `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          forM_ replies $ \reply -> reply `shouldNotSatisfy` T.isInfixOf "Error"
+        other -> expectationFailure ("Expected 4 replies, got " ++ show other)
+
+    -- A reason that runs over several lines stands each later line under its
+    -- first, for an expression and an #ASSERT, plain and traced.
+    it "stands every line of a reason over several lines under the first" $ withRepl \repl -> do
+      let refusal = "REFUSE \"line one\\nline two\"" :: String
+      replies <- replReplies repl
+        [ refusal
+        , ":traceascii " <> refusal
+        , "#ASSERT " <> refusal
+        , ":traceascii #ASSERT " <> refusal
+        ]
+      -- the first two lines of each reply; :traceascii adds the trace below them
+      map (take 2 . T.lines) replies `shouldBe`
+        replicate 4 ["Refused: line one", "         line two"]
+
+    -- A reason outside ASCII comes back as it went in, through a pipe each
+    -- way: UTF-8, which on Windows is not the console's code page.
+    it "reads a query and writes its reply in UTF-8" $ withRepl \repl -> do
+      replies <- replReplies repl ["REFUSE \"§ 12 is not modelled\""]
+      replies `shouldBe` ["Refused: § 12 is not modelled"]
+
+    it "lists #ASSERT REFUSED in its :help" $ withRepl \repl -> do
+      replies <- replReplies repl [":help"]
+      map (T.isInfixOf "#ASSERT REFUSED <expr> [BECAUSE \"reason\"]") replies `shouldBe` [True]
+
+    -- A failed #ASSERT REFUSED is a false assertion that says why, plain and
+    -- under :traceascii, for an answer and for a refusal with another reason.
+    it "answers False and says why, for a failed #ASSERT REFUSED" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ "#ASSERT REFUSED 1"
+        , ":traceascii #ASSERT REFUSED 1"
+        , "#ASSERT REFUSED `not modelled` BECAUSE \"some other reason\""
+        ]
+      -- the first line of each reply; :traceascii adds the trace below it
+      map (T.takeWhile (/= '\n')) replies `shouldBe`
+        [ "False (assertion failed: expected a refusal, but the expression produced a value)"
+        , "Result: False (assertion failed: expected a refusal, but the expression produced a value)"
+        , "False (assertion failed: expected the refusal \"some other reason\", got \"not modelled\")"
+        ]
+
+    -- The root of a trace carries the directive's outcome, so a refusal met
+    -- only while the answer is read in full, below its head, is at the root,
+    -- in the text trace and in the graph, for an expression and for an
+    -- #ASSERT REFUSED that it satisfies.
+    it "puts a refusal met below the answer's head at the root of the trace" $ withRepl \repl -> do
+      replies <- replReplies repl
+        [ ":traceascii JUST `not modelled`"
+        , ":trace JUST `not modelled`"
+        , ":traceascii #ASSERT REFUSED JUST `not modelled`"
+        ]
+      case replies of
+        [ascii, dot, asserted] -> do
+          ascii `shouldSatisfy` T.isPrefixOf "Refused: not modelled\n"
+          last (T.lines ascii) `shouldSatisfy` T.isSuffixOf "↯ refused: not modelled"
+          asserted `shouldSatisfy` T.isPrefixOf "Result: True (assertion passed)\n"
+          last (T.lines asserted) `shouldSatisfy` T.isSuffixOf "↯ refused: not modelled"
+          let root = fst (T.breakOn "style=filled" (snd (T.breakOn "0 [label=" dot)))
+          root `shouldSatisfy` T.isInfixOf "↯ refused: not modelled"
+          root `shouldSatisfy` T.isInfixOf "#ffcccc"
+        other -> expectationFailure ("Expected 3 replies, got " ++ show other)
+
+    -- A trace saved with :tracefile names its result in its header: a
+    -- refusal as one, not as an error, for an expression and for an #ASSERT,
+    -- and a failed #ASSERT REFUSED as a false assertion that says why.
+    it "names a refusal as one in the header of a trace saved with :tracefile" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-refuse" \work -> do
+        replies <- replRepliesIn work repl
+          [ ":tracefile " <> (work </> "trace")
+          , ":trace `not modelled` PLUS 1"
+          , ":trace #ASSERT `not modelled` EQUALS 1"
+          , ":trace #ASSERT REFUSED 1"
+          ]
+        length replies `shouldBe` 4
+        -- the trace is saved with the platform's line endings, as `l4 trace` saves one
+        headers <- forM ["trace-01.dot", "trace-02.dot", "trace-03.dot"] \name -> do
+          saved <- T.filter (/= '\r') . TE.decodeUtf8Lenient <$> BS.readFile (work </> name)
+          pure [ l | l <- T.lines saved, "// Result: " `T.isPrefixOf` l ]
+        case headers of
+          [[expr], [asserted], [failed]] -> do
+            forM_ [expr, asserted] \resultLine -> do
+              resultLine `shouldSatisfy` T.isPrefixOf "// Result: Refused"
+              resultLine `shouldSatisfy` T.isInfixOf "not modelled"
+              resultLine `shouldNotSatisfy` T.isInfixOf "Error"
+            failed `shouldBe`
+              "// Result: False (assertion failed: expected a refusal, but the expression produced a value)"
+          other -> expectationFailure ("Expected one Result line in each of three traces, got " ++ show other)
+
+  -- The REPL's :type names the inference variables of a polymorphic type `a`,
+  -- `b`, ... by order of first appearance, as #CHECK does, and not by the
+  -- checker's internal labels (`x5`), which change whenever the file does.
+  describe "the REPL's :type" $ do
+    mRepl <- runIO locateReplBinary
+    let withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+        replies repl file queries = withSystemTempDirectory "l4-repl-type" \work ->
+          replRepliesFor work repl (fixtureDir </> file) queries
+
+    it "names inference variables a, b, ... and not by the checker's labels" $ withRepl \repl -> do
+      rs <- replies repl "repl-type.l4"
+        [ ":type GIVEN x, y YIELD x"
+        , ":t GIVEN x YIELD granted"
+        ]
+      rs `shouldBe`
+        [ "FUNCTION FROM a AND b TO a"
+        , "FUNCTION FROM a TO decision"
+        ]
+
+    -- Naming the input `a` too would print the text of the identity function.
+    it "skips a name that is a type in the printed type" $ withRepl \repl -> do
+      rs <- replies repl "repl-type-collision.l4" [":type GIVEN `the application` YIELD approved"]
+      rs `shouldBe` ["FUNCTION FROM b TO a"]
+
+  -- The REPL's :info and :env print an inferred polymorphic type as #CHECK
+  -- does, with `a`, `b`, ..., and not with the checker's internal labels (`z5`).
+  describe "the REPL's :info and :env" $ do
+    mRepl <- runIO locateReplBinary
+    let infoFile = fixtureDir </> "repl-info.l4"
+        withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+
+    it "names the type variables in :info and :env a, b, ..." $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-info" \work -> do
+        rs <- replRepliesFor work repl infoFile [":info pick", ":info same", ":env"]
+        case rs of
+          [pick, same, env] -> do
+            T.takeWhile (/= '\n') pick `shouldBe` "pick :: FUNCTION FROM a TO a"
+            T.takeWhile (/= '\n') same `shouldBe` "same :: FUNCTION FROM NUMBER TO FUNCTION FROM a TO a"
+            filter (\l -> any (`T.isPrefixOf` l) ["pick: ", "same: "]) (T.lines env) `shouldBe`
+              [ "pick: FUNCTION FROM a TO a"
+              , "same: FUNCTION FROM NUMBER TO FUNCTION FROM a TO a"
+              ]
+          other -> expectationFailure ("Expected 3 replies, got " ++ show other)
+
+  -- A rule that may refuse to answer gets no query plan, from the REPL or from
+  -- the language server: each says why in the one sentence core gives, which
+  -- names the rule and every reason it may refuse with, read from the rule and
+  -- from the definitions it calls, in a file it imports or in its own. A rule
+  -- beside it is planned. The REPL declines a rule over a number that may
+  -- refuse, where the ladder would draw nothing. The language server answers
+  -- l4/queryPlan for the rule whose decision graph it drew last, and decides
+  -- the decline when it draws the graph.
+  -- Pending: this asserts main's #762 design; the 2026-11 sync keeps unstable's (D4).
+  xdescribe "the query planners on a rule that may refuse" $ do
+    mRepl <- runIO locateReplBinary
+    mLsp <- runIO locateLspBinary
+    let mainFile = queryPlanDeclineDir </> "main.l4"
+        coveredDeclined :: T.Text
+        coveredDeclined = "No query plan for covered: it may refuse to answer, with the reason \"insurance is not modelled\"."
+        checkedDeclined :: T.Text
+        checkedDeclined = "No query plan for checked: it may refuse to answer, with the reason \"insurance is not modelled\" or \"minors are not modelled\"."
+        settledDeclined :: T.Text
+        settledDeclined = "No query plan for settled: it may refuse to answer, with the reason \"residence is not modelled\"."
+        withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+        withLsp act = maybe (pendingWith "no jl4-lsp binary (set JL4_LSP_BIN, or run under cabal test)") act mLsp
+        -- Draw a rule's decision graph in the language server, from its lens,
+        -- the last one at or above the line that names it, and give back the
+        -- version of the document the graph is drawn from.
+        drawRule :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> IO (Maybe Value)
+        drawRule request uri source name = drawRuleAt request uri source name 0
+        -- The same, for the rule on the nth line, from 0, that names it.
+        drawRuleAt :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> Int -> IO (Maybe Value)
+        drawRuleAt request uri source name nth =
+          lensArgsAt request uri source name nth >>= \case
+            Just args@(verDocId : _) -> do
+              drawn <- request "workspace/executeCommand"
+                (Aeson.object ["command" Aeson..= ("l4.visualize" :: T.Text), "arguments" Aeson..= args])
+              (drawn >>= (`objField` "result")) `shouldSatisfy` maybe False (/= Null)
+              pure (Just verDocId)
+            _ -> pure Nothing
+        -- The arguments of the decision graph lens of the rule on the nth
+        -- line, from 0, that names it: the last lens at or above that line.
+        lensArgsAt :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> T.Text -> T.Text -> Int -> IO (Maybe [Value])
+        lensArgsAt request uri source name nth = do
+          lenses <- request "textDocument/codeLens" (Aeson.object ["textDocument" Aeson..= Aeson.object ["uri" Aeson..= uri]])
+          let graphLenses =
+                [ (line, args)
+                | Just (Array ls) <- [lenses >>= (`objField` "result")]
+                , lens <- toList ls
+                , Just (String "Show decision graph") <- [lens `objField` "command" >>= (`objField` "title")]
+                , Just (Number line) <- [lens `objField` "range" >>= (`objField` "start") >>= (`objField` "line")]
+                , Just (Array args) <- [lens `objField` "command" >>= (`objField` "arguments")]
+                ]
+              decideLines = [i | (i, l) <- zip [0 :: Int ..] (T.lines source), ("DECIDE " <> name <> " ") `T.isPrefixOf` l]
+              decideLine = case drop nth decideLines of
+                l : _ -> l
+                [] -> length (T.lines source)
+          case reverse [args | (line, args) <- graphLenses, line <= fromIntegral decideLine] of
+            args : _ | not (null args) -> pure (Just (toList args))
+            _ -> do
+              expectationFailure ("no decision graph lens for " <> T.unpack name <> " in " <> show lenses)
+              pure Nothing
+        -- Ask the language server for the plan of a rule, with an answer for
+        -- each input given and no other, giving the version of the document
+        -- its graph is drawn from: the result, or the error.
+        askPlanWith :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> [(T.Text, Bool)] -> Value -> IO (Maybe Value)
+        askPlanWith request name bindings verDocId = do
+          answer <- request "l4/queryPlan" (Aeson.object
+            [ "fnName" Aeson..= name
+            , "bindings" Aeson..= Aeson.object [Key.fromText input Aeson..= known | (input, known) <- bindings]
+            , "verDocId" Aeson..= verDocId
+            ])
+          pure (answer >>= \a -> a `objField` "result" <|> a `objField` "error")
+        -- The same, with no input known.
+        askPlan :: (T.Text -> Value -> IO (Maybe Value)) -> T.Text -> Value -> IO (Maybe Value)
+        askPlan request name = askPlanWith request name []
+        -- The language server with the fixture open, and a way to ask it for
+        -- the plan of a rule: draw the rule's decision graph, then ask
+        -- l4/queryPlan with an answer for each input given.
+        withLspPlanner :: FilePath -> ((T.Text -> [(T.Text, Bool)] -> IO (Maybe Value)) -> IO ()) -> IO ()
+        withLspPlanner lsp act = do
+          source <- TE.decodeUtf8 <$> BS.readFile mainFile
+          withOpenDocument lsp mainFile \uri _notify request ->
+            act \name bindings -> drawRule request uri source name >>= maybe (pure Nothing) (askPlanWith request name bindings)
+        -- The language server with a file of the given text open, in a
+        -- directory of its own.
+        withRuleFile :: FilePath -> T.Text -> (T.Text -> (T.Text -> Value -> IO ()) -> (T.Text -> Value -> IO (Maybe Value)) -> IO ()) -> IO ()
+        withRuleFile lsp source act =
+          withSystemTempDirectory "l4-lsp-queryplan" \scratch -> do
+            work <- canonicalizePath scratch
+            let file = work </> "rule.l4"
+            BS.writeFile file (TE.encodeUtf8 source)
+            withOpenDocument lsp file act
+        -- Draw a decision graph with the given arguments of l4.visualize.
+        visualize :: (T.Text -> Value -> IO (Maybe Value)) -> [Value] -> IO (Maybe Value)
+        visualize request args = request "workspace/executeCommand"
+          (Aeson.object ["command" Aeson..= ("l4.visualize" :: T.Text), "arguments" Aeson..= args])
+        -- The label of every atom of every input a plan asks for, in its
+        -- order.
+        asksOf :: Maybe Value -> [T.Text]
+        asksOf plan =
+          [ label
+          | Just (Array asks) <- [plan >>= (`objField` "asks")]
+          , ask <- toList asks
+          , Just (Array atoms) <- [ask `objField` "atoms"]
+          , atom <- toList atoms
+          , Just (String label) <- [atom `objField` "label"]
+          ]
+        -- The unique of every node of a drawn graph that names the
+        -- definition and can be inlined.
+        inlinableUniques :: T.Text -> Value -> [Value]
+        inlinableUniques label = \case
+          Object o ->
+            [ u
+            | KeyMap.lookup "canInline" o == Just (Bool True)
+            , Just n <- [KeyMap.lookup "name" o]
+            , n `objField` "label" == Just (String label)
+            , Just u <- [n `objField` "unique"]
+            ]
+              <> concatMap (inlinableUniques label) (KeyMap.elems o)
+          Array a -> concatMap (inlinableUniques label) (toList a)
+          _ -> []
+        declinedWith :: T.Text -> T.Text -> [T.Text] -> Value
+        declinedWith rule sentence reasons = Aeson.object
+          [ "error" Aeson..= sentence
+          , "kind" Aeson..= ("declined" :: T.Text)
+          , "rule" Aeson..= rule
+          , "reasons" Aeson..= reasons
+          ]
+        didChange :: (T.Text -> Value -> IO ()) -> T.Text -> Int -> T.Text -> IO ()
+        didChange notify uri version text = notify "textDocument/didChange" (Aeson.object
+          [ "textDocument" Aeson..= Aeson.object ["uri" Aeson..= uri, "version" Aeson..= version]
+          , "contentChanges" Aeson..= [Aeson.object ["text" Aeson..= text]]
+          ])
+
+    it "the REPL's :queryplan says why it declines, with an answer for an input or without, and plans a rule beside it" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile
+          [ ":queryplan covered"
+          , ":queryplan covered adult=false"
+          , ":queryplan checked"
+          , ":queryplan planned"
+          , ":queryplan planned adult=false"
+          ]
+      case replies of
+        [covered, coveredAnswered, checked, planned, plannedAnswered] -> do
+          covered `shouldBe` coveredDeclined
+          coveredAnswered `shouldBe` coveredDeclined
+          checked `shouldBe` checkedDeclined
+          planned `shouldSatisfy` T.isPrefixOf "determined: Unknown\n"
+          plannedAnswered `shouldSatisfy` T.isPrefixOf "determined: False\n"
+        other -> expectationFailure ("Expected 5 replies, got " ++ show other)
+
+    it "the REPL's :queryplan declines a rule that refuses through a definition in its own file" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile [":queryplan settled"]
+      replies `shouldBe` [settledDeclined]
+
+    it "the REPL's :queryplan declines a rule over a number that may refuse, where the ladder would draw nothing" $ withRepl \repl -> do
+      replies <- withSystemTempDirectory "l4-repl-queryplan" \work ->
+        replRepliesFor work repl mainFile [":queryplan fee", ":queryplan charge"]
+      replies `shouldBe`
+        [ "No query plan for fee: it may refuse to answer, with the reason \"a negative fee is not modelled\"."
+        , "Can only visualize, as a ladder diagram, a DECIDE that returns a boolean."
+        ]
+
+    it "the language server's l4/queryPlan declines a rule whose REFUSE is its own, on every path, with an answer for an input or without" $ withLsp \lsp -> do
+      let source = T.unlines
+            [ "GIVEN resident IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF IF resident THEN REFUSE \"one\" ELSE REFUSE \"two\""
+            ]
+          declined = Just (declinedWith "target"
+            "No query plan for target: it may refuse to answer, with the reason \"one\" or \"two\"."
+            ["one", "two"])
+      withRuleFile lsp source \uri _notify request -> do
+        drawnAt <- drawRule request uri source "target"
+        let planWith bindings = maybe (pure Nothing) (askPlanWith request "target" bindings) drawnAt
+        planWith [] >>= (`shouldBe` declined)
+        planWith [("resident", True)] >>= (`shouldBe` declined)
+        planWith [("resident", False)] >>= (`shouldBe` declined)
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition it imports" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf -> do
+        planOf "covered" [] >>= (`shouldBe` Just (declinedWith "covered" coveredDeclined ["insurance is not modelled"]))
+        planOf "checked" [] >>= (`shouldBe` Just (declinedWith "checked" checkedDeclined ["insurance is not modelled", "minors are not modelled"]))
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition it imports, once the graph is drawn again on a change to the document" $ withLsp \lsp -> do
+      source <- TE.decodeUtf8 <$> BS.readFile mainFile
+      withOpenDocument lsp mainFile \uri notify request -> do
+        _ <- drawRule request uri source "covered"
+        didChange notify uri 2 (source <> "\n")
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        maybe (pure Nothing) (askPlan request "covered") redrawnAt
+          >>= (`shouldBe` Just (declinedWith "covered" coveredDeclined ["insurance is not modelled"]))
+
+    it "the language server's l4/queryPlan declines a rule that refuses through a definition in its own file" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf ->
+        planOf "settled" [] >>= (`shouldBe` Just (declinedWith "settled" settledDeclined ["residence is not modelled"]))
+
+    it "the language server's l4/queryPlan plans a rule that cannot refuse, with an answer for an input or without" $ withLsp \lsp ->
+      withLspPlanner lsp \planOf -> do
+        planned <- planOf "planned" []
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        (planned >>= (`objField` "determined")) `shouldBe` Just Null
+        asksOf planned `shouldBe` ["adult", "resident"]
+        answered <- planOf "planned" [("adult", False)]
+        (answered >>= (`objField` "determined")) `shouldBe` Just (Bool False)
+        asksOf answered `shouldBe` []
+
+    it "the language server's l4/queryPlan answers, of two rules with one name, for the one whose decision graph it drew, the plan and the decline alike" $ withLsp \lsp -> do
+      -- The first rule named target may refuse, through the helper, and the
+      -- second cannot.
+      let overloads = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS REFUSE \"the helper is not modelled\""
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            , ""
+            , "GIVEN a IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a > 1"
+            ]
+      withRuleFile lsp overloads \uri _notify request -> do
+        let planOfNth nth = drawRuleAt request uri overloads "target" nth >>= maybe (pure Nothing) (askPlan request "target")
+        second <- planOfNth 1
+        (second >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf second `shouldBe` ["a GREATER THAN 1"]
+        planOfNth 0 >>= (`shouldBe` Just (declinedWith "target"
+          "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+          ["the helper is not modelled"]))
+        secondAgain <- planOfNth 1
+        (secondAgain >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf secondAgain `shouldBe` ["a GREATER THAN 1"]
+
+    -- A client draws the decision graph again on a change to the document,
+    -- naming the document and its version only, as the VS Code extension
+    -- does; or from the rule's lens.
+    it "the language server's l4/queryPlan answers for the document as changed once the graph is drawn again, after an edit that adds a REFUSE and one that takes it away" $ withLsp \lsp -> do
+      let answers = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS TRUE"
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            ]
+          refuses = T.replace "helper MEANS TRUE" "helper MEANS REFUSE \"the helper is not modelled\"" answers
+      withRuleFile lsp answers \uri notify request -> do
+        planned <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf planned `shouldBe` ["a", "helper"]
+        didChange notify uri 2 refuses
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        declined <- maybe (pure Nothing) (askPlan request "target") redrawnAt
+        declined `shouldBe` Just (declinedWith "target"
+          "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+          ["the helper is not modelled"])
+        didChange notify uri 3 answers
+        redrawnAgain <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (3 :: Int)]]
+        let redrawnAgainAt = redrawnAgain >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAgainAt >>= (`objField` "version")) `shouldBe` Just (Number 3)
+        plannedOnChange <- maybe (pure Nothing) (askPlan request "target") redrawnAgainAt
+        (plannedOnChange >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf plannedOnChange `shouldBe` ["a", "helper"]
+        plannedAgain <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (plannedAgain >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf plannedAgain `shouldBe` ["a", "helper"]
+
+    it "the language server's l4/queryPlan declines a rule after an edit that adds a REFUSE to its own body, once the graph is drawn again on the change" $ withLsp \lsp -> do
+      let answers = T.unlines
+            [ "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a"
+            ]
+          refuses = T.replace "DECIDE target IF a" "DECIDE target IF IF a THEN REFUSE \"the rule is not modelled\" ELSE FALSE" answers
+      withRuleFile lsp answers \uri notify request -> do
+        planned <- drawRule request uri answers "target" >>= maybe (pure Nothing) (askPlan request "target")
+        (planned >>= (`objField` "kind")) `shouldBe` Nothing
+        asksOf planned `shouldBe` ["a"]
+        didChange notify uri 2 refuses
+        redrawn <- visualize request [Aeson.object ["uri" Aeson..= uri, "version" Aeson..= (2 :: Int)]]
+        let redrawnAt = redrawn >>= (`objField` "result") >>= (`objField` "verDocId")
+        (redrawnAt >>= (`objField` "version")) `shouldBe` Just (Number 2)
+        maybe (pure Nothing) (askPlan request "target") redrawnAt
+          >>= (`shouldBe` Just (declinedWith "target"
+                "No query plan for target: it may refuse to answer, with the reason \"the rule is not modelled\"."
+                ["the rule is not modelled"]))
+
+    -- l4/inlineExprs draws the graph again with a definition's body in place
+    -- of its name.
+    it "the language server's l4/queryPlan keeps the decline of a decision graph that l4/inlineExprs draws again" $ withLsp \lsp -> do
+      let source = T.unlines
+            [ "GIVETH A BOOLEAN"
+            , "helper MEANS REFUSE \"the helper is not modelled\""
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE target IF a AND helper"
+            ]
+      withRuleFile lsp source \uri _notify request ->
+        lensArgsAt request uri source "target" 0 >>= traverse_ \args -> do
+          drawn <- visualize request args
+          let drawnAt = fromMaybe Null (drawn >>= (`objField` "result") >>= (`objField` "verDocId"))
+          case inlinableUniques "helper" =<< toList (drawn >>= (`objField` "result")) of
+            [helper] -> do
+              inlined <- request "l4/inlineExprs" (Aeson.object ["uniques" Aeson..= [helper], "verDocId" Aeson..= drawnAt])
+              (inlined >>= (`objField` "result")) `shouldSatisfy` maybe False (null . inlinableUniques "helper")
+              askPlan request "target" drawnAt >>= (`shouldBe` Just (declinedWith "target"
+                "No query plan for target: it may refuse to answer, with the reason \"the helper is not modelled\"."
+                ["the helper is not modelled"]))
+            other -> expectationFailure ("expected one node naming the helper that can be inlined, got " <> show other)
+
+  -- A directive reads a list answer only so deep, so a REFUSE or a division by
+  -- zero at the end of a long list stops it for a short list and not for a
+  -- longer one. `l4 batch` reads each row's answer to the same depth as `l4 run`
+  -- reads an #EVAL, so the two give the same verdict for every n, including the
+  -- n on each side of the depth limit.
+  describe "l4 run and l4 batch read a long list answer to the same depth" $ do
+    let depthFixture = fixtureDir </> "refuse-depth.l4"
+        depthRows = fixtureDir </> "refuse-depth-rows.json"
+        verdictOf :: T.Text -> String
+        verdictOf t
+          | "The model refuses to answer:" `T.isInfixOf` t = "refuses"
+          | "Division by zero" `T.isInfixOf` t = "division by zero"
+          | otherwise = "answers"
+        runVerdictsOf fixture = do
+          Output _ sout _ <- runL4 bin ["run", fixture]
+          let blocks = drop 1 (T.splitOn "Evaluation[" (T.pack (filter (/= '\r') sout)))
+              result b = fst (T.breakOn "Trace:" (snd (T.breakOn "Result:" b)))
+          pure (map (verdictOf . result) blocks)
+        runVerdicts = runVerdictsOf depthFixture
+        batchRowsOf :: FilePath -> FilePath -> String -> IO [Value]
+        batchRowsOf fixture rowsFile entry = do
+          Output _ sout _ <- runL4 bin ["batch", "-c", fixture, "-i", rowsFile, "-e", entry]
+          pure [ row | l <- map (filter (/= '\r')) (lines sout)
+                     , Right row <- [eitherDecode (BSL8.pack l)] ]
+        batchRows = batchRowsOf depthFixture depthRows
+        maybeFixture = fixtureDir </> "refuse-depth-maybe.l4"
+        maybeRows = fixtureDir </> "refuse-depth-maybe-rows.json"
+        rowResult row = case objField row "output" of
+          Just (Array outs) | (o : _) <- toList outs -> objField o "result"
+          _ -> Nothing
+        batchVerdict :: Value -> String
+        batchVerdict row = case rowResult row of
+          Just (Object o)
+            | Just (Object _) <- KeyMap.lookup (Key.fromString "refused") o
+            , objField row "status" == Just (String "refused") -> "refuses"
+            | Just (String e) <- KeyMap.lookup (Key.fromString "error") o -> verdictOf e
+          Just (Array _) | objField row "status" == Just (String "success") -> "answers"
+          other -> "unexpected: " <> take 300 (show other)
+        -- each rule, with the verdicts `l4 run` gives for n = 200, 201, 202
+        expected :: [(String, [String])]
+        expected =
+          [ ("refusal in the list",  ["refuses", "answers", "answers"])
+          , ("refusal as the rest",  ["refuses", "refuses", "answers"])
+          , ("division in the list", ["division by zero", "answers", "answers"])
+          , ("division as the rest", ["division by zero", "division by zero", "answers"])
+          ]
+
+    it "l4 run reaches the end of the list for the smaller n and answers for the larger" $ do
+      verdicts <- runVerdicts
+      verdicts `shouldBe` concatMap snd expected
+
+    forM_ expected \(entry, verdicts) ->
+      it ("l4 batch gives the verdict l4 run gives for each n, for `" <> entry <> "`") $ do
+        rows <- batchRows entry
+        map batchVerdict rows `shouldBe` verdicts
+
+    -- An answered row carries the list as deep as the service's direct path
+    -- does: the numbers, then a null for the element and one for the rest of
+    -- the list that the depth limit leaves unprinted.
+    it "l4 batch answers a row past the limit with the numbers the depth limit reaches, then a null for the element and one for the rest" $ do
+      rows <- batchRows "refusal in the list"
+      case drop 1 rows of
+        (row : _) -> case rowResult row of
+          Just (Array xs) -> do
+            let entries = toList xs
+            length entries `shouldBe` 202
+            take 200 entries `shouldBe` map (Number . fromInteger) [201, 200 .. 2]
+            drop 200 entries `shouldBe` [Null, Null]
+          other -> expectationFailure ("Expected a list answer, got " <> take 300 (show other))
+        [] -> expectationFailure "Expected three rows"
+
+    -- The rule's own JUST takes a level on both paths, so the refusal at the
+    -- end of the list is reached one element sooner than in a bare list. l4
+    -- batch reads a function's answer inside a JUST of its own, and only that
+    -- outer JUST takes no level.
+    it "l4 run and l4 batch reach a refusal one element sooner in a list inside the rule's own JUST" $ do
+      runV <- runVerdictsOf maybeFixture
+      rows <- batchRowsOf maybeFixture maybeRows "refusal in a MAYBE list"
+      runV `shouldBe` ["refuses", "answers"]
+      map batchVerdict rows `shouldBe` ["refuses", "answers"]
+
+    it "l4 batch answers the row past that limit with the numbers one element sooner, then the two nulls" $ do
+      rows <- batchRowsOf maybeFixture maybeRows "refusal in a MAYBE list"
+      case drop 1 rows of
+        (row : _) -> case rowResult row of
+          Just (Array xs) -> do
+            let entries = toList xs
+            length entries `shouldBe` 201
+            take 199 entries `shouldBe` map (Number . fromInteger) [200, 199 .. 2]
+            drop 199 entries `shouldBe` [Null, Null]
+          other -> expectationFailure ("Expected a list answer, got " <> take 300 (show other))
+        [] -> expectationFailure "Expected two rows"
+
+    -- An export with no inputs is asked for bare, not inside a JUST, so a JUST
+    -- in its answer is the rule's own and takes a level, as it does for an
+    -- #EVAL of the export. The fixture's list ends in a refusal one level below
+    -- the depth read, so both answer.
+    it "l4 batch gives the verdict l4 run gives for an export with no inputs whose answer is in its own JUST" $ do
+      let fixture = fixtureDir </> "refuse-depth-no-inputs.l4"
+          rowsFile = fixtureDir </> "refuse-depth-no-inputs-rows.json"
+      Output _ rout _ <- runL4 bin ["run", fixture]
+      Output _ bout _ <- runL4 bin ["batch", "-c", fixture, "-i", rowsFile, "-e", "wrapped"]
+      let runResult = fst (T.breakOn "Trace:" (snd (T.breakOn "Result:" (T.pack (filter (/= '\r') rout)))))
+          rows = [ row | l <- map (filter (/= '\r')) (lines bout)
+                       , Right row <- [eitherDecode (BSL8.pack l)] ]
+      runResult `shouldSatisfy` T.isInfixOf "JUST OF (LIST 200, 199"
+      verdictOf runResult `shouldBe` "answers"
+      map batchVerdict rows `shouldBe` ["answers"]
+
+  -- The warnings main added beside the redundant-`@lang en` hint (558e019a8,
+  -- 7cafe2435, bb907feab); the hint's own cases are in "l4 check: a redundant
+  -- @lang en" above. Each is a warning, and the check still succeeds.
+  describe "l4 check: two @lang lines, a percent pair, a lone tag (carried from main)" $ do
+    it "warns that the earlier of two different `@lang` lines is overridden, naming both" $ do
+      Output code _ serr <- runL4 bin ["check", langEnThenHeFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("declares two different languages with @lang: `en` here and `he` on line 4." `isInfixOf`)
+
+    it "does not warn when every `@lang` line names the same language" $ do
+      Output code _ serr <- runL4 bin ["check", langEnHintFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` ("two different languages" `isInfixOf`)
+
+    it "warns that a percent pair with spaces inside it is plain text, naming the slot to write" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/not-ok/nlg/nlg_spaced_slot.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("This wording has `% amount %`, with spaces inside the percent signs, so it prints as plain text." `isInfixOf`)
+      serr `shouldSatisfy` ("A slot is written `%amount%`, with no spaces." `isInfixOf`)
+
+    it "warns that a language tag nothing else backs may be the first word of a sentence" $ do
+      Output code _ serr <- runL4 bin ["check", "examples/not-ok/nlg/nlg_lone_tag.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("`@nlg:the` tags the wording on `over limit` as language `the`" `isInfixOf`)
+      serr `shouldSatisfy` ("write `@nlg the …` with no colon." `isInfixOf`)
+
+    it "names the declared tag when a lone tag differs from it only in case" $ do
+      Output code _ serr <- runL4 bin ["check", langTagCaseFixture]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy`
+        ("the module declares `@lang fr`: `FR` and `fr` differ only in case." `isInfixOf`)
+      serr `shouldSatisfy` ("Write `@nlg:fr`, or leave the tag off" `isInfixOf`)
+      serr `shouldNotSatisfy` ("add `@lang" `isInfixOf`)
+
   describe "l4 format" $ do
-    it "prints the reformatted source of a clean file to stdout" $ do
+    it "prints a clean file to stdout as written" $ do
+      src <- readFile cleanFixture
       Output code sout _ <- runL4 bin ["format", cleanFixture]
       code `shouldBe` ExitSuccess
-      -- Formatter output should contain the DECIDE (exact spelling may
-      -- differ from input, so we only look for the identifier).
-      sout `shouldSatisfy` ("xor" `isInfixOf`)
+      -- Carriage returns are dropped on both sides: the checkout may have
+      -- CRLF line endings, which 'readFile' turns into LF on Windows.
+      filter (/= '\r') sout `shouldBe` filter (/= '\r') src
+
+    -- The output has the file's own line endings, compared byte for byte. On
+    -- Windows, reading the file or writing stdout in text mode would turn LF
+    -- into CRLF or the other way round.
+    it "keeps LF and CRLF line endings as they are in the file" $
+      withSystemTempDirectory "l4-format-line-endings" \dir ->
+        forM_ [("lf.l4", "\n"), ("crlf.l4", "\r\n")] \(name, eol) -> do
+          let file = dir </> name
+              bytes = TE.encodeUtf8 $ T.intercalate eol
+                [ "GIVETH A STRING"
+                , "DECIDE `the city` IS \"São Paulo\""
+                , ""
+                ]
+          BS.writeFile file bytes
+          Output code sout _ <- runL4 bin ["format", file]
+          code `shouldBe` ExitSuccess
+          sout `shouldBe` T.unpack (TE.decodeUtf8 bytes)
+
+    -- A postfix call used to lose its argument, and a call written between its
+    -- arguments used to be printed head first, with exit code 0 and output that
+    -- no longer checked (smucclaw/l4-ide#918). Each fixture covers one of the two.
+    -- Carriage returns are dropped before comparing, as the file may be checked
+    -- out with CRLF line endings (Windows).
+    let formatsAsWritten fixture = do
+          src <- readFile fixture
+          Output code sout _ <- runL4 bin ["format", fixture]
+          code `shouldBe` ExitSuccess
+          filter (/= '\r') sout `shouldBe` filter (/= '\r') src
+          checkCode <- withSystemTempDirectory "l4-cli-test-format" \tmp -> do
+            let formatted = tmp </> takeFileName fixture
+            writeFile formatted sout
+            Output c _ _ <- runL4 bin ["check", formatted]
+            pure c
+          checkCode `shouldBe` ExitSuccess
+
+    it "prints a postfix mixfix call back with its argument, and the output checks" $
+      formatsAsWritten (fixtureDir </> "format-mixfix-postfix.l4")
+
+    it "prints a binary and a chained mixfix call back in source order, and the output checks" $
+      formatsAsWritten (fixtureDir </> "format-mixfix-infix.l4")
 
     it "writes nothing to stdout and exits non-zero on a broken file" $ do
       Output code _ _ <- runL4 bin ["format", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
+
+    it "reproduces multi-clause DECIDE and MEANS groups byte-for-byte" $ do
+      -- The parser fuses a clause group into one definition; formatting must
+      -- still print every clause as written. Carriage returns are dropped on
+      -- both sides so a CRLF checkout on Windows compares equal.
+      let fixture = fixtureDir </> "multi-clause-format.l4"
+      src <- readFile fixture
+      Output code sout _ <- runL4 bin ["format", fixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldBe` filter (/= '\r') src
 
   ----------------------------------------------------------------------------
   -- One encoding, several languages.
@@ -1483,6 +2846,40 @@ spec bin = do
       sout `shouldSatisfy` ("exceeds the threshold" `isInfixOf`)
       sout `shouldNotSatisfy` ("עולה על הסף" `isInfixOf`)
 
+    -- The frame words: the ones the linearizer supplies, not the author.
+    -- `--lang he` renders them from the Hebrew phrasebook, a phrase at a time;
+    -- the maqaf-final "ל־" meets its value with no space; a month is a frame
+    -- word too; and a word with no entry stays English and is NAMED on stderr,
+    -- so the gap is visible. With no flag nothing changes.
+    it "l4 nlg --lang he renders the frame words from the phrasebook" $ do
+      Output code sout serr <- runL4 bin ["nlg", "--lang", "he", bilingualFramesFixture]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "150 עולה על הסף שווה ל־`TRUE`"
+        , "לא 5 עולה על הסף"
+        , "16 ביולי 2025"
+        , "150 as string"
+        ]
+      serr `shouldSatisfy` ("have no he rendering and stay English: as, string" `isInfixOf`)
+
+    -- A region on the tag, or on the request, changes neither the wording
+    -- picked nor the frame words: one language, one set of frame words.
+    it "l4 nlg --lang he and --lang he-IL both read a he-IL wording, with Hebrew frame words" $
+      forM_ ["he", "he-IL"] $ \ lang -> do
+        Output code sout _ <- runL4 bin ["nlg", "--lang", lang, bilingualFramesRegionFixture]
+        code `shouldBe` ExitSuccess
+        map (filter (/= '\r')) (lines sout) `shouldBe`
+          [ "150 עולה על הסף שווה ל־`TRUE`"
+          , "לא 5 עולה על הסף"
+          ]
+
+    it "l4 nlg with no --lang keeps English frame words and reports nothing" $ do
+      Output code sout serr <- runL4 bin ["nlg", bilingualFramesFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("exceeds the threshold is equal to `TRUE`" `isInfixOf`)
+      sout `shouldSatisfy` ("16 July 2025" `isInfixOf`)
+      serr `shouldNotSatisfy` ("stay English" `isInfixOf`)
+
     it "l4 render reaches the same annotations, through the exporter" $ do
       Output code sout _ <- runL4 bin ["render", "--format", "text", "--lang", "he", bilingualFixture]
       code `shouldBe` ExitSuccess
@@ -1516,7 +2913,8 @@ spec bin = do
         -- `dir=` anywhere" would also forbid a per-element `dir="auto"` on a
         -- prose span, which is the natural remedy for a MIXED document and is
         -- not what any of these cases is about.
-        htmlTag s = unwords [ l | l <- lines s, "<html" `isPrefixOf` l ]
+        -- (A Windows process ends the line with a carriage return; drop it.)
+        htmlTag s = unwords [ filter (/= '\r') l | l <- lines s, "<html" `isPrefixOf` l ]
 
     it "labels a Hebrew rendering he and marks it right-to-left" $ do
       Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he", langModule]
@@ -1598,21 +2996,30 @@ spec bin = do
       htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
       sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
 
-    it "passes a region subtag through unmangled, and falls back because nothing carries it" $ do
-      -- Two things at once, and the name says both because the label alone would
-      -- mislead: the reader keeps `he-IL` as typed (the stderr note quotes it
-      -- back verbatim), and the LABEL is still the module's `he`, because no
-      -- herald in the module is tagged `he-IL`.
+    it "labels the document with a region its Hebrew answers" $ do
+      -- The module's wordings are `he`, and a request for `he-IL` reads them
+      -- (`L4.Lexer.langMatchRank`), so the document is honestly `he-IL`, as
+      -- typed, and nothing is reported.
       Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "he-IL", langModule]
       code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he-IL\" dir=\"rtl\">"
+      serr `shouldNotSatisfy` ("no renderings" `isInfixOf`)
+
+    it "passes a region subtag through unmangled, and falls back because nothing carries it" $ do
+      -- Two things at once, and the name says both because the label alone would
+      -- mislead: the reader keeps `fr-CA` as typed (the stderr note quotes it
+      -- back verbatim), and the LABEL is still the module's `he`, because no
+      -- wording in the module is in French.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "fr-CA", langModule]
+      code `shouldBe` ExitSuccess
       htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
-      serr `shouldSatisfy` ("no renderings in \"he-IL\"" `isInfixOf`)
+      serr `shouldSatisfy` ("no renderings in \"fr-CA\"" `isInfixOf`)
 
     it "rejects an empty or malformed --lang instead of putting it in the markup" $ do
       -- `he-`, `he--IL` and the over-long subtag are the SHAPE cases: every
       -- character is legal and the tag is still not one, so a character-class
       -- check alone would have let them into the attribute.
-      for_ ["", "  ", "-he", "he-", "he--IL", "abcdefghij", "he_IL", "en\"><script>"] \bad -> do
+      forM_ ["", "  ", "-he", "he-", "he--IL", "abcdefghij", "he_IL", "en\"><script>"] \bad -> do
         Output code _ serr <- runL4 bin ["render", "--format", "html", "--lang", bad, langModule]
         code `shouldNotBe` ExitSuccess
         serr `shouldSatisfy` ("Invalid --lang value" `isInfixOf`)
@@ -1659,6 +3066,152 @@ spec bin = do
       -- The dumper uses pretty-simple; any module will start with "MkModule".
       sout `shouldSatisfy` ("MkModule" `isInfixOf`)
 
+  -- `l4 batch` and the REPL re-print the module and run the printed text. A
+  -- CONSIDER's arms were printed comma-separated on one hanging indent, so in a
+  -- CONSIDER inside an arm of another, the outer's later arms were read as more
+  -- arms of the inner one, and an arm that ended in a comma list took the comma
+  -- after it for another element. The expected answers are what `l4 run` gives
+  -- on the fixture's own #EVALs, which the first test of each group pins.
+  --
+  -- Everything this needs is local to the block, so that it shares no line with
+  -- the rest of the file: the fixtures are named here, and an answer is a
+  -- `Value`, with a string standing for an exception or for text that is none
+  -- of TRUE, FALSE, a number or a LIST of numbers.
+  describe "a CONSIDER whose arms are printed back" $ do
+    mRepl <- runIO $ do
+      fromEnv <- lookupEnv "L4_REPL_BIN"
+      case fromEnv of
+        Just p  -> do ok <- doesFileExist p
+                      pure (if ok then Just p else Nothing)
+        Nothing -> do
+          (code, out, _) <- readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-repl"]) ""
+          let path = takeWhile (`notElem` ("\r\n" :: String)) out
+          ok <- doesFileExist path
+          pure (if code == ExitSuccess && ok then Just path else Nothing)
+    let noBranch = String "<a CONSIDER with no branch for its value>"
+        one n    = Number n
+        -- the answer a block of output spells
+        answerOf :: T.Text -> Value
+        answerOf t
+          | Just rest <- T.stripPrefix "LIST " t
+          , let elems = T.splitOn ", " rest
+          , all (\e -> not (T.null e) && T.all isDigit e) elems
+          = toJSON (map (read . T.unpack) elems :: [Integer])
+          | t == "TRUE"  = Bool True
+          | t == "FALSE" = Bool False
+          | not (T.null t), T.all isDigit t = Number (fromInteger (read (T.unpack t)))
+          | "has no branch" `T.isInfixOf` t = noBranch
+          | otherwise = String ("<" <> t <> ">")
+        -- what `l4 run` gives for each #EVAL of a file, in order
+        runAnswers file = do
+          Output _ sout _ <- runL4 bin ["run", file]
+          let blocks = drop 1 (T.splitOn "Evaluation[" (T.pack (filter (/= '\r') sout)))
+              result b = T.strip (fst (T.breakOn "Trace:" (T.drop (T.length "Result:") (snd (T.breakOn "Result:" b)))))
+          pure (map (answerOf . result) blocks)
+        -- what each row of `l4 batch` gives. A row that raises is `"status":"error"`
+        -- with its message in the result, and it stops the batch unless `-c` says to
+        -- go on; so a file with a raising row is run with `-c`, and every row is read.
+        batchAnswers file inputs entry = do
+          Output _ sout _ <- runL4 bin ["batch", "-c", file, "-i", inputs, "-e", entry]
+          let result row = case objField row "output" of
+                Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+                _ -> Nothing
+              rowAnswer row = case (objField row "status", result row) of
+                (_, Just (Object o))
+                  | Just (String e) <- KeyMap.lookup (Key.fromString "error") o -> answerOf e
+                (Just (String "success"), Just v) -> v
+                _ -> String ("<" <> T.pack (take 300 (show (objField row "diagnostics"))) <> ">")
+          pure [ rowAnswer row | l <- map (filter (/= '\r')) (lines sout)
+                               , Right row <- [eitherDecode (BSL8.pack l)] ]
+        -- what the REPL gives to each query, loading the file first. It runs in a
+        -- directory of its own, because it keeps a history file in the one it is in.
+        replAnswers repl file queries = withSystemTempDirectory "l4-repl-consider-arms" \work -> do
+          absFile <- makeAbsolute file
+          (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
+            { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
+          hPutStr hin (unlines (queries <> [":quit"]))
+          hClose hin
+          hSetBinaryMode hout True
+          hSetBinaryMode herr True
+          soutBytes <- BS.hGetContents hout
+          _ <- BS.hGetContents herr
+          _ <- waitForProcess ph
+          -- the banner, then one reply after each prompt, then the last prompt's goodbye
+          let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
+          pure (map (answerOf . T.strip) (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+        inRepl file queries expected = case mRepl of
+          Nothing   -> pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`"
+          Just repl -> replAnswers repl file queries `shouldReturn` expected
+
+        types    = fixtureDir </> "batch-nested-consider-types.l4"
+        silent   = fixtureDir </> "batch-nested-consider-silent.l4"
+        listArms = fixtureDir </> "batch-consider-list-arms.l4"
+        rows f   = fixtureDir </> ("batch-" ++ f ++ ".json")
+
+        typesWant  = [one 1, one 2, one 3, one 4]
+        -- Red Red, Red Blue (no arm for Blue in the inner one), Green, Blue
+        silentWant = [Bool True, noBranch, Bool False, Bool True]
+        listsWant  = [toJSON [1, 2 :: Integer], toJSON [3 :: Integer], toJSON [4, 5 :: Integer]]
+
+        -- a WHERE under an arm; the three files differ in which arm holds it
+        whereFile n = fixtureDir </> ("batch-consider-where-" ++ n ++ ".l4")
+        whereRows n = rows ("consider-where-" ++ n)
+        whereWant   = [one 0, one 20, one 50]
+        whereQueries = [ "`late fee` 1000 0", "`late fee` 1000 10", "`late fee` 1000 45" ]
+        whereArms   = ["first", "middle", "last"]
+
+    -- the inner CONSIDER is on another type, so the outer's later arms did not
+    -- type-check as its arms and every row was an error
+    it "is read by l4 run as the rule says" $ do
+      runAnswers types  `shouldReturn` typesWant
+      runAnswers silent `shouldReturn` (silentWant <> [one 4])
+      runAnswers listArms `shouldReturn` listsWant
+
+    it "is read as written by l4 batch, when the inner one is on another type" $
+      batchAnswers types (rows "nested-consider-types") "inner on another type" `shouldReturn` typesWant
+
+    -- the inner CONSIDER is on the same type, so they did type-check, and the
+    -- printed rule answered differently with no diagnostic
+    it "is read as written by l4 batch, when the inner one is on the same type" $
+      batchAnswers silent (rows "nested-consider-silent") "inner on the same type" `shouldReturn` silentWant
+
+    -- the control: an inner CONSIDER that is the last arm was always printed right
+    it "is read as written by l4 batch, when it is the last arm" $
+      batchAnswers silent (rows "nested-consider-last") "inner last" `shouldReturn` [one 4]
+
+    -- no nesting at all: the comma after an arm was read as the next element of
+    -- the LIST the arm ended in
+    it "is read as written by l4 batch, when an arm ends in a comma list" $
+      batchAnswers listArms (rows "consider-list-arms") "list arms" `shouldReturn` listsWant
+
+    it "is read as written by the REPL, when the inner one is on another type" $
+      inRepl types
+        [ "`inner on another type` 0 1", "`inner on another type` 0 9"
+        , "`inner on another type` 1 1", "`inner on another type` 2 9" ]
+        typesWant
+
+    it "is read as written by the REPL, when the inner one is on the same type" $
+      inRepl silent
+        [ "`inner on the same type` 0 0", "`inner on the same type` 0 2"
+        , "`inner on the same type` 1 0", "`inner on the same type` 2 0" ]
+        silentWant
+
+    it "is read as written by the REPL, when an arm ends in a comma list" $
+      inRepl listArms [ "`list arms` 0", "`list arms` 1", "`list arms` 2" ] listsWant
+
+    -- a WHERE under an arm: its line stood at the column of the arm's WHEN, which
+    -- ends the definition, so any arm after it did not parse and every row failed.
+    -- The last arm has none after it, and was always printed right.
+    it "is read by l4 run as the rule says, with a WHERE under an arm" $
+      forM_ whereArms \n -> runAnswers (whereFile n) `shouldReturn` whereWant
+
+    forM_ whereArms \n -> do
+      it ("is read as written by l4 batch, with a WHERE under the " ++ n ++ " arm") $
+        batchAnswers (whereFile n) (whereRows n) "late fee" `shouldReturn` whereWant
+
+      it ("is read as written by the REPL, with a WHERE under the " ++ n ++ " arm") $
+        inRepl (whereFile n) whereQueries whereWant
+
   ----------------------------------------------------------------------------
   -- @desc attachment (L4.Parser.ResolveAnnotation)
   --
@@ -1679,7 +3232,7 @@ spec bin = do
       -- top-level declaration claims it" is the behaviour this replaced, not a
       -- hypothetical — and the fixture's next declaration deliberately carries
       -- no @desc of its own, so a mis-attachment would show up as its key.
-      Output code sout serr <- runL4 bin ["docassemble", descAttachmentFixture]
+      Output code sout serr <- runL4 bin ["export", "docassemble", descAttachmentFixture]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of
@@ -1708,6 +3261,58 @@ spec bin = do
             ++ "raw TDesc token, so the annotation was dropped silently"
 
   describe "l4 trace" $ do
+    -- Both of these raise while forcing an address, before a frame for it is
+    -- pushed. Post-processing used to fail on that, and the fallback gave a graph
+    -- of one empty node with exit 0.
+    -- A limit of 300 frames instead of a million, which took 12 s and 5.6 GB
+    -- to trace. Which frame the limit falls on depends on the limit: at 300, as
+    -- at a million, it is the update frame of `count up`, and the test fails
+    -- without the split's fix for it; at 301 it is another frame, and it passes.
+    it "traces a real stack overflow at an update frame, naming the call" $ do
+      parent <- getEnvironment
+      Output code sout _ <- runL4WithEnv (Just (("JL4_MAX_FRAME_DEPTH", "300") : filter ((/= "JL4_MAX_FRAME_DEPTH") . fst) parent)) bin ["trace", traceOverflowFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("count up` OF 1" `isInfixOf`)
+      sout `shouldSatisfy` ("<error>" `isInfixOf`)
+      sout `shouldNotSatisfy` ("trace unavailable" `isInfixOf`)
+
+    it "traces a definition that needs itself, naming it" $ do
+      Output code sout _ <- runL4 bin ["trace", traceLoopFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("label=\"x\\n" `isInfixOf`)
+      sout `shouldSatisfy` ("<error>" `isInfixOf`)
+
+    -- No known input makes a trace fail to build, so the test seam makes it
+    -- fail: `l4 trace`, and nothing else, reads JL4_TEST_FAIL_TRACE_POSTPROCESS,
+    -- and only the value 1. A graph of one node must not pass for a trace with
+    -- exit 0.
+    it "exits 1 with its error line when a trace cannot be built" $ do
+      parent <- getEnvironment
+      Output code sout serr <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", "1") : parent)) bin ["trace", evalTraceFixture]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("Error: a trace could not be built" `isInfixOf`)
+      sout `shouldSatisfy` ("trace unavailable" `isInfixOf`)
+
+    -- The seam takes exactly "1": any other value is no seam.
+    it "builds traces as usual when the test seam is set to anything but 1" $ do
+      parent <- getEnvironment
+      forM_ ["0", "", "true"] $ \v -> do
+        Output code sout _ <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", v) : parent)) bin ["trace", evalTraceFixture]
+        code `shouldBe` ExitSuccess
+        sout `shouldNotSatisfy` ("trace unavailable" `isInfixOf`)
+
+    it "exits 1 with its error line when a trace written to --output-dir cannot be built" $ do
+      parent <- getEnvironment
+      tmp <- getTemporaryDirectory
+      let outDir = tmp </> "l4-trace-unavailable-out"
+      removePathForcibly outDir
+      Output code _ serr <- runL4WithEnv (Just (("JL4_TEST_FAIL_TRACE_POSTPROCESS", "1") : parent)) bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
+      wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
+      removePathForcibly outDir
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("Error: a trace could not be built" `isInfixOf`)
+      wrote `shouldBe` True
+
     it "refuses --format png without --output-dir" $ do
       Output code _ serr <- runL4 bin ["trace", cleanFixture, "--format", "png"]
       code `shouldSatisfy` (/= ExitSuccess)
@@ -1723,6 +3328,36 @@ spec bin = do
       -- it just produces no output but still exits 0.
       Output code _ _ <- runL4 bin ["trace", evalFixture]
       code `shouldBe` ExitSuccess
+
+    -- The graph says a refusal is one, with its reason, as the text trace
+    -- does, and does not label it as an error.
+    it "labels a refusal in the DOT graph with its reason, not as an error" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("digraph" `isInfixOf`)
+      sout `shouldSatisfy` ("↯ refused: not modelled" `isInfixOf`)
+      sout `shouldNotSatisfy` ("<error>" `isInfixOf`)
+
+    -- The root of each graph carries the directive's outcome. A refusal met
+    -- only while the answer is read in full, below its head (inside a JUST,
+    -- or at the end of a list), is the directive's outcome, so the root is
+    -- labelled and filled as a refusal, and not as the answer's head.
+    it "labels and fills the root as a refusal when it is met below the answer's head" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace-deep.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      let roots = [ fst (T.breakOn "style=filled" (snd (T.breakOn "0 [label=" g)))
+                  | g <- drop 1 (T.splitOn "digraph {" (T.pack sout)) ]
+      length roots `shouldBe` 2
+      forM_ roots $ \root -> do
+        root `shouldSatisfy` T.isInfixOf "↯ refused: not modelled"
+        root `shouldSatisfy` T.isInfixOf "#ffcccc"
+
+    -- A reason is printed whole in the graph, every line of it, as it is in
+    -- the text form of the trace.
+    it "labels a refusal with every line of its reason" $ do
+      Output code sout _ <- runL4 bin ["trace", fixtureDir </> "refuse-trace-lines.l4", "--format", "dot"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("↯ refused: not modelled\\nfor this year" `isInfixOf`)
 
   describe "l4 state-graph" $ do
     it "fails on a file without regulative rules" $ do
@@ -1770,7 +3405,7 @@ spec bin = do
         , "  Every path to FULFILLED passes through: nothing in particular (there is more than one route)."
         , "  Every path to BREACH passes through:"
         , "    - the deadline passing on PARTY S delivery (MUST, WITHIN 3)"
-        , "    - the deadline passing on PARTY B payment ... (MUST, WITHIN 5)"
+        , "    - the deadline passing on PARTY B payment n (MUST, WITHIN 5)"
         , "a"
         , "  Every path to FULFILLED passes through: nothing in particular (there is more than one route)."
         , "  Every path to BREACH passes through: nothing in particular (there is more than one route)."
@@ -1781,10 +3416,20 @@ spec bin = do
         ["state-graph", "--dominators", "--all-states", "examples/ok/contracts.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"initial\" is the start state" `isInfixOf`)
+      -- Two things moved in this block on 2026-09-22 and neither is a change
+      -- to what dominates what. The state NAME carries the obligation\'s
+      -- @WITHIN@ ('L4.StateGraph.describeDeonton'), because without it the
+      -- promissory note drew three of its six states under one string. And
+      -- the act is printed by 'L4.Print.printActionPattern' now, which spells
+      -- a binder bare: @price@ was @`price`@ here for one day, under a
+      -- back-quote mark of the picture\'s own that also reached the BPMN task
+      -- names. Which of @price@ and @n@ BINDS is said in the DOT, in a clause
+      -- beside the act ('L4.StateGraph.labelBinds'); this view has no such
+      -- clause and does not claim one.
       sout `shouldSatisfy` (unlines
-        [ "  Every path to \"B must return\" passes through:"
+        [ "  Every path to \"B must return WITHIN 10\" passes through:"
         , "    - PARTY S delivery (MUST, WITHIN 3)"
-        , "    - PARTY B payment ... (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
+        , "    - PARTY B payment price (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
         , "    - the arm IF NOT (price EQUALS 20)"
         ] `isInfixOf`)
 
@@ -1835,6 +3480,77 @@ spec bin = do
       serr2 `shouldSatisfy` ("cannot be combined" `isInfixOf`)
       sout2 `shouldSatisfy` ("digraph" `notInfixOf`)
 
+    -- The caption defects of 2026-09-21\/22, one shape each, over
+    -- 'captionFixture'. These are asserted HERE and could not be asserted
+    -- anywhere else: no golden in the tree captures state-graph DOT output,
+    -- and the review that found them ran the renderer by hand.
+    --
+    -- Each assertion names what it catches. A reader who moves one of these
+    -- deliberately should be able to tell from the line above which claim
+    -- about the picture they are giving up.
+    it "draws an act, a binder, a deadline and a wrap the way the reader has to read them" $ do
+      Output code sout _ <- runL4 bin ["state-graph", captionFixture]
+      code `shouldBe` ExitSuccess
+
+      -- Shape 1 — a suppressed caption never leaves a BLANK arrow. The inner
+      -- obligation has no window, no guard, no opening, no binder and no join
+      -- line, so there is nothing left once the node\'s copy is dropped and
+      -- the restatement stands. A blank green arrow reads "it just goes
+      -- there" where the arrow MEANS the act being performed, and it is
+      -- indistinguishable from a junction\'s branch edge but for colour.
+      -- This fixture has no junction, so no caption here may be empty at all.
+      sout `shouldSatisfy` ("1 -> 2 [label=\"a MUST deliver (EXACTLY theChair)\"" `isInfixOf`)
+      sout `shouldSatisfy` ("label=\"\"" `notInfixOf`)
+
+      -- Shape 2 — the act is 'L4.Print.printActionPattern' and not a second
+      -- printer. A hand-written one dropped the @EXACTLY@ the author wrote
+      -- and the brackets round a compound pinned expression, so this read
+      -- @pay base PLUS 1@ — which is @pay@ applied to three arguments.
+      sout `shouldSatisfy` ("pay (EXACTLY (base" `isInfixOf`)
+      sout `shouldSatisfy` ("pay base PLUS 1" `notInfixOf`)
+
+      -- Shape 3 — a caption may name a deadline only when it is THE deadline
+      -- that takes that arm. Here the act says @WITHIN 30@ and the barrier
+      -- says @ONCE ALL HAVE WITHIN 10@: two clocks, one red arm, so naming
+      -- either one is a precise claim that is wrong half the time. The bare
+      -- word is vague and true. Both windows are still drawn, on the green
+      -- edge, where they are not a claim about which fires.
+      sout `shouldSatisfy` ("[label=timeout\n" `isInfixOf`)
+      sout `shouldSatisfy` ("timeout [30]" `notInfixOf`)
+      sout `shouldSatisfy` ("ONCE ALL HAVE WITHIN 10" `isInfixOf`)
+
+      -- Shape 4 — the wrap breaks between tokens and never inside a
+      -- back-quoted L4 name, which is ONE name that happens to contain
+      -- spaces; breaking it makes the page assert a name the source has not
+      -- got. Beside it, the binder clause: @sum@ is a 'L4.Syntax.PatVar' and
+      -- any number discharges the act.
+      sout `shouldSatisfy` ("`settle the account with` (EXACTLY" `isInfixOf`)
+      sout `shouldSatisfy` ("the rule binds `sum`" `isInfixOf`)
+
+      -- Shape 5 — the state NAME carries the obligation\'s window. Two
+      -- obligations over one act pattern are told apart by nothing else, and
+      -- the promissory note writes that shape three times.
+      sout `shouldSatisfy` ("[label=\"theChair must pay 1 WITHIN 9\"" `isInfixOf`)
+
+      -- Shape 6 — the binder clause is not the node\'s, so it survives the
+      -- suppression that drops party, modal, act and window. It is the whole
+      -- of what this arrow has left, and it says the one thing the act text
+      -- cannot.
+      sout `shouldSatisfy` ("1 -> 2 [label=\"the rule binds `amount`\"" `isInfixOf`)
+
+      -- Shape 7 — and the counterpart, which is why the clause exists.
+      -- @pay base@ and shape 6\'s @pay amount@ print identically, because
+      -- 'L4.Print.printActionPattern' is re-emitting source and the source
+      -- says a bare name in both. Only shape 6 binds; only shape 6 says so.
+      sout `shouldSatisfy` ("MUST pay base [3]" `isInfixOf`)
+      sout `shouldSatisfy` ("the rule binds `base`" `notInfixOf`)
+
+      -- Shape 8 — an UNTERMINATED back-quoted run is not a name. It used to
+      -- be glued into one token to the end of the line, so a single stray
+      -- back quote in a string literal silently defeated the wrap for
+      -- everything after it and the box grew with no diagnostic.
+      sout `shouldSatisfy` ("after\\nit" `isInfixOf`)
+
   describe "l4 batch" $ do
     -- `batch` re-prints the module through 'prettyLayout' and re-runs it per
     -- row, so the printer is on the correctness path here, not a cosmetic one.
@@ -1856,6 +3572,62 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
       sout `shouldSatisfy` ("\"result\":true" `isInfixOf`)
       sout `shouldNotSatisfy` ("multiple definitions" `isInfixOf`)
+
+    -- A multi-clause group prints as the clauses the drafter wrote. Printed
+    -- from what they compile to, a name the compiler made up was written out
+    -- as source, and a drafter's definition of the same text captured it:
+    -- each of the first three answered differently with status "success".
+    describe "re-prints a multi-clause group as its clauses" $ do
+      let results args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args)
+            code `shouldBe` ExitSuccess
+            pure [ (objField row "status", outResult row)
+                 | l <- lines sout
+                 , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value]
+                 ]
+          outResult row = case objField row "output" of
+            Just (Array os) | [o] <- toList os -> objField o "result"
+            _ -> Nothing
+          ok v = (Just (String "success"), Just v)
+      it "reads a drafter's definition named like the binding of the later clauses" $
+        results [batchClauses, "-e", "later", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 7, Number 2, Number 3])
+      it "reads a drafter's definition named like the binding of the last clause" $
+        results [batchClauses, "-e", "fee", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 101, Number 3])
+      it "reads a drafter's definition named like an input of a group with no GIVEN" $
+        results [batchClauses, "-e", "through", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Red", String "Green"])
+      it "reads a drafter's `input 1` in a group whose only clause left matches anything" $ do
+        results [batchClausesCatchAll, "-e", "one", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Blue", String "Blue"])
+        results [batchClausesCatchAll, "-e", "two", "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "Blue", String "Blue", String "Blue"])
+      it "tests the input a pattern variable is named after, not the variable" $
+        results [batchClausesCapture, "-e", "capture", "--inputs", batchClausesBooleans]
+          >>= (`shouldBe` map ok [Number 1, Number 2, Number 1, Number 2])
+      -- Printed from the source text instead, the next four answered
+      -- differently or did not parse: a ditto resolved against the printer's
+      -- line, operators lost their precedence, tabs did not re-parse.
+      it "keeps what a ditto in a clause body copies" $
+        results [batchClausesDitto, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 0, Number 0])
+      it "keeps what a ditto in a clause head copies" $
+        results [batchClausesDittoHead, "--inputs", batchClausesB]
+          >>= (`shouldBe` map ok [Number 1, Number 2])
+      it "keeps the precedence of declared infix operators in a clause body" $
+        results [batchClausesFixity, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 7, Number 7, Number 0])
+      it "reads clauses indented with tabs" $
+        results [batchClausesTabs, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [Number 1, Number 3, Number 3])
+      -- A string that spans lines keeps the later lines as the source wrote
+      -- them: printed back as source, its line break is written as an escape
+      -- (#1028), so the printer's indentation cannot enter the string. `l4 run`
+      -- gives "a\n      b".
+      it "keeps a string that spans lines in a clause body" $ do
+        results [batchClausesString, "--inputs", batchClausesColours]
+          >>= (`shouldBe` map ok [String "a\n      b", String "z", String "z"])
 
     it "serializes a #TRACE breach with correctly-labeled fields" $ do
       -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch
@@ -1895,15 +3667,32 @@ spec bin = do
             "Expected batch stdout NOT to contain " ++ show frag
             ++ "\n--- stdout ---\n" ++ sout
 
+    it "says on stderr which annotation line it ignored, and still runs the exports it found" $ do
+      Output code sout serr <- runL4 bin ["batch", batchIgnoredAnnotation, "--inputs", batchIgnoredAnnotationJson]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+      serr `shouldSatisfy` ("Unknown annotation `@exprot`" `isInfixOf`)
+      serr `shouldSatisfy` ("Did you mean `@export`?" `isInfixOf`)
+      -- where it is: the file, the line and the column
+      serr `shouldSatisfy` ("batch-ignored-annotation.l4:6:1" `isInfixOf`)
+
+    it "says why a module has no exports when its only @export is misspelt" $ do
+      Output code sout serr <- runL4 bin ["batch", batchIgnoredAnnotationOnly, "--inputs", batchIgnoredAnnotationJson]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("no @export functions found" `isInfixOf`)
+      serr `shouldSatisfy` ("Did you mean `@export`?" `isInfixOf`)
+
     it "streams one NDJSON row per input (default format)" $ do
       Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchDataJson]
       code `shouldBe` ExitSuccess
       nonBlankLines sout `shouldBe` 2
       sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
 
-    it "infers CSV cell types so numeric params typecheck" $ do
+    it "reads a CSV cell for a NUMBER or BOOLEAN input as the number or boolean it spells" $ do
       -- If age/income stayed strings, JSONDECODE into NUMBER would fail and
-      -- the rows would come back status=error; success proves inference works.
+      -- the rows would come back status=error; success proves the declared
+      -- types were applied. (Every column here is declared, so this does not
+      -- reach 'inferCsvCell'; the undeclared-column test below does.)
       Output code sout _ <-
         runL4 bin ["batch", batchEligFixture, "--inputs", batchDataCsv, "--format", "json"]
       code `shouldBe` ExitSuccess
@@ -1912,6 +3701,14 @@ spec bin = do
       let statuses = [ s | Object o <- rows
                          , Just (String s) <- [KeyMap.lookup (Key.fromString "status") o] ]
       statuses `shouldBe` ["success", "success"]
+
+    it "reads a cases file that holds one object as one case" $ do
+      -- Plain main answered a JSON object where it expected an array with
+      -- "failed to parse inputs: ... expected Array, but encountered Object".
+      Output code sout _ <- runL4 bin ["batch", batchEligFixture, "--inputs", batchSingleObjectJson]
+      code `shouldBe` ExitSuccess
+      nonBlankLines sout `shouldBe` 1
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
 
     it "emits a single JSON array with --format json" $ do
       Output code sout _ <-
@@ -1927,8 +3724,7 @@ spec bin = do
       sout `shouldSatisfy` ("input_age" `isInfixOf`)
       sout `shouldSatisfy` ("status" `isInfixOf`)
 
-    it "writes results to a file with --output" $ do
-      tmp <- getTemporaryDirectory
+    it "writes results to a file with --output" $ withSystemTempDirectory "l4-batch-out" \tmp -> do
       let outFile = tmp </> "l4-batch-out.json"
       Output code sout _ <-
         runL4 bin [ "batch", batchEligFixture, "--inputs", batchDataJson
@@ -1940,7 +3736,6 @@ spec bin = do
       contents <- readFile outFile
       rows <- decodeArray contents
       length rows `shouldBe` 2
-      removeFile outFile
 
     it "stops at the first failing row by default (and exits non-zero)" $ do
       -- Row 2 has a non-numeric income; row 3 must NOT be processed.
@@ -1963,15 +3758,320 @@ spec bin = do
       sout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
       sout `shouldSatisfy` ("Type mismatch" `isInfixOf`)
 
-    it "keeps exponent-form CSV cells (1E5) as STRING, not numbers" $ do
+    it "keeps an exponent-form CSV cell (1E5) for a STRING input as written, not a number" $ do
       -- A product/lot code like 1E5 is a valid JSON number (1e5 = 100000),
       -- but must survive as the string "1E5" against a STRING param rather
-      -- than being coerced to 100000.
+      -- than being coerced to 100000. (A STRING input is read by its declared
+      -- type, so this does not reach 'inferCsvCell' either.)
       Output code sout _ <-
         runL4 bin ["batch", batchCodeFixture, "--inputs", batchExponentCsv]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"code\":\"1E5\"" `isInfixOf`)
       sout `shouldSatisfy` (not . ("100000" `isInfixOf`))
+
+    -- The one place a CSV cell is still typed by how it looks ('inferCsvCell'):
+    -- a column that no input declares, which the case echoes under `input`.
+    -- The columns are `lot`, `flag` and `serial`; batchEligFixture declares
+    -- none of them. The exponent form must stay text here too, because JSON's
+    -- number grammar would otherwise turn the lot code 1E5 into 100000.
+    it "types a CSV cell by how it looks when no input declares its column, and keeps 1E5 text" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchEligFixture, "--inputs", batchUndeclaredColumnCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      let cell k r = objField r "input" >>= (`objField` k)
+      map (cell "lot")    rows `shouldBe` [Just (String "1E5"), Just (Number 123456)]
+      map (cell "flag")   rows `shouldBe` [Just (Bool True), Just (Bool False)]
+      -- 007 is not a JSON number, and a date is text
+      map (cell "serial") rows `shouldBe` [Just (String "007"), Just (String "2026-10-13")]
+
+    -- T3c (ruled, specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md on unstable): a
+    -- blank CSV cell is ABSENT, exactly like a column missing from the file, for
+    -- every kind of input. Plain main answered an empty STRING cell with "" and
+    -- a blank MAYBE STRING cell with JUST "", and an empty NUMBER cell with a
+    -- decode error under status "success".
+    describe "a blank CSV cell is absent, not null and not an empty string" $ do
+      let blankRows args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
+            pure ( code
+                 , [ row | l <- map (filter (/= '\r')) (lines sout)
+                         , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ] )
+          diagnosticsOf row = show (objField row "diagnostics")
+          resultOfRow row = case objField row "output" of
+            Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+            _ -> Nothing
+
+      it "makes a required STRING input missing, and a MAYBE STRING input NOTHING" $ do
+        (code, rows) <- blankRows [batchBlankFixture, "--inputs", batchBlankCsv]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows
+          `shouldBe` map (Just . String) ["error", "error", "success", "success", "success"]
+        case rows of
+          [empty, spaces, noNote, blankNote, note] -> do
+            diagnosticsOf empty  `shouldSatisfy` ("Missing required field 'code'" `isInfixOf`)
+            diagnosticsOf spaces `shouldSatisfy` ("Missing required field 'code'" `isInfixOf`)
+            resultOfRow noNote    `shouldBe` Just (String "nothing")
+            resultOfRow blankNote `shouldBe` Just (String "nothing")
+            resultOfRow note      `shouldBe` Just (String "hello")
+            -- the case as read leaves the blank cell out
+            (objField noNote "input" >>= (`objField` "note")) `shouldBe` Nothing
+            (objField empty "input" >>= (`objField` "code")) `shouldBe` Nothing
+          other -> expectationFailure ("expected 5 rows, got " ++ show (length other))
+
+      it "makes a required NUMBER input missing too" $ do
+        (code, rows) <- blankRows [batchEligFixture, "--inputs", batchBlankIncomeCsv]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["error", "error", "success"]
+        map diagnosticsOf (take 2 rows) `shouldSatisfy` all ("Missing required field 'income'" `isInfixOf`)
+
+      it "is reported by --validate-only as a missing field" $ do
+        Output code sout _ <-
+          runL4 bin ["batch", batchEligFixture, "--inputs", batchBlankIncomeCsv, "--validate-only", "--continue-on-error"]
+        code `shouldSatisfy` (/= ExitSuccess)
+        length (filter ("Missing required field: 'income'" `isInfixOf`) (lines sout)) `shouldBe` 2
+
+    -- A value is read by the type its input declares. The merge of main into
+    -- unstable (d543d8531) dropped main's `coerceInputTypes` as "superseded by
+    -- inferCsvCell", which types a CSV cell by how it looks and knows nothing of
+    -- JSON or YAML, so each of these answered with status "error".
+    describe "reads a value by the type its input declares" $ do
+      let rowsOf args = do
+            Output code sout _ <- runL4 bin (["batch"] <> args <> ["--continue-on-error"])
+            pure ( code
+                 , sout
+                 , [ row | l <- map (filter (/= '\r')) (lines sout)
+                         , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ] )
+          statusAndResult row = (objField row "status", fst (resultAndPresumed row))
+          succeeded r = (Just (String "success"), Just r)
+
+      it "reads text for a NUMBER or BOOLEAN input as a number or a boolean, in JSON" $ do
+        (code, sout, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredStringsJson]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Bool True), succeeded (Bool False)]
+        -- the line shows the case as the inputs declare it
+        sout `shouldSatisfy` ("\"age\":25" `isInfixOf`)
+
+      it "reads text for a NUMBER or BOOLEAN input as a number or a boolean, in YAML" $ do
+        (code, _, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredStringsYaml]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Bool True), succeeded (Bool False)]
+
+      it "validates a case that sends text for a NUMBER or BOOLEAN input" $ do
+        Output code sout _ <-
+          runL4 bin ["batch", batchEligFixture, "--inputs", batchDeclaredStringsJson, "--validate-only"]
+        code `shouldBe` ExitSuccess
+        sout `shouldNotSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+
+      it "keeps a CSV cell for a STRING input as the text written" $ do
+        -- 123456 and 1.50 used to arrive as numbers and be refused; 018956 and
+        -- 1e3 already stayed text
+        (code, _, rows) <- rowsOf [batchCodeFixture, "--inputs", batchDeclaredStringCellsCsv]
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows
+          `shouldBe` map (succeeded . String) ["123456", "018956", "1.50", "1e3"]
+
+      -- Assumed, not ruled: JSON and YAML carry their own types, so a number
+      -- sent for a STRING input is an error, as it is on main.
+      it "still refuses a JSON number for a STRING input" $ do
+        (code, _, rows) <- rowsOf [batchCodeFixture, "--inputs", batchDeclaredNumberForStringJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` [Just (String "error")]
+
+      it "leaves text that is not a number alone, so the error names the value" $ do
+        -- `age` is readable and `income` is not. The error is about `lots`;
+        -- before, it was about the `25` that came first.
+        (code, _, rows) <- rowsOf [batchEligFixture, "--inputs", batchDeclaredBadNumberJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        case rows of
+          [row] -> do
+            objField row "status" `shouldBe` Just (String "error")
+            let diagnostics = show (objField row "diagnostics")
+            diagnostics `shouldSatisfy` ("lots" `isInfixOf`)
+            diagnostics `shouldNotSatisfy` ("25" `isInfixOf`)
+          other -> expectationFailure ("expected 1 row, got " ++ show (length other))
+
+      -- Only a NUMBER or a BOOLEAN reads a CSV cell as anything but its text.
+      -- A choice named `True`, or a DATE written without dashes, was typed by
+      -- how it looks and then refused: `True` became JSON true ("Could not
+      -- decode true as Answer"), and 20261013 a number.
+      let csvRows entry csv = rowsOf [batchDeclaredText, "-e", entry, "--inputs", csv]
+      it "reads a CSV cell for a choice input as the name written" $ do
+        (code, _, rows) <- csvRows "echo answer" batchDeclaredTextAnswers
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` map (succeeded . String) ["yes", "no", "dunno"]
+
+      it "reads a CSV cell for a MAYBE choice input as the name written, and a blank one as left out" $ do
+        -- the second row is a quoted "", a cell that is blank (T3c)
+        (code, _, rows) <- csvRows "echo optional answer" batchDeclaredTextOptional
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` map (succeeded . String) ["yes", "none", "dunno"]
+
+      it "reads a CSV cell for a DATE input as text, so a bad date is reported as one" $ do
+        (code, _, rows) <- csvRows "echo date" batchDeclaredTextDates
+        code `shouldSatisfy` (/= ExitSuccess)
+        case rows of
+          [good, bad] -> do
+            statusAndResult good `shouldBe` succeeded (String "2026-10-13")
+            objField bad "status" `shouldBe` Just (String "error")
+            show (objField bad "diagnostics") `shouldSatisfy` ("Could not parse date string '20261013'" `isInfixOf`)
+          other -> expectationFailure ("expected 2 rows, got " ++ show (length other))
+
+      -- Not a regression test: it passes on a build that types every cell by
+      -- its look. It pins the way a synonym is still read as what it stands for.
+      it "still reads a CSV cell for a synonym of NUMBER or BOOLEAN as one" $ do
+        (code, _, rows) <- csvRows "echo year" batchDeclaredTextSynonyms
+        code `shouldBe` ExitSuccess
+        map statusAndResult rows `shouldBe` [succeeded (Number 2026)]
+
+      -- A MAYBE input is read by the type it wraps, so "25" is 25 for a MAYBE
+      -- NUMBER. Nothing tested that, and a build that stopped looking through
+      -- MAYBE would have passed every other test here.
+      it "reads text for a MAYBE NUMBER input as the number it spells, and refuses text that is not one" $ do
+        (code, _, rows) <- rowsOf [batchMaybeFixture, "--inputs", batchMaybeTextJson]
+        code `shouldSatisfy` (/= ExitSuccess)
+        map (`objField` "status") rows `shouldBe` map (Just . String) ["success", "error", "success"]
+        case rows of
+          [text, notANumber, number] -> do
+            fst (resultAndPresumed text)   `shouldBe` Just (Number 25)
+            fst (resultAndPresumed number) `shouldBe` Just (Number 25)
+            show (objField notANumber "diagnostics") `shouldSatisfy` ("abc" `isInfixOf`)
+          other -> expectationFailure ("expected 3 rows, got " ++ show (length other))
+
+      -- An input declared through a synonym is the type the synonym stands for
+      -- (DECLARE Year IS A NUMBER), and --validate-only has to judge it so:
+      -- it used to look at the name `Year` and judge nothing, so text that is
+      -- no number, or a number for a flag, was `valid` and then refused when
+      -- the case was run. The plain exports in the fixture are the control.
+      describe "an input declared through a synonym" $ do
+        let run extra entry file = rowsOf ([batchSynonym, "-e", entry, "--inputs", file] <> extra)
+            -- one word for how a case went, run or validated
+            outcome row = case objField row "status" of
+              Just (String st) | st `elem` ["success", "valid"] -> "accepted"
+              _                                                  -> "refused" :: String
+            shape row = (outcome row, objField row "diagnostics", objField row "errors")
+
+        it "refuses text that is no number, as for a NUMBER, in JSON and in CSV" $ do
+          forM_ [batchSynonymYearJson, batchSynonymYearCsv] \file -> do
+            (_, _, plain)   <- run [] "plain number" file
+            (_, _, through) <- run [] "next year" file
+            map shape through `shouldBe` map shape plain
+            -- and the first row, the text `abc`, is the one refused
+            take 1 (map outcome through) `shouldBe` ["refused"]
+            show (map (`objField` "diagnostics") (take 1 through)) `shouldSatisfy` ("field 'y'" `isInfixOf`)
+
+        it "refuses text that is no boolean, and a number, as for a BOOLEAN, in JSON and in CSV" $ do
+          forM_ [batchSynonymFlagJson, batchSynonymFlagCsv] \file -> do
+            (_, _, plain)   <- run [] "plain flag" file
+            (_, _, through) <- run [] "flip flag" file
+            map shape through `shouldBe` map shape plain
+            take 1 (map outcome through) `shouldBe` ["refused"]
+
+        it "judges a synonym's value under --validate-only as it judges the plain type's" $ do
+          forM_ [ ("next year", "plain number", batchSynonymYearJson)
+                , ("flip flag", "plain flag", batchSynonymFlagJson) ] \(entry, control, file) -> do
+            (_, _, plain)   <- run ["--validate-only"] control file
+            (_, _, through) <- run ["--validate-only"] entry file
+            map shape through `shouldBe` map shape plain
+            -- the mismatch is named, as for the plain type
+            show (map (`objField` "errors") through) `shouldSatisfy` ("Type mismatch for field" `isInfixOf`)
+
+        it "validates what it would run: a case is valid exactly when it is accepted" $ do
+          forM_ [ ("next year", batchSynonymYearJson), ("flip flag", batchSynonymFlagJson)
+                , ("maybe year", batchSynonymYearJson), ("year maybe", batchSynonymYearJson) ]
+            \(entry, file) -> do
+              (_, _, validated) <- run ["--validate-only"] entry file
+              (_, _, ran)       <- run [] entry file
+              (entry, map outcome validated) `shouldBe` (entry, map outcome ran)
+
+    -- A CSV file that cannot be read stops the command before any case runs.
+    -- It used to say only what the parser was called (`endOfInput`, `13: not
+    -- enough input`); cassava's own reader, before `csvRows`, named the input
+    -- it stopped at.
+    it "names the line of a CSV file it cannot read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvBadQuote]
+      code `shouldSatisfy` (/= ExitSuccess)
+      -- the stray quote is on line 2, after `ab`
+      sout `shouldSatisfy` ("line 2 of the CSV file is not valid CSV, near `\"c`" `isInfixOf`)
+      sout `shouldNotSatisfy` ("endOfInput" `isInfixOf`)
+
+    it "says that an empty CSV file is empty" $ do
+      Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvEmpty]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("the CSV file is empty" `isInfixOf`)
+      sout `shouldNotSatisfy` ("not enough input" `isInfixOf`)
+
+    -- A quote that opens a cell and is never closed. cassava's reader of a
+    -- quoted cell takes everything to the end of the file and drops the last
+    -- byte, taking it for the closing quote: `"abc` was the text `ab` with
+    -- status success, and in the middle of a file the cell swallowed every row
+    -- after it. Each is refused, at the line where the quote opens.
+    describe "a quote that opens a CSV cell and is never closed" $ do
+      let refusedAt n file = do
+            Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", file]
+            code `shouldSatisfy` (/= ExitSuccess)
+            sout `shouldSatisfy` (("line " <> show (n :: Int) <> " of the CSV file is not valid CSV: a quote that opens a cell there is never closed") `isInfixOf`)
+            -- and no row is run
+            sout `shouldNotSatisfy` ("\"status\"" `isInfixOf`)
+
+      it "is refused at the end of the file, naming the line" $ refusedAt 2 batchCsvOpenQuoteEof
+      it "is refused in the middle of a file, rather than taking the rows after it" $ refusedAt 2 batchCsvOpenQuoteMid
+      it "is refused in a file with Windows line ends" $ refusedAt 2 batchCsvOpenQuoteCrlf
+      it "is refused when the last quote is half of a doubled one" $ refusedAt 2 batchCsvOpenQuoteDoubled
+      it "is refused in the header" $ refusedAt 1 batchCsvOpenQuoteHeader
+
+      -- The control: a cell that closes at the very end of the file, with no
+      -- line end after it, is a cell, so the check cannot be refusing every
+      -- file that ends in a quote.
+      it "does not refuse a cell that closes at the end of the file" $ do
+        Output code sout _ <- runL4 bin ["batch", batchCodeFixture, "--inputs", batchCsvQuoteClosesAtEof]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` ("\"result\":\"abc\"" `isInfixOf`)
+
+    it "refuses a choice-type input it cannot decode, instead of answering OTHERWISE" $ do
+      -- Rows: "Square", a Circle object, "Bogus", "Circle" (it has a field),
+      -- and 42. Before #1012 the last four decoded to NOTHING or to
+      -- themselves, reached the fixture's OTHERWISE, and came back
+      -- "status":"success" with the answer "other".
+      Output code sout _ <-
+        runL4 bin ["batch", batchChoiceFixture, "--inputs", batchChoiceJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      let rows = filter (not . all isSpace) (lines sout)
+      length rows `shouldBe` 5
+      case rows of
+        (sq : refused) -> do
+          sq `shouldSatisfy` ("\"result\":\"square\"" `isInfixOf`)
+          sq `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          flip mapM_ refused $ \r -> do
+            r `shouldSatisfy` ("Could not decode" `isInfixOf`)
+            r `shouldSatisfy` ("as Shape for field 's'" `isInfixOf`)
+            r `shouldSatisfy` ("one of: Square." `isInfixOf`)
+            r `shouldSatisfy` (not . ("\"other\"" `isInfixOf`))
+        [] -> expectationFailure "l4 batch printed no rows"
+      sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
+      sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "decodes a constructor of a choice type declared under a section by its bare name" $ do
+      -- "Red" is what JSONENCODE writes for Red, and what a request sends;
+      -- the constructor is stored as `Part A.Red`. Before #947's fix every
+      -- row answered FALSE, success; after #1012 alone, every row was refused.
+      Output code sout _ <- runL4 bin ["batch", batchSectionEnumFixture, "--inputs", batchSectionEnumJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [red, blue] -> do
+          red  `shouldSatisfy` ("\"result\":true" `isInfixOf`)
+          blue `shouldSatisfy` ("\"result\":false" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
+
+    it "keeps a line break inside a string literal as it is written" $ do
+      -- batch runs the re-printed module; before #1028 the newline came back
+      -- followed by the body's indentation ("line\\n  next"), status success.
+      Output code sout _ <- runL4 bin ["batch", batchLineBreakFixture, "--inputs", batchLineBreakJson]
+      code `shouldBe` ExitSuccess
+      case filter (not . all isSpace) (lines sout) of
+        [broken, tabbed] -> do
+          broken `shouldSatisfy` ("\"result\":\"line\\nnext\"" `isInfixOf`)
+          tabbed `shouldSatisfy` ("\"result\":\"tab\\there\"" `isInfixOf`)
+        rows -> expectationFailure ("expected 2 rows, got " ++ show (length rows) ++ ":\n" ++ sout)
 
     it "validate-only type-checks MAYBE primitive params" $ do
       -- premium is declared `A MAYBE NUMBER`; a BOOLEAN value must be flagged
@@ -2014,68 +4114,672 @@ spec bin = do
 
     -- Regression tests for target T11 (CLI injection / corruption).
     it "escapes payloads with backslashes, quotes and control chars (no lexer break)" $ do
-      -- The input row's payload contains backslashes (Windows path), embedded
-      -- quotes, newline/tab, and shell metacharacters. A naive quote-only
-      -- escaper produced an unparseable generated wrapper; a correct one
-      -- round-trips every byte as an L4 string literal.
+      -- The payload holds a Windows path, embedded quotes, a newline, a tab,
+      -- an apostrophe, braces and a percent sign. This pins the LOUD half of
+      -- the escaping only: `echoFixed` ignores its payload, so a quote-only
+      -- escaper fails here just because an unescaped `"` ends the wrapper's
+      -- string literal early and the wrapper no longer lexes. A backslash, a
+      -- tab or a line break does not break the lexing, and is pinned by the
+      -- next test.
       env <- jsonEnvelope bin ["batch", batchEscapeFixture, "--inputs", batchEscapeInput]
       objField env "status" `shouldBe` Just (String "success")
 
+    -- The silent half. With a quote-only escaper a backslash reaches the lexer
+    -- unescaped, which reads it as the start of an escape of its own, so the
+    -- rule is handed JSON that is not the JSON that was sent, and the row is
+    -- still a success. Measured on the old escaper: `\u0041` (a backslash, then
+    -- u0041) comes back as `A`, `\\n` (two backslashes and an n) as a backslash
+    -- and an n, and a Windows path, a tab and a line break as null.
+    -- `echoCode` returns its input, so a payload the wrapper changed shows as a
+    -- result that is not the one sent.
+    it "hands every payload to the rule and back unchanged: backslashes, tabs, line breaks, escape-looking text" $ do
+      Output code sout _ <-
+        runL4 bin ["batch", batchCodeFixture, "--inputs", batchEscapeRoundtripJson, "--continue-on-error"]
+      let rows = [ row | l <- map (filter (/= '\r')) (lines sout)
+                       , Right row <- [eitherDecode (BSL8.pack l) :: Either String Value] ]
+          sent = [ objField r "input" >>= (`objField` "code") | r <- rows ]
+      code `shouldBe` ExitSuccess
+      map (`objField` "status") rows `shouldBe` replicate 6 (Just (String "success"))
+      sent `shouldBe` map (Just . String . T.pack)
+        [ "C:\\Users\\x", "back\\slash", "tab\there", "line\nbreak", "\\u0041", "\\\\n" ]
+      map (fst . resultAndPresumed) rows `shouldBe` sent
+
+    -- The same, for a CSV file, where the values arrive as cells. Each cell is
+    -- `echoCode`'s input and so must be its answer, and each is its own example,
+    -- so a failure names the cell. On the hand-rolled escaper the double quote
+    -- fails to lex, and the backslash, the trailing backslash, the tab, the line
+    -- break and the carriage return come back as null, and the escape-looking
+    -- text as a different string, every one under status success; the plain
+    -- text, the non-ASCII letter and the apostrophe case are the controls that
+    -- pass there.
+    describe "hands a CSV cell to the rule and back unchanged" $ do
+      let cells :: [(String, String)]
+          cells = [ ("plain text", "plain"), ("a double quote", "say \"hi\""), ("a backslash", "C:\\Users\\x")
+                  , ("a trailing backslash", "trailing\\"), ("a tab", "tab\there")
+                  , ("a line break", "line one\nline two"), ("a carriage return", "cr\rhere")
+                  , ("a non-ASCII letter", "caf\233"), ("text that looks like an escape", "\\u0041")
+                  , ("two backslashes and an n", "\\\\n"), ("an apostrophe, braces and a percent sign", "it's {braced} 100%") ]
+          resultOf row = case objField row "output" of
+            Just (Array outs) | (o : _) <- foldr (:) [] outs -> objField o "result"
+            _ -> Nothing
+      beforeAll
+        (do Output code sout _ <-
+              runL4 bin ["batch", batchCodeFixture, "--inputs", batchEscapeCellsCsv, "--continue-on-error"]
+            pure ( code
+                 , [ row | l <- lines sout
+                         , Right row <- [eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack (filter (/= '\r') l)))) :: Either String Value] ] )) do
+        it "reads one row per cell, and exits 0" \(code, rows) -> do
+          length rows `shouldBe` length cells
+          code `shouldBe` ExitSuccess
+        forM_ (zip [0 ..] cells) \(i, (name, expected)) ->
+          it ("keeps " <> name) \(_, rows) ->
+            case drop i rows of
+              row : _ ->
+                (objField row "status", resultOf row)
+                  `shouldBe` (Just (String "success"), Just (String (T.pack expected)))
+              [] -> expectationFailure "no row for this cell"
+
+  describe "l4 batch: TYPICALLY defaults (W3)" $ do
+    -- Before W3 every one of these rows came back "Missing required field",
+    -- although #EVAL honours the section default (R1: batch must agree).
+    it "S1: a row that leaves a section GIVEN out takes its default and lists it in presumed" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyOmitted]
+      objField env "status" `shouldBe` Just (String "success")
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "S2: a value the row supplies wins, and nothing is presumed" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTySupplied]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    -- The positive control for `presumed`: it lists defaults the evaluation
+    -- FORCED (T6), not inputs the row left out. `is adult` FALSE short-circuits
+    -- `has capacity` away, so the same omission presumes nothing.
+    it "lists only a default the evaluation actually read" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyUnread]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    it "S3: a row that leaves a rule GIVEN out takes its default" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyOmitted]
+      objField env "status" `shouldBe` Just (String "success")
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    -- R3: a row that evaluates must also validate. Before: "invalid",
+    -- "Missing required field".
+    it "S3: --validate-only accepts the row that evaluates" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyOmitted, "--validate-only"]
+      objField env "status" `shouldBe` Just (String "valid")
+
+    it "S4: YAML with the field left out gives the same row as JSON" $ do
+      env <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyYaml]
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "S4: CSV with the column left out gives the same row as JSON, section and rule alike" $ do
+      envS <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyNoCol]
+      resultAndPresumed envS `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+      envR <- jsonEnvelope bin ["batch", batchTyRule, "--inputs", batchTyNoCol]
+      resultAndPresumed envR `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    -- T3c: an empty cell is a left-out input, not null, so one file can let
+    -- one row take the default while the next supplies a value.
+    it "S5: an empty CSV cell takes the default while presumption is soft" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyEmpty, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"])
+        , (Just (Bool False), presumedOf [])
+        ]
+
+    -- R5: a refusal stays loud, and names the input; it must not come back as
+    -- a quiet FALSE, which is the defect W1 fixed.
+    it "S5: with --presumption hard the same empty cell is an error naming the input" $ do
+      Output code sout _ <-
+        runL4 bin [ "batch", batchTySection, "--inputs", batchTyEmpty
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      code `shouldSatisfy` (/= ExitSuccess)
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success")]
+      sout `shouldSatisfy` ("Missing required field 'has capacity'" `isInfixOf`)
+      sout `shouldSatisfy` ("presumption is hard" `isInfixOf`)
+
+    it "with --presumption hard --validate-only reports the left-out input" $ do
+      env <- jsonEnvelope bin [ "batch", batchTyRule, "--inputs", batchTyOmitted
+                              , "--validate-only", "--presumption", "hard" ]
+      objField env "status" `shouldBe` Just (String "invalid")
+      objField env "errors" `shouldBe` Just (Array (pure (String "Missing required field: 'has capacity'")))
+
+    it "S6: null never takes the default, and the error names the field (T3)" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("\"status\":\"error\"" `isInfixOf`)
+      sout `shouldSatisfy` ("Field 'has capacity' is null" `isInfixOf`)
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyNull, "--validate-only"]
+      vout `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+
+    -- The cell is the same list as compact JSON, because a name may hold the
+    -- characters a separator would need (`of sound mind; sober`).
+    it "S7: --format csv carries a presumed column, as a JSON list" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyOmitted, "--format", "csv"]
+      code `shouldBe` ExitSuccess
+      -- cassava ends each record with CRLF
+      case map (filter (/= '\r')) (lines sout) of
+        header : row : _ -> do
+          header `shouldBe` "input_is adult,output,status,presumed,diagnostics"
+          row `shouldSatisfy` (",success,\"[\"\"has capacity\"\"]\"," `isInfixOf`)
+        other -> expectationFailure ("expected a header and a row, got: " ++ show other)
+      Output _ tout _ <- runL4 bin ["batch", batchTyTwo, "--inputs", batchTyOmitted, "--format", "csv"]
+      tout `shouldSatisfy` ("\"[\"\"has capacity\"\",\"\"of sound mind; sober\"\"]\"" `isInfixOf`)
+
+    -- T3c: a quoted "" is a row whose one cell is empty, so absent; cassava's
+    -- own decoder drops it as if it were a blank line (two rows in, one out,
+    -- exit 0). A quoted "   " is a row too, its cell of spaces empty. A blank
+    -- line is not a row, and neither is an unquoted line of spaces, in a
+    -- one-column file too (review M4; ruled by Meng on 2026-10-13,
+    -- legalese/l4-ide#653): the fixture's `   ` line is skipped, and to give an
+    -- empty value in a one-column file, write `""`.
+    it "evaluates a one-column CSV row whose only cell is \"\"" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyOneCol, "--inputs", batchTyOneColCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"])
+        , (Just (Bool False), presumedOf [])
+        , (Just (Bool True), presumedOf ["has capacity"])
+        ]
+
+    -- Review M4 (ruled by Meng on 2026-10-13, legalese/l4-ide#653): a short
+    -- row used to take the defaults of its missing cells, and a long one lost
+    -- its extra cells, both with status success. A line of a tab and a space
+    -- is blank, so it is skipped and still counted.
+    it "refuses a CSV record whose cell count is not the header's, naming its line" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyRaggedCsv, "--format", "json", "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "success"), Just (String "error"), Just (String "error")]
+      sout `shouldSatisfy` ("Line 3 has 1 cell, but the header has 2" `isInfixOf`)
+      sout `shouldSatisfy` ("Line 5 has 3 cells, but the header has 2" `isInfixOf`)
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyRaggedCsv, "--validate-only", "--continue-on-error"]
+      vout `shouldSatisfy` ("Line 3 has 1 cell" `isInfixOf`)
+
+    -- Review M1 (decided overnight 2026-10-02, pending Meng's review): where
+    -- an input left out takes its default, a key that matches no input is
+    -- refused, naming it and the nearest input, in a CSV header, a JSON row
+    -- and a nested record, and --validate-only agrees. Where nothing took a
+    -- default, an unknown key is still ignored (row 2 of the JSON fixture).
+    it "refuses an unknown key where a default is filled, and ignores it elsewhere" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoCsv]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Unknown field 'has capasity' (did you mean 'has capacity'?)" `isInfixOf`)
+      Output _ jout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoJson, "--format", "json", "--continue-on-error"]
+      jrows <- decodeArray jout
+      map (`objField` "status") jrows `shouldBe` [Just (String "error"), Just (String "success"), Just (String "success")]
+      map resultAndPresumed (drop 1 jrows) `shouldBe` [ (Just (Bool False), presumedOf []), (Just (Bool True), presumedOf ["has capacity"]) ]
+      Output _ vout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyTypoJson, "--validate-only", "--format", "json", "--continue-on-error"]
+      vrows <- decodeArray vout
+      map (`objField` "status") vrows `shouldBe` [Just (String "invalid"), Just (String "valid"), Just (String "valid")]
+      Output _ rout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordTypoJson, "--format", "json", "--continue-on-error"]
+      rrows <- decodeArray rout
+      map (`objField` "status") rrows `shouldBe` [Just (String "error"), Just (String "success")]
+      rout `shouldSatisfy` ("Unknown field 'cfg.timout' (did you mean 'cfg.timeout'?)" `isInfixOf`)
+      Output _ rvout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordTypoJson, "--validate-only", "--format", "json", "--continue-on-error"]
+      rvrows <- decodeArray rvout
+      map (`objField` "status") rvrows `shouldBe` [Just (String "invalid"), Just (String "valid")]
+
+    -- Review M2 (decided overnight 2026-10-02, pending Meng's review): {} on a
+    -- record input is null too, so it is refused by name; it used to be a
+    -- record that supplied nothing in batch and null on the service.
+    it "reads {} on a record input as null, and refuses it by name" $ do
+      Output _ sout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordEmptyJson, "--format", "json", "--continue-on-error"]
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success")]
+      sout `shouldSatisfy` ("Field 'cfg' is {}, which means the value is not known: supply a value" `isInfixOf`)
+
+    it "takes every default for a JSON row {} that supplies nothing" $ do
+      env <- jsonEnvelope bin ["batch", batchTyOneCol, "--inputs", batchTyEmptyRow]
+      resultAndPresumed env `shouldBe` (Just (Bool True), presumedOf ["has capacity"])
+
+    it "reads {} as a value like null: it never takes the default" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyUncertain]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Field 'has capacity' is {}, which means the value is not known" `isInfixOf`)
+
+    -- Review B1: Excel's "CSV UTF-8" export starts with a byte-order mark,
+    -- which used to rename the first column, so its input took its default.
+    -- The first column here has one: `has capacity` FALSE must win.
+    it "reads a CSV that starts with a UTF-8 byte-order mark" $ do
+      env <- jsonEnvelope bin ["batch", batchTySection, "--inputs", batchTyBomCsv]
+      resultAndPresumed env `shouldBe` (Just (Bool False), presumedOf [])
+
+    it "reads CRLF line ends, and a quoted cell holding a newline, as one row each" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyCrlfCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["has capacity"]), (Just (Bool False), presumedOf []) ]
+      Output scode sstr _ <- runL4 bin ["batch", batchTyString, "--inputs", batchTyStringCsv, "--format", "json"]
+      scode `shouldBe` ExitSuccess
+      srows <- decodeArray sstr
+      map resultAndPresumed srows `shouldBe`
+        [ (Just (Number 2), presumedOf ["n"]), (Just (Number 7), presumedOf []) ]
+      sstr `shouldSatisfy` ("\"note\":\"line one\\nline two\"" `isInfixOf`)
+
+    -- Review M3 / code #1, T4b: the switch reaches the request's decode only.
+    -- A decode the rule makes of its own fills its default in both modes;
+    -- under hard the answer says it rests on it, because no row could
+    -- supply it. Soft keeps T6b's filter, so it is not listed there.
+    it "lets a rule's own JSONDECODE fill its defaults in both modes" $ do
+      soft <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson]
+      resultAndPresumed soft `shouldBe` (Just (Bool True), presumedOf [])
+      hard <- jsonEnvelope bin ["batch", batchTyOwnDecode, "--inputs", batchTyOwnDecodeJson, "--presumption", "hard"]
+      resultAndPresumed hard `shouldBe` (Just (Bool True), presumedOf ["JSONDECODE Settings: limit"])
+
+    -- T3: null on an enum with no default used to decode to NOTHING and
+    -- answer FALSE, status success. A synonym for MAYBE is a MAYBE.
+    it "refuses null on an enum by name, and reads a MAYBE synonym as a MAYBE" $ do
+      Output _ sout _ <- runL4 bin ["batch", batchTyEnum, "--inputs", batchTyEnumJson, "--format", "json", "--continue-on-error"]
+      rows <- decodeArray sout
+      map (`objField` "status") rows `shouldBe` [Just (String "error"), Just (String "success"), Just (String "success")]
+      sout `shouldSatisfy` ("Field 'shade' is null, which means the value is not known" `isInfixOf`)
+      map resultAndPresumed (drop 1 rows) `shouldBe`
+        [ (Just (Bool True), presumedOf []), (Just (Bool True), presumedOf ["second"]) ]
+
+    -- Review m1: batch re-prints its module, and printed literals and the
+    -- record's TYPICALLY went through a Double. #EVAL says TRUE.
+    it "keeps a decimal default exact through the re-print" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyExact, "--inputs", batchTyExactJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Bool True), presumedOf ["r"]), (Just (Bool True), presumedOf []), (Just (Bool False), presumedOf []) ]
+
+    -- With presumption hard every defaulted input left out is named in one
+    -- run, as --validate-only names them, and as one with no default is.
+    -- Hard refuses a left-out defaulted input before anything runs, even one
+    -- the rule would not have read: the same eager refusal as for an input
+    -- with no default. The batch page says so.
+    it "with --presumption hard refuses a left-out default the rule would not read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTySection, "--inputs", batchTyUnread, "--presumption", "hard"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Missing required field 'has capacity'" `isInfixOf`)
+
+    it "with --presumption hard names every defaulted input left out" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyTwo, "--inputs", batchTyOmitted, "--presumption", "hard"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      sout `shouldSatisfy` ("Missing required fields 'of sound mind; sober'" `isInfixOf`)
+      sout `shouldSatisfy` ("'has capacity' (it has a TYPICALLY default" `isInfixOf`)
+
+    -- T1b: the decoder fills a record field from its DECLARE, and an enum
+    -- default resolves on a field (p10, which used to fail to check) as it
+    -- does on a GIVEN. `presumed` names a field by its path, in force order.
+    it "fills record-field and enum defaults, and presumes only what was read" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyRecord, "--inputs", batchTyRecordJson, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 32), presumedOf ["cfg.colour", "shade", "cfg.timeout"])
+        , (Just (Number 0), presumedOf [])
+        , (Just (Number 0), presumedOf ["cfg.colour"])
+        ]
+
+    -- The decoder knows the field defaults of an IMPORTed module's records too
+    -- (the evaluator is handed the importer's transitive imports).
+    it "fills a field default declared in an imported module" $ do
+      env <- jsonEnvelope bin ["batch", batchTyImported, "--inputs", batchTyImportedJson]
+      resultAndPresumed env `shouldBe` (Just (Number 32), presumedOf ["cfg.timeout"])
+
+    -- T3c's MAYBE paragraph: a left-out MAYBE input with no default is
+    -- NOTHING while soft, missing while hard. The fixture's MAYBE comes first,
+    -- which also pins the wrapper's InputArgs layout: a leading ", " after a
+    -- MAYBE field used to fail every row with "incorrect indentation".
+    it "an empty cell for a MAYBE input is NOTHING when soft and missing when hard" $ do
+      Output code sout _ <- runL4 bin ["batch", batchTyMaybe, "--inputs", batchTyMaybeCsv, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      rows <- decodeArray sout
+      -- NOTHING for a left-out MAYBE is a presumption (T1b puts it under the
+      -- switch), so it is listed like a default.
+      map resultAndPresumed rows `shouldBe`
+        [ (Just (Number 0), presumedOf ["premium"]), (Just (Number 7), presumedOf []) ]
+      Output hcode hout _ <-
+        runL4 bin [ "batch", batchTyMaybe, "--inputs", batchTyMaybeCsv
+                  , "--presumption", "hard", "--format", "json", "--continue-on-error" ]
+      hcode `shouldSatisfy` (/= ExitSuccess)
+      hrows <- decodeArray hout
+      map (`objField` "status") hrows `shouldBe` [Just (String "error"), Just (String "success")]
+      hout `shouldSatisfy` ("Missing required field 'premium'" `isInfixOf`)
+
+  -- Each example works in a directory of its own (`withSystemTempDirectory`):
+  -- two runs of this suite on one machine, say two worktrees' gates at once,
+  -- used to share fixed names here and delete each other's directories.
   describe "l4 trace (output path safety)" $ do
-    it "never runs a shell for the output path, so metacharacters can't inject" $ do
+    it "never runs a shell for the output path, so metacharacters can't inject" $ withSystemTempDirectory "l4-trace-injection" \work -> do
       -- Render into a directory whose *name* would execute `touch <sentinel>`
       -- if the path were ever handed to a shell. With a direct `proc` call it
       -- is just a literal (if unusual) directory name. The sentinel must not
       -- appear regardless of whether Graphviz's `dot` is installed.
-      tmp <- getTemporaryDirectory
-      let sentinel = tmp </> "l4-trace-injection-sentinel"
-          evilDir  = tmp </> ("l4trace$(touch " ++ sentinel ++ ").d")
-      removePathForcibly sentinel
-      removePathForcibly evilDir
-      createDirectoryIfMissing True evilDir
-      _ <- runL4 bin ["trace", evalTraceFixture, "--format", "png", "--output-dir", evilDir]
-      ranShell <- doesFileExist sentinel
-      removePathForcibly evilDir
+      -- The sentinel is relative, run from a scratch directory: an absolute
+      -- Windows path would put a drive colon into the directory name.
+      let sentinel = "l4-trace-injection-sentinel"
+          evilDir  = "l4trace$(touch " ++ sentinel ++ ").d"
+      createDirectoryIfMissing True (work </> evilDir)
+      fixture <- makeAbsolute evalTraceFixture
+      _ <- runL4In (Just work) Nothing bin
+        ["trace", fixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist (work </> sentinel)
       ranShell `shouldBe` False
 
-    it "writes trace output into a directory whose path contains a space" $ do
+    it "writes trace output into a directory whose path contains a space" $ withSystemTempDirectory "l4-trace-out" \tmp -> do
       -- The `.dot` branch needs no external tools; it exercises the same
       -- outDir path-join the png/svg branches feed to `dot`, proving spaces
       -- survive instead of being word-split.
-      tmp <- getTemporaryDirectory
       let outDir = tmp </> "l4 trace out"   -- note the space
-      removePathForcibly outDir
       Output code _ _ <- runL4 bin ["trace", evalTraceFixture, "--format", "dot", "--output-dir", outDir]
       code `shouldBe` ExitSuccess
       wrote <- doesFileExist (outDir </> "evaltrace-eval1.dot")
-      removePathForcibly outDir
       wrote `shouldBe` True
 
-  -- Regression tests for the import-cycle false-success bug: `l4 check`/`run`
-  -- previously exited 0 on a 2-/3-module import ring because the engine's cycle
-  -- error attaches to a transitively-imported file, not the entry file, and the
-  -- verdict only inspected the entry file's own typecheck result.
+    it "runs no shell for --output-dir, and renders or fails with a diagnostic" $ withSystemTempDirectory "l4-trace-metachar" \work -> do
+      -- `;` ends a shell command, so this name, handed to a shell, runs
+      -- `touch PWNED` in the working directory. The marker is relative, so
+      -- unlike the case above the name has no drive colon and no separator,
+      -- and is a legal directory on Windows as well.
+      let evilDir = "o;touch PWNED;x"
+      fixture <- makeAbsolute evalTraceFixture
+      Output code _ serr <- runL4In (Just work) Nothing bin
+        ["trace", fixture, "--format", "png", "--output-dir", evilDir]
+      ranShell <- doesFileExist (work </> "PWNED")
+      rendered <- doesFileExist (work </> evilDir </> "evaltrace-eval1.png")
+      ranShell `shouldBe` False
+      case code of
+        ExitSuccess   -> rendered `shouldBe` True
+        ExitFailure _ -> serr `shouldSatisfy` ("Error: " `isInfixOf`)
+
+    it "hands dot an output dir beginning with '-' as a path, not an option" $ do
+      -- dot reads any argument starting with `-` as an option, and has no
+      -- `--` to stop that. Given `-out/evaltrace-eval1.dot` it reads
+      -- `-o ut/...`, takes the graph from stdin instead, and exits 0 having
+      -- written nothing, so `l4 trace` reported an empty SVG as generated.
+      -- Only a real `dot` shows this, so without one the test is pending.
+      mDot <- findExecutable "dot"
+      case mDot of
+        Nothing -> pendingWith "Graphviz `dot` is not on PATH"
+        Just _ -> withSystemTempDirectory "l4-trace-dash-path" \work -> do
+          let svgFile = work </> "-out" </> "evaltrace-eval1.svg"
+          fixture <- makeAbsolute evalTraceFixture
+          Output code _ _ <- runL4In (Just work) Nothing bin
+            ["trace", fixture, "--format", "svg", "--output-dir=-out"]
+          wrote <- doesFileExist svgFile
+          svg <- if wrote
+            then T.unpack . TE.decodeUtf8Lenient <$> BS.readFile svgFile
+            else pure ""
+          code `shouldBe` ExitSuccess
+          svg `shouldSatisfy` ("<svg" `isInfixOf`)
+
+  -- `l4 batch` re-prints the module and evaluates the printed text, so these
+  -- check the printer's brackets as much as batch. Each operand nests inside an
+  -- AND, and each expected answer is the fixture's own #EVAL under `l4 run`.
+  -- With the printer as it was, batch answered `true` to every one of them,
+  -- with "status":"success" and no diagnostic.
+  describe "l4 batch keeps the grouping the rule wrote" $ do
+    let bracket = fixtureDir </> "batch-bracket.l4"
+        rows f  = fixtureDir </> ("batch-bracket-" ++ f ++ ".json")
+    it "brackets an OR inside an AND" $
+      batchAnswer bin bracket (rows "tff") "or under and" `shouldReturn` Bool False
+    it "brackets a NOT inside an AND" $
+      batchAnswer bin bracket (rows "tff") "not under and" `shouldReturn` Bool False
+    it "brackets an IMPLIES inside an AND" $
+      batchAnswer bin bracket (rows "fff") "implies under and" `shouldReturn` Bool False
+    it "brackets an IF inside an AND" $
+      batchAnswer bin bracket (rows "ttf") "if under and" `shouldReturn` Bool False
+    it "brackets a function call inside an AND" $
+      batchAnswer bin bracket (rows "fff") "call under and" `shouldReturn` Bool False
+
+  -- `l4 batch` re-prints the module and evaluates the printed text, so these
+  -- check the printer as much as batch. Each expected value is what `l4 run`
+  -- gives on the fixture's own #EVAL. On build 90 the first three returned the
+  -- opposite answer with "status":"success", and the division failed to
+  -- re-parse (`a DIVIDED b`).
+  describe "l4 batch agrees with l4 run" $ do
+    let grouping = fixtureDir </> "batch-grouping.l4"
+        rows f   = fixtureDir </> ("batch-grouping-" ++ f ++ ".json")
+    it "keeps the brackets on an OR inside an AND" $
+      batchAnswer bin grouping (rows "tff") "or under and" `shouldReturn` Bool False
+    it "keeps the brackets on a NOT inside an OR" $
+      batchAnswer bin grouping (rows "ttf") "not under or" `shouldReturn` Bool True
+    it "keeps the brackets on an IMPLIES inside an AND" $
+      batchAnswer bin grouping (rows "fff") "implies under and" `shouldReturn` Bool False
+    it "evaluates an exported division" $
+      batchAnswer bin (fixtureDir </> "batch-division.l4") (fixtureDir </> "batch-division.json") "divided"
+        `shouldReturn` Number 2
+
+  -- `l4 batch` prints the checked module back and checks it again beside a
+  -- generated record with a field for each input. An annotation that names an
+  -- input (`%a%`) would then have two candidates and no expected type to choose
+  -- between them, and `main`'s checker refuses that ("multiple definitions").
+  -- `prettyLayout` writes no annotation back, so the row runs; this pins it.
+  describe "l4 batch runs an export whose annotation names its input" $
+    it "answers instead of refusing the printed module" $
+      batchAnswer bin (fixtureDir </> "batch-nlg-input-slot.l4") (fixtureDir </> "batch-nlg-input-slot.json") "is large"
+        `shouldReturn` Bool True
+
+  -- An `@nlg` annotation is wording for the reader of a rule, not part of what
+  -- the rule evaluates to. `prettyLayout` prints evaluation results, and it
+  -- writes no annotation back; a printer that did would put `[a red colour]`
+  -- inside `Shape OF Red [a red colour], 3`.
+  -- Pending: main's printer writes no annotation back; unstable's prettyLayout
+  -- re-emits them, and `l4 run` prints values through it (the 2026-11 sync, D9).
+  xdescribe "l4 run prints a value without its annotations" $ do
+    let runOut = do
+          Output code sout0 _ <- runL4 bin ["run", fixtureDir </> "annotated-values.l4"]
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout0)
+    it "leaves an annotation off a constructor inside a value" $ do
+      sout <- runOut
+      sout `shouldSatisfy` ("Shape OF Red, 3" `isInfixOf`)
+      sout `shouldSatisfy` ("JUST OF Green" `isInfixOf`)
+      sout `shouldNotSatisfy` ("a red colour" `isInfixOf`)
+      sout `shouldNotSatisfy` ("a green colour" `isInfixOf`)
+    it "leaves an annotation off the party and the action of an obligation" $ do
+      sout <- runOut
+      sout `shouldSatisfy` ("PARTY Alice" `isInfixOf`)
+      sout `shouldSatisfy` ("MUST `pay the price`" `isInfixOf`)
+      sout `shouldNotSatisfy` ("the payer" `isInfixOf`)
+      sout `shouldNotSatisfy` ("paying" `isInfixOf`)
+
+  -- An import ring used to pass `l4 check` and `l4 run` with exit 0 and "Check
+  -- succeeded." printed under the cycle's own error. The engine reports the
+  -- cycle as an Error on a module that is IMPORTED, not on the file named on the
+  -- command line, and the verdict looked only at the named file's typecheck. A
+  -- self-import is the exception: there the error lands on the entry file, so
+  -- it already failed, which makes it the positive control for the rest.
+  describe "a file on a ring of imports is refused, not run with the import left out" $ do
+    let rule imports = unlines $
+          map ("IMPORT " <>) imports <>
+          [ ""
+          , "@export Doubles a number"
+          , "GIVEN x IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE doubled x IS x TIMES 2"
+          ]
+        withProject act = withSystemTempDirectory "l4-import-ring" \dir -> do
+          writeFile (dir </> "left.l4") (rule ["right"])
+          writeFile (dir </> "right.l4") "IMPORT left\n\nDECIDE `the rate` IS 2\n"
+          writeFile (dir </> "solo.l4") (rule ["solo"])
+          writeFile (dir </> "plain.l4") (rule [])
+          writeFile (dir </> "inputs.json") "[{\"x\": 1}]"
+          act dir
+        -- Found as 'locateL4Binary' finds l4, so the jl4-schema tested is the one
+        -- built here: PATH can put an older install first, and one did.
+        schemaGenerator = do
+          fromEnv <- lookupEnv "JL4_SCHEMA_BIN"
+          fromCabal <- case fromEnv of
+            Just p -> pure (Just p)
+            Nothing -> do
+              listed <- try (readCreateProcessWithExitCode (proc "cabal" ["list-bin", "exe:jl4-schema"]) "")
+              case listed :: Either IOException (ExitCode, String, String) of
+                Right (ExitSuccess, out, _) -> do
+                  let path = T.unpack (T.strip (T.pack out))
+                  ok <- doesFileExist path
+                  pure (if ok then Just path else Nothing)
+                _ -> pure Nothing
+          found <- maybe (findExecutable "jl4-schema") (pure . Just) fromCabal
+          maybe (fail "jl4-schema not found: set JL4_SCHEMA_BIN or run this with cabal test") pure found
+
+    it "the same rule with no ring goes through both, which is what the rest refuses" $
+      withProject \dir -> do
+        Output batchCode _ _ <- runL4 bin ["batch", dir </> "plain.l4", "--inputs", dir </> "inputs.json"]
+        batchCode `shouldBe` ExitSuccess
+        schema <- schemaGenerator
+        Output schemaCode _ _ <- runL4 schema [dir </> "plain.l4"]
+        schemaCode `shouldBe` ExitSuccess
+
+    forM_ [("a ring of imports", "left.l4"), ("a self-import", "solo.l4")] \(what, file) -> do
+      it ("l4 batch refuses " <> what) $
+        withProject \dir -> do
+          Output code sout _ <- runL4 bin ["batch", dir </> file, "--inputs", dir </> "inputs.json"]
+          code `shouldBe` ExitFailure 1
+          sout `shouldSatisfy` ("type checking failed" `isInfixOf`)
+
+      it ("jl4-schema refuses " <> what) $
+        withProject \dir -> do
+          schema <- schemaGenerator
+          Output code _ serr <- runL4 schema [dir </> file]
+          code `shouldBe` ExitFailure 1
+          serr `shouldSatisfy` ("Failed to parse or typecheck" `isInfixOf`)
+
   describe "l4 import cycles" $ do
-    it "fails check on a 3-module import ring" $
-      expectFail bin ["check", cycle3Entry]
+    forM_ ["check", "run"] \cmd -> do
+      it ("fails " <> cmd <> " on a 3-module import ring") $
+        expectExit1 bin [cmd, cycle3Entry]
 
-    it "fails run on a 3-module import ring" $
-      expectFail bin ["run", cycle3Entry]
+      it ("fails " <> cmd <> " on a 2-module import ring") $
+        expectExit1 bin [cmd, cycle2Entry]
 
-    it "fails check on a 2-module import ring" $
-      expectFail bin ["check", cycle2Entry]
+      it ("fails " <> cmd <> " on a self-import") $
+        expectExit1 bin [cmd, selfImportEntry]
 
-    it "fails check on a self-import" $
-      expectFail bin ["check", selfImportEntry]
+      -- The file named on the command line is not in the ring, so the error
+      -- cannot land on it.
+      it ("fails " <> cmd <> " when the entry file imports a ring without being in it") $
+        expectExit1 bin [cmd, cycle3OutsideEntry]
 
-    it "reports ok=false in JSON on a cyclic import" $ do
-      env <- jsonEnvelope bin ["check", cycle3Entry, "--json"]
-      objField env "ok" `shouldBe` Just (Bool False)
+      it ("reports ok=false in JSON from " <> cmd <> " on a cyclic import") $
+        expectJsonNotOk bin [cmd, cycle3Entry]
 
-    it "still succeeds on a clean multi-file import" $
-      -- Guard: the broadened 'any non-eval Error diagnostic fails the run'
-      -- rule must NOT over-fire on a legitimate clean import.
+    -- `l4 FILE` with no command is `l4 run FILE`.
+    it "fails the bare `l4 FILE` form on a 3-module import ring" $
+      expectExit1 bin [cycle3Entry]
+
+  -- The verdict now also looks at the modules a file imports. These are the
+  -- cases it must NOT turn into a failure, so that the check above cannot be
+  -- satisfied by failing everything that has an IMPORT.
+  describe "l4 check and run on imports that are not cycles" $ do
+    it "still succeeds on a clean multi-file import" $ do
       expectOk bin ["check", cleanImportEntry] "Check succeeded."
+      expectOk bin ["run", cleanImportEntry] "Checking succeeded."
+
+    -- A warning in an imported module is a warning, as it is in the entry file.
+    it "still succeeds when an imported module only warns" $ do
+      expectOk bin ["check", warningImportEntry] "Check succeeded."
+      expectOk bin ["run", warningImportEntry] "Checking succeeded."
+
+    -- A failed #ASSERT is published as an Error diagnostic of the evaluator's
+    -- own. It is a verdict about the rules, not a fault in the file, so it must
+    -- not become one now that every Error in the closure counts; the plain-text
+    -- case is "leaves a clean FALSE #ASSERT at exit 0" under `l4 run`.
+    -- Not run on unstable (D4): main keeps l4 run at ok=true on a failed #ASSERT;
+    -- unstable reports ok=false and exits 1 on it (ruled 2026-09-29).
+    xit "still reports ok=true in JSON for a failed #ASSERT" $ do
+      env <- jsonEnvelope bin ["run", fixtureDir </> "assert-clean.l4", "--json"]
+      objField env "ok" `shouldBe` Just (Bool True)
+
+  -- Not a ring, but the same blind spot: the entry file typechecks against the
+  -- modules it imports, and an error INSIDE one of them, or an IMPORT that
+  -- finds no module at all, did not fail the run. In each case the entry file is
+  -- fine and uses nothing from the import, so only the import's own error can
+  -- fail it. The unresolved IMPORT is reported as a module that could not be
+  -- found, and not also as a module that depends on itself.
+  describe "l4 check and run on an import that cannot be loaded" $
+    forM_ [ ("a type error in an imported module", brokenImportEntry)
+          , ("a syntax error in an imported module", syntaxImportEntry)
+          , ("an unclosed string in an imported module", lexImportEntry)
+          , ("an IMPORT that resolves to no module", missingImportEntry)
+          ] \(what, entry) ->
+      forM_ ["check", "run"] \cmd -> do
+        it ("fails " <> cmd <> " on " <> what) $
+          expectExit1 bin [cmd, entry]
+
+        it ("reports ok=false in JSON from " <> cmd <> " on " <> what) $
+          expectJsonNotOk bin [cmd, entry]
+
+  -- `l4 deploy` and `l4 redeploy` refuse a file for the reasons `l4 check`
+  -- does, and say so before they touch the network. Nothing listens on the
+  -- discard port, so a command that gets past the local check stops at the
+  -- first request with "Could not reach", and one that refuses never gets that
+  -- far. The refusal carries the same diagnostics `l4 check` prints.
+  describe "l4 deploy and redeploy refuse what l4 check refuses" $ do
+    let noServer = ["--server", "http://127.0.0.1:9"]
+        refusal = "doesn't typecheck; fix it before deploying (see `l4 check`)."
+        errorLabel = "Severity: DiagnosticSeverity_Error"
+        textBefore needle = go []
+          where
+            go acc s
+              | needle `isPrefixOf` s = Just (reverse acc)
+              | otherwise = case s of
+                  [] -> Nothing
+                  c : cs -> go (c : acc) cs
+
+    forM_ [ ("a type error in an imported module", brokenImportEntry)
+          , ("a syntax error in an imported module", syntaxImportEntry)
+          , ("an unclosed string in an imported module", lexImportEntry)
+          , ("an IMPORT that resolves to no module", missingImportEntry)
+          , ("a 3-module import ring", cycle3Entry)
+          , ("a file that imports a ring without being in it", cycle3OutsideEntry)
+          , ("a 2-module import ring", cycle2Entry)
+          , ("a self-import", selfImportEntry)
+          ] \(what, entry) ->
+      forM_ ["deploy", "redeploy"] \cmd ->
+        it ("refuses " <> cmd <> " of " <> what <> ", with the diagnostics, before the network") $ do
+          Output check _ _ <- runL4 bin ["check", entry]
+          check `shouldBe` ExitFailure 1
+          Output code sout serr0 <- runL4 bin ([cmd, entry] ++ noServer)
+          let serr = filter (/= '\r') serr0
+          code `shouldBe` ExitFailure 1
+          sout `shouldBe` ""
+          serr `shouldSatisfy` isInfixOf refusal
+          serr `shouldNotSatisfy` isInfixOf "Could not reach"
+          -- The error comes first, then the refusal that says what to do.
+          case textBefore refusal serr of
+            Just printed -> printed `shouldSatisfy` isInfixOf errorLabel
+            Nothing -> expectationFailure ("no refusal in:\n" ++ serr)
+
+    -- The guards: a file `l4 check` accepts, and one it accepts with a warning
+    -- from an imported module, must get past the local check, or the refusal
+    -- above could be satisfied by refusing every file that has an IMPORT.
+    forM_ [ ("a clean multi-file import", cleanImportEntry)
+          , ("an imported module that only warns", warningImportEntry)
+          ] \(what, entry) ->
+      forM_ ["deploy", "redeploy"] \cmd ->
+        it ("lets " <> cmd <> " of " <> what <> " past the local check") $ do
+          Output check _ _ <- runL4 bin ["check", entry]
+          check `shouldBe` ExitSuccess
+          Output code _ serr <- runL4 bin ([cmd, entry] ++ noServer)
+          code `shouldBe` ExitFailure 1
+          serr `shouldSatisfy` isInfixOf "Could not reach http://127.0.0.1:9"
+          serr `shouldNotSatisfy` isInfixOf "doesn't typecheck"
+
+  -- Regression test for smucclaw/l4-ide#1008: every module used to be checked
+  -- (and evaluated) once per import PATH, so a type error in a module reached by
+  -- several paths was reported once per path (10 times under `check`, 36 under
+  -- `run` on this fixture). It must be reported exactly once.
+  describe "l4 diagnostics in a shared imported module" $
+    for_ ["check", "run"] \cmd ->
+      it ("reports a type error in a diamond's bottom module once under " <> cmd) $ do
+        Output code sout serr <- runL4 bin [cmd, dupDiagDiamondEntry]
+        code `shouldNotBe` ExitSuccess
+        -- The error names the operator as written (Thomas's a0a01b3be), and its
+        -- first line is quoted again by each importer's "has errors" note, so
+        -- the count is of the error itself: its first line ends the line.
+        countInfix "The second input of PLUS is expected to be of type\n" (filter (/= '\r') (sout <> serr)) `shouldBe` 1
 
   -- Regression test for smucclaw/l4-ide#906: a diamond import over the
   -- embedded-library fallback used to starve the second sibling of the shared
@@ -2109,18 +4813,18 @@ spec bin = do
   -- guarded against (§3.1 of the spec): a machine-global XDG symlink silently
   -- shadowing the stdlib the binary was built with.
   describe "l4 library resolution shadow (B′)" $ do
-    let mkXdgStore name libFileName mkLib = do
-          tmp <- getTemporaryDirectory
-          let xdgHome = tmp </> name
+    -- `tmp` is the example's own directory (`withSystemTempDirectory`), so
+    -- two runs of this suite on one machine cannot share a store.
+    let mkXdgStore tmp libFileName mkLib = do
+          let xdgHome = tmp </> "xdg"
               store = xdgHome </> "jl4" </> "libraries"
-          removePathForcibly xdgHome
           createDirectoryIfMissing True store
           _ <- mkLib (store </> libFileName)
           pure xdgHome
         poison = "this is not L4 at all ("
 
-    it "embedded stdlib outranks a poisoned machine-global XDG copy" $ do
-      xdgHome <- mkXdgStore "l4-shadow-xdg-poison" "prelude.l4" \p -> writeFile p poison
+    it "embedded stdlib outranks a poisoned machine-global XDG copy" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      xdgHome <- mkXdgStore tmp "prelude.l4" \p -> writeFile p poison
       Output code sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
       case code of
         ExitSuccess -> pure ()
@@ -2129,26 +4833,44 @@ spec bin = do
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
       -- Option E: two differing copies were visible; the warning names them
-      -- and the chosen one, at a priority the CLI actually prints.
+      -- and the chosen one, at a priority the CLI actually prints. The two rows
+      -- are asserted whole, with their markers: that the words "embedded
+      -- stdlib" and "XDG data dir" appear somewhere in the output proves
+      -- nothing, because the unresolved-import error and the parse error in
+      -- the poisoned file name them too.
       serr `shouldSatisfy` ("Multiple differing copies of module `prelude`" `isInfixOf`)
-      serr `shouldSatisfy` ("[chosen]" `isInfixOf`)
-      serr `shouldSatisfy` ("embedded stdlib" `isInfixOf`)
-      serr `shouldSatisfy` ("XDG data dir" `isInfixOf`)
+      serr `shouldSatisfy` ("[chosen]   embedded stdlib" `isInfixOf`)
+      serr `shouldSatisfy` ("[shadowed] XDG data dir" `isInfixOf`)
 
-    it "dereferences symlinks when naming the shadowed copy" $ do
-      tmp <- getTemporaryDirectory
-      let target = tmp </> "l4-shadow-poison-target.l4"
+    -- The example below makes a symbolic link, and is marked pending where the
+    -- account may not make one (Windows without the symlink privilege). This
+    -- pins that path: a link made in a folder the account may not write to is
+    -- reported, not thrown.
+    it "reports a link it may not create, instead of throwing" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      let locked = tmp </> "locked"
+          target = tmp </> "locked-target.l4"
+          open' = setOwnerWritable True (setOwnerSearchable True (setOwnerReadable True emptyPermissions))
+      createDirectoryIfMissing True locked
+      writeFile target poison
+      setPermissions locked emptyPermissions
+      r <- tryLink target (locked </> "prelude.l4") `finally` setPermissions locked open'
+      case r of
+        Left why -> why `shouldSatisfy` ("cannot create a symbolic link" `isInfixOf`)
+        Right () -> pendingWith "this account can make a link in a read-only folder (root, or a platform that ignores the mode)"
+
+    it "dereferences symlinks when naming the shadowed copy" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      let target = tmp </> "poison-target.l4"
       writeFile target poison
       realTarget <- canonicalizePath target
-      xdgHome <- mkXdgStore "l4-shadow-xdg-symlink" "prelude.l4" \p -> createFileLink target p
+      xdgHome <- mkXdgStore tmp "prelude.l4" \p -> linkOrPending target p
       Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowEmbeddedEntry]
       code `shouldBe` ExitSuccess
       -- The warning must print the symlink's real target, so a reader can see
       -- WHICH checkout/file a machine-global entry actually points at.
       serr `shouldSatisfy` (realTarget `isInfixOf`)
 
-    it "a project-local prelude override still outranks the embedded stdlib" $ do
-      xdgHome <- mkXdgStore "l4-shadow-xdg-empty" "unused.txt" \_ -> pure ()
+    it "a project-local prelude override still outranks the embedded stdlib" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      xdgHome <- mkXdgStore tmp "unused.txt" \_ -> pure ()
       Output code sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowSiblingEntry]
       -- main.l4 uses `shadow marker`, defined only in the fixture's local
       -- prelude.l4 — this checks clean iff the project-scoped copy won.
@@ -2159,18 +4881,18 @@ spec bin = do
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
 
-    it "identical copies do not warn (content gate, non-embedded module)" $ do
+    it "identical copies do not warn (content gate, non-embedded module)" $ withSystemTempDirectory "l4-shadow" \tmp -> do
       -- `shadow-extra` is NOT an embedded module; it exists beside the
       -- importing file AND in the XDG store, byte-identical. Two sources, one
       -- content: the Option E warning must stay silent.
       localCopy <- readFile (fixtureDir </> "library-shadow" </> "xdg-extra" </> "shadow-extra.l4")
-      xdgHome <- mkXdgStore "l4-shadow-xdg-identical" "shadow-extra.l4" \p -> writeFile p localCopy
+      xdgHome <- mkXdgStore tmp "shadow-extra.l4" \p -> writeFile p localCopy
       Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowExtraEntry]
       code `shouldBe` ExitSuccess
       serr `shouldSatisfy` (not . ("Multiple differing copies" `isInfixOf`))
 
-    it "differing copies of the same non-embedded module do warn" $ do
-      xdgHome <- mkXdgStore "l4-shadow-xdg-differing" "shadow-extra.l4" \p ->
+    it "differing copies of the same non-embedded module do warn" $ withSystemTempDirectory "l4-shadow" \tmp -> do
+      xdgHome <- mkXdgStore tmp "shadow-extra.l4" \p ->
         writeFile p "`something else entirely` MEANS TRUE\n"
       Output code _sout serr <- runL4WithXdgHome xdgHome bin ["check", shadowExtraEntry]
       -- The project-scoped copy wins either way; the differing ambient copy
@@ -2221,6 +4943,20 @@ spec bin = do
           ++ show n ++ "\n--- stdout ---\n" ++ sout
           ++ "\n--- stderr ---\n" ++ serr
 
+    -- The names, not just the import. embedded-wins/main.l4 above only writes
+    -- the `IMPORT`, so it cannot tell a prelude that is in scope from one that
+    -- is not. With the entry file named bare and nothing on disk to find, plain
+    -- main binds none of the prelude's names: `cd project && l4 run total.l4`
+    -- answers "I could not find a definition for the identifier `sum`" and
+    -- exits 1, while `l4 run project/total.l4` works.
+    it "a bare entry path still brings the stdlib's names into scope" $ withSystemTempDirectory "l4-bare-entry-stdlib-names" \work -> do
+      writeFile (work </> "total.l4") (unlines ["IMPORT prelude", "", "#EVAL sum (LIST 1, 2, 3)"])
+      Output code sout serr <- runL4EmbeddedOnlyIn (Just work) bin ["run", "total.l4"]
+      let combined = sout ++ "\n" ++ serr
+      when ("could not find a definition" `isInfixOf` combined) $
+        expectationFailure ("`sum` was not in scope after IMPORT prelude:\n" ++ combined)
+      code `shouldBe` ExitSuccess
+
     -- One module name, one source — including for importers that are themselves
     -- embedded libraries. embedded-importer/daydate.l4 is a deliberately
     -- narrower override of a module the embedded `actus-schedule` imports and
@@ -2258,6 +4994,24 @@ spec bin = do
       "...and also when the entry file is named bare"
       (checkFrom shadowImporterDir)
 
+    -- With the entry file named bare, the project root and the importing
+    -- file's directory are the same directory, so the root tier and the
+    -- importer-relative tier probe ONE file. The warning listed it twice, once
+    -- as [chosen] and once as [shadowed], which reads as a copy shadowing itself.
+    it "the shadow warning lists a copy once when two tiers name the same file" $ do
+      Output code sout serr <- checkFrom shadowSiblingDir
+      case code of
+        ExitSuccess -> pure ()
+        ExitFailure n -> expectationFailure $
+          "Expected the project-local prelude override to win, but l4 exited "
+          ++ show n ++ "\n--- stdout ---\n" ++ sout ++ "\n--- stderr ---\n" ++ serr
+      serr `shouldSatisfy` ("Multiple differing copies of module `prelude`" `isInfixOf`)
+      -- Two copies are visible, the project's prelude.l4 and the embedded
+      -- stdlib: two rows, the first chosen and the second shadowed.
+      let rows = [ l | l <- lines serr, "  [chosen]" `isPrefixOf` l || "  [shadowed]" `isPrefixOf` l ]
+      map (takeWhile (/= ']')) rows `shouldBe` ["  [chosen", "  [shadowed"]
+      length (filter ("prelude.l4" `isInfixOf`) rows) `shouldBe` 1
+
   -- smucclaw/l4-ide#971: an IMPORT that resolves to nothing has to say so, and a
   -- candidate URI has to read back as the path it was built from.
   --
@@ -2278,11 +5032,7 @@ spec bin = do
   -- covers the non-ASCII spelling directly, at the string level, where no locale
   -- is involved.
   describe "l4 IMPORT resolution failures (#971)" $ do
-    let sandbox name files act = do
-          tmp <- getTemporaryDirectory
-          let dir = tmp </> name
-          removePathForcibly dir
-          createDirectoryIfMissing True dir
+    let sandbox name files act = withSystemTempDirectory name \dir -> do
           mapM_ (\(nm, body) -> BS.writeFile (dir </> nm) (TE.encodeUtf8 (T.pack body))) files
           act dir
         -- A library whose basename percent-escapes. It is ordinary L4 otherwise.
@@ -2393,861 +5143,34 @@ spec bin = do
           -- ...and no location is listed twice.
           nub (map asFile paths) `shouldBe` map asFile paths
 
-  -- Track S0: `l4 export --to=dmn|dmn-md|bpmn [--fidelity-report]`.
-  --
-  -- The interesting property of these goldens is that they are not new files.
-  -- `jl4/tests/BpmnExport.hs` and `jl4/tests/DmnExport.hs` build the same
-  -- artifacts through the library API (`checkWithImports`), and the CLI reaches
-  -- them through a completely different front end (the LSP one-shot Shake
-  -- pipeline). Byte equality across those two paths is the actual claim.
-  describe "l4 export" $ do
-    it "reproduces the BPMN golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=bpmn", bpmnOfferingSource] bpmnOfferingGolden
-
-    it "reproduces the DMN 1.3 XML golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName]
-                       dmnGolden
-
-    it "reproduces the dmnmd markdown golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName]
-                       dmnMarkdownGolden
-
-    it "writes the fidelity report as a sibling file, not into the document" $ do
-      -- The goldens under examples/ are pairs (X.bpmn beside X.fidelity.txt),
-      -- and that is the shape --output + --fidelity-report reproduces.
-      tmp <- getTemporaryDirectory
-      let outDir  = tmp </> "l4-export-sidecar"
-          outFile = outDir </> "offering.bpmn"
-          sidecar = outDir </> "offering.fidelity.txt"
-      removePathForcibly outDir
-      createDirectoryIfMissing True outDir
-      Output code sout serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "-o", outFile, "--fidelity-report"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` null                       -- the document went to the file
-      serr `shouldSatisfy` ("fidelity report written to" `isInfixOf`)
-      xml <- readUtf8 outFile
-      goldenXml <- readUtf8 bpmnOfferingGolden
-      xml `shouldBe` goldenXml
-      report <- readUtf8 sidecar
-      goldenReport <- readUtf8 bpmnOfferingFidelity
-      report `shouldBe` goldenReport
-      -- Nothing of the report leaked into the document.
-      xml `shouldSatisfy` (not . ("fidelity report" `isInfixOf`))
-      removePathForcibly outDir
-
-    it "keeps stdout a pure document when --fidelity-report goes to stderr" $ do
-      -- `l4 export --to=bpmn f.l4 --fidelity-report > f.bpmn` must still
-      -- produce an importable file.
-      Output code sout serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--fidelity-report"]
-      code `shouldBe` ExitSuccess
-      goldenXml <- readUtf8 bpmnOfferingGolden
-      sout `shouldBe` goldenXml
-      serr `shouldSatisfy` ("fidelity report — BPMN 2.0" `isInfixOf`)
-      serr `shouldSatisfy` ("[F1]" `isInfixOf`)
-
-    it "tallies what was lost on stderr even without --fidelity-report" $ do
-      -- The report is not optional in spirit: an export never silently drops
-      -- what the source said just because the caller did not know to ask.
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
-      code `shouldBe` ExitSuccess
-      serr `shouldSatisfy` ("could not carry everything" `isInfixOf`)
-      serr `shouldSatisfy` ("blocking" `isInfixOf`)
-      serr `shouldSatisfy` ("--fidelity-report" `isInfixOf`)
-      -- ... but the tally alone is not the located list.
-      serr `shouldSatisfy` (not . ("lost:" `isInfixOf`))
-
-    it "exits 0 on a Blocking note by default" $ do
-      -- Blocking means "the target notation has no form for this", which is
-      -- true of every realistic export (F1 fires for every task in every BPMN
-      -- file). A gate that always fires would be no gate at all.
-      Output code _ _ <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
-      code `shouldBe` ExitSuccess
-
-    it "exits non-zero on a Blocking note under --fail-on=blocking" $
-      expectFail bin ["export", "--to=bpmn", bpmnOfferingSource, "--fail-on=blocking"]
-
-    -- --fail-on is a THRESHOLD ("a note this severe or worse"), over a lattice
-    -- ordered Blocking < Lossy < Advisory. `expectFail ... --fail-on=blocking`
-    -- above cannot see the threshold at all: it is satisfied by any gate that
-    -- trips on anything, and by one whose comparison runs backwards. The two
-    -- fixtures below are the discriminating inputs — one report that is
-    -- blocking-ONLY, one that is advisory-ONLY — so every gate value gets both
-    -- a case that must trip and a case that must not.
-    --
-    -- Concretely: flip `tripsGate`'s `<=` to `>=` and the blocking-only
-    -- `--fail-on=lossy`/`=advisory` rows go green→red; make the gate trip on
-    -- any note regardless of severity and the advisory-only
-    -- `--fail-on=blocking`/`=lossy` rows do.
-    describe "--fail-on thresholds" $ do
-      let dmnGate fixture gate = runL4 bin (["export", "--to=dmn", fixture] <> gate)
-          exitsNonZero fixture gate = do
-            Output code _ _ <- dmnGate fixture gate
-            code `shouldSatisfy` (/= ExitSuccess)
-          exitsZero fixture gate = do
-            Output code _ _ <- dmnGate fixture gate
-            code `shouldBe` ExitSuccess
-
-      it "a blocking-only report is caught by every threshold" $ do
-        -- `l4 export --to=dmn export-blocking-only.l4` reports 2 blocking,
-        -- 0 lossy, 0 advisory: the pure-Blocking end of the lattice. Assert
-        -- that first, so the rows below cannot go green for the wrong reason
-        -- if the fixture's notes ever change severity.
-        Output tally _ serr <- dmnGate exportBlockingOnlyFixture []
-        tally `shouldBe` ExitSuccess
-        serr `shouldSatisfy` ("2 blocking" `isInfixOf`)
-        serr `shouldSatisfy` (not . ("lossy" `isInfixOf`))
-        serr `shouldSatisfy` (not . ("advisory" `isInfixOf`))
-        mapM_ (\g -> exitsNonZero exportBlockingOnlyFixture ["--fail-on=" ++ g])
-          ["blocking", "lossy", "advisory"]
-
-      it "an advisory-only report is caught by --fail-on=advisory and nothing stricter" $ do
-        -- `l4 export --to=dmn export-advisory-only.l4` reports 1 advisory and
-        -- nothing else. Notes ARE present throughout, so "exit 0" here means
-        -- "no note reached the threshold", not "no notes".
-        Output tally _ serr <- dmnGate exportAdvisoryOnlyFixture []
-        tally `shouldBe` ExitSuccess
-        serr `shouldSatisfy` ("1 advisory" `isInfixOf`)
-        serr `shouldSatisfy` (not . ("blocking" `isInfixOf`))
-        mapM_ (\g -> exitsZero exportAdvisoryOnlyFixture ["--fail-on=" ++ g])
-          ["blocking", "lossy"]
-        exitsNonZero exportAdvisoryOnlyFixture ["--fail-on=advisory"]
-
-      it "--fail-on=none never trips, and is the default" $
-        mapM_ (\fixture -> do
-                 exitsZero fixture ["--fail-on=none"]
-                 exitsZero fixture [])
-          [exportBlockingOnlyFixture, exportAdvisoryOnlyFixture]
-
-      -- Phase 4's population filter (§2.5.6 rule 3) routes uncalled
-      -- regulative bodies out of the DRG; a module holding ONLY those now
-      -- exports an empty model, which the CLI refuses loudly rather than
-      -- writing a decision-free document. This is the behaviour change that
-      -- retired export-two-rules.l4 from the blocking-only role above.
-      it "refuses an all-regulative module as DMN (empty model after the population filter)" $
-        expectFail bin ["export", "--to=dmn", exportTwoRulesFixture]
-
-    -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
-    -- module name can only be imported as IMPORT `interp-common`, and the
-    -- textual sibling scan used to match only the bare spelling — so every
-    -- hyphenated module (the whole housing-act/charities/reg-cf population)
-    -- saw "no importers", returned Just Set.empty ("verified clear") instead
-    -- of the fail-safe Nothing, and dropped its externally-called
-    -- fixture-shaped decisions: the "delete a statute" case §2.5.7 names.
-    -- `local sample` is the in-fixture negative control: same module-local
-    -- shape, unreferenced by the importer, so it must still drop — proving
-    -- the scan discriminates by name rather than failing open.
-    it "keeps a fixture-shaped decision whose importer spells the IMPORT with backticks" $ do
-      Output code sout _ <- runL4 bin ["export", "--to=dmn", importViewFixture]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("decision_statute" `isInfixOf`)
-      sout `shouldSatisfy` (not . ("local sample" `isInfixOf`))
-
-    it "still writes the document when --fail-on trips" $ do
-      Output code sout _ <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--fail-on=blocking"]
-      code `shouldSatisfy` (/= ExitSuccess)
-      goldenXml <- readUtf8 bpmnOfferingGolden
-      sout `shouldBe` goldenXml
-
-    it "honours --deadline-unit=refuse (no invented ISO duration)" $ do
-      Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
-      code `shouldBe` ExitSuccess
-      -- Under the default the unitless WITHINs are read as days and reported as
-      -- P-DEADLINE-UNIT advisories; under `refuse` they become P-DEADLINE.
-      serr `shouldSatisfy` ("P-DEADLINE" `isInfixOf`)
-      Output _ soutDefault _ <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
-      Output _ soutRefuse  _ <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
-      soutDefault `shouldSatisfy` ("timerEventDefinition" `isInfixOf`)
-      soutRefuse `shouldSatisfy` (not . ("timerEventDefinition" `isInfixOf`))
-
-    it "rejects an unknown --to with a message naming the accepted targets" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=xml", dmnSource]
-      code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("Invalid export target" `isInfixOf`)
-      serr `shouldSatisfy` ("dmn|dmn-md|bpmn" `isInfixOf`)
-
-    it "requires --to" $
-      expectFail bin ["export", dmnSource]
-
-    it "refuses BPMN when the module has no regulative rules" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", exportNothingFixture]
-      code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("regulative" `isInfixOf`)
-
-    it "refuses DMN when the module has no decisions" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=dmn", exportNothingFixture]
-      code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("No decisions found" `isInfixOf`)
-
-    it "refuses to guess which process to draw, and names the candidates" $ do
-      -- renderBpmn writes its own XML prolog, so two processes concatenated is
-      -- not a document. Refusing beats emitting something no tool can read.
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", exportTwoRulesFixture]
-      code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("--rule" `isInfixOf`)
-      serr `shouldSatisfy` ("the filing" `isInfixOf`)
-      serr `shouldSatisfy` ("the fee" `isInfixOf`)
-
-    it "selects one process with --rule" $ do
-      Output code sout _ <- runL4 bin
-        ["export", "--to=bpmn", exportTwoRulesFixture, "--rule", "the fee"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("<?xml" `isInfixOf`)
-      sout `shouldSatisfy` ("the fee" `isInfixOf`)
-      sout `shouldSatisfy` (not . ("the filing" `isInfixOf`))
-
-    it "fails on an unknown --rule and lists what is available" $ do
-      Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", exportTwoRulesFixture, "--rule", "no such rule"]
-      code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("no such rule" `isInfixOf`)
-      serr `shouldSatisfy` ("the filing" `isInfixOf`)
-
-    it "rejects --rule on a DMN export instead of ignoring it" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=dmn", dmnSource, "--rule", "x"]
-      code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("--rule" `isInfixOf`)
-      serr `shouldSatisfy` ("--to=bpmn" `isInfixOf`)
-
-    it "rejects --model-name on a BPMN export instead of ignoring it" $ do
-      Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--model-name", "X"]
-      code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("--model-name" `isInfixOf`)
-
-    it "fails on a file that does not typecheck" $
-      expectFail bin ["export", "--to=dmn", errorFixture]
-
-    -- --flavor (R7). The two flavors differ on exactly one construct, and that
-    -- construct is not emitted until Phase 5, so today the flag is observable
-    -- only in the fidelity report's target line. That is deliberate: the seam
-    -- and its goldens land before the divergence does, so that when the
-    -- divergence arrives it has somewhere to be checked.
-    describe "--flavor" $ do
-      it "defaults to camunda, and says so in the report rather than just 'DMN'" $ do
-        Output code _ serr <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--fidelity-report"]
-        code `shouldBe` ExitSuccess
-        serr `shouldSatisfy` ("DMN 1.3 (XML), camunda flavor" `isInfixOf`)
-
-      it "accepts kie, and drools as a synonym for it" $
-        for_ ["kie", "drools"] \flavor -> do
-          Output code _ serr <- runL4 bin
-            [ "export", "--to=dmn", dmnSource, "--model-name", dmnModelName
-            , "--flavor=" ++ flavor, "--fidelity-report" ]
-          code `shouldBe` ExitSuccess
-          serr `shouldSatisfy` ("DMN 1.3 (XML), kie flavor" `isInfixOf`)
-
-      it "the flavors diverge on the §-invocation exhibit and nowhere else, through the CLI" $ do
-        -- This test used to be the CLI half of the Phase 5 tripwire
-        -- ("EXPECTED TO FAIL AT PHASE 5"); it fired on 2026-08-01 and was
-        -- flipped as instructed: the goldens split (svc.kie.dmn beside
-        -- svc.dmn) and the seam is asserted in both directions.
-        --
-        -- Positive direction: the kie bytes of the §-invocation exhibit carry
-        -- a requiredKnowledge onto a decisionService; the camunda bytes do
-        -- not (that one edge is fatal to Camunda 8's parse(), spec §13.4),
-        -- and each equals its committed golden.
-        Output _ svcCam _ <- runL4 bin ["export", "--to=dmn", svcSource]
-        Output _ svcKie _ <- runL4 bin ["export", "--to=dmn", svcSource, "--flavor=kie"]
-        svcKie `shouldSatisfy`
-          ("<requiredKnowledge href=\"#service_special_assessment\"/>" `isInfixOf`)
-        svcCam `shouldSatisfy` (not . ("requiredKnowledge href=\"#service_" `isInfixOf`))
-        svcCamGolden <- readUtf8 svcGolden
-        svcCam `shouldBe` svcCamGolden
-        svcKieGolden <- readUtf8 svcKieDmnGolden
-        svcKie `shouldBe` svcKieGolden
-        -- Identity direction: reg-cf has no §-invocation, so its flavors stay
-        -- byte-identical (measured 2026-08-01 over every golden subject) and
-        -- both equal the one unsuffixed golden. A drift here means the flavor
-        -- bit grew a second observable, which wants its own golden split.
-        Output _ camunda _ <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=camunda"]
-        Output _ kie _ <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
-        kie `shouldBe` camunda
-        golden <- readUtf8 dmnGolden
-        camunda `shouldBe` golden
-
-      it "rejects --flavor on --to=dmn-md, because nothing on that path reads it" $ do
-        -- It was admitted here at first, on the theory that "the flavor lives
-        -- in the Drg, which both emitters read". It does not: emitMarkdown
-        -- mentions no field of it and markdownReport hard-codes the target
-        -- "dmnmd", so --flavor=kie produced a byte-identical document AND a
-        -- byte-identical fidelity report. That is the silent ignore
-        -- checkTargetFlags exists to refuse.
-        Output code _ serr <- runL4 bin
-          ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
-        code `shouldSatisfy` (/= ExitSuccess)
-        serr `shouldSatisfy` ("--flavor" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=dmn-md" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=dmn" `isInfixOf`)
-
-      it "still accepts --model-name on --to=dmn-md, which does belong to both" $ do
-        Output code sout _ <- runL4 bin
-          ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName]
-        code `shouldBe` ExitSuccess
-        golden <- readUtf8 dmnMarkdownGolden
-        sout `shouldBe` golden
-
-      it "rejects --flavor on a BPMN export instead of ignoring it" $ do
-        Output code _ serr <- runL4 bin
-          ["export", "--to=bpmn", bpmnOfferingSource, "--flavor=kie"]
-        code `shouldSatisfy` (/= ExitSuccess)
-        serr `shouldSatisfy` ("--flavor" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=bpmn" `isInfixOf`)
-
-      it "rejects an unknown flavor, naming the accepted ones" $ do
-        Output code _ serr <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--flavor=camunda7"]
-        code `shouldSatisfy` (/= ExitSuccess)
-        serr `shouldSatisfy` ("Invalid --flavor" `isInfixOf`)
-        serr `shouldSatisfy` ("camunda|kie" `isInfixOf`)
-
-  -- The two real DMN engines, over the shipped golden. See
-  -- `dmnEngineCheck` below for the skip contract and why the assertion is on
-  -- the harness's VERDICT banner rather than on its exit code.
-  describe "DMN engine checks (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "Drools/KIE 8.44.0.Final validates, builds and answers the golden correctly" $
-      dmnEngineCheck "KIE" kieCheckScript "KIE_CHECK_REQUIRED" \out -> do
-        -- The VERSION is asserted because the banner reports what the harness
-        -- OBSERVED off the classpath (KieServices' implementation version), not
-        -- a constant its launcher passed in. Without this the one token in the
-        -- banner naming the engine would be unpinned.
-        out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
-        -- Not just "0 errors": the emitted names used to fire six
-        -- ILLEGAL_USE_OF_NAME / ILLEGAL_USE_OF_TYPEREF warnings and then two
-        -- hard errors, and the file did not build at all. Pinning the warning
-        -- count here (rather than inside the harness, whose validator is known
-        -- to over-report) means relaxing it takes a visible edit.
-        out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-        out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-        out `shouldSatisfy` ("25/25 decision(s) SUCCEEDED" `isInfixOf`)
-        -- ...and the part that is not a liveness claim. SUCCEEDED says every
-        -- decision ran. Only this says each answered what reg-cf.cases.json
-        -- says it must -- which is the check that catches a wrong NON-NULL
-        -- answer, the shape the Camunda name misparse actually takes.
-        out `shouldSatisfy` ("25/25 value(s) as expected" `isInfixOf`)
-
-    it "Camunda 8.7.6 parses and answers the golden correctly" $
-      dmnEngineCheck "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" \out -> do
-        out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
-        -- Camunda 8 fails whole-file at parse(), so "1 parsed" is the load-bearing
-        -- claim; the golden used to be rejected outright.
-        out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-        out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-        out `shouldSatisfy` ("25/25 decision(s) evaluated" `isInfixOf`)
-        out `shouldSatisfy` ("25/25 value(s) as expected" `isInfixOf`)
-
-    -- The CORPUS leg (R12/R13, spec §15.12/§16): the whole 70-decision Reg CF
-    -- corpus builds and answers on both engines, over TWENTY-TWO cases — the
-    -- base world, the 15 dated cases that relocate the rule-date-rebinding
-    -- fixtures R12 dropped (ruling R-C, spec §15.12.1: "the model owns the law
-    -- under a date; the harness owns the dates"), the 4 seed cases that close
-    -- the total-assets and restricted-period leaves the §8 diff oracle reported
-    -- structurally inert, THE LEAP CASE, THE ESCHEAT CASE, and (2026-09-05,
-    -- ruling D1) THE PRE-COMMENCEMENT CASE, which is the first here to ask a
-    -- rule date below Reg CF's 2016-05-16 commencement AND the first to supply
-    -- NEITHER refusal -- both are explicit JSON nulls rather than the -1 and the
-    -- invented assurance level every other case hands the model. 23 x 70 = 1610.
-    -- All counts below are MEASURED (2026-08-09, this machine, both harnesses),
-    -- not aspirational: before R12/R13 KIE refused with 16 build errors and
-    -- Camunda refused the file at parse() on the raw-L4 deontic body.
-    --
-    -- 67 decisions became 69, and 20 cases became 21, on 2026-08-05, when Rule
-    -- 501(a)'s "one year" stopped being the constant 365. The two added
-    -- decisions are the anniversary and the deadline computed from it; the added
-    -- case is the one that constant got WRONG — a transfer on day 365 of a
-    -- holding spanning 29 February 2024, which the flat count PERMITTED and the
-    -- calendar refuses. It is pinned here rather than only in the L4 #ASSERTs
-    -- because R0 says the execution is the exhibit: an engine we do not control
-    -- has to be the one that refuses it.
-    --
-    -- 69 became 70, and 21 cases became 22, on 2026-08-09, when Rule 501(a)(4)
-    -- stopped being one ~300-character boolean and became six. The added
-    -- decision is the limb itself; the added case is the ESCHEAT case — a
-    -- transfer in connection with the purchaser's death to a transferee who is
-    -- nobody in particular — which is the fact pattern the decomposition's
-    -- nexus ruling turns on, and which no case could express while the limb was
-    -- a single self-assessed fact.
-    it "KIE builds and answers the whole Reg CF corpus (R12/R13)" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
-          out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("23 case(s)" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1610/1610 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("1610/1610 value(s) as expected" `isInfixOf`)
-          -- the SVC leg is a value check since 2026-08-02 (each service fed
-          -- its inputDecisions' computed values, each outputDecision compared
-          -- against the same expect entry): 7 services, 15 declared outputs,
-          -- per case
-          out `shouldSatisfy` ("345/345 service output value(s) as expected" `isInfixOf`)
-
-    it "Camunda parses and answers the whole Reg CF corpus (R12/R13)" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        corpusGolden [corpusGolden, "--cases", corpusEngineCases] \out -> do
-          out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("23 case(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1610/1610 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("1610/1610 value(s) as expected" `isInfixOf`)
-
-  -- The LAW-TIME legs (spec §15). What is being asserted here that nothing
-  -- else asserts: the SAME model answers DIFFERENTLY for different rule dates,
-  -- in a real engine, driven only by half-open date intervals on a UNIQUE
-  -- table. `77/77 value(s) as expected` over ELEVEN cases is the claim -- eleven
-  -- rule dates x seven decisions (Phase 5 moved `the rules in force include`
-  -- to a businessKnowledgeModel, which the cases schema cannot assert -- its
-  -- logic is exercised through the interval endpoints D2 inlined it into; and
-  -- since 2026-09-06 the pre-commencement floor is a REFUSE, so it is a
-  -- decision answering null in every case rather than an input handed in as
-  -- -1: 66 became 77) -- and seven of those cases exist purely to pin the
-  -- interval convention: a day-of/day-before pair on each of the three seams,
-  -- plus a rule date well before commencement. F, J and K all reach the floor
-  -- now; until the migration F and J handed the model -1 and expected -1 back,
-  -- so only K (2026-09-05, ruling D1) reached the bottom the floor arm names.
-  describe "law time on a date axis (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "KIE answers the dated-regime exhibit correctly for eleven rule dates" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
-          out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          -- zero warnings is load-bearing: the emitted BKM must carry its
-          -- DMNShape, or KIE raises WARN [DMNDI_MISSING_DIAGRAM] (measured
-          -- 2026-08-01; the shape row above the decisions exists for this).
-          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("77/77 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("77/77 value(s) as expected" `isInfixOf`)
-
-    it "Camunda answers the dated-regime exhibit correctly for eleven rule dates" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        gstGolden [gstGolden, "--cases", gstEngineCases] \out -> do
-          out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
-          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("77/77 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("77/77 value(s) as expected" `isInfixOf`)
-
-    -- The hand-written probe PAIR. It is NOT redundant with the exhibit above:
-    -- the emitter cannot generate an <annotationEntry> carrying an @id, so only
-    -- a fixture can ask whether Xerces objects to one -- and only the NEGATIVE
-    -- half can show that it does. Same rationale, and the same construction, as
-    -- the dmn-xsd-order pair.
-    -- The DATE ARITHMETIC pair. What this asserts that nothing else does: the
-    -- CLAMP that `daydate`'s `add months`/`add years` perform is the same clamp
-    -- FEEL performs, so an L4 module that computes an anniversary and the DMN it
-    -- exports to cannot answer differently. That equivalence is the licence for
-    -- the two lowering arms in "L4.Dmn.Lower"; if this goes red they are unsound
-    -- and the Reg CF corpus's exported resale restriction has silently drifted
-    -- from its own #ASSERTs.
-    it "both engines CLAMP date arithmetic, agreeing with daydate on all six" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        dateArithModel [dateArithModel, "--cases", dateArithCases] \out -> do
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
-
-    it "both engines CLAMP date arithmetic, agreeing with daydate on all six (Camunda)" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        dateArithModel [dateArithModel, "--cases", dateArithCases] \out -> do
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
-
-    -- The negative half, and it is not decoration: it is the reason the corpus
-    -- writes `add years` instead of rebuilding the date from its components.
-    -- `date(2025, 2, 29)` is not a date, and neither engine clamps or rolls it.
-    it "reconstructing an anniversary from components is REFUSED for 29 February" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
-        dateArithNegative [dateArithNegative, "--cases", dateArithNegativeCases] \out -> do
-          -- the control in the same file DOES clamp, so the failure isolates to
-          -- the reconstruction rather than to anything about the fixture
-          out `shouldSatisfy` ("anniv_duration" `isInfixOf`)
-          out `shouldSatisfy` ("anniv_reconstruct" `isInfixOf`)
-
-    it "reconstructing an anniversary from components is REFUSED for 29 February (Camunda)" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
-        dateArithNegative [dateArithNegative, "--cases", dateArithNegativeCases] \out -> do
-          out `shouldSatisfy` ("anniv_duration" `isInfixOf`)
-          out `shouldSatisfy` ("anniv_reconstruct" `isInfixOf`)
-
-    it "the date-axis probe pair differs ONLY in the @id on the annotationEntry" $ do
-      pos <- readUtf8 dateProbeModel
-      neg <- readUtf8 dateProbeNegative
-      -- The headers differ (each says why its own file exists), so compare from
-      -- <definitions> down. Without this the negative could drift and a red run
-      -- would no longer isolate the @id as the cause.
-      -- `<definitions xmlns` and not `<definitions`: each header comment names
-      -- the element in prose, and matching the prose made the negative's body
-      -- start inside its own comment.
-      let body = dropWhile (not . isInfixOf "<definitions xmlns") . lines
-          isAE = isInfixOf "<annotationEntry"
-      filter (not . isAE) (body pos) `shouldBe` filter (not . isAE) (body neg)
-      filter isAE (body pos) `shouldSatisfy` all (not . isInfixOf "id=")
-      filter isAE (body neg) `shouldSatisfy` \ls ->
-        not (null ls) && all (isInfixOf "id=") ls
-
-    it "KIE (Xerces) accepts the annotation elements and the date-interval cells" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        dateProbeModel [dateProbeModel, "--cases", dateProbeCases] \out -> do
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
-
-    it "KIE (Xerces) REJECTS an @id on the annotationEntry, naming the rule" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
-        dateProbeNegative [dateProbeNegative, "--cases", dateProbeCases] \out -> do
-          out `shouldSatisfy` ("XSD    INVALID" `isInfixOf`)
-          out `shouldSatisfy` ("cvc-complex-type.3.2.2" `isInfixOf`)
-          out `shouldSatisfy` ("'id' is not allowed to appear in element 'annotationEntry'"
-                                 `isInfixOf`)
-          -- MEASURED, and the reason the negative earns its keep: KIE 8.44
-          -- BUILDS the file anyway and answers all three cases correctly. The
-          -- schema leg is the only thing objecting -- exactly as with the
-          -- itemDefinition pair.
-          out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
-          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
-
-    it "Camunda evaluates the hand-written date axis" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        dateProbeModel [dateProbeModel, "--cases", dateProbeCases] \out -> do
-          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
-
-    -- Camunda 8 is stricter than Drools here: it does not merely flag the file,
-    -- it refuses to parse it at all.
-    it "Camunda 8 REJECTS the same file outright, at parse" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
-        dateProbeNegative [dateProbeNegative, "--cases", dateProbeCases] \out -> do
-          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
-          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
-
-  -- H4. The permanent record that the HYDRATION idiom is portable, and the
-  -- tripwire for an engine upgrade that changes the answer. The emitter's own
-  -- hydration output is measured separately (the `hydration.l4` golden subject
-  -- through both engines); this fixture is the idiom in isolation, so a red run
-  -- here isolates the ENGINE and a red run there isolates the EMITTER.
-  describe "the hydration idiom (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "KIE evaluates a boxed context whose entries read earlier siblings" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        hydrationProbeModel [hydrationProbeModel, "--cases", hydrationProbeCases] \out -> do
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          -- Zero warnings is part of the measurement, not decoration: KIE warns
-          -- on plenty it still evaluates, and the claim being pinned is that
-          -- this idiom is unremarkable to the engine, not merely tolerated.
-          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
-
-    it "Camunda (zeebe-dmn) evaluates the same boxed context" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        hydrationProbeModel [hydrationProbeModel, "--cases", hydrationProbeCases] \out -> do
-          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("6/6 value(s) as expected" `isInfixOf`)
-
-  -- The EMITTER's hydration output through both engines. This is the leg that
-  -- turns §4.4 from a design into a measurement: 40 decision values per engine,
-  -- over an artifact jl4-core/src/L4/Dmn/Lower.hs produced.
-  --
-  -- Case D supplies a NULL source record, which is the one input shape under
-  -- which D-COMPUTEDFIELD's "nothing an engine needs is lost" could have been
-  -- engine-visibly wrong. Both engines agree exactly, and the answer is not the
-  -- obvious one -- `band` comes back 1, not null -- so it is measured rather
-  -- than reasoned about. See hydration.cases.json's own note and §4.4.6.
-  describe "emitted hydration (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "KIE evaluates the emitted hydrators, their sources and their readers" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        hydrationGolden [hydrationGolden, "--cases", hydrationEngineCases] \out -> do
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("40/40 value(s) as expected" `isInfixOf`)
-
-    it "Camunda evaluates the same emitted model" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        hydrationGolden [hydrationGolden, "--cases", hydrationEngineCases] \out -> do
-          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("40/40 value(s) as expected" `isInfixOf`)
-
-    -- The COUNTERPART, and it is not a consolation prize. `sumtype.dmn` is the
-    -- exhibit of what the exporter REFUSES, and R4-a's refusal emits L4 source
-    -- by design -- so an engine must reject it, and until this leg existed
-    -- nothing in the repo said so. `grep -n sumtype jl4/tests-cli/Main.hs`
-    -- returned nothing before 2026-07-31: no engine had ever looked at this
-    -- file. So this is coverage that never existed, not a defect retired.
-    --
-    -- It goes RED if someone "fixes" `stated term`, which is the point: the
-    -- refusal is now a measurement rather than an argument.
-    it "KIE REJECTS the refusal exhibit, and names the payload projection" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
-        sumtypeGolden [sumtypeGolden] \out -> do
-          -- Not a schema failure: the file is valid DMN. It is the FEEL that
-          -- cannot compile, which is exactly what a Blocking note claims.
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          -- ★ Assert the CAUSE, not merely that the id appears. Every decision
-          -- id shows up in KIE's per-decision listing on any run, pass or fail,
-          -- so `"decision_stated_term" isInfixOf out` -- which is all this leg
-          -- asserted when it was written -- carries no information about WHY
-          -- the run failed, and a change that made the file fail for an
-          -- entirely different reason would have kept it green.
-          out `shouldSatisfy` ("ERR_COMPILING_FEEL" `isInfixOf`)
-          out `shouldSatisfy` ("decision_stated_term_literal" `isInfixOf`)
-          out `shouldSatisfy` ("Unknown variable 'disposal.term_in_years'" `isInfixOf`)
-          out `shouldSatisfy` ("<<< FAILED" `isInfixOf`)
-          -- A SECOND, independent error, measured 2026-07-31 and recorded here
-          -- rather than tidied away: KIE resolves itemDefinition typeRefs in
-          -- DOCUMENT ORDER, and `itemdef_claim`'s `assessed grade` component
-          -- points at `Grade_optional`, which this emitter appends AFTER the
-          -- definitions that reference it. Pre-existing (HEAD's sumtype.dmn has
-          -- the same ordering) and previously unmeasured, because no engine had
-          -- ever looked at this file. It is confined to the `_optional` alias
-          -- machinery and `sumtype.dmn` is the only DMN golden that uses it, so
-          -- it changes no MustPass leg -- but it is a real portability defect
-          -- and pinning it here is what stops it being lost. See §11-R8-a.
-          out `shouldSatisfy` ("TYPE_DEF_NOT_FOUND" `isInfixOf`)
-          out `shouldSatisfy` ("Grade_optional" `isInfixOf`)
-
-  -- Tier 1 of the Phase 5 evidence: the 23 hand-written BKM/service probes,
-  -- exactly per DMN-PHASE5-BUILD-PLAN.md §1's matrix. See 'bkmProbeMatrix'
-  -- for what the asymmetry means and what a flip would say. What is asserted
-  -- per leg is the VERDICT banner (the harness RAN) and the exit direction
-  -- (the measured outcome); the value-level detail lives in each fixture's
-  -- own cases file and MEASURED header. NOTE the recorded harness limitation
-  -- (spec §13.6): `expect` keys on DECISION names only, so a BKM's or a
-  -- service's own return value is never compared directly — every probe
-  -- asserts invocables through caller decisions, deliberately.
-  describe "the 23 BKM/service probes (opt-in: L4_DMN_ENGINE_CHECK=1)" $
-    for_ bkmProbeMatrix \(label, stem, kieOutcome, camOutcome) -> do
-      let model = dmnBkmProbeDir </> (stem <> ".dmn")
-          cases = dmnBkmProbeDir </> (stem <> ".cases.json")
-      it (label <> " " <> stem <> ": KIE " <> outcomeWord kieOutcome) $
-        dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" kieOutcome
-          model [model, "--cases", cases] \out ->
-            out `shouldSatisfy` ("KIE 8.44.0.Final VERDICT" `isInfixOf`)
-      it (label <> " " <> stem <> ": Camunda " <> outcomeWord camOutcome) $
-        dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" camOutcome
-          model [model, "--cases", cases] \out ->
-            out `shouldSatisfy` ("Camunda 8.7.6 (zeebe-dmn) VERDICT" `isInfixOf`)
-
-  -- The Phase 5 EMITTED-BKM legs (spec §6.2, §13.6): the emitter's own BKM
-  -- output through both engines, the strictly-stronger counterpart of the 23
-  -- hand-written dmn-bkm-probe fixtures — a red probe isolates the ENGINE, a
-  -- red run here isolates the LOWERING. Each leg names its flavor; an absent
-  -- harness reports UNEXERCISED (pendingWith) rather than passing.
-  describe "the Phase 5 BKM exhibit (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "KIE evaluates the emitted BKMs: chain, hydrator call, lifted closure (camunda golden)" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        bkmDmnGolden [bkmDmnGolden, "--cases", bkmEngineCases] \out -> do
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          -- zero warnings pins the DMNDI contract: every BKM has a DMNShape
-          -- and every knowledgeRequirement a DMNEdge (KIE warns
-          -- DMNDI_MISSING_DIAGRAM for each omission — measured 2026-08-01).
-          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("14/14 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("14/14 value(s) as expected" `isInfixOf`)
-
-    it "Camunda evaluates the same bytes (the flavors are byte-identical here, by measurement)" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        bkmDmnGolden [bkmDmnGolden, "--cases", bkmEngineCases] \out -> do
-          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("14/14 decision(s) evaluated" `isInfixOf`)
-          out `shouldSatisfy` ("14/14 value(s) as expected" `isInfixOf`)
-
-  -- The §-invocation exhibit: the ONE construct on which the flavors emit
-  -- different bytes (§13.5), so each golden meets exactly one engine, in
-  -- opposite directions. The asymmetry IS the flavor axis.
-  describe "the §-invocation exhibit (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "KIE executes the kie golden: the service invocation binds per call" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        svcKieDmnGolden [svcKieDmnGolden, "--cases", svcEngineCases] \out -> do
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          -- case B is the load-bearing pair: special_rate (standalone,
-          -- global-bound) answers 5 while special_case (through the service,
-          -- invocation-bound) answers 195 — the invocation carries its OWN
-          -- bindings, which is the whole point of an invocable §.
-          out `shouldSatisfy` ("8/8 decision(s) SUCCEEDED" `isInfixOf`)
-          out `shouldSatisfy` ("8/8 value(s) as expected" `isInfixOf`)
-
-    it "Camunda REJECTS the camunda golden at parse: the refused call site is raw L4, loudly noted" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
-        svcGolden [svcGolden, "--cases", svcEngineCases] \out -> do
-          -- The camunda flavor cannot emit the KR→service edge (fatal to
-          -- parse(), §13.4), so `special case` stays verbatim and zeebe-dmn
-          -- refuses the file. The loudness lives in the FIDELITY report
-          -- (D-FLAVOR-NOSERVICE, Blocking) — this leg pins that the artifact
-          -- itself is not silently degraded into something that half-loads.
-          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
-          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
-
-
-  -- R8-d′'s evidence. Written and MEASURED before the MAYBE→null lowering
-  -- existed, because the ruling is only safe if `=` against null is a proper
-  -- boolean on both engines. It is. See the fixture headers for the fallback
-  -- that was pre-declared in case it had not been.
-  describe "FEEL null semantics (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
-    it "KIE: comparison against null is boolean, and a table may default to null" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        nullProbeModel [nullProbeModel, "--cases", nullProbeCases] \out -> do
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          -- The single-output table carries no @name and no @typeRef on its
-          -- <output>, matching what Emit.hs emits; carrying them draws two
-          -- ILLEGAL_USE_OF_* warnings, so zero here is also a statement that
-          -- the probe is written in the emitter's shape.
-          out `shouldSatisfy` ("0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("15/15 value(s) as expected" `isInfixOf`)
-
-    it "Camunda: same five questions, same five answers" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        nullProbeModel [nullProbeModel, "--cases", nullProbeCases] \out -> do
-          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("15/15 value(s) as expected" `isInfixOf`)
-
-    -- The ONE null question the engines answer differently, asserted in both
-    -- directions. A shared expectation would have had to pick a side and would
-    -- then have read as a bug in the other.
-    it "Camunda treats a name that was never supplied as null" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        nullAbsentModel [nullAbsentModel, "--cases", nullAbsentCases] \out -> do
-          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("1/1 value(s) as expected" `isInfixOf`)
-
-    it "KIE calls the same thing a model error and SKIPS the decision" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
-        nullAbsentModel [nullAbsentModel, "--cases", nullAbsentCases] \out -> do
-          out `shouldSatisfy` ("Required dependency 'r' not found" `isInfixOf`)
-          out `shouldSatisfy` ("SKIPPED" `isInfixOf`)
-          out `shouldSatisfy` ("0/1 decision(s) SUCCEEDED" `isInfixOf`)
-          -- It is a RUNTIME divergence, not a schema or build one: the file is
-          -- perfectly valid and KIE builds it without complaint.
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
-
-  -- The placement rule's NEGATIVE control (spec §4.3, §9). Everything else in
-  -- this file asserts that a gate stays green, which on its own says nothing
-  -- about whether the gate is connected: an emitter that put
-  -- <itemDefinition> after <inputData> passed every check in the tree —
-  -- xmllint, dmn-moddle, the goldens — until these two files existed.
-  describe "the XSD sequence-order gate (DMN 1.3 tDefinitions is a sequence)" $ do
-    it "the committed pair differs ONLY in where the itemDefinition block sits" $ do
-      pos <- readUtf8 dmnXsdOrderPositive
-      neg <- readUtf8 dmnXsdOrderNegative
-      -- Same lines, permuted. Without this the two files could drift apart and
-      -- a red negative would no longer isolate placement as the cause.
-      sort (lines pos) `shouldBe` sort (lines neg)
-      pos `shouldNotBe` neg
-      -- The needles carry the @ id=@ so they match the ELEMENTS and not the
-      -- files' own header comment, which names both tags in prose. (It did
-      -- match the comment at first, and the negative assertion duly failed on
-      -- line 5.)
-      firstLineWith "<itemDefinition id=" pos
-        `shouldSatisfy` (< firstLineWith "<inputData id=" pos)
-      firstLineWith "<itemDefinition id=" neg
-        `shouldSatisfy` (> firstLineWith "<inputData id=" neg)
-
-    it "Drools/KIE ACCEPTS those lines with the itemDefinition first" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        dmnXsdOrderPositive [dmnXsdOrderPositive, "--cases", dmnXsdOrderCases] \out -> do
-          out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
-          out `shouldSatisfy` ("0 error(s), 0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("2/2 value(s) as expected" `isInfixOf`)
-
-    it "Drools/KIE REJECTS the misordered file, naming the schema rule" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
-        dmnXsdOrderNegative [dmnXsdOrderNegative, "--cases", dmnXsdOrderCases] \out -> do
-          out `shouldSatisfy` ("XSD    INVALID" `isInfixOf`)
-          out `shouldSatisfy` ("cvc-complex-type.2.4.a" `isInfixOf`)
-          -- MEASURED, and the reason the fixture earns its keep: KIE 8.44
-          -- BUILDS the misordered file and answers both cases correctly. Only
-          -- the schema legs object. So "a misordered emitter fails in the
-          -- engine" is NOT true of Drools — the schema check is the only thing
-          -- between a misordered emitter and a shipped artifact, which is
-          -- precisely why it has to be the gate.
-          out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
-          out `shouldSatisfy` ("2/2 value(s) as expected" `isInfixOf`)
-
-    it "Camunda 8 ACCEPTS those lines with the itemDefinition first" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        dmnXsdOrderPositive [dmnXsdOrderPositive, "--cases", dmnXsdOrderCases] \out -> do
-          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("2/2 value(s) as expected" `isInfixOf`)
-
-    it "Camunda 8 REJECTS the misordered file outright, at parse" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
-        dmnXsdOrderNegative [dmnXsdOrderNegative, "--cases", dmnXsdOrderCases] \out -> do
-          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
-          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
-
-  -- The engine-INTERSECTION triple (spec §6 measured note, 2026-07-30). What
-  -- it pins: the two-engine-portable spellings of a per-element predicate are
-  -- an opaque inline `satisfies` string or a BKM — NOTHING in between. The
-  -- boxed-context placement is schema-valid DMN 1.3 (Xerces and KIE's
-  -- validator both take it) that zeebe-dmn cannot parse, so "schema-valid"
-  -- and "portable" are different properties, measured on the same file.
-  describe "the engine-intersection triple (per-element predicate as a table)" $ do
-    it "KIE accepts the inline control, warning-free" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        spouseInlineDmn [spouseInlineDmn, "--cases", spouseCases] \out -> do
-          out `shouldSatisfy` ("0 error(s), 0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
-
-    it "Camunda 8 accepts the inline control" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        spouseInlineDmn [spouseInlineDmn, "--cases", spouseCases] \out -> do
-          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
-
-    -- The one warning is pinned BY NAME because it is a finding, not noise:
-    -- MISSING_TYPE_REF asks for the type of `eligible`, and the type it wants
-    -- is the function type Spouse -> boolean — which DMN's itemDefinition
-    -- language cannot spell. "No function types on the edges", stated by the
-    -- vendor's own validator.
-    it "KIE accepts the boxed-context table, with exactly the unspellable-type warning" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        spouseContextTableDmn [spouseContextTableDmn, "--cases", spouseCases] \out -> do
-          out `shouldSatisfy` ("0 error(s), 1 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("MISSING_TYPE_REF" `isInfixOf`)
-          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
-
-    -- UPGRADE RISK, wired on purpose. If a future zeebe-dmn bump LEARNS to
-    -- parse a decision table inside a context entry, HarnessMustFail turns
-    -- this test red — and that red is good news, not a regression: the engine
-    -- intersection has widened. Flip this expectation to HarnessMustPass and
-    -- update the two write-ups that cite the split (the fixture's own header
-    -- and the §6 measured note), then reconsider whether BKM emission is
-    -- still the ONLY portable route to an analyzable per-element predicate.
-    it "Camunda 8 REJECTS the boxed-context table at parse — the pinned negative" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
-        spouseContextTableDmn [spouseContextTableDmn, "--cases", spouseCases] \out -> do
-          out `shouldSatisfy` ("PARSE  INVALID" `isInfixOf`)
-          out `shouldSatisfy` ("expected literal expression" `isInfixOf`)
-          out `shouldSatisfy` ("0 parsed, 1 error(s)" `isInfixOf`)
-
-    it "KIE accepts the BKM table, warning-free" $
-      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
-        spouseBkmTableDmn [spouseBkmTableDmn, "--cases", spouseCases] \out -> do
-          out `shouldSatisfy` ("0 error(s), 0 warning(s)" `isInfixOf`)
-          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
-
-    it "Camunda 8 accepts the BKM table — the only portable tabular predicate" $
-      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
-        spouseBkmTableDmn [spouseBkmTableDmn, "--cases", spouseCases] \out -> do
-          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
-          out `shouldSatisfy` ("5/5 value(s) as expected" `isInfixOf`)
+    -- Two rules resolve every IMPORT: the one that collects parser hints
+    -- (GetMixfixRegistry) and the one that collects typecheck dependencies
+    -- (GetImports). Each used to log "Module not found" at Warning, so one
+    -- mistake printed two warnings, and both landed in `--json` diagnostics.
+    it "warns once about an unresolved import, not once per rule that resolves it" $
+      sandbox "l4-import-missing-warns-once"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n") ]
+        \dir -> do
+          let warning = "Module not found: zz no such module 971"
+              occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+          Output _code _sout serr <- runIn dir ["check", "importer.l4"]
+          occurrences warning serr `shouldBe` 1
+          -- `l4 check --json` and `l4 run --json` carry the Warning lines in
+          -- `diagnostics`; each must carry this one once.
+          Output _ checkJson _ <- runIn dir ["check", "--json", "importer.l4"]
+          occurrences warning checkJson `shouldBe` 1
+          Output _ runJson _ <- runIn dir ["run", "--json", "importer.l4"]
+          occurrences warning runJson `shouldBe` 1
+          -- Positive control: `l4 ast` never typechecks, so the rule that
+          -- collects dependencies never runs, and the parser-hint rule is the
+          -- only one that tells you. One warning must not become none.
+          Output _ _ astErr <- runIn dir ["ast", "importer.l4"]
+          occurrences warning astErr `shouldBe` 1
+
+  -- `l4 export` and the DMN engine checks. Called here rather than with the
+  -- other backends below because this is where those describes have always
+  -- run, so the suite's output order is unchanged.
+  DmnBpmn.spec bin
 
   -- The NLG footing. Two assertions, and the second is the one that matters:
   -- `l4 nlg` must be byte-identical to what jl4-test writes into the committed
@@ -3270,6 +5193,14 @@ spec bin = do
     it "reproduces the committed regcf-wizard NLG golden byte for byte" $
       expectGolden bin ["nlg", nlgWizardSource] nlgWizardGolden
 
+    -- Carried from main: two more modules whose committed .nlg.golden
+    -- `l4 nlg` must reproduce.
+    it "reproduces the committed promissory-note NLG golden byte for byte" $
+      expectGolden bin ["nlg", nlgPromissorySource] nlgPromissoryGolden
+
+    it "reproduces the committed directive-showcase NLG golden byte for byte" $
+      expectGolden bin ["nlg", nlgShowcaseSource] nlgShowcaseGolden
+
   -- An @nlg on a rule head's INPUT, which is the one placement the two
   -- projections used to disagree about (smucclaw/l4-ide#972). `l4 render` read it
   -- as the rule's sentence and `l4 nlg` as the input's gloss, so a positional
@@ -3280,6 +5211,138 @@ spec bin = do
   -- Rows 5, 7, 8 and 12 of the fixture are the repaired ones; row 13 and the
   -- `AKA` rows are the controls, and they are the assertions that fail if the
   -- repair is widened into an unconditional promotion.
+  -- A rule under a section GIVEN has no GIVEN of its own, so an @nlg on its own
+  -- line above it is its sentence, as for any rule with no GIVEN; one indented
+  -- under the section GIVEN is the binder's. This is a port decision, assumed,
+  -- not ruled (2026-11-01, legalese/l4-ide#802 to unstable).
+  describe "an @nlg on its own line above a rule under a section GIVEN" $ do
+    it "is that rule's sentence, and one indented under the GIVEN is the binder's" $ do
+      Output code sout _ <- runL4 bin ["nlg", nlgOwnLineSectionGivenFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("the age of the applicant" `isPrefixOf`)
+      -- The rule above used to take these two, so they read as bare names.
+      out `shouldSatisfy` any ("the applicant's age again" `isPrefixOf`)
+      out `shouldSatisfy` any ("the constant seven" `isPrefixOf`)
+      out `shouldSatisfy` any ("the claimant is a minor where the claimant's age in years is 3" `isInfixOf`)
+
+    -- `l4 render` used to leave `age again` out: a rule with no GIVEN of its
+    -- own whose body is a call counted as test data once an #EVAL named it.
+    -- `seven` is a bare literal that only an #EVAL names, which is test data on
+    -- main and unstable alike, and stays out even with an @nlg (assumed, not
+    -- ruled, 2026-11-01).
+    it "renders every rule under the section GIVEN, with its sentence" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgOwnLineSectionGivenFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("The age of the applicant means" `isInfixOf`)
+      out `shouldSatisfy` any ("The applicant's age again means the age of the applicant." `isInfixOf`)
+      out `shouldSatisfy` any ("The claimant is a minor if" `isInfixOf`)
+      out `shouldNotSatisfy` any ("seven" `isInfixOf`)
+
+  describe "l4 render of a rule that a directive names" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderSectionGivenEvalFixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "keeps a rule under a section GIVEN whose body calls another rule" $ do
+      out <- rows
+      out `shouldSatisfy` any ("The person is an adult if age is at least 18." `isInfixOf`)
+      out `shouldSatisfy` any ("The person may vote" `isInfixOf`)
+      out `shouldSatisfy` any ("May stand" `isInfixOf`)
+
+    -- Such a rule is often a named-argument call to a rule under another
+    -- section GIVEN. With no herald on that rule it used to read as a record
+    -- construction ("F is a g with: foo — foo").
+    it "reads a named-argument call to a rule as a call, not a record" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", sectionGivenBridgeSource]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("1. F means g where foo is foo." `isSuffixOf`)
+      out `shouldNotSatisfy` any ("is a g with" `isInfixOf`)
+
+    it "still leaves out a constant that only a directive names" $ do
+      out <- rows
+      out `shouldSatisfy` any ("Twice " `isInfixOf`)
+      out `shouldNotSatisfy` any ("doubled fee" `isInfixOf`)
+      out `shouldNotSatisfy` any ("test age" `isInfixOf`)
+
+  -- The operands of a mixfix call go in its pattern's slots, whatever the
+  -- operands are. A call whose first operand was itself a call used to reach
+  -- the renderer as a plain function, and lost its subject.
+  describe "l4 render of a mixfix call whose operand is a call" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderMixfixOperandFixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = (`shouldSatisfy` any (r `isSuffixOf`))
+
+    it "puts each operand in its slot" $ do
+      out <- rows
+      hasRow "(a) the day x is on or before the day y;" out
+      hasRow "(b) (the day x plus days 12) is on or before the day y;" out
+      hasRow "(c) the day y is on or before (the day x plus days 12);" out
+      hasRow "(d) (the day y plus days 1) is on or before (the day x plus days 12); and" out
+      hasRow "(e) (the day x plus days 2) precedes the day y." out
+
+    -- A slot holding a call of two or more arguments, or a built-in operator, is
+    -- bracketed. Without that, a left-nested and a right-nested call read the
+    -- same, for two different numbers (85 and 95).
+    it "brackets a slot that holds a call, so left and right nesting read apart" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderMixfixNestedFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+          rowOf w = headOr "" [ l | l <- out, ("Net " <> w <> " means") `isInfixOf` l ]
+      rowOf "one" `shouldSatisfy` ("Net one means ([price] reduced by [discount]) reduced by [rebate]." `isSuffixOf`)
+      rowOf "two" `shouldSatisfy` ("Net two means [price] reduced by ([discount] reduced by [rebate])." `isSuffixOf`)
+      rowOf "three" `shouldSatisfy` ("Net three means (price + discount) reduced by [rebate]." `isSuffixOf`)
+      rowOf "four" `shouldSatisfy` ("Net four means (Money where amount is 100 and cur is SGD) less 5." `isSuffixOf`)
+      drop 7 (rowOf "one") `shouldNotBe` drop 7 (rowOf "two")
+
+    -- A denial, a choice, a list joined on, or a joined list in a slot reads as
+    -- more than one thing too. Each pair below has two values; while those slots
+    -- took no brackets, each pair read as one sentence (the round-3 refuter's G1
+    -- and G2). A rule's reading is its whole entry, less its name.
+    it "brackets a slot that holds a denial, a choice or a list, so each pair reads apart" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderMixfixNestedFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+          entryOf name = case dropWhile (not . ((". " <> name <> " ") `isInfixOf`)) out of
+            (h : rest) -> unwords (drop 1 (dropWhile (/= lastWord name) (words h)))
+                            <> concat (takeWhile (not . null) rest)
+            []         -> ""
+          lastWord name = case reverse (words name) of { (w : _) -> w; [] -> "" }
+      forM_ [("Neg right", "Neg whole"), ("Multi left", "Multi whole"), ("If left", "If right")
+           , ("Cons left", "Cons right"), ("Join left", "Join right")] $ \ (l, r) -> do
+        entryOf l `shouldNotBe` ""
+        entryOf l `shouldNotBe` entryOf r
+      entryOf "Neg right" `shouldSatisfy` ("(b) yes as well as (no is false)." `isSuffixOf`)
+      entryOf "Neg whole" `shouldSatisfy` ("(b) yes as well as no is false." `isSuffixOf`)
+      entryOf "Multi left" `shouldSatisfy` ("(b) (it is not the case that is big for 5) as well as no." `isSuffixOf`)
+      -- A mixfix call that is an operand of arithmetic is bracketed as a whole
+      -- too (legalese/l4-ide#804's operand rule), around the slot's own brackets.
+      entryOf "If left" `shouldBe` "equals 0 + ((if c then base else 7) reduced by [r])."
+      entryOf "Cons left" `shouldBe` "means (1 followed by nums) then also [ys]."
+      entryOf "Cons right" `shouldBe` "means 1 followed by nums then also [ys]."
+      entryOf "Join left" `shouldBe` "means (nums followed by nums) then also [ys]."
+
+    it "reads a section GIVEN's input in a slot as a blank, as a rule's own input" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderSectionGivenBlanksFixture]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("Net income means [income] reduced by 10." `isSuffixOf`)
+      out `shouldSatisfy` any ("Check if [income] is above the age." `isSuffixOf`)
+
+    -- A section GIVEN is unstable's way to write what main writes as an ASSUME,
+    -- and #803 opens a document with what it takes as given. The checker's
+    -- ASSUMEs for the section are stripped, so the section states its inputs.
+    it "states a section GIVEN's inputs as taken as given" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderSectionGivenBlanksFixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy`
+        ("The following are taken as given:\n\n1. Age.\n\n2. Income." `isInfixOf`)
+
   describe "an @nlg on a rule head's input" $ do
     let nlgOf   = runL4 bin ["nlg", nlgHeadPlacementSource]
         renderOf = runL4 bin ["render", "--format", "text", nlgHeadPlacementSource]
@@ -3307,10 +5370,10 @@ spec bin = do
     it "renders the same sentences through l4 render, which is the point" $ do
       Output code sout _ <- renderOf
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("row five saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row seven saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row eight saw amount" `isInfixOf`)
-      sout `shouldSatisfy` ("row twelve saw amount over floor" `isInfixOf`)
+      sout `shouldSatisfy` ("Row five saw [amount]" `isInfixOf`)
+      sout `shouldSatisfy` ("Row seven saw [amount]" `isInfixOf`)
+      sout `shouldSatisfy` ("Row eight saw [amount]" `isInfixOf`)
+      sout `shouldSatisfy` ("Row twelve saw [amount] over [floor]" `isInfixOf`)
 
     it "reads the placements that already worked the same way, argument in the slot" $ do
       Output _ sout _ <- nlgOf
@@ -3327,18 +5390,1030 @@ spec bin = do
       sout `shouldSatisfy` ("row thirteen the rule saw 200\n" `isInfixOf`)
       sout `shouldSatisfy` ("row thirteen the input" `isInfixOf`)
 
-    it "does not touch an AKA head, where the disagreement is a different one" $ do
+    it "reads a herald on an AKA head as the rule's sentence at both call shapes (#978)" $ do
       Output _ nlgOut _ <- nlgOf
       Output _ renOut _ <- renderOf
-      -- Row 10: the AKA's name claims the herald, so `l4 nlg` prints it — as
-      -- the bare linearizer does, slot unfilled and the argument appended,
-      -- because the herald is on no position `decideNlg` searches — and
-      -- `l4 render` prints its own paraphrase. Row 11: the herald above the
-      -- head IS found by `decideNlg`, so the splice reads it and the two
-      -- projections now agree on this row; the AKA residue is row 10 alone.
-      nlgOut `shouldSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
+      -- Row 10: the herald lands on the AKA's NAME. `L4.Nlg.decideNlg` now
+      -- searches that position, so `l4 render` finds it and `l4 nlg` fills its
+      -- slot; before, render lost it and nlg printed "row ten saw `amount`
+      -- with 200". A call through the alias reads the same.
+      nlgOut `shouldNotSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("row ten saw 200\nrow ten saw `amount` where `amount` is 200\nrow ten saw 200\n" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row ten saw [amount] if amount is more than 100." `isInfixOf`)
+      -- Row 11: the herald above the head lands on the declaration. A `WITH`
+      -- call used to print the bare name, "`row eleven` where ...".
       nlgOut `shouldSatisfy` ("row eleven saw 200\n" `isInfixOf`)
-      renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("row eleven saw `amount` where `amount` is 200" `isInfixOf`)
+      nlgOut `shouldNotSatisfy` ("`row eleven` where" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row eleven saw [amount] if amount is more than 100." `isInfixOf`)
+
+    it "heads a WITH call with the herald without re-expanding an input's gloss (row 13)" $ do
+      Output _ nlgOut _ <- nlgOf
+      nlgOut `shouldSatisfy` ("row thirteen the rule saw `amount` where row thirteen the input is 200" `isInfixOf`)
+
+    it "reads a GIVEN gloss as the input's label, never as the rule's sentence (row 14)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- The head names no input, so the type checker hoists the GIVEN name
+      -- into it; the gloss must not be taken for the rule's herald on that
+      -- account (smucclaw/l4-ide#977). Positional: the bare name. WITH: the
+      -- gloss labels the input. Render: the rule's own body.
+      nlgOut `shouldSatisfy` ("`row fourteen` with 200\n" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row fourteen` where the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldNotSatisfy` ("the sum of money with 200" `isInfixOf`)
+      renOut `shouldNotSatisfy` (" if the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row fourteen if amount is more than 100" `isInfixOf`)
+
+    it "reads an own-line gloss under a GIVEN list's LAST input as that input's (rows 15-19)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- Ruled 2026-10-02: indented past the GIVEN keyword, it describes the
+      -- input above it, with a GIVETH next (row 15) or without (row 16), past
+      -- TYPICALLY defaults (row 18), and under a section GIVEN (row 19). Before,
+      -- row 15's was dropped, row 16's became the rule's sentence, and row 18's
+      -- first landed on the second input.
+      nlgOut `shouldSatisfy` ("`row fifteen` where `floor` is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row sixteen` with 200\n`row sixteen` where the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row eighteen` where the floor is 100 and the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row nineteen` where the section's floor is 100" `isInfixOf`)
+      -- Render describes each rule by its own body; only a section input's
+      -- gloss shows up in it.
+      renOut `shouldSatisfy` ("Row fifteen if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row sixteen if amount is more than 100" `isInfixOf`)
+      renOut `shouldNotSatisfy` ("means the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row eighteen if amount is more than floor" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row nineteen if amount is more than the section's floor" `isInfixOf`)
+
+    -- doc/reference/syntax/nlg.md says of its placement table that "a
+    -- change to any cell is a test failure". So the cells are read from the
+    -- page: each row's `l4 render` cell, and both `l4 nlg` cells of rows 2 and
+    -- 3, name what the output must show. Editing a cell turns this red, and so
+    -- does a change to the output.
+    it "matches the reference table's l4 render cell for every row, read from the page" $ do
+      Output _ renOut _ <- renderOf
+      Output _ nlgOut _ <- nlgOf
+      table <- placementTable <$> readFile placementReadme
+      map fst table `shouldBe` [1 .. 19]
+      for_ table \(n, cells) -> case cells of
+        [_shape, _placement, positional, withCall, render] -> do
+          let word = numberWord n
+              line = headOr "" [ l | l <- lines renOut, ("Row " <> word <> " ") `isInfixOf` l ]
+          unless (renderCellHolds word render line) $
+            expectationFailure ("row " <> show n <> ": the table's l4 render cell is "
+              <> show render <> ", but l4 render printed " <> show line)
+          when (n `elem` [2, 3]) $ do
+            unless (positional == "sentence" && ("row " <> word <> " saw 200\n") `isInfixOf` nlgOut) $
+              expectationFailure ("row " <> show n <> ": positional cell " <> show positional)
+            unless (withCall == "sentence"
+                    && ("row " <> word <> " saw `amount` where `amount` is 200") `isInfixOf` nlgOut) $
+              expectationFailure ("row " <> show n <> ": WITH cell " <> show withCall)
+        _ -> expectationFailure ("row " <> show n <> ": expected six cells, got " <> show cells)
+
+    it "still reads one at the GIVEN keyword's column as the rule's sentence (row 17)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      nlgOut `shouldSatisfy` ("row seventeen saw 200\n" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row seventeen saw [amount] if amount is more than 100." `isInfixOf`)
+
+  -- An @nlg on a MIXFIX definition, read at its call sites. A mixfix call
+  -- resolves to the operator's canonical name (`the lower of _ and _`), while the
+  -- herald table was keyed on the definition's head keyword alone (`the lower
+  -- of`), so an interleaved call never found its herald and printed the pattern
+  -- with the arguments after it, or, where the herald sat on the head, with its
+  -- slots unfilled. The `OF` spelling and a `WITH` call resolve to the head
+  -- keyword and always worked; they are rows here so a repair that keys on the
+  -- canonical name ONLY would fail them.
+  --
+  -- Whole-output equality, not `isInfixOf`: the failure being guarded is a line
+  -- that reads plausibly and is wrong, and an infix test would not see a wrong
+  -- line sitting beside a right one.
+  describe "an @nlg on a mixfix definition" $ do
+    let -- Lines of `l4 nlg`'s output with any carriage return dropped, as the house idiom does.
+        nlgLines fixture = do
+          Output code sout _ <- runL4 bin ["nlg", fixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        -- One line per #EVAL in the fixtures, in order. The first seven are the
+        -- interleaved calls, then the nested one, then the OF and WITH calls.
+        interleaved =
+          [ "the smaller of 840 and 160"
+          , "the amount by which 840 exceeds 160"
+          , "840 less 160"
+          , "840 and 160 together"
+          , "the first of 840 with 160"
+          , "`the bare _ and _` with 840 and 160"
+          , "the greater of 3 and 4"
+          , "the smaller of the smaller of 5 and 6 and 7"
+          ]
+        ofCalls =
+          [ "the smaller of 840 and 160"
+          , "the amount by which 840 exceeds 160"
+          ]
+        lowerWith = "the smaller of `a` and `b` where `a` is 840 and `b` is 160"
+        exceedsWith = "the amount by which `a` exceeds `b` where `a` is 840 and `b` is 160"
+        -- The prefix control with its herald after the last input: positional,
+        -- then WITH. Across an IMPORT the WITH call used to print the herald a
+        -- second time, as the label of `b`.
+        gapRows =
+          [ "the gap between 840 and 160"
+          , "the gap between `a` and `b` where `a` is 840 and `b` is 160"
+          ]
+
+    it "fills the herald's slots at a call in the same module" $ do
+      rows <- nlgLines nlgMixfixLocalFixture
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith] ++ gapRows
+
+    it "fills the herald's slots at a call across an IMPORT" $ do
+      rows <- nlgLines nlgMixfixImportFixture
+      rows `shouldBe` interleaved ++ ofCalls ++ [lowerWith, exceedsWith] ++ gapRows
+
+    -- The other reader of a herald at a call site: `l4 render`, for a call in the
+    -- body of another rule. The fixtures end in one rule per call shape, named
+    -- "render ...". A rule's bullet is "• Render lower means ..."; the bullet is
+    -- not what is being tested, so the row is the text after it.
+    let renderRows fixture = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ drop 1 (dropWhile (/= ' ') l)
+               | l <- map (filter (/= '\r')) (lines sout)
+               , " Render " `isInfixOf` l ]
+        expectedRenderRows =
+          [ "Render lower means the smaller of [n] and 100."
+          , "Render exceeds means the amount by which [n] exceeds 100."
+          , "Render shortfall means 100 less [n]."
+          , "Render plus means [n] and 100 together."
+          , "Render first means the first of [n] with 100."
+          , "Render bare means the bare [n] and 100."
+          , "Render greater means the greater of [n] and 100."
+          , "Render nested means the smaller of the smaller of [n] and 100 and 200."
+          , "Render of [n] means the smaller of [n] and 100."
+          , "Render exceeds with [n] equals (the amount by which a exceeds b where a is n and b is 100) + 1."
+          , "Render gap with [n] equals (the gap between a and b where a is n and b is 100) + 1."
+          , "Render lower with [n] equals (the smaller of a and b where a is n and b is 100) + 1."
+          , "Render half selector means the span's size's half."
+          , "Render third selector means the span's size's third."
+          , "Render exceeds direct means the amount by which a exceeds b where a is n and b is 100."
+          , "Render gap direct means the gap between a and b where a is n and b is 100."
+          , "Render lower direct means the smaller of a and b where a is n and b is 100."
+          , "Render point is a Pt with:"
+          ]
+
+    it "is read by l4 render at a call in the body of another rule" $ do
+      rows <- renderRows nlgMixfixLocalFixture
+      rows `shouldBe` expectedRenderRows
+
+    it "is read by l4 render at such a call across an IMPORT" $ do
+      rows <- renderRows nlgMixfixImportFixture
+      rows `shouldBe` expectedRenderRows
+
+    it "is read by l4 render in the example the syntax reference links" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgMixfixDocExample]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy` ("The price we charge means the smaller of [price] and 100." `isInfixOf`)
+
+  -- A rule shown under "Imported definitions" is rendered from its own module's
+  -- copy of the tree, so it must read as it does when that module is rendered on
+  -- its own. A WITH call made in the middle of a chain used to print the herald
+  -- of a function two modules down a second time, because only the module being
+  -- rendered had its heralds moved onto their rules.
+  describe "l4 render of a rule imported through two modules" $ do
+    let midRows fixture = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", "--include-imports", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ dropWhile (not . isAlpha) l
+               | l <- map (filter (/= '\r')) (lines sout)
+               , "Mid rule " `isInfixOf` l ]
+        expected = ["Mid rule equals (the gap between a and b where a is n and b is 100) + 1."]
+
+    it "reads the same when the middle module is the one rendered" $ do
+      rows <- midRows nlgTransMid
+      rows `shouldBe` expected
+
+    it "reads the same when the top module is the one rendered" $ do
+      rows <- midRows nlgTransTop
+      rows `shouldBe` expected
+
+  -- A herald is found by the definition a call resolved to. It used to be found
+  -- by the call's name and its number of arguments, so any definition with the
+  -- same name read the herald of another one: a record, a rule of the drafter's
+  -- own beside an imported one, a library function reused for something else.
+  describe "a herald belongs to the definition the call resolved to" $ do
+    let -- The rows of `l4 render` whose heading starts with one of these words.
+        renderedRows fixture needles = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", fixture]
+          code `shouldBe` ExitSuccess
+          pure [ row
+               | l <- map (filter (/= '\r')) (lines sout)
+               , let row = dropWhile (not . isAlpha) l
+               , any (`isPrefixOf` row) needles ]
+        nlgRows fixture = do
+          Output code sout _ <- runL4 bin ["nlg", fixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads a WITH body that builds a record as a record, not as a call to a rule named like it" $ do
+      rows <- renderedRows nlgOwnerMain ["Own origin shift", "Own band around"]
+      rows `shouldBe`
+        [ "Own origin shift is a Pt with:"
+        , "Own band around is a range with:"
+        ]
+
+    -- The drafter's own `LESS`, `is in` and `sum` have no herald. The prelude's
+    -- do, on sets and lists; a call to the drafter's reads as an unheralded call.
+    it "gives a definition with no herald no sentence from a prelude definition of the same name" $ do
+      rows <- renderedRows nlgOwnerMain ["Own net price", "Own working age", "Own total"]
+      rows `shouldBe`
+        [ "Own net price means [price] LESS 20."
+        , "Own working age if [age] is in 65."
+        , "Own total means sum of total."
+        ]
+
+    it "gives a #EVAL of a definition with no herald no sentence from a prelude definition of the same name" $ do
+      rows <- nlgRows nlgOwnerMain
+      take 3 rows `shouldBe`
+        [ "`_ LESS _` with 100 and 20"
+        , "`_ is in _` with 5 and 10"
+        , "`sum` with 5"
+        ]
+
+    -- Same pattern, same name, different types, each with a herald: the call
+    -- reads the one it resolved to, from this module or from the library.
+    it "reads the herald of the overload a call resolved to, one in this module and one imported" $ do
+      rows <- renderedRows nlgOwnerMain ["Own first name", "Own cap", "Own first word", "Own floor"]
+      rows `shouldBe`
+        [ "Own first name means whichever of [s] and m comes first in the alphabet."
+        , "Own cap means the smaller of [n] and 100."
+        , "Own first word means whichever of [s] and m comes first in the alphabet, written plainly."
+        , "Own floor means the smaller number of [n] and 100."
+        ]
+
+    it "reads the herald of the overload a #EVAL resolved to, one in this module and one imported" $ do
+      rows <- nlgRows nlgOwnerMain
+      drop 3 rows `shouldBe`
+        [ "whichever of x and y comes first in the alphabet"
+        , "the smaller of 3 and 4"
+        , "whichever of x and y comes first in the alphabet, written plainly"
+        , "the smaller number of 3 and 4"
+        ]
+
+    -- The same, for two overloads of one mixfix pattern in a single module.
+    it "reads the herald of the overload a call resolved to, both written in one module" $ do
+      nlg <- nlgRows nlgOwnerOverload
+      nlg `shouldBe`
+        [ "the smaller number of 3 and 4"
+        , "whichever of x and y comes first in the alphabet"
+        ]
+      ren <- renderedRows nlgOwnerOverload ["Own cap", "Own first name"]
+      ren `shouldBe`
+        [ "Own cap means the smaller number of [n] and 100."
+        , "Own first name means whichever of [s] and m comes first in the alphabet."
+        ]
+
+    -- A positional call builds a record only if its head is the record's
+    -- constructor. These records share a name with a function that is not one:
+    -- the library's `Pt` and the prelude's `range`.
+    it "reads a positional call to a function named like a record as a call, not as building the record" $ do
+      rows <- renderedRows nlgPositionalMain ["Pos shift", "Pos numbers"]
+      rows `shouldBe`
+        [ "Pos shift means Pt with n and 100."
+        , "Pos numbers means the whole numbers from 1 to [n]."
+        ]
+
+    it "still reads a positional call to the record's own constructor as building it" $ do
+      rows <- renderedRows nlgPositionalMain ["Pos point", "Pos band"]
+      rows `shouldBe`
+        [ "Pos point is a Pt with:"
+        , "Pos band is a range with:"
+        ]
+
+  -- A herald is the sentence for a CALL: its slots are bound by the call's
+  -- arguments. A rule that is named but not called, passed to `filter` or
+  -- `foldr` or given a second name, has no arguments to bind them, and used to
+  -- read as its sentence with the slot names of its definition in it
+  -- ("for which x is even holds"), which says something the author did not write.
+  -- What a rendering must never change. A reader of the document has nothing but
+  -- these words, so each row is a rule whose meaning a flat rendering would change
+  -- or lose, read as a whole line: an infix test would not see a wrong line beside
+  -- a right one.
+  describe "l4 render keeps a rule's meaning" $ do
+    let rowOf heading = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderMeaningFixture]
+          code `shouldBe` ExitSuccess
+          pure (unlines (takeWhile (not . null) (dropWhile (not . (heading `isInfixOf`)) (map (filter (/= '\r')) (lines sout)))))
+
+    it "keeps the right operand of a subtraction or a division in brackets" $ do
+      rowOf "Right nested minus" >>= (`shouldSatisfy` ("equals a − (b − c)." `isInfixOf`))
+      rowOf "Right nested division" >>= (`shouldSatisfy` ("equals a ÷ (b × c)." `isInfixOf`))
+      rowOf "Right nested divide by quotient" >>= (`shouldSatisfy` ("equals a ÷ (b ÷ c)." `isInfixOf`))
+
+    it "says where a group of the other connective starts and ends" $ do
+      rowOf "And of or in a condition" >>= (`shouldSatisfy` ("If a and either b or c: 1;" `isInfixOf`))
+      rowOf "Or of and in a condition" >>= (`shouldSatisfy` ("If either a or b, and c: 1;" `isInfixOf`))
+      rowOf "Not of and in a condition" >>= (`shouldSatisfy` ("If it is not the case that both a and b: 1;" `isInfixOf`))
+      rowOf "Not as a whole rule" >>= (`shouldSatisfy` ("neither a nor b." `isInfixOf`))
+      rowOf "Rule with not of an and" >>= (`shouldSatisfy` ("it is not the case that both a and (b or c)." `isInfixOf`))
+
+    it "spells a possessive to fit the word, and leaves an author's alone" $ do
+      rowOf "The rate on the facts" >>= (`shouldSatisfy` ("the contribution facts' rate" `isInfixOf`))
+      rowOf "The age of the witness" >>= (`shouldSatisfy` ("the witness's age" `isInfixOf`))
+
+    it "keeps a denial to the one operand of an OR it covers" $
+      rowOf "Denial of one operand" >>= (`shouldSatisfy` ("If (it is not the case that the facts are not met for the contribution facts) or b: 1;" `isInfixOf`))
+
+    it "does not take a name ending in over for a preposition" $
+      rowOf "Old enough" >>= (`shouldSatisfy` ("I am 18 or over for the contribution facts." `isInfixOf`))
+
+    it "gives each nested calculation words of its own in l4 nlg" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderMeaningFixture]
+      code `shouldBe` ExitSuccess
+      take 6 (lines (filter (/= '\r') sout)) `shouldBe`
+        [ "10 minus (5 minus 2)"
+        , "(10 minus 5) minus 2"
+        , "the product of 4 and (5 minus 2)"
+        , "(the product of 4 and 5) minus 2"
+        , "the result of dividing 12 by (6 minus 2)"
+        , "(the result of dividing 12 by 6) minus 2"
+        ]
+
+    it "makes a unit of time agree with the number 1 in a sentence" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderMeaningFixture]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      out `shouldSatisfy` ("the date 1 month after" `isInfixOf`)
+      out `shouldSatisfy` ("the date 2 months after" `isInfixOf`)
+
+    it "keeps a subtraction in the order it was written" $
+      rowOf "Difference in prose" >>= (`shouldSatisfy` ("If a − b is more than 0: more;" `isInfixOf`))
+
+    it "keeps the drafter's name for a role" $ do
+      rowOf "The applicant is eligible" >>= (`shouldSatisfy` ("(a) the applicant is a citizen; and" `isInfixOf`))
+      rowOf "Discount" >>= (`shouldSatisfy` ("If the buyer's age is at least 65: the amount × 0.1;" `isInfixOf`))
+
+    it "tells a deadline of zero from no deadline at all" $ do
+      rowOf "At once" >>= (`shouldSatisfy` ("the Tenant must pay the rent immediately." `isInfixOf`))
+      rowOf "No deadline at all" >>= (`shouldSatisfy` ("the Tenant must pay the rent. Failing" `isInfixOf`))
+
+    it "says who is in breach, and what follows an obligation" $ do
+      rowOf "With a deadline and a chain" >>= (`shouldSatisfy` ("(a) Once that is done, the Landlord must repair the roof within 30." `isInfixOf`))
+      rowOf "With a deadline and a chain" >>= (`shouldSatisfy` ("(b) Failing that, the Tenant is in breach." `isInfixOf`))
+
+    it "reads a day that exists as that day, and no other as a day" $ do
+      rowOf "A real date" >>= (`shouldSatisfy` ("29 February 2024" `isInfixOf`))
+      rowOf "A date that rolls over" >>= (`shouldNotSatisfy` ("29 February 2025" `isInfixOf`))
+
+  -- The two surfaces read one document: `l4 render` with no flags is the Render
+  -- tab's default, so an import is left out but still informs the file's own rules.
+  describe "l4 render and imports" $ do
+    it "writes the document, and fails, when an imported module does not check" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderBrokenImportFixture]
+      code `shouldNotBe` ExitSuccess
+      filter (/= '\r') sout `shouldSatisfy` ("Still fine means 1." `isInfixOf`)
+
+    let run args = do
+          Output code sout _ <- runL4 bin (["render", "--format", "text"] ++ args ++ [nlgTransTop])
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout)
+
+    it "leaves imported rules out by default" $
+      run [] >>= (`shouldNotSatisfy` ("Mid rule" `isInfixOf`))
+
+    it "shows them when asked" $ do
+      run ["--include-imports"] >>= (`shouldSatisfy` ("Mid rule" `isInfixOf`))
+      run ["--include-import", "nlg-trans-mid"] >>= (`shouldSatisfy` ("Mid rule" `isInfixOf`))
+
+    it "numbers sections and clauses unless told not to" $ do
+      run [] >>= (`shouldSatisfy` ("1. " `isInfixOf`))
+      run ["--no-number-clauses"] >>= (`shouldNotSatisfy` ("1. " `isInfixOf`))
+
+  -- unstable has five constructs main does not: a ledger write (RECORD, COMMIT)
+  -- and read (RECALL), a lifecycle noun as a value (THE JOIN), a refusal
+  -- (REFUSE), and #ASSERT REFUSED. The prose pass came from main, where its
+  -- catch-alls sent them to the linearizer, which echoes keywords ("record
+  -- balance is 100"). Each row is read whole.
+  describe "l4 render of the constructs main does not have" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderUnstableConstructsFixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = (`shouldSatisfy` any (r `isSuffixOf`))
+
+    it "says a refusal in the author's words, in a body and in a branch" $ do
+      out <- rows
+      hasRow "The old fee means the model refuses to answer: this schedule is not encoded for years before 2000." out
+      hasRow "(b) Otherwise: the model refuses to answer: years before 2000 are not encoded." out
+
+    it "reads a ledger write as the value it records, and where" $ do
+      out <- rows
+      hasRow "Store the balance means 100, recorded as balance." out
+      hasRow "Commit the balance means 100, recorded as balance in the official record." out
+      hasRow "Tell the landlord means 100, recorded as balance in landlord's record." out
+
+    it "reads a ledger read as the value recorded there" $ do
+      out <- rows
+      hasRow "The stored balance means the value last recorded as balance, if any." out
+      hasRow "The landlord's balance means the value last recorded as balance in landlord's record, if any." out
+      hasRow "Every stored balance means every value recorded as balance, oldest first." out
+      hasRow "The official balance means the value last recorded as balance in the official record, if any." out
+
+    it "lays out a write with a HENCE as a step, then what follows it" $ do
+      out <- rows
+      hasRow "(i) paid is recorded as true; and" out
+      hasRow "(ii) landlord must deliver within 20." out
+
+    it "reads a lifecycle noun as the anchor of a deadline reads it" $ do
+      out <- rows
+      hasRow "(a) Once that is done, landlord must deliver within 0 of the join + 5." out
+
+    it "echoes no keyword" $ do
+      out <- rows
+      out `shouldNotSatisfy` any (\l -> any (`isInfixOf` l) ["record balance", "recall ", "commit balance", " hence "])
+
+    it "prints no directive, and l4 nlg reads #ASSERT REFUSED" $ do
+      out <- rows
+      out `shouldNotSatisfy` any ("must refuse" `isInfixOf`)
+      Output code sout _ <- runL4 bin ["nlg", renderUnstableConstructsFixture]
+      code `shouldBe` ExitSuccess
+      lines (filter (/= '\r') sout) `shouldSatisfy` (("the following must refuse: `the fee in year` with 1999" `elem`))
+
+  -- An action that is an input of the rule is whatever action is passed in.
+  -- Read as a noun after "must" it is not a sentence ("the party must the
+  -- action"), so it takes a verb (assumed, not ruled, 2026-11-01).
+  describe "l4 render of an obligation whose action is an input" $
+    it "says the party must perform that action" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", regulativeActionParamSource]
+      code `shouldBe` ExitSuccess
+      let out = map (filter (/= '\r')) (lines sout)
+      out `shouldSatisfy` any ("the party must perform the action within 30." `isInfixOf`)
+      out `shouldNotSatisfy` any ("must the action" `isInfixOf`)
+
+  -- An EVERY that is an operand of RAND or ROR is laid out like any other
+  -- operand: a lettered list, "; and" before the last entry of a RAND and
+  -- "; or" before the last entry of a ROR. doc/reference/regulative/EVERY.md
+  -- states it, and states that the join line is not rendered.
+  describe "l4 render of an EVERY under RAND and ROR" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", everyRandSource]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "lists the operands, joined by and, or by or" $ do
+      out <- rows
+      out `shouldSatisfy` any ("(a) every Tenant t must Sign (t) within 14. Failing that, the obligation is breached; and" `isSuffixOf`)
+      out `shouldSatisfy` any ("(a) every Tenant t must Sign (t) within 14; or" `isSuffixOf`)
+      out `shouldSatisfy` any ("(b) every Tenant t who t is Tenant with Alice must Sign (t) within 7." `isSuffixOf`)
+
+    it "echoes no keyword of the join line" $ do
+      out <- rows
+      out `shouldNotSatisfy` any (\l -> any (`isInfixOf` l) ["once all", "ONCE", "hence", "FULFILLED", "lest"])
+  -- What the renderer does with the shape of a document, none of which reads an
+  -- author's words: a name or a sentence is printed as it stands.
+  describe "l4 render house style" $ do
+    let render format = do
+          Output code sout _ <- runL4 bin ["render", "--format", format, renderHouseStyleFixture]
+          code `shouldBe` ExitSuccess
+          pure (filter (/= '\r') sout)
+
+    -- The marks that tell the renderer's words from an author's are internal, and
+    -- a noncharacter in a document prints as a box.
+    it "leaves none of its internal marks in any format" $
+      forM_ ["text", "html", "akn", "json"] $ \format -> do
+        out <- render format
+        filter (`elem` ['\xFDD0', '\xFDD1']) out `shouldBe` ""
+
+    it "puts its own connecting words into the document's language, in every format" $
+      forM_ ["text", "html", "akn"] $ \format -> do
+        Output code sout _ <- runL4 bin ["render", "--format", format, "--lang", "he", renderHebrewWordsFixture]
+        code `shouldBe` ExitSuccess
+        let out = filter (/= '\r') sout
+        out `shouldSatisfy` ("; \1488\1493" `isInfixOf`)         -- "; or"
+        out `shouldSatisfy` ("\1506\1501 5" `isInfixOf`)         -- "with 5"
+        out `shouldNotSatisfy` ("; or" `isInfixOf`)
+        filter (`elem` ['\xFDD0', '\xFDD1']) out `shouldBe` ""
+
+    it "keeps those words in English without --lang" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", renderHebrewWordsFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("; or" `isInfixOf`)
+      sout `shouldSatisfy` ("the threshold is passed with 5" `isInfixOf`)
+
+    it "keeps a provision's own labels and lead-in, and generates no letters for them" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("Transfer falls within an exception where such securities are transferred:\n    (1) to the issuer of the securities, for the transfer; or\n    (2) to an accredited investor, for the transfer." `isInfixOf`)
+
+    it "keeps a negation outside the statement it denies" $
+      render "text" >>= (`shouldSatisfy` ("Plain negation if it is not the case that the person is a hotel." `isInfixOf`))
+
+    it "reads a negative wording an author wrote as an @nlg" $
+      render "text" >>= (`shouldSatisfy` ("(a) the person is not a hotel; and\n    (b) the person is licensed." `isInfixOf`))
+
+    it "lays out cases and ladders with short results as decision tables, in order" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("The fee by status depends on the status:\n    | the status | Result |" `isInfixOf`)
+      out `shouldSatisfy` ("| otherwise, if age is at least 18 | adult  |" `isInfixOf`)
+
+    it "opens with an interpretation section" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("§ 1  Interpretation\n\nIn this document, unless the context otherwise requires:" `isInfixOf`)
+      out `shouldSatisfy` ("The following are taken as given:\n\n1. The person is a hotel." `isInfixOf`)
+
+    it "moves long constant data to a Schedule, and says so where it is used" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("The rate for [n] means item number [n] of the rate table (Schedule 1)." `isInfixOf`)
+      out `shouldSatisfy` ("§ 3  Schedule 1: The rate table" `isInfixOf`)
+
+    it "fills a pattern's slots so that an input's name cannot read as more of its words" $ do
+      out <- render "text"
+      out `shouldSatisfy` ("The later schedule applies to the status when assessed on [assessed on] and the pass expires on [expiring on], depending on the status:" `isInfixOf`)
+      out `shouldSatisfy` ("the later schedule applies to Active when assessed on [on date] and the pass expires on 0." `isInfixOf`)
+
+    it "gives a name that ends in a preposition its inputs, and keeps a code's capitals" $
+      render "text" >>= (`shouldSatisfy` ("The band for the C1 sector means 1." `isInfixOf`))
+
+    it "links a citation its file maps to a web address, keeping the address's case" $
+      render "html" >>= (`shouldSatisfy` ("<a href=\"https://example.com/Acts/Grants#S4\">Grants Act 2024, s 4(1)</a>" `isInfixOf`))
+
+    it "puts the rendering's own words into the document's language" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      filter (/= '\r') sout `shouldNotSatisfy` (" if amount" `isInfixOf`)
+
+  describe "an @nlg on its own line above a rule" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", nlgOwnLineFixture]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "belongs to that rule after a section heading, a name or a DECLARE" $ do
+      out <- rows
+      out `shouldSatisfy` any ("The first constant means 1." `isInfixOf`)
+      out `shouldSatisfy` any ("The second constant means the first constant." `isInfixOf`)
+      out `shouldSatisfy` any ("The third constant means the second constant." `isInfixOf`)
+      out `shouldSatisfy` any ("The declared constant means 4." `isInfixOf`)
+
+    it "prints a rule's @ref with the rule, written above it or below its signature" $ do
+      out <- rows
+      out `shouldSatisfy` any ("Source: Grants Act 2024, s 4(1)" `isInfixOf`)
+      out `shouldSatisfy` any ("Source: Grants Act 2024, s 5" `isInfixOf`)
+
+    it "fills a slot with the input it names, not a rule or a field of that name" $ do
+      out <- rows
+      out `shouldSatisfy` any ("the day 3 for the tenant" `isInfixOf`)
+
+  describe "a rule named but not called" $ do
+    it "reads as its name in l4 nlg" $ do
+      Output code sout _ <- runL4 bin ["nlg", nlgBareReference]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "the items of list of 1, 2 and 4 for which `even` holds"
+        , "the items of list of 1, 5 and 3 combined from the right with `max`, starting from 0"
+        , "`the span` 's `size` 's `half`"
+        ]
+
+    it "reads as its name in l4 render" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgBareReference]
+      code `shouldBe` ExitSuccess
+      [ dropWhile (not . isAlpha) l
+        | l <- map (filter (/= '\r')) (lines sout), "Own " `isInfixOf` l ] `shouldBe`
+        [ "Own evens means the items of [xs] for which even holds."
+        , "Own biggest means the items of [xs] combined from the right with max, starting from 0."
+        , "Own mapper means fmap."
+        ]
+
+  -- An operand of an arithmetic phrase says where it starts and ends, or two
+  -- calculations with different answers read alike.
+  describe "l4 nlg and nested arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgArithGrouping]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads each grouping as it is written" $
+      rows >>= (`shouldBe`
+        [ "10 minus (5 minus 2)"
+        , "(10 minus 5) minus 2"
+        , "the product of 4 and (5 minus 2)"
+        , "(the product of 4 and 5) minus 2"
+        , "the sum of 4 and (5 minus 2)"
+        , "(the sum of 4 and 5) minus 2"
+        , "10 minus (the sum of 5 and 2)"
+        , "the sum of (10 minus 5) and 2"
+        , "the result of dividing 12 by (6 minus 2)"
+        , "(the result of dividing 12 by 6) minus 2"
+        , "the product of (the sum of 4 and 5) and 2"
+        , "the sum of 4 and (the product of 5 and 2)"
+        , "(the result of 12 modulo 5) minus 1"
+        , "the result of 12 modulo (5 minus 1)"
+        , "the result of (10 minus 4) modulo 3"
+        , "10 minus (the result of 4 modulo 3)"
+        , "10 minus 4 is greater than 5"
+        ])
+
+    it "gives no two groupings the same words" $ do
+      out <- rows
+      length (nub out) `shouldBe` length out
+
+  -- A call's arguments, an IF's ELSE and a rule's own sentence do not say where
+  -- they end, so "minus" after one would read as part of it.
+  describe "l4 nlg and operands that are not arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgArithOperands]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads each grouping as it is written" $
+      rows >>= (`shouldBe`
+        [ "(`f2` with 2 and 5) minus 3"
+        , "`f2` with 2 and (5 minus 3)"
+        , "(5 doubled) minus 2"
+        , "(5 minus 2) doubled"
+        , "5 minus (2 doubled)"
+        , "(twice 5) minus 2"
+        , "twice (5 minus 2)"
+        , "(if `TRUE` then 1 else 10) minus 3"
+        , "if `TRUE` then 1 else 10 minus 3"
+        , "(the sum of 5 and 2) doubled"
+        , "the sum of 5 and (2 doubled)"
+        , "the sum of (`f2` with 2 and 5) and 3"
+        , "`f2` with 2 and the sum of 5 and 3"
+        , "2 less (3 minus 5)"
+        , "(2 less 3) minus 5"
+        ])
+
+    it "gives no two groupings the same words" $ do
+      out <- rows
+      length (nub out) `shouldBe` length out
+
+  describe "l4 render and operands that are not arithmetic" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderArithOperands]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a call, a sentence or an IF beside an operator" $ do
+      hasRow "Call then minus equals (f2 for 2 and x) − 3."
+      hasRow "Sentence then minus equals (twice [x]) − 3."
+      hasRow "If then minus equals (if c then 1 else 10) − x."
+      hasRow "Year then minus equals (the year of d) − 1."
+      hasRow "Call then minus then call equals a − (f2 for b and c) − d."
+
+    it "brackets arithmetic given to a call or a sentence" $ do
+      hasRow "Minus in a call means f2 for 2 and (x − 3)."
+      hasRow "Minus in a sentence means twice (x − 3)."
+      hasRow "Months less one means the date (n − 1) months after [d]"
+      hasRow "Minus of a call of minus equals a − (f2 for b and (c − d))."
+
+    it "leaves arithmetic inside arithmetic as the formula has it" $
+      hasRow "Times of minus equals 4 × (x − 2)."
+
+    it "brackets a call named like a maths function unless it reads as f(x)" $ do
+      hasRow "Round then minus equals (round for a and b) − c."
+      hasRow "Minus in a round means round for a and (b − c)."
+      hasRow "Floor then minus equals (the floor of [x]) − 3."
+      hasRow "Minus in a floor means the floor of (x − 3)."
+      hasRow "Exp then minus equals (e raised to the power of [x]) − 3."
+      hasRow "Minus in exp means e raised to the power of (x − 3)."
+
+    it "brackets a mod beside a × or a ÷, which do not reassociate with it" $ do
+      hasRow "Times of mod equals a × (b mod c)."
+      hasRow "Mod of times equals (a × b) mod c."
+      hasRow "Mod then times equals (a mod b) × c."
+      hasRow "Mod of a product equals a mod (b × c)."
+      hasRow "Mod then divided equals (a mod b) ÷ c."
+      hasRow "Mod of a quotient equals a mod (b ÷ c)."
+      hasRow "Quotient then mod equals (a ÷ b) mod c."
+      hasRow "Divided by a mod equals a ÷ (b mod c)."
+
+    it "brackets a mod beside a + or a −, where the word could reach further" $ do
+      hasRow "Plus of mod equals a + (b mod c)."
+      hasRow "Minus of mod equals a − (b mod c)."
+      hasRow "Mod then minus equals (a mod b) − c."
+      hasRow "Mod of a difference equals (a − b) mod c."
+
+  -- A denial in more than one word, next to AND or OR, is bracketed, so that it
+  -- cannot be read as denying what follows it as well.
+  describe "l4 render and the scope of a NOT" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderNotScope]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denied call beside OR or AND" $ do
+      hasRow "(a) If (it is not the case that the Act governs for n) or b: 1;"
+      hasRow "(a) If (it is not the case that the Act governs for n) and b: 1;"
+
+    it "brackets a denied AND beside OR" $
+      hasRow "(a) If (it is not the case that both the Act governs for n and c) or b: 1;"
+
+    it "brackets a denied call inside a group" $
+      hasRow "(a) If a and either (it is not the case that the Act governs for n) or b: 1;"
+
+    it "brackets a denied OR beside AND or OR" $ do
+      hasRow "(a) If (neither the Act governs for n nor b) and c: 1;"
+      hasRow "(a) If (n is not one of 1 or 2) or b: 1;"
+      hasRow "(a) If (it is not the case that the Act governs for n) and (neither b nor c) and d: 1;"
+
+    it "brackets an IMPLIES or an IF inside a group" $ do
+      hasRow "(a) If neither p nor (q implies r): 1;"
+      hasRow "(a) If neither (q implies r) nor p: 1;"
+      hasRow "(a) If it is not the case that both p and (q implies r): 1;"
+      hasRow "(a) If s and either (q implies r) or p: 1;"
+      hasRow "(a) If neither (if q then r else s) nor p: 1;"
+      hasRow "(a) If not (p or q) implies r: 1;"
+
+    it "leaves a denial that is already delimited as it was" $ do
+      hasRow "(a) If neither the Act governs for n nor b: 1;"
+      hasRow "(a) If a is false or b: 1;"
+
+  -- A denial, an IMPLIES or an IF that fills a slot is bracketed when the
+  -- sentence goes on after the slot, so that the rest of the sentence cannot
+  -- read as part of it. A slot at the end of the sentence is left as it was.
+  describe "l4 render and a condition in a sentence's slot" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", slotScope]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denial in a slot the sentence goes on after" $ do
+      hasRow "Denial in the slot if (it is not the case that the Act governs for n) is disclosed."
+      hasRow "Denial of the sentence if it is not the case that the Act governs for n is disclosed."
+      hasRow "Denial in the first slot if (it is not the case that the Act governs for n) is told [p]."
+      hasRow "Denial of the two-slot sentence if it is not the case that the Act governs for n is told [p]."
+      hasRow "Denial in the middle slot if [p] outweighs (it is not the case that the Act governs for n) in law."
+
+    it "brackets a denial in a pattern's hole the pattern goes on after" $ do
+      hasRow "Denial in the hole if (it is not the case that the Act governs for n) is published."
+      hasRow "Denial of the pattern if it is not the case that the Act governs for n is published."
+
+    it "brackets a denied OR or an IMPLIES in such a slot" $ do
+      hasRow "Denied or in the slot if (neither the Act governs for n nor q) is disclosed."
+      hasRow "Denied or around the sentence if neither the Act governs for n nor [q] is disclosed."
+      hasRow "Implies in the slot if (the Act governs for n implies q) is disclosed."
+      hasRow "Implies around the sentence if the Act governs for n implies [q] is disclosed."
+
+    it "brackets an AND in such a slot, so that it is not read as the sentence beside an AND" $ do
+      hasRow "And in the slot if (p and (it is not the case that the Act governs for n)) is disclosed implies r."
+      hasRow "And beside the slot if p and (it is not the case that the Act governs for n) is disclosed implies r."
+      hasRow "Last slot then and if ([p] is told it is not the case that the Act governs for n and r) is disclosed."
+
+    it "brackets a call that ends with such a condition, in such a slot" $ do
+      hasRow "Call ending in a denial in the slot if (fb for it is not the case that the Act governs for n) is disclosed."
+      hasRow "Call around a denied sentence if fb for it is not the case that the Act governs for n is disclosed."
+      hasRow "Call ending in an implies in the slot if (fb for p and (q implies r)) is disclosed."
+      hasRow "Call around an and with the sentence if fb for p and (q implies r) is disclosed."
+      hasRow "And in the last slot if ([p] is told (it is not the case that the Act governs for n) and r) is disclosed."
+
+    it "leaves a slot at the end of the sentence, and a delimited denial, as they were" $ do
+      hasRow "Denial in the last slot if [p] is told it is not the case that the Act governs for n."
+      hasRow "One word denied if p is false is disclosed."
+      hasRow "Inequality in the slot if n is not 3 is disclosed."
+
+  describe "l4 nlg and a condition in a sentence's slot" $
+    it "brackets a denial, an IMPLIES, an IF, an OR, or a call ending in one, in a slot the sentence goes on after" $ do
+      Output code sout _ <- runL4 bin ["nlg", slotScope]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "(not `the Act governs` with 3) is disclosed"
+        , "not `the Act governs` with 3 is disclosed"
+        , "(not `the Act governs` with 3) is told `TRUE`"
+        , "not `the Act governs` with 3 is told `TRUE`"
+        , "`TRUE` is told not `the Act governs` with 3"
+        , "(`TRUE` implies `FALSE`) is disclosed"
+        , "`TRUE` implies `FALSE` is disclosed"
+        , "(if `TRUE` then `FALSE` else `TRUE`) is disclosed"
+        , "if `TRUE` then `FALSE` else `TRUE` is disclosed"
+        , "(`TRUE` or `FALSE`) is disclosed"
+        , "`TRUE` or `FALSE` is disclosed"
+        , "(`fb` with `TRUE` or `FALSE`) is disclosed"
+        , "`fb` with `TRUE` or `FALSE` is disclosed"
+        ]
+
+  -- A slot is the end of the sentence only when nothing of the sentence comes
+  -- after it, words or another slot. And a call with a sentence of its own has
+  -- no closing word when the slot at the end of its sentence holds a condition
+  -- that has none, so in such a slot it is bracketed as a whole.
+  describe "l4 render and a slot that another slot comes after" $ do
+    let rows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", slotScopeSentence]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = rows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a denial in a slot that a slot, or punctuation and a slot, comes after" $ do
+      hasRow "Juxt inside if (it is not the case that the Act governs for n) [q]."
+      hasRow "Juxt outside if it is not the case that the Act governs for n [q]."
+      hasRow "Comma inside if (it is not the case that the Act governs for n), [q]."
+      hasRow "Comma outside if it is not the case that the Act governs for n, [q]."
+      hasRow "Paren inside if (it is not the case that the Act governs for n) ([q])."
+      hasRow "Paren outside if it is not the case that the Act governs for n ([q])."
+
+    it "leaves a denial in the last slot as it was" $
+      hasRow "Juxt last if [q] it is not the case that the Act governs for n."
+
+  describe "l4 nlg and a sentence in a slot" $
+    it "brackets a sentence whose last slot holds a condition, and a condition in a slot another slot comes after" $ do
+      Output code sout _ <- runL4 bin ["nlg", slotScopeSentence]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "(it is shown that `TRUE` or (`FALSE` and `TRUE`)) is shown"
+        , "it is shown that `TRUE` or (`FALSE` and `TRUE`) is shown"
+        , "(`TRUE` is told not (`FALSE` and `TRUE`)) is shown"
+        , "`TRUE` is told not (`FALSE` and `TRUE`) is shown"
+        , "`TRUE` not `FALSE`"
+        , "(not `FALSE`) `TRUE`"
+        , "not `FALSE` `TRUE`"
+        , "(not `FALSE`), `TRUE`"
+        , "not `FALSE`, `TRUE`"
+        ]
+
+  describe "library sentences at a call" $ do
+    let nlgRows = do
+          Output code sout _ <- runL4 bin ["nlg", nlgLibraryWording]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+
+    it "reads a count of one without a plural" $
+      nlgRows >>= (`shouldBe`
+        [ "the date 1 month after 31 January 2025 (capped at the last day of that month)"
+        , "the date 1 year after 29 February 2024 (capped at the last day of that month)"
+        , "a one-entry dictionary mapping 1 to a"
+        , "the date 1 day after 31 January 2025"
+        , "the date 1 day before 31 January 2025"
+        , "the date 1 day after 31 January 2025"
+        , "the date 1 month after 31 January 2025 (capped at the last day of that month)"
+        , "the last day of the month 1 month after the month of 31 January 2025"
+        , "the date 1 day after 31 January 2025"
+        ])
+
+    it "reads a dictionary alias by its sentence in l4 render too" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", nlgLibraryWording]
+      code `shouldBe` ExitSuccess
+      let out = filter (/= '\r') sout
+      out `shouldSatisfy` ("One entry means a one-entry dictionary mapping 1 to a." `isInfixOf`)
+      out `shouldSatisfy` ("From pairs means a dictionary holding the entries list of PAIR where fst is 1 and snd is a." `isInfixOf`)
+
+    it "lets a module use singleton and fromList at two types" $ do
+      Output code _ _ <- runL4 bin ["check", libraryAliasTwoTypes]
+      code `shouldBe` ExitSuccess
+
+    it "looks up what singleton and fromList build" $ do
+      Output code sout _ <- runL4 bin ["run", libraryAliasTwoTypes]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("JUST OF \"a\"" `isInfixOf`)
+      sout `shouldSatisfy` ("JUST OF 2" `isInfixOf`)
+      length (filter ("JUST OF 250" `isInfixOf`) (lines sout)) `shouldSatisfy` (>= 2)
+
+    it "renders a deeply nested call without its time doubling at each level" $ do
+      mOut <- runL4Within 60 bin ["render", "--format", "text", renderDeepNesting]
+      case mOut of
+        Nothing -> expectationFailure "l4 render did not finish in 60 s"
+        Just (Output code sout _) -> do
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` ("[p] is shown" `isInfixOf`)
+
+  -- legalese/l4-ide#804 brackets a call that ends with a condition, in a slot
+  -- the sentence goes on after, and an operand that is prose. On unstable a
+  -- mixfix hole already brackets whatever does not read as one thing, in any
+  -- hole. unstable's ledger write, ledger read and refusal end in a clause of
+  -- their own, so they take both brackets. Each pair below records or returns
+  -- different values.
+  describe "l4 render and nlg where #804 meets unstable" $ do
+    let renderRows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderHoleAndClause]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = renderRows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    -- #804's slot brackets made "[p] beats (q and r) is shown" the reading of
+    -- both rules below, until a mixfix call that ends with a hole was taken to
+    -- end as the argument there does.
+    it "brackets a mixfix call whose last hole would run on, in a slot the sentence goes on after" $ do
+      hasRow "Beats then shown means ([p] beats (q and r)) is shown."
+      hasRow "Shown in a hole means [p] beats (q and r) is shown."
+
+    -- A stated limit (nlg.md): a call with one argument reads as one thing in a
+    -- hole, so these two still read alike.
+    it "leaves a call with one argument in a hole as it was" $ do
+      hasRow "One means ([x] beats fb of q and r) is shown."
+      hasRow "Two means ([x] beats fb of q and r) is shown."
+
+    it "brackets a mixfix call that is an operand of arithmetic" $ do
+      hasRow "Sum then reduced equals price + ([discount] reduced by [rebate])."
+      hasRow "Reduced then sum means (price + discount) reduced by [rebate]."
+
+    it "brackets a ledger write, a ledger read and a refusal that would run on" $ do
+      hasRow "Record then minus equals (100, recorded as balance) − 3."
+      hasRow "Record of a minus means 100 − 3, recorded as balance."
+      hasRow "Refuse then minus equals (the model refuses to answer: not yet) − 3."
+      hasRow "Record doubled means (100, recorded as balance) doubled."
+      hasRow "Record of a double means 100 doubled, recorded as balance."
+      hasRow "Refuse doubled means (the model refuses to answer: not yet) doubled."
+      hasRow "Every recall due if (the sum of every value recorded as balance, oldest first) is due."
+
+    it "brackets a ledger write and a refusal in l4 nlg the same way" $ do
+      Output code sout _ <- runL4 bin ["nlg", renderHoleAndClause]
+      code `shouldBe` ExitSuccess
+      map (filter (/= '\r')) (lines sout) `shouldBe`
+        [ "(record balance is 100) minus 3"
+        , "record balance is 100 minus 3"
+        , "(record balance is 100) doubled"
+        , "record balance is 100 doubled"
+        , "(the model refuses to answer: not yet) minus 3"
+        , "(the model refuses to answer: not yet) doubled"
+        ]
+
+  -- A ledger write reads "V, recorded as C": its value comes first, and no word
+  -- of its own opens it, so ", recorded as C" can attach to the words before the
+  -- value. So it is bracketed wherever it is part of something larger: a call's
+  -- argument, a sentence's slot in any position, a comparison, an operand of OR,
+  -- a branch, a list's element. Each pair records a different value; before,
+  -- both rules of each pair read the same.
+  describe "l4 render brackets a ledger write given to something larger" $ do
+    let renderRows = do
+          Output code sout _ <- runL4 bin ["render", "--format", "text", renderLedgerWriteOperand]
+          code `shouldBe` ExitSuccess
+          pure (map (filter (/= '\r')) (lines sout))
+        hasRow r = renderRows >>= (`shouldSatisfy` any (r `isInfixOf`))
+
+    it "brackets a write given to a call with no sentence, in any argument" $ do
+      hasRow "Call of a record means plain1 of (100, recorded as balance)."
+      hasRow "Record of a call means plain1 of 100, recorded as balance."
+      hasRow "Second argument record means plain2 for 100 and (3, recorded as balance)."
+      hasRow "Record of two arguments means plain2 for 100 and 3, recorded as balance."
+      hasRow "First argument record means plain2 for (100, recorded as balance) and 3."
+      hasRow "Preposition of a record means minimum of 3 and (100, recorded as balance)."
+      hasRow "Record of a preposition means minimum of 3 and 100, recorded as balance."
+      hasRow "Condition of a record means fb for (p, recorded as flag)."
+      hasRow "Record of a condition means fb for p, recorded as flag."
+
+    it "brackets a write in a sentence's slot that nothing follows" $ do
+      hasRow "Sentence of a record means pay (100, recorded as balance)."
+      hasRow "Record of a sentence means pay 100, recorded as balance."
+      hasRow "Bare of a record means (100, recorded as balance)."
+      hasRow "Record of a bare means 100, recorded as balance."
+
+    it "brackets a write that is compared" $ do
+      hasRow "Compare to a record if p is (true, recorded as flag)."
+      hasRow "Record of a comparison means p is true, recorded as flag."
+
+    it "brackets a write anywhere else inside something larger" $ do
+      hasRow "Or of a record means (p or (q, recorded as flag)) is shown."
+      hasRow "Record of an or means (p or q, recorded as flag) is shown."
+      hasRow "Branch of a record means total of list of if c then 1 else (3, recorded as balance)."
+      hasRow "Record of a branch means total of list of (if c then 1 else 3, recorded as balance)."
+      hasRow "Element of a record means total of list of 1 and (2, recorded as balance)."
+      hasRow "Record of a list means total of list of 1 and 2, recorded as balance."
+
+    it "leaves a write on its own as it was, and keeps the brackets on a list's item" $ do
+      hasRow "A write alone means 100, recorded as balance."
+      hasRow "    (b) (true, recorded as flag)."
+
+    it "gives a write one pair of brackets inside a wrapper that brackets its argument" $ do
+      hasRow "Abs of a record means abs(4, recorded as balance)."
+      hasRow "must Pay (3, recorded as balance) within 14."
+      renderRows >>= (`shouldSatisfy` all (not . ("((" `isInfixOf`)))
+
+  -- smucclaw/l4-ide#1068: clause columns decide which rule a HENCE or LEST
+  -- belongs to. A nested rule keeps one written at its own clauses, and ends
+  -- at one written at the clauses of the rule it is nested in. Before, the
+  -- innermost open rule took it, with exit 0 everywhere, and the residual
+  -- `l4 explore` prints was the only place the wrong reading showed; so each
+  -- case pins that line whole, and the hanging case pins the verdict too.
+  describe "HENCE and LEST belong to the rule whose clauses they line up with" $ do
+    let r0Of args = do
+          Output code sout _ <- runL4 bin ("explore" : args)
+          code `shouldBe` ExitSuccess
+          pure [ l | l <- map (dropWhile (== ' ') . filter (/= '\r')) (lines sout), "r0 " `isPrefixOf` l ]
+
+    it "gives the issue's outer LEST to the Seller, and the Buyer's own LEST to the Buyer" $
+      r0Of [lestLayoutRepro] >>= (`shouldBe`
+        [ "r0  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment (EXACTLY 100) WITHIN 7 LEST (PARTY Buyer MUST payment (EXACTLY 120) WITHIN 14)) LEST (BREACH BY Seller)" ])
+
+    it "gives the LEST after a rule written on its HENCE's line to the outer rule" $
+      r0Of [lestLayoutFixture, "--contract", "sameLine"] >>= (`shouldBe`
+        [ "r0  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7) LEST (BREACH BY Seller)" ])
+
+    it "chains a HENCE written at the nested rule's own clauses after that rule" $
+      r0Of [lestLayoutFixture, "--contract", "henceChain"] >>= (`shouldBe`
+        [ "r0  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 HENCE (PARTY Seller MUST delivery WITHIN 9)) LEST (BREACH BY Seller)" ])
+
+    it "keeps a nested rule's LEST at its own clauses when the outer rule's clauses hang right of them" $
+      r0Of [lestLayoutHanging, "--contract", "hanging"] >>= (`shouldBe`
+        [ "r0  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment WITHIN 7 LEST (BREACH BY Buyer))" ])
+
+    it "so a missed delivery in that layout is the Seller's breach, not the Buyer's" $ do
+      Output code sout _ <- runL4 bin ["run", lestLayoutHanging]
+      code `shouldBe` ExitSuccess
+      unwords (words (filter (/= '\r') sout)) `shouldSatisfy`
+        ("surpassed the deadline of party Seller who had to do obligatory action MUST delivery" `isInfixOf`)
+
+    it "refuses a HENCE at the outer rule's clauses after its LEST, naming the rule" $ do
+      Output code _ serr <- runL4 bin ["check", lestLayoutHenceAfterLest]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This HENCE lines up with the clauses of the rule that starts with PARTY at line 8, column 3. It comes after that rule's LEST. Write HENCE before LEST." `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
@@ -3437,6 +6512,116 @@ spec bin = do
       Output code _ _ <- runL4 bin ["verify", verifyUnsatFixture, "--no-coalesce-atoms"]
       code `shouldBe` ExitFailure 1
 
+    -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
+    -- Before, it was skipped as not boolean; then its generated nesting made
+    -- the analysis report a dead limb that is only the clause that returns
+    -- FALSE, which the hand-written CONSIDER next to it does not.
+    it "analyses a clause group, and finds in it what it finds in the CONSIDER written by hand" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyClauseGroupFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"analysed\":2" `isInfixOf`)
+      sout `shouldSatisfy` ("\"skipped\":0" `isInfixOf`)
+      sout `shouldSatisfy` ("\"findings\":0" `isInfixOf`)
+
+    -- The two forms are one rule, so `l4 verify` counts them alike: the same
+    -- leaves, the same questions among them (one atomId each), the same ladder,
+    -- and a call in a clause is read through as it is in the CONSIDER.
+    it "counts a clause group's atoms, and reads its calls, as it does the CONSIDER written by hand" $ do
+      for_ [ (verifyClauseGroupFixture, "covered", "`covered by hand`", 0)
+           , (verifyClauseGroupCallFixture, "paid", "`paid by hand`", 1)
+           , (verifyClauseTableFixture, "`colour rule`", "`colour rule by hand`", 0)
+           , (verifyClauseTableFixture, "`either rule`", "`either rule by hand`", 0) ] \ (fixture, clauses, hand, calls) -> do
+        env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
+        let stats nm =
+              [ (k, v)
+              | Just (Array ds) <- [objField env "decisions"]
+              , d <- toList ds
+              , objField d "name" == Just (String nm)
+              , k <- ["analysed", "atoms", "atomClasses", "ladderNodes", "callsReadThrough", "callsLeftOpaque", "findings"]
+              , Just v <- [objField d k]
+              ]
+        length (stats clauses) `shouldBe` 7
+        lookup "analysed" (stats clauses) `shouldBe` Just (Bool True)
+        lookup "callsReadThrough" (stats clauses) `shouldBe` Just (Number calls)
+        stats clauses `shouldBe` stats hand
+
+    -- Reading a table's clauses as their CONSIDER comes before putting any other
+    -- binding in. In the other order the clauses' shared fall-through was walked
+    -- once for every branch that reached it: this 25-row table of two enums did
+    -- not finish in 4 GiB (killed after 27 s on 9d7f5829e), and its CONSIDER takes
+    -- a moment. The bound is generous; the failure it guards against is not slow
+    -- but unbounded.
+    it "analyses a 25-row table of two enums in moments, as the CONSIDER written by hand" $ do
+      mOut <- runL4Within 60 bin ["verify", verifyClauseTableLargeFixture, "--format", "json"]
+      case mOut of
+        Nothing -> expectationFailure "l4 verify did not finish a 25-row clause table within 60 s"
+        Just (Output code sout _) -> do
+          code `shouldBe` ExitSuccess
+          case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
+            Left err -> expectationFailure ("JSON parse failed: " ++ err)
+            Right env -> do
+              let stats nm =
+                    [ (k, v)
+                    | Just (Array ds) <- [objField env "decisions"]
+                    , d <- toList ds
+                    , objField d "name" == Just (String nm)
+                    , k <- ["analysed", "atoms", "atomClasses", "ladderNodes", "findings"]
+                    , Just v <- [objField d k]
+                    ]
+              lookup "analysed" (stats "`table rule`") `shouldBe` Just (Bool True)
+              stats "`table rule`" `shouldBe` stats "`table rule by hand`"
+
+    -- A rule that CALLS a rule written as clauses too long to read through. The
+    -- callee is refused on its own line; the call is left as a box with the
+    -- reason, as any other call whose meaning cannot be drawn. It used to be
+    -- unfolded raw and its clauses' LETs drawn as one leaf: here a meaningless
+    -- "read through", and with long clause bodies no answer at all (killed at
+    -- 100 s and 2.7 GB in review).
+    it "leaves a call to clauses too long to read through as a box, and says why" $ withSystemTempDirectory "l4-cli-test-too-long-callee" \dir -> do
+      let file = dir </> "too-long-callee.l4"
+      writeFile file tooLongCalleeSource
+      mOut <- runL4Within 60 bin ["verify", file, "--format", "json"]
+      case mOut of
+        Nothing -> expectationFailure "l4 verify did not finish within 60 s on a caller of clauses too long to read through"
+        Just (Output _ sout _) -> case eitherDecode (BSL8.fromStrict (TE.encodeUtf8 (T.pack sout))) of
+          Left err -> expectationFailure ("JSON parse failed: " ++ err)
+          Right env -> do
+            let decisionNamed nm =
+                  [ d
+                  | Just (Array ds) <- [objField env "decisions"]
+                  , d <- toList ds
+                  , objField d "name" == Just (String nm)
+                  ]
+            map (`objField` "analysed") (decisionNamed "bigrule") `shouldBe` [Just (Bool False)]
+            case decisionNamed "caller" of
+              [d] -> case objField d "callsLeftOpaque" of
+                Just (Array opaque) ->
+                  [why | String why <- toList opaque] `shouldSatisfy` any ("too long to draw" `T.isInfixOf`)
+                other -> expectationFailure ("expected callsLeftOpaque on caller, got " ++ show other)
+              other -> expectationFailure ("expected one decision named caller, got " ++ show other)
+
+    -- A clause group whose ladder is one box (a column matches JUST x, a list
+    -- and the like, which the ladder does not break down) is not reported as
+    -- clean: there was nothing to check.
+    it "says it did not analyse a clause group the ladder could not break down" $ do
+      env <- jsonEnvelope bin ["verify", verifyClauseGroupMaybeFixture, "--format", "json"]
+      let reasons =
+            [ (nm, analysed, reason)
+            | Just (Array ds) <- [objField env "decisions"]
+            , d <- toList ds
+            , Just (String nm) <- [objField d "name"]
+            , Just (Bool analysed) <- [objField d "analysed"]
+            , let reason = case objField d "reason" of
+                    Just (String r) -> r
+                    _ -> ""
+            ]
+      case reasons of
+        [(nm, analysed, reason)] -> do
+          nm `shouldBe` "`flag is set`"
+          analysed `shouldBe` False
+          reason `shouldSatisfy` T.isInfixOf "not broken down"
+        other -> expectationFailure ("expected one decision, got " ++ show other)
+
     it "records a non-boolean DECIDE as skipped, never as clean" $ do
       env <- jsonEnvelope bin ["verify", nlgRegcfSource, "--format", "json"]
       case objField env "summary" >>= (`objField` "skipped") of
@@ -3454,6 +6639,27 @@ spec bin = do
       case objField env "summary" >>= (`objField` "nestedNotVisited") of
         Just (Number n) -> n `shouldBe` 1
         other -> expectationFailure ("expected summary.nestedNotVisited, got " ++ show other)
+
+    -- A rule written as DECIDE clauses is compiled to a CONSIDER and a LET for
+    -- the clauses after the first. No drafter wrote that LET, and verify reads
+    -- the group as the CONSIDER with the LET read through, so it is not a
+    -- decision left unvisited; a WHERE the drafter wrote inside a clause is.
+    it "does not count what a clause group is compiled to as WHERE-nested decisions" $ do
+      let nestedLine = "nested in a WHERE clause were NOT visited" :: String
+          nestedCount fixture = do
+            env <- jsonEnvelope bin ["verify", fixture, "--format", "json"]
+            pure (objField env "summary" >>= (`objField` "nestedNotVisited"))
+      -- three clauses, nothing the drafter nested
+      Output _ groupText _ <- runL4 bin ["verify", verifyClauseGroupFixture]
+      groupText `shouldSatisfy` (not . (nestedLine `isInfixOf`))
+      nestedCount verifyClauseGroupFixture `shouldReturn` Just (Number 0)
+      -- three clauses, one WHERE the drafter wrote inside the second
+      Output _ whereText _ <- runL4 bin ["verify", verifyClauseGroupWhereFixture]
+      whereText `shouldSatisfy` (("1 further decision(s) " <> nestedLine) `isInfixOf`)
+      nestedCount verifyClauseGroupWhereFixture `shouldReturn` Just (Number 1)
+      -- a hand-written WHERE-nested DECIDE outside any clause group
+      Output _ handText _ <- runL4 bin ["verify", verifyNestedFixture]
+      handText `shouldSatisfy` (("1 further decision(s) " <> nestedLine) `isInfixOf`)
 
     -- This test used to assert the OPPOSITE, as a tripwire: "a future change
     -- which starts descending announces itself here rather than by silently
@@ -3474,8 +6680,11 @@ spec bin = do
 
     -- Referential transparency. Four spellings of `m AND NOT m`, three of which
     -- put a limb behind a local name; all four must report the contradiction,
-    -- because they are the same rule. `parameterised` is the control: a binding
-    -- that takes arguments is NOT inlined, so it stays two atoms and clean.
+    -- because they are the same rule. `parameterised` was the control while a
+    -- binding that takes arguments stayed opaque; it is read through now (beta
+    -- reduction, WHERE-INLINING-SPEC.md §9) and is unsat like the rest. The
+    -- control is `parameterised, consistent`, which must stay clean — it is what
+    -- a substitution that dropped its arguments would falsely report.
     it "analyses a rule the same however its limbs are named" $ do
       env <- jsonEnvelope bin ["verify", verifyWhereTransparencyFixture, "--format", "json"]
       let unsats =
@@ -3487,13 +6696,93 @@ spec bin = do
             , any (\ f -> objField f "kind" == Just (String "unsat")) (toList fs)
             ]
       sort unsats `shouldBe`
-        sort ["flat", "`behind a where`", "`behind a let`", "`behind two hops`"]
+        sort ["flat", "`behind a where`", "`behind a let`", "`behind two hops`", "parameterised"]
 
     -- Termination, not correctness: a cycle among local bindings must be
     -- detected rather than substituted. A regression here hangs the suite.
     it "terminates on recursive and mutually recursive local bindings" $ do
       Output code _ _ <- runL4 bin ["verify", verifyWhereRecursiveFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
+
+    -- An atomId is the hash of a leaf's term (R3). Unfolding `f a` and `f b` makes
+    -- two copies of a recursive WHERE local that keep its one name; keyed by the
+    -- name alone they were one atom, and a satisfiable rule was reported
+    -- unsatisfiable. `same` is the control: its two copies are one proposition.
+    it "keeps two read-through copies of a recursive local apart, and joins two that are one" $ do
+      env <- jsonEnvelope bin ["verify", verifyRecursiveLocalCopiesFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "top" found `shouldBe` Just []
+      lookup "same" found `shouldBe` Just ["unsat"]
+
+    -- A RECALL is not a function of its operands, so two occurrences of one RECALL
+    -- term on either side of a RECORD are two atoms (C1's `fresh`).
+    it "does not join two ledger reads that a RECORD between them can tell apart" $ do
+      env <- jsonEnvelope bin ["verify", verifyLedgerReadsFixture, "--format", "json"]
+      lookup "top" (findingsByDecision env) `shouldBe` Just []
+
+    -- `p's adult` and `adult p` are one field read, so one atom (smucclaw/l4-ide#1033).
+    it "joins a field read and the same read written as its selector applied" $ do
+      env <- jsonEnvelope bin ["verify", verifyFieldReadsFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`either spelling contradicts`" found `shouldBe` Just ["unsat"]
+      lookup "`two people`" found `shouldBe` Just []
+      lookup "`computed, projection first`" found `shouldBe` Just ["unsat"]
+      lookup "`computed, projection only`" found `shouldBe` Just ["unsat"]
+      lookup "`ledger by projection`" found `shouldBe` Just []
+
+    -- Reading through calls. `the arrow is broken` asks for an exception and the
+    -- offence it defeats at once; with calls as opaque leaves that was two
+    -- unrelated atoms and no finding. Its twin over an offence that forgets the
+    -- exception is the control, and must stay clean: before this change the two
+    -- could not be told apart, which is the whole defect.
+    it "finds a contradiction that only appears once calls are read through" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldCallsFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`the arrow is broken`" found `shouldBe` Just ["unsat"]
+      lookup "`the arrow is broken in the bad encoding`" found `shouldBe` Just []
+      case objField env "summary" >>= (`objField` "callsReadThrough") of
+        Just (Number n) -> n `shouldSatisfy` (> 0)
+        other -> expectationFailure ("expected summary.callsReadThrough, got " ++ show other)
+
+    -- A call written with named arguments is read through like a positional one
+    -- (smucclaw/l4-ide#1033); before, it stayed an opaque atom.
+    it "reads through a call written with named arguments" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldNamedCallsFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`named and negated`" found `shouldBe` Just ["unsat"]
+      lookup "`named and narrower`" found `shouldBe` Just []
+
+    -- Across an import, where the rules' return types are INFERRED: the imported
+    -- bodies must be zonked with their own module's substitution before they can
+    -- be recognised as boolean. Without that this finding is silently missed.
+    it "reads through calls to rules in an imported module" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldImportsFixture, "--format", "json"]
+      lookup "`the arrow is broken across an import`" (findingsByDecision env)
+        `shouldBe` Just ["unsat"]
+
+    -- A call whose meaning is too large to draw stays an opaque leaf. The rule
+    -- is still ANALYSED, every other call is still read through, and the one
+    -- left opaque is NAMED — on its rule and in the summary. What is lost is only
+    -- what that call would have shown: here, the contradiction.
+    it "leaves a call opaque, and names it, when its meaning is too large" $ do
+      env <- jsonEnvelope bin ["verify", verifyUnfoldCallsFixture, "--format", "json", "--max-nodes", "5"]
+      case objField env "summary" of
+        Just summ -> do
+          objField summ "analysed" `shouldBe` Just (Number 5)
+          objField summ "callsLeftOpaque" `shouldBe` Just (Number 1)
+        Nothing -> expectationFailure "expected a summary"
+      lookup "`the arrow is broken`" (findingsByDecision env) `shouldBe` Just []
+      Output _ sout _ <- runL4 bin ["verify", verifyUnfoldCallsFixture, "--max-nodes", "5"]
+      sout `shouldSatisfy` ("call left as a leaf: `the offence is made out`" `isInfixOf`)
+
+    -- Termination: a recursive rule is never unfolded. Also a soundness guard: a
+    -- compound leaf's variable id once collided with a bare input's unique, so
+    -- `all hold xs AND b` read as ONE atom and both conjuncts were reported as
+    -- vacuous. It must be clean.
+    it "terminates on a recursive rule, and invents no finding around it" $ do
+      Output code sout _ <- runL4 bin ["verify", verifyUnfoldRecursiveFixture, "--format", "json"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"findings\":0" `isInfixOf`)
 
     -- The corpus figure the p8-verify receipt now carries.
     it "reports the Reg CF corpus's own nested count" $ do
@@ -3505,2176 +6794,18 @@ spec bin = do
     it "fails on a module that does not typecheck" $
       expectFail bin ["verify", errorFixture]
 
-  describe "l4 openfisca" $ do
-    it "compiles the flat-tax example to its golden OpenFisca module" $
-      expectGolden bin ["openfisca", "examples/openfisca/flat-tax.l4"]
-                       "examples/openfisca/expected/flat-tax.py"
-
-    it "compiles the means-tested benefit example to its golden module" $
-      expectGolden bin ["openfisca", "examples/openfisca/benefit.l4"]
-                       "examples/openfisca/expected/benefit.py"
-
-    it "compiles a group entity with LIST OF aggregation (household)" $
-      expectGolden bin ["openfisca", "examples/openfisca/household.l4"]
-                       "examples/openfisca/expected/household.py"
-
-    it "compiles a time-varying marginal-rate scale + parameter store (scale)" $
-      expectGolden bin ["openfisca", "examples/openfisca/scale.l4"]
-                       "examples/openfisca/expected/scale.py"
-
-    it "compiles roles + count/any/all aggregation (roles)" $
-      expectGolden bin ["openfisca", "examples/openfisca/roles.l4"]
-                       "examples/openfisca/expected/roles.py"
-
-    it "compiles an enum + CONSIDER (housing)" $
-      expectGolden bin ["openfisca", "examples/openfisca/housing.l4"]
-                       "examples/openfisca/expected/housing.py"
-
-    it "compiles dated formulas (BRANCH IF period reaches → formula_YYYY_MM)" $
-      expectGolden bin ["openfisca", "examples/openfisca/dated.l4"]
-                       "examples/openfisca/expected/dated.py"
-
-    it "compiles a member decision-call inside an aggregation (agecheck)" $
-      expectGolden bin ["openfisca", "examples/openfisca/agecheck.l4"]
-                       "examples/openfisca/expected/agecheck.py"
-
-    it "compiles a scalar legislation-parameter store (incometax)" $
-      expectGolden bin ["openfisca", "examples/openfisca/incometax.l4"]
-                       "examples/openfisca/expected/incometax.py"
-
-    it "compiles the country-template basic_income (dated formulas + scalar params)" $
-      expectGolden bin ["openfisca", "examples/openfisca/basic-income.l4"]
-                       "examples/openfisca/expected/basic-income.py"
-
-    it "rejects a name collision (distinct L4 names → same Python identifier)" $
-      expectFail bin ["openfisca", "examples/openfisca/not-ok/name-collision.l4"]
-
-    it "rejects a mis-ordered dated BRANCH (ascending arms)" $
-      expectFail bin ["openfisca", "examples/openfisca/not-ok/branch-misordered.l4"]
-
-    it "emits a Variable subclass and a TaxBenefitSystem" $ do
-      Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("class flat_tax_on_salary(Variable):" `isInfixOf`)
-      sout `shouldSatisfy` ("class L4TaxBenefitSystem(TaxBenefitSystem):" `isInfixOf`)
-
-    it "fails on a file that does not typecheck" $
-      expectFail bin ["openfisca", errorFixture]
-
-  describe "l4 yscript" $ do
-    it "compiles the Foreign Relations Act s10 example to its golden yscript" $
-      expectGolden bin ["yscript", "examples/yscript/foreign-relations-s10.l4"]
-                       "examples/yscript/expected/foreign-relations-s10.ys"
-
-    it "compiles the Hairdressers Act s4(1) example to its golden yscript" $
-      expectGolden bin ["yscript", "examples/yscript/hairdressers-s4-1.l4"]
-                       "examples/yscript/expected/hairdressers-s4-1.ys"
-
-    it "emits one RULE per in-fragment Decide, PROVIDES text verbatim" $ do
-      Output code sout _ <- runL4 bin ["yscript", "examples/yscript/foreign-relations-s10.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("RULE Section 10 - Core foreign arrangements PROVIDES" `isInfixOf`)
-      sout `shouldSatisfy` ("RULE Section 10(3) PROVIDES" `isInfixOf`)
-      sout `shouldSatisfy` ("ONLY IF" `isInfixOf`)
-
-    it "fails on a file that does not typecheck" $
-      expectFail bin ["yscript", errorFixture]
-
-    it "rejects a call (with arguments) to a parameterised Decide reached from the \
-       \@export closure (R1)" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-parameterized-decide.l4"]
-      code `shouldNotBe` ExitSuccess
-      shouldContain' "stderr" serr "argument"
-
-    it "rejects a parameterised @export entry point itself (R1)" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-parameterized-export.l4"]
-      code `shouldNotBe` ExitSuccess
-      shouldContain' "stderr" serr "has parameters"
-
-    it "rejects NOT (R2: yscript's negation spelling is unverified)" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-not.l4"]
-      code `shouldNotBe` ExitSuccess
-      shouldContain' "stderr" serr "NOT"
-
-    it "rejects a non-boolean ASSUME reached from the @export closure (R1/R3)" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-non-boolean-assume.l4"]
-      code `shouldNotBe` ExitSuccess
-      shouldContain' "stderr" serr "not BOOLEAN"
-
-    it "batches every offender into one refusal (R5), not first-error-wins" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-multiple-offenders.l4"]
-      code `shouldNotBe` ExitSuccess
-      shouldContain' "stderr" serr "NOT"
-      shouldContain' "stderr" serr "not BOOLEAN"
-
-  describe "l4 blawx" $ do
-    it "compiles the Appendix-A benefit example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/benefit.l4"]
-                       "examples/blawx/expected/benefit.blawx"
-
-    it "dumps benefit's concatenated s(CASP) (--scasp) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/benefit.l4", "--scasp"]
-                       "examples/blawx/expected/benefit.pl"
-
-    it "compiles the minimal mortality example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/mortality.l4"]
-                       "examples/blawx/expected/mortality.blawx"
-
-    it "dumps mortality's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/mortality.l4", "--scasp"]
-                       "examples/blawx/expected/mortality.pl"
-
-    it "compiles the aggregates example (findall + *_blawx_list) to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/scores.l4"]
-                       "examples/blawx/expected/scores.blawx"
-
-    it "dumps scores' s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/scores.l4", "--scasp"]
-                       "examples/blawx/expected/scores.pl"
-
-    it "compiles the structural-recursion example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/sumlist.l4"]
-                       "examples/blawx/expected/sumlist.blawx"
-
-    it "dumps sumlist's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/sumlist.l4", "--scasp"]
-                       "examples/blawx/expected/sumlist.pl"
-
-    it "compiles the rodents-and-vermin exclusion to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/rodents.l4"]
-                       "examples/blawx/expected/rodents.blawx"
-
-    it "dumps rodents' s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/rodents.l4", "--scasp"]
-                       "examples/blawx/expected/rodents.pl"
-
-    it "compiles the ASSUME-shaped anti-social example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial.l4"]
-                       "examples/blawx/expected/antisocial.blawx"
-
-    it "dumps antisocial's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial.l4", "--scasp"]
-                       "examples/blawx/expected/antisocial.pl"
-
-    it "compiles antisocial's record-spelled semantic twin to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial-twin.l4"]
-                       "examples/blawx/expected/antisocial-twin.blawx"
-
-    it "dumps the antisocial twin's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial-twin.l4", "--scasp"]
-                       "examples/blawx/expected/antisocial-twin.pl"
-
-    it "compiles the ASSUME-shaped alcohol act to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol.l4"]
-                       "examples/blawx/expected/alcohol.blawx"
-
-    it "dumps alcohol's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol.l4", "--scasp"]
-                       "examples/blawx/expected/alcohol.pl"
-
-    it "compiles alcohol's record-spelled semantic twin to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol-twin.l4"]
-                       "examples/blawx/expected/alcohol-twin.blawx"
-
-    it "dumps the alcohol twin's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol-twin.l4", "--scasp"]
-                       "examples/blawx/expected/alcohol-twin.pl"
-
-    -- P4c, the statute showcase: Housing Act 1988 Sch 2 grounds 8, 13, 15 and
-    -- 17 inlined into ONE module (`buildCtx` is module-scoped, so an aggregator
-    -- that IMPORTed them would emit queries against an ontology that does not
-    -- exist). Four records in one Blawx namespace, 49 oracle-anchored
-    -- directives, and the corpus's only arity-2 computed predicate.
-    it "compiles the four Housing Act grounds to their golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/housing-grounds.l4"]
-                       "examples/blawx/expected/housing-grounds.blawx"
-
-    it "compiles the four Housing Act grounds to their golden s(CASP) dump" $
-      expectGolden bin ["blawx", "examples/blawx/housing-grounds.l4", "--scasp"]
-                       "examples/blawx/expected/housing-grounds.pl"
-
-    -- The arity-2 gap, pinned rather than assumed. `per-period threshold met`
-    -- is (Ground8Claim, NUMBER) -> BOOLEAN: total arity 2 with the boolean
-    -- output dropped, and its second parameter is neither record- nor
-    -- enum-sorted, so it is not attribute-shaped and does not reach the arity-3
-    -- relationship form either. It therefore gets NO `blawx_attribute`
-    -- declaration (`L4.Blawx.Lower`, the recorded relationships-start-at-arity-3
-    -- gap) while its rules and its four query rows DO emit. This asserts both
-    -- halves: the declaration is absent, and nothing downstream blanks — the
-    -- `noBlankedBlawxRow` row below covers the images, and the headless fixpoint
-    -- harness re-saves every one of them. If a later change starts declaring
-    -- arity-2 predicates, this test is the one to delete.
-    it "emits an undeclared but imaged arity-2 predicate (the recorded gap)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/housing-grounds.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("per_period_threshold_met(Claim,Arrears)" `isInfixOf`)
-      sout `shouldSatisfy` ("?- per_period_threshold_met(g1,1300)." `isInfixOf`)
-      sout `shouldSatisfy`
-        (not . ("blawx_attribute(ground8_claim,per_period_threshold_met" `isInfixOf`))
-      -- and the four records really did land in one namespace, un-collided
-      mapM_ (\c -> sout `shouldSatisfy` (("blawx_category(" ++ c ++ ")") `isInfixOf`))
-        ["ground8_claim", "ground13_claim", "ground15_claim", "ground17_claim"]
-      -- the rename that made that possible: the enum keeps `rent_period`, the
-      -- field became `the basis on which rent is payable`
-      sout `shouldSatisfy` ("blawx_category(rent_period)" `isInfixOf`)
-      sout `shouldSatisfy`
-        ("blawx_attribute(ground8_claim,the_basis_on_which_rent_is_payable" `isInfixOf`)
-      -- the interview follows the FIRST @export: the mandatory ground
-      sout `shouldSatisfy` ("?- ground_8_made_out(X)." `isInfixOf`)
-
-    -- The twin discipline, as a property rather than a comment. An
-    -- `ASSUME`-shaped seed has no evaluable directive, so `etc/blawx-tier1-harness.py`
-    -- takes its expectations from a record-spelled twin and replays the twin's
-    -- fact rows against the ASSUME seed's own workspaces. That is only sound if
-    -- the two spellings share their atoms, and this is the assertion that they
-    -- do: the emitted s(CASP) is identical apart from the first line, which is
-    -- the provenance comment naming the source file. If someone renames a field
-    -- in a twin "for readability", this fails here rather than degrading the
-    -- tier-1 run into a comparison of two unrelated programs.
-    it "emits byte-identical s(CASP) for an ASSUME seed and its record twin" $
-      mapM_ (twinsAgree bin)
-        [("antisocial", "antisocial-twin"), ("alcohol", "alcohol-twin")]
-
-    it "never blanks a row's xml_content while its scasp_encoding is non-empty (R12)" $
-      mapM_ (noBlankedBlawxRow bin)
-        [ "benefit", "mortality", "scores", "sumlist", "rodents"
-        , "antisocial", "antisocial-twin", "alcohol", "alcohol-twin"
-        , "housing-grounds" ]
-
-    it "carries the @export prose into rule_text, and falls back to @ref (structural)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
-      code `shouldBe` ExitSuccess
-      -- arm A: a decision carrying BOTH @export prose and @ref shows the prose
-      sout `shouldSatisfy`
-        ("1. Anti-social Behaviour, Crime and Policing Act 2014 s.43(1): an authorised person"
-           `isInfixOf`)
-      -- arm B: a bare @export with only a @ref shows the citation, not the stub
-      sout `shouldSatisfy`
-        ("5. Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)" `isInfixOf`)
-      sout `shouldSatisfy`
-        (not . ("Definition of the conduct is unreasonable." `isInfixOf`))
-      -- the P1 earmark discharged: an interview on a module with no DECLARE
-      sout `shouldSatisfy` ("#abducible person(X)." `isInfixOf`)
-      sout `shouldSatisfy` ("#abducible conduct(X,Y)." `isInfixOf`)
-      sout `shouldSatisfy` ("?- may_issue_a_community_protection_notice(X,Y)." `isInfixOf`)
-      -- the reachability gate: an ASSUME no clause reaches contributes nothing
-      sout `shouldSatisfy` (not . ("effect_target" `isInfixOf`))
-
-    it "gives NOT over an ASSUMEd input classical negation, not NAF (R5)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/alcohol.l4", "--scasp"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("-the_proprietor_corrects_the_price_list(Pr)." `isInfixOf`)
-      sout `shouldSatisfy` (not . ("not the_proprietor_corrects_the_price_list" `isInfixOf`))
-
-    it "rejects a subjectless ASSUMEd input rather than blanking its row" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/zero-arity.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("no category subject" `isInfixOf`)
-      -- the refused band is an ARITY band; the message must say so, because
-      -- `arity-two.l4` below satisfies "first parameter is a category" and is
-      -- refused anyway
-      serr `shouldSatisfy` ("total arity 0" `isInfixOf`)
-      serr `shouldSatisfy` ("start at total arity 3" `isInfixOf`)
-
-    it "rejects a two-place ASSUMEd input EVEN WITH a category first parameter" $ do
-      -- The other half of the refused band. `classifyPred` places an input as
-      -- an attribute only at (category) or (category) -> value; relationship
-      -- blocks start at total arity 3; a two-place input falls between them.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity-two.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("no category subject" `isInfixOf`)
-      serr `shouldSatisfy` ("`severity exceeds` is an input of total arity 2" `isInfixOf`)
-      -- and it must NOT tell an author who already has a category subject to
-      -- add one: that was the old wording, and it named no reachable fix
-      serr `shouldSatisfy` (not . ("first parameter is not a category" `isInfixOf`))
-
-    it "emits the ruledoc first, then workspaces with the dedup-marked triple (structural smoke)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/benefit.l4"]
-      code `shouldBe` ExitSuccess
-      -- R1: exactly one ruledoc row, FIRST — before any workspace row
-      firstLineWith "- model: blawx.ruledoc" sout
-        `shouldSatisfy` (< firstLineWith "- model: blawx.workspace" sout)
-      sout `shouldSatisfy` ("workspace_name: root_section" `isInfixOf`)
-      sout `shouldSatisfy` ("workspace_name: sec_1_section" `isInfixOf`)
-      sout `shouldSatisfy` (":- dynamic applicant/1." `isInfixOf`)
-      sout `shouldSatisfy` ("% BLAWX CHECK DUPLICATES" `isInfixOf`)
-      sout `shouldSatisfy` ("?- benefit_amount(a1,Benefitamount)." `isInfixOf`)
-      -- R11: the #ASSERT-as-constraint emission and the #abducible interview test
-      sout `shouldSatisfy` ("false :- not eligible_for_benefit(a1)." `isInfixOf`)
-      sout `shouldSatisfy` ("false :- not benefit_amount(a1,1250)." `isInfixOf`)
-      sout `shouldSatisfy` ("test_name: interview" `isInfixOf`)
-      sout `shouldSatisfy` ("#abducible applicant(X)." `isInfixOf`)
-      sout `shouldSatisfy` ("#abducible age(X,Y)." `isInfixOf`)
-      sout `shouldSatisfy` ("#abducible is_veteran(X)." `isInfixOf`)
-      sout `shouldSatisfy` ("?- eligible_for_benefit(X)." `isInfixOf`)
-
-    it "refuses -o FILE.pl without --scasp (the dump would clobber its own YAML)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/benefit.l4",
-                                       "-o", "examples/blawx/refused.pl"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("--scasp" `isInfixOf`)
-
-    it "rejects a DATE-sorted field by name (Blawx v1)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/dates.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("dates (Blawx v1)" `isInfixOf`)
-
-    it "rejects an unstratified module (the middle-end records, this leg refuses)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/unstratified.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("unstratified negation (Blawx v1)" `isInfixOf`)
-
-    it "rejects EQUALS on record-typed operands (§11 W1, the silent one)" $ do
-      -- This fixture is Jason Morris's own reading of RPS s.4 and it USED to
-      -- lower clean: L4 answered TRUE, the tier-1 harness found no model,
-      -- because R11's flattening emits one object per occurrence of a record
-      -- value. A wrong answer with a green exit code is the worst outcome a
-      -- transpiler has, so the refusal is loud and both operand positions of
-      -- the IF/ELSE (the REq and its complement RNeq) are covered.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
-      serr `shouldSatisfy` ("EQUALS on operands of record type `Player`" `isInfixOf`)
-      serr `shouldSatisfy` ("a disequality on operands of record type `Player`" `isInfixOf`)
-      serr `shouldSatisfy` ("once per slot" `isInfixOf`)
-
-    it "rejects it inside a container too (LIST OF, and LIST OF MAYBE)" $ do
-      -- The first cut of the §11 W1 refusal tested the operand sort for a
-      -- record at the top only, so `a's members EQUALS b's members` over a
-      -- `LIST OF Player` lowered clean and emitted `Members = Members2`. Both
-      -- rules in this fixture are refused now, and each diagnostic names the
-      -- operand's OWN sort, because "of record type `Player`" would be a false
-      -- description of a list.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity-list.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("type `LIST OF Player`, which contains the record type `Player`" `isInfixOf`)
-      serr `shouldSatisfy` ("type `LIST OF MAYBE Player`, which contains the record type `Player`" `isInfixOf`)
-
-    -- Integration, 2026-09-02 (§11 W1). W1's note said the `RSOpaque` escape
-    -- was "not known to be reachable in the M1 fragment, and none was
-    -- constructed". It is reachable through `IMPORT`, and this is the
-    -- construction: a record DECLAREd in an imported module arrives as
-    -- `RSOpaque "Shared Ontology.Player"` — a printed name with no `RName`
-    -- behind it — so `recordInSort` had nothing to look up and the comparison
-    -- lowered at exit 0, emitting the `A = B` identity W1 exists to refuse.
-    it "rejects EQUALS on an IMPORTed record, whose sort reaches us opaque" $ do
-      Output code _ serr <- runL4 bin
-        ["blawx", "tests-cli/fixtures/blawx-opaque/imported-record-identity.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
-      serr `shouldSatisfy` ("opaque type `Shared Ontology.Player`" `isInfixOf`)
-      serr `shouldSatisfy` ("no name to look up" `isInfixOf`)
-
-    it "rejects a relationship above the arity-10 block ceiling" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("above the block ceiling of 10" `isInfixOf`)
-
-    -- Spec §11 W3(b): a pinned section whose text opens with a SECOND index is
-    -- a sub-provision, and emitting it hands clean-law the insert index `4. 5`
-    -- -- eId sec_4_5 against the workspace sec_4_section we wrote, i.e. an
-    -- orphaned canvas in a document that imports and stores without complaint.
-    it "rejects a pinned section whose text opens with another index" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/sub-provision-index.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("sub-provision index (Blawx v1)" `isInfixOf`)
-      serr `shouldSatisfy` ("orphaning" `isInfixOf`)
-
-    -- Integration, 2026-09-02 (§8.4, §11 W3). The number/eId invariant W3 built
-    -- has a third road into it: clean-law's `legal_text` is pyparsing
-    -- `printables`, which is ASCII-only, so ANY character above U+007F ends the
-    -- parse there and orphans every later canvas. `asciiFold` folds what
-    -- legislation actually contains; the residue is refused.
-    it "rejects a section text carrying a character clean-law cannot lex" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/section-text-non-ascii.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("non-ASCII section text (Blawx v1)" `isInfixOf`)
-      serr `shouldSatisfy` ("U+00A3" `isInfixOf`)
-      serr `shouldSatisfy` ("orphaned" `isInfixOf`)
-
-    -- ... and the characters legislation.gov.uk actually serves are FOLDED, not
-    -- refused: a curly apostrophe would otherwise make every UK statute paste
-    -- unemittable. The fixture above pins the refusal; this pins the fold, on
-    -- the seed corpus, which carries ten U+2014 em dashes across five files.
-    it "folds the punctuation legislation carries rather than refusing it" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
-      code `shouldBe` ExitSuccess
-      -- the ten U+2014 em dashes across the seed corpus become hyphens, and
-      -- none of them reaches the emitted rule_text
-      sout `shouldSatisfy` (not . ("\x2014" `isInfixOf`))
-
-    it "fails on a file that does not typecheck" $
-      expectFail bin ["blawx", errorFixture]
-
-  -- The import direction (R14, spec §10 P5). `lift . emit = id` has two
-  -- halves; this is the parse half, and it is checked in the only way that
-  -- needs no foreign toolchain and no external corpus: emit a real document,
-  -- read it back through every layer, and compare both the IR and the bytes.
-  describe "l4 blawx --import" $ do
-    it "round-trips each P1/P3 seed: emit -> parse -> the same block IR and the same bytes" $
-      mapM_
-        (\stem -> do
-            Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4", "--roundtrip"]
-            unless (code == ExitSuccess) $
-              expectationFailure (stem ++ ": --roundtrip failed\n--- stderr ---\n" ++ serr)
-            sout `shouldSatisfy` ("IR and bytes unchanged" `isInfixOf`))
-        ["benefit", "mortality", "scores", "sumlist"]
-
-    it "parses an emitted .blawx back and reports a clean census" $ do
-      Output code sout serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "examples/blawx/expected/mortality.blawx"]
-      unless (code == ExitSuccess) $
-        expectationFailure ("--import --parse-only failed\n--- stderr ---\n" ++ serr)
-      -- One machine-readable line, so the census harness need not scrape prose.
-      sout `shouldSatisfy` ("CENSUS mortality clean" `isInfixOf`)
-      sout `shouldSatisfy` ("workspaces=2 tests=3" `isInfixOf`)
-      -- Our own emission is by construction not stale, so nothing warns.
-      serr `shouldSatisfy` (not . ("stale-encoding" `isInfixOf`))
-
-    it "names the row and the block when a document is outside the liftable fragment" $ do
-      Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/unsupported.blawx"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("blawx-parse/unsupported-block" `isInfixOf`)
-      serr `shouldSatisfy` ("sec_1_section" `isInfixOf`)
-      serr `shouldSatisfy` ("date_value" `isInfixOf`)
-
-    it "warns per skipped disabled block rather than silently dropping it (P5-3)" $ do
-      Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/disabled.blawx"]
-      code `shouldBe` ExitSuccess
-      serr `shouldSatisfy` ("blawx-parse/disabled-block-skipped" `isInfixOf`)
-      serr `shouldSatisfy` ("skipped disabled <query>" `isInfixOf`)
-
-    it "refuses a stream whose first row is not the ruledoc" $ do
-      Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/no-ruledoc.blawx"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("blawx-parse/row-order" `isInfixOf`)
-
-    it "refuses XML outside the Blockly subset by name and offset" $ do
-      Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/bad-xml.blawx"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("blawx-parse/xml-malformed" `isInfixOf`)
-      serr `shouldSatisfy` ("mismatched close tag" `isInfixOf`)
-
-    -- `l4 blawx` has no --help of its own (the subcommand parsers carry no
-    -- helper), so the usage banner optparse prints on a bad option is where
-    -- the surface is documented. Asserting on it keeps the new flags from
-    -- being added to the parser and forgotten in the spec.
-    it "documents the new flags in the usage banner" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--help"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("--import" `isInfixOf`)
-      serr `shouldSatisfy` ("--parse-only" `isInfixOf`)
-      serr `shouldSatisfy` ("--reemit" `isInfixOf`)
-
-  -- The lift (R14's other half). Its evidence is `jl4/examples/blawx/imported/`,
-  -- both halves of which the pipeline produced: `bird.l4` is what the lift
-  -- emitted from upstream's own bird.yaml, and `bird.blawx` is what the
-  -- renderers re-emitted from the same parsed blocks. The reference checkout
-  -- is NOT a test dependency -- these tests read only what is committed.
-  describe "l4 blawx --import (the lift)" $ do
-    it "the committed bird artifact evaluates to the oracles recorded in it" $ do
-      Output code sout serr <- runL4 bin ["run", "--trace", "none", "examples/blawx/imported/bird.l4"]
-      unless (code == ExitSuccess) $
-        expectationFailure ("l4 run on the lifted bird failed\n--- stderr ---\n" ++ serr)
-      -- The four blawxtests, in document order: an unbound query filtered over
-      -- the declared universe, then the three defeat-layer booleans. The last
-      -- is the one the whole example exists for -- the [pingu] span makes NBA 5
-      -- inapplicable, so NBA 3 survives and pingu cannot fly.
-      let ls = lines sout
-          results = [dropWhile (== ' ') l | (prev, l) <- zip ls (drop 1 ls), prev == "Result:"]
-      results `shouldBe` ["LIST \"pingu\"", "TRUE", "TRUE", "TRUE"]
-
-    it "re-lifting the re-emitted .blawx reproduces the same rules and the same oracles" $ do
-      Output code sout serr <- runL4 bin ["blawx", "--import", "examples/blawx/imported/bird.blawx"]
-      unless (code == ExitSuccess) $
-        expectationFailure ("--import on the re-emitted bird failed\n--- stderr ---\n" ++ serr)
-      -- The applies-idiom, the unfolded defeat layer, and the recorded answers.
-      sout `shouldSatisfy` ("DECIDE `NBA 5 applies to x` x" `isInfixOf`)
-      sout `shouldSatisfy` ("IF naf (`it is not the case that NBA 5 applies to x` x)" `isInfixOf`)
-      sout `shouldSatisfy` ("AND NOT `the conclusion in NBA 2 that x can fly is defeated` x" `isInfixOf`)
-      sout `shouldSatisfy` ("-- L4 oracle ==> LIST \"pingu\"" `isInfixOf`)
-      length (filter ("-- L4 oracle ==> " `isPrefixOf`) (lines sout)) `shouldBe` 4
-
-    it "refuses a document outside the liftable fragment, naming every construct" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/sumlist.blawx"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("cannot lift this document to L4" `isInfixOf`)
-      -- an n-ary relation is not a unary predicate over the object universe
-      serr `shouldSatisfy` ("blawx-lift/relationship" `isInfixOf`)
-      serr `shouldSatisfy` ("total_from/3" `isInfixOf`)
-      -- and the refusal is BATCHED: one run names them all, so a caller does
-      -- not have to fix them one at a time.
-      serr `shouldSatisfy` ("go/4" `isInfixOf`)
-
-    -- BLAWX-EXPORT-SPEC §11 W5 made `number` attributes liftable — as an
-    -- input field plus an accessor — so the claim this test used to pin
-    -- ("a non-boolean attribute is refused") is no longer true. What still
-    -- has no image is a rule that DERIVES a value-typed attribute
-    -- (benefit.blawx concludes `benefit_amount(A, Tmp)` from `Tmp is
-    -- 1000 + Bonus`), and it is refused by its own name.
-    it "refuses a value-typed attribute a rule CONCLUDES, by name" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/benefit.blawx"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("blawx-lift/value-attribute-concluded" `isInfixOf`)
-      serr `shouldSatisfy` ("blawx-lift/conclusion-shape" `isInfixOf`)
-
-    -- Jason Morris's own Beard Tax Act, the second of the two shipped
-    -- examples §11 W5 sized the lift against. Everything this asserts was
-    -- refused by name before that increment: the `number` attribute, the
-    -- binary attribute goal, `blawx_comparison(L,gte,5)`, the paragraph
-    -- workspaces, and the free-variable test query.
-    it "lifts Blawx's own beard_tax, comparisons and paragraphs included" $ do
-      Output code sout serr <- runL4 bin
-        ["blawx", "--import", "examples/blawx/imported/beard_tax.blawx"]
-      unless (code == ExitSuccess) $
-        expectationFailure ("beard_tax did not lift\n--- stderr ---\n" ++ serr)
-      -- the number attribute: one MAYBE NUMBER field, one definedness
-      -- decision, one accessor
-      sout `shouldSatisfy` ("facial_hair_length_mm           IS A MAYBE NUMBER" `isInfixOf`)
-      sout `shouldSatisfy` ("IF isJust (x's facial_hair_length_mm)" `isInfixOf`)
-      sout `shouldSatisfy` ("MEANS fromMaybe 0 (x's facial_hair_length_mm)" `isInfixOf`)
-      -- blawx_comparison(Length, gte, 5)
-      sout `shouldSatisfy` ("AND `the facial_hair_length_mm of` x AT LEAST 5" `isInfixOf`)
-      -- two attributed_rules concluding `bearded` in s.1: one decision each,
-      -- OR-ed by `according_to`
-      sout `shouldSatisfy` ("`according to BTA 1, x is bearded (clause 1)` x" `isInfixOf`)
-      sout `shouldSatisfy` ("OR `according to BTA 1, x is bearded (clause 2)` x" `isInfixOf`)
-      -- the paragraph rules are filed under the parent section, and say so
-      serr `shouldSatisfy` ("blawx-lift/rule-section-flattened" `isInfixOf`)
-      sout `shouldSatisfy` ("sec_1__para_a_section attributed_rule" `isInfixOf`)
-      -- `?- bearded(Person)` over an empty universe: provenance, no #EVAL
-      serr `shouldSatisfy` ("blawx-lift/unbound-query-empty-universe" `isInfixOf`)
-      sout `shouldSatisfy` ("-- blawxtest are_they_bearded" `isInfixOf`)
-      length (filter ("#EVAL" `isPrefixOf`) (lines sout)) `shouldBe` 0
-
-    -- __The defect the paragraph fold shipped with__ (§11 W5), and the reason
-    -- these two fixtures exist. Both are Jason Morris's `beard_tax.yaml` with
-    -- the two `sec_1__para_a_section` rules made `defeasible TRUE` and one
-    -- `overrules` block appended to `sec_1_section`'s XML, defeating
-    -- `qualifies_s1a`; they differ only in which section the DEFEATING
-    -- `doc_selector` names.
-    --
-    -- `paragraph-defeat-ok.blawx` names `sec_1__para_b_section`, the
-    -- paragraph that actually concludes `qualifies_s1b`. The fold is
-    -- extension-preserving, so the defeat survives it. Before the fix the
-    -- rules were filed under the FOLDED section while the `overrules` was
-    -- keyed on the RAW paragraph: the `AND NOT <defeated>` conjunct was never
-    -- emitted, the `… is defeated` decision was defined and never used, and
-    -- the lift exited 0 with warnings only.
-    it "keeps a defeat whose sections are paragraphs (§11 W5)" $ do
-      Output code sout serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-defeat-ok.blawx"]
-      unless (code == ExitSuccess) $
-        expectationFailure ("paragraph-defeat-ok did not lift\n--- stderr ---\n" ++ serr)
-      sout `shouldSatisfy`
-        ("AND NOT `the conclusion in BTA 1 that x qualifies under section 1 a is defeated` x" `isInfixOf`)
-      -- the sentence the old artifact printed in its place, which was false
-      sout `shouldSatisfy` (not . ("no overrules names BTA 1 as defeated" `isInfixOf`))
-      -- and the fold is disclosed on the defeat too, not only on the rules
-      serr `shouldSatisfy` ("blawx-lift/defeat-section-flattened" `isInfixOf`)
-      serr `shouldSatisfy` ("sec_1__para_a_section" `isInfixOf`)
-
-    -- `paragraph-defeat.blawx` is the review counterexample verbatim: its
-    -- DEFEATING `doc_selector` names `sec_1_section`, the flat parent, which
-    -- no rule is attributed to. s(CASP) keys `holds/3` on the exact section,
-    -- so `holds(sec_1_section,qualifies_s1b,X)` has no clause and the defeat
-    -- never fires in Blawx — measured with swipl over the re-emitted program:
-    -- `?- qualifies_s1a(p).` answers MODEL in all four scenarios. Folding it
-    -- would give the defeat a body the source does not have, so it is refused
-    -- by name instead.
-    it "refuses an `overrules` the fold would activate, by name (§11 W5)" $ do
-      Output code _ serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-defeat.blawx"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("blawx-lift/defeat-target" `isInfixOf`)
-      serr `shouldSatisfy` ("holds(sec_1_section,qualifies_s1b,X)" `isInfixOf`)
-
-    -- __The APPLICABILITY layer's half of the same fold hazard__, found in
-    -- review of W5a and closed at integration (2026-09-02). The fixture is
-    -- Jason Morris's own bird.yaml with ONE empty workspace
-    -- (`sec_5__para_a_section`) added and two `doc_selector` section_references
-    -- repointed at it, so the `inapplicable TRUE` attributed_rule is attributed
-    -- to a PARAGRAPH. `scasp_generator.js:1188-1194` injects
-    -- `blawx_applies(<the rule's own section>, X)`, so Blawx asks
-    -- `blawx_applies(sec_5__para_a_section, X)`, which has no clause at all;
-    -- the lift injected the PARENT's gate, which is derivable. Measured before
-    -- the fix: exit 0, warnings only, `l4 check` clean, and the two engines
-    -- disagreed — L4 TRUE, s(CASP) NOMODEL, with a hand-added
-    -- `blawx_applies(sec_5__para_a_section,A) :- not -blawx_applies(...)`
-    -- flipping it back. Refused by name now, exactly as `defeat-target` is.
-    it "refuses an `inapplicable` rule the fold would re-gate, by name" $ do
-      Output code _ serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-applies.blawx"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("blawx-lift/applies-target" `isInfixOf`)
-      serr `shouldSatisfy` ("blawx_applies(sec_5__para_a_section,X)" `isInfixOf`)
-
-    it "--reemit writes the .blawx regenerated from the parsed blocks" $ do
-      Output code sout serr <- runL4 bin
-        ["blawx", "--import", "--reemit", "examples/blawx/expected/mortality.blawx"]
-      unless (code == ExitSuccess) $
-        expectationFailure ("--reemit failed\n--- stderr ---\n" ++ serr)
-      -- Our own emission parsed and re-emitted is byte-identical to itself;
-      -- that is the byte half of `lift . emit = id`, reached through the CLI
-      -- rather than through --roundtrip's in-process comparison.
-      original <- readFile "examples/blawx/expected/mortality.blawx"
-      sout `shouldBe` original
-
-  describe "l4 docassemble" $ do
-    it "compiles the WHERE-heavy rodents example to its golden interview (R3 survival)" $
-      expectGolden bin ["docassemble", "examples/docassemble/rodents-and-vermin.l4"]
-                       "examples/docassemble/expected/rodents-and-vermin.yml"
-
-    it "compiles the top-level IMPLIES seam example (R4 verdict driver)" $
-      expectGolden bin ["docassemble", "examples/docassemble/seam.l4"]
-                       "examples/docassemble/expected/seam.yml"
-
-    it "compiles a 3-way enum CONSIDER to a radio question + elif chain (R6)" $
-      expectGolden bin ["docassemble", "examples/docassemble/enum-triage.l4"]
-                       "examples/docassemble/expected/enum-triage.yml"
-
-    it "compiles TYPICALLY prefills + MAYBE optionality with Mako-hostile @desc (R7/R8/R9)" $
-      expectGolden bin ["docassemble", "examples/docassemble/defaults.l4"]
-                       "examples/docassemble/expected/defaults.yml"
-
-    it "keeps attributes out of the DAObject namespace + inlines a computed field (R2)" $
-      expectGolden bin ["docassemble", "examples/docassemble/computed-and-shadow.l4"]
-                       "examples/docassemble/expected/computed-and-shadow.yml"
-
-    it "emits a question for an ASSUME referenced only through an inlined function (R3)" $
-      expectGolden bin ["docassemble", "examples/docassemble/assume-via-fn.l4"]
-                       "examples/docassemble/expected/assume-via-fn.yml"
-
-    it "drives the seam scope-first, never as the classical short-circuit (R4)" $ do
-      Output code sout _ <- runL4 bin ["docassemble", "examples/docassemble/seam.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("if notice_rule_satisfied_scope:" `isInfixOf`)
-      sout `shouldSatisfy` (not . ("not notice_rule_satisfied_scope or" `isInfixOf`))
-
-    it "refuses a deontic body by name (Regulative, Blocking)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/deontic-body.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("deontic/regulative rule (PARTY MUST/MAY/SHANT) has no docassemble form" `isInfixOf`)
-
-    -- M4 flips the two R8 refusals M1 shipped: `not-ok/maybe-number.l4` and
-    -- `not-ok/just-payload-pattern.l4` are now `../maybe-scalars.l4`, a
-    -- SUPPORTED example, and their assertions moved to the M4 describe block
-    -- below. What is left refusing is `MAYBE <enum>` — see
-    -- "still refuses MAYBE of an enum" there, which also pins the diagnostic
-    -- against the false claim M4 would otherwise leave behind.
-
-    it "refuses a post-sanitisation name collision, naming both originals" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/name-collision.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("name collision: `t.notice_period`" `isInfixOf`)
-      serr `shouldSatisfy` ("L4 `notice period`" `isInfixOf`)
-      serr `shouldSatisfy` ("L4 `notice_period`" `isInfixOf`)
-
-    it "refuses a function value passed as data, by the function's own name (R3)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/higher-order.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("higher-order use of function `is positive`" `isInfixOf`)
-
-    it "refuses a seam-goal reference that travels through an inlined function (R4 guard)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/seam-ref-via-fn.l4"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("seam-shaped export (top-level IMPLIES) is referenced by another decision" `isInfixOf`)
-
-    it "gates on advisory fidelity notes with --fail-on=advisory" $
-      expectFail bin ["docassemble", "examples/docassemble/defaults.l4", "--fail-on=advisory"]
-
-    it "emits only block keys docassemble 1.10.7 recognises (R9.5 vocabulary)" $
-      DAEmit.emitterVocabularyViolations `shouldBe` []
-
-    it "fails on a file that does not typecheck" $
-      expectFail bin ["docassemble", errorFixture]
-
-    -- M1 regression, tightened for M2: the six goldens above pin STDOUT.
-    -- `-o` is a different code path (it also drops the fidelity report into a
-    -- sibling .fidelity.txt), and the six committed .fidelity.txt files were
-    -- pinned by no test at all. Both are pinned here so that M2's --package
-    -- work cannot quietly change the bare artifact.
-    it "writes to --output exactly the stdout bytes, plus the committed fidelity sidecar" $
-      for_ daBareExamples \stem -> do
-        tmp <- getTemporaryDirectory
-        let outFile = tmp </> ("l4-da-out-" ++ stem ++ ".yml")
-            sidecar = tmp </> ("l4-da-out-" ++ stem ++ ".fidelity.txt")
-        removePathForcibly outFile
-        removePathForcibly sidecar
-        Output code sout serr <-
-          runL4 bin ["docassemble", daExampleDir </> (stem ++ ".l4"), "-o", outFile]
-        unless (code == ExitSuccess) $
-          expectationFailure (stem ++ ": -o run failed\n--- stderr ---\n" ++ serr)
-        sout `shouldBe` ""
-        written   <- readUtf8 outFile
-        goldenYml <- readUtf8 (daExampleDir </> "expected" </> (stem ++ ".yml"))
-        unless (written == goldenYml) $
-          expectationFailure (stem ++ ": -o bytes differ from the committed golden")
-        haveSidecar <- doesFileExist sidecar
-        unless haveSidecar $
-          expectationFailure (stem ++ ": -o wrote no .fidelity.txt sibling")
-        gotReport  <- readUtf8 sidecar
-        wantReport <- readUtf8 (daExampleDir </> "expected" </> (stem ++ ".fidelity.txt"))
-        unless (gotReport == wantReport) $
-          expectationFailure $
-            stem ++ ": fidelity sidecar differs from its committed golden"
-            ++ "\n--- got ---\n" ++ gotReport ++ "\n--- golden ---\n" ++ wantReport
-        removePathForcibly outFile
-        removePathForcibly sidecar
-
-  ----------------------------------------------------------------------------
-  -- M2 (spec §10): the installable package tree (R11 §8.11)
-  --
-  -- R11 is explicit that this artifact gets "a shape test, not byte goldens",
-  -- so every assertion below is about the SHAPE of the written tree: which
-  -- files exist, which must NOT exist, what they say, and that two runs agree.
-  ----------------------------------------------------------------------------
-  describe "l4 docassemble --package (M2/R11: the installable package tree)" $ do
-    it "writes the PEP 420 shape, including the namespace __init__.py that must be ABSENT" $ do
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-shape"
-      files <- expectPackage bin daCitationsSource dir
-      let wanted =
-            [ "pyproject.toml"
-            , "MANIFEST.in"
-            -- R11 decision 4: the fidelity report is part of the shape, at the
-            -- package root under the same-stem convention `-o FILE` uses.
-            , "citations.fidelity.txt"
-            , daPkgInner </> "__init__.py"
-            , daPkgInner </> "l4runtime.py"
-            , daPkgInner </> "data" </> "questions" </> "citations.yml"
-            , daPkgInner </> "data" </> "sources"   </> "citations.l4"
-            ]
-      for_ wanted \want ->
-        unless (want `elem` files) $
-          expectationFailure $
-            "package tree is missing " ++ show want
-            ++ "\n--- tree ---\n" ++ unlines files
-      -- The absence is a REQUIREMENT, not a detail: setuptools' pyproject path
-      -- defaults to PEP 420 namespace finding, and a namespace __init__.py
-      -- turns `docassemble` into a regular package that shadows the installed
-      -- `docassemble.base`. The 1.10.7 exemplar has no such file — verified by
-      -- `git ls-tree -r 1b6678384 docassemble_demo/ | grep -c
-      -- 'docassemble_demo/docassemble/__init__.py'` => 0.
-      let nsInit = "docassemble" </> "__init__.py"
-      when (nsInit `elem` files) $
-        expectationFailure $
-          "package tree contains " ++ show nsInit
-          ++ ", which breaks PEP 420 namespace finding (R11)"
-      removePathForcibly dir
-
-    it "writes a pyproject.toml naming the package, an SPDX licence, and the Python floor" $ do
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-toml"
-      _ <- expectPackage bin daCitationsSource dir
-      toml <- readUtf8 (dir </> "pyproject.toml")
-      let has = shouldContain' "pyproject.toml" toml
-      has "docassemble.l4citations"
-      has "license = \""            -- PEP 639 SPDX expression, string form
-      -- R11: `requires-python >= 3.12` (docassemble_base/pyproject.toml:14 at
-      -- 1b6678384). Asserted as ONE substring: `has "requires-python"` and
-      -- `has "3.12"` as two independent whole-file checks would be satisfied by
-      -- a floor of ">= 3.9" beside any other mention of 3.12 — a comment, a
-      -- classifier, a dependency pin — which is not the claim R11 makes.
-      has "requires-python = \">= 3.12\""
-      has "[tool.setuptools.packages.find]"
-      has "where = [\".\"]"
-      has "docassemble.base"        -- an installable package depends on the runtime
-      removePathForcibly dir
-
-    it "writes a MANIFEST.in grafting the data directory and shipping the report" $ do
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-manifest"
-      _ <- expectPackage bin daCitationsSource dir
-      manifest <- readUtf8 (dir </> "MANIFEST.in")
-      shouldContain' "MANIFEST.in" manifest ("graft " ++ (daPkgInner </> "data"))
-      -- MANIFEST.in governs the sdist, and a root-level file is not package
-      -- data, so without this line R11 decision 4's "and MANIFEST.in includes
-      -- it so it ships" is false and nothing would notice.
-      shouldContain' "MANIFEST.in" manifest "include citations.fidelity.txt"
-      removePathForcibly dir
-
-    it "writes the same fidelity report the bare -o run writes, at the package root" $ do
-      -- R11 decision 4 places the report at the package root rather than under
-      -- data/. Its CONTENT is pinned for the bare `-o` path by the
-      -- daBareExamples golden loop above; this asserts the --package copy is
-      -- the same bytes, so the two placements cannot drift.
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-fidelity"
-      _ <- expectPackage bin daCitationsSource dir
-      got  <- readUtf8 (dir </> "citations.fidelity.txt")
-      want <- readUtf8 (daExampleDir </> "expected" </> "citations.fidelity.txt")
-      unless (got == want) $
-        expectationFailure $
-          "the packaged fidelity report differs from the committed golden"
-          ++ "\n--- got ---\n" ++ got ++ "\n--- golden ---\n" ++ want
-      removePathForcibly dir
-
-    it "writes an l4runtime.py carrying the provenance API its __all__ promises" $ do
-      -- Existence was asserted; content was not, and the module is the whole
-      -- reason `modules:` exists in the packaged interview (R11 decision 6).
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-runtime"
-      _ <- expectPackage bin daCitationsSource dir
-      rt <- readUtf8 (dir </> daPkgInner </> "l4runtime.py")
-      let has = shouldContain' "l4runtime.py" rt
-      has "__all__"
-      -- The author's spelling of the source file survives here even though the
-      -- on-disk copy is renamed to <slug>.l4 (R11 decision 3).
-      has "L4_SOURCE_NAME = 'citations.l4'"
-      has "L4_PACKAGE_NAME = 'docassemble.l4citations'"
-      has "def l4_source_path():"
-      has "def l4_source_text():"
-      -- It must define nothing the interview CALLS: the bare and packaged
-      -- artifacts have to mean the same thing, so anything the interview needed
-      -- would have to work bare too, where there is no runtime module at all.
-      yml <- readUtf8 (dir </> daPkgInner </> "data" </> "questions" </> "citations.yml")
-      for_ ["l4_source_path(", "l4_source_text(", "L4_SOURCE_NAME"] \name ->
-        shouldNotContain' "the packaged interview" yml name
-      removePathForcibly dir
-
-    it "writes an __init__.py that opts the package out of docassemble's pre-load scan" $ do
-      -- `# do not pre-load` is not decoration: docassemble's package scanner
-      -- breaks out of the file on exactly that prefix
-      -- (docassemble_webapp/.../packages/helpers.py:63 at 1b6678384), which is
-      -- what keeps a generated package from being imported at server start.
-      -- It is also byte-for-byte the shape of docassemble_demo's own __init__.
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-init"
-      _ <- expectPackage bin daCitationsSource dir
-      ini <- readUtf8 (dir </> daPkgInner </> "__init__.py")
-      unless ("# do not pre-load" `isPrefixOf` ini) $
-        expectationFailure $
-          "the generated __init__.py does not open with `# do not pre-load`, so "
-          ++ "docassemble's pre-load scan would keep reading it\n--- got ---\n" ++ ini
-      removePathForcibly dir
-
-    it "replaces a previous run rather than accumulating beside it" $ do
-      -- Writing without deleting meant that regenerating after the .l4 was
-      -- RENAMED left the whole previous inner package in the tree, and
-      -- `[tool.setuptools.packages.find] where = ["."]` then found both: a
-      -- wheel declaring itself docassemble.l4beta shipped an importable
-      -- docassemble.l4alpha whose l4_source_text() had no data file behind it.
-      -- The slug follows the source basename by design, so a rename is the
-      -- designed trigger, and the command reported success throughout.
-      tmp <- getTemporaryDirectory
-      let srcDir = tmp </> "l4-da-regen-src"
-          dir    = tmp </> "l4-da-regen"
-          alpha  = srcDir </> "alpha.l4"
-          beta   = srcDir </> "beta.l4"
-      removePathForcibly srcDir
-      removePathForcibly dir
-      createDirectoryIfMissing True srcDir
-      copyFile daCitationsSource alpha
-      copyFile daCitationsSource beta
-      _ <- expectPackage bin alpha dir
-      -- expectPackage clears the directory first, so regenerate by hand.
-      Output code _ serr <- runL4 bin ["docassemble", beta, "--package", dir]
-      unless (code == ExitSuccess) $
-        expectationFailure ("regeneration failed\n--- stderr ---\n" ++ serr)
-      files <- treeFiles dir
-      let stale = [ f | f <- files, "l4alpha" `isInfixOf` f ]
-      unless (null stale) $
-        expectationFailure $
-          "regenerating after a rename left the previous package in the tree: "
-          ++ show stale ++ "\n--- tree ---\n" ++ unlines files
-      unless ((("docassemble" </> "l4beta") </> "l4runtime.py") `elem` files) $
-        expectationFailure $
-          "the regenerated package is missing\n--- tree ---\n" ++ unlines files
-      unless ("beta.fidelity.txt" `elem` files) $
-        expectationFailure $
-          "the regenerated fidelity report is missing\n--- tree ---\n" ++ unlines files
-      unless ("alpha.fidelity.txt" `notElem` files) $
-        expectationFailure $
-          "the previous run's fidelity report survived regeneration\n--- tree ---\n"
-          ++ unlines files
-      removePathForcibly srcDir
-      removePathForcibly dir
-
-    it "leaves a file the user put in their own package directory alone" $ do
-      -- The prune above must not become a licence to delete: guardClobber
-      -- establishes that we WROTE this tree, not that we own every file in it.
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-regen-keep"
-      _ <- expectPackage bin daCitationsSource dir
-      writeFile (dir </> "NOTES.md") "hand-written, not ours\n"
-      Output code _ serr <- runL4 bin ["docassemble", daCitationsSource, "--package", dir]
-      unless (code == ExitSuccess) $
-        expectationFailure ("regeneration failed\n--- stderr ---\n" ++ serr)
-      kept <- readUtf8 (dir </> "NOTES.md")
-      kept `shouldBe` "hand-written, not ours\n"
-      removePathForcibly dir
-
-    it "embeds the .l4 source byte-identically under data/sources (that is what provenance means)" $ do
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-provenance"
-      _ <- expectPackage bin daCitationsSource dir
-      orig   <- BS.readFile daCitationsSource
-      copied <- BS.readFile (dir </> daPkgInner </> "data" </> "sources" </> "citations.l4")
-      unless (copied == orig) $
-        expectationFailure
-          "data/sources/citations.l4 is not byte-identical to the input .l4"
-      removePathForcibly dir
-
-    it "puts the interview under data/questions and wires the runtime module via modules:" $ do
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-questions"
-      _ <- expectPackage bin daCitationsSource dir
-      yml <- readUtf8 (dir </> daPkgInner </> "data" </> "questions" </> "citations.yml")
-      -- It is the interview, not a stub: the driver and the goal block are in it.
-      shouldContain' "data/questions/citations.yml" yml "id: driver_offering_exempt"
-      shouldContain' "data/questions/citations.yml" yml "id: c_offering_exempt"
-      -- R11: the runtime module is a SIBLING of data/, loaded as `.l4runtime`.
-      -- The leading dot is package-name concatenation: docassemble execs
-      -- `from <question.package><name> import *` (parse.py:8569-8573 at
-      -- 1b6678384), so `.l4runtime` resolves to
-      -- docassemble.l4citations.l4runtime.
-      shouldContain' "data/questions/citations.yml" yml "modules:"
-      shouldContain' "data/questions/citations.yml" yml ".l4runtime"
-      removePathForcibly dir
-
-    it "leaves no empty directory anywhere in the tree" $ do
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-empties"
-      _ <- expectPackage bin daCitationsSource dir
-      empties <- emptyTreeDirs dir
-      unless (null empties) $
-        expectationFailure $
-          "empty directories in the package tree (they survive neither git nor "
-          ++ "zip, R11): " ++ show empties
-      removePathForcibly dir
-
-    it "is deterministic: two runs write identical trees" $ do
-      tmp <- getTemporaryDirectory
-      let dirA = tmp </> "l4-da-pkg-detA"
-          dirB = tmp </> "l4-da-pkg-detB"
-      filesA <- expectPackage bin daCitationsSource dirA
-      filesB <- expectPackage bin daCitationsSource dirB
-      unless (filesA == filesB) $
-        expectationFailure $
-          "two --package runs wrote different file sets:\n" ++ show filesA
-          ++ "\nvs\n" ++ show filesB
-      for_ filesA \f -> do
-        a <- BS.readFile (dirA </> f)
-        b <- BS.readFile (dirB </> f)
-        unless (a == b) $
-          expectationFailure ("--package is non-deterministic in " ++ show f)
-      removePathForcibly dirA
-      removePathForcibly dirB
-
-    -- RULING TAKEN BY THIS TEST: --package and --output are two different
-    -- artifact shapes (a directory vs a file), and `-o` is already overloaded
-    -- house-wide (FILE in eight verbs, DIR in `l4 trace`). Honouring one and
-    -- silently ignoring the other is the failure mode with no precedent to
-    -- lean on, so the combination is REFUSED by name. The exact phrase is
-    -- pinned because optparse's own "Invalid option" message happens to
-    -- contain both option names via the usage line, which would let a
-    -- generic assertion pass for the wrong reason.
-    it "refuses --package together with --output, by name" $ do
-      tmp <- getTemporaryDirectory
-      let dir  = tmp </> "l4-da-pkg-conflict"
-          file = tmp </> "l4-da-pkg-conflict.yml"
-      removePathForcibly dir
-      removePathForcibly file
-      Output code _ serr <-
-        runL4 bin ["docassemble", daCitationsSource, "-o", file, "--package", dir]
-      code `shouldBe` ExitFailure 1
-      shouldContain' "stderr" serr "--package cannot be combined with --output"
-      wroteFile <- doesFileExist file
-      wroteDir  <- doesDirectoryExist dir
-      unless (not wroteFile && not wroteDir) $
-        expectationFailure "a refused invocation still wrote an artifact"
-      removePathForcibly dir
-      removePathForcibly file
-
-    it "derives an ASCII package slug from a hostile filename" $ do
-      -- `moduleSource` is a PERCENT-ENCODED URI segment and `pyIdent` keeps
-      -- non-ASCII letters, so a slug taken from either inherits `%20`/`%C3%A9`
-      -- or a bare `é` — neither is usable as an on-disk Python package name.
-      tmp <- getTemporaryDirectory
-      let srcDir = tmp </> "l4-da-hostile-src"
-          src    = srcDir </> "2024 Café Rules v2.1.l4"
-          dir    = tmp </> "l4-da-pkg-hostile"
-      removePathForcibly srcDir
-      createDirectoryIfMissing True srcDir
-      copyFile daCitationsSource src
-      _ <- expectPackage bin src dir
-      inner <- listDirectory (dir </> "docassemble")
-      case filter (/= "__init__.py") inner of
-        [pkgName] -> do
-          unless ("l4" `isPrefixOf` pkgName) $
-            expectationFailure $
-              "generated package " ++ show pkgName ++ " is not `l4<slug>` (R11)"
-          let ok c = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
-          unless (all ok pkgName) $
-            expectationFailure $
-              "generated package name " ++ show pkgName
-              ++ " is not lowercase ASCII alphanumeric; a percent-encoded or "
-              ++ "non-ASCII slug is not a usable Python package name"
-          toml <- readUtf8 (dir </> "pyproject.toml")
-          shouldContain' "pyproject.toml" toml ("docassemble." ++ pkgName)
-          -- provenance survives the rename: whatever the source file is called
-          -- inside the package, its bytes are the input's bytes
-          let srcsDir = dir </> "docassemble" </> pkgName </> "data" </> "sources"
-          srcs <- listDirectory srcsDir
-          case srcs of
-            [one] -> do
-              orig   <- BS.readFile src
-              copied <- BS.readFile (srcsDir </> one)
-              unless (copied == orig) $
-                expectationFailure "data/sources copy is not byte-identical"
-            other -> expectationFailure $
-              "expected exactly one file under data/sources, got " ++ show other
-        other -> expectationFailure $
-          "expected exactly one generated package under docassemble/, got "
-          ++ show other
-      removePathForcibly srcDir
-      removePathForcibly dir
-
-  ----------------------------------------------------------------------------
-  -- M2 (spec §10): @ref citations on the verdict screen, and the glossary
-  --
-  -- The claim this milestone is worth having for: the verdict screen cites the
-  -- law that ACTUALLY decided the case. Short-circuited rules did not decide
-  -- anything, so citing them would be citing law that never fired.
-  ----------------------------------------------------------------------------
-  describe "l4 docassemble citations (M2: @ref citations and the glossary)" $ do
-    it "attaches each rule's own @ref to that rule's own code block, via explain()" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-
-      -- Rule 1: the plain `@ref` form.
-      cap <- blockWithId sout "c_offering_exempt_within_the_annual_cap"
-      shouldContain'    "the `within the annual cap` code block" cap "explain("
-      shouldContain'    "the `within the annual cap` code block" cap daCite1
-      -- A node's Anno carries at most one Ref and the NEAREST preceding ref
-      -- wins (`attachRef` in ResolveAnnotation.hs), so "picked up the
-      -- neighbour's citation" is a real failure mode and gets its own
-      -- assertion.
-      shouldNotContain' "the `within the annual cap` code block" cap daCite2
-      shouldNotContain' "the `within the annual cap` code block" cap daCite3Tail
-      shouldNotContain' "the `within the annual cap` code block" cap daCiteGoal
-
-      -- Rule 2: the inline `<< >>` ref form.
-      via <- blockWithId sout "c_offering_exempt_sold_through_a_single_intermediary"
-      shouldContain'    "the `sold through a single intermediary` code block" via "explain("
-      shouldContain'    "the `sold through a single intermediary` code block" via daCite2
-      shouldNotContain' "the `sold through a single intermediary` code block" via daCite1
-      shouldNotContain' "the `sold through a single intermediary` code block" via daCite3Tail
-      shouldNotContain' "the `sold through a single intermediary` code block" via daCiteGoal
-
-      -- Rule 3: the Mako-hostile ref.
-      reg <- blockWithId sout "c_offering_exempt_the_intermediary_is_registered"
-      shouldContain'    "the `the intermediary is registered` code block" reg "explain("
-      shouldContain'    "the `the intermediary is registered` code block" reg daCite3Tail
-      shouldNotContain' "the `the intermediary is registered` code block" reg daCite1
-      shouldNotContain' "the `the intermediary is registered` code block" reg daCite2
-      shouldNotContain' "the `the intermediary is registered` code block" reg daCiteGoal
-
-      -- The exported DECIDE carries a @ref of its own, which attaches to the
-      -- TopDecl node rather than the inner MkDecide and rides onto the GOAL
-      -- code block. That path was implemented but exercised by no fixture
-      -- until this one; it is also the only place the emitted ORDER is
-      -- observable (see `daCiteGoal`).
-      goal <- blockWithId sout "c_offering_exempt"
-      shouldContain'    "the `offering exempt` goal code block" goal "explain("
-      shouldContain'    "the `offering exempt` goal code block" goal daCiteGoal
-      shouldNotContain' "the `offering exempt` goal code block" goal daCite1
-      shouldNotContain' "the `offering exempt` goal code block" goal daCite2
-      shouldNotContain' "the `offering exempt` goal code block" goal daCite3Tail
-      -- The design rule the citation list depends on, asserted as a claim: the
-      -- explain() call sits AFTER the assignment, because a block whose
-      -- assignment raises on an undefined input has decided nothing and
-      -- docassemble re-runs it once the input arrives. Cite first and the goal
-      -- records itself before the rules it pulls on — measured, and caught by
-      -- the round-trip harness's ordered citation list only because the goal
-      -- carries a @ref at all.
-      for_ [ ("c_offering_exempt_within_the_annual_cap", daCite1)
-           , ("c_offering_exempt_sold_through_a_single_intermediary", daCite2)
-           , ("c_offering_exempt_the_intermediary_is_registered", daCite3Tail)
-           , ("c_offering_exempt", daCiteGoal)
-           ] \(bid, cite) -> do
-        blk <- blockWithId sout bid
-        shouldPrecede ("the " ++ bid ++ " code block") blk " = " "explain('"
-        shouldContain' ("the " ++ bid ++ " code block") blk cite
-
-    it "renders logic_explanation() on every verdict screen" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-      for_ ["ev_offering_exempt_screen_holds", "ev_offering_exempt_screen_fails"] \sid -> do
-        blk <- blockWithId sout sid
-        shouldContain' ("the " ++ sid ++ " screen") blk "logic_explanation()"
-
-    it "emits one `auto terms:` glossary block, keyed on the L4 defined terms" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-      case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of
-        [glossary] -> do
-          for_
-            [ ( "Offering"
-              , "A securities offering made in reliance on the crowdfunding exemption" )
-            , ( "within the annual cap"
-              , "The amount sold in reliance on the exemption in the preceding 12 months does not exceed $5,000,000" )
-            , ( "sold through a single intermediary"
-              , "The offering is conducted exclusively through a single intermediary" )
-            , ( "the intermediary is registered"
-              , "The intermediary is registered with the Commission as a funding portal" )
-            ] \(term, defn) -> do
-              shouldContain' "the `auto terms:` glossary" glossary term
-              shouldContain' "the `auto terms:` glossary" glossary defn
-          -- docassemble only reads `auto terms` from a block that has no
-          -- `question` key: `if 'auto terms' in data and 'question' not in
-          -- data` (parse.py:2878 at 1b6678384). A glossary emitted inside a
-          -- question block is silently ignored.
-          shouldNotContain' "the `auto terms:` glossary block" glossary "question:"
-        other -> expectationFailure $
-          "expected exactly one `auto terms:` block, found " ++ show (length other)
-          ++ "\n--- emitted interview ---\n" ++ sout
-
-    it "strips L4's own `@ref ` herald and the inline `<< >>` delimiters" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-      -- The inline form's text must ARRIVE …
-      shouldContain' "the emitted interview" sout daCite2
-      -- … but neither ref spelling may reach a user-facing screen as syntax.
-      -- `getRef` does NOT strip the herald (unlike `getDesc`): the payload of
-      -- `@ref X` is the text "@ref X", verbatim.
-      shouldNotContain' "the emitted interview" sout "@ref "
-      shouldNotContain' "the emitted interview" sout "<<17 CFR"
-      shouldNotContain' "the emitted interview" sout "intermediary only>>"
-
-    it "escapes Mako-hostile citation text (R9.1, the `defaults` discipline applied to @ref)" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-      -- carried at all
-      shouldContain' "the emitted interview" sout daCite3Tail
-      -- never as a line Mako would read as a control line: the citation begins
-      -- with `%`, and a line-leading `%` makes the whole line vanish.
-      let hostileControlLine ln =
-            "%" `isPrefixOf` dropWhile (`elem` (" \t" :: String)) ln
-              && "of the proceeds retained" `isInfixOf` ln
-      case filter hostileControlLine (lines sout) of
-        [] -> pure ()
-        bad -> expectationFailure $
-          "citation emitted as a Mako control line (it would vanish from the "
-          ++ "screen): " ++ show bad
-      -- and never as a LIVE `${ … }` inside a Mako-rendered screen: either the
-      -- text is escaped in place (escapeL4) or interpolated at render time.
-      for_ ["ev_offering_exempt_screen_holds", "ev_offering_exempt_screen_fails"] \sid -> do
-        blk <- blockWithId sout sid
-        shouldNotContain' ("the " ++ sid ++ " screen") blk "${ fee_schedule }"
-
-    -- Added by the GREEN phase, which the RED phase asked for by name: the
-    -- shape assertions above say what must be true of the M2 emission, and
-    -- this pins the exact bytes so a later change to the citation or glossary
-    -- rendering has to be deliberate. It is the same `expectGolden` contract
-    -- the six M1 examples ride on.
-    it "compiles the @ref citations + glossary example to its golden interview" $
-      expectGolden bin ["docassemble", daCitationsSource]
-                       "examples/docassemble/expected/citations.yml"
-
-    it "declares the M2 block keys in its own emitter vocabulary (R9.5)" $ do
-      -- `modules` and `auto terms` are already in the vendored 1.10.7
-      -- whitelist; they are NOT yet in the emitter's declaration of what it
-      -- writes, so `emitterVocabularyViolations == []` would keep passing
-      -- while silently stopping to describe the emitter.
-      let declared = map T.unpack DAEmit.emitterKeyVocabulary
-          missing  = [k | k <- ["auto terms", "modules"], k `notElem` declared]
-      missing `shouldBe` []
-
-    it "keeps block keys and field modifiers in separate vocabularies (R9.5)" $ do
-      -- `daRecognisedKeys` is parse.py:1947, the whitelist docassemble applies
-      -- to TOP-LEVEL BLOCK KEYS only (parse.py:1946-1948 iterates the block
-      -- dict under `if self.interview.debug`); field modifiers are read in a
-      -- different place entirely. Checking the two lists together against one
-      -- whitelist gave false assurance in both directions: `mandatory` and
-      -- `subquestion` are members and yet break a field
-      -- (`Syntax error: field label 'mandatory' overwrites previous label`,
-      -- measured against 1.10.7), while real modifiers like `show if` are not
-      -- members at all. Docassemble has no field-modifier whitelist to vendor,
-      -- so the repair is to stop pretending it does.
-      let blockKeys = map T.unpack DAEmit.emitterBlockKeys
-          modifiers = map T.unpack DAEmit.emitterFieldModifiers
-      DAEmit.emitterVocabularyViolations `shouldBe` []
-      [k | k <- modifiers, k `elem` blockKeys] `shouldBe` []
-      sort (blockKeys ++ modifiers) `shouldBe` sort (map T.unpack DAEmit.emitterKeyVocabulary)
-
-  ----------------------------------------------------------------------------
-  -- M2 repair cases: losses that used to be silent, and one that used to
-  -- change the answer.
-  ----------------------------------------------------------------------------
-  describe "l4 docassemble (M2 repairs: declared losses and reserved names)" $ do
-    it "declares both ways an `auto terms:` entry cannot survive, and drops them" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daGlossLossSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-
-      -- (1) A regex metacharacter in the term. Docassemble interpolates an
-      -- `auto terms` key straight into a regex with no re.escape
-      -- (parse.py:2908 at 1b6678384): a balanced `(...)` becomes a capture
-      -- group whose pattern no longer matches its own term, and an unbalanced
-      -- one raises re.error while the Interview is constructed, so the emitted
-      -- interview cannot be LOADED at all — while `l4 check` and
-      -- `l4 docassemble` both report success and the report said
-      -- "(nothing lost)".
-      shouldContain'    "stderr" serr "DA-GLOSS-REGEX"
-      shouldContain'    "stderr" serr "s 12(1)"
-      shouldNotContain' "the emitted interview" sout "REGEXDROPPEDGLOSS"
-
-      -- (2) Two terms folding onto one key. What that costs is not a duplicate
-      -- key but the loser's whole definition.
-      shouldContain'    "stderr" serr "DA-GLOSS-COLLIDE"
-      shouldContain'    "stderr" serr "folds onto"
-      shouldNotContain' "the emitted interview" sout "COLLIDEDROPPEDGLOSS"
-
-      -- What survives: the winner, deterministically the first spelling.
-      case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of
-        [glossary] -> do
-          shouldContain'    "the glossary" glossary
-            "\"Notice\": \"A formal notice served under the Act\""
-          shouldNotContain' "the glossary" glossary "s 12(1)"
-        other -> expectationFailure $
-          "expected exactly one `auto terms:` block, found " ++ show (length other)
-
-    it "reserves the generated runtime module's names, in both artifact shapes" $ do
-      -- `modules: [.l4runtime]` is exec'd as `from <pkg>.l4runtime import *`
-      -- (parse.py:8572 at 1b6678384) into the interview dict on every assemble
-      -- pass. `__all__` bounds WHICH names arrive; it does nothing to stop an
-      -- interview variable from being one of them, and the loser is the
-      -- interview's — so the packaged artifact asked no question and returned
-      -- the opposite verdict to the bare one (R11 decision 6 says the two
-      -- shapes must mean the same thing). The bare artifact reserves the name
-      -- too, so the shapes cannot disagree about a variable's NAME either.
-      Output code sout serr <- runL4 bin ["docassemble", daRuntimeCollisionSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-      shouldContain' "the emitted interview" sout "l4_source_text_ = d.filed_on_time"
-      case [ ln | ln <- lines sout, "l4_source_text " `isInfixOf` (ln ++ " ") ] of
-        [] -> pure ()
-        bad -> expectationFailure $
-          "an interview variable is spelled exactly like a name the runtime "
-          ++ "module star-imports: " ++ show bad
-
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-reserved"
-      _ <- expectPackage bin daRuntimeCollisionSource dir
-      files <- treeFiles dir
-      case [ f | f <- files, ("data" </> "questions") `isInfixOf` f ] of
-        [ymlPath] -> do
-          yml <- readUtf8 (dir </> ymlPath)
-          shouldContain' "the packaged interview" yml "l4_source_text_ = d.filed_on_time"
-          shouldContain' "the packaged interview" yml ".l4runtime"
-        other -> expectationFailure $
-          "expected exactly one interview under data/questions, got " ++ show other
-      removePathForcibly dir
-
-  ----------------------------------------------------------------------------
-  -- M4 (spec §10): breadth. ACCEPTANCE TESTS, WRITTEN FAIL-FIRST.
-  --
-  -- Every test in this block was RED at the commit that introduced it, and each
-  -- was red for a reason the tool stated in words: M1 refused each of these
-  -- constructs BY NAME, so the failure was `l4 docassemble` exiting 1 with
-  -- prose naming the milestone that owed the answer — not a missing symbol,
-  -- not a typo, not a compile error. `daEmit` still prints that stderr verbatim,
-  -- which is what makes a regression legible. The block is GREEN as of
-  -- 2026-08-17, together with `m4_acceptance.sh`, its behavioural half.
-  --
-  -- Three of these tests would still have been red after a naive
-  -- implementation, and that is deliberate; they are the ones worth having:
-  --
-  --   * the leap-day case in "computes statutory age calendar-exactly", where
-  --     dateutil's `relativedelta` CLAMPS and L4's `Date` ROLLS FORWARD.
-  --     Measured over 27,028 comparisons (every birth date 1970-01-01 to
-  --     2006-12-31, tested on the L4 majority date and the day before):
-  --     `date_difference(...).years >= 18` disagrees with L4 on 6,629;
-  --     `born.plus(years=18) <= assessed` disagrees on 9, all of them
-  --     leap-day births; `born <= assessed.minus(years=18)` disagrees on
-  --     NONE. The forward form is the wrong one against this oracle.
-  --   * "still refuses MAYBE of an enum", which was red not because the
-  --     refusal was missing but because the refusal's PROSE became a false
-  --     claim the moment MAYBE NUMBER and MAYBE DATE landed.
-  --   * the `show if:` spelling, where the `{variable:, is:}` form parses,
-  --     renders, and is browser-side JavaScript only — it defines every field
-  --     under an API drive and cannot encode a constructor payload at all.
-  --
-  -- No M4 example carries a byte golden here. See `daListSource` for why.
-  ----------------------------------------------------------------------------
-  describe "l4 docassemble (M4: breadth — acceptance)" $ do
-
-    ------------------------------------------------------------------------
-    -- A. `LIST OF` via DAList gathering
-    ------------------------------------------------------------------------
-    it "gathers a LIST OF input as a DAList with a per-element question (A)" $ do
-      out <- daEmit bin daListSource
-
-      -- The list must ride as a DAList with an element class. `object_type`
-      -- is not decoration: a `DAList.using(complete_attribute=…)` with no
-      -- object_type fails on the first element access (ablation-probed
-      -- against 1.10.7, variant G).
-      shouldContain' "the emitted interview" out "DAList"
-      shouldContain' "the emitted interview" out "object_type"
-
-      -- Gather control. Two shapes were probed working and the RED phase
-      -- declines to choose: `there_are_any` + `there_is_another` (dropping
-      -- EITHER raises DAErrorMissingVariable), or `ask_number` +
-      -- `target_number`, which replaces both with a single count question.
-      shouldContainAny "the emitted interview" out
-        ["there_is_another", "target_number"]
-
-      -- A per-element question. Element attributes are reached either through
-      -- a `generic object:` block or through explicitly indexed assignments;
-      -- a bare `tenants.age` raises DAAttributeError (probed).
-      shouldContainAny "the emitted interview" out
-        ["generic object:", "[i]", "for _i in"]
-
-      -- The goal quantifies over the gathered list rather than over a fixed
-      -- number of fields. `all` and `any` are the whole list-consumption
-      -- surface the docassemble-relevant corpus uses.
-      shouldContainAny "the goal code" out ["all(", "any("]
-
-    it "asks a list element's later attribute only when the earlier one leaves it open (A)" $ do
-      -- The property the backend sells, at the level where it is provable
-      -- from the emission: `the tenant qualifies` is `age AT LEAST 18 AND
-      -- signed`, so the signing test must be guarded by the age test WITHIN
-      -- one element. Docassemble prunes per element inside a gather (probed:
-      -- element 0 aged 17 never had its `has_lease` asked), so a lowering
-      -- that evaluates both attributes eagerly — say by building a list of
-      -- booleans first — throws that away silently.
-      out <- daEmit bin daListSource
-      shouldContainAny "the per-element predicate" out
-        [ "age >= 18 and", "(x.age >= 18) and", "age >= 18) and" ]
-      -- and it must not have been flattened into an eager per-element list
-      shouldNotContain' "the emitted interview" out "complete_elements()"
-
-    ------------------------------------------------------------------------
-    -- B. constructor payloads via `show if`
-    ------------------------------------------------------------------------
-    it "emits a payload follow-up gated by a SERVER-SIDE `show if` (B)" $ do
-      out <- daEmit bin daPayloadSource
-
-      -- The enum still rides as a radio over constructor-name strings (R6),
-      -- with the payload-bearing constructors among the choices.
-      shouldContain' "the emitted interview" out "datatype: radio"
-      shouldContain' "the emitted interview" out "granted subject to conditions"
-      shouldContain' "the emitted interview" out "refused"
-
-      -- Each payload becomes its own follow-up field of its own datatype.
-      shouldContain' "the emitted interview" out "the_number_of_conditions"
-      shouldContain' "the emitted interview" out "the_stated_ground_of_refusal"
-
-      -- THE CORRECTNESS PIVOT. `show if:` must carry a `code:` sub-key. The
-      -- `{variable:, is:}` spelling sets show_if_var/show_if_val and no
-      -- showif_code (parse.py:3998-4002 at 1b6678384): it is browser-side
-      -- JavaScript, the engine shows every field, and a headless or API drive
-      -- DEFINES them all. Only the code form leaves a hidden field genuinely
-      -- undefined (parse.py:6316-6325 evals showif_code and sets
-      -- extras['ok'][n] = False at 6320/6324).
-      shouldContain' "the emitted interview" out "show if:"
-      case [ b | b <- yamlBlocks out, "show if:" `isInfixOf` b ] of
-        [] -> expectationFailure "no block carries a `show if:` at all"
-        blocks -> for_ blocks \b -> do
-          shouldContain'    "the `show if:` block" b "code:"
-          shouldNotContain' "the `show if:` block" b "is: "
-
-      -- `show if` is FIELD-level only. It is not among the 169 block keys at
-      -- parse.py:1947, and an unknown block key is silently ignored — only a
-      -- logmessage, and only under debug (parse.py:1945-1948). A block-level
-      -- `show if` therefore does nothing AND says nothing.
-      for_ (yamlBlocks out) \b ->
-        shouldNotContain' "a block" b "\nshow if:"
-
-    it "keeps the constructor radio in its own, earlier question (B)" $ do
-      -- HAZARD H1, probed: a `show if: {code: …}` reading a variable that a
-      -- field in the SAME question defines is fatal —
-      -- `DASourceError: Infinite loop: <var> already looked for`, on every
-      -- choice. The radio must be a separate, earlier block.
-      out <- daEmit bin daPayloadSource
-      for_ (yamlBlocks out) \b ->
-        when ("show if:" `isInfixOf` b && "the_outcome" `isInfixOf` b) $
-          shouldNotContain' "the payload follow-up block" b "datatype: radio"
-
-    ------------------------------------------------------------------------
-    -- C. MAYBE NUMBER / MAYBE DATE via paired is-known questions
-    ------------------------------------------------------------------------
-    it "pairs each MAYBE NUMBER/DATE with an is-known question (C)" $ do
-      out <- daEmit bin daMaybeSource
-
-      -- One L4 field, two docassemble questions: the flag and the value.
-      shouldContain' "the emitted interview" out "declared_income"
-      shouldContain' "the emitted interview" out "date_last_worked"
-      shouldContainAny "the emitted interview" out
-        ["declared_income_known", "declared_income_is_known", "has_declared_income"]
-      shouldContainAny "the emitted interview" out
-        ["date_last_worked_known", "date_last_worked_is_known", "has_date_last_worked"]
-
-      -- The value questions keep their own datatypes.
-      shouldContain' "the emitted interview" out "datatype: number"
-      shouldContain' "the emitted interview" out "datatype: date"
-
-      -- And each MAYBE value field is guarded, server-side, by its flag.
-      -- Without the guard a second consumer reading the value on the absence
-      -- path makes docassemble ask the value question anyway, and a blank
-      -- submission arrives as 0.0 — a fabricated answer, silently (probed).
-      --
-      -- Scoped to the two MAYBE fields on purpose. `the qualifying date` is a
-      -- PLAIN `DATE` in the same record and must NOT be guarded; requiring a
-      -- `show if:` on every date question would demand a defect.
-      for_ ["declared_income", "date_last_worked"] \field ->
-        case [ b | b <- yamlBlocks out
-                 , field `isInfixOf` b
-                 , "datatype: number" `isInfixOf` b || "datatype: date" `isInfixOf` b ] of
-          [] -> expectationFailure $
-            "no value question was emitted for the MAYBE field " ++ show field
-          blocks -> for_ blocks \b -> do
-            shouldContain' ("the " ++ field ++ " value question") b "show if:"
-            shouldContain' ("the " ++ field ++ " value question") b "code:"
-      -- and the plain DATE in the same record keeps its unguarded question
-      case [ b | b <- yamlBlocks out, "the_qualifying_date" `isInfixOf` b
-               , "datatype: date" `isInfixOf` b ] of
-        [] -> expectationFailure "the plain DATE field lost its question"
-        (b : _) -> shouldNotContain' "the plain DATE question" b "show if:"
-
-    it "reads absence as absence, never as 0 or '' (C)" $ do
-      -- What R8 was afraid of, asserted on the emitted code rather than on
-      -- the widget: the goal must consult the is-known flag, not merely the
-      -- value. `#EVAL` 2 (a real declared income of ZERO) and `#EVAL` 3 (no
-      -- declaration at all) disagree in L4; any lowering that reads only the
-      -- number cannot tell them apart.
-      out <- daEmit bin daMaybeSource
-      let goalBlocks = [ b | b <- yamlBlocks out, "the_claim_must_be_referred" `isInfixOf` b ]
-      when (null goalBlocks) $
-        expectationFailure "no code block sets the goal"
-      shouldContainAny "the emitted rule code" (concat goalBlocks)
-        ["_known", "_is_known", "has_declared_income"]
-
-    it "lowers `WHEN JUST FALSE` as a payload-VALUE match, not a presence test (C)" $ do
-      -- Scope ruling: a match on a MAYBE's payload value is IN M4, under R8.
-      -- M1 refused it by name, and before that repair it compiled to
-      -- `is None`, reporting TRUE for the unanswered case — which is the
-      -- opposite answer. The emitted code must compare the VALUE.
-      out <- daEmit bin daMaybeSource
-      shouldContainAny "the disclaimer rule" out
-        [ "declaration_confirmed is False"
-        , "declaration_confirmed == False"
-        , "declaration_confirmed) is False" ]
-
-    it "still refuses MAYBE of an enum, and names the enum (C)" $ do
-      -- The refusal survives M4 (see the fixture's own header for why). What
-      -- must NOT survive is M1's wording: "v1: MAYBE BOOLEAN and MAYBE STRING
-      -- only" becomes a false claim in user-facing prose the moment NUMBER
-      -- and DATE land, which is precisely the drift CLAUDE.md warns about. So
-      -- the diagnostic is required to name what it is refusing.
-      Output code _ serr <-
-        runL4 bin ["docassemble", "examples/docassemble/not-ok/maybe-enum.l4"]
-      code `shouldBe` ExitFailure 1
-      shouldContain' "the refusal" serr "MAYBE"
-      shouldContain' "the refusal" serr "Severity"
-      shouldNotContain' "the refusal" serr "MAYBE BOOLEAN and MAYBE STRING only"
-
-    ------------------------------------------------------------------------
-    -- D. date literals and calendar-exact date arithmetic
-    ------------------------------------------------------------------------
-    it "routes every date literal through as_datetime() (D)" $ do
-      -- A `datatype: date` answer enters the interview as
-      -- `as_datetime(<submitted string>)` (webapp interview/views.py:1372 at
-      -- 1b6678384), i.e. a tz-aware DADateTime. A bare string literal
-      -- compared against one raises TypeError — executed:
-      -- `as_datetime('2016-05-16') >= '2015-01-01'` is a TypeError, not a
-      -- comparison. The failure is loud; it is also certain.
-      out <- daEmit bin daDateSource
-      shouldContain' "the emitted interview" out "as_datetime("
-      shouldContain' "the emitted interview" out "2015-04-01"
-      case [ ln | ln <- lines out, "2015-04-01" `isInfixOf` ln ] of
-        [] -> expectationFailure "the commencement literal is not emitted at all"
-        lns -> for_ lns \ln ->
-          shouldContain' "the line carrying the date literal" ln "as_datetime("
-
-    it "computes statutory age calendar-exactly, never via date_difference (D)" $ do
-      -- `date_difference(...).years` is
-      -- `(delta.days + delta.seconds/86400.0) / 365.2425` — elapsed days over
-      -- the MEAN GREGORIAN YEAR, as a float (dates.py:482 at 1b6678384). It
-      -- reports 17.99900 on the applicant's own eighteenth birthday. Measured
-      -- over every birth date from 1970-01-01 to 2006-12-31 it disagrees with
-      -- the L4 oracle on 6,629 of 27,028 comparisons. It must not appear.
-      out <- daEmit bin daDateSource
-      shouldNotContain' "the emitted interview" out "date_difference"
-      shouldNotContain' "the emitted interview" out "365.2425"
-      -- and the calendar-exact idiom must be there instead
-      shouldContainAny "the emitted interview" out
-        [".minus(years=", ".plus(years=", "relativedelta(years="]
-
-    ------------------------------------------------------------------------
-    -- E. the `review:` block as a compliance checklist
-    ------------------------------------------------------------------------
-    it "emits a review block listing every input, answered or not (E)" $ do
-      out <- daEmit bin daReviewSource
-      shouldContain' "the emitted interview" out "review:"
-      -- A review block is only reachable by firing its `event:`
-      -- (current_info['action'] = '<event>'); without one the interview simply
-      -- ends. Probed.
-      case [ b | b <- yamlBlocks out, "review:" `isInfixOf` b ] of
-        [] -> expectationFailure "no review block was emitted"
-        [rv] -> do
-          shouldContain' "the review block" rv "event:"
-          -- every L4 input gets a row, including the three that this rule's
-          -- short-circuit means are never asked
-          for_ [ "the_return_was_filed", "the_return_was_on_time"
-               , "the_fee_was_paid", "a_waiver_was_granted" ] $
-            shouldContain' "the review block" rv
-          -- The recipe that actually renders an unanswered row: a `note:`
-          -- carrying showifdef(). A note row has no saveas to evaluate, so it
-          -- renders whether or not the variable exists.
-          shouldContain' "the review block" rv "note:"
-          shouldContain' "the review block" rv "showifdef("
-        other -> expectationFailure $
-          "expected exactly one review block, found " ++ show (length other)
-
-    it "does NOT reach for `skip undefined: False`, which force-asks (E)" $ do
-      -- SPEC CORRECTION, measured. §10 called for a review block "with
-      -- `skip undefined: False`". That flag does not make a passive
-      -- checklist: it makes the review block FORCE-ASK every undefined
-      -- variable it lists — with the flag the row's eval is no longer wrapped
-      -- in try/except (parse.py:5876-5904 at 1b6678384), and the probe landed
-      -- on the field screen for the unasked variable instead of on a review
-      -- screen. The default (absent) is the opposite failure: an undefined row
-      -- is silently dropped into a debug log line. Neither is a checklist.
-      --
-      -- The review block is required to EXIST here as well as to lack the
-      -- flag, so this cannot pass vacuously on an interview that emits no
-      -- review block at all.
-      out <- daEmit bin daReviewSource
-      shouldContain'    "the emitted interview" out "review:"
-      shouldNotContain' "the emitted interview" out "skip undefined: False"
-
-    ------------------------------------------------------------------------
-    -- F. document assembly
-    ------------------------------------------------------------------------
-    it "assembles a letter from the verdict screen, under a `variable name:` (F)" $ do
-      out <- daEmit bin daLetterSource
-      shouldContain' "the emitted interview" out "attachment:"
-      -- WITHOUT `variable name:` docassemble files the document under
-      -- `_internal['docvar'][n]` (parse.py:4997-5003 at 1b6678384) and there
-      -- is nothing to assert about afterwards. The hazard this defends
-      -- against is not an exception — a raising body propagates and an
-      -- unaskable reference propagates, both probed — it is a SUCCESSFUL
-      -- EMPTY RENDER: interview completes, variable is a healthy
-      -- DAFileCollection, letter is blank, nothing raises and nothing logs.
-      shouldContain' "the emitted interview" out "variable name:"
-      -- Headless assembly is DOCX- and HTML-capable in the harness venv
-      -- (docx and docxtpl present) but there is no LibreOffice/soffice, so a
-      -- PDF format would fail at assemble time — and per parse.py:9521-9526
-      -- that failure inside a question block is swallowed into a log line.
-      -- Scoped to the attachment block: `pdf` is a broad needle and a bare
-      -- whole-file negative would be brittle rather than meaningful.
-      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
-        [] -> expectationFailure "no attachment block was emitted at all"
-        blocks -> for_ blocks \b -> do
-          shouldContain'    "the attachment block" b "valid formats:"
-          shouldNotContain' "the attachment block" b "pdf"
-
-      -- The verdict screen must actually reference the document, or it is
-      -- never assembled. Asserted on an `event:` block specifically: the
-      -- attachment block names the variable itself, so looking for the name
-      -- anywhere in the file would be satisfied by the declaration alone.
-      let verdictScreens = [ b | b <- yamlBlocks out, "event:" `isInfixOf` b ]
-      when (null verdictScreens) $
-        expectationFailure "no verdict screen (`event:` block) was emitted"
-      shouldContainAny "the verdict screens" (concat verdictScreens)
-        ["${ notice_letter }", "${notice_letter}", "notice_letter"]
-
-    it "keeps attachment sub-keys out of the BLOCK-key vocabulary (F/R9.5)" $ do
-      -- A third vocabulary. `variable name`, `filename`, `content`,
-      -- `valid formats` and `content file` are ATTACHMENT sub-keys, read by
-      -- process_attachment (parse.py:4914-5230 at 1b6678384); `name`,
-      -- `filename`, `docx template file` and `valid formats` are NOT among
-      -- the 169 block keys at parse.py:1947. Adding them to the emitter's
-      -- block-key list would break `emitterVocabularyViolations == []`, so
-      -- they need their own list with its own oracle — exactly the split M2
-      -- already made between block keys and field modifiers.
-      out <- daEmit bin daLetterSource
-      let known = [ "name", "filename", "description", "variable name"
-                  , "valid formats", "content", "content file", "raw"
-                  , "docx template file", "pdf template file", "fields"
-                  , "metadata", "editable", "skip undefined", "language"
-                  , "redact", "template file", "rtf template file"
-                  , "docx reference file", "update references", "usedefs"
-                  , "initial yaml", "additional yaml", "checkbox export value"
-                  , "decimal places" ]
-          subKeys b = [ takeWhile (/= ':') (drop 2 ln)
-                      | ln <- lines b, "  " `isPrefixOf` ln
-                      , not ("   " `isPrefixOf` ln), ':' `elem` ln ]
-      -- Required to EXIST as well as to be well-formed, so this cannot pass
-      -- vacuously on an interview that emits no attachment at all.
-      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
-        [] -> expectationFailure "no attachment block was emitted at all"
-        blocks -> for_ blocks \b ->
-          for_ (subKeys b) \k ->
-            unless (null k || k `elem` known) $
-              expectationFailure $
-                "the attachment block uses sub-key " ++ show k
-                ++ ", which process_attachment does not read (parse.py:4914-5230 "
-                ++ "at 1b6678384). It is not a block key either, so nothing will "
-                ++ "warn: an unrecognised attachment sub-key is silently ignored."
-                ++ "\n--- block ---\n" ++ b
-
-    it "ships the letter template in the package under data/templates (F/R11)" $ do
-      -- The `--package` tree already grafts `<inner>/data` in MANIFEST.in, so
-      -- a template dropped under data/templates ships automatically. Note for
-      -- the implementer: if the interview references it with `content file:`,
-      -- the BARE artifact stops parsing, because content file resolves
-      -- through package_template_filename and raises DASourceError when the
-      -- file is not found (parse.py:5059-5064 at 1b6678384) — at parse time,
-      -- before any question is asked.
-      haveTemplate <- doesFileExist daLetterTemplate
-      unless haveTemplate $
-        expectationFailure (daLetterTemplate ++ " is missing from the corpus")
-      tmp <- getTemporaryDirectory
-      let dir = tmp </> "l4-da-pkg-letter"
-      files <- expectPackage bin daLetterSource dir
-      case [ f | f <- files, ("data" </> "templates") `isInfixOf` f ] of
-        [] -> expectationFailure $
-          "the --package tree ships no data/templates entry; files were "
-          ++ show files
-        _  -> pure ()
-      removePathForcibly dir
-
-    ------------------------------------------------------------------------
-    -- G. regression: the boundary of what M4 owns
-    --
-    -- GREEN today, and it must stay green. This block pre-authorises nothing:
-    -- the seven M1/M2 byte goldens are pinned where they already were
-    -- (stdout, and again through `-o` with its fidelity sidecar), and the four
-    -- refusals below are the ones M4 does not own.
-    ------------------------------------------------------------------------
-    ------------------------------------------------------------------------
-    -- H. added by the GREEN phase, which the RED phase asked for by name
-    ------------------------------------------------------------------------
-    it "declares the attachment sub-keys it writes, as a THIRD vocabulary (F/R9.5)" $ do
-      -- The RED phase could only hard-code the oracle inside its own test,
-      -- because `emitterAttachmentKeys` did not exist and adding it would have
-      -- been a compile error rather than a red assertion. It exists now, so the
-      -- emitter's declaration of what it writes inside an `attachment:` is
-      -- checked in both directions: every declared key is one
-      -- `process_attachment` reads (parse.py:4914-5230 at 1b6678384), and every
-      -- key the emitter actually emits is declared.
-      let readByProcessAttachment =
-            [ "name", "filename", "description", "variable name"
-            , "valid formats", "content", "content file", "raw"
-            , "docx template file", "pdf template file", "fields"
-            , "metadata", "editable", "skip undefined", "language"
-            , "redact", "template file", "rtf template file"
-            , "docx reference file", "update references", "usedefs"
-            , "initial yaml", "additional yaml", "checkbox export value"
-            , "decimal places" ]
-          declared = map T.unpack DAEmit.emitterAttachmentKeys
-      [k | k <- declared, k `notElem` readByProcessAttachment] `shouldBe` []
-      -- and it is NOT folded into the block-key/field-modifier split, because
-      -- an attachment sub-key is neither.
-      [ k | k <- declared
-          , k `elem` map T.unpack DAEmit.emitterKeyVocabulary ] `shouldBe` []
-
-      out <- daEmit bin daLetterSource
-      let subKeys b = [ takeWhile (/= ':') (drop 2 ln)
-                      | ln <- lines b, "  " `isPrefixOf` ln
-                      , not ("   " `isPrefixOf` ln), ':' `elem` ln ]
-      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
-        [] -> expectationFailure "no attachment block was emitted at all"
-        blocks -> for_ blocks \b ->
-          [ k | k <- subKeys b, not (null k), k `notElem` declared ] `shouldBe` []
-
-    it "unlocks the REAL corpus file that motivated `LIST OF` (A)" $ do
-      -- The RED phase listed this as untested and said why it matters: "a green
-      -- M4 could pass every test I wrote and still leave both files locked
-      -- out", because ONE `LIST OF` field anywhere in a reachable record used
-      -- to refuse the whole module. `charity-test.l4` is a 700-line Jersey
-      -- charities encoding whose `Entity.purposes` is a `LIST OF Purpose`, and
-      -- it is not a fixture written for this backend — which is the point.
-      --
-      -- It also pins the ETA-REDUCED predicate: the corpus writes
-      -- `any \`the purpose is a charitable purpose\` (entity's purposes)`, a
-      -- one-parameter decision passed by name rather than a lambda written out
-      -- at the call site. No example under examples/docassemble/ does that.
-      out <- daEmit bin "examples/legal/charities-cleanroom/charity-test.l4"
-      shouldContain' "the charities interview" out "DAList"
-      shouldContain' "the charities interview" out "object_type"
-      shouldContain' "the charities interview" out "for _purpose in entity.purposes"
-      -- Nested quantifiers must not share a generator variable: Python scopes
-      -- one to its own comprehension, so an inner binder that sanitised onto an
-      -- outer one would make the outer's element unreachable from the inner
-      -- body. This file nests `any` inside `all` over the same list.
-      shouldContain' "the charities interview" out "for _purpose_2 in entity.purposes"
-
-    it "compiles each M4 example to its golden interview" $
-      for_ [ daListSource, daPayloadSource, daMaybeSource, daDateSource
-           , daReviewSource, daLetterSource ] \src -> do
-        let stem = takeWhile (/= '.') (drop (length daExampleDir + 1) src)
-        expectGolden bin ["docassemble", src]
-          (daExampleDir </> "expected" </> (stem ++ ".yml"))
-
-    it "leaves the four refusals M4 does not own refusing, by their own names (G)" $
-      for_ daStillRefused \(fixture, diagnostic) -> do
-        Output code _ serr <-
-          runL4 bin ["docassemble", "examples/docassemble/not-ok" </> fixture]
-        unless (code == ExitFailure 1) $
-          expectationFailure $
-            fixture ++ " no longer refuses (exit " ++ show code
-            ++ "); M4 does not own this refusal"
-        shouldContain' (fixture ++ " refusal") serr diagnostic
-
-    ------------------------------------------------------------------------
-    -- I. the repair pass (2026-08-17). Five adversarial lenses attacked M4
-    -- and an independent skeptic tried to refute each finding; these pin the
-    -- five that survived AND changed behaviour. Each one names the measured
-    -- failure, not just the shape it wants.
-    ------------------------------------------------------------------------
-    it "splices the letter template under an explicit indentation indicator (I/F)" $ do
-      -- A YAML block scalar with no indentation indicator takes its
-      -- indentation from its own FIRST non-empty line. The emitter indents
-      -- every template line by a flat four spaces, so a template opening on any
-      -- leading whitespace — ONE space is enough, and so is a whitespace-only
-      -- first line — set the block indent above four, and the first following
-      -- line at exactly four TERMINATED the scalar. The parser then met
-      -- template prose where an `attachment:` sub-key must be. Measured against
-      -- real docassemble 1.10.7: `parse.Interview` raises `DASourceError` from
-      -- parse.py:8352-8360, so the whole interview is unloadable — every
-      -- question, in BOTH artifact shapes — while `l4 docassemble` exits 0.
-      --
-      -- `|2`, not `|4`: the indicator is an offset from the PARENT node's
-      -- indentation and the `attachment:` mapping sits at two.
-      --
-      -- `notice-letter.letter.md` opens on an indented address block precisely
-      -- so the shipped corpus carries the trigger; strip the `2` from the
-      -- emitted YAML and the harness cannot even load the interview.
-      out <- daEmit bin daLetterSource
-      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
-        [] -> expectationFailure "no attachment block was emitted at all"
-        blocks -> for_ blocks \b -> do
-          shouldContain'    "the attachment block" b "content: |2"
-          shouldNotContain' "the attachment block" b "content: |\n"
-      -- and the template really does open indented, or the assertion above is
-      -- pinning a shape nothing exercises.
-      tpl <- readUtf8 daLetterTemplate
-      case dropWhile null (lines tpl) of
-        (firstLine : _) | " " `isPrefixOf` firstLine -> pure ()
-        other -> expectationFailure $
-          daLetterTemplate ++ " no longer opens on an indented line, so the "
-          ++ "block-scalar indicator above is no longer exercised by anything: "
-          ++ show (take 1 other)
-
-    it "re-assembles the letter when an earlier answer changes (I/F, §8.4)" $ do
-      -- §8.4's repair put `reconsider: True` on the derived CODE blocks and
-      -- stopped there. An attachment is derived too, and docassemble assembles
-      -- one only when the variable it names is SOUGHT (parse.py:9513-9530 at
-      -- 1b6678384) — a variable that is already defined is never sought. So the
-      -- letter was computed once and outlived every later answer: measured on
-      -- this example, changing the notice period from three months to one left
-      -- the verdict screen reading `..._screen_fails` above a letter still
-      -- saying "Notice period served: 3 month(s)" and "the notice is valid".
-      -- A non-flipping edit was stale the same way.
-      out <- daEmit bin daLetterSource
-      case [ b | b <- yamlBlocks out, "attachment:" `isInfixOf` b ] of
-        [] -> expectationFailure "no attachment block was emitted at all"
-        blocks -> for_ blocks \b ->
-          shouldContain' "the attachment block" b "reconsider: True"
-
-    it "clears a gated answer when the answer that gates it is re-asked (I/B/C, §8.4)" $ do
-      -- `show if:` decides whether a gated question is ASKED. It does not
-      -- decide whether an answer already given SURVIVES its gate being
-      -- withdrawn, and `reconsider:` deletes derived variables only — so after
-      -- a review-block Edit the compliance checklist reported, on one screen,
-      -- "the outcome: refused" beside "the number of conditions: 9", and
-      -- `refused` carries no `the number of conditions` in L4 at all. The
-      -- paired MAYBE had the same shape: "is there an answer?: False" beside
-      -- "declared income: 2500". `undefine:` fires in `ask` (parse.py:5389) and
-      -- is a documented no-op on a variable that is not defined, so it costs
-      -- nothing forward and clears exactly the stale answers on a re-ask.
-      payload <- daEmit bin daPayloadSource
-      case [ b | b <- yamlBlocks payload, "q_d.the_outcome" `isInfixOf` b ] of
-        [] -> expectationFailure "no question block for the enum discriminator"
-        blocks -> for_ blocks \b -> do
-          shouldContain' "the discriminator question" b "undefine:"
-          shouldContain' "the discriminator question" b "d.the_number_of_conditions"
-          shouldContain' "the discriminator question" b "d.the_stated_ground_of_refusal"
-      -- and the payload follow-ups must NOT undefine anything: they gate
-      -- nothing, and clearing on every ask would erase the answer being given.
-      case [ b | b <- yamlBlocks payload
-               , "q_d.the_number_of_conditions" `isInfixOf` b ] of
-        [] -> expectationFailure "no question block for the payload follow-up"
-        blocks -> for_ blocks \b ->
-          shouldNotContain' "the payload follow-up question" b "undefine:"
-
-      maybes <- daEmit bin daMaybeSource
-      case [ b | b <- yamlBlocks maybes
-               , "q_c.declared_income_known" `isInfixOf` b ] of
-        [] -> expectationFailure "no question block for the is-known flag"
-        blocks -> for_ blocks \b -> do
-          shouldContain' "the is-known question" b "undefine:"
-          shouldContain' "the is-known question" b "c.declared_income"
-
-    it "reserves the interview's builtin and util namespaces too (I/R11)" $ do
-      -- M2 closed ONE THIRD of this hazard — the `l4runtime` star-import — and
-      -- left the two larger thirds open. A goal variable whose name already
-      -- resolves is never sought, because docassemble backchains only on
-      -- NameError; it resolves to a function object, which is truthy, so the
-      -- driver takes the "holds" branch, NO QUESTION IS ASKED, and the fidelity
-      -- report says `(nothing lost)`. Measured against real 1.10.7 on an
-      -- `@export` named `All`: `screen='All: Holds'`, `questions asked=[]`,
-      -- against an L4 `#EVAL` of FALSE. `Today` is worse — it is in the
-      -- user_dict for real, via `from docassemble.base.util import *`
-      -- (parse.py:131, exec'd at :8523-8524), which the emitter deliberately
-      -- does not suppress.
-      Output code sout serr <- runL4 bin ["docassemble", daGlobalShadowSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-      shouldContain' "the emitted interview" sout "all_ = f.the_box_was_ticked"
-      shouldContain' "the emitted interview" sout "today_ = f.the_box_was_ticked"
-      let bare = [ ln | ln <- lines sout
-                 , any (`isInfixOf` (ln ++ " "))
-                       ["all = f.", "today = f.", "if all:", "if today:"] ]
-      unless (null bare) $
-        expectationFailure $
-          "an interview variable is spelled exactly like a name already bound "
-          ++ "in the interview's top-level namespace: " ++ show bare
-
-    it "declares, rather than mis-emits, the gather it cannot clear (I/§8.4)" $ do
-      -- `ask` runs `substitute_vars` over `reconsider:` and NOT over `undefine:`
-      -- (parse.py:5389 beside :5392 at 1b6678384), so an element question's
-      -- `<list>[i].<attr>` spelling would reach `undefine()` with the iterator
-      -- unresolved. The emitter therefore emits none there — and says so, which
-      -- is the difference between a bounded repair and a silent one.
-      Output code sout serr <- runL4 bin ["docassemble", daGatheredMaybeSource]
-      unless (code == ExitSuccess) $
-        expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
-      -- the guard IS emitted on the element's value question …
-      shouldContain'    "the emitted interview" sout
-        "h.claimants[i].declared_income_known"
-      -- … and no `undefine:` reaches it.
-      shouldNotContain' "the emitted interview" sout "undefine:"
-      -- The omission is declared, per module, naming the gated variable.
-      tmp <- getTemporaryDirectory
-      let ymlPath = tmp </> "l4-da-gathered-maybe.yml"
-          repPath = tmp </> "l4-da-gathered-maybe.fidelity.txt"
-      Output code2 _ serr2 <-
-        runL4 bin ["docassemble", daGatheredMaybeSource, "-o", ymlPath]
-      unless (code2 == ExitSuccess) $
-        expectationFailure ("emit -o failed\n--- stderr ---\n" ++ serr2)
-      report <- readUtf8 repPath
-      shouldContain' "the fidelity report" report "DA-UNDEFINE-LIST"
-      shouldContain' "the fidelity report" report "h.claimants[i].declared_income"
-      removePathForcibly ymlPath
-      removePathForcibly repPath
-
-    it "refuses M4's own two new collisions, by their own names (I)" $
-      for_ daM4Refused \(fixture, diagnostic) -> do
-        Output code _ serr <-
-          runL4 bin ["docassemble", "examples/docassemble/not-ok" </> fixture]
-        unless (code == ExitFailure 1) $
-          expectationFailure $
-            fixture ++ " no longer refuses (exit " ++ show code ++ ")"
-        shouldContain' (fixture ++ " refusal") serr diagnostic
-        -- Not the internal-error message: a user-authored condition must be
-        -- reported in L4 terms, naming what to rename.
-        shouldNotContain' (fixture ++ " refusal") serr "internal id collision"
-  -- `l4 catala` (specs/todo/CATALA-EXPORT-SPEC.md). Each golden below has been
-  -- run through the real toolchain — `catala typecheck` and `clerk test`
-  -- against catala 1.2.1 — so the goldens are not merely "what the emitter
-  -- currently prints"; see examples/catala/README.md.
-  describe "l4 catala" $ do
-    it "compiles the spec's Appendix A example to its golden Catala module" $
-      expectGolden bin ["catala", "examples/catala/benefit.l4"]
-                       "examples/catala/expected/benefit.catala_en"
-
-    it "compiles a nested-guard rate table (the ladder-direction exhibit)" $
-      expectGolden bin ["catala", "examples/catala/bands.l4"]
-                       "examples/catala/expected/bands.catala_en"
-
-    it "compiles the literate weave: § headings, inert law text, @ref, enums" $
-      expectGolden bin ["catala", "examples/catala/statute.l4"]
-                       "examples/catala/expected/statute.catala_en"
-
-    -- The two OpenFisca seed-corpus ports named in the spec's P1 exit
-    -- criterion (§10). Both compile unchanged from their OpenFisca originals;
-    -- what makes them Catala-clean is R11's elision of the `period` plumbing
-    -- string (and, in household, of `Person.name`).
-    it "compiles the flat-tax port, eliding the OpenFisca period string (R11)" $
-      expectGolden bin ["catala", "examples/catala/flat-tax.l4"]
-                       "examples/catala/expected/flat-tax.catala_en"
-
-    it "compiles the household port: group entity, LIST OF, absorbed sum (R5)" $
-      expectGolden bin ["catala", "examples/catala/household.l4"]
-                       "examples/catala/expected/household.catala_en"
-
-    it "compiles CONSIDER-on-enum plus TYPICALLY → context (R10)" $
-      expectGolden bin ["catala", "examples/catala/tariff.l4"]
-                       "examples/catala/expected/tariff.catala_en"
-
-    -- The coverage exhibit. An adversarial review found the other six goldens
-    -- between them exercised two of the emitter's expression forms, so a
-    -- regression in `match`, dates, `optional of`, `combine all`, `number of`,
-    -- `contains`, `impossible`, a private toplevel or the R3 date helper would
-    -- have been caught by nothing in the tree.
-    it "compiles the coverage exhibit: dates, MAYBE, folds, a private toplevel" $
-      expectGolden bin ["catala", "examples/catala/registry.l4"]
-                       "examples/catala/expected/registry.catala_en"
-
-    -- The @export-everything hatch, and the only file in this corpus carrying a
-    -- module-level binder at all: before it, no golden exercised `collectAssumes`,
-    -- `assumeClosure` or the `ssAssumes` threading, so the whole ASSUME path was
-    -- emitted by code that nothing in the tree ran. It pins two things at once —
-    -- that a section GIVEN becomes a scope `input`, and that `assumeClosure`'s
-    -- fixpoint carries it TRANSITIVELY (`the top` never names the binder, reaches
-    -- it only through `the middle`, and must still declare and forward it).
-    it "compiles the @export chain, threading a section GIVEN as a scope input" $
-      expectGolden bin ["catala", "examples/catala/export-chain.l4"]
-                       "examples/catala/expected/export-chain.catala_en"
-
-    -- The lowering scans the whole IMPORT closure, not just the entry module.
-    -- Before 2026-09-21 it scanned only what it was handed, so a `DECLARE` next
-    -- door was reported as "outside the v1 Catala fragment (§6)" — a message
-    -- about the language, for a defect in the scan.
-    it "compiles a decision built out of imported declarations and an imported helper" $
-      expectGolden bin ["catala", "examples/catala/imports.l4"]
-                       "examples/catala/expected/imports.catala_en"
-
-    -- Reading the closure means the prelude's own declarations are visible too.
-    -- They must not be EMITTED: an imported declaration reaches the artifact
-    -- only when the emitted code reaches it. Assert on what is absent, because
-    -- the golden above can only show what is present.
-    it "emits no stdlib declaration for a module that merely imports the prelude" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/imports.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("declaration structure Assessment:" `isInfixOf`)
-      sout `shouldSatisfy` ("declaration enumeration Band:" `isInfixOf`)
-      -- Exactly one of each: the two the emitted code reaches. Anything the
-      -- prelude contributes would show up as a third.
-      length (filter ("declaration structure " `isPrefixOf`) (lines sout)) `shouldBe` 1
-      length (filter ("declaration enumeration " `isPrefixOf`) (lines sout)) `shouldBe` 1
-
-    -- R1 prunes to what an `@export` reaches, and a directive reaches things
-    -- too: R7 makes each `#EVAL`/`#ASSERT` a `#[test]` scope, so a fixture
-    -- named only in a directive's arguments is emitted code. Before 2026-09-21
-    -- it was not collected and the directive was dropped, so only directives
-    -- with literal arguments became tests.
-    it "collects a fixture reached only from a directive and tests against it" $
-      expectGolden bin ["catala", "examples/catala/fixtures.l4"]
-                       "examples/catala/expected/fixtures.catala_en"
-
-    it "emits every directive as a test scope when its arguments name fixtures" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/fixtures.l4"]
-      code `shouldBe` ExitSuccess
-      -- The three fixture-argument directives convert. The file's last two are
-      -- skipped on purpose, so this asserts the absence of the CAUSE rather
-      -- than of every skip note — which the numbering test below covers, and
-      -- which a blanket absence test would contradict.
-      sout `shouldSatisfy` (not . ("that is a lowering bug" `isInfixOf`))
-      sout `shouldSatisfy` (not . ("was not collected as a helper" `isInfixOf`))
-      for_ ["Test1", "Test2", "Test3"] $ \n ->
-        sout `shouldSatisfy` (("#[test] declaration scope " ++ n ++ ":") `isInfixOf`)
-      -- Nullary, unary, and a helper wrapping an exported call: all three are
-      -- ordinary R1 toplevels, not a new emission kind for test data.
-      sout `shouldSatisfy` ("declaration the_ordinary_household content Household" `isInfixOf`)
-      sout `shouldSatisfy` ("declaration a_household_of content Household" `isInfixOf`)
-      sout `shouldSatisfy` ("declaration in_tens content decimal" `isInfixOf`)
-
-    -- A skip note quotes the DIRECTIVE's position, not the number of the test
-    -- it would have been. Sharing one counter mislabelled every skip after the
-    -- first — and because identical notes are deduplicated, the second one then
-    -- vanished rather than appearing under the wrong number. The last two
-    -- directives of `fixtures.l4` are both skipped, so this catches either half.
-    it "numbers a skipped directive by its own position, and reports every one" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/fixtures.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("- directive 4 did not become a Catala" `isInfixOf`)
-      sout `shouldSatisfy` ("- directive 5 did not become a Catala" `isInfixOf`)
-      -- Three converted, so no note may claim a number a test scope also holds.
-      for_ ["1", "2", "3"] $ \n ->
-        sout `shouldSatisfy` (not . (("- directive " ++ n ++ " did not become") `isInfixOf`))
-
-    -- R11 addendum, 2026-09-21: a structure every one of whose fields was
-    -- elided cannot be emitted at all — catala 1.2.1 refuses a fieldless
-    -- `declaration structure` AND the value `P { }`. The golden pins that the
-    -- structure and the fields carrying it are both gone, and the test below it
-    -- pins that both disappearances are disclosed rather than silent.
-    it "elides a record whose every field is a STRING, and the fields that carry it" $
-      expectGolden bin ["catala", "examples/catala/all-string-record.l4"]
-                       "examples/catala/expected/all-string-record.catala_en"
-
-    it "discloses an elided structure and the fields that vanish with it" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/all-string-record.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("structure `Provenance` is not emitted at all" `isInfixOf`)
-      sout `shouldSatisfy`
-        ("field `sources` of `Finding` has a type built from `Provenance`" `isInfixOf`)
-      -- The empty structure and its value are what catala refuses; neither may
-      -- reach the artifact. Assert that by what IS emitted rather than by
-      -- searching for `Provenance { }`: the note above quotes that very string
-      -- to explain why it cannot be written, so an absence test on it fails on
-      -- its own disclosure. (It did, first time out.)
-      sout `shouldSatisfy` (not . ("declaration structure Provenance:" `isInfixOf`))
-      sout `shouldSatisfy` (not . ("data sources" `isInfixOf`))
-      sout `shouldSatisfy`
-        ("Finding { -- amount: (claimed * 2.0) -- settled: (claimed > 0.0) }" `isInfixOf`)
-
-    -- R11's disclosure obligation is the point of these two, not the text: a
-    -- narrower emitted record than its L4 source is a shape divergence a
-    -- reader must be told about, so it goes in the notes block, not just on
-    -- stderr.
-    it "discloses every R11 elision in the emitted document's notes block" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/household.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("field `name` of `Person` is a STRING" `isInfixOf`)
-      sout `shouldSatisfy` ("parameter `period` of `household income` is a STRING" `isInfixOf`)
-
-    -- R10's cost, disclosed: the emitted scope is MORE PERMISSIVE than its
-    -- source, because Catala lets a caller omit a `context` variable and L4
-    -- does not let a caller omit anything.
-    it "emits TYPICALLY as `context` + an in-scope default, and says so" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/tariff.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("context cap content decimal" `isInfixOf`)
-      sout `shouldSatisfy` ("A Catala caller may omit it; an L4 caller may not." `isInfixOf`)
-      sout `shouldSatisfy`
-        ("match a.class with pattern -- Domestic : 0.2" `isInfixOf`)
-
-    -- L4 has no way to omit an argument, so every ordinary test scope supplies
-    -- the cap and the emitted `definition cap equals 500.0` is dead: change it
-    -- and nothing fails. The twin scope omits it, over a directive whose cap
-    -- actually binds, which is what makes the default observable.
-    it "pins the R10 default with a twin test scope that omits the argument" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/tariff.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("#[test] declaration scope Test3Default:" `isInfixOf`)
-      sout `shouldSatisfy`
-        ("(output of TariffPayable with { -- a: Account { -- class: Industrial \
-         \-- units_used: 2000.0 } }).tariff_payable" `isInfixOf`)
-
-    -- R2 (§8.2) promised a lowering note at each coercion; R7 (§8.7) promised a
-    -- human-legible companion to the exact-rational JSON block.
-    it "emits R2's per-coercion note and R7's human-format companion line" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/registry.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("# R2 coercion: `decimal of` was inserted" `isInfixOf`)
-      sout `shouldSatisfy` ("is ROUNDED here rather than refused" `isInfixOf`)
-      sout `shouldSatisfy` ("{\"result\":\"2025-03-01\"}" `isInfixOf`)
-      sout `shouldSatisfy` ("L4 computes that as: `DATE OF 1, 3, 2025`." `isInfixOf`)
-
-    -- §6.1: L4's connectives short-circuit and Catala's `and`/`or` do not, so
-    -- the emitter writes the conditional form. `benefit.l4`'s disjunction is
-    -- the one the spec's Appendix A example turns on.
-    it "emits AND/OR as short-circuiting conditionals, never Catala `and`/`or`" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/benefit.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy`
-        ("(if (a.age >= 65.0) then true else a.is_veteran)" `isInfixOf`)
-      sout `shouldNotSatisfy` (" or " `isInfixOf`)
-
-    -- R4: the exception ladder is the PRIMARY emission, and it never ships
-    -- without the apparatus that re-checks it.
-    it "emits Mode B ladders together with their equivalence grid" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/bands.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("label rate_band_r1 exception rate_band_r2" `isInfixOf`)
-      sout `shouldSatisfy` ("#[test] declaration scope RateBandEqvGrid:" `isInfixOf`)
-      sout `shouldSatisfy` ("{\"all_agree\":true}" `isInfixOf`)
-
-    -- R7: the expected values come from L4's evaluator, not from
-    -- `clerk test --reset`. 0.25 is L4's answer for a 60000 income, and Catala
-    -- prints exact rationals in JSON, so it has to appear as 1/4.
-    it "fills test blocks with values L4 computed, as exact rationals" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/bands.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("$ catala test-scope Test1 --disable-warnings -F json" `isInfixOf`)
-      sout `shouldSatisfy` ("{\"result\":\"1/4\"}" `isInfixOf`)
-      sout `shouldSatisfy` ("{\"result\":\"2/5\"}" `isInfixOf`)
-
-    it "--boolean-only drops the ladders and the grids that check them" $ do
-      Output code sout _ <- runL4 bin ["catala", "--boolean-only", "examples/catala/bands.l4"]
-      code `shouldBe` ExitSuccess
-      sout `shouldNotSatisfy` ("EqvGrid" `isInfixOf`)
-      sout `shouldNotSatisfy` ("label rate_band_r1" `isInfixOf`)
-      sout `shouldSatisfy` ("--boolean-only" `isInfixOf`)
-
-    -- R4's escape flag had one test of three substring checks and no golden, so
-    -- nothing re-ran its output through the toolchain. It has one now, and
-    -- etc/validate-catala.mjs walks `expected/`, so the flag's output is under
-    -- `catala typecheck`, `catala proof` and `clerk test` like everything else.
-    it "pins the --boolean-only rendering as a golden the R9 harness checks" $
-      expectGolden bin ["catala", "--boolean-only", "examples/catala/bands.l4"]
-                       "examples/catala/expected/bands-boolean-only.catala_en"
-
-    -- Catala wants the module name to be the file's basename with its first
-    -- letter capitalised, so a basename it cannot spell is rejected here rather
-    -- than by the toolchain after the file has been written.
-    it "rejects an -o basename that cannot be a Catala module name" $ do
-      Output code _ serr <- runL4 bin
-        ["catala", "examples/catala/flat-tax.l4", "-o", "ft-out.catala_en"]
-      code `shouldNotBe` ExitSuccess
-      serr `shouldSatisfy` ("cannot be a Catala module name" `isInfixOf`)
-
-    -- Two field names that mangle to one Catala identifier would silently
-    -- conflate in Catala's flat per-structure namespace; the OpenFisca fixture
-    -- has the same shape and serves both backends.
-    it "rejects a name collision (distinct L4 names → same Catala identifier)" $
-      expectFail bin ["catala", "examples/openfisca/not-ok/name-collision.l4"]
-
-    -- Six shapes that used to compile to Catala saying something other than
-    -- what the L4 says. Each fixture's header names the divergence; the point
-    -- of the group is that `l4 catala` refuses rather than emitting quietly.
-    -- `duplicate-type-name` became possible only once the lowering read the
-    -- import closure (§8.1.2): two imported modules each declaring a `Thing`,
-    -- which `l4 check` accepts and one flat Catala namespace cannot hold.
-    for_ [ "otherwise-not-last"
-         , "otherwise-not-last-enum"
-         , "local-name-shadow"
-         , "elided-string-compared"
-         , "enum-constructor-collision"
-         , "duplicate-type-name"
-         ] $ \name ->
-      it ("rejects " ++ name ++ " rather than changing its denotation") $
-        expectFail bin ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
-
-    -- smucclaw/l4-ide#958. R1 emits an @export'd decision as a Catala SCOPE and
-    -- every other reachable decision as a TOPLEVEL, and Catala allows a scope
-    -- call only inside a scope — so a non-exported caller of an exported callee
-    -- cannot be expressed. Until this refusal, `l4 catala` emitted that module,
-    -- printed nothing at all, and exited 0; the invalid output was found only by
-    -- running `catala typecheck` over it by hand, which reports "Scope calls are
-    -- not allowed outside of a scope" (catala 1.2.1, exit 123).
-    --
-    -- Two fixtures because there were two emission sites: the direct call, and
-    -- the combinator argument that R5 absorbs into `map each … among …`. The
-    -- second carried no context check at all, so a fix to the first alone would
-    -- have left it open.
-    --
-    -- The MESSAGE is asserted, not just the exit code. Exit 1 alone would be
-    -- satisfied by a fixture that merely fails to typecheck — the same argument
-    -- `expectVerifyFinding` makes above — and both fixtures typecheck cleanly,
-    -- so a bare `expectFail` here would be a control over nothing.
-    for_ [ ("export-chain-broken",     "the middle",  "the base")
-         , ("export-chain-combinator", "all doubled", "double")
-         ] $ \(name, caller, callee) ->
-      it ("refuses " ++ name ++ ": a scope call would land outside a scope") $ do
-        Output code _ serr <- runL4 bin
-          ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
-        code `shouldNotBe` ExitSuccess
-        -- names the caller, the callee, the rule, and the way out
-        serr `shouldSatisfy` (("`" ++ caller ++ "`") `isInfixOf`)
-        serr `shouldSatisfy` ((callee ++ "` is @export'd") `isInfixOf`)
-        serr `shouldSatisfy`
-          ("Catala allows a scope call only from inside another scope" `isInfixOf`)
-        serr `shouldSatisfy` ("Mark this caller @export too" `isInfixOf`)
-
-    it "fails on a file that does not typecheck" $
-      expectFail bin ["catala", errorFixture]
+  OpenFisca.spec bin
+  Yscript.spec bin
+  Blawx.spec bin
+  Docassemble.spec bin
+  Catala.spec bin
+  Coverage.spec bin
+  Explore.spec bin
+  SiblingReads.spec bin
+  Prove.spec bin
+  BuildVersion.spec bin
+  BuildIdentity.spec
+  Ledger.spec bin
   where
     for_ xs f = mapM_ f xs
 
@@ -5698,3 +6829,71 @@ locationsTried serr =
     dropTrailingComma e
       | not (null e), last e == ',' = init e
       | otherwise                   = e
+
+-- | A rule written as clauses that, read through, passes the 20,000-part bound,
+-- and a rule that calls it. Each clause tests two MAYBE inputs with patterns that
+-- bind a name, which tell the pruning nothing, so every clause draws the ones
+-- after it twice: eleven clauses are the fewest that pass the bound.
+tooLongCalleeSource :: String
+tooLongCalleeSource = unlines $
+  ["GIVEN m IS A MAYBE NUMBER", "      k IS A MAYBE NUMBER", "GIVETH A BOOLEAN"]
+    <> [ "DECIDE bigrule (JUST x) (JUST y) IS x GREATER THAN " <> show i <> " AND y GREATER THAN " <> show i | i <- [0 .. 10 :: Int] ]
+    <> [ "DECIDE bigrule m k IS FALSE", ""
+       , "GIVEN p IS A MAYBE NUMBER", "      q IS A MAYBE NUMBER", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+       , "DECIDE caller p q f IS bigrule p q OR f" ]
+
+-- | Each decision in an @l4 verify@ JSON envelope, with the kinds of its
+-- findings, in report order. A decision that was not analysed has none.
+findingsByDecision :: Value -> [(String, [String])]
+findingsByDecision env =
+  [ ( T.unpack nm
+    , [ T.unpack k
+      | Just (Array fs) <- [objField d "findings"]
+      , f <- toList fs
+      , Just (String k) <- [objField f "kind"]
+      ]
+    )
+  | Just (Array ds) <- [objField env "decisions"]
+  , d <- toList ds
+  , Just (String nm) <- [objField d "name"]
+  ]
+
+-- | The placement table of doc/reference/syntax/nlg.md: each row's number
+-- and the cells after it, trimmed.
+placementTable :: String -> [(Int, [String])]
+placementTable page =
+  [ (n, cells)
+  | l <- takeWhile ("|" `isPrefixOf`) (drop 1 (dropWhile (not . ("| head shape" `isInfixOf`)) (lines page)))
+  , numCell : cells <- [map trim (init (drop 1 (splitOnChar '|' l)))]
+  , [(n, "")] <- [reads numCell]
+  ]
+ where
+  trim = dropWhileEnd isSpace . dropWhile isSpace
+  splitOnChar c str = case break (== c) str of
+    (a, [])       -> [a]
+    (a, _ : rest) -> a : splitOnChar c rest
+
+-- | What an `l4 render` cell of that table promises about a row's line.
+renderCellHolds :: String -> String -> String -> Bool
+renderCellHolds word cell line = case cell of
+  -- A sentence that heads a rule starts with a capital (legalese/l4-ide#802),
+  -- so the rule's own words are matched whatever their case.
+  -- In a rule's own sentence an input of a built-in type reads as a blank,
+  -- "[amount]" (legalese/l4-ide#803).
+  "sentence"          -> ("row " <> word <> " saw [amount]") `isInfixOf` map toLower line
+  "outer sentence"    -> ("row " <> word <> " the rule saw [amount]") `isInfixOf` map toLower line
+  "rule's body"       -> "amount is more than" `isInfixOf` line && not (" saw " `isInfixOf` line)
+  "gloss in the body" -> "the section's floor" `isInfixOf` line
+  _                   -> False
+
+-- | The fixture names its rules `row one` to `row nineteen`.
+numberWord :: Int -> String
+numberWord n = headOr (show n) (drop (n - 1) ws)
+ where
+  ws = words "one two three four five six seven eight nine ten eleven twelve \
+             \thirteen fourteen fifteen sixteen seventeen eighteen nineteen"
+
+headOr :: a -> [a] -> a
+headOr d xs = case xs of
+  x : _ -> x
+  []    -> d

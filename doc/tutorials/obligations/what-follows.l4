@@ -6,6 +6,7 @@
 --   a receipt follows a payment                 (HENCE)
 --   a late fee follows a missed payment         (LEST, as a second chance)
 --   a guarantor pays when the tenant does not   (LEST, then ROR)
+--   counting from somewhere else                (WITHIN … OF, AFTER)
 --
 -- Every example on the tutorial page that runs today also lives here, in
 -- the order the page presents them. Run it with:
@@ -59,7 +60,7 @@ GIVETH A DEONTIC Actor Action
 
 -- Alice never pays: the receipt never becomes due.
 #TRACE `rent, then receipt` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 
 -- ====================================================================
@@ -80,22 +81,22 @@ GIVETH A DEONTIC Actor Action
 
 -- Alice misses day 7, then pays 1550 on day 15.
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY Alice DOES Pay Alice `Ms Ng` 1550 AT 15
 
 -- Day 8 has come with no payment: the second chance is now what is owed.
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 -- Alice pays the plain rent on day 15, without the fee.
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 15
 
 -- Nobody does anything for a month.
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
-    (`WAIT UNTIL` 40)
+    (WAITUNTIL 8)
+    (WAITUNTIL 40)
 
 
 -- ====================================================================
@@ -133,7 +134,7 @@ GIVETH A DEONTIC Actor Action
 #TRACE `rent, receipt for the amount paid` AT 0 WITH
     PARTY Alice   DOES Pay Alice `Ms Ng` 1600     AT 6
     PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 9
-    (`WAIT UNTIL` 12)
+    (WAITUNTIL 12)
 
 -- A payment under the rent does not count; the clock keeps running.
 #TRACE `rent, receipt for the amount paid` AT 0 WITH
@@ -162,7 +163,7 @@ GIVETH A DEONTIC Actor Action
 
 -- Alice misses day 7; Mr Lim pays on day 15.
 #TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY `Mr Lim` DOES Pay `Mr Lim` `Ms Ng` 1500 AT 15
 
 -- Mr Lim pays on day 3, before Alice has missed anything: it does not count.
@@ -175,8 +176,8 @@ GIVETH A DEONTIC Actor Action
 
 -- Neither of them pays.
 #TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
-    (`WAIT UNTIL` 30)
+    (WAITUNTIL 8)
+    (WAITUNTIL 30)
 
 
 -- ====================================================================
@@ -207,8 +208,67 @@ GIVETH A DEONTIC Actor Action
 
 -- Nobody has paid yet.
 #TRACE `rent, Alice or Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 3)
+    (WAITUNTIL 3)
 
 -- Neither pays by day 7.
 #TRACE `rent, Alice or Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
+
+
+-- ====================================================================
+-- Step 6: Counting from somewhere else.
+-- ====================================================================
+
+-- The receipt is due five days after the rent fell due, not after the
+-- payment: day 12, whenever Alice pays.
+GIVETH A DEONTIC Actor Action
+`rent, receipt counted from the due date` MEANS
+    PARTY  Alice
+    MUST   (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  PARTY  `Ms Ng`
+           MUST   (Receipt `Ms Ng` Alice 1500)
+           WITHIN 5 OF THE DEADLINE
+
+-- Paid on day 2, receipt on day 11: in time (a plain WITHIN 5 would not be).
+#TRACE `rent, receipt counted from the due date` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 2
+    PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 11
+
+-- The deposit comes back no sooner than 14 days after the last month's
+-- rent, and within 16 days after that.
+GIVETH A DEONTIC Actor Action
+`last month's rent, then the deposit back` MEANS
+    PARTY  Alice
+    MUST   (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  PARTY  `Ms Ng`
+           MUST   (Pay `Ms Ng` Alice 500)
+           AFTER  14
+           WITHIN 16
+
+-- Refunded on day 5: before the window opens on day 16, so it counts for
+-- nothing, and the run says so in a Notes line.
+#TRACE `last month's rent, then the deposit back` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 2
+    PARTY `Ms Ng` DOES Pay `Ms Ng` Alice 500 AT 5
+
+-- Refunded on day 20: inside the window.
+#TRACE `last month's rent, then the deposit back` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 2
+    PARTY `Ms Ng` DOES Pay `Ms Ng` Alice 500 AT 20
+
+-- The same window, both edges measured from the payment.
+GIVETH A DEONTIC Actor Action
+`the same window, both edges from the payment` MEANS
+    PARTY  Alice
+    MUST   (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  PARTY  `Ms Ng`
+           MUST   (Pay `Ms Ng` Alice 500)
+           AFTER  14
+           WITHIN 30 OF THE JOIN
+
+#TRACE `the same window, both edges from the payment` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 2
+    PARTY `Ms Ng` DOES Pay `Ms Ng` Alice 500 AT 20

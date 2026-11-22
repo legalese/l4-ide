@@ -16,6 +16,7 @@ import LSP.Core.Types.Monitoring
 import LSP.Core.Types.Options
 import LSP.Core.Types.Shake
 
+import LSP.L4.BuildInfo (buildInfoLine)
 import LSP.L4.Config
 import LSP.L4.Handlers hiding (Log (..))
 import qualified LSP.L4.Handlers as Handlers
@@ -86,7 +87,8 @@ syncOptions =
 lspOptions :: Options
 lspOptions =
   defaultOptions
-    { optTextDocumentSync = Just syncOptions
+    { optServerInfo = Just (LSP.ServerInfo "jl4-lsp" (Just buildInfoLine))
+    , optTextDocumentSync = Just syncOptions
     , optExecuteCommandCommands =
         Just $ map snd l4CmdNames
     }
@@ -96,7 +98,8 @@ lspOptions =
 -- ----------------------------------------------------------------------------
 
 data Log
-  = LogLspStart
+  = LogBuildInfo Text.Text
+  | LogLspStart
   | LogLspStartDuration !Seconds
   | LogShouldRunSubset !Bool
   | LogConfigurationChange Text.Text
@@ -116,6 +119,7 @@ data WebsocketLog
 
 instance Pretty Log where
   pretty = \ case
+    LogBuildInfo versionLine -> "jl4-lsp" <+> pretty versionLine
     LogLspStart ->
       nest 2 $ vsep
         [ "Starting LSP server..."
@@ -169,7 +173,7 @@ data CommunicationKind
 parseComm :: Opa.ParserInfo CliOptions
 parseComm =
   Opa.info
-    (MkCliOptions
+    (versionOption <*> (MkCliOptions
       <$> Opa.optional (Opa.strOption (Opa.long "cwd"))
       <*>
       (Opa.helper <*> Opa.hsubparser
@@ -183,9 +187,16 @@ parseComm =
           )
         )
         Opa.<|> pure StdIO
-      )
+      ))
     )
     (Opa.briefDesc <> Opa.progDesc "The L4 language server. Invoke to run using StdIO")
+
+-- | @jl4-lsp --version@: one line naming the build, @dev@ for a local build
+-- ("LSP.L4.BuildInfo"). The server reports the same line as its @serverInfo@.
+versionOption :: Opa.Parser (a -> a)
+versionOption =
+  Opa.infoOption (Text.unpack buildInfoLine)
+    (Opa.long "version" <> Opa.help "Print the version of this build and exit")
 
 getDefaultArguments :: Recorder (WithPriority Log) -> IO Arguments
 getDefaultArguments recorder = do
@@ -229,6 +240,7 @@ defaultMain recorder args = do
 
   withNumCapabilities numCapabilities $ do
     ioT <- offsetTime
+    logWith recorder Info $ LogBuildInfo buildInfoLine
     logWith recorder Info LogLspStart
 
     let

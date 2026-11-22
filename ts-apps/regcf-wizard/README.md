@@ -6,7 +6,7 @@ with the deployment half (**C2c**) prepared but not performed.
 
 It re-implements no law. Every number, every sentence and every citation on the
 page comes back from `jl4-service` evaluating
-[`jl4/examples/legal/regcf/regcf-wizard.l4`](../../jl4/examples/legal/regcf/regcf-wizard.l4),
+[`jl4/examples/canon/us/regcf/regcf-wizard.l4`](../../jl4/examples/canon/us/regcf/regcf-wizard.l4),
 which is itself a façade over `regcf.l4`. The client's job is to ask, to render,
 and to refuse to guess.
 
@@ -93,7 +93,7 @@ _why_ it applied the date it applied.
 ```bash
 # 1. a loopback jl4-service with the regcf bundle
 mkdir -p /tmp/jl4-store/regcf/sources
-cp jl4/examples/legal/regcf/*.l4 /tmp/jl4-store/regcf/sources/
+cp jl4/examples/canon/us/regcf/*.l4 /tmp/jl4-store/regcf/sources/
 echo '{"smFunctions":[],"smVersion":"dev","smCreatedAt":"2025-01-01T00:00:00Z"}' \
   > /tmp/jl4-store/regcf/metadata.json
 JL4_LIBRARY_PATH="$PWD/jl4-core/libraries" \

@@ -1,0 +1,48 @@
+-- `p's adult` and `adult p` read one field of one record: the projection is sugar
+-- for the selector applied, and the evaluator reads both as one field read
+-- (smucclaw/l4-ide#1033, gap 3). Keyed as two atoms, `l4 verify` could not see
+-- that `either spelling contradicts` asks for the field and its negation at once.
+-- `two people` is the control: the same shape over two records is satisfiable.
+--
+-- A computed field is read through to its MEANS whichever way it is written, so
+-- its contradiction is found when the projection comes first, and when it is
+-- the only spelling. And a rule that reads the ledger, called by projection
+-- either side of a RECORD, is two reads, not one: `ledger by projection` is
+-- satisfiable (its #EVAL is TRUE). All three found by adversarial review.
+
+DECLARE Person HAS adult IS A BOOLEAN
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `either spelling contradicts` IF p's adult AND NOT adult p
+
+GIVEN p IS A Person
+      q IS A Person
+GIVETH A BOOLEAN
+DECIDE `two people` IF p's adult AND NOT adult q
+
+DECLARE Person2 HAS age IS A NUMBER
+                    grown IS A BOOLEAN MEANS age >= 18
+
+GIVEN p IS A Person2
+GIVETH A BOOLEAN
+DECIDE `computed, projection first` IF p's grown AND grown p AND NOT (p's age >= 18)
+
+GIVEN p IS A Person2
+GIVETH A BOOLEAN
+DECIDE `computed, projection only` IF p's grown AND NOT (p's age >= 18)
+
+DECLARE Acct HAS id IS A NUMBER
+
+GIVEN a IS AN Acct
+GIVETH A BOOLEAN
+DECIDE `is recorded` a IF (RECALL `x`) EQUALS JUST 7
+
+GIVEN a IS AN Acct
+GIVETH A BOOLEAN
+DECIDE `ledger by projection` IF
+        NOT a's `is recorded`
+    AND (RECORD `x` IS 7) EQUALS 7
+    AND a's `is recorded`
+
+#EVAL `ledger by projection` (Acct WITH id IS 1)

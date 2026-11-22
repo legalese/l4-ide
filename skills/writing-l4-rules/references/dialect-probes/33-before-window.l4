@@ -1,0 +1,7 @@
+IMPORT daydate
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+
+GIVETH A DEONTIC Person Action
+`by june` MEANS
+  PARTY Buyer MUST pay 100 AFTER 3 BEFORE (Date 30 6 2026)

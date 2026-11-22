@@ -1,0 +1,46 @@
+l4 coverage: examples/catala/or-leaves.l4
+
+Decision `filing is required`  (or-leaves.l4:14:1-23:30)
+  Inputs: category, holds a licence, is dormant, is publicly funded
+  Cover points (4):
+    c0  category EQUALS Other  or-leaves.l4:20:7-21:9
+    c1  `holds a licence`      or-leaves.l4:21:10-22:9
+    c2  `is dormant`           or-leaves.l4:22:10-23:9
+    c3  `is publicly funded`   or-leaves.l4:23:10-30
+
+  Buckets (16 combinations: 16 witnessed, 0 proved impossible, none undecided):
+    c0 c1 c2 c3   status
+    F  F  F  F    witnessed by 8 inputs; L4 answers TRUE
+          category = Individual, holds a licence = FALSE, is dormant = FALSE, is publicly funded = FALSE gives TRUE
+    F  F  F  T    witnessed by 8 inputs; L4 answers FALSE
+          category = Individual, holds a licence = FALSE, is dormant = FALSE, is publicly funded = TRUE gives FALSE
+    F  F  T  F    witnessed by 8 inputs; L4 answers FALSE
+          category = Individual, holds a licence = FALSE, is dormant = TRUE, is publicly funded = FALSE gives FALSE
+    F  F  T  T    witnessed by 8 inputs; L4 answers FALSE
+          category = Individual, holds a licence = FALSE, is dormant = TRUE, is publicly funded = TRUE gives FALSE
+    F  T  F  F    witnessed by 8 inputs; L4 answers FALSE
+          category = Individual, holds a licence = TRUE, is dormant = FALSE, is publicly funded = FALSE gives FALSE
+    F  T  F  T    witnessed by 8 inputs; L4 answers FALSE
+          category = Individual, holds a licence = TRUE, is dormant = FALSE, is publicly funded = TRUE gives FALSE
+    F  T  T  F    witnessed by 8 inputs; L4 answers FALSE
+          category = Individual, holds a licence = TRUE, is dormant = TRUE, is publicly funded = FALSE gives FALSE
+    F  T  T  T    witnessed by 8 inputs; L4 answers FALSE
+          category = Individual, holds a licence = TRUE, is dormant = TRUE, is publicly funded = TRUE gives FALSE
+    T  F  F  F    witnessed by 1 input; L4 answers FALSE
+          category = Other, holds a licence = FALSE, is dormant = FALSE, is publicly funded = FALSE gives FALSE
+    T  F  F  T    witnessed by 1 input; L4 answers FALSE
+          category = Other, holds a licence = FALSE, is dormant = FALSE, is publicly funded = TRUE gives FALSE
+    T  F  T  F    witnessed by 1 input; L4 answers FALSE
+          category = Other, holds a licence = FALSE, is dormant = TRUE, is publicly funded = FALSE gives FALSE
+    T  F  T  T    witnessed by 1 input; L4 answers FALSE
+          category = Other, holds a licence = FALSE, is dormant = TRUE, is publicly funded = TRUE gives FALSE
+    T  T  F  F    witnessed by 1 input; L4 answers FALSE
+          category = Other, holds a licence = TRUE, is dormant = FALSE, is publicly funded = FALSE gives FALSE
+    T  T  F  T    witnessed by 1 input; L4 answers FALSE
+          category = Other, holds a licence = TRUE, is dormant = FALSE, is publicly funded = TRUE gives FALSE
+    T  T  T  F    witnessed by 1 input; L4 answers FALSE
+          category = Other, holds a licence = TRUE, is dormant = TRUE, is publicly funded = FALSE gives FALSE
+    T  T  T  T    witnessed by 1 input; L4 answers FALSE
+          category = Other, holds a licence = TRUE, is dormant = TRUE, is publicly funded = TRUE gives FALSE
+
+Coverage: 1 decision covered (4 cover points, 16 buckets); 16 witnessed by 72 inputs, at most 8 per bucket; 0 proved impossible; nothing undecided; every decision at leaf level; nothing skipped; a call to another rule is one cover point, and conditions inside an arm's result are not cover points.

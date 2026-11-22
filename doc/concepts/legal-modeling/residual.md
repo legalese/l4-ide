@@ -14,7 +14,7 @@ caring about all three senses at once.
 ## Where L4 got the word
 
 When a regulative rule consumes an event stream, one of the
-[three possible outcomes](regulative-rules.md#the-three-possible-outcomes) is neither
+[three possible outcomes](regulative-rules.md#three-possible-outcomes) is neither
 `FULFILLED` nor `BREACH` but a **residual obligation**: the contract in its current state,
 clock partly used up, partially-completed chains ready to resume — the contract frozen
 mid-flight, as a first-class value. [`EVALTRACE`](../../reference/regulative/EVENT.md)

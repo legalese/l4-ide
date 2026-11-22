@@ -1,0 +1,16 @@
+-- Two records whose names differ only in case, `household` and `Household`.
+-- Both entities get the key `household` and the situation key `households`,
+-- so a situation cannot say which one it means: the old output loaded and
+-- gave one household's salary to two. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE household HAS salary IS A NUMBER
+DECLARE Household HAS members IS A LIST OF household
+
+@export Income
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`income` h period MEANS sum (map (GIVEN m YIELD m's salary) (h's members))
+
+#ASSERT (`income` OF (Household WITH members IS (LIST (household WITH salary IS 5))), "2026-01") EQUALS 5

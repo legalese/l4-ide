@@ -7,14 +7,14 @@ module LSP.L4.Handlers where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.Strict (Chan, writeChan)
-import Control.Exception.Safe (MonadCatch, MonadMask, MonadThrow)
+import Control.Exception.Safe (MonadCatch, MonadMask, MonadThrow, SomeException, displayException, handleAny)
 import Control.Lens ((^.))
 import qualified Control.Monad.Extra as Extra
 import Control.Monad.Reader (MonadReader (..))
 import Control.Monad.Trans.Reader (ReaderT)
 import Data.Monoid (Ap (..))
 import Data.Tuple (swap)
-import UnliftIO (MonadUnliftIO, atomically, STM, MonadIO(..))
+import UnliftIO (MonadUnliftIO, atomically, evaluateDeep, STM, MonadIO(..))
 import qualified StmContainers.Map as STM
 import Control.Applicative
 import Control.Monad.Except (runExceptT, throwError, MonadError(..), ExceptT(..))
@@ -22,6 +22,8 @@ import Control.Monad.Trans.Maybe
 import qualified Control.Monad.Trans.Reader as ReaderT
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Text as Aeson
+import Data.Foldable (traverse_)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
@@ -34,6 +36,7 @@ import GHC.Generics
 import GHC.TypeLits (Symbol)
 import Data.Proxy (Proxy (..))
 import System.FilePath (takeExtension)
+import Development.IDE.Graph (Action, actionCatch)
 import L4.FindReferences (lookupReference)
 import LSP.L4.Base
 import LSP.L4.Config
@@ -51,7 +54,6 @@ import LSP.Core.Types.Location
 import qualified LSP.L4.Viz.Ladder as Ladder
 import qualified LSP.L4.Viz.CustomProtocol as Ladder
 import LSP.L4.Viz.CustomProtocol (LadderRequestParams)
-import qualified LSP.L4.Viz.QueryPlan as VizQueryPlan
 import LSP.Logger
 import qualified Language.LSP.Protocol.Lens as J
 import Language.LSP.Protocol.Message
@@ -61,12 +63,16 @@ import Language.LSP.Server hiding (notificationHandler, requestHandler)
 import qualified Language.LSP.Server as LSP
 import Language.LSP.VFS (VFS)
 import LSP.L4.Actions
+import LSP.L4.DocumentSymbols (documentSymbols)
+import LSP.L4.EmbeddedLibrary
+import qualified LSP.L4.BlockingErrors as BlockingErrors
 import qualified LSP.L4.Inspector as Inspector
 import L4.EvaluateLazy (EvalConfig)
 import qualified L4.EvaluateLazy as EL
 import qualified L4.Export as Export
 import qualified L4.Export.Document as ExportDoc
 import qualified L4.Export.Render as ExportRender
+import qualified L4.Nlg as Nlg
 import qualified L4.FunctionSchema as FSchema
 
 data ReactorMessage
@@ -101,6 +107,7 @@ data Log
   | LogHandlingCustomRequest !Uri !Text          -- ^ Uri CustomMethodName
   | LogSuppliedTooManyArguments [Aeson.Value]
   | LogExecutingCommand !Text
+  | LogFileCheckedFailed !Uri !Text
   | LogShake Shake.Log
   deriving (Show)
 
@@ -113,6 +120,7 @@ instance Pretty Log where
     LogMultipleDecideClauses uri -> "Document contains multiple decide clauses:" <+> pretty (getUri uri)
     LogSuppliedTooManyArguments args -> "Visualization command was passed too many arguments, this is a bug:" <+> pretty (Aeson.encodeToLazyText args)
     LogExecutingCommand cmd -> "Executing command:" <+> pretty cmd
+    LogFileCheckedFailed uri msg -> "Could not report the check of" <+> pretty (getUri uri) <> ":" <+> pretty msg
     LogFileStore msg -> pretty msg
     LogShake msg -> pretty msg
     LogHandlingCustomRequest uri method -> "Handling custom request:" <+> pretty (getUri uri) <+> pretty method
@@ -159,61 +167,122 @@ notificationHandler m k = LSP.notificationHandler m $ \TNotificationMessage{_par
   liftIO $ writeChan st.reactor $ ReactorNotification (LSP.runLspT env $ runServerM st $ k st.ideState vfs _params)
 
 -- ----------------------------------------------------------------------------
--- Directive results notification
+-- What a check found
 -- ----------------------------------------------------------------------------
 
--- | After a file change, wait for evaluation to complete then push all directive
--- results to the client as a @l4/directiveResultsUpdated@ notification.
--- Runs in a background thread so it doesn't block the reactor.
-scheduleDirectiveResultsNotification
-  :: IdeState -> Uri -> NormalizedUri -> ServerM Config ()
-scheduleDirectiveResultsNotification ide doc nuri = do
+-- | After a change to a document, report the check of that document and of each
+-- open document that imports it, in a background thread so as not to block the
+-- reactor.
+--
+-- The importers need this because 'LSP.L4.LanguageServer.kick' re-checks every
+-- open file after any change, and their published diagnostics do follow, but
+-- without it a client hears nothing else: no directive results, and no way to
+-- tell that a file was checked again and nothing changed.
+scheduleFileChecked :: Recorder (WithPriority Log) -> IdeState -> Uri -> ServerM Config ()
+scheduleFileChecked recorder ide doc = do
   env <- LSP.getLspEnv
   liftIO $ Extra.void $ forkIO $ do
-    -- Wait for EvaluateLazy (also blocks on SuccessfulTypeCheck transitively).
-    -- If type-checking fails, mEvalResults is Nothing and we send nothing,
-    -- leaving inspector sections frozen at their last valid state (matching WASM behaviour).
-    (mEvalResults, mTcResult, mRope) <- runAction "l4/directiveResultsNotif" ide $ do
-      mEval <- use EvaluateLazy nuri
-      mTc   <- use SuccessfulTypeCheck nuri
-      mRope <- getFileContents nuri
-      pure (mEval, mTc, mRope)
-    case mEvalResults of
-      Nothing -> pure ()
-      Just evalResults -> do
-        -- `body` carries the directive's full source span (the inclusive
-        -- [startLine, endLine] slice joined by '\n'), so multi-line
-        -- directives stay distinguishable. Render sites truncate to one
-        -- line when a header is wanted.
-        let getLines startLine endLine = case mRope of
-              Nothing   -> ""
-              Just rope ->
-                let ls = Text.lines (Rope.toText rope)
-                    s  = max 1 startLine
-                    e  = min (length ls) endLine
-                in if s <= e
-                   then Text.intercalate "\n" (take (e - s + 1) (drop (s - 1) ls))
-                   else ""
-            conFields    = maybe mempty (extractConstructorFieldNames . (.entityInfo)) mTcResult
-            evalUpdates  = Maybe.mapMaybe (Inspector.evalDirectiveToUpdateItem conFields getLines) evalResults
-            checkUpdates =
-              [ Inspector.DirectiveUpdateItem
-                  { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
-                  , prettyText  = Text.intercalate "\n" (prettyCheckErrorWithContext info)
-                  , success     = Just True
-                  , body        = getLines startLine endLine
-                  }
-              | Just tcResult <- [mTcResult]
-              , info <- tcResult.infos
-              , Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _) <- [rangeOf info]
-              ]
-        LSP.runLspT env $
-          sendNotification
-            (SMethod_CustomMethod (Proxy @Inspector.DirectiveResultsUpdatedMethodName))
-            (Aeson.toJSON $ Inspector.DirectiveResultsUpdatedParams
-              { uri     = getUri doc
-              , results = evalUpdates <> checkUpdates
-              })
+    let nuri = toNormalizedUri doc
+    reportFileChecked recorder env ide doc
+    importers <-
+      logFileCheckedFailure recorder doc [] $
+        runAction "l4/fileChecked.importers" ide do
+          open <- HashMap.keys <$> getFilesOfInterestUntracked
+          Extra.filterM (fmap (nuri `elem`) . BlockingErrors.importClosure) (filter (/= nuri) open)
+    traverse_ (reportFileChecked recorder env ide . fromNormalizedUri) importers
+
+-- | Wait until a document's checking and evaluation have finished, then push
+-- its directive results and @l4/fileChecked@, in that order.
+--
+-- All of this runs in one 'Action', for two reasons. A session cannot start while
+-- an action of the session before it runs, so the diagnostics read here cannot
+-- be those of a newer version than the check that was waited for, which they
+-- could be if they were read after 'runAction' returned. And it keeps the
+-- notifications of consecutive sessions in order. An edit that cancels the
+-- session runs the whole action again in the next one, so a client may hear of a
+-- version twice, but it always hears.
+--
+-- Nothing that goes wrong before the last step may cost the client its
+-- @l4/fileChecked@: a client that waits for it would hang. A rule that failed
+-- is no problem, since 'use' just answers 'Nothing'. Any other exception on the
+-- way to the directive results is logged here, and 'actionCatch' lets the
+-- cancellation of the session through.
+reportFileChecked
+  :: Recorder (WithPriority Log)
+  -> LSP.LanguageContextEnv Config
+  -> IdeState
+  -> Uri
+  -> IO ()
+reportFileChecked recorder env ide doc =
+  logFileCheckedFailure recorder doc () $ runAction "l4/fileChecked" ide do
+    actionCatch (pushDirectiveResults env doc) \(e :: SomeException) ->
+      logWith recorder Error $ LogFileCheckedFailed doc (Text.pack (displayException e))
+    (version, diagnostics) <- liftIO $ atomically $ getFileDiagnostics (shakeExtras ide) nuri
+    liftIO $ LSP.runLspT env $
+      sendNotification
+        (SMethod_CustomMethod (Proxy @Inspector.FileCheckedMethodName))
+        (Aeson.toJSON Inspector.FileCheckedParams
+          { uri = getUri doc
+          , version
+          , diagnostics = map (.fdLspDiagnostic) diagnostics
+          })
+ where
+  nuri = toNormalizedUri doc
+
+logFileCheckedFailure :: Recorder (WithPriority Log) -> Uri -> a -> IO a -> IO a
+logFileCheckedFailure recorder doc fallback =
+  handleAny \e -> do
+    logWith recorder Error $ LogFileCheckedFailed doc (Text.pack (displayException e))
+    pure fallback
+
+-- | Wait for evaluation to complete, then push all directive results to the
+-- client as a @l4/directiveResultsUpdated@ notification.
+pushDirectiveResults :: LSP.LanguageContextEnv Config -> Uri -> Action ()
+pushDirectiveResults env doc = do
+  let nuri = toNormalizedUri doc
+  -- Wait for EvaluateLazy (also blocks on SuccessfulTypeCheck transitively).
+  -- If type-checking fails, mEvalResults is Nothing and we send nothing,
+  -- leaving inspector sections frozen at their last valid state (matching WASM behaviour).
+  mEvalResults <- use EvaluateLazy nuri
+  mTcResult    <- use SuccessfulTypeCheck nuri
+  mRope        <- getFileContents nuri
+  case mEvalResults of
+    Nothing -> pure ()
+    Just evalResults -> do
+      -- `body` carries the directive's full source span (the inclusive
+      -- [startLine, endLine] slice joined by '\n'), so multi-line
+      -- directives stay distinguishable. Render sites truncate to one
+      -- line when a header is wanted.
+      let getLines startLine endLine = case mRope of
+            Nothing   -> ""
+            Just rope ->
+              let ls = Text.lines (Rope.toText rope)
+                  s  = max 1 startLine
+                  e  = min (length ls) endLine
+              in if s <= e
+                 then Text.intercalate "\n" (take (e - s + 1) (drop (s - 1) ls))
+                 else ""
+          conFields    = maybe mempty (extractConstructorFieldNames . (.entityInfo)) mTcResult
+          evalUpdates  = Maybe.mapMaybe (Inspector.evalDirectiveToUpdateItem conFields getLines) evalResults
+          checkUpdates =
+            [ Inspector.DirectiveUpdateItem
+                { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
+                , prettyText  = Text.intercalate "\n" (prettyCheckErrorWithContext info)
+                , success     = Just True
+                , body        = getLines startLine endLine
+                }
+            | Just tcResult <- [mTcResult]
+            , info <- checkDirectiveResults tcResult.infos
+            , Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _) <- [rangeOf info]
+            ]
+      -- Rendered here, not when the message is encoded: an exception in a
+      -- result would otherwise surface in the thread that writes to the client.
+      params <- evaluateDeep $ Aeson.toJSON Inspector.DirectiveResultsUpdatedParams
+        { uri     = getUri doc
+        , results = evalUpdates <> checkUpdates
+        }
+      liftIO $ LSP.runLspT env $
+        sendNotification (SMethod_CustomMethod (Proxy @Inspector.DirectiveResultsUpdatedMethodName)) params
 
 -- ----------------------------------------------------------------------------
 -- Handlers
@@ -240,7 +309,7 @@ handlers evalConfig recorder =
             setFileModified (VFSModified vfs) ide nuri $
               addFileOfInterest ide nuri Modified{firstOpen=True}
             logWith recorder Debug $ LogOpenedTextDocument doc
-          scheduleDirectiveResultsNotification ide doc nuri
+          scheduleFileChecked recorder ide doc
     , notificationHandler SMethod_TextDocumentDidChange $ \ide vfs msg -> do
         let
           doc = msg ^. J.textDocument . J.uri
@@ -254,7 +323,7 @@ handlers evalConfig recorder =
             setFileModified (VFSModified vfs) ide nuri $
               addFileOfInterest ide nuri Modified{firstOpen=False}
             logWith recorder Debug $ LogModifiedTextDocument doc
-          scheduleDirectiveResultsNotification ide doc nuri
+          scheduleFileChecked recorder ide doc
     , notificationHandler SMethod_TextDocumentDidSave $ \ide vfs msg -> do
         let
           doc = msg ^. J.textDocument . J.uri
@@ -265,7 +334,7 @@ handlers evalConfig recorder =
             setFileModified (VFSModified vfs) ide nuri $
               addFileOfInterest ide nuri OnDisk
             logWith recorder Debug $ LogSavedTextDocument doc
-          scheduleDirectiveResultsNotification ide doc nuri
+          scheduleFileChecked recorder ide doc
     , notificationHandler SMethod_TextDocumentDidClose $ \ide vfs msg -> liftIO $ do
         let
           doc = msg ^. J.textDocument . J.uri
@@ -308,14 +377,16 @@ handlers evalConfig recorder =
         logWith recorder Debug $ LogExecutingCommand cid
         runExceptT case lookup cid (map swap l4CmdNames) of
           Just CmdVisualize -> do
+            -- Arguments: [verDocId] (auto-refresh), [verDocId, srcPos, simplify],
+            -- or [verDocId, srcPos, simplify, {"expandCalls": true}]
+            -- ('decodeVisualiseArgs', 'VisualiseOptions' in LSP.L4.Actions).
             let decodeXdata
                   | Just ((Aeson.fromJSON -> Aeson.Success verTextDocId) :  args) <- xdata
-                  , msrcPos <- case args of
-                     [GFromJSON srcPos, Aeson.fromJSON -> Aeson.Success simplify] -> Just (srcPos, simplify)
-                     _ -> Nothing
-                  = do
-                    mtcRes <- liftIO $ runAction "l4.visualize" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
-                    visualise mtcRes (atomically $ getMostRecentVisualisation ide, atomically . setMostRecentVisualisation ide) verTextDocId msrcPos
+                  = case decodeVisualiseArgs args of
+                      Left err -> defaultResponseError err
+                      Right msrcPos -> do
+                        mtcRes <- liftIO $ runAction "l4.visualize" ide $ use TypeCheck $ toNormalizedUri verTextDocId._uri
+                        visualise mtcRes (atomically $ getMostRecentVisualisation ide, atomically . setMostRecentVisualisation ide) verTextDocId msrcPos
                   | otherwise = defaultResponseError $ "Failed to decode request data: " <> LazyText.toStrict (Aeson.encodeToLazyText xdata)
             decodeXdata
 
@@ -340,8 +411,13 @@ handlers evalConfig recorder =
           rng = params ^. J.range
         diags <- atomically $ do
           activeFileDiagnosticsInRange (shakeExtras ide) uri rng
-        cas <- Extra.mapMaybeM (outOfScopeAssumeQuickFix ide) diags
-        pure $ Right $ InL $ fmap InR cas
+        casDeclaration <- Extra.mapMaybeM (outOfScopeDeclarationQuickFix ide) diags
+        casConfusable  <- Extra.mapMaybeM (outOfScopeConfusableQuickFix ide) diags
+        let casLexFix = concatMap lexErrorCodeActions diags
+            casNbsp    = Maybe.mapMaybe nbspCodeAction diags
+        casStraighten <- straightenWholeFileCodeAction ide uri diags
+        pure $ Right $ InL $ fmap InR $
+          casDeclaration <> casConfusable <> casLexFix <> casNbsp <> casStraighten
     , requestHandler SMethod_TextDocumentSemanticTokensFull $ \ide req -> do
         let
           SemanticTokensParams _ _ doc = req
@@ -393,15 +469,6 @@ handlers evalConfig recorder =
           visualizeDecides :: [CodeLens] =
             decisionGraphCodeLenses verTextDocId typeCheck
               <> stateGraphCodeLenses verTextDocId typeCheck
-
-          directiveLabel :: Directive Resolved -> Text
-          directiveLabel = \case
-            LazyEval{}      -> "#EVAL"
-            LazyEvalTrace{} -> "#EVALTRACE"
-            Check{}         -> "#CHECK"
-            Contract{}      -> "#CHECK"
-            Assert{}        -> "#ASSERT"
-            AssertRefused{} -> "#ASSERT REFUSED"
 
           mkRenderResultCodeLens srcPos label = CodeLens
             { _command = Just Command
@@ -456,222 +523,7 @@ handlers evalConfig recorder =
 
         let docSymbols = case mTypeCheck of
               Nothing -> []
-              Just (typeCheck, _positionMapping) ->
-                let MkModule _ moduleNuri section = typeCheck.module'
-                    subst = typeCheck.substitution
-                    entInfo = typeCheck.entityInfo
-                in sectionToSymbols moduleNuri subst entInfo section
-
-            sectionToSymbols :: NormalizedUri -> Substitution -> EntityInfo -> Section Resolved -> [DocumentSymbol]
-            sectionToSymbols moduleNuri subst entInfo (MkSection _ _ _ _ topDecls) =
-              concatMap (topDeclToSymbol moduleNuri subst entInfo) topDecls
-
-            topDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> TopDecl Resolved -> [DocumentSymbol]
-            topDeclToSymbol moduleNuri subst entInfo = \case
-              Section _ s@(MkSection _ mName _ _ _) ->
-                case rangeOfNode s of
-                  Just rng ->
-                    let name = maybe "§" (nameToText . getOriginal) mName
-                        lspRange = srcRangeToLspRange (Just rng)
-                        selRange = maybe lspRange nameSelRange mName
-                    in [ DocumentSymbol
-                          { _name = name
-                          , _detail = Nothing
-                          , _kind = SymbolKind_Namespace
-                          , _tags = Nothing
-                          , _deprecated = Nothing
-                          , _range = lspRange
-                          , _selectionRange = selRange
-                          , _children = Just $ sectionToSymbols moduleNuri subst entInfo s
-                          }
-                       ]
-                  Nothing -> sectionToSymbols moduleNuri subst entInfo s
-
-              Declare _ decl@(MkDeclare _ _ (MkAppForm _ n _ _) typeDecl) ->
-                case rangeOfNode decl of
-                  Just rng ->
-                    let lspRange = srcRangeToLspRange (Just rng)
-                        selRange = nameSelRange n
-                        originalName = nameToText (getOriginal n)
-                    in case typeDecl of
-                      RecordDecl{} ->
-                        [ mkSymbol originalName Nothing SymbolKind_TypeParameter lspRange selRange ]
-                      EnumDecl _ cons ->
-                        let children = map (conDeclToSymbol originalName lspRange) cons
-                        in [ mkSymbolWithChildren originalName Nothing SymbolKind_Enum lspRange selRange children ]
-                      SynonymDecl _ ty ->
-                        let detail = prettyLayout ty
-                        in [ mkSymbol originalName (Just detail) SymbolKind_Variable lspRange selRange ]
-                      -- An opaque type has no body to describe, so no detail.
-                      -- 'SymbolKind_TypeParameter' is what the @ASSUME T IS A
-                      -- TYPE@ spelling of the same declaration already yields
-                      -- ('typeToSymbolKind' falls through on @"TYPE"@), and is
-                      -- what a record yields; a migration between the two
-                      -- spellings leaves the outline unchanged.
-                      OpaqueDecl _ ->
-                        [ mkSymbol originalName Nothing SymbolKind_TypeParameter lspRange selRange ]
-                  Nothing -> []
-
-              Decide _ decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givenParams) _) (MkAppForm _ n _ _) body) ->
-                case rangeOfNode decide of
-                  Just rng ->
-                    let lspRange = srcRangeToLspRange (Just rng)
-                        selRange = nameSelRange n
-                        detail = inferredReturnType moduleNuri subst entInfo n
-                        isDeontic = case body of
-                          Regulative{} -> True
-                          _ -> case detail of
-                            Just t  -> "DEONTIC" `Text.isPrefixOf` t
-                            Nothing -> False
-                        kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
-                        paramChildren = map (givenParamToSymbol lspRange) givenParams
-                        localChildren = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals body)
-                    in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind lspRange selRange (paramChildren <> localChildren) ]
-                  Nothing -> []
-
-              Assume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy _) ->
-                case rangeOfNode assume of
-                  Just rng ->
-                    let lspRange = srcRangeToLspRange (Just rng)
-                        selRange = nameSelRange n
-                        (detail, kind) = case mTy of
-                          Nothing -> (Nothing, SymbolKind_Variable)
-                          Just ty ->
-                            let tyText = prettyLayout ty
-                            in (Just tyText, typeToSymbolKind tyText)
-                    in [ mkSymbol (nameToText (getOriginal n)) detail kind lspRange selRange ]
-                  Nothing -> []
-
-              Directive _ d ->
-                case rangeOfNode d of
-                  Just rng ->
-                    let lspRange = srcRangeToLspRange (Just rng)
-                        (label, dExpr) = case d of
-                          LazyEval _ e      -> ("#EVAL", e)
-                          LazyEvalTrace _ e -> ("#EVALTRACE", e)
-                          Check _ e         -> ("#CHECK", e)
-                          Contract _ e _ _  -> ("#CHECK", e)
-                          Assert _ e        -> ("#ASSERT", e)
-                          AssertRefused _ e _ -> ("#ASSERT REFUSED", e)
-                        detail = prettyLayout dExpr
-                    in [ mkSymbol label (Just detail) SymbolKind_Operator lspRange lspRange ]
-                  Nothing -> []
-
-              Import _ imp@(MkImport _ n _) ->
-                case rangeOfNode imp of
-                  Just rng ->
-                    let lspRange = srcRangeToLspRange (Just rng)
-                        selRange = nameSelRange n
-                    in [ mkSymbol (nameToText (getOriginal n)) Nothing SymbolKind_File lspRange selRange ]
-                  Nothing -> []
-
-              _ -> []
-
-            nameSelRange :: Resolved -> LSP.Range
-            nameSelRange n = srcRangeToLspRange (rangeOf (getOriginal n))
-
-            inferredReturnType :: NormalizedUri -> Substitution -> EntityInfo -> Resolved -> Maybe Text
-            inferredReturnType moduleNuri subst entInfo n =
-              case Map.lookup (getUnique n) entInfo of
-                Just (_, KnownTerm ty _) ->
-                  let resolved = applyFinalSubstitution subst moduleNuri ty
-                      retTy = case resolved of
-                        Fun _ _ ret -> ret
-                        other       -> other
-                  in Just (prettyLayout retTy)
-                _ -> Nothing
-
-            mkSymbol :: Text -> Maybe Text -> SymbolKind -> LSP.Range -> LSP.Range -> DocumentSymbol
-            mkSymbol name detail kind range selRange = mkSymbolWithChildren name detail kind range selRange []
-
-            mkSymbolWithChildren :: Text -> Maybe Text -> SymbolKind -> LSP.Range -> LSP.Range -> [DocumentSymbol] -> DocumentSymbol
-            mkSymbolWithChildren name detail kind range selRange children = DocumentSymbol
-              { _name = name
-              , _detail = detail
-              , _kind = kind
-              , _tags = Nothing
-              , _deprecated = Nothing
-              , _range = range
-              , _selectionRange = clampRange range selRange
-              , _children = case children of
-                  [] -> Nothing
-                  cs -> Just cs
-              }
-
-            conDeclToSymbol :: Text -> LSP.Range -> ConDecl Resolved -> DocumentSymbol
-            conDeclToSymbol _enumName parentRange (MkConDecl _ n _) =
-              let variantName = nameToText (getOriginal n)
-                  selRange = nameSelRange n
-              in mkSymbol variantName Nothing SymbolKind_EnumMember parentRange selRange
-
-            givenParamToSymbol :: LSP.Range -> OptionallyTypedName Resolved -> DocumentSymbol
-            givenParamToSymbol parentRange (MkOptionallyTypedName _ n mTy _) =
-              let paramName = nameToText (getOriginal n)
-                  selRange = nameSelRange n
-                  (detail, kind) = case mTy of
-                    Nothing -> (Nothing, SymbolKind_Variable)
-                    Just ty ->
-                      let tyText = prettyLayout ty
-                      in (Just tyText, typeToSymbolKind tyText)
-              in mkSymbol paramName detail kind parentRange selRange
-
-            typeToSymbolKind :: Text -> SymbolKind
-            typeToSymbolKind tyText
-              | tyText == "BOOLEAN"                       = SymbolKind_Boolean
-              | tyText `elem` ["NUMBER", "INTEGER"]       = SymbolKind_Number
-              | tyText `elem` ["STRING", "TEXT"]           = SymbolKind_String
-              | "LIST" `Text.isPrefixOf` tyText           = SymbolKind_Array
-              | Just inner <- Text.stripPrefix "MAYBE OF " tyText = typeToSymbolKind inner
-              | Just inner <- Text.stripPrefix "MAYBE " tyText = typeToSymbolKind inner
-              | "FUNCTION" `Text.isPrefixOf` tyText        = SymbolKind_Field
-              | otherwise                                 = SymbolKind_TypeParameter
-
-            collectLocals :: Expr Resolved -> [LocalDecl Resolved]
-            collectLocals (Where _ _ locals)  = locals
-            collectLocals (LetIn _ locals _)  = locals
-            collectLocals _                   = []
-
-            localDeclToSymbol :: NormalizedUri -> Substitution -> EntityInfo -> LSP.Range -> LocalDecl Resolved -> [DocumentSymbol]
-            localDeclToSymbol moduleNuri subst entInfo parentRange = \case
-              LocalDecide _ decide@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givenParams) _) (MkAppForm _ n _ _) localBody) ->
-                case rangeOfNode decide of
-                  Just rng ->
-                    let lspRange = srcRangeToLspRange (Just rng)
-                        selRange = nameSelRange n
-                        detail = inferredReturnType moduleNuri subst entInfo n
-                        isDeontic = case localBody of
-                          Regulative{} -> True
-                          _ -> case detail of
-                            Just t  -> "DEONTIC" `Text.isPrefixOf` t
-                            Nothing -> False
-                        kind = if isDeontic then SymbolKind_Event else SymbolKind_Function
-                        paramChildren = map (givenParamToSymbol lspRange) givenParams
-                        nestedLocals = concatMap (localDeclToSymbol moduleNuri subst entInfo lspRange) (collectLocals localBody)
-                    in [ mkSymbolWithChildren (nameToText (getOriginal n)) detail kind parentRange selRange (paramChildren <> nestedLocals) ]
-                  Nothing -> []
-              LocalAssume _ assume@(MkAssume _ _ (MkAppForm _ n _ _) mTy _) ->
-                case rangeOfNode assume of
-                  Just _ ->
-                    let selRange = nameSelRange n
-                        detail = fmap prettyLayout mTy
-                    in [ mkSymbol (nameToText (getOriginal n)) detail SymbolKind_Variable parentRange selRange ]
-                  Nothing -> []
-
-            -- | Ensure selectionRange is contained within fullRange (LSP requirement).
-            -- Falls back to fullRange if selectionRange is not contained.
-            clampRange :: LSP.Range -> LSP.Range -> LSP.Range
-            clampRange full sel
-              | containsRange full sel = sel
-              | otherwise = full
-
-            containsRange :: LSP.Range -> LSP.Range -> Bool
-            containsRange (LSP.Range fStart fEnd) (LSP.Range sStart sEnd) =
-              posLeq fStart sStart && posLeq sEnd fEnd
-
-            posLeq :: LSP.Position -> LSP.Position -> Bool
-            posLeq a b = a._line < b._line || (a._line == b._line && a._character <= b._character)
-
-
+              Just (typeCheck, _positionMapping) -> documentSymbols typeCheck
 
         pure (Right (InR (InL docSymbols)))
 
@@ -697,17 +549,17 @@ handlers evalConfig recorder =
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.InlineExprsMethodName)) $ \ide params ->
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.InlineExprsMethodName) params ide $
           \(ieParams :: Ladder.InlineExprsRequestParams) _tcRes recentViz ->
-            let postInliningDecide = Ladder.inlineExprs recentViz.vizState recentViz.decide ieParams.uniques
-            in MkVizHandler $
-              case Ladder.doVisualize postInliningDecide (Ladder.getVizConfig recentViz.vizState) of
-                Right (vizProgramInfo, vizState) -> do
+            MkVizHandler $
+              case renderAfterInlining recentViz.vizState recentViz.decide ieParams.uniques of
+                Right (postInliningDecide, vizProgramInfo, vizState, rawInfo) -> do
                   -- Update RecentlyVisualized's decide with the latest vizState and postInliningDecide,
                   -- so that they can be used for further l4/inlineExprs requests.
                   -- (The usecase here: think of a Decide with multiple inline-able Uniques,
                   -- and where user does the inlining in stages.)
                   -- IMPT: The state synchronization / managing of state (re the stuff in RecentlyVisualized etc) feels potentially complicated:
                   -- I definitely have NOT thought through it carefully.
-                  liftIO $ atomically $ setMostRecentVisualisation ide $ recentViz {vizState = vizState, decide = postInliningDecide}
+                  liftIO $ atomically $ setMostRecentVisualisation ide $ recentViz {vizState = vizState, decide = postInliningDecide, ladderInfo = rawInfo}
+                  -- Already in the atomId namespace of "Show decision graph".
                   pure $ Aeson.toJSON vizProgramInfo
                 Left vizError ->
                   defaultResponseError $ Text.unlines
@@ -719,24 +571,13 @@ handlers evalConfig recorder =
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.QueryPlanMethodName)) $ \ide params ->
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.QueryPlanMethodName) params ide $
           \(qpParams :: Ladder.QueryPlanRequestParams) _tcRes recentViz -> do
-            let vizConfig = Ladder.getVizConfig recentViz.vizState
-            MkVizHandler $
-              case Ladder.doVisualize recentViz.decide vizConfig of
-                Right (vizProgramInfo, vizState) ->
-                  let paramsByUnique =
-                        VizQueryPlan.buildParamsByUnique vizProgramInfo
-                      flatBindings = Map.toList qpParams.bindings
-                      result = VizQueryPlan.queryPlanFromLadder qpParams.fnName paramsByUnique vizProgramInfo vizState flatBindings
-                  in do
-                    logWith recorder Debug $
-                      LogHandlingCustomRequest qpParams.verDocId._uri
-                        ("Query plan for: " <> qpParams.fnName)
-                    pure $ Aeson.toJSON result
-                Left vizError ->
-                  defaultResponseError $ Text.unlines
-                    [ "Could not compute query plan:"
-                    , Ladder.prettyPrintVizError vizError
-                    ]
+            -- Planned from the ladder last drawn, not drawn again (see 'queryPlanForRecent').
+            let result = queryPlanForRecent recentViz qpParams.fnName (Map.toList qpParams.bindings)
+            MkVizHandler $ do
+              logWith recorder Debug $
+                LogHandlingCustomRequest qpParams.verDocId._uri
+                  ("Query plan for: " <> qpParams.fnName)
+              pure $ Aeson.toJSON result
 
     , requestHandler (SMethod_CustomMethod (Proxy @Inspector.EvalDirectiveResultMethodName)) $ \ide params -> do
         let parseParams :: Aeson.Value -> Maybe Inspector.EvalDirectiveResultParams
@@ -767,10 +608,10 @@ handlers evalConfig recorder =
                 }
               Just results -> do
                 let conFields = maybe mempty (extractConstructorFieldNames . (.entityInfo)) mTcResult'
-                    matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _) = fmap (.start) rng == Just targetPos
+                    matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _ _) = fmap (.start) rng == Just targetPos
                     matchingResult = List.find matchesPos results
                 case matchingResult of
-                  Just evalRes@(EL.MkEvalDirectiveResult (Just rng) _ _ _ _) ->
+                  Just evalRes@(EL.MkEvalDirectiveResult (Just rng) _ _ _ _ _) ->
                     pure $ Right $ Aeson.toJSON $
                       Inspector.evalDirectiveToResult conFields reqParams.directiveType rng evalRes
                   Just _ -> pure $ Left $ TResponseError
@@ -791,7 +632,7 @@ handlers evalConfig recorder =
                         }
                       Just tcResult ->
                         let matchesCheckPos err = fmap (.start) (rangeOf err) == Just targetPos
-                            mInfo = List.find matchesCheckPos tcResult.infos
+                            mInfo = List.find matchesCheckPos (checkDirectiveResults tcResult.infos)
                         in case mInfo of
                           Nothing -> pure $ Left $ TResponseError
                             { _code = InR ErrorCodes_InvalidRequest
@@ -818,6 +659,20 @@ handlers evalConfig recorder =
                     , _xdata = Nothing
                     }
 
+    , requestHandler (SMethod_CustomMethod (Proxy @EmbeddedLibraryMethodName)) $ \_ide params ->
+        pure case Aeson.fromJSON params of
+          Aeson.Error err -> Left $ TResponseError
+            { _code = InR ErrorCodes_InvalidParams
+            , _message = "Failed to parse l4/embeddedLibrary params: " <> Text.pack err
+            , _xdata = Nothing
+            }
+          Aeson.Success reqParams -> case embeddedLibraryResponse reqParams of
+            Nothing -> Left $ TResponseError
+              { _code = InR ErrorCodes_InvalidParams
+              , _message = "Not an embedded library: " <> reqParams.uri
+              , _xdata = Nothing
+              }
+            Just response -> Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Inspector.GetExportedFunctionsMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Inspector.GetExportedFunctionsParams
             parseParams v = case Aeson.fromJSON v of
@@ -833,14 +688,38 @@ handlers evalConfig recorder =
           Just reqParams -> do
             let nuri = toNormalizedUri reqParams.verDocId._uri
 
-            mTcResult <- liftIO $ runAction "l4/getExportedFunctions" _ide $
-              use TypeCheck nuri
+            (mTcResult, closure) <- liftIO $ runAction "l4/getExportedFunctions" _ide $
+              (,) <$> use TypeCheck nuri
+                  <*> BlockingErrors.importClosure nuri
+            -- Read after the action: the rules it ran have published their
+            -- diagnostics for every file in the closure by now.
+            diags <- liftIO $ atomically $ getDiagnostics _ide
+            let
+                diagErrors =
+                  [ Inspector.BlockingError
+                      { uri = getUri (fromNormalizedUri fd.fdFilePath)
+                      , line = fromIntegral fd.fdLspDiagnostic._range._start._line + 1
+                      , message = Text.strip fd.fdLspDiagnostic._message
+                      }
+                  -- The engine's own errors (a raw exception, or "depends on
+                  -- itself", which an IMPORT that finds no module also
+                  -- causes) say less than the parser's and the typechecker's,
+                  -- so they go last.
+                  | fd <- uncurry (<>) $ List.partition
+                      (\fd -> fd.fdLspDiagnostic._source `notElem` [Just "jl4", Just "compiler"])
+                      (BlockingErrors.blockingErrorsIn closure diags)
+                  ]
+                -- A diagnostic is stored once per rule that published it, and
+                -- a typecheck runs once per import path that reaches it.
+                blockingErrors = List.nub diagErrors
 
             case mTcResult of
-              Nothing -> pure $ Left $ TResponseError
-                { _code = InR ErrorCodes_InvalidRequest
-                , _message = "No type check result available"
-                , _xdata = Nothing
+              -- The file does not parse, or is on a ring of imports: nothing
+              -- to export, and that error is the reason Deploy is off.
+              Nothing -> pure $ Right $ Aeson.toJSON Inspector.GetExportedFunctionsResponse
+                { functions = []
+                , importedFiles = []
+                , blockingErrors
                 }
               Just tcResult -> do
                 let -- `tc.dependencies` is the transitive-import *tree*, so a
@@ -880,6 +759,7 @@ handlers evalConfig recorder =
                     response = Inspector.GetExportedFunctionsResponse
                       { functions = summaries
                       , importedFiles = importUris
+                      , blockingErrors
                       }
                 pure $ Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.ExportDocumentMethodName)) $ \_ide params -> do
@@ -897,10 +777,9 @@ handlers evalConfig recorder =
             -- The token stream alongside the type-check result, for the same
             -- reason `l4 render` reads it: the document's language — the HTML
             -- wrapper's @lang@, and the AKN Expression FRBR URIs — comes from the
-            -- module's declared @\@lang@, which lives in the tokens. This request
-            -- carries no language of its own, so there is nothing to override it
-            -- with here, and nothing to fall back FROM either: the CLI's
-            -- "asked-for language nothing renders in" case cannot arise.
+            -- module's declared @\@lang@, which lives in the tokens, unless the
+            -- request names one (@lang@, which the Render tab's language picker
+            -- sets, as @--lang@ does for the CLI).
             (mTc, mToks) <- liftIO $ runAction "l4/exportDocument" _ide $
               (,) <$> use TypeCheck nuri <*> use GetLexTokens nuri
             case mTc of
@@ -909,38 +788,54 @@ handlers evalConfig recorder =
                 , _message = "No type check result available"
                 , _xdata = Nothing }
               Just tcResult -> do
-                let -- Excluded imports are removed from the dependency list
-                    -- outright (not merely set to the 'Exclude' disposition,
-                    -- which only collapses a still-referenced module to
-                    -- "as defined in …" stubs). Dropping the module means its
-                    -- units are never extracted, so the main document's
-                    -- references to them render as plain prose names.
-                    excludedUris = Set.fromList
-                      [ toNormalizedUri (Uri u) | u <- reqParams.excludeModules ]
-                    keepModule (MkModule _ u _) = not (u `Set.member` excludedUris)
-                    deps = filter keepModule (drop 1 (flattenExportModules tcResult))
+                let -- An unticked import is hidden, not dropped: it stays in the
+                    -- dependency list, so the main document's rules keep reading
+                    -- its @nlg sentences and its records, as they do in `l4 render`.
+                    -- Only its own text is left out, and references to it read as
+                    -- plain prose names.
+                    hidden = Map.fromList
+                      [ (toNormalizedUri (Uri u), ExportDoc.Hidden) | u <- reqParams.excludeModules ]
+                    rawDeps = drop 1 (flattenExportModules tcResult)
+                    declaredLang =
+                      Maybe.fromMaybe defaultModuleLang (declaredModuleLang . fst =<< mToks)
+                    requestedLang = MkLangTag <$> reqParams.lang
+                    (docLang, _unsupported) =
+                      Nlg.documentLanguage declaredLang requestedLang (tcResult.module' : rawDeps)
                     ecfg = ExportDoc.defaultExportConfig
                       { ExportDoc.dropUnused = not reqParams.includeUnused
+                      , ExportDoc.moduleDispositions = hidden
                       , ExportDoc.mixfixHeadings =
                           ExportDoc.mixfixHeadingsFromRegistry tcResult.mixfixRegistry
+                      , ExportDoc.mixfixPatterns =
+                          ExportDoc.mixfixPatternsFromRegistry tcResult.mixfixRegistry
                       }
                     rcfg = ExportRender.MkRenderConfig
                              { ExportRender.numberSections = reqParams.numberSections
                              , ExportRender.numberClauses = reqParams.numberClauses
                              , ExportRender.toc = reqParams.toc
-                             , ExportRender.docLang =
-                                 Maybe.fromMaybe defaultModuleLang
-                                   (declaredModuleLang . fst =<< mToks) }
-                    doc = ExportDoc.buildDocument ecfg tcResult.module' deps
+                             , ExportRender.sourceLinks = maybe mempty (ExportRender.sourceLinksFrom . fst) mToks
+                             , ExportRender.docLang = docLang }
+                    -- The same preparation as `l4 render`: a herald written after a
+                    -- rule's last input is moved onto the rule, then the language
+                    -- is chosen, in the imports too.
+                    (docModule, docDeps) = Nlg.prepareModules requestedLang tcResult.module' rawDeps
+                    doc = ExportDoc.buildDocument ecfg docModule docDeps
+                    -- What the Render tab offers to switch to: the languages
+                    -- of the file's own wordings, not of its imports, whose
+                    -- English would otherwise be offered for every file.
+                    languages = Nlg.moduleLanguages declaredLang tcResult.module'
+                    langText (MkLangTag t) = t
                     content = case reqParams.format of
                       "text" -> ExportRender.renderText rcfg doc
                       "akn"  -> ExportRender.renderAkn rcfg doc
                       "json" -> ""
                       _      -> ExportRender.renderHtml rcfg doc
                 pure $ Right $ Aeson.object
-                  [ "format"  Aeson..= reqParams.format
-                  , "content" Aeson..= content
-                  , "ir"      Aeson..= doc
+                  [ "format"    Aeson..= reqParams.format
+                  , "content"   Aeson..= content
+                  , "ir"        Aeson..= doc
+                  , "languages" Aeson..= map langText languages
+                  , "lang"      Aeson..= langText docLang
                   ]
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.ExportPlanMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Ladder.ExportPlanParams
@@ -962,7 +857,8 @@ handlers evalConfig recorder =
                 , _xdata = Nothing }
               Just tcResult -> do
                 let deps = drop 1 (flattenExportModules tcResult)
-                    plan = ExportDoc.buildPlan ExportDoc.defaultExportConfig tcResult.module' deps
+                    (planModule, planDeps) = Nlg.prepareModules Nothing tcResult.module' deps
+                    plan = ExportDoc.buildPlan ExportDoc.defaultExportConfig planModule planDeps
                 pure $ Right $ Aeson.toJSON plan
     ]
 
@@ -1013,21 +909,26 @@ findHover ide fileUri pos = runMaybeT $ refHover <|> tyHover
 -- LSP Code Actions
 -- ----------------------------------------------------------------------------
 
--- | The one code action: for a name no definition supplies, declare it as a
--- @GIVEN@ — of the nearest @§@ heading, or of the enclosing rule. The edit is
--- computed by 'outOfScopeGivenFix' in "LSP.L4.Actions", where it is testable
--- without an IDE; this handler only fetches the checked module and wraps the
--- result as a 'CodeAction'. (Before 2026-09-06 it inserted an @ASSUME@.)
-outOfScopeAssumeQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
-outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
+-- | The out-of-scope quick fix: for a name no definition supplies, declare
+-- it — a term as a @GIVEN@ of the nearest @§@ heading or of the enclosing
+-- rule, a type as a bodiless @DECLARE@ above the declaration that uses it.
+-- The edit is computed by 'outOfScopeFix' in "LSP.L4.Actions", where it is
+-- testable without an IDE; this handler only fetches the checked module and
+-- its tokens and wraps the result as a 'CodeAction'. (Before 2026-09-06 it
+-- inserted an @ASSUME@, and was named @outOfScopeAssumeQuickFix@ until
+-- 2026-10-07; until then, too, a type got the term's @GIVEN@.)
+outOfScopeDeclarationQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
+outOfScopeDeclarationQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
   Nothing -> pure Nothing
   Just ctx -> case ctx.kind of
     OutOfScopeError name ty -> do
-      mTypeCheck <- liftIO $ runAction "codeAction.outOfScope" ide $ do
-        use TypeCheck nuri
+      mInputs <- liftIO $ runAction "codeAction.outOfScope" ide $ do
+        mTypeCheck <- use TypeCheck nuri
+        mLex       <- use GetLexTokens nuri
+        pure ((,) <$> mTypeCheck <*> mLex)
       pure $ do
-        typeCheck <- mTypeCheck
-        fix <- outOfScopeGivenFix typeCheck.module' name ty
+        (typeCheck, (tokens, _)) <- mInputs
+        fix <- outOfScopeFix tokens typeCheck.module' name ty
         Just $ CodeAction
           { _title = fix.title
           , _kind = Just CodeActionKind_QuickFix
@@ -1049,12 +950,109 @@ outOfScopeAssumeQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext o
     uri :: Uri
     uri = fromNormalizedUri nuri
 
+-- | The out-of-scope did-you-mean quick fix: when a name no definition
+-- supplies differs from one that IS in scope only in a confusable
+-- character — a curly quote pasted from Word into one spelling and not the
+-- other, either direction — offer to replace it with the in-scope spelling.
+-- The match is computed by 'Actions.confusableDidYouMeanFix', pure and
+-- testable without an IDE; this handler only gathers the candidate names in
+-- scope at the reference (the same set 'Actions.completions' would offer
+-- there) and wraps the result as a 'CodeAction'.
+outOfScopeConfusableQuickFix :: IdeState -> FileDiagnostic -> ServerM Config (Maybe CodeAction)
+outOfScopeConfusableQuickFix ide fd = case fd ^. messageOfL @CheckErrorWithContext of
+  Nothing -> pure Nothing
+  Just ctx -> case ctx.kind of
+    OutOfScopeError name _ty -> do
+      mTypeCheck <- liftIO $ runAction "codeAction.outOfScopeConfusable" ide $
+        use TypeCheck nuri
+      pure $ do
+        typeCheck <- mTypeCheck
+        range <- rangeOf name
+        let refRaw = rawNameToText (rawName name)
+            inScopeRaw = inScopeRawNamesAt range.start typeCheck
+        fix <- confusableDidYouMeanFix range refRaw inScopeRaw
+        pure (quickFixToCodeAction True [fd ^. fdLspDiagnosticL] uri fix)
+    _ -> pure Nothing
+  where
+    nuri = fd ^. fdFilePathL
+
+    uri :: Uri
+    uri = fromNormalizedUri nuri
+
+-- | Every quick-fix 'CodeAction' a confusable-character lexer error's
+-- 'PError' carries (see 'Actions.lexErrorQuickFixes'): a paired-quote fix
+-- first when there is one, then — for a dash — its two spellings in the
+-- order 'L4.SmartPunctuation.dashReplacementFor' picks for that dash's own
+-- position, or, for every other confusable, just the single-character
+-- replacement. The first is preferred.
+lexErrorCodeActions :: FileDiagnostic -> [CodeAction]
+lexErrorCodeActions fd = case fd ^. messageOfL @PError of
+  Nothing -> []
+  Just pErr ->
+    [ quickFixToCodeAction (i == 0) [fd ^. fdLspDiagnosticL] (fromNormalizedUri (fd ^. fdFilePathL)) fix
+    | (i, fix) <- zip [0 :: Int ..] (lexErrorQuickFixes pErr)
+    ]
+
+-- | The NBSP lint's one code action, from 'Actions.nbspQuickFix'.
+nbspCodeAction :: FileDiagnostic -> Maybe CodeAction
+nbspCodeAction fd = do
+  nl <- fd ^. messageOfL @NbspLint
+  pure $ quickFixToCodeAction True [fd ^. fdLspDiagnosticL] (fromNormalizedUri (fd ^. fdFilePathL)) (nbspQuickFix nl.range)
+
+-- | The whole-file "Straighten all smart punctuation" action, offered once
+-- per request rather than once per diagnostic — megaparsec stops lexing at
+-- the FIRST error, so a document with several confusables shows only one
+-- lexer diagnostic even though 'straightenDocumentQuickFix' would repair
+-- more than that. Gated on there being at least one smart-punctuation
+-- diagnostic already in view (a lexer 'PError' with fixes, or an 'NbspLint'
+-- warning) in the requested range, so this does not fetch and re-lex the
+-- whole file on every unrelated code-action request.
+straightenWholeFileCodeAction :: IdeState -> NormalizedUri -> [FileDiagnostic] -> ServerM Config [CodeAction]
+straightenWholeFileCodeAction ide nuri diags
+  | not relevant = pure []
+  | otherwise = do
+      mRope <- liftIO $ runAction "codeAction.straightenWholeFile" ide $ getFileContents nuri
+      pure $ Maybe.maybeToList $ do
+        rope <- mRope
+        fix <- straightenDocumentQuickFix nuri (Rope.toText rope)
+        pure (quickFixToCodeAction False [] (fromNormalizedUri nuri) fix)
+  where
+    relevant = any isSmartPunctuationDiagnostic diags
+
+    isSmartPunctuationDiagnostic fd =
+      case fd ^. messageOfL @PError of
+        Just pErr | not (null pErr.fixes) -> True
+        _ -> case fd ^. messageOfL @NbspLint of
+          Just _  -> True
+          Nothing -> False
+
+-- | Turn a pure 'Actions.QuickFix' into an LSP 'CodeAction' over one file.
+-- The shared tail of every smart-punctuation code action above.
+quickFixToCodeAction :: Bool -> [Diagnostic] -> Uri -> QuickFix -> CodeAction
+quickFixToCodeAction preferred diagnostics uri fix =
+  CodeAction
+    { _title = fix.title
+    , _kind = Just CodeActionKind_QuickFix
+    , _diagnostics = if null diagnostics then Nothing else Just diagnostics
+    , _isPreferred = if preferred then Just True else Nothing
+    , _disabled = Nothing
+    , _edit = Just WorkspaceEdit
+      { _changeAnnotations = Nothing
+      , _documentChanges = Nothing
+      , _changes = Just $ Map.singleton uri fix.edits
+      }
+    , _command = Nothing
+    , _data_ = Nothing
+    }
+
 data L4Cmd
   = CmdVisualize
   | CmdResetVisualization
   | CmdStateGraph
   deriving stock (Eq, Show, Enum, Bounded)
 
+-- | @l4.visualize@ takes an optional fourth argument, @{"expandCalls": true}@,
+-- for call expansions; see 'decodeVisualiseArgs' and 'VisualiseOptions'.
 l4CmdNames :: [(L4Cmd, Text)]
 l4CmdNames =
   [ (CmdVisualize, "l4.visualize")

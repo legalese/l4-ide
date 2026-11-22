@@ -6,6 +6,7 @@ export * from './language-client.js'
 
 /* Message types for communication between VSCode extension and webview */
 export * from './vscode-and-webview-messages.js'
+export * from './cloud-sessions-messages.js'
 
 // Ladder Backend API
 export * from './ladder-api.js'
@@ -20,3 +21,13 @@ export * from './render-l4-value.js'
 // The "Show state graph" lens: its reply, and the position
 // arithmetic a host needs to redraw the pane after an edit
 export * from './state-graph.js'
+
+// Whether a function takes the DEONTIC simulation envelope, for the deploy
+// sidebar's schema diff
+export * from './deontic-envelope.js'
+
+// What the chat shows for an assistant message's blocks
+export * from './assistant-blocks.js'
+
+// When a rule call's row asks for the schema it renders L4 with
+export * from './rule-render-meta.js'

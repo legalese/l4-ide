@@ -8,5 +8,7 @@ hlib: hself: hsuper: {
   jl4-websessions = hlib.doJailbreak (hself.callCabal2nix "jl4-websessions" ../../jl4-websessions { });
   jl4-core = hlib.doJailbreak (hself.callCabal2nix "jl4-core" ../../jl4-core { });
   jl4-query-plan = hlib.doJailbreak (hself.callCabal2nix "jl4-query-plan" ../../jl4-query-plan { });
-  jl4-lsp = hlib.doJailbreak (hself.callCabal2nix "jl4-lsp" ../../jl4-lsp { });
+  # CI runs the jl4-lsp test suite. Several of its specs walk ../jl4/examples, which is not in
+  # this package's Nix source, so under Nix they find no files and fail.
+  jl4-lsp = hlib.dontCheck (hlib.doJailbreak (hself.callCabal2nix "jl4-lsp" ../../jl4-lsp { }));
 }

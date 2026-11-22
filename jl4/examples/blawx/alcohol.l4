@@ -50,7 +50,7 @@
 -- used to refuse the arrow spelling alone on an `@export`ed decision, so the
 -- arrow spelling never reached the middle end. Since R-X4 (built 2026-09-08) it
 -- refuses BOTH, keyed on arity — `l4 check` on this file reports 14 refusals and
--- nothing is wrong with it — while `l4 blawx` compiles it unchanged, because a
+-- nothing is wrong with it — while `l4 export blawx` compiles it unchanged, because a
 -- refusal about what a JSON request can carry says nothing about a logic
 -- program. `antisocial.l4`'s header records the whole measurement; to publish
 -- this subject as a web API, use the record-spelled `alcohol-twin.l4`.

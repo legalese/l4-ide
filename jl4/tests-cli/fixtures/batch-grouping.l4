@@ -1,0 +1,31 @@
+-- `l4 batch` re-prints a module and evaluates the printed text, so a printer
+-- that loses a bracket changes the answer with no diagnostic. Each export
+-- here nests one connective inside another; tests-cli checks that batch
+-- gives the answer `l4 run` gives for the same inputs. Division is in
+-- batch-division.l4, because a module that fails to re-print fails whole,
+-- and would hide these silent cases behind a loud one.
+
+@export A disjunction inside a conjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+`or under and` MEANS (p OR q) AND r
+
+@export A negation inside a disjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+`not under or` MEANS (NOT p) OR q
+
+@export An implication inside a conjunction
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A BOOLEAN
+`implies under and` MEANS (p IMPLIES q) AND r
+
+#EVAL `or under and` TRUE FALSE FALSE
+#EVAL `not under or` TRUE TRUE FALSE
+#EVAL `implies under and` FALSE FALSE FALSE

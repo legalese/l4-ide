@@ -76,22 +76,22 @@ and test successfully **[E]** (see the appendix header); the Docker leg (colima,
 
 ## 0. Ruling status
 
-| ruling | state                   | detail                                                             |
-| ------ | ----------------------- | ------------------------------------------------------------------ |
-| R1     | **ANSWERED 2026-08-18** | `.blawx` YAML primary; raw `.pl` dumped alongside, §8.1            |
-| R2     | **ANSWERED 2026-08-18** | Blawx _drives_ `L4.Relational`; findall/DNF middle-end first, §8.2 |
-| R3     | **ANSWERED 2026-08-18** | no `@desc` name side-channel in v1, §8.3                           |
-| R4     | **ANSWERED 2026-08-18** | flat numbered CLEAN sections for v1, §8.4                          |
-| R5     | **ANSWERED 2026-08-18** | as proposed; CWA bridges yes-later on corpus need, §8.5            |
-| R6     | **ANSWERED 2026-08-18** | Mode A first; Mode B gate = bounded truth tables, revisit, §8.6    |
-| R7     | **ANSWERED 2026-08-18** | as proposed; money = cents as integers, §8.7                       |
-| R8     | **ANSWERED 2026-08-18** | as proposed; date-library requirements ledger opened, §8.8         |
-| R9     | **ANSWERED 2026-08-18** | share recognisers for now; free to break loose later, §8.9         |
-| R10    | **ANSWERED 2026-08-18** | byte-exact incl. quirks; quirk-fix PR goes to our fork, §8.10      |
-| R11    | **ANSWERED 2026-08-18** | as proposed; `#ASSERT` also emits `false :-`, §8.11                |
-| R12    | **ANSWERED 2026-08-18** | delegated; proposal stands as written, §8.12                       |
-| R13    | **ANSWERED 2026-08-18** | no checksum pin; loud provenance comment instead, §8.13            |
-| R14    | **ANSWERED 2026-08-18** | CLI = `l4 blawx --import`; Blawx may drive SUBJECT-TO, §8.14       |
+| ruling | state                   | detail                                                                                                                         |
+| ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| R1     | **ANSWERED 2026-08-18** | `.blawx` YAML primary; raw `.pl` dumped alongside, §8.1                                                                        |
+| R2     | **ANSWERED 2026-08-18** | Blawx _drives_ `L4.Relational`; findall/DNF middle-end first, §8.2                                                             |
+| R3     | **ANSWERED 2026-08-18** | no `@desc` name side-channel in v1, §8.3                                                                                       |
+| R4     | **ANSWERED 2026-08-18** | flat numbered CLEAN sections for v1, §8.4                                                                                      |
+| R5     | **ANSWERED 2026-08-18** | as proposed; CWA bridges yes-later on corpus need, §8.5                                                                        |
+| R6     | **ANSWERED 2026-08-18** | Mode A first; Mode B gate = bounded truth tables, revisit, §8.6                                                                |
+| R7     | **ANSWERED 2026-08-18** | as proposed; money = cents as integers, §8.7                                                                                   |
+| R8     | **ANSWERED 2026-08-18** | as proposed; date-library requirements ledger opened, §8.8                                                                     |
+| R9     | **ANSWERED 2026-08-18** | share recognisers for now; free to break loose later, §8.9                                                                     |
+| R10    | **ANSWERED 2026-08-18** | byte-exact incl. quirks; quirk-fix PR goes to our fork, §8.10                                                                  |
+| R11    | **ANSWERED 2026-08-18** | as proposed; `#ASSERT` also emits `false :-`, §8.11                                                                            |
+| R12    | **ANSWERED 2026-08-18** | delegated; proposal stands as written, §8.12                                                                                   |
+| R13    | **ANSWERED 2026-08-18** | no checksum pin; loud provenance comment instead, §8.13                                                                        |
+| R14    | **ANSWERED 2026-08-18** | CLI = `l4 blawx --import` (**REVERSED 2026-09-24**: `l4 import blawx`, CLI-SURFACE-SPEC C1); Blawx may drive SUBJECT-TO, §8.14 |
 
 All fourteen rulings were answered by Meng on 2026-08-18; each §8 entry carries the ruling
 beneath its original evidence/cost/case-against, per house style. Consequences now in motion:
@@ -1649,7 +1649,7 @@ the structure the XML already carries. **Not decided.** CLI surface (`l4 blawx -
 `l4 import` family); whether lifted defeat structure waits for
 `SUBJECT-TO-NOTWITHSTANDING` to land as structure rather than comments.
 
-**ANSWERED 2026-08-18 (Meng).** CLI surface: `l4 blawx --import`. And the dependency direction is settled: where lifted defeat structure needs a landed `SUBJECT TO`/`NOTWITHSTANDING`, the Blawx project drives that work incrementally rather than waiting on it.
+**ANSWERED 2026-08-18 (Meng).** CLI surface: `l4 blawx --import`. **REVERSED 2026-09-24** by `CLI-SURFACE-SPEC.md` C1, which chose the `l4 import` family this ruling passed over: the export is now `l4 export blawx`, the import `l4 import blawx`, and `--parse-only`/`--reemit` belong to the import alone. The rest of this spec keeps the old spellings, as a record of what was run. And the dependency direction is settled: where lifted defeat structure needs a landed `SUBJECT TO`/`NOTWITHSTANDING`, the Blawx project drives that work incrementally rather than waiting on it.
 
 **EXECUTED 2026-08-19 — both directions of the bird cross-check are green.**
 `L4.Blawx.Xml` → `L4.Blawx.Blocks` → `L4.Blawx.Parse` → `L4.Blawx.Lift`, with the CLI surface

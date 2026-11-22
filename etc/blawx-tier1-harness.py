@@ -6,7 +6,7 @@ Blawx container — and compares each test query's answer to the L4 oracle.
 
 For each seed pair jl4/examples/blawx/<name>.l4 + expected/<name>.blawx:
 
-  1. parse the .blawx (the restricted YAML subset `l4 blawx` emits) into
+  1. parse the .blawx (the restricted YAML subset `l4 export blawx` emits) into
      workspaces and tests;
   2. parse the `-- L4 oracle ==>` comments in the .l4 — one per #EVAL/#ASSERT
      directive, in directive order, matching the tests' q1..qn order (the
@@ -48,8 +48,8 @@ repo claims tier 3 for the Blawx leg.
 
 THE IMPORT DIRECTION (BLAWX-EXPORT-SPEC R14, spec §10 P5) rides the same
 machinery, from `jl4/examples/blawx/imported/`: the .l4 is what
-`l4 blawx --import` LIFTED, its `-- L4 oracle ==>` lines are what the L4
-engine answered, and the .blawx beside it is what `l4 blawx --import
+`l4 import blawx` LIFTED, its `-- L4 oracle ==>` lines are what the L4
+engine answered, and the .blawx beside it is what `l4 import blawx
 --reemit` regenerated FROM THE PARSED BLOCKS via `renderScasp` (never the
 stored, and usually stale, encoding).  So a PASS here is the cross-engine
 claim P5 exists to make: the same query, put to L4 and to s(CASP), coming
@@ -197,7 +197,7 @@ def have_scasp():
     return True, ""
 
 
-# --- .blawx parsing (the restricted subset `l4 blawx` emits) ---------------
+# --- .blawx parsing (the restricted subset `l4 export blawx` emits) ---------------
 
 def parse_blawx(path):
     """Return (workspaces, tests): lists of (name, encoding) in file order."""
@@ -234,7 +234,7 @@ def parse_blawx(path):
 def parse_unlifted(path):
     """Test names the lift REFUSED, read off the `-- NOT LIFTED` lines it wrote.
 
-    `l4 blawx --import` drops a test canvas it cannot lift — `rps`'s
+    `l4 import blawx` drops a test canvas it cannot lift — `rps`'s
     `hypothetical` declares `#abducible`s, and abduction is not evaluation — and
     says so in the artifact where the `#EVAL` would have gone, so the .l4 has no
     directive for it. The .blawx beside it still carries the test, because the
@@ -545,7 +545,7 @@ def twin_preflight(seed, twin):
 # `bobjane` test's `xml_content` replace the query's `first_element` -- the
 # `object_selector` block naming `testgame` -- with a `variable` block named
 # `Game`, so the query reads `?- winner(Game,Winner).` with BOTH places free.
-# `l4 blawx --import` lifts that to the nested comprehension and records the
+# `l4 import blawx` lifts that to the nested comprehension and records the
 # oracle `LIST LIST "testgame", "jane"`; registered here as an IMPORTED seed it
 # runs 2/2, real s(CASP) answering `[('testgame','jane')]`.  The fixture is not
 # committed -- it is a document Jason did not write, and its `.blawx` would be

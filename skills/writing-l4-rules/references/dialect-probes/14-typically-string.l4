@@ -1,0 +1,2 @@
+DECLARE Place HAS
+    country IS A STRING TYPICALLY "Singapore"

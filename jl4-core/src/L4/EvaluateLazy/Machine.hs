@@ -15,6 +15,11 @@ module L4.EvaluateLazy.Machine
 , tryEval
 , traceEval
 , raiseException
+-- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
+, tickUnknownSteps
+, resetUnknownSteps
+, reachedUnknowns
+, unknownNames
 , withPoppedFrame
 , newUnique
 , getTemporalContext
@@ -24,6 +29,12 @@ module L4.EvaluateLazy.Machine
 , getModuleUri
 , getSafeMode
 , formatUTCTimeIso
+, getAnswerInJust
+-- * The string parsers TODATE, TOTIME and TODATETIME use, for callers that must
+-- agree with them (jl4-service names the input one of them refused).
+, parseDateText
+, parseTimeText
+, parseDatetimeText
 -- * STATE-AS-LEDGER substrate. Exposed for the test suite and the high-level
 -- driver in 'L4.EvaluateLazy'; not part of the stable public API.
 , tellEventRouted
@@ -45,6 +56,12 @@ module L4.EvaluateLazy.Machine
 , readEvalRef
 , Note (..)
 , tellNote
+, Presumed (..)
+, PresumedOrigin (..)
+, PresumedLog
+, emptyPresumedLog
+, presumedEvents
+, renderPresumedPath
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -58,6 +75,7 @@ module L4.EvaluateLazy.Machine
 , emptyEnvironment
 , boolView
 , pattern ValBool
+, builtinConnective
 -- * Constants exposed for the eager evaluator
 , builtinBinOps
 , writeJSONToReferences
@@ -69,6 +87,8 @@ import qualified Base.DList as DList
 import qualified Base.Text as Text
 import qualified Base.Map as Map
 import qualified Base.Set as Set
+import qualified Data.IntMap.Strict as IntMap
+import Data.IntMap.Strict (IntMap)
 import Control.Concurrent
 import System.Environment (lookupEnv)
 import qualified Data.ByteString as BS
@@ -90,7 +110,6 @@ import qualified Data.Time as Time
 import Data.Time.LocalTime (TimeOfDay(..), LocalTime(..), timeToTimeOfDay, timeOfDayToTime)
 import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
-import qualified Data.Time.Zones.All as TZAll
 import L4.Annotation
 import L4.Evaluate.Ledger
   ( EventRoute (..)
@@ -109,7 +128,7 @@ import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (CtxReads (..), EvalClause (..), ReadObs (..), TemporalContext (..), applyEvalClauses, hasReads, noReads, validFor)
 import L4.Parser.SrcSpan (SrcRange, prettySrcRangeM)
-import L4.Print hiding (tryLoadTZ, tryLoadTZPure, formatDateTimeIso)
+import L4.Print hiding (tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
@@ -117,15 +136,29 @@ import L4.EvaluateLazy.ContractFrame
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
-import L4.EvaluateLazy.Trace (EvalTraceAction (..))
+import L4.EvaluateLazy.SiblingReads
+import qualified L4.Lint.SiblingReads as Lint
+import L4.EvaluateLazy.Trace (EvalTrace, EvalTraceAction (..))
+import L4.Presumption
+import L4.TypeSynonym (substituteTypeParams)
+import L4.TypeCheck.Unify (synonymExpansionFuel)
 import L4.TracePolicy (TracePolicy)
 import qualified L4.TracePolicy as TracePolicy
 import L4.Utils.Ratio
 import Text.Read (readMaybe)
 import qualified Data.Scientific as Sci
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Exception (SomeException, catch)
+import Control.Exception (SomeException, catch, fromException, throwIO, uninterruptibleMask_)
+import GHC.Conc (getAllocationCounter, setAllocationCounter)
 import qualified Control.Exception
+
+-- | The right operand of a built-in connective, kept until the left has said
+-- whether it is needed: an expression, from a call written as @a AND b@, or
+-- a reference, from a call through a variable holding the connective.
+data ConnRight
+  = ConnRightExpr (Expr Resolved) Environment
+  | ConnRightRef Reference
+  deriving stock Show
 
 data Frame =
     BinOp1 BinOp {- -} (Expr Resolved) Environment
@@ -148,9 +181,12 @@ data Frame =
   -- 'Nothing' is M1 expression use (the write returns its value); @Just k@ makes
   -- the write an event-free deontic step (after 'tellEvent', forward
   -- @[time, events]@ to @k@). The 'Maybe Text' is the NOTIFY recipient key.
-  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved))
-  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text)
-  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text)
+  | Record0 {- -} (Expr Resolved) (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe SrcRange)
+  | Record1 {- -} (Expr Resolved) Environment Bool (Maybe (Expr Resolved)) (Maybe Text) (Maybe SrcRange)
+  | Record2 WHNF {- -} Bool Environment (Maybe (Expr Resolved)) (Maybe Text) (Maybe SrcRange)
+  -- (The trailing 'Maybe SrcRange' on the three Record and the two ReadCell
+  -- frames is the site, for the sibling-read check's messages,
+  -- 'L4.EvaluateLazy.SiblingReads'.)
   -- STATE-AS-LEDGER M1.5 / M4.5: RECALL. 'ReadCell1' waits for the CELL to
   -- evaluate to a 'WHNF'; it carries the optional party-qualifier expr (still
   -- unevaluated), the isOfficial flag, and the env to evaluate the qualifier in.
@@ -163,13 +199,13 @@ data Frame =
   -- The 'RecallMode' (last-write-wins vs collect-all, approach B) is carried
   -- through to 'finishRead' so the read folds the chosen ledger into either a
   -- MAYBE (last) or a LIST (all).
-  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment
+  | ReadCell1 {- -} (Maybe (Expr Resolved)) Bool RecallMode Environment (Maybe SrcRange)
   -- 'ReadCell2' waits for the PARTY qualifier to evaluate; it carries the
   -- already-evaluated cell WHNF and the 'RecallMode' so 'finishRead' can complete
   -- the read against the named party's own ledger. The mode MUST be threaded here
   -- too: the cross-party branch pushes 'ReadCell2' before reaching 'finishRead',
   -- so without it @RECALL ALL <party>'s@ would silently fall back to last-write-wins.
-  | ReadCell2 WHNF RecallMode {- -}
+  | ReadCell2 WHNF RecallMode {- -} (Maybe SrcRange)
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -184,9 +220,32 @@ data Frame =
   -- and the frame then touches the log not at all; with the log off it is
   -- always 'False'. No extra frame, so the stack is the same in both modes.
   | RestoreCurrentParty (Maybe Text) Bool
+  -- smucclaw/l4-ide#1069: restore the sibling-read check's operand path and
+  -- clock once a compound (and the frames it pushed) has evaluated. Pushed
+  -- beneath the compound's 'RBinOp1', so it runs after the 'RBinOp2' or the
+  -- @ROR@ short-circuit has combined the operands.
+  | RestoreSibling OperandPath Clock
+  -- smucclaw/l4-ide#1069: restore the sibling-read check's 'ssBehind' once a
+  -- barrier, which takes again events the compounds around it have taken,
+  -- has evaluated. Pushed beneath the barrier's frames ('startBarrier').
+  | RestoreBehind Int
+  -- smucclaw/l4-ide#1069, NORM-LOG-SPEC N10's option A: a @RAND@ whose
+  -- operands take the trace one event at a time. It sits on the stack beneath
+  -- the operand that is running, or beneath the force of the compound's own
+  -- stream, and holds the operands that are waiting for the next event. See
+  -- Note [Operands in step] and 'startCompound'.
+  | Lockstep LockstepFrame
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
-  | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
+  | ConnectiveLeft Connective (Maybe ConnRight) {- -}
+    -- ^ the left operand of a built-in connective (NOT's only one) is being
+    -- evaluated; the right operand is still to come, if there is one
+  | ConnectiveRight Connective Term {- -}
+    -- ^ the right operand of a connective whose left operand is the term
+    -- (UNKNOWN-EVALUATION-SPEC §4.3): combined with it by the connective's
+    -- table, and the frame through which an error, a refusal or running out
+    -- of steps in the right operand unwinds as 'Stuck' (§8 step 3)
+  | ConsiderWhen1 (Maybe PmGroup) Reference {- -} (Expr Resolved) [Branch Resolved] Environment
   | PatNil0
   | PatCons0 (Pattern Resolved) Environment (Pattern Resolved)
   | PatCons1 {- -} Reference Environment (Pattern Resolved)
@@ -205,9 +264,12 @@ data Frame =
     -- way; 'PatApp1' did not, which is why @Pay (EXACTLY t) (EXACTLY theLandlord)@
     -- reported @theLandlord is not in scope@ while
     -- @Pay (EXACTLY theLandlord) payee@ worked.
-  | EqConstructor1 {- -} Reference [(Reference, Reference)]
-  | EqConstructor2 WHNF {- -} [(Reference, Reference)]
-  | EqConstructor3 {- -} [(Reference, Reference)]
+  | EqConstructor1 (Maybe Term) {- -} Reference [(Reference, Reference)]
+  | EqConstructor2 (Maybe Term) WHNF {- -} [(Reference, Reference)]
+  | EqConstructor3 (Maybe Term) {- -} [(Reference, Reference)]
+    -- ^ the 'Maybe Term' in the three is what the components compared so far
+    -- came to when one of them was a term: the equalities are combined left
+    -- to right by the @AND@ table (§8 step 3)
   | UnaryBuiltin0 UnaryBuiltinFun (Maybe (Type' Resolved)) -- Added type for type-directed decoding
   | BinBuiltin1 BinOp Reference
   | BinBuiltin2 BinOp WHNF
@@ -253,6 +315,84 @@ data Frame =
   | JsonEncodeConstructorFrame [(Text, Text)] Text [(Text, Reference)] -- accumulated (fieldName, encodedJson) pairs, current field name, remaining (fieldName, fieldRef) pairs to encode
   deriving stock Show
 
+-- | A @RAND@ whose operands run in step (smucclaw/l4-ide#1069; NORM-LOG-SPEC
+-- N10's option A): every operand takes event n of the compound's stream
+-- before any operand takes event n+1, as Hvitved's reduction semantics
+-- reduces both conjuncts of @c1 and c2@ on one event (thesis Fig. 2.8,
+-- p. 49) and his monitor feeds a specification one event at a time (§2.3.6,
+-- p. 52). See 'startLockstep'.
+data LockstepFrame = MkLockstepFrame
+  { lsGate    :: !Int
+    -- ^ the number every gate of this compound carries ('mintGate'), so a
+    -- forced gate finds this frame on the stack
+  , lsScope   :: !Int
+    -- ^ the sibling-read check's scope for this application of the compound
+  , lsOp      :: RBinOp
+  , lsEnv     :: Environment
+  , lsTime    :: Reference
+    -- ^ the compound's own time, every operand's first clock
+  , lsType    :: Maybe (Type' Resolved)
+  , lsStream  :: Reference
+    -- ^ the part of the compound's stream no operand has been handed yet
+  , lsSlots   :: [OperandSlot]
+    -- ^ the operands, left first
+  , lsRunning :: Maybe Int
+    -- ^ the operand running above this frame; 'Nothing' while the frame is
+    -- forcing 'lsStream'
+  , lsRound   :: [Int]
+    -- ^ the operands still to be started, or still to be handed the current
+    -- cell, in order
+  , lsCell    :: Maybe (Maybe Reference)
+    -- ^ the cell this round hands out: 'Nothing' before the first event,
+    -- @Just (Just e)@ the event @e@, @Just Nothing@ the end of the stream
+  , lsTaken   :: !Int
+    -- ^ how many events have been handed out
+  , lsHead    :: Maybe (Reference, Reference)
+    -- ^ under an evaluation trace, the event and the rest of the stream while
+    -- the frame forces the event, outside every operand ('lockstepReturn')
+  , lsBase    :: DynState
+    -- ^ the dynamic state the compound was applied under
+  }
+  deriving stock Show
+
+-- | One operand of a 'LockstepFrame'.
+data OperandSlot
+  = SlotPending MaybeEvaluated
+    -- ^ not started yet
+  | SlotRunning
+    -- ^ running above the frame
+  | SlotPaused PausedOperand
+    -- ^ waiting for the next cell of the stream
+  | SlotDone WHNF
+    -- ^ finished: a verdict, or the residual it left when its stream ended
+  deriving stock Show
+
+-- | An operand that forced its gate: the frames it had pushed above the
+-- compound's frame, top first, the gate it is waiting on, and the dynamic
+-- state it had.
+data PausedOperand = MkPausedOperand
+  { poFrames :: [Frame]
+  , poGate   :: Reference
+  , poDyn    :: DynState
+  }
+  deriving stock Show
+
+-- | The machine's dynamic state that frames save and restore around a
+-- stretch of evaluation, and so that an operand paused between events takes
+-- with it: the acting party, the temporal context, the deontic log's
+-- re-look scope, and the sibling-read check's operand path and clock.
+data DynState = MkDynState
+  { dyParty    :: Maybe Text
+  , dyTemporal :: TemporalContext
+  , dyRelook   :: Maybe [Maybe SrcRange]
+  , dyPath     :: OperandPath
+  , dyClock    :: Clock
+  , dyBehind   :: Int
+  , dyMuted    :: Int
+    -- ^ 'traceMuted': one more than the compound's own while an operand runs
+  }
+  deriving stock Show
+
 -- ----------------------------------------------------------------------------
 -- The evaluation monad.
 --
@@ -281,6 +421,28 @@ data EvalState =
                                      -- that party's own ledger. 'Nothing' = no enclosing
                                      -- party (a top-level RECORD), routed to the anonymous
                                      -- own ledger. Set/restored around 'continueWithFollowup'.
+    , siblings :: !(IORef SiblingState)
+                                     -- ^ smucclaw/l4-ide#1069: the sibling-read check's
+                                     -- state (the compound operand the evaluation is in,
+                                     -- the contract clock, and every read and write made
+                                     -- inside an operand), per directive like the ledger.
+                                     -- See 'L4.EvaluateLazy.SiblingReads'.
+    , siblingStarts :: !(IORef (IntMap Reference))
+                                     -- ^ the time of each compound that started while
+                                     -- its time was still a thunk, by scope, until it is
+                                     -- found evaluated ('siblingCheck')
+    , operandsInStep :: !Bool
+                                     -- ^ smucclaw/l4-ide#1069: run a @RAND@'s operands in
+                                     -- step (Note [Operands in step]). 'False' only to
+                                     -- compare with the order every @RAND@ had before,
+                                     -- one operand over the whole stream and then the
+                                     -- other ('L4.EvaluateLazy.EvalConfig').
+    , traceMuted :: !(IORef Int)
+                                     -- ^ while above 0, 'traceEval' records nothing: an
+                                     -- operand of an in-step compound is running, whose
+                                     -- frames the trace builder cannot nest (Note
+                                     -- [Operands in step]). Saved and restored with the
+                                     -- rest of the dynamic state ('DynState').
     , entityInfo :: !EntityInfo    -- type information for constructors/records
     , evalTime   :: !UTCTime
     , temporalContext :: !(IORef TemporalContext)
@@ -310,12 +472,159 @@ data EvalState =
       -- silent nullity is how a party loses a deadline it believed it had
       -- met; the second is the empty window a run reveals. Nothing here is
       -- an error: the value stands.
+    , unknownSteps :: !(IORef Int)
+      -- ^ UNKNOWN-EVALUATION-SPEC §4.5's step counter (C4): negative until a
+      -- site of §4.3's table first receives a term in this directive, then
+      -- the machine steps still allowed. Reset per directive.
+    , unknownReached :: !(IORef [Term])
+      -- ^ every input, or field of one, that reached a §4.3 site in this
+      -- directive, first first: what a directive that runs out of steps is
+      -- Stuck on (§8 step 3). Reset per directive.
     , deonticLog :: !(Maybe DeonticLog)
       -- ^ LTS-VISUALISER §4.3 (P2b): the deontic step log, OPTIONAL and off
       -- by default exactly as 'evalTrace' is (ruling R5, §8). 'Nothing' means
       -- no call site computes anything; 'L4.EvaluateLazy.captureDeonticSteps'
       -- installs one for the duration of a directive.
+    , presume :: !Bool
+      -- ^ T4's presumption switch (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §5): when
+      -- False, a @TYPICALLY@ default is not used where a value can be
+      -- supplied, so an absent input is absent with no default. Read by the
+      -- JSON decoder for the REQUEST's decode only ('requestRecord'); discharge
+      -- reads the same flag from the 'EvalConfig'.
+    , requestRecord :: !(Maybe Text)
+      -- ^ The record type the request's arguments are decoded into, when the
+      -- evaluation has a request ('L4.Presumption.requestRecordName'). A
+      -- decode at that type is the request's: the switch above reaches it, and
+      -- its defaults are reported as the request's. Any other decode is the
+      -- rules' own: it always fills its defaults, because no request can
+      -- supply them (T4b).
+    , presumableDefs :: !(Map Unique Presumed)
+      -- ^ The module-level 0-ary definitions that ARE a default: a section
+      -- binder's @TYPICALLY@, which 'L4.Discharge' turns into a definition,
+      -- and any default a caller filled at the root. Static for the run.
+      -- 'evalDecide' registers each one's reference in 'presumable'.
+    , presumable :: !(IORef (IntMap (IORef Thunk, Presumed)))
+      -- ^ References whose first force means a default took effect. Filled
+      -- by 'evalDecide' (from 'presumableDefs') and by the JSON decoder (a
+      -- field it filled from its @DECLARE@); drained by 'evalRef', which
+      -- reports each one once, in 'presumed', the first time it is forced.
+      --
+      -- Keyed by the address's number, and confirmed by the reference's own
+      -- pointer: an address is unique only within the run that minted it, and
+      -- a reference from another run (the service's cached import environment
+      -- holds the main module's compile-time references, numbered like this
+      -- run's) must never match. 'snapshotRef' re-registers a copy it makes.
+      -- Each run gets its own registry ('L4.EvaluateLazy' builds a fresh
+      -- 'EvalState' per evaluation), so concurrent requests share none of it.
+      --
+      -- Known gap: a reader that peeks at a thunk without 'evalRef'
+      -- ('peekWHNF', 'peekNF'; the deontic machinery's reads of a party) sees
+      -- a decoder-filled default, which is a value from birth, without
+      -- reporting it.
+    , recordDefaults :: Map Unique (Map Text (Expr Resolved))
+      -- ^ Each record type's field defaults, keyed by the type's 'Unique' and
+      -- then by field name, from the @DECLARE@s of the evaluated module and of
+      -- whatever modules the caller passed beside it. The JSON decoder fills an
+      -- absent field from here (T1b). Static for the run, and deliberately
+      -- lazy: only a run that decodes JSON pays for walking the modules.
+    , presumed :: !(IORef PresumedLog)
+      -- ^ The defaults that took effect during this directive, in the order
+      -- they were forced: W8's \"took its default\" event. Per directive,
+      -- like 'notes' (swapped fresh by 'L4.EvaluateLazy.withFreshLedger').
+    , answerInJust :: !Bool        -- see 'L4.EvaluateLazy.EvalConfig'
+    , maxFrameDepth :: !Int        -- see 'maximumFrameDepth'
+    , tracePostprocessor :: [EvalTraceAction] -> EvalTrace  -- see 'L4.EvaluateLazy.EvalConfig'
     }
+
+-- | 'EvalState.presumed': the events in the order forced, and the ones seen,
+-- so that a repeat is dropped without rescanning the list.
+data PresumedLog = MkPresumedLog
+  { events :: !(DList Presumed)
+  , seen   :: !(Set ([Text], PresumedOrigin))
+  }
+
+emptyPresumedLog :: PresumedLog
+emptyPresumedLog = MkPresumedLog mempty Set.empty
+
+presumedEvents :: PresumedLog -> [Presumed]
+presumedEvents l = DList.toList l.events
+
+-- | W8's \"took its default\" event (TYPICALLY-ONE-BEHAVIOUR-SPEC.md §4 W8,
+-- §5 T6): a @TYPICALLY@ default that was actually forced, so the answer
+-- rests on it.
+--
+-- Recorded when the default is FORCED, not when it is filled in: an input the
+-- rule never reads did not shape the answer, and T6 lists only the defaults
+-- that did. That is why the event is raised by 'evalRef' rather than at the
+-- fill site, wherever the fill happened.
+data Presumed =
+  MkPresumed
+    { path       :: ![Text]
+      -- ^ Where the default landed: the input's name, then the field names
+      -- below it, with a list element written as its index.
+    , declaredAt :: !(Maybe SrcRange)
+      -- ^ The @TYPICALLY@ that supplied the value.
+    , origin     :: !PresumedOrigin
+    }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | Which fill site supplied a default. A consumer keeps only the events that
+-- belong to its request (T6b): an L4 program may decode JSON of its own.
+data PresumedOrigin
+  = FromSectionBinder
+    -- ^ A section @GIVEN@'s default, filled at the root by 'L4.Discharge'.
+  | FromRootFill
+    -- ^ A default the caller filled at the root ('presumableDefs').
+  | FromRequest
+    -- ^ A field of the request's own decode ('EvalState.requestRecord'),
+    -- filled from its @DECLARE@, or a MAYBE there filled with NOTHING.
+  | FromDecode !Text
+    -- ^ A field of a decode the RULES made, filled the same way; the text is
+    -- the type that decode started from.
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass NFData
+
+-- | Report a default that took effect ('EvalState.presumed'), once.
+tellPresumed :: Presumed -> Eval ()
+tellPresumed p = do
+  psRef <- asks (.presumed)
+  liftIO $ modifyIORef' psRef \ l ->
+    let key = (p.path, p.origin)
+    in if key `Set.member` l.seen
+         then l
+         else MkPresumedLog (l.events `DList.snoc` p) (Set.insert key l.seen)
+
+-- | Mark a reference as a default, so that forcing it reports one.
+registerPresumable :: Reference -> Presumed -> Eval ()
+registerPresumable rf p = do
+  pRef <- asks (.presumable)
+  liftIO $ modifyIORef' pRef (IntMap.insert (addressNumber rf.address) (rf.pointer, p))
+
+-- | The default a reference was registered as, if it is one not yet forced.
+-- The pointer comparison is what makes a number from another run harmless.
+lookupPresumable :: Reference -> Eval (Maybe Presumed)
+lookupPresumable rf = do
+  m <- readEvalRef (.presumable)
+  pure $ case IntMap.lookup (addressNumber rf.address) m of
+    Just (ptr, p) | ptr == rf.pointer -> Just p
+    _                                 -> Nothing
+
+addressNumber :: Address -> Int
+addressNumber (MkAddress _ i) = i
+
+-- | Called on every force ('evalRef'): if the reference is a default nobody
+-- has forced yet, report it. The map is empty for almost every run, and the
+-- 'IntMap.null' test is all such a run pays.
+notePresumedForce :: Reference -> Eval ()
+notePresumedForce rf = do
+  pRef <- asks (.presumable)
+  m <- liftIO (readIORef pRef)
+  unless (IntMap.null m) $
+    for_ (IntMap.lookup (addressNumber rf.address) m) \ (ptr, p) ->
+      when (ptr == rf.pointer) do
+        liftIO $ modifyIORef' pRef (IntMap.delete (addressNumber rf.address))
+        tellPresumed p
 
 -- | A note the run reports beside a directive's value ('EvalState.notes').
 -- Plain text: rendered where it is raised, from what the machine has in
@@ -365,8 +674,36 @@ newtype Eval a = MkEval (EvalState -> IO a)
 -- written against this alias.
 type Machine = Eval
 
+-- | Run an evaluation. An exception that is not an 'EvalException' (a time or
+-- allocation limit, a cancelled thread, a Haskell crash) leaves the frame
+-- stack as it was, because only 'raiseException' unwinds it; so the frames
+-- still on it are unwound here, and a thunk whose force was interrupted gets
+-- its blackhole mark back ('unwindFrame'). Thunks of imported modules outlive
+-- the run, and a mark left on one made the next run on the same thread report
+-- an infinite loop (smucclaw/l4-ide#1020).
+--
+-- The unwinding is uninterruptible, so a second exception cannot cut it
+-- short, and it is cheap for the same reason: one walk over the frame list,
+-- touching only the frames that restore state, with no trace entry and no
+-- write to the stack per frame.
+-- It also runs with the allocation counter lifted. After an allocation limit
+-- is hit, the RTS re-arms it with a grace of about 100 KB and raises again
+-- for every further 100 KB; the unwinding allocates, those raises wait for the
+-- end of the mask, and they would land outside whatever catches the limit
+-- (a dropped connection, where the limit should have been a 500). The counter
+-- is put back as it was, so what the caller reads from it is unchanged.
 runEval :: EvalState -> Eval a -> IO a
-runEval s (MkEval f) = f s
+runEval s (MkEval f) = f s `catch` \(e :: SomeException) -> do
+  case fromException e of
+    Just (_ :: EvalException) -> pure ()
+    Nothing -> uninterruptibleMask_ do
+      counter <- getAllocationCounter
+      setAllocationCounter maxBound
+      frames <- (.frames) <$> readIORef s.stack
+      writeIORef s.stack emptyStack
+      let MkEval unwind = traverse_ unwindFrame frames in unwind s
+      setAllocationCounter counter
+  throwIO e
 
 -- | Catch evaluation exceptions (used at directive boundaries).
 tryEval :: Eval a -> Eval (Either EvalException a)
@@ -397,7 +734,11 @@ traceEval ta = do
   mtr <- asks (.evalTrace)
   case mtr of
     Nothing -> pure ()
-    Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
+    Just tr -> do
+      mref <- asks (.traceMuted)
+      liftIO do
+        muted <- readIORef mref
+        when (muted == 0) (modifyIORef' tr (`DList.snoc` ta))
 
 -----------------------------------------------------------------------------
 -- The deontic step log (LTS-VISUALISER §4.3, amended by §4.9; P2b).
@@ -460,6 +801,33 @@ peekClock :: Reference -> Eval (Maybe Rational)
 peekClock rf = peekWHNF rf >>= pure . \ case
   Just (ValNumber t) -> Just t
   _                  -> Nothing
+
+-- | The event at the head of a stream, when it is a copy RE-OFFERED to a
+-- continuation (Contract5's expiry: the event that revealed a missed
+-- deadline, or a kept SHANT's discharge) — its party, action and stamp.
+-- Peeked, never forced: a re-offered copy is allocated as a value, so a head
+-- that is still a thunk is not one.
+revealingEvent :: Reference -> Eval (Maybe (Reference, Reference, Rational))
+revealingEvent evs = peekWHNF evs >>= \ case
+  Just (ValCons hd _) -> isReoffered hd >>= \ case
+    Nothing -> pure Nothing
+    Just _  -> peekWHNF hd >>= \ case
+      Just (ValEvent p a tR) -> fmap (p, a,) <$> peekClock tR
+      _                      -> pure Nothing
+  _ -> pure Nothing
+
+-- | A breach whose declared failures have no timing yet, given one (SEESAW,
+-- spec §6.1.2). When nothing in it had a timing — one @BREACH@, naming one
+-- party or a list — every entry now took effect at the one instant, so
+-- every entry is decisive; otherwise the decisive entries stay as they were.
+restamp :: Timing Reference -> ReasonForBreach Reference -> ReasonForBreach Reference
+restamp t reason = breachOf $
+  if allUntimed then filled {alsoDecisive = filter (/= anchorIndex filled) [0 .. length (blameList filled) - 1]}
+  else filled
+  where
+    blame = breachBlame reason
+    filled = fillDeclaredTiming t blame
+    allUntimed = all (isNothing . failureTiming) (blameList blame)
 
 -- | The action of a forced action reference, if forced.
 peekAction :: Reference -> Eval (Maybe Text)
@@ -640,8 +1008,8 @@ breachSummary reason = do
   let blame = breachBlame reason
   failures <- traverse failureSummary (toList (blameList blame))
   (party, name, deadline) <- case blame.anchor of
-    MissedDeadline partyR _ d -> (\ (p, n) -> (p, n, Just d)) <$> blameOf partyR
-    DeclaredBreach mParty _   -> (\ (p, n) -> (p, n, Nothing)) <$> maybe (pure (Nothing, Nothing)) blameOf mParty
+    MissedDeadline partyR _ d _ -> (\ (p, n) -> (p, n, Just d)) <$> blameOf partyR
+    DeclaredBreach mParty _ _   -> (\ (p, n) -> (p, n, Nothing)) <$> maybe (pure (Nothing, Nothing)) blameOf mParty
   pure MkBreachSummary
     { bsBlame = party
     , bsBlameName = name
@@ -660,10 +1028,10 @@ breachSummary reason = do
       Just v  -> (Just (partyKeyWHNF v),) <$> peekName v
     peekParty rf = fmap partyKeyWHNF <$> peekWHNF rf
     failureSummary = \ case
-      MissedDeadline partyR act d -> do
+      MissedDeadline partyR act d _ -> do
         party <- peekParty partyR
         pure (MissedSummary party (prettyLayout act) d)
-      DeclaredBreach mParty mReason -> do
+      DeclaredBreach mParty mReason _ -> do
         -- whether BY named anyone is known without forcing; who, only if forced
         party <- maybe (pure NobodyNamed) (fmap PartyNamed . peekParty) mParty
         why <- maybe (pure Nothing) peekReason mReason
@@ -696,12 +1064,90 @@ plainStep clock ev scrutiny norm outcome = MkDeonticStep
 -- active trace records the pops, mirroring the historical behaviour),
 -- interpreting the state-restoring frames along the way ('unwindFrame'),
 -- and then throw an IO exception.
+--
+-- Each frame is popped and unwound under 'uninterruptibleMask_', as one step.
+-- An allocation limit or a timeout that landed between the pop and
+-- 'unwindFrame' lost the frame: 'runEval' only unwinds the frames still on the
+-- stack, so an 'UpdateThunk' popped but not yet unwound left its thunk
+-- blackholed, which for an imported thunk is smucclaw/l4-ide#1020 again.
+-- Between frames the mask is off, so a limit landing there finds the next
+-- frame still on the stack, and 'runEval' unwinds it. The mask is only on this
+-- exception path, so evaluation that raises nothing pays nothing.
 raiseException :: EvalException -> Eval a
-raiseException e = do
-  traceEval (Exit (Left e))
-  withPoppedFrame \ case
-    Nothing -> liftIO (Control.Exception.throwIO e)
-    Just f  -> unwindFrame f >> raiseException e
+raiseException e0 = loop e0
+ where
+  -- 'Exit' before every 'Pop', as when this called itself once per frame:
+  -- the trace builder closes a node on 'Pop' and drops one without a result.
+  -- Neither touches a frame, so both stay outside the mask.
+  -- What a frame turns the exception into ('rewriteUnwinding') goes on to the
+  -- next frame, so the exception thrown at the bottom is the rewritten one.
+  loop e = do
+    traceEval (Exit (Left e))
+    r <- case unwindOne e of MkEval g -> MkEval (uninterruptibleMask_ . g)
+    case r of
+      Nothing -> liftIO (Control.Exception.throwIO e)
+      Just e' -> loop e'
+  unwindOne e = withPoppedFrame \ case
+    Nothing -> pure Nothing
+    Just f  -> unwindFrame f >> pure (Just (rewriteUnwinding f e))
+
+-- | What an exception becomes as it unwinds through a frame. Only the frames
+-- that hold a term on the left of what is still being evaluated change it
+-- (UNKNOWN-EVALUATION-SPEC §8 step 3): an error, a refusal or running out of
+-- steps there becomes 'Stuck' naming the left's inputs, and the right's too
+-- if it was itself 'Stuck'. The two-valued run would have stopped at the left
+-- operand, Stuck on those inputs, so this is that answer, naming every input
+-- it waits on (U7b) rather than the first. Until build step 5 builds the
+-- guarded leaves this is U13's interim for a refusal, and assumed, not ruled,
+-- for the other two. It rewrites the exception; it never catches it and
+-- resumes. A built-in's 'RuntimeTypeError', which is how one reports an
+-- argument it cannot take (FETCH of a string that is no https URL), is
+-- rewritten the same way; the machine's own invariant failures, the other
+-- internal errors, propagate as they are.
+rewriteUnwinding :: Frame -> EvalException -> EvalException
+rewriteUnwinding f e = case speculativeLeft f of
+  Nothing -> e
+  Just p  -> case e of
+    UserEvalException (Stuck ns) -> stuckException (termNames p <> toList ns)
+    UserEvalException _          -> stuckException (termNames p)
+    RefusalException _           -> stuckException (termNames p)
+    InternalEvalException (RuntimeTypeError _) -> stuckException (termNames p)
+    InternalEvalException _      -> e
+  where
+    stuckException ns = case nubTerms ns of
+      (n : rest) -> UserEvalException (Stuck (n :| rest))
+      []         -> e
+
+-- | The term on the left of a frame through which what is being evaluated is
+-- speculative (§8 step 3): the right operand of a connective whose left is a
+-- term, or the remaining fields of a structural equality that has already
+-- met one. The two-valued run would have stopped at that term, so what is
+-- evaluated under such a frame is evaluated only because the term might
+-- turn out to need it.
+speculativeLeft :: Frame -> Maybe Term
+speculativeLeft = \ case
+  ConnectiveRight _ p    -> Just p
+  EqConstructor1 acc _ _ -> acc
+  EqConstructor2 acc _ _ -> acc
+  EqConstructor3 acc _   -> acc
+  _                      -> Nothing
+
+-- | An effect on the outside world, a ledger write, an HTTP request or a
+-- read of the process environment, does not happen under a speculative
+-- frame ('speculativeLeft'): the two-valued run would not have reached it
+-- unless the term on that frame's left came out so. It is Stuck on that
+-- term's inputs instead, which unwinding through the frame reports as it
+-- reports any error there.
+refuseEffectUnderUnknown :: Eval ()
+refuseEffectUnderUnknown = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  case mapMaybe speculativeLeft stack.frames of
+    p : _ -> stuckOn (termNamesNE p)
+    []    -> pure ()
+
+-- | Each term once, first occurrence first.
+nubTerms :: [Term] -> [Term]
+nubTerms = foldr (\ x acc -> x : filter (/= x) acc) []
 
 -- | Interpret the state-restoring effects of a frame while unwinding on an
 -- exception. Most frames are pure control flow and need nothing, but:
@@ -747,6 +1193,9 @@ unwindFrame = \ case
   RestoreCurrentParty mOriginal scoped   -> do
     putCurrentParty mOriginal
     when scoped leaveRelookScope
+  RestoreSibling path clock              -> restoreSibling path clock
+  RestoreBehind n                        -> restoreBehind n
+  Lockstep ls                            -> unwindLockstep ls
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
     -- reads made before the abort soundly over-approximate the enclosing
@@ -766,6 +1215,8 @@ unwindFrame = \ case
   ReadCell1 {}                  -> pure ()
   ReadCell2 {}                  -> pure ()
   App1 {}                       -> pure ()
+  ConnectiveLeft {}             -> pure ()
+  ConnectiveRight {}            -> pure ()
   IfThenElse1 {}                -> pure ()
   ConsiderWhen1 {}              -> pure ()
   PatNil0 {}                    -> pure ()
@@ -832,35 +1283,106 @@ internalException = raiseException . InternalEvalException
 userException :: UserEvalException -> Eval a
 userException = raiseException . UserEvalException
 
-stuckOnAssumed :: Resolved -> Eval a
-stuckOnAssumed assumedResolved = userException (Stuck assumedResolved)
+stuckOnAssumed :: Resolved -> Maybe (Type' Resolved) -> Eval a
+stuckOnAssumed assumedResolved ty = userException (Stuck (TInput assumedResolved ty :| []))
+
+-- | A site of §4.3's table has received a term: start the step counter if
+-- it has not started in this directive (C4), and note the inputs the term
+-- reads.
+noteTerm :: Term -> Eval ()
+noteTerm t = do
+  stepsRef <- asks (.unknownSteps)
+  steps <- liftIO (readIORef stepsRef)
+  when (steps < 0) (liftIO (writeIORef stepsRef maximumUnknownSteps))
+  reachedRef <- asks (.unknownReached)
+  liftIO (modifyIORef' reachedRef (\ ns -> ns <> filter (`notElem` ns) (termNames t)))
+
+-- | One machine step: counted once the counter has started, and running out
+-- raises 'RanOutOfSteps' (§4.5).
+tickUnknownSteps :: Eval ()
+tickUnknownSteps = do
+  stepsRef <- asks (.unknownSteps)
+  steps <- liftIO (readIORef stepsRef)
+  if steps < 0
+    then pure ()
+    else if steps == 0
+      then userException RanOutOfSteps
+      else liftIO (writeIORef stepsRef (steps - 1))
+{-# INLINE tickUnknownSteps #-}
+
+-- | Start a directive with the counter stopped and nothing reached.
+resetUnknownSteps :: Eval ()
+resetUnknownSteps = do
+  stepsRef <- asks (.unknownSteps)
+  liftIO (writeIORef stepsRef (-1))
+  reachedRef <- asks (.unknownReached)
+  liftIO (writeIORef reachedRef [])
+
+-- | The inputs that reached a §4.3 site in this directive.
+reachedUnknowns :: Eval [Term]
+reachedUnknowns = liftIO . readIORef =<< asks (.unknownReached)
+
+-- | Stuck on what an unknown value waits on.
+stuckOn :: NonEmpty Term -> Eval a
+stuckOn = userException . Stuck
+
+-- | The names an unknown value waits on: the input itself, or every input
+-- (and field of one) a term reads. 'Nothing' for a determined value.
+unknownNames :: WHNF -> Maybe (NonEmpty Term)
+unknownNames = \ case
+  ValAssumed r ty -> Just (TInput r ty :| [])
+  ValTerm t       -> case termNames t of
+    (n : rest) -> Just (n :| rest)
+    []         -> Nothing
+  _               -> Nothing
+
+-- | The term an unknown value is: an input, or a term. 'Nothing' for a
+-- determined value.
+unknownTerm :: WHNF -> Maybe Term
+unknownTerm = \ case
+  ValAssumed r ty -> Just (TInput r ty)
+  ValTerm t       -> Just t
+  _               -> Nothing
+
+-- | The value a term is: a bare input stays the input it always was.
+termValue :: Term -> WHNF
+termValue = \ case
+  TInput r ty -> ValAssumed r ty
+  t           -> ValTerm t
 
 -- | REFUSE: stop evaluation with the author's reason.
 --
 -- UNCATCHABLE, and that is the point. 'tryEval' is the only @try@ over an
 -- 'EvalException' anywhere in the tree, and it is used only at the directive
 -- boundary ('L4.EvaluateLazy.nfDirective') and in @withEvalClauses@ (which
--- rethrows). There is no user-facing catch construct, so nothing between a
--- 'Refuse' and the directive that demanded it can observe the refusal or turn
--- it into a value: not a CONSIDER arm, not a boolean connective, not a
--- WHERE\/LET binding. THIS IS AN INVARIANT, not an accident of the current
--- code: a static refusal analysis is only sound while it holds. Anything that
--- adds a second @try@ (a TRY\/RECOVER construct, a service-level resume)
--- breaks it, and would also have to reckon with 'unwindFrame'\'s docstring.
+-- rethrows). There is no user-facing catch construct, and A REFUSAL IS NEVER
+-- TURNED INTO A VALUE: not by a CONSIDER arm, not by a boolean connective, not
+-- by a WHERE\/LET binding. One frame does observe a refusal as it unwinds: the
+-- right operand of a connective whose left operand is unknown
+-- ('ConnectiveRight', and structural equality's 'EqConstructor' frames) turns
+-- it into 'Stuck' on that left operand ('rewriteUnwinding';
+-- UNKNOWN-EVALUATION-SPEC U13's interim), which is still no value and still
+-- ends the directive. THIS IS AN INVARIANT, not an accident of the current
+-- code: a static refusal analysis is only sound while it holds. A frame may
+-- observe a refusal; nothing may resume evaluation with a value in its place.
+-- Anything that adds a second @try@ (a TRY\/RECOVER construct, a service-level
+-- resume) breaks it, and would also have to reckon with 'unwindFrame'\'s
+-- docstring.
 refuseWith :: Refusal -> Eval a
 refuseWith = raiseException . RefusalException
 
 pushFrame :: Frame -> Eval ()
 pushFrame frame = do
   stackRef <- asks (.stack)
+  limit <- asks (.maxFrameDepth)
   s <- liftIO (readIORef stackRef)
-  if s.size >= maximumFrameDepth
-    then userException StackOverflow
+  if s.size >= limit
+    then userException (StackOverflow limit)
     else do
       -- Emit the trace `Push` only once the frame is actually pushed. If we
       -- recorded it before the overflow check, a StackOverflow would leave a
       -- dangling Push (M Pushes / M+1 Pops) that later unbalances trace
-      -- post-processing and crashes it (see T7).
+      -- post-processing and crashes it.
       traceEval Push
       liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
 
@@ -877,6 +1399,43 @@ withPoppedFrame k = do
       k (Just f)
 {-# INLINE withPoppedFrame #-}
 
+-- | 'withPoppedFrame' for 'backward', which leaves an 'UpdateThunk' frame on
+-- the stack for its own arm to drop once the thunk has its value. With the
+-- frame popped first, an asynchronous exception between the pop and the write
+-- left the thunk's blackhole mark with no frame to undo it
+-- (smucclaw/l4-ide#1020); left on the stack, the frame restores the thunk if
+-- the exception comes before the write, and 'restoreThunkOnUnwind' keeps the
+-- value if it comes after.
+withPoppedFrameKeepingUpdate :: (Maybe Frame -> Eval a) -> Eval a
+withPoppedFrameKeepingUpdate k = do
+  traceEval Pop
+  stackRef <- asks (.stack)
+  s <- liftIO (readIORef stackRef)
+  case s.frames of
+    []       -> k Nothing
+    (f : fs) -> do
+      case f of
+        UpdateThunk {} -> pure ()
+        _              -> liftIO (writeIORef stackRef (MkStack (s.size - 1) fs))
+      k (Just f)
+{-# INLINE withPoppedFrameKeepingUpdate #-}
+
+-- | Set the displaced cache of the 'UpdateThunk' frame on top of the stack.
+setTopDisplaced :: (CtxReads, WHNF) -> Eval ()
+setTopDisplaced d = do
+  stackRef <- asks (.stack)
+  liftIO (modifyIORef' stackRef \s -> case s.frames of
+    UpdateThunk rf saved _ : fs -> MkStack s.size (UpdateThunk rf saved (Just d) : fs)
+    _                           -> s)
+
+-- | Drop the frame on top of the stack, which the caller has just read.
+dropTopFrame :: Eval ()
+dropTopFrame = do
+  stackRef <- asks (.stack)
+  liftIO (modifyIORef' stackRef \s -> case s.frames of
+    []       -> s
+    (_ : fs) -> MkStack (s.size - 1) fs)
+
 getEvalTime :: Eval UTCTime
 getEvalTime = asks (.evalTime)
 
@@ -885,6 +1444,9 @@ getTracePolicy = asks (.tracePolicy)
 
 getSafeMode :: Eval Bool
 getSafeMode = asks (.safeMode)
+
+getAnswerInJust :: Eval Bool
+getAnswerInJust = asks (.answerInJust)
 
 getEntityInfo :: Eval EntityInfo
 getEntityInfo = asks (.entityInfo)
@@ -985,6 +1547,7 @@ writeEvalRef f !x = asks f >>= liftIO . flip writeIORef x
 -- Modeled on 'traceEval', but non-optional: every write is recorded, newest-last.
 tellEventRouted :: EventRoute -> LedgerEvent -> Eval ()
 tellEventRouted route ev = do
+  refuseEffectUnderUnknown
   noteLedgerWrite -- a write POISONS the current force span (T6+ledger): write-once
   store <- asks (.envLedger)
   case route of
@@ -1026,6 +1589,414 @@ getCurrentParty = readEvalRef (.currentParty)
 -- | Set the current acting party (M4); restored via a 'RestoreCurrentParty' frame.
 putCurrentParty :: Maybe Text -> Eval ()
 putCurrentParty = writeEvalRef (.currentParty)
+
+-- ----------------------------------------------------------------------------
+-- The sibling-read check (smucclaw/l4-ide#1069; 'L4.EvaluateLazy.SiblingReads').
+--
+-- The machine keeps, beside the ledger, which compound operand the evaluation
+-- is in and the contract instant it is at, and asks the check at every ledger
+-- read and write made inside an operand. Outside every compound nothing is
+-- logged and nothing is compared.
+
+-- | One step of the check: refuse on a 'Left', else keep the new state.
+siblingCheck :: (SiblingState -> Either Text SiblingState) -> Eval ()
+siblingCheck stepIt = do
+  sref <- asks (.siblings)
+  st0 <- liftIO (readIORef sref)
+  when (inCompound st0) do
+    -- a compound time that was a thunk may have been evaluated since, by an
+    -- event the operands scanned: read it now, so that what was logged at the
+    -- compound's start gets its instant
+    tref <- asks (.siblingStarts)
+    pending <- liftIO (readIORef tref)
+    known <- for (IntMap.toList pending) \ (s, t) -> fmap (s,) <$> peekClock t
+    let found = catMaybes known
+        st = foldl' (\ acc (s, c) -> startKnown s c acc) st0 found
+    unless (null found) $
+      liftIO (writeIORef tref (foldl' (flip IntMap.delete) pending (map fst found)))
+    case stepIt st of
+      Left msg  -> userException (UserError msg)
+      Right st' -> liftIO (writeIORef sref st')
+
+-- | The contract instant the evaluation is now at, when it is inside a
+-- compound's operand: an event's stamp, a hand-off's clock, or the time an
+-- obligation was armed at. A clock that is still a thunk is left as it was:
+-- the check never forces anything here.
+noteClock :: Reference -> Eval ()
+noteClock t = do
+  sref <- asks (.siblings)
+  st <- liftIO (readIORef sref)
+  when (inCompound st) do
+    mclock <- peekClock t
+    for_ mclock \ c -> liftIO (writeIORef sref st {ssClock = At c})
+
+-- | 'noteClock' for a clock already forced.
+noteClockWHNF :: WHNF -> Eval ()
+noteClockWHNF = \ case
+  ValNumber c -> do
+    sref <- asks (.siblings)
+    liftIO (modifyIORef' sref \ st -> if inCompound st then st {ssClock = At c} else st)
+  _ -> pure ()
+
+-- | Every record an @ROR@ alternative the machine did not run could have
+-- made: the @RECORD@s, @COMMIT@s and @NOTIFY@s in its expression or residual,
+-- and in every definition, closure, continuation and argument reachable from
+-- it through the heap, found without forcing anything (an unforced thunk is
+-- read as its expression). Over-approximates, as reachability does: a
+-- record behind a branch the alternative would never take still counts.
+possibleWrites :: Environment -> MaybeEvaluated -> Eval [PossibleWrite]
+possibleWrites env0 alt = do
+  seen <- liftIO (newIORef Set.empty)
+  found <- liftIO (newIORef Set.empty)
+  let goExpr env e = do
+        liftIO $ modifyIORef' found (Set.union (Set.fromList
+          [ MkPossibleWrite official cell site verb | (official, cell, site, verb) <- Lint.writeSitesIn e ]))
+        for_ (Lint.namesIn e) \ u -> for_ (Map.lookup u env) goRef
+      goRef rf = do
+        visited <- liftIO (readIORef seen)
+        unless (Set.member rf.address visited) do
+          liftIO (writeIORef seen (Set.insert rf.address visited))
+          liftIO (readIORef rf.pointer) >>= \ case
+            Unevaluated _ e env  -> goExpr env e
+            WHNFWhen _ v e env   -> goExpr env e >> goVal v
+            WHNF v               -> goVal v
+      goVal v = do
+        case v of
+          ValClosure _ body env -> goExpr env body
+          ValObligation env _ act _ _ followup lest -> do
+            traverse_ (goExpr env) (Lint.actionExprs act)
+            goExpr env followup
+            traverse_ (goExpr env) lest
+          ValROp env _ l r -> for_ [l, r] (either (goExpr env) goVal)
+          ValQuantified env d -> traverse_ (goExpr env) (Lint.deontonExprs d)
+          _ -> pure ()
+        -- the references a value holds (list cells, constructor fields,
+        -- partial applications, an obligation's evaluated parts)
+        traverse_ goRef (toList v)
+  either (goExpr env0) goVal alt
+  Set.toList <$> liftIO (readIORef found)
+
+-- | Back to the operand path and clock a compound was applied under.
+restoreSibling :: OperandPath -> Clock -> Eval ()
+restoreSibling path clock = do
+  sref <- asks (.siblings)
+  liftIO (modifyIORef' sref \ st -> st {ssPath = path, ssClock = clock})
+
+-- | Put back the sibling-read check's 'ssBehind' ('RestoreBehind').
+restoreBehind :: Int -> Eval ()
+restoreBehind n = do
+  sref <- asks (.siblings)
+  liftIO (modifyIORef' sref \ st -> st {ssBehind = n})
+
+-- | How a message names one operand of a compound: the rule it names, the
+-- line it is written on, or, for an @EVERY@'s member, the member.
+operandLabel :: Text -> MaybeEvaluated -> Text
+operandLabel side = \ case
+  Left (App _ r []) -> backquoted (prettyLayout r)
+  Left (Var _ r)    -> backquoted (prettyLayout r)
+  Left e | Just rng <- rangeOf e -> "the " <> side <> " side (line " <> Text.textShow (lineOf rng) <> ")"
+  Right (ValObligation _ (Right p) _ _ _ _ _) -> partyKeyWHNF p <> "'s obligation"
+  _ -> "the " <> side <> " side"
+  where
+    -- a rule's name as written, always quoted, so it never starts a sentence bare
+    backquoted t = if "`" `Text.isPrefixOf` t then t else "`" <> t <> "`"
+
+-- | A compound ('ValROp') meets its @[time, events]@: open a scope for the
+-- sibling-read check at the compound's own time, then run the left operand
+-- over the events; 'RBinOp1' runs the right one over the same events, and
+-- 'RestoreSibling' closes the scope once 'RBinOp2' has combined them.
+--
+-- The time is read, never forced: forcing it here changed what @l4 explore@
+-- could see of a compound whose time nothing else forces (measured on
+-- @jl4/examples/ok/every/run-after.l4@), and the check must change nothing
+-- for operands that do not read each other's records. While the time is
+-- still a thunk, an access at the compound's start is logged against the
+-- start ('StartOf'), and 'siblingCheck' fills in the instant once something
+-- else has evaluated the time; an access whose instant is never known counts
+-- as simultaneous with every other, so the check errs towards refusing.
+--
+-- A @RAND@ applied to a time and a stream runs its operands in step
+-- ('lockstepNext'), with or without an evaluation trace; an @ROR@ still runs
+-- them one after the other: NORM-LOG-SPEC N17 and N18 rule how an @ROR@ runs
+-- under goal A, and that is not built.
+startCompound :: Environment -> RBinOp -> MaybeEvaluated -> MaybeEvaluated -> [Reference] -> Maybe (Type' Resolved) -> Machine Config
+startCompound env op rexpr1 rexpr2 rs appType = do
+  clock <- case rs of
+    t : _ -> peekClock t
+    []    -> pure Nothing
+  stepOn <- asks (.operandsInStep)
+  let opText = case op of
+        ValRAnd -> "RAND"
+        ValROr  -> "ROR"
+      inStep = case (op, rs) of
+        (ValRAnd, [_, _]) -> stepOn
+        _                 -> False
+  sref <- asks (.siblings)
+  outer <- liftIO (readIORef sref)
+  let fork = case rexpr1 of
+        Right ValObligation {} -> True
+        _                      -> False
+      (scope, opened) = openScope (MkScope opText (operandLabel "left" rexpr1) (operandLabel "right" rexpr2) fork inStep) clock outer
+      outerPath = outer.ssPath
+  liftIO (writeIORef sref opened)
+  case (clock, rs) of
+    (Nothing, t : _) -> do
+      tref <- asks (.siblingStarts)
+      liftIO (modifyIORef' tref (IntMap.insert scope t))
+    _ -> pure ()
+  pushFrame (RestoreSibling outerPath outer.ssClock)
+  case rs of
+    [time, events] | inStep -> do
+      liftIO (modifyIORef' sref (setTaken scope 0))
+      dyn0 <- captureDyn
+      lockstepNext MkLockstepFrame
+        { lsGate = scope, lsScope = scope, lsOp = op, lsEnv = env, lsTime = time, lsType = appType
+        , lsStream = events, lsSlots = [SlotPending rexpr1, SlotPending rexpr2]
+        , lsRunning = Nothing, lsRound = [0, 1], lsCell = Nothing, lsTaken = 0, lsHead = Nothing
+        , lsBase = dyn0 {dyPath = outerPath, dyClock = outer.ssClock} }
+    _ -> do
+      -- make sure to reassemble the operation after returning
+      pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
+      -- apply the arguments of the left hand expression to the
+      -- expression
+      pushFrame (App1 rs appType)
+      -- R-Q7B: the operand is handed off here, exactly as a HENCE's
+      -- value is, so a continuation that arrives as a VALUE inside a
+      -- compound anchors to the obligation the compound is attached
+      -- to ('operandHandoff').
+      operandHandoff env rexpr1
+      maybeEvaluate env rexpr1 -- TODO: build application
+
+-- ----------------------------------------------------------------------------
+-- Operands in step (smucclaw/l4-ide#1069; NORM-LOG-SPEC N10, option A).
+--
+-- Note [Operands in step]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- A @RAND@ used to run its left operand over the whole stream, then its right
+-- operand over the same stream. Each operand shares one ledger with the
+-- other, so a @RECALL@ on one side saw every record the other side would ever
+-- make, or none of them, whatever their instants (smucclaw/l4-ide#1069). In
+-- Hvitved's CSL, which the contract evaluator follows, @c1 and c2@ reduces
+-- BOTH conjuncts on each event and combines the residues (thesis Fig. 2.8,
+-- p. 49), and the monitor feeds the specification one event at a time
+-- (§2.3.6, p. 52). That is what the machine now does, without changing what a
+-- residual is: each operand is a suspended stretch of the machine's stack.
+--
+-- * Each operand is applied, not to the compound's stream, but to a GATE: a
+--   thunk whose expression is a variable no environment binds, minted by
+--   'mintGate' with a unique of sort @g@ that carries the compound's number.
+-- * When the operand forces its gate (it wants the next event), 'forwardExpr'
+--   meets that variable and calls 'lockstepPause', which cuts the stack at the
+--   compound's 'Lockstep' frame, stores the frames above it and the dynamic
+--   state frames would otherwise restore ('DynState'), and goes on with the
+--   next operand ('lockstepNext').
+-- * When every operand is paused or finished, the frame forces the next cell
+--   of the real stream and hands it to each paused operand in turn, left
+--   first, as @e@ consed onto a fresh gate (or the end of the stream),
+--   writing the cell into the operand's old gate so that its stream becomes
+--   an ordinary list, and putting its frames back.
+-- * When every operand has finished, the two values are combined by the same
+--   'RBinOp2' arms as before.
+--
+-- So every operand takes event n before any takes event n+1. A record made on
+-- one side while it takes an event is in the ledger for every read the other
+-- side makes from the next event on; within one event the left side runs
+-- first. That is not yet goal A as NORM-LOG-SPEC rules it (2026-10-26): N20
+-- settles every deadline an event reveals, in every operand, before any
+-- operand matches the event, and N19 has a match not see what a sibling
+-- records while matching the same event; this frame does neither, since an
+-- operand settles and matches in one turn. The sibling-read check stays as
+-- the backstop for what that cannot
+-- order (two accesses while the sides take the same event, in an order other
+-- than their instants', or at one instant), and it now knows which event each
+-- access was made at ('setTaken'), so two events with one stamp are ordered
+-- as the trace orders them.
+--
+-- Not in step, and so left to the check ('startCompound'): an @ROR@. N17 and
+-- N18 (2026-10-26) rule it, every alternative stepping on every event and a
+-- losing alternative's entries kept, tagged and skipped by later reads; that
+-- is not built. A
+-- barrier's members run in its own loop ('barrierNext'), and make no records.
+--
+-- Under an evaluation trace (@#EVALTRACE@, the REPL, a service request for
+-- a full trace) a @RAND@ runs in step too, so every surface gives one
+-- answer. The trace builder ("L4.EvaluateLazy.Trace") reads the frame pushes
+-- and pops as one nested tree, and a paused operand's frames leave and come
+-- back unpopped, so the trace records nothing while an operand runs
+-- ('traceMuted', saved in 'DynState'): the compound appears in the trace with
+-- its stream and its value, and without its operands' steps. Before
+-- 2026-11-13 a traced @RAND@ ran one operand after the other, which the
+-- sibling-read check refused where in step answers.
+-- An @ROR@'s right operand and a barrier's later members and join go over
+-- events an in-step compound around them has already taken, so their
+-- accesses carry no count for that compound ('takenOn', 'RestoreBehind').
+--
+-- Nothing about an operand that does not read the other's records depends on
+-- the schedule: its run is a function of the trace and of the ledger as it
+-- was when the compound was applied, so its verdict, its breach instant and
+-- its blamed parties are what they were, and 'RBinOp2' combines them as
+-- before (Hvitved's Corollary 2.3.7, p. 52). What moves is the order of the
+-- ledger's entries, of notes and of the deontic step log, now the order of
+-- the events.
+--
+-- What a paused operand must not hold: an 'UpdateThunk' for a thunk another
+-- operand can force, which would read as a loop there. Its gate's own
+-- 'UpdateThunk' is dropped when it pauses, and the gate is written when it
+-- resumes; any other thunk still being forced when the gate is reached has a
+-- value that depends on the gate, which only this operand can reach, so it
+-- is this operand's own.
+
+-- | A gate for an operand of the compound numbered @g@ ('lsGate').
+mintGate :: Int -> Machine Reference
+mintGate g = do
+  uri <- getModuleUri
+  let gate = Def (MkUnique 'g' g uri) (MkName emptyAnno (NormalName "the next event"))
+  fst <$> allocateRecursive (Var emptyAnno gate) (const emptyEnvironment)
+
+-- | Is this the variable of a gate ('mintGate')?
+isGate :: Resolved -> Bool
+isGate r = (getUnique r).sort == 'g'
+
+-- | The dynamic state as it is now.
+captureDyn :: Eval DynState
+captureDyn = do
+  party <- getCurrentParty
+  tc <- getTemporalContext
+  relook <- asks (.deonticLog) >>= traverse \ l -> liftIO (readIORef l.dlRelookScope)
+  st <- readEvalRef (.siblings)
+  muted <- readEvalRef (.traceMuted)
+  pure (MkDynState party tc relook st.ssPath st.ssClock st.ssBehind muted)
+
+-- | Put a dynamic state back.
+setDyn :: DynState -> Eval ()
+setDyn d = do
+  putCurrentParty d.dyParty
+  putTemporalContext d.dyTemporal
+  asks (.deonticLog) >>= traverse_ \ l -> for_ d.dyRelook (liftIO . writeIORef l.dlRelookScope)
+  restoreSibling d.dyPath d.dyClock
+  restoreBehind d.dyBehind
+  mref <- asks (.traceMuted)
+  liftIO (writeIORef mref d.dyMuted)
+
+-- | The next step of an in-step compound: start or resume the next operand
+-- of the round; when the round is over, take the next cell of the stream if
+-- an operand is waiting for one; when none is, combine the operands' values.
+lockstepNext :: LockstepFrame -> Machine Config
+lockstepNext ls = case ls.lsRound of
+  i : is -> do
+    let running = ls {lsRound = is, lsRunning = Just i, lsSlots = setSlot i SlotRunning ls.lsSlots}
+    case drop i ls.lsSlots of
+      SlotPending rexpr : _ -> do
+        -- the compound's own time is the operand's first clock, as it was for
+        -- the right operand before ('RBinOp1'); an earlier operand may have
+        -- forced it by now
+        clock <- peekClock ls.lsTime
+        let start = ls.lsBase
+        -- the operand's dynamic state goes in first, so that the trace is
+        -- muted for everything the operand does, its gate and frames included
+        setDyn start {dyPath = (ls.lsScope, i) : start.dyPath, dyClock = maybe (StartOf ls.lsScope) At clock, dyMuted = start.dyMuted + 1}
+        gate <- mintGate ls.lsGate
+        pushFrame (Lockstep running)
+        pushFrame (App1 [ls.lsTime, gate] ls.lsType)
+        -- R-Q7B: the operand is handed off here, exactly as a HENCE's value
+        -- is ('operandHandoff')
+        operandHandoff ls.lsEnv rexpr
+        maybeEvaluate ls.lsEnv rexpr
+      SlotPaused po : _ -> do
+        setDyn po.poDyn
+        cell <- case ls.lsCell of
+          Just (Just e) -> ValCons e <$> mintGate ls.lsGate
+          _             -> pure ValNil
+        updateThunkToWHNF po.poGate cell
+        pushFrame (Lockstep running)
+        traverse_ pushFrame (reverse po.poFrames)
+        continueBackward cell
+      _ -> lockstepNext ls {lsRound = is}
+  []
+    | not (null (pausedSlots ls.lsSlots)) -> do
+        setDyn ls.lsBase
+        pushFrame (Lockstep ls {lsRunning = Nothing})
+        continueRef ls.lsStream
+    | [SlotDone v1, SlotDone v2] <- ls.lsSlots -> do
+        setDyn ls.lsBase
+        pushFrame (ContractFrame (RBinOp2 MkRBinOp2 {op = ls.lsOp, rval1 = v1, env = ls.lsEnv}))
+        continueBackward v2
+    | otherwise -> internalException $ RuntimeTypeError
+        "an in-step compound ended its round with an operand neither waiting nor finished"
+
+-- | The frame of an in-step compound gets a value: the operand that was
+-- running has finished, or the next cell of the stream has arrived.
+lockstepReturn :: LockstepFrame -> WHNF -> Machine Config
+lockstepReturn ls val = case ls.lsRunning of
+  Just i -> lockstepNext ls {lsRunning = Nothing, lsSlots = setSlot i (SlotDone val) ls.lsSlots}
+  Nothing | Just (e, rest) <- ls.lsHead -> handOut e rest
+  Nothing -> case val of
+    ValCons e rest -> do
+      tracing <- asks (isJust . (.evalTrace))
+      if tracing
+        then do
+          -- the operands run with the trace muted (Note [Operands in step]),
+          -- so the event is forced here, where the trace records it beside
+          -- the stream it came from; an operand forces it anyway when it
+          -- takes it, so this moves the force and adds none
+          pushFrame (Lockstep ls {lsHead = Just (e, rest)})
+          continueRef e
+        else handOut e rest
+    ValNil ->
+      lockstepNext ls {lsCell = Just Nothing, lsRound = pausedSlots ls.lsSlots}
+    _ -> internalException $ RuntimeTypeError $
+      "expected a list of events but found: " <> prettyLayout val
+  where
+    handOut e rest = do
+      let n = ls.lsTaken + 1
+      sref <- asks (.siblings)
+      liftIO (modifyIORef' sref (setTaken ls.lsScope n))
+      lockstepNext ls {lsHead = Nothing, lsStream = rest, lsCell = Just (Just e), lsTaken = n, lsRound = pausedSlots ls.lsSlots}
+
+-- | An operand forced the gate of the compound numbered @g@: store it, with
+-- the frames it pushed above the compound's frame, and go on.
+lockstepPause :: Int -> Machine Config
+lockstepPause g = do
+  stackRef <- asks (.stack)
+  s <- liftIO (readIORef stackRef)
+  case s.frames of
+    UpdateThunk gateRef saved _ : framesAbove ->
+      case break owner framesAbove of
+        (segment, Lockstep ls : framesBelow) | Just i <- ls.lsRunning -> do
+          -- the gate's force is not finished: its read span closes as an
+          -- unforced thunk's does, and the gate is written when it resumes
+          void (swapCtxReads saved)
+          liftIO (writeIORef stackRef (MkStack (s.size - 2 - length segment) framesBelow))
+          dyn <- captureDyn
+          lockstepNext ls
+            { lsRunning = Nothing
+            , lsSlots = setSlot i (SlotPaused MkPausedOperand {poFrames = segment, poGate = gateRef, poDyn = dyn}) ls.lsSlots }
+        _ -> internalException $ RuntimeTypeError
+          "an operand asked for the next event of a compound that is not waiting for it"
+    _ -> internalException $ RuntimeTypeError
+      "the next event of an in-step compound was asked for outside a thunk"
+  where
+    owner = \ case
+      Lockstep ls -> ls.lsGate == g
+      _           -> False
+
+-- | Unwinding through an in-step compound: the paused operands are unwound as
+-- if they were on the stack, and their gates are made forcible again.
+unwindLockstep :: LockstepFrame -> Eval ()
+unwindLockstep ls = do
+  for_ ls.lsSlots \ case
+    SlotPaused po -> do
+      traverse_ unwindFrame po.poFrames
+      restoreThunkOnUnwind po.poGate Nothing
+    _ -> pure ()
+  setDyn ls.lsBase
+
+setSlot :: Int -> OperandSlot -> [OperandSlot] -> [OperandSlot]
+setSlot i x xs = [ if j == i then x else y | (j, y) <- zip [0 ..] xs ]
+
+pausedSlots :: [OperandSlot] -> [Int]
+pausedSlots xs = [ i | (i, SlotPaused _) <- zip [0 ..] xs ]
 
 -- ----------------------------------------------------------------------------
 -- Per-force context-read tracking (T6).
@@ -1157,7 +2128,9 @@ preAllocateRef r = do
 
 data Config
   = ForwardMachine Environment (Expr Resolved)
-  | MatchBranchesMachine Reference Environment [Branch Resolved]
+  | MatchBranchesMachine (Maybe PmGroup) Reference Environment [Branch Resolved]
+    -- ^ the group, when the CONSIDER was generated from a multi-clause
+    -- definition's clauses (see 'NonExhaustivePatterns')
   | MatchPatternMachine Reference Environment (Pattern Resolved)
   | BackwardMachine WHNF
   | EvalRefMachine Reference
@@ -1170,9 +2143,15 @@ continueExpr :: Environment -> Expr Resolved -> Machine Config
 continueExpr env e = pure (ForwardMachine env e)
 {-# INLINE continueExpr #-}
 
-continueBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-continueBranches r env e = pure (MatchBranchesMachine r env e)
+continueBranches :: Maybe PmGroup -> Reference -> Environment -> [Branch Resolved] -> Machine Config
+continueBranches g r env e = pure (MatchBranchesMachine g r env e)
 {-# INLINE continueBranches #-}
+
+-- | The multi-clause group a CONSIDER was generated from, if it was.
+consideredClauses :: Anno -> Maybe PmGroup
+consideredClauses ann = case view annPmSynthetic ann of
+  Just (PmConsider g _ _) -> Just g
+  _ -> Nothing
 
 continuePattern :: Reference -> Environment -> Pattern Resolved -> Machine Config
 continuePattern r env pat = pure (MatchPatternMachine r env pat)
@@ -1195,14 +2174,13 @@ forwardExpr :: Environment -> Expr Resolved -> Machine Config
 forwardExpr env = \ case
   RAnd _ann e1 e2 -> continueBackward (ValROp env ValRAnd (Left e1) (Left e2))
   ROr  _ann e1 e2 -> continueBackward (ValROp env ValROr (Left e1) (Left e2))
-  And  _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 e2 falseExpr)
-  Or   _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 trueExpr e2)
-  Implies _ann e1 e2 ->
-    continueExpr env (IfThenElse emptyAnno e1 e2 trueExpr)
-  Not _ann e ->
-    continueExpr env (IfThenElse emptyAnno e falseExpr trueExpr)
+  -- The surface connectives do not survive type checking (it rewrites them to
+  -- applications of the built-ins, below), but should one reach here it gets
+  -- the same frames.
+  And  _ann e1 e2 -> connective env ConnAnd e1 (Just e2)
+  Or   _ann e1 e2 -> connective env ConnOr e1 (Just e2)
+  Implies _ann e1 e2 -> connective env ConnImplies e1 (Just e2)
+  Not _ann e -> connective env ConnNot e Nothing
   Equals _ann e1 e2 -> do
     pushFrame (BinOp1 BinOpEquals e2 env)
     continueExpr env e1
@@ -1235,6 +2213,8 @@ forwardExpr env = \ case
     continueExpr env e1
   Proj _ann e l ->
     continueExpr env (App emptyAnno l [e]) -- we desugar projection to plain function application
+  -- an operand of an in-step compound wants the next event (Note [Operands in step])
+  Var _ann n | isGate n -> lockstepPause (getUnique n).unique
   Var _ann n -> do -- still problematic: similarity / overlap between this and App with no args
     -- Auto-apply a discharged import only in VALUE position. The App case above
     -- fetches the function it is about to apply by re-entering here, and
@@ -1279,6 +2259,12 @@ forwardExpr env = \ case
                thunkRef <- allocate_ thunkExpr env
                pushFrame (EvalUnderRulesEncodedAt1 thunkRef env)
                continueExpr env dateExpr
+      -- A built-in connective called by name: its operands are evaluated in
+      -- its frames, as expressions, so that each shows in a trace under its
+      -- own source text ('connective').
+      uniq | Just conn <- builtinConnective uniq
+           , Just (left, right) <- connectiveOperands conn es ->
+               connective env conn left right
       _ -> do
         let expectedType = case getAnno ann of
               Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
@@ -1325,9 +2311,9 @@ forwardExpr env = \ case
     desugarMultiWayIf :: [GuardedExpr Resolved] -> Expr Resolved -> Expr Resolved
     desugarMultiWayIf [] o = o
     desugarMultiWayIf (MkGuardedExpr _ann c f : es') o = IfThenElse emptyAnno c f $ desugarMultiWayIf es' o
-  Consider _ann e branches -> do
+  Consider ann e branches -> do
     rf <- allocate_ e env
-    continueBranches rf env branches
+    continueBranches (consideredClauses ann) rf env branches
   Lit _ann lit -> do
     rval <- runLit lit
     continueBackward rval
@@ -1369,7 +2355,7 @@ forwardExpr env = \ case
   Post _ann e1 e2 e3 -> do
     pushFrame (Post1 e2 e3 env)
     continueExpr env e1
-  Record _ann mParty cell val isOfficial mHence -> do
+  Record ann mParty cell val isOfficial mHence -> do
     -- STATE-AS-LEDGER M1 (+ NOTIFY-v1): evaluate the cell to a String path, then
     -- the value to WHNF, append an Assign event to the ledger. M5: if a HENCE
     -- continuation is present, forward [time, events] to it (event-free deontic
@@ -1383,18 +2369,18 @@ forwardExpr env = \ case
     -- the acting party's own ledger exactly as before.
     case mParty of
       Just partyExpr -> do
-        pushFrame (Record0 cell val env isOfficial mHence)
+        pushFrame (Record0 cell val env isOfficial mHence (rangeOf ann))
         continueExpr env partyExpr
       Nothing -> do
-        pushFrame (Record1 val env isOfficial mHence Nothing)
+        pushFrame (Record1 val env isOfficial mHence Nothing (rangeOf ann))
         continueExpr env cell
-  ReadCell _ann mParty isOfficial mode cell -> do
+  ReadCell ann mParty isOfficial mode cell -> do
     -- STATE-AS-LEDGER M1.5 / M4.5: evaluate the cell to a String path first,
     -- carrying the optional party qualifier (still unevaluated), the isOfficial
     -- flag, the 'RecallMode' (approach B), and the env. The 'ReadCell1' frame then
     -- routes to the right ledger (own / cross-party / official) and reads it,
     -- yielding MAYBE (RecallLast) or a LIST (RecallAll).
-    pushFrame (ReadCell1 mParty isOfficial mode env)
+    pushFrame (ReadCell1 mParty isOfficial mode env (rangeOf ann))
     continueExpr env cell
   Concat _ann [] ->
     continueBackward (ValString "")
@@ -1419,7 +2405,7 @@ forwardExpr env = \ case
       -- ('declareBreach'). No norm (a terminal is not an obligation), no
       -- clock (the expression arm has none in hand), and the blame is
       -- peeked, never forced.
-      Nothing -> declareBreach (ExplicitBreach (singleBlame (DeclaredBreach Nothing mReasonRef)))
+      Nothing -> declareBreach (ExplicitBreach (singleBlame (DeclaredBreach Nothing mReasonRef Nothing)))
       Just p  -> do
         partyRef <- allocate_ p env
         pushFrame $ ContractFrame $ BreachBy BreachByFrame
@@ -1442,9 +2428,19 @@ forwardExpr env = \ case
       InertCtxAnd  -> continueBackward (ValBool True)
       InertCtxOr   -> continueBackward (ValBool False)
       InertCtxNone -> continueBackward (ValBool True)  -- Default to True for compatibility
+  -- THE JOIN / THE DEADLINE / THE ARMING as a value (§2.6 card B1): the
+  -- binding the nearest hand-off made in this environment ('bindLifecycle'),
+  -- or this obligation's own arming ('withOwnArming'). Absent, the noun
+  -- names a position that does not exist where it ran — which the checker
+  -- refuses where it can see it ('L4.TypeCheck.checkLifecycle') — and the
+  -- run refuses it by name rather than as a scope error.
+  Lifecycle _ann p ->
+    case Map.lookup (lifecyclePointUnique p) env of
+      Just r  -> continueRef r
+      Nothing -> userException (UserError (lifecycleValueRefusal p))
 
 backward :: WHNF -> Machine Config
-backward val = withPoppedFrame $ \ case
+backward val = withPoppedFrameKeepingUpdate $ \ case
   Nothing -> continueDone val
   Just (BinOp1 binOp e2 env) -> do
     pushFrame (BinOp2 binOp val)
@@ -1459,27 +2455,27 @@ backward val = withPoppedFrame $ \ case
     continueExpr env e3
   Just (Post3 val1 val2) -> do
     runPost val1 val2 val
-  Just (Record0 cell valExpr env isOfficial mHence) -> do
+  Just (Record0 cell valExpr env isOfficial mHence site) -> do
     -- NOTIFY v1: the recipient party qualifier has evaluated to 'val' (a WHNF);
     -- key it the SAME way a cross-party RECALL read does ('partyKeyWHNF'), so the
     -- write-key matches the recipient's read-key by construction. Carry that key
     -- through to 'Record1'/'Record2'/'runRecord', then proceed to evaluate the
     -- cell exactly as a bare RECORD does.
     let recipientKey = partyKeyWHNF val
-    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey))
+    pushFrame (Record1 valExpr env isOfficial mHence (Just recipientKey) site)
     continueExpr env cell
-  Just (Record1 valExpr env isOfficial mHence mRecipientKey) -> do
+  Just (Record1 valExpr env isOfficial mHence mRecipientKey site) -> do
     -- the cell has evaluated to 'val'; now evaluate the value expression. Carry
     -- the env, the M5 HENCE, and the NOTIFY recipient key so 'runRecord' can
     -- route the write and forward to the continuation.
-    pushFrame (Record2 val isOfficial env mHence mRecipientKey)
+    pushFrame (Record2 val isOfficial env mHence mRecipientKey site)
     continueExpr env valExpr
-  Just (Record2 cellVal isOfficial env mHence mRecipientKey) -> do
+  Just (Record2 cellVal isOfficial env mHence mRecipientKey site) -> do
     -- both the cell ('cellVal') and the value ('val') are evaluated: append the
     -- Assign event to the ledger (D2 / Rung 3). Then M5: with a HENCE, become the
     -- continuation (forward [time, events] to it); without, return the value (M1).
-    runRecord cellVal val isOfficial env mHence mRecipientKey
-  Just (ReadCell1 mParty isOfficial mode env) -> do
+    runRecord cellVal val isOfficial env mHence mRecipientKey site
+  Just (ReadCell1 mParty isOfficial mode env site) -> do
     -- the cell has evaluated to 'val' (a String path). Route to the right
     -- ledger and finish (M1.5 / M4.5), carrying the 'RecallMode' (approach B):
     --   * isOfficial   -> read the shared OFFICIAL record.
@@ -1490,21 +2486,29 @@ backward val = withPoppedFrame $ \ case
     if isOfficial
       then do
         ledger <- officialLedgerEval
-        finishRead mode val ledger
+        finishRead mode val OfficialKey site ledger
       else case mParty of
         Just partyExpr -> do
-          pushFrame (ReadCell2 val mode)
+          pushFrame (ReadCell2 val mode site)
           continueExpr env partyExpr
         Nothing -> do
           ledger <- currentLedgerEval
-          finishRead mode val ledger
-  Just (ReadCell2 cellVal mode) -> do
+          party <- fromMaybe anonymousParty <$> getCurrentParty
+          finishRead mode val (OwnKey party) site ledger
+  Just (ReadCell2 cellVal mode site) -> do
     -- the party qualifier has evaluated to 'val' (a WHNF): key it the SAME way
     -- a RECORD write does ('partyKeyWHNF'), so a cross-party read matches a
     -- write, then read that party's own ledger and finish (M4.5), in 'mode'.
     let key = partyKeyWHNF val
     ledger <- partyLedgerEval key
-    finishRead mode cellVal ledger
+    finishRead mode cellVal (OwnKey key) site ledger
+  Just (RestoreSibling path clock) -> do
+    restoreSibling path clock
+    continueBackward val
+  Just (RestoreBehind n) -> do
+    restoreBehind n
+    continueBackward val
+  Just (Lockstep ls) -> lockstepReturn ls val
   Just (RestoreCurrentParty mOriginal scoped) -> do
     -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
     -- restore the enclosing acting party and pass the value on unchanged (M4).
@@ -1532,11 +2536,14 @@ backward val = withPoppedFrame $ \ case
         -- P2b: this is the ENTRY into the obligation's site — the activation
         -- the step log's key counts. Lazy when the log is off.
         norm <- armNormKey party act
+        -- smucclaw/l4-ide#1069: the sibling-read check's clock is the arming
+        -- time until an event is taken
+        noteClock time
         -- this is the arming point: the clock now is what THE ARMING will
         -- name in this obligation's continuation (R-Q7B), so keep it —
         -- 'time' itself advances with every scrutinised event; no event has
         -- been taken from the stream yet
-        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, seen = 0, ..}))
+        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, seen = 0, env = withOwnArming time env, ..}))
         continueRef events
       ValQuantified env deonton -> do
         -- EVERY meets its event stream: this is the arming point, so the roll
@@ -1546,18 +2553,18 @@ backward val = withPoppedFrame $ \ case
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
         startRollCall env deonton time events
-      ValROp env op rexpr1 rexpr2 -> do
-        -- make sure to reassemble the operation after returning
-        pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
-        -- apply the arguments of the left hand expression to the
-        -- expression
-        pushFrame f
-        -- R-Q7B: the operand is handed off here, exactly as a HENCE's
-        -- value is, so a continuation that arrives as a VALUE inside a
-        -- compound anchors to the obligation the compound is attached
-        -- to ('operandHandoff').
-        operandHandoff env rexpr1
-        maybeEvaluate env rexpr1 -- TODO: build application
+      ValROp env op rexpr1 rexpr2 ->
+        startCompound env op rexpr1 rexpr2 rs mTy
+      ValConnective conn ->
+        case (conn, rs) of
+          (ConnNot, [r]) -> do
+            pushFrame (ConnectiveLeft ConnNot Nothing)
+            autoApplyDischargedImport r
+          (_, [r1, r2]) | conn /= ConnNot -> do
+            pushFrame (ConnectiveLeft conn (Just (ConnRightRef r2)))
+            autoApplyDischargedImport r1
+          _ -> internalException $ RuntimeTypeError $
+            connectiveName conn <> " applied to " <> Text.textShow (length rs) <> " arguments"
       ValUnaryBuiltinFun fn -> do
         r <- expect1 rs
         pushFrame (UnaryBuiltin0 fn mTy)
@@ -1589,9 +2596,33 @@ backward val = withPoppedFrame $ \ case
         pushFrame (TernaryBuiltin1 fn arg2 z)
         continueRef arg1
       ValFulfilled -> continueBackward ValFulfilled
-      ValBreached r -> continueBackward (ValBreached r)
-      ValAssumed r ->
-        stuckOnAssumed r -- TODO: we can do better here
+      -- SEESAW (spec §6.1.2): a declared breach takes its effective instant
+      -- from the clock of the hand-off that reached it — the deadline (no
+      -- earlier than the failed obligation's arming) under a LEST, the
+      -- violating stamp under a SHANT's LEST, the act's stamp or a kept
+      -- SHANT's window end under a HENCE, the start of a run at the top.
+      -- Here, where every contract value meets its @[time, events]@, is the
+      -- one place every route to a BREACH passes. The clock is forced, and
+      -- the stamp goes on a FRESH value: a @BREACH@ shared by two
+      -- continuations is one cached thunk, reached at two clocks.
+      ValBreached r
+        | hasUntimed (breachBlame r), [t, evs] <- rs -> do
+            pushFrame (ContractFrame (StampBreach StampBreachFrame {reason = r, eventsRef = evs}))
+            continueRef t
+        | otherwise -> continueBackward (ValBreached r)
+      -- An assumed function applied is a term (§4.2), keyed by the function
+      -- and its arguments' values, read without forcing anything; an
+      -- argument that cannot be read so leaves the call Stuck on the
+      -- function, as it always was (§8 step 3).
+      ValAssumed g gty -> do
+        margs <- traverse refTerm rs
+        case sequence margs of
+          Just args -> do
+            let t = TCall (TInput g gty) args
+            noteTerm t
+            continueBackward (ValTerm t)
+          Nothing -> stuckOnAssumed g gty
+      ValTerm t -> stuckOn (termNamesNE t)
       res -> internalException (RuntimeTypeError $ "expected a function but found: " <> prettyLayout res)
   -- Evaluate thunk under overridden system time (serial number)
   Just (EvalAsOfSystemTime1 thunkRef _env) -> do
@@ -1631,11 +2662,17 @@ backward val = withPoppedFrame $ \ case
       ValBool True -> continueExpr env e2
       ValBool False -> continueExpr env e3
 
-      ValAssumed r -> stuckOnAssumed r
+      -- An unknown condition, a bare input or a term, is Stuck on what it
+      -- waits on until build step 5 builds joins (§4.3, §8 step 3).
+      _ | Just ns <- unknownNames val -> stuckOn ns
 
       _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating IF-THEN-ELSE"
-  Just (ConsiderWhen1 _scrutinee e _branches env) -> do
+  Just (ConnectiveLeft conn right) ->
+    connectiveLeft conn right val
+  Just (ConnectiveRight conn p) ->
+    connectiveRight conn p val
+  Just (ConsiderWhen1 _clauses _scrutinee e _branches env) -> do
     case val of
       ValEnvironment env' ->
         continueExpr (Map.union env' env) e
@@ -1646,6 +2683,8 @@ backward val = withPoppedFrame $ \ case
     case val of
       ValNil ->
         continueBackward (ValEnvironment Map.empty)
+      _ | Just ns <- unknownNames val ->
+        patternMetUnknown ns
       _ ->
         patternMatchFailure
   Just (PatCons0 p1 env p2) -> do
@@ -1653,6 +2692,8 @@ backward val = withPoppedFrame $ \ case
       ValCons rf1 rf2 -> do
         pushFrame (PatCons1 rf2 env p2)
         continuePattern rf1 env p1
+      _ | Just ns <- unknownNames val ->
+        patternMetUnknown ns
       _ ->
         patternMatchFailure
   Just (PatCons1 rf2 env p2) -> do
@@ -1685,6 +2726,19 @@ backward val = withPoppedFrame $ \ case
                     continuePattern r env p
             else internalException $ RuntimeTypeError
               "pattern for constructor has the wrong number of arguments"
+      _ | Just t <- unknownTerm val -> do
+        -- A record's generated selector applied to an unknown record gives
+        -- the field-path term, @d's age@ (§4.2, U5b); any other match on an
+        -- unknown is what 'patternMetUnknown' says.
+        projection <- selectorProjection n ps
+        case projection of
+          Just (field, fieldTy) -> do
+            -- the selector's own CONSIDER, whose answer this is
+            _ <- withPoppedFrame pure
+            let path = TField t field fieldTy
+            noteTerm path
+            continueBackward (ValTerm path)
+          Nothing -> patternMetUnknown (termNamesNE t)
       _ ->
         patternMatchFailure
   Just (PatApp1 ambient envs rps) ->
@@ -1699,35 +2753,59 @@ backward val = withPoppedFrame $ \ case
       _ -> internalException $ RuntimeTypeError $
         "expected an environment but found: " <> prettyLayout val <> " when matching constructor"
   Just (PatLit0 env lit) -> do
+    -- The pattern's expression is evaluated whatever the scrutinee is, as
+    -- the match would: it can raise or refuse, and that must not turn into
+    -- a failed branch because a LATER position clashes. 'PatLit1' consults
+    -- the refinement, once both sides are in hand.
     pushFrame (PatLit1 val)
     continueExpr env lit
   Just (PatLit1 lit) -> do
-    pushFrame PatLit2
-    runBinOpEquals lit val
+    -- For a literal pattern 'lit' is the literal and 'val' the scrutinee;
+    -- for an expression pattern 'lit' is the scrutinee and 'val' the
+    -- expression's value. Either can be an unknown. The comparison names it
+    -- ('runBinOpEquals' does on either side, U6), unless a sub-pattern still
+    -- to be matched already clashes ('metUnknown').
+    let compareLit = pushFrame PatLit2 >> runBinOpEquals lit val
+        unknown = isJust . unknownTerm
+    if unknown lit || unknown val
+      then metUnknown >>= \ case
+        BranchClashes  -> patternMatchFailure
+        BranchMayMatch -> compareLit
+      else compareLit
   Just PatLit2 ->
     case val of
       -- NOTE: in future, we may give the pattern that was matched a name, potentially
       ValBool True -> continueBackward $ ValEnvironment emptyEnvironment
       ValBool False -> patternMatchFailure
+      -- the comparison is a term: a CONSIDER on a term, Stuck until build
+      -- step 5 (§8 step 3)
+      _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
         "expected a boolean but found: " <> prettyLayout val <> " while matching literal pattern"
-  Just (EqConstructor1 rf rfs) -> do
-    pushFrame (EqConstructor2 val rfs)
+  Just (EqConstructor1 acc rf rfs) -> do
+    pushFrame (EqConstructor2 acc val rfs)
     continueRef rf
-  Just (EqConstructor2 val1 rfs) -> do
-    pushFrame (EqConstructor3 rfs)
+  Just (EqConstructor2 acc val1 rfs) -> do
+    pushFrame (EqConstructor3 acc rfs)
     runBinOpEquals val1 val
-  Just (EqConstructor3 rfs) ->
-    case boolView val of
-      Just False -> continueBackward $ valBool False
-      Just True ->
-        case rfs of
-          [] -> continueBackward $ valBool True
-          ((r1, r2) : rfs') -> do
-            pushFrame (EqConstructor1 r2 rfs')
-            continueRef r1
-      Nothing -> internalException $ RuntimeTypeError $
+  Just (EqConstructor3 acc rfs) ->
+    -- The component equalities combine left to right by the AND table
+    -- (§8 step 3): a FALSE decides, a TRUE leaves what came before, and a
+    -- term is conjoined to it.
+    case val of
+      ValBool False -> continueBackward $ valBool False
+      ValBool True  -> nextComponent acc
+      _ | Just t <- unknownTerm val -> do
+          noteTerm t
+          nextComponent (Just (maybe t (\ p -> TConn ConnAnd p t) acc))
+      _ -> internalException $ RuntimeTypeError $
         "expected a BOOLEAN but found: " <> prettyLayout val <> " when testing equality"
+    where
+      nextComponent acc' = case rfs of
+        [] -> continueBackward (maybe (valBool True) termValue acc')
+        ((r1, r2) : rfs') -> do
+          pushFrame (EqConstructor1 acc' r2 rfs')
+          continueRef r1
   Just (UnaryBuiltin0 fn mTy) -> do
     runBuiltin val fn mTy
   -- Ternary builtin handling: got 1st arg value, need to eval 2nd
@@ -1769,7 +2847,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (EverBetweenFrame originalCtx predicate endDay nextDay step)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "EVER BETWEEN expects predicate returning BOOLEAN"
+        iteratorNotBoolean "EVER BETWEEN" val
   Just (AlwaysBetweenFrame originalCtx predicate endDay currentDay step) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1784,7 +2862,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (AlwaysBetweenFrame originalCtx predicate endDay nextDay step)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "ALWAYS BETWEEN expects predicate returning BOOLEAN"
+        iteratorNotBoolean "ALWAYS BETWEEN" val
   Just (WhenLastFrame originalCtx predicate currentDay) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1801,7 +2879,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (WhenLastFrame originalCtx predicate nextDay)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "WHEN LAST expects predicate returning BOOLEAN"
+        iteratorNotBoolean "WHEN LAST" val
   Just (WhenNextFrame originalCtx predicate currentDay limitDay) -> do
     putTemporalContext originalCtx
     case boolView val of
@@ -1818,7 +2896,7 @@ backward val = withPoppedFrame $ \ case
             pushFrame (WhenNextFrame originalCtx predicate nextDay limitDay)
             applyDatePredicate predicate nextDay
       Nothing ->
-        userException $ UserError "WHEN NEXT expects predicate returning BOOLEAN"
+        iteratorNotBoolean "WHEN NEXT" val
   -- VALUE AT is the one interval builtin whose result is not forced to a
   -- BOOLEAN/DATE by its own frame, so it needs the same deep pin as the four
   -- EVAL clause builtins (#934). EVER/ALWAYS BETWEEN and WHEN LAST/NEXT demand
@@ -1859,6 +2937,9 @@ backward val = withPoppedFrame $ \ case
             -- More elements to process. Evaluate the head element first
             pushFrame (JsonEncodeListFrame acc nextTailRef False)
             continueRef headRef
+          -- a list whose rest is unknown
+          v | Just ns <- unknownNames v ->
+            stuckOn ns
           _ ->
             -- Should not happen - tail should be ValNil or ValCons
             internalException $ RuntimeTypeError "Expected list (ValNil or ValCons) for tail"
@@ -1940,6 +3021,7 @@ backward val = withPoppedFrame $ \ case
         -- (smucclaw/l4-ide#914 §2B; snapshot-per-scope, see 'crLedgerRead').
         then updateThunkToWHNFWhen rf mine val
         else updateThunkToWHNF rf val -- read-free force: plain WHNF, full sharing forever
+    dropTopFrame
     continueBackward val
   Just (ContractFrame cFrame) -> backwardContractFrame val cFrame
 
@@ -2093,15 +3175,26 @@ backwardContractFrame val = \ case
       --     2026-09-16), so a defaulting party's silence cannot postpone
       --     the start of its own cure period; the re-offered event then
       --     decrements the continuation's WITHIN by the time that had
-      --     already passed since the deadline. It is the SAME reference
-      --     THE DEADLINE reads in that continuation ('lifecycleAt'), so
-      --     @WITHIN d@ and @WITHIN d OF THE DEADLINE@ agree under LEST by
-      --     construction. (For SHANT the failure is a violation, handled
-      --     at 'Contract10' with the violating event's own stamp.)
-      --   * under HENCE — here, a kept prohibition — it is the hand-off,
-      --     i.e. the revealing event's stamp, which is also THE JOIN there
-      --     (spec §5.1.1.1; moving a kept SHANT's join to its deadline is
-      --     a separate decision, not taken here).
+      --     already passed since the deadline. (For SHANT the failure is a
+      --     violation, handled at 'Contract10' with the violating event's
+      --     own stamp.)
+      --   * under HENCE — here, a kept prohibition — it is the window's end
+      --     (§2.6 card A3, built 2026-10-09): a kept SHANT achieves at its
+      --     deadline, and that instant is also THE JOIN there. The
+      --     revealing event's stamp would make the clock depend on how
+      --     many idle events the trace carried before it (measured:
+      --     @WAITUNTIL 10@ alone left a @WITHIN 1@ follow-up pending,
+      --     @WAITUNTIL 6@ then 10 breached it).
+      --
+      -- Both are floored at the obligation's own arming (§2.6 card A2,
+      -- built 2026-10-09): an obligation armed after its deadline — an
+      -- anchored WITHIN whose anchor lay before it was entered — could
+      -- never have been met, and fails (or lapses, or is kept) when it is
+      -- armed, not before it existed; the run says so in a note
+      -- ('armedAfterDeadlineNote'). THE DEADLINE in the continuation is
+      -- still the deadline as written ('lifecycleAt'); it and the clock
+      -- part only when the floor engages, so @WITHIN d@ and @WITHIN d OF
+      -- THE DEADLINE@ agree under LEST everywhere else.
       --
       -- Before 2026-09-16 both slots used the revealing event's stamp,
       -- which made the re-offered event decrement a LEST's WITHIN by zero.
@@ -2162,14 +3255,24 @@ backwardContractFrame val = \ case
         -- What the continuation may anchor to (R-Q7B): the deadline that
         -- just passed, this obligation's arming, and — only when the
         -- continuation is the HENCE, i.e. the join fired — the hand-off
-        -- clock as THE JOIN. Under LEST the hand-off clock IS 'deadlineR'
-        -- (§5.2): one reference, read both as the unanchored default and
-        -- as THE DEADLINE, so the two cannot drift apart. A barrier member
+        -- clock as THE JOIN. Under LEST the hand-off clock is the deadline
+        -- (§5.2), floored at the arming ('clockR', §2.6 card A2), and THE
+        -- DEADLINE is the deadline as written; the two are one reference
+        -- unless the floor engages. A barrier member
         -- hands that same reference to the failure sentinel as its anchor
         -- ('continueWithFollowup', 'sentinelArgs'), which is how the
         -- barrier's LEST comes to count from the failing member's deadline
         -- without a mechanism of its own ('barrierFail').
         deadlineR <- allocateValue (ValNumber deadline)
+        -- A2: the hand-off clock, no earlier than the arming, and a note
+        -- when that floor engages (see the clock NOTE above)
+        armedT <- peekClock armed
+        let effective = maybe deadline (max deadline) armedT
+        clockR <- case armedT of
+          Just a | a > deadline -> do
+            tellNote (armedAfterDeadlineNote act.modal act.action due a deadline)
+            allocateValue (ValNumber a)
+          _ -> pure deadlineR
         -- P2b: the 'Expired' step. It is built here, where the deadline and
         -- the revealing event are in hand, but LOGGED at the ResolveParty
         -- frame for the routed cases, because that is where the party gets
@@ -2187,11 +3290,10 @@ backwardContractFrame val = \ case
                 norm' <- maybe (pure norm) (`naming` norm) mBearer
                 pure $ Just $ plainStep (Just time') (Just ev)
                   (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm' (Expired branch deadline)
-        let lifecycleAt isHence t = MkLifecycle
-              { join = if isHence then Just t else Nothing
+        let lifecycleAt isHence = MkLifecycle
+              { join = if isHence then Just clockR else Nothing
               , deadline = Just deadlineR
               , armed }
-            clockAt isHence stampR = if isHence then stampR else deadlineR
             reofferResolve isHence followup' branch = do
               pending <- expiredStep branch Nothing
               -- The mark the copy carries on: a fresh event starts the walk
@@ -2212,7 +3314,7 @@ backwardContractFrame val = \ case
               evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
               markReoffered evR mark
               eventsR <- allocateValue (ValCons evR events)
-              pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockAt isHence ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
+              pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockR, pending, seen, lifecycle = lifecycleAt isHence})
               maybeEvaluate env party
         case act.modal of
           DMustNot ->
@@ -2241,7 +3343,8 @@ backwardContractFrame val = \ case
                 whenDeonticLog \ _ -> do
                   mBearer <- peekWHNF partyR
                   expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
-                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline))))
+                let timing = Timing {effective, observed = stamp, revealedBy = Just (ev'party, ev'act)}
+                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline timing))))
               Just lestFollowup -> reofferResolve False lestFollowup ToLest
       else do
         -- NOTE: we have observed the event and do not branch, either, the
@@ -2276,6 +3379,9 @@ backwardContractFrame val = \ case
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) named PartyMismatch)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, norm = named, ..} events
+      -- whether the event's party is the obligation's depends on an
+      -- unknown: Stuck on it, never a type error (§8 step 3)
+      _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
   Contract11 ActionDoesn'tmatch {} ->
@@ -2284,6 +3390,9 @@ backwardContractFrame val = \ case
   Contract9 ScrutinizeEnvironment {..} ->
     case val of
       ValEnvironment henceEnv -> do
+        -- smucclaw/l4-ide#1069: a RECALL in the PROVIDED is read at the
+        -- event's stamp
+        noteClockWHNF time
         pushCFrame $ Contract10 ScrutinizeActions {..}
         continueExpr (env `Map.union` henceEnv) (fromMaybe trueExpr act.provided)
       _ -> internalException $ RuntimeTypeError $
@@ -2344,9 +3453,13 @@ backwardContractFrame val = \ case
               -- is consumed, not re-offered — 'events' is what followed it.
               timeR <- allocateValue time
               deadlineR <- absoluteDeadline time due
-              -- LEST: the join did not fire, so no THE JOIN (R-Q7B); THE
-              -- DEADLINE is the window's end, which is NOT the clock here
-              let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineR, armed}
+              -- LEST: THE JOIN is the violating stamp, which is the clock
+              -- here (§2.6 card A3: a SHANT's failure is an act, so under
+              -- its LEST there is an instant to name — under a MUST's, DO's
+              -- or MAY's there is none, and the checker refuses THE JOIN
+              -- there); THE DEADLINE is the window's end, which is NOT the
+              -- clock here
+              let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed}
               continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR seen
             -- No LEST clause: immediate breach
             Nothing -> do
@@ -2365,7 +3478,9 @@ backwardContractFrame val = \ case
               -- matrix only mandates SHANT+action => LEST/breach and does not
               -- prescribe the breach record's deadline field, so this does
               -- not contradict the spec.
-              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp))))
+              -- SEESAW: a violation takes effect when it happens, and is seen then
+              let timing = Timing {effective = stamp, observed = stamp, revealedBy = Just (ev'partyRef, ev'act)}
+              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp timing))))
           -- MUST, MAY, DO: action done = success
           _ -> do
             matchedStep ToHence
@@ -2384,6 +3499,8 @@ backwardContractFrame val = \ case
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm GuardFailed)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
+      -- a PROVIDED that depends on an unknown: Stuck on it (§8 step 3)
+      _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
   ResolveParty ResolvePartyFrame {..} -> do
@@ -2404,23 +3521,43 @@ backwardContractFrame val = \ case
   -- environment the value happened to capture ('rebindLifecycle').
   Handoff lifecycle ->
     continueBackward (rebindLifecycle lifecycle val)
-  -- EVERY, the roll call. One cons cell of the roll per step.
+  -- SEESAW: the hand-off clock a declared breach takes ('StampBreach'). It
+  -- is observed at that clock too, unless the stream it was handed starts
+  -- with a re-offered event — the event that revealed the miss its LEST (or
+  -- a kept SHANT's HENCE) answers — which is then the observation. A clock
+  -- that is not a number (an unknown, say) leaves the breach untimed.
+  StampBreach StampBreachFrame {..} -> case val of
+    ValNumber clock -> do
+      revealed <- revealingEvent eventsRef
+      let timing = case revealed of
+            Just (p, a, stamp) -> Timing {effective = clock, observed = max clock stamp, revealedBy = Just (p, a)}
+            Nothing            -> Timing {effective = clock, observed = clock, revealedBy = Nothing}
+      continueBackward (ValBreached (restamp timing reason))
+    _ -> continueBackward (ValBreached reason)
+  -- EVERY, the roll call. One cons cell of the roll per step. A roll, or the
+  -- rest of one, that is not known is Stuck on it: nobody can say who the
+  -- group is.
   QuantRoll QuantRollFrame {..} ->
     case val of
       ValNil -> assembleQuantified ctx (reverse acc)
       ValCons hd tl -> do
         pushCFrame (QuantCast QuantCastFrame {candidate = hd, rest = tl, ..})
         continueRef hd
+      _ | Just ns <- unknownNames val -> stuckOn ns
       _ -> internalException $ RuntimeTypeError $
         "expected a LIST for the cast of EVERY but found: " <> prettyLayout val
   -- EVERY: the cast test. @EVERY Tenant t@ admits only values built by the
-  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll.
+  -- constructor @Tenant@; @EVERY t@ admits every entry of the roll. An
+  -- unknown entry may or may not be a @Tenant@, so the cast neither admits
+  -- nor drops it: it is Stuck, naming it (smucclaw/l4-ide#998). Dropping it
+  -- was the bug: the join then released without that member's obligation.
   QuantCast QuantCastFrame {..} -> do
-    let admitted = case ctx.cast of
-          Nothing -> True
-          Just c  -> case val of
-            ValConstructor n _ -> n `sameResolved` c
-            _                  -> False
+    admitted <- case ctx.cast of
+      Nothing -> pure True
+      Just c  -> case val of
+        ValConstructor n _ -> pure (n `sameResolved` c)
+        _ | Just ns <- unknownNames val -> stuckOn ns
+        _                  -> pure False
     if not admitted
       then quantNext QuantRollFrame {..} rest
       else case ctx.filt of
@@ -2433,6 +3570,8 @@ backwardContractFrame val = \ case
     case boolView val of
       Just True  -> quantNext QuantRollFrame {acc = (candidate, candidateV) : acc, ..} rest
       Just False -> quantNext QuantRollFrame {..} rest
+      -- a WHO filter that depends on an unknown: Stuck on it (§8 step 3)
+      Nothing | Just ns <- unknownNames val -> stuckOn ns
       Nothing    -> internalException $ RuntimeTypeError $
         "expected BOOLEAN from the WHO filter of EVERY but found: " <> prettyLayout val
   -- EVERY, the barrier: one member's result. NOTE: a barrier member never
@@ -2560,12 +3699,12 @@ backwardContractFrame val = \ case
       ValNil -> case reverse acc of
         []       -> userException (UserError (emptyBreachByRefusal clause))
         (p : ps) -> declareBreach $ ExplicitBreach
-          Blame { before = [], anchor = declared p, after = map declared ps }
+          Blame { before = [], anchor = declared p, after = map declared ps, alsoDecisive = [] }
       _ | null acc -> declareBreach (ExplicitBreach (singleBlame (declared partyRef)))
         | otherwise -> internalException $ RuntimeTypeError $
             "expected a LIST of parties after BREACH BY but found: " <> prettyLayout val
     where
-      declared p = DeclaredBreach (Just p) mReason
+      declared p = DeclaredBreach (Just p) mReason Nothing
   -- EVERY, the barrier: the WITHIN on the ONCE line (R-T2), which bounds the
   -- WHOLE (spec §2.2.7.5 point 3) rather than any one act.
   Barrier3 BarrierStateDueFrame {..} -> do
@@ -2576,7 +3715,7 @@ backwardContractFrame val = \ case
     -- instant an OF-expression names. OF THE JOIN and OF THE DEADLINE are
     -- refused on a join line by the checker ('L4.TypeCheck.checkAnchor').
     case joinStateDue ctx of
-      Just (MkDeadline _ _ (Just (AnchorAt _ e))) -> continueExpr ctx.env e
+      Just (MkDeadline _ _ (Just (AnchorAt _ e))) -> continueExpr (joinLineEnv ctx) e
       Just (MkDeadline _ _ (Just a@AnchorJoin{}))     -> unreachableAnchor a
       Just (MkDeadline _ _ (Just a@AnchorDeadline{})) -> unreachableAnchor a
       Just MkBefore{} -> beforeOnJoinLine
@@ -2630,9 +3769,26 @@ backwardContractFrame val = \ case
       -- fulfilled LEFT operand is unreachable because of this short-circuit,
       -- so the step is logged here.
       joinedStep op JoinFulfilled (Just LeftSide) False
+      -- smucclaw/l4-ide#1069: the right alternative is never run, so a
+      -- record it would have made is never compared with a read; written the
+      -- other way round it would have run first. Hand the check what it can
+      -- make, from the ROR's start on ('registerUnrun').
+      clock' <- case (clock, args) of
+        (Nothing, t : _) -> peekClock t
+        _                -> pure clock
+      writes <- possibleWrites env rexpr2
+      unless (null writes) $
+        siblingCheck (registerUnrun scope outerPath (maybe (StartOf scope) At clock') writes)
       continueBackward ValFulfilled
 
   RBinOp1 MkRBinOp1 {..} -> do
+    -- smucclaw/l4-ide#1069: the right operand runs on side 1 of the
+    -- compound's scope, from the compound's own time, which the left operand
+    -- has usually forced by now if it was still a thunk when the compound began
+    clock' <- case (clock, args) of
+      (Nothing, t : _) -> peekClock t
+      _                -> pure clock
+    restoreSibling ((scope, 1) : outerPath) (maybe (StartOf scope) At clock')
 
     -- push a frame for when the evaluation of the
     -- second argument has completed
@@ -2651,46 +3807,35 @@ backwardContractFrame val = \ case
     | ValBreached r1 <- rval1
     , ValBreached r2 <- val
     -> do
-      -- NOTE: the compound breach is ANCHORED at one operand's breach and
-      -- NAMES every failure of both operands (R-T3, spec §6.1, built
-      -- 2026-09-15; per-entry detail and no dedup RULED the same day).
-      --
-      -- The anchor — whose kind ('DeadlineMissed' with its revealing event,
-      -- or 'ExplicitBreach') and whose time the result carries — is chosen
-      -- by time: the FIRST breach for RAND, because it is already the reason
-      -- the conjunction is lost; the SECOND for ROR, because that is when
-      -- the last alternative "missed its chance". When both happen at the
-      -- same time the tie goes to the left operand for RAND and the right
-      -- for ROR (consistently with CSL). ExplicitBreach carries no timestamp
-      -- (adding one would ripple through the constructor arity and the
-      -- jl4-service wire — known limitation), so a pair involving one is
-      -- treated as simultaneous and resolved by the same tie-break: with a
-      -- BECAUSE on both sides, the order they were lost in is never
-      -- consulted. Each entry keeps its own action, deadline or BECAUSE, so
-      -- nothing is lost by the choice except which side dates the breach.
+      -- NOTE: the compound breach NAMES every failure of both operands (R-T3,
+      -- spec §6.1, built 2026-09-15; per-entry detail and no dedup RULED the
+      -- same day) and is dated along the operand tree (SEESAW, spec §6.1.2,
+      -- RULED 2026-10-09): a RAND is lost at the EARLIER of its operands'
+      -- effective instants, because the first failure already loses the
+      -- conjunction; an ROR at the LATER, because that is when the last
+      -- alternative missed its chance. The entries that fix that instant are
+      -- the deciding operand's own decisive entries, or both operands' when
+      -- the instants are equal ('combineBlame'). Nothing is chosen by
+      -- position: swapping the operands decides the same entries, and only
+      -- the order of the list — the drafter's — changes. Until 2026-10-09
+      -- the operands' REVEALING stamps decided and a tie fell to the left
+      -- operand, so one event that revealed two misses reported deadline 5
+      -- one way round and 9 the other.
       --
       -- The failures are the CONCATENATION of both operands', left operand
       -- first, with duplicates: @PARTY alice MUST x RAND PARTY alice MUST y@
       -- both missed names alice twice, once per way. A breach with no BY is
       -- one entry naming nobody.
-      let leftAnchored = case (breachTime r1, breachTime r2, op) of
-            (Just vt, Just vt', ValRAnd) -> vt <= vt'
-            (Just vt, Just vt', ValROr)  -> vt > vt'
-            (_, _, ValRAnd)              -> True
-            (_, _, ValROr)               -> False
-          -- P2b: simultaneous, or one side untimestamped, is CSL's tie-break
-          tieBreak = case (breachTime r1, breachTime r2) of
-            (Just vt, Just vt') -> vt == vt'
-            _                   -> True
-          (anchor, blame)
-            | leftAnchored = (r1, anchorLeft  (breachBlame r1) (breachBlame r2))
-            | otherwise    = (r2, anchorRight (breachBlame r1) (breachBlame r2))
-          chosen = rebase blame anchor
-      -- P2b: which side's breach anchors the compound's, and whether the
-      -- tie-break chose it. The summary names every failure of both sides.
+      let (decider, blame) = combineBlame op (breachBlame r1) (breachBlame r2)
+          chosen = breachOf blame
+      -- P2b: which operand decides the compound's instant (both, on a tie).
+      -- The summary names every failure of both sides.
       whenDeonticLog \ _ -> do
         summary <- breachSummary chosen
-        joinedStep op (JoinBreached summary) (Just (if leftAnchored then LeftSide else RightSide)) tieBreak
+        joinedStep op (JoinBreached summary) (Just (case decider of
+          LeftDecides  -> LeftSide
+          RightDecides -> RightSide
+          BothDecide   -> BothSides)) False
       continueBackward (ValBreached chosen)
 
   RBinOp2 MkRBinOp2 {..}
@@ -2836,12 +3981,6 @@ backwardContractFrame val = \ case
 
     pushCFrame = pushFrame . ContractFrame
 
-    -- | The time at which a breach materialized, if it carries one.
-    -- ExplicitBreach is untimestamped (see NOTE at the both-breached clause).
-    breachTime :: ReasonForBreach a -> Maybe Rational
-    breachTime (DeadlineMissed _ _ stamp _) = Just stamp
-    breachTime (ExplicitBreach _) = Nothing
-
     -- P2b: the branch a pending 'Expired' step was routed to.
     expiredBranch :: StepOutcome -> Maybe DS.Branch
     expiredBranch (Expired b _) = Just b
@@ -2905,6 +4044,10 @@ backwardContractFrame val = \ case
     continueWithFollowup mParty lifecycle env followup events time seen = do
       mOriginal <- getCurrentParty
       putCurrentParty mParty
+      -- smucclaw/l4-ide#1069: a RECORD or RECALL in the continuation is made
+      -- at the hand-off's clock (the act's stamp under HENCE, the missed
+      -- deadline under LEST)
+      noteClock time
       pushFrame (RestoreCurrentParty mOriginal False)
       args <- case followup of
         App _ r [] | isSentinel r -> do
@@ -3053,10 +4196,14 @@ startRollCall env deonton time events =
   case deonton.subject of
     Party{} -> internalException $ RuntimeTypeError
       "a PARTY obligation reached the quantifier's roll call"
-    Every _ cast var roll filt -> do
+    Every _ cast var roll mFilt -> do
       -- P2b: arming is the join's own entry into its site.
       norm <- armJoinKey deonton
-      let ctx = MkQuantCtx {deonton, var, cast, roll, filt, env, time, events, norm}
+      -- WHO and WHOSE are one filter to the machine: the checker has already
+      -- rewritten a WHOSE operand's first word into @v's field@ (§13.6), so
+      -- what runs here is a Boolean expression either way.
+      let filt = filterExpr <$> mFilt
+          ctx = MkQuantCtx {deonton, var, cast, roll, filt, env, time, events, norm}
       case maybe (filt >>= quantifierRoll var) Just roll of
         Nothing -> userException (UserError rollCallRefusal)
         -- The roll is read BEFORE any member exists, so it cannot depend on
@@ -3159,6 +4306,24 @@ memberEnv ctx mdue mref =
     demoted = case mdue of
       DemotedJoinDue _ -> Map.insert lifecycleArmingUnique ctx.time
       _                -> id
+
+-- | The environment a join line's own @WITHIN@ (its duration, and an
+-- anchor written as an expression) is evaluated in: the EVERY's, with THE
+-- ARMING bound to the EVERY's own arming — what a bare @OF THE ARMING@ on
+-- that line already means ('Barrier3', 'memberEnv') — so that
+-- @OF (THE ARMING PLUS 2)@ and @OF THE ARMING@ name the same instant
+-- however deep the EVERY is nested. THE JOIN and THE DEADLINE are deleted:
+-- that @WITHIN@ is what defines both, so an outer obligation's must not
+-- show through (refusal 3; the checker refuses a noun WRITTEN there,
+-- 'L4.TypeCheck.checkLifecycle'). A value built elsewhere keeps the
+-- environment it closed over. Overriding an outer arming here, rather
+-- than binding it only where absent, is assumed, not ruled (2026-10-24).
+joinLineEnv :: QuantCtx -> Environment
+joinLineEnv ctx =
+  Map.insert lifecycleArmingUnique ctx.time
+    . Map.delete lifecycleJoinUnique
+    . Map.delete lifecycleDeadlineUnique
+    $ ctx.env
 
 -- | Does this expression name the quantifier's member variable anywhere?
 mentionsVar :: Resolved -> Expr Resolved -> Bool
@@ -3288,6 +4453,14 @@ joinFailpointName  = "the join fails"
 -- vacuously true.
 startBarrier :: QuantCtx -> [CastMember] -> MemberDue -> Machine Config
 startBarrier ctx members mdue = do
+  -- smucclaw/l4-ide#1069: the members after the first, and the join, take
+  -- events again that the compounds the barrier sits in have already taken,
+  -- so an access in here must not be ordered by those compounds' event
+  -- counts ('takenOn'); the barrier's own compounds are counted as usual
+  sref <- asks (.siblings)
+  outer <- liftIO (readIORef sref)
+  pushFrame (RestoreBehind outer.ssBehind)
+  liftIO (writeIORef sref outer {ssBehind = max outer.ssBehind (length outer.ssPath)})
   -- Both names are user-visible: a member that has not yet acted when the
   -- event stream runs out is printed as a residual obligation carrying these
   -- sentinels in its HENCE and LEST, so they have to read as English there.
@@ -3376,18 +4549,17 @@ barrierFinish step = case reverse step.failures of
     -- DEADLINE under a barrier's LEST is the earliest failer's, by the
     -- same choice)
     (_, BarrierFailedAt {failTimeRef, failEvsRef, failDueRef}) -> barrierFail step.ctx failDueRef failTimeRef failEvsRef
-    (i, BarrierBreached {failReason}) ->
-      -- Every failed member's own failure, in roll order, anchored at the
-      -- earliest's: the members before it on the roll are prepended, those
-      -- after it appended, each with its own action and deadline. A member
-      -- listed twice on the roll fails twice (no dedup, RULED 2026-09-15).
-      let (earlier, later) = splitAt i (f : fs)
-          own = breachBlame failReason
-          blame = own
-            { before = concatMap entries earlier ++ own.before
-            , after  = own.after ++ concatMap entries (drop 1 later) }
-          verdict = rebase blame failReason
-      in do
+    (_, BarrierBreached {}) ->
+      -- Every failed member's own failure, in roll order, combined as a
+      -- RAND (SEESAW, spec §6.1.2): the barrier is lost at the earliest
+      -- effective instant among them, and the members that failed at that
+      -- instant are its decisive entries. A member listed twice on the roll
+      -- fails twice (no dedup, RULED 2026-09-15).
+      case nonEmpty [ breachBlame r | BarrierBreached {failReason = r} <- f : fs ] of
+       Nothing -> internalException $ RuntimeTypeError
+         "a barrier with no LEST recorded a failure that is not a breach"
+       Just blames -> do
+        let verdict = breachOf (combineAll blames)
         -- P2b: the barrier's own step, logged once the verdict is decided
         -- (every member has run). The clock is the anchoring failure's
         -- revealing stamp — in hand for a missed deadline, absent only when
@@ -3419,10 +4591,6 @@ barrierFinish step = case reverse step.failures of
         Nothing       -> internalException $ RuntimeTypeError
           "the barrier finished with every member complete but no completion recorded"
         Just (t, evs) -> barrierJoined step.ctx t evs step.dueLatest
-  where
-    entries = \ case
-      BarrierBreached {failReason} -> toList (blameList (breachBlame failReason))
-      BarrierFailedAt {}           -> []
 
 -- | The earliest of a barrier's failures, with its position in the order
 -- they were recorded (roll order): a later one replaces the best so far only
@@ -3454,11 +4622,7 @@ earliestFailure (f :| fs) = foldl' pick (0, f) (zip [1 ..] fs)
       BarrierBreached {}        -> Nothing
     failureTime = \ case
       BarrierFailedAt {failAt} -> Just failAt
-      BarrierBreached {failReason} -> case failReason of
-        DeadlineMissed _ _ _ b -> case b.anchor of
-          MissedDeadline _ _ deadline -> Just deadline
-          DeclaredBreach _ _          -> Nothing
-        ExplicitBreach _ -> Nothing
+      BarrierBreached {failReason} -> breachEffective (breachBlame failReason)
 
 -- | The join has fired at @t@ (the last completion, or the arming for an
 -- empty cast), with the stream that followed it: run the HENCE through the
@@ -3478,7 +4642,7 @@ barrierJoined ctx t evs dueLatest = case joinStateDue ctx of
   Just (MkDeadline _ duration _) -> do
     pushFrame (ContractFrame
       (Barrier3 BarrierStateDueFrame {ctx, joinTime = t, joinEvents = evs}))
-    continueExpr ctx.env duration
+    continueExpr (joinLineEnv ctx) duration
   Just MkBefore{} -> beforeOnJoinLine
 
 -- | A @BEFORE@ on a join line is refused by the checker
@@ -3511,6 +4675,7 @@ fireBarrierHence ctx deadlineRef timeRef eventsRef = do
     logStep l (plainStep clock Nothing NoEvent ctx.norm JoinReleased)
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
+  noteClock timeRef -- smucclaw/l4-ide#1069: the join's clock
   pushFrame (RestoreCurrentParty mOriginal False)
   pushFrame (App1 [timeRef, eventsRef] Nothing)
   let lifecycle = MkLifecycle {join = Just timeRef, deadline = deadlineRef, armed = ctx.time}
@@ -3555,6 +4720,7 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
       logStep l (plainStep clock Nothing NoEvent ctx.norm (JoinFailed ToLest))
     mOriginal <- getCurrentParty
     putCurrentParty Nothing
+    noteClock timeRef -- smucclaw/l4-ide#1069: the failure's clock
     pushFrame (RestoreCurrentParty mOriginal False)
     pushFrame (App1 [timeRef, eventsRef] Nothing)
     let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineRef, armed = ctx.time}
@@ -3591,7 +4757,10 @@ barrierStateMissed ctx joinTime deadline = case ctx.deonton.lest of
     tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToBreach deadline)
     reason <- allocateValue (ValString
       "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
-    continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason)))))
+    -- SEESAW: the state layer was lost at its deadline, and the late last
+    -- completion is what showed it
+    let timing = Timing {effective = deadline, observed = max deadline joinTime, revealedBy = Nothing}
+    continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason) (Just timing)))))
 
 -- | The state-layer LEST, applied to the trimmed stream ('BarrierTrim'):
 -- @cellRef@ is the first cell of the barrier's stream whose event is
@@ -3611,6 +4780,7 @@ barrierStateLest :: QuantCtx -> RExpr -> Reference -> Reference -> Machine Confi
 barrierStateLest ctx lestExpr tRef cellRef = do
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
+  noteClock tRef -- smucclaw/l4-ide#1069: the state deadline's clock
   scoped <- enterRelookScope (joinSiteOf ctx.deonton)
   pushFrame (RestoreCurrentParty mOriginal scoped)
   pushFrame (App1 [tRef, cellRef] Nothing)
@@ -3716,6 +4886,31 @@ operandHandoff env = \ case
   Left _  -> for_ (lifecycleOf env) (pushFrame . ContractFrame . Handoff)
   Right _ -> pure ()
 
+-- | The unique a lifecycle VALUE reads ('Lifecycle', §2.6 card B1): the
+-- same three the anchors read.
+lifecyclePointUnique :: LifecyclePoint -> Unique
+lifecyclePointUnique = \ case
+  LifecycleJoin     -> lifecycleJoinUnique
+  LifecycleDeadline -> lifecycleDeadlineUnique
+  LifecycleArming   -> lifecycleArmingUnique
+
+-- | An obligation's environment as it is armed: THE ARMING bound to the
+-- arming instant ONLY where no hand-off bound one (§2.6 card B1, "THE
+-- ARMING bound only where absent"). Under a HENCE or LEST the hand-off's
+-- binding stands — THE ARMING there is when the obligation this one
+-- continues was entered, as a bare @OF THE ARMING@ says ('resolveAnchor'
+-- falls back to 'armed' exactly where this binds it). At the top level it
+-- is this obligation's own arming, so @WITHIN 5 OF (THE ARMING)@ and
+-- @WITHIN 5 OF THE ARMING@ agree there too. What it cannot reach is a
+-- value that never reaches an obligation: a top-level
+-- @WHERE t MEANS THE ARMING@ is a thunk over the rule's environment, which
+-- no arming touched. The checker refuses that where it is written
+-- (refusal 8, 'L4.TypeCheck.checkLifecycle', whose 'inOwnSlots' is set at
+-- exactly the slots this environment serves); the run refuses it by name
+-- when forced, as the backstop.
+withOwnArming :: Reference -> Environment -> Environment
+withOwnArming armedAt = Map.alter (Just . fromMaybe armedAt) lifecycleArmingUnique
+
 -- | Resolve a lifecycle anchor: the binding, or the fallback (THE ARMING with
 -- no enclosing obligation is the obligation's own arming), or — for an
 -- anchor the checker should have refused — a named refusal rather than a
@@ -3748,6 +4943,28 @@ lifecycleRefusal a = Text.unwords
   , "obligation the WITHIN, or guard an EVERY that may range over nobody."
   ]
 
+-- | What the machine says when a lifecycle VALUE ('Lifecycle') is forced
+-- where the position it names does not exist: the value's counterpart of
+-- 'lifecycleRefusal', worded for an expression rather than an @OF@. Its
+-- first cause, a noun defined at the top level and used there, is refused
+-- by the checker where it is written (refusals 1 and 8,
+-- 'L4.TypeCheck.checkLifecycle'), so a checked module reaches this only by
+-- the other causes; the wording keeps it as the backstop.
+lifecycleValueRefusal :: LifecyclePoint -> Text
+lifecycleValueRefusal p = Text.unwords
+  [ lifecyclePointWords p <> " was read where it names nothing: it is the"
+  , Text.toLower (Text.drop 4 (lifecyclePointWords p)) <> " of the obligation an expression"
+  , "sits in the HENCE or LEST of, and this one was evaluated where no"
+  , "obligation had that position. One of: it was defined at the top level"
+  , "(a top-level rule's WHERE, or a function's body) and used there, where no"
+  , "obligation has been entered; it was passed in a value attached under a"
+  , "LEST, whose join never fired (THE JOIN), or under an obligation with no"
+  , "WITHIN (THE DEADLINE); or this is the HENCE of a barrier whose cast was"
+  , "EMPTY, so nobody had a deadline (THE DEADLINE). Read it inside the HENCE"
+  , "or LEST whose position it means, and pass it to a function as an"
+  , "argument from there."
+  ]
+
 -- | An anchor's instant on the trace's clock (R-Q7C): a NUMBER as it is, a
 -- DATE by its serial — the same arithmetic as @DATE_SERIAL@, not a call
 -- through it. This is the ONE place the lowering is defined: 'Barrier4' (a
@@ -3775,13 +4992,6 @@ partyKeyWHNF = \ case
   ValString t -> t
   v           -> prettyLayout v
 
--- | The same breach — same kind, same revealing event if any — carrying this
--- blame instead (R-T3, spec §6.1). The anchor of the blame must be of the
--- breach's own kind; every caller builds it so.
-rebase :: Blame a -> ReasonForBreach a -> ReasonForBreach a
-rebase blame = \ case
-  DeadlineMissed ev'p ev'a stamp _ -> DeadlineMissed ev'p ev'a stamp blame
-  ExplicitBreach _                 -> ExplicitBreach blame
 
 -- | What the machine says when @BREACH BY@ is given a list with nobody in it.
 emptyBreachByRefusal :: Text -> Text
@@ -3816,8 +5026,8 @@ emptyBreachByRefusal clause = Text.unwords
 --     'continueWithFollowup' already pushed is still on the stack, so once
 --     @hence@ reduces to a 'ValObligation' that 'App1' applies it to
 --     @[time, events]@ — the next step scrutinizes the SAME event stream.
-runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Machine Config
-runRecord cellVal val isOfficial env mHence mRecipientKey = do
+runRecord :: WHNF -> WHNF -> Bool -> Environment -> Maybe (Expr Resolved) -> Maybe Text -> Maybe SrcRange -> Machine Config
+runRecord cellVal val isOfficial env mHence mRecipientKey site = do
   cell <- expectString cellVal
   -- Bitemporal stamps (smucclaw/l4-ide#914 §2A). Transaction time is the
   -- ROOT eval clock ('getEvalTime'): a plain EvalState field that
@@ -3847,6 +5057,16 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
       route = if isOfficial
               then RouteOfficial
               else maybe RouteOwn RouteNotify mRecipientKey
+      -- the ledger the write lands in, keyed as 'tellEventRouted' keys it
+      key = case route of
+        RouteOfficial  -> OfficialKey
+        RouteOwn       -> OwnKey (fromMaybe anonymousParty mParty)
+        RouteNotify rk -> OwnKey rk
+  -- smucclaw/l4-ide#1069: rules 2, 4 and 5 of the sibling-read check, before
+  -- the write. The value is printed only if it is already evaluated through
+  -- and through ('peekName'): the check forces nothing.
+  shown <- peekName val
+  siblingCheck (checkWrite key cell prov.source shown site)
   tellEventRouted route (Assign [cell] val prov)
   case mHence of
     Nothing    -> continueBackward val          -- M1: terminal / expression use
@@ -3876,9 +5096,12 @@ runRecord cellVal val isOfficial env mHence mRecipientKey = do
 --     'readCellAllBitemporal' (oldest->newest, append order), building it
 --     right-to-left as 'ValCons'\/'ValNil'. Result @[]@ (ValNil) when no
 --     visible entry exists — NOT @NOTHING@.
-finishRead :: RecallMode -> WHNF -> Ledger -> Machine Config
-finishRead mode cellVal ledger = do
+finishRead :: RecallMode -> WHNF -> LedgerKey -> Maybe SrcRange -> Ledger -> Machine Config
+finishRead mode cellVal key site ledger = do
   cell <- expectString cellVal
+  -- smucclaw/l4-ide#1069: rules 1 and 3 of the sibling-read check. The
+  -- @key@ is the ledger the caller chose, keyed as a write to it is.
+  siblingCheck (checkRead key cell (mode == RecallAll) site)
   -- Bitemporal read bounds (smucclaw/l4-ide#914 §2B): RECALL reads THROUGH
   -- the ambient temporal context. @EVAL AS OF SYSTEM TIME t@ hides entries
   -- appended after t (tx > t); @EVAL UNDER VALID TIME t@ selects, among
@@ -4029,22 +5252,22 @@ matchGivens' closureEnv ns f rs = do
         internalException $
           RuntimeTypeError "given signatures' values' lengths do not match"
 
-matchBranches :: Reference -> Environment -> [Branch Resolved] -> Machine Config
-matchBranches scrutinee _env [] = do
+matchBranches :: Maybe PmGroup -> Reference -> Environment -> [Branch Resolved] -> Machine Config
+matchBranches clauses scrutinee _env [] = do
   -- The scrutinee has been forced by the failed branch matches, so we can
   -- usually show the actual value in the error instead of a heap reference.
   thunk <- readThunk scrutinee
-  userException $ NonExhaustivePatterns case thunk of
+  userException $ NonExhaustivePatterns clauses case thunk of
     WHNF val          -> Right val
     -- A context-dependent cache still holds the value the branches were
     -- matched against, so it names the scrutinee just as well as a plain
     -- 'WHNF'; we are inside that very force, so it cannot be stale here.
     WHNFWhen _ val _ _ -> Right val
     Unevaluated{}     -> Left scrutinee
-matchBranches _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
+matchBranches _clauses _scrutinee env (MkBranch _ann (Otherwise _ann') e : _) =
   continueExpr env e
-matchBranches scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do
-  pushFrame (ConsiderWhen1 scrutinee e branches env)
+matchBranches clauses scrutinee env (MkBranch _ann (When _ann' pat) e : branches) = do
+  pushFrame (ConsiderWhen1 clauses scrutinee e branches env)
   continuePattern scrutinee env pat
 
 matchPattern :: Reference -> Environment -> Pattern Resolved -> Machine Config
@@ -4074,8 +5297,8 @@ patternMatchFailure :: Machine Config
 patternMatchFailure = withPoppedFrame $ \ case
   Nothing ->
     internalException UnhandledPatternMatch
-  Just (ConsiderWhen1 scrutinee _ branches env) ->
-    continueBranches scrutinee env branches
+  Just (ConsiderWhen1 clauses scrutinee _ branches env) ->
+    continueBranches clauses scrutinee env branches
   -- we have unwound the frame that would reenter when scrutinizing the event
   Just (ContractFrame (Contract11 ActionDoesn'tmatch {..})) -> do
     -- P2b: the action pattern did not match; next event.
@@ -4088,8 +5311,159 @@ patternMatchFailure = withPoppedFrame $ \ case
     newTime <- allocateValue time
     pushFrame $ ContractFrame $ Contract1 ScrutinizeEvents {party = Right party, time = newTime, ..}
     continueRef events
+  -- an in-step compound's paused operands are dropped with it, so their
+  -- blackholed thunks must be made forcible again
+  Just (Lockstep ls) -> do
+    unwindLockstep ls
+    patternMatchFailure
+  Just (RestoreBehind n) -> do
+    restoreBehind n
+    patternMatchFailure
   Just _ ->
     patternMatchFailure
+
+-- | A pattern frame met an unknown where it needed a constructor or a list.
+--
+-- Under the regulative action matcher this is Stuck, naming the unknown
+-- (smucclaw/l4-ide#999): failing the match would move on to the next
+-- event, which asserts that the act was not this one, and nothing says so.
+-- Under a @CONSIDER@ (and so a record selector, a one-branch @CONSIDER@) it
+-- is Stuck too: failing the match would hand the unknown to the next branch,
+-- where a catch-all takes it silently, or would report an exhaustive
+-- @CONSIDER@ as having no branch for it (UNKNOWN-EVALUATION-SPEC §8 step 1).
+-- The exception is a sub-pattern still to be matched that is already KNOWN
+-- to clash, with every sub-pattern the match would reach before it already
+-- known to match; then the branch cannot match whatever the unknown is, and
+-- the match fails exactly as for any mismatch ('metUnknown').
+patternMetUnknown :: NonEmpty Term -> Machine Config
+patternMetUnknown ns = metUnknown >>= \ case
+  BranchMayMatch -> stuckOn ns
+  BranchClashes  -> patternMatchFailure
+
+-- | What a pattern that met an unknown is to do. The literal patterns
+-- ('PatLit1') ask too, and on 'BranchMayMatch' leave the raising to their
+-- comparison, which names an unknown on either side.
+data MetUnknown
+  = BranchClashes
+    -- ^ a sub-pattern still to be matched already clashes: fail the match
+  | BranchMayMatch
+    -- ^ the branch may match, depending on the unknown: it is Stuck
+
+-- | Decide 'MetUnknown' by reading the stack, without popping it, down to the
+-- frame 'patternMatchFailure' would unwind to. The sub-patterns still to be
+-- matched sit in the 'PatApp1' and 'PatCons1' frames between here and that
+-- handler, innermost first, which is the order the match would take them, and
+-- the refinement ('anyKnownClash') does not depend on which handler it is.
+metUnknown :: Machine MetUnknown
+metUnknown = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  -- the handler is the frame 'patternMatchFailure' would unwind to
+  case break isMatchHandler stack.frames of
+    (pending, handler : _) | metUnknownHandled handler -> do
+      clash <- anyKnownClash (concatMap pendingPositions pending)
+      pure (if clash then BranchClashes else BranchMayMatch)
+    -- No handler: every pattern match is rooted at one, so this cannot
+    -- happen, and failing the match reports 'UnhandledPatternMatch'.
+    _ -> pure BranchClashes
+  where
+    isMatchHandler = \ case
+      ConsiderWhen1{}              -> True
+      ContractFrame (Contract11 _) -> True
+      _                            -> False
+    pendingPositions = \ case
+      PatApp1 _ _ rps -> rps
+      PatCons1 rf _ p -> [(rf, p)]
+      _               -> []
+
+-- | The handlers under which an unknown met by a pattern is Stuck rather than
+-- a failed match: the regulative action matcher, and a @CONSIDER@ (by
+-- UNKNOWN-EVALUATION-SPEC §8 step 1).
+metUnknownHandled :: Frame -> Bool
+metUnknownHandled = \ case
+  ContractFrame (Contract11 _) -> True
+  ConsiderWhen1{}              -> True
+  _                            -> False
+
+-- | What reading a pending position tells us, without forcing anything.
+data PendingVerdict
+  = KnownClash  -- ^ the match would fail here, whatever any unknown is
+  | KnownMatch  -- ^ the match would succeed here, forcing nothing new
+  | Undecided   -- ^ the match would have to force something to say
+
+-- | Whether the pending positions, taken in the order the match would take
+-- them, reach a KNOWN clash before anything the match would have to force.
+--
+-- Cells are read, never forced: a check made only so that a mismatch stays a
+-- mismatch must not raise or diverge where the match itself would not have.
+-- And the scan stops at the first position it cannot decide, rather than
+-- looking past it for a later clash, because the match would force that
+-- position first, and forcing it can refuse, raise or diverge. Skipping it
+-- would answer "no match" for every value of the unknown when some values
+-- would refuse: with @tbd MEANS REFUSE ...@, the event @Send3 k tbd Wholesale@
+-- against @MUST Send3 Retail 7 Retail@ refuses when @k@ is @Retail@, so it is
+-- Stuck, not passed over.
+--
+-- A position is decided when its cell is already a value, or an unevaluated
+-- literal; a variable pattern binds without looking, so it always matches.
+-- A context-dependent cache ('WHNFWhen') is not trusted, since it may not hold
+-- for this context, and a pattern expression other than a literal would be
+-- evaluated, so neither is decided.
+--
+-- So the refinement is conservative. A computed argument (@2 PLUS 3@), or a
+-- list longer than the pattern whose tail is not yet evaluated, is Stuck
+-- rather than skipped, and whether a position counts as decided can depend on
+-- whether something else has already forced its cell. Either way a clash is
+-- claimed only where the match, run in order, would reach one.
+anyKnownClash :: [(Reference, Pattern Resolved)] -> Machine Bool
+anyKnownClash positions = pendingVerdict positions >>= \ case
+  KnownClash -> pure True
+  _          -> pure False
+
+-- | The positions in matching order: the first that is not 'KnownMatch' is
+-- the answer.
+pendingVerdict :: [(Reference, Pattern Resolved)] -> Machine PendingVerdict
+pendingVerdict = \ case
+  [] -> pure KnownMatch
+  ((rf, p) : rest) -> knownClash rf p >>= \ case
+    KnownMatch -> pendingVerdict rest
+    verdict    -> pure verdict
+
+knownClash :: Reference -> Pattern Resolved -> Machine PendingVerdict
+knownClash rf pat = case pat of
+  PatVar{} -> pure KnownMatch
+  PatExpr _ e | not (isLiteral e) -> pure Undecided
+  _ -> readThunk rf >>= \ case
+    WHNF v                      -> verdictOn v
+    Unevaluated _ (Lit _ lit) _ -> verdictOn =<< runLit lit
+    Unevaluated{}               -> pure Undecided
+    WHNFWhen{}                  -> pure Undecided
+  where
+    isLiteral = \ case
+      Lit{} -> True
+      _     -> False
+    verdictOn v = case pat of
+      PatApp _ n []
+        | getUnique n == TypeCheck.emptyUnique -> pure case v of
+            ValNil    -> KnownMatch
+            ValCons{} -> KnownClash
+            _         -> Undecided
+      PatApp _ n ps -> case v of
+        ValConstructor n' rfs
+          | sameResolved n n' -> pendingVerdict (zip rfs ps)
+          | otherwise         -> pure KnownClash
+        _ -> pure Undecided
+      PatCons _ p1 p2 -> case v of
+        ValNil        -> pure KnownClash
+        ValCons r1 r2 -> pendingVerdict [(r1, p1), (r2, p2)]
+        _             -> pure Undecided
+      PatLit _ lit          -> pure (literalVerdict lit v)
+      PatExpr _ (Lit _ lit) -> pure (literalVerdict lit v)
+      PatExpr{}             -> pure Undecided
+      PatVar{}              -> pure KnownMatch
+    literalVerdict lit v = case (lit, v) of
+      (NumericLit _ n, ValNumber m) -> if n == m then KnownMatch else KnownClash
+      (StringLit _ s, ValString t)  -> if s == t then KnownMatch else KnownClash
+      _                             -> Undecided
 
 runLit :: Lit -> Machine WHNF
 runLit (NumericLit _ann num) = pure (ValNumber num)
@@ -4113,20 +5487,20 @@ expect3 = \ case
 expectNumber :: WHNF -> Machine Rational
 expectNumber = \ case
   ValNumber f -> pure f
-  ValAssumed r -> stuckOnAssumed r
+  v | Just ns <- unknownNames v -> stuckOn ns
   v -> internalException $ RuntimeTypeError $ "expected a NUMBER but got: " <> prettyLayout v
 
 expectString :: WHNF -> Machine Text
 expectString = \ case
   ValString f -> pure f
-  ValAssumed r -> stuckOnAssumed r
+  v | Just ns <- unknownNames v -> stuckOn ns
   v -> internalException $ RuntimeTypeError $ "expected a STRING but got: " <> prettyLayout v
 
 expectDateValue :: WHNF -> Machine Time.Day
 expectDateValue = \ case
   ValDate d -> pure d
   ValNumber serial -> pure (Time.utctDay (serialToUTCTime serial))
-  ValAssumed r -> stuckOnAssumed r
+  v | Just ns <- unknownNames v -> stuckOn ns
   v -> internalException $ RuntimeTypeError $ "expected a DATE but got: " <> prettyLayout v
 
 expectInteger :: BinOp -> Rational -> Machine Integer
@@ -4175,6 +5549,52 @@ extractFieldNamesAndTypes ty = case ty of
         Just name -> Just (nameToText (TypeCheck.getName name), fieldType)
         Nothing -> Nothing
 
+-- | A JSON value the typed decoder cannot make into the type it was asked
+-- for. Each caller of this used to fall back to the untyped
+-- 'jsonValueToWHNF', which turns an object into @NOTHING@ and passes a string
+-- or a number through as itself: a value of the wrong type, carried on with no
+-- error, so that a rule reaching an @OTHERWISE@ answered with that branch and
+-- @l4 batch@ reported success (smucclaw/l4-ide#1012).
+cannotDecode :: DecodeAt -> Text -> Aeson.Value -> Text -> Machine a
+cannotDecode at typeName jsonValue why =
+  userException $ UserError $
+    "Could not decode " <> TE.decodeUtf8 (BS.toStrict (Aeson.encode jsonValue))
+      <> " as " <> typeName <> atField at <> ": " <> why
+
+-- | What a value of a choice type is given as in JSON, for 'cannotDecode':
+-- the constructors without fields, by name, and those with fields, which
+-- cannot be given at all.
+choiceExpectation :: Text -> [Text] -> [Text] -> Text
+choiceExpectation typeName withoutFields withFields = case (withoutFields, withFields) of
+  ([], [])  -> typeName <> " has no constructor that JSON input can name."
+  ([], _)   -> "every constructor of " <> typeName <> " has fields (" <> commas withFields
+                 <> "), and a constructor with fields cannot be given as JSON input."
+  (_, [])   -> "expected a string naming one of: " <> commas withoutFields <> "."
+  (_, _)    -> "expected a string naming one of: " <> commas withoutFields
+                 <> ". A constructor with fields (" <> commas withFields
+                 <> ") cannot be given as JSON input."
+  where commas = Text.intercalate ", "
+
+-- | Why a JSON string is not a value of a choice type, for 'cannotDecode'.
+choiceNameMiss :: Text -> Text -> [Text] -> [Text] -> Text
+choiceNameMiss typeName name withoutFields withFields
+  | name `elem` withFields =
+      name <> " has fields, and a constructor with fields cannot be given as JSON input"
+        <> if null withoutFields
+             then "."
+             else "; expected a string naming one of: " <> Text.intercalate ", " withoutFields <> "."
+  | otherwise =
+      "it names no constructor of " <> typeName <> "; "
+        <> choiceExpectation typeName withoutFields withFields
+
+-- | Is this a constructor of the given type, with or without fields?
+constructorReturning :: Type' Resolved -> Resolved -> Bool
+constructorReturning conType targetTypeRef = case conType of
+  Forall _ _ innerTy -> constructorReturning innerTy targetTypeRef
+  Fun _ _ resultTy   -> constructorReturning resultTy targetTypeRef
+  TyApp _ tyRef _    -> getUnique tyRef == getUnique targetTypeRef
+  _                  -> False
+
 -- | Check if a constructor type is nullary (no arguments) and returns the given type
 -- Used for enum (ONE OF) type detection
 isNullaryConstructorReturning :: Type' Resolved -> Resolved -> Bool
@@ -4213,6 +5633,8 @@ encodeValueToJson = \case
     internalException $ RuntimeTypeError $
       "Internal error: Constructor encoding should be handled in runBuiltin, not encodeValueToJson: " <>
       nameToText (TypeCheck.getName conRef)
+  -- an unknown cannot be encoded, and it is not an internal error either
+  v | Just ns <- unknownNames v -> stuckOn ns
   val -> internalException $ RuntimeTypeError $ "Cannot encode value to JSON: " <> prettyLayout val
   where
     escapeJson :: Text -> Text
@@ -4238,14 +5660,66 @@ decodeJsonToValueTyped jsonStr ty = do
       pure $ ValConstructor TypeCheck.leftRef [errorRef]
     Right jsonValue -> do
       -- Parse success: convert to L4 value using type information and wrap in RIGHT
-      l4Value <- jsonValueToWHNFTyped jsonValue ty
+      at <- decodeRoot ty
+      l4Value <- jsonValueToWHNFTyped at jsonValue ty
       valueRef <- allocateValue l4Value
       pure $ ValConstructor TypeCheck.rightRef [valueRef]
 
+-- | Where in a JSON value the typed decoder is: the type the decode started
+-- from, and the path of field names (and list indices) down to here. The path
+-- names a field in an error, and is where a default that the decoder filled is
+-- reported ('Presumed').
+data DecodeAt = MkDecodeAt
+  { decodeFrom :: !Text
+  , fieldPath  :: ![Text]
+  , isRequest  :: !Bool
+    -- ^ whether this is the request's own decode ('EvalState.requestRecord')
+  }
+
+-- | The start of a decode at a type. It is the request's when the type is
+-- the record this evaluation decodes its request into.
+decodeRoot :: Type' Resolved -> Machine DecodeAt
+decodeRoot ty = do
+  rr <- asks (.requestRecord)
+  let isRequest = case (rr, ty) of
+        (Just r, TyApp _ tyRef []) -> nameToText (TypeCheck.getName tyRef) == r
+        _                          -> False
+  pure (MkDecodeAt (prettyLayout ty) [] isRequest)
+
+-- | @ for field 'a.b'@, or nothing at the root of the decode.
+atField :: DecodeAt -> Text
+atField at
+  | null at.fieldPath = ""
+  | otherwise         = " for field '" <> renderPresumedPath at.fieldPath <> "'"
+
+-- | A decode path as one string: field names joined with dots, a list index
+-- written straight after its list (@people[0].age@).
+renderPresumedPath :: [Text] -> Text
+renderPresumedPath = Text.concat . go True
+  where
+    go _ [] = []
+    go atStart (s : ss)
+      | "[" `Text.isPrefixOf` s = s : go False ss
+      | atStart                 = s : go False ss
+      | otherwise               = "." : s : go False ss
+
+-- | The value of a @TYPICALLY@ default, which is a literal ('L4.TypeCheck.isTypicallyLiteral'):
+-- a number, a string, or a nullary constructor. 'Nothing' for anything else,
+-- which the checker does not admit today; R8 rule 3 (expression defaults, W7)
+-- will need an environment here.
+typicallyLiteralValue :: Expr Resolved -> Maybe WHNF
+typicallyLiteralValue = \ case
+  Lit _ (NumericLit _ r) -> Just (ValNumber r)
+  Lit _ (StringLit _ t)  -> Just (ValString t)
+  App _ r []             -> Just (ValConstructor r [])
+  _                      -> Nothing
+
 -- | Convert Aeson Value to L4 WHNF using type information
 -- This function recursively handles nested structures: lists of records, records containing records, etc.
-jsonValueToWHNFTyped :: Aeson.Value -> Type' Resolved -> Machine WHNF
-jsonValueToWHNFTyped jsonValue ty = do
+jsonValueToWHNFTyped :: DecodeAt -> Aeson.Value -> Type' Resolved -> Machine WHNF
+jsonValueToWHNFTyped at jsonValue ty0 = do
+  -- a synonym decodes as what it stands for (a synonym for MAYBE X as MAYBE X)
+  ty <- expandTypeSynonyms ty0
   case ty of
     -- Handle LIST OF α
     TyApp _anno listRef [elementType]
@@ -4254,10 +5728,10 @@ jsonValueToWHNFTyped jsonValue ty = do
           Aeson.Array vec -> do
             -- Recursively decode each element with the element type
             let values = Vector.toList vec
-            jsonListToWHNFTyped values elementType
+            jsonListToWHNFTyped at values elementType
           _ -> do
             userException $ UserError $
-              "Expected JSON array to decode to LIST type, but got: " <> Text.pack (show jsonValue)
+              "Expected JSON array to decode to LIST type" <> atField at <> ", but got: " <> Text.pack (show jsonValue)
 
     -- Handle MAYBE α
     TyApp _anno maybeRef [innerType]
@@ -4268,7 +5742,7 @@ jsonValueToWHNFTyped jsonValue ty = do
             pure $ ValConstructor TypeCheck.nothingRef []
           _ -> do
             -- Non-null value: decode and wrap in JUST
-            innerVal <- jsonValueToWHNFTyped jsonValue innerType
+            innerVal <- jsonValueToWHNFTyped at jsonValue innerType
             innerRef <- allocateValue innerVal
             pure $ ValConstructor TypeCheck.justRef [innerRef]
 
@@ -4282,17 +5756,17 @@ jsonValueToWHNFTyped jsonValue ty = do
           case jsonValue of
             Aeson.String s -> pure $ ValString s
             _ -> userException $ UserError $
-                  "Expected JSON string but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "NUMBER" -> do
           case jsonValue of
             Aeson.Number n -> pure $ ValNumber (toRational n)
             _ -> userException $ UserError $
-                  "Expected JSON number but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON number" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "BOOLEAN" -> do
           case jsonValue of
             Aeson.Bool b -> pure $ if b then ValBool True else ValBool False
             _ -> userException $ UserError $
-                  "Expected JSON boolean but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON boolean" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "DATE" -> do
           -- DATE fields in JSON should be ISO-8601 strings (YYYY-MM-DD)
           case jsonValue of
@@ -4302,7 +5776,7 @@ jsonValueToWHNFTyped jsonValue ty = do
                 Nothing -> userException $ UserError $
                   "Could not parse date string '" <> s <> "'. Expected format: YYYY-MM-DD"
             _ -> userException $ UserError $
-                  "Expected JSON string for DATE field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for DATE" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "TIME" -> do
           -- TIME fields in JSON should be strings (HH:MM:SS or HH:MM)
           case jsonValue of
@@ -4312,7 +5786,7 @@ jsonValueToWHNFTyped jsonValue ty = do
                 Nothing -> userException $ UserError $
                   "Could not parse time string '" <> s <> "'. Expected format: HH:MM:SS or HH:MM"
             _ -> userException $ UserError $
-                  "Expected JSON string for TIME field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for TIME" <> atField at <> " but got: " <> Text.pack (show jsonValue)
         "DATETIME" -> do
           -- DATETIME fields in JSON should be ISO-8601 strings with timezone
           case jsonValue of
@@ -4326,7 +5800,7 @@ jsonValueToWHNFTyped jsonValue ty = do
                 Nothing -> userException $ UserError $
                   "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ"
             _ -> userException $ UserError $
-                  "Expected JSON string for DATETIME field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for DATETIME" <> atField at <> " but got: " <> Text.pack (show jsonValue)
 
         -- Not a primitive, check if it's a custom record type
         _ -> do
@@ -4336,7 +5810,12 @@ jsonValueToWHNFTyped jsonValue ty = do
           -- First check if this is a type
           case Map.lookup (getUnique tyRef) entityInfo of
             Nothing ->
-              jsonValueToWHNF jsonValue
+              -- The type's declaration is not among those the evaluator can
+              -- see (a choice type under a § section is one way to get here,
+              -- smucclaw/l4-ide#947). See 'cannotDecode' for why this is an
+              -- error rather than an untyped decode.
+              cannotDecode at typeName jsonValue $
+                "the decoder cannot find the declaration of " <> typeName
             Just (typeNameRef, _checkEntity) -> do
               -- Now look for a constructor with the same name
               let constructors = Map.toList entityInfo
@@ -4350,13 +5829,31 @@ jsonValueToWHNFTyped jsonValue ty = do
                 Nothing -> do
                   -- No record constructor found. Check if this is an enum type
                   -- by looking for nullary constructors that return this type.
+                  -- Only those can be given as JSON: a constructor with fields
+                  -- has no JSON spelling (smucclaw/l4-ide#1012).
+                  -- Named bare: a constructor declared under a § is stored
+                  -- with its section path (`Part A.Red`), which is not what
+                  -- JSONENCODE writes or what anyone should be told to send.
+                  let ofThisType =
+                        [ (unqualifiedRawNameToText (rawName (TypeCheck.getName name)), isNullaryConstructorReturning conType tyRef)
+                        | (_, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
+                        , constructorReturning conType tyRef
+                        ]
+                      withoutFields = [ n | (n, True)  <- ofThisType ]
+                      withFields    = [ n | (n, False) <- ofThisType ]
+                      expected = choiceExpectation typeName withoutFields withFields
                   case jsonValue of
                     Aeson.String enumName -> do
                       -- Look for a nullary constructor with this name that returns tyRef
                       let enumConstructor = listToMaybe
                             [ (unique, name)
                             | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
-                            , nameToText (TypeCheck.getName name) == enumName
+                            -- the bare name as well as the stored one: under a
+                            -- §, `Red` is stored as `Part A.Red`, and the bare
+                            -- name is what JSONENCODE writes (smucclaw/l4-ide#947)
+                            , let spelled = TypeCheck.getName name
+                            , enumName `elem` [ nameToText spelled
+                                              , unqualifiedRawNameToText (rawName spelled) ]
                             , isNullaryConstructorReturning conType tyRef
                             ]
                       case enumConstructor of
@@ -4365,11 +5862,10 @@ jsonValueToWHNFTyped jsonValue ty = do
                           let enumRef = Def enumUnique enumConName
                           pure $ ValConstructor enumRef []
                         Nothing ->
-                          -- No matching enum constructor, fall back to generic decoding
-                          jsonValueToWHNF jsonValue
+                          cannotDecode at typeName jsonValue
+                            (choiceNameMiss typeName enumName withoutFields withFields)
                     _ ->
-                      -- Not a string, fall back to generic decoding
-                      jsonValueToWHNF jsonValue
+                      cannotDecode at typeName jsonValue expected
                 Just (conUnique, conName, conType) -> do
                   -- Construct a Resolved reference for the constructor
                   let conRef = Def conUnique conName
@@ -4377,31 +5873,132 @@ jsonValueToWHNFTyped jsonValue ty = do
                   fieldNamesAndTypes <- extractFieldNamesAndTypes conType
                   case jsonValue of
                     Aeson.Object obj -> do
-                      -- Decode each field from the JSON object WITH TYPE INFORMATION
-                      -- Note: We ignore extra fields in the JSON (Postel's Law)
-                      fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType) -> do
-                        case KeyMap.lookup (Key.fromText fieldName) obj of
-                          Nothing
-                            | isMaybeFieldTy fieldType ->
-                              -- MAYBE field missing in JSON: treat as NOTHING
-                              allocateValue $ ValConstructor TypeCheck.nothingRef []
-                            | otherwise -> do
-                              -- Required field missing in JSON: error
-                              userException $ UserError $
-                                "Missing required field '" <> fieldName <> "' in JSON object"
-                          Just fieldValue -> do
+                      -- Decode each field from the JSON object WITH TYPE INFORMATION.
+                      -- Extra fields are ignored (Postel's Law), except in an
+                      -- object where a field took its default (below).
+                      -- The presumption switch reaches the request's own
+                      -- decode only; a decode the rules make always fills its
+                      -- defaults, because no request can supply them (T4b).
+                      presumeOn <- if at.isRequest then asks (.presume) else pure True
+                      declared <- asks (.recordDefaults)
+                      let defaults = Map.findWithDefault Map.empty (getUnique tyRef) declared
+                          origin | at.isRequest = FromRequest
+                                 | otherwise    = FromDecode at.decodeFrom
+                      fields <- forM fieldNamesAndTypes $ \(fieldName, fieldType0) -> do
+                        -- a synonym for MAYBE is a MAYBE: expand before deciding
+                        fieldType <- expandTypeSynonyms fieldType0
+                        let given = suppliedField (KeyMap.lookup (Key.fromText fieldName) obj)
+                            fieldAt  = at { fieldPath = at.fieldPath <> [fieldName] }
+                            mDefault = Map.lookup fieldName defaults >>= \ d -> (d,) <$> typicallyLiteralValue d
+                            decision = fillDecision presumeOn (isMaybeFieldTy fieldType) mDefault given
+                        pure (fieldType, fieldAt, given, decision)
+                      -- Where a field left out takes its default, a key that
+                      -- matches no field is refused, naming it and the nearest
+                      -- field, rather than ignored: it may misspell the one left
+                      -- out, which would otherwise take the default with no
+                      -- error (review M1; decided overnight 2026-10-02, pending
+                      -- Meng's review, spec §4.1).
+                      let fieldNames = map fst fieldNamesAndTypes
+                          tookDefault = or [ True | (_, _, _, UseDefault _) <- fields ]
+                          unknown = [ Key.toText k | k <- KeyMap.keys obj, Key.toText k `notElem` fieldNames ]
+                          pathTo k = renderPresumedPath (at.fieldPath <> [k])
+                      when (tookDefault && not (null unknown)) $
+                        userException $ UserError $ unrecognisedMessage "field"
+                          [ (pathTo k, pathTo <$> nearestName k fieldNames) | k <- unknown ]
+                      -- Every field that is absent and that nothing fills,
+                      -- named together, so that one run names them all (as
+                      -- @l4 batch --validate-only@ does), rather than the
+                      -- first and then the next on the following run.
+                      let missing =
+                            [ (renderPresumedPath fieldAt.fieldPath, withheldText why)
+                            | (_, fieldAt, _, RefuseMissing why) <- fields
+                            ]
+                      unless (null missing) $
+                        userException $ UserError $ missingFieldsMessage missing
+                      fieldRefs <- forM fields $ \(fieldType, fieldAt, given, decision) -> do
+                        let fieldTxt = renderPresumedPath fieldAt.fieldPath
+                            presumedHere declaredAt =
+                              MkPresumed { path = fieldAt.fieldPath, declaredAt, origin }
+                        case (decision, given) of
+                          -- A declared default, reported when it is forced,
+                          -- not here: a field the rule never reads did not
+                          -- shape the answer (T6).
+                          (UseDefault (d, v), _) -> do
+                            rf <- allocateValue v
+                            registerPresumable rf (presumedHere (rangeOf d))
+                            pure rf
+                          -- D7.3's NOTHING for a MAYBE left out: a presumption
+                          -- too (T1b puts it under the switch), reported the
+                          -- same way, with no TYPICALLY behind it.
+                          (UseNothing, _) -> do
+                            rf <- allocateValue $ ValConstructor TypeCheck.nothingRef []
+                            registerPresumable rf (presumedHere Nothing)
+                            pure rf
+                          (NullIsNothing, _) ->
+                            allocateValue $ ValConstructor TypeCheck.nothingRef []
+                          -- "Not known" on a non-MAYBE is refused, naming the
+                          -- field, and never takes a default (T3).
+                          (RefuseNull spelling hasDefault, _) ->
+                            userException $ UserError $
+                              "Field '" <> fieldTxt <> "' " <> nullRefusalText spelling hasDefault
+                          (_, Supplied fieldValue) -> do
                             -- RECURSIVELY decode the field value WITH TYPE INFORMATION
-                            fieldWHNF <- jsonValueToWHNFTyped fieldValue fieldType
+                            fieldWHNF <- jsonValueToWHNFTyped fieldAt fieldValue fieldType
                             allocateValue fieldWHNF
+                          -- unreachable: an absent field that nothing fills
+                          -- was refused above, with the others
+                          _ -> internalException $ RuntimeTypeError $
+                                 "decoder: no value for field '" <> fieldTxt <> "'"
                       -- Construct the record with the decoded fields
                       pure $ ValConstructor conRef fieldRefs
                     _ -> do
                       -- JSON value is not an object, can't decode to record
                       userException $ UserError $
-                        "Expected JSON object to decode to record type, but got: " <> Text.pack (show jsonValue)
+                        "Expected JSON object to decode to record type" <> atField at <> ", but got: " <> Text.pack (show jsonValue)
 
     -- For other types, fall back to generic decoding
     _ -> jsonValueToWHNF jsonValue
+
+-- | The error for the fields an object leaves out that nothing fills. One
+-- field keeps the message the documentation quotes; several are listed in it.
+missingFieldsMessage :: [(Text, Text)] -> Text
+missingFieldsMessage = \ case
+  [(f, why)] -> "Missing required field '" <> f <> "' in JSON object" <> why
+  fs -> "Missing required fields " <> Text.intercalate ", " [ "'" <> f <> "'" <> why | (f, why) <- fs ]
+          <> " in JSON object"
+
+-- | What a JSON value says about a field or a list element
+-- ('L4.Presumption.Supplied'). @{}@ means "not known", exactly like @null@
+-- (T3), whatever the type, a record's included: so it never takes a default,
+-- and on a record that is not a MAYBE it is refused, naming the field (review
+-- M2; decided overnight 2026-10-02, pending Meng's review, spec §4.1). Only a
+-- whole object decoded at the root, such as a batch row @{}@, is a record
+-- that supplies nothing.
+suppliedField :: Maybe Aeson.Value -> Supplied Aeson.Value
+suppliedField = \ case
+  Nothing                                -> Absent
+  Just Aeson.Null                        -> SuppliedNull "null"
+  Just (Aeson.Object o) | KeyMap.null o  -> SuppliedNull "{}"
+  Just v                                 -> Supplied v
+
+-- | A type with its synonyms expanded at the head, as far as they go. The
+-- checker records a synonym's body on its 'TypeCheck.KnownType'; a
+-- parameterised synonym has its arguments substituted for its parameters.
+-- Without this, @DECLARE Year IS A NUMBER@ is not a primitive here, and a JSON
+-- string for a @Year@ is accepted as it stands instead of refused as it is for
+-- a @NUMBER@.
+expandTypeSynonyms :: Type' Resolved -> Machine (Type' Resolved)
+expandTypeSynonyms = go synonymExpansionFuel
+  where
+    go 0 ty = pure ty
+    go n ty@(TyApp _ tyRef args) = do
+      entityInfo <- getEntityInfo
+      case Map.lookup (getUnique tyRef) entityInfo of
+        Just (_, TypeCheck.KnownType _ params (Just body))
+          | length params == length args ->
+              go (n - 1) (substituteTypeParams (Map.fromList (zip (map getUnique params) args)) body)
+        _ -> pure ty
+    go _ ty = pure ty
 
 -- | Check if a type is MAYBE α (used for optional record field handling)
 isMaybeFieldTy :: Type' Resolved -> Bool
@@ -4410,14 +6007,25 @@ isMaybeFieldTy _ = False
 
 -- | Convert list of JSON values to L4 list (ValCons/ValNil) with type information
 -- This recursively decodes each element using the provided element type
-jsonListToWHNFTyped :: [Aeson.Value] -> Type' Resolved -> Machine WHNF
-jsonListToWHNFTyped [] _elementType = pure ValNil
-jsonListToWHNFTyped (x:xs) elementType = do
-  headVal <- jsonValueToWHNFTyped x elementType
-  headRef <- allocateValue headVal
-  tailVal <- jsonListToWHNFTyped xs elementType
-  tailRef <- allocateValue tailVal
-  pure $ ValCons headRef tailRef
+jsonListToWHNFTyped :: DecodeAt -> [Aeson.Value] -> Type' Resolved -> Machine WHNF
+jsonListToWHNFTyped at = go (0 :: Int)
+  where
+    go _ [] _elementType = pure ValNil
+    go i (x:xs) elementType0 = do
+      let elementAt = at { fieldPath = at.fieldPath <> ["[" <> Text.pack (show i) <> "]"] }
+      -- An element is a value, so @null@ and @{}@ are "not known" there too
+      -- (T3): NOTHING in a list of MAYBEs, refused by its path otherwise.
+      elementType <- expandTypeSynonyms elementType0
+      headVal <- case suppliedField (Just x) of
+        SuppliedNull spelling
+          | isMaybeFieldTy elementType -> pure (ValConstructor TypeCheck.nothingRef [])
+          | otherwise -> userException $ UserError $
+              "Field '" <> renderPresumedPath elementAt.fieldPath <> "' " <> nullRefusalText spelling False
+        _ -> jsonValueToWHNFTyped elementAt x elementType
+      headRef <- allocateValue headVal
+      tailVal <- go (i + 1) xs elementType
+      tailRef <- allocateValue tailVal
+      pure $ ValCons headRef tailRef
 
 decodeJsonToValue :: Text -> Machine WHNF
 decodeJsonToValue jsonStr = do
@@ -4501,6 +6109,7 @@ runPost urlVal headersVal bodyVal = do
               queryOptions = map (\p -> let (k,v) = Text.breakOn "=" p in k =: Text.drop 1 v) params
               req_options = mconcat (headerOptions <> queryOptions)
 
+          refuseEffectUnderUnknown
           res <- liftIO $ Req.runReq Req.defaultHttpConfig $ do
             Req.req Req.POST reqWithPath (Req.ReqBodyLbs $ LBS.fromStrict $ TE.encodeUtf8 body) Req.lbsResponse req_options
           continueBackward $ ValString (TE.decodeUtf8 . LBS.toStrict $ Req.responseBody res)
@@ -4542,6 +6151,9 @@ coerceToString val = case val of
             internalException $ RuntimeTypeError "DATE values must have three fields (day, month, year) for string conversion"
     | otherwise ->
         incompatible
+  -- an unknown is not of the wrong type: name it
+  _ | Just ns <- unknownNames val ->
+    stuckOn ns
   _ ->
     incompatible
   where
@@ -4621,7 +6233,16 @@ runBuiltin es op mTy = do
               TypeCheck.KnownTerm conType Constructor -> do
                 -- Extract field names from the constructor's function type
                 fieldNames <- extractFieldNames conType
-                if length fieldNames /= length fields
+                case (fieldNames, fields) of
+                 ([], [field]) -> do
+                  -- One argument without a name, as in LEFT x and RIGHT x:
+                  -- an object keyed by the constructor, {"LEFT": x}, so the
+                  -- two sides of an EITHER stay apart.
+                  pushFrame (JsonEncodeConstructorFrame [] (nameToText (TypeCheck.getName conRef)) [])
+                  pushFrame (UnaryBuiltin0 UnaryJsonEncode Nothing)
+                  continueRef field
+                 _ ->
+                  if length fieldNames /= length fields
                   then internalException $ RuntimeTypeError $
                     "Field count mismatch for constructor " <> nameToText (TypeCheck.getName conRef) <>
                     ": expected " <> Text.pack (show (length fieldNames)) <>
@@ -4682,6 +6303,7 @@ runBuiltin es op mTy = do
                   params = if Text.null options then [] else Text.splitOn "&" (Text.drop 1 options)
                   req_options =
                     mconcat (map (\p -> let (k,v) = Text.breakOn "=" p in k =: Text.drop 1 v) params)
+              refuseEffectUnderUnknown
               res <- liftIO $ Req.runReq Req.defaultHttpConfig $ do
                 Req.req Req.GET reqWithPath Req.NoReqBody Req.lbsResponse req_options
               continueBackward $ ValString (TE.decodeUtf8 . LBS.toStrict $ Req.responseBody res)
@@ -4692,6 +6314,7 @@ runBuiltin es op mTy = do
 #endif
     UnaryEnv -> do
       varName <- expectString es
+      refuseEffectUnderUnknown
       maybeValue <- liftIO $ lookupEnv (Text.unpack varName)
       case maybeValue of
         Just value -> do
@@ -4836,31 +6459,47 @@ runBuiltin es op mTy = do
       val :: Rational <- expectNumber es
       let valDouble :: Double
           valDouble = fromRational val
+          -- The functions computed on a double. An answer that is not finite
+          -- would reach 'toRational' as a meaningless 309-digit number, so it
+          -- raises, naming the input when the input is what did not fit. A
+          -- finite answer is returned, even for an input past the range: ATAN
+          -- of 10^400 is pi/2 to the last digit.
+          viaDouble :: Text -> (Double -> Double) -> Machine Config
+          viaDouble name f
+            | isNaN r || isInfinite r =
+                userException $ UserError (name <> " cannot compute this: " <> why)
+            | otherwise = continueBackward $ ValNumber (toRational r)
+            where
+              r = f valDouble
+              why
+                | isInfinite valDouble = "the number is past the range of numbers it handles (about 1.8E308 either side of 0)"
+                | valDouble == 0 && val /= 0 = "the number is too close to 0 for the numbers it handles (about 4.9E-324)"
+                | otherwise = "the result is too large (it handles results up to about 1.8E308)"
       case op of
         UnaryLn ->
           if val <= 0
             then userException $ UserError "LN expects input greater than 0"
-            else continueBackward $ ValNumber (toRational (log valDouble))
+            else viaDouble "LN" log
         UnaryLog10 ->
           if val <= 0
             then userException $ UserError "LOG10 expects input greater than 0"
-            else continueBackward $ ValNumber (toRational (logBase 10 valDouble))
+            else viaDouble "LOG10" (logBase 10)
         UnarySin ->
-          continueBackward $ ValNumber (toRational (sin valDouble))
+          viaDouble "SIN" sin
         UnaryCos ->
-          continueBackward $ ValNumber (toRational (cos valDouble))
+          viaDouble "COS" cos
         UnaryTan ->
-          continueBackward $ ValNumber (toRational (tan valDouble))
+          viaDouble "TAN" tan
         UnaryAsin ->
           if val < (-1) || val > 1
             then userException $ UserError "ASIN expects input between -1 and 1"
-            else continueBackward $ ValNumber (toRational (asin valDouble))
+            else viaDouble "ASIN" asin
         UnaryAcos ->
           if val < (-1) || val > 1
             then userException $ UserError "ACOS expects input between -1 and 1"
-            else continueBackward $ ValNumber (toRational (acos valDouble))
+            else viaDouble "ACOS" acos
         UnaryAtan ->
-          continueBackward $ ValNumber (toRational (atan valDouble))
+          viaDouble "ATAN" atan
         UnaryIsInteger -> continueBackward $ valBool $ isJust $ isInteger val
         UnaryRound -> continueBackward $ valInt $ round val
         UnaryCeiling -> continueBackward $ valInt $ ceiling val
@@ -4869,7 +6508,7 @@ runBuiltin es op mTy = do
         UnarySqrt ->
           if val < 0
             then userException $ UserError "SQRT expects input greater than or equal to 0"
-            else continueBackward $ ValNumber (toRational (sqrt valDouble))
+            else viaDouble "SQRT" sqrt
   where
     valInt :: Integer -> WHNF
     valInt = ValNumber . toRational
@@ -4943,11 +6582,32 @@ runBinOp BinOpModulo    (ValNumber num1) (ValNumber num2)      = do
   if n2 /= 0
     then continueBackward $ ValNumber (toRational $ n1 `mod` n2)
     else userException (DivisionByZero BinOpModulo)
-runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)   =
-  let result = (fromRational base :: Double) ** (fromRational exp_ :: Double)
-  in if isNaN result || isInfinite result
-       then userException $ UserError "TO THE POWER OF produced a non-finite result (overflow, 0 to a negative power, or a negative base raised to a fractional power)"
-       else continueBackward $ ValNumber (toRational result)
+runBinOp BinOpExponent  (ValNumber base) (ValNumber exp_)
+  -- Checked on the exact values: as doubles, a huge negative base is -Infinity,
+  -- and a power that is nearly whole rounds to whole, and then no NaN says so.
+  | base == 0 && exp_ < 0 =
+      userException $ UserError "EXPONENT of 0 to a negative power has no result"
+  | base < 0 && denominator exp_ /= 1 =
+      userException $ UserError "EXPONENT does not compute a negative number to a fractional power"
+  | otherwise =
+      let base' = fromRational base :: Double
+          exp' = fromRational exp_ :: Double
+          result = base' ** exp'
+      -- Only an answer that is not finite raises; a finite one is returned,
+      -- even for an input past the range: 10^400 to the power 0 is 1.
+      in if isNaN result || isInfinite result
+           then userException $ UserError (exponentNotFinite base' exp')
+           else continueBackward $ ValNumber (toRational result)
+  where
+    -- A result that is not finite is not always too large: an input that is
+    -- past the range of a double is already infinite, or 0, before the power is
+    -- taken, and then the true result may well fit. Only when every input fits
+    -- is the result said to be too large.
+    exponentNotFinite base' exp'
+      | isInfinite base' = "EXPONENT cannot compute this: the base is past the range of numbers it handles (about 1.8E308 either side of 0)"
+      | base' == 0 && base /= 0 = "EXPONENT cannot compute this: the base is too close to 0 for the numbers it handles (about 4.9E-324)"
+      | isInfinite exp' = "EXPONENT cannot compute this: the power is past the range of numbers it handles (about 1.8E308 either side of 0)"
+      | otherwise = "EXPONENT overflowed: the result is too large (it handles results up to about 1.8E308)"
 runBinOp BinOpTrunc (ValNumber value) (ValNumber digits) =
   let digitsInt = round digits :: Integer
       scale k = (10 :: Rational) ^^ k
@@ -5011,11 +6671,40 @@ runBinOp BinOpCharAt     (ValString text) (ValNumber idx) =
 runBinOp BinOpWhenLast startVal predicateVal = startWhenLast startVal predicateVal
 runBinOp BinOpWhenNext startVal predicateVal = startWhenNext startVal predicateVal
 runBinOp BinOpValueAt dateVal attrVal = startValueAt dateVal attrVal
-runBinOp _op         (ValAssumed r) _e2                          = stuckOnAssumed r
-runBinOp _op         _e1 (ValAssumed r)                          = stuckOnAssumed r
+runBinOp op          v1 v2
+  | isJust (unknownTerm v1) || isJust (unknownTerm v2)           = binOpOnUnknown op v1 v2
 runBinOp _           _                _                          = internalException (RuntimeTypeError "running bin op with invalid operation / value combination")
 
+-- | A built-in operation with an unknown operand (UNKNOWN-EVALUATION-SPEC
+-- §4.3, §4.6): the total arithmetic and the comparisons build their term,
+-- keyed by their operands; every other operation is Stuck on the unknown,
+-- as it always was. A partial operation (DIVIDED BY, MODULO, TO THE POWER
+-- OF) stays Stuck until build step 5 can emit its definedness guard, and the
+-- string operations, the iterators and the temporal switches are not lifted
+-- at this step (assumed, not ruled; §8 step 3).
+binOpOnUnknown :: BinOp -> WHNF -> WHNF -> Machine Config
+binOpOnUnknown op v1 v2
+  | op `elem` [BinOpPlus, BinOpMinus, BinOpTimes, BinOpLeq, BinOpGeq, BinOpLt, BinOpGt] = do
+      mt1 <- valueTerm v1
+      mt2 <- valueTerm v2
+      case (mt1, mt2) of
+        (Just a, Just b) -> do
+          let t = TBin op a b
+          noteTerm t
+          continueBackward (ValTerm t)
+        _ -> stuckOnOperands v1 v2
+  | otherwise = stuckOnOperands v1 v2
+
+-- | Stuck on whatever the two operands wait on, the left's first.
+stuckOnOperands :: WHNF -> WHNF -> Machine a
+stuckOnOperands v1 v2 =
+  case nubTerms (foldMap toList (unknownNames v1) <> foldMap toList (unknownNames v2)) of
+    (n : rest) -> stuckOn (n :| rest)
+    []         -> internalException (RuntimeTypeError "an operation on an unknown found no unknown")
+
 runBinOpEquals :: WHNF -> WHNF -> Machine Config
+runBinOpEquals v1 v2
+  | isJust (unknownTerm v1) || isJust (unknownTerm v2) = equalsOnUnknown v1 v2
 runBinOpEquals (ValNumber num1)        (ValNumber num2) = continueBackward $ valBool $ num1 == num2
 runBinOpEquals (ValString str1)        (ValString str2) = continueBackward $ valBool $ str1 == str2
 runBinOpEquals (ValDate d1)            (ValDate d2) = continueBackward $ valBool $ d1 == d2
@@ -5023,7 +6712,7 @@ runBinOpEquals (ValTime t1)            (ValTime t2) = continueBackward $ valBool
 runBinOpEquals (ValDateTime u1 _)      (ValDateTime u2 _) = continueBackward $ valBool $ u1 == u2
 runBinOpEquals ValNil                  ValNil           = continueBackward $ valBool True
 runBinOpEquals (ValCons r1 rs1)        (ValCons r2 rs2) = do
-  pushFrame (EqConstructor1 r2 [(rs1, rs2)])
+  pushFrame (EqConstructor1 Nothing r2 [(rs1, rs2)])
   continueRef r1
 runBinOpEquals ValNil                  (ValCons _ _)   = continueBackward $ ValBool False
 runBinOpEquals (ValCons _ _)           ValNil           = continueBackward $ ValBool False
@@ -5035,15 +6724,365 @@ runBinOpEquals (ValConstructor n1 rs1) (ValConstructor n2 rs2)
       case pairs of
         [] -> continueBackward $ ValBool True
         ((r1, r2) : rss) -> do
-          pushFrame (EqConstructor1 r2 rss)
+          pushFrame (EqConstructor1 Nothing r2 rss)
           continueRef r1
   | otherwise                                           = continueBackward $ ValBool False
 -- TODO: we probably also want to check ValObligations for equality
-runBinOpEquals (ValAssumed r)          _                = stuckOnAssumed r
 runBinOpEquals v1                       v2              = userException (EqualityOnUnsupportedType v1 v2)
+
+-- | @EQUALS@ with an unknown on either side (UNKNOWN-EVALUATION-SPEC §4.6).
+--
+-- The same keyed term on both sides is @TRUE@ when its type supports
+-- equality (the identity rule, U6, U6b, C1), and the unsupported-type error
+-- when that type is a function or a @CONTRACT@; a type that only contains
+-- one, or is not known, is Stuck on the term, which is what it was before.
+-- Otherwise an equality over @BOOLEAN@s is the biconditional, a connective
+-- and not an atom, and any other equality is a comparison atom keyed by its
+-- two sides. A side that cannot be read without forcing anything, or a
+-- determined side of a type equality does not support, keeps the answer it
+-- had before this step: Stuck on the unknown, or the unsupported-type error
+-- for a function on the left.
+equalsOnUnknown :: WHNF -> WHNF -> Machine Config
+equalsOnUnknown v1 v2 = do
+  mt1 <- valueTerm v1
+  mt2 <- valueTerm v2
+  case (mt1, mt2) of
+    (Just a, Just b)
+      | a == b -> termEqualityType a >>= \ case
+          EqualitySupported   -> do
+            noteTerm a
+            continueBackward (valBool True)
+          EqualityUnsupported -> userException (EqualityOnUnsupportedType v1 v2)
+          EqualityExcluded    -> stuckOn (termNamesNE a)
+      | otherwise -> do
+          ta <- termEqualityType a
+          tb <- termEqualityType b
+          case (ta, tb) of
+            (EqualityUnsupported, _) -> userException (EqualityOnUnsupportedType v1 v2)
+            (_, EqualityUnsupported) -> userException (EqualityOnUnsupportedType v1 v2)
+            (EqualitySupported, EqualitySupported) -> do
+              booleans <- (||) <$> isBooleanTerm a <*> isBooleanTerm b
+              let t = if booleans
+                        then biconditional (asTruth a) (asTruth b)
+                        else Unknown (TBin BinOpEquals a b)
+              case t of
+                Known bool -> continueBackward (valBool bool)
+                Unknown u  -> do
+                  noteTerm u
+                  continueBackward (termValue u)
+            _ -> stuckOnOperands v1 v2
+    _ | isJust (unknownTerm v1) -> stuckOnOperands v1 v2
+      | supportsEquality v1      -> stuckOnOperands v1 v2
+      | otherwise                -> userException (EqualityOnUnsupportedType v1 v2)
+
+-- | A Boolean that is known, or a term (§4.3's table, over values that are
+-- already in hand).
+data Truth = Known Bool | Unknown Term
+
+asTruth :: Term -> Truth
+asTruth t = case t of
+  TCon c [] | getUnique c == getUnique TypeCheck.trueRef  -> Known True
+            | getUnique c == getUnique TypeCheck.falseRef -> Known False
+  _ -> Unknown t
+
+andTruth, orTruth :: Truth -> Truth -> Truth
+andTruth (Known False) _           = Known False
+andTruth (Known True)  r           = r
+andTruth (Unknown _)   (Known False) = Known False
+andTruth (Unknown p)   (Known True)  = Unknown p
+andTruth (Unknown p)   (Unknown q)   = Unknown (TConn ConnAnd p q)
+orTruth (Known True)   _           = Known True
+orTruth (Known False)  r           = r
+orTruth (Unknown _)    (Known True)  = Known True
+orTruth (Unknown p)    (Known False) = Unknown p
+orTruth (Unknown p)    (Unknown q)   = Unknown (TConn ConnOr p q)
+
+notTruth :: Truth -> Truth
+notTruth (Known b)   = Known (not b)
+notTruth (Unknown p) = Unknown (TNot p)
+
+-- | @a EQUALS b@ over @BOOLEAN@s: @(a AND b) OR (NOT a AND NOT b)@ (§4.6).
+biconditional :: Truth -> Truth -> Truth
+biconditional a b = orTruth (andTruth a b) (andTruth (notTruth a) (notTruth b))
+
+-- | Whether a term is a @BOOLEAN@, as far as its form or its declared type
+-- says.
+isBooleanTerm :: Term -> Machine Bool
+isBooleanTerm = \ case
+  TCon c [] -> pure (getUnique c == getUnique TypeCheck.trueRef || getUnique c == getUnique TypeCheck.falseRef)
+  TNot{}    -> pure True
+  TConn{}   -> pure True
+  TBin op _ _ -> pure (op `elem` [BinOpEquals, BinOpLeq, BinOpGeq, BinOpLt, BinOpGt])
+  TInput _ ty    -> pure (maybe False isBooleanType ty)
+  TField _ _ ty  -> pure (maybe False isBooleanType ty)
+  TCall (TInput _ (Just fty)) args -> pure (maybe False isBooleanType (callResultType fty (length args)))
+  _ -> pure False
+  where
+    isBooleanType = \ case
+      TyApp _ r [] -> getUnique r == TypeCheck.booleanUnique
+      _            -> False
+
+-- | The type an assumed function's result has once it is given this many
+-- arguments, if it takes that many.
+callResultType :: Type' Resolved -> Int -> Maybe (Type' Resolved)
+callResultType ty n = case ty of
+  Forall _ _ t -> callResultType t n
+  Fun _ ps r
+    | length ps == n -> Just r
+    | length ps > n  -> Just (Fun emptyAnno (drop n ps) r)
+  _ -> Nothing
+
+-- | What equality can say about two copies of one keyed term (§4.6, U6b).
+data EqualityType
+  = EqualitySupported
+    -- ^ no function or @CONTRACT@ anywhere inside: the identity rule applies
+  | EqualityUnsupported
+    -- ^ a function or a @CONTRACT@ itself: the unsupported-type error
+  | EqualityExcluded
+    -- ^ one inside, or a type that is not known: the term stays unknown
+
+termEqualityType :: Term -> Machine EqualityType
+termEqualityType = \ case
+  TInput _ ty    -> equalityType ty
+  TField _ _ ty  -> equalityType ty
+  TCall (TInput _ (Just fty)) args -> do
+    fty' <- expandTypeHead fty
+    equalityType (callResultType fty' (length args))
+  TCall{}        -> pure EqualityExcluded
+  TBin{}         -> pure EqualitySupported
+  TNot{}         -> pure EqualitySupported
+  TConn{}        -> pure EqualitySupported
+  TNumber{}      -> pure EqualitySupported
+  TString{}      -> pure EqualitySupported
+  TDate{}        -> pure EqualitySupported
+  TTime{}        -> pure EqualitySupported
+  TDateTime{}    -> pure EqualitySupported
+  TNil           -> pure EqualitySupported
+  TCons a b      -> worst <$> traverse termEqualityType [a, b]
+  TCon _ ts      -> worst <$> traverse termEqualityType ts
+  where
+    worst ts
+      | any isUnsupported ts = EqualityUnsupported
+      | all isSupported ts   = EqualitySupported
+      | otherwise            = EqualityExcluded
+    isUnsupported = \ case EqualityUnsupported -> True; _ -> False
+    isSupported   = \ case EqualitySupported -> True; _ -> False
+
+-- | The declared type's verdict: a function or @CONTRACT@ type itself is
+-- unsupported; a type with one anywhere inside, through declared records, or
+-- a type variable, an inference variable or a type the module does not
+-- describe, is excluded; anything else is supported. A synonym is read as
+-- the type it names, at the top and inside ('expandTypeHead'), so @f@ of a
+-- synonym @Fn@ for a function type is a function. @typeHasFunctionComponent@
+-- (in the DMN exporter) walks the same structure.
+equalityType :: Maybe (Type' Resolved) -> Machine EqualityType
+equalityType = \ case
+  Nothing -> pure EqualityExcluded
+  Just ty0 -> expandTypeHead ty0 >>= \ ty -> case ty of
+    Fun{} -> pure EqualityUnsupported
+    TyApp _ r _ | getUnique r == TypeCheck.contractUnique -> pure EqualityUnsupported
+    _ -> do
+      ok <- functionFree Set.empty ty
+      pure (if ok then EqualitySupported else EqualityExcluded)
+  where
+    functionFree seen ty0 = expandTypeHead ty0 >>= \ case
+      TyApp _ r ts
+        | u `elem` primitives -> pure True
+        | u `elem` [TypeCheck.listUnique, TypeCheck.maybeUnique, TypeCheck.eitherUnique] ->
+            allM (functionFree seen) ts
+        | u == TypeCheck.contractUnique -> pure False
+        | Set.member u seen -> pure True
+        | otherwise -> typeComponents u >>= \ case
+            Nothing    -> pure False
+            Just comps -> allM (functionFree (Set.insert u seen)) comps
+        where u = getUnique r
+      _ -> pure False
+    primitives =
+      [ TypeCheck.numberUnique, TypeCheck.stringUnique, TypeCheck.booleanUnique
+      , TypeCheck.dateUnique, TypeCheck.timeUnique, TypeCheck.datetimeUnique ]
+    allM f = foldr (\ x acc -> f x >>= \ b -> if b then acc else pure False) (pure True)
+
+-- | The field types of a declared type with no parameters, read from its
+-- constructors; 'Nothing' if the module does not describe it so. A synonym
+-- is not such a type: 'expandTypeHead' reads it as the type it names first.
+typeComponents :: Unique -> Machine (Maybe [Type' Resolved])
+typeComponents u = do
+  entityInfo <- getEntityInfo
+  case Map.lookup u entityInfo of
+    Just (_, TypeCheck.KnownType 0 _ Nothing) ->
+      let fields =
+            [ map (\ (MkOptionallyNamedType _ _ t) -> t) ps
+            | (_, (_, TypeCheck.KnownTerm (Fun _ ps (TyApp _ r [])) Constructor)) <- Map.toList entityInfo
+            , getUnique r == u
+            ]
+      in pure (Just (concat fields))
+    _ -> pure Nothing
+
+-- | A type with any synonym at its head replaced by the type it names, as
+-- the type checker's @tryExpandTypeSynonym@ does, until the head is not a
+-- synonym: @Fn@, declared @IS FUNCTION FROM NUMBER TO NUMBER@, is that
+-- function type. A synonym in a declaration cycle is installed without a
+-- body and does not expand; the fuel bounds a cycle that arrives otherwise.
+expandTypeHead :: Type' Resolved -> Machine (Type' Resolved)
+expandTypeHead ty0 = do
+  entityInfo <- getEntityInfo
+  let go :: Int -> Type' Resolved -> Type' Resolved
+      go fuel ty = case ty of
+        TyApp _ r args
+          | fuel > 0
+          , Just (_, TypeCheck.KnownType _ params (Just body)) <- Map.lookup (getUnique r) entityInfo ->
+              go (fuel - 1) (TypeCheck.substituteType (Map.fromList (zipWith (\ p a -> (getUnique p, a)) params args)) body)
+        _ -> ty
+  pure (go 100 ty0)
+
+-- | The type of a constructor's i-th field, as its declaration gives it.
+constructorFieldType :: Resolved -> Int -> Machine (Maybe (Type' Resolved))
+constructorFieldType con i = do
+  entityInfo <- getEntityInfo
+  pure case Map.lookup (getUnique con) entityInfo of
+    Just (_, TypeCheck.KnownTerm ty Constructor) -> fieldOf ty
+    _ -> Nothing
+  where
+    fieldOf = \ case
+      Forall _ _ t -> fieldOf t
+      Fun _ ps _   -> case drop i ps of
+        (MkOptionallyNamedType _ _ t : _) -> Just t
+        []                                -> Nothing
+      _ -> Nothing
+
+-- | Whether the match in progress is a record's generated selector (built by
+-- 'evalConDecl'): its own one-branch CONSIDER, with no source position, that
+-- matches the constructor and answers with one of the fields it binds. If so,
+-- and the constructor is the only one its type has, that field's name and
+-- declared type. A type with several constructors gets no field path: an
+-- unknown of it may be one without the field, whose selector has no branch
+-- for it, so @s's radius@ for a @Shape@ that may be a @Square@ stays Stuck on
+-- @s@, as it was before this step.
+selectorProjection :: Resolved -> [Pattern Resolved] -> Machine (Maybe (Resolved, Maybe (Type' Resolved)))
+selectorProjection con ps = do
+  stack <- liftIO . readIORef =<< asks (.stack)
+  case stack.frames of
+    (ConsiderWhen1 _ _ (App ann body []) [] _ : _)
+      | isNothing ann.range
+      , Just vars <- traverse patVar ps
+      , Just i <- elemIndex (getUnique body) (map getUnique vars) -> do
+          sole <- isSoleConstructor con
+          if sole
+            then do
+              ty <- constructorFieldType con i
+              pure (Just (body, ty))
+            else pure Nothing
+    _ -> pure Nothing
+  where
+    patVar = \ case
+      PatVar _ v -> Just v
+      _          -> Nothing
+
+-- | Whether a constructor is the only one the type it builds has, as the
+-- module's entity information describes that type. 'False' when the
+-- constructor or its type is not described.
+isSoleConstructor :: Resolved -> Machine Bool
+isSoleConstructor con = do
+  entityInfo <- getEntityInfo
+  pure case Map.lookup (getUnique con) entityInfo >>= builds . snd of
+    Nothing -> False
+    Just u  -> length [ () | (_, e) <- Map.elems entityInfo, builds e == Just u ] == 1
+  where
+    builds = \ case
+      TypeCheck.KnownTerm ty Constructor -> resultHead ty
+      _                                  -> Nothing
+    resultHead = \ case
+      Forall _ _ t          -> resultHead t
+      Fun _ _ (TyApp _ r _) -> Just (getUnique r)
+      TyApp _ r _           -> Just (getUnique r)
+      _                     -> Nothing
+
+-- | The names a term waits on, non-empty.
+termNamesNE :: Term -> NonEmpty Term
+termNamesNE t = case termNames t of
+  (n : rest) -> n :| rest
+  []         -> t :| []
+
+-- | The term a value stands for, read without forcing anything (§8 step 3):
+-- its determined parts must already be values, or unevaluated literals, or
+-- names bound to either, and the whole no larger than a bound. 'Nothing' for
+-- a value that cannot be read so, or that no term describes, a function.
+valueTerm :: WHNF -> Machine (Maybe Term)
+valueTerm v = do
+  budget <- liftIO (newIORef termReadBound)
+  readValueTerm budget v
+
+-- | The term a reference's value stands for, read the same way.
+refTerm :: Reference -> Machine (Maybe Term)
+refTerm r = do
+  budget <- liftIO (newIORef termReadBound)
+  readRefTerm budget r
+
+-- | How many steps 'valueTerm' takes before it gives up: one for each value
+-- node it reads and one for each alias (a name bound to a name) it follows,
+-- so that a cycle of aliases, @one IS two@ and @two IS one@, ends too.
+termReadBound :: Int
+termReadBound = 1000
+
+readValueTerm :: IORef Int -> WHNF -> Machine (Maybe Term)
+readValueTerm budget v = do
+  left <- liftIO (readIORef budget)
+  if left <= 0
+    then pure Nothing
+    else do
+      liftIO (writeIORef budget (left - 1))
+      case v of
+        ValAssumed r ty    -> pure (Just (TInput r ty))
+        ValTerm t          -> pure (Just t)
+        ValNumber q        -> pure (Just (TNumber q))
+        ValString s        -> pure (Just (TString s))
+        ValDate d          -> pure (Just (TDate d))
+        ValTime t          -> pure (Just (TTime t))
+        ValDateTime u tz   -> pure (Just (TDateTime u tz))
+        ValNil             -> pure (Just TNil)
+        ValCons r1 r2      -> do
+          a <- readRefTerm budget r1
+          b <- readRefTerm budget r2
+          pure (TCons <$> a <*> b)
+        ValConstructor c rs -> fmap (TCon c) . sequence <$> traverse (readRefTerm budget) rs
+        _ -> pure Nothing
+
+readRefTerm :: IORef Int -> Reference -> Machine (Maybe Term)
+readRefTerm budget r = do
+  left <- liftIO (readIORef budget)
+  if left <= 0 then pure Nothing else readThunk r >>= \ case
+    WHNF v -> readValueTerm budget v
+    Unevaluated _ (Lit _ lit) _ -> readValueTerm budget =<< runLit lit
+    Unevaluated _ (App _ n []) env | Just r' <- Map.lookup (getUnique n) env -> hop r'
+    Unevaluated _ (Var _ n) env    | Just r' <- Map.lookup (getUnique n) env -> hop r'
+    _ -> pure Nothing
+  where
+    hop r' = do
+      liftIO (modifyIORef' budget (subtract 1))
+      readRefTerm budget r'
+
+-- | The value forms 'runBinOpEquals' compares, when both sides have one.
+supportsEquality :: WHNF -> Bool
+supportsEquality = \ case
+  ValNumber {}      -> True
+  ValString {}      -> True
+  ValDate {}        -> True
+  ValTime {}        -> True
+  ValDateTime {}    -> True
+  ValNil            -> True
+  ValCons {}        -> True
+  ValConstructor {} -> True
+  _                 -> False
 
 infinityDay :: Time.Day
 infinityDay = Time.fromGregorian 9999 12 31
+
+-- | A temporal iterator's predicate returned something other than a BOOLEAN.
+-- An unknown is not of the wrong type: name it.
+iteratorNotBoolean :: Text -> WHNF -> Machine a
+iteratorNotBoolean _    v | Just ns <- unknownNames v = stuckOn ns
+iteratorNotBoolean what _              =
+  userException $ UserError (what <> " expects predicate returning BOOLEAN")
 
 applyDatePredicate :: WHNF -> Time.Day -> Machine Config
 applyDatePredicate predicate day = do
@@ -5250,6 +7289,8 @@ snapshotRef d memo r
   where
     freeze v = do
       r' <- allocateValue v
+      -- a pinned copy of a default is still that default (W8's event)
+      lookupPresumable r >>= traverse_ (registerPresumable r')
       let memo' = Map.insert r.address r' memo
       (memo'', v') <- snapshotVal (d - 1) memo' v
       liftIO (writeIORef r'.pointer (WHNF v'))
@@ -5370,6 +7411,9 @@ updateThunkToWHNFWhen rf fp v =
 -- well, which should be benign.
 evalRef :: Reference -> Machine Config
 evalRef rf = do
+  -- A default that took effect is reported where it is forced, whichever
+  -- fill site put it here ('notePresumedForce', 'Presumed').
+  notePresumedForce rf
   -- Fast path: plain-WHNF thunk updates are monotonic (Unevaluated ->
   -- Unevaluated with more blackhole marks, or Unevaluated -> WHNF, never
   -- back), so a thunk observed in WHNF is final and can be returned from a
@@ -5391,32 +7435,38 @@ evalRef rf = do
         else forceIt
     Unevaluated{} -> forceIt
   where
+    -- The UpdateThunk frame goes on BEFORE the thunk is marked, so that an
+    -- exception between the two finds a frame and no mark, and 'unwindFrame'
+    -- ('restoreThunkOnUnwind' ignores a thunk without our mark); the other
+    -- order left a mark with no frame to undo it (smucclaw/l4-ide#1020). A
+    -- thunk that turns out not to need forcing (another thread finished it
+    -- since the read above), or a blackhole, takes the frame off again.
     forceIt :: Machine Config
     forceIt = do
       -- Read the context BEFORE the atomic poke (the poke fn must stay pure).
       tc <- getTemporalContext
-      join $ pokeThunk rf \tid -> \ case
-        thunk@(WHNF val) ->
-          -- Another thread finished it between our read and the atomic poke.
-          (thunk, whnfConfig val)
-        thunk@(WHNFWhen fp val e env)
-          | validFor tc fp -> (thunk, noteCtxRead fp >> whnfConfig val)
-          | otherwise ->
-              -- Stale for the current temporal context: re-force under it.
-              -- The displaced cache travels on the UpdateThunk frame so an
-              -- aborted force can put it back ('restoreThunkOnUnwind').
-              (Unevaluated (Set.singleton tid) e env, beginForce (Just (fp, val)) e env)
-        thunk@(Unevaluated tids e env)
-          | tid `Set.member` tids ->  (thunk, userException (BlackholeForced e))
-          | otherwise -> (Unevaluated (Set.insert tid tids) e env, beginForce Nothing e env)
-    beginForce :: Maybe (CtxReads, WHNF) -> Expr Resolved -> Environment -> Machine Config
-    beginForce displaced e env = do
       -- Open a fresh read span for this force; the enclosing span's
       -- accumulator travels on the UpdateThunk frame and is merged back
       -- (together with this force's reads) in 'backward'.
       saved <- swapCtxReads noReads
-      pushFrame (UpdateThunk rf saved displaced)
-      continueExpr env e
+      pushFrame (UpdateThunk rf saved Nothing)
+      let notForced = traceEval Pop >> dropTopFrame >> void (swapCtxReads saved)
+      join $ pokeThunk rf \tid -> \ case
+        thunk@(WHNF val) ->
+          -- Another thread finished it between our read and the atomic poke.
+          (thunk, notForced >> whnfConfig val)
+        thunk@(WHNFWhen fp val e env)
+          | validFor tc fp -> (thunk, notForced >> noteCtxRead fp >> whnfConfig val)
+          | otherwise ->
+              -- Stale for the current temporal context: re-force under it.
+              -- The cache this poke displaced travels on the UpdateThunk
+              -- frame so an aborted force can put it back
+              -- ('restoreThunkOnUnwind'); it is the one the poke saw, not one
+              -- read earlier, which another thread may have replaced.
+              (Unevaluated (Set.singleton tid) e env, setTopDisplaced (fp, val) >> continueExpr env e)
+        thunk@(Unevaluated tids e env)
+          | tid `Set.member` tids ->  (thunk, notForced >> userException (BlackholeForced e))
+          | otherwise -> (Unevaluated (Set.insert tid tids) e env, continueExpr env e)
     whnfConfig :: WHNF -> Machine Config
     whnfConfig val =
       case val of
@@ -5602,13 +7652,15 @@ evalDirective env (AssertRefused ann expr mmsg) = do
   -- is decided statically here rather than evaluated.
   --
   -- 'Nothing' here means "the directive imposes no constraint on the reason",
-  -- so the wildcard MUST be unreachable for a payload the author wrote: a
-  -- payload we cannot read would otherwise become an assertion that holds for
-  -- every refusal reason. Two upstream checks make it so -- 'Parser.directive'
-  -- accepts only a 'lit' after BECAUSE, and 'TypeCheck.inferDirective' requires
-  -- that literal to be a STRING -- which leaves the wildcard reachable only for
-  -- a module that never type-checked. If you widen either of those, decide what
-  -- an unreadable payload means before you land it.
+  -- so it MUST be unreachable for a reason the author wrote: a reason we
+  -- cannot read, or one that never reaches the directive, would otherwise
+  -- become an assertion that holds for every refusal reason. Three upstream
+  -- checks make it so -- 'Parser.directive' accepts only a 'lit' after
+  -- BECAUSE, 'Parser.assertRefusedSubject' rejects a BECAUSE that a BREACH in
+  -- the expression would take as its own, and 'TypeCheck.inferDirective'
+  -- requires the literal to be a STRING -- which leaves the wildcard reachable
+  -- only for a module that never type-checked. If you widen any of those,
+  -- decide what an unreadable reason means before you land it.
   let wanted = case mmsg of
         Just (Lit _ (StringLit _ t)) -> Just t
         _                            -> Nothing
@@ -5627,12 +7679,12 @@ contractToEvalDirective contract t evs = do
   -- seen" assumption hold.
   --
   -- We only reorder genuine literal-AT 'Event' nodes relative to one another. Entries
-  -- whose AT is not a literal at parse time (e.g. @`WAIT UNTIL` 100@, which is a runtime
+  -- whose AT is not a literal at parse time (e.g. @WAITUNTIL 100@, which is a runtime
   -- @Number -> Event@ application, or an already-desugared event) carry no extractable
   -- key and stay PINNED in their authored positions -- 'sortByStablePinned' never moves
   -- an unkeyed element. This is why we use a comparison that only orders when both keys
   -- are present, rather than a plain @sortOn@ (which would float unkeyed entries to one
-  -- end and scramble positional markers like WAIT UNTIL).
+  -- end and scramble positional markers like WAITUNTIL).
   evListExpr = List emptyAnno $ map eventExpr (sortByStablePinned eventAtKey evs)
 
 -- | Sort key for an authored event: the literal AT timestamp as a 'Rational'.
@@ -5644,7 +7696,7 @@ eventAtKey _ = Nothing
 -- | A stable sort by a partial key that leaves every element whose key is 'Nothing'
 -- pinned at its original index. Keyed elements ('Just') are stably sorted by their key
 -- among themselves and then poured back into the non-pinned slots in that sorted order;
--- equal keys preserve authored order. Unkeyed elements (e.g. @`WAIT UNTIL` 100@, whose
+-- equal keys preserve authored order. Unkeyed elements (e.g. @WAITUNTIL 100@, whose
 -- AT is not a parse-time literal) never move, so positional markers are preserved.
 -- For an all-keyed, already-monotonic list this is the identity.
 sortByStablePinned :: Ord k => (a -> Maybe k) -> [a] -> [a]
@@ -5675,12 +7727,14 @@ evalLocalDecl env (LocalAssume _ann assume) =
 
 -- We are assuming that the environment already contains an entry with an address for us.
 evalAssume :: Environment -> Assume Resolved -> Machine ()
-evalAssume env (MkAssume _ann _tysig (MkAppForm _ n []   _maka) _ _) =
-  updateTerm env n (WHNF (ValAssumed n))
+evalAssume env (MkAssume _ann _tysig (MkAppForm _ n []   _maka) mty _) =
+  updateTerm env n (WHNF (ValAssumed n mty))
 evalAssume env (MkAssume _ann _tysig (MkAppForm _ n _args _maka) _ _) = do
   -- TODO: we should create a given here yielding an assumed, but we currently cannot do that easily,
   -- because we do not have Assumed as an expression, and we also cannot embed values into expressions.
-  updateTerm env n (WHNF (ValAssumed n))
+  -- Its declared type is its result's, not a function's, so it is not
+  -- carried (§4.6: no type counts as excluded from the identity rule).
+  updateTerm env n (WHNF (ValAssumed n Nothing))
 
 -- NOTE (T6): writes module-eval-time closures/ValAssumed/Unevaluated bodies,
 -- not force results — deliberately unfingerprinted.
@@ -5691,8 +7745,16 @@ updateTerm env n thunk = do
 
 -- We are assuming that the environment already contains an entry with an address for us.
 evalDecide :: Environment -> Decide Resolved -> Machine ()
-evalDecide env (MkDecide _ann _tysig (MkAppForm _ n []   _maka) expr) =
+evalDecide env (MkDecide _ann _tysig (MkAppForm _ n []   _maka) expr) = do
   updateTerm env n (Unevaluated Set.empty expr env)
+  -- A definition that IS a default ('presumableDefs') reports itself when it
+  -- is first forced. Registered per allocation, so each directive's fresh
+  -- heap ('L4.EvaluateLazy.forEachDirectiveFreshHeap') registers its own.
+  defs <- asks (.presumableDefs)
+  unless (Map.null defs) $
+    for_ (Map.lookup (getUnique n) defs) \ p -> do
+      rf <- expectTerm env n
+      registerPresumable rf p
 evalDecide env (MkDecide _ann _tysig (MkAppForm _ n args _maka) expr) = do
   let
     v = ValClosure (MkGivenSig emptyAnno ((\ r -> MkOptionallyTypedName emptyAnno r Nothing Nothing) <$> args)) expr env
@@ -5742,9 +7804,6 @@ evalConDecl env (MkConDecl _ann n tns) = do
 -----------------------------------------------------------------------------
 -- Premade expressions and values
 -----------------------------------------------------------------------------
-
-falseExpr :: Expr Resolved
-falseExpr = App emptyAnno TypeCheck.falseRef []
 
 falseVal :: Value a
 falseVal = ValConstructor TypeCheck.falseRef []
@@ -5914,18 +7973,18 @@ initialEnvironment = do
   everBetweenRef <- allocateValue (ValTernaryBuiltinFun TernaryEverBetween)
   alwaysBetweenRef <- allocateValue (ValTernaryBuiltinFun TernaryAlwaysBetween)
   -- Temporal context switching entry (handled specially by the evaluator)
-  evalAsOfSystemTimeRef <- allocateValue (ValAssumed TypeCheck.evalAsOfSystemTimeRef)
-  evalUnderValidTimeRef <- allocateValue (ValAssumed TypeCheck.evalUnderValidTimeRef)
-  evalUnderRulesEffectiveAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEffectiveAtRef)
-  evalUnderRulesEncodedAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEncodedAtRef)
+  evalAsOfSystemTimeRef <- allocateValue (ValAssumed TypeCheck.evalAsOfSystemTimeRef Nothing)
+  evalUnderValidTimeRef <- allocateValue (ValAssumed TypeCheck.evalUnderValidTimeRef Nothing)
+  evalUnderRulesEffectiveAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEffectiveAtRef Nothing)
+  evalUnderRulesEncodedAtRef <- allocateValue (ValAssumed TypeCheck.evalUnderRulesEncodedAtRef Nothing)
   fulfilRef <- allocateValue ValFulfilled
   neverMatchesPartyRef <- allocateValue ValNeverMatchesParty
   neverMatchesActRef <- allocateValue ValNeverMatchesAct
   waitUntilRef <- allocateValue =<< waitUntilVal eventCRef neverMatchesPartyRef neverMatchesActRef
-  andRef <- allocateValue =<< andValClosure trueRef falseRef
-  orRef <- allocateValue =<< orValClosure trueRef falseRef
-  impliesRef <- allocateValue =<< impliesValClosure trueRef falseRef
-  notRef <- allocateValue =<< notValClosure trueRef falseRef
+  andRef <- allocateValue (ValConnective ConnAnd)
+  orRef <- allocateValue (ValConnective ConnOr)
+  impliesRef <- allocateValue (ValConnective ConnImplies)
+  notRef <- allocateValue (ValConnective ConnNot)
 
   builtinBinOpRefs <-
     traverse
@@ -6223,6 +8282,40 @@ floatingClockRefusal what d t = Text.unwords
 -- as a reference is printed bare, as the source spelled it. The generic
 -- 'Pattern' printer would re-emit it as @(EXACTLY name)@, the deprecated
 -- spelling, for a source that never wrote it.
+-- | An obligation entered after its own deadline (§2.6 card A2, and Meng's
+-- ruling with SEESAW on 2026-10-09: _"surely we should warn/error loudly
+-- about the impossible to satisfy obligation"_). It cannot be refused when
+-- the file is checked — deadlines are values the run computes — and an error
+-- would stop the whole trace, its @LEST@ (the drafter's own answer to a
+-- failure) included. So it runs, fails (or lapses, or is kept) the moment
+-- it is entered rather than before it existed, and the run says so here.
+armedAfterDeadlineNote :: DeonticModal -> Pattern Resolved -> MaybeEvaluated' (Maybe (Deadline Resolved)) -> Rational -> Rational -> Text
+armedAfterDeadlineNote modal actPat due entered deadline = Text.unwords $
+  [ what <> ", " <> modalWord <> " " <> act <> ","
+  , "was entered at " <> prettyRatio entered <> ", after its own deadline of " <> prettyRatio deadline <> ","
+  ] <> outcome <> cause <> [ "(EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)" ]
+  where
+    act = Text.strip (docText (printActionPattern actPat))
+    (what, modalWord) = case modal of
+      DMust    -> ("An obligation", "MUST")
+      DDo      -> ("An obligation", "DO")
+      DMay     -> ("A permission", "MAY")
+      DMustNot -> ("A prohibition", "SHANT")
+    outcome = case modal of
+      DMustNot -> [ "so nothing could violate it: it is kept at " <> prettyRatio entered <> ", when it was entered." ]
+      DMay     -> [ "so it could never be exercised in time: it lapses at " <> prettyRatio entered <> ", when it was entered." ]
+      _        -> [ "so it could never be met in time: it fails at " <> prettyRatio entered <> ", when it was entered." ]
+    cause = case due of
+      Left (Just (MkDeadline _ _ (Just a)))
+        | lifecyclePointOfAnchor a == Just LifecycleArming ->
+        [ "Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when"
+        , "the obligation it continues was entered, not when this one was." ]
+      Left (Just (MkDeadline _ _ (Just anchor))) ->
+        [ "Its WITHIN counts from " <> Text.strip (prettyLayout anchor) <> ", which came before it was entered." ]
+      Left (Just (MkBefore _ _)) ->
+        [ "Its BEFORE date had already passed." ]
+      _ -> []
+
 earlyActNote :: DeonticModal -> NF -> Pattern Resolved -> Rational -> Rational -> Maybe Rational -> Text
 earlyActNote modal partyNF actPat stamp open deadlineAt = Text.unwords $
   [ "PARTY " <> prettyLayout partyNF <> " did " <> Text.strip (docText (printActionPattern actPat))
@@ -6311,11 +8404,8 @@ emptyWindowNote (MkOpening _ _ moa) closing openAbsolute anchorIsClock open clos
       , "Drop the anchor from the WITHIN to count it from the instant the window"
       , "opens, or make the closing offset at least the opening one —" ]
     words' a = Text.strip (prettyLayout a)
-    sameNoun a b = case (a, b) of
-      (AnchorJoin{},     AnchorJoin{})     -> True
-      (AnchorDeadline{}, AnchorDeadline{}) -> True
-      (AnchorArming{},   AnchorArming{})   -> True
-      _                                    -> False
+    -- bare or bracketed, @OF THE JOIN@ and @OF (THE JOIN)@ are one noun
+    sameNoun a b = isJust (lifecyclePointOfAnchor a) && lifecyclePointOfAnchor a == lifecyclePointOfAnchor b
     demoted = \ case
       AnchorArming a -> isEmptyAnno a
       _              -> False
@@ -6530,15 +8620,6 @@ parseDigits txt =
 -- Timezone utilities
 ----------------------------------------------------------------------------
 
--- | Try to load a TZ from the IANA database. Returns Nothing on failure.
-tryLoadTZ :: String -> IO (Maybe TZ.TZ)
-tryLoadTZ name =
-  (Just <$> TZ.loadTZFromDB name) `catch` \(_ :: SomeException) ->
-    -- Fall back to the embedded timezone database.  The system DB may be
-    -- unavailable when the LSP runs inside VS Code or other sandboxed
-    -- environments on macOS.
-    pure $ TZAll.tzByLabel <$> TZAll.fromTZName (TE.encodeUtf8 (Text.pack name))
-
 -- | Extract a timezone string from a TIMEZONE IS expression.
 -- Handles string literals directly and simple identifiers by peeking at thunks.
 extractTimezoneString :: Environment -> Expr Resolved -> Machine (Maybe Text)
@@ -6629,85 +8710,101 @@ expectDateTimeValue (ValDateTime utc tz) = pure (utc, tz)
 expectDateTimeValue val = internalException $ RuntimeTypeError $
   "Expected DATETIME value but got: " <> prettyLayout val
 
-boolBinOpClosure :: Reference -> Reference -> (Resolved -> Resolved -> Expr Resolved) -> Machine (Value a)
-boolBinOpClosure true false buildExpr = do
-  let
-    mkName = MkName emptyAnno . NormalName
-    na = mkName "a"
-    nb = mkName "b"
-  aDef <- def na
-  bDef <- def nb
-  aRef <- ref na aDef
-  bRef <- ref nb bDef
-  pure $ ValClosure
-    (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean) Nothing
-      , MkOptionallyTypedName emptyAnno bDef (Just TypeCheck.boolean) Nothing
-      ])
-    (buildExpr aRef bRef)
-    ( Map.fromList
-      [ (TypeCheck.trueUnique, true)
-      , (TypeCheck.falseUnique, false)
-      ]
-    )
+-- | Evaluate a built-in connective written out as a call (UNKNOWN-EVALUATION-SPEC
+-- §4.4, U2, U2b). The left operand (NOT's only one) is evaluated in a frame of
+-- its own, so it shows in a trace as a child of the call, under its own source
+-- text and with its value; the right operand, if the left does not decide, is
+-- evaluated in tail position ('connectiveLeft'). In two-valued evaluation this
+-- computes exactly what @IF a THEN b ELSE FALSE@ and its siblings did, in the
+-- same order, for programs that finish. One that does not finish through the
+-- right operand, such as @loop n MEANS TRUE AND loop n@, now runs until it is
+-- stopped, since the operand is in tail position, where the @IF@'s closure
+-- body overflowed the frame cap; a recursion through an @IF@'s branch already
+-- ran that way.
+connective :: Environment -> Connective -> Expr Resolved -> Maybe (Expr Resolved) -> Machine Config
+connective env conn left right = do
+  pushFrame (ConnectiveLeft conn ((`ConnRightExpr` env) <$> right))
+  continueExpr env left
 
-boolUnaryOpClosure :: Reference -> Reference -> (Resolved -> Expr Resolved) -> Machine (Value a)
-boolUnaryOpClosure true false buildExpr = do
-  let
-    mkName = MkName emptyAnno . NormalName
-    na = mkName "a"
-  aDef <- def na
-  aRef <- ref na aDef
-  pure $ ValClosure
-    (MkGivenSig emptyAnno
-      [ MkOptionallyTypedName emptyAnno aDef (Just TypeCheck.boolean) Nothing
-      ])
-    (buildExpr aRef)
-    ( Map.fromList
-      [ (TypeCheck.trueUnique, true)
-      , (TypeCheck.falseUnique, false)
-      ]
-    )
+-- | The left operand's value has arrived: decide, or go on to the right
+-- operand. The right operand continues in tail position, with no frame of its
+-- own and no check that it is a BOOLEAN, so the prelude's @x AND and xs@ stays
+-- flat and its value is whatever the right operand's is.
+connectiveLeft :: Connective -> Maybe ConnRight -> WHNF -> Machine Config
+connectiveLeft conn right val =
+  case val of
+    ValBool b ->
+      case (conn, b) of
+        (ConnNot,     _)     -> continueBackward (valBool (not b))
+        (ConnAnd,     False) -> continueBackward (valBool False)
+        (ConnOr,      True)  -> continueBackward (valBool True)
+        (ConnImplies, False) -> continueBackward (valBool True)
+        _ -> continueRight
+    -- The left operand is unknown (§4.3): NOT builds its node; the others
+    -- evaluate the right operand in a frame of their own, which combines it
+    -- with the left by the connective's table ('connectiveRight').
+    _ | Just p <- unknownTerm val -> do
+      noteTerm p
+      case conn of
+        ConnNot -> continueBackward (ValTerm (TNot p))
+        _       -> do
+          pushFrame (ConnectiveRight conn p)
+          continueRight
+    _ -> internalException $ RuntimeTypeError $
+      "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating " <> connectiveName conn
+  where
+    continueRight = case right of
+      Just (ConnRightExpr e env) -> continueExpr env e
+      Just (ConnRightRef r)      -> autoApplyDischargedImport r
+      Nothing -> internalException $ RuntimeTypeError $
+        connectiveName conn <> " has no right operand"
 
-andValClosure :: Reference -> Reference -> Machine (Value a)
-andValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        (Var emptyAnno bRef)
-        falseExpr
-    )
+-- | The right operand of a connective whose left operand is the term @p@ has
+-- arrived: §4.3's table for an unknown left operand. A known right operand
+-- that decides the connective decides it, as @x AND FALSE@ is @FALSE@; one
+-- that does not leaves @p@, as @x AND TRUE@ is @x@; an unknown one builds the
+-- connective's node. @IMPLIES@ builds its node whatever the right operand
+-- is, so that the seam between a rule's scope and its requirement survives
+-- (§4.2).
+connectiveRight :: Connective -> Term -> WHNF -> Machine Config
+connectiveRight conn p val = case (conn, val) of
+  (ConnAnd, ValBool False) -> continueBackward (valBool False)
+  (ConnAnd, ValBool True)  -> continueBackward (termValue p)
+  (ConnOr,  ValBool True)  -> continueBackward (valBool True)
+  (ConnOr,  ValBool False) -> continueBackward (termValue p)
+  (ConnImplies, ValBool b) -> continueBackward (ValTerm (TConn ConnImplies p (boolTerm b)))
+  _ | Just q <- unknownTerm val -> do
+        noteTerm q
+        continueBackward (ValTerm (TConn conn p q))
+  _ -> internalException $ RuntimeTypeError $
+    "expected a BOOLEAN but found: " <> prettyLayout val <> " when evaluating " <> connectiveName conn
 
-notValClosure :: Reference -> Reference -> Machine (Value a)
-notValClosure true false =
-  boolUnaryOpClosure true false
-    (\aRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        falseExpr
-        trueExpr
-    )
+-- | @TRUE@ or @FALSE@ as a term.
+boolTerm :: Bool -> Term
+boolTerm b = TCon (if b then TypeCheck.trueRef else TypeCheck.falseRef) []
 
-orValClosure :: Reference -> Reference -> Machine (Value a)
-orValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        trueExpr
-        (Var emptyAnno bRef)
-    )
+-- | The built-in connective a name stands for, if it is one.
+builtinConnective :: Unique -> Maybe Connective
+builtinConnective u
+  | u == TypeCheck.andUnique     = Just ConnAnd
+  | u == TypeCheck.orUnique      = Just ConnOr
+  | u == TypeCheck.impliesUnique = Just ConnImplies
+  | u == TypeCheck.notUnique     = Just ConnNot
+  | otherwise                    = Nothing
 
-impliesValClosure :: Reference -> Reference -> Machine (Value a)
-impliesValClosure true false =
-  boolBinOpClosure true false
-    (\aRef bRef ->
-      IfThenElse emptyAnno
-        (Var emptyAnno aRef)
-        (Var emptyAnno bRef)
-        trueExpr
-    )
+-- | A connective's operands, if the call has the connective's arity.
+connectiveOperands :: Connective -> [Expr Resolved] -> Maybe (Expr Resolved, Maybe (Expr Resolved))
+connectiveOperands ConnNot [e]      = Just (e, Nothing)
+connectiveOperands ConnNot _        = Nothing
+connectiveOperands _       [e1, e2] = Just (e1, Just e2)
+connectiveOperands _       _        = Nothing
+
+connectiveName :: Connective -> Text
+connectiveName = \ case
+  ConnAnd     -> "AND"
+  ConnOr      -> "OR"
+  ConnImplies -> "IMPLIES"
+  ConnNot     -> "NOT"
 
 ----------------------------------------------------------------------------
 -- JSON to Environment conversion for batch processing
@@ -6737,6 +8834,8 @@ writeJSONToReferences json env = case json of
               -- Convert JSON to WHNF and write into the existing Reference.
               -- NOTE (T6): deliberately a plain WHNF — externally injected
               -- batch input is a per-run constant, not a force result.
-              whnf <- jsonValueToWHNFTyped val ty
+              -- the values a caller writes into the module's ASSUMEs are
+              -- its request, each its own root, named by the input
+              whnf <- jsonValueToWHNFTyped (MkDecodeAt (prettyLayout ty) [key] True) val ty
               updateThunkToWHNF existingRef whnf
   _ -> pure ()

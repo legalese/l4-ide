@@ -100,14 +100,15 @@ DECLARE `Prohibited Action` IS ONE OF
 
 -- Testing Prohibitions
 
--- Test 1: Prohibition complied with (no action taken - this is success)
+-- Test 1: Prohibition complied with (no action taken until the period ends - this is success)
 #TRACE `confidentiality obligation` AT 0 WITH
+  WAITUNTIL 1826
 
 -- Test 2: Prohibition violated (action taken - this should result in breach)
 #TRACE `confidentiality obligation` AT 0 WITH
   PARTY `The Employee` DOES `disclose confidential information` AT 100
 
--- Test 3: Conditional prohibition not violated (condition not met)
+-- Test 3: Conditional prohibition not violated (condition not met; the prohibition stays in force)
 #TRACE `structural alteration prohibition` AT 0 WITH
   PARTY `The Tenant` DOES `make alterations` "cosmetic" AT 50
 
@@ -115,7 +116,7 @@ DECLARE `Prohibited Action` IS ONE OF
 #TRACE `structural alteration prohibition` AT 0 WITH
   PARTY `The Tenant` DOES `make alterations` "structural" AT 50
 
--- Test 5: Financial prohibition within threshold (allowed)
+-- Test 5: Financial prohibition within threshold (allowed; the prohibition stays in force)
 #TRACE `debt restriction` AT 0 WITH
   PARTY `The Borrower` DOES `incur additional debt` 40000 AT 100
 

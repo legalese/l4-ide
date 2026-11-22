@@ -1,0 +1,23 @@
+-- WHOSE reads the FIRST word of each line, so a line that begins with NOT
+-- has no field in the position the rule reads. WHO is the general form
+-- (§13.6, RULED 2026-09-21).
+IMPORT prelude
+
+DECLARE Actor IS ONE OF
+    Tenant HAS tname IS A STRING
+               standing IS A STRING
+DECLARE Action IS ONE OF
+    Pay HAS payer IS AN Actor
+
+alice MEANS Tenant WITH tname IS "Alice", standing IS "current"
+everyone MEANS LIST alice
+
+GIVETH A DEONTIC Actor Action
+`a negation under WHOSE` MEANS
+    EVERY Tenant t IN everyone
+        WHOSE  NOT (standing EQUALS "current")
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH

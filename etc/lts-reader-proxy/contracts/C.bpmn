@@ -43,8 +43,8 @@
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P3D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:task id="Task_1" name="MUST payment ...">
-      <bpmn:documentation>PARTY B MUST payment ... WITHIN 3 PROVIDED price AT LEAST 20</bpmn:documentation>
+    <bpmn:task id="Task_1" name="MUST payment price">
+      <bpmn:documentation>PARTY B MUST payment price WITHIN 3 PROVIDED price AT LEAST 20</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_1" name="after P3D" attachedToRef="Task_1" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 3</bpmn:documentation>
@@ -68,8 +68,8 @@
     <bpmn:endEvent id="End_5" name="Breach">
       <bpmn:errorEventDefinition id="ErrorDef_End_5" errorRef="Error_breach" />
     </bpmn:endEvent>
-    <bpmn:task id="Task_6" name="MUST payment ...">
-      <bpmn:documentation>PARTY B MUST payment ... WITHIN 3</bpmn:documentation>
+    <bpmn:task id="Task_6" name="MUST payment fine">
+      <bpmn:documentation>PARTY B MUST payment fine WITHIN 3</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_6" name="after P3D" attachedToRef="Task_6" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 3</bpmn:documentation>

@@ -1,0 +1,6 @@
+-- Typechecks cleanly. Its one directive traces an evaluation that reaches a
+-- refusal.
+GIVETH A NUMBER
+`not modelled` MEANS REFUSE "not modelled"
+
+#EVALTRACE `not modelled` PLUS 1

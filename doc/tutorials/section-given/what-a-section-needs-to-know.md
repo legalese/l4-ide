@@ -284,18 +284,18 @@ l4 batch what-a-section-needs-to-know.l4 \
 One line of answer comes back per case:
 
 ```
-{"diagnostics":[],"input":{"annual income":40000,"net worth":20000},"output":[{"result":2500,"trace":null}],"status":"success"}
-{"diagnostics":[],"input":{"annual income":300000,"net worth":900000},"output":[{"result":90000,"trace":null}],"status":"success"}
+{"diagnostics":[],"input":{"annual income":40000,"net worth":20000},"output":[{"result":2500,"trace":null}],"presumed":[],"status":"success"}
+{"diagnostics":[],"input":{"annual income":300000,"net worth":900000},"output":[{"result":90000,"trace":null}],"presumed":[],"status":"success"}
 ```
 
-Six things are written on each of those lines, and only one of them is the answer. `input` repeats the case that was asked, so that what was asked and what was decided stay on one line. `result` is the answer. `status` says whether the case ran at all, and `success` means it did. `diagnostics` is the list of things that went wrong, and the empty pair of square brackets `[]` means that list is empty — nothing went wrong. `output` sits inside square brackets because the tool always writes it as a list, even where, as here, the list holds one answer. `trace` would hold a step-by-step working of how the answer was reached, which nobody asked for here; the word beside it is the tool's way of writing _there is none_ (**"null"**). Nothing on either line is a warning, and nothing is missing.
+Seven things are written on each of those lines, and only one of them is the answer. `input` repeats the case that was asked, so that what was asked and what was decided stay on one line. `result` is the answer. `status` says whether the case ran at all, and `success` means it did. `diagnostics` is the list of things that went wrong, and the empty pair of square brackets `[]` means that list is empty — nothing went wrong. `output` sits inside square brackets because the tool always writes it as a list, even where, as here, the list holds one answer. `trace` would hold a step-by-step working of how the answer was reached, which nobody asked for here; the word beside it is the tool's way of writing _there is none_ (**"null"**). `presumed` would list any fact the answer took its usual value for, because the case left it out and the rules give it one with `TYPICALLY`; this section gives none, so the list is empty. Nothing on either line is a warning, and nothing is missing.
 
 Alex is below the cut point on both measures, so five per cent applies: five per cent of $40,000 is $2,000, under the floor, so the floor of $2,500 governs. The second investor is above it on both, so ten per cent of the larger measure applies: $90,000, below the ceiling. Each line carries the case alongside the answer, so what was asked and what was decided is one line, not two files.
 
 **Leave a fact out and you are told which one.** Send Alex's income with no net worth:
 
 ```
-{"diagnostics":["Missing required field 'net worth' in JSON object"],"input":{"annual income":40000},"output":[{"result":{"error":"Missing required field 'net worth' in JSON object\n"},"trace":null}],"status":"error"}
+{"diagnostics":["Missing required field 'net worth' in JSON object"],"input":{"annual income":40000},"output":[{"result":{"error":"Missing required field 'net worth' in JSON object\n"},"trace":null}],"presumed":[],"status":"error"}
 ```
 
 `net worth` is required because the chain of rules reaches it. Nothing else is required, because nothing else is reached, and a fact you send that the question never reaches is ignored.
@@ -306,12 +306,13 @@ Put `#EVAL` on the question and run the file with no case at all, and the answer
 
 ```
 Result:
-  I could not continue evaluating, because I needed to know the value of
+  I could not continue evaluating, because I needed to know the values of
     `annual income`
-  but it is an assumed term.
+    `net worth`
+  but they are assumed terms.
 ```
 
-That is easy to mistake for a complaint about your rule. It is not; the rule is fine. "An assumed term" is a fact the file names but does not settle — exactly what you wrote the `GIVEN` to say. The tool says _assumed_ of any fact left open, whichever keyword named it: a section `GIVEN` and an older `ASSUME` report in exactly these words, so meeting the word here is not a sign that your `GIVEN` was quietly treated as something else. L4 names the first blank it reached and stops, rather than guessing a value and handing you a number that looks like an answer. (That is why the `#EVAL` line is shown here and is not in the companion file: a run ending this way counts as a run that did not succeed, and every file in this documentation must succeed.)
+That is easy to mistake for a complaint about your rule. It is not; the rule is fine. "An assumed term" is a fact the file names but does not settle — exactly what you wrote the `GIVEN` to say. The tool says _assumed_ of any fact left open, whichever keyword named it: a section `GIVEN` and an older `ASSUME` report in exactly these words, so meeting the word here is not a sign that your `GIVEN` was quietly treated as something else. L4 names every blank the answer is waiting for and stops, rather than guessing a value and handing you a number that looks like an answer. (That is why the `#EVAL` line is shown here and is not in the companion file: a run ending this way counts as a run that did not succeed, and every file in this documentation must succeed.)
 
 What you _can_ do with no facts at all is ask what kind of answer a rule gives:
 
@@ -324,7 +325,7 @@ which reports `NUMBER`. Checking that the rules fit together needs no facts abou
 Run the file whole, and among the tool's notes this comes back:
 
 ```
-Evaluation[1] @ what-a-section-needs-to-know.l4:40:1-35
+Evaluation[1] @ what-a-section-needs-to-know.l4:39:1-35
 
 Result:
   40000
@@ -336,9 +337,15 @@ Trace:
 
 One block, because the file holds one `#EVAL`: the recap from Step 1. The two `#CHECK` lines answer `NUMBER` and `BOOLEAN`, and they report as information among the file's other messages rather than as blocks of their own; in an editor they appear against the line you wrote them on. The run ends successfully, which is the point of putting `#CHECK` in a file and keeping `#EVAL` out of one whose facts nobody has supplied.
 
-What you cannot do today is keep worked cases against a section's facts — three or four applicants you re-run after every edit, as a standing check on your encoding — inside the `.l4` file. That is what the proposed spelling below is for. Until it is built, those cases live in a `.json` file next to the `.l4` file and run with `l4 batch`: the same discipline, kept in two files instead of one.
+You can also keep worked cases against a section's facts — three or four applicants you re-run after every edit, as a standing check on your encoding — inside the `.l4` file. Write `WITH` after the rule's name, then each fact's name, `IS`, and the value:
 
-_Proposed, not landed (2026-09-04) — designed and written down, but not yet built: supplying a fact inside the file itself, by writing `WITH` after the rule's name and then the fact's name, `IS`, and the value — for example ``#EVAL `the investor's 12-month limit` WITH `annual income` IS 40000``, and the same spelling where one rule uses another. Write that line today and the file is rejected: L4 answers `You are giving named inputs to … but it is not a function, so it takes none.`, meaning the rule takes no inputs of its own. It is not quietly ignored. Until it is built, facts come from outside the file: a web form, `l4 batch`, or the published service — the same rules put behind a web address, where other people and other programs can ask them._
+```l4
+#EVAL `the investor's 12-month limit` WITH `annual income` IS 40000, `net worth` IS 80000
+```
+
+That answers `4000`. Name every fact the question reaches: leave out `net worth` and the run stops on it, with the same "assumed term" screen as above. The same spelling works where one rule uses another.
+
+Facts for a real case, from whoever is asking, still come from outside the file: a web form, `l4 batch`, or the published service — the same rules put behind a web address, where other people and other programs can ask them.
 
 ### Two questions, two forms
 
@@ -397,13 +404,13 @@ Two boxes on one, six on the other, and no box on both. Nobody drew either form 
 
 ### Checking the list before you publish
 
-Seeing that published list set out as a list, and turning it into a form, are both part of publishing the rules; [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) shows you how. Before you get that far there is a rough check you can make from the command line. Give `l4 batch` a case with nothing in it at all — a file holding `[{}]` — and it names a fact the question requires:
+Seeing that published list set out as a list, and turning it into a form, are both part of publishing the rules; [Exporting Rules for Deployment](../deploying-rules/exporting-rules-for-deployment.md) shows you how. Before you get that far there is a rough check you can make from the command line. Give `l4 batch` a case with nothing in it at all — a file holding `[{}]` — and it names every fact the question requires:
 
 ```
-{"diagnostics":["Missing required field 'annual income' in JSON object"],"input":{},"output":[{"result":{"error":"Missing required field 'annual income' in JSON object\n"},"trace":null}],"status":"error"}
+{"diagnostics":["Missing required fields 'annual income', 'net worth' in JSON object"],"input":{},"output":[{"result":{"error":"Missing required fields 'annual income', 'net worth' in JSON object\n"},"trace":null}],"presumed":[],"status":"error"}
 ```
 
-It names one fact, not the whole list, so it confirms rather than enumerates: fill that one in, run it again, and it names the next. For a section with two facts that is a quick way to satisfy yourself both came out right. For a section with twenty, it is the published list you want.
+For a section with two facts that is a quick way to satisfy yourself both came out right. It leaves out any fact with a usual value written with `TYPICALLY`, because an empty case takes those; for the whole list, including those, it is the published list you want.
 
 ---
 
@@ -487,13 +494,23 @@ The options are:
 
 That message asks a question about the source text, and answering it is a drafting decision. Each answer says something different about what the provision means:
 
-| If                                                           | Then                                                                                                                     |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| it is really one fee across the whole Part                   | **hoist** _(available today)_: move the `GIVEN` up to the `§ Fees` heading and delete both copies                        |
-| they are really two fees                                     | **rename** _(available today)_: call them `the application fee` and `the renewal fee`, as a careful drafter would have   |
-| section 7's fee is section 2's fee, for this one calculation | **bridge** _(proposed, not landed — see below)_: say at the point where section 7 borrows the fee which fee it is taking |
+| If                                                           | Then                                                                                                                        |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| it is really one fee across the whole Part                   | **hoist** _(available today)_: move the `GIVEN` up to the `§ Fees` heading and delete both copies                           |
+| they are really two fees                                     | **rename** _(available today)_: call them `the application fee` and `the renewal fee`, as a careful drafter would have      |
+| section 7's fee is section 2's fee, for this one calculation | **bridge** _(available today)_: give section 7 a fee of its own, and hand it to section 2's rule where section 7 borrows it |
 
-_Proposed, not landed (2026-09-04): the bridge spelling, `WITH` followed by the fact's name, `IS`, and the value to give it. It is the same proposed `WITH` as in Step 5, and today it is rejected in the same way. Until it is built, the two ways out are to hoist or to rename._
+The bridge is the `WITH` from Step 5: the fact's name, `IS`, and the value to give it. Section 7 declares the fee it hands over, because a `the fee` written in section 7 with none of its own would be the same two-way question:
+
+```l4
+§§ `7. Refunds`
+    GIVEN `the fee` IS A NUMBER
+
+GIVETH A NUMBER
+`the refund` MEANS (`the application fee payable` WITH `the fee` IS `the fee`) TIMES 0.5
+```
+
+``#EVAL `the refund` WITH `the fee` IS 100`` then answers `50`.
 
 ### When no heading sits above both
 

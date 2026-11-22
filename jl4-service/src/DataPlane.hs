@@ -16,27 +16,34 @@ import FileBrowser (ShortFileBrowseApi, shortFileBrowseHandler)
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import Servant.Multipart
 import Backend.DecisionQueryPlan (CachedDecisionQuery (ladderInfo), buildDecisionQueryCacheFromCompiled, queryPlan, QueryPlanResponse)
-import L4.FunctionSchema (Parameter, Parameters(..))
 import Shared (AnnotatedFunctionSummary (..), buildPropertyReverseMap, remapArguments, sanitizePropertyName)
-import Backend.Jl4 (CompiledModule (..), evaluateWithCompiledDeontic)
+import Backend.Jl4 (CompiledModule (..))
+import DeonticTrace (isDeonticFunction, isStrayTraceField, noDeonticModule, noTraceForOtherFunctions, requireTrace, runDeonticLimited, traceFromJSON)
 import qualified L4.StateGraph as StateGraph
 import qualified L4.StateGraph.Dot as StateGraph
 import qualified LSP.L4.Viz.VizExpr as VizExpr
-import Compiler (toDecl)
-import Logging (logInfo)
+import EvalLimits (limitHitMessage)
+import qualified EvalLimits
+import Ledger (InstanceRoutes, instanceRoutesHandler)
+import Logging (logError, logInfo)
 import Options (Options (..))
-import Shared (jsonError)
+import Shared (jsonError, trySynchronous)
 import Types
 
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Lazy as LBS
 import Data.Int (Int64)
 import Control.Concurrent.Async (forConcurrently)
+import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
+import Control.DeepSeq (NFData)
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
-import Control.Exception (catch, evaluate)
+import Control.Exception (bracket_, displayException, evaluate)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
+import Data.Functor ((<&>))
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
 import Data.List (find)
 import Data.Map.Strict (Map)
@@ -45,11 +52,7 @@ import qualified Data.Maybe as Maybe
 import Data.Scientific (Scientific)
 import qualified Data.Set as Set
 import Data.Text (Text)
-import qualified Data.Text as Text
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
-import GHC.IO.Exception (AllocationLimitExceeded (..))
 import Servant
-import System.FilePath ((<.>))
 import System.Timeout (timeout)
 
 -- | The data plane API — per-deployment function evaluation.
@@ -82,6 +85,9 @@ type DeploymentRoutes =
        "functions" :> Get '[JSON] [SimpleFunction]
   :<|> "functions" :> Capture "name" Text :> FunctionRoutes
   :<|> "openapi.json" :> Get '[JSON] Aeson.Value
+       -- /deployments/{id}/instances/... → the instance ledger ("Ledger");
+       -- long routes only, since a short /{id}/instances is a function name
+  :<|> InstanceRoutes
 
 -- | Evaluation responses include an X-Eval-Alloc-Bytes header reporting
 -- the GHC allocation bytes consumed by the evaluation.
@@ -104,6 +110,7 @@ dataPlaneHandler vis deployIdText =
        listFunctionsHandler deployId
   :<|> functionRoutesHandler deployId
   :<|> openApiHandler vis deployId
+  :<|> instanceRoutesHandler deployIdText
  where
   deployId = DeploymentId deployIdText
 
@@ -237,35 +244,30 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
   (fns, _meta) <- requireDeploymentReady deployId
   vf <- requireFunction fns fnName
 
-  -- Check if this function has deontic parameters (indicating DEONTIC return type)
-  let paramMap = vf.fnImpl.parameters.parameterMap :: Map Text Parameter
-      isDeontic = Map.member "startTime" paramMap
-                  && Map.member "events" paramMap
+  -- Does this function return a DEONTIC? (its type, not its parameters' names)
+  let isDeontic = isDeonticFunction vf
 
   -- Build reverse mapping so REST API accepts both hyphenated and spaced field names
   let reverseMap = buildPropertyReverseMap vf.fnImpl.parameters
       rawArgs = Map.toList fnArgs.fnArguments
       remappedArgs = remapArguments reverseMap rawArgs
+      presumption = Maybe.fromMaybe PresumeSoft fnArgs.presumption
 
   (result, allocBytes) <- case (isDeontic, fnArgs.startTime, fnArgs.events) of
     -- Non-deontic function: reject deontic params
     (False, Just _, _) ->
-      throwError err400 { errBody = jsonError "startTime and events are only valid for functions returning DEONTIC" }
+      throwError err400 { errBody = jsonError noTraceForOtherFunctions }
     (False, _, Just _) ->
-      throwError err400 { errBody = jsonError "startTime and events are only valid for functions returning DEONTIC" }
+      throwError err400 { errBody = jsonError noTraceForOtherFunctions }
     -- Non-deontic function: existing path
     (False, Nothing, Nothing) ->
-      runEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs Nothing mTraceHeader mTraceParam mGraphViz
-    -- Deontic function: require both startTime and events
-    (True, Nothing, _) ->
-      throwError err400 { errBody = jsonError "startTime is required for functions returning DEONTIC" }
-    (True, _, Nothing) ->
-      throwError err400 { errBody = jsonError "events is required for functions returning DEONTIC" }
-    -- Deontic function with both params: use deontic evaluator
-    (True, Just st, Just evts) ->
-      runDeonticEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs st evts
-        vf.fnImpl.deonticPartyType vf.fnImpl.deonticActionType
-        mTraceHeader mTraceParam mGraphViz
+      runEvaluatorFor vf fnArgs.fnEvalBackend remappedArgs Nothing mTraceHeader mTraceParam mGraphViz presumption
+    -- Deontic function: require both startTime and events, then replay them
+    (True, mStart, mEvents) -> case requireTrace mStart mEvents of
+      Left msg -> throwError err400 { errBody = jsonError msg }
+      Right (st, evts) ->
+        runDeonticEvaluatorFor vf remappedArgs st evts
+          mTraceHeader mTraceParam mGraphViz presumption
   case result of
     SimpleError _ -> throwEvalError allocBytes result
     _ -> pure $ addHeader allocBytes result
@@ -296,13 +298,63 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
   -- Build reverse mapping so REST API accepts both hyphenated and spaced field names
   let reverseMap = buildPropertyReverseMap vf.fnImpl.parameters
 
-  -- Evaluate all cases in parallel, collecting alloc bytes per case
-  evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase -> do
-    let args = remapArguments reverseMap $ Map.assocs $ fmap Just inputCase.attributes
-    r <- runAppM env (runEvaluatorForDirect vf Nothing args outputFilter traceLevel includeGraphViz)
-    pure (inputCase.id, r)
+  -- Evaluate the cases concurrently, but each case only once it holds one of
+  -- the process's batch slots ('batchSlots', one per capability, shared with
+  -- every other batch in flight), collecting alloc bytes per case.
+  --
+  -- A case's time limit is wall-clock, so it counts whatever shares the core
+  -- while the case runs. With every case started at once, each case's timer
+  -- counted its siblings' work as well as its own: on one core, forty cases of
+  -- a fifth of a second each failed the batch under a three-second limit that
+  -- no case came near (TRAFFICJAM, 2026-10-02). A case acquires its slot
+  -- before 'withEvalLimits' starts its clock, so waiting for a slot is not
+  -- counted either.
+  --
+  -- A case that hits a limit is an errored case (below), marked with the
+  -- limit it hit: it does not take the other cases' answers down with it.
+  let limitHitCase (hit, allocBytes) =
+        (SimpleError (EvaluatorLimited hit (limitHitMessage env.options hit)), allocBytes)
 
-  -- Check for fatal errors and propagate
+  -- In front of the shared slots, each request has a bound of its own, as
+  -- many units as there are shared slots, so that a request never has more
+  -- than that many cases waiting for a shared slot. Without it, every case of
+  -- a big batch queued at once, and a one-case batch from another client sent
+  -- 0.5 s later waited for the whole big batch: 11.5 s, against 0.1 s before
+  -- the slots were shared (-N2, 12 slow cases, 2026-10-03). This depends on
+  -- base's QSem granting a released unit to the oldest waiter ("guaranteed
+  -- FIFO ordering for satisfying blocked waitQSem calls"): the small batch's
+  -- case is then next in line. Do not swap in an STM TSem, which wakes every
+  -- waiter and lets any of them take the unit, so a big batch can keep it.
+  local <- liftIO $ newQSem env.batchSlots.count
+  evalResults <- liftIO $ forConcurrently batchArgs.cases $ \inputCase ->
+    bracket_ (waitQSem local) (signalQSem local) $
+    bracket_ (waitQSem env.batchSlots.shared) (signalQSem env.batchSlots.shared) do
+      let presumption' = Maybe.fromMaybe PresumeSoft batchArgs.presumption
+          -- a startTime or events that is not an input is not passed on: a
+          -- non-null one is refused below, and a null one is a field left out
+          args = remapArguments reverseMap
+            [ (k, Just v)
+            | (k, v) <- Map.toList inputCase.attributes
+            , not (isStrayTraceField vf.fnImpl.parameters k) ]
+      -- An exception the case raises by itself is that case's error. It must not
+      -- escape 'forConcurrently', which would fail the whole batch.
+      r <- trySynchronous $ runAppM env $
+        if isDeonticFunction vf
+          then runDeonticBatchCase vf reverseMap inputCase.attributes traceLevel includeGraphViz presumption'
+          else case strayTraceOfCase vf inputCase.attributes of
+            Just refusal -> pure $ Right (SimpleError (InterpreterError refusal), 0)
+            Nothing -> runEvaluatorForDirectLimited False vf Nothing args outputFilter traceLevel includeGraphViz presumption'
+      case r of
+        Left e -> do
+          logError env.logger "Batch case raised an exception"
+            [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
+            , ("functionName", Aeson.toJSON fnName)
+            , ("error", Aeson.toJSON (displayException e)) ]
+          pure (inputCase.id, Right (SimpleError (InterpreterError batchCaseFailed), 0))
+        Right done -> pure (inputCase.id, either limitHitCase id <$> done)
+
+  -- Check for fatal errors and propagate. None is a case's own: the one left
+  -- is a function with no evaluator for its backend, which fails every case.
   case [err | (_, Left err) <- evalResults] of
     (err:_) -> throwError err
     [] -> pure ()
@@ -312,26 +364,36 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     nCases = length responses
     totalAllocBytes = sum [alloc | (_, _, alloc) <- responses]
 
-    successfulRuns =
-      Maybe.mapMaybe
-        ( \(rid, simpleRes, _) -> case simpleRes of
-            SimpleResponse r -> Just (rid, r)
-            SimpleError _ -> Nothing
-        )
-        responses
+    -- Every case comes back. An answer carries its result; a refusal is a
+    -- determinate answer too, and carries its reason and the defaults it
+    -- rests on (T6); an error carries its message, so that no case vanishes
+    -- into the count without a reason, and an error that is a limit hit says
+    -- which limit, so a client can tell it from one that will recur. Only
+    -- answers and refusals count as processed.
+    outputCase (rid, simpleRes, _) = case simpleRes of
+      SimpleResponse r -> OutputCase
+        { id = rid, attributes = r.fnResult, graphviz = r.graphviz
+        , presumed = r.presumed, outcome = CaseAnswered }
+      SimpleError (EvaluatorRefused reason presumedInputs) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = presumedInputs, outcome = CaseRefused reason }
+      SimpleError (EvaluatorLimited hit msg) -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = [], outcome = CaseLimited hit msg }
+      SimpleError err -> OutputCase
+        { id = rid, attributes = Map.empty, graphviz = Nothing
+        , presumed = [], outcome = CaseErrored (prettyEvaluatorError err) }
+    outputCases = map outputCase responses
 
-    nSuccessful = length successfulRuns
+    nSuccessful = length [ () | c <- outputCases, not (isErrored c.outcome) ]
     nIgnored = nCases - nSuccessful
+    isErrored = \case
+      CaseErrored _   -> True
+      CaseLimited _ _ -> True
+      _               -> False
 
   pure $ addHeader totalAllocBytes $ BatchResponse
-    { cases =
-        [ OutputCase
-          { id = rid
-          , attributes = response.fnResult
-          , graphviz = response.graphviz
-          }
-        | (rid, response) <- successfulRuns
-        ]
+    { cases = outputCases
     , summary = OutputSummary
         { casesRead = nCases
         , casesProcessed = nSuccessful
@@ -353,6 +415,11 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
         batchArgs.outcomes
 
 -- | POST /deployments/{id}/functions/{fn}/query-plan
+--
+-- The plan is computed here, under --eval-timeout. Returned unevaluated, it
+-- would be computed while Warp sends the response, and by then Warp's own
+-- connection timeout (30 s) is running again: a plan that took longer was cut
+-- off at 30 to 60 s, the connection closed with no status and no error.
 queryPlanHandler' :: DeploymentId -> Text -> FnArguments -> AppM QueryPlanResponse
 queryPlanHandler' deployId fnName fnArgs = do
   logger <- asks (.logger)
@@ -363,7 +430,11 @@ queryPlanHandler' deployId fnName fnArgs = do
   (fns, _meta) <- requireDeploymentReady deployId
   vf <- requireFunction fns fnName
   cached <- requireDecisionQueryCache deployId fnName vf
-  pure $ queryPlan fnName cached fnArgs
+  withinEvalTimeout $ do
+    let plan = queryPlan fnName cached fnArgs
+    -- Encoding computes all of the plan that is sent.
+    _ <- evaluate (LBS.length (Aeson.encode plan))
+    pure plan
 
 -- | GET /deployments/{id}/functions/{fn}/ladder
 --
@@ -398,18 +469,19 @@ queryPlanHandler' deployId fnName fnArgs = do
 -- the containment and the exception, over seven shapes including record
 -- projections, WHERE-expansion and the IMPLIES seam.
 --
--- It was not always so — see upstream smucclaw/l4-ide#935. Both ids were UUID5
--- over @"fn|label|refs=..."@, but @L4.Viz.Ladder.generateAtomId@ rendered each
--- ref as its numeric @rootUnique@ over the atom's /direct/ ref set while
+-- It was not always so — see upstream smucclaw/l4-ide#935. Both ids were once
+-- UUID5 over @"fn|label|refs=..."@, but the ladder rendered each ref as its
+-- numeric @rootUnique@ over the atom's /direct/ ref set while
 -- @L4.Decision.QueryPlan.atomIdByUnique@ rendered it as the ref's /label/ over
 -- the /transitive closure/, so they disagreed for every atom with a non-empty
 -- ref set — which is every ordinary leaf — and a binding keyed by a ladder
--- atomId was accepted with a 200 and did nothing at all. @jl4-lsp@ had always
--- reconciled them by calling @LSP.L4.Viz.QueryPlan.annotateLadderWithAtomIds@
--- before serving the ladder (see @LSP.L4.Actions@); jl4-service now does the
--- same in 'buildDecisionQueryCacheFromCompiled', so both surfaces and both
--- products agree. 'IntegrationSpec' pins it, including the end-to-end claim that
--- such a binding moves @determined@.
+-- atomId was accepted with a 200 and did nothing at all. Since R3
+-- (WHERE-INLINING-SPEC §10.1, smucclaw/l4-ide#1013) both are the hash of the
+-- leaf's C1 term key, which the ladder records once while drawing and the plan
+-- reads ("L4.Viz.AtomKey"), so they agree by construction; what is left of the
+-- reconciliation in 'buildDecisionQueryCacheFromCompiled' only names them under
+-- the function name this deployment serves. 'IntegrationSpec' pins it, including
+-- the end-to-end claim that such a binding moves @determined@.
 ladderHandler :: DeploymentId -> Text -> AppM VizExpr.RenderAsLadderInfo
 ladderHandler deployId fnName = do
   logger <- asks (.logger)
@@ -455,8 +527,9 @@ ladderHandler deployId fnName = do
 -- the constructor cannot be returned without entering each.
 --
 -- What that does NOT cover is serialization: Servant encodes the response after
--- this returns, outside the timeout. That is not an oversight, it is why the
--- node budget exists and why it is a separate limit. Removing the budget and
+-- this returns, outside the timeout. That holds for 'ladderHandler';
+-- 'queryPlanHandler'' encodes its plan itself, under the timeout. It is not an
+-- oversight, it is why the node budget exists and why it is a separate limit. Removing the budget and
 -- leaving only this timeout was measured: the 32-variable case then passes the
 -- timeout in well under a second and the request still does not complete.
 requireDecisionQueryCache :: DeploymentId -> Text -> ValidatedFunction -> AppM CachedDecisionQuery
@@ -585,11 +658,12 @@ runEvaluatorFor
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runEvaluatorFor vf engine args outputFilter mTraceHeader mTraceParam mGraphViz = do
+runEvaluatorFor vf engine args outputFilter mTraceHeader mTraceParam mGraphViz presumption = do
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
-  runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz
+  runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption
 
 -- | Core evaluator logic. Returns the response and GHC allocation bytes consumed.
 runEvaluatorForDirect
@@ -599,94 +673,143 @@ runEvaluatorForDirect
   -> Maybe (Set.Set Text)
   -> TraceLevel
   -> Bool
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz = do
+runEvaluatorForDirect vf engine args outputFilter traceLevel includeGraphViz presumption =
+  runEvaluatorForDirectLimited True vf engine args outputFilter traceLevel includeGraphViz presumption
+    >>= either (const resourceLimitExceeded) pure
+
+-- | 'runEvaluatorForDirect', returning a limit hit (and the bytes allocated up
+-- to it) instead of failing the request, so that the batch endpoint can report
+-- it on the one case that hit it.
+--
+-- The first argument says whether the caller writes the reasoning tree. A
+-- batch does not (it reads the result, the GraphViz text and what the answer
+-- presumed), so it drops the tree before the limits force the response:
+-- otherwise a traced batch would pay for a tree it never sends.
+runEvaluatorForDirectLimited
+  :: Bool
+  -> ValidatedFunction
+  -> Maybe EvalBackend
+  -> [(Text, Maybe FnLiteral)]
+  -> Maybe (Set.Set Text)
+  -> TraceLevel
+  -> Bool
+  -> Presumption
+  -> AppM (Either (LimitHit, Int64) (SimpleResponse, Int64))
+runEvaluatorForDirectLimited keepReasoning vf engine args outputFilter traceLevel includeGraphViz presumption = do
   let evalBackend = Maybe.fromMaybe JL4 engine
   case Map.lookup evalBackend vf.fnEvaluator of
     Nothing -> throwError err500 { errBody = jsonError "No evaluator available for backend" }
     Just runFn -> do
-      (evaluationResult, allocBytes) <-
-        timeoutAction $
-          runExceptT
-            ( runFn.runFunction
-                args
-                outputFilter
-                traceLevel
-                includeGraphViz
-            )
-      case evaluationResult of
-        Left err -> pure (SimpleError err, allocBytes)
-        Right r -> pure (SimpleResponse r, allocBytes)
+      limited <-
+        withEvalLimits $
+          fmap (fmap (\r -> if keepReasoning then r else r { reasoning = emptyReasoning })) $
+            runExceptT
+              ( runFn.runFunction
+                  args
+                  outputFilter
+                  traceLevel
+                  includeGraphViz
+                  presumption
+              )
+      pure $ limited <&> \(evaluationResult, allocBytes) -> case evaluationResult of
+        Left err -> (SimpleError err, allocBytes)
+        Right r -> (SimpleResponse r, allocBytes)
 
--- | Run deontic evaluation with EVALTRACE.
+-- | Run deontic evaluation with EVALTRACE: @/evaluation@'s half of the shared
+-- path ('runDeonticLimited'), which reports a limit hit as a 500.
 runDeonticEvaluatorFor
   :: ValidatedFunction
-  -> Maybe EvalBackend
   -> [(Text, Maybe FnLiteral)]
   -> Scientific       -- ^ Start time
   -> [TraceEvent]     -- ^ Events
-  -> Maybe Text       -- ^ Party type name
-  -> Maybe Text       -- ^ Action type name
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
+  -> Presumption
   -> AppM (SimpleResponse, Int64)
-runDeonticEvaluatorFor vf _engine args startTime events mPartyType mActionType mTraceHeader mTraceParam mGraphViz = do
+runDeonticEvaluatorFor vf args startTime events mTraceHeader mTraceParam mGraphViz presumption = do
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
 
-  compiled <- case vf.fnCompiled of
-    Nothing -> throwError err500 { errBody = jsonError "No compiled module available for deontic evaluation" }
-    Just c -> pure c
+  when (Maybe.isNothing vf.fnCompiled) $
+    throwError err500 { errBody = jsonError noDeonticModule }
 
-  let fnDecl = toDecl vf.fnImpl
-      filepath = Text.unpack vf.fnImpl.name <.> "l4"
+  cfg <- asks (.options)
+  limited <- liftIO $ runDeonticLimited cfg vf args startTime events traceLevel includeGraphViz presumption True
+  case limited of
+    Left _ -> resourceLimitExceeded
+    Right (Left err, allocBytes) -> pure (SimpleError err, allocBytes)
+    Right (Right r, allocBytes) -> pure (SimpleResponse r, allocBytes)
 
-  (evaluationResult, allocBytes) <-
-    timeoutAction $
-      runExceptT
-        ( evaluateWithCompiledDeontic
-            filepath
-            fnDecl
-            compiled
-            vf.fnSourceText
-            vf.fnModuleContext
-            args
-            startTime
-            events
-            mPartyType
-            mActionType
-            traceLevel
-            includeGraphViz
-        )
+-- | One case of a batch for a DEONTIC function: the case carries its own
+-- @startTime@ and @events@ among its attributes, and the rest are the inputs.
+-- A case without them is an errored case, with the refusal @/evaluation@ gives.
+--
+-- The trace is read from the attributes as the case arrived, before the inputs'
+-- names are mapped back to the rule's: @/evaluation@ does not map the events'
+-- names either, so a party that is a record reads the same in both.
+-- Like any batch case, it does not write the reasoning tree, and drops it before
+-- the limits force the outcome ('runDeonticLimited').
+runDeonticBatchCase
+  :: ValidatedFunction
+  -> Map Text Text
+  -> Map Text FnLiteral
+  -> TraceLevel
+  -> Bool
+  -> Presumption
+  -> AppM (Either (LimitHit, Int64) (SimpleResponse, Int64))
+runDeonticBatchCase vf reverseMap attributes traceLevel includeGraphViz presumption =
+  case traceFromJSON (Aeson.toJSON <$> Map.lookup "startTime" attributes) (Aeson.toJSON <$> Map.lookup "events" attributes) of
+    Left msg -> pure $ Right (SimpleError (InterpreterError msg), 0)
+    Right (startTime, events) -> do
+      cfg <- asks (.options)
+      let inputs = remapArguments reverseMap
+            [ (k, Just v) | (k, v) <- Map.toList attributes, k `notElem` ["startTime", "events"] ]
+      limited <- liftIO $ runDeonticLimited cfg vf inputs startTime events traceLevel includeGraphViz presumption False
+      pure $ limited <&> \(evaluationResult, allocBytes) -> case evaluationResult of
+        Left err -> (SimpleError err, allocBytes)
+        Right r -> (SimpleResponse r, allocBytes)
 
-  case evaluationResult of
-    Left err -> pure (SimpleError err, allocBytes)
-    Right r -> pure (SimpleResponse r, allocBytes)
+-- | What a batch case says when evaluating it raised an exception of its own.
+-- The exception is in the service log; it is not the client's to read.
+batchCaseFailed :: Text
+batchCaseFailed = "This case could not be evaluated: the service failed on it. The other cases are answered."
+
+-- | A batch case for a function that is not DEONTIC, with a trace among its
+-- attributes: a @startTime@ or @events@ that is not one of the function's
+-- inputs, and is not @null@. The case is an errored case with the refusal
+-- @/evaluation@ gives for the same request, and the cases beside it are
+-- answered. A function that declares inputs of those names reads them as inputs.
+strayTraceOfCase :: ValidatedFunction -> Map Text FnLiteral -> Maybe Text
+strayTraceOfCase vf attributes
+  | or [ isStrayTraceField vf.fnImpl.parameters k && Aeson.toJSON v /= Aeson.Null
+       | (k, v) <- Map.toList attributes ] = Just noTraceForOtherFunctions
+  | otherwise = Nothing
 
 -- | Run an AppM action in IO with a given environment.
 runAppM :: AppEnv -> AppM a -> IO (Either ServerError a)
 runAppM env action = runHandler $ runReaderT action env
 
--- | Timeout and memory-limited evaluation action.
--- Uses configurable eval timeout and per-evaluation allocation limits.
--- Returns the result and the number of GHC allocation bytes consumed.
-timeoutAction :: IO b -> AppM (b, Int64)
-timeoutAction act = do
+resourceLimitExceeded :: AppM a
+resourceLimitExceeded = throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
+
+-- | 'EvalLimits.withEvalLimits' under the service's configured limits.
+withEvalLimits :: NFData b => IO b -> AppM (Either (LimitHit, Int64) (b, Int64))
+withEvalLimits act = do
   cfg <- asks (.options)
-  let timeoutMicros = cfg.evalTimeout * 1_000_000
-      memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
-  result <- liftIO $
-    (timeout timeoutMicros $ do
-      setAllocationCounter memLimitBytes
-      enableAllocationLimit
-      r <- act
-      remaining <- getAllocationCounter
-      pure (r, memLimitBytes - remaining)
-    ) `catch` \AllocationLimitExceeded ->
-      pure Nothing
+  liftIO (EvalLimits.withEvalLimits cfg act)
+
+-- | Run an action under --eval-timeout only. Unlike 'withEvalLimits' it sets no
+-- allocation limit: that limit counts every byte allocated, not memory held,
+-- and query plans have never been held to it.
+withinEvalTimeout :: IO a -> AppM a
+withinEvalTimeout act = do
+  cfg <- asks (.options)
+  result <- liftIO $ timeout (cfg.evalTimeout * 1_000_000) act
   case result of
-    Nothing -> throwError err500 { errBody = jsonError "Evaluation resource limit exceeded" }
+    Nothing -> throwError err500 { errBody = jsonError "Query plan timed out" }
     Just x -> pure x
 
 -- ----------------------------------------------------------------------------

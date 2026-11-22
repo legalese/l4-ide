@@ -1,0 +1,27 @@
+-- An input of a section GIVEN, in a slot. A rule under the section reads the
+-- section's inputs as its own, so an input of a built-in type in a slot of a
+-- mixfix pattern or an @nlg sentence reads as a blank, "[income]", as a rule's
+-- own input does (legalese/l4-ide#803). Before, it read as a bare name beside
+-- the pattern's words, "income reduced by 10".
+
+GIVEN amount IS A NUMBER
+      cut IS A NUMBER
+GIVETH A NUMBER
+amount `reduced by` cut MEANS amount MINUS cut
+
+§ `Eligibility`
+    GIVEN age IS A NUMBER
+          income IS A NUMBER
+
+GIVETH A NUMBER
+`net income` MEANS income `reduced by` 10
+
+GIVEN x IS A NUMBER
+GIVETH A BOOLEAN
+@nlg %x% is above the age
+`above` x MEANS x > age
+
+GIVETH A BOOLEAN
+`check` MEANS `above` income
+
+#EVAL `check` WITH age IS 20, income IS 30

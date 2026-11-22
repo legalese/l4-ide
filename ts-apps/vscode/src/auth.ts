@@ -1,5 +1,17 @@
 import * as vscode from 'vscode'
 import { createHash } from 'crypto'
+import {
+  buildLoginUrl,
+  createPendingLogin,
+  exchangeHandoffCode,
+  isPendingLoginFresh,
+  parseAuthCallback,
+  parsePendingLogin,
+} from './auth-handoff.js'
+import {
+  LEGALESE_CLOUD_DOMAIN,
+  isLegaleseCloudUrl,
+} from './legalese-cloud-url.js'
 
 type ConnectionStatus = 'connected' | 'not-configured' | 'connecting' | 'error'
 
@@ -10,8 +22,14 @@ export interface ConnectionState {
   error?: string
 }
 
-export const LEGALESE_CLOUD_DOMAIN = 'legalese.cloud'
+export { LEGALESE_CLOUD_DOMAIN, isLegaleseCloudUrl }
+/** Where sign-in starts: the console confirms account and org. */
+export const LEGALESE_CONSOLE_URL = 'https://legalese.com/console'
 const SECRET_KEY_SESSION = 'l4.sessionToken'
+// The PKCE verifier of a login in progress (see auth-handoff.ts). Kept in
+// SecretStorage, not memory: the OS may deliver the callback URI to a
+// different window than the one that started the login.
+const SECRET_KEY_PENDING_LOGIN = 'l4.pendingLogin'
 
 function sameState(
   a: ConnectionState | undefined,
@@ -31,7 +49,7 @@ function sameState(
  *
  * Two modes:
  * 1. Self-hosted: User configures jl4.serviceUrl + optional jl4.serviceApiKey in settings
- * 2. Legalese Cloud: Browser-based login via WorkOS, token stored in SecretStorage
+ * 2. Legalese Cloud: Browser-based login, token stored in SecretStorage
  */
 export class AuthManager {
   private readonly onDidChangeEmitter =
@@ -105,12 +123,20 @@ export class AuthManager {
     return !this.getServiceUrl()
   }
 
-  async getAuthHeaders(): Promise<Record<string, string>> {
+  /**
+   * Auth headers for a request to `url` (jl4-service, its MCP endpoint).
+   * The configured `jl4.serviceApiKey` goes with any of them; the
+   * browser-login session only to Legalese Cloud
+   * ({@link isLegaleseCloudUrl}), so a `jl4.serviceUrl` pointing
+   * elsewhere (from a workspace's settings, say) never receives it.
+   */
+  async getAuthHeaders(url: string): Promise<Record<string, string>> {
     // Use API key if explicitly configured in settings
     const apiKey = this.getApiKeyFromSettings()
     if (apiKey) return { Authorization: `Bearer ${apiKey}` }
 
     // Otherwise use session token (for Legalese Cloud browser login)
+    if (!isLegaleseCloudUrl(url)) return {}
     const session = await this.secrets.get(SECRET_KEY_SESSION)
     if (session) return { Authorization: `Bearer ${session}` }
 
@@ -118,17 +144,20 @@ export class AuthManager {
   }
 
   /**
-   * Auth headers for the Legalese AI proxy.
+   * Auth headers for a request to the Legalese AI service at `url`.
    * Prefers `legaleseAi.apiKey` when set; otherwise falls back to the
    * shared flow (jl4 service API key, then browser-login session).
    * Keeping this distinct from `getAuthHeaders` lets users mix a
    * self-hosted jl4 service (with `jl4.serviceApiKey`) and a separate
-   * Legalese AI key — neither setting clobbers the other.
+   * Legalese AI key — neither setting clobbers the other. Nothing is
+   * sent to a `url` that isn't Legalese Cloud (a local AI server in local
+   * mode gets the client's dev stand-in instead).
    */
-  async getAiAuthHeaders(): Promise<Record<string, string>> {
+  async getAiAuthHeaders(url: string): Promise<Record<string, string>> {
+    if (!isLegaleseCloudUrl(url)) return {}
     const aiKey = this.getAiApiKeyFromSettings()
     if (aiKey) return { Authorization: `Bearer ${aiKey}` }
-    return this.getAuthHeaders()
+    return this.getAuthHeaders(url)
   }
 
   /**
@@ -151,7 +180,7 @@ export class AuthManager {
    * The effective service URL — the org subdomain in cloud mode, or the
    * user-configured URL in self-hosted mode.
    *
-   * Used for ALB-level endpoints that don't fit the consolidated api host:
+   * Used for host-level endpoints that don't fit the consolidated api host:
    * the `/health` connectivity ping and any UI surface that wants to show
    * the user where their data lives. Dataplane traffic (deployments / files /
    * functions / evaluation) should go through 'getApiBaseUrl' instead.
@@ -234,6 +263,23 @@ export class AuthManager {
   }
 
   /**
+   * Keep a rotated sealed session (the server refreshed the
+   * session, e.g. on GET /auth/access-token) in place of `replaces`, the
+   * one the request presented. Unlike {@link setSessionToken} it leaves the
+   * connection state alone: the sign-in is the same, and invalidating would
+   * drop a verify in flight and leave the sidebar on "Connecting...". A
+   * no-op once the stored session has changed (sign-out, another sign-in),
+   * so a late response can't bring the old sign-in back.
+   */
+  async storeRotatedSessionToken(
+    token: string,
+    replaces: string
+  ): Promise<void> {
+    if ((await this.secrets.get(SECRET_KEY_SESSION)) !== replaces) return
+    await this.secrets.store(SECRET_KEY_SESSION, token)
+  }
+
+  /**
    * Sign out (Legalese Cloud) or disconnect (configured service URL).
    * Clears session token. Never touches the serviceUrl setting.
    */
@@ -258,9 +304,8 @@ export class AuthManager {
 
   /**
    * Filesystem-safe identity key for scoping local state (conversation
-   * history, per-user caches). Mirrors the ai-proxy's `creatorId` so
-   * the local layout matches the server: each api key gets its own
-   * silo, each WorkOS user gets theirs. Returns `undefined` when no
+   * history, per-user caches): each api key gets its own, each user gets
+   * theirs. Returns `undefined` when no
    * credential is available — callers should treat that as "no
    * history" rather than collapsing into a shared bucket.
    *
@@ -282,7 +327,7 @@ export class AuthManager {
     const id = this.cloudUserId
     if (!id) return undefined
     // Keep only characters we know are safe across macOS/Win/Linux
-    // filesystems. A WorkOS user id (`user_01H...`) already satisfies
+    // filesystems. A user id already satisfies
     // this, but the guard means any future identity shape can't inject
     // a path separator.
     const safe = id.replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -304,31 +349,77 @@ export class AuthManager {
       return
     }
 
-    // No service URL → Legalese Cloud browser login
+    // No service URL → Legalese Cloud browser login, through the console
+    // (account, org, Switch account). The PKCE challenge gets the extension
+    // its own sign-in and a hand-off code instead of a session token in the
+    // callback URL.
     const callbackUri = await vscode.env.asExternalUri(
       vscode.Uri.parse(
         `${vscode.env.uriScheme}://legalese.l4-vscode/auth-callback`
       )
     )
-    const loginUrl = `https://${LEGALESE_CLOUD_DOMAIN}/auth/login?return_to=${encodeURIComponent(callbackUri.toString())}`
+    const { pending, challenge } = createPendingLogin()
+    await this.secrets.store(SECRET_KEY_PENDING_LOGIN, JSON.stringify(pending))
+    const loginUrl = buildLoginUrl(
+      LEGALESE_CONSOLE_URL,
+      callbackUri.toString(),
+      challenge
+    )
 
     this.outputChannel.appendLine(`[auth] Opening login: ${loginUrl}`)
     await vscode.env.openExternal(vscode.Uri.parse(loginUrl))
   }
 
   async handleAuthCallback(uri: vscode.Uri): Promise<void> {
-    const params = new URLSearchParams(uri.query)
-    const token = params.get('token')
+    const callback = parseAuthCallback(uri.query)
+    const pending = parsePendingLogin(
+      await this.secrets.get(SECRET_KEY_PENDING_LOGIN)
+    )
+    let token: string
 
-    if (!token) {
+    if (callback.kind === 'code') {
+      // Hand-off: redeem the code with this login's verifier.
+      await this.secrets.delete(SECRET_KEY_PENDING_LOGIN)
+      if (!isPendingLoginFresh(pending)) {
+        this.outputChannel.appendLine(
+          '[auth] Callback code without a pending login on this machine'
+        )
+        vscode.window.showErrorMessage(
+          'Login expired or was started elsewhere. Please sign in again.'
+        )
+        return
+      }
+      try {
+        token = await exchangeHandoffCode(
+          fetch,
+          LEGALESE_CLOUD_DOMAIN,
+          callback.code,
+          pending.verifier
+        )
+      } catch (err) {
+        this.outputChannel.appendLine(
+          `[auth] Hand-off exchange failed: ${err instanceof Error ? err.message : String(err)}`
+        )
+        vscode.window.showErrorMessage(
+          'Login failed: could not complete sign-in. Please try again.'
+        )
+        return
+      }
+      this.outputChannel.appendLine('[auth] Received session via hand-off')
+    } else if (callback.kind === 'token') {
+      // Legacy callback from a server without hand-off support.
+      await this.secrets.delete(SECRET_KEY_PENDING_LOGIN)
+      token = callback.token
       this.outputChannel.appendLine(
-        `[auth] Callback missing token: ${uri.toString()}`
+        '[auth] Received session token from callback'
       )
+    } else {
+      // Never log the URI: it may carry a credential.
+      this.outputChannel.appendLine('[auth] Callback missing code and token')
       vscode.window.showErrorMessage('Login failed: no token received.')
       return
     }
 
-    this.outputChannel.appendLine('[auth] Received session token from callback')
     await this.setSessionToken(token)
 
     // Resolve the org slug, then verify the connection.
@@ -401,12 +492,12 @@ export class AuthManager {
     const minDelay = new Promise((r) => setTimeout(r, 1000))
 
     try {
-      const headers = await this.getAuthHeaders()
       // Legalese Cloud: check health on the service domain (org may be idle/suspended).
       // Direct jl4-service connection: use /health.
       const healthUrl = this.isLegaleseCloudSession()
         ? `https://${LEGALESE_CLOUD_DOMAIN}/service/health?org=${encodeURIComponent(this.cloudOrgSlug!)}`
         : `${serviceUrl.replace(/\/$/, '')}/health`
+      const headers = await this.getAuthHeaders(healthUrl)
       const [resp] = await Promise.all([
         fetch(healthUrl, {
           headers,

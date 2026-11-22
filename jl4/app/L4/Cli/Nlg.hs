@@ -1,17 +1,13 @@
 -- | @l4 nlg FILE@ — linearize a module's directives to natural-language prose.
 --
--- This is the CLI footing for the TNR/NLG round-trip leg. It is deliberately a
--- thin wrapper: the payload is 'L4.Nlg.linearizeDirectives', which is the same
--- function @jl4-test@'s @jl4NlgAnnotationsGolden@ calls to write
--- @\<stem\>.nlg.golden@.
+-- This is deliberately a thin wrapper: the payload is 'L4.Nlg.linearizeDirectives',
+-- which is the same function @jl4-test@'s @jl4NlgAnnotationsGolden@ calls to
+-- write @\<stem\>.nlg.golden@.
 --
 -- Sameness with the golden producer is the whole point of the command, and it is
--- load-bearing rather than incidental: before this existed, the only way to
--- regenerate an @.nlg.golden@ was @cabal test jl4:jl4-test@, which the @go@
--- orchestrator will not run (it never invokes cabal — the build lock is a shared
--- resource). That is why @etc\/go\/phases\/p7-tnr.sh@ could only ever report
--- @NOT-REGENERATED@. With this command the leg gets a real differential oracle:
--- regenerate, then diff against the committed golden.
+-- load-bearing rather than incidental: it lets anyone regenerate an
+-- @.nlg.golden@ without running the whole golden suite, and compare it with the
+-- committed one. @l4-cli-test@ pins the equality on two corpus modules.
 --
 -- __Both sides used to spell the payload out__, and this comment asked whoever
 -- edited one to remember the other. They now call one function, so the invariant
@@ -45,6 +41,7 @@ module L4.Cli.Nlg
 import Base
 import qualified Base.Text as Text
 import Options.Applicative
+import qualified Data.Set as Set
 import System.Exit (exitFailure, exitSuccess)
 
 import qualified LSP.Core.Shake as Shake
@@ -100,7 +97,8 @@ nlgCmd opts = do
       exitFailure
     Just tc -> do
       putDiagnostics errs
-      let payload = linearizeModule opts.nlgLang tc.module' (dedupModules (transitiveDeps tc))
+      let (payload, misses) = linearizeModule opts.nlgLang tc.module' (dedupModules (transitiveDeps tc))
+      reportMisses opts.nlgLang misses
       case opts.nlgOutput of
         Just f  -> Text.writeFile f payload
         Nothing -> Text.putStr payload
@@ -112,5 +110,17 @@ nlgCmd opts = do
 --
 -- The dependencies ride along because a heralded call in a directive can name
 -- a rule an imported module defines ('Nlg.linearizeDirectives').
-linearizeModule :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> Text
-linearizeModule mlang mod' deps = Text.unlines (Nlg.linearizeDirectives mlang mod' deps)
+linearizeModule :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> (Text, Set.Set Text)
+linearizeModule mlang mod' deps =
+  first Text.unlines (Nlg.linearizeDirectivesIn mlang mod' deps)
+
+-- | Say, once, which frame words stayed English because the language's
+-- phrasebook has no entry for them ('L4.Nlg.localize'). A gap is reported
+-- rather than silently filled with English. The output itself is unchanged,
+-- so this goes to stderr and the exit code stays 0.
+reportMisses :: Maybe LangTag -> Set.Set Text -> IO ()
+reportMisses mlang misses = case (mlang, Set.toList misses) of
+  (Just (MkLangTag t), ws@(_ : _)) -> Text.hPutStrLn stderr $
+    "l4 nlg: " <> Text.pack (show (length ws)) <> " frame word(s) have no " <> t
+      <> " rendering and stay English: " <> Text.intercalate ", " ws
+  _ -> pure ()

@@ -1,45 +1,45 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-hierarchy.l4:292:1-29:
+hierarchy.l4:313:1-29:
   6
-hierarchy.l4:293:1-21:
+hierarchy.l4:314:1-21:
   3
-hierarchy.l4:294:1-46:
+hierarchy.l4:315:1-46:
   LIST "Tenant's covenants", "a	pay the Rent when due", "b	keep the interior in good repair", "b.i	fair wear and tear excepted", "b.ii	damage by insured risks excepted", "c	not assign or sublet without the Landlord's consent"
-hierarchy.l4:304:1-50:
+hierarchy.l4:326:1-50:
   LIST "Clauses", "1	Payment", "2b	Late payment", "2	Delivery"
-hierarchy.l4:313:1-58:
+hierarchy.l4:336:1-58:
   LIST "Clauses", "1	Payment", "2b	Late payment", "3	Delivery"
-hierarchy.l4:323:1-53:
+hierarchy.l4:347:1-53:
   LIST "Recitals", "1	Recital one", "2	Recital two", "7	Recital seven", "8	Recital eight"
-hierarchy.l4:336:1-51:
+hierarchy.l4:361:1-51:
   LIST "Definitions", "a	Affiliate", "b	Business Day", "c	Confidential Information", "d	Effective Date", "e	Intellectual Property", "f	Territory"
-hierarchy.l4:339:1-37:
+hierarchy.l4:364:1-37:
   assertion satisfied
-hierarchy.l4:340:1-40:
+hierarchy.l4:365:1-40:
   assertion satisfied
-hierarchy.l4:341:1-32:
+hierarchy.l4:366:1-32:
   assertion satisfied
-hierarchy.l4:342:1-45:
+hierarchy.l4:367:1-45:
   assertion satisfied
-hierarchy.l4:343:1-45:
+hierarchy.l4:368:1-45:
   assertion satisfied
-hierarchy.l4:344:1-46:
+hierarchy.l4:369:1-46:
   assertion satisfied
-hierarchy.l4:345:1-42:
+hierarchy.l4:370:1-42:
   assertion satisfied
-hierarchy.l4:346:1-37:
+hierarchy.l4:371:1-37:
   assertion satisfied
-hierarchy.l4:347:1-33:
+hierarchy.l4:372:1-33:
   assertion satisfied
-hierarchy.l4:350:1-286:
+hierarchy.l4:375:1-286:
   assertion satisfied
-hierarchy.l4:351:1-125:
+hierarchy.l4:376:1-125:
   assertion satisfied
-hierarchy.l4:352:1-133:
+hierarchy.l4:377:1-133:
   assertion satisfied
-hierarchy.l4:353:1-156:
+hierarchy.l4:378:1-156:
   assertion satisfied
-hierarchy.l4:354:1-212:
+hierarchy.l4:379:1-212:
   assertion satisfied

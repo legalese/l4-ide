@@ -1,0 +1,304 @@
+import { describe, test } from 'node:test'
+import * as assert from 'node:assert/strict'
+import {
+  BUILTIN_TOOLS,
+  BuiltinTools,
+  PendingInteractions,
+  ToolDispatcher,
+  fixedPermissionPolicy,
+  type ToolProvider,
+} from '../src/index.js'
+import {
+  FakeL4Language,
+  MemoryWorkspace,
+  RecordingInteraction,
+  silentLogger,
+} from './fakes.js'
+
+const ctxA = { conversationId: 'conv-a', turnId: 'turn-a' }
+const ctxB = { conversationId: 'conv-b', turnId: 'turn-b' }
+
+function dispatcher(
+  opts: {
+    files?: Record<string, string>
+    permissions?: Parameters<typeof fixedPermissionPolicy>[0]
+    providers?: ToolProvider[]
+  } = {}
+): {
+  ws: MemoryWorkspace
+  interaction: RecordingInteraction
+  dispatcher: ToolDispatcher
+} {
+  const ws = new MemoryWorkspace(opts.files ?? {})
+  const interaction = new RecordingInteraction()
+  return {
+    ws,
+    interaction,
+    dispatcher: new ToolDispatcher({
+      logger: silentLogger,
+      tools: new BuiltinTools(ws, new FakeL4Language(ws)),
+      permissions: fixedPermissionPolicy(opts.permissions),
+      interaction,
+      providers: opts.providers,
+    }),
+  }
+}
+
+describe('ToolDispatcher', () => {
+  test('runs an allowed tool and reports status with its context', async () => {
+    const { dispatcher: d, interaction } = dispatcher({
+      files: { 'a.txt': 'hello' },
+    })
+    const result = await d.run(
+      { callId: 'c1', name: 'fs__read_file', argsJson: '{"path":"a.txt"}' },
+      ctxA
+    )
+    assert.deepEqual(result, { ok: true, output: '[a.txt 1-1/1]\nhello' })
+    assert.deepEqual(
+      interaction.statuses.map((s) => [s.status, s.ctx.conversationId]),
+      [
+        ['running', 'conv-a'],
+        ['done', 'conv-a'],
+      ]
+    )
+  })
+
+  test('refuses a category set to never', async () => {
+    const { dispatcher: d } = dispatcher({
+      permissions: { 'fs.read': 'never' },
+    })
+    const result = await d.run(
+      { callId: 'c1', name: 'fs__read_file', argsJson: '{"path":"a"}' },
+      ctxA
+    )
+    assert.equal(result.ok, false)
+    assert.equal((result as { code?: string }).code, 'denied')
+  })
+
+  test('runs a move, snapshots and opens its target', async () => {
+    const { ws, dispatcher: d } = dispatcher({
+      files: { 'tmp/a.txt': 'new', 'a.txt': 'old' },
+      // A move deletes its source: allowed here, asked by default.
+      permissions: { 'fs.delete': 'always' },
+    })
+    assert.equal(d.categoryFor('fs__copy_file'), 'fs.edit')
+    const call = {
+      callId: 'c1',
+      name: 'fs__copy_file',
+      argsJson:
+        '{"from":"tmp/a.txt","to":"a.txt","overwrite":true,"deleteSource":true}',
+    }
+    const result = await d.run(call, ctxA)
+    assert.equal(result.ok, true)
+    assert.equal(ws.get('a.txt'), 'new')
+    // The applied-diff view's "before" side is the replaced target.
+    assert.equal(d.snapshotFor('c1')?.before, 'old')
+    assert.equal(d.resolveFile(call), 'file:///ws/a.txt')
+  })
+
+  // A copy creates (and with overwrite replaces), a move also deletes:
+  // each needs what the dedicated tool would.
+  test('a copy or move needs the permissions of what it does', async () => {
+    const move = {
+      callId: 'c1',
+      name: 'fs__copy_file',
+      argsJson: '{"from":"a.txt","to":"b.txt","deleteSource":true}',
+    }
+    // Deletes ask by default: so does a move.
+    const asked = dispatcher({ files: { 'a.txt': 'x' } })
+    asked.interaction.autoDecision = 'deny'
+    assert.equal(
+      asked.dispatcher.permissionFor(move.name, move.argsJson),
+      'ask'
+    )
+    assert.equal((await asked.dispatcher.run(move, ctxA)).ok, false)
+    assert.deepEqual(asked.interaction.approvalRequests, [
+      { callId: 'c1', ctx: ctxA },
+    ])
+    assert.equal(asked.ws.get('a.txt'), 'x')
+
+    const noDeletes = dispatcher({
+      files: { 'a.txt': 'x' },
+      permissions: { 'fs.delete': 'never' },
+    })
+    const denied = await noDeletes.dispatcher.run(move, ctxA)
+    assert.equal((denied as { code?: string }).code, 'denied')
+    assert.match((denied as { error: string }).error, /"fs\.delete"/)
+
+    const noCreates = dispatcher({
+      files: { 'a.txt': 'x' },
+      permissions: { 'fs.create': 'never' },
+    })
+    const copy = { ...move, argsJson: '{"from":"a.txt","to":"b.txt"}' }
+    assert.equal(
+      ((await noCreates.dispatcher.run(copy, ctxA)) as { code?: string }).code,
+      'denied'
+    )
+    assert.equal(noCreates.ws.get('b.txt'), undefined)
+
+    // A plain copy creates only: edits may be off.
+    const noEdits = dispatcher({
+      files: { 'a.txt': 'x' },
+      permissions: { 'fs.edit': 'never' },
+    })
+    assert.equal((await noEdits.dispatcher.run(copy, ctxA)).ok, true)
+    assert.equal(noEdits.ws.get('b.txt'), 'x')
+  })
+
+  test('asks before deleting (the default) and honours a deny', async () => {
+    const {
+      ws,
+      dispatcher: d,
+      interaction,
+    } = dispatcher({
+      files: { 'a.txt': 'x' },
+    })
+    interaction.autoDecision = 'deny'
+    const result = await d.run(
+      { callId: 'c1', name: 'fs__delete_file', argsJson: '{"path":"a.txt"}' },
+      ctxB
+    )
+    assert.equal(result.ok, false)
+    assert.deepEqual(interaction.approvalRequests, [
+      { callId: 'c1', ctx: ctxB },
+    ])
+    assert.equal(ws.get('a.txt'), 'x')
+  })
+
+  test('snapshots files before a mutating tool runs', async () => {
+    const { dispatcher: d } = dispatcher({ files: { 'a.txt': 'before' } })
+    await d.run(
+      {
+        callId: 'c1',
+        name: 'fs__edit_file',
+        argsJson: '{"path":"a.txt","old":"before","new":"after"}',
+      },
+      ctxA
+    )
+    assert.equal(d.snapshotFor('c1')?.before, 'before')
+    assert.equal(d.snapshotFor('c1')?.relativePath, 'a.txt')
+  })
+
+  test('advertises provider tools after the built-ins and routes by prefix', async () => {
+    const calls: string[] = []
+    const provider: ToolProvider = {
+      prefix: 'l4-rules__',
+      listTools: async () => [
+        {
+          type: 'function',
+          function: { name: 'l4-rules__tax', parameters: { type: 'object' } },
+        },
+      ],
+      callTool: async (name, args) => {
+        calls.push(`${name} ${args}`)
+        return 'rule result'
+      },
+      getToolTarget: () => ({ deployId: 'dep', fnName: 'tax' }),
+    }
+    const broken: ToolProvider = {
+      prefix: 'vsmcp__',
+      listTools: () => {
+        throw new Error('down')
+      },
+      callTool: async () => '',
+    }
+    const { dispatcher: d } = dispatcher({ providers: [provider, broken] })
+    const tools = await d.listTools()
+    assert.equal(tools.length, BUILTIN_TOOLS.length + 1)
+    assert.equal(tools.at(-1)?.function.name, 'l4-rules__tax')
+    assert.deepEqual(d.getToolTarget('l4-rules__tax'), {
+      deployId: 'dep',
+      fnName: 'tax',
+    })
+    const result = await d.run(
+      { callId: 'c1', name: 'l4-rules__tax', argsJson: '{"x":1}' },
+      ctxA
+    )
+    assert.deepEqual(result, { ok: true, output: 'rule result' })
+    assert.deepEqual(calls, ['l4-rules__tax {"x":1}'])
+  })
+
+  test('web fetch runs by default and obeys its own permission', async () => {
+    const fetched: string[] = []
+    const web: ToolProvider = {
+      prefix: 'web__',
+      listTools: () => [],
+      callTool: async (_name, args) => {
+        fetched.push(args)
+        return 'page'
+      },
+    }
+    const call = {
+      callId: 'c1',
+      name: 'web__fetch',
+      argsJson: '{"url":"https://example.com"}',
+    }
+    const allowed = dispatcher({ providers: [web] })
+    assert.equal(allowed.dispatcher.categoryFor(call.name), 'web.fetch')
+    assert.deepEqual(await allowed.dispatcher.run(call, ctxA), {
+      ok: true,
+      output: 'page',
+    })
+
+    const refused = dispatcher({
+      providers: [web],
+      permissions: { 'web.fetch': 'never' },
+    })
+    const result = await refused.dispatcher.run(call, ctxA)
+    assert.equal((result as { code?: string }).code, 'denied')
+    assert.equal(fetched.length, 1)
+  })
+
+  test('unknown tools are refused', async () => {
+    const { dispatcher: d } = dispatcher()
+    const result = await d.run(
+      { callId: 'c1', name: 'nope__x', argsJson: '{}' },
+      ctxA
+    )
+    assert.equal((result as { code?: string }).code, 'unknown_tool')
+  })
+})
+
+describe('PendingInteractions', () => {
+  test('a new message in one conversation leaves the other conversation waiting', async () => {
+    const p = new PendingInteractions()
+    const a = p.requestApproval('call-a', ctxA)
+    const b = p.requestApproval('call-b', ctxB)
+    const q = p.askUser('q-a', ctxA)
+
+    assert.equal(p.cancelConversation('conv-a'), 2)
+    assert.equal(await a, 'deny')
+    assert.equal(await q, '')
+    assert.equal(p.pendingApprovalCount(), 1)
+
+    assert.equal(p.decide('call-b', 'allow'), true)
+    assert.equal(await b, 'allow')
+  })
+
+  test('stopping a turn only cancels that turn', async () => {
+    const p = new PendingInteractions()
+    const a = p.requestApproval('call-a', ctxA)
+    p.requestApproval('call-b', ctxB)
+    assert.equal(p.cancelTurn('turn-a'), 1)
+    assert.equal(await a, 'deny')
+    assert.equal(p.contextFor('call-b')?.turnId, 'turn-b')
+  })
+
+  test('early decisions are consumed by the later request', async () => {
+    const p = new PendingInteractions()
+    assert.equal(p.decide('call-a', 'allow', 'conv-a'), false)
+    assert.equal(await p.requestApproval('call-a', ctxA), 'allow')
+  })
+
+  test('early decisions of a cancelled conversation are dropped', async () => {
+    const p = new PendingInteractions()
+    p.decide('call-a', 'allow', 'conv-a')
+    p.decide('call-b', 'allow', 'conv-b')
+    p.cancelConversation('conv-a')
+    assert.equal(await p.requestApproval('call-b', ctxB), 'allow')
+    const a = p.requestApproval('call-a', ctxA)
+    assert.equal(p.pendingApprovalCount(), 1)
+    p.decide('call-a', 'deny')
+    assert.equal(await a, 'deny')
+  })
+})

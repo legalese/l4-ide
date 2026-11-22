@@ -260,10 +260,9 @@ collectTopDecides (MkModule _ _ section) = goSection section
 -- node (@Decide ann d@), and one written above a @WHERE@ binding attaches to
 -- the @LocalDecide ann d@ node — not to the inner @MkDecide@ — so both annos
 -- are consulted, outer first, exactly as the DMN lowerer does. A node's anno
--- can hold at most one ref and the nearest preceding one wins, every other
--- becoming a @RefNotAttached@ warning (@attachRef@,
--- @ResolveAnnotation.hs:1162-1172@) — which is why each definition is read from
--- its /own/ node and never from a neighbour's.
+-- holds every ref written above it and 'annRef' reads the nearest, the last
+-- (@attachRef@), so a stack of refs shows its bottom one. Each definition is
+-- read from its /own/ node and never from a neighbour's.
 --
 -- The gloss is read from the inner @MkDecide@, where 'attachLeadingDesc' puts
 -- it.
@@ -388,7 +387,7 @@ foldKey = Text.toLower . Text.unwords . Text.words
 --
 --   * an unbalanced @(@ or @[@ raises @re.error@ while the @Interview@ is being
 --     constructed, so the emitted interview cannot be loaded /at all/ — and
---     @l4 check@ and @l4 docassemble@ both report success;
+--     @l4 check@ and @l4 export docassemble@ both report success;
 --   * a balanced @(…)@ compiles to a capture group, so the pattern no longer
 --     matches the term that named it: the entry is dead, and the phrase it does
 --     match (parentheses stripped) occurs nowhere.
@@ -2226,6 +2225,9 @@ refuse = \case
   Refuse {} -> LFBlocked "DA-REFUSE"
     "REFUSE has no docassemble form in v1"
     "a declined answer (the designed image, a terminal screen carrying the reason, is PROPS-REDTEAM §6 item 6)"
+  Lifecycle {} -> LFBlocked "DA-DEONTIC"
+    "THE JOIN, THE DEADLINE and THE ARMING have no docassemble form"
+    "a position in the life of an obligation, which only the deontic machine knows"
   RAnd {} -> LFBlocked "DA-DEONTIC"
     "regulative AND has no docassemble form"
     "deontic composition"

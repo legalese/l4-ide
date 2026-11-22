@@ -1,0 +1,10 @@
+GIVEN principal IS A NUMBER
+      rate      IS A NUMBER
+GIVETH A NUMBER
+`interest on` principal `at` rate MEANS principal TIMES rate
+
+#ASSERT `interest on` 1000 `at` 0.05 EQUALS 50
+
+`named call` MEANS `interest on` WITH rate IS 0.05, principal IS 1000
+
+#ASSERT `named call` EQUALS 50

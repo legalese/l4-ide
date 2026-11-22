@@ -1,75 +1,75 @@
-`US Dollar code`
-`Euro code`
-`British Pound code`
-`Japanese Yen code`
-`Swiss Franc code`
-`Canadian Dollar code`
-`Australian Dollar code`
-`Singapore Dollar code`
-`US Dollar decimals`
-`Euro decimals`
-`Japanese Yen decimals`
-`South Korean Won decimals`
-`decimal places for currency` with USD
-`decimal places for currency` with EUR
-`decimal places for currency` with GBP
-`decimal places for currency` with JPY
-`decimal places for currency` with CHF
-`decimal places for currency` with XXX
-`Money` with 10000 and USD
-`Money` with 5000 and EUR
-`Money` with 1000 and JPY
-`Money` with 123456 and GBP
-`Money` with 99 and USD
-`Money` with 1 and USD
-`Money` with 0 and USD
-`Money` with 10000 and XXX
-`Money` with 100.5 and USD
-`major to minor units` with 100 and USD
-`major to minor units` with 50.5 and USD
-`major to minor units` with 1000 and JPY
-`major to minor units` with 123.45 and EUR
-`minor to major units` with 10000 and USD
-`minor to major units` with 5050 and USD
-`minor to major units` with 1000 and JPY
-`minor to major units` with 12345 and EUR
-`add money` with 10000, 5000 and USD
-`add money` with 1000, 2000 and JPY
-`add money` with 99, 1 and USD
-`subtract money` with 10000, 5000 and USD
-`subtract money` with 5000, 10000 and USD
-`subtract money` with 100, 99 and USD
-`multiply money` with 10000, 2 and USD
-`multiply money` with 10000, 1.5 and USD
-`multiply money` with 10000, 0.1 and USD
-`multiply money` with 10000, 1.15 and USD
-`multiply money` with 1000, 1.5 and JPY
-`divide money` with 10000, 2 and USD
-`divide money` with 10000, 3 and USD
-`divide money` with 100, 3 and USD
-`divide money` with 10000, 0 and USD
-`divide money` with 1000, 2 and JPY
-`money equal` with 10000 and 10000
-`money equal` with 10000 and 5000
-`money greater than` with 10000 and 5000
-`money greater than` with 5000 and 10000
-`money less than` with 5000 and 10000
-`money less than` with 10000 and 5000
-`money at least` with 10000 and 10000
-`money at least` with 10000 and 5000
-`money at least` with 5000 and 10000
-`money at most` with 10000 and 10000
-`money at most` with 5000 and 10000
-`money at most` with 10000 and 5000
-`is valid currency code` with USD
-`is valid currency code` with EUR
-`is valid currency code` with usd
-`is valid currency code` with US
-`is valid currency code` with USDT
-`is non-negative` with 10000
-`is non-negative` with 0
-`is non-negative` with -10000
-`is positive` with 10000
-`is positive` with 1
-`is positive` with 0
-`is positive` with -10000
+the ISO 4217 code for the US Dollar
+the ISO 4217 code for the Euro
+the ISO 4217 code for the Pound Sterling
+the ISO 4217 code for the Japanese Yen
+the ISO 4217 code for the Swiss Franc
+the ISO 4217 code for the Canadian Dollar
+the ISO 4217 code for the Australian Dollar
+the ISO 4217 code for the Singapore Dollar
+the number of decimal places of the US Dollar
+the number of decimal places of the Euro
+the number of decimal places of the Japanese Yen
+the number of decimal places of the South Korean Won
+the number of decimal places of USD
+the number of decimal places of EUR
+the number of decimal places of GBP
+the number of decimal places of JPY
+the number of decimal places of CHF
+the number of decimal places of XXX
+the written amount of 10000 minor units of USD
+the written amount of 5000 minor units of EUR
+the written amount of 1000 minor units of JPY
+the written amount of 123456 minor units of GBP
+the written amount of 99 minor units of USD
+the written amount of 1 minor units of USD
+the written amount of 0 minor units of USD
+the written amount of 10000 minor units of XXX
+the written amount of 100.5 minor units of USD
+the minor units in 100 major units of USD, rounded down
+the minor units in 50.5 major units of USD, rounded down
+the minor units in 1000 major units of JPY, rounded down
+the minor units in 123.45 major units of EUR, rounded down
+the major units in 10000 minor units of USD
+the major units in 5050 minor units of USD
+the major units in 1000 minor units of JPY
+the major units in 12345 minor units of EUR
+the sum of 10000 and 5000 in USD
+the sum of 1000 and 2000 in JPY
+the sum of 99 and 1 in USD
+10000 less 5000 in USD
+5000 less 10000 in USD
+100 less 99 in USD
+10000 multiplied by 2 in USD, rounded down
+10000 multiplied by 1.5 in USD, rounded down
+10000 multiplied by 0.1 in USD, rounded down
+10000 multiplied by 1.15 in USD, rounded down
+1000 multiplied by 1.5 in JPY, rounded down
+10000 divided by 2 in USD, rounded down
+10000 divided by 3 in USD, rounded down
+100 divided by 3 in USD, rounded down
+10000 divided by 0 in USD, rounded down
+1000 divided by 2 in JPY, rounded down
+10000 equals 10000
+10000 equals 5000
+10000 is more than 5000
+5000 is more than 10000
+5000 is less than 10000
+10000 is less than 5000
+10000 is at least 10000
+10000 is at least 5000
+5000 is at least 10000
+10000 is at most 10000
+5000 is at most 10000
+10000 is at most 5000
+USD has three characters and no lower-case letters, like an ISO 4217 code
+EUR has three characters and no lower-case letters, like an ISO 4217 code
+usd has three characters and no lower-case letters, like an ISO 4217 code
+US has three characters and no lower-case letters, like an ISO 4217 code
+USDT has three characters and no lower-case letters, like an ISO 4217 code
+10000 is zero or more
+0 is zero or more
+-10000 is zero or more
+10000 is more than zero
+1 is more than zero
+0 is more than zero
+-10000 is more than zero

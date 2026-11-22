@@ -1,0 +1,87 @@
+-- Alice and Bob each mean to buy dinner tonight, and neither wants to buy it
+-- if the other already has. Alice checks whether dinner is bought and, if her
+-- check found it unbought, buys. If Bob buys between her check and her
+-- purchase, two dinners are bought. The file is wrong on purpose.
+--
+-- Alice and Bob are the two sides of a RAND, and Alice's side reads the
+-- record Bob's side makes. Before smucclaw/l4-ide#1069 L4 ran one side over
+-- the whole trace before the other, so `l4 explore` said the property held
+-- (it does not: Alice checks at 10, Bob buys at 11, Alice buys at 12). Now
+-- the two sides take the trace's events in step, so Alice's purchase at 12
+-- sees Bob's at 11, `l4 run` records `open at acceptance` IS FALSE, and
+-- `l4 explore` finds the race.
+
+IMPORT prelude
+
+DECLARE Party IS ONE OF Alice, Bob
+
+DECLARE Act IS ONE OF
+    `checks whether dinner is bought`
+    `buys dinner`
+
+DECLARE Status IS ONE OF
+    opened     -- nobody has bought dinner
+    taken      -- Bob has
+
+DECLARE Dinner IS ONE OF
+    `dinner for two`
+
+`closing` MEANS 100
+
+§ `Reading the ledgers`
+
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A BOOLEAN
+`the ledger is open` MEANS NOT (elem taken `dinner status record`)
+
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A Status
+`the ledger's status` MEANS
+    IF elem taken `dinner status record` THEN taken ELSE opened
+
+§ `The evening`
+
+-- Dinner starts unbought; then Alice and Bob act independently, at the same time.
+GIVETH A DEONTIC Party Act
+`the arrangement` MEANS
+    COMMIT `dinner status record` IS opened
+    HENCE `Alice's evening` RAND `Bob's evening`
+
+GIVETH A DEONTIC Party Act
+`Alice's evening` MEANS
+    PARTY Alice
+    MAY   `checks whether dinner is bought`
+    WITHIN 0 OF closing
+    HENCE RECORD Alice's `belief` IS `the ledger's status` (RECALL ALL OFFICIAL's `dinner status record`)
+          HENCE `Alice decides`
+    LEST  FULFILLED
+
+GIVETH A DEONTIC Party Act
+`Alice decides` MEANS
+    PARTY Alice
+    MAY   `buys dinner` PROVIDED (RECALL Alice's `belief`) EQUALS JUST opened
+    WITHIN 0 OF closing
+    HENCE COMMIT `dinners bought` IS `dinner for two`
+          HENCE COMMIT `open at acceptance` IS `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`)
+          HENCE FULFILLED
+    LEST  FULFILLED
+
+GIVETH A DEONTIC Party Act
+`Bob's evening` MEANS
+    PARTY Bob
+    MAY   `buys dinner` PROVIDED `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`)
+    WITHIN 0 OF closing
+    HENCE COMMIT `dinner status record` IS taken
+          HENCE FULFILLED
+    LEST  FULFILLED
+
+§ `The property`
+
+GIVEN `open at acceptance` IS A LIST OF BOOLEAN
+GIVETH A BOOLEAN
+`every dinner was accepted while open` MEANS all (GIVEN ok YIELD ok) `open at acceptance`
+
+#TRACE `the arrangement` AT 0 WITH
+    PARTY Alice DOES `checks whether dinner is bought` AT 10
+    PARTY Bob   DOES `buys dinner`                     AT 11
+    PARTY Alice DOES `buys dinner`                     AT 12

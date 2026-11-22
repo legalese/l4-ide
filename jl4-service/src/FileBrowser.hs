@@ -13,9 +13,11 @@ module FileBrowser (
   -- * Search utilities (re-exported for MCP)
   searchIdentifier,
   searchText,
+  searchTextWith,
 ) where
 
 import qualified BundleStore
+import SearchPattern (Pattern, compilePatterns, matchesAny)
 import Types
 
 import Control.Concurrent.STM (readTVarIO)
@@ -224,18 +226,22 @@ filesQueryHandler deployId mFileFilter mIdentifier mSearch = do
 --   - Block boundary detection is heuristic (indentation + keyword-based)
 --   - Unusual formatting or multi-line backtick identifiers may confuse it
 --
--- A future improvement could use the AST (SerializedBundle.sbModule has source
--- spans) for compiled deployments, falling back to text scanning for
--- pending/failed ones.
+-- A future improvement could use the AST (its annotations have source spans)
+-- for compiled deployments, falling back to text scanning for pending/failed
+-- ones.
 -- ----------------------------------------------------------------------------
 
 -- | Search for an L4 identifier across source files.
 -- Returns matches with context. For definitions (DECLARE/DECIDE/MEANS/ASSUME),
 -- returns the entire definition block including decorators and GIVEN/GIVETH.
+-- Backticks around the identifier are optional: @`the greater of`@ and
+-- @the greater of@ find the same lines.
 searchIdentifier :: Text -> Map FilePath Text -> [SearchMatch]
 searchIdentifier identifier sources =
-  concatMap (\(fp, content) -> searchIdentifierInFile identifier (Text.pack fp) content)
+  concatMap (\(fp, content) -> searchIdentifierInFile name (Text.pack fp) content)
     (Map.toList sources)
+ where
+  name = Text.dropAround (== '`') (Text.strip identifier)
 
 searchIdentifierInFile :: Text -> Text -> Text -> [SearchMatch]
 searchIdentifierInFile identifier filepath content =
@@ -382,20 +388,24 @@ buildContextMatch filepath allLines totalLines lineNum =
     , smIsDefinition = False
     }
 
--- | Grep-like text search across source files (case-insensitive).
+-- | Grep-like text search across source files: the query's patterns, in the
+-- syntax of "SearchPattern" (case-insensitive regexes, any one matching).
 searchText :: Text -> Map FilePath Text -> [SearchMatch]
-searchText query sources =
-  concatMap (\(fp, content) -> searchTextInFile query (Text.pack fp) content)
+searchText = searchTextWith . compilePatterns
+
+-- | 'searchText' with the patterns already compiled.
+searchTextWith :: [Pattern] -> Map FilePath Text -> [SearchMatch]
+searchTextWith pats sources =
+  concatMap (\(fp, content) -> searchTextInFile pats (Text.pack fp) content)
     (Map.toList sources)
 
-searchTextInFile :: Text -> Text -> Text -> [SearchMatch]
-searchTextInFile query filepath content =
+searchTextInFile :: [Pattern] -> Text -> Text -> [SearchMatch]
+searchTextInFile pats filepath content =
   let allLines = zip [1..] (Text.lines content)
       totalLines = length allLines
-      queryLower = Text.toLower query
       matchingLineNums = [ lineNum
                          | (lineNum, line) <- allLines
-                         , queryLower `Text.isInfixOf` Text.toLower line
+                         , matchesAny pats line
                          ]
   in deduplicateMatches $ map (buildContextMatch filepath allLines totalLines) matchingLineNums
 

@@ -1,0 +1,20 @@
+-- Zero-parameter WHERE and LET locals: one refers to another local, and both
+-- to a GIVEN.
+§ `Locals`
+    GIVEN n IS A NUMBER
+
+GIVEN k IS A NUMBER
+GIVETH A NUMBER
+`f` k MEANS m PLUS 1
+  WHERE
+    m MEANS j PLUS k
+    j MEANS 5
+
+-- proved: two WHERE locals, the first reading the second and the GIVEN k
+#ASSERT `f` n EQUALS n PLUS 6
+
+-- proved: a LET inside a LET, reading the outer one and the section GIVEN
+#ASSERT LET a IS n PLUS 1 IN (LET b IS a TIMES 2 IN b EQUALS 2 TIMES n PLUS 2)
+
+-- refuted: a LET whose comparison is never true
+#ASSERT LET a IS n PLUS 1 IN a GREATER THAN n PLUS 2

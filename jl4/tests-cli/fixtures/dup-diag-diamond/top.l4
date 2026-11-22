@@ -1,0 +1,5 @@
+IMPORT a
+IMPORT b
+IMPORT d
+`tx` MEANS bx
+#EVAL tx

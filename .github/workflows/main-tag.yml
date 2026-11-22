@@ -36,6 +36,20 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
 
+      # GHC's rts package hard-codes the Command Line Tools SDK, so every link
+      # gets -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib, but
+      # ld comes from the selected Xcode. When the image's CLT is newer than its
+      # Xcode (CLT 27 beside Xcode 26.6 since image 20261013), that ld cannot read
+      # the newer SDK's .tbd files ("unknown architecture arm64e.x1-macos").
+      # Point the rts at the selected Xcode's own SDK, so ld and SDK match.
+      - name: Point GHC at the selected Xcode's SDK
+        run: |
+          sdk=$(xcrun --sdk macosx --show-sdk-path)
+          db=$(ghc --print-libdir)/package.conf.d
+          sed -i '' "s|/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk|$sdk|g" "$db"/*.conf
+          ghc-pkg recache --global
+          ghc-pkg field rts library-dirs,include-dirs --global
+
       - name: Configure and generate build plan
         run: |
           cabal update
@@ -52,6 +66,15 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
 
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: cabal build exe:jl4-lsp exe:l4 test:l4-cli-test --only-dependencies
@@ -67,7 +90,10 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        timeout-minutes: 20
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
@@ -121,6 +147,16 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
 
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        shell: bash
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
@@ -138,8 +174,11 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
+        timeout-minutes: 20
         shell: bash
-        run: cabal test l4-cli-test --test-show-details=streaming
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy binaries
         shell: bash
@@ -158,20 +197,57 @@ jobs:
 
   build-lsp-linux-x64:
     name: Build jl4-lsp + l4 + jl4-service - Linux x64
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: a binary needs at least the glibc it was linked
+    # against (see etc/check-glibc.sh). When ubuntu-latest moved to ubuntu-26.04,
+    # build 112 came out needing glibc 2.43, and production, on 2.34, could not
+    # start it. The dependency cache key below names the image too, so a store
+    # built on another image is never restored here.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
           submodules: true
 
+      # Bake the build version (<major>.<minor> of the VS Code extension, then
+      # the run number, matching the l4-ide-build-<run_number> tag) into the
+      # jl4-service binary via the JL4_SERVICE_VERSION env var, which the
+      # Version module captures with a Template Haskell splice at compile time.
+      # It must be set before any step compiles jl4-service, and "Install
+      # dependencies" does: for exe:jl4-service it builds the package's own
+      # library, Version.hs included. Neither cabal nor GHC rebuilds a module
+      # whose source is unchanged when only an environment variable changed
+      # (touching the file does not help, as both compare contents), so a
+      # library compiled before this step keeps 0.0.0-dev. Build 95 shipped
+      # that way. "Check the baked jl4-service version" below catches it.
+      - name: Compute jl4-service version
+        run: |
+          CURRENT=$(grep -m1 '"version"' ts-apps/vscode/package.json | sed -E 's/.*"version" *: *"([^"]+)".*/\1/')
+          MAJOR_MINOR=$(echo "$CURRENT" | sed 's/\.[^.]*$//')
+          echo "JL4_SERVICE_VERSION=${MAJOR_MINOR}.${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "jl4-service version: ${MAJOR_MINOR}.${{ github.run_number }}"
+
+      # What `l4 --version` and `jl4-lsp --version` report (LSP.L4.BuildInfo bakes it
+      # in at compile time). The same constraint as the version above: it must be
+      # set before any step compiles the local libraries, which "Install
+      # dependencies" does. A library compiled without these variables says `dev`,
+      # and the build step after it finds it up to date; the l4 CLI test suite
+      # checks the binaries against these variables.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install system dependencies
+        timeout-minutes: 5
+        env:
+          APT_OPTIONS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30
         run: |
           for i in 1 2 3; do
-            sudo apt-get update && break
+            sudo apt-get $APT_OPTIONS update && break
             echo "Retry $i: apt-get update failed, waiting 10s..."
             sleep 10
           done
-          sudo apt-get install -y pkg-config liblzma-dev libgmp-dev
+          sudo apt-get $APT_OPTIONS install -y pkg-config liblzma-dev libgmp-dev
 
       - name: Set up GHC
         uses: haskell-actions/setup@v2
@@ -191,7 +267,7 @@ jobs:
         uses: actions/cache/restore@v5
         id: cache
         env:
-          key: lsp-linux-x64-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
+          key: lsp-linux-x64-ubuntu-24.04-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
@@ -208,30 +284,14 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
-      # Bake the build version (1.5.<run_number>, matching the VS Code
-      # extension version + the l4-ide-build-<run_number> tag) into the
-      # jl4-service binary via the JL4_SERVICE_VERSION env var, which the
-      # Version module captures with a Template Haskell splice at compile time.
-      # The project is built fresh each run (only the cabal store is cached),
-      # so the splice never goes stale.
-      - name: Compute jl4-service version
-        run: |
-          CURRENT=$(grep -m1 '"version"' ts-apps/vscode/package.json | sed -E 's/.*"version" *: *"([^"]+)".*/\1/')
-          MAJOR_MINOR=$(echo "$CURRENT" | sed 's/\.[^.]*$//')
-          echo "JL4_SERVICE_VERSION=${MAJOR_MINOR}.${{ github.run_number }}" >> "$GITHUB_ENV"
-          echo "jl4-service version: ${MAJOR_MINOR}.${{ github.run_number }}"
-          # The version is baked into Version.hs via a Template Haskell splice
-          # that reads JL4_SERVICE_VERSION at *compile* time. GHC won't re-run
-          # the splice if Version.o is up to date, so force a recompile by
-          # touching the source — this keeps the bake correct even if the build
-          # dir is ever cached (today it isn't).
-          touch jl4-service/src/Version.hs
-
       - name: Build jl4-lsp, l4, and jl4-service
         run: cabal build exe:jl4-lsp exe:l4 exe:jl4-service
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        timeout-minutes: 20
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
@@ -251,6 +311,37 @@ jobs:
           echo "jl4-service SHA256: $(cat bin/linux-x64/jl4-service.sha256)"
 
           ls -lh bin/linux-x64/
+
+      - name: Check the glibc the binaries need
+        run: bash etc/check-glibc.sh bin/linux-x64/jl4-lsp bin/linux-x64/l4 bin/linux-x64/jl4-service
+
+      # The binary that is released must say the version it is released as:
+      # production reads it from /health, and new deployments take their major
+      # version from it.
+      - name: Check the baked jl4-service version
+        run: |
+          store=$(mktemp -d)
+          bin/linux-x64/jl4-service --port 18080 --store-path "$store" > "$RUNNER_TEMP/jl4-service-check.log" 2>&1 &
+          pid=$!
+          reported=""
+          for _ in $(seq 1 30); do
+            if body=$(curl -sf http://127.0.0.1:18080/health); then
+              reported=$(jq -r '.version // empty' <<<"$body")
+              break
+            fi
+            sleep 1
+          done
+          kill "$pid" 2>/dev/null || true
+          if [ -z "$reported" ]; then
+            echo "::error::jl4-service gave no version on /health within 30 s"
+            cat "$RUNNER_TEMP/jl4-service-check.log"
+            exit 1
+          fi
+          echo "jl4-service reports version: $reported"
+          if [ "$reported" != "$JL4_SERVICE_VERSION" ]; then
+            echo "::error::jl4-service reports version $reported, expected $JL4_SERVICE_VERSION"
+            exit 1
+          fi
 
       - name: Upload LSP + CLI binary artifact
         uses: actions/upload-artifact@v6
@@ -279,13 +370,16 @@ jobs:
           submodules: true
 
       - name: Install system dependencies
+        timeout-minutes: 5
+        env:
+          APT_OPTIONS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30
         run: |
           for i in 1 2 3; do
-            sudo apt-get update && break
+            sudo apt-get $APT_OPTIONS update && break
             echo "Retry $i: apt-get update failed, waiting 10s..."
             sleep 10
           done
-          sudo apt-get install -y pkg-config liblzma-dev libgmp-dev
+          sudo apt-get $APT_OPTIONS install -y pkg-config liblzma-dev libgmp-dev
 
       - name: Set up GHC
         uses: haskell-actions/setup@v2
@@ -311,6 +405,15 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
           restore-keys: ${{ env.key }}-
 
+      # What `l4 --version` reports (LSP.L4.BuildInfo bakes it in at compile time).
+      # This is before "Install dependencies", which compiles the local libraries
+      # too: one compiled without these variables says `dev`, and the build step
+      # after it finds it up to date.
+      - name: Name the build
+        run: |
+          bash etc/build-identity.sh >> "$GITHUB_ENV"
+          tail -n 4 "$GITHUB_ENV"
+
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: cabal build exe:jl4-lsp exe:l4 test:l4-cli-test --only-dependencies
@@ -326,7 +429,10 @@ jobs:
         run: cabal build exe:jl4-lsp exe:l4
 
       - name: Run l4 CLI test suite
-        run: cabal test l4-cli-test --test-show-details=streaming
+        timeout-minutes: 20
+        run: |
+          test -n "$L4_BUILD_RELEASE" || { echo "::error::L4_BUILD_RELEASE is empty, so l4 and jl4-lsp say dev: the Name the build step did not run"; exit 1; }
+          cabal test l4-cli-test --test-show-details=streaming
 
       - name: Copy and process binaries
         run: |
@@ -338,11 +444,57 @@ jobs:
           chmod +x bin/linux-arm64/jl4-lsp bin/linux-arm64/l4
           ls -lh bin/linux-arm64/
 
+      - name: Check the glibc the binaries need
+        run: bash etc/check-glibc.sh bin/linux-arm64/jl4-lsp bin/linux-arm64/l4
+
       - name: Upload binary artifact
         uses: actions/upload-artifact@v6
         with:
           name: jl4-lsp-linux-arm64
           path: bin/linux-arm64/
+          retention-days: 90
+
+  # ============================================
+  # Build the cloud agent bundle
+  # ============================================
+
+  # The headless Legalese AI harness for cloud sessions. This repository only
+  # publishes it (with jl4-lsp-linux-arm64) as release assets.
+  build-cloud-agent:
+    name: Build cloud agent bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and test the harness
+        run: |
+          npx turbo build --filter=cloud-agent
+          npm test --workspace=cloud-agent
+
+      - name: Hash the bundle
+        working-directory: ts-apps/cloud-agent/dist
+        run: |
+          sha256sum cloud-agent.cjs | awk '{print $1}' > cloud-agent.cjs.sha256
+          echo "cloud-agent.cjs SHA256: $(cat cloud-agent.cjs.sha256)"
+          ls -lh
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: cloud-agent
+          path: |
+            ts-apps/cloud-agent/dist/cloud-agent.cjs
+            ts-apps/cloud-agent/dist/cloud-agent.cjs.sha256
           retention-days: 90
 
   # ============================================
@@ -622,6 +774,81 @@ jobs:
   # Create Git Tag with Artifacts
   # ============================================
 
+  # ============================================
+  # Package the Claude Code plugin and the skill
+  # ============================================
+
+  package-plugin:
+    name: Package L4 plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The plugin keeps its own <major>.<minor> (from .claude-plugin/plugin.json)
+      # and takes this build's run number as the patch, matching the
+      # l4-ide-build-<run_number> tag it is released under.
+      - name: Set the plugin version
+        run: |
+          CURRENT=$(jq -r '.version' .claude-plugin/plugin.json)
+          VERSION="${CURRENT%.*}.${{ github.run_number }}"
+          echo "Plugin version: $VERSION"
+          # Both manifests: Claude Code's .claude-plugin/ and the portable
+          # Agent Plugins 1.0 one at the plugin root.
+          for m in .claude-plugin/plugin.json plugin.json; do
+            jq --arg ver "$VERSION" '.version = $ver' "$m" > "$m.tmp"
+            mv "$m.tmp" "$m"
+          done
+          # The marketplace catalog, published at .claude-plugin/ (Claude Code)
+          # and .github/plugin/ (Copilot CLI, VS Code); keep them byte-identical.
+          jq --arg ver "$VERSION" '.metadata.version = $ver | .plugins[0].version = $ver' \
+            .claude-plugin/marketplace.json > .claude-plugin/marketplace.json.tmp
+          mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
+          cp .claude-plugin/marketplace.json .github/plugin/marketplace.json
+
+      - name: Create plugin packages
+        run: |
+          # Skill only: SKILL.md and its references
+          (
+            cd skills/writing-l4-rules
+            zip -r "$GITHUB_WORKSPACE/writing-l4-rules.skill" \
+              assets/ \
+              references/ \
+              scripts/ \
+              SKILL.md \
+              -x "*.DS_Store" \
+              -x "*/__pycache__/*" \
+              -x "*/node_modules/.cache/*"
+          )
+          # Skill only: the whole-Act encoding workflow
+          (
+            cd skills/encoding-a-subject
+            zip -r "$GITHUB_WORKSPACE/encoding-a-subject.skill" \
+              assets/ \
+              references/ \
+              SKILL.md \
+              -x "*.DS_Store"
+          )
+          # Full plugin: both manifests, every skill and PLUGIN.md
+          zip -r l4-plugin.zip \
+            .claude-plugin/ \
+            plugin.json \
+            skills/ \
+            PLUGIN.md \
+            -x "*.DS_Store" \
+            -x "*/__pycache__/*" \
+            -x "*/node_modules/.cache/*"
+          ls -lh writing-l4-rules.skill encoding-a-subject.skill l4-plugin.zip
+          unzip -l l4-plugin.zip | head -30
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: l4-plugin
+          path: |
+            l4-plugin.zip
+            writing-l4-rules.skill
+            encoding-a-subject.skill
+
   create-tag:
     name: Create Git Tag
     runs-on: ubuntu-latest
@@ -630,6 +857,10 @@ jobs:
       - package-vscode-cross-platform
       - package-vscode-universal
       - build-wasm
+      - package-plugin
+      - build-cloud-agent
+    outputs:
+      tag: ${{ steps.tag-name.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -655,12 +886,26 @@ jobs:
           find artifacts -name "jl4-core.mjs" -exec cp {} release-artifacts/ \;
           find artifacts -name "version.txt" -exec cp {} release-artifacts/wasm-version.txt \; 2>/dev/null || true
 
+          # Collect the Claude Code plugin and the skill
+          find artifacts -name "l4-plugin.zip" -exec cp {} release-artifacts/ \;
+          find artifacts -name "writing-l4-rules.skill" -exec cp {} release-artifacts/ \;
+          find artifacts -name "encoding-a-subject.skill" -exec cp {} release-artifacts/ \;
+
           # Collect jl4-service binary and SHA256
           if [ -d artifacts/jl4-service-linux-x64 ]; then
             cp artifacts/jl4-service-linux-x64/jl4-service release-artifacts/jl4-service-linux-x64
             cp artifacts/jl4-service-linux-x64/jl4-service.sha256 release-artifacts/jl4-service-linux-x64.sha256
             echo "jl4-service SHA256: $(cat release-artifacts/jl4-service-linux-x64.sha256)"
           fi
+
+          # Collect the cloud agent bundle and its language server (linux-arm64),
+          # each with a SHA256.
+          cp artifacts/cloud-agent/cloud-agent.cjs release-artifacts/cloud-agent.cjs
+          cp artifacts/cloud-agent/cloud-agent.cjs.sha256 release-artifacts/cloud-agent.cjs.sha256
+          cp artifacts/jl4-lsp-linux-arm64/jl4-lsp release-artifacts/jl4-lsp-linux-arm64
+          sha256sum release-artifacts/jl4-lsp-linux-arm64 | awk '{print $1}' > release-artifacts/jl4-lsp-linux-arm64.sha256
+          echo "cloud-agent.cjs SHA256: $(cat release-artifacts/cloud-agent.cjs.sha256)"
+          echo "jl4-lsp-linux-arm64 SHA256: $(cat release-artifacts/jl4-lsp-linux-arm64.sha256)"
 
           echo "Release artifacts:"
           ls -la release-artifacts/
@@ -695,14 +940,16 @@ jobs:
           Artifacts included:
           - VSCode extensions (platform-specific, cross-platform, universal)
           - WASM binaries (jl4-core.wasm, jl4-core.mjs)
-          - jl4-service binary (linux-x64) with SHA256"
+          - jl4-service binary (linux-x64) with SHA256
+          - Claude Code plugin (l4-plugin.zip) and skills (writing-l4-rules.skill, encoding-a-subject.skill)
+          - Cloud agent bundle and jl4-lsp (linux-arm64) with SHA256"
           git push origin "${{ steps.tag-name.outputs.tag }}"
 
       - name: Upload artifacts to tag
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag-name.outputs.tag }}
-          name: L4 VSCode Extension & WASM (Build ${{ github.run_number }})
+          name: L4 VSCode Extension & Tools (Build ${{ github.run_number }})
           body: |
             ## Build Artifacts
 
@@ -727,12 +974,31 @@ jobs:
             | `jl4-service-linux-x64` | Decision service binary for Linux x86_64 |
             | `jl4-service-linux-x64.sha256` | SHA256 hash for binary verification |
 
+            ### Cloud agent (Legalese AI cloud sessions)
+
+            | File | Description |
+            |------|-------------|
+            | `cloud-agent.cjs` | Headless Legalese AI harness bundle (Node.js 24) |
+            | `cloud-agent.cjs.sha256` | SHA256 hash for bundle verification |
+            | `jl4-lsp-linux-arm64` | Language server for Linux ARM64, used by the harness image |
+            | `jl4-lsp-linux-arm64.sha256` | SHA256 hash for binary verification |
+
             ### WASM Binaries
 
             | File | Description |
             |------|-------------|
             | `jl4-core.wasm` | L4 core WASM module |
             | `jl4-core.mjs` | JavaScript FFI glue code |
+
+            ### Claude Code Plugin
+
+            | File | Description |
+            |------|-------------|
+            | `l4-plugin.zip` | The L4 plugin: the `writing-l4-rules` and `encoding-a-subject` skills and the plugin manifests |
+            | `writing-l4-rules.skill` | The L4 authoring skill alone (SKILL.md and its references) |
+            | `encoding-a-subject.skill` | The whole-Act encoding workflow skill alone: brief, coverage table, source-derived tests, the legalese/canon layout |
+
+            Install from the marketplace with `/plugin marketplace add legalese/l4-ide`, then `/plugin install l4-computational-law@legalese`; or extract each `.skill` into `~/.claude/skills/<skill-name>/`.
 
             ### Installation
 
@@ -754,6 +1020,84 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================
+  # Deploy the web editor (play.legalese.com)
+  # ============================================
+  # Runs once the release exists, with that release's WASM. Its target comes
+  # from the web-editor environment's variables, which steps can read but a
+  # job-level `if:` can't.
+
+  deploy-web-editor:
+    name: Deploy Web Editor
+    runs-on: ubuntu-latest
+    needs:
+      - build-wasm
+      - create-tag
+    environment:
+      name: web-editor
+      url: https://play.legalese.com
+    permissions:
+      contents: read
+      id-token: write # OIDC
+    env:
+      RELEASE_TAG: ${{ needs.create-tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: jl4-wasm-${{ needs.build-wasm.outputs.version }}
+          path: ${{ runner.temp }}/wasm
+
+      # The WASM lives under its release tag, so each release has new URLs and
+      # browsers never mix a cached module with a newer page.
+      - name: Configure the build for this release
+        env:
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+        run: |
+          # The session Lambda rejects shares without a Turnstile token, so a
+          # build without the key would ship a Share button that always fails.
+          if [ -z "$TURNSTILE_SITE_KEY" ]; then
+            echo "::error::Repository variable TURNSTILE_SITE_KEY is not set"
+            exit 1
+          fi
+          WASM_DIR="ts-apps/jl4-web/static/wasm/$RELEASE_TAG"
+          mkdir -p "$WASM_DIR"
+          cp "$RUNNER_TEMP/wasm/jl4-core.wasm" "$RUNNER_TEMP/wasm/jl4-core.mjs" "$WASM_DIR/"
+          cat > ts-apps/jl4-web/.env.production.local <<EOF
+          VITE_WASM_VERSION=$RELEASE_TAG
+          VITE_WASM_URL=/wasm/$RELEASE_TAG/jl4-core.wasm
+          VITE_WASM_JS_URL=/wasm/$RELEASE_TAG/jl4-core.mjs
+          VITE_SESSION_URL=/session
+          VITE_TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY
+          EOF
+          cat ts-apps/jl4-web/.env.production.local
+
+      - name: Build web editor
+        run: npx turbo build --filter=jl4-web
+
+      - name: Configure credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Publish the web editor
+        run: >-
+          ts-apps/jl4-web/scripts/deploy-static.sh ts-apps/jl4-web/build
+          "${{ vars.WEB_EDITOR_BUCKET }}" "${{ vars.WEB_EDITOR_DISTRIBUTION_ID }}"
+
+  # ============================================
   # Build summary
   # ============================================
 
@@ -765,7 +1109,10 @@ jobs:
       - package-vscode-cross-platform
       - package-vscode-universal
       - build-wasm
+      - package-plugin
+      - build-cloud-agent
       - create-tag
+      - deploy-web-editor
     if: always()
     steps:
       - name: Summary
@@ -783,4 +1130,7 @@ jobs:
           echo "| Cross Platform | ${{ needs.package-vscode-cross-platform.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Universal | ${{ needs.package-vscode-universal.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| WASM Build | ${{ needs.build-wasm.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Claude Code Plugin | ${{ needs.package-plugin.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cloud Agent Bundle | ${{ needs.build-cloud-agent.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Git Tag | ${{ needs.create-tag.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web Editor | ${{ needs.deploy-web-editor.result == 'success' && '✅' || needs.deploy-web-editor.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY

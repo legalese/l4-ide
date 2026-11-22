@@ -1,0 +1,7 @@
+-- Typechecks cleanly; the first #EVAL is decided whatever x is, and the
+-- second waits on both inputs, which the default report names.
+§ `Two unknowns`
+    GIVEN x IS A BOOLEAN
+          y IS A BOOLEAN
+#EVAL x AND FALSE
+#EVAL x AND y

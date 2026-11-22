@@ -55,7 +55,6 @@ COMMANDS:
 SERVICES:
     jl4-lsp                LSP WebSocket server (port 8000)
     jl4-service            Decision service (port 8080)
-    jl4-websessions        Session management (port 8002)
     jl4-web                Web frontend (port 5173)
 
 EXAMPLES:
@@ -69,7 +68,6 @@ EXAMPLES:
 URLS:
     Web Frontend:      http://localhost:5173
     Decision Service:  http://localhost:8080
-    Websessions:       http://localhost:8002
     LSP WebSocket:     ws://localhost:8000
 
 EOF
@@ -175,39 +173,11 @@ cmd_test() {
         log_error "✗ jl4-service not responding on port 8080"
     fi
 
-    # Test Websessions
-    if curl -sf http://localhost:8002/ > /dev/null 2>&1; then
-        log_success "✓ Websessions responding on port 8002"
-    else
-        log_error "✗ Websessions not responding on port 8002"
-    fi
-
     # Test Web Frontend
     if curl -sf http://localhost:5173 > /dev/null 2>&1; then
         log_success "✓ Web frontend responding on port 5173"
     else
         log_error "✗ Web frontend not responding on port 5173"
-    fi
-
-    echo ""
-    log_info "Integration test: Save and retrieve via websessions..."
-    
-    # Save a test program
-    UUID=$(curl -s -X POST http://localhost:8002 \
-        -H "Content-Type: application/json" \
-        -d '"DECIDE test MEANS TRUE"' | tr -d '"')
-    
-    if [ -n "$UUID" ]; then
-        log_success "✓ Saved test program with UUID: $UUID"
-        
-        # Try to retrieve it
-        if curl -sf "http://localhost:8002?id=$UUID" > /dev/null 2>&1; then
-            log_success "✓ Retrieved program from websessions"
-        else
-            log_error "✗ Could not retrieve program from websessions"
-        fi
-    else
-        log_error "✗ Failed to save test program"
     fi
 
     echo ""

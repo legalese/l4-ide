@@ -1,0 +1,52 @@
+-- llm example: a model answers a question of judgment, an L4 rule decides.
+IMPORT prelude
+IMPORT llm
+
+-- The part of an Anthropic reply this file needs.
+-- JSONDECODE ignores the other fields.
+DECLARE `reply block` HAS
+  text IS A STRING
+
+DECLARE `Anthropic reply` HAS
+  content IS A LIST OF `reply block`
+
+GIVEN `raw reply` IS A STRING
+GIVETH A MAYBE STRING
+`the text of` `raw reply` MEANS
+  CONSIDER `decoded reply`
+  WHEN RIGHT reply THEN
+    CONSIDER reply's content
+    WHEN EMPTY THEN NOTHING
+    WHEN block FOLLOWED BY rest THEN JUST (block's text)
+  WHEN LEFT problem THEN NOTHING
+  WHERE
+    GIVETH AN EITHER STRING `Anthropic reply`
+    `decoded reply` MEANS JSONDECODE `raw reply`
+
+-- The question put to the model.
+GIVEN `the notice` IS A STRING
+GIVETH A STRING
+`the question about` `the notice` MEANS
+  CONCAT "Answer YES or NO and nothing else. Is this notice written in a professional tone? ", `the notice`
+
+-- Asks Claude. This needs ANTHROPIC_API_KEY and network access,
+-- so the file defines it but does not evaluate it.
+GIVEN `the notice` IS A STRING
+GIVETH A MAYBE STRING
+`the verdict of the model on` `the notice` MEANS
+  CONSIDER ENV "ANTHROPIC_API_KEY"
+  WHEN JUST key THEN `the text of` (callClaude key (`the question about` `the notice`))
+  WHEN NOTHING THEN NOTHING
+
+-- The rule takes the model's answer as an input,
+-- so it can be tested without calling a model.
+GIVEN `the notice was given in time` IS A BOOLEAN
+      `the verdict of the model` IS A MAYBE STRING
+GIVETH A BOOLEAN
+DECIDE `the notice is valid` IF
+      `the notice was given in time`
+  AND `the verdict of the model` EQUALS JUST "YES"
+
+#EVAL `the text of` "{\"id\":\"msg_1\",\"content\":[{\"type\":\"text\",\"text\":\"YES\"}]}"
+#EVAL `the notice is valid` TRUE (JUST "YES")
+#EVAL `the notice is valid` TRUE NOTHING

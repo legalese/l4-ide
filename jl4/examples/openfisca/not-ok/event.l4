@@ -1,0 +1,17 @@
+-- An EVENT value. An event is a party, an action and a time, which no
+-- OpenFisca variable can hold. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Actor IS ONE OF Landlord, Tenant
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+DECLARE Person HAS rent IS A NUMBER
+
+@export When the rent was paid
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`paid at` p period MEANS
+    CONSIDER EVENT Tenant (pay (p's rent)) 3
+    WHEN EVENT who what n THEN n
+
+#ASSERT (`paid at` OF (Person WITH rent IS 100), "2026-01") EQUALS 3

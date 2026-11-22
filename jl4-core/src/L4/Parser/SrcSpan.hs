@@ -16,7 +16,7 @@ data SrcSpan = MkSrcSpan
   , end :: !SrcPos
   }
   deriving (Show, Eq, Ord, Generic)
-  deriving anyclass (SOP.Generic)
+  deriving anyclass (SOP.Generic, NFData)
 
 instance Semigroup SrcSpan where
   -- Always expand the 'SrcSpan' s.t. it now covers both 'SrcSpan's.

@@ -1,0 +1,38 @@
+-- A lifecycle point is a property of the RUN, not of the rule: each entry
+-- into a continuation carries its own (EVERY-EACH-QUANTIFIER-SPEC §2.6, card
+-- B5, RULED 2026-09-21: binders take their value per instance).
+--
+-- One rule, two runs. Bob does exactly the same thing in both — he notes on
+-- day 9 — and only Alice's cure moves. THE JOIN is the instant Alice's
+-- obligation was met, so Bob's deadline follows it.
+
+IMPORT prelude
+
+DECLARE Actor IS ONE OF
+    Person HAS who IS A STRING
+DECLARE Action IS ONE OF
+    Cure HAS by IS AN Actor
+    Note HAS by IS AN Actor
+
+alice MEANS Person "Alice"
+bob   MEANS Person "Bob"
+
+GIVETH A DEONTIC Actor Action
+`note within 3 of the cure` MEANS
+    PARTY alice MUST Cure alice WITHIN 10
+    HENCE (PARTY bob MUST Note bob WITHIN 3 OF THE JOIN)
+
+-- Alice cures on day 2: Bob's note is due on day 5, so day 9 is late.
+#TRACE `note within 3 of the cure` AT 0 WITH
+  PARTY alice DOES Cure alice AT 2
+  PARTY bob   DOES Note bob   AT 9
+
+-- Alice cures on day 7: due on day 10, so the same note on day 9 is in time.
+#TRACE `note within 3 of the cure` AT 0 WITH
+  PARTY alice DOES Cure alice AT 7
+  PARTY bob   DOES Note bob   AT 9
+
+-- The residual after each cure prints the anchor as written, not a number:
+-- the instant it names is the run's.
+#TRACE `note within 3 of the cure` AT 0 WITH
+  PARTY alice DOES Cure alice AT 2

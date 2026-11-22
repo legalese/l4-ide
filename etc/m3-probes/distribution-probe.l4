@@ -13,7 +13,7 @@
 -- error is one-directional (distribution can only ADD demands), so it inflated
 -- the declaration-order baseline and flattered the planner.
 --
--- § 227.503(a)(7) and § 227.503(a)(8) of jl4/examples/legal/regcf/denovo have
+-- § 227.503(a)(7) and § 227.503(a)(8) of jl4/examples/canon/us/regcf/cleanroom have
 -- exactly this shape and are two of the eleven decisions the planner won on, so
 -- the bug lived where the result lived. The first run's guard 2 could not catch
 -- it: every interview it covered was a decision on which the two askers TIE.

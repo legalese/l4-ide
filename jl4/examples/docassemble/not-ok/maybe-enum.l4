@@ -16,7 +16,7 @@
 -- what it is refusing — the enum — rather than recite a list that has moved on
 -- without it.
 --
--- The file itself typechecks: the refusal belongs to `l4 docassemble`.
+-- The file itself typechecks: the refusal belongs to `l4 export docassemble`.
 
 DECLARE Severity IS ONE OF Critical, Reportable, Trivial
 

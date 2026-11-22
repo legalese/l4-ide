@@ -11,7 +11,7 @@ One area of the phrasebook. The index, the preamble and the other ten areas are 
 
 > `PAA s 2 — "court" means the General Division of the High Court or a Family Court`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/family-domain.l4:172`
+> — `jl4/examples/canon/sg/succession/cleanroom/family-domain.l4:172`
 
 **It is doing** The drafter has written the right-hand side down, so the meaning is settled for
 every reader of the Act. It is not a fact about the case in front of you.
@@ -91,7 +91,7 @@ exercisable on any case; the Part's rule is exercised as [entry 11.9](11-when-th
 
 > `s 28(1) — "Upon the grant of any probate or letters of administration, the grantee shall take an oath in the prescribed form, faithfully to administer the estate and to account for the same."`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2715`
+> — `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2715`
 
 **It is doing** naming a role that each case fills differently. The Part opens by naming "the
 grantee" and then talks about him for twenty sections without introducing him again — the role is
@@ -153,7 +153,7 @@ subtree, and a rule that reaches two at once is an error naming both.
 files under `jl4/examples/legal/` and `jl4/examples/canon/` (measured 2026-09-16): no `("P")`, no `(the "Purchaser")`, no `(hereinafter …)`, in
 quoted text or in comments. Modern United Kingdom drafting uses it constantly, and the encoded slice
 of the British Nationality Act 1981 does not reach one. The nearest corpus analogue is the role
-parameter `GIVEN person IS A PersonProfile` (`jl4/examples/legal/bna/bna.l4:257`, and 28 more
+parameter `GIVEN person IS A PersonProfile` (`jl4/examples/canon/uk/bna-1981/bna.l4:257`, and 28 more
 sites).
 
 **It is doing** exactly what [entry 1.2](#e1-2) does, with a shorter name. The parenthetical letter is a role
@@ -193,7 +193,7 @@ renamed role breaks that for no gain.
 
 > `s 6(6) — "For the purposes of this section, "trust corporation" means the Public Trustee or a corporation licensed as a trust company under the Trust Companies Act 2005."`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:222`
+> — `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:222`
 
 and then, twenty-two sections later, uses "a trust company" unqualified for a class that is **not**
 the same (`:2715`).
@@ -325,7 +325,7 @@ That is the mistake the corpus made and reverted.
 
 > `"(4) In this Law, unless the context otherwise requires, \"constitution\" in relation to an entity means –"`
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:81`
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:81`
 
 **It is doing** two very different jobs under one phrase. As boilerplate on a definitions section it
 usually has no operative effect and rides as inert prose beside the definition. But where a
@@ -334,7 +334,7 @@ and belongs to whoever runs the rules.
 
 **Write** the reading as a parameter, and declare it once for the whole encoding as a section
 `GIVEN`. "Rather than pick one and present it as the text, the encoding takes the reading as a
-parameter" (`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:92-93`).
+parameter" (`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:92-93`).
 
 ```l4
 § `Regulation Crowdfunding`
@@ -363,21 +363,26 @@ This is the largest measured win in the corpus: `GIVEN interp IS AN Interpretati
 replaces all 26.
 
 **Keep writing the named readings** (`` `the staff reading` ``, `` `the text alone` ``) as values.
-Until supply lands they are how a file demonstrates both poles: a `#EVAL` that reads an unsupplied
-section `GIVEN` stops, and makes `l4 run` exit non-zero. What it prints depends on where the missing
-value is first needed. Reached by the `CONSIDER` above, as here:
+They are what a directive hands the section `GIVEN`, by name, beside the rule's own inputs; this
+answers `10`:
 
 ```
-The value
-  `the reading`
-reached a CONSIDER that has no branch for it.
-Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
-The typechecker's exhaustiveness warning lists all missing branches.
+#EVAL `the day the twelve month window opens on` WITH `the closing date` IS 10, `the offer date` IS 20, `the reading` IS `the staff reading`
 ```
 
-**That message is not about `CONSIDER`, and hunting for one will waste your time.** A plain genitive
-field access on an unsupplied record produces it word for word, with no `CONSIDER` anywhere in the
-file — field access is itself a match. Measured on the section-`GIVEN` binary, whole file, exit 1:
+Without the `WITH`, a `#EVAL` that reads the unsupplied section `GIVEN` stops, names what it
+needed, and makes `l4 run` exit non-zero. Reached by the `CONSIDER` above, which reads a field of the
+reading, it names that field by its path (measured on the build-step-3 binary,
+`UNKNOWN-EVALUATION-SPEC.md` §8, with both own inputs supplied):
+
+```
+I could not continue evaluating, because I needed to know the value of
+  `the reading`'s `the twelve month window`
+but it is an assumed term.
+```
+
+A plain genitive field access on an unsupplied record names the path the same way, with no
+`CONSIDER` anywhere in the file. Measured on the build-step-3 binary, whole file, exit 1:
 
 ```l4
 DECLARE Applicant HAS
@@ -394,17 +399,18 @@ GIVETH A BOOLEAN
 ```
 
 ```
-The value
-  `the applicant`
-reached a CONSIDER that has no branch for it.
-Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
-The typechecker's exhaustiveness warning lists all missing branches.
+I could not continue evaluating, because I needed to know the value of
+  `the applicant`'s `age in years`
+but it is an assumed term.
 ```
 
-Read it as **"you did not supply this input"**, whatever construct it names.
+An `l4` from build steps 1 and 2 names the record, `` `the applicant` ``, rather than the field, and
+one built before step 1 prints `reached a CONSIDER that has no branch for it` for both of these
+instead. **That message is not about `CONSIDER` there**: read it as "you did not supply this
+input", whatever construct it names.
 
-Reached by arithmetic instead — a section `GIVEN` `` `the rate` `` read by
-`` `tax on` amount MEANS amount TIMES `the rate` `` — it is the assumed-term message:
+Reached by arithmetic — a section `GIVEN` `` `the rate` `` read by
+`` `tax on` amount MEANS amount TIMES `the rate` `` — it is the same assumed-term message:
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -418,9 +424,9 @@ evaluating, so an unsupplied section `GIVEN` costs it nothing. That is what lets
 the house style still run green; [entry 11.9](11-when-the-encoding-cannot-answer.md#e11-9) is the whole recipe.
 
 **Not** ``#EVAL `the day the twelve month window opens on` WITH `the reading` IS `the staff
-reading` `` — `WITH` names a rule's own inputs, and `` `the reading` `` is not one of them, so
-that line is a check error: the rule's two real inputs are reported unsupplied and
-`` `the reading` `` is reported undefined. **Not** a `TYPICALLY` default to make one reading win: a
+reading` `` on its own — a `WITH` that names any input must name the rule's own inputs too, so that
+line is a check error reporting `` `the closing date` `` and `` `the offer date` `` unsupplied.
+Name every input, as above. **Not** a `TYPICALLY` default to make one reading win: a
 `TYPICALLY` value must be a literal, and `` `the staff reading` `` is a defined name of record type,
 so the typechecker rejects it — _"The TYPICALLY value for `the reading` must be a literal: a number,
 a string, or a nullary constructor such as TRUE, FALSE or NOTHING."_ A constructor of your own
@@ -626,8 +632,8 @@ clause runs to a table rather than a list.
 
 > `(2) _Funding portal_ means a broker acting as an intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act …, that does not: (i) Offer investment advice or recommendations; (ii) Solicit purchases, sales or offers to buy the securities displayed on its platform; …`
 >
-> — 17 CFR (Code of Federal Regulations) 227.300(c)(2), in the repository at
-> `jl4/examples/legal/regcf/denovo/source/part227.txt:458`
+> — 17 CFR (Code of Federal Regulations) 227.300(c)(2), at
+> `source/part227.txt:458` of the `us/regcf` subject in `legalese/canon`
 
 The same instrument's sibling definition carries the other common form, an exception rather than a
 condition: "except that any person … whose functions are solely clerical or ministerial shall not be
@@ -654,7 +660,7 @@ DECLARE IntermediaryProfile HAS
 @ref 17 CFR 227.300(c)(2)
 GIVEN intermediary IS AN IntermediaryProfile
 GIVETH A BOOLEAN
-DECIDE `the intermediary is a funding portal` intermediary IF
+DECIDE `the intermediary is a funding portal` IF
         intermediary's `a broker acting as an intermediary in a section 4(a)(6) transaction`
     AND NOT "(i)"   ... intermediary's `offers investment advice or recommendations`
     AND NOT "(ii)"  ... intermediary's `solicits purchases, sales or offers to buy the securities displayed on its platform`
@@ -663,7 +669,7 @@ DECIDE `the intermediary is a funding portal` intermediary IF
 
 _(Checked on the release binary, exit 0, no errors; limb (iii) is elided above for length, which is
 why the tags run (i), (ii), (iv).)_ This is the corpus's own shape, at
-`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2210-2218`, where all four limbs are written
+`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:2210-2218`, where all four limbs are written
 against fields declared in the positive at `:869-873`, under a comment calling them the four
 negative limbs of "funding portal".
 
@@ -710,7 +716,7 @@ on a section rather than part of a definition.
 
 > `"charitable purpose" has the meaning given by Article 6;` … `"constitution" has the meaning given by Article 2(4);`
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:66-71`, carrying Article 1 of the
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:66-71`, carrying Article 1 of the
 > Charities (Jersey) Law 2014
 
 **It is doing** deferring. The interpretation section is not defining anything; it is telling you
@@ -752,7 +758,7 @@ DECIDE `section 3 — a “child” within the meaning of this Act` IF
 @ref Probate and Administration Act 1934 s 18(4)(a); Intestate Succession Act 1967 s 3
 GIVEN c IS A Child
 GIVETH A BOOLEAN
-`a “child” within the meaning of section 3 of the Intestate Succession Act 1967` c MEANS
+`a “child” within the meaning of section 3 of the Intestate Succession Act 1967` MEANS
         c's `a legitimate child of the person whose child he is`
     OR  c's `adopted by that person by virtue of an order of court`
 
@@ -772,7 +778,7 @@ _(Checked on the release binary, exit 0, no errors, with an `#ASSERT` over the c
 satisfied. The adoption field's name is shortened here; the corpus carries the whole phrase,
 including the three jurisdictions, for the reason its own note gives.)_ The three rule names are the
 corpus's own:
-`jl4/examples/legal/sg-succession/cleanroom-2026-08/intestate-succession-act.l4:194`,
+`jl4/examples/canon/sg/succession/cleanroom/intestate-succession-act.l4:194`,
 `probate-administration-act.l4:417`, and the cross-check at `family-cases.l4:1016-1019`, whose
 comment says why it exists — "there are two texts of one definition. What a composition can do is
 assert that they still say the same thing, in one expression that fails if either is edited alone".
@@ -809,8 +815,8 @@ active — quote the label, not the sentence", for the second destination.
 
 > `36.—(1) Notwithstanding any other written law, a minor who has attained the age of 18 years and who is not otherwise under any legal disability — (a) may, in his own name and without a litigation representative, bring, defend, conduct or intervene in any legal proceeding or action specified in the Schedule as if he were of full age`
 >
-> — Civil Law Act 1909 (Singapore) s 36(1)(a), in the repository at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/source/CLA1909.txt:1766-1772`
+> — Civil Law Act 1909 (Singapore) s 36(1)(a), at
+> `CLA1909.txt:1766-1772` of the `pdftotext -layout` rendering that legalese/canon's `subjects/sg/succession/encodings/cleanroom-2026-08/source/fetch-sso.py` re-creates byte for byte
 
 **It is doing** putting the extension of a term somewhere the operative section is not, usually
 because the list is long, or ordered, or meant to be amended without touching the section. The
@@ -857,7 +863,7 @@ GIVETH A LIST OF `Scheduled item`
 @ref Civil Law Act 1909 s 36(1)(a)
 GIVEN p IS A Proceeding
 GIVETH A BOOLEAN
-`s 36(1)(a) — a legal proceeding or action specified in the Schedule` p MEANS
+`s 36(1)(a) — a legal proceeding or action specified in the Schedule` MEANS
     any `the item is this proceeding` `the Schedule`
     WHERE
         `the item is this proceeding` i MEANS i's `the proceeding` EQUALS p
@@ -967,7 +973,7 @@ find it: a `#EVAL` or `#ASSERT` on every defined term you actually use, not a cl
 
 **If the source says** an interpretation section for the whole instrument and, later, a Part that
 redefines one of its words for itself. Section 2 of the Probate and Administration Act 1934 carries
-"the three definitions" for the Act (`jl4/examples/legal/sg-succession/cleanroom-2026-08/family-domain.l4:1497`),
+"the three definitions" for the Act (`jl4/examples/canon/sg/succession/cleanroom/family-domain.l4:1497`),
 while s 6(6) confines a definition of "trust corporation" to s 6 alone
 (`probate-administration-act.l4:222`; entry [1.4](#e1-4)).
 
@@ -1068,7 +1074,7 @@ then the directives that use them:
 -- The operative test carries its own rule GIVEN, so a directive can exercise it.
 GIVEN m IS A `Month of the engagement`
 GIVETH A NUMBER
-`the fee for the month` m MEANS
+`the fee for the month` MEANS
     IF   m's `hours worked` AT MOST 40
     THEN m's `hours worked` TIMES 120
     ELSE (40 TIMES 120) PLUS ((m's `hours worked` MINUS 40) TIMES 150)
@@ -1093,20 +1099,21 @@ printing `NUMBER ` at Information severity.)_ The illustrations heading is a **c
 section, not a sibling: nesting it under `§ 4. Fees` keeps the fixtures with the rules they belong
 to, and a reader scanning `§` headings still sees one entry per clause.
 
-**Not** an `#ASSERT` on the rule that reads the section `GIVEN`. The fixture exists and there is
-still no way to hand it over — nothing inside the file supplies a section `GIVEN` in this release —
-so the assertion stops, and `l4 run` exits 1 (probe `r11b-assert-on-the-reader.l4`):
+**Not** an `#ASSERT` on the rule that reads the section `GIVEN` without a `WITH`. A fixture under
+the heading does not hand itself over, so the assertion stops, and `l4 run` exits 1 (probe
+`r11b-assert-on-the-reader.l4`, its message
+re-measured on the build-step-3 binary, which names the field the rule reads):
 
 ```
 assertion could not be evaluated:
-The value
-  `the month`
-reached a CONSIDER that has no branch for it.
-Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
+I could not continue evaluating, because I needed to know the value of
+  `the month`'s `hours worked`
+but it is an assumed term.
 ```
 
-Read that as "you did not supply this input", whatever construct it names — entry [1.5](#e1-5) has
-the other wording it comes in. The recipe that keeps the file green is
+Entry [1.5](#e1-5) has the wording an older `l4` gives it. Hand the fixture over by name instead:
+``#ASSERT (`the fee for this month` WITH `the month` IS `a 50 hour month`) EQUALS 6300``, under the
+illustrations heading, is satisfied. Or keep to the recipe in
 [11.9](11-when-the-encoding-cannot-answer.md#e11-9): assert on the rule `GIVEN`, `#CHECK` the reader.
 
 **Not** the fixtures at the end of the file, in one block, away from the rules. It reads well until

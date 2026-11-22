@@ -19,9 +19,9 @@ what the corpus deliberately does not model (§5). This page is only about what 
 
 | # | Artifact                                       | Files | Regenerate with                                    | Verified by                     |
 | - | ---------------------------------------------- | ----- | -------------------------------------------------- | ------------------------------- |
-| 1 | DMN 1.3 decision model                         | 2     | `l4 export … --to dmn`                              | `cabal test jl4:jl4-test`       |
-| 2 | dmnmd markdown                                 | 2     | `l4 export … --to dmn-md`                           | `cabal test jl4:jl4-test`       |
-| 3 | BPMN 2.0 processes (3 rules)                   | 6     | `l4 export … --to bpmn --rule …`                    | `cabal test jl4:jl4-test`       |
+| 1 | DMN 1.3 decision model                         | 2     | `l4 export dmn …`                              | `cabal test jl4:jl4-test`       |
+| 2 | dmnmd markdown                                 | 2     | `l4 export dmn-md …`                           | `cabal test jl4:jl4-test`       |
+| 3 | BPMN 2.0 processes (3 rules)                   | 6     | `l4 export bpmn … --rule …`                    | `cabal test jl4:jl4-test`       |
 | 4 | Ladder figures (7 decisions × 4 carriers)      | 28    | `npm run demo:regcf` in `ts-shared/ladder-svg`      | `turbo run test` (drift guard)  |
 | 5 | Deployable API / MCP surface                   | 1 `.l4` | `POST /deployments` to `jl4-service`              | `cabal test jl4:jl4-test`       |
 
@@ -50,7 +50,7 @@ Pin `JL4_LIBRARY_PATH=<repo>/jl4-core/libraries` for every command on this page.
 ## 1. DMN 1.3 — `jl4/examples/dmn/expected/regcf-corpus.{dmn,fidelity.txt}`
 
 ```
-l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn \
+l4 export dmn jl4/examples/legal/regcf/regcf.l4 \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn --fidelity-report
 ```
 
@@ -160,7 +160,7 @@ clean decision table.
 ## 2. dmnmd markdown — `jl4/examples/dmn/expected/regcf-corpus.{dmn.md,md.fidelity.txt}`
 
 ```
-l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn-md \
+l4 export dmn-md jl4/examples/legal/regcf/regcf.l4 \
    -o jl4/examples/dmn/expected/regcf-corpus.dmn.md --fidelity-report
 ```
 
@@ -191,7 +191,7 @@ is invisible**. The 149 edges that make the DRG single-sourced are exactly what 
 ## 3. BPMN 2.0 — `jl4/examples/bpmn/expected/regcf-{reporting,advertising,resale}.{bpmn,fidelity.txt}`
 
 ```
-l4 export jl4/examples/legal/regcf/regcf.l4 --to bpmn \
+l4 export bpmn jl4/examples/legal/regcf/regcf.l4 \
    --rule "ongoing reporting obligation" \
    -o jl4/examples/bpmn/expected/regcf-reporting.bpmn --fidelity-report
 # likewise --rule "advertising restriction" / "resale restriction"
@@ -200,7 +200,7 @@ l4 export jl4/examples/legal/regcf/regcf.l4 --to bpmn \
 All six goldens load in `bpmn-moddle` with **0 warnings**, every node drawn.
 
 **This used to be the dishonest one, and it is worth saying how.** Until 2026-07-27 the corpus could
-not be exported to BPMN at all — `l4 export --to=bpmn` exited 1 with "No regulative rules found in
+not be exported to BPMN at all — `l4 export bpmn` exited 1 with "No regulative rules found in
 module" — because `L4.StateGraph.findRegulativeExpr` peeled only `Where` and `LetIn` on its way to a
 deontic head, and all three corpus duties are `IF`-headed. The CFR writes its guard _outside_ the
 duty ("An issuer must continue to comply … **until** one of the following occurs", "**unless** such

@@ -1,0 +1,25 @@
+-- A BOOLEAN rule written as DECIDE clauses, one of which calls another rule,
+-- beside the CONSIDER a drafter would write by hand. `l4 verify` reads the
+-- group as the CONSIDER it stands for, so it counts the same atoms in both and
+-- reads the call through in both.
+DECLARE Peril IS ONE OF Water, Fire, Cosmetic
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both hold` x y IS x AND y
+
+GIVEN p IS A Peril
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE paid Water a b IS `both hold` a b
+DECIDE paid p     a b IS a OR b
+
+GIVEN p IS A Peril
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `paid by hand` p a b IS CONSIDER p
+  WHEN Water THEN `both hold` a b
+  OTHERWISE a OR b

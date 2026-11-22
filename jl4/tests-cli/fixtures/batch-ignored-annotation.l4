@@ -1,0 +1,9 @@
+@export This function echoes a product code as-is
+GIVEN code IS A STRING
+GIVETH A STRING
+echoCode code MEANS code
+
+@exprot This function is meant to be published too
+GIVEN code IS A STRING
+GIVETH A STRING
+echoAgain code MEANS code

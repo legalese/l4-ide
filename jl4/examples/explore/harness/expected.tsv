@@ -1,0 +1,63 @@
+# The verdict each fixture must get on each property, under each fairness variant, tab-separated.
+# Every cell the harness computes must have a row here, and every row a cell: an unpinned cell fails the run.
+# verdict: holds or violated (for reachable, holds means a state where the decision is TRUE was reached).
+# path: for an always or reachable property, the shortest counterexample or witness every column must print, as reference labels; - for none.
+#   For stays and eventually the columns print lassos, which the harness replays and checks instead of comparing them (see README.md).
+# source: where the expectation comes from.
+#   brief: the probes' P1 to P4 table (REGULATIVE-LOWERING-SPEC.md sections 1 and 7, brief/README.md); P1 on D1 is the positive control.
+#   wp3: the verdicts TLC 2.19 and NuSMV 2.7.0 gave on the emitted models on 2026-10-26, recorded in brief/README.md ("The emitted models").
+#   measured: first measured by this harness on 2026-10-26, with no record before it; its oracle is the three columns agreeing.
+fixture	variant	property	verdict	path	source
+d1-naive	alice	P1	violated	CheckBought,BobBuys,Buy	brief
+d1-naive	alice	P2	holds	-	brief
+d1-naive	alice	P3	holds	CheckBought,BobBuys	brief
+d1-naive	alice	P4	holds	-	brief
+d1-naive	alice	P5	holds	-	wp3
+d1-naive	alice	P6	holds	-	wp3
+d1-naive	alice	C	violated	-	wp3
+d2-reread	alice	P1	violated	CheckBought,ReadAgain,BobBuys,Send	brief
+d2-reread	alice	P2	holds	-	brief
+d2-reread	alice	P3	holds	CheckBought,BobBuys	brief
+d2-reread	alice	P4	holds	-	brief
+d2-reread	alice	P5	holds	-	wp3
+d2-reread	alice	P6	holds	-	wp3
+d2-reread	alice	C	violated	-	wp3
+d3-atomic	alice	P1	holds	-	brief
+d3-atomic	alice	P2	holds	-	brief
+d3-atomic	alice	P3	holds	CheckBought,BobBuys	brief
+d3-atomic	alice	P4	holds	-	brief
+d3-atomic	alice	P5	holds	-	wp3
+d3-atomic	alice	P6	holds	-	wp3
+d3-atomic	alice	C	violated	-	wp3
+d3-cancel	alice	P1	holds	-	brief
+d3-cancel	alice	P2	holds	-	brief
+d3-cancel	alice	P3	holds	CheckBought,BobBuys	brief
+d3-cancel	alice	P4	violated	-	brief
+d3-cancel	alice	P5	holds	-	measured
+d3-cancel	alice	P6	holds	-	measured
+d3-cancel	alice	C	violated	-	measured
+d3-double	alice	P1	holds	-	brief
+d3-double	alice	P2	violated	CheckBought,BuyChecked	brief
+d3-double	alice	P3	holds	CheckBought,BobBuys	brief
+d3-double	alice	P4	holds	-	brief
+d3-double	alice	P5	holds	-	measured
+d3-double	alice	P6	violated	-	measured
+d3-double	alice	C	violated	-	measured
+d1-naive	none	P5	holds	-	wp3
+d1-naive	none	P6	holds	-	wp3
+d1-naive	none	C	violated	-	measured
+d2-reread	none	P5	violated	-	wp3
+d2-reread	none	P6	violated	-	wp3
+d2-reread	none	C	violated	-	measured
+d3-atomic	none	P5	violated	-	wp3
+d3-atomic	none	P6	violated	-	wp3
+d3-atomic	none	C	violated	-	measured
+d1-naive	world	P5	holds	-	measured
+d1-naive	world	P6	holds	-	measured
+d1-naive	world	C	holds	-	wp3
+d2-reread	world	P5	holds	-	measured
+d2-reread	world	P6	holds	-	measured
+d2-reread	world	C	holds	-	wp3
+d3-atomic	world	P5	holds	-	measured
+d3-atomic	world	P6	holds	-	measured
+d3-atomic	world	C	holds	-	wp3

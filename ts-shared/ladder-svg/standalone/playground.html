@@ -191,23 +191,17 @@
       #ladder .lad-box.lad-clickable:hover {
         filter: brightness(0.97);
       }
-      /* a leaf that references another DECIDE — click to hydrate it inline */
-      #ladder .lad-ref {
-        cursor: pointer;
-      }
-      #ladder rect.lad-ref {
-        stroke: #4a72b0;
-        stroke-dasharray: 3 2;
-      }
-      #ladder text.lad-ref {
-        fill: #3a5c93;
-      }
-      #ladder text.lad-ref:hover {
+      /* a call panel's name — click to fold the call to one box */
+      #ladder text.lad-panel-name:hover {
         text-decoration: underline;
       }
-      /* the heading of a hydrated limb — click to collapse it back */
-      #ladder .lad-hydrated {
-        cursor: pointer;
+      /* what the last click did, in words ("Set a to true: 2 boxes changed.") */
+      #msg {
+        padding: 6px 24px;
+        font-size: 12px;
+        color: #556;
+        min-height: 1.4em;
+        border-bottom: 1px solid #eee;
       }
     </style>
   </head>
@@ -218,8 +212,11 @@
         Paste or pick an <b>inert-style L4 program</b> on the left and
         <b>Render</b> — it goes through the real <code>jl4-lsp</code> to an
         interactive ladder. <b>Click a box</b> to cycle unknown → true → false;
-        <b>click a heading / connector / ▸ caret</b> to fold. Fine-dashed boxes
-        ride a <code>TYPICALLY</code> presumption (§22).
+        every box that is the same proposition changes with it.
+        <b>Click a heading / connector / ▸ caret</b> to fold. A call to another
+        rule is drawn in place inside a shaded <b>panel</b> named after the
+        call; click the name to fold it to one box. Fine-dashed boxes ride a
+        <code>TYPICALLY</code> presumption (§22).
       </p>
     </header>
     <div class="main">
@@ -249,6 +246,17 @@
           </select>
           <button id="expand-all" type="button">expand all</button>
           <button id="collapse-all" type="button">collapse all</button>
+          <label
+            id="calls-toggle"
+            title="Open each call to another rule in place, or draw it as one box"
+            hidden
+            ><input type="checkbox" id="calls-in-place" checked /> draw calls in
+            place</label
+          >
+          <span id="panel-buttons" hidden>
+            <button id="expand-calls" type="button">expand calls</button>
+            <button id="collapse-calls" type="button">collapse calls</button>
+          </span>
           <button id="all-true" type="button">all true</button>
           <button id="reset" type="button">reset</button>
           <span class="grp">view</span>
@@ -282,6 +290,7 @@
           >
         </div>
         <div id="epi-note" class="grounded"></div>
+        <div id="msg" aria-live="polite"></div>
         <div id="ladder"></div>
         <div id="sentences-wrap">
           <div class="sent-head">

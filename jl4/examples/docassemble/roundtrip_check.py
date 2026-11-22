@@ -1,12 +1,12 @@
-"""Defensibility round-trip: load an interview emitted by `l4 docassemble`,
+"""Defensibility round-trip: load an interview emitted by `l4 export docassemble`,
 drive it headlessly in real docassemble.base (no server, no Redis, no Flask),
 and assert the verdict/goal equals the L4 #EVAL oracle.
 
 Usage (inside the docassemble venv -- recipe in README.md):
     python roundtrip_check.py <source> <example-name> [--also=<source>] [--quiet]
 
-<source> is EITHER a bare interview YAML (`l4 docassemble FILE -o out.yml`)
-OR a package tree (`l4 docassemble FILE --package DIR`, M2/R11); the two are
+<source> is EITHER a bare interview YAML (`l4 export docassemble FILE -o out.yml`)
+OR a package tree (`l4 export docassemble FILE --package DIR`, M2/R11); the two are
 told apart by os.path.isdir, and a package tree is resolved to its
 docassemble/l4<slug>/data/questions/<stem>.yml with the package name and
 sys.path entry that make its `modules: [.l4runtime]` block importable.
@@ -14,7 +14,7 @@ sys.path entry that make its `modules: [.l4runtime]` block importable.
 <example-name> is one of: rodents-and-vermin, seam, enum-triage, defaults,
 computed-and-shadow, assume-via-fn, citations (M1/M2), and tenant-list,
 payload-enum, maybe-scalars, statutory-age, review-checklist, notice-letter
-(M4 -- these are RED until M4 lands, and `l4 docassemble` refuses five of the
+(M4 -- these are RED until M4 lands, and `l4 export docassemble` refuses five of the
 six outright, so there is nothing to drive; `m4_acceptance.sh` runs the whole
 set in one command and prints each refusal verbatim).
 Each example carries one fixture case per #EVAL in its .l4 source; the drive
@@ -1218,7 +1218,7 @@ def find_variable(user_dict, candidates):
 
 def resolve_source(path):
     """Return (yaml_text, package_name, label) for a bare YAML file or for a
-    `l4 docassemble --package DIR` tree (M2/R11).
+    `l4 export docassemble --package DIR` tree (M2/R11).
 
     For a package tree the interview lives at
     docassemble/l4<slug>/data/questions/<stem>.yml and its `modules:` block
@@ -1236,7 +1236,7 @@ def resolve_source(path):
         if not os.path.isdir(ns):
             raise SystemExit(
                 f"{path!r} is a directory but has no docassemble/ inside it; "
-                f"expected a `l4 docassemble --package` tree")
+                f"expected a `l4 export docassemble --package` tree")
         pkgs = [d for d in sorted(os.listdir(ns))
                 if os.path.isdir(os.path.join(ns, d))]
         if len(pkgs) != 1:

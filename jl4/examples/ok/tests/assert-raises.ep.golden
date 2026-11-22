@@ -1,3 +1,7 @@
+-- An #ASSERT whose expression RAISES is neither satisfied nor failed: the
+-- evaluator could not decide it, and the report must say so — and say why.
+-- Before this was pinned, both polarities of a raising assertion reported
+-- "assertion failed", so a wrong answer and an error were indistinguishable.
 
 § `Assert raises`
     GIVEN x IS A NUMBER

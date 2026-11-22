@@ -11,7 +11,7 @@
 -- modules differing in ONE annotation each, and a golden per refusal would be a
 -- golden per line. Every source below runs the real pipeline (type check →
 -- 'lowerModule' → 'lowerBlawx' → 'renderBlawxYaml') and asserts on emitted
--- text, so nothing here can drift from what @l4 blawx@ writes.
+-- text, so nothing here can drift from what @l4 export blawx@ writes.
 --
 -- __Where the expected strings come from.__ Not from this file's taste: the
 -- transcribed sentences are Jason Morris's own hand NLG, read out of
@@ -176,7 +176,7 @@ spec = do
   -- A `%` opens a slot only when it delimits a name. Before that test
   -- (2026-09-02) prose percentages paired with each other into phantom slots,
   -- and when the phantom count matched the block's arity the sentence was
-  -- mis-cut silently and `l4 blawx` exited 0.
+  -- mis-cut silently and `l4 export blawx` exited 0.
   describe "a % in prose is a percent sign, not a slot" $ do
     it "refuses a sentence whose only % are percentages, on the arity check" $
       refusedFor "has 0 slot(s), but its Blawx declaration block has 2"

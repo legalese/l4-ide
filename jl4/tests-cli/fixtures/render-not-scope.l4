@@ -1,0 +1,113 @@
+-- A NOT beside AND or OR, as `l4 render` reads it: the denial must not reach
+-- past the operand it applies to.
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`the Act governs` n MEANS n > 5
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied call or` n b MEANS
+  IF (NOT (`the Act governs` n)) OR b THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied or` n b MEANS
+  IF NOT ((`the Act governs` n) OR b) THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied call and` n b MEANS
+  IF (NOT (`the Act governs` n)) AND b THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+GIVETH A NUMBER
+`denied both or` n b c MEANS
+  IF (NOT ((`the Act governs` n) AND c)) OR b THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied call in a group` n a b MEANS
+  IF a AND ((NOT (`the Act governs` n)) OR b) THEN 1 ELSE 2
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied variable or` a b MEANS
+  IF (NOT a) OR b THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+GIVETH A NUMBER
+`denied or and` n b c MEANS
+  IF (NOT ((`the Act governs` n) OR b)) AND c THEN 1 ELSE 2
+
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+GIVETH A NUMBER
+`denied one of or` n b MEANS
+  IF (NOT (n EQUALS 1 OR n EQUALS 2)) OR b THEN 1 ELSE 2
+
+-- Three operands, as in Delaware s 165 (commons dg3-subscriptions.l4:211).
+GIVEN n IS A NUMBER
+      b IS A BOOLEAN
+      c IS A BOOLEAN
+      d IS A BOOLEAN
+GIVETH A NUMBER
+`denied or among three` n b c d MEANS
+  IF (NOT (`the Act governs` n)) AND (NOT (b OR c)) AND d THEN 1 ELSE 2
+
+-- An IMPLIES, or an IF, has no word that closes it, so as one operand of a
+-- group it would take in the rest: "neither p nor q implies r" also reads as
+-- (NOT (p OR q)) IMPLIES r.
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A NUMBER
+`implication in a denied or` p q r MEANS
+  IF NOT (p OR (q IMPLIES r)) THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A NUMBER
+`denied or then implication` p q r MEANS
+  IF (NOT (p OR q)) IMPLIES r THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A NUMBER
+`implication first in a denied or` p q r MEANS
+  IF NOT ((q IMPLIES r) OR p) THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+GIVETH A NUMBER
+`implication in a denied and` p q r MEANS
+  IF NOT (p AND (q IMPLIES r)) THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+      s IS A BOOLEAN
+GIVETH A NUMBER
+`implication in a group` p q r s MEANS
+  IF s AND ((q IMPLIES r) OR p) THEN 1 ELSE 2
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+      r IS A BOOLEAN
+      s IS A BOOLEAN
+GIVETH A NUMBER
+`if in a denied or` p q r s MEANS
+  IF NOT ((IF q THEN r ELSE s) OR p) THEN 1 ELSE 2

@@ -1,0 +1,3 @@
+IMPORT prelude
+
+b MEANS "a" `is in` (setFromList (LIST "a", "b"))

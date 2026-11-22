@@ -27,6 +27,8 @@ module LSP.Core.Types.Diagnostics (
   ideErrorText,
   ideErrorWithSource,
   ideErrorFromLspDiag,
+  diagnosticCode,
+  diagnosticCodeDescription,
   prettyDiagnostics,
   prettyDiagnostic,
   IdeResultNoDiagnosticsEarlyCutoff,
@@ -65,11 +67,27 @@ type IdeResult v = ([FileDiagnostic], Maybe v)
 -- | an IdeResult with a fingerprint
 type IdeResultNoDiagnosticsEarlyCutoff  v = (Maybe ByteString, Maybe v)
 
+-- | A stable diagnostic code, as the 'LSP._code' of a diagnostic. Every
+-- diagnostic this server reports has one, so that tooling never has to match on
+-- message text. For what a code promises, see
+-- 'L4.TypeCheck.Types.checkErrorCode'; the list is in
+-- @jl4-lsp/DIAGNOSTIC-CODES.md@.
+diagnosticCode :: T.Text -> Maybe (Int32 |? T.Text)
+diagnosticCode = Just . InR
+
+-- | Where a code is documented, as the 'LSP._codeDescription' of a diagnostic.
+-- One formula for every code and no table: a code with no entry of its own on
+-- the page still links to the page. An entry takes a code by an explicit anchor
+-- in @doc/reference/errors/README.md@.
+diagnosticCodeDescription :: T.Text -> Maybe CodeDescription
+diagnosticCodeDescription slug = Just CodeDescription
+  { _href = Uri ("https://legalese.com/l4/reference/errors#" <> T.replace "/" "-" slug) }
+
 -- | Produce a 'FileDiagnostic' for the given 'NormalizedFilePath'
--- with an error message.
-ideErrorText :: NormalizedUri -> T.Text -> FileDiagnostic
-ideErrorText nfp msg =
-  ideErrorWithSource (Just "compiler") (Just DiagnosticSeverity_Error) nfp msg
+-- with an error message and its stable code ('diagnosticCode').
+ideErrorText :: T.Text -> NormalizedUri -> T.Text -> FileDiagnostic
+ideErrorText code nfp msg =
+  ideErrorWithSource code (Just "compiler") (Just DiagnosticSeverity_Error) nfp msg
 
 -- | Create a 'FileDiagnostic' from an existing 'LSP.Diagnostic' for a
 -- specific 'NormalizedFilePath'.
@@ -96,22 +114,23 @@ attachedReason :: Traversal' Diagnostic (Maybe JSON.Value)
 attachedReason = data_ . non (JSON.object []) . JSON.atKey "attachedReason"
 
 ideErrorWithSource
-  :: Maybe T.Text
+  :: T.Text
+  -> Maybe T.Text
   -> Maybe DiagnosticSeverity
   -> NormalizedUri
   -> T.Text
   -> FileDiagnostic
-ideErrorWithSource source sev fdFilePath msg =
+ideErrorWithSource code source sev fdFilePath msg =
   let lspDiagnostic =
         LSP.Diagnostic {
           _range = noRange,
           _severity = sev,
-          _code = Nothing,
+          _code = diagnosticCode code,
           _source = source,
           _message = msg,
           _relatedInformation = Nothing,
           _tags = Nothing,
-          _codeDescription = Nothing,
+          _codeDescription = diagnosticCodeDescription code,
           _data_ = Nothing
         }
   in

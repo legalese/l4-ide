@@ -1,0 +1,10 @@
+-- A STRING input that has to be given and a MAYBE STRING input that need not
+-- be, for the cases in batch-blank.csv. The MAYBE input is last on purpose.
+@export default describe a code and a note
+GIVEN code IS A STRING
+      note IS A MAYBE STRING
+GIVETH A STRING
+describe code note MEANS
+  CONSIDER note
+    WHEN NOTHING THEN "nothing"
+    WHEN JUST s THEN s

@@ -18,6 +18,26 @@ is met on the numbers and the ruling is back with Meng. Read that alongside RESU
 measures a run-to-run drift on unchanged documents larger than the effect the rerun was for. This
 directory remains materials and evidence, not a verdict.
 
+**The record is frozen; every artifact `prepare.sh` cuts is not.** `A.txt`, `lts.json`, `B.dot`,
+`C.bpmn`, `C.fidelity.txt` and `probes.out` are all regenerated from the corpus, and all of them
+are kept current rather than frozen. The record of what the 48 readers were actually shown is
+`manifest.json` and `transcripts/` — those are the primary evidence for every score in
+`RESULTS.md`, and the regenerated files are not. Do not re-cut `manifest.json` or `transcripts/`
+to make the directory self-consistent: that would score 48 committed readings against a packet
+nobody read. `prepare.sh` ends with `build-manifest.mjs`, which rewrites `manifest.json` with the
+full artifact text, so re-cutting one packet by hand with `prepare.sh`'s own commands is the way
+to keep the record intact.
+
+**What has moved since the runs, measured 2026-09-23 rather than assumed.** The four `B.dot` were
+re-cut on 2026-09-21 and again on 2026-09-23 from `lts/draw-what-it-means`, where five fixes
+changed what `l4 state-graph` writes on a node and on an arrow. **All four `C.bpmn` had also gone
+stale** — the same branch un-elided the act, so a task the packets carry as `name="MUST Pay ..."`
+now exports as `name="MUST Pay t theLandlord amount"` — and were re-cut on 2026-09-23. Three of
+the four `A.txt` were still current; `tenancy/A.txt` went out of date the same day, when
+`jl4/examples/bpmn/tenancy.l4` had its ten deprecated `EXACTLY` keywords swept out, and was re-cut
+with them. One `B.dot` had already drifted from its own source before any of this
+(`contracts/B.dot` said `B must payment OF fine` at a tree that emitted something else).
+
 `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §7.3 gates the two-plane picture (P2d/P2e) on a
 **reader** experiment: can readers answer _what do I owe, what discharges it, what breaches it_
 from the plain list (`l4 lts`, §7.6), and does a picture add _where am I_ and _what happens
@@ -51,25 +71,25 @@ scored against a ground truth derived from the evaluator.
 | `promissory-note`   | `Payment Obligations`, `jl4/examples/legal/promissory-note.l4` | the file's own second `#TRACE` (line 192): one late payment on 3 April 2025               | a real LEST chain (reparation, then a deadline-free reparation of the reparation), see below |
 
 **Why not a Reg CF rule.** The task asked for a regcf rule with a LEST chain, a BPMN golden and a
-runnable `#TRACE`. None exists: `jl4/examples/legal/regcf/regcf.l4`'s three regulative rules
+runnable `#TRACE`. None exists: `jl4/examples/canon/us/regcf/regcf.l4`'s three regulative rules
 (`advertising restriction`, `ongoing reporting obligation`, `resale restriction`) contain **no
 `LEST`** — two are bare `SHANT`s and the third is a `HENCE` cycle — and
-`jl4/examples/legal/regcf/denovo/regcf-denovo.l4` has `LEST BREACH … BECAUSE` arms but no
+`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4` has `LEST BREACH … BECAUSE` arms but no
 `#TRACE` and no BPMN golden. So the fourth is from `jl4/examples/legal/`, per the task's fallback.
 
 ## Files per contract
 
-| file                   | what                                                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `A.txt`                | the `l4 lts` block for the position, default flags (no `--steps`, no `--json`)                                                                                |
-| `B.dot`                | the one `digraph` for the rule from `l4 state-graph FILE`                                                                                                     |
-| `C.bpmn`               | the P1 BPMN: the golden from `jl4/examples/bpmn/expected/` where one exists (`tenancy`, `every-run-example`), else `l4 export FILE --to bpmn --rule NAME`     |
-| `C.fidelity.txt`       | the exporter's fidelity report for `C.bpmn` (golden or freshly cut); not shown to readers                                                                     |
-| `history.txt`          | the position in plain words, for B and C readers                                                                                                              |
-| `truth.json`           | the five questions, the five answers, and per answer the evidence it was read from                                                                            |
-| `lts.json`             | `l4 lts --json` for the position — the Q1–Q3 evidence                                                                                                         |
-| `probes.l4`            | the contract (verbatim) plus `#TRACE`s that extend the position by one or two events — the Q2, Q3, Q5 evidence; `probes.out` is their `l4 lts --steps` output |
-| `position.l4`/`.trace` | `every-run-example` only: the source file with the appended trace that is the position                                                                        |
+| file                   | what                                                                                                                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `A.txt`                | the `l4 lts` block for the position, default flags (no `--steps`, no `--json`)                                                                                                      |
+| `B.dot`                | the one `digraph` for the rule from `l4 state-graph FILE`. **Kept current, so it is no longer the B text the readers saw** — that is in `manifest.json`; see the status block above |
+| `C.bpmn`               | the P1 BPMN: the golden from `jl4/examples/bpmn/expected/` where one exists (`tenancy`, `every-run-example`), else `l4 export bpmn FILE --rule NAME`                                |
+| `C.fidelity.txt`       | the exporter's fidelity report for `C.bpmn` (golden or freshly cut); not shown to readers                                                                                           |
+| `history.txt`          | the position in plain words, for B and C readers                                                                                                                                    |
+| `truth.json`           | the five questions, the five answers, and per answer the evidence it was read from                                                                                                  |
+| `lts.json`             | `l4 lts --json` for the position — the Q1–Q3 evidence                                                                                                                               |
+| `probes.l4`            | the contract (verbatim) plus `#TRACE`s that extend the position by one or two events — the Q2, Q3, Q5 evidence; `probes.out` is their `l4 lts --steps` output                       |
+| `position.l4`/`.trace` | `every-run-example` only: the source file with the appended trace that is the position                                                                                              |
 
 `manifest.json` is the reader-facing bundle: twelve entries `{contract, artifact, text, history,
 questions, truth}` — the **full** text of each artifact, since a reader sees only what the entry
@@ -131,6 +151,12 @@ names, in order: …"_, the note's `LEST` anchor moved (above), and the action t
 member. RESULTS.md §6.1 has the classification and §6.7.3 has why the breach-names clause matters —
 `tenancy` Q3 went 4/4 to 0/4 on it. So "A changed by design" is half true, and the half that is not
 is where run 2's most interesting finding is.
+
+**A full `prepare.sh` un-freezes the record**, because it rewrites `manifest.json` along with the
+artifacts, and `manifest.json` is what the 48 committed readings were made from. To refresh one
+artifact without touching the record — which is what was done for `B.dot` on 2026-09-21 and
+2026-09-23 — cut that file alone with the same command `prepare.sh` uses for it, and say in
+`RESULTS.md` which artifacts have moved away from the reading.
 
 None of the `.l4` files here is under a goldened glob (`CLAUDE.md` §3.1), so they carry no
 `tests/` goldens; `probes.l4` is type-checked by hand with `l4 check` before committing.

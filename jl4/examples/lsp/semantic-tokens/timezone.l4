@@ -1,0 +1,5 @@
+-- TIMEZONE IS declares the time zone of the module. Its two tokens are
+-- part of the declaration, as the keyword of any other declaration is.
+TIMEZONE IS "Etc/UTC"
+
+DECIDE `the answer` IS 42

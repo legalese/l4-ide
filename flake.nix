@@ -40,13 +40,19 @@
           ];
         };
 
-        # working version on AWS
+        # jl4.legalese.com (ap-southeast-1): the beta. It was production until the AWS
+        # deployment on the US west coast replaced it (2026-10). Deploy it from the
+        # unstable branch, from lhs (never on the box: it has 2 GiB):
+        #   nixos-rebuild switch --flake github:legalese/l4-ide/unstable#jl4-aws-2505 \
+        #     --target-host root@jl4.legalese.com
         nixosConfigurations.jl4-aws-2505 = inputs.nixpkgs.lib.nixosSystem {
           system = "x86_64-linux";
 
           modules = [
             (let stateVer = "25.05"; in {
               system.stateVersion = stateVer;
+              # `nixos-version --configuration-revision` on the box names the commit it runs.
+              system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or "unknown";
               # do not change the stateVersion even if you change nixpkgs.url above.
               # the system is not fully stateless because the jl4-websessions component persists l4 programs to sqlite
               jl4-demo = {
@@ -60,6 +66,7 @@
                 text = ''
                 deployed-from-flake-2025-05-12 15:37
                 system.stateVersion = ${stateVer}
+                environment = beta, deployed from the unstable branch (since 2026-10-14)
                 '';
                 mode = "0444";
               };

@@ -27,14 +27,27 @@ arithmetic-heavy files (see below). All 38 compiled and deployed — zero
 | `refused-unsupported` |     5 | backend correctly flags `supported:false` → routes to fallback |
 | `skip-no-cases`       |     0 | (was 1 — `ceo-performance-award` now refuses instead)          |
 
+> **Stale as of 2026-10-13.** The board below was measured before the service's
+> response envelope gained `contents.presumed` (`jl4-service/src/Backend/Api.hs`,
+> `ToJSON ResponseWithReason`). `wrapEvaluationEnvelope` in the runtime does not
+> write it, so no successful evaluation is byte-identical any more: on 2026-10-13
+> every comparable cell classified `value-equal`, before and after the
+> party/action change in ledger #13. The 227 row, "227 of 227 … byte-identical"
+> and "byte-identical natively" below describe the board as it was, and have
+> **not** been re-measured. The 2026-10-13 re-measure covered the 9 files CI's
+> `jl4-mlir-parity-full` runs (120 comparisons, all `value-equal`, 0 `differs`),
+> not the 38 files of this corpus.
+
 **227 of 227 real comparisons (100%) are byte-identical — the extended sweep
 passes (`PARITY OK`).** Re-measured after merging ~6 weeks of `unstable` into the
 lane, where it first came back **213/14** and had to be earned again: `a9caf2f6`
 had changed the reference's wire format (plain constructor names, `NOTHING` as
 `null`, `JUST x` unwrapped) while this backend still spoke the old dialect. See
 **ledger #13** in [`../PARITY-HUNT-LOG.md`](../PARITY-HUNT-LOG.md) — including
-why the party/action backtick asymmetry in a deontic OBLIGATION is correct on
-both sides and must not be harmonised. This is the post-merge board: the three adversarial-lane
+the party/action backtick asymmetry in a deontic OBLIGATION, which was correct on
+both sides when this board was measured and was retired on 2026-10-13, when the
+reference began spelling the action plain too (the dated note at the end of that
+entry has the re-measured board). This is the post-merge board: the three adversarial-lane
 fix sets (#7 string ordering + NUL, #8 fail-closed deontic, #10 EITHER
 `CONSIDER`) plus the ledger-#12 code-point string-builtin fix, measured over the
 coverage.json corpus + `list-probe` + `either-probe` + the four

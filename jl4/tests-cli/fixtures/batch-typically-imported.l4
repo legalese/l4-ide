@@ -1,0 +1,9 @@
+-- l4 batch over a record declared in an IMPORTed module: the JSON decoder
+-- fills a field the row leaves out from that module's DECLARE (T1b).
+
+IMPORT `batch-typically-config-types`
+
+@export Budget
+GIVEN cfg IS A Config
+GIVETH A NUMBER
+budget MEANS cfg's timeout PLUS cfg's retries

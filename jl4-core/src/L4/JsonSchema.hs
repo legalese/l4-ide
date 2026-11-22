@@ -15,9 +15,14 @@ import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
 
-import L4.Export (ExportedFunction (..), ExportedParam (..))
+import L4.Export (ExportedFunction (..), ExportedParam (..), honouredDefault, isRequiredInput)
 import L4.FunctionSchema (typicallyToJson)
+import L4.TypeSynonym (expandSynonyms)
 import L4.Syntax
+import L4.TypeCheck.Environment
+  ( booleanUnique, dateUnique, datetimeUnique, listUnique, maybeUnique
+  , numberUnique, stringUnique, timeUnique
+  )
 import Optics
 
 data JsonSchema = JsonSchema
@@ -153,14 +158,17 @@ buildParamsSchema ctx params =
  where
   addParam :: ExportedParam -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType) -> ([(Text, SchemaType, Bool, Maybe Aeson.Value)], Map Text SchemaType)
   addParam param (acc, defs) =
-    let mdef = typicallyToJson =<< param.paramDefault
+    -- An input with a default a caller may omit is not required (R8; W2 of
+    -- TYPICALLY-ONE-BEHAVIOUR-SPEC.md), and its default is published.
+    let mdef = typicallyToJson =<< honouredDefault param
+        required = isRequiredInput param
     in case param.paramType of
       Nothing ->
-        ((param.paramName, SString param.paramDescription, param.paramRequired, mdef) : acc, defs)
+        ((param.paramName, SString param.paramDescription, required, mdef) : acc, defs)
       Just ty ->
         let (schema, newDefs) = typeToJsonSchema ctx{ctxCollectedDefs = defs} ty
             schemaWithDesc = addDescription schema param.paramDescription
-         in ((param.paramName, schemaWithDesc, param.paramRequired, mdef) : acc, newDefs)
+         in ((param.paramName, schemaWithDesc, required, mdef) : acc, newDefs)
 
   addDescription :: SchemaType -> Maybe Text -> SchemaType
   addDescription st Nothing = st
@@ -180,41 +188,39 @@ buildParamsSchema ctx params =
     SNull -> SNull
 
 typeToJsonSchema :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text SchemaType)
-typeToJsonSchema ctx = \case
+typeToJsonSchema ctx = typeToJsonSchema' ctx . expandApplied
+ where
+  -- A synonym with arguments is decided by what it stands for, as the decoder
+  -- does: its definition would hold the bare parameter. One without is kept
+  -- as a reference to its definition, which holds what it stands for.
+  expandApplied ty = case ty of
+    TyApp _ _ (_ : _) -> expandSynonyms ctx.ctxDeclares ty
+    _ -> ty
+
+typeToJsonSchema' :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text SchemaType)
+typeToJsonSchema' ctx = \case
   Type _ -> (SString Nothing, ctx.ctxCollectedDefs)
   TyApp _ name args ->
-    -- Match on the lower-cased builtin name: L4's resolved builtin type names
-    -- are ALL-CAPS (NUMBER/STRING/BOOLEAN/DATE/DATETIME/LIST/MAYBE), so a
-    -- case-sensitive match against "Number"/… never fired and every builtin
-    -- fell through to a dangling `$ref: "#/$defs/NUMBER"`. Mirror the naming
-    -- convention used by L4.FunctionSchema.primitiveJsonType. The declares
-    -- lookup below deliberately keeps the ORIGINAL-case `typeName` as its key.
+    -- Decide from the resolved type, not from its name. A name says nothing: a
+    -- module may declare, or import, its own `Text`, `Date` or `Time`, and each
+    -- of those is that record or enum, not a JSON string. The builtins have
+    -- uniques of their own, so only they reach these arms.
     let typeName = resolvedToText name
-     in case (Text.toLower typeName, args) of
-          ("number", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("int", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
-          ("integer", []) -> (SInteger Nothing, ctx.ctxCollectedDefs)
-          ("float", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("double", []) -> (SNumber Nothing, ctx.ctxCollectedDefs)
-          ("string", []) -> (SString Nothing, ctx.ctxCollectedDefs)
-          ("text", []) -> (SString Nothing, ctx.ctxCollectedDefs)
-          ("boolean", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
-          ("bool", []) -> (SBoolean Nothing, ctx.ctxCollectedDefs)
-          ("date", []) -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
-          ("datetime", []) -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
-          ("time", []) -> (SStringFormat "time" Nothing, ctx.ctxCollectedDefs)
-          ("list", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SArray innerSchema Nothing, defs)
-          ("listof", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SArray innerSchema Nothing, defs)
-          ("optional", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SAnyOf [innerSchema, SNull] Nothing, defs)
-          ("maybe", [inner]) ->
-            let (innerSchema, defs) = typeToJsonSchema ctx inner
-             in (SAnyOf [innerSchema, SNull] Nothing, defs)
+        unique = getUnique name
+     in case args of
+          [] | unique == numberUnique -> (SNumber Nothing, ctx.ctxCollectedDefs)
+             | unique == stringUnique -> (SString Nothing, ctx.ctxCollectedDefs)
+             | unique == booleanUnique -> (SBoolean Nothing, ctx.ctxCollectedDefs)
+             | unique == dateUnique -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
+             | unique == datetimeUnique -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
+             | unique == timeUnique -> (SStringFormat "time" Nothing, ctx.ctxCollectedDefs)
+          [inner]
+            | unique == listUnique ->
+                let (innerSchema, defs) = typeToJsonSchema ctx inner
+                 in (SArray innerSchema Nothing, defs)
+            | unique == maybeUnique ->
+                let (innerSchema, defs) = typeToJsonSchema ctx inner
+                 in (SAnyOf [innerSchema, SNull] Nothing, defs)
           _ ->
             case Map.lookup typeName ctx.ctxDeclares of
               Just decl ->
@@ -261,7 +267,9 @@ declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
         fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
         (fieldSchema, newDefs) = typeToJsonSchema ctx'{ctxCollectedDefs = defs} fieldTy
         schemaWithDesc = addDescToSchema fieldSchema fieldDesc
-        isRequired = not (isMaybeOrOptionalType fieldTy)
+        -- A field with a TYPICALLY may be left out: the JSON decoders fill it
+        -- from this DECLARE (T1b).
+        isRequired = not (isMaybeOrOptionalType ctx'.ctxDeclares fieldTy) && isNothing mTypically
      in ((fieldNameText, schemaWithDesc, isRequired, typicallyToJson =<< mTypically) : acc, newDefs)
 
   addDescToSchema :: SchemaType -> Maybe Text -> SchemaType
@@ -330,15 +338,18 @@ enumWithPayloads ctx' desc constructors =
             SAnyOf opts _ -> SAnyOf opts (Just d)
             SStringFormat fmt _ -> SStringFormat fmt (Just d)
             SNull -> SNull
-     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType fieldTy), typicallyToJson =<< mTypically) : acc, newDefs)
+     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType ctx''.ctxDeclares fieldTy), typicallyToJson =<< mTypically) : acc, newDefs)
 
--- | Check if a type is MAYBE or Optional, matching the same logic as typeToJsonSchema.
--- Lower-cased for the same reason: the resolved builtin name is ALL-CAPS "MAYBE",
--- so the old case-sensitive match never fired and MAYBE-typed record fields were
--- wrongly emitted as required.
-isMaybeOrOptionalType :: Type' Resolved -> Bool
-isMaybeOrOptionalType (TyApp _ name [_]) = Text.toLower (resolvedToText name) `elem` ["maybe", "optional"]
-isMaybeOrOptionalType _ = False
+-- | Is this the builtin MAYBE, or a synonym for it, the types whose schema can
+-- be null? Decided from the resolved, synonym-expanded type, as the decoder
+-- decides whether a field may be left out: a type a module declares and calls
+-- @Optional@ or @Maybe@ is a @$ref@ to that type, which cannot be null, so
+-- leaving it out of @required@ would describe an input that may be omitted but
+-- not be null.
+isMaybeOrOptionalType :: Map Text (Declare Resolved) -> Type' Resolved -> Bool
+isMaybeOrOptionalType declares ty = case expandSynonyms declares ty of
+  TyApp _ name [_] -> getUnique name == maybeUnique
+  _ -> False
 
 resolvedToText :: Resolved -> Text
 resolvedToText =

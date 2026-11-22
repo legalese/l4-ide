@@ -5,9 +5,16 @@
 -- other three hid a limb behind a local name and the contradiction vanished,
 -- although every one of them is a top-level decision that IS analysed.
 --
--- `parameterised` is the control. A binding that takes arguments stays opaque —
--- substituting under arguments is beta reduction, which this pass does not do —
--- so it must produce NO finding, and it must not lose its arguments on the way.
+-- `parameterised` used to be the control: a binding that takes arguments stayed
+-- opaque, so it produced no finding. Bindings with parameters are now read
+-- through too, by beta reduction (WHERE-INLINING-SPEC.md §9), and
+-- `both of a b AND NOT both of b a` is `a AND b AND NOT (b AND a)`: unsat.
+--
+-- `parameterised, consistent` is the control now, and it guards the arguments.
+-- `both of a b AND NOT both of c d` has four independent inputs and no
+-- redundancy, so it must produce NO finding. A substitution that dropped the
+-- arguments, as the ladder's expand gesture once did, would turn both calls into
+-- the same bare `x AND y` and report a contradiction that is not there.
 
 GIVEN m IS A BOOLEAN
 GIVETH A BOOLEAN
@@ -43,6 +50,15 @@ GIVETH A BOOLEAN
 DECIDE `parameterised` IF
         `both of` a b
     AND NOT `both of` b a
+    WHERE
+        GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+        `both of` x y MEANS x AND y
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `parameterised, consistent` IF
+        `both of` a b
+    AND NOT `both of` c d
     WHERE
         GIVEN x IS A BOOLEAN, y IS A BOOLEAN
         `both of` x y MEANS x AND y

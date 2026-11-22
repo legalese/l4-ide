@@ -1,0 +1,37 @@
+-- A CONSIDER inside an arm of another CONSIDER, with arms of the outer one
+-- after it. `l4 batch` and the REPL re-print the module and run the printed
+-- text, and the printer wrote a CONSIDER's arms comma-separated on one hanging
+-- indent, so the outer's later arms (Green, Blue) were read as more arms of the
+-- INNER one. Here the inner CONSIDER is on another type, so they did not
+-- type-check as its arms, and every row was an error.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+DECLARE Size IS ONE OF Small, Large
+
+GIVEN n IS A NUMBER
+GIVETH A Colour
+colourOf n MEANS
+  IF n EQUALS 0 THEN Red ELSE IF n EQUALS 1 THEN Green ELSE Blue
+
+GIVEN n IS A NUMBER
+GIVETH A Size
+sizeOf n MEANS IF n AT MOST 5 THEN Small ELSE Large
+
+@export An inner CONSIDER that is not the last arm, on another type
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`inner on another type` MEANS
+  CONSIDER colourOf a
+    WHEN Red THEN
+      CONSIDER sizeOf b
+        WHEN Small THEN 1
+        WHEN Large THEN 2
+    WHEN Green THEN 3
+    WHEN Blue THEN 4
+
+#EVAL `inner on another type` 0 1
+#EVAL `inner on another type` 0 9
+#EVAL `inner on another type` 1 1
+#EVAL `inner on another type` 2 9

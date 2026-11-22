@@ -107,6 +107,8 @@ export type Verdict =
   | 'Complies'
   | 'InBreach'
   | 'NotApplicable'
+  /** Evaluation of this case refuses to answer (REFUSE, R7); `refusal` says why. */
+  | 'Refused'
 
 export type QueryOutcome = {
   /** The FUNCTION's truth value. Correct, and not a verdict. */
@@ -152,16 +154,36 @@ export type QueryPlanResponse = {
   impact: Record<string, QueryImpact>
   impactByAtomId: Record<string, QueryImpact>
   note: string
+  /**
+   * Where evaluation of this case is sure to refuse (REFUSE, R7): the reasons it
+   * refuses with, and the refusing leaves it can reach first. `null` everywhere
+   * else.
+   */
+  refusal?: { reasons: string[]; atoms: QueryAtom[] } | null
   ladder?: unknown
+}
+
+/**
+ * The answer for a rule that may refuse to answer: no plan, because a plan
+ * would say which inputs settle an answer the rule may not give. `error` is
+ * the sentence that says why, naming the rule and every reason; `rule` is the
+ * rule as L4 writes it, and `reasons` are the reasons it may refuse with.
+ */
+export type QueryPlanDecline = {
+  kind: 'declined'
+  error: string
+  rule: string
+  reasons: string[]
 }
 
 /**
  * Request type for computing the query plan (elicitation ordering)
  * for a visualized DECIDE function, given current boolean bindings.
+ * A rule that may refuse to answer is declined.
  */
 export const QueryPlanRequestType = makeL4RpcRequestType<
   QueryPlanRequestParams,
-  QueryPlanResponse
+  QueryPlanResponse | QueryPlanDecline
 >('l4/queryPlan')
 
 /****************************************
@@ -251,9 +273,22 @@ export interface GetExportedFunctionsParams {
   verDocId: { uri: string; version: number }
 }
 
+/** An error that stops the file from being deployed: a parse or type error,
+ *  an IMPORT that finds no module, or an import cycle, in the file or in a
+ *  module it imports. */
+export interface BlockingErrorInfo {
+  uri: string
+  /** 1-based */
+  line: number
+  message: string
+}
+
 export interface GetExportedFunctionsResponse {
   functions: ExportedFunctionInfo[]
   importedFiles: string[]
+  /** Non-empty when the file must not be deployed. Absent from older
+   *  language servers. */
+  blockingErrors?: BlockingErrorInfo[]
 }
 
 /**
@@ -263,6 +298,32 @@ export const GetExportedFunctionsRequestType = makeL4RpcRequestType<
   GetExportedFunctionsParams,
   GetExportedFunctionsResponse
 >('l4/getExportedFunctions')
+
+// ---------------------------------------------------------------------------
+// l4/embeddedLibrary — the source of a stdlib module compiled into the server
+// ---------------------------------------------------------------------------
+
+export interface EmbeddedLibraryParams {
+  /** A `jl4-embedded:/<module>.l4` URI, spelled as the server returned it in a
+   *  definition, a diagnostic or an import list. */
+  uri: string
+}
+
+export interface EmbeddedLibraryResponse {
+  /** The module's source: byte-for-byte what the server type-checks when
+   *  another file imports it. */
+  text: string
+}
+
+/**
+ * The standard library that `jl4-lsp` carries inside its binary has no file on
+ * disk, so the server names those modules with `jl4-embedded:` URIs. This is
+ * how a client reads one (to show it read-only, for go-to-definition).
+ */
+export const EmbeddedLibraryRequestType = makeL4RpcRequestType<
+  EmbeddedLibraryParams,
+  EmbeddedLibraryResponse
+>('l4/embeddedLibrary')
 
 // ---------------------------------------------------------------------------
 // l4/exportDocument — deterministic L4 → formatted document
@@ -280,6 +341,9 @@ export interface ExportDocumentParams {
   toc?: boolean
   /** Module URIs to exclude from the render (deselected imports). */
   excludeModules?: string[]
+  /** The language to render, spelled exactly as one of the result's
+   *  `languages` (e.g. "he", "he-IL"). Omitted: the module's own language. */
+  lang?: string
 }
 
 export interface ExportDocumentResult {
@@ -288,6 +352,13 @@ export interface ExportDocumentResult {
   content: string
   /** The structured document IR (always present). */
   ir: unknown
+  /** The distinct languages the main file's wordings are in: the module's
+   *  own language first, then the others. Empty when the file has no
+   *  wordings. Absent from servers that predate it. */
+  languages?: string[]
+  /** The language the returned document is in. Absent from servers that
+   *  predate it. */
+  lang?: string
 }
 
 export const ExportDocumentRequestType = makeL4RpcRequestType<

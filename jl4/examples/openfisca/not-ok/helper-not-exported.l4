@@ -1,0 +1,17 @@
+-- A call to a helper that is not @export. The export does not inline
+-- helpers. The export must REFUSE it, and say so.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`double` x MEANS x TIMES 2
+
+@export Doubled salary
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`doubled` p period MEANS `double` (p's salary)
+
+#ASSERT (`doubled` OF (Person WITH salary IS 10), "2026-01") EQUALS 20

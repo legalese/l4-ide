@@ -85,7 +85,7 @@ spec = describe "Import Resolution" $ do
           -- Should have resolved currency, jurisdiction, prelude (no duplicates)
           length r.tcdResolvedImports `shouldSatisfy` (>= 3)
 
-    it "type-checks BOTH siblings of a diamond against the shared bottom (issue #904)" $ do
+    it "type-checks BOTH siblings of a diamond against the shared bottom (smucclaw/l4-ide#904)" $ do
       -- A -> {left, right} -> bottom, where the SECOND sibling (right) also uses
       -- a binding from bottom. Once left has resolved bottom, a name-only
       -- "already resolved, skip" starves right's dependency environment: right

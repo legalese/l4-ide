@@ -1,0 +1,182 @@
+-- Operands of arithmetic that are not themselves arithmetic, as `l4 render`
+-- reads them: a call, a rule's own sentence, an IF, a library date phrase.
+-- Each pair has different values, and must read differently.
+IMPORT daydate
+IMPORT math
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`f2` a b MEANS a TIMES b
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+@nlg twice %a%
+`twice` a MEANS a TIMES 2
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`call then minus` x MEANS `f2` 2 x MINUS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`minus in a call` x MEANS `f2` 2 (x MINUS 3)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`sentence then minus` x MEANS `twice` x MINUS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`minus in a sentence` x MEANS `twice` (x MINUS 3)
+
+GIVEN c IS A BOOLEAN
+      x IS A NUMBER
+GIVETH A NUMBER
+`if then minus` c x MEANS (IF c THEN 1 ELSE 10) MINUS x
+
+GIVEN d IS A DATE
+GIVETH A NUMBER
+`year then minus` d MEANS (DATE_YEAR d) MINUS 1
+
+GIVEN d IS A DATE
+      n IS A NUMBER
+GIVETH A DATE
+`months less one` d n MEANS `add months` d (n MINUS 1)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`times of minus` x MEANS 4 TIMES (x MINUS 2)
+
+-- Pairs whose texts must differ, each needing more than precedence to read.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+      d IS A NUMBER
+GIVETH A NUMBER
+`call then minus then call` a b c d MEANS a MINUS `f2` b c MINUS d
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+      d IS A NUMBER
+GIVETH A NUMBER
+`minus of a call of minus` a b c d MEANS a MINUS `f2` b (c MINUS d)
+
+-- MODULO does not reassociate with TIMES or DIVIDED BY, so each pair below has
+-- two values: 6 and 2, then 8 and 2, at 2, 7, 4; 2 and 0 at 12, 8, 2; 2 and 6
+-- at 12, 2, 4.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`times of mod` a b c MEANS a TIMES (b MODULO c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod of times` a b c MEANS (a TIMES b) MODULO c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod then times` a b c MEANS (a MODULO b) TIMES c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod of a product` a b c MEANS a MODULO (b TIMES c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod then divided` a b c MEANS (a MODULO b) DIVIDED BY c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod of a quotient` a b c MEANS a MODULO (b DIVIDED BY c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`quotient then mod` a b c MEANS (a DIVIDED BY b) MODULO c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`divided by a mod` a b c MEANS a DIVIDED BY (b MODULO c)
+
+-- A call reads as f(x), which says where it ends, only when it has one input
+-- and no sentence of its own. A rule that happens to share a name with a maths
+-- function is bracketed like any other call: the name decides nothing.
+GIVEN x IS A NUMBER
+      places IS A NUMBER
+GIVETH A NUMBER
+`round` x places MEANS x TIMES places
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+@nlg the floor of %x%
+`floor` x MEANS x TIMES 2
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`round then minus` a b c MEANS `round` a b MINUS c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`minus in a round` a b c MEANS `round` a (b MINUS c)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`floor then minus` x MEANS `floor` x MINUS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`minus in a floor` x MEANS `floor` (x MINUS 3)
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`exp then minus` x MEANS exp x MINUS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`minus in exp` x MEANS exp (x MINUS 3)
+
+-- A mod beside + or −: tighter by the formula's rules, but a word, so a reader
+-- can take "a − b mod c" to be (a − b) mod c.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`plus of mod` a b c MEANS a PLUS (b MODULO c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`minus of mod` a b c MEANS a MINUS (b MODULO c)
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod then minus` a b c MEANS (a MODULO b) MINUS c
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+`mod of a difference` a b c MEANS (a MINUS b) MODULO c

@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+nlg-typically-default.l4:48:1-106:
+  TRUE
+nlg-typically-default.l4:49:1-112:
+  TRUE
+nlg-typically-default.l4:66:1-85:
+  TRUE
+nlg-typically-default.l4:67:1-88:
+  TRUE
+nlg-typically-default.l4:85:1-73:
+  TRUE
+nlg-typically-default.l4:86:1-76:
+  TRUE

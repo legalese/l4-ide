@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-new-name-catch-all.l4:13:15-19:
+  I found a problem while checking the definition of `colour`:
+    The pattern `Gren` in this clause of `colour` is a new name, which matches every input.
+    It is very close to `Green`, a value of its input's type that no clause matches.
+    If you meant that value, correct the spelling; if you meant to match anything, use the input's GIVEN name.
+pattern-matching-new-name-catch-all.l4:14:8-14:
+  I found a problem while checking the definition of `colour`:
+    This clause of `colour` is never used, because the clause above it with the new name `Gren` matches every input.
+    `Gren` is not a value of its input's type, so it is a new name, and a new name matches anything.
+    If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
+pattern-matching-new-name-catch-all.l4:16:1-18:
+  2
+pattern-matching-new-name-catch-all.l4:25:8-13:
+  I found a problem while checking the definition of `price`:
+    This clause of `price` is never used, and neither is the clause after it, because the clause above it with the new name `Gren` matches every input.
+    `Gren` is not a value of its input's type, so it is a new name, and a new name matches anything.
+    If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
+pattern-matching-new-name-catch-all.l4:28:1-18:
+  2
+pattern-matching-new-name-catch-all.l4:35:8-12:
+  I found a problem while checking the definition of `size`:
+    This clause of `size` is never used, because the clause above it with the new name `other` matches every input.
+    `other` is not a value of its input's type, so it is a new name, and a new name matches anything.
+    If you meant a value, correct the spelling; if you meant to match anything, move that clause below the others.
+pattern-matching-new-name-catch-all.l4:37:1-13:
+  2

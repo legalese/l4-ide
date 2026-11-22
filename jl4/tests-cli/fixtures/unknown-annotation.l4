@@ -1,0 +1,6 @@
+@future-annotation this version of L4 has never heard of this one
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `add one` n IS n + 1
+
+#EVAL `add one` 1

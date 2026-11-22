@@ -1,0 +1,110 @@
+name: Haskell dependency cache
+
+# The Haskell job of PR Checks restores its Hackage dependencies from a cache.
+# A pull request may restore a cache saved by itself or by main, and nothing
+# else. PR Checks only ever runs on pull requests, so nothing saved one on main,
+# and the first run of every PR built all of its dependencies again: 15 to 19
+# of its 30 minutes.
+#
+# This builds the dependencies on main and saves them under the very key PR
+# Checks restores. Every PR can restore that cache, and no PR can write to it
+# (a PR's own saves stay with that PR), so what PR builds rest on, including
+# the jl4-service binary they publish, only ever comes from code that has been
+# merged.
+#
+# Keep the environment below identical to the Haskell job in pr-checks.yml:
+# the same container, packages, GHC, cabal and configure flags. Anything that
+# differs makes the cache key, or the store's contents, not match.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.cabal"
+      - "cabal.project"
+      - ".github/workflows/haskell-dependencies.yml"
+  # An unused cache is evicted after a week; PR restores keep it in use, and
+  # this rebuilds it should it go anyway.
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: haskell-dependencies
+  cancel-in-progress: true
+
+jobs:
+  dependencies:
+    name: Build and cache Haskell dependencies
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:24.04
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+
+    steps:
+      - name: Update repositories
+        run: apt update
+      - name: Install deps
+        run: >
+          apt install -y
+          git
+          sudo
+          software-properties-common
+          build-essential
+          curl
+          libffi-dev
+          libffi8
+          libgmp-dev
+          libgmp10
+          libncurses-dev
+          pkg-config
+          zlib1g-dev
+          liblzma-dev
+          xz-utils
+      - name: Update git config
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
+      - uses: actions/checkout@v5
+
+      - name: Update git submodules
+        run: git submodule update --init
+
+      - name: Set up GHC
+        uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: "9.10.2"
+          cabal-version: "latest"
+          cabal-update: true
+
+      - name: Restore cached dependencies
+        uses: actions/cache/restore@v5
+        id: deps-cache
+        env:
+          key: pr-checks-${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ env.key }}-plan-${{ hashFiles('**/*.cabal', 'cabal.project') }}
+          restore-keys: ${{ env.key }}-
+
+      - name: Configure the build
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: |
+          cabal update
+          cabal configure --enable-tests --disable-documentation
+          cabal build all --dry-run
+
+      - name: Install dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: cabal build all --only-dependencies
+
+      - name: Save cached dependencies
+        uses: actions/cache/save@v5
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}

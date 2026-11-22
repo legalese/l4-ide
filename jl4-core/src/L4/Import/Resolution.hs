@@ -48,6 +48,7 @@ module L4.Import.Resolution
   , ImportResolutionError(..)
     -- * Type Checking with Dependencies
   , typecheckWithDependencies
+  , typecheckWithDependenciesLocated
   , TypeCheckWithDepsResult(..)
   ) where
 
@@ -56,10 +57,12 @@ import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
-import L4.Annotation (emptyAnno)
+import L4.Annotation (emptyAnno, rangeOf)
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
+import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.TypeCheck (doCheckProgramWithDependencies, initialCheckState, initialCheckEnv, applyFinalSubstitution)
 import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext, Substitution, Environment, EntityInfo, MixfixRegistry, InfoMap, ScopeMap, NlgMap, DescMap, SectionPaths)
 import qualified L4.TypeCheck as TypeCheck
@@ -176,7 +179,7 @@ data ImportResolutionError
 -- @A -> {B, C} -> D@, once B has resolved D, C must still receive D's exported
 -- environment. Returning @[]@ here (the old, name-set behaviour) type-checked C
 -- against an empty dependency environment, silently degrading the types and
--- entities of the second sibling that A then consumed. See issue #904.
+-- entities of the second sibling that A then consumed. See smucclaw/l4-ide#904.
 resolveImports
   :: forall m. Monad m
   => ModuleLookup m                      -- ^ How to find module sources
@@ -205,7 +208,7 @@ resolveImports lookupModule inProgress resolved (modName : rest)
           -- Parse the module
           case execProgramParserWithHintPass uri source of
             Left parseErrors ->
-              pure $ Left $ ParseError modName $ map (\(PError msg _ _) -> msg) (toList parseErrors)
+              pure $ Left $ ParseError modName $ map (.message) (toList parseErrors)
             
             Right (parsed, _hints, _warnings) -> do
               -- Extract and resolve transitive imports first
@@ -282,6 +285,9 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
   , tcdImplicitReaders :: Set Unique
     -- ^ Definitions with a non-empty read-set, this module's and its imports'.
     -- See 'L4.TypeCheck.Types.CheckResult.implicitReaders'.
+  , tcdAnnotationWarnings :: [Resolve.Warning]
+    -- ^ The main module's annotation warnings, from the parser: an @\@nlg@
+    -- that attaches to nothing, a lone language tag, a slot with spaces in it.
   }
   deriving stock (Generic)
 
@@ -294,25 +300,44 @@ typecheckWithDependencies
   -> NormalizedUri      -- ^ URI of the main module
   -> Text               -- ^ Source code of the main module
   -> m (Either [Text] TypeCheckWithDepsResult)
-typecheckWithDependencies lookupModule uri source = do
+typecheckWithDependencies lookupModule uri source =
+  either (Left . snd) Right <$> typecheckWithDependenciesLocated lookupModule uri source
+
+-- | 'typecheckWithDependencies', where an import error also carries the range
+-- of the main module's @IMPORT@ it belongs to, when that is known: the
+-- @IMPORT@ of the module the error names, or for a cycle, of a module in it.
+typecheckWithDependenciesLocated
+  :: forall m. Monad m
+  => ModuleLookup m     -- ^ How to find module sources
+  -> NormalizedUri      -- ^ URI of the main module
+  -> Text               -- ^ Source code of the main module
+  -> m (Either (Maybe SrcRange, [Text]) TypeCheckWithDepsResult)
+typecheckWithDependenciesLocated lookupModule uri source = do
   -- Parse the main module
   case execProgramParserWithHintPass uri source of
     Left parseErrors ->
-      pure $ Left $ map (\(PError msg _ _) -> msg) (toList parseErrors)
+      pure $ Left (Nothing, map (.message) (toList parseErrors))
     
-    Right (parsed, _hints, _warnings) -> do
+    Right (parsed, _hints, annotationWarnings) -> do
       -- Extract and resolve imports
       let importNames = extractImportNames parsed
+          importRanges = foldTopDecls importRange parsed
+          importRange = \case
+            Import _ (MkImport a n _) -> [(rawNameToText (rawName n), rangeOf a)]
+            _ -> []
+          rangeOfImportOf names = case [ r | (n, Just r) <- importRanges, n `elem` names ] of
+            r : _ -> Just r
+            [] -> Nothing
       
       importResult <- resolveImports lookupModule Set.empty Map.empty importNames
       
       case importResult of
         Left (ModuleNotFound modName searched) ->
-          pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
+          pure $ Left (rangeOfImportOf [modName], ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"])
         Left (ParseError modName errs) ->
-          pure $ Left $ ("Parse error in " <> modName <> ":") : errs
+          pure $ Left (rangeOfImportOf [modName], ("Parse error in " <> modName <> ":") : errs)
         Left (CyclicImport cycleModules) ->
-          pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
+          pure $ Left (rangeOfImportOf cycleModules, ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules])
         
         Right resolvedImports -> do
           -- Combine environments from imports
@@ -345,6 +370,7 @@ typecheckWithDependencies lookupModule uri source = do
             , tcdUri = uri
             , tcdSectionPaths = result.sectionPaths
             , tcdImplicitReaders = result.implicitReaders
+            , tcdAnnotationWarnings = annotationWarnings
             }
 
 -- ----------------------------------------------------------------------------
@@ -371,6 +397,9 @@ combineResolvedImports uri imports =
         , TypeCheck.constBodies = finalState.constBodies
         , TypeCheck.sectionPaths = finalState.sectionPaths
         , TypeCheck.deferredChoices = 0
+        , TypeCheck.plural = False
+        , TypeCheck.bindLog = []
+        , TypeCheck.bindLogLen = 0
         }
     , finalEnv
     )
@@ -405,6 +434,9 @@ combineResolvedImports uri imports =
                -- imported 'Unique' is still never ranked (spec §5.5, FIX C).
              , TypeCheck.sectionPaths = Map.union accState.sectionPaths r.sectionPaths
              , TypeCheck.deferredChoices = 0
+             , TypeCheck.plural = False
+             , TypeCheck.bindLog = []
+             , TypeCheck.bindLogLen = 0
              }
          , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders
          )

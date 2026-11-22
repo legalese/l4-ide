@@ -1,0 +1,23 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regulative-lest-layout.l4:148:1-19:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 LEST (PARTY Buyer MUST payment 120 WITHIN 14)) LEST (BREACH BY Seller)
+regulative-lest-layout.l4:149:1-18:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MAY cancel WITHIN 7) LEST (BREACH BY Seller)
+regulative-lest-layout.l4:150:1-25:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7) LEST (BREACH BY Seller)
+regulative-lest-layout.l4:151:1-18:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7) LEST (BREACH BY Seller)
+regulative-lest-layout.l4:152:1-20:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 HENCE (PARTY Seller MUST delivery WITHIN 9)) LEST (BREACH BY Seller)
+regulative-lest-layout.l4:153:1-28:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 LEST (BREACH BY Buyer)) LEST (BREACH BY Seller)
+regulative-lest-layout.l4:154:1-24:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 LEST (PARTY Buyer MUST payment 120 WITHIN 14 LEST (BREACH BY Seller)))
+regulative-lest-layout.l4:155:1-32:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 HENCE FULFILLED) LEST (BREACH BY Seller)
+regulative-lest-layout.l4:156:1-44:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 LEST (BREACH BY Buyer)) LEST (BREACH BY Seller)
+regulative-lest-layout.l4:157:1-20:
+  PARTY Seller MUST delivery WITHIN 3 HENCE (PARTY Buyer MUST payment 100 WITHIN 7 LEST (BREACH BY Buyer))

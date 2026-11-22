@@ -35,7 +35,7 @@
 -- 2023-01-01, 9% from 2024-01-01) because a reader should be able to check
 -- them; the module is still an exhibit, not a formalisation of the Act.
 --
--- The heading below is load-bearing: `l4 export --to=dmn` with no
+-- The heading below is load-bearing: `l4 export dmn` with no
 -- `--model-name` takes the model name from the outermost `§`.
 
 IMPORT prelude

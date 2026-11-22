@@ -12,6 +12,7 @@ import Options.Applicative
   ( Parser
   , ParserInfo
   , command
+  , commandGroup
   , customExecParser
   , footer
   , footerDoc
@@ -19,26 +20,47 @@ import Options.Applicative
   , header
   , helper
   , info
+  , metavar
   , progDesc
   , prefs
   , showHelpOnEmpty
   , subparser
   )
+import qualified Data.Text as Text
 import qualified Options.Applicative as Options
 import qualified Options.Applicative.Help.Pretty as Pretty
 import System.IO (hSetEncoding, stdin, stdout, stderr)
 
+import LSP.L4.BuildInfo (buildInfoLine)
+
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
-import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxOptionsParser)
+import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxExportOptionsParser, blawxImportOptionsParser)
 import L4.Cli.Catala (CatalaOptions, catalaCmd, catalaOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
+import L4.Cli.Deploy
+  ( DeployOptions
+  , DeploymentsOptions
+  , UndeployOptions
+  , deployCmd
+  , deployOptionsParser
+  , deploymentsCmd
+  , deploymentsOptionsParser
+  , redeployCmd
+  , redeployOptionsParser
+  , undeployCmd
+  , undeployOptionsParser
+  )
 import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
-import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
+import L4.Cli.Explore (ExploreCliOptions, exploreCmd, exploreOptionsParser)
+import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
+import L4.Cli.Install (InstallOptions, installCmd, installOptionsParser)
 import L4.Cli.Lts (LtsOptions, ltsCmd, ltsOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
+import L4.Cli.CoverageReport (CoverageOptions, coverageBound, coverageCmd, coverageOptionsParser)
+import L4.Cli.Prove (ProveOptions, proveBound, proveCmd, proveOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
@@ -66,8 +88,16 @@ data Command
   | CmdDocassemble DocassembleOptions
   | CmdNlg        NlgOptions
   | CmdLts        LtsOptions
+  | CmdExplore    ExploreCliOptions
   | CmdVerify     VerifyOptions
+  | CmdProve      ProveOptions
+  | CmdCoverage   CoverageOptions
   | CmdYscript    YscriptOptions
+  | CmdDeploy     DeployOptions
+  | CmdRedeploy   DeployOptions
+  | CmdUndeploy   UndeployOptions
+  | CmdDeployments DeploymentsOptions
+  | CmdInstall    InstallOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -78,54 +108,44 @@ commandParser =
   where
     subcommandSet =
          command "run"
-           (info (CmdRun <$> runOptionsParser)
+           (info (helper <*> (CmdRun <$> runOptionsParser))
              (progDesc "Typecheck and evaluate an L4 file (prints diagnostics + #EVAL results)"))
       <> command "check"
-           (info (CmdCheck <$> checkOptionsParser)
+           (info (helper <*> (CmdCheck <$> checkOptionsParser))
              (progDesc "Typecheck an L4 file only (fast path; no evaluation)"))
       <> command "format"
-           (info (CmdFormat <$> formatOptionsParser)
-             (progDesc "Reformat an L4 file and print to stdout"))
+           (info (helper <*> (CmdFormat <$> formatOptionsParser))
+             (progDesc "Print an L4 file to stdout exactly as written"))
       <> command "ast"
-           (info (CmdAst <$> astOptionsParser)
+           (info (helper <*> (CmdAst <$> astOptionsParser))
              (progDesc "Dump the parsed AST of an L4 file"))
       <> command "batch"
-           (info (CmdBatch <$> batchOptionsParser)
+           (info (helper <*> (CmdBatch <$> batchOptionsParser))
              -- "NDJSON" here is the OUTPUT default (--output-format); the input
              -- side reads json|yaml|csv and has no ndjson reader. The summary
              -- used to say just "NDJSON streaming", which read as if
              -- `--input-format ndjson` were available (smucclaw/l4-ide#932).
              (progDesc "Evaluate an @export function against many input rows (json|yaml|csv in, NDJSON streaming out)"))
       <> command "trace"
-           (info (CmdTrace <$> traceOptionsParser)
+           (info (helper <*> (CmdTrace <$> traceOptionsParser))
              (progDesc "Render #EVALTRACE evaluation traces as GraphViz (dot|png|svg)"))
       <> command "state-graph"
-           (info (CmdStateGraph <$> stateGraphOptionsParser)
+           (info (helper <*> (CmdStateGraph <$> stateGraphOptionsParser))
              (progDesc "Extract regulative-rule state transition graphs as GraphViz DOT"))
       <> command "render"
-           (info (CmdRender <$> renderOptionsParser)
+           (info (helper <*> (CmdRender <$> renderOptionsParser))
              (progDesc "Render an L4 file to a formatted document (html|text|json|plan)"))
-      <> command "export"
-           (info (CmdExport <$> exportOptionsParser)
-             (progDesc "Export an L4 file to a foreign interchange notation (dmn|dmn-md|bpmn) with a fidelity report"))
-      <> command "openfisca"
-           (info (CmdOpenFisca <$> openFiscaOptionsParser)
-             (progDesc "Compile the decision-rule subset of an L4 file to a runnable OpenFisca Python module"))
-      <> command "blawx"
-           (info (CmdBlawx <$> blawxOptionsParser)
-             (progDesc "Compile the decision-rule subset of an L4 file to a Blawx project (.blawx YAML + s(CASP) dump)"))
-      <> command "catala"
-           (info (helper <*> (CmdCatala <$> catalaOptionsParser))
-             (progDesc "Compile the constitutive subset of an L4 file to a literate Catala module"))
-      <> command "docassemble"
-           (info (CmdDocassemble <$> docassembleOptionsParser)
-             (progDesc "Compile the decision-rule subset of an L4 file to a docassemble interview (YAML), with a fidelity report"))
       <> command "nlg"
            (info (helper <*> (CmdNlg <$> nlgOptionsParser))
              (progDesc "Linearize a module's directives to natural-language prose (the .nlg golden payload)"))
       <> command "lts"
            (info (helper <*> (CmdLts <$> ltsOptionsParser))
              (progDesc "List, for every #TRACE, what is owed now, what would discharge it, what would breach it, and the next deadline"))
+      <> command "explore"
+           (info (helper <*> (CmdExplore <$> exploreOptionsParser))
+             ( progDesc "Every position a contract can reach, as an explicit labelled transition system, ending in a coverage line"
+             <> footer "Exit status: 0 complete, and every property named holds; 1 the file or an option failed, or an emitted file could not be written; 2 an act was refused (a variable whose type has no finite set of values) or a candidate could not be tried; 3 the depth or state bound stopped it; 4 a property is violated; 5 a property's verdict is unknown (every liveness property: run the emitted model). No sample is ever tried in a refused act's place."
+             ))
       -- `helper` here, and not on the older subcommands, is deliberate rather
       -- than inconsistent-by-accident: `l4 <cmd> --help` answers
       -- `Invalid option '--help'` for every subcommand that predates these two,
@@ -138,9 +158,78 @@ commandParser =
            (info (helper <*> (CmdVerify <$> verifyOptionsParser))
              (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
                <> footerDoc (Just (verbatim propositionalBound))))
-      <> command "yscript"
-           (info (CmdYscript <$> yscriptOptionsParser)
-             (progDesc "Compile the pure-propositional-logic subset of an L4 file to AustLII DataLex's yscript rule language (one-way, no fidelity report)"))
+      <> command "prove"
+           (info (helper <*> (CmdProve <$> proveOptionsParser))
+             (progDesc "Prove or refute, with an SMT solver (z3), each #ASSERT the evaluator cannot decide because it reads a section GIVEN"
+               <> footerDoc (Just (verbatim proveBound))))
+      <> command "coverage"
+           (info (helper <*> (CmdCoverage <$> coverageOptionsParser))
+             (progDesc "List the buckets of every decision of a file (each combination of its separate conditions), with an input that realises each one and L4's answer there, and the buckets nothing can realise"
+               <> footerDoc (Just (verbatim coverageBound))))
+      <> command "export"
+           (info (helper <*> exportFormats)
+             (progDesc "Write an L4 module out in another notation: an interchange document, a runnable program, or an interview. Run `l4 export --help` for the formats, `l4 export FORMAT --help` for each one's options"))
+      <> command "import"
+           (info (helper <*> importFormats)
+             (progDesc "Read another notation into L4 source. Run `l4 import --help` for the formats"))
+      <> command "deploy"
+           (info (helper <*> (CmdDeploy <$> deployOptionsParser))
+             (progDesc "Deploy an L4 file and its imports as a new deployment (Legalese Cloud, or --server)"))
+      <> command "redeploy"
+           (info (helper <*> (CmdRedeploy <$> redeployOptionsParser))
+             (progDesc "Update an existing deployment; refuses breaking changes unless --force"))
+      <> command "undeploy"
+           (info (helper <*> (CmdUndeploy <$> undeployOptionsParser))
+             (progDesc "Delete a deployment"))
+      <> command "deployments"
+           (info (helper <*> (CmdDeployments <$> deploymentsOptionsParser))
+             (progDesc "List deployments"))
+      <> command "install"
+           (info (helper <*> (CmdInstall <$> installOptionsParser))
+             (progDesc "Install a companion tool: `l4 install legalese` (the Legalese Cloud CLI)"))
+
+    -- One subcommand per foreign notation (CLI-SURFACE-SPEC C1). Each was a
+    -- top-level verb, or a `--to` value on `l4 export`, until 2026-09-24.
+    -- Adding a backend adds one entry here, and `l4 export --help` is the
+    -- catalogue of every notation L4 can write.
+    exportFormats =
+      subparser
+        (  metavar "FORMAT"
+        <> commandGroup "Formats:"
+        <> command "dmn"
+             (info (helper <*> (CmdExport <$> exportDmnOptionsParser))
+               (progDesc "DMN 1.3 XML decision model, with a fidelity report"))
+        <> command "dmn-md"
+             (info (helper <*> (CmdExport <$> exportDmnMarkdownOptionsParser))
+               (progDesc "dmnmd markdown decision tables, with a fidelity report"))
+        <> command "bpmn"
+             (info (helper <*> (CmdExport <$> exportBpmnOptionsParser))
+               (progDesc "BPMN 2.0 XML process for one regulative rule, with a fidelity report"))
+        <> command "openfisca"
+             (info (helper <*> (CmdOpenFisca <$> openFiscaOptionsParser))
+               (progDesc "A runnable OpenFisca Python module of the decision-rule subset"))
+        <> command "blawx"
+             (info (helper <*> (CmdBlawx <$> blawxExportOptionsParser))
+               (progDesc "A Blawx project (.blawx YAML + s(CASP) dump) of the decision-rule subset"))
+        <> command "catala"
+             (info (helper <*> (CmdCatala <$> catalaOptionsParser))
+               (progDesc "A literate Catala module of the constitutive subset"))
+        <> command "docassemble"
+             (info (helper <*> (CmdDocassemble <$> docassembleOptionsParser))
+               (progDesc "A docassemble interview (YAML) of the decision-rule subset, with a fidelity report"))
+        <> command "yscript"
+             (info (helper <*> (CmdYscript <$> yscriptOptionsParser))
+               (progDesc "AustLII DataLex yscript for the pure-propositional-logic subset (one-way, no fidelity report)"))
+        )
+
+    importFormats =
+      subparser
+        (  metavar "FORMAT"
+        <> commandGroup "Formats:"
+        <> command "blawx"
+             (info (helper <*> (CmdBlawx <$> blawxImportOptionsParser))
+               (progDesc "Lift a .blawx project to L4 source"))
+        )
 
 -- | A footer that keeps the line breaks it was written with.
 --
@@ -154,12 +243,21 @@ verbatim :: String -> Pretty.Doc
 verbatim = Pretty.vsep . fmap Pretty.pretty . lines
 
 commandInfo :: ParserInfo Command
-commandInfo = info (helper <*> commandParser)
+commandInfo = info (helper <*> versionOption <*> commandParser)
   ( fullDesc
   <> header "l4 — the L4 computational-law CLI"
-  <> progDesc "Typecheck, evaluate, format, and visualize .l4 files. Run `l4 <command> --help` for per-command options."
+  <> progDesc "Typecheck, evaluate, format, visualize and deploy .l4 files, and export them to (or import them from) other notations. Run `l4 <command> --help` for per-command options."
   <> footer "Part of the L4 tool family from Legalese.com"
   )
+
+-- | @l4 --version@: one line naming the build, @dev@ for a local build
+-- ("LSP.L4.BuildInfo"). It is an option of @l4@ itself and not a subcommand,
+-- because @l4 version@ already means the file called @version@ (the
+-- fall-through to @l4 run@ above).
+versionOption :: Parser (a -> a)
+versionOption =
+  Options.infoOption (Text.unpack buildInfoLine)
+    (Options.long "version" <> Options.help "Print the version of this build and exit")
 
 main :: IO ()
 main = do
@@ -200,8 +298,16 @@ main = do
     CmdDocassemble opts -> docassembleCmd opts
     CmdNlg        opts -> nlgCmd        opts
     CmdLts        opts -> ltsCmd        opts
+    CmdExplore    opts -> exploreCmd    opts
     CmdVerify     opts -> verifyCmd     opts
+    CmdProve      opts -> proveCmd      opts
+    CmdCoverage   opts -> coverageCmd   opts
     CmdYscript    opts -> yscriptCmd    opts
+    CmdDeploy     opts -> deployCmd     opts
+    CmdRedeploy   opts -> redeployCmd   opts
+    CmdUndeploy   opts -> undeployCmd   opts
+    CmdDeployments opts -> deploymentsCmd opts
+    CmdInstall    opts -> installCmd    opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.

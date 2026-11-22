@@ -1,0 +1,30 @@
+`JUST` with `TRUE` has been proven true
+`JUST` with `FALSE` has been proven true
+`NOTHING` has been proven true
+`JUST` with `TRUE` has not been proven true
+`JUST` with `FALSE` has not been proven true
+`NOTHING` has not been proven true
+`JUST` with `TRUE` has not been proven false
+`JUST` with `FALSE` has not been proven false
+`NOTHING` has not been proven false
+`NOTHING` has been proven true is equal to `FALSE`
+`NOTHING` has not been proven false is equal to `TRUE`
+`NOTHING` has not been proven true
+not `JUST` with `TRUE` has not been proven true
+`decided` with `JUST` with `FALSE`
+not `decided` with `NOTHING`
+`in breach` with `NOTHING`
+not `in breach` with `JUST` with `TRUE`
+`may park` with `NOTHING`
+not `may park` with `JUST` with `TRUE`
+`_ kand _` with `NOTHING` and `JUST` with `FALSE`
+`_ kand _` with `NOTHING` and `JUST` with `TRUE`
+`_ kor _` with `NOTHING` and `JUST` with `TRUE`
+`_ kor _` with `NOTHING` and `JUST` with `FALSE`
+`knot` with `NOTHING`
+`_ kand _` with `NOTHING` and `JUST` with `FALSE` is equal to `JUST` with `FALSE`
+`_ kand _` with `NOTHING` and `JUST` with `TRUE` is equal to `NOTHING`
+`_ kor _` with `NOTHING` and `JUST` with `TRUE` is equal to `JUST` with `TRUE`
+`knot` with `JUST` with `TRUE` is equal to `JUST` with `FALSE`
+`_ kor _` with `NOTHING` and `knot` with `NOTHING` is equal to `NOTHING`
+`_ kand _` with `NOTHING` and `JUST` with `TRUE` has been proven true is equal to `FALSE`

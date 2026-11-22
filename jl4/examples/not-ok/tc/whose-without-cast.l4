@@ -1,0 +1,22 @@
+-- WHOSE with no cast: there is no constructor to take the fields from, so the
+-- checker asks for the cast or for WHO (§13.6, RULED 2026-09-21).
+IMPORT prelude
+
+DECLARE Actor IS ONE OF
+    Tenant HAS tname IS A STRING
+               arrears IS A NUMBER
+DECLARE Action IS ONE OF
+    Pay HAS payer IS AN Actor
+
+alice MEANS Tenant WITH tname IS "Alice", arrears IS 1200
+everyone MEANS LIST alice
+
+GIVETH A DEONTIC Actor Action
+`no cast to read fields from` MEANS
+    EVERY t IN everyone
+        WHOSE  arrears AT LEAST 1000
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH

@@ -1,0 +1,26 @@
+-- Two overloads of one mixfix pattern in ONE module, on numbers and on strings,
+-- each with a herald of its own. A call reads the herald of the overload it
+-- resolved to. The prefix counterpart of this is the second pair of overloads in
+-- jl4/examples/ok/pattern-matching-overloads-own-annotations.l4.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+@nlg the smaller number of %a% and %b%
+`the lower of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A STRING
+@nlg whichever of %a% and %b% comes first in the alphabet
+`the lower of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+#EVAL `the lower of` 3 `and` 4
+#EVAL `the lower of` "x" `and` "y"
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`own cap` n MEANS `the lower of` n `and` 100
+
+GIVEN s IS A STRING
+GIVETH A STRING
+`own first name` s MEANS `the lower of` s `and` "m"

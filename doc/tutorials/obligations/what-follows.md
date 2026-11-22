@@ -16,6 +16,7 @@ The same tenancy. Ms Ng lets a flat to Alice; the rent is $1,500, due by the sev
 - **If Alice misses the seventh, she may still pay within fourteen more days, with a $50 late fee.**
 - **Alice may pay more than the rent, and the receipt is for whatever she paid.**
 - **Alice's father, Mr Lim, guarantees the rent** — and there are two quite different things that sentence can mean.
+- **The receipt is counted from the day the rent fell due, and the deposit comes back no sooner than fourteen days after the last month's rent** — deadlines measured from somewhere other than "now".
 
 Each of those is written by putting something other than `FULFILLED` or `BREACH` after `HENCE` or `LEST`. What goes there is another obligation. That is the whole idea of this page: **the two "then what" lines can each name a further obligation, and a lease is a chain of them.**
 
@@ -92,7 +93,7 @@ And if Alice never pays, the receipt never becomes due, because the chain never 
 
 ```l4
 #TRACE `rent, then receipt` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -129,7 +130,7 @@ Alice misses the seventh, then pays $1,550 on day 15:
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY Alice DOES Pay Alice `Ms Ng` 1550 AT 15
 ```
 
@@ -142,7 +143,7 @@ Look at what is owed on day 8, when the miss has just come to light:
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -150,13 +151,13 @@ Result:
   PARTY Alice MUST Pay Alice `Ms Ng` 1550 WITHIN 13 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
 ```
 
-The original obligation is gone; the second chance is what stands, with thirteen days left on its clock. **Where does the second clock start?** At day 7 — the deadline Alice missed — and not at day 8, the day the miss came to light. Fourteen days from day 7 is day 21, which is what a lease saying "fourteen more days from the seventh" means; on day 8, one of those days has already gone. L4 only _learns_ that a deadline has passed when the next event arrives, but the second obligation is counted from the deadline regardless of when that is, so a tenant who misses the seventh and then goes quiet does not gain a day for every day of silence. The ``(`WAIT UNTIL` 8)`` that every miss on this page begins with is there to show the miss on the screen before anything else happens; it does not set the clock.
+The original obligation is gone; the second chance is what stands, with thirteen days left on its clock. **Where does the second clock start?** At day 7 — the deadline Alice missed — and not at day 8, the day the miss came to light. Fourteen days from day 7 is day 21, which is what a lease saying "fourteen more days from the seventh" means; on day 8, one of those days has already gone. L4 only _learns_ that a deadline has passed when the next event arrives, but the second obligation is counted from the deadline regardless of when that is, so a tenant who misses the seventh and then goes quiet does not gain a day for every day of silence. The `(WAITUNTIL 8)` that every miss on this page begins with is there to show the miss on the screen before anything else happens; it does not set the clock.
 
 Alice pays the plain rent on day 15, forgetting the fee:
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 15
 ```
 
@@ -169,8 +170,8 @@ Not the payment the second chance asks for, so it is passed over, and she has si
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
-    (`WAIT UNTIL` 8)
-    (`WAIT UNTIL` 40)
+    (WAITUNTIL 8)
+    (WAITUNTIL 40)
 ```
 
 ```
@@ -254,7 +255,7 @@ A receipt for $1,500 is not the receipt that is owed, and by day 12 Ms Ng is in 
 #TRACE `rent, receipt for the amount paid` AT 0 WITH
     PARTY Alice   DOES Pay Alice `Ms Ng` 1600     AT 6
     PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 9
-    (`WAIT UNTIL` 12)
+    (WAITUNTIL 12)
 ```
 
 ```
@@ -319,7 +320,7 @@ Alice misses the seventh; Mr Lim pays on day 15:
 
 ```l4
 #TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
     PARTY `Mr Lim` DOES Pay `Mr Lim` `Ms Ng` 1500 AT 15
 ```
 
@@ -354,14 +355,14 @@ Result:
   FULFILLED
 ```
 
-His payment on day 20 is the event that reveals Alice's default, and it is then offered to the obligation that the default brings into being — his own — which it satisfies. Step 2's rule about the second clock is at work here: Mr Lim's fourteen days begin at day 7, the deadline Alice missed, and end on day 21, so his payment on day 20 is on time by one day. Had he paid on day 22 instead, the same payment would have revealed Alice's default _and_ his own, and the breach would be his. The day a deadline passed does not have to be written down for the clock to be right; this page's other examples do it with `WAIT UNTIL` so that the miss is visible on the screen before the next thing happens.
+His payment on day 20 is the event that reveals Alice's default, and it is then offered to the obligation that the default brings into being — his own — which it satisfies. Step 2's rule about the second clock is at work here: Mr Lim's fourteen days begin at day 7, the deadline Alice missed, and end on day 21, so his payment on day 20 is on time by one day. Had he paid on day 22 instead, the same payment would have revealed Alice's default _and_ his own, and the breach would be his. The day a deadline passed does not have to be written down for the clock to be right; this page's other examples do it with `WAITUNTIL` so that the miss is visible on the screen before the next thing happens.
 
 And if neither of them pays, the breach is Mr Lim's, because the last obligation standing was his:
 
 ```l4
 #TRACE `rent, guaranteed by Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
-    (`WAIT UNTIL` 30)
+    (WAITUNTIL 8)
+    (WAITUNTIL 30)
 ```
 
 ```
@@ -414,7 +415,7 @@ Alice paying on day 5 settles it just the same. With nothing paid yet, both obli
 
 ```l4
 #TRACE `rent, Alice or Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 3)
+    (WAITUNTIL 3)
 ```
 
 ```
@@ -428,7 +429,7 @@ And if neither pays by the seventh:
 
 ```l4
 #TRACE `rent, Alice or Mr Lim` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 ```
 
 ```
@@ -440,6 +441,83 @@ Result:
 ```
 
 Both of them failed, and the screen names both, in the order the rule wrote them, each with the reason from their own side. A choice between obligations is only broken when every one of its sides is lost; when that happens the breach carries one line per side — whom, and why — so you do not have to guess whose reason you are reading. [Several Parties](several-parties.md) comes back to this, because it matters more when there are three flatmates than when there is one guarantor.
+
+---
+
+## Step 6: Counting From Somewhere Else
+
+Every `WITHIN` so far has counted from the moment its obligation arose: the receipt's five days from the payment, the late fee's fourteen from the missed deadline. Leases often count from a different point. "The landlord will issue a receipt within five days of the rent falling due" does not care when Alice actually paid; it cares about the seventh.
+
+Say where to count from with `OF`:
+
+```l4
+GIVETH A DEONTIC Actor Action
+`rent, receipt counted from the due date` MEANS
+    PARTY  Alice
+    MUST   (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  PARTY  `Ms Ng`
+           MUST   (Receipt `Ms Ng` Alice 1500)
+           WITHIN 5 OF THE DEADLINE
+```
+
+`THE DEADLINE` is the deadline of the obligation this one follows — Alice's seventh — so the receipt is due on day 12 whether Alice pays on day 2 or day 6. Alice pays on day 2 and Ms Ng issues the receipt on day 11:
+
+```l4
+#TRACE `rent, receipt counted from the due date` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 2
+    PARTY `Ms Ng` DOES Receipt `Ms Ng` Alice 1500 AT 11
+```
+
+```
+Result:
+  FULFILLED
+```
+
+Written as a plain `WITHIN 5`, the same trace would be a breach: five days from the payment on day 2 is day 7, and day 11 is late.
+
+There are three points to count from, all of them positions in the life of the obligation this one follows:
+
+| write             | counts from                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| `OF THE JOIN`     | the moment the earlier obligation was met — what a plain `HENCE` does |
+| `OF THE DEADLINE` | the earlier obligation's own deadline                                 |
+| `OF THE ARMING`   | the moment the earlier obligation arose                               |
+
+and `OF` can also take a date, when the lease names one. An anchor has to have something to be the position of, so `OF THE JOIN` at the top of a rule, with no earlier obligation, is refused with a message saying why. The [WITHIN reference](../../reference/regulative/consequences.md#within) has the rest, including the forms that are refused.
+
+**A window that opens later.** Some duties may not be performed _too early_ either. When the last month's rent is paid, the deposit comes back — but not in the first fourteen days, which is when the landlord inspects the flat, and within sixteen days after that:
+
+```l4
+GIVETH A DEONTIC Actor Action
+`last month's rent, then the deposit back` MEANS
+    PARTY  Alice
+    MUST   (Pay Alice `Ms Ng` 1500)
+    WITHIN 7
+    HENCE  PARTY  `Ms Ng`
+           MUST   (Pay `Ms Ng` Alice 500)
+           AFTER  14
+           WITHIN 16
+```
+
+`AFTER 14` opens the window fourteen days after the rent is paid, and `WITHIN 16` closes it sixteen days after _that_ — the second number counts from where the first one left off. Alice pays on day 2, so the window is day 16 to day 32. Ms Ng, keen to be done with it, refunds on day 5:
+
+```l4
+#TRACE `last month's rent, then the deposit back` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 2
+    PARTY `Ms Ng` DOES Pay `Ms Ng` Alice 500 AT 5
+```
+
+```
+Result:
+  PARTY `Ms Ng` MUST Pay `Ms Ng` Alice 500 AFTER 11 WITHIN 16 HENCE FULFILLED
+Notes:
+  PARTY `Ms Ng` did Pay `Ms Ng` Alice 500 at 5, before the window opened at 16: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 32), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+```
+
+An act before the window opens does not count. It is not a breach either — the duty is simply still owed — and the run says so in a `Notes:` line, because an act that quietly counts for nothing is exactly the kind of thing a reader needs told. Refunding on day 20 instead is inside the window, and the result is `FULFILLED`.
+
+If the lease measures both edges from the same point — "no sooner than fourteen days and no later than thirty days after payment" — say so with `OF`: `AFTER 14 WITHIN 30 OF THE JOIN` is the same day-16-to-day-32 window, written the way that lease writes it. The [AFTER reference](../../reference/regulative/AFTER.md) explains why the plain form counts the second number from the first.
 
 ---
 
@@ -458,11 +536,12 @@ The three things the screen can say are the same as for one obligation, but they
 ## What You Learned
 
 - **`HENCE` and `LEST` can each name another obligation.** A lease is a chain of them, and every chain ends at a `FULFILLED` or a `BREACH`.
-- **The next clock starts where the previous link ended**: for `HENCE`, at the act that discharged it; for `LEST`, at the deadline that was missed — not at the later event that brought the miss to light.
+- **The next clock starts where the previous link ended**: for `HENCE`, at the act that discharged it; for `LEST`, at the deadline that was missed — not at the later event that brought the miss to light. Step 6 shows how to count from somewhere else.
 - **An act can accept any amount**: leave the amount as a blank, test it with `PROVIDED`, and hand it on to a rule that gives the next obligation, so that the same obligation can be used from more than one place.
 - **A named figure and a literal figure are required the same way.** A name in an act requires the value it names, whether that name sits on the whole act or on one figure inside it; there is no special keyword for it any more.
 - **Two guarantees, one word apart.** A guarantor who pays only after the tenant's default is a `LEST`. A guarantor the landlord may go to first is a `ROR`. Which one the source text says is a question of law, and the encoding has to answer it.
 - **A choice is broken only when every side is lost**, and the screen then names everyone who failed, one line each, with each side's own reason.
+- **`OF` says where a deadline counts from** — `THE JOIN`, `THE DEADLINE` or `THE ARMING` of the obligation this one follows, or a date. **`AFTER` opens a window late**, and the `WITHIN` after it counts from the opening; an act before the window opens counts for nothing, and the run says so.
 
 ---
 
@@ -472,3 +551,4 @@ The three things the screen can say are the same as for one obligation, but they
 - [The Regulative Layer, Whole](../../concepts/legal-modeling/regulative-layer-whole.md) — the five separate ideas and how they fit
 - [Regulative Rules](../../concepts/legal-modeling/regulative-rules.md) — reparation clauses, recursive obligations, and the rest of the reference-style account
 - [`BECAUSE`](../../reference/regulative/BECAUSE.md) — the forms of `BREACH`, and what to write after it
+- [`AFTER`](../../reference/regulative/AFTER.md) — windows that open late, and the two ways to measure their edges

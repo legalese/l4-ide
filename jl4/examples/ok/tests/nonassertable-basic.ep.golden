@@ -1,0 +1,51 @@
+-- @nonassertable closes a named step to assertion by a request
+-- (specs/todo/presumption-assertion/CONTRACT.md §6). It is an annotation of
+-- its own, kept by exactprint and re-emitted by the printer; this file checks
+-- that it parses, round-trips, and changes nothing a rule works out.
+
+§ `The offence`
+    GIVEN `did the act`    IS A BOOLEAN
+          `had the intent` IS A BOOLEAN
+          `has a defence`  IS A BOOLEAN
+
+-- A nullary step a request may not assert: its truth comes from its derivation.
+@nonassertable
+`offence made out` MEANS `did the act` AND `had the intent` AND NOT `has a defence`
+
+-- Above the GIVEN of a definition with inputs of its own.
+@nonassertable
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+`closed with inputs` MEANS x AND `offence made out`
+
+-- Directly above the name line, below the GIVETH: still above the definition.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+@nonassertable
+`closed below giveth` MEANS x OR `offence made out`
+
+-- A @desc whose first word is "nonassertable" is a description, not the mark.
+@desc nonassertable in name only
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+`described` MEANS x
+
+#EVAL `offence made out` WITH `did the act` IS TRUE, `had the intent` IS TRUE, `has a defence` IS FALSE
+-- A two-clause group, and a mark on the definition after it: the group's range
+-- stops at its last clause, so the mark is the next definition's, not a stray
+-- inside the group.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`clauses` 0 MEANS 1
+`clauses` n MEANS n
+
+@nonassertable
+`after the group` MEANS `offence made out`
+
+-- A nullary probe, so the section's inputs can be supplied with WITH.
+`probe closed` MEANS `closed with inputs` TRUE
+
+#EVAL `probe closed` WITH `did the act` IS TRUE, `had the intent` IS TRUE, `has a defence` IS TRUE
+#EVAL `described` TRUE
+#EVAL `clauses` 0
+#EVAL `clauses` 7

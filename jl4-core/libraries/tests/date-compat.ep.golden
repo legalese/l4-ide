@@ -22,23 +22,28 @@ GIVEN day   IS A NUMBER
       month IS A NUMBER
       year  IS A NUMBER
 GIVETH A DATE
+@nlg the date %day%/%month%/%year%
 `DATE` MEANS DATE_FROM_DMY day month year
 
 -- Single-argument version for serial numbers
 GIVEN days IS A NUMBER
 GIVETH A DATE
+@nlg the date numbered %days%
 `DATE` MEANS DATE_FROM_SERIAL days
 
 §§ `Field Accessor Helpers`
 
 GIVEN date IS A DATE
 GIVETH A NUMBER
+@nlg the day of the month of %date%
 `Day of` AKA `day of` MEANS DATE_DAY date
 
 GIVEN date IS A DATE
 GIVETH A NUMBER
+@nlg the month number of %date%
 `Month of` AKA `month of` MEANS DATE_MONTH date
 
 GIVEN date IS A DATE
 GIVETH A NUMBER
+@nlg the year of %date%
 `Year of` AKA `year of` MEANS DATE_YEAR date

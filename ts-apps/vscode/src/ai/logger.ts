@@ -1,11 +1,12 @@
 import * as vscode from 'vscode'
+import type { Logger } from '@repo/legalese-agent'
 
 /**
  * Dedicated output channel for the Legalese AI tab. Kept separate from
  * the language server's channel so a noisy agent loop doesn't drown out
- * LSP debug output.
+ * LSP debug output. The VS Code adapter for the core's `Logger` port.
  */
-export class AiLogger {
+export class AiLogger implements Logger {
   private readonly channel: vscode.OutputChannel
 
   constructor(name = 'Legalese AI') {

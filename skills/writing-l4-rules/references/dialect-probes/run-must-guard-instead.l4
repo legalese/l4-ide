@@ -1,0 +1,23 @@
+DECLARE Party IS ONE OF Borrower, Lender, Stranger
+DECLARE Act IS ONE OF Pay HAS payer IS A Party, to IS A Party, amount IS A NUMBER
+
+GIVEN creditor IS A Party
+GIVETH A DEONTIC Party Act
+f creditor MEANS
+  PARTY Borrower
+  MUST Pay Borrower payee 10 PROVIDED payee EQUALS creditor
+  WITHIN 5
+  HENCE FULFILLED
+  LEST BREACH
+
+-- right payee
+#TRACE f Lender AT 0 WITH
+  PARTY Borrower DOES Pay Borrower Lender 10 AT 2
+
+-- wrong payee
+#TRACE f Lender AT 0 WITH
+  PARTY Borrower DOES Pay Borrower Stranger 10 AT 2
+
+-- wrong amount
+#TRACE f Lender AT 0 WITH
+  PARTY Borrower DOES Pay Borrower Lender 99 AT 2

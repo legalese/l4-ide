@@ -28,12 +28,14 @@ DECLARE `Contract State` HAS
 
 GIVEN state IS A `Contract State`
 GIVETH A BOOLEAN
+@nlg %state% has zero notional principal and zero accrued interest, whatever fees have accrued
 `is fully paid` MEANS
     state's notionalPrincipal EQUALS 0
     AND state's accruedInterest EQUALS 0
 
 GIVEN state IS A `Contract State`
 GIVETH A BOOLEAN
+@nlg %state% records the contract as in default
 `is in default` MEANS
     CONSIDER state's contractPerformance
     WHEN DF THEN TRUE
@@ -41,6 +43,7 @@ GIVETH A BOOLEAN
 
 GIVEN state IS A `Contract State`
 GIVETH A NUMBER
+@nlg the outstanding balance in %state%, being notional principal plus accrued interest and fees
 `outstanding balance` MEANS
     state's notionalPrincipal PLUS state's accruedInterest PLUS state's feeAccrued
 
@@ -49,6 +52,7 @@ GIVETH A NUMBER
 -- =============================================================================
 
 `empty state` MEANS
+    @nlg the empty contract state, performant at 1 January 2000, with all balances and rates zero
     `Contract State` WITH
         statusDate          IS DATE_FROM_DMY 1 1 2000
         contractPerformance IS PF
@@ -61,4 +65,5 @@ GIVETH A NUMBER
 §§ `Version Information`
 -- =============================================================================
 
+@nlg the version of the ACTUS state library
 `ACTUS State Library Version` MEANS "1.0.0"

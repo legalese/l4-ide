@@ -2265,7 +2265,7 @@ triggerName (Just DMustNot) mDue trigger _ = case trigger of
     | isJust mDue -> "deadline passes, not performed"
     -- No WITHIN: the compliance arm this node draws is reached by the deadline
     -- passing, and there is no deadline. Measured — @SHANT smoke LEST …@ with
-    -- no WITHIN, run to @WAIT UNTIL 1000@, leaves the prohibition standing as a
+    -- no WITHIN, run to @WAITUNTIL 1000@, leaves the prohibition standing as a
     -- residual and never reaches HENCE. This used to read "the act is not
     -- performed", naming an event that never fires.
     | otherwise -> noTriggerWording

@@ -1,0 +1,47 @@
+-- l4 batch over inputs declared through a type synonym. A synonym for a
+-- NUMBER, a BOOLEAN or a MAYBE is read as what it stands for, so a case with
+-- text that is no number, or a number that is no boolean, is refused as it is
+-- for the plain type, whether the case is run or only validated. The plain
+-- exports at the end are the control: the same cases, the plain types.
+
+DECLARE Year IS A NUMBER
+
+DECLARE Flag IS A BOOLEAN
+
+DECLARE MaybeYear IS A MAYBE NUMBER
+
+@export Next year
+GIVEN y IS A Year
+GIVETH A NUMBER
+`next year` y MEANS y PLUS 1
+
+@export Flip a flag
+GIVEN f IS A Flag
+GIVETH A BOOLEAN
+`flip flag` f MEANS NOT f
+
+@export Next year, for a year that may be left out
+GIVEN y IS A MAYBE Year
+GIVETH A NUMBER
+`maybe year` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+
+@export Next year, for a synonym of a MAYBE
+GIVEN y IS A MaybeYear
+GIVETH A NUMBER
+`year maybe` y MEANS
+  CONSIDER y
+    WHEN JUST n THEN n PLUS 1
+    WHEN NOTHING THEN 0
+
+@export Next year, plain
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+`plain number` y MEANS y PLUS 1
+
+@export Flip a flag, plain
+GIVEN f IS A BOOLEAN
+GIVETH A BOOLEAN
+`plain flag` f MEANS NOT f

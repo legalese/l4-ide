@@ -1,0 +1,11 @@
+-- `l4 batch` runs a PRINTED copy of the module. A pattern variable named
+-- like a later input could capture that input's test once the module was
+-- printed from what the clauses compile to, and the printed module was
+-- ambiguous; printed as the clauses the drafter wrote, it is not.
+
+@export capture
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE capture b TRUE  IS 1
+DECIDE capture a FALSE IS 2

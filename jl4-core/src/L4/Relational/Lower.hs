@@ -2260,6 +2260,7 @@ kindOfExpr = \case
   ReadCell{}   -> LELedger
   Breach{}     -> LEBreach
   Refuse{}     -> LEUnsupported "REFUSE"
+  Lifecycle{}  -> LEUnsupported "THE JOIN / THE DEADLINE / THE ARMING"
   Concat{}     -> LEString
   AsString{}   -> LEString
   Lam{}        -> LEHigherOrder
@@ -2288,6 +2289,7 @@ msgOfExpr = \case
   Breach{}   -> "BREACH is a deontic outcome, not a proposition"
   Refuse{}   -> "REFUSE is a declined answer, not a proposition: a Horn clause could only \
                 \assert or negate it, which is precisely the conversion a refusal forbids"
+  Lifecycle{} -> "THE JOIN, THE DEADLINE and THE ARMING are positions in an obligation's life, which a clause body has no image of"
   Concat{}   -> "M1 admits strings only as literal-equality atoms"
   AsString{} -> "M1 admits strings only as literal-equality atoms"
   Lam{}      -> "first-order Horn clauses cannot carry a function as a value; M1 admits a lambda only inside a recognised aggregate"
@@ -2313,6 +2315,7 @@ constructorName = \case
   ReadCell{}   -> "RECALL"
   Breach{}     -> "BREACH"
   Refuse{}     -> "REFUSE"
+  Lifecycle{}  -> "THE JOIN / THE DEADLINE / THE ARMING"
   Concat{}     -> "string concatenation"
   AsString{}   -> "string coercion"
   Lam{}        -> "lambda"

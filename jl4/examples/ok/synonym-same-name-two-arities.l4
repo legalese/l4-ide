@@ -1,0 +1,22 @@
+IMPORT prelude
+
+-- Two type synonyms may share a name when they take different numbers of
+-- arguments. `Cargo OF NUMBER` is the one-parameter synonym and the bare
+-- `Cargo` is the other, so the second declaration refers to the first, not
+-- to itself. These used to be rejected as "Circular dependency detected
+-- between type synonyms" in one declaration order and accepted in the other.
+
+DECLARE Cargo IS A Cargo OF NUMBER
+DECLARE Cargo a IS A LIST OF a
+
+DECLARE Slot a IS A PAIR OF a, Slot
+DECLARE Slot IS A NUMBER
+
+GIVETH A Cargo
+cargo MEANS LIST 1, 2
+
+GIVETH A Slot OF STRING
+slot MEANS PAIR OF "x", 41
+
+#EVAL cargo
+#EVAL slot

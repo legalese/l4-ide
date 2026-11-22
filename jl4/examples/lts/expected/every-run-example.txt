@@ -42,14 +42,14 @@ receipts — after 6 events, the clock stands at 6 (the #TRACE on line 66)
 
   Steps, in order:
     at 1: Tenant OF "Alice" does Pay OF …, …, … at 1; Tenant OF "Alice" MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
-    at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Landlord OF "Ms Ng" MUST — done; on to what follows
     at 1: Tenant OF "Alice" does Pay OF …, …, … at 1; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
-    at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
-    at 3: Tenant OF "Bob" does Pay OF …, …, … at 3; Tenant OF "Bob" MUST (member 2 of 3) — done; on to what follows (member 2 of 3: their own next step begins)
-    at 4: Landlord OF "Ms Ng" does Receipt OF …, …, … at 4; Landlord OF "Ms Ng" MUST — done; on to what follows
     at 1: Tenant OF "Alice" does Pay OF …, …, … at 1; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Landlord OF "Ms Ng" MUST — done; on to what follows
+    at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
     at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
+    at 3: Tenant OF "Bob" does Pay OF …, …, … at 3; Tenant OF "Bob" MUST (member 2 of 3) — done; on to what follows (member 2 of 3: their own next step begins)
     at 3: Tenant OF "Bob" does Pay OF …, …, … at 3; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
+    at 4: Landlord OF "Ms Ng" does Receipt OF …, …, … at 4; Landlord OF "Ms Ng" MUST — done; on to what follows
     at 4: Landlord OF "Ms Ng" does Receipt OF …, …, … at 4; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
     at 5: Tenant OF "Carol" does Pay OF …, …, … at 5; Tenant OF "Carol" MUST (member 3 of 3) — done; on to what follows (member 3 of 3: their own next step begins)
     at 6: Landlord OF "Ms Ng" does Receipt OF …, …, … at 6; Landlord OF "Ms Ng" MUST — done; on to what follows
@@ -66,16 +66,16 @@ receipts — after 5 events, the clock stands at 20 (the #TRACE on line 75)
 
   Steps, in order:
     at 1: Tenant OF "Alice" does Pay OF …, …, … at 1; Tenant OF "Alice" MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
-    at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Landlord OF "Ms Ng" MUST — done; on to what follows
     at 1: Tenant OF "Alice" does Pay OF …, …, … at 1; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
+    at 1: Tenant OF "Alice" does Pay OF …, …, … at 1; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Landlord OF "Ms Ng" MUST — done; on to what follows
     at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
     at 5: Tenant OF "Carol" does something at 5; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
+    at 5: Tenant OF "Carol" does Pay OF …, …, … at 5; Tenant OF "Carol" MUST (member 3 of 3) — done; on to what follows (member 3 of 3: their own next step begins)
     at 6: Landlord OF "Ms Ng" does something at 6; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
+    at 6: Landlord OF "Ms Ng" does Receipt OF …, …, … at 6; Landlord OF "Ms Ng" MUST — done; on to what follows
     at 6: Landlord OF "Ms Ng" does something at 20; Tenant OF "Bob" MUST (member 2 of 3) — deadline 7 passed without the act; on to the fallback (member 2 of 3: their own next step begins)
     at —: BREACH declared by Tenant OF "Bob"
-    at 1: Tenant OF "Alice" does Pay OF …, …, … at 1; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
-    at 2: Landlord OF "Ms Ng" does Receipt OF …, …, … at 2; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
-    at 5: Tenant OF "Carol" does Pay OF …, …, … at 5; Tenant OF "Carol" MUST (member 3 of 3) — done; on to what follows (member 3 of 3: their own next step begins)
-    at 6: Landlord OF "Ms Ng" does Receipt OF …, …, … at 6; Landlord OF "Ms Ng" MUST — done; on to what follows
     at —: both parts together: breached by Tenant OF "Bob" (decided by the first part)
     at —: both parts together: breached by Tenant OF "Bob" (decided by the second part)

@@ -117,9 +117,24 @@
     border: 1px solid var(--vscode-widget-border, rgba(127, 127, 127, 0.2));
     border-radius: 10px;
     padding: 8px 10px;
+    /* Bleed across the message list's 10px side padding — an IDE-sidebar
+       look where the bubble spans edge to edge. */
     margin-left: -10px;
     margin-right: -10px;
     box-shadow: 0 0 16px 2px var(--sidebar-bg);
+  }
+  /* When the chat column is squeezed (narrow viewport, or the sidebar
+     eating into a mid-size window) the list padding IS the column edge, so
+     the bleed would press the bubble flush against it. Keyed on the
+     `.message-list` size container, not the viewport: the conversation
+     column caps at 800px, minus 2×10px list padding → below 780px of
+     content there is no outside whitespace left to bleed into. */
+  @container (max-width: 779px) {
+    .user-bubble {
+      margin-left: 0;
+      margin-right: 0;
+      padding: 8px 12px;
+    }
   }
   /* Cap a non-sticky user bubble at half the chat's visible height
      (`cqh` resolves against the `.message-list` size container) and let

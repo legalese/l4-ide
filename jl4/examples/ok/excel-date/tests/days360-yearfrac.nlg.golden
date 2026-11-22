@@ -1,6 +1,6 @@
 the number of days from `US 30/360 start` to `US 30/360 end`
-`ExcelDays360` with `US 30/360 start` and `US 30/360 end`
-`ExcelDays360` with `US 30/360 start`, `US 30/360 end` and `TRUE`
-`ExcelYearFrac` with `Basis start`, `Basis end` and 0
-`ExcelYearFrac` with `Basis start`, `Basis end` and 1
-`ExcelYearFrac` with `Basis start`, `Basis end` and 2
+the US 30/360 day count from `US 30/360 start` to `US 30/360 end`
+the 30/360 day count from `US 30/360 start` to `US 30/360 end`, European if `TRUE` holds, otherwise US
+the year fraction from `Basis start` to `Basis end` on Excel basis 0 (negative if reversed)
+the year fraction from `Basis start` to `Basis end` on Excel basis 1 (negative if reversed)
+the year fraction from `Basis start` to `Basis end` on Excel basis 2 (negative if reversed)

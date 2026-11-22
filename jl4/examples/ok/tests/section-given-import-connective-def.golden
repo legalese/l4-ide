@@ -1,0 +1,7 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-import-connective-def.l4:18:1-21:
+  TRUE
+section-given-import-connective-def.l4:19:1-20:
+  FALSE

@@ -1,0 +1,14 @@
+-- A line written in the form of a mixfix rule, with a literal for an input,
+-- was read as a one-clause group defining a rule named Red. It checked, and
+-- `Red `costs` 0` went on giving 0, where the drafter meant 1. It is refused,
+-- once, at the line.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+      n IS A NUMBER
+GIVETH A NUMBER
+c `costs` n MEANS n
+Red `costs` 0 MEANS 1
+
+#EVAL Red `costs` 0
+#EVAL Green `costs` 5

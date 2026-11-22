@@ -1,0 +1,1567 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+
+§ `TERMS AND CONDITIONS FOR THE UOB LADY'S CARDS`
+
+-- ===========================================================================
+-- DOCUMENT: source/uob-ladys-cards-tnc.txt, bundle id `uob-ladys-cards-tnc`,
+-- footed "United Overseas Bank Limited Co. Reg. No. 193500026Z. Updated in
+-- August 2025 (Version 1.1)". source/uob-ladys-faq.txt is the issuer's own FAQ
+-- on the same programme; it is read here ONLY to corroborate arithmetic the
+-- T&C already states, never as the operative text.
+--
+-- WHAT THIS MODULE ANSWERS. For one transaction on a UOB Lady's Solitaire
+-- Card: how many UNI$ per dollar it earns, what that is in miles, whether it
+-- earns the Bonus UNI$, which monthly cap governs, and the clauses relied on.
+--
+-- THE SHAPE OF THE CARD, in the document's own numbers. cl.2(b) gives a Base
+-- UNI$ of UNI$1 per S$5 on everything (0.4 miles per S$1). Heading A and
+-- cl.2(c) add a Bonus UNI$ of 9X UNI$ per S$5 (3.6 miles per S$1) on spending
+-- in a Preferred Rewards Category the cardmember has elected -- 10X in total,
+-- which cl.3's conversion of UNI$1 = 2 miles turns into 4 miles per S$1. The
+-- Solitaire elects TWO categories (cl.4(b)) from Schedule 1's seven.
+--
+-- WHAT IS DELIBERATELY NOT MODELLED, AND WHY.
+--
+--   THE QUARTER (cl.5). Which categories are in force is the product of a
+--   registration history: selections take effect the following Quarter, the
+--   last one before 11.59PM on the day before a Quarter wins, and an absent
+--   selection rolls the previous one forward. The shared domain records the
+--   ANSWER to that history -- `Solitaire preferred rewards categories` on the
+--   Cardholder -- and not the history, which is right: a cardholder can depose
+--   to what their categories are without reconstructing when they chose them.
+--   So cl.5 is recorded as a condition string on every answer rather than
+--   computed, and the Quarter is not a type in this module.
+--
+--   THE CAP'S CONSUMPTION. cl.6(b) caps Bonus UNI$ per calendar month. How
+--   much of that cap a given month has already used is the allocation problem,
+--   out of scope (spec section 6), and `Month position` carries no UOB field.
+--   This module returns the cap that GOVERNS, in dollars of bonus-earning
+--   spend; it does not decide whether this transaction is under it.
+--
+--   CLAUSES 11-31 AND 36-43. The LuxePay instalment plan (cl.11-17), upgrade
+--   and downgrade (cl.18-26), annual fees (cl.27), account standing (cl.9,
+--   cl.28), settlement failures (cl.29-31) and the boilerplate (cl.36-43) do
+--   not bear on what a transaction earns. cl.9 and cl.36 are carried as a
+--   condition string because they are a live precondition on earning at all.
+--
+--   CLAUSE 33 (UOB$). "Base UNI$ will not be awarded for UOB$ transactions (up
+--   till 31 Oct 2024). However, Bonus UNI$ will be awarded if the UOB$
+--   transaction falls under your selected Preferred Rewards Category(ies).
+--   Note: W.e.f. 1 Nov 2024, UOB$ transactions will be awarded Base UNI$."
+--   Whether a transaction is a UOB$ transaction is not a fact the shared
+--   domain's Transaction carries, so this cannot be tested. It is also spent:
+--   under this August 2025 document, every transaction on or after 1 Nov 2024
+--   earns Base UNI$ regardless. Recorded, not encoded.
+--
+-- THE CREDENTIAL AND THE MERCHANT INDICATOR ARE IRRELEVANT TO THIS CARD, and
+-- that is a finding rather than an omission. The other issuers in this corpus
+-- split their rates on how the merchant's acquirer flagged the charge; UOB
+-- does not. Reading the whole document for channel language turns up exactly
+-- three mentions and none of them moves a rate: cl.12(a)(i) ("online at
+-- website stores") is a LuxePay eligibility condition, cl.32(f) ("Online money
+-- transfers") is an excluded KIND of transaction, and Schedule 1's Travel row
+-- says "(including card-not-present transactions like ecommerce/mail/phone
+-- order transactions)" -- which is INCLUSIVE, widening Travel rather than
+-- rating it. So every answer here sets both `miles per dollar if the merchant
+-- flags online` and `... card-present` to the same figure and
+-- `depends on the merchant indicator` to FALSE, and an `Unknown` indicator
+-- costs the cardholder nothing. There is an assertion to that effect below.
+--
+-- ISOMORPHISM, AND WHERE IT STOPS. Clauses 32, 34 and 35 are three separate
+-- withholding lists and are encoded as three separate rules, in the document's
+-- order, so a reviewer can read each against its clause. ALL THREE NOW FIRE.
+-- cl.34's MCC table is still a generated ditto block, because ditto (^)
+-- resolves by exact start column and that is not a thing to hand-align. The
+-- script that emitted it was not preserved (it lived in a scratchpad and was
+-- overwritten), so the block below is now the source of record; to regenerate
+-- it, follow the pattern of `source/gen-hsbc-mcc.py`, which is the same shape.
+-- cl.35 is no longer a table at all, for the reason in the next paragraph.
+--
+-- A RULE HERE NEVER COMPARES A STRING, and that is what the second pass over
+-- this module changed. The first draft read `merchant name` and
+-- `transaction description` directly, which made cl.32 untestable and cl.35
+-- almost inert: the printed list says "AXS*" and a real statement line says
+-- "AXS*SP SERVICES", and L4 has no prefix test. The shared domain now carries
+-- the classification instead of only the printed text -- `charge kind` for
+-- what kind of posting this is, and `description patterns` for which families
+-- of statement text the line belongs to -- and the substring work is done once
+-- in layer 1 (`classify.l4`). So cl.32 discharges seventeen of its
+-- twenty-two limbs and cl.35 matches the lines the document means.
+--
+-- TWO CONSEQUENCES FOR A REVIEWER. First, the caveat that cl.35 tests exact
+-- strings is GONE, and so is the assertion that pinned it: an AXS line is now
+-- excluded, which is what UOB wrote. Second, this module lowers to Catala,
+-- which has no string type -- every STRING field is elided from the emitted
+-- artifact, and that is why `conditions`, `pool`, `dated` and `quote` may be
+-- built from string literals here while no rule may read one.
+-- ===========================================================================
+
+
+§§ `2(b), 2(c), 3 and heading A — the two rewards and the conversion`
+
+-- cl.2(b): "Base UNI$" means the reward of UNI$1 for every S$5.00 spent
+-- (equivalent to 0.4 miles per S$1 spent) ... as posted on UOB's systems.
+GIVETH A NUMBER
+`Base UNI$ per dollar` MEANS 1 DIVIDED BY 5
+
+-- cl.2(c): "Bonus UNI$" means the bonus reward of 9X UNI$ per S$5 spent
+-- (equivalent to 3.6 miles per S$1 spent) by you, IN ADDITION TO the Base
+-- UNI$. The "in addition to" is what makes heading A's 10X the sum of the two
+-- rather than a replacement for the base.
+GIVETH A NUMBER
+`Bonus UNI$ per dollar` MEANS 9 DIVIDED BY 5
+
+-- Heading A: "Preferred Rewards Category(ies) Spending - 10X UNI$ per S$5
+-- spent (equivalent to 4 miles per S$1 spent)". Written as the sum the
+-- document says it is, not as the literal 10, so that the addition in cl.2(c)
+-- is visible in the code and the assertions below can test it.
+GIVETH A NUMBER
+`Preferred Rewards Category UNI$ per dollar` MEANS
+    `Base UNI$ per dollar` PLUS `Bonus UNI$ per dollar`
+
+-- cl.3: "UNI$ can be converted to KrisFlyer or Asia miles (in blocks of
+-- 10,000 miles) at the conversion rate of UNI$1 = 2 miles."
+GIVETH A NUMBER
+`miles per UNI$` MEANS 2
+
+-- THE TWO HEADLINE RATES, NAMED ONCE. Every answer below returns one of these
+-- in all three `miles per dollar` fields, so the arithmetic is written here
+-- rather than four times, and an edit to the conversion cannot reach one
+-- answer and miss another.
+GIVETH A NUMBER
+`the Base UNI$ miles per dollar` MEANS
+    `Base UNI$ per dollar` TIMES `miles per UNI$`
+
+GIVETH A NUMBER
+`the Preferred Rewards Category miles per dollar` MEANS
+    `Preferred Rewards Category UNI$ per dollar` TIMES `miles per UNI$`
+
+-- `earns the bonus rate` IS DERIVED FROM THE HEADLINE, NEVER SET BESIDE IT.
+-- The flag and the number are two renderings of one fact, and a record lets
+-- them be written independently, so an edit that changes the rate and forgets
+-- the flag produces an answer that contradicts itself with nothing to catch
+-- it. Reading the flag off the rate makes that edit impossible rather than
+-- merely tested for. cl.2(c) is what fixes the threshold: the Bonus UNI$ is
+-- "in addition to the Base UNI$", so any rate strictly above the base is a
+-- rate that earned it.
+GIVEN rate IS A NUMBER
+GIVETH A BOOLEAN
+`this rate is above the Base UNI$ rate` rate MEANS
+    rate GREATER THAN `the Base UNI$ miles per dollar`
+
+-- cl.6(b), with effect from 1 August 2025: 1,350 UNI$ per Preferred Rewards
+-- Category per calendar month. The document states the dollar equivalent
+-- itself -- S$750 -- and the assertions below check that UOB's two figures
+-- agree with each other.
+GIVETH A NUMBER
+`the Bonus UNI$ cap for one Preferred Rewards Category` MEANS 1350
+
+GIVETH A NUMBER
+`the dollars of category spend the cap admits` MEANS
+    `the Bonus UNI$ cap for one Preferred Rewards Category`
+        DIVIDED BY `Bonus UNI$ per dollar`
+
+
+§§ `The clauses this module cites`
+
+-- One Provenance per clause relied on, built by `cite`. `document`, `clause`,
+-- `dated` and `quote` are STRINGs, and Catala has no string type, so all four
+-- are elided when this module lowers (R11); `document date` is the same fact as
+-- `dated` written as a DATE, which is what keeps the record emittable and lets
+-- two citations be compared for currency.
+--
+-- THE DAY IN `document date` IS OURS, NOT UOB'S. The footer says "Updated in
+-- August 2025" and names no day, so the first of the month is a convention this
+-- module chose. `dated` carries UOB's own words unchanged, so the two together
+-- disclose the choice rather than hide it.
+--
+-- `quote` is trimmed to the operative words, extracted from the .txt rather
+-- than transcribed, and carries the source's curly quotation marks.
+
+GIVEN clause IS A STRING
+      quote  IS A STRING
+GIVETH A Provenance
+`cite` clause quote MEANS Provenance WITH
+    `document`      IS "uob-ladys-cards-tnc"
+    `clause`        IS clause
+    `dated`         IS "Updated in August 2025 (Version 1.1)"
+    `document date` IS YMD 2025 8 1
+    `quote`         IS quote
+
+GIVETH A Provenance
+`cl.2(b) — the Base UNI$` MEANS `cite` "2(b)" "“Base UNI$” means the reward of UNI$1 for every S$5.00 spent (equivalent to 0.4 miles per S$1 spent) by a UOB Lady’s Card principal cardholder (“you” or “Cardmember”) on a Card, as posted on UOB’s systems."
+
+GIVETH A Provenance
+`cl.2(c) — the Bonus UNI$` MEANS `cite` "2(c)" "“Bonus UNI$” means the bonus reward of 9X UNI$ per S$5 spent (equivalent to 3.6 miles per S$1 spent) by you, in addition to the Base UNI$, as posted on UOB’s systems."
+
+GIVETH A Provenance
+`cl.3 — the conversion to miles` MEANS `cite` "3" "UNI$ can be converted to KrisFlyer or Asia miles (in blocks of 10,000 miles) at the conversion rate of UNI$1 = 2 miles."
+
+GIVETH A Provenance
+`heading A — ten times UNI$ on a Preferred Rewards Category` MEANS `cite` "A (heading)" "A. Preferred Rewards Category(ies) Spending – 10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+
+GIVETH A Provenance
+`cl.4(b) — the Solitaire elects two categories` MEANS `cite` "4(b)" "UOB Lady’s Solitaire Card and UOB Lady’s Solitaire Metal Card Cardmembers can select two Preferred Rewards Categories. You will be eligible to earn Bonus UNI$ for every S$5.00 of spending in your Preferred Rewards Categories in accordance with these Terms and Conditions."
+
+GIVETH A Provenance
+`cl.5 — the selection is made each Quarter` MEANS `cite` "5" "To select your Preferred Rewards Category(ies) to earn Bonus UNI$, you must first register via uob.com.sg/ladys-enrol. You may change your selection each Quarter. ... If you do not select or change your Preferred Rewards Category(ies) for the next Quarter, the current selected category(s) shall continue to apply in the next Quarter."
+
+GIVETH A Provenance
+`cl.6(b) — the monthly cap on Bonus UNI$` MEANS `cite` "6(b)" "With effect from 1 August 2025, if you hold a Lady’s Solitaire Card, 2,700 UNI$ (which is equivalent to S$1,500 spent), with each Preferred Rewards Category capped at 1,350 UNI$ (which is equivalent to S$750 spent)."
+
+GIVETH A Provenance
+`cl.8 — UNI$ are computed on the posting date` MEANS `cite` "8" "For the avoidance of doubt, any Base UNI$ and Bonus UNI$ that may be awarded for any transactions charged to your Card will be computed based on the date that the transaction is posted on UOB’s systems."
+
+GIVETH A Provenance
+`cl.10 — foreign currency is converted` MEANS `cite` "10" "All transactions charged to your Card and effected in foreign currencies will be converted into Singapore dollars based on UOB’s prevailing exchange rate and the Singapore dollar amount ... will be used for the purposes of computing your Base UNI$, Bonus UNI$ awards pursuant to these Terms and Conditions."
+
+GIVETH A Provenance
+`cl.32 — the excluded kinds of transaction` MEANS `cite` "32" "UNI$ will not be awarded for: a) Bill payment (where applicable); b) NETS and NETS-related transactions; c) 0% Instalment Payment Plans; d) SmartPay; e) Personal loans; f) Online money transfers g) Balance/funds transfers; h) Cash advances; i) Fees; j) Interests; k) Finance charges; l) Late payment charges; m) Annual fee charges ; n) Reversals; o) Void card transactions p) Chargebacks q) Payment of funds to prepaid accounts, including top-ups for any pre-paid card; r) Transactions relating to brokerage / securities; s) Any gambling related transactions, any trading transactions (including but not limited to websites for trading of shares and cryptocurrency); t) UOB Lady’s LuxePay Plans (if applicable) u) amounts approved under the UOB Payment Facility and any associated fees or chargers (w.e.f. 19 June 2023); v) Other financial charges and any other transactions we may exclude from time to time without prior notice."
+
+GIVETH A Provenance
+`cl.34 — the excluded Merchant Transaction Codes` MEANS `cite` "34" "UNI$ will not be awarded for the following Merchant Transaction Codes:"
+
+GIVETH A Provenance
+`cl.35 — the excluded transaction descriptions` MEANS `cite` "35" "You will also not earn UNI$ for transactions with the following transaction descriptions:"
+
+GIVETH A Provenance
+`Schedule 1 — the category table` MEANS `cite` "Schedule 1" "Transaction categories are automatically categorised according to the Merchant Category Code (MCC). The MCC determines whether the transaction is eligible for Bonus UNI$ under each category. ... A merchant’s registered MCC may not always correspond with its nature of business. Therefore, we cannot guarantee that a transaction will fall within your selected Preferred Rewards Category(ies) to qualify Bonus UNI$."
+
+GIVETH A Provenance
+`Schedule 1 — the Travel row` MEANS `cite` "Schedule 1 (Travel)" "Travel: Credit card retail transaction(s) made at major airlines and/or hotels with their main business activity classified as flights and/or hotels only. (including card-not-present transactions like ecommerce/mail/phone order transactions)"
+
+
+§§ `Schedule 1 — Transaction Categories`
+
+-- Schedule 1 maps a Merchant Category Code to one of seven categories. The
+-- Schedule's own preamble disclaims the mapping it just gave: "A merchant's
+-- registered MCC may not always correspond with its nature of business.
+-- Therefore, we cannot guarantee that a transaction will fall within your
+-- selected Preferred Rewards Category(ies)". So an answer from this table is
+-- UOB's operative test, not a promise about the merchant, and every bonus
+-- answer says so in its conditions.
+--
+-- One rule per printed row, in the Schedule's order, so a reviewer can read
+-- each against the table. The Description column is reproduced as the comment
+-- above each rule.
+
+-- Discount, Mass and Drug Stores, Cosmetics Stores, Barber and Beauty Shops,
+-- Health and Beauty Spa, Massage Parlors
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`Schedule 1 puts this MCC in Beauty & Wellness` mcc MEANS
+       mcc EQUALS 5912
+    OR ^   ^      5977
+    OR ^   ^      7230
+    OR ^   ^      7231
+    OR ^   ^      7298
+    OR ^   ^      7297
+
+-- Caterers, Eating places and Restaurants, Fast food restaurants and food
+-- deliveries
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`Schedule 1 puts this MCC in Dining` mcc MEANS
+       mcc EQUALS 5811
+    OR ^   ^      5812
+    OR ^   ^      5814
+    OR ^   ^      5499
+
+-- Bars, Taverns, Lounges and Nightclubs, Motion Picture Theaters, Theatrical,
+-- Producers and Ticket Agencies
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`Schedule 1 puts this MCC in Entertainment` mcc MEANS
+       mcc EQUALS 5813
+    OR ^   ^      7832
+    OR ^   ^      7922
+
+-- Grocery stores, Children and Infants wear store
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`Schedule 1 puts this MCC in Family` mcc MEANS
+       mcc EQUALS 5411
+    OR ^   ^      5641
+
+-- Department Stores, Mens and Boys Clothing and Accessories Store, Womens
+-- Ready-To-Wear Stores, Womens Access and Specialty, Family Clothing Stores,
+-- Sports and Riding Apparel Stores, Shoes Stores, Mens and Womens Clothing
+-- Stores, Miscellaneous Apparel and Accessories Shops, Luggage and Leather
+-- Stores
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`Schedule 1 puts this MCC in Fashion` mcc MEANS
+       mcc EQUALS 5311
+    OR ^   ^      5611
+    OR ^   ^      5621
+    OR ^   ^      5631
+    OR ^   ^      5651
+    OR ^   ^      5655
+    OR ^   ^      5661
+    OR ^   ^      5691
+    OR ^   ^      5699
+    OR ^   ^      5948
+
+-- Local Commuter Transport, Taxi, Cabs, Limousines and Travel Service,
+-- Service Stations and Automatic Gas Dispensers
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`Schedule 1 puts this MCC in Transport` mcc MEANS
+       mcc EQUALS 4111
+    OR ^   ^      4121
+    OR ^   ^      4789
+    OR ^   ^      5541
+    OR ^   ^      5542
+
+-- TRAVEL HAS NO MCC LIST, AND THAT IS THE ONE INTERESTING ROW IN THE TABLE.
+-- Where the other six rows are decided by a code the statement prints, Travel
+-- is decided by a fact about the merchant: "Credit card retail transaction(s)
+-- made at major airlines and/or hotels with their MAIN BUSINESS ACTIVITY
+-- classified as flights and/or hotels only." Main business activity is not a
+-- field of the shared domain's Transaction, and could not be -- it is not
+-- something a cardholder deposes to from a statement line.
+--
+-- So this module does NOT decide Travel. `the Solitaire category of MCC`
+-- answers NOTHING for every code outside the six lists, and the top-level rule
+-- turns that into an `Unconfirmed` answer WHEN AND ONLY WHEN the cardholder
+-- has actually elected Travel. A cardholder who has not elected Travel loses
+-- nothing by the gap, and their answer stays Verified.
+
+GIVEN mcc IS A NUMBER
+GIVETH A MAYBE `Solitaire category`
+`the Solitaire category of MCC` mcc MEANS
+    BRANCH
+      IF `Schedule 1 puts this MCC in Beauty & Wellness` mcc THEN JUST `Beauty & Wellness`
+      IF `Schedule 1 puts this MCC in Dining` mcc            THEN JUST Dining
+      IF `Schedule 1 puts this MCC in Entertainment` mcc     THEN JUST Entertainment
+      IF `Schedule 1 puts this MCC in Family` mcc            THEN JUST Family
+      IF `Schedule 1 puts this MCC in Fashion` mcc           THEN JUST Fashion
+      IF `Schedule 1 puts this MCC in Transport` mcc         THEN JUST Transport
+      OTHERWISE                                                   NOTHING
+
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`Schedule 1 gives this MCC no category` mcc MEANS
+    CONSIDER `the Solitaire category of MCC` mcc
+    WHEN NOTHING THEN TRUE
+    WHEN JUST c  THEN FALSE
+
+
+§§ `32. UNI$ will not be awarded for:`
+
+-- TWENTY-TWO LIMBS, SEVENTEEN OF WHICH THE SHARED DOMAIN CAN NOW TEST.
+--
+-- cl.32 classifies a transaction by what the posting IS -- a bill payment, a
+-- cash advance, a fee, a reversal, an instalment plan -- which is neither an
+-- MCC nor a merchant name but is something a statement shows and a cardholder
+-- can depose to. That is `Charge kind` in the shared domain, and this rule is a
+-- CONSIDER over it, so the compiler checks that every kind has an answer.
+--
+-- Each arm names the limbs it discharges. The three FALSE arms are the
+-- interesting ones, because they say what cl.32 does NOT reach.
+--
+-- FIVE LIMBS REMAIN UNTESTABLE, and they are untestable for different reasons:
+--   b) "NETS and NETS-related transactions" -- a scheme, not a kind of
+--      posting. A NETS purchase is still a purchase; nothing in the domain
+--      records which rails carried it.
+--   q) "Payment of funds to prepaid accounts, including top-ups for any
+--      pre-paid card" -- partly reached elsewhere: cl.34 excludes MCC 6540,
+--      Stored Value Card Purchase/Load. A top-up posted under another MCC is
+--      not caught.
+--   r) "Transactions relating to brokerage / securities" -- likewise partly
+--      reached: cl.34 excludes MCC 6211.
+--   s) "Any gambling related transactions, any trading transactions" --
+--      likewise: cl.34 excludes MCC 7995 for gambling. Crypto and share
+--      trading under other codes are not caught.
+--   u) "amounts approved under the UOB Payment Facility ... (w.e.f. 19 June
+--      2023)" -- a UOB product, and no fact says a posting is one. Its "any
+--      associated fees or chargers" limb IS caught, as a fee.
+-- and the second half of v) -- "any other transactions we may exclude from
+-- time to time without prior notice" -- is unmodellable by construction, being
+-- cl.36's discretion restated. Every answer carries a condition saying so.
+
+GIVEN kind IS A `Charge kind`
+GIVETH A BOOLEAN
+`32 — no UNI$ is awarded for this kind of transaction` kind MEANS
+    CONSIDER kind
+    -- a) Bill payment (where applicable);
+    WHEN `Bill payment via internet banking` THEN TRUE
+    -- c) 0% Instalment Payment Plans; d) SmartPay; e) Personal loans;
+    -- t) UOB Lady's LuxePay Plans (if applicable)
+    WHEN `Instalment plan transaction`       THEN TRUE
+    -- f) Online money transfers; g) Balance/funds transfers;
+    WHEN `Balance or funds transfer`         THEN TRUE
+    -- h) Cash advances;
+    WHEN `Cash advance or quasi-cash`        THEN TRUE
+    -- i) Fees; m) Annual fee charges;
+    WHEN `Annual fee or bank charge`         THEN TRUE
+    -- j) Interests; k) Finance charges; l) Late payment charges;
+    -- v) Other financial charges
+    WHEN `Interest or finance charge`        THEN TRUE
+    -- n) Reversals; o) Void card transactions; p) Chargebacks
+    WHEN `Refund or reversal`                THEN TRUE
+    -- NOT REACHED BY cl.32. An ordinary retail purchase is what the whole
+    -- document is about.
+    WHEN `Retail purchase`                   THEN FALSE
+    -- NOT REACHED, and the document says so in the one place it could have
+    -- said otherwise: Schedule 1's Travel row expressly INCLUDES "card-not-
+    -- present transactions like ecommerce/mail/phone order transactions".
+    WHEN `Telephone or mail order`           THEN FALSE
+    -- NOT REACHED, because cl.32 does not name a pre-authorisation. A pre-auth
+    -- is arguably not a posting UNI$ could be awarded on at all, but the
+    -- document does not say that and this rule does not invent it.
+    WHEN `Pre-authorisation`                 THEN FALSE
+
+
+§§ `34. UNI$ will not be awarded for the following Merchant Transaction Codes`
+
+-- The printed table gives a Category name and its MCCs. Five of its codes
+-- carry their own commencement date and the rest do not, so the list is split
+-- three ways and the dated ones are gated. The gate compares against the
+-- TRANSACTION date; cl.8 computes UNI$ on the POSTING date, and the document
+-- never says which date a "with effect from" runs against. Recorded as an
+-- ambiguity; transaction date is the corpus-wide convention.
+
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`34 — this Merchant Category Code is excluded whatever the date` mcc MEANS
+    -- Wire Transfer/Remittance
+       mcc EQUALS 4829
+    -- Nondurable Goods
+    OR ^   ^      5199
+    -- Direct Marketing - Insurance Services
+    OR ^   ^      5960
+    -- Member Financial Institution–Merchandise and Services
+    OR ^   ^      6012
+    -- Quasi Cash
+    OR ^   ^      6050
+    OR ^   ^      6051
+    OR ^   ^      6529
+    OR ^   ^      6530
+    OR ^   ^      6534
+    OR ^   ^      7511
+    -- Securities–Brokers and Dealers
+    OR ^   ^      6211
+    -- Insurance
+    OR ^   ^      6300
+    -- Real Estate Agents & Managers – Rentals
+    OR ^   ^      6513
+    -- Stored Value Card Purchase/Load
+    OR ^   ^      6540
+    -- Clean/Maint/Janitorial Serv aka Property Management
+    OR ^   ^      7349
+    -- Automobile Parking Lots and Garages
+    OR ^   ^      7523
+    -- Gambling - Betting, including Lottery Tickets, Casino Gaming Chips, Off-Track Betting, and Wagers at Race Tracks
+    OR ^   ^      7995
+    -- Hospitals
+    OR ^   ^      8062
+    -- Schools
+    OR ^   ^      8211
+    OR ^   ^      8220
+    OR ^   ^      8241
+    OR ^   ^      8244
+    OR ^   ^      8249
+    OR ^   ^      8299
+    -- Charitable/religious/political organisations
+    OR ^   ^      8398
+    OR ^   ^      8651
+    OR ^   ^      8661
+    -- Government institutions and services
+    OR ^   ^      9211
+    OR ^   ^      9222
+    OR ^   ^      9223
+    OR ^   ^      9311
+    OR ^   ^      9399
+    OR ^   ^      9402
+    OR ^   ^      9405
+
+-- Utilities (with effect from 1 August 2022)
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`34 — this Merchant Category Code is excluded from 1 August 2022` mcc MEANS
+    mcc EQUALS 4900
+
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`34 — this Merchant Category Code is excluded from 1 October 2024` mcc MEANS
+    -- Direct Marketing - Combination Catalog and Retail Merchants
+       mcc EQUALS 5965
+    -- Cigar Stores and Stands
+    OR ^   ^      5993
+    -- Membership Organizations (Not Elsewhere Classified)
+    OR ^   ^      8699
+    -- Professional Services (Not Elsewhere Classified)
+    OR ^   ^      8999
+
+GIVETH A DATE
+`1 August 2022` MEANS YMD 2022 8 1
+GIVETH A DATE
+`1 October 2024` MEANS YMD 2024 10 1
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`34 — no UNI$ is awarded for this Merchant Transaction Code` txn MEANS
+       `34 — this Merchant Category Code is excluded whatever the date`
+           (txn's `merchant category code`)
+    OR (    `34 — this Merchant Category Code is excluded from 1 August 2022`
+                (txn's `merchant category code`)
+        AND txn's `transaction date` AT LEAST `1 August 2022`)
+    OR (    `34 — this Merchant Category Code is excluded from 1 October 2024`
+                (txn's `merchant category code`)
+        AND txn's `transaction date` AT LEAST `1 October 2024`)
+
+
+§§ `35. Excluded transaction descriptions`
+
+-- THIRTY-NINE PRINTED ENTRIES, THIRTY OF THEM PREFIXES, AND THE PREFIX PROBLEM
+-- IS NOW SOMEBODY ELSE'S.
+--
+-- The printed list matches statement text: "AXS*" is a prefix, and the real
+-- line reads "AXS*SP SERVICES". A rule cannot do that here, because a rule
+-- never compares a string -- Catala has no string type, so the substring work
+-- is done once in layer 1 (`classify.l4`) and the closed enumeration
+-- `Description pattern` is what reaches this module. So this rule is a
+-- membership test over `txn`'s `description patterns`, and the thirty-nine
+-- entries collapse onto fourteen families.
+--
+-- THE MAPPING, entry by printed entry, so a reviewer can check the collapse
+-- against the document:
+--   AXS*                                        -> AXS
+--   AMAZE* (wef 1 October 2024)                 -> AMAZE, and only from that date
+--   AMAZE*TRANSIT                               -> TRANSIT (undated; see below)
+--   TRANSIT*                                    -> TRANSIT
+--   EZ Link* / EZ LINK* / EZLINK* / EzLink*
+--     / EZ-LINK* / EZ-Link* / EZLINKS*
+--     / WWW.MYEZLINK.COM.SG                     -> `EZ-Link`
+--   FlashPay* / FLASHPAY* / NETSFLASHPAY*
+--     / NETS VCASHCARD*                         -> FlashPay
+--   MB * MONEYBOOKERS.COM / SKR*SKRILL.COM
+--     / SKR*xglobalmarkets.com*                 -> `Skrill or Moneybookers`
+--   BANC DE BINARY* / BANCDEBINARY.COM*
+--     / City Index* / CITY INDEX* / OANDA*
+--     / PLUS500 / PLUS500UK LIMITED
+--     / WWW.PLUS500.CO.UK / SKR*PLUS500CY LTD
+--     / Saxo Cap Mkts Pte Ltd / SKYFX.COM*
+--     / WWW.IGMARKETS.COM.SG                    -> `Forex or CFD platform`
+--   PAYPAL*                                     -> PayPal
+--   YOUTRIP                                     -> YouTrip
+--   IPAYMY*                                     -> iPaymy
+--   RWS-LEVY*                                   -> `Government levy`
+--   SMOOVE PAY*                                 -> SmoovPay
+--   SINGPOST-SAM*                               -> SAM
+--   RazerPay*                                   -> RazerPay
+--   NORWDS* (wef 21 Jul 2024)                   -> NO PATTERN. See below.
+--
+-- ONE ENTRY IS LOST AND IT IS A LAYER-1 GAP, NOT A DRAFTING CHOICE. "NORWDS*"
+-- has no constructor in the shared domain's `Description pattern`, so nothing
+-- in this corpus can recognise a NORWDS line and this rule cannot exclude one.
+-- A NORWDS transaction therefore earns here and does not earn at UOB. Adding
+-- the constructor is a shared-domain edit, which is not this module's to make;
+-- it is reported instead. NOTE THE DIRECTION OF THE ERROR: every other gap in
+-- this module understates a reward, and this one OVERSTATES it.
+--
+-- TWO ENTRIES CARRY THEIR OWN COMMENCEMENT, and now that the test can actually
+-- fire they are gated rather than noted. "AMAZE*" takes effect 1 October 2024;
+-- the gate compares against the TRANSACTION date, which is the corpus
+-- convention and not something the document settles (cl.8 computes UNI$ on the
+-- POSTING date, and a "with effect from" is not a computation). "NORWDS* (wef
+-- 21 Jul 2024)" would be gated the same way if it had a pattern to gate.
+--
+-- A NOTE ON "AMAZE*TRANSIT", which the printed list carries WITHOUT a date
+-- while carrying "AMAZE*" WITH one: an Amaze-routed transit ride is excluded
+-- at all times anyway, because its line also carries TRANSIT, and "TRANSIT*"
+-- is undated. So gating AMAZE loses nothing that the document grants. There is
+-- an assertion to that effect.
+
+GIVEN patterns IS A LIST OF `Description pattern`
+GIVETH A BOOLEAN
+`35 — this transaction description is excluded whatever the date` patterns MEANS
+       elem AXS                      patterns
+    OR elem TRANSIT                  patterns
+    OR elem `EZ-Link`                patterns
+    OR elem FlashPay                 patterns
+    OR elem `Skrill or Moneybookers` patterns
+    OR elem `Forex or CFD platform`  patterns
+    OR elem PayPal                   patterns
+    OR elem YouTrip                  patterns
+    OR elem iPaymy                   patterns
+    OR elem `Government levy`        patterns
+    OR elem SmoovPay                 patterns
+    OR elem SAM                      patterns
+    OR elem RazerPay                 patterns
+
+-- "AMAZE* (wef 1 October 2024)"
+GIVEN patterns IS A LIST OF `Description pattern`
+GIVETH A BOOLEAN
+`35 — this transaction description is excluded from 1 October 2024` patterns MEANS
+    elem AMAZE patterns
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`35 — no UNI$ is awarded for this transaction description` txn MEANS
+       `35 — this transaction description is excluded whatever the date`
+           (txn's `description patterns`)
+    OR (    `35 — this transaction description is excluded from 1 October 2024`
+                (txn's `description patterns`)
+        AND txn's `transaction date` AT LEAST `1 October 2024`)
+
+
+§§ `The withholding cascade`
+
+-- cl.32, cl.34 and cl.35 are three independent withholdings and any one of
+-- them takes the whole transaction to zero -- Base UNI$ and Bonus UNI$ alike,
+-- since each is drafted over "UNI$" and not over one of the two.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`no UNI$ is awarded for this transaction` txn MEANS
+       `32 — no UNI$ is awarded for this kind of transaction` (txn's `charge kind`)
+    OR `34 — no UNI$ is awarded for this Merchant Transaction Code` txn
+    OR `35 — no UNI$ is awarded for this transaction description` txn
+
+
+§§ `4(b) and 5 — spending in an elected Preferred Rewards Category`
+
+-- cl.4(b) entitles the Solitaire cardmember to Bonus UNI$ "for every S$5.00 of
+-- spending in your Preferred Rewards Categories". The test is therefore a
+-- membership test: does Schedule 1 put this transaction's MCC in a category
+-- this cardmember has elected? WHICH categories are elected is a standing fact
+-- on the Cardholder; cl.5's quarterly machinery that produced it is recorded
+-- as a condition, not computed (see the header).
+
+-- cl.4(b)'s "your Preferred Rewards Categories", as a test. This is its own
+-- rule rather than an `elem` written at the one place it is used, and the
+-- reason is the Catala export rather than the law: R11 elides every STRING
+-- field, which makes several of the shared domain's structures NARROWER in
+-- Catala than in L4, so the exporter refuses any whole-value comparison whose
+-- operand type it cannot pin down -- and a variable bound by `WHEN JUST c`
+-- carries no type it can read, while a GIVEN parameter does. Naming the test
+-- gives the comparison a type and is better reading besides. Measured
+-- 2026-09-21; do not inline it back.
+GIVEN c          IS A `Solitaire category`
+      cardholder IS A Cardholder
+GIVETH A BOOLEAN
+`the cardmember has elected this category` c cardholder MEANS
+    elem c (cardholder's `Solitaire preferred rewards categories`)
+
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A BOOLEAN
+`the transaction is spending in an elected Preferred Rewards Category` cardholder txn MEANS
+    CONSIDER `the Solitaire category of MCC` (txn's `merchant category code`)
+    WHEN NOTHING THEN FALSE
+    WHEN JUST c  THEN `the cardmember has elected this category` c cardholder
+
+-- The Travel gap, narrowed to the only case in which it costs anything: the
+-- cardmember elected Travel AND Schedule 1's six code lists do not answer, so
+-- this transaction is Travel if and only if the merchant's main business
+-- activity is flights or hotels, which nothing here knows.
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A BOOLEAN
+`the transaction may be Travel and Schedule 1 cannot say` cardholder txn MEANS
+        `the cardmember has elected this category` Travel cardholder
+    AND `Schedule 1 gives this MCC no category` (txn's `merchant category code`)
+
+
+§ `What a transaction earns`
+
+§§ `6(b) and 8 — the cap that governs, and the date it is attributed by`
+
+-- cl.6(b) caps BONUS UNI$ only; cl.6 opens "The maximum amount of Bonus UNI$
+-- that you can earn in a calendar month", and nothing in the document caps
+-- Base UNI$. So an answer that earns only the base is uncapped.
+--
+-- The figure returned is the PER-CATEGORY cap, 1,350 UNI$ = S$750, not the
+-- card-wide 2,700 UNI$ = S$1,500. That is the one that binds a transaction:
+-- cl.6(b) says "each Preferred Rewards Category capped at 1,350 UNI$", the
+-- clause's own illustration says a cardmember with two categories "can earn up
+-- to 1,350 UNI$ on EACH", and nothing lets one category's unused room serve
+-- the other. A cardmember who elected only one category is capped at 1,350
+-- rather than 2,700, which is the FAQ's reading of the same clause.
+--
+-- cl.6(c) gives the UOB Lady's Solitaire METAL Card a different cap -- 3,600
+-- UNI$, S$2,000, with no per-category split at all. The shared domain's Card
+-- enum has one `UOB Lady's Solitaire` constructor and no Metal variant, so
+-- this module cannot tell the two apart and answers for the non-Metal card.
+-- Reported as a domain gap.
+
+-- `pool` NAMES THE POT, and naming it is what makes cl.6(b)'s "each Preferred
+-- Rewards Category capped at 1,350 UNI$" a checkable claim rather than a
+-- sentence. Two Solitaire answers in different categories come back with
+-- different pools, so a projection can show that S$750 of Dining headroom is
+-- not S$750 of Family headroom and the two do not transfer.
+GIVEN c IS A `Solitaire category`
+GIVETH A Cap
+`the cap on Bonus UNI$ in the Preferred Rewards Category` c MEANS Cap WITH
+    `pool`                  IS (CONSIDER c
+                                WHEN `Beauty & Wellness` THEN "Solitaire — Beauty & Wellness"
+                                WHEN Dining              THEN "Solitaire — Dining"
+                                WHEN Entertainment       THEN "Solitaire — Entertainment"
+                                WHEN Family              THEN "Solitaire — Family"
+                                WHEN Fashion             THEN "Solitaire — Fashion"
+                                WHEN Transport           THEN "Solitaire — Transport"
+                                WHEN Travel              THEN "Solitaire — Travel")
+    `capped`                IS TRUE
+    `bonus spend per month` IS `the dollars of category spend the cap admits`
+    `basis`                 IS `Calendar month`
+    `attribution`           IS `By posting date`
+
+-- cl.8 fixes the attribution for BOTH rewards ("any Base UNI$ and Bonus UNI$
+-- ... will be computed based on the date that the transaction is posted"), so
+-- the uncapped answer still carries the basis and attribution.
+GIVETH A Cap
+`the document states no cap` MEANS Cap WITH
+    `pool`                  IS "Solitaire — Base UNI$, which cl.6 does not cap"
+    `capped`                IS FALSE
+    `bonus spend per month` IS 0
+    `basis`                 IS `Calendar month`
+    `attribution`           IS `By posting date`
+
+-- A withheld transaction runs against no pot at all. Distinguished from the
+-- uncapped Base UNI$ above so that a projection reading `pool` does not report
+-- a transaction that earned nothing as having uncapped headroom.
+GIVETH A Cap
+`no cap, because no UNI$ is earned` MEANS Cap WITH
+    `pool`                  IS "Solitaire — nothing earned"
+    `capped`                IS FALSE
+    `bonus spend per month` IS 0
+    `basis`                 IS `Calendar month`
+    `attribution`           IS `By posting date`
+
+
+§§ `The four answers`
+
+-- Every answer sets the two indicator-conditional rates equal to
+-- `miles per dollar` and `depends on the merchant indicator` to FALSE. That is
+-- not a shortcut: this document rates nothing on the merchant's system
+-- indicator (see the header), so there is no uncertainty for the fields to
+-- carry and an `Unknown` indicator costs the cardholder nothing.
+--
+-- WHY THE CONDITIONS ARE WRITTEN OUT FOUR TIMES instead of once in a helper.
+-- `conditions` is a LIST OF STRING; Catala has no string type, so the field is
+-- elided and its value expression is never lowered, which is why a string may
+-- be built here at all. A HELPER returning LIST OF STRING is refused outright,
+-- even when only an elided field reads it (measured 2026-09-21), so there is
+-- nowhere to factor the five notes every answer shares. The repetition is the
+-- price of the export, not a drafting preference. Edit all four together.
+
+GIVEN txn IS A Transaction
+GIVETH A `Rate answer`
+`the answer when no UNI$ is awarded` txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS 0
+        `miles per point`                                     IS `miles per UNI$`
+        `conversion status`                                   IS Verified
+        `miles per dollar`                                    IS 0
+        `miles per dollar if the merchant flags online`       IS 0
+        `miles per dollar if the merchant flags card-present` IS 0
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `this rate is above the Base UNI$ rate` 0
+        `cap`                                                 IS `no cap, because no UNI$ is earned`
+        `conditions`                                          IS
+            append (LIST "No UNI$ at all, and not only the Bonus UNI$: cl.32, cl.34 and cl.35 are each drafted over bare UNI$, so a transaction any one of them reaches earns neither the Base UNI$ nor the Bonus UNI$.",
+                         (BRANCH
+                            IF `32 — no UNI$ is awarded for this kind of transaction` (txn's `charge kind`)
+                                THEN "Withheld by cl.32: this posting is one of the twenty-two kinds for which UNI$ is not awarded."
+                            IF `34 — no UNI$ is awarded for this Merchant Transaction Code` txn
+                                THEN "Withheld by cl.34: this transaction's Merchant Category Code is on the excluded list."
+                            OTHERWISE "Withheld by cl.35: this transaction's description is on the excluded list."),
+                         "cl.32 withholds UNI$ for twenty-two kinds of transaction. Seventeen of them are tested here from the kind of posting this is; five are not, because no fact in this corpus records them: NETS-rail transactions, prepaid-account top-ups, brokerage and securities, gambling and trading, and amounts approved under the UOB Payment Facility. cl.34 reaches some of those by MCC instead (6540 stored value, 6211 securities, 7995 gambling), and cl.32(v) lets UOB exclude anything else without notice.",
+                         "cl.35 also excludes any line beginning NORWDS (wef 21 Jul 2024), and this corpus has no way to recognise one, so a NORWDS transaction earns here and would earn nothing at UOB. Every other gap in this module understates what you earn; this one overstates it.",
+                         "UNI$ are computed on the date the transaction is POSTED to UOB's systems, not the date you spent (cl.8).",
+                         "UNI$ convert to KrisFlyer or Asia miles in blocks of 10,000 miles, so UNI$ below a whole block buy nothing yet (cl.3).",
+                         "Your Card account must be in good standing and not cancelled, or no UNI$ is earned (cl.9, cl.36).",
+                         "A Lady's Savings Account uplift above 4 miles per S$1 is NOT in this document and is unconfirmed here. What the held T&C states is 10X UNI$ per S$5, which is 4 miles per S$1.")
+                   (IF txn's `posted in a foreign currency`
+                    THEN LIST "This charge was posted in a foreign currency. UOB converts it to Singapore dollars at its prevailing exchange rate and computes UNI$ on the converted amount, so the miles you see depend on UOB's rate on the day (cl.10)."
+                    ELSE EMPTY)
+        `sources`                                             IS LIST `cl.32 — the excluded kinds of transaction`,
+                                                                      `cl.34 — the excluded Merchant Transaction Codes`,
+                                                                      `cl.35 — the excluded transaction descriptions`
+        `status`                                              IS Verified
+
+-- The `cap` field's NOTHING arm is unreachable from the rule: this answer is
+-- only reached when `the transaction is spending in an elected Preferred
+-- Rewards Category` held, which requires a JUST. It is written because a
+-- CONSIDER must be total, and it answers with the uncapped Cap rather than an
+-- invented one.
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`the answer at the Preferred Rewards Category rate` cardholder txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `Preferred Rewards Category UNI$ per dollar`
+        `miles per point`                                     IS `miles per UNI$`
+        `conversion status`                                   IS Verified
+        `miles per dollar`                                    IS `the Preferred Rewards Category miles per dollar`
+        `miles per dollar if the merchant flags online`       IS `the Preferred Rewards Category miles per dollar`
+        `miles per dollar if the merchant flags card-present` IS `the Preferred Rewards Category miles per dollar`
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `this rate is above the Base UNI$ rate` `the Preferred Rewards Category miles per dollar`
+        `cap`                                                 IS
+            (CONSIDER `the Solitaire category of MCC` (txn's `merchant category code`)
+             WHEN NOTHING THEN `the document states no cap`
+             WHEN JUST c  THEN `the cap on Bonus UNI$ in the Preferred Rewards Category` c)
+        `conditions`                                          IS
+            append (LIST (CONCAT "Counted in your "
+                                 (CONSIDER `the Solitaire category of MCC` (txn's `merchant category code`)
+                                  WHEN NOTHING THEN "none"
+                                  WHEN JUST c  THEN CONSIDER c
+                                                    WHEN `Beauty & Wellness` THEN "Beauty & Wellness"
+                                                    WHEN Dining              THEN "Dining"
+                                                    WHEN Entertainment       THEN "Entertainment"
+                                                    WHEN Family              THEN "Family"
+                                                    WHEN Fashion             THEN "Fashion"
+                                                    WHEN Transport           THEN "Transport"
+                                                    WHEN Travel              THEN "Travel")
+                                 " Preferred Rewards Category (Schedule 1)."),
+                         "The S$750 cap is PER CATEGORY and does not transfer: unused room in your other Preferred Rewards Category cannot be spent here (cl.6(b)).",
+                         "Your categories are the ones registered for this Quarter at uob.com.sg/ladys-enrol; a change made now applies from the following Quarter (cl.5).",
+                         "Schedule 1 categorises by the merchant's MCC, and UOB disclaims it: a merchant's registered MCC may not match its nature of business, so UOB cannot guarantee this transaction falls in your category.",
+                         "cl.32 withholds UNI$ for twenty-two kinds of transaction. Seventeen of them are tested here from the kind of posting this is; five are not, because no fact in this corpus records them: NETS-rail transactions, prepaid-account top-ups, brokerage and securities, gambling and trading, and amounts approved under the UOB Payment Facility. cl.34 reaches some of those by MCC instead (6540 stored value, 6211 securities, 7995 gambling), and cl.32(v) lets UOB exclude anything else without notice.",
+                         "cl.35 also excludes any line beginning NORWDS (wef 21 Jul 2024), and this corpus has no way to recognise one, so a NORWDS transaction earns here and would earn nothing at UOB. Every other gap in this module understates what you earn; this one overstates it.",
+                         "UNI$ are computed on the date the transaction is POSTED to UOB's systems, not the date you spent (cl.8).",
+                         "UNI$ convert to KrisFlyer or Asia miles in blocks of 10,000 miles, so UNI$ below a whole block buy nothing yet (cl.3).",
+                         "Your Card account must be in good standing and not cancelled, or no UNI$ is earned (cl.9, cl.36).",
+                         "A Lady's Savings Account uplift above 4 miles per S$1 is NOT in this document and is unconfirmed here. What the held T&C states is 10X UNI$ per S$5, which is 4 miles per S$1.")
+                   (IF txn's `posted in a foreign currency`
+                    THEN LIST "This charge was posted in a foreign currency. UOB converts it to Singapore dollars at its prevailing exchange rate and computes UNI$ on the converted amount, so the miles you see depend on UOB's rate on the day (cl.10)."
+                    ELSE EMPTY)
+        `sources`                                             IS LIST `heading A — ten times UNI$ on a Preferred Rewards Category`,
+                                                                      `cl.2(b) — the Base UNI$`,
+                                                                      `cl.2(c) — the Bonus UNI$`,
+                                                                      `cl.3 — the conversion to miles`,
+                                                                      `cl.4(b) — the Solitaire elects two categories`,
+                                                                      `cl.5 — the selection is made each Quarter`,
+                                                                      `cl.6(b) — the monthly cap on Bonus UNI$`,
+                                                                      `cl.8 — UNI$ are computed on the posting date`,
+                                                                      `Schedule 1 — the category table`
+        `status`                                              IS Verified
+
+GIVEN txn IS A Transaction
+GIVETH A `Rate answer`
+`the answer at the Base UNI$ rate only` txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `Base UNI$ per dollar`
+        `miles per point`                                     IS `miles per UNI$`
+        `conversion status`                                   IS Verified
+        `miles per dollar`                                    IS `the Base UNI$ miles per dollar`
+        `miles per dollar if the merchant flags online`       IS `the Base UNI$ miles per dollar`
+        `miles per dollar if the merchant flags card-present` IS `the Base UNI$ miles per dollar`
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `this rate is above the Base UNI$ rate` `the Base UNI$ miles per dollar`
+        `cap`                                                 IS `the document states no cap`
+        `conditions`                                          IS
+            append (LIST (CONCAT "The Schedule 1 category for this transaction is: "
+                                 (CONSIDER `the Solitaire category of MCC` (txn's `merchant category code`)
+                                  WHEN NOTHING THEN "none"
+                                  WHEN JUST c  THEN CONSIDER c
+                                                    WHEN `Beauty & Wellness` THEN "Beauty & Wellness"
+                                                    WHEN Dining              THEN "Dining"
+                                                    WHEN Entertainment       THEN "Entertainment"
+                                                    WHEN Family              THEN "Family"
+                                                    WHEN Fashion             THEN "Fashion"
+                                                    WHEN Transport           THEN "Transport"
+                                                    WHEN Travel              THEN "Travel")
+                                 ". That is not a Preferred Rewards Category you have elected, so no Bonus UNI$ (cl.4(b))."),
+                         "Base UNI$ is uncapped: cl.6 caps Bonus UNI$ only.",
+                         "cl.32 withholds UNI$ for twenty-two kinds of transaction. Seventeen of them are tested here from the kind of posting this is; five are not, because no fact in this corpus records them: NETS-rail transactions, prepaid-account top-ups, brokerage and securities, gambling and trading, and amounts approved under the UOB Payment Facility. cl.34 reaches some of those by MCC instead (6540 stored value, 6211 securities, 7995 gambling), and cl.32(v) lets UOB exclude anything else without notice.",
+                         "cl.35 also excludes any line beginning NORWDS (wef 21 Jul 2024), and this corpus has no way to recognise one, so a NORWDS transaction earns here and would earn nothing at UOB. Every other gap in this module understates what you earn; this one overstates it.",
+                         "UNI$ are computed on the date the transaction is POSTED to UOB's systems, not the date you spent (cl.8).",
+                         "UNI$ convert to KrisFlyer or Asia miles in blocks of 10,000 miles, so UNI$ below a whole block buy nothing yet (cl.3).",
+                         "Your Card account must be in good standing and not cancelled, or no UNI$ is earned (cl.9, cl.36).",
+                         "A Lady's Savings Account uplift above 4 miles per S$1 is NOT in this document and is unconfirmed here. What the held T&C states is 10X UNI$ per S$5, which is 4 miles per S$1.")
+                   (IF txn's `posted in a foreign currency`
+                    THEN LIST "This charge was posted in a foreign currency. UOB converts it to Singapore dollars at its prevailing exchange rate and computes UNI$ on the converted amount, so the miles you see depend on UOB's rate on the day (cl.10)."
+                    ELSE EMPTY)
+        `sources`                                             IS LIST `cl.2(b) — the Base UNI$`,
+                                                                      `cl.3 — the conversion to miles`,
+                                                                      `cl.4(b) — the Solitaire elects two categories`,
+                                                                      `cl.8 — UNI$ are computed on the posting date`,
+                                                                      `Schedule 1 — the category table`
+        `status`                                              IS Verified
+
+-- THE ONLY UNCONFIRMED ANSWER THIS MODULE PRODUCES, and it is unconfirmed for
+-- a reason the document states rather than one it omits: Schedule 1 defines
+-- Travel by the merchant's main business activity and gives no MCC list. The
+-- rate returned is the LOWER of the two possible answers, so the headline
+-- figure never overstates; the higher one is in the conditions. The cap
+-- returned is the uncapped one, to match the rate returned; the conditions
+-- name the Travel pot that would govern under the other reading.
+GIVEN txn IS A Transaction
+GIVETH A `Rate answer`
+`the answer when Travel cannot be determined` txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `Base UNI$ per dollar`
+        `miles per point`                                     IS `miles per UNI$`
+        `conversion status`                                   IS Verified
+        `miles per dollar`                                    IS `the Base UNI$ miles per dollar`
+        `miles per dollar if the merchant flags online`       IS `the Base UNI$ miles per dollar`
+        `miles per dollar if the merchant flags card-present` IS `the Base UNI$ miles per dollar`
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `this rate is above the Base UNI$ rate` `the Base UNI$ miles per dollar`
+        `cap`                                                 IS `the document states no cap`
+        `conditions`                                          IS
+            append (LIST "You have elected Travel, and Schedule 1 gives Travel NO MCC list: it is decided by whether the merchant's main business activity is classified as flights or hotels. Nothing on a statement line says that, so this answer cannot tell you.",
+                         "If this merchant IS a major airline or hotel by main business activity, the transaction earns 10X UNI$ per S$5, which is 4 miles per S$1, capped at S$750 of Travel spend for the calendar month, in the Solitaire Travel pot.",
+                         "If it is not, it earns the Base UNI$ only, which is 0.4 miles per S$1, and is uncapped. The figure returned is the lower one.",
+                         "cl.32 withholds UNI$ for twenty-two kinds of transaction. Seventeen of them are tested here from the kind of posting this is; five are not, because no fact in this corpus records them: NETS-rail transactions, prepaid-account top-ups, brokerage and securities, gambling and trading, and amounts approved under the UOB Payment Facility. cl.34 reaches some of those by MCC instead (6540 stored value, 6211 securities, 7995 gambling), and cl.32(v) lets UOB exclude anything else without notice.",
+                         "cl.35 also excludes any line beginning NORWDS (wef 21 Jul 2024), and this corpus has no way to recognise one, so a NORWDS transaction earns here and would earn nothing at UOB. Every other gap in this module understates what you earn; this one overstates it.",
+                         "UNI$ are computed on the date the transaction is POSTED to UOB's systems, not the date you spent (cl.8).",
+                         "UNI$ convert to KrisFlyer or Asia miles in blocks of 10,000 miles, so UNI$ below a whole block buy nothing yet (cl.3).",
+                         "Your Card account must be in good standing and not cancelled, or no UNI$ is earned (cl.9, cl.36).",
+                         "A Lady's Savings Account uplift above 4 miles per S$1 is NOT in this document and is unconfirmed here. What the held T&C states is 10X UNI$ per S$5, which is 4 miles per S$1.")
+                   (IF txn's `posted in a foreign currency`
+                    THEN LIST "This charge was posted in a foreign currency. UOB converts it to Singapore dollars at its prevailing exchange rate and computes UNI$ on the converted amount, so the miles you see depend on UOB's rate on the day (cl.10)."
+                    ELSE EMPTY)
+        `sources`                                             IS LIST `Schedule 1 — the Travel row`,
+                                                                      `cl.2(b) — the Base UNI$`,
+                                                                      `cl.3 — the conversion to miles`,
+                                                                      `heading A — ten times UNI$ on a Preferred Rewards Category`,
+                                                                      `cl.6(b) — the monthly cap on Bonus UNI$`
+        `status`                                              IS Unconfirmed
+
+
+§§ `The rule`
+
+-- A first-match cascade in the document's own order of precedence: the
+-- withholding clauses defeat everything (cl.32/34/35 are drafted over "UNI$"
+-- without qualification), then the Preferred Rewards Category entitlement of
+-- cl.4(b) and heading A, then the Travel gap, then the Base UNI$ of cl.2(b),
+-- which cl.2(b) gives to every qualifying transaction and so is the residue.
+--
+-- TWO OF THE FOUR PARAMETERS ARE NOT READ, and the reasons differ.
+--   `card`  -- the composing module dispatches on this rule's NAME, so by the
+--             time control is here the card is a UOB Lady's Solitaire. The
+--             domain's Card enum has no Metal variant to distinguish (cl.6(c)).
+--   `month` -- `Month position` carries yuu and PAssion running totals only.
+--             UOB's cap is a calendar-month Bonus UNI$ total and the domain
+--             records no field for it, which is right: consuming the cap is
+--             the allocation problem and out of scope. This rule returns the
+--             cap that governs, not how much of it is left.
+
+@export What a transaction earns on a UOB Lady's Solitaire Card: the UNI$ per dollar, the miles per dollar, whether it earns the 10X Preferred Rewards Category bonus or only the base, which monthly cap governs, and the clauses of the UOB Lady's Cards T&C relied on.
+GIVEN card       IS A Card              @desc The card the transaction was made on. This rule answers for UOB Lady's Solitaire; the parameter is taken for uniformity with the other card rules and is not read.
+      cardholder IS A Cardholder        @desc The cardholder, whose Solitaire preferred rewards categories are the two categories registered for this Quarter at uob.com.sg/ladys-enrol.
+      month      IS A `Month position`  @desc How much has been spent so far this month. Not read by this rule: UOB's cap is a Bonus UNI$ total the shared domain records no field for.
+      txn        IS A Transaction       @desc The transaction, as the cardholder and the statement describe it. The Merchant Category Code and the transaction description are what this rule turns on.
+GIVETH A `Rate answer`
+`UOB Lady's Solitaire earns on` card cardholder month txn MEANS
+    BRANCH
+      IF `no UNI$ is awarded for this transaction` txn
+          THEN `the answer when no UNI$ is awarded` txn
+      IF `the transaction is spending in an elected Preferred Rewards Category` cardholder txn
+          THEN `the answer at the Preferred Rewards Category rate` cardholder txn
+      IF `the transaction may be Travel and Schedule 1 cannot say` cardholder txn
+          THEN `the answer when Travel cannot be determined` txn
+      OTHERWISE `the answer at the Base UNI$ rate only` txn
+
+
+§§ `Illustrations`
+
+-- THE DOCUMENT HAS NO WORKED TRANSACTION. Its only illustrations are cl.6(b)'s
+-- note on the cap and the FAQ's Quarter-selection timeline, and neither is a
+-- purchase. So the arithmetic assertions below test the document against
+-- ITSELF: for each rate UOB states both a UNI$ formula and a miles figure, and
+-- for each cap both a UNI$ ceiling and its dollar equivalent. Those are eight
+-- independent chances for the document to contradict itself, and it takes
+-- none of them -- every figure UOB prints is the one its own formula yields.
+
+-- cl.2(b): UNI$1 per S$5, stated as "equivalent to 0.4 miles per S$1 spent".
+#ASSERT `Base UNI$ per dollar` TIMES `miles per UNI$` EQUALS 0.4
+-- cl.2(c): 9X UNI$ per S$5, stated as "equivalent to 3.6 miles per S$1 spent".
+#ASSERT `Bonus UNI$ per dollar` TIMES `miles per UNI$` EQUALS 3.6
+-- Heading A: base plus bonus is "10X UNI$ per S$5", i.e. 4 miles per S$1.
+#ASSERT `Preferred Rewards Category UNI$ per dollar` TIMES 5 EQUALS 10
+#ASSERT `Preferred Rewards Category UNI$ per dollar` TIMES `miles per UNI$` EQUALS 4
+-- cl.6(b): 1,350 UNI$ "(which is equivalent to S$750 spent)".
+#ASSERT `the dollars of category spend the cap admits` EQUALS 750
+-- cl.6(b): 2,700 UNI$ "(which is equivalent to S$1,500 spent)".
+#ASSERT 2700 DIVIDED BY `Bonus UNI$ per dollar` EQUALS 1500
+-- cl.6(a): 1,800 UNI$ "(which is equivalent to S$1,000 spent in a calendar month)".
+#ASSERT 1800 DIVIDED BY `Bonus UNI$ per dollar` EQUALS 1000
+-- cl.6(c): 3,600 UNI$ "(which is equivalent to S$2,000 in spent in a calendar month)".
+#ASSERT 3600 DIVIDED BY `Bonus UNI$ per dollar` EQUALS 2000
+
+
+-- Fixtures. `Month position` is required by the shared shape and read by
+-- nothing here, so one empty value serves every case.
+
+GIVETH A `Month position`
+`a month with nothing recorded` MEANS `Month position` WITH
+    `yuu eligible spend so far this calendar month`                     IS 0
+    `yuu participating merchants transacted so far this calendar month` IS 0
+    `PAssion spend at Participating Stores so far this month`           IS 0
+    `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+GIVEN cats IS A LIST OF `Solitaire category`
+GIVETH A Cardholder
+`a Solitaire cardmember who elected` cats MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS cats
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVETH A Cardholder
+`Dining and Family`    MEANS `a Solitaire cardmember who elected` (LIST Dining, Family)
+GIVETH A Cardholder
+`Travel and Fashion`   MEANS `a Solitaire cardmember who elected` (LIST Travel, Fashion)
+GIVETH A Cardholder
+`Dining only`          MEANS `a Solitaire cardmember who elected` (LIST Dining)
+GIVETH A Cardholder
+`no categories at all` MEANS `a Solitaire cardmember who elected` EMPTY
+
+-- THE FIXTURE EVERY ILLUSTRATION IS BUILT FROM. Seven facts, because the rule
+-- now turns on three of them that the first draft of this module could not
+-- test: the posting's `charge kind` (cl.32), its `description patterns`
+-- (cl.35), and whether it was posted in a foreign currency (cl.10). The
+-- `merchant` field is set to `Another merchant` throughout: UOB's document
+-- names no merchant, and that is itself worth stating.
+GIVEN mcc          IS A NUMBER
+      description  IS A STRING
+      patterns     IS A LIST OF `Description pattern`
+      kind         IS A `Charge kind`
+      foreign      IS A BOOLEAN
+      purchasedate IS A DATE
+      indicator    IS A `Merchant indicator`
+GIVETH A Transaction
+`a charge` mcc description patterns kind foreign purchasedate indicator MEANS Transaction WITH
+    `merchant name`                IS description
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS mcc
+    `transaction description`      IS description
+    `description patterns`         IS patterns
+    `charge kind`                  IS kind
+    `amount`                       IS 100
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS foreign
+    `transaction date`             IS purchasedate
+    `posting date`                 IS purchasedate
+    `payment channel`              IS `Inserted or swiped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags card-present`
+    `made in Singapore`            IS TRUE
+
+GIVETH A DATE
+`a day in September 2026` MEANS YMD 2026 9 15
+
+-- The ordinary case: a retail purchase in Singapore dollars, carrying no
+-- description pattern, on a day well after every commencement in the document.
+GIVEN mcc         IS A NUMBER
+      description IS A STRING
+GIVETH A Transaction
+`a purchase` mcc description MEANS
+    `a charge` mcc description EMPTY `Retail purchase` FALSE `a day in September 2026` `Flags card-present`
+
+GIVETH A Transaction
+`a restaurant bill`        MEANS `a purchase` 5812 "SUSHI TEI SUNTEC"
+GIVETH A Transaction
+`a supermarket shop`       MEANS `a purchase` 5411 "NTUC FAIRPRICE"
+GIVETH A Transaction
+`a department store buy`   MEANS `a purchase` 5311 "TANGS ORCHARD"
+GIVETH A Transaction
+`an airline ticket`        MEANS `a purchase` 3047 "SINGAPORE AIRLINES"
+GIVETH A Transaction
+`a utilities bill`         MEANS `a purchase` 4900 "SP SERVICES"
+GIVETH A Transaction
+`a hospital bill`          MEANS `a purchase` 8062 "MOUNT ELIZABETH"
+GIVETH A Transaction
+`a cigar shop buy on 30 September 2024` MEANS
+    `a charge` 5993 "CIGAR AFICIONADO" EMPTY `Retail purchase` FALSE (YMD 2024 9 30) `Flags card-present`
+GIVETH A Transaction
+`a cigar shop buy on 1 October 2024` MEANS
+    `a charge` 5993 "CIGAR AFICIONADO" EMPTY `Retail purchase` FALSE (YMD 2024 10 1) `Flags card-present`
+GIVETH A Transaction
+`a restaurant bill in yen` MEANS
+    `a charge` 5812 "ICHIRAN SHINJUKU" EMPTY `Retail purchase` TRUE `a day in September 2026` `Flags card-present`
+GIVETH A Transaction
+`a restaurant bill whose merchant has never posted before` MEANS
+    `a charge` 5812 "A NEW CAFE" EMPTY `Retail purchase` FALSE `a day in September 2026` Unknown
+
+-- cl.35 FIXTURES. Each carries a Dining MCC, so that a test which comes back
+-- at zero is testing cl.35 and not the absence of an elected category: the
+-- cardmembers below elect Dining, so without cl.35 every one of these would
+-- earn the full 4 miles per S$1.
+--
+-- THE FIRST ONE IS THE POINT OF THE WHOLE PASS. "AXS*SP SERVICES" is what a
+-- real AXS line says, and the printed list says "AXS*". The first draft of
+-- this module compared strings, so it answered that the line was NOT excluded
+-- and pinned that wrong answer with an assertion. Layer 1 now reads the line
+-- into the AXS pattern and the rule reads the pattern, so the answer is right
+-- and the assertion below is the one that changed.
+GIVETH A Transaction
+`an AXS bill with a real statement line` MEANS
+    `a charge` 5812 "AXS*SP SERVICES" (LIST AXS) `Retail purchase` FALSE `a day in September 2026` `Flags card-present`
+GIVETH A Transaction
+`a PayPal line at a restaurant MCC` MEANS
+    `a charge` 5812 "PAYPAL *SUSHI TEI" (LIST PayPal) `Retail purchase` FALSE `a day in September 2026` `Flags card-present`
+GIVETH A Transaction
+`an EZ-Link top-up` MEANS
+    `a charge` 5812 "WWW.MYEZLINK.COM.SG" (LIST `EZ-Link`) `Retail purchase` FALSE `a day in September 2026` `Flags card-present`
+GIVETH A Transaction
+`a CardUp payment` MEANS
+    `a charge` 5812 "CARDUP*RENT" (LIST CardUp) `Retail purchase` FALSE `a day in September 2026` `Flags card-present`
+-- The dated limb of cl.35, the same Amaze-routed purchase one day apart.
+GIVETH A Transaction
+`an Amaze purchase on 30 September 2024` MEANS
+    `a charge` 5812 "AMAZE*SUSHI TEI" (LIST AMAZE) `Retail purchase` FALSE (YMD 2024 9 30) `Flags card-present`
+GIVETH A Transaction
+`an Amaze purchase on 1 October 2024` MEANS
+    `a charge` 5812 "AMAZE*SUSHI TEI" (LIST AMAZE) `Retail purchase` FALSE (YMD 2024 10 1) `Flags card-present`
+-- "AMAZE*TRANSIT" is printed WITHOUT a date while "AMAZE*" is printed with
+-- one, and the line carries both patterns, so TRANSIT excludes it before the
+-- AMAZE gate is ever reached.
+GIVETH A Transaction
+`an Amaze transit ride on 30 September 2024` MEANS
+    `a charge` 5812 "AMAZE*TRANSIT" (LIST AMAZE, TRANSIT) `Retail purchase` FALSE (YMD 2024 9 30) `Flags card-present`
+
+-- cl.32 FIXTURES. Also at a Dining MCC, for the same reason.
+GIVETH A Transaction
+`a cash advance` MEANS
+    `a charge` 5812 "UOB CASH ADVANCE" EMPTY `Cash advance or quasi-cash` FALSE `a day in September 2026` `Flags card-present`
+GIVETH A Transaction
+`a SmartPay instalment` MEANS
+    `a charge` 5812 "UOB SMARTPAY" EMPTY `Instalment plan transaction` FALSE `a day in September 2026` `Flags card-present`
+GIVETH A Transaction
+`a mail order dinner` MEANS
+    `a charge` 5812 "SUSHI TEI PHONE ORDER" EMPTY `Telephone or mail order` FALSE `a day in September 2026` `Flags card-present`
+
+-- THE FLAG AND THE HEADLINE ARE TWO RENDERINGS OF ONE FACT, and this rule
+-- says so in one place so the assertions below can each fit on a line, which a
+-- directive requires. It is not reachable from the export, so it is an L4-side
+-- check only; the threshold rule it calls IS reachable and does lower.
+GIVEN answer IS A `Rate answer`
+GIVETH A BOOLEAN
+`the bonus flag agrees with the headline rate` answer MEANS
+    answer's `earns the bonus rate`
+        EQUALS `this rate is above the Base UNI$ rate` (answer's `miles per dollar`)
+
+-- EVERY ASSERTION BELOW CALLS THE EXPORTED RULE BY ITS OWN NAME, with all four
+-- arguments written out. That is verbose, and the verbosity is bought rather
+-- than merely endured.
+--
+-- The first draft curried the two unread parameters into a helper, so an
+-- assertion read as one question. It compiled, and `l4 run` was green, and the
+-- shape was wrong in a way nothing here could see: a rule that CALLS an
+-- @export'd rule but is not itself @export'd has no Catala counterpart,
+-- because an exported rule becomes a scope and Catala allows a scope call only
+-- from inside another scope. `l4 export catala` says so in terms (R1, §8.1). While
+-- the exporter collected only what the export reached, the helper was never
+-- lowered and the defect sat behind a passing gate; it surfaced the moment
+-- directive-rooted helpers began to be collected (2026-09-21).
+--
+-- So the convenience is gone and the assertions test the exported entry point
+-- itself, which is what they should have been testing all along. Do not
+-- reintroduce a wrapper: put the arguments in the directive.
+
+
+-- BRANCH 1 of the top-level rule: a withholding clause bites, and takes the
+-- Base UNI$ down with the Bonus UNI$.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a utilities bill`)'s `miles per dollar` EQUALS 0
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a hospital bill`)'s `miles per dollar` EQUALS 0
+#ASSERT NOT ((`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a utilities bill`)'s `earns the bonus rate`)
+-- cl.35 defeats an elected category: the MCC is Dining, the description is not.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a PayPal line at a restaurant MCC`)'s `miles per dollar` EQUALS 0
+-- THE ASSERTION THAT CHANGED. A real AXS statement line reads "AXS*SP
+-- SERVICES", and cl.35 lists "AXS*". The first draft of this module compared
+-- strings, could not test a prefix, and asserted that this line was NOT
+-- excluded -- a wrong answer pinned by a passing test. The substring work now
+-- happens in layer 1 and the rule reads the AXS pattern, so the answer is the
+-- document's.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `an AXS bill with a real statement line`)'s `miles per dollar` EQUALS 0
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `an EZ-Link top-up`)'s `miles per dollar` EQUALS 0
+-- CardUp is in the shared domain because another issuer excludes it. cl.35
+-- does not name it, so on this card a CardUp line at a Dining MCC earns the
+-- full category rate. A rule that read "is this a payment-platform line" rather
+-- than "is this one of UOB's listed families" would get this wrong.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a CardUp payment`)'s `miles per dollar` EQUALS 4
+-- cl.35's dated limb, the same Amaze-routed purchase one day apart.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `an Amaze purchase on 30 September 2024`)'s `miles per dollar` EQUALS 4
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `an Amaze purchase on 1 October 2024`)'s `miles per dollar` EQUALS 0
+-- ... and an Amaze-routed TRANSIT ride on the earlier day is still excluded,
+-- because its line carries TRANSIT too and "TRANSIT*" is printed undated. So
+-- gating AMAZE gives nothing back that the document withholds.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `an Amaze transit ride on 30 September 2024`)'s `miles per dollar` EQUALS 0
+-- cl.32 end to end: a cash advance and a SmartPay instalment at a Dining MCC,
+-- for a cardmember who elected Dining. Without cl.32 both would earn 4.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a cash advance`)'s `miles per dollar` EQUALS 0
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a SmartPay instalment`)'s `miles per dollar` EQUALS 0
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a cash advance`)'s `cap`'s `pool` EQUALS "Solitaire — nothing earned"
+-- ... and a phone order at the same MCC is NOT withheld, which is the FALSE
+-- arm of cl.32 doing work rather than sitting there.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a mail order dinner`)'s `miles per dollar` EQUALS 4
+-- cl.34's dated limb. The same shop, one day apart, across 1 October 2024.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a cigar shop buy on 30 September 2024`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a cigar shop buy on 1 October 2024`)'s `miles per dollar` EQUALS 0
+
+-- BRANCH 2: spending in an elected Preferred Rewards Category, both of them.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `miles per dollar` EQUALS 4
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a supermarket shop`)'s `miles per dollar` EQUALS 4
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `earns the bonus rate`
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `points per dollar` EQUALS 2
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `status` EQUALS Verified
+-- cl.3 states the conversion, so it is Verified rather than assumed.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `conversion status` EQUALS Verified
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `miles per point` EQUALS 2
+-- cl.6(b): the PER-CATEGORY cap, on a calendar month, by posting date (cl.8).
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `cap`'s `bonus spend per month` EQUALS 750
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `cap`'s `basis` EQUALS `Calendar month`
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `cap`'s `attribution` EQUALS `By posting date`
+-- cl.6(b)'s own illustration: electing ONE category does not buy that category
+-- the card-wide S$1,500; it is still S$750.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining only` `a month with nothing recorded` `a restaurant bill`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- THE TWO S$750s ARE DIFFERENT POTS, which is the claim cl.6(b) makes in the
+-- words "with each Preferred Rewards Category capped at 1,350 UNI$" and which
+-- a single number cannot express. The same cardmember, two transactions, two
+-- pool names: unused Dining headroom is not Family headroom.
+--
+-- THESE FIVE ARE L4-ONLY, and a reader comparing the two artifacts should know
+-- it. `pool` is a STRING, so Catala elides it and a comparison of it is not
+-- expressible there; `l4 export catala` says so and declines to emit these directives
+-- as test scopes. That is the right trade rather than a loss: the pot has to be
+-- NAMED for a projection to render "S$750 left in Dining" beside "S$750 left in
+-- Family", and it is L4, not Catala, that checks the naming.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `cap`'s `pool` EQUALS "Solitaire — Dining"
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a supermarket shop`)'s `cap`'s `pool` EQUALS "Solitaire — Family"
+#ASSERT NOT ((`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)'s `cap`'s `pool`
+             EQUALS (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a supermarket shop`)'s `cap`'s `pool`)
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Travel and Fashion` `a month with nothing recorded` `a department store buy`)'s `cap`'s `pool` EQUALS "Solitaire — Fashion"
+-- A base-only answer runs against no category pot at all, and says so.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a department store buy`)'s `cap`'s `pool` EQUALS "Solitaire — Base UNI$, which cl.6 does not cap"
+-- The same purchase, a different cardmember's election. Fashion is elected here.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Travel and Fashion` `a month with nothing recorded` `a department store buy`)'s `miles per dollar` EQUALS 4
+-- cl.10: a foreign-currency charge earns at the same rate on the converted amount.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill in yen`)'s `miles per dollar` EQUALS 4
+
+-- BRANCH 3: Travel is elected and Schedule 1 gives no MCC to test it with.
+-- The rate returned is the LOWER of the two readings and the status says so.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Travel and Fashion` `a month with nothing recorded` `an airline ticket`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Travel and Fashion` `a month with nothing recorded` `an airline ticket`)'s `status` EQUALS Unconfirmed
+#ASSERT NOT ((`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Travel and Fashion` `a month with nothing recorded` `an airline ticket`)'s `earns the bonus rate`)
+-- The SAME airline ticket for a cardmember who did not elect Travel is not
+-- uncertain at all: whatever the merchant's main business activity is, it is
+-- not a category this cardmember elected, so the answer is Verified base.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `an airline ticket`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `an airline ticket`)'s `status` EQUALS Verified
+
+-- BRANCH 4: the Base UNI$ residue.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a department store buy`)'s `miles per dollar` EQUALS 0.4
+#ASSERT NOT ((`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a department store buy`)'s `earns the bonus rate`)
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a department store buy`)'s `points per dollar` EQUALS 0.2
+-- cl.6 caps Bonus UNI$ only, so a base-only answer is uncapped.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a department store buy`)'s `cap`'s `capped` EQUALS FALSE
+-- FAQ 10: elect nothing and the base still runs.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `no categories at all` `a month with nothing recorded` `a restaurant bill`)'s `miles per dollar` EQUALS 0.4
+
+-- THE MERCHANT INDICATOR DOES NOT MOVE THIS CARD'S ANSWER, which is the point
+-- of these three. A merchant nobody has seen post before earns exactly what a
+-- known card-present merchant earns, the two conditional rates agree, and the
+-- flag that would tell a projection to render the uncertainty is FALSE.
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill whose merchant has never posted before`)'s `miles per dollar` EQUALS 4
+#ASSERT NOT ((`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill whose merchant has never posted before`)'s `depends on the merchant indicator`)
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill whose merchant has never posted before`)'s `miles per dollar if the merchant flags online` EQUALS 4
+#ASSERT (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill whose merchant has never posted before`)'s `miles per dollar if the merchant flags card-present` EQUALS 4
+
+-- THE FLAG AGREES WITH THE HEADLINE, ON ALL FOUR ANSWER SHAPES. `earns the
+-- bonus rate` is now read off `miles per dollar` rather than set beside it, so
+-- these four cannot fail while the module compiles. They are here anyway,
+-- because the invariant is what a reader wants stated, and because an edit
+-- that re-separated the two fields would have to delete an assertion saying in
+-- words what it was about to break.
+--
+-- The base-only answer is the one to watch: it is the shape where a hand-set
+-- flag is likeliest to be left TRUE, sitting as it does between a withheld
+-- answer and a bonus answer that differ from it in opposite directions.
+#ASSERT `the bonus flag agrees with the headline rate` (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a department store buy`)
+#ASSERT `the bonus flag agrees with the headline rate` (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a restaurant bill`)
+#ASSERT `the bonus flag agrees with the headline rate` (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Dining and Family` `a month with nothing recorded` `a cash advance`)
+#ASSERT `the bonus flag agrees with the headline rate` (`UOB Lady's Solitaire earns on` `UOB Lady's Solitaire` `Travel and Fashion` `a month with nothing recorded` `an airline ticket`)
+
+-- The threshold itself, against cl.2(b) and heading A's printed figures: the
+-- base rate is NOT above itself, the category rate IS, and a withheld
+-- transaction is not. These three DO reach the Catala artifact.
+#ASSERT NOT (`this rate is above the Base UNI$ rate` `the Base UNI$ miles per dollar`)
+#ASSERT `this rate is above the Base UNI$ rate` `the Preferred Rewards Category miles per dollar`
+#ASSERT NOT (`this rate is above the Base UNI$ rate` 0)
+-- The two named rates are the figures UOB prints.
+#ASSERT `the Base UNI$ miles per dollar` EQUALS 0.4
+#ASSERT `the Preferred Rewards Category miles per dollar` EQUALS 4
+
+-- Schedule 1, row by row, against the printed table.
+#ASSERT `Schedule 1 puts this MCC in Beauty & Wellness` 7230
+#ASSERT `Schedule 1 puts this MCC in Dining` 5499
+#ASSERT `Schedule 1 puts this MCC in Entertainment` 7922
+#ASSERT `Schedule 1 puts this MCC in Family` 5641
+#ASSERT `Schedule 1 puts this MCC in Fashion` 5948
+#ASSERT `Schedule 1 puts this MCC in Transport` 4789
+#ASSERT `Schedule 1 gives this MCC no category` 3047
+-- 5311 is Fashion in Schedule 1 and is NOT excluded by cl.34, which is worth
+-- pinning: the two lists overlap nowhere for the categories, and a code that
+-- appeared in both would make the cascade's order load-bearing.
+#ASSERT NOT (`34 — this Merchant Category Code is excluded whatever the date` 5311)
+
+-- cl.32, ONE ASSERTION PER ARM, because the rule is now a total CONSIDER and
+-- an arm silently flipped is exactly the edit nothing else here would catch.
+-- The seven TRUE arms discharge seventeen of the clause's twenty-two limbs;
+-- the three FALSE arms are the claim that cl.32 does NOT reach an ordinary
+-- purchase, a mail or phone order, or a pre-authorisation.
+#ASSERT `32 — no UNI$ is awarded for this kind of transaction` `Bill payment via internet banking`
+#ASSERT `32 — no UNI$ is awarded for this kind of transaction` `Instalment plan transaction`
+#ASSERT `32 — no UNI$ is awarded for this kind of transaction` `Balance or funds transfer`
+#ASSERT `32 — no UNI$ is awarded for this kind of transaction` `Cash advance or quasi-cash`
+#ASSERT `32 — no UNI$ is awarded for this kind of transaction` `Annual fee or bank charge`
+#ASSERT `32 — no UNI$ is awarded for this kind of transaction` `Interest or finance charge`
+#ASSERT `32 — no UNI$ is awarded for this kind of transaction` `Refund or reversal`
+#ASSERT NOT (`32 — no UNI$ is awarded for this kind of transaction` `Retail purchase`)
+#ASSERT NOT (`32 — no UNI$ is awarded for this kind of transaction` `Telephone or mail order`)
+#ASSERT NOT (`32 — no UNI$ is awarded for this kind of transaction` `Pre-authorisation`)
+
+
+-- THE GENERATED DITTO BLOCKS, TESTED AT THEIR EDGES. Ditto (^) resolves by
+-- exact start column and fails SILENTLY when it lands on the wrong token, so
+-- "the script aligned it" is a belief until something checks it. The first and
+-- last row of every generated block is asserted below, plus the two rows most
+-- likely to go wrong: the Quasi Cash run, where six codes share one comment,
+-- and "MB * MONEYBOOKERS.COM", the one description carrying spaces and an
+-- interior asterisk.
+
+-- cl.34, the undated list: first row, the end of the Quasi Cash run, last row.
+#ASSERT `34 — this Merchant Category Code is excluded whatever the date` 4829
+#ASSERT `34 — this Merchant Category Code is excluded whatever the date` 7511
+#ASSERT `34 — this Merchant Category Code is excluded whatever the date` 9405
+#ASSERT NOT (`34 — this Merchant Category Code is excluded whatever the date` 5812)
+-- cl.34, the dated lists.
+#ASSERT `34 — this Merchant Category Code is excluded from 1 August 2022` 4900
+#ASSERT `34 — this Merchant Category Code is excluded from 1 October 2024` 5965
+#ASSERT `34 — this Merchant Category Code is excluded from 1 October 2024` 8999
+#ASSERT NOT (`34 — this Merchant Category Code is excluded from 1 October 2024` 4900)
+
+-- cl.35, ONE ASSERTION PER FAMILY. Thirteen undated families and the one
+-- dated family, asserted against the undated limb so that the date gate below
+-- is tested separately from the membership.
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST AXS)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST TRANSIT)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST `EZ-Link`)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST FlashPay)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST `Skrill or Moneybookers`)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST `Forex or CFD platform`)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST PayPal)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST YouTrip)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST iPaymy)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST `Government levy`)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST SmoovPay)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST SAM)
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST RazerPay)
+#ASSERT `35 — this transaction description is excluded from 1 October 2024` (LIST AMAZE)
+#ASSERT NOT (`35 — this transaction description is excluded whatever the date` (LIST AMAZE))
+-- A line carrying no family at all, and a line carrying a family UOB's list
+-- does not name. `Description pattern` is shared across eight issuers, so most
+-- of its constructors are somebody else's exclusion, not UOB's: CardUp,
+-- FavePay, ShopeePay, Singtel Dash, BUS/MRT, the SimplyGo description and the
+-- crypto and payment-platform families are all absent from cl.35.
+#ASSERT NOT (`35 — this transaction description is excluded whatever the date` EMPTY)
+#ASSERT NOT (`35 — this transaction description is excluded whatever the date` (LIST CardUp))
+#ASSERT NOT (`35 — this transaction description is excluded whatever the date` (LIST ShopeePay))
+#ASSERT NOT (`35 — this transaction description is excluded whatever the date` (LIST `Cryptocurrency platform`))
+-- A line carrying several families is excluded if ANY of them is listed.
+#ASSERT `35 — this transaction description is excluded whatever the date` (LIST CardUp, AXS)
+
+-- Schedule 1: the first and last MCC of every row that has an MCC list.
+#ASSERT `Schedule 1 puts this MCC in Beauty & Wellness` 5912
+#ASSERT `Schedule 1 puts this MCC in Beauty & Wellness` 7297
+#ASSERT `Schedule 1 puts this MCC in Dining` 5811
+#ASSERT `Schedule 1 puts this MCC in Dining` 5499
+#ASSERT `Schedule 1 puts this MCC in Entertainment` 5813
+#ASSERT `Schedule 1 puts this MCC in Entertainment` 7922
+#ASSERT `Schedule 1 puts this MCC in Family` 5411
+#ASSERT `Schedule 1 puts this MCC in Family` 5641
+#ASSERT `Schedule 1 puts this MCC in Fashion` 5311
+#ASSERT `Schedule 1 puts this MCC in Fashion` 5948
+#ASSERT `Schedule 1 puts this MCC in Transport` 4111
+#ASSERT `Schedule 1 puts this MCC in Transport` 5542
+-- The seven categories are disjoint on the codes Schedule 1 lists, so a code
+-- from one row must not answer for another.
+#ASSERT NOT (`Schedule 1 puts this MCC in Dining` 5311)
+#ASSERT NOT (`Schedule 1 puts this MCC in Fashion` 5812)
+
+
+-- ===========================================================================
+-- TWO WHOLE ANSWERS, PRINTED. Everything above asserts one field at a time;
+-- these two print the entire `Rate answer` for a transaction that earns the
+-- category rate and one that earns nothing, so a reader can see the cap, the
+-- pool, the conditions and the citations together.
+--
+-- They also carry their arguments INLINE rather than naming the fixtures
+-- above, and that is not a style choice. The Catala exporter emits only what
+-- an @export decision reaches, so a fixture referenced solely by a directive
+-- is not collected and the directive does not become a Catala `#[test]` scope
+-- (measured 2026-09-21). Written out, these two become the emitted module's
+-- only executable tests. Do not "tidy" them into fixtures.
+-- ===========================================================================
+
+#EVAL `UOB Lady's Solitaire earns on` `UOB Lady's Solitaire`
+          (Cardholder WITH
+             `Solitaire preferred rewards categories`               IS LIST Dining, Family
+             `yuu account linked to the card`                       IS FALSE
+             `HSBC Everyday Global Account deposits ADB this month` IS 0
+             `PAssion membership registered and card linked in yuu` IS FALSE)
+          (`Month position` WITH
+             `yuu eligible spend so far this calendar month`                     IS 0
+             `yuu participating merchants transacted so far this calendar month` IS 0
+             `PAssion spend at Participating Stores so far this month`           IS 0
+             `PAssion spend at non-Participating Stores so far this month`       IS 0)
+          (Transaction WITH
+             `merchant name`                IS "SUSHI TEI SUNTEC"
+             `merchant`                     IS `Another merchant`
+             `merchant category code`       IS 5812
+             `transaction description`      IS "SUSHI TEI SUNTEC"
+             `description patterns`         IS EMPTY
+             `charge kind`                  IS `Retail purchase`
+             `amount`                       IS 100
+             `currency`                     IS "SGD"
+             `posted in a foreign currency` IS FALSE
+             `transaction date`             IS YMD 2026 9 15
+             `posting date`                 IS YMD 2026 9 15
+             `payment channel`              IS `Inserted or swiped at a terminal`
+             `credential`                   IS `The physical card`
+             `merchant indicator`           IS `Flags card-present`
+             `made in Singapore`            IS TRUE)
+
+#EVAL `UOB Lady's Solitaire earns on` `UOB Lady's Solitaire`
+          (Cardholder WITH
+             `Solitaire preferred rewards categories`               IS LIST Dining, Family
+             `yuu account linked to the card`                       IS FALSE
+             `HSBC Everyday Global Account deposits ADB this month` IS 0
+             `PAssion membership registered and card linked in yuu` IS FALSE)
+          (`Month position` WITH
+             `yuu eligible spend so far this calendar month`                     IS 0
+             `yuu participating merchants transacted so far this calendar month` IS 0
+             `PAssion spend at Participating Stores so far this month`           IS 0
+             `PAssion spend at non-Participating Stores so far this month`       IS 0)
+          (Transaction WITH
+             `merchant name`                IS "AXS*SP SERVICES"
+             `merchant`                     IS `Another merchant`
+             `merchant category code`       IS 5812
+             `transaction description`      IS "AXS*SP SERVICES"
+             `description patterns`         IS (LIST AXS)
+             `charge kind`                  IS `Retail purchase`
+             `amount`                       IS 100
+             `currency`                     IS "SGD"
+             `posted in a foreign currency` IS FALSE
+             `transaction date`             IS YMD 2026 9 15
+             `posting date`                 IS YMD 2026 9 15
+             `payment channel`              IS `Inserted or swiped at a terminal`
+             `credential`                   IS `The physical card`
+             `merchant indicator`           IS `Flags card-present`
+             `made in Singapore`            IS TRUE)
+
+
+-- ===========================================================================
+-- DEFEASIBILITY SITES (spec section 4.5). Where a native DESPITE / SUBJECT TO /
+-- exception construct would have collapsed several guards into one rule.
+-- One entry per site: the clause, the shape in the text (general rule +
+-- exception list), the L4 shape used instead, and what a native construct
+-- would have bought.
+-- ===========================================================================
+--
+-- SITE 1 -- cl.2(b) read against cl.32, cl.34 and cl.35.
+--   TEXT SHAPE. cl.2(b) grants the Base UNI$ unconditionally: "the reward of
+--   UNI$1 for every S$5.00 spent ... on a Card". Three later clauses withdraw
+--   it from named classes -- twenty-two kinds of transaction (cl.32), thirty-
+--   nine MCCs (cl.34), thirty-nine descriptions (cl.35) -- each drafted as a
+--   flat "UNI$ will not be awarded for", with no cross-reference back to
+--   cl.2(b) and none to each other.
+--   L4 SHAPE USED. The grant is not written where the document writes it. It
+--   is written as the OTHERWISE arm of a four-arm BRANCH whose first arm is a
+--   disjunction of the three withholdings. The general rule has been turned
+--   inside out into the residue of its own exceptions, and cl.2(b)'s text now
+--   appears in the module at a place the document does not put it.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY. `the Base UNI$ applies` stated once at
+--   cl.2(b), with cl.32, cl.34 and cl.35 each written at its own clause as
+--   DESPITE it. Order between the three withholdings would then be the
+--   language's problem rather than the author's, and adding a fourth
+--   withholding -- which cl.36 expressly reserves the right to do, "without
+--   giving any reason or prior notice" -- would be a local edit instead of a
+--   new disjunct in a rule three sections away.
+--
+-- SITE 2 -- heading A and cl.4(b) read against the same three withholdings.
+--   TEXT SHAPE. The Bonus UNI$ entitlement is granted twice over (heading A's
+--   rate line and cl.4(b)'s "You will be eligible to earn Bonus UNI$ for every
+--   S$5.00 of spending in your Preferred Rewards Categories") and defeated by
+--   the same three lists, which never mention it.
+--   L4 SHAPE USED. The withholding arm is placed FIRST in the BRANCH so that
+--   it defeats the category arm below it. Priority is encoded as line order,
+--   which is the thing a reviewer cannot check against the document, because
+--   the document states no order.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY. The defeat would be stated once and
+--   apply to both grants, instead of being re-earned by the position of an arm.
+--   The assertion that a PAYPAL* line at a Dining MCC earns nothing is today a
+--   test of arm order; it would become a test of the law.
+--
+-- SITE 3 -- cl.6(b)'s per-category cap inside its own card-wide cap.
+--   TEXT SHAPE. One sentence states a general ceiling (2,700 UNI$ a calendar
+--   month) and then a stricter one that partitions it ("with each Preferred
+--   Rewards Category capped at 1,350 UNI$"). The stricter limb always governs
+--   a single transaction; the general one can only ever bind across categories.
+--   L4 SHAPE USED. The general figure is not represented at all. The module
+--   returns 1,350 UNI$ as dollars and mentions the card-wide figure only in a
+--   comment and an assertion, because `Cap` holds one number.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY. Both ceilings carried, the narrower
+--   marked as SUBJECT TO the wider, so that a projection could show a
+--   cardmember both "S$750 left in Dining" and "S$1,500 across both" without
+--   the module having to decide in advance which one the reader wanted.
+--
+-- SITE 4 -- cl.6(b) against cl.6(c), and cl.6(b) against its own predecessor.
+--   TEXT SHAPE. Two overlapping defeasances in one clause. cl.6(c) states a
+--   different cap for the Metal card, defeating cl.6(b) by cardholder type;
+--   and cl.6(b)'s own Note defeats the FORMER figure by date ("From 1 August
+--   2025 ... will be revised from 3,600 UNI$ ... to 2,700 UNI$").
+--   L4 SHAPE USED. Neither is encoded. The Metal card has no constructor in
+--   the shared domain, and the pre-August-2025 figure is dropped on the ground
+--   that this document is the August 2025 version. Both are recorded in prose.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY. Less here than elsewhere, and it is
+--   worth being honest about that: the missing piece is a Card constructor and
+--   a rule-version axis, not a defeasibility operator. Listed because the TEXT
+--   has the defeasible shape even though the fix is somewhere else.
+--
+-- SITE 5 -- a dated row inside an undated list, TWICE IN THIS MODULE.
+--   TEXT SHAPE. cl.34 is one table under one operative sentence, and five of
+--   its thirty-nine codes carry a parenthetical commencement ("(with effect
+--   from 1 August 2022)", "(wef 1 October 2024)"). cl.35 is one bulleted list
+--   under one operative sentence, and two of its thirty-nine entries do the
+--   same ("AMAZE* (wef 1 October 2024)", "NORWDS* (wef 21 Jul 2024)"). The
+--   exception is not to the rule but to the rule's REACH IN TIME, written
+--   inline in a cell or a bullet.
+--   L4 SHAPE USED. Each list is split by commencement date and rejoined by a
+--   disjunction, with every dated limb guarded by a date comparison. One
+--   printed table becomes three L4 rules and a three-way OR; one printed
+--   bullet list becomes three L4 rules and a three-way OR. A reader checking
+--   an entry against the document has to know which of the three to look in,
+--   and the two splits do not even use the same number of parts for the same
+--   reason.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY. Each list kept whole, with a
+--   commencement annotation on the rows that carry one. That is closer to a
+--   temporal-qualification construct than to DESPITE. The first pass over this
+--   module predicted the shape would recur "in at least three places" on the
+--   strength of cl.34, cl.32(u)'s "(w.e.f. 19 June 2023)" and cl.35's two
+--   dated entries; cl.35 is now encoded and the prediction is discharged
+--   rather than merely repeated -- the same three-rule scaffolding is written
+--   twice in one file, thirty lines apart.
+--
+-- SITE 6 -- cl.35's "AMAZE*" against its own "AMAZE*TRANSIT".
+--   TEXT SHAPE. Two bullets in one list, one dated and one not, whose matches
+--   OVERLAP: every "AMAZE*TRANSIT" line is also an "AMAZE*" line. Read alone,
+--   the dated bullet says an Amaze transit ride before 1 October 2024 earns;
+--   read with the undated "TRANSIT*" bullet three rows down, it does not.
+--   L4 SHAPE USED. Nothing, and that is the finding. The resolution falls out
+--   of the encoding for free, because a line carries a LIST of description
+--   families and the undated TRANSIT disjunct is reached before the AMAZE gate
+--   is consulted. There is an assertion pinning it, which is the only thing
+--   that makes the free resolution a checked one.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY. Here, nothing -- which is worth saying
+--   out loud in a list of six sites that all want one. A defeasibility
+--   operator answers "which rule wins"; this is two rules that agree, reached
+--   by different routes, and the encoding that makes them agree is the LIST.

@@ -36,7 +36,8 @@ withRefMap = \ case
     | (ref, url) <- Text.breakOnEnd " " $ Text.strip refmp
     , not $ Text.all isSpace ref
     , not $ Text.all isSpace url
-    -> Vector.singleton (normalizeRef ref, normalizeRef url)
+    -- Only the reference is matched loosely. A URL's path is case-sensitive.
+    -> Vector.singleton (normalizeRef ref, Text.strip url)
   _ -> mempty
 
 -- | Normalize a reference string for case-insensitive matching.

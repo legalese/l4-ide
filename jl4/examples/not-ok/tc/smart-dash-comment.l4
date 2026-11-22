@@ -1,0 +1,18 @@
+-- DUMBWAITER (ruled 2026-09-21): an en dash (–, U+2013) at the start of a
+-- line, where a `--` line comment was meant. Word's AutoFormat turns both
+-- ` - ` and ` -- ` into an en dash, so the dash is inherently ambiguous; the
+-- per-diagnostic quick fix therefore offers BOTH the arithmetic spelling
+-- (`-`) and the comment-starting spelling (`--`), and the whole-document
+-- straighten breaks the tie by position -- comment-shaped here, since the
+-- dash is the first non-blank character on its line.
+--
+-- See doc/reference/errors/README.md, "Curly quotes and dashes from a word
+-- processor".
+
+DECLARE Person
+  HAS age IS A NUMBER
+
+GIVEN p IS A Person
+DECIDE `is adult` IF p's age >= 18
+
+– plain comment

@@ -30,30 +30,65 @@ high-fidelity — and unusually useful as a cross-check.
   formalisation sit side by side on the page.
 - **Provisos stay provisos.** An L4 `UNLESS` becomes a Catala exception ladder rather than being
   compiled away, so the structure a drafter would recognise survives into the target.
-- **You get machine-checked agreement between two independent implementations.** This is the real
+- **You get machine-checked agreement between two separately written evaluators.** This is the real
   prize. The generated module carries test scopes whose expected values were computed by **L4's**
   evaluator; running Catala's own `clerk test` then checks Catala's answers against them. Two
-  languages with separately written evaluators agreeing on the same rules is far stronger evidence
-  than either being self-consistent.
+  evaluators written separately agreeing on the same rules is stronger evidence than either being
+  self-consistent. The limits: Catala evaluates the module _we_ generate, so a bug in the
+  generation shows up, and so does a bug in either evaluator, but a misreading of your L4 shared by
+  the generator and L4's own evaluator would not. And nothing runs it for you: Catala is not
+  installed on the CI runners, so that job skips, and the check is `node etc/validate-catala.mjs`
+  on a machine that has Catala.
 - **Catala's prover can inspect the ladder.** `catala proof` verifies that no two rungs of an
   exception ladder can fire simultaneously.
+- **Every exception ladder is checked against L4 on the scope you ship.** Rewriting an `UNLESS`
+  or a `BRANCH` as a ladder is a change of shape, so each ladder carries a _witness gate_: test
+  scopes that call the emitted scope at concrete inputs and expect the value L4 computed there.
+  The inputs come from a fixed set of candidates: each number the conditions mention, one either
+  side of it, zero, both truth values, and every option of a choice. The conditions are the
+  separate yes-or-no questions inside the ladder's rungs, so `a OR b` is two of them, not one, and a
+  question that appears in two rungs counts once; a call to another rule counts as one question
+  and its body is not read. Every combination of those questions that some candidate produces is
+  tested at up to eight of the candidates that produce it, so an inequality is tested exactly at
+  its threshold as well as either side of it, and an edit that drops `b` from `a OR b` changes a
+  tested answer.
+  An edit to the shipped rule that changes its answer at any of those inputs fails `clerk test`;
+  that includes changing `>` to `>=` on a threshold the rule compares with. An edit that changes the
+  answer only at inputs outside the candidate set is not caught.
+  Beyond twelve such questions, or where a question raises an error at an input that an earlier
+  question of its rung already decides (`x ≠ 0 AND 10 / x > 2` at zero), the gate takes each rung
+  as one question instead, and the emitted file says so and says why.
+  An SMT solver, [z3](https://github.com/Z3Prover/z3), is used only to show that the remaining
+  combinations are impossible (a higher income band without the lower one, say), and to find a
+  witness when no candidate produces a combination; the file says so when it does. Unless a
+  witness had to come from the solver, the emitted file does not depend on which solver is
+  installed.
+  `l4 coverage FILE` prints the same combinations, the inputs found for them and the ones proved
+  impossible, for any rule, without Catala: see [Which combinations a rule has been tried
+  on](../concepts/reviewing/coverage.md).
 
 ## The command
 
 ```
-l4 catala FILE
+l4 export catala FILE
 ```
 
 Compiles the constitutive subset of `FILE` to a literate Catala module, printed to standard output.
 
-| Flag             | Effect                                                                             |
-| ---------------- | ---------------------------------------------------------------------------------- |
-| `--output FILE`  | write the generated `.catala_en` to `FILE` instead of stdout                       |
-| `--boolean-only` | emit only the plain boolean rendering — no exception ladders, no equivalence grids |
+| Flag             | Effect                                                                                              |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| `--output FILE`  | write the generated `.catala_en` to `FILE` instead of stdout                                        |
+| `--boolean-only` | emit only the plain boolean rendering — no exception ladders, no witness gates or equivalence grids |
+
+If z3 is not installed (it is found through `Z3_EXE`, then `PATH`), a ladder whose conditions have any impossible combination cannot be gated.
+It then keeps the older check, an exhaustive grid that re-runs a freshly built copy of the ladder over every combination of its conditions; that grid does not look at the rule you ship, and it stops at eight conditions, past which the rule is emitted in the plain boolean rendering instead.
+The command says which ladders fell back, and why, on standard error.
+Ladders with more than twelve conditions are not gated either.
+Executing any of these checks needs Catala itself (`clerk test`); `l4 export catala` only writes them.
 
 One sharp edge worth knowing before it bites: Catala takes a module's name from the **output
 file's** basename, capitalised — not CamelCased. A file named `flat-tax.catala_en` therefore
-cannot host any module at all, so `l4 catala --output` rejects a basename that could not be a legal
+cannot host any module at all, so `l4 export catala --output` rejects a basename that could not be a legal
 Catala module name rather than writing a file the toolchain would refuse.
 
 ## What it consumes
@@ -86,10 +121,10 @@ export reaches is emitted as a private **top-level definition**, which those too
 which is not meant to be published.
 
 Catala allows a scope to be called only from inside another scope. So if rule A is exported, rule B
-is not, and B calls A, there is nowhere valid for that call to go — and `l4 catala` refuses:
+is not, and B calls A, there is nowhere valid for that call to go — and `l4 export catala` refuses:
 
 ```
-l4 catala: cannot compile these decisions to Catala:
+l4 export catala: cannot compile these decisions to Catala:
   - in `the middle`: `Chain.the base` is @export'd, so it compiles to a Catala scope — and Catala
     allows a scope call only from inside another scope. This caller is not @export'd, so it
     compiles to a toplevel definition, and the call would land outside any scope (`catala

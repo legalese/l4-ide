@@ -52,6 +52,7 @@ library
     safe-exceptions,
     stm,
     stm-containers,
+    template-haskell,
     text,
     text-rope,
     time,
@@ -98,6 +99,10 @@ library
     LSP.Core.Types.Shake
 
     LSP.L4.Actions
+    LSP.L4.BlockingErrors
+    LSP.L4.BuildInfo
+    LSP.L4.DocumentSymbols
+    LSP.L4.EmbeddedLibrary
     LSP.L4.Inspector
     LSP.L4.SemanticTokens
     LSP.L4.Rules
@@ -158,21 +163,55 @@ test-suite jl4-lsp-test
   hs-source-dirs: test
   main-is: Spec.hs
   other-modules:
+    AtomKeySizeSpec
+    AtomKeySweepSpec
+    BlockingErrorsSpec
+    BuildInfoSpec
+    CheckSource
+    ClauseGeneratedNamesSpec
+    ClauseGroupLadderSpec
+    CorpusSweep
+    CosmosExprSpec
+    DiagnosticCodesSpec
+    EmbeddedLibrarySpec
+    FileCheckedSpec
     HoverDisplaySpec
     ImportDiagnosticSpec
     ImportUriSpec
+    KeyEnvSharingSpec
+    LadderAtomIdSpec
+    LadderCallExpansionSpec
+    LadderTermKeySpec
+    ImportClosureSpec
+    ImportOnceSpec
+    ImportSharedSpec
+    InspectorOutcomeSpec
+    LatestDiagnosticsSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
+    ProvisionEditorSpec
+    SmartPunctuationActionsSpec
     StateGraphLensSpec
+    UnknownAnnotationLspSpec
+    VisualiseExpansionOptInSpec
+  -- FileCheckedSpec talks to the server.
   build-tool-depends:
-    hspec-discover:hspec-discover
+    hspec-discover:hspec-discover,
+    jl4-lsp:jl4-lsp
   build-depends:
     aeson,
+    bytestring,
+    containers,
+    deepseq,
     directory,
     filepath,
     hspec,
     jl4-core,
     jl4-lsp,
+    jl4-query-plan,
     lsp-types,
     mtl,
-    text
+    optics,
+    process,
+    text,
+    text-rope

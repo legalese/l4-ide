@@ -1,0 +1,21 @@
+-- Nested arithmetic as `l4 nlg` reads it. Each #EVAL's comment is its value:
+-- no two lines with different groupings may read the same, and each must read
+-- with the grouping it has.
+
+#EVAL 10 MINUS (5 MINUS 2)          -- 7
+#EVAL (10 MINUS 5) MINUS 2          -- 3
+#EVAL 4 TIMES (5 MINUS 2)           -- 12
+#EVAL (4 TIMES 5) MINUS 2           -- 18
+#EVAL 4 PLUS (5 MINUS 2)            -- 7
+#EVAL (4 PLUS 5) MINUS 2            -- 7
+#EVAL 10 MINUS (5 PLUS 2)           -- 3
+#EVAL (10 MINUS 5) PLUS 2           -- 7
+#EVAL 12 DIVIDED BY (6 MINUS 2)     -- 3
+#EVAL (12 DIVIDED BY 6) MINUS 2     -- 0
+#EVAL (4 PLUS 5) TIMES 2            -- 18
+#EVAL 4 PLUS (5 TIMES 2)            -- 14
+#EVAL (12 MODULO 5) MINUS 1         -- 1
+#EVAL 12 MODULO (5 MINUS 1)         -- 0
+#EVAL (10 MINUS 4) MODULO 3         -- 0
+#EVAL 10 MINUS (4 MODULO 3)         -- 9
+#EVAL 10 MINUS 4 GREATER THAN 5     -- TRUE

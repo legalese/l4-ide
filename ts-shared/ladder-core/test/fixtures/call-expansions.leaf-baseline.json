@@ -1,0 +1,1242 @@
+{
+  "_provenance": "fromVizFunDecl(f) in the default mode, over each funDecl of call-expansions.json (the real capture), run with the ladder-core sources of 3e012727c (before the call-panels change); Maps serialised as entry arrays. The leaf-mode test pins today's decoder to this.",
+  "modules": {
+    "joint": [
+      {
+        "fn": {
+          "id": 158,
+          "name": "`is creditworthy`",
+          "params": ["p"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "p's `has stable income`",
+                "atomId": "1da7638a-d568-5afc-8c7b-0208af37fb8e",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "Not",
+                "id": 162,
+                "negand": {
+                  "$type": "UBoolVar",
+                  "id": 163,
+                  "label": "p's `has recent default`",
+                  "atomId": "0bd23d82-3407-5c80-98df-1b482118f77f",
+                  "unique": 164,
+                  "canInline": false
+                }
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [163, 164]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [164, [163]]
+        ],
+        "atomIdByNode": [
+          [160, "1da7638a-d568-5afc-8c7b-0208af37fb8e"],
+          [163, "0bd23d82-3407-5c80-98df-1b482118f77f"]
+        ],
+        "nodesByAtomId": [
+          ["1da7638a-d568-5afc-8c7b-0208af37fb8e", [160]],
+          ["0bd23d82-3407-5c80-98df-1b482118f77f", [163]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`may lend jointly`",
+          "params": ["a", "b"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "`is creditworthy` OF a",
+                "atomId": "d1b523f8-7c1d-500c-80fb-96c9277e1e6e",
+                "unique": 161,
+                "canInline": true
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 168,
+                "label": "`is creditworthy` OF b",
+                "atomId": "5674d857-283f-5964-a995-b591b8579c25",
+                "unique": 169,
+                "canInline": true
+              },
+              {
+                "$type": "Or",
+                "id": 176,
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "id": 177,
+                    "label": "a's `has collateral`",
+                    "atomId": "627b865d-768e-55b8-afea-9100cc294c3a",
+                    "unique": 178,
+                    "canInline": false
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "id": 179,
+                    "label": "b's `has collateral`",
+                    "atomId": "7928a2c2-832f-5c14-8c68-61e1a89aa0b0",
+                    "unique": 180,
+                    "canInline": false
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "id": 181,
+                    "label": "`is creditworthy` OF a",
+                    "atomId": "d1b523f8-7c1d-500c-80fb-96c9277e1e6e",
+                    "unique": 182,
+                    "canInline": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [168, 169],
+          [177, 178],
+          [179, 180],
+          [181, 182]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [169, [168]],
+          [178, [177]],
+          [180, [179]],
+          [182, [181]]
+        ],
+        "atomIdByNode": [
+          [160, "d1b523f8-7c1d-500c-80fb-96c9277e1e6e"],
+          [168, "5674d857-283f-5964-a995-b591b8579c25"],
+          [177, "627b865d-768e-55b8-afea-9100cc294c3a"],
+          [179, "7928a2c2-832f-5c14-8c68-61e1a89aa0b0"],
+          [181, "d1b523f8-7c1d-500c-80fb-96c9277e1e6e"]
+        ],
+        "nodesByAtomId": [
+          ["d1b523f8-7c1d-500c-80fb-96c9277e1e6e", [160, 181]],
+          ["5674d857-283f-5964-a995-b591b8579c25", [168]],
+          ["627b865d-768e-55b8-afea-9100cc294c3a", [177]],
+          ["7928a2c2-832f-5c14-8c68-61e1a89aa0b0", [179]]
+        ]
+      }
+    ],
+    "passthru": [
+      {
+        "fn": {
+          "id": 158,
+          "name": "limb",
+          "params": ["p", "q"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "p",
+                "atomId": "dea213c5-31f7-50e1-8d32-a4bc5edd61d7",
+                "unique": 5,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 161,
+                "label": "q",
+                "atomId": "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8",
+                "unique": 6,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 5],
+          [161, 6]
+        ],
+        "nodesByUnique": [
+          [5, [160]],
+          [6, [161]]
+        ],
+        "atomIdByNode": [
+          [160, "dea213c5-31f7-50e1-8d32-a4bc5edd61d7"],
+          [161, "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8"]
+        ],
+        "nodesByAtomId": [
+          ["dea213c5-31f7-50e1-8d32-a4bc5edd61d7", [160]],
+          ["dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8", [161]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`pass through`",
+          "params": ["a", "b"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "App",
+                "id": 160,
+                "label": "limb OF a, b",
+                "atomId": "c99a35cd-fae7-5145-9454-5d19123c2166"
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 166,
+                "label": "a",
+                "atomId": "0dcba61b-410b-597f-8b7f-bda14197c3f7",
+                "unique": 9,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [[166, 9]],
+        "nodesByUnique": [[9, [166]]],
+        "atomIdByNode": [
+          [160, "c99a35cd-fae7-5145-9454-5d19123c2166"],
+          [166, "0dcba61b-410b-597f-8b7f-bda14197c3f7"]
+        ],
+        "nodesByAtomId": [
+          ["c99a35cd-fae7-5145-9454-5d19123c2166", [160]],
+          ["0dcba61b-410b-597f-8b7f-bda14197c3f7", [166]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`is creditworthy`",
+          "params": ["p"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "p's `has stable income`",
+                "atomId": "1da7638a-d568-5afc-8c7b-0208af37fb8e",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "Not",
+                "id": 162,
+                "negand": {
+                  "$type": "UBoolVar",
+                  "id": 163,
+                  "label": "p's `has recent default`",
+                  "atomId": "0bd23d82-3407-5c80-98df-1b482118f77f",
+                  "unique": 164,
+                  "canInline": false
+                }
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [163, 164]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [164, [163]]
+        ],
+        "atomIdByNode": [
+          [160, "1da7638a-d568-5afc-8c7b-0208af37fb8e"],
+          [163, "0bd23d82-3407-5c80-98df-1b482118f77f"]
+        ],
+        "nodesByAtomId": [
+          ["1da7638a-d568-5afc-8c7b-0208af37fb8e", [160]],
+          ["0bd23d82-3407-5c80-98df-1b482118f77f", [163]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`record pass through`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "`is creditworthy` OF a",
+                "atomId": "6a9ccec4-dd08-548f-81ea-2fc171a82a55",
+                "unique": 161,
+                "canInline": true
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 168,
+                "label": "a's `has stable income`",
+                "atomId": "6a55ea57-df0b-5d7d-bb40-4791fb9f3b12",
+                "unique": 169,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [168, 169]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [169, [168]]
+        ],
+        "atomIdByNode": [
+          [160, "6a9ccec4-dd08-548f-81ea-2fc171a82a55"],
+          [168, "6a55ea57-df0b-5d7d-bb40-4791fb9f3b12"]
+        ],
+        "nodesByAtomId": [
+          ["6a9ccec4-dd08-548f-81ea-2fc171a82a55", [160]],
+          ["6a55ea57-df0b-5d7d-bb40-4791fb9f3b12", [168]]
+        ]
+      }
+    ],
+    "r991": [
+      {
+        "fn": {
+          "id": 152,
+          "name": "limb",
+          "params": ["p", "q"],
+          "body": {
+            "$type": "And",
+            "id": 153,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 154,
+                "label": "p",
+                "atomId": "dea213c5-31f7-50e1-8d32-a4bc5edd61d7",
+                "unique": 1,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 155,
+                "label": "q",
+                "atomId": "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8",
+                "unique": 2,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [154, 1],
+          [155, 2]
+        ],
+        "nodesByUnique": [
+          [1, [154]],
+          [2, [155]]
+        ],
+        "atomIdByNode": [
+          [154, "dea213c5-31f7-50e1-8d32-a4bc5edd61d7"],
+          [155, "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8"]
+        ],
+        "nodesByAtomId": [
+          ["dea213c5-31f7-50e1-8d32-a4bc5edd61d7", [154]],
+          ["dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8", [155]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 152,
+          "name": "`different actuals`",
+          "params": ["a", "b", "c", "d"],
+          "body": {
+            "$type": "And",
+            "id": 153,
+            "args": [
+              {
+                "$type": "App",
+                "id": 154,
+                "label": "limb OF a, b",
+                "atomId": "c9e92aa4-ab90-5bb4-8ce5-6cca22afd28f"
+              },
+              {
+                "$type": "App",
+                "id": 160,
+                "label": "limb OF c, d",
+                "atomId": "e35e1a09-fd39-5b2d-9827-c09feac7ad87"
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [],
+        "nodesByUnique": [],
+        "atomIdByNode": [
+          [154, "c9e92aa4-ab90-5bb4-8ce5-6cca22afd28f"],
+          [160, "e35e1a09-fd39-5b2d-9827-c09feac7ad87"]
+        ],
+        "nodesByAtomId": [
+          ["c9e92aa4-ab90-5bb4-8ce5-6cca22afd28f", [154]],
+          ["e35e1a09-fd39-5b2d-9827-c09feac7ad87", [160]]
+        ]
+      }
+    ],
+    "r991pc": [
+      {
+        "fn": {
+          "id": 152,
+          "name": "limb",
+          "params": ["p", "q"],
+          "body": {
+            "$type": "And",
+            "id": 153,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 154,
+                "label": "p",
+                "atomId": "dea213c5-31f7-50e1-8d32-a4bc5edd61d7",
+                "unique": 1,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 155,
+                "label": "q",
+                "atomId": "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8",
+                "unique": 2,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [154, 1],
+          [155, 2]
+        ],
+        "nodesByUnique": [
+          [1, [154]],
+          [2, [155]]
+        ],
+        "atomIdByNode": [
+          [154, "dea213c5-31f7-50e1-8d32-a4bc5edd61d7"],
+          [155, "dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8"]
+        ],
+        "nodesByAtomId": [
+          ["dea213c5-31f7-50e1-8d32-a4bc5edd61d7", [154]],
+          ["dc6e0e0e-ee71-52ae-9e17-f6cf546bd0f8", [155]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 152,
+          "name": "`different actuals`",
+          "params": ["z", "a", "b", "c", "d"],
+          "body": {
+            "$type": "And",
+            "id": 153,
+            "args": [
+              {
+                "$type": "App",
+                "id": 154,
+                "label": "limb OF a, b",
+                "atomId": "c9e92aa4-ab90-5bb4-8ce5-6cca22afd28f"
+              },
+              {
+                "$type": "App",
+                "id": 160,
+                "label": "limb OF c, d",
+                "atomId": "e35e1a09-fd39-5b2d-9827-c09feac7ad87"
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [],
+        "nodesByUnique": [],
+        "atomIdByNode": [
+          [154, "c9e92aa4-ab90-5bb4-8ce5-6cca22afd28f"],
+          [160, "e35e1a09-fd39-5b2d-9827-c09feac7ad87"]
+        ],
+        "nodesByAtomId": [
+          ["c9e92aa4-ab90-5bb4-8ce5-6cca22afd28f", [154]],
+          ["e35e1a09-fd39-5b2d-9827-c09feac7ad87", [160]]
+        ]
+      }
+    ],
+    "visa": [
+      {
+        "fn": {
+          "id": 158,
+          "name": "`identity is established`",
+          "params": ["a"],
+          "body": {
+            "$type": "Or",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "a's `has valid passport`",
+                "atomId": "1d191bb4-84e1-5d1c-b996-77fd25d6a502",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 162,
+                "label": "a's `has national ID card`",
+                "atomId": "f707dbf2-abd8-5e45-ab4b-b2e3684f895e",
+                "unique": 163,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [162, 163]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [163, [162]]
+        ],
+        "atomIdByNode": [
+          [160, "1d191bb4-84e1-5d1c-b996-77fd25d6a502"],
+          [162, "f707dbf2-abd8-5e45-ab4b-b2e3684f895e"]
+        ],
+        "nodesByAtomId": [
+          ["1d191bb4-84e1-5d1c-b996-77fd25d6a502", [160]],
+          ["f707dbf2-abd8-5e45-ab4b-b2e3684f895e", [162]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`character requirement is met`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "Not",
+                "id": 160,
+                "negand": {
+                  "$type": "UBoolVar",
+                  "id": 161,
+                  "label": "a's `is on a watchlist`",
+                  "atomId": "c0ec604d-f68f-59be-a940-dc38e60f943e",
+                  "unique": 162,
+                  "canInline": false
+                }
+              },
+              {
+                "$type": "Or",
+                "id": 163,
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "id": 164,
+                    "label": "a's `has clean record`",
+                    "atomId": "2cba9f8e-440e-595b-a1a6-f1cb8956bba1",
+                    "unique": 165,
+                    "canInline": false
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "id": 166,
+                    "label": "a's `record is spent`",
+                    "atomId": "f2580657-b46e-526e-9ea6-7f98f3d31e29",
+                    "unique": 167,
+                    "canInline": false
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [161, 162],
+          [164, 165],
+          [166, 167]
+        ],
+        "nodesByUnique": [
+          [162, [161]],
+          [165, [164]],
+          [167, [166]]
+        ],
+        "atomIdByNode": [
+          [161, "c0ec604d-f68f-59be-a940-dc38e60f943e"],
+          [164, "2cba9f8e-440e-595b-a1a6-f1cb8956bba1"],
+          [166, "f2580657-b46e-526e-9ea6-7f98f3d31e29"]
+        ],
+        "nodesByAtomId": [
+          ["c0ec604d-f68f-59be-a940-dc38e60f943e", [161]],
+          ["2cba9f8e-440e-595b-a1a6-f1cb8956bba1", [164]],
+          ["f2580657-b46e-526e-9ea6-7f98f3d31e29", [166]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`meets general requirements`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "`identity is established` OF a",
+                "atomId": "eb1367c0-24ac-544c-aca0-b8fe6be57d5e",
+                "unique": 161,
+                "canInline": true
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 167,
+                "label": "`character requirement is met` OF a",
+                "atomId": "45192f4a-c13b-5f63-9f6a-8d763fc72767",
+                "unique": 168,
+                "canInline": true
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [167, 168]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [168, [167]]
+        ],
+        "atomIdByNode": [
+          [160, "eb1367c0-24ac-544c-aca0-b8fe6be57d5e"],
+          [167, "45192f4a-c13b-5f63-9f6a-8d763fc72767"]
+        ],
+        "nodesByAtomId": [
+          ["eb1367c0-24ac-544c-aca0-b8fe6be57d5e", [160]],
+          ["45192f4a-c13b-5f63-9f6a-8d763fc72767", [167]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`has qualifying skills`",
+          "params": ["a"],
+          "body": {
+            "$type": "Or",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "a's `has degree`",
+                "atomId": "fedaba63-ed74-5d02-b2da-3bab97ac220e",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "And",
+                "id": 162,
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "id": 163,
+                    "label": "a's `has trade certificate`",
+                    "atomId": "40071810-6429-52f2-8464-eb346a35c9cb",
+                    "unique": 164,
+                    "canInline": false
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "id": 165,
+                    "label": "(a's `years of experience`) AT LEAST 3",
+                    "atomId": "e3aab1da-8ea1-5565-b2e3-d7dc55c3418a",
+                    "unique": 166,
+                    "canInline": false
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [163, 164],
+          [165, 166]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [164, [163]],
+          [166, [165]]
+        ],
+        "atomIdByNode": [
+          [160, "fedaba63-ed74-5d02-b2da-3bab97ac220e"],
+          [163, "40071810-6429-52f2-8464-eb346a35c9cb"],
+          [165, "e3aab1da-8ea1-5565-b2e3-d7dc55c3418a"]
+        ],
+        "nodesByAtomId": [
+          ["fedaba63-ed74-5d02-b2da-3bab97ac220e", [160]],
+          ["40071810-6429-52f2-8464-eb346a35c9cb", [163]],
+          ["e3aab1da-8ea1-5565-b2e3-d7dc55c3418a", [165]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`qualifies by employer sponsorship`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "a's `has job offer`",
+                "atomId": "826b9221-c0e6-5fb8-bdda-d709007fafb3",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 162,
+                "label": "`has qualifying skills` OF a",
+                "atomId": "41a5d4e9-0ea9-50e7-832e-17f28aadbdc8",
+                "unique": 163,
+                "canInline": true
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [162, 163]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [163, [162]]
+        ],
+        "atomIdByNode": [
+          [160, "826b9221-c0e6-5fb8-bdda-d709007fafb3"],
+          [162, "41a5d4e9-0ea9-50e7-832e-17f28aadbdc8"]
+        ],
+        "nodesByAtomId": [
+          ["826b9221-c0e6-5fb8-bdda-d709007fafb3", [160]],
+          ["41a5d4e9-0ea9-50e7-832e-17f28aadbdc8", [162]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`has financial backing`",
+          "params": ["a"],
+          "body": {
+            "$type": "Or",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "a's `has own funds`",
+                "atomId": "7f3a3a1f-2573-5b59-93ef-079d51f94731",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 162,
+                "label": "a's `has investor letter`",
+                "atomId": "c8b99d1e-78fd-59f6-a6db-e692f648aa13",
+                "unique": 163,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [162, 163]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [163, [162]]
+        ],
+        "atomIdByNode": [
+          [160, "7f3a3a1f-2573-5b59-93ef-079d51f94731"],
+          [162, "c8b99d1e-78fd-59f6-a6db-e692f648aa13"]
+        ],
+        "nodesByAtomId": [
+          ["7f3a3a1f-2573-5b59-93ef-079d51f94731", [160]],
+          ["c8b99d1e-78fd-59f6-a6db-e692f648aa13", [162]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`qualifies by self-employment`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "a's `has business plan`",
+                "atomId": "84ed33db-b564-59cd-a902-e1e07908198a",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 162,
+                "label": "`has financial backing` OF a",
+                "atomId": "258600c3-c3d6-5707-9bf9-8029995729ba",
+                "unique": 163,
+                "canInline": true
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [162, 163]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [163, [162]]
+        ],
+        "atomIdByNode": [
+          [160, "84ed33db-b564-59cd-a902-e1e07908198a"],
+          [162, "258600c3-c3d6-5707-9bf9-8029995729ba"]
+        ],
+        "nodesByAtomId": [
+          ["84ed33db-b564-59cd-a902-e1e07908198a", [160]],
+          ["258600c3-c3d6-5707-9bf9-8029995729ba", [162]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`may be granted a work visa`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "`meets general requirements` OF a",
+                "atomId": "4584735e-00b0-5e5a-9fc1-92bc06c41edd",
+                "unique": 161,
+                "canInline": true
+              },
+              {
+                "$type": "Or",
+                "id": 181,
+                "args": [
+                  {
+                    "$type": "UBoolVar",
+                    "id": 182,
+                    "label": "`qualifies by employer sponsorship` OF a",
+                    "atomId": "df124ca0-ddbe-575d-8a08-a0991d89ac77",
+                    "unique": 183,
+                    "canInline": true
+                  },
+                  {
+                    "$type": "UBoolVar",
+                    "id": 197,
+                    "label": "`qualifies by self-employment` OF a",
+                    "atomId": "15e40e95-0893-5161-a489-498150d31583",
+                    "unique": 198,
+                    "canInline": true
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [182, 183],
+          [197, 198]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [183, [182]],
+          [198, [197]]
+        ],
+        "atomIdByNode": [
+          [160, "4584735e-00b0-5e5a-9fc1-92bc06c41edd"],
+          [182, "df124ca0-ddbe-575d-8a08-a0991d89ac77"],
+          [197, "15e40e95-0893-5161-a489-498150d31583"]
+        ],
+        "nodesByAtomId": [
+          ["4584735e-00b0-5e5a-9fc1-92bc06c41edd", [160]],
+          ["df124ca0-ddbe-575d-8a08-a0991d89ac77", [182]],
+          ["15e40e95-0893-5161-a489-498150d31583", [197]]
+        ]
+      }
+    ],
+    "loan": [
+      {
+        "fn": {
+          "id": 158,
+          "name": "`is of age`",
+          "params": ["a"],
+          "body": {
+            "$type": "UBoolVar",
+            "id": 159,
+            "label": "(a's age) AT LEAST 18",
+            "atomId": "0b0d39ac-f839-519c-8ffc-3358448a5cd3",
+            "unique": 160,
+            "canInline": false
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [[159, 160]],
+        "nodesByUnique": [[160, [159]]],
+        "atomIdByNode": [[159, "0b0d39ac-f839-519c-8ffc-3358448a5cd3"]],
+        "nodesByAtomId": [["0b0d39ac-f839-519c-8ffc-3358448a5cd3", [159]]]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`has stable income`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "a's `is employed`",
+                "atomId": "7108f2bd-9d16-5794-a073-60b44f998940",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 162,
+                "label": "a's `income is verified`",
+                "atomId": "6f245deb-3ba9-5e6d-8c70-b19f827e49ea",
+                "unique": 163,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [162, 163]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [163, [162]]
+        ],
+        "atomIdByNode": [
+          [160, "7108f2bd-9d16-5794-a073-60b44f998940"],
+          [162, "6f245deb-3ba9-5e6d-8c70-b19f827e49ea"]
+        ],
+        "nodesByAtomId": [
+          ["7108f2bd-9d16-5794-a073-60b44f998940", [160]],
+          ["6f245deb-3ba9-5e6d-8c70-b19f827e49ea", [162]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`has clean credit history`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "Not",
+                "id": 160,
+                "negand": {
+                  "$type": "UBoolVar",
+                  "id": 161,
+                  "label": "a's `has recent default`",
+                  "atomId": "502be3ac-bfea-51d9-aa8c-6aab1c5ad65d",
+                  "unique": 162,
+                  "canInline": false
+                }
+              },
+              {
+                "$type": "Not",
+                "id": 163,
+                "negand": {
+                  "$type": "UBoolVar",
+                  "id": 164,
+                  "label": "a's `is bankrupt`",
+                  "atomId": "c46d1ece-c891-5b09-9852-c7f6e9034a91",
+                  "unique": 165,
+                  "canInline": false
+                }
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [161, 162],
+          [164, 165]
+        ],
+        "nodesByUnique": [
+          [162, [161]],
+          [165, [164]]
+        ],
+        "atomIdByNode": [
+          [161, "502be3ac-bfea-51d9-aa8c-6aab1c5ad65d"],
+          [164, "c46d1ece-c891-5b09-9852-c7f6e9034a91"]
+        ],
+        "nodesByAtomId": [
+          ["502be3ac-bfea-51d9-aa8c-6aab1c5ad65d", [161]],
+          ["c46d1ece-c891-5b09-9852-c7f6e9034a91", [164]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`is adequately secured`",
+          "params": ["a"],
+          "body": {
+            "$type": "Or",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "a's `has guarantor`",
+                "atomId": "fb9448cd-be42-5cab-b30b-74f31c79c04c",
+                "unique": 161,
+                "canInline": false
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 162,
+                "label": "a's `has collateral`",
+                "atomId": "a81ae26a-3cac-521c-bb26-0f9900d681c0",
+                "unique": 163,
+                "canInline": false
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [162, 163]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [163, [162]]
+        ],
+        "atomIdByNode": [
+          [160, "fb9448cd-be42-5cab-b30b-74f31c79c04c"],
+          [162, "a81ae26a-3cac-521c-bb26-0f9900d681c0"]
+        ],
+        "nodesByAtomId": [
+          ["fb9448cd-be42-5cab-b30b-74f31c79c04c", [160]],
+          ["a81ae26a-3cac-521c-bb26-0f9900d681c0", [162]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`is creditworthy`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "`has stable income` OF a",
+                "atomId": "f15adb5b-2a6a-5816-984b-98518ea6de53",
+                "unique": 161,
+                "canInline": true
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 167,
+                "label": "`has clean credit history` OF a",
+                "atomId": "ef5ac3a5-edad-5054-88bc-a55ef36f38d7",
+                "unique": 168,
+                "canInline": true
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [167, 168]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [168, [167]]
+        ],
+        "atomIdByNode": [
+          [160, "f15adb5b-2a6a-5816-984b-98518ea6de53"],
+          [167, "ef5ac3a5-edad-5054-88bc-a55ef36f38d7"]
+        ],
+        "nodesByAtomId": [
+          ["f15adb5b-2a6a-5816-984b-98518ea6de53", [160]],
+          ["ef5ac3a5-edad-5054-88bc-a55ef36f38d7", [167]]
+        ]
+      },
+      {
+        "fn": {
+          "id": 158,
+          "name": "`may receive a loan`",
+          "params": ["a"],
+          "body": {
+            "$type": "And",
+            "id": 159,
+            "args": [
+              {
+                "$type": "UBoolVar",
+                "id": 160,
+                "label": "`is of age` OF a",
+                "atomId": "2ba2b51d-3cdd-540c-a38a-784bfe3a2724",
+                "unique": 161,
+                "canInline": true
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 164,
+                "label": "`is creditworthy` OF a",
+                "atomId": "e6120831-02bc-59d6-a2a3-0194da7d77d0",
+                "unique": 165,
+                "canInline": true
+              },
+              {
+                "$type": "UBoolVar",
+                "id": 183,
+                "label": "`is adequately secured` OF a",
+                "atomId": "460ccb6f-aace-5b66-842d-f0e1ee4558fa",
+                "unique": 184,
+                "canInline": true
+              }
+            ]
+          }
+        },
+        "valuation": [],
+        "provenance": [],
+        "defaults": [],
+        "uniqueByNode": [
+          [160, 161],
+          [164, 165],
+          [183, 184]
+        ],
+        "nodesByUnique": [
+          [161, [160]],
+          [165, [164]],
+          [184, [183]]
+        ],
+        "atomIdByNode": [
+          [160, "2ba2b51d-3cdd-540c-a38a-784bfe3a2724"],
+          [164, "e6120831-02bc-59d6-a2a3-0194da7d77d0"],
+          [183, "460ccb6f-aace-5b66-842d-f0e1ee4558fa"]
+        ],
+        "nodesByAtomId": [
+          ["2ba2b51d-3cdd-540c-a38a-784bfe3a2724", [160]],
+          ["e6120831-02bc-59d6-a2a3-0194da7d77d0", [164]],
+          ["460ccb6f-aace-5b66-842d-f0e1ee4558fa", [183]]
+        ]
+      }
+    ]
+  }
+}

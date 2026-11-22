@@ -42,34 +42,7 @@ GIVETH AN a
 `the first of` MEANS x
 
 -- =============================================================================
--- SECTION 3: Local Definitions with WHERE
--- =============================================================================
-
--- Compound interest with a named helper
-GIVEN `the principal` IS A NUMBER
-      `the annual rate` IS A NUMBER
-      `the years` IS A NUMBER
-GIVETH A NUMBER
-`the compound interest` MEANS
-    `the principal` * EXPONENT `the growth factor` `the years`
-    WHERE
-        `the growth factor` MEANS 1 + `the annual rate`
-
--- Loan payment with several helpers
-GIVEN `the loan amount` IS A NUMBER
-      `the annual rate` IS A NUMBER
-      `the term in months` IS A NUMBER
-GIVETH A NUMBER
-`the monthly payment` MEANS
-    `the loan amount` *
-    (`the monthly rate` * `the compound factor`) /
-    (`the compound factor` - 1)
-    WHERE
-        `the monthly rate` MEANS `the annual rate` / 12
-        `the compound factor` MEANS EXPONENT (1 + `the monthly rate`) `the term in months`
-
--- =============================================================================
--- SECTION 4: Recursive Functions
+-- SECTION 3: Recursive Functions
 -- =============================================================================
 
 -- Simple recursion
@@ -89,7 +62,7 @@ GIVETH A NUMBER
     WHEN x FOLLOWED BY rest THEN x + `the sum of the list` rest
 
 -- =============================================================================
--- SECTION 5: Higher-Order Functions
+-- SECTION 4: Higher-Order Functions
 -- =============================================================================
 
 -- Transform every element with map
@@ -111,7 +84,7 @@ GIVETH A NUMBER
     foldl (GIVEN acc, n YIELD acc + n) 0 numbers
 
 -- =============================================================================
--- SECTION 6: Tests
+-- SECTION 5: Tests
 -- =============================================================================
 
 -- Function basics
@@ -124,10 +97,6 @@ GIVETH A NUMBER
 -- Polymorphic functions
 #EVAL `the first of` 1 2
 #EVAL `the first of` "yes" "no"
-
--- WHERE
-#EVAL `the compound interest` 1000 0.05 10
-#EVAL `the monthly payment` 300000 0.06 360
 
 -- Recursion
 #EVAL `the factorial of` 5

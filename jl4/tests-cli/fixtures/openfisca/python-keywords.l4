@@ -1,0 +1,17 @@
+-- A record named `class` and an enum named `None` are Python keywords; the
+-- emitted names must be made safe (`class_`, `None_`) so the module loads.
+IMPORT prelude
+
+DECLARE None IS ONE OF Nobody, Somebody
+DECLARE class HAS size IS A NUMBER, who IS A None
+
+@export Fee
+GIVEN c      IS A class
+      period IS A STRING
+GIVETH A NUMBER
+`fee` c period MEANS
+    CONSIDER c's who
+    WHEN Somebody THEN c's size TIMES 10
+    OTHERWISE 0
+
+#ASSERT (`fee` OF (class WITH size IS 3, who IS Somebody), "2026-01") EQUALS 30

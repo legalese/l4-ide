@@ -1,0 +1,6 @@
+GIVEN child       IS A BOOLEAN
+      sibling     IS A BOOLEAN
+      `same abode` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `qualifies` child sibling `same abode` IF
+    (child OR sibling) AND `same abode`

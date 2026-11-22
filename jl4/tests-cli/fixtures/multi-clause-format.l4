@@ -1,0 +1,24 @@
+-- `l4 format` must print every clause of a multi-clause DECIDE / MEANS group
+-- exactly as written: the parser fuses a group into one definition, and the
+-- formatter used to print only its signature and head name.
+
+DECLARE Peril IS ONE OF Water, Fire, Cosmetic
+
+GIVEN p IS A Peril
+GIVETH A NUMBER
+DECIDE premium Water IS 100   -- comments survive too
+DECIDE premium Fire  IS 200
+-- including a comment between two clauses
+DECIDE premium other IS 0
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+factorial 0 MEANS 1
+factorial n MEANS n * factorial (n - 1)
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is zero` 0 IS TRUE
+
+#EVAL premium Fire
+#EVAL factorial 5

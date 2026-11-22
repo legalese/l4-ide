@@ -1,0 +1,24 @@
+-- A household decision calling a person decision outside an aggregation.
+-- OpenFisca cannot read a person variable for a household, and failed with
+-- ValueError. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Household HAS
+    members IS A LIST OF Person
+    head    IS A Person
+
+@export Person tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`person tax` p period MEANS p's salary TIMES 0.1
+
+@export Tax of the household head
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`head tax` h period MEANS `person tax` OF (h's head), period
+
+`alice` MEANS Person WITH salary IS 1000
+#ASSERT (`head tax` OF (Household WITH members IS (LIST `alice`), head IS `alice`), "2026-01") EQUALS 100

@@ -36,8 +36,17 @@ resolveNlgAnnotation a = do
 resolveNlgFragment :: NlgFragment Name -> Check (NlgFragment Resolved)
 resolveNlgFragment = \ case
   MkNlgText ann t -> pure $ MkNlgText ann t
-  MkNlgRef ann n ->
-    MkNlgRef ann . fst <$> resolveTerm n
+  -- A slot names an input of the rule, and a record's field or a top-level rule
+  -- of the same name is not what it means. An expression tells such names apart
+  -- by type; a slot has none, so the nearest binding wins.
+  MkNlgRef ann n -> do
+    options <- lookupRawNameInEnvironment (rawName n)
+    let kinds = [ kind | (_, _, KnownTerm _ kind) <- options ]
+        wanted
+          | Local `elem` kinds         = (== Local)
+          | any (/= Selector) kinds    = (/= Selector)
+          | otherwise                  = const True
+    MkNlgRef ann . fst <$> resolveTerm' wanted n
 
 resolveNlgAnnotationInResolved :: Resolved -> Check Resolved
 resolveNlgAnnotationInResolved = traverseResolved resolveNlgAnnotation
@@ -48,6 +57,12 @@ nlgDecide (MkDecide ann tySig appForm body) =
     <$> nlgTypeSig tySig
     <*> nlgAppForm appForm
     <*> nlgExpr body
+
+-- | The quantifier's filter, either spelling ('L4.Syntax.Filter').
+nlgFilter :: Filter Resolved -> Check (Filter Resolved)
+nlgFilter = \ case
+  Who ann e   -> Who ann <$> nlgExpr e
+  Whose ann e -> Whose ann <$> nlgExpr e
 
 nlgExpr :: Expr Resolved -> Check (Expr Resolved)
 nlgExpr = \ case
@@ -154,7 +169,7 @@ nlgExpr = \ case
       subj' <- case subj of
         Party sann party -> Party sann <$> nlgExpr party
         Every sann mCast v mRoll mFilter ->
-          Every sann mCast v <$> traverse nlgExpr mRoll <*> traverse nlgExpr mFilter
+          Every sann mCast v <$> traverse nlgExpr mRoll <*> traverse nlgFilter mFilter
       rule' <- nlgPattern rule
       provided' <- traverse nlgExpr provided
       let nlgAnchor = \ case
@@ -232,6 +247,7 @@ nlgExpr = \ case
       pure $ Breach ann mParty' mReason'
     Refuse ann msg -> Refuse ann <$> nlgExpr msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
+    Lifecycle ann p -> pure $ Lifecycle ann p
 
 nlgPattern :: Pattern Resolved -> Check (Pattern Resolved)
 nlgPattern = \ case
@@ -278,7 +294,16 @@ nlgAppForm (MkAppForm ann n ns maka) =
   MkAppForm ann
     <$> resolveNlgAnnotationInResolved n
     <*> traverse resolveNlgAnnotationInResolved ns
-    <*> traverse resolveNlgAnnotation maka
+    <*> traverse nlgAka maka
+
+-- | The @AKA@'s own annotation, and each alias name's. A herald on its own line
+-- under @\`r\` p AKA \`a\`@ lands on the alias name, and left parsed its
+-- @%slots%@ had no 'Unique' to splice a call's arguments into
+-- (smucclaw\/l4-ide#978).
+nlgAka :: Aka Resolved -> Check (Aka Resolved)
+nlgAka aka = do
+  MkAka ann ns <- resolveNlgAnnotation aka
+  MkAka ann <$> traverse resolveNlgAnnotationInResolved ns
 
 nlgTypeSig :: TypeSig Resolved -> Check (TypeSig Resolved)
 nlgTypeSig (MkTypeSig ann givenSig mGivethSig) =

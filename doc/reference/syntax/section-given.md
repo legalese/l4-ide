@@ -97,13 +97,10 @@ column rule and L4 accepts it, but it is not the house style:
   the `GIVEN` to a common ancestor heading if it is one thing; **rename** one of
   them if they are two.
 
-  _Proposed, not landed (2026-09-04): a fourth way out, **bridging at the point
-  of use** — `g WITH foo IS foo`, meaning "for this use, this section's `foo` is
-  the one the other section means". Supplying a name with `WITH` does not work
-  today: written after a bare rule name, L4 reports a check error (it cannot
-  apply a rule that takes no inputs to named ones), and written after
-  a rule that already has its values it is rejected at `WITH`. It lands
-  with the discharge pull request; until then, qualify, hoist or rename._
+  A fourth way out is to **bridge at the point of use** — `g WITH foo IS foo`,
+  meaning "for this use, this section's `foo` is the one the other section
+  means". It is written inside a rule whose own section declares `foo`; see
+  [One name, one value](#one-name-one-value).
 
 ## One name, several types
 
@@ -246,8 +243,8 @@ cannot introduce the hazard.
 ## What a section `GIVEN` does in this release
 
 **A section `GIVEN` that nothing supplies behaves as an assumed term, exactly
-as an older `ASSUME` did.** A rule that reads one cannot be run to an answer
-until the name is supplied; `#EVAL` on such a rule reports
+as an older `ASSUME` did.** A rule whose answer depends on one cannot be run to
+an answer until the name is supplied; `#EVAL` on such a rule reports
 
 ```
 I could not continue evaluating, because I needed to know the value of
@@ -321,13 +318,15 @@ value whose kind is unmistakable rather than another name.
 What else works:
 
 - **The list of facts a published rule asks for.** A name that an `@export`ed
-  rule reads — directly or through anything it relies on — becomes a required
-  request input, carrying its `@desc` if it has one and its `TYPICALLY` value as
-  the JavaScript Object Notation (JSON) Schema `default`. (A name with a
-  `TYPICALLY` value is still listed under `required`; making it optional is
-  separate, later work.)
+  rule reads — directly or through anything it relies on — becomes a request
+  input, carrying its `@desc` if it has one and its `TYPICALLY` value as the
+  JavaScript Object Notation (JSON) Schema `default`. A name with a
+  `TYPICALLY` value is optional, and so is one whose type is a `MAYBE`, which
+  a request may leave out to mean `NOTHING`; any other name is `required`.
 - **`l4 batch` and `jl4-service`**, which supply the names a rule reads from the
-  request the same way they supply a read `ASSUME`.
+  request the same way they supply a read `ASSUME`, and fill in a name's
+  `TYPICALLY` value when the request leaves it out (see
+  [TYPICALLY](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
 - **Every export backend** — Decision Model and Notation (DMN), Business Process
   Model and Notation (BPMN), docassemble, Catala, OpenFisca, Blawx and the
   Multi-Level Intermediate Representation (MLIR) — treats a section `GIVEN` as
@@ -340,13 +339,13 @@ What else works:
 
 **What Catala makes of one, measured 2026-09-07.** The backends compile the
 module as you wrote it, not the rewritten one in which the section's `GIVEN` has
-become an ordinary input of every rule beneath the heading. So `l4 catala` meets
+become an ordinary input of every rule beneath the heading. So `l4 export catala` meets
 a section `GIVEN` as an `ASSUME` term — and it will only read an `ASSUME` term
 inside a rule marked `@export`. A plain helper that reads one is refused, the
 command exits 1, and no file is written:
 
 ```
-l4 catala: cannot compile these decisions to Catala:
+l4 export catala: cannot compile these decisions to Catala:
   - in `the rank of the teacher`: ASSUMEd input `the teacher` is only readable
     inside an @export decision's scope (where it becomes a scope `input`); pass
     it to this helper as a parameter instead (pay.l4:10:5-18)
@@ -365,12 +364,12 @@ today.
 published as a Catala _scope_, and Catala allows a scope to be called only from
 inside another scope. So if an `@export`ed rule is called by one that is **not**
 exported, the call would come out inside a plain top-level definition, which
-Catala rejects. `l4 catala` refuses that up front rather than writing a file the
+Catala rejects. `l4 export catala` refuses that up front rather than writing a file the
 next tool will throw out — it exits 1, names the rule and the rule that calls
 it, and tells you what to do:
 
 ```
-l4 catala: cannot compile these decisions to Catala:
+l4 export catala: cannot compile these decisions to Catala:
   - in `the middle`: `Chain.the base` is @export'd, so it compiles to a Catala
     scope — and Catala allows a scope call only from inside another scope. This
     caller is not @export'd, so it compiles to a toplevel definition, and the
@@ -394,7 +393,7 @@ the condition costs you little, since every rule that reads the binder has to be
 exported anyway; if you are applying `@export` to an ordinary helper, it is the
 whole story.
 
-Until 2026-09-08 there was no refusal: `l4 catala` exited 0, printed nothing,
+Until 2026-09-08 there was no refusal: `l4 export catala` exited 0, printed nothing,
 and wrote a file `catala typecheck` then rejected — so the failure found you one
 tool later, with nothing pointing back at the rule that caused it. If you are
 reading an older note that says the export "is not composable", that is what it
@@ -529,5 +528,5 @@ repair — refusal first, wider search second — is ruled in
 - [`ASSUME` (deprecated)](../types/ASSUME.md) — the older spelling of the same idea, at module level, and where each of its jobs went
 - [`GIVEN`](../functions/GIVEN.md) — the inputs of one rule
 - [Field opening](field-opening.md) — a record-typed section `GIVEN` puts its fields in scope by bare name for every rule under the heading
-- [Section markers (§)](README.md#section-markers-)
+- [Section markers (§)](README.md#sections)
 - [Sections](sections.md) — the full visibility rule for nested and sibling sections, qualified names, and the ambiguity error

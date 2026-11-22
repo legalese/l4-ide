@@ -557,8 +557,10 @@ spec = do
         Left errs -> expectationFailure (show errs)
         Right sg  -> do
           length (outOf sg sg.sgInitialState) `shouldBe` 2
+          -- A branch state is named after the obligation it enters, window
+          -- and all ('L4.StateGraph.describeDeonton', 2026-09-22).
           branchNames sg sg.sgInitialState
-            `shouldBe` ["Alice must pay", "Bob must deliver"]
+            `shouldBe` ["Alice must pay WITHIN 3", "Bob must deliver WITHIN 5"]
 
     it "makes branch edges unlabelled control flow, not obligations" $ do
       case graphFor randSrc of
@@ -575,7 +577,10 @@ spec = do
         Right sg  -> do
           junctions sg `shouldBe` [("initial", AllOf)]
           branchNames sg sg.sgInitialState
-            `shouldBe` ["Alice must pay", "Bob must deliver", "Carol must notify"]
+            `shouldBe` [ "Alice must pay WITHIN 3"
+                       , "Bob must deliver WITHIN 5"
+                       , "Carol must notify WITHIN 7"
+                       ]
 
     it "keeps a ROR nested inside a RAND distinct from its parent" $ do
       case graphFor mixedSrc of
@@ -585,7 +590,7 @@ spec = do
           map snd (junctions sg) `shouldBe` [AllOf, OneOf]
           lookup "initial" (junctions sg) `shouldBe` Just AllOf
           lookup "one of" (junctions sg) `shouldBe` Just OneOf
-          branchNames sg sg.sgInitialState `shouldBe` ["Alice must pay", "one of"]
+          branchNames sg sg.sgInitialState `shouldBe` ["Alice must pay WITHIN 3", "one of"]
 
   describe "DOT rendering" $ do
     it "labels a RAND junction ALL OF and nothing else" $ do
@@ -668,7 +673,7 @@ spec = do
     -- transition the runtime never makes. Measured with jl4:exe:l4 run:
     --
     --   PARTY Alice MUST pay LEST (PARTY Bob MUST refund WITHIN 5)
-    --   #TRACE ... AT 0 WITH (`WAIT UNTIL` 1000)
+    --   #TRACE ... AT 0 WITH (WAITUNTIL 1000)
     --     ==> the ORIGINAL obligation, as a residual. Bob's refund never
     --         becomes current. Adding WITHIN 30 to the same rule yields
     --         "PARTY Bob MUST refund WITHIN 5", i.e. the arm taken.
@@ -716,7 +721,7 @@ spec = do
       -- DO is documented as requiring an explicit LEST, and the extractor used
       -- to believe the documentation and draw nothing — leaving a rule whose
       -- only drawn outcome was Fulfilled. The evaluator disagrees: measured,
-      -- `PARTY Alice DO pay WITHIN 5` run to (`WAIT UNTIL` 100) yields DEONTIC
+      -- `PARTY Alice DO pay WITHIN 5` run to (WAITUNTIL 100) yields DEONTIC
       -- BREACHED. Contract5 lumps DDo in with DMust.
       it "now draws the breach a bare DO reaches by the clock" $
         lestCaptions (defaultLestSrc "DO") `shouldBe` Right ["timeout"]
@@ -906,14 +911,18 @@ spec = do
     it "does not change the unmarked edges' attributes" $
       withGraph (graphFor linearSrc) \sg -> do
         let marked = stateGraphToDot defaultStateGraphOptions { showDominators = True } sg
-            timeoutEdge from =
-              from <> " -> 3 [label=timeout\n           ,color=\"#dc3545\"\n           ,style=dashed];"
+            -- The caption names the deadline that TAKES the arm, not just the
+            -- fact that one ran out, so it is per-edge: 3 for Alice's, 5 for
+            -- Bob's. Before 2026-09-21 both read the bare word "timeout".
+            timeoutEdge from due =
+              from <> " -> 3 [label=\"timeout [" <> due
+                   <> "]\"\n           ,color=\"#dc3545\"\n           ,style=dashed];"
         -- The two timeouts dominate nothing, and their three lines are
         -- exactly the default output's: the annotation only ADDS, to the
         -- edges it marks.
-        dotFor sg `shouldSatisfy` Text.isInfixOf (timeoutEdge "0")
-        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "0")
-        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "1")
+        dotFor sg `shouldSatisfy` Text.isInfixOf (timeoutEdge "0" "3")
+        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "0" "3")
+        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "1" "5")
  where
   isJust' = maybe False (const True)
   allSame xs = case xs of

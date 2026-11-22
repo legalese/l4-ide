@@ -154,11 +154,11 @@ GIVETH A LIST OF DATE
 --   20.09 Weltkindertag: ab 2019 in TH.
 -- Ohne diese vier Schaltungen rechnete Beispiel 11 (Berlin, 2006) gegen
 -- einen Kalender, den es 2006 nicht gab.
--- MESSBARE ANMERKUNG ZUR SYNTAX: gestapelte @ref-Zeilen hängen sich NICHT
--- alle an. Nur die letzte erreicht den Knoten; jede frühere quittiert mit
--- "could not be attached to any following syntax node". Gemessen am
--- 2026-09-14. Deshalb steht hier EIN @ref, und die Einzelnachweise stehen
--- als Kommentar darüber.
+-- ANMERKUNG ZUR SYNTAX: gestapelte @ref-Zeilen hängen sich alle an den
+-- Knoten, der darauf folgt. Früher blieb nur die letzte; jede frühere
+-- quittierte mit einer Warnung, sie finde keinen Knoten (gemessen am
+-- 2026-09-14), obwohl sie nur überstimmt war. Hier steht trotzdem nur EIN
+-- @ref, und die Einzelnachweise stehen als Kommentar darüber.
 --
 -- Reformationstag 31.10: seit 1990 in BB, MV, SN, ST, TH; seit 2018 in
 --     HB, HH, NI, SH. Quelle: de.wikipedia.org/wiki/Reformationstag.

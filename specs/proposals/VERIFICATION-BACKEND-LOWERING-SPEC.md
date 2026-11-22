@@ -1,8 +1,10 @@
 # Verification Backend Lowering Specification
 
-**Status:** Proposal. **Phase 1 is ruled but not built** — R-V1–R-V10 were answered by Meng on
-2026-09-07 (§"Phase 1 rulings"); no prover exists in the tree as of that date, and `l4 prove` is
-named throughout this document as a thing to write, not a thing that runs.
+**Status:** Proposal. **Phase 1 is ruled, and partly built on a branch not yet merged.** R-V1–R-V10 were answered by Meng on 2026-09-07 (§"Phase 1 rulings").
+`l4 prove` is built on `feat/l4-prove`, draft legalese/l4-ide#784 (2026-10-30), not merged into `unstable`; until it merges, `l4 prove` does not exist in the tree, and this document's present-tense mentions of it are still plans.
+What #784 builds, by ruling: R-V2's unfolding (every reached `DECIDE` a `define-fun`), not its generated obligations; R-V3's selection of obligations (an `#ASSERT` that reads a section binder and that the evaluator did not decide), not its diagnostic reword; R-V4 (each `analyzeSafety` clause a side condition or a named refusal); R-V5; R-V6 with z3 only; R-V7 except `STRING`; R-V8.
+**R-V10 is discharged as a design** in #784 (2026-10-30): the Mode A/B gate now calls the real emitted scope at a witness per realisable combination; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`). See CATALA-EXPORT-SPEC §8.4's discharge note.
+R-V3's `deferred` outcome and its `l4 run` exit-code change are withdrawn: UNKNOWN-EVALUATION-SPEC U1b (ruled 2026-10-01) supersedes them, by Meng's firing of PECKINGORDER on 2026-10-30; see the note under R-V3.
 **Author:** Meng Wong
 **Date:** 2026-06-29 (Phase 1 rulings appended 2026-09-07)
 **Related:** [BOUNDED-DEONTICS-SPEC.md](../todo/BOUNDED-DEONTICS-SPEC.md), [ACTUS-L4-BRIDGE-SPEC.md](../done/ACTUS-L4-BRIDGE-SPEC.md), [DEONTIC-TRACE-API-SPEC.md](../done/DEONTIC-TRACE-API-SPEC.md), [PROHIBITION-BREACH-SPEC.md](../done/PROHIBITION-BREACH-SPEC.md)
@@ -145,7 +147,7 @@ The principle generalizes a hard-won lesson: bugs hide in the _contexts you did 
 > below is about obligations, clocks and defeasible priority; none of them is asked by the pure
 > decision fragment Phase 1 targets, whose reference semantics already exists and is executable —
 > the jl4 evaluator, already the oracle of record for the Catala backend's expected values, the DMN
-> engine harnesses and the Blawx s(CASP) comparison (portfolio invariant I1).
+> engine harnesses and the Blawx s(CASP) comparison (portfolio invariant I2).
 >
 > **This re-scoping is a deferral, not a cancellation, and it is the one most likely to evaporate.**
 > Meng's note on R-V1: _"What I'm worried about is that we will do Phase 1 now and never get around
@@ -187,6 +189,8 @@ The principle generalizes a hard-won lesson: bugs hide in the _contexts you did 
 
 - [ ] Counterexample → IDE visualization (reuse the trace visualizer)
 - [ ] Per-query backend selection heuristic (timed? arithmetic? liveness? → tool)
+
+For the explicit-LTS route, REGULATIVE-LOWERING-SPEC R-L7 orders the emitters TLA+ with NuSMV, then PNML as a picture; Z3 and Alloy are untouched by it.
 
 ## Phase 1 rulings — R-V1 to R-V10
 
@@ -238,6 +242,14 @@ than writing a second one.
 
 ### R-V3 — No new directive. `l4 prove` discharges the `#ASSERT`s that already cannot be decided. ANSWERED 2026-09-07. **Diverges from the recommendation.**
 
+**SUPERSEDED IN PART 2026-10-30** by UNKNOWN-EVALUATION-SPEC U1b (ruled 2026-10-01), by Meng's firing of PECKINGORDER on 2026-10-30.
+An undetermined `#ASSERT` exits 1 (`specs/todo/UNKNOWN-EVALUATION-SPEC.md:589`), as implemented at `jl4/app/L4/Cli/Run.hs:164-168`.
+The `deferred` outcome below, and its `l4 run` exit-code change, are withdrawn.
+R-V3's selection of obligations stands: `l4 prove` discharges the `#ASSERT`s the evaluator cannot decide, and there is no new directive.
+The CI coverage check below ("The safety net is CI, not the exit code") was justified by the `deferred` outcome; with that withdrawn its premise no longer holds, and whether it is still wanted is not ruled.
+The reword of the non-ground diagnostic is not withdrawn by this, and is not built.
+The rest of this section is the 2026-09-07 record, unedited.
+
 An `#ASSERT` whose free variables are section binders is already a universally quantified statement
 that the evaluator cannot decide, and the tree already treats it as undecidable-on-purpose. `l4
 prove` decides it. **Plus** the half of the recommendation Meng kept: the non-ground `#ASSERT`
@@ -263,8 +275,8 @@ to the binder is still the module-level `ASSUME` the desugaring left there."_ A 
 root. So a directive over a section binder is still stuck, which is exactly the handle B needs.
 
 **Load-bearing consequence — one pinned CLI behaviour changes, and only one.** `l4 run` today
-**exits non-zero** on a stuck `#ASSERT`: `evalDirectiveCrashed` maps `Assertion (Errored _)` to
-`True` (`jl4/app/L4/Cli/Run.hs:136-158`), a stuck assert reports `Errored (Stuck _)`, and
+**exits non-zero** on a stuck `#ASSERT`: `evalDirectiveFailsRun` maps `Assertion (Errored _)` to
+`True` (`jl4/app/L4/Cli/Run.hs:141-162`), a stuck assert reports `Errored (Stuck _)`, and
 `jl4/tests-cli/Main.hs` pins it — _"fails the run when an #ASSERT is stuck on a bare assumed
 BOOLEAN"_. Under B, a file carrying proof obligations would fail `l4 run`, which would push authors
 into keeping obligations in separate files from tests. So B adds a fourth assertion outcome,
@@ -390,6 +402,11 @@ emitter sits behind an interface narrow enough that an `sbv` implementation is a
 pivot is a swap of one module, not a rewrite — and the emitter must not leak subprocess assumptions
 into the lowering. See §"Deferred obligations" D3.
 
+**Input widened 2026-10-01 (D1, HOMEBREW; `specs/todo/UNKNOWN-EVALUATION-SPEC.md` §9 D1, §4.2, §4.7.3).**
+The lowering's input now includes the evaluator's residual term language (#526 §4.2): the Boolean residual a lifted evaluation leaves at its root, each atom's term, and the guards of its error and give-up leaves as named side conditions.
+One lowering from that language to SMT-LIB2 serves both `l4 prove` and the query planner's arithmetic atoms, and the term language is kept close to SMT-LIB2 so that swapping z3 for cvc5 stays a change to this emitter.
+Nothing else in this ruling changes.
+
 ### R-V7 — Encode rounding, modulo and dates exactly; reject transcendentals by name. ANSWERED 2026-09-07.
 
 `BOOLEAN` → `Bool`; `NUMBER` → `Real`, which is **faithful** rather than approximate because L4
@@ -483,6 +500,11 @@ three-band rate table that `catala typecheck` was green on.
 When this lands, `CATALA-EXPORT-SPEC.md` §8.4's disclosed-open item is discharged **in the same PR**
 or it is not discharged.
 
+**Built 2026-10-30 in legalese/l4-ide#784 (draft, not merged), as a design: the gate now calls the real emitted scope; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`).**
+`l4 export catala` replaces the grid of each ladder with `#[test]` scopes that call the emitted scope at witness inputs (up to eight per realisable combination of its atoms) and expect L4's value there; z3 only proves the other combinations impossible, or finds a witness the fixed candidates miss.
+The grid's cap of 8 does not bind a gated ladder. The measurements (all goldens pass; a flipped consequence that the grid passes now fails; a nine-atom ladder gated) are in CATALA-EXPORT-SPEC §8.4's discharge note, which is the record.
+The conditions the gate enumerates are the leaves of the ladder's rungs, so `a OR b` is two; that criterion, its limits and its fallback to rung level are in the same section of CATALA-EXPORT-SPEC.
+
 ## Deferred obligations
 
 Three of the Phase 1 rulings buy their speed by deferring something. This register exists because
@@ -490,11 +512,11 @@ two of Meng's ruling notes say, in different words, _don't let this evaporate_. 
 table only when the work is done or the deferral is explicitly withdrawn — not because it stopped
 being convenient.
 
-| id     | what was deferred                                                                          | trigger                                                                                                     | owed by |
-| ------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ------- |
-| **D1** | Phase 0 — core IR, reference semantics, defeasibility strategy, assertion-language surface | **The first deontic, timed or defeasible property anyone wants to check.** Phase 2 cannot start without it. | R-V1    |
-| **D2** | Lifting `analyzeSafety` and `vizExprToBoolExpr` out of the `Dmn`/`Viz` namespaces          | The PR immediately after the prover's first. It does nothing else.                                          | R-V9    |
-| **D3** | An `sbv`-backed implementation behind the same interface                                   | Hand-rolled SMT-LIB2 emission or model parsing costing more than it saves — pivot, do not endure.           | R-V6    |
+| id     | what was deferred                                                                          | trigger                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | owed by |
+| ------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| **D1** | Phase 0 — core IR, reference semantics, defeasibility strategy, assertion-language surface | **The first deontic, timed or defeasible property anyone wants to check.** Phase 2 cannot start without it, except the explicit-LTS route. Triggered 2026-10-24 by the safety property of a check-then-act race. [REGULATIVE-LOWERING-SPEC.md](REGULATIVE-LOWERING-SPEC.md) §3 answers the IR and reference-semantics items for the explicit-LTS route only (its R-L1); they reopen for the symbolic lowering (its D-L1). Defeasibility is still owed (its D-L3, trigger: a priority, an exception or a contrary-to-duty chain); the assertion surface is still owed (its D-L2, trigger: the first property not writable as a boolean decision). | R-V1    |
+| **D2** | Lifting `analyzeSafety` and `vizExprToBoolExpr` out of the `Dmn`/`Viz` namespaces          | The PR immediately after the prover's first. It does nothing else.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | R-V9    |
+| **D3** | An `sbv`-backed implementation behind the same interface                                   | Hand-rolled SMT-LIB2 emission or model parsing costing more than it saves — pivot, do not endure.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | R-V6    |
 
 **D1 is the one to watch.** It is deferred by a whole phase rather than a PR, it is the only one
 whose absence is invisible while Phase 1 works fine, and it is the one Meng flagged in his own
@@ -503,7 +525,7 @@ words. A Phase 1 that ships and a Phase 0 that never starts is the failure this 
 ## Open Questions
 
 - **Backend selection:** automatic (infer from which IR features a query touches) vs explicit annotation?
-- **Witness translation:** can a backend counterexample always be lifted back to an L4-level, citation-bearing trace a non-lawyer can read? — **Answered for Phase 1 by R-V5**: an SMT model is a concrete input, so the lift is an evaluator run rather than a translation, and the replay doubles as the confirmation. Open for the backends whose counterexample is a _path_ rather than an assignment.
+- **Witness translation:** can a backend counterexample always be lifted back to an L4-level, citation-bearing trace a non-lawyer can read? — **Answered for Phase 1 by R-V5**: an SMT model is a concrete input, so the lift is an evaluator run rather than a translation, and the replay doubles as the confirmation. Open for the backends whose counterexample is a _path_ rather than an assignment. Answered for the explicit-LTS route by REGULATIVE-LOWERING-SPEC §5.4: a state is a path of events, so a counterexample is a `#TRACE`.
 - **Scope/bounds discipline:** for bounded engines, how do we communicate "checked up to scope N" honestly (no silent truncation of assurance)? — **Answered for Phase 1 by R-V8**: three verdicts, every `unknown` naming its reason, and a per-run coverage line. Open for the bounded engines, where the honest statement is about scope rather than about theory.
 - **Defeasibility round-trip:** if the ASP layer changes the in-force set, must every downstream backend re-run, and how is that cached?
 

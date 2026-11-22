@@ -113,7 +113,7 @@ DECLARE Submission IS ONE OF
 ```
 
 ```
-l4 export p1.l4 --to bpmn --rule 'the staged consultation' -o p1.bpmn --fidelity-report
+l4 export bpmn p1.l4 --rule 'the staged consultation' -o p1.bpmn --fidelity-report
 ```
 
 The `.bpmn` here is that emission with a comment header added and the XML

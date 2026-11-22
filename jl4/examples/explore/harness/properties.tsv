@@ -1,0 +1,13 @@
+# The properties checked on every fixture, one per line, tab-separated, in the order they are passed to l4 explore.
+# Each decision is a boolean decision of brief/properties.l4; kind is the l4 explore flag that says its class.
+# premise: for an eventually, the decision given to --if-always, or - for none.
+# C is the non-vacuity control of REGULATIVE-LOWERING-SPEC.md section 6.3, "the environment eventually acts":
+# it must be violated under every fairness assumption the harness answers a liveness verdict under.
+id	kind	decision	premise
+P1	always	every dinner was accepted while open	-
+P2	always	at most one dinner is bought	-
+P3	reachable	Alice's belief is stale	-
+P4	stays	one dinner is bought	-
+P5	eventually	Alice has bought or stopped	-
+P6	eventually	one dinner is bought	the ledger is open
+C	eventually	Bob has bought	-

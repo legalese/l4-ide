@@ -35,3 +35,120 @@ infix-under-connective.l4:109:1-55:
   TRUE
 infix-under-connective.l4:124:1-9:
   3
+infix-under-connective.l4:200:1-21:
+  TRUE
+infix-under-connective.l4:201:1-21:
+  FALSE
+infix-under-connective.l4:202:1-29:
+  TRUE
+infix-under-connective.l4:203:1-22:
+  TRUE
+infix-under-connective.l4:204:1-21:
+  TRUE
+infix-under-connective.l4:205:1-26:
+  TRUE
+infix-under-connective.l4:206:1-26:
+  FALSE
+infix-under-connective.l4:210:1-64:
+  assertion satisfied
+infix-under-connective.l4:211:1-64:
+  assertion satisfied
+infix-under-connective.l4:212:1-66:
+  assertion satisfied
+infix-under-connective.l4:213:1-66:
+  assertion satisfied
+infix-under-connective.l4:214:1-62:
+  assertion satisfied
+infix-under-connective.l4:215:1-62:
+  assertion satisfied
+infix-under-connective.l4:216:1-64:
+  assertion satisfied
+infix-under-connective.l4:217:1-64:
+  assertion satisfied
+infix-under-connective.l4:220:1-28:
+  assertion satisfied
+infix-under-connective.l4:221:1-32:
+  assertion satisfied
+infix-under-connective.l4:222:1-33:
+  assertion satisfied
+infix-under-connective.l4:253:1-29:
+  TRUE
+infix-under-connective.l4:254:1-29:
+  FALSE
+infix-under-connective.l4:255:1-28:
+  FALSE
+infix-under-connective.l4:256:1-29:
+  TRUE
+infix-under-connective.l4:257:1-37:
+  TRUE
+infix-under-connective.l4:259:1-69:
+  assertion satisfied
+infix-under-connective.l4:260:1-69:
+  assertion satisfied
+infix-under-connective.l4:261:1-67:
+  assertion satisfied
+infix-under-connective.l4:269:1-27:
+  16
+infix-under-connective.l4:270:1-27:
+  16
+infix-under-connective.l4:271:1-57:
+  assertion satisfied
+infix-under-connective.l4:274:1-44:
+  TRUE
+infix-under-connective.l4:275:1-45:
+  FALSE
+infix-under-connective.l4:276:1-37:
+  TRUE
+infix-under-connective.l4:280:8-23:
+  I found a problem while checking the assumption of `unknown count`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `unknown count`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN `unknown count` IS A NUMBER
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+infix-under-connective.l4:284:1-56:
+  FALSE
+infix-under-connective.l4:285:1-58:
+  FALSE
+infix-under-connective.l4:286:1-54:
+  TRUE
+infix-under-connective.l4:287:1-56:
+  TRUE
+infix-under-connective.l4:297:1-41:
+  TRUE
+infix-under-connective.l4:298:1-42:
+  FALSE
+infix-under-connective.l4:299:1-41:
+  TRUE
+infix-under-connective.l4:334:1-31:
+  assertion satisfied
+infix-under-connective.l4:335:1-37:
+  assertion satisfied
+infix-under-connective.l4:336:1-40:
+  assertion satisfied
+infix-under-connective.l4:337:1-38:
+  assertion satisfied
+infix-under-connective.l4:338:1-70:
+  assertion satisfied
+infix-under-connective.l4:339:1-87:
+  assertion satisfied
+infix-under-connective.l4:340:1-93:
+  assertion satisfied
+infix-under-connective.l4:341:1-89:
+  assertion satisfied
+infix-under-connective.l4:358:1-30:
+  TRUE
+infix-under-connective.l4:359:1-30:
+  FALSE

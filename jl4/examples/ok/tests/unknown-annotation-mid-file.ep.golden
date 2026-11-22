@@ -1,0 +1,15 @@
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `add one` n IS n + 1
+
+-- Unknown annotations on either side of a known one, and one after a rule.
+@future-annotation an annotation a newer version might define
+@desc the second rule adds two
+@future-annotation and another one, directly above the rule
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `add two` n IS n + 2
+@trailing-future-annotation
+
+#ASSERT (`add one` 1) EQUALS 2
+#ASSERT (`add two` 1) EQUALS 3

@@ -1,0 +1,14 @@
+DECLARE Actor IS ONE OF Eater, Drinker
+
+DECLARE Action HAS
+  actor IS AN Actor
+  verb  IS A STRING
+
+eat   MEANS Action OF Eater,   "eat"
+drink MEANS Action OF Drinker, "drink"
+
+GIVETH DEONTIC Actor Action
+contract MEANS PARTY Eater MUST eat WITHIN 30
+
+#TRACE contract AT 0 WITH
+  PARTY Drinker DOES eat AT 5

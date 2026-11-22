@@ -68,7 +68,7 @@ for commencement.
 rule does to it, and [entry 11.5](11-when-the-encoding-cannot-answer.md#e11-5) for the different
 case of scope the encoding deliberately does not cover.
 
-**One documented near-exception.** `jl4/examples/legal/regcf/regcf.l4:143-154` names its
+**One documented near-exception.** `jl4/examples/canon/us/regcf/regcf.l4:143-154` names its
 pre-commencement arm for a refusal, and says out loud why: the taxonomy puts "not in force" in the gate row, no gate
 construct exists, and there is no figure to return. The site itself is still an `ASSUME` — the
 rewrite to `REFUSE` is drafted, unlanded. Cite it as an exception, never as the pattern.
@@ -86,7 +86,7 @@ building the comparison (and the `Date` month-subtraction footgun, which `YMD` d
 
 > `s 18(5) — "Nothing in this section shall affect any law by which special provision is made regarding the estates of persons of a particular religion or race."`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:1600`
+> — `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:1600`
 
 **It is doing** leaving some other law, or some accrued right, untouched. It is the mechanism by
 which the law itself reaches a period or a class that the rule in front of you does not cover.
@@ -98,13 +98,13 @@ ontology actually puts in evidence, and consult it in the rule it saves.
 @ref Probate and Administration Act 1934 s 18(5)
 GIVEN d IS A `Deceased person`
 GIVETH A BOOLEAN
-`s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` d MEANS
+`s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` MEANS
         "Nothing in this section shall affect any law by which special provision is made regarding the estates of persons of a particular religion or race."
     AND d's `a Muslim`
 
 GIVEN d IS A `Deceased person`
 GIVETH A BOOLEAN
-`s 18 governs the distribution of the estate of` d MEANS
+`s 18 governs the distribution of the estate of` MEANS
     NOT `s 18(5) — a law making special provision regarding the estates of persons of a particular religion or race is in evidence` d
 ```
 
@@ -134,7 +134,7 @@ for `UNLESS` and named defeaters, which is the same move at limb scale.
 > `s 28(1) — "Upon the grant of any probate or letters of administration, the grantee shall take an oath in the prescribed form …"`, encoded with `WITHIN 14`
 >
 > — the shape at [entry 2.1](02-conditions-and-logic.md#e2-1), from
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2715`
+> `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2715`
 
 **It is doing** fixing a period, in a unit — days, months, business days — that the statute states
 and L4 does not record. `WITHIN` takes a bare `NUMBER` on the same nameless timeline as the `AT`
@@ -268,7 +268,7 @@ DECLARE `Hearing notice` HAS
 @ref 6 NYCRR 617.9(a)(4)
 GIVEN notice IS A `Hearing notice`
 GIVETH A BOOLEAN
-`the hearing is scheduled in the permitted window` notice MEANS
+`the hearing is scheduled in the permitted window` MEANS
         notice's `Scheduled date` AT LEAST notice's `Publish date` PLUS 14
     AND notice's `Scheduled date` AT MOST  notice's `Publish date` PLUS 60
 ```
@@ -329,7 +329,7 @@ encoding stops to reason about one word of it:
 -- birth date >= 1983-01-01 (taken here, and the settled understanding).
 ```
 
-— `jl4/examples/legal/bna/bna.l4:73-76`
+— `jl4/examples/canon/uk/bna-1981/bna.l4:73-76`
 
 **It is doing** two separate things that both look like arithmetic. First, saying whether the
 boundary day is inside the period: "on or before" and "not later than" include it, "before" does
@@ -409,7 +409,7 @@ endpoint of a window measured in years.
 `father or mother settled in the United Kingdom or the territory of birth at the time of the birth`    IS A BOOLEAN
 ```
 
-— `jl4/examples/legal/bna/bna.l4:132-133`
+— `jl4/examples/canon/uk/bna-1981/bna.l4:132-133`
 
 **It is doing** freezing a fact. Nationality, residence, marital status, solvency, share ownership,
 capacity — all of these change, and the rule asks about the value one of them had at an instant that
@@ -433,7 +433,7 @@ DECLARE PersonProfile HAS
 @ref British Nationality Act 1981 s 1(1)
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
-`section 1(1) is satisfied for` person MEANS
+`section 1(1) is satisfied for` MEANS
         person's `born in the United Kingdom`
     AND person's `date of birth` AT LEAST `commencement`
     AND person's `father or mother a British citizen at the time of the birth`
@@ -452,7 +452,7 @@ present-tense source:
 ```l4
 GIVEN person IS A PersonProfile
 GIVETH A BOOLEAN
-`the parent was a citizen at the birth (wrong)` person MEANS
+`the parent was a citizen at the birth (wrong)` MEANS
         person's `father or mother a British citizen`
     AND person's `date of birth` AT MOST TODAY
 ```
@@ -482,11 +482,11 @@ corpus reads that off a built-in rather than off a parameter:
 ```text
 GIVEN amendment IS A DATE
 GIVETH A BOOLEAN
-`the rules in force include` amendment MEANS
+`the rules in force include` MEANS
     `RULES EFFECTIVE DATE` AT LEAST amendment
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:130-133`
+— `jl4/examples/canon/us/regcf/regcf.l4:130-133`
 
 **It is doing** naming the third clock. There are three, they move independently, and confusing them
 produces answers that are confidently wrong rather than obviously wrong:
@@ -514,7 +514,7 @@ GIVETH A NUMBER
 
 GIVEN value IS A NUMBER
 GIVETH A NUMBER
-`the tax payable on` value MEANS value TIMES `the rate of tax`
+`the tax payable on` MEANS value TIMES `the rate of tax`
 
 #ASSERT `EVAL UNDER RULES EFFECTIVE AT` (YMD 2023 6 1) (`the tax payable on` 1000) EQUALS 70
 #ASSERT `EVAL UNDER RULES EFFECTIVE AT` (YMD 2024 7 1) (`the tax payable on` 1000) EQUALS 90
@@ -535,7 +535,7 @@ GIVETH A NUMBER
 
 GIVEN value IS A NUMBER
 GIVETH A NUMBER
-`the tax payable on (wrong)` value MEANS value TIMES `the rate of tax (wrong)`
+`the tax payable on (wrong)` MEANS value TIMES `the rate of tax (wrong)`
 
 #EVAL `EVAL UNDER RULES EFFECTIVE AT` (YMD 2023 6 1) (`the tax payable on (wrong)` 1000)
 ```
@@ -569,7 +569,7 @@ rule does. The corpus records one of the second kind at length:
 -- consequential edit in Reg CF's history for an individual investor.
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:387-392`
+— `jl4/examples/canon/us/regcf/regcf.l4:387-392`
 
 **It is doing** replacing one rule with another as of a date, while leaving both in force for their
 own periods. The encoding does not choose between them; it holds both and selects on the rule-version
@@ -584,7 +584,7 @@ citation on each arm and the pre-commencement case last.
 @ref 17 CFR 227.100(a)(2)(i)-(ii) — "greater of" since 2021-03-15; "lesser of" before
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
-`the applicable measure of annual income or net worth` investor MEANS
+`the applicable measure of annual income or net worth` MEANS
     BRANCH IF `the rules in force include` `the 2021 amendments` THEN max (investor's `annual income`) (investor's `net worth`)
            IF `the rules in force include` `Reg CF commenced`    THEN min (investor's `annual income`) (investor's `net worth`)
            OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
@@ -616,7 +616,7 @@ GIVETH A NUMBER
 
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
-`the applicable measure (wrong)` investor MEANS
+`the applicable measure (wrong)` MEANS
     max (investor's `annual income`) (investor's `net worth`)
 
 #EVAL `EVAL UNDER RULES EFFECTIVE AT` (YMD 2018 1 1) (`the applicable measure (wrong)` `the investor`)
@@ -684,7 +684,7 @@ the next month:
 ```l4
 GIVEN d IS A DATE
 GIVETH A DATE
-`the first anniversary of (wrong)` d MEANS
+`the first anniversary of (wrong)` MEANS
     Date (DATE_DAY d) (DATE_MONTH d) (DATE_YEAR d PLUS 1)
 
 #EVAL `the first anniversary of (wrong)` (YMD 2024 2 29)
@@ -732,8 +732,8 @@ harder to transpose than `Date day month year`, and it fails loudly on a date th
 @ref § 227.203(b)(3) — "within five business days from the date on which the issuer becomes eligible"
 ```
 
-— `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2026`; the corpus binds the number once, as
-`` `business days to file Form C-TR` MEANS 5 `` (`jl4/examples/legal/regcf/regcf.l4:239`)
+— `jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:2026`; the corpus binds the number once, as
+`` `business days to file Form C-TR` MEANS 5 `` (`jl4/examples/canon/us/regcf/regcf.l4:239`)
 
 **It is doing** counting against a calendar that the instrument does not print. "Business day"
 almost always means "not a Saturday, not a Sunday, and not a public holiday **in a named place**",
@@ -752,7 +752,7 @@ yourself. There is no holiday calendar in the library, and no import will produc
 
 GIVEN d IS A DATE
 GIVETH A BOOLEAN
-`is a business day` d MEANS
+`is a business day` MEANS
         `is weekday` d
     AND NOT (elem d `the public holidays for 2026`)
 
@@ -797,7 +797,7 @@ nobody can file:
 ```l4
 GIVEN d IS A DATE
 GIVETH A DATE
-`the day three business days after (wrong)` d MEANS Date (Day d PLUS 3)
+`the day three business days after (wrong)` MEANS Date (Day d PLUS 3)
 
 #EVAL `the day three business days after (wrong)` (YMD 2026 12 24)
 ```

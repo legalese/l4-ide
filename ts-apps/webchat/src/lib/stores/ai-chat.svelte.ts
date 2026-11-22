@@ -11,6 +11,10 @@ import {
   AiConversationDelete,
   AiConversationList,
   AiConversationLoad,
+  AiDictationCancel,
+  AiDictationStart,
+  AiDictationStatus,
+  AiDictationStop,
   AiFileOpen,
   AiFileOpenDiff,
   AiGetActiveFileSelection,
@@ -27,8 +31,9 @@ import {
   type AiMentionCandidate,
   type AiPermissionCategory,
   type AiPermissionValue,
+  mergeSources,
+  sourcesLabel,
 } from 'jl4-client-rpc'
-import { aiPrefs } from '$lib/stores/ai-prefs.svelte'
 
 export interface PendingQuestion {
   callId: string
@@ -122,8 +127,8 @@ export interface RenderedToolActivity {
   /** Most recent status across the merged run — `done`/`error` stick. */
   status: 'running' | 'done' | 'error'
   /** Bold action prefix the row shows in front of `message`. Stamped
-   *  by the proxy ("L4 Deployments", "Compacting...", "Legalesing...").
-   *  Absent for activities emitted by older proxy builds — the row
+   *  by the AI service ("L4 Deployments", "Compacting...", "Legalesing...").
+   *  Absent for activities emitted by older servers — the row
    *  falls back to a default label. */
   label?: string
   /** Most recent message; prior messages of the same run are dropped
@@ -157,9 +162,9 @@ export interface RenderedToolActivity {
  *  status tickers like `search_l4_docs`), which keep the minimal row.
  *
  *  Two shapes carry a rule:
- *    - direct MCP rule descriptors → `ruleId` is set by the proxy.
+ *    - direct MCP rule descriptors → `ruleId` is set by the AI service.
  *    - the generic `evaluate_rule` tool → rule name lives in
- *      `input.function_name` (proxy can't know it statically).
+ *      `input.function_name` (the server can't know it statically).
  *  Both must also carry `input` so there's something to render. */
 function ruleActivityIdentity(a: {
   tool: string
@@ -336,7 +341,7 @@ export function createAiChatStore(
 ): AiChatStore {
   // Server-assigned id of the conversation the user is currently
   // viewing, or null when they're composing a fresh chat that hasn't
-  // received its id from the proxy yet. Only ever holds real server
+  // received its id from the AI service yet. Only ever holds real server
   // ids — the not-yet-started state lives in `pendingConversation`
   // below.
   let currentId = $state<string | null>(null)
@@ -361,6 +366,12 @@ export function createAiChatStore(
   let usedToday = $state<number>(0)
   let dailyLimit = $state<number>(0)
   let blockOnOverage = $state<boolean>(false)
+  // Voice dictation. `dictationAvailable` stays false until the host
+  // confirms it can record; the input renders no dictation UI before
+  // that, or ever where it can't (e.g. a remote workspace).
+  let dictationAvailable = $state<boolean>(false)
+  let dictationMaxSeconds = $state<number>(120)
+  let dictationPhase = $state<DictationPhase>('idle')
   let signedIn = $state<boolean>(false)
   // Active deployment binding ("Use in chat" from the Deployment tab).
   // Single source of truth for the deployment banner and for stamping
@@ -867,11 +878,11 @@ export function createAiChatStore(
     if (!m || !conv) return
 
     // No server-assigned conversationId yet → the very first turn
-    // failed before the proxy emitted its `metadata` SSE frame, so
+    // failed before the AI service emitted its `metadata` SSE frame, so
     // there is no on-disk history to resume against. Fall back to
     // re-sending the last user message as a fresh request — same
     // effect as the user retyping it. Without this fallback Retry
-    // silently no-ops, which is the bug the user hit when the proxy
+    // silently no-ops, which is the bug the user hit when the AI service
     // crashed on their first prompt.
     if (!conv.id) {
       const lastUserTurn = [...conv.turns]
@@ -1324,7 +1335,7 @@ export function createAiChatStore(
     if (!turn || turn.role !== 'assistant') return
     if (!turn.blocks) turn.blocks = []
 
-    // L4-rule activities (the proxy ran a deployed rule on the
+    // L4-rule activities (the AI service ran a deployed rule on the
     // server) merge `running → done` into a SINGLE mutating row so
     // they read exactly like a client-side rule tool-call: the row
     // appears pulsating the moment the call lands, then swaps to the
@@ -1387,7 +1398,15 @@ export function createAiChatStore(
           b.activity.status = params.status
           if (params.message) b.activity.message = params.message
           if (params.label !== undefined) b.activity.label = params.label
-          if (params.sources !== undefined) b.activity.sources = params.sources
+          // One activity per response of the turn (a pause for client
+          // tools starts a new one): add to the citations, don't replace.
+          if (params.sources !== undefined) {
+            b.activity.sources = mergeSources(
+              b.activity.sources,
+              params.sources
+            )
+            b.activity.message = sourcesLabel(b.activity.sources!.length)
+          }
           if (params.error !== undefined) b.activity.error = params.error
           return
         }
@@ -1406,35 +1425,26 @@ export function createAiChatStore(
       return
     }
 
-    // Dedupe policy:
+    // Status updates:
     //   - Same tool + same message as the tail → treat as a status
     //     update on the existing block (don't push a new row). This
     //     is what swallows a `running → running → done` burst that
-    //     keeps re-emitting the same status text.
+    //     keeps re-emitting the same status text. A failed block stays
+    //     failed: what follows it is a new attempt.
     //   - Same tool but a new message → the activity is reporting
     //     real progress, so push a new row even if the previous one
     //     is still "running" (it effectively terminates when the next
     //     message arrives).
     //
-    // When the user has hidden reasoning ("Show model reasoning"
-    // toggle off in chat settings), the dedupe scan walks past
-    // intervening thinking blocks. Otherwise two identical activity
-    // events sandwiching a hidden think look like duplicate rows.
-    // When reasoning is visible, we want a thinking block to act
-    // as a divider so the user can see "model thought, then status
-    // re-emitted" — so the scan only looks at the immediate tail.
-    let tailIdx = turn.blocks.length - 1
-    if (!aiPrefs.showReasoning) {
-      while (tailIdx >= 0 && turn.blocks[tailIdx]?.kind === 'thinking') {
-        tailIdx--
-      }
-    }
-    const tail = turn.blocks[tailIdx]
+    // Which rows are worth showing isn't decided here: the bubble
+    // leaves out a row that repeats the one above it (`omittedBlocks`).
+    const tail = turn.blocks[turn.blocks.length - 1]
     if (
       tail &&
       tail.kind === 'tool-activity' &&
       tail.activity.tool === params.tool &&
-      tail.activity.message === params.message
+      tail.activity.message === params.message &&
+      tail.activity.status !== 'error'
     ) {
       tail.activity.status = params.status
       return
@@ -1785,6 +1795,82 @@ export function createAiChatStore(
     }
   }
 
+  /** Ask the host whether it can record from a microphone. */
+  async function refreshDictationStatus(): Promise<void> {
+    const m = getMessenger()
+    if (!m) return
+    try {
+      const res = await m.sendRequest(
+        AiDictationStatus,
+        HOST_EXTENSION,
+        undefined as never
+      )
+      dictationAvailable = res?.available === true
+      if (res?.maxSeconds) dictationMaxSeconds = res.maxSeconds
+    } catch {
+      dictationAvailable = false
+    }
+  }
+
+  /** Start recording. `{ ok: false, note }` carries a reason to show
+   *  the user (no microphone, permission denied, …). */
+  async function startDictation(): Promise<{ ok: boolean; note?: string }> {
+    const m = getMessenger()
+    if (!m || dictationPhase !== 'idle') return { ok: false }
+    dictationPhase = 'starting'
+    try {
+      const res = await m.sendRequest(
+        AiDictationStart,
+        HOST_EXTENSION,
+        undefined as never
+      )
+      if (res?.error) {
+        dictationPhase = 'idle'
+        return { ok: false, note: res.error }
+      }
+      dictationPhase = 'recording'
+      return { ok: true }
+    } catch (err) {
+      dictationPhase = 'idle'
+      return {
+        ok: false,
+        note: err instanceof Error ? err.message : String(err),
+      }
+    }
+  }
+
+  /** Stop recording and transcribe. Resolves with the transcript
+   *  (empty when nothing intelligible was said) or a `note` explaining
+   *  why there isn't one. No-op unless a recording is running. */
+  async function stopDictation(): Promise<{ text?: string; note?: string }> {
+    const m = getMessenger()
+    if (!m || dictationPhase !== 'recording') return {}
+    dictationPhase = 'transcribing'
+    try {
+      // A deployment-bound chat's dictation is metered against that
+      // deployment, same as its turns.
+      const res = await m.sendRequest(AiDictationStop, HOST_EXTENSION, {
+        ...(deploymentBinding
+          ? { apiBaseUrl: deploymentBinding.apiBaseUrl }
+          : {}),
+      })
+      if (res?.error) return { note: res.error }
+      return { text: res?.text ?? '' }
+    } catch (err) {
+      return { note: err instanceof Error ? err.message : String(err) }
+    } finally {
+      dictationPhase = 'idle'
+    }
+  }
+
+  /** Stop recording and discard the clip. */
+  function cancelDictation(): void {
+    if (dictationPhase !== 'recording') return
+    const m = getMessenger()
+    m?.sendNotification(AiDictationCancel, HOST_EXTENSION, undefined as never)
+    dictationPhase = 'idle'
+  }
+
   function removeAttachment(index: number): void {
     stagedAttachments = stagedAttachments.filter((_, i) => i !== index)
   }
@@ -1883,6 +1969,19 @@ export function createAiChatStore(
     pickAttachment,
     removeAttachment,
     previewAttachment,
+    get dictationAvailable() {
+      return dictationAvailable
+    },
+    get dictationMaxSeconds() {
+      return dictationMaxSeconds
+    },
+    get dictationPhase() {
+      return dictationPhase
+    },
+    refreshDictationStatus,
+    startDictation,
+    stopDictation,
+    cancelDictation,
     toggleIncludeActiveFile,
     setIncludeActiveFile,
     answerQuestion,
@@ -1929,6 +2028,10 @@ export function createAiChatStore(
   }
 }
 
+/** Where a dictation is in its life: `starting` covers the moment
+ *  between the click and the microphone going live. */
+export type DictationPhase = 'idle' | 'starting' | 'recording' | 'transcribing'
+
 export type AiChatStore = {
   readonly currentId: string | null
   readonly current: ConversationState | null
@@ -1956,6 +2059,13 @@ export type AiChatStore = {
   ) => Promise<{ ok: boolean; note?: string }>
   removeAttachment: (index: number) => void
   previewAttachment: (att: AiChatAttachment) => void
+  readonly dictationAvailable: boolean
+  readonly dictationMaxSeconds: number
+  readonly dictationPhase: DictationPhase
+  refreshDictationStatus: () => Promise<void>
+  startDictation: () => Promise<{ ok: boolean; note?: string }>
+  stopDictation: () => Promise<{ text?: string; note?: string }>
+  cancelDictation: () => void
   getPermissions: () => Promise<Record<AiPermissionCategory, AiPermissionValue>>
   setPermission: (
     category: AiPermissionCategory,

@@ -1,0 +1,15 @@
+-- A ditto in a clause head (probe q/dit5): printed from the source text,
+-- it resolved against the printer's line, and swapped `f TRUE` and
+-- `f FALSE` under `l4 batch`.
+
+GIVETH A BOOLEAN
+k MEANS FALSE OR
+  TRUE
+f ^    MEANS 1
+f b    MEANS 2
+
+@export default g
+GIVEN b IS A BOOLEAN
+GIVETH A NUMBER
+g b MEANS f b
+

@@ -1,0 +1,597 @@
+{
+  "kind": "fork-register",
+  "register_version": 1,
+  "subject": "sg-child-support",
+  "interpretation_type": "Interpretation",
+  "note": "NINE FORKS, TWO MATERIALISED. The subject's primary source is a speech and a set of administrative web pages, which is a thinner text than a statute and leaves more open; but most of what it leaves open is settled by reading it against the Act it would amend, and a fork settled that way is resolved at encode time rather than materialised. The two that survive both readings are F1 and F2, and each is one field of the Interpretation record, threaded as an ordinary GIVEN, so both readings execute and the case suite shows what turns on the difference.\n\nCOMPLETENESS IS UNFALSIFIABLE and this note does not claim it. What can be said is how the list was built: every figure in life.gov.sg's cohort table was traced to a rule and every rule to a source; then ss 12B, 12C and 12CA were read line by line against the announcement, and each mechanism the Act contains and the announcement does not mention was entered here. That procedure finds silences. It does not find a reading nobody thought of.",
+  "entries": [
+    {
+      "id": "F1",
+      "kind": "vagueness",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "the harmonised co-matching cap counts a lifetime total",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-csp.l4",
+        "anchor": "`co-matching still available to` \u2026 `given` \u2026 `under` \u2026",
+        "provisions": [
+          "life.gov.sg cohort table \u2014 CDA co-matching transition"
+        ]
+      },
+      "source": {
+        "quote": "Children born before 1 April 2027 retain the existing co-matching cap until 30 September 2027; from 1 October 2027, all caps adjust to $5,000.",
+        "citations": [
+          {
+            "kind": "authority",
+            "cite": "life.gov.sg, SG Child Support Package",
+            "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F1a",
+          "description": "The harmonised $5,000 is a LIFETIME TOTAL. A family already co-matched $12,000 under the $15,000 cap receives nothing further; a family co-matched $3,000 has $2,000 of headroom left. WHY THIS READING: Preferred because a cap that reset would pay a fifth child MORE government money after the harmonisation than before it, which inverts the announced direction of the change (the Package levels support across birth orders by raising the first child, not by topping up the fifth).",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "life.gov.sg, SG Child Support Package",
+              "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package"
+            }
+          ]
+        },
+        {
+          "id": "F1b",
+          "description": "The harmonised $5,000 is FRESH HEADROOM from 1 October 2027, so every child gets a further $5,000 of co-matching capacity whatever they have already received.",
+          "status": "arguable",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "life.gov.sg, SG Child Support Package",
+              "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package"
+            }
+          ],
+          "foreclosure": "Not rejected \u2014 arguable. 'Adjust to $5,000' most naturally describes the cap going forward, and the announcement nowhere says the cap counts what was matched under a previous one. Materialised rather than dismissed because the money is real: $5,000 per child, concentrated on the largest families."
+        }
+      ],
+      "taken": {
+        "reading": "F1a",
+        "mechanism": "TYPICALLY",
+        "rationale": "Taken because a cap that reset would pay a fifth child more government money after harmonisation than before it, inverting the announced direction of the change. Materialised because $5,000 per child turns on it."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "sg-child-support-cases.l4 \u2014 `co-matching left for` `Gopal` `given` 12_000 under each reading: 0 against 5_000 on 2027-10-01, and equal on 2027-09-30"
+      ],
+      "cross_refs": [
+        "M4"
+      ],
+      "notes": [
+        "The fork OPENS on 1 October 2027 and not before: while the outgoing cap still governs, both readings return the same number, and the case suite asserts that too."
+      ]
+    },
+    {
+      "id": "F2",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "the service-duration graduation survives the merger",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-childcare-leave.l4",
+        "anchor": "`days of leave as announced for` \u2026 `on` \u2026 `under` \u2026",
+        "provisions": [
+          "CDCSA 2001 s 12B(1)(i)-(v)",
+          "NDR 2026 \u2014 merged childcare leave"
+        ]
+      },
+      "source": {
+        "quote": "Every working parent will get: 8 days with one child, aged 12 and below, 10 days with two children, aged 12 and below, and 12 days with three or more children.",
+        "citations": [
+          {
+            "kind": "authority",
+            "cite": "NDR 2026 (Singapore), 23 August 2026",
+            "url": "https://www.pmo.gov.sg/newsroom/ndr2026/"
+          },
+          {
+            "kind": "provision",
+            "cite": "Child Development Co-Savings Act 2001 s 12B(1)(i)-(v)",
+            "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F2a",
+          "description": "The s 12B(1) graduation by months served survives the merger: an employee part-way through the relevant period gets the announced figure scaled in the proportion the Act already uses. WHY THIS READING: An announcement that does not mention a mechanism does not repeal it, and the graduation is the Act's existing answer to part-year service. The merger is stated as a change to the NUMBER OF DAYS and the age band, not to the structure.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Child Development Co-Savings Act 2001 s 12B(1)(i)-(v)",
+              "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+            }
+          ]
+        },
+        {
+          "id": "F2b",
+          "description": "The merged entitlement is FLAT: every employee past the three-month threshold gets 8, 10 or 12 days regardless of months served.",
+          "status": "arguable",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "NDR 2026 (Singapore), 23 August 2026",
+              "url": "https://www.pmo.gov.sg/newsroom/ndr2026/"
+            }
+          ],
+          "foreclosure": "Not rejected \u2014 arguable, and it is what the words say. 'Every working parent will get 8 days' states one number and no schedule. Materialised because a half-year employee gets four days on one reading and eight on the other."
+        }
+      ],
+      "taken": {
+        "reading": "F2a",
+        "mechanism": "TYPICALLY",
+        "rationale": "Taken because an announcement that does not mention a mechanism does not repeal it, and the graduation is the Act's existing answer to part-year service. Materialised because a half-year employee gets 4 days on one reading and 8 on the other."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "sg-child-support-cases.l4 \u2014 `the half-year parent`: 4 days under the live reading, 8 under the rival; a full-year employee is unaffected and both readings agree"
+      ],
+      "cross_refs": [],
+      "notes": [
+        "THE ROUNDING IS THE ENCODING'S OWN AND IS NOT A READING OF ANYTHING. Under F2a the source gives no rule for a fractional day, and 8 x 2/6 is not a whole number. The encoding floors. Any implementation would have to choose; this one chooses visibly."
+      ]
+    },
+    {
+      "id": "F3",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-childcare-leave.l4",
+        "anchor": "`the announced leave scheme commences`",
+        "provisions": [
+          "NDR 2026 \u2014 merged childcare leave (no commencement date)"
+        ]
+      },
+      "source": {
+        "quote": "No start date has been announced; legislative amendments are required.",
+        "citations": [
+          {
+            "kind": "authority",
+            "cite": "NDR 2026 (Singapore), 23 August 2026",
+            "url": "https://www.pmo.gov.sg/newsroom/ndr2026/"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F3a",
+          "description": "Date the announced leave arm at the Package's own commencement, 1 April 2027, as an explicit placeholder so the arm can be reached and tested. WHY THIS READING: The only date the announcement supplies for anything in this policy area. Chosen so the arm is reachable, and LABELLED a placeholder in the module text so a reader cannot mistake it for a commencement date.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "NDR 2026 (Singapore), 23 August 2026",
+              "url": "https://www.pmo.gov.sg/newsroom/ndr2026/"
+            }
+          ]
+        },
+        {
+          "id": "F3b",
+          "description": "Leave the announced arm undated and unreachable until a commencement date is announced.",
+          "status": "rejected",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "NDR 2026 (Singapore), 23 August 2026",
+              "url": "https://www.pmo.gov.sg/newsroom/ndr2026/"
+            }
+          ],
+          "rejection_rationale": "An unreachable arm cannot be tested, and an untested arm is not evidence of anything. The placeholder is the more honest choice PROVIDED it is labelled, which it is."
+        }
+      ],
+      "taken": {
+        "reading": "F3a",
+        "mechanism": "encoded",
+        "rationale": "Taken so the announced arm is reachable and testable at all, and labelled a placeholder in the module text so it cannot be mistaken for a commencement date."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [
+        "M2"
+      ],
+      "notes": [
+        "Currency risk. The day a commencement date is announced, this constant moves and every leave answer dated between the two moves with it.",
+        "DIVERGENCE UNASSESSED, DELIBERATELY. The rival reading is not materialised, so nothing in the case suite executes it and no witness can honestly be named. Materialising it would be the way to find out what turns on it."
+      ]
+    },
+    {
+      "id": "F4",
+      "kind": "fact-convention",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "birth order",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-child-support-domain.l4",
+        "anchor": "Child's `birth order`",
+        "provisions": [
+          "Baby Bonus Scheme \u2014 birth-order rates",
+          "CDCSA 2001 s 9"
+        ]
+      },
+      "source": {
+        "quote": "$13,000 for their third and subsequent children.",
+        "citations": [
+          {
+            "kind": "authority",
+            "cite": "madeforfamilies.gov.sg, Baby Bonus Scheme",
+            "url": "https://www.madeforfamilies.gov.sg/support-measures/child-raising/financial-support/baby-bonus-scheme"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F4a",
+          "description": "Birth order is the child's order among the mother's living children, and is supplied to the encoding as a fact. WHY THIS READING: The encoding cannot see a pregnancy history, a death, a step-family or an adoption. Every reading of 'third child' turns on facts outside the model, so the number is taken as given.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "madeforfamilies.gov.sg, Baby Bonus Scheme",
+              "url": "https://www.madeforfamilies.gov.sg/support-measures/child-raising/financial-support/baby-bonus-scheme"
+            }
+          ]
+        },
+        {
+          "id": "F4b",
+          "description": "Derive birth order from a list of the mother's children held in the model.",
+          "status": "rejected",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "madeforfamilies.gov.sg, Baby Bonus Scheme",
+              "url": "https://www.madeforfamilies.gov.sg/support-measures/child-raising/financial-support/baby-bonus-scheme"
+            }
+          ],
+          "rejection_rationale": "Would make the encoding's answer depend on the completeness of a family list it has no way to validate, and would silently return a wrong birth order for an incomplete one. A supplied fact fails loudly instead."
+        }
+      ],
+      "taken": {
+        "reading": "F4a",
+        "mechanism": "fact-supplied",
+        "rationale": "Taken because every reading of 'third child' turns on facts \u2014 deaths, adoptions, step-families \u2014 that the encoding cannot see. A supplied fact fails loudly where a derived one would fail silently."
+      },
+      "status": "resolved",
+      "divergence": "none",
+      "cross_refs": []
+    },
+    {
+      "id": "F5",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-childcare-leave.l4",
+        "anchor": "`days of leave as announced for` (the per-child lifetime caps are NOT carried)",
+        "provisions": [
+          "CDCSA 2001 s 12B(2)(a)(i)",
+          "CDCSA 2001 s 12B(2)(a)(ii)"
+        ]
+      },
+      "source": {
+        "quote": "An employee \u2026 is not entitled to \u2014 (i) more than 42 days of childcare leave in respect of any qualifying child; (ii) more than 12 days of extended childcare leave in respect of any qualifying child",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Child Development Co-Savings Act 2001 s 12B(2)(a)(i)-(ii)",
+            "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F5a",
+          "description": "The per-child lifetime caps are not modelled on the announced arm, because they cannot be stated without knowing how the two merged entitlements map onto them. WHY THIS READING: 42 days of childcare leave plus 12 of extended is 54 over a child's eligible life. The announced scheme offers 8 to 12 days a year for twelve years, up to 96 for one child \u2014 so the existing caps cannot survive unchanged, and the announcement does not say what replaces them. Modelling a number nobody stated would be invention.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Child Development Co-Savings Act 2001 s 12B(2)(a)",
+              "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+            }
+          ]
+        },
+        {
+          "id": "F5b",
+          "description": "Carry the 42/12 caps unchanged into the announced arm.",
+          "status": "rejected",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Child Development Co-Savings Act 2001 s 12B(2)(a)",
+              "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+            }
+          ],
+          "rejection_rationale": "Would bind the announced entitlement to a ceiling the announcement contradicts, and would produce a confidently wrong answer for any parent past the cap."
+        }
+      ],
+      "taken": {
+        "reading": "F5a",
+        "mechanism": "encoded",
+        "rationale": "Taken because the announced 8-to-12 days a year for twelve years cannot coexist with a 42-plus-12-day lifetime ceiling, and the announcement does not say what replaces it. Modelling an unstated number would be invention."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "A KNOWN GAP, ON THE RECORD. The announced arm answers per relevant period only. A parent asking 'how many days do I have left for this child, ever' gets no answer from this encoding, and the Act's answer is one the announcement has overtaken.",
+        "DIVERGENCE UNASSESSED, DELIBERATELY. The rival reading is not materialised, so nothing in the case suite executes it and no witness can honestly be named. Materialising it would be the way to find out what turns on it."
+      ]
+    },
+    {
+      "id": "F6",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-childcare-leave.l4",
+        "anchor": "`is barred from leave for the child`",
+        "provisions": [
+          "CDCSA 2001 s 12B(1B)",
+          "CDCSA 2001 s 12B(1C)"
+        ]
+      },
+      "source": {
+        "quote": "A male employee is not entitled to childcare leave and extended childcare leave \u2026 if (a) the male employee is the natural father of the qualifying child; and (b) either the male employee or the natural mother \u2026 was lawfully married to another person \u2026 at the time the qualifying child was conceived.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Child Development Co-Savings Act 2001 s 12B(1B)",
+            "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+          },
+          {
+            "kind": "provision",
+            "cite": "Child Development Co-Savings Act 2001 s 12B(1C)",
+            "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F6a",
+          "description": "The s 12B(1B) bar and its s 12B(1C) cure survive the merger and are carried into both arms. WHY THIS READING: The announcement says nothing about the bar. Silence is not repeal, and a bar on entitlement is exactly the kind of provision that an amendment would have to address expressly.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Child Development Co-Savings Act 2001 s 12B(1B)",
+              "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+            }
+          ]
+        },
+        {
+          "id": "F6b",
+          "description": "The merged scheme sweeps the bar away as part of a universal entitlement for 'every working parent'.",
+          "status": "arguable",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "NDR 2026 (Singapore), 23 August 2026",
+              "url": "https://www.pmo.gov.sg/newsroom/ndr2026/"
+            }
+          ],
+          "foreclosure": "Not taken. 'Every working parent will get' is the register of a speech, not of a repealing provision; reading it as one would silently extend an entitlement Parliament has not extended. Recorded as arguable rather than rejected because the policy direction plainly points that way."
+        }
+      ],
+      "taken": {
+        "reading": "F6a",
+        "mechanism": "encoded",
+        "rationale": "Taken because silence is not repeal, and a bar on entitlement is exactly what an amendment would have to address expressly."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "Watch this one. If a Bill is introduced and does not mention s 12B(1B), the live reading is confirmed; if it repeals it, this entry settles.",
+        "DIVERGENCE UNASSESSED, DELIBERATELY. The rival reading is not materialised, so nothing in the case suite executes it and no witness can honestly be named. Materialising it would be the way to find out what turns on it."
+      ]
+    },
+    {
+      "id": "F7",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-childcare-leave.l4",
+        "anchor": "`the employer's cost as announced for`",
+        "provisions": [
+          "CDCSA 2001 s 12B(9)",
+          "CDCSA 2001 s 12B(10)",
+          "CDCSA 2001 s 12C(2)",
+          "NDR 2026 \u2014 employer cost coverage"
+        ]
+      },
+      "source": {
+        "quote": "The Government will cover the cost for all child-related leave \u2026 up to the reimbursement limit.",
+        "citations": [
+          {
+            "kind": "authority",
+            "cite": "NDR 2026 (Singapore), 23 August 2026",
+            "url": "https://www.pmo.gov.sg/newsroom/ndr2026/"
+          },
+          {
+            "kind": "provision",
+            "cite": "Child Development Co-Savings Act 2001 s 12B(10)",
+            "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+          },
+          {
+            "kind": "provision",
+            "cite": "Child Development Co-Savings Act 2001 s 12C(2)",
+            "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F7a",
+          "description": "The employee keeps receiving their gross rate of pay and the EMPLOYER bears any excess above the $500-a-day reimbursement limit. WHY THIS READING: s 12B(9)'s obligation to pay the gross rate is the baseline, and the announcement is framed as relief for EMPLOYERS ('removing the burden from employers'), not as a cut to what parents are paid. Reading the limit as a cap on the employer's reimbursement leaves the employee whole.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Child Development Co-Savings Act 2001 s 12B(9)",
+              "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+            }
+          ]
+        },
+        {
+          "id": "F7b",
+          "description": "The EMPLOYEE's entitlement is capped at $500 a day, as s 12B(10) already caps it after the third day of childcare leave, so nobody bears an excess.",
+          "status": "arguable",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Child Development Co-Savings Act 2001 s 12B(10)",
+              "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+            },
+            {
+              "kind": "provision",
+              "cite": "Child Development Co-Savings Act 2001 s 12B(10A)",
+              "url": "https://sso.agc.gov.sg/Act/CDCSA2001"
+            }
+          ],
+          "foreclosure": "Not rejected. It is the structure the Act actually uses today, and if it were carried forward the employer's residual cost would be zero and this encoding's third finding would vanish. Recorded because the finding depends on the reading."
+        }
+      ],
+      "taken": {
+        "reading": "F7a",
+        "mechanism": "encoded",
+        "rationale": "Taken because s 12B(9)'s gross-rate obligation is the baseline and the announcement is framed as relief for employers, not as a cut to what parents are paid on leave."
+      },
+      "status": "open",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "THE THIRD FINDING IN THE CONVERSION REPORT RIDES ON THIS FORK. Under F7b the employer's residual is nil and the finding is that high earners take a pay cut on leave days instead. Either way somebody bears the excess; the fork decides who.",
+        "DIVERGENCE UNASSESSED, DELIBERATELY. The rival reading is not materialised, so nothing in the case suite executes it and no witness can honestly be named. Materialising it would be the way to find out what turns on it."
+      ]
+    },
+    {
+      "id": "F8",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-csp.l4",
+        "anchor": "`the Baby Gift top-up for`",
+        "provisions": [
+          "life.gov.sg \u2014 Baby Gift top-up"
+        ]
+      },
+      "source": {
+        "quote": "Those born before 1 April 2027 who are still receiving the Baby Bonus Cash Gift will continue to do so until 31 March 2027, and thereafter they will receive a top-up by 30 April 2027 to bring the amount of support received to $10,000.",
+        "citations": [
+          {
+            "kind": "authority",
+            "cite": "life.gov.sg, SG Child Support Package",
+            "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F8a",
+          "description": "The top-up is a FLOOR: the shortfall between what has been paid and $10,000, and never negative. A child already paid more than $10,000 keeps it. WHY THIS READING: 'Bring the amount of support received to $10,000' describes raising a total, and nothing in the announcement claws money back. An administration that recovered a Cash Gift already disbursed would need a power to do it.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "life.gov.sg, SG Child Support Package",
+              "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package"
+            }
+          ]
+        },
+        {
+          "id": "F8b",
+          "description": "The Package replaces the Cash Gift with exactly $10,000, so a child paid $11,000 by 31 March 2027 would be over-compensated and adjusted down.",
+          "status": "rejected",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "life.gov.sg, SG Child Support Package",
+              "url": "https://www.life.gov.sg/family-parenting/benefits-support/sg-child-support-package"
+            }
+          ],
+          "rejection_rationale": "No source suggests recovery, and life.gov.sg's cohort table shows a top-up column, not an adjustment column."
+        }
+      ],
+      "taken": {
+        "reading": "F8a",
+        "mechanism": "encoded",
+        "rationale": "Taken because 'bring the amount of support received to $10,000' describes raising a total, and no source suggests recovery of a Cash Gift already disbursed."
+      },
+      "status": "resolved",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "Matters for a third or subsequent child born in 2023: on the enhanced schedule they pass $10,000 before 31 March 2027, so their top-up is nil and their loss is the instalments that stop.",
+        "DIVERGENCE UNASSESSED, DELIBERATELY. The rival reading is not materialised, so nothing in the case suite executes it and no witness can honestly be named. Materialising it would be the way to find out what turns on it."
+      ]
+    },
+    {
+      "id": "F9",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-child-support/sg-csp.l4",
+        "anchor": "`no Baby Bonus Cash Gift rate is encoded for a birth before 2015-01-01`",
+        "provisions": [
+          "Baby Bonus Scheme \u2014 rates for births on/after 2015-01-01"
+        ]
+      },
+      "source": {
+        "quote": "For children born on or after 1 January 2015, parents received $8,000 for the first and second child, and $10,000 for the third and subsequent birth order.",
+        "citations": [
+          {
+            "kind": "authority",
+            "cite": "madeforfamilies.gov.sg, Baby Bonus Scheme",
+            "url": "https://www.madeforfamilies.gov.sg/support-measures/child-raising/financial-support/baby-bonus-scheme"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "F9a",
+          "description": "Below 1 January 2015 the outgoing-scheme comparison REFUSES: an ASSUME bottom names the missing rate table and stops evaluation. WHY THIS READING: The Baby Bonus Scheme has been re-rated repeatedly since 2001 and this encoding holds two cohorts' rates. A refusal that names what is missing is worth more than a figure that looks measured.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "madeforfamilies.gov.sg, Baby Bonus Scheme",
+              "url": "https://www.madeforfamilies.gov.sg/support-measures/child-raising/financial-support/baby-bonus-scheme"
+            }
+          ]
+        },
+        {
+          "id": "F9b",
+          "description": "Extend the 2015 rates backwards to every earlier birth.",
+          "status": "rejected",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "madeforfamilies.gov.sg, Baby Bonus Scheme",
+              "url": "https://www.madeforfamilies.gov.sg/support-measures/child-raising/financial-support/baby-bonus-scheme"
+            }
+          ],
+          "rejection_rationale": "Would answer confidently and wrongly for eight cohorts, and the wrongness would be invisible."
+        }
+      ],
+      "taken": {
+        "reading": "F9a",
+        "mechanism": "encoded",
+        "rationale": "Taken because a refusal that names the missing rate table is worth more than a figure that looks measured and is not."
+      },
+      "status": "resolved",
+      "divergence": "unassessed",
+      "cross_refs": [],
+      "notes": [
+        "SCOPE, NOT DEFECT. The PACKAGE-side answer is total from a 2009 birth onward, because life.gov.sg's table covers that far; it is only the COMPARISON against the outgoing scheme that needs the old rates and therefore refuses. The two questions are computed by different functions for exactly this reason.",
+        "DIVERGENCE UNASSESSED, DELIBERATELY. The rival reading is not materialised, so nothing in the case suite executes it and no witness can honestly be named. Materialising it would be the way to find out what turns on it."
+      ]
+    }
+  ]
+}

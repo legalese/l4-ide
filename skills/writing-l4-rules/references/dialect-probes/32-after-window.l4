@@ -1,0 +1,11 @@
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF
+    pay HAS amount IS A NUMBER
+    deliver
+    order
+
+GIVETH A DEONTIC Person Action
+`cooling off` MEANS
+  PARTY Seller MUST deliver WITHIN 30
+  HENCE (PARTY Buyer MUST order AFTER 3 WITHIN 30)
+  LEST  BREACH

@@ -1,0 +1,10 @@
+-- l4 batch over a rule GIVEN with a TYPICALLY default
+-- (specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md, W3).
+
+@export Rule default
+GIVEN `has capacity` IS A BOOLEAN TYPICALLY TRUE
+      `is adult` IS A BOOLEAN
+GIVETH A BOOLEAN
+`can contract` MEANS `is adult` AND `has capacity`
+
+#EVAL `can contract` TRUE TRUE

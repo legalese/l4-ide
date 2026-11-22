@@ -1,0 +1,18 @@
+-- A decision with no `period` input reads a legislation parameter. It is an
+-- ETERNITY variable. openfisca-core 45.0.4 cannot calculate any formula at
+-- the period ETERNITY ("year -1 is out of range"), whether or not it reads a
+-- parameter, so it is calculated at a month, where it gives L4's answer.
+IMPORT prelude
+
+DECLARE Person HAS income IS A NUMBER
+
+@desc parameter benefits.amount
+`amount` MEANS 600
+
+@export A one-off grant, with no period
+GIVEN p IS A Person
+GIVETH A NUMBER
+`grant` p MEANS IF p's income AT MOST 1000 THEN `amount` ELSE 0
+
+#ASSERT (`grant` OF (Person WITH income IS 10)) EQUALS 600
+#ASSERT (`grant` OF (Person WITH income IS 2000)) EQUALS 0

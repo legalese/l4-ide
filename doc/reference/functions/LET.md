@@ -1,104 +1,89 @@
-# LET
+# LET and WHERE
 
-Introduces local bindings before an expression. The bindings are visible only within the IN clause.
+`LET` and `WHERE` give names to values that are used only inside one expression.
+`LET` puts the definitions before the expression; `WHERE` puts them after it.
+Use whichever matches the order of the legal text.
 
 ## Syntax
 
-```l4
+```text
 LET name IS expression IN body
-LET name1 IS expr1, name2 IS expr2 IN body
+
 LET
   name1 IS expression1
   name2 IS expression2
 IN body
+
+body
+WHERE
+  name1 MEANS expression1
+  name2 MEANS expression2
 ```
 
-## Purpose
+Several definitions go one per line, lined up in the same column; commas between them are a syntax error.
 
-LET allows you to:
+**Example files:** [let-example.l4](let-example.l4), [where-example.l4](where-example.l4)
 
-1. Name intermediate values before using them
-2. Break complex expressions into readable parts
-3. Create local scope for temporary variables
-
-## Examples
-
-**Example file:** [let-example.l4](let-example.l4)
-
-### Single Binding
+## LET
 
 ```l4
-DECIDE result IS
-  LET x IS 5
-  IN x TIMES 2
-```
-
-### Multiple Bindings (Inline)
-
-```l4
-DECIDE result IS
-  LET x IS 5, y IS 10
-  IN x PLUS y
-```
-
-### Multiple Bindings (Multi-line)
-
-```l4
-DECIDE result IS
+GIVEN price IS A NUMBER
+GIVETH A NUMBER
+`total price` price MEANS
   LET
-    x IS 5
-    y IS 10
-    z IS 15
-  IN x PLUS y PLUS z
+    `the tax` IS price TIMES 0.2
+    `the fee` IS 5
+  IN price PLUS `the tax` PLUS `the fee`
 ```
 
-### Forward References
-
-Bindings can reference earlier bindings:
+After `LET`, a definition can use `IS`, `BE`, `MEAN`, `MEANS` or `=`:
 
 ```l4
-DECIDE result IS
+DECIDE `the sum` IS
   LET
-    x IS 5
-    y IS x TIMES 2
-    z IS y PLUS 3
-  IN z
+    a IS 1
+    b BE 2
+    c MEAN 3
+    d MEANS 4
+    e = 5
+  IN a PLUS b PLUS c PLUS d PLUS e
 ```
 
-## Binding Keywords
-
-Multiple keywords can introduce bindings:
+## WHERE
 
 ```l4
-LET
-  a IS 1
-  b BE 2
-  c MEAN 3
-  d MEANS 4
-  e = 5
-IN a PLUS b PLUS c PLUS d PLUS e
+GIVEN radius IS A NUMBER
+GIVETH A NUMBER
+`area of a circle` radius MEANS
+  `pi` TIMES radius TIMES radius
+  WHERE
+    `pi` MEANS 3.14159
 ```
 
-## LET vs WHERE
-
-- **LET** - Definitions come before the main expression
-- **WHERE** - Definitions come after the main expression
+A definition under `WHERE` can take inputs, so it can be a local function, with or without its own `GIVEN` and `GIVETH`:
 
 ```l4
--- Using LET (definitions before)
-result1 MEANS LET x IS 1, y IS 2 IN x PLUS y
-
--- Using WHERE (definitions after)
-result2 MEANS x PLUS y WHERE x MEANS 1, y MEANS 2
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`sum of squares` a b MEANS
+  `square of` a PLUS `square of` b
+  WHERE
+    GIVEN n IS A NUMBER
+    GIVETH A NUMBER
+    `square of` n MEANS n TIMES n
 ```
 
-## Related Keywords
+A `WHERE` can be nested inside a definition under another `WHERE`.
 
-- **[WHERE](WHERE.md)** - Alternative local binding syntax
-- **[MEANS](MEANS.md)** - Alternative assignment keyword
+## Scope
 
-> Note: IN, IS, and BE are part of the LET syntax, not separate keyword pages.
+- The names are visible only in the expression they belong to: after `IN` for `LET`, and in the body above for `WHERE`.
+- Definitions in one `LET` or one `WHERE` can refer to each other, in any order.
+- They can use the function's `GIVEN` inputs and any name defined outside.
+- A rule written as [several clauses](DECIDE.md#several-clauses) cannot be defined inside `LET` or `WHERE`.
 
-## See Also
+## Related pages
 
-- **[Syntax: Local Declarations](../syntax/README.md)** - Scope rules
+- [DECIDE](DECIDE.md) and [MEANS](MEANS.md): top-level definitions
+- [Error messages: I could not find a definition for the identifier](../errors/README.md#i-could-not-find-a-definition-for-the-identifier)

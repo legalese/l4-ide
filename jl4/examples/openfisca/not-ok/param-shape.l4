@@ -1,0 +1,19 @@
+-- A @desc parameter whose body is not a literal or a year-guarded choice of
+-- literals. The export used to leave such a value unregistered, and its
+-- callers then failed with an unrelated message. The export must REFUSE it,
+-- naming the parameter.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@desc parameter taxes.flat
+GIVETH A NUMBER
+`flat amount` MEANS 100 PLUS 5
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`tax` p period MEANS `flat amount`
+
+#ASSERT (`tax` OF (Person WITH salary IS 0), "2026-01") EQUALS 105

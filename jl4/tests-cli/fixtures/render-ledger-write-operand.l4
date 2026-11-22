@@ -1,0 +1,128 @@
+-- A ledger write given to something larger. unstable's render says a write as
+-- "V, recorded as C": its value comes first and no word of its own opens it,
+-- so ", recorded as C" can attach to whatever comes before the value. Each
+-- pair below records a different value and read alike before a write was
+-- bracketed wherever it is part of something larger: an argument of a call, a
+-- sentence's slot in any position, an operand of a comparison or of OR, a
+-- branch of an IF, an element of a list.
+-- The l4-cli-test block "l4 render brackets a ledger write given to something
+-- larger" reads each row. No #EVAL here: render's output is the rules alone.
+
+IMPORT prelude
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`plain1` x MEANS x PLUS 1
+
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`plain2` x y MEANS x PLUS y
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+@nlg pay %x%
+`pay` x MEANS x PLUS 2
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+@nlg %x%
+`bare` x MEANS x PLUS 4
+
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+`minimum of` x y MEANS x PLUS y
+
+GIVEN a IS A BOOLEAN
+GIVETH A BOOLEAN
+`fb` a MEANS a
+
+-- A call with no sentence: its argument, last or not.
+GIVETH A NUMBER
+`call of a record` MEANS `plain1` (RECORD `balance` IS 100)
+GIVETH A NUMBER
+`record of a call` MEANS RECORD `balance` IS (`plain1` 100)
+GIVETH A NUMBER
+`second argument record` MEANS `plain2` 100 (RECORD `balance` IS 3)
+GIVETH A NUMBER
+`record of two arguments` MEANS RECORD `balance` IS (`plain2` 100 3)
+GIVETH A NUMBER
+`first argument record` MEANS `plain2` (RECORD `balance` IS 100) 3
+GIVETH A NUMBER
+`preposition of a record` MEANS `minimum of` 3 (RECORD `balance` IS 100)
+GIVETH A NUMBER
+`record of a preposition` MEANS RECORD `balance` IS (`minimum of` 3 100)
+GIVEN p IS A BOOLEAN
+DECIDE `condition of a record` p IF `fb` (RECORD `flag` IS p)
+GIVEN p IS A BOOLEAN
+DECIDE `record of a condition` p IF RECORD `flag` IS (`fb` p)
+
+-- A sentence's slot that nothing follows.
+GIVETH A NUMBER
+`sentence of a record` MEANS `pay` (RECORD `balance` IS 100)
+GIVETH A NUMBER
+`record of a sentence` MEANS RECORD `balance` IS (`pay` 100)
+GIVETH A NUMBER
+`bare of a record` MEANS `bare` (RECORD `balance` IS 100)
+GIVETH A NUMBER
+`record of a bare` MEANS RECORD `balance` IS (`bare` 100)
+
+-- A comparison.
+GIVEN p IS A BOOLEAN
+DECIDE `compare to a record` p IF p EQUALS (RECORD `flag` IS TRUE)
+GIVEN p IS A BOOLEAN
+DECIDE `record of a comparison` p IF RECORD `flag` IS (p EQUALS TRUE)
+
+-- Anywhere else inside something larger: an operand of OR in a slot, a
+-- branch of an IF, an element of a list.
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`total` xs MEANS sum xs
+
+GIVEN p IS A BOOLEAN
+GIVETH A BOOLEAN
+@nlg %p% is shown
+`shown` p MEANS p
+
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+DECIDE `or of a record` p q IF `shown` (p OR (RECORD `flag` IS q))
+GIVEN p IS A BOOLEAN
+      q IS A BOOLEAN
+DECIDE `record of an or` p q IF `shown` (RECORD `flag` IS (p OR q))
+GIVEN c IS A BOOLEAN
+GIVETH A NUMBER
+`branch of a record` c MEANS `total` (LIST (IF c THEN 1 ELSE (RECORD `balance` IS 3)))
+GIVEN c IS A BOOLEAN
+GIVETH A NUMBER
+`record of a branch` c MEANS `total` (LIST (RECORD `balance` IS (IF c THEN 1 ELSE 3)))
+GIVETH A NUMBER
+`element of a record` MEANS `total` (LIST 1, (RECORD `balance` IS 2))
+GIVETH A NUMBER
+`record of a list` MEANS RECORD `balance` IS (`total` (LIST 1, 2))
+
+-- A write on its own reads as it did. One laid out as an item of a list is
+-- part of something larger too, and keeps its brackets (a stated cost).
+GIVETH A NUMBER
+`a write alone` MEANS RECORD `balance` IS 100
+GIVEN p IS A BOOLEAN
+DECIDE `an item of a list` p IF p AND (RECORD `flag` IS TRUE)
+
+-- A wrapper that brackets its argument itself, a maths function's f(x) and a
+-- deontic action's argument, gives a write one pair of brackets, not two.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+abs x MEANS IF x < 0 THEN 0 - x ELSE x
+
+GIVETH A NUMBER
+`abs of a record` MEANS abs (RECORD `balance` IS 4)
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Pay HAS amt IS A NUMBER
+
+GIVETH A DEONTIC Actor Action
+`pay a record` MEANS PARTY Landlord OF "x" MUST Pay (RECORD `balance` IS 3) WITHIN 14

@@ -11,6 +11,7 @@ import qualified Base.Map as Map
 import qualified Base.Set as Set
 import qualified Base.Text as Text
 
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Monoid (Alt (..))
 import qualified Data.Scientific as Sci
 import Data.Char hiding (Space)
@@ -20,6 +21,7 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.State ( initialPosState )
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 import L4.Parser.SrcSpan
+import qualified L4.SmartPunctuation as SP
 
 type Lexer = Parsec Void Text
 
@@ -64,6 +66,29 @@ newtype LangTag = MkLangTag Text
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (ToExpr, NFData)
 
+-- | The language part of a tag, before its first hyphen: the @he@ of @he-IL@.
+langPrimary :: LangTag -> Text
+langPrimary (MkLangTag t) = Text.takeWhile (/= '-') t
+
+-- | How closely a wording's language answers a request for another, or
+-- 'Nothing' when it does not answer it at all. Lower is closer:
+--
+-- * 0, the same tag;
+-- * 1, the wording's tag is a prefix of the request: @he@ answers @he-IL@;
+-- * 2, the two share their language: @he-IL@ answers @he@, and @he-IL@
+--   answers @he-XX@.
+--
+-- Every reader that asks "is this wording in that language" goes through
+-- this, so a wording tagged @he-IL@ is picked by @--lang he@, and the Hebrew
+-- frame words reach it, without each reader deciding that again. The tags are
+-- compared as written, as everywhere else: @HE@ is not @he@.
+langMatchRank :: LangTag -> LangTag -> Maybe Int
+langMatchRank want@(MkLangTag w) have@(MkLangTag h)
+  | want == have                        = Just 0
+  | (h <> "-") `Text.isPrefixOf` w      = Just 1
+  | langPrimary want == langPrimary have = Just 2
+  | otherwise                           = Nothing
+
 data TDirectives
   = TLazyEvalDirective
   | TLazyEvalTraceDirective
@@ -94,6 +119,10 @@ data TAnnotations
   | TExport       !Text -- ^ "@export"
   | TFixity       !FixityDirection !Text -- ^ "@infixl" / "@infixr" / "@infix"
   | TNonexhaustive      !Text -- ^ "@nonexhaustive"
+  | TNonassertable
+    -- ^ @\@nonassertable@: the definition below may not be asserted by a
+    -- request (PRESUMPTION-ASSERTION contract §6). Its own token, so that a
+    -- @\@desc@ whose text happens to start with the word cannot stand in for it.
   | TLang         !LangTag !Text
     -- ^ @\@lang he@ — the module's default language, the one an untagged
     -- @\@nlg@ in that module is written in. The 'Text' is the RAW remainder
@@ -262,6 +291,9 @@ data TKeywords
   | TKTypically
   | TKEvery      -- ^ @EVERY@: the quantified deonton head (EVERY-EACH-QUANTIFIER-SPEC §2.4)
   | TKWho        -- ^ @WHO@: the quantifier filter (spec §2.1)
+  | TKWhose      -- ^ @WHOSE@: the possessive quantifier filter, whose operands
+                 -- name FIELDS of the cast by position (spec §13.6, ruled
+                 -- 2026-09-21)
   | TKOnce       -- ^ @ONCE@: the barrier\/threshold join, @ONCE ALL HAVE@ (spec §2.2.7.4, R-T1)
   | TKHave       -- ^ @HAVE@: @ONCE ALL HAVE@ (spec §2.2.7.4)
   | TKSome       -- ^ @SOME@: @SOME m OF@ (spec §2.2.7.4, R-T5); lexed now, parsed in phase 3
@@ -368,6 +400,7 @@ keywords = Map.fromList
   , ("TYPICALLY"  , TKTypically  )
   , ("EVERY"      , TKEvery      )
   , ("WHO"        , TKWho        )
+  , ("WHOSE"      , TKWhose      )
   , ("ONCE"       , TKOnce       )
   , ("HAVE"       , TKHave       )
   , ("SOME"       , TKSome       )
@@ -416,6 +449,14 @@ data TSpaces
   = TSpace        !Text
   | TLineComment  !Text
   | TBlockComment !Text
+  | TIgnoredAnnotation !Text !Text
+    -- ^ @\@name rest@: an annotation line this version of L4 cannot use. Either
+    -- the name is not one of 'knownAnnotationHeralds', or it is one and the line
+    -- does not have the form it needs (a bare @\@lang@). The first field is the
+    -- name WITHOUT the @\@@; the second is the rest of the line, verbatim, which
+    -- an annotation always takes ('lineAnno'). It is trivia, as a comment is, so
+    -- no parser position can reject it and exactprint reproduces it byte for
+    -- byte; a warning ("L4.IgnoredAnnotation") is the only trace it leaves.
   | EOF
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
@@ -445,8 +486,78 @@ data TokenType
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
+-- | The annotation names the editor offers as completions ("LSP.L4.Actions").
+-- Four of them: this is NOT the list of annotations the lexer knows, which is
+-- 'knownAnnotationHeralds'.
 annotations :: [Text]
 annotations = ["nlg", "ref", "ref-map", "ref-src"]
+
+-- | The name (without the @\@@) of every annotation this version of L4 knows.
+--
+-- Two things read this and must agree with the lexers below: 'ignoredAnnotation'
+-- lexes any @\@name@ the lexers above it refused as trivia, and the warning for
+-- an unknown one suggests the nearest of these (a known name is warned about as
+-- malformed instead). "UnknownAnnotationSpec" reads a name off a token of every
+-- kind, by a function that must cover every constructor, and checks that the
+-- set of names is this list: an annotation added to the lexer and not here, or
+-- here and not to the lexer, fails that test.
+knownAnnotationHeralds :: [Text]
+knownAnnotationHeralds =
+  [ "desc", "export", "infix", "infixl", "infixr", "lang", "nlg"
+  , "nonassertable", "nonexhaustive", "ref", "ref-map", "ref-src"
+  ]
+
+-- | The name after the @\@@ of an annotation: a letter, then letters, digits
+-- and underscores, with hyphens allowed BETWEEN those, the way @ref-src@ is
+-- spelled. A hyphen not followed by one of them ends the name, so @\@desc-- note@
+-- is @\@desc@ and a comment.
+annotationName :: Lexer Text
+annotationName =
+  Text.cons <$> satisfy isAlpha <*> (Text.concat <$> many (nameWord <|> try hyphenatedWord))
+  where
+    nameWord = takeWhile1P (Just "annotation name character") isAnnotationNameChar
+    hyphenatedWord = Text.cons <$> char '-' <*> nameWord
+
+-- | A character that can continue an annotation's name (after a letter).
+isAnnotationNameChar :: Char -> Bool
+isAnnotationNameChar c = isAlphaNum c || c == '_'
+
+-- | An annotation line no annotation lexer above accepted: @\@name@, then the
+-- rest of the line. Lexed as trivia and warned about, as GHC treats an unknown
+-- @{-# FOO #-}@ pragma ('-Wunrecognised-pragmas'), so that a module written for
+-- a newer L4 still loads, checks and highlights in an older one.
+--
+-- That covers two cases, told apart only by the warning ("L4.IgnoredAnnotation"
+-- looks the name up in 'knownAnnotationHeralds'):
+--
+--   * a name L4 has no annotation for (@\@exprot@, or one from a newer L4);
+--   * a name it does know whose own lexer refused the line. Only @\@lang@ can
+--     be refused: the rest accept a bare herald, a trailing space, a tab and a
+--     non-ASCII letter after them. A bare @\@lang@,
+--     @\@lang<TAB>en@ and a non-ASCII code are plausible typos, and a lexer
+--     error on any of them leaves the file with no semantic tokens at all.
+--
+-- Nothing is stricter than "an @\@, then a letter". An @\@ followed by anything
+-- else is not the shape of an annotation, so no annotation of any version can
+-- take that form, and it stays a lexer error.
+--
+-- Order matters: this is a 'spacesPayload' alternative, and 'tokenPayload' tries
+-- 'annotationsPayload' first, so a well-formed known annotation never reaches it.
+--
+-- The annotation shape (an @\@, then a letter) is decided by looking ahead, and a
+-- line that does not have it fails here at the @\@ having said nothing. That
+-- matters for the one error that remains: megaparsec keeps the failure that got
+-- furthest, so a 'try' that consumed the @\@ before failing left its own
+-- failure behind and the message read "expecting end of input or whitespace",
+-- where it used to list every token that could have stood there. Once the shape
+-- is confirmed nothing below can fail.
+ignoredAnnotation :: Lexer TSpaces
+ignoredAnnotation = do
+  isAnnotation <- lookAhead ((True <$ try (char '@' *> satisfy isAlpha)) <|> pure False)
+  unless isAnnotation empty
+  _ <- char '@'
+  name <- annotationName
+  TIgnoredAnnotation name <$> takeWhileP (Just "character") (/= '\n')
 
 nlgAnnotation :: Lexer (Maybe LangTag, Text, AnnoType)
 nlgAnnotation =
@@ -528,6 +639,19 @@ fixityAnnotation =
 
 nonexhaustiveAnnotation :: Lexer Text
 nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
+
+-- | @\@nonassertable@ takes nothing: it is the herald alone, and whatever
+-- follows it on the line is read as source. So a definition written after it
+-- on the same line is still parsed (and the mark is then reported as not on a
+-- line of its own), and prose after it is a parse error; a line annotation
+-- would swallow both silently.
+--
+-- 'try', because the herald has been consumed when the next character is
+-- refused, and an alternative that fails after consuming ends the whole lexer
+-- instead of letting 'ignoredAnnotation' read @\@nonassertablex@ as an
+-- annotation this version does not know.
+nonassertableAnnotation :: Lexer ()
+nonassertableAnnotation = () <$ try (string "@nonassertable" <* notFollowedBy (satisfy (\ c -> isAlphaNum c || c == '_')))
 
 -- | A run of literal text inside an NLG annotation.
 --
@@ -827,6 +951,7 @@ annotationsPayload = asum
   , TExport       <$> exportAnnotation
   , uncurry TFixity <$> fixityAnnotation
   , TNonexhaustive      <$> nonexhaustiveAnnotation
+  , TNonassertable      <$  nonassertableAnnotation
   , (\ (mtag, t, ty) -> TNlg mtag t ty) <$> nlgAnnotation
   , uncurry TRef  <$> refAnnotation
   ]
@@ -836,6 +961,7 @@ spacesPayload = asum
   [ TSpace        <$> whitespace
   , TLineComment  <$> lineComment
   , TBlockComment <$> blockComment
+  , ignoredAnnotation
   ]
 
 symbolsPayload :: Lexer TSymbols
@@ -914,7 +1040,135 @@ execLexer :: NormalizedUri -> Text -> Either (NonEmpty PError) [PosToken]
 execLexer uri input =
   case parse (rawTokens <* eof) (showNormalizedUri uri) input of
     Right rtoks -> Right (mkPosTokens Nothing uri input rtoks)
-    Left errs   -> Left (fmap (mkPError "lexer") $ errorBundleToErrorMessages errs)
+    Left errs   ->
+      Left $ case confusableLexError input errs of
+        -- A confusable character gets the word-processor-aware message and
+        -- structured fixes instead of megaparsec's default "unexpected …,
+        -- expecting …" list — see 'confusableLexError'. Megaparsec stops at
+        -- the first lexer error (its token stream is 'many'-based, not
+        -- backtracking), so there is at most one lexer 'PError' either way.
+        Just pErr -> pErr :| []
+        -- A lexer error is about a raw character, which is user text: it has
+        -- no token kind to name.
+        Nothing   -> bundleToPErrors "lexer" (const Nothing) errs
+
+-- | When the lexer's first failure sits on a character
+-- 'L4.SmartPunctuation.lookupConfusable' recognises, build the
+-- word-processor-aware 'PError' for it instead of megaparsec's default: name
+-- the glyph, offer a quick fix that replaces it, and — for an opening curly
+-- quote — look ahead on the same line for its matching closer and offer a
+-- single fix that straightens the whole pair at once (the same pairing
+-- rustc gives @“…”@). 'Nothing' when the failure is not on a confusable
+-- character, in which case the caller falls back to megaparsec's own
+-- message: this is additive only on the failure path, so a document that
+-- lexes today keeps lexing exactly as it did.
+--
+-- __The dash's two spellings are ordered by 'SP.dashReplacementFor', not
+-- fixed.__ Whichever spelling that heuristic would pick for THIS dash's own
+-- position (comment-shaped, or not) is listed — and therefore preferred,
+-- see 'LSP.L4.Handlers.lexErrorCodeActions' — first, so the per-diagnostic
+-- quick fix agrees with what the whole-document straighten action
+-- ('L4.SmartPunctuation.straightenWith') would have done for the identical
+-- character in the identical position. Getting this wrong is not cosmetic:
+-- a client that auto-applies the preferred fix on a dash that starts a
+-- @--@ comment must not turn it into a plain hyphen, which would still fail
+-- to parse.
+confusableLexError :: Text -> ParseErrorBundle Text Void -> Maybe PError
+confusableLexError input ParseErrorBundle{ bundleErrors, bundlePosState } = do
+  err <- case bundleErrors of
+    e :| _ -> Just e
+  off <- case err of
+    TrivialError o _ _ -> Just o
+    FancyError _ _      -> Nothing
+  guard (off < Text.length input)
+  let ch = Text.index input off
+  c <- SP.lookupConfusable ch
+  let pst1       = reachOffsetNoLine off bundlePosState
+      pst2       = reachOffsetNoLine (off + 1) pst1
+      startPos   = convertPos (pstateSourcePos pst1)
+      endPos     = convertPos (pstateSourcePos pst2)
+      span_      = MkSrcSpan startPos endPos
+      lineBefore = Text.takeWhileEnd (/= '\n') (Text.take off input)
+      singleFix = MkLexFix
+        { title = "Replace with `" <> c.replacement <> "`"
+        , edits = [(span_, c.replacement)]
+        }
+      dashFixes = case c.altReplacement of
+        Nothing              -> [singleFix]
+        Just (alt, altTitle) ->
+          let altFix = MkLexFix altTitle [(span_, alt)]
+          in if SP.dashReplacementFor lineBefore c == alt
+               then [altFix, singleFix]
+               else [singleFix, altFix]
+      pairFixes = maybe [] (: []) (pairedQuoteFix input off ch startPos)
+  pure PError
+    { message = SP.confusableMessage lineBefore c
+    , range = span_
+    , origin = "lexer"
+    , fixes = pairFixes <> dashFixes
+    , code = parseErrorCode (const Nothing) err
+    }
+
+-- | For an OPENING curly quote (@‘@ or @“@), look ahead on the REST OF THE
+-- LINE for its matching CLOSING curly quote and, if found, offer one fix
+-- that straightens both characters at once — so accepting it repairs a
+-- whole string literal or backtick name in one action, the way rustc and
+-- swiftc pair @“@/@”@. Column arithmetic (rather than a second
+-- 'reachOffsetNoLine' walk) is safe here precisely because both characters
+-- are asserted to be on the same line.
+pairedQuoteFix :: Text -> Offset -> Char -> SrcPos -> Maybe LexFix
+pairedQuoteFix input off ch startPos = do
+  closeCh <- SP.pairedQuoteCloser ch
+  let restOfLine = Text.takeWhile (/= '\n') (Text.drop (off + 1) input)
+  relIdx <- Text.findIndex (== closeCh) restOfLine
+  openC  <- SP.lookupConfusable ch
+  closeC <- SP.lookupConfusable closeCh
+  let openSpan  = MkSrcSpan startPos (startPos { column = startPos.column + 1 })
+      closeCol  = startPos.column + 1 + relIdx
+      closeStart = MkSrcPos startPos.line closeCol
+      closeSpan  = MkSrcSpan closeStart (closeStart { column = closeCol + 1 })
+  pure MkLexFix
+    { title = "Straighten this pair of quotes"
+    , edits = [(openSpan, openC.replacement), (closeSpan, closeC.replacement)]
+    }
+
+-- | The whole-document repair described atop "L4.SmartPunctuation": the
+-- concrete, real-lexer-backed instantiation of
+-- 'L4.SmartPunctuation.straightenWith' (see that module's header for why
+-- this wiring lives here rather than there). Lexes; while the first failure
+-- sits on a confusable, replaces it and lexes again; then, once the
+-- document lexes cleanly, also replaces every no-break space found inside a
+-- successfully-lexed whitespace ('TSpace') token. Returns the number of
+-- replacements made and the final text — the accepted design is one
+-- whole-document 'Language.LSP.Protocol.Types.TextEdit', because @…@ -> @...@
+-- and @—@ -> @--@ both change the text's length, so per-edit ranges could
+-- not be mapped back through earlier replacements.
+straightenDocument :: NormalizedUri -> Text -> (Int, Text)
+straightenDocument uri input = (n + m, final)
+  where
+    (n, straightened) = SP.straightenWith SP.defaultStraightenIterationCap firstErrorPos input
+    (m, final)         = replaceNbsp straightened
+
+    firstErrorPos t = case execLexer uri t of
+      Right _         -> Nothing
+      Left (e :| _)   -> Just e.range.start
+
+    replaceNbsp t = case execLexer uri t of
+      -- Still fails after the fixed point (a non-confusable error, or the
+      -- iteration cap was hit): leave whitespace alone rather than guess.
+      Left _     -> (0, t)
+      Right toks -> replaceAt nbspOffsets t
+        where
+          nbspOffsets = Set.fromList
+            [ SP.offsetOfSrcPos t range.start
+            | pt <- toks
+            , TSpaces (TSpace txt) <- [computedPayload pt]
+            , range <- SP.nbspHitsInToken uri pt.range.start txt
+            ]
+          replaceAt offs txt =
+            ( Set.size offs
+            , Text.pack [ if i `Set.member` offs then ' ' else ch | (i, ch) <- zip [0 ..] (Text.unpack txt) ]
+            )
 
 execNlgLexer :: SourcePos -> NormalizedUri -> Text -> Either (ParseErrorBundle Text Void) [PosToken]
 execNlgLexer offset uri input = do
@@ -1144,11 +1398,37 @@ data PError
     { message :: Text
     , range :: SrcSpan
     , origin :: Text
+    , fixes :: [LexFix]
+      -- ^ Structured quick fixes for this error, currently only populated by
+      -- 'confusableLexError'. Every other producer of a 'PError' — 'mkPError'
+      -- itself, and every parser-level error in "L4.Parser" that goes
+      -- through it — sets this to @[]@; a diagnostic with no fixes simply
+      -- offers no code action.
+    , code :: Text
+      -- ^ The stable diagnostic code ('parseErrorCode').
     }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+  deriving anyclass (NFData)
+  -- ^ 'NFData' (and, via 'Generic', 'Typeable' for free) so a 'PError' can be
+  -- attached to a 'LSP.Core.Types.Diagnostics.FileDiagnostic' as its typed
+  -- source ('LSP.Core.Types.Diagnostics.messageOfL'), the way
+  -- 'L4.TypeCheck.Types.CheckErrorWithContext' already is — that is how
+  -- "LSP.L4.Handlers" recovers a lexer error's structured 'fixes' to build
+  -- its code actions.
 
-mkPError :: Text -> (Text, SourcePos, SourcePos) -> PError
-mkPError orig (m, s, e) =
+-- | One quick fix a lexer 'PError' can carry: a title for the editor's menu
+-- and the (possibly several — see 'pairedQuoteFix') text replacements that
+-- carry it out, each a span in the ORIGINAL source and its replacement text.
+data LexFix
+  = MkLexFix
+    { title :: Text
+    , edits :: [(SrcSpan, Text)]
+    }
+  deriving (Show, Eq, Ord, Generic)
+  deriving anyclass (NFData)
+
+mkPError :: Text -> Text -> (Text, SourcePos, SourcePos) -> PError
+mkPError orig errCode (m, s, e) =
   PError
     { message = m
     , range = MkSrcSpan
@@ -1164,7 +1444,112 @@ mkPError orig (m, s, e) =
             }
       }
     , origin = orig
+    , fixes = []
+    , code = errCode
     }
+
+-- | The errors of a bundle, in order, each with its code. The first argument
+-- says where they came from; the second names the kind of a token of the
+-- stream, or 'Nothing' if a token of this stream has no kind that is safe to
+-- put in a code.
+bundleToPErrors ::
+  ( VisualStream s
+  , TraversableStream s
+  , ShowErrorComponent e
+  ) =>
+  Text -> (Token s -> Maybe Text) -> ParseErrorBundle s e -> NonEmpty PError
+bundleToPErrors orig tokenKind bundle =
+  NonEmpty.zipWith
+    (mkPError orig . parseErrorCode tokenKind)
+    (bundleErrors bundle)
+    (errorBundleToErrorMessages bundle)
+
+-- | The stable diagnostic code of a parse error, read from the error itself and
+-- never from its rendered text. See 'L4.TypeCheck.Types.checkErrorCode' for
+-- what a code promises.
+--
+-- A code must not contain anything the user wrote, so that tools can group by
+-- it. An unexpected token contributes its KIND ('tokenKindSlug'). A 'Label' is
+-- free text from a parser, which may quote the source, so it is not used.
+-- Anything else, such as the messages of 'fail', is @parse/syntax-error@.
+parseErrorCode :: (Token s -> Maybe Text) -> ParseError s e -> Text
+parseErrorCode tokenKind = \ case
+  TrivialError _ (Just (Tokens (t :| _))) _ -> maybe syntaxError unexpectedCode (tokenKind t)
+  TrivialError _ (Just EndOfInput) _        -> unexpectedCode endOfInputSlug
+  TrivialError _ (Just (Label _)) _         -> syntaxError
+  TrivialError _ Nothing _                  -> syntaxError
+  FancyError _ fancy
+    | any isIndentationError fancy -> "parse/indentation"
+    | otherwise                    -> syntaxError
+ where
+  syntaxError = "parse/syntax-error"
+  unexpectedCode kind = "parse/unexpected-" <> kind
+  isIndentationError = \ case
+    ErrorIndentation {} -> True
+    _                   -> False
+
+endOfInputSlug :: Text
+endOfInputSlug = "end-of-input"
+
+-- | The kind of a token, for a code such as @parse/unexpected-WITH@. A keyword
+-- is its own kind, spelled as the language spells it. Every other token is
+-- named by a fixed word: an identifier or a literal must never appear as what
+-- the user wrote. Exhaustive on purpose, so that a new token has to be named.
+tokenKindSlug :: TokenType -> Text
+tokenKindSlug tt = case tt of
+  TKeywords _   -> displayTokenType tt
+  TDirectives _ -> "directive"
+  TAnnotations _ -> "annotation"
+  TLiterals lit -> case lit of
+    TIntLit {}      -> "number"
+    TRationalLit {} -> "number"
+    TStringLit {}   -> "string"
+  TSpaces spaces -> case spaces of
+    TSpace {}        -> "whitespace"
+    TLineComment {}  -> "comment"
+    TBlockComment {} -> "comment"
+    TIgnoredAnnotation {} -> "annotation"
+    EOF              -> endOfInputSlug
+  TIdentifiers ident -> case ident of
+    TIdentifier {} -> "identifier"
+    TQuoted {}     -> "identifier"
+    TGenitive      -> "genitive"
+  TSymbols sym -> case sym of
+    TRefOpen         -> "ref-open"
+    TRefClose        -> "ref-close"
+    TNlgOpen         -> "open-bracket"
+    TNlgClose        -> "close-bracket"
+    TParagraph       -> "section-sign"
+    TBullet          -> "bullet"
+    TPOpen           -> "open-paren"
+    TPClose          -> "close-paren"
+    TCOpen           -> "open-brace"
+    TCClose          -> "close-brace"
+    TComma           -> "comma"
+    TSemicolon       -> "semicolon"
+    TDot             -> "dot"
+    TEllipsis        -> "ellipsis"
+    TEllipsisOr      -> "ellipsis-or"
+    TColon           -> "colon"
+    TPercent         -> "percent"
+    TCopy (Just tt') -> tokenKindSlug tt'
+    TCopy Nothing    -> "caret"
+    TOtherSymbolic _ -> "symbol"
+  TOperators op -> case op of
+    TTimes         -> "times"
+    TPlus          -> "plus"
+    TMinus         -> "minus"
+    TGreaterEquals -> "greater-equals"
+    TLessEquals    -> "less-equals"
+    TGreaterThan   -> "greater-than"
+    TLessThan      -> "less-than"
+    TEquals        -> "equals"
+    TEqualsEquals  -> "double-equals"
+    TNotEquals     -> "not-equals"
+    TAnd           -> "and"
+    TOr            -> "or"
+    TImplies       -> "implies"
+    TDividedBy     -> "divided-by"
 
 errorBundleToErrorMessages ::
   forall s e.
@@ -1335,6 +1720,7 @@ displayTokenType = \case
     TSpace t          -> t
     TLineComment t    -> t
     TBlockComment t   -> t
+    TIgnoredAnnotation name rest -> "@" <> name <> rest
     EOF               -> ""
   TLiterals lit -> case lit of
     TIntLit t _i      -> t
@@ -1351,6 +1737,7 @@ displayTokenType = \case
     TExport t         -> "@export" <> t
     TFixity dir t     -> fixityHerald dir <> t
     TNonexhaustive t        -> "@nonexhaustive" <> t
+    TNonassertable          -> "@nonassertable"
     TLang _ raw       -> "@lang" <> raw
   TIdentifiers i -> case i of
     TGenitive         -> "'s"
@@ -1399,6 +1786,9 @@ posTokenCategory = \ case
   TSpaces EOF -> CEOF
   TSpaces TLineComment {} -> CComment
   TSpaces TBlockComment {} -> CComment
+  -- Ignored, as a comment is: an editor that greys it out says what the
+  -- warning says.
+  TSpaces TIgnoredAnnotation {} -> CComment
   TSpaces TSpace {} -> CWhitespace
   TLiterals TStringLit {} -> CStringLit
   TLiterals TIntLit {} -> CNumberLit

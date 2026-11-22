@@ -1,0 +1,165 @@
+{
+  "kind": "source-bundle",
+  "bundle_version": 1,
+  "subject": "sg-miles-card",
+  "citation": "Issuer terms and conditions for Singapore consumer credit/debit card reward programmes (DBS yuu, DBS Woman's / Woman's World, Citi Rewards 10X, HSBC Revolution, UOB Lady's, PAssion POSB Debit), as published by the issuers and retrieved 2026-09-21. Private contract terms, not law.",
+  "retrieved": "2026-09-21",
+  "note": "SIX FACTS A READER OF THIS BUNDLE NEEDS.\n\n(1) THE DOCUMENTS CARRY INDEPENDENT DATES, and there is no bundle-wide currency banner. The bundle-level in_force names the newest document only. Each document's own line, verbatim from the pdftotext -layout extraction beside it: dbs-yuu-card-tnc — 'Updated on 7 August 2026'; dbs-womans-card-tnc — 'Updated 27 Jul 2026'; citi-rewards-10x-tnc — 'Effective 1 April 2024'; citi-rewards-10x-faq — 'Effective 1 April 2024'; citi-rewards-exclusion-list — 'Updated November 2024. With effect from 16 December 2024.'; hsbc-revolution-reward-points-tnc — 'Effective from 1 April 2026'; posb-passion-yuu-tnc — 'Updated as of 30 May 2025'; uob-ladys-cards-tnc — 'United Overseas Bank Limited Co. Reg. No. 193500026Z. Updated in August 2025 (Version 1.1)'. hsbc-revolution-faq and uob-ladys-faq state NO currency line anywhere; that absence is recorded on each as covers_absent_reason and is itself a finding in the external-modification register.\n\n(2) THE HOUSEHOLD CHEAT SHEET ([S5] of the spec) IS NOT A DOCUMENT OF THIS BUNDLE, and its absence is deliberate twice over. It lives at 'Dropbox/Chun Wong/Cards/miles-card-cheat-sheet.md', it belongs to a third party (Alexis), it is read-only to this project and is deliberately not committed — so no sha256 and no local_path can be given for it. The schema's rule integrity-digest-or-immutable-capture requires that a document with no digest carry an archive_url, and there is no archive capture of a private file; a documents[] entry for it could therefore only be written by breaking that rule. It is recorded here instead. Its role in the exercise is unchanged: it is the SECONDARY source whose claims the encoding tests as property assertions against the primary terms below (spec §1, §4.1, §4.2), so it is evidence about the documents rather than one of them.\n\n(3) THREE T&Cs THE SPEC LISTS AS 'STILL TO OBTAIN' ARE ABSENT: Standard Chartered Smart Card, UOB PRVI Miles and Citi PremierMiles. None was fetched, so two of the eight programmes the subject names (SC Smart, and the flat uncapped miles cards) have no primary source here at all. Spec §4.3 records SC Smart's cap cycle as 'not researched'; that remains true and must propagate as an unconfirmed value rather than default to any cycle.\n\n(4) THERE IS NO 'instrument' DOCUMENT, and the reason is that none could be fetched rather than that none exists. Every T&C here is made under a parent cardmember agreement which it names and incorporates — dbs-yuu-card-tnc cl.5 ('These Terms and Conditions shall be read in conjunction with the DBS Credit Card Agreement. In the event of any inconsistency, these Terms and Conditions shall prevail.'), dbs-womans-card-tnc cl.6 (DBS Rewards Programme Terms and Conditions), citi-rewards-10x-tnc cl.16 (Citi ThankYou Rewards Program terms), hsbc-revolution-reward-points-tnc cl.13 (HSBC Rewards Programme terms), uob-ladys-cards-tnc cl.41 (UOB Cardmembers Agreement and UOB Rewards terms), posb-passion-yuu-tnc cl.18 (DBS Debit Card Agreement and DBS/POSB Card Declaration). This task had no network access, so none of those parent agreements was retrieved and none is invented here. The consequence for P4 is the one the runbook names: the instrument cross-check cannot run, and P4 must say so rather than let a reader infer the two texts agree.\n\n(5) THE ANNOTATION INVENTORIES ARE EMPTY BY DECLARATION, NOT BY OVERSIGHT. Issuer T&Cs carry no amendment or modification apparatus: there is no equivalent of the UK's F1-F19 textual-amendment or C1-C5 modification markers, no endnote numbering, and no marginal revision marks. An issuer republishes the whole document under a new 'Updated'/'Effective' line and says nothing about what changed. Every document therefore carries annotations: [] — an inventory that is complete and contains nothing. The schema's annotation_group requires at least one marker, so 'complete and empty' cannot be spelled as a group with inventory_complete true; the empty array plus this paragraph is the honest spelling, and the external-modification register's dispositions[] is correspondingly empty. What replaces the apparatus is the in-text dated arm ('With effect from 1 May 2026', 'With effect from 1 August 2025', 'wef 1 October 2024'), which is carried as register entries rather than as annotation markers.\n\n(6) ROLE OF THE CITI EXCLUSION LIST: 'current', not 'guidance'. It is titled 'ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion Terms and Conditions', it states operative terms, and citi-rewards-10x-tnc cl.5(xii) incorporates it by reference at www.citibank.com.sg/rwdexcl. It is a source of encoded text, which is what 'current' means. The three FAQs are 'guidance': the issuer's own explanation of its terms, which is exactly the class whose divergence from the terms P2 routes.\n\nNo retrieval_cost is recorded at bundle or document level. The ten PDFs were fetched on 2026-09-21 by an earlier session, which left no timing or request-count record; a fabricated zero would be worse than the silence.\n\nEXTRACTION. Each PDF has a pdftotext -layout rendering beside it as <stem>.txt. Every quotation in this bundle, in the external-modification register and in the roadmap is copied from those .txt files, never retyped from the PDF or from memory. The .txt files are hard-wrapped, so they are searched in paragraph mode.\n\nCANON NOTE: the PDFs themselves are not vendored into this repository (issuer copyright, redistribution rights unconfirmed); this bundle is the pin (url + sha256 + retrieval date) per docs/directory-conventions.md §6. The .txt pdftotext extractions and PDFs are held in legalese/l4-ide at jl4/examples/legal/miles-card/source/, at commit 1dd165f9c and after. Ruled 2026-09-23: they stay in l4-ide when the rest of that directory moves here. Each document's integrity.local_path names its l4-ide path, so the digest checks run where the bytes are.",
+  "in_force": {
+    "statement": "Updated on 7 August 2026",
+    "as_of": "2026-08-07",
+    "document": "dbs-yuu-card-tnc"
+  },
+  "documents": [
+    {
+      "id": "dbs-yuu-card-tnc",
+      "role": "current",
+      "title": "Terms and Conditions — DBS yuu Card Programme and Promotions",
+      "citation": "DBS yuu Card Programme and Promotions Terms and Conditions, cl.1-22 and Appendix 1, updated 7 August 2026 (DBS Bank Ltd, Singapore)",
+      "url": "https://www.dbs.com.sg/iwov-resources/media/pdf/cards/promotions/dbs-yuu-cards/dbs-yuu-card-promotion-tncs.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "a66495e986aed36cf749abe4d747b8896951f95980f504211d5e6ecbacb4de3e",
+        "local_path": "jl4/examples/legal/miles-card/source/dbs-yuu-card-tnc.pdf"
+      },
+      "covers": { "from": "2026-08-07", "to": null },
+      "annotations": []
+    },
+    {
+      "id": "dbs-womans-card-tnc",
+      "role": "current",
+      "title": "Terms and Conditions Governing the DBS Woman's Card Promotions and Programmes",
+      "citation": "DBS Woman's Card Promotions & Programmes Terms and Conditions, cl.1-23, updated 27 July 2026 (DBS Bank Ltd, Singapore)",
+      "url": "https://www.dbs.com.sg/iwov-resources/media/pdf/cards/dbs-womans-card-tnc.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "2ed822793a965b7512a5b54d36fc91e371594003b2557d60b122e93ba40349df",
+        "local_path": "jl4/examples/legal/miles-card/source/dbs-womans-card-tnc.pdf"
+      },
+      "covers": { "from": "2026-07-27", "to": null },
+      "annotations": []
+    },
+    {
+      "id": "citi-rewards-10x-tnc",
+      "role": "current",
+      "title": "Citi Rewards Card – 10X Rewards Promotion Terms and Conditions",
+      "citation": "Citi Rewards Card – 10X Rewards Promotion Terms and Conditions, cl.1-19, effective 1 April 2024 (Citibank Singapore Limited)",
+      "url": "https://www.citibank.com.sg/credit-cards/rewards/citi-rewards-card/pdf/10x-rewards-promotion-terms-and-conditions-2020.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "f7d5dfb840409f92c51f203005bba40f8ab7434f440f9d56b9c6b17337cf9f10",
+        "local_path": "jl4/examples/legal/miles-card/source/citi-rewards-10x-tnc.pdf"
+      },
+      "covers": { "from": "2024-04-01", "to": null },
+      "annotations": []
+    },
+    {
+      "id": "citi-rewards-10x-faq",
+      "role": "guidance",
+      "title": "Citi Rewards Card – 10X Rewards Promotion Frequently Asked Questions",
+      "citation": "Citi Rewards Card – 10X Rewards Promotion FAQ, Q1-Q4, effective 1 April 2024 (Citibank Singapore Limited)",
+      "url": "https://www.citibank.com.sg/credit-cards/rewards/citi-rewards-card/pdf/10x-rewards-promotion-frequently-asked-questions.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "1ed263a0b1826bbcf1198143039dca0082c7f16fedabf18db4a12c47579019c1",
+        "local_path": "jl4/examples/legal/miles-card/source/citi-rewards-10x-faq.pdf"
+      },
+      "covers": { "from": "2024-04-01", "to": null },
+      "annotations": []
+    },
+    {
+      "id": "citi-rewards-exclusion-list",
+      "role": "current",
+      "title": "ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion Terms and Conditions",
+      "citation": "Citi rewards exclusion Terms and Conditions, cl.1-6, updated November 2024, with effect from 16 December 2024 (Citibank Singapore Ltd); incorporated by reference by citi-rewards-10x-tnc cl.5(xii)",
+      "url": "https://www.citibank.com.sg/credit-cards/pdf/rewards-exclusion-list.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "d43f74d8ca64a96141c244ca5126179e77543ae82cebe4c177a0c029c73b1a68",
+        "local_path": "jl4/examples/legal/miles-card/source/citi-rewards-exclusion-list.pdf"
+      },
+      "covers": { "from": "2024-12-16", "to": null },
+      "annotations": []
+    },
+    {
+      "id": "hsbc-revolution-reward-points-tnc",
+      "role": "current",
+      "title": "Terms and Conditions governing the HSBC Revolution Credit Card Reward Points Programme",
+      "citation": "HSBC Revolution Credit Card Reward Points Programme Terms and Conditions, cl.1-17, effective from 1 April 2026 (HSBC Bank (Singapore) Limited)",
+      "url": "https://www.hsbc.com.sg/content/dam/hsbc/sg/documents/credit-cards/revolution/offers/revolution-credit-card-reward-points-terms-and-conditions.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "e3778406a7d0c2cec70afffbf8cbfe1d23ed7ed0ff80aeb0537f8e410795703e",
+        "local_path": "jl4/examples/legal/miles-card/source/hsbc-revolution-reward-points-tnc.pdf"
+      },
+      "covers": { "from": "2026-04-01", "to": null },
+      "annotations": []
+    },
+    {
+      "id": "hsbc-revolution-faq",
+      "role": "guidance",
+      "title": "Frequently asked questions for the HSBC Revolution Credit Card",
+      "citation": "HSBC Revolution Credit Card FAQ, Q1-Q4, undated (HSBC Bank (Singapore) Limited)",
+      "url": "https://www.hsbc.com.sg/content/dam/hsbc/sg/documents/credit-cards/revolution/offers/faq-for-hsbc-revolution-credit-card.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "af6a5eb78006dbfc7304519fa0fc521d5bbd63ed57c8f8e0d29a093765a92143",
+        "local_path": "jl4/examples/legal/miles-card/source/hsbc-revolution-faq.pdf"
+      },
+      "covers_absent_reason": "The document states no currency line of any kind — no 'Updated', no 'Effective from', no version — so the range of terms it describes cannot be stated without inventing it. The only date inside it is in the body of Q2, 'With effect from 15 July 2024, contactless payment transactions will earn 1 HSBC Reward point', which is a statement about one rule and not a currency banner for the document; note that it predates the T&C effective from 1 April 2026, which does not carry that rule.",
+      "annotations": []
+    },
+    {
+      "id": "posb-passion-yuu-tnc",
+      "role": "current",
+      "title": "Terms and Conditions Governing the PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points) Promotion'",
+      "citation": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points) Promotion' Terms and Conditions, cl.1-20 and Appendix 1, updated as of 30 May 2025 (DBS Bank Ltd / POSB, Singapore)",
+      "url": "https://www.posb.com.sg/iwov-resources/media/pdf/cards/posb-passion-yuu-tnc.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "ccc07ade0a04da9857b3d2dca68e0abb1740e20cdfc3b3075bfb12f6a9a2a619",
+        "local_path": "jl4/examples/legal/miles-card/source/posb-passion-yuu-tnc.pdf"
+      },
+      "covers": { "from": "2025-05-30", "to": "2025-09-30" },
+      "annotations": []
+    },
+    {
+      "id": "uob-ladys-cards-tnc",
+      "role": "current",
+      "title": "Terms and Conditions for the UOB Lady's Cards",
+      "citation": "UOB Lady's Cards Terms and Conditions, cl.1-43 and Schedule 1, updated in August 2025 (Version 1.1) (United Overseas Bank Limited)",
+      "url": "https://www.uob.com.sg/assets/pdfs/ladys-cards-tcs.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "81f35dee522221c2ceea2d18b157771ac06308b87998d0177ac583966160eb51",
+        "local_path": "jl4/examples/legal/miles-card/source/uob-ladys-cards-tnc.pdf"
+      },
+      "covers_absent_reason": "The document dates itself by month only — 'United Overseas Bank Limited Co. Reg. No. 193500026Z. Updated in August 2025 (Version 1.1)' — so no from-date can be given without inventing a day of the month. The operative cap regime inside it is separately dated by its own clause 6(b), 'With effect from 1 August 2025, if you hold a Lady's Solitaire Card, 2,700 UNI$ (which is equivalent to S$1,500 spent), with each Preferred Rewards Category capped at 1,350 UNI$ (which is equivalent to S$750 spent).', and that dated arm is carried in the external-modification register instead.",
+      "annotations": []
+    },
+    {
+      "id": "uob-ladys-faq",
+      "role": "guidance",
+      "title": "UOB Lady's Card FAQ",
+      "citation": "UOB Lady's Card FAQ, Q1-Q19, undated (United Overseas Bank Limited)",
+      "url": "https://www.uob.com.sg/assets/pdfs/faqs-final.pdf",
+      "retrieved": "2026-09-21",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "f98a64ea75d4b714ae678530f6c86e760964b07abb30a5752fb4f2886d46c936",
+        "local_path": "jl4/examples/legal/miles-card/source/uob-ladys-faq.pdf"
+      },
+      "covers_absent_reason": "The document states no currency line of any kind — no 'Updated', no 'Effective', no version — and its filename upstream is the generic 'faqs-final.pdf', so the range of terms it describes cannot be stated without inventing it. The only dates inside it are in the bodies of Q7, Q8 and Q13, each a 'With effect from 1 August 2025' note about the Solitaire cap revision, which is a statement about one rule and not a currency banner for the document.",
+      "annotations": []
+    }
+  ]
+}

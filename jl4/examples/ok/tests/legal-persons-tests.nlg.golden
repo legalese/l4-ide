@@ -1,111 +1,111 @@
-`full name` with John and Smith
-`full name` with Jane and Doe
-`full name with middle` with John, William and Smith
-`full name with middle` with Jane, Marie and Doe
-`formal name` with Dr., John and Smith
-`formal name` with Ms., Jane and Doe
-`format address` with 123 Main St, New York, NY, 10001 and US
-`format address` with 456 High St, London, England, SW1A 1AA and GB
-`format address` with 789 Rue de la Paix, Paris, Île-de-France, 75001 and FR
-`is valid US zip code` with 12345
-`is valid US zip code` with 12345-6789
-`is valid US zip code` with 1234
-`is valid US zip code` with ABCDE
-`is valid UK postcode` with SW1A 1AA
-`is valid UK postcode` with AB1 2CD
-`is valid UK postcode` with ABC
-`is valid Canadian postal code` with A1A 1A1
-`is valid Canadian postal code` with K1A0B1
-`is valid US SSN format` with 123-45-6789
-`is valid US SSN format` with 123456789
-`is valid US SSN format` with 12-345-6789
-`is valid Canadian SIN format` with 123-456-789
-`is valid Canadian SIN format` with 123456789
-`is valid UK NINO format` with AB123456C
-`is valid UK NINO format` with AB123456
-`age in years` with `John birth` and `Fixed ref`
-`age in years` with `Jane birth` and `Fixed ref`
-`age in years` with `Minor birth` and `Fixed ref`
-`age in years` with `Senior birth` and `Fixed ref`
-`is at least age` with `John birth`, 18 and `Fixed ref`
-`is at least age` with `Jane birth`, 18 and `Fixed ref`
-`is at least age` with `Minor birth`, 18 and `Fixed ref`
-`is at least age` with `Senior birth`, 65 and `Fixed ref`
-`is adult` with `John birth` and US
-`is adult` with `Jane birth` and US
-`is adult` with `Minor birth` and US
-`is adult` with `Japan adult birth` and JP
-`is adult` with `Jane birth` and JP
-`is adult` with `John birth` and KR
-`is minor` with `Minor birth` and US
-`is minor` with `John birth` and US
-`can enter contract` with `John birth` and US
-`can enter contract` with `Minor birth` and US
-`can vote` with `John birth` and US
-`can vote` with `Jane birth` and US
-`can vote` with `Minor birth` and US
-`is citizen of` with US and US
-`is citizen of` with US and GB
-`has citizenship in` with `Single citizenship` and US
-`has citizenship in` with `Single citizenship` and GB
-`has citizenship in` with `Dual citizenship` and US
-`has citizenship in` with `Dual citizenship` and GB
-`has citizenship in` with `Dual citizenship` and CA
-`has multiple citizenships` with `Single citizenship`
-`has multiple citizenships` with `Dual citizenship`
-`has multiple citizenships` with `Triple citizenship`
-`citizenship count` with `Single citizenship`
-`citizenship count` with `Dual citizenship`
-`citizenship count` with `Triple citizenship`
-`is valid US EIN format` with 12-3456789
-`is valid US EIN format` with 123456789
-`is valid US EIN format` with 12-34567890
-`is valid UK CRN format` with 12345678
-`is valid UK CRN format` with AB123456
-`is valid UK CRN format` with 1234567
-`is valid Canadian BN format` with 123456789
-`is valid Canadian BN format` with 12345678
-`years since incorporation` with `Acme Inc date`
-`years since incorporation` with `Startup date`
-`years since incorporation` with `Old Corp date`
-`established for at least` with `Acme Inc date` and 5
-`established for at least` with `Acme Inc date` and 20
-`established for at least` with `Old Corp date` and 50
-`is active corporation` with `Acme Inc date`
-`is active corporation` with `Startup date`
-`is active corporation` with `Old Corp date`
-`is beneficial owner` with 25
-`is beneficial owner` with 30
-`is beneficial owner` with 24
-`is beneficial owner` with 0
-`is majority owner` with 51
-`is majority owner` with 60
-`is majority owner` with 50
-`is majority owner` with 40
-`is controlling owner` with 51
-`is controlling owner` with 100
-`is controlling owner` with 50
-`has significant control` with 25
-`has significant control` with 50
-`has significant control` with 24
-`is Delaware corporation` with `Delaware code`
-`is Delaware corporation` with `California code`
-`is Delaware corporation` with US-DE
-`is Delaware corporation` with US-CA
-`is UK corporation` with GB
-`is UK corporation` with `England code`
-`is UK corporation` with `Scotland code`
-`is UK corporation` with US
-`is Canadian corporation` with CA-ON
-`is Canadian corporation` with CA-QC
-`is Canadian corporation` with US-CA
-`is US corporation` with US-DE
-`is US corporation` with US-CA
-`is US corporation` with CA-ON
-`requires registered agent` with US-DE
-`requires registered agent` with GB
-`requires registered agent` with CA-ON
-`requires registered agent` with SG
-`is foreign qualification required` with US-DE and US-CA
-`is foreign qualification required` with US-CA and US-CA
-`is foreign qualification required` with US-DE and CA-ON
+the full name comprising first name John and last name Smith
+the full name comprising first name Jane and last name Doe
+the full name comprising first name John, middle name William and last name Smith
+the full name comprising first name Jane, middle name Marie and last name Doe
+the formal name comprising prefix Dr., first name John and last name Smith
+the formal name comprising prefix Ms., first name Jane and last name Doe
+the address comprising street 123 Main St, city New York, state NY, postal code 10001 and country code US
+the address comprising street 456 High St, city London, state England, postal code SW1A 1AA and country code GB
+the address comprising street 789 Rue de la Paix, city Paris, state Île-de-France, postal code 75001 and country code FR
+12345 has 5 or 10 characters, the length of a US ZIP code
+12345-6789 has 5 or 10 characters, the length of a US ZIP code
+1234 has 5 or 10 characters, the length of a US ZIP code
+ABCDE has 5 or 10 characters, the length of a US ZIP code
+SW1A 1AA has 5 to 8 characters, the length of a UK postcode
+AB1 2CD has 5 to 8 characters, the length of a UK postcode
+ABC has 5 to 8 characters, the length of a UK postcode
+A1A 1A1 has 7 characters, the length of a Canadian postal code
+K1A0B1 has 7 characters, the length of a Canadian postal code
+123-45-6789 has 11 characters with hyphens placed as in a US Social Security number
+123456789 has 11 characters with hyphens placed as in a US Social Security number
+12-345-6789 has 11 characters with hyphens placed as in a US Social Security number
+123-456-789 has 11 characters with hyphens placed as in a Canadian Social Insurance Number
+123456789 has 11 characters with hyphens placed as in a Canadian Social Insurance Number
+AB123456C has 9 characters, the length of a UK National Insurance number
+AB123456 has 9 characters, the length of a UK National Insurance number
+the age in completed years on `Fixed ref` of a person born on `John birth`
+the age in completed years on `Fixed ref` of a person born on `Jane birth`
+the age in completed years on `Fixed ref` of a person born on `Minor birth`
+the age in completed years on `Fixed ref` of a person born on `Senior birth`
+a person born on `John birth` is at least 18 years old on `Fixed ref`
+a person born on `Jane birth` is at least 18 years old on `Fixed ref`
+a person born on `Minor birth` is at least 18 years old on `Fixed ref`
+a person born on `Senior birth` is at least 65 years old on `Fixed ref`
+a person born on `John birth` has reached the age of majority in US, 18 by default
+a person born on `Jane birth` has reached the age of majority in US, 18 by default
+a person born on `Minor birth` has reached the age of majority in US, 18 by default
+a person born on `Japan adult birth` has reached the age of majority in JP, 18 by default
+a person born on `Jane birth` has reached the age of majority in JP, 18 by default
+a person born on `John birth` has reached the age of majority in KR, 18 by default
+a person born on `Minor birth` is under the age of majority in US, 18 by default
+a person born on `John birth` is under the age of majority in US, 18 by default
+a person born on `John birth` is of age to contract in US, 18 by default
+a person born on `Minor birth` is of age to contract in US, 18 by default
+a person born on `John birth` is of voting age in US, 18 by default
+a person born on `Jane birth` is of voting age in US, 18 by default
+a person born on `Minor birth` is of voting age in US, 18 by default
+citizenship US is that of US
+citizenship US is that of GB
+`Single citizenship` lists the citizenship of US
+`Single citizenship` lists the citizenship of GB
+`Dual citizenship` lists the citizenship of US
+`Dual citizenship` lists the citizenship of GB
+`Dual citizenship` lists the citizenship of CA
+`Single citizenship` lists more than one citizenship
+`Dual citizenship` lists more than one citizenship
+`Triple citizenship` lists more than one citizenship
+the number of citizenships listed in `Single citizenship`
+the number of citizenships listed in `Dual citizenship`
+the number of citizenships listed in `Triple citizenship`
+12-3456789 has 10 characters with a hyphen placed as in a US Employer Identification Number
+123456789 has 10 characters with a hyphen placed as in a US Employer Identification Number
+12-34567890 has 10 characters with a hyphen placed as in a US Employer Identification Number
+12345678 has 8 characters, the length of a UK company registration number
+AB123456 has 8 characters, the length of a UK company registration number
+1234567 has 8 characters, the length of a UK company registration number
+123456789 has 9 characters, the length of a Canadian Business Number
+12345678 has 9 characters, the length of a Canadian Business Number
+the current year less the year of incorporation on `Acme Inc date`
+the current year less the year of incorporation on `Startup date`
+the current year less the year of incorporation on `Old Corp date`
+the year of incorporation on `Acme Inc date` is at least 5 years before the current year
+the year of incorporation on `Acme Inc date` is at least 20 years before the current year
+the year of incorporation on `Old Corp date` is at least 50 years before the current year
+the date of incorporation `Acme Inc date` is before today
+the date of incorporation `Startup date` is before today
+the date of incorporation `Old Corp date` is before today
+an ownership percentage of 25 meets the 25 percent threshold for beneficial ownership
+an ownership percentage of 30 meets the 25 percent threshold for beneficial ownership
+an ownership percentage of 24 meets the 25 percent threshold for beneficial ownership
+an ownership percentage of 0 meets the 25 percent threshold for beneficial ownership
+an ownership percentage of 51 exceeds 50 percent, giving majority ownership
+an ownership percentage of 60 exceeds 50 percent, giving majority ownership
+an ownership percentage of 50 exceeds 50 percent, giving majority ownership
+an ownership percentage of 40 exceeds 50 percent, giving majority ownership
+an ownership percentage of 51 exceeds 50 percent, giving a controlling interest
+an ownership percentage of 100 exceeds 50 percent, giving a controlling interest
+an ownership percentage of 50 exceeds 50 percent, giving a controlling interest
+an ownership percentage of 25 meets the 25 percent threshold for significant control
+an ownership percentage of 50 meets the 25 percent threshold for significant control
+an ownership percentage of 24 meets the 25 percent threshold for significant control
+the jurisdiction code the ISO 3166-2 code for the US state of Delaware is that of Delaware
+the jurisdiction code the ISO 3166-2 code for the US state of California is that of Delaware
+the jurisdiction code US-DE is that of Delaware
+the jurisdiction code US-CA is that of Delaware
+the jurisdiction code GB is that of the United Kingdom or one of its constituent countries
+the jurisdiction code the ISO 3166-2 code for England is that of the United Kingdom or one of its constituent countries
+the jurisdiction code the ISO 3166-2 code for Scotland is that of the United Kingdom or one of its constituent countries
+the jurisdiction code US is that of the United Kingdom or one of its constituent countries
+the jurisdiction code CA-ON begins with the alpha-2 code for Canada
+the jurisdiction code CA-QC begins with the alpha-2 code for Canada
+the jurisdiction code US-CA begins with the alpha-2 code for Canada
+the jurisdiction code US-DE begins with the alpha-2 code for the United States
+the jurisdiction code US-CA begins with the alpha-2 code for the United States
+the jurisdiction code CA-ON begins with the alpha-2 code for the United States
+a registered agent is required in US-DE, as a US, UK or Canadian jurisdiction
+a registered agent is required in GB, as a US, UK or Canadian jurisdiction
+a registered agent is required in CA-ON, as a US, UK or Canadian jurisdiction
+a registered agent is required in SG, as a US, UK or Canadian jurisdiction
+foreign qualification is required, as home jurisdiction US-DE and operating jurisdiction US-CA are different US jurisdictions
+foreign qualification is required, as home jurisdiction US-CA and operating jurisdiction US-CA are different US jurisdictions
+foreign qualification is required, as home jurisdiction US-DE and operating jurisdiction CA-ON are different US jurisdictions

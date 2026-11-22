@@ -310,6 +310,7 @@ describeUnsupported e = "uses a construct outside yscript's propositional fragme
   AsString{}   -> "a string coercion"
   Breach{}     -> "BREACH"
   Refuse{}     -> "REFUSE"
+  Lifecycle{}  -> "THE JOIN / THE DEADLINE / THE ARMING (a position in an obligation's life)"
   Percent{}    -> "a PERCENT literal"
   Inert{}      -> "inert grammatical scaffolding"
   _            -> "an unrecognised expression form"

@@ -1,0 +1,24 @@
+-- A CONSIDER whose arms end in comma lists, no nesting. `l4 batch` and the REPL
+-- re-print the module and run the printed text, and the printer wrote the arms
+-- comma-separated, so the comma after an arm was read as the next element of the
+-- `LIST` the arm ended in, and every row was an error.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN n IS A NUMBER
+GIVETH A Colour
+colourOf n MEANS
+  IF n EQUALS 0 THEN Red ELSE IF n EQUALS 1 THEN Green ELSE Blue
+
+@export Arms whose bodies are lists
+GIVEN a IS A NUMBER
+GIVETH A LIST OF NUMBER
+`list arms` MEANS
+  CONSIDER colourOf a
+    WHEN Red THEN LIST 1, 2
+    WHEN Green THEN LIST 3
+    WHEN Blue THEN LIST 4, 5
+
+#EVAL `list arms` 0
+#EVAL `list arms` 1
+#EVAL `list arms` 2

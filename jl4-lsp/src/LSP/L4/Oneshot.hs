@@ -3,7 +3,7 @@ module LSP.L4.Oneshot where
 import qualified LSP.Core.FileStore as Store
 import qualified LSP.Core.Shake as Shake
 import LSP.Core.Types.Location (normalizeFilePath)
-import LSP.Logger (Pretty, Recorder, WithPriority, cmapWithPrio, makeRefRecorder, pretty)
+import LSP.Logger (Pretty, Recorder, WithPriority, cmapWithPrio, makeKeyedRefRecorder, pretty)
 
 import qualified LSP.L4.Rules as Rules
 
@@ -11,7 +11,8 @@ import Base.Text (Text)
 import Control.Concurrent.STM (atomically)
 import Development.IDE.Graph (Action)
 import Development.IDE.Graph.Database (shakeRunDatabase)
-import Language.LSP.Protocol.Types (NormalizedFilePath)
+import Language.LSP.Protocol.Types (NormalizedFilePath, NormalizedUri)
+import qualified Data.Set as Set
 import LSP.Core.Types.Diagnostics (FileDiagnostic)
 import System.FilePath
 
@@ -28,11 +29,38 @@ instance Pretty Log where
     RulesLog l -> pretty l
     StoreLog l -> pretty l
 
+-- | The file whose diagnostics a message lists, for a message that lists them
+-- ('Shake.LogDiagsDiffButNoLspEnv'); 'Nothing' for every other message.
+diagnosticsOf :: Log -> Maybe NormalizedUri
+diagnosticsOf = \case
+  ShakeLog (Shake.LogDiagsDiffButNoLspEnv uri _) -> Just uri
+  -- the rules log the store's messages through their own recorder
+  RulesLog (Rules.ShakeLog (Shake.LogDiagsDiffButNoLspEnv uri _)) -> Just uri
+  _ -> Nothing
+
+-- | A log with each list of a file's diagnostics dropped that a later list of
+-- the same file's replaces; every other message is kept, in order.
+latestDiagnostics :: [(Maybe NormalizedUri, Text)] -> [Text]
+latestDiagnostics = snd . foldr step (Set.empty, [])
+ where
+  step (Nothing, t) (seen, kept) = (seen, t : kept)
+  step (Just uri, t) (seen, kept)
+    | uri `Set.member` seen = (seen, kept)
+    | otherwise = (Set.insert uri seen, t : kept)
+
 oneshotL4ActionAndErrors :: EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO ([Text], b)
-oneshotL4ActionAndErrors evalConfig fp act = do
-  (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
-  res <- oneshotL4Action recorder evalConfig fp act
-  errs <- getLog
+oneshotL4ActionAndErrors = oneshotL4ActionAndErrorsIn Rules.AmbientLibraries
+
+-- | 'oneshotL4ActionAndErrors' under a chosen 'Rules.LibraryScope'. A host that
+-- serves bundles somebody else uploaded asks for 'Rules.EmbeddedStdlibOnly', so
+-- that nothing on the host can stand in for the stdlib.
+oneshotL4ActionAndErrorsIn :: Rules.LibraryScope -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO ([Text], b)
+oneshotL4ActionAndErrorsIn scope evalConfig fp act = do
+  -- Only the last list of each file's diagnostics, where it falls in the log,
+  -- as the CLI prints it ('latestDiagnostics'; smucclaw/l4-ide#1082).
+  (getLog, recorder) <- makeKeyedRefRecorder diagnosticsOf pretty
+  (_diags, res) <- oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act
+  errs <- latestDiagnostics <$> getLog
   pure (errs, res)
 
 -- | 'oneshotL4ActionAndErrors' plus the structured diagnostics.
@@ -45,15 +73,29 @@ oneshotL4ActionAndErrors evalConfig fp act = do
 -- @SuccessfulTypeCheck@, so a module importing a module that does not exist and
 -- referencing nothing from it used to pass the suite while @l4 check@ failed it
 -- (smucclaw\/l4-ide#971).
+-- A host that serves bundles somebody else uploaded uses it to say why a file of
+-- one did not parse: that file has no check result, and the reason is only here.
 oneshotL4ActionAndDiagnostics
   :: EvalConfig
   -> FilePath
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], [FileDiagnostic], b)
-oneshotL4ActionAndDiagnostics evalConfig fp act = do
-  (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
-  (diags, res) <- oneshotL4ActionWithDiags recorder evalConfig fp act
-  errs <- getLog
+oneshotL4ActionAndDiagnostics = oneshotL4ActionAndDiagnosticsIn Rules.AmbientLibraries
+
+-- | 'oneshotL4ActionAndDiagnostics' under a chosen 'Rules.LibraryScope', for a
+-- host that serves bundles somebody else uploaded and wants to say why a file
+-- of one did not parse (see 'oneshotL4ActionAndErrorsIn').
+oneshotL4ActionAndDiagnosticsIn
+  :: Rules.LibraryScope
+  -> EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([Text], [FileDiagnostic], b)
+oneshotL4ActionAndDiagnosticsIn scope evalConfig fp act = do
+  -- as in 'oneshotL4ActionAndErrorsIn'
+  (getLog, recorder) <- makeKeyedRefRecorder diagnosticsOf pretty
+  (diags, res) <- oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act
+  errs <- latestDiagnostics <$> getLog
   pure (errs, diags, res)
 
 oneshotL4Action :: Recorder (WithPriority Log) -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO b
@@ -70,11 +112,21 @@ oneshotL4ActionWithDiags
   -> FilePath
   -> (NormalizedFilePath -> Action b)
   -> IO ([FileDiagnostic], b)
-oneshotL4ActionWithDiags recorder evalConfig fp act = do
+oneshotL4ActionWithDiags = oneshotL4ActionWithDiagsIn Rules.AmbientLibraries
+
+-- | 'oneshotL4ActionWithDiags' under a chosen 'Rules.LibraryScope'.
+oneshotL4ActionWithDiagsIn
+  :: Rules.LibraryScope
+  -> Recorder (WithPriority Log)
+  -> EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([FileDiagnostic], b)
+oneshotL4ActionWithDiagsIn scope recorder evalConfig fp act = do
   let curDir = takeDirectory fp
   state <- Shake.oneshotIdeState (cmapWithPrio ShakeLog recorder) curDir do
     Store.fileStoreRules (cmapWithPrio StoreLog recorder) (const $ pure False)
-    Rules.jl4Rules evalConfig curDir (cmapWithPrio RulesLog recorder)
+    Rules.jl4RulesIn scope evalConfig curDir (cmapWithPrio RulesLog recorder)
 
   let nfp = normalizeFilePath fp
 

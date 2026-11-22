@@ -117,7 +117,7 @@ golden pins it.
 
 | ruling | state                                                                   | detail                                                                                   |
 | ------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| R1     | **ANSWERED** 2026-08-16                                                 | CLI surface: own verb; package placement; plan lives above core, §8.1                    |
+| R1     | **ANSWERED** 2026-08-16; CLI half **REVERSED** 2026-09-24               | CLI surface: own verb; package placement; plan lives above core, §8.1                    |
 | R2     | **ANSWERED** 2026-08-16                                                 | records → DAObject subclasses, one question per _field_, §8.2                            |
 | R3     | **ANSWERED** 2026-08-16                                                 | survival: every reachable `DECIDE`/`WHERE` binding → one `code:` block, §8.3             |
 | R4     | **ANSWERED** 2026-08-16                                                 | the verdict seam: scope-first driver, six-valued verdict, §8.4                           |
@@ -274,9 +274,10 @@ All **[E]**. The selection layer is `L4.Export`:
   written above a top-level definition attaches to the **TopDecl** `Decide ann d` node, not to
   the inner `MkDecide`; above a `WHERE` binding it attaches to `LocalDecide ann d`
   (`l4 ast` on `citations.l4`, three `LocalDecide` annos each carrying a `MkRef`) **[E]**. A
-  node's `Anno` holds at most one ref and the nearest preceding one wins, every other becoming a
-  `RefNotAttached` warning (`attachRef`, `ResolveAnnotation.hs:1162-1172`) **[E]** — which is why each block's
-  citation must be read from its _own_ node. The payload text **includes the herald**: `getRef`
+  node's `Anno` held at most one ref and the nearest preceding one won, every other becoming a
+  `RefNotAttached` warning (`attachRef`) **[E]** when this was written; since 2026-10-13 it holds
+  every ref that precedes it, in source order, and the lowerer reads the nearest, the last (`specs/done/REF-ANNOTATION-SPEC.md`, "Amendment").
+  Either way each block's citation must be read from its _own_ node. The payload text **includes the herald**: `getRef`
   hands back `"@ref X"` verbatim (unlike `getDesc`, which strips), and the inline form hands back
   `"<<X>>"`, delimiters and all **[E]**. `@ref-src` and `@ref-map` are dead in the AST
   (`Parser.hs:246-252` maps `refAdditionalP` to `Just ()`); the LSP hover reads `@ref-map` off the
@@ -452,6 +453,12 @@ roundtrip_check.py}`, hand-registered `expectGolden` blocks appended after
 ## 8. Open rulings
 
 ### 8.1 R1 — CLI surface and package placement
+
+> **CLI half REVERSED 2026-09-24** by `specs/todo/CLI-SURFACE-SPEC.md` C1: every backend is now a
+> format of `l4 export`, so this one is `l4 export docassemble`. The split below, between
+> interchange notations under `l4 export --to=` and runnable artifacts with their own verb, is the
+> reasoning C1 replaces. The package-placement half stands. The rest of this spec keeps the old
+> spelling, as a record of what was run.
 
 **Evidence.** The repo splits its backends: DMN/BPMN live under `l4 export --to=…` as "foreign
 interchange notations"; OpenFisca got its own verb as "a compiler to a runnable artifact"

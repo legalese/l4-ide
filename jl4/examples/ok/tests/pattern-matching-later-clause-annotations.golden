@@ -1,0 +1,68 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+pattern-matching-later-clause-annotations.l4:15:1-15:
+  I found a problem while checking the definition of `how many`:
+    This @desc is above the second clause of `how many`, where it is not used.
+    A rule written as clauses takes its @desc from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:17:1-24:
+  I found a problem while checking the definition of `how many`:
+    This @export is above the third clause of `how many`, where it is not used.
+    A rule written as clauses takes its @export from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:19:1-17:
+  I found a problem while checking the definition of `how many`:
+    This @nlg is above the fourth clause of `how many`, where it is not used.
+    A rule written as clauses takes its @nlg from the line above its first clause only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:22:1-19:
+  "two"
+pattern-matching-later-clause-annotations.l4:28:1-18:
+  I found a problem while checking the definition of `stacked`:
+    This @desc is above the second clause of `stacked`, where it is not used.
+    A rule written as clauses takes its @desc from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:29:1-18:
+  I found a problem while checking the definition of `stacked`:
+    This @desc is above the second clause of `stacked`, where it is not used.
+    A rule written as clauses takes its @desc from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:31:1-22:
+  I found a problem while checking the definition of `stacked`:
+    This @export is above the third clause of `stacked`, where it is not used.
+    A rule written as clauses takes its @export from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:32:1-18:
+  I found a problem while checking the definition of `stacked`:
+    This @nlg is above the third clause of `stacked`, where it is not used.
+    A rule written as clauses takes its @nlg from the line above its first clause only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:35:1-16:
+  2
+pattern-matching-later-clause-annotations.l4:45:1-23:
+  I found a problem while checking the definition of `colour code`:
+    This @export is above the second clause of `colour code`, where it is not used.
+    A rule written as clauses takes its @export from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:48:1-26:
+  2
+pattern-matching-later-clause-annotations.l4:55:3-23:
+  I found a problem while checking the definition of `indented`:
+    This @desc is above the second clause of `indented`, where it is not used.
+    A rule written as clauses takes its @desc from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:57:3-26:
+  I found a problem while checking the definition of `indented`:
+    This @export is above the third clause of `indented`, where it is not used.
+    A rule written as clauses takes its @export from above its GIVEN only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:58:3-24:
+  I found a problem while checking the definition of `indented`:
+    This @nlg is above the third clause of `indented`, where it is not used.
+    A rule written as clauses takes its @nlg from the line above its first clause only.
+    Move it there, or remove it.
+pattern-matching-later-clause-annotations.l4:61:1-17:
+  2
+pattern-matching-later-clause-annotations.l4:77:1-15:
+  2

@@ -1,6 +1,6 @@
 -- Hairdressers Act 2003 (NSW), s4(1).
 --
--- Transcribed for `l4 yscript` (specs/todo/YSCRIPT-EXPORT-SPEC.md R7) from the
+-- Transcribed for `l4 export yscript` (specs/todo/YSCRIPT-EXPORT-SPEC.md R7) from the
 -- verbatim yscript figure quoted in specs/research/DATALEX-YSCRIPT-RESEARCH.md
 -- §C (Mowbray, Chung & Greenleaf 2022/2023, Figure 9). The figure's own
 -- top-level "RULE Section 4" aggregates s4(1) and s4(2) via SUBRULE, a

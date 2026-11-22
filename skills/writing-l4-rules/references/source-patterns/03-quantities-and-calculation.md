@@ -16,7 +16,7 @@ the Federal Register:
 -- (82 FR 17545 instr. 5.a); $5,000,000 from 2021-03-15 (86 FR 3496 instr. 3).
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:145-146`, with the rule at `:158-164`.
+— `jl4/examples/canon/us/regcf/regcf.l4:145-146`, with the rule at `:158-164`.
 
 **It is doing** delegating the number to an instrument. The power has been exercised, so **the
 instrument is law and you encode it**, with the citation on each arm.
@@ -120,7 +120,7 @@ own default.
 -- exclusive, so one boolean selects between them.
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:412-415`
+— `jl4/examples/canon/us/regcf/regcf.l4:412-415`
 
 (The citations in this area are to the Code of Federal Regulations (CFR) and the Federal Register
 (FR), which are where the rules and the releases amending them are published.)
@@ -145,11 +145,11 @@ than chance suggests — it is the number somebody was aiming at.
 -- "not more than 21" / "at most 21"   -> AT MOST    (inclusive)
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
-DECIDE `the amount is not less than 21` n IF n AT LEAST 21
+DECIDE `the amount is not less than 21` IF n AT LEAST 21
 
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
-DECIDE `the amount exceeds 21` n IF n GREATER THAN 21
+DECIDE `the amount exceeds 21` IF n GREATER THAN 21
 
 #ASSERT     `the amount is not less than 21` 21
 #ASSERT NOT `the amount exceeds 21` 21
@@ -165,7 +165,7 @@ case a dollar below the cut point and one exactly on it, asserted separately —
 #ASSERT NOT `either annual income or net worth is less than the cut point` (`an investor with` FALSE 124000 124000 0)
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:1039-1040`.
+— `jl4/examples/canon/us/regcf/regcf.l4:1039-1040`.
 
 **Not** `GREATER THAN` for "not less than". It is off by exactly the case the drafter cared about,
 and nothing type-checks it for you:
@@ -173,7 +173,7 @@ and nothing type-checks it for you:
 ```l4
 GIVEN n IS A NUMBER
 GIVETH A BOOLEAN
-DECIDE `the amount is not less than 21 (wrong)` n IF n GREATER THAN 21
+DECIDE `the amount is not less than 21 (wrong)` IF n GREATER THAN 21
 
 #ASSERT `the amount is not less than 21 (wrong)` 21
 ```
@@ -182,8 +182,9 @@ DECIDE `the amount is not less than 21 (wrong)` n IF n GREATER THAN 21
 assertion failed
 ```
 
-_(Probe `q02-boundary-wrong.l4`; the file still exits 0 — a failing assertion is reported at
-`DiagnosticSeverity_Error` but does not change the exit code, so read the diagnostics.)_
+_(Probe `q02-boundary-wrong.l4`; `l4 run` exits 1 on it, but an `l4` built before
+legalese/l4-ide#518 exits 0, and only the `DiagnosticSeverity_Error` line says which assertion
+failed, so read the diagnostics.)_
 
 **See** entry 4.5 for the same distinction on dates, where "on or before" and "beginning with the
 day" hide an extra off-by-one, and [drafting-patterns.md](../drafting-patterns.md), "Constitutive
@@ -212,7 +213,7 @@ GIVEN a IS A NUMBER                         -- At some point in the future, ther
 **It is doing** exactly what it says. The interest is that "greater of" and "lesser of" are the two
 words most often swapped by an amendment: the 2021 amendment to the investor limit in Regulation
 Crowdfunding substituted one for the other in both limbs, which raised the limit for every investor
-whose two figures differed (`jl4/examples/legal/regcf/regcf.l4:384-406`). Name the concept after
+whose two figures differed (`jl4/examples/canon/us/regcf/regcf.l4:384-406`). Name the concept after
 the phrase so that an amendment is a one-word edit in one place.
 
 **Write** the prelude's `max` and `min`. They are there now, so the hand-written pair above is
@@ -313,12 +314,12 @@ do not have sufficient information", the fix is almost always the argument types
 @ref 17 CFR 227.100(a)(1); 17 CFR 227.201(t) Instruction 1
 GIVEN offering IS AN Offering
 GIVETH A NUMBER
-`aggregate offering amount` offering MEANS
+`aggregate offering amount` MEANS
         offering's `aggregate amount sold in reliance on section 4(a)(6) during the preceding 12 months`
     PLUS offering's `maximum offering amount the issuer will accept`
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:349-354`
+— `jl4/examples/canon/us/regcf/regcf.l4:349-354`
 
 **It is doing** two different jobs under one word. When the source **names** the things being added
 — "the aggregate of the amount already sold and the amount to be sold" — the naming is operative:
@@ -339,14 +340,14 @@ DECLARE Offering HAS
 @ref 17 CFR 227.100(a)(1)
 GIVEN offering IS AN Offering
 GIVETH A NUMBER
-`aggregate offering amount` offering MEANS
+`aggregate offering amount` MEANS
          offering's `the amount already sold in the preceding 12 months`
     PLUS offering's `the maximum amount the issuer will accept`
 
 -- "the sum of all payments made": the source ranges over an open class, so sum a LIST.
 GIVEN payments IS A LIST OF NUMBER
 GIVETH A NUMBER
-`the sum of the payments made` payments MEANS sum payments
+`the sum of the payments made` MEANS sum payments
 ```
 
 _(Probe `q04-aggregate.l4`, exit 0, no errors; two assertions satisfied.)_
@@ -402,7 +403,7 @@ a number, but the shape is the same one a fee schedule uses:
 @ref 17 CFR 227.201(t)(1)-(3)
 GIVEN offering IS AN Offering
 GIVETH A FinancialStatementRequirement
-`financial statements required` offering MEANS
+`financial statements required` MEANS
     BRANCH IF `the COVID-19 temporary relief could change this answer` THEN `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
            IF `aggregate` AT MOST `tier 1 ceiling`                     THEN `financial statements certified by the principal executive officer, with tax return information`
            IF `aggregate` AT MOST `tier 2 ceiling`                     THEN `financial statements reviewed by an independent public accountant`
@@ -410,7 +411,7 @@ GIVETH A FinancialStatementRequirement
            OTHERWISE `financial statements audited by an independent public accountant`
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:497-505`
+— `jl4/examples/canon/us/regcf/regcf.l4:497-505`
 
 **It is doing** partitioning a quantity into intervals. Two readings are possible and the source
 almost never says which in the table itself: a **slab** table applies one rate to the whole amount
@@ -478,7 +479,7 @@ GIVETH A NUMBER
 
 GIVEN amount IS A NUMBER
 GIVETH A NUMBER
-`the duty on` amount MEANS
+`the duty on` MEANS
     sum (map `the duty on this slice` `the duty bands`)
     WHERE
         `the duty on this slice` band MEANS `the duty on the slice of` amount `falling in` band
@@ -519,7 +520,7 @@ amount:
 ```l4
 GIVEN amount IS A NUMBER
 GIVETH A NUMBER
-`the duty on (wrong)` amount MEANS
+`the duty on (wrong)` MEANS
     BRANCH IF amount AT MOST 180000 THEN amount TIMES 1%
            IF amount AT MOST 360000 THEN amount TIMES 2%
            OTHERWISE                     amount TIMES 3%
@@ -557,7 +558,7 @@ over time.
          ELSE `maximum amount sold to any one investor in a 12-month period`
 ```
 
-— `jl4/examples/legal/regcf/regcf.l4:423-433`
+— `jl4/examples/canon/us/regcf/regcf.l4:423-433`
 
 **It is doing** two different things that look alike. A **floor** ("or $2,500, whichever is
 greater") protects the smallest case, and it is `max`. A **cap** ("not to exceed $124,000") protects
@@ -571,7 +572,7 @@ the largest, and it is `min`. Swap them and both protections invert.
 -- "10 percent ..., not to exceed $124,000"         -- a CAP,   so min.
 GIVEN investor IS AN InvestorProfile
 GIVETH A NUMBER
-`the investment limit for` investor MEANS
+`the investment limit for` MEANS
     IF   `either measure is below the cut point`
     THEN max `the minimum permitted investment` `five percent of the measure`
     ELSE min `ten percent of the measure` `the maximum amount sold to any one investor in 12 months`
@@ -644,7 +645,7 @@ the parties, which is why instruments spell out the direction rather than leavin
 -- There is no ROUND. "Rounded to the nearest dollar, half up" is written out.
 GIVEN amount IS A NUMBER
 GIVETH A NUMBER
-`rounded to the nearest dollar, half up` amount MEANS FLOOR (amount PLUS 0.5)
+`rounded to the nearest dollar, half up` MEANS FLOOR (amount PLUS 0.5)
 
 #ASSERT `the levy rounded down`   EQUALS 6199
 #ASSERT `the levy rounded up`     EQUALS 6200
@@ -736,7 +737,7 @@ on:
 -- the NUMBER field carries whatever count the fact-supplier certifies).
 ```
 
-— `jl4/examples/legal/bna/bna.l4:390-394`
+— `jl4/examples/canon/uk/bna-1981/bna.l4:390-394`
 
 **It is doing** one of two very different things, and the phrase is the same for both. Ask whether
 the encoding holds the things being counted. If it does, count them. If it does not — days absent
@@ -975,7 +976,7 @@ convention where you divide.
 ```l4
 GIVEN principal IS A NUMBER
 GIVETH A NUMBER
-`the interest for one year (wrong)` principal MEANS
+`the interest for one year (wrong)` MEANS
     principal TIMES `Interest Rate Per Annum` TIMES 12
 
 #EVAL `the interest for one year (wrong)` 25000

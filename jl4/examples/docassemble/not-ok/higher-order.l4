@@ -6,7 +6,7 @@
 -- no docassemble variable it could become, so the lowering must refuse it
 -- by name. Contrast rodents-and-vermin.l4's `not covered if`, which IS
 -- directly applied and therefore inlines.
--- The file itself typechecks: the refusal belongs to `l4 docassemble`.
+-- The file itself typechecks: the refusal belongs to `l4 export docassemble`.
 
 DECLARE Reading
     HAS

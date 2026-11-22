@@ -1,0 +1,54 @@
+-- `l4 lts` over the lifecycle nouns written as anchors and as values
+-- (EVERY-EACH-QUANTIFIER-SPEC §2.6 card B1). Read by jl4/tests/LtsList.hs,
+-- case `lifecycle-anchors`; the golden is examples/lts/expected/.
+--
+-- Alice signs at 8 in every trace. The first three rules all fall due at
+-- 13: OF THE JOIN and OF (THE JOIN) are 8 + 5, and OF (THE ARMING) is the
+-- arming of the obligation the delivery continues, which its trace starts
+-- at 3, plus 10. A noun anchor is the same anchor whether bare or
+-- bracketed, and the list dates all three. The
+-- fourth falls due at 13 as well, but its anchor does arithmetic on the
+-- noun, and the list does not work that out: it says the deadline is not
+-- known here (doc/reference/regulative/lts-list.md).
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+
+alice MEANS Tenant OF "Alice"
+
+GIVETH A DEONTIC Actor Action
+`noun anchor` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY alice MUST Deliver alice WITHIN 5 OF THE JOIN)
+
+GIVETH A DEONTIC Actor Action
+`bracketed noun` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY alice MUST Deliver alice WITHIN 5 OF (THE JOIN))
+
+GIVETH A DEONTIC Actor Action
+`bracketed arming` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY alice MUST Deliver alice WITHIN 10 OF (THE ARMING))
+
+GIVETH A DEONTIC Actor Action
+`arithmetic on the noun` MEANS
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY alice MUST Deliver alice WITHIN 0 OF (THE JOIN PLUS 5))
+
+#TRACE `noun anchor` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+
+#TRACE `bracketed noun` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+
+#TRACE `bracketed arming` AT 3 WITH
+  PARTY alice DOES Sign alice AT 8
+
+#TRACE `arithmetic on the noun` AT 0 WITH
+  PARTY alice DOES Sign alice AT 8

@@ -214,6 +214,9 @@ run-anchors.l4:173:1-174:62:
       MUST Sign alice
     before their deadline, which was at
       740156
+    but was only entered at, and so failed at
+      740162
+  NOTE: An obligation, MUST Sign alice, was entered at 740162, after its own deadline of 740156, so it could never be met in time: it fails at 740162, when it was entered. Its WITHIN counts from (YMD OF 2026, 6, 20), which came before it was entered. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
 run-anchors.l4:183:27-32:
   I found a problem while checking the definition of `applied duration`:
     In this action, `alice` refers to
@@ -472,6 +475,12 @@ run-anchors.l4:412:1-415:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       16
+    and at the same instant
+      Landlord OF "Ms Ng"
+        who had to do obligatory action
+          MUST Deliver theLandlord
+        before their deadline, which was at
+          16
     and the breach names, in order
       Landlord OF "Ms Ng"
         who had to do obligatory action
@@ -812,17 +821,17 @@ run-anchors.l4:646:43-54:
 run-anchors.l4:649:1-651:51:
   DEONTIC BREACHED:
     party
-      Landlord OF "Ms Ng"
+      Tenant OF "Bob"
     who did action
-      Deliver OF (Landlord OF "Ms Ng")
+      Sign OF (Tenant OF "Bob")
     at
-      34
+      30
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
       MUST Deliver theLandlord
     before their deadline, which was at
-      33
+      13
 run-anchors.l4:655:29-34:
   I found a problem while checking the definition of `kept, the deadline`:
     In this action, `alice` refers to

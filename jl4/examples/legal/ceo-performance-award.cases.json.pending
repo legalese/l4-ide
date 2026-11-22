@@ -35,7 +35,7 @@
   "Eligible-Service-Requirement": [
     {
       "__branch": "maintain-service (Termination NOTHING, in eligible service, before performance end) -> MUST maintain, LEST forfeit",
-      "expectedReference": {"OBLIGATION": {"action": "`maintain eligible service status` `Service Status`", "deadline": "`Date to days` OF (`Performance End Date` MINUS (`award state`'s `Current Date`))", "modal": "MUST", "party": "`Elon Musk`"}},
+      "expectedReference": {"OBLIGATION": {"action": "`maintain eligible service status` `Service Status`", "deadline": "`Date to days` OF (`Performance End Date` MINUS (`award state`'s `Current Date`))", "modal": "MUST", "party": "Elon Musk"}},
       "arguments": {
         "award state": {
           "Musk Service Status": "Chief Executive Officer",
@@ -51,7 +51,7 @@
     },
     {
       "__branch": "immediate-vesting via Without Cause -> MAY vest immediately (no deadline)",
-      "expectedReference": {"OBLIGATION": {"action": "`vest immediately` EXACTLY `Immediate Vesting Reason` OF `award state`", "deadline": null, "modal": "MAY", "party": "`Elon Musk`"}},
+      "expectedReference": {"OBLIGATION": {"action": "`vest immediately` EXACTLY `Immediate Vesting Reason` OF `award state`", "deadline": null, "modal": "MAY", "party": "Elon Musk"}},
       "arguments": {
         "award state": {
           "Musk Service Status": "Not In Eligible Service",
@@ -67,7 +67,7 @@
     },
     {
       "__branch": "immediate-vesting via Change In Control -> MAY vest immediately (order note: Forfeiture is checked BEFORE ImmediateVesting; a Change-In-Control state is NOT a forfeiture so it falls to the MAY branch)",
-      "expectedReference": {"OBLIGATION": {"action": "`vest immediately` EXACTLY `Immediate Vesting Reason` OF `award state`", "deadline": null, "modal": "MAY", "party": "`Elon Musk`"}},
+      "expectedReference": {"OBLIGATION": {"action": "`vest immediately` EXACTLY `Immediate Vesting Reason` OF `award state`", "deadline": null, "modal": "MAY", "party": "Elon Musk"}},
       "arguments": {
         "award state": {
           "Musk Service Status": "Chief Executive Officer",
@@ -83,7 +83,7 @@
     },
     {
       "__branch": "forfeiture via For Cause -> MUST forfeit (highest-priority branch; wins even though metrics are high)",
-      "expectedReference": {"OBLIGATION": {"action": "`forfeit unvested shares` EXACTLY `Forfeiture Reason` OF `award state`", "deadline": null, "modal": "MUST", "party": "`Elon Musk`"}},
+      "expectedReference": {"OBLIGATION": {"action": "`forfeit unvested shares` EXACTLY `Forfeiture Reason` OF `award state`", "deadline": null, "modal": "MUST", "party": "Elon Musk"}},
       "arguments": {
         "award state": {
           "Musk Service Status": "Chief Executive Officer",
@@ -99,7 +99,7 @@
     },
     {
       "__branch": "forfeiture via NOTHING termination + not in eligible service -> MUST forfeit (exercises the CONSIDER WHEN NOTHING sub-branch of Forfeiture Applies)",
-      "expectedReference": {"OBLIGATION": {"action": "`forfeit unvested shares` EXACTLY `Forfeiture Reason` OF `award state`", "deadline": null, "modal": "MUST", "party": "`Elon Musk`"}},
+      "expectedReference": {"OBLIGATION": {"action": "`forfeit unvested shares` EXACTLY `Forfeiture Reason` OF `award state`", "deadline": null, "modal": "MUST", "party": "Elon Musk"}},
       "arguments": {
         "award state": {
           "Musk Service Status": "Not In Eligible Service",

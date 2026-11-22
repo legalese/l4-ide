@@ -1,0 +1,24 @@
+-- `period reaches` is recognised by name. This definition ignores the month,
+-- so L4 applies 600 from January 2015, while OpenFisca's formula_2015_12
+-- would apply it from December. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+GIVEN `the period` IS A Period
+      y IS A NUMBER
+      m IS A NUMBER
+GIVETH A BOOLEAN
+`period reaches` MEANS `the period`'s year AT LEAST y
+
+@export Basic income
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`basic income` p period MEANS
+    BRANCH
+        IF `period reaches` OF period, 2015, 12 THEN 600
+        OTHERWISE 0
+
+#ASSERT (`basic income` OF (Person WITH salary IS 0), (Period WITH year IS 2015, month IS 6)) EQUALS 600

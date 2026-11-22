@@ -1,0 +1,68 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+consider-numbers-and-text.l4:23:3-25:22:
+  I found a problem while checking the definition of `describe`:
+    The following branches still need to be considered:
+    
+      OTHERWISE
+    
+consider-numbers-and-text.l4:27:1-17:
+  The value
+    2
+  reached a CONSIDER that has no branch for it.
+  Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
+  The typechecker's exhaustiveness warning lists all missing branches.
+consider-numbers-and-text.l4:42:3-44:24:
+  I found a problem while checking the definition of `code`:
+    The following branches still need to be considered:
+    
+      OTHERWISE
+    
+consider-numbers-and-text.l4:59:3-60:28:
+  I found a problem while checking the definition of `only`:
+    The following branches still need to be considered:
+    
+      WHEN Green THEN
+      WHEN Blue THEN
+    
+consider-numbers-and-text.l4:62:1-17:
+  2
+consider-numbers-and-text.l4:69:3-74:22:
+  I found a problem while checking the definition of `h`:
+    The following CONSIDER branch is redundant: 
+    
+      WHEN 1.0 THEN "one point zero"
+      WHEN 0.1 THEN "tenth again"
+    
+consider-numbers-and-text.l4:81:3-83:26:
+  I found a problem while checking the definition of `rate charge`:
+    The following branches still need to be considered:
+    
+      WHEN Rate 1.50 Premium THEN
+      WHEN Rate `_` `_` THEN
+    
+consider-numbers-and-text.l4:91:3-92:34:
+  I found a problem while checking the definition of `constant only`:
+    The following branches still need to be considered:
+    
+      OTHERWISE
+    
+consider-numbers-and-text.l4:119:3-122:30:
+  I found a problem while checking the definition of `left out`:
+    The following branches still need to be considered:
+    
+      OTHERWISE
+    
+consider-numbers-and-text.l4:128:3-130:28:
+  I found a problem while checking the definition of `show`:
+    The following branches still need to be considered:
+    
+      WHEN JUST `_` THEN
+    
+consider-numbers-and-text.l4:138:3-139:27:
+  I found a problem while checking the definition of `by date`:
+    The following branches still need to be considered:
+    
+      OTHERWISE
+    

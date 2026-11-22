@@ -10,7 +10,7 @@ module Schema (
 ) where
 
 import Backend.Api
-import Backend.DecisionQueryPlan (QueryPlanResponse, QueryAtom, QueryOutcome, QueryImpact, QueryInput, QueryAsk)
+import Backend.DecisionQueryPlan (QueryPlanResponse, QueryAtom, QueryOutcome, QueryImpact, QueryInput, QueryAsk, QueryRefusal)
 import L4.FunctionSchema (Parameters (..), Parameter (..))
 import Types
 
@@ -105,6 +105,13 @@ instance ToSchema SimpleFunction where
 
 instance ToSchema SimpleResponse
 instance ToSchema EvaluatorError
+-- | As its ToJSON writes it: @"time"@ or @"memory"@, not the constructor names.
+instance ToSchema LimitHit where
+  declareNamedSchema _ =
+    pure $ NamedSchema (Just "LimitHit") $
+      mempty
+        & type_ ?~ OpenApiString
+        & enum_ ?~ ["time", "memory"]
 instance ToSchema ParameterMismatch
 instance ToSchema ResponseWithReason
 instance ToSchema Reasoning
@@ -161,6 +168,7 @@ instance ToSchema QueryOutcome
 instance ToSchema QueryImpact
 instance ToSchema QueryInput
 instance ToSchema QueryAsk
+instance ToSchema QueryRefusal
 instance ToSchema QueryPlanResponse
 
 instance ToSchema Function where
@@ -274,6 +282,15 @@ instance ToSchema FnLiteral where
                     & items ?~ OpenApiItemsObject fnLiteralSchema
                ]
 
+instance ToSchema Presumption where
+  declareNamedSchema _ =
+    pure $
+      NamedSchema (Just "Presumption") $
+        mempty
+          & type_ ?~ OpenApiString
+          & description ?~ "soft (the default): an argument left out takes its TYPICALLY default; hard: it is absent with no default. null never takes a default."
+          & enum_ ?~ [Aeson.String "soft", Aeson.String "hard"]
+
 instance ToSchema EvalBackend where
   declareNamedSchema p = do
     pure $
@@ -306,6 +323,7 @@ instance ToParamSchema (Map Text FnLiteral) where
 instance ToSchema BatchRequest where
   declareNamedSchema _ = do
     textRef <- declareSchemaRef (Proxy @Text)
+    presumptionRef <- declareSchemaRef (Proxy @Presumption)
     let
       intRef =
         Inline $
@@ -353,6 +371,7 @@ instance ToSchema BatchRequest where
                                      ]
                           )
                  )
+               , ("presumption", presumptionRef)
                ]
 
 instance ToSchema BatchResponse where
@@ -365,6 +384,7 @@ instance ToSchema BatchResponse where
             & example ?~ Aeson.Number 0
     doubleRef <- declareSchemaRef (Proxy @Double)
     graphvizRef <- declareSchemaRef (Proxy @GraphVizResponse)
+    presumedRef <- declareSchemaRef (Proxy @[Text])
     pure $
       NamedSchema (Just "BatchResponse") $
         mempty
@@ -384,6 +404,7 @@ instance ToSchema BatchResponse where
                                     & properties
                                       .~ [ ("@id", intRef)
                                          , ("@graphviz", graphvizRef)
+                                         , ("@presumed", presumedRef)
                                          ]
                           )
                  )
@@ -399,5 +420,13 @@ instance ToSchema BatchResponse where
                            , ("processorCasesPerSec", doubleRef)
                            , ("processorQueuedSec", doubleRef)
                            ]
+                 )
+                 -- every response states its report (UNKNOWN-EVALUATION-SPEC U7b)
+               , ( "report"
+                 , Inline $
+                    mempty
+                      & type_ ?~ OpenApiString
+                      & enum_ ?~ ["default"]
+                      & description ?~ "How a result that is not yet known is shown. Always \"default\" for now: such a result is an error that names every input it needs."
                  )
                ]

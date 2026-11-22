@@ -33,7 +33,10 @@ DECLARE Action IS ONE OF
     `determine appeal`
     `lodge appeal against` HAS `the decision` IS A Decision
     `determine appeal against` HAS `the decision` IS A Decision
-    `hear appeal` HAS `the decision` IS A `Commissioner Decision`
+    `appeal to the Royal Court` HAS `the decision appealed` IS A `Commissioner Decision`
+    `decide the appeal` HAS `the outcome` IS A `Court Decision`
+    `withdraw the decision`
+    `make the varied decision` HAS `the varied decision` IS A Decision
     `issue warning`
     `comply with warning`
     `impose fine`
@@ -264,28 +267,34 @@ GIVETH A DEONTIC Actor Action
 -- SECTION 7: Article 33 - Appeal to Royal Court (Jersey Charities Law)
 --------------------------------------------------------------------------------
 
--- Placeholder functions for court decisions
-`original decision takes effect` MEANS FULFILLED
-`decision has no effect` MEANS FULFILLED
-
-GIVEN `the new decision` IS A Decision
+-- What the Royal Court's decision leads to
+GIVEN outcome IS A `Court Decision`
 GIVETH A DEONTIC Actor Action
-`varied decision takes effect` MEANS FULFILLED
+`the effect of the court's decision` MEANS
+    CONSIDER outcome
+    WHEN Upheld THEN FULFILLED
+    WHEN Quashed THEN
+        PARTY  `the Commissioner`
+        MUST   `withdraw the decision`
+        WITHIN 7
+    WHEN Varied `the new decision` THEN
+        PARTY  `the Commissioner`
+        MUST   `make the varied decision` (EXACTLY `the new decision`)
+        WITHIN 7
 
 -- Article 33: Appeal Commissioner decision to Royal Court
 GIVEN charity IS A `Registered Charity`
       decision IS A `Commissioner Decision`
 GIVETH A DEONTIC Actor Action
 `appeal commissioner decision` MEANS
-    PARTY `the charity` charity
-    MAY `hear appeal` decision  -- Note: using available action
+    PARTY  `the charity` charity
+    MAY    `appeal to the Royal Court` (EXACTLY decision)
     WITHIN 21  -- 21 days from notification
     HENCE
+        -- No statutory deadline for the hearing, so no WITHIN
         PARTY `the Royal Court`
-        MUST `hear appeal` decision
-        -- No statutory deadline for hearing in original law
-        HENCE FULFILLED
-        LEST BREACH BY `the Royal Court` BECAUSE "failed to hear appeal"
+        MUST  `decide the appeal` outcome
+        HENCE `the effect of the court's decision` outcome
 
 --------------------------------------------------------------------------------
 -- SECTION 8: Escalation Chains
@@ -374,12 +383,11 @@ GIVETH A DEONTIC Actor Action
         -- Grace period with late fee
         PARTY debtor
         MUST `pay with late fee` `the late amount`
-        WITHIN `the grace deadline`
+        WITHIN `the grace period`
         HENCE FULFILLED
         LEST BREACH BY debtor BECAUSE "failed to pay within grace period"
     WHERE
         `the late amount` MEANS amount * (1 + `the late fee rate`)
-        `the grace deadline` MEANS `the due date` + `the grace period`
 
 --------------------------------------------------------------------------------
 -- SECTION 10: Licence Renewal Procedure (Exercise Solution)
@@ -409,12 +417,14 @@ GIVETH A DEONTIC `Licence Party` `Licence Action`
         -- Grace period with late fee
         PARTY holder
         MUST `apply with late fee`
-        WITHIN (`the expiry date` - 30 + 14)  -- 14 day grace period
+        WITHIN 14  -- 14 day grace period, from when the first deadline is missed
         HENCE FULFILLED
         LEST
             -- Reinstatement period after suspension
+            -- DO: an option. Doing it leads to HENCE, letting the time pass to LEST.
+            -- (A MAY would never reach its LEST.)
             PARTY holder
-            MAY `apply for reinstatement`
+            DO `apply for reinstatement`
             WITHIN 60
             HENCE FULFILLED
             LEST
@@ -463,8 +473,11 @@ GIVETH A DEONTIC `Licence Party` `Licence Action`
 #TRACE `payment with grace` `the Commissioner` 1000 30 10 0.1 AT 0 WITH
     PARTY `the Commissioner` DOES `pay` 1000 AT 25
 
--- Test 6: Payment with grace period - paid during grace
+-- Test 6: Payment with grace period - the payment on day 32 misses the
+-- 30-day deadline and opens the 10-day grace period; the payment with the
+-- late fee on day 38 is within it
 #TRACE `payment with grace` `the Commissioner` 1000 30 10 0.1 AT 0 WITH
+    PARTY `the Commissioner` DOES `pay` 1000 AT 32
     PARTY `the Commissioner` DOES `pay with late fee` 1100 AT 38
 
 -- Test 7: Escalation chain - complies at warning stage
@@ -486,10 +499,31 @@ GIVETH A DEONTIC `Licence Party` `Licence Action`
 #TRACE `licence renewal procedure` `the test holder` 100 AT 0 WITH
     PARTY `the test holder` DOES `apply for renewal` AT 60
 
--- Test 11: Licence renewal - late with fee
+-- Test 11: Licence renewal - late with fee: the application on day 75 misses
+-- the day-70 deadline and opens the 14-day grace period; the late-fee
+-- application on day 80 is within it
 #TRACE `licence renewal procedure` `the test holder` 100 AT 0 WITH
-    PARTY `the test holder` DOES `apply with late fee` AT 78
+    PARTY `the test holder` DOES `apply for renewal` AT 75
+    PARTY `the test holder` DOES `apply with late fee` AT 80
 
--- Test 12: Licence renewal - reinstatement
+-- Test 12: Licence renewal - reinstatement: both deadlines are missed
+-- (day 75, then day 95), and the holder applies for reinstatement on day 100
 #TRACE `licence renewal procedure` `the test holder` 100 AT 0 WITH
+    PARTY `the test holder` DOES `apply for renewal` AT 75
+    PARTY `the test holder` DOES `apply with late fee` AT 95
     PARTY `the test holder` DOES `apply for reinstatement` AT 100
+
+-- Test 13: Article 33 appeal - the Royal Court quashes the decision,
+-- and the Commissioner withdraws it within 7 days
+`the test decision` MEANS `Commissioner Decision` "CD-001" "deregistration" `the test charity`
+#TRACE `appeal commissioner decision` `the test charity` `the test decision` AT 0 WITH
+    PARTY (`the charity` `the test charity`) DOES `appeal to the Royal Court` `the test decision` AT 10
+    PARTY `the Royal Court` DOES `decide the appeal` Quashed AT 60
+    PARTY `the Commissioner` DOES `withdraw the decision` AT 62
+
+-- Test 14: Article 33 appeal - the Royal Court varies the decision; the
+-- result is the Commissioner's duty to make the varied decision
+`the varied test decision` MEANS Decision "CD-001-V" "suspension for 3 months"
+#TRACE `appeal commissioner decision` `the test charity` `the test decision` AT 0 WITH
+    PARTY (`the charity` `the test charity`) DOES `appeal to the Royal Court` `the test decision` AT 10
+    PARTY `the Royal Court` DOES `decide the appeal` (Varied `the varied test decision`) AT 60

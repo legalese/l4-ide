@@ -13,9 +13,13 @@ module McpServer (
 
 import qualified BundleStore
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
-import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
+import EvalLimits (withEvalLimits)
+import FileBrowser (searchIdentifier, searchTextWith, SearchMatch (..))
+import SearchPattern (compilePatterns, identifierSyntax, invalidPatternNote, noMatchHint, patternSyntax)
 import Logging (logInfo, logWarn)
-import Shared (collectMetadataEntries, collectDeploymentMetadata, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
+import L4.FunctionSchema (Parameters)
+import DeonticTrace (isDeonticFunction, isStrayArgumentsField, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
+import Shared (collectMetadataEntries, collectDeploymentMetadata, jsonError, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, remapTraceKeys, sanitizeFieldNamesInText)
 import Types
 
 import Control.Monad.IO.Class (liftIO)
@@ -29,7 +33,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import Data.Char (isAlphaNum)
-import Data.Int (Int64)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 import Data.Text (Text)
@@ -37,15 +40,14 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
+import Data.Int (Int64)
 import Data.Time (UTCTime, getCurrentTime, diffUTCTime)
 import qualified Data.UUID as UUID
 import qualified Data.UUID.V4 as UUID
-import GHC.Conc (setAllocationCounter, getAllocationCounter, enableAllocationLimit)
 import Control.Exception (SomeException, catch)
-import GHC.IO.Exception (AllocationLimitExceeded (..))
-import System.Timeout (timeout)
 
-import Backend.Api (EvalBackend (..), FnLiteral (..), RunFunction (..), TraceLevel (..), prettyEvaluatorError)
+import Backend.Api (EvalBackend (..), EvaluatorError, FnLiteral (..), LimitHit, Presumption (..), ResponseWithReason, RunFunction (..), TraceLevel (..))
 import Options (Options (..))
 
 -- ----------------------------------------------------------------------------
@@ -284,7 +286,7 @@ buildToolList vis mScope = do
 
 mcpToolSchema :: FunctionSummary -> Aeson.Value
 mcpToolSchema fn
-  | "DEONTIC" `Text.isPrefixOf` fn.fsReturnType =
+  | fn.fsIsDeontic =
       Aeson.object
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
@@ -341,12 +343,13 @@ fileToolDefinitions =
     ]
   , Aeson.object
     [ "name" .= ("search_identifier" :: Text)
-    , "description" .= ("Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments." :: Text)
+    , "description" .= ("Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments. " <> identifierSyntax)
     , "inputSchema" .= Aeson.object
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
             [ "identifier" .= Aeson.object
                 [ "type" .= ("string" :: Text)
+                , "description" .= ("One L4 name as written, e.g. `the greater of`" :: Text)
                 ]
             , "deployment" .= Aeson.object
                 [ "type" .= ("string" :: Text)
@@ -362,12 +365,13 @@ fileToolDefinitions =
     ]
   , Aeson.object
     [ "name" .= ("search_text" :: Text)
-    , "description" .= ("Tooling: Search text in .l4 source files (case-insensitive)" :: Text)
+    , "description" .= ("Tooling: Search .l4 source files line by line, like grep -E -i. Returns matching lines with context." :: Text)
     , "inputSchema" .= Aeson.object
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
             [ "query" .= Aeson.object
                 [ "type" .= ("string" :: Text)
+                , "description" .= patternSyntax
                 ]
             , "deployment" .= Aeson.object
                 [ "type" .= ("string" :: Text)
@@ -437,10 +441,10 @@ findUniquePrefix dep others = go 1
 callTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Aeson.Value -> AppM Aeson.Value
 callTool vis mScope reqId toolName tasksRequested arguments = do
   case toolName of
-    "list_files" | vis.showFiles -> callListFiles reqId arguments
-    "read_file" | vis.showFiles -> callReadFile reqId arguments
-    "search_identifier" | vis.showFiles -> callSearchIdentifier reqId arguments
-    "search_text" | vis.showFiles -> callSearchText reqId arguments
+    "list_files" | vis.showFiles -> callListFiles mScope reqId arguments
+    "read_file" | vis.showFiles -> callReadFile mScope reqId arguments
+    "search_identifier" | vis.showFiles -> callSearchIdentifier mScope reqId arguments
+    "search_text" | vis.showFiles -> callSearchText mScope reqId arguments
     _ -> callFunctionTool vis mScope reqId toolName tasksRequested arguments
 
 -- | Execute a function evaluation tool call.
@@ -453,7 +457,7 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
   env <- ask
   entries <- collectMetadataEntries mScope
   let toolMap = Map.fromList
-        [ (tn, (deployId, fn.fsName, fn.fsParameters, "DEONTIC" `Text.isPrefixOf` fn.fsReturnType))
+        [ (tn, (deployId, fn.fsName, fn.fsParameters, fn.fsIsDeontic))
         | (tn, deployId, fn) <- buildToolNames entries
         ]
 
@@ -470,7 +474,7 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
         , ("tasksRequested", Aeson.toJSON tasksRequested)
         ]
       let reverseMap = buildPropertyReverseMap params
-      let argPairs = buildArgPairs reverseMap isDeontic arguments
+      let call = buildMcpCall reverseMap params isDeontic arguments
 
       let did = DeploymentId deployId
       compResult <- tryCompileWithTimeout did 2_000_000
@@ -478,13 +482,13 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
         CompilationReady fns _meta ->
           case Map.lookup fnName fns of
             Just vf -> do
-              evalResult <- runMcpEvaluation vf argPairs
+              evalResult <- runMcpEvaluation vf call
               pure $ evalResultToToolResponse reqId reverseMap evalResult
             Nothing ->
               pure $ jsonRpcError reqId (-32602) ("Function not found: " <> fnName)
         CompilationInProgress
           | tasksRequested ->
-              spawnEvaluationTask reqId did fnName isDeontic reverseMap argPairs
+              spawnEvaluationTask reqId did fnName reverseMap call
           | otherwise ->
               pure $ mcpTextResult reqId
                 "{\"status\":\"compiling\",\"retryAfterMs\":2000}" False
@@ -495,23 +499,87 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
           -- and has no protocol meaning attached to it.
           pure $ jsonRpcError reqId (-32000) ("Deployment failed: " <> err)
 
--- | Build the (name, value) argument list from a tools/call invocation.
+-- | What a @tools/call@ carries once its arguments are split: the function's
+-- inputs, and the trace fields a DEONTIC export is replayed against.
+--
+-- The trace fields are kept as the client sent them. Whether they are read
+-- depends on the function ('isDeonticFunction'), which a call to a deployment
+-- that is still compiling does not have yet. A call to a function that is not
+-- DEONTIC carries a trace only by mistake, and is refused when it is evaluated
+-- ('runMcpEvaluationIO'), with the message @/evaluation@ gives.
+data McpCall = McpCall
+  { inputs    :: [(Text, Maybe FnLiteral)]
+  , startTime :: Maybe Aeson.Value
+  , events    :: Maybe Aeson.Value
+  }
+
+-- | Split a tools/call invocation into a 'McpCall'.
 -- Splits deontic vs non-deontic arg layout and applies the reverse-mapping
--- from sanitized JSON keys to original L4 identifiers.
-buildArgPairs :: Map Text Text -> Bool -> Aeson.Value -> [(Text, Maybe FnLiteral)]
-buildArgPairs reverseMap isDeontic arguments = case arguments of
+-- from sanitized JSON keys to original L4 identifiers. The flag and the
+-- function's parameters are the ones its tool was listed with
+-- ('FunctionSummary.fsIsDeontic', 'FunctionSummary.fsParameters').
+--
+-- For a DEONTIC tool, @tools/list@ advertises @startTime@ and @events@ twice:
+-- beside @arguments@, and inside it (the function's parameters, which carry
+-- them). Both places are read. When both are given the TOP-LEVEL one wins, the
+-- shape the README documents and @/evaluation@ takes, where @startTime@ and
+-- @events@ are siblings of @arguments@; a @null@ is a field left out, so it
+-- does not shadow the other place. Whichever place they came from, they are
+-- not inputs, and are not passed on as such. A DEONTIC call with no
+-- @arguments@ object at all is read flat, the inputs and the trace side by
+-- side, which is how a call written for a flat tool arrives.
+--
+-- The trace is mapped through the reverse map, as the inputs are: the schema
+-- @tools/list@ gives for @events@ is the function's own, so the record fields
+-- of a party or an action are advertised under their sanitized names, and the
+-- call is read back under the names the rule has ('remapTraceKeys'). A name
+-- that is not a sanitized one is left as it was sent, so a client that sends
+-- the rule's own names is read as well. @/evaluation@ and a batch read the
+-- names as sent.
+--
+-- A tool that is not DEONTIC is flat, and a @startTime@ or @events@ on it is
+-- a trace unless the function declares an input of that name ('isStrayTraceField'),
+-- in which case it is an input as any other. A stray one is not an input and is
+-- kept in the 'McpCall' so that the call can be refused. An @arguments@ on it is
+-- left out unless the function declares an input of that name
+-- ('isStrayArgumentsField'), in which case it is an input as any other.
+buildMcpCall :: Map Text Text -> Parameters -> Bool -> Aeson.Value -> McpCall
+buildMcpCall reverseMap params isDeontic arguments = case arguments of
   Aeson.Object obj
     | isDeontic
     , Just (Aeson.Object argsObj) <- Aeson.KeyMap.lookup "arguments" obj ->
-        [ (Map.findWithDefault k k reverseMap, remapFnLiteralKeys reverseMap <$> parseFnLiteral v)
-        | (k, v) <- Map.toList (Aeson.KeyMap.toMapText argsObj)
-        ]
+        McpCall
+          { inputs = pairs (without traceKeys argsObj)
+          , startTime = present "startTime" obj argsObj
+          , events = remapTraceKeys reverseMap <$> present "events" obj argsObj
+          }
+    | isDeontic ->
+        McpCall
+          { inputs = pairs (without ("arguments" : traceKeys) obj)
+          , startTime = present "startTime" obj Aeson.KeyMap.empty
+          , events = remapTraceKeys reverseMap <$> present "events" obj Aeson.KeyMap.empty
+          }
     | otherwise ->
-        [ (Map.findWithDefault k k reverseMap, remapFnLiteralKeys reverseMap <$> parseFnLiteral v)
-        | (k, v) <- Map.toList (Aeson.KeyMap.toMapText obj)
-        , Aeson.Key.fromText k `notElem` ["startTime", "events", "arguments"]
-        ]
-  _ -> []
+        let strays = filter (isStrayTraceField params) traceKeys
+            wrappers = filter (isStrayArgumentsField params) ["arguments"]
+        in McpCall
+          { inputs = pairs (without (wrappers <> strays) obj)
+          , startTime = if "startTime" `elem` strays then present "startTime" obj Aeson.KeyMap.empty else Nothing
+          , events = if "events" `elem` strays then present "events" obj Aeson.KeyMap.empty else Nothing
+          }
+  _ -> McpCall { inputs = [], startTime = Nothing, events = Nothing }
+ where
+  traceKeys = ["startTime", "events"]
+  without keys o = Map.toList (Map.withoutKeys (Aeson.KeyMap.toMapText o) (Set.fromList keys))
+  pairs kvs =
+    [ (Map.findWithDefault k k reverseMap, remapFnLiteralKeys reverseMap <$> parseFnLiteral v)
+    | (k, v) <- kvs
+    ]
+  -- the first of the two places that holds the field, with a null as absent
+  present key outer inner =
+    case [ v | Just v <- [Aeson.KeyMap.lookup key outer, Aeson.KeyMap.lookup key inner], v /= Aeson.Null ] of
+      v : _ -> Just v
+      []    -> Nothing
 
 -- | Convert the synchronous evaluation result (Left err | Right resultText)
 -- into the MCP @tools/call@ JSON-RPC response shape.
@@ -560,34 +628,49 @@ evalResultToToolPayload reverseMap = \case
       ]
 
 -- | Run evaluation for an MCP tool call.
-runMcpEvaluation :: ValidatedFunction -> [(Text, Maybe FnLiteral)] -> AppM (Either Text Text)
-runMcpEvaluation vf args = do
+runMcpEvaluation :: ValidatedFunction -> McpCall -> AppM (Either Text Text)
+runMcpEvaluation vf call = do
   cfg <- asks (.options)
-  liftIO $ runMcpEvaluationIO cfg vf args
+  liftIO $ runMcpEvaluationIO cfg vf call
 
-runMcpEvaluationIO :: Options -> ValidatedFunction -> [(Text, Maybe FnLiteral)] -> IO (Either Text Text)
-runMcpEvaluationIO cfg vf args = do
-  let timeoutMicros = cfg.evalTimeout * 1_000_000
-      memLimitBytes = fromIntegral cfg.maxEvalMemoryMb * 1024 * 1024 :: Int64
-  case Map.lookup JL4 vf.fnEvaluator of
-    Nothing -> pure $ Left "No evaluator available"
-    Just runFn -> do
-      mResult <- (timeout timeoutMicros $ do
-          setAllocationCounter memLimitBytes
-          enableAllocationLimit
-          r <- runExceptT (runFn.runFunction args Nothing TraceNone False)
-          remaining <- getAllocationCounter
-          let _ = memLimitBytes - remaining
-          pure r
-        ) `catch` \AllocationLimitExceeded ->
-          pure Nothing
-      case mResult of
-        Nothing -> pure $ Left "Evaluation resource limit exceeded"
-        Just (Left err) ->
-          pure $ Left (prettyEvaluatorError err)
-        Just (Right rwr) ->
-          let encoded = Aeson.encode (SimpleResponse rwr)
-          in pure $ Right (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))
+-- | Run an MCP call's evaluation. The tasks worker calls it too, so it takes
+-- the options and not the request's environment.
+--
+-- A DEONTIC export is replayed against the call's trace ('runDeonticLimited',
+-- the path @/evaluation@ takes), and a call that carries no trace is refused as
+-- @/evaluation@ refuses it, with the body of its 400, as an error result.
+-- A call to any other function that carries a trace is refused the same way,
+-- with @/evaluation@'s message for that. Otherwise the function is called as it
+-- always was.
+runMcpEvaluationIO :: Options -> ValidatedFunction -> McpCall -> IO (Either Text Text)
+runMcpEvaluationIO cfg vf call
+  | isDeonticFunction vf =
+      case traceFromJSON call.startTime call.events of
+        Left refusal -> pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError refusal)))
+        Right (startTime, events) ->
+          mcpOutcome <$> runDeonticLimited cfg vf call.inputs startTime events TraceNone False PresumeSoft True
+  | Maybe.isJust call.startTime || Maybe.isJust call.events =
+      pure $ Left (Text.Encoding.decodeUtf8 (LBS.toStrict (jsonError noTraceForOtherFunctions)))
+  | otherwise =
+      case Map.lookup JL4 vf.fnEvaluator of
+        Nothing -> pure $ Left "No evaluator available"
+        Just runFn ->
+          fmap mcpOutcome $ withEvalLimits cfg $
+            runExceptT (runFn.runFunction call.inputs Nothing TraceNone False PresumeSoft)
+
+-- | An evaluation's outcome as the (error, result) text of an MCP result.
+mcpOutcome :: Either (LimitHit, Int64) (Either EvaluatorError ResponseWithReason, Int64) -> Either Text Text
+mcpOutcome = \case
+  Left _ -> Left "Evaluation resource limit exceeded"
+  -- An evaluation's answer and its error are both the body the HTTP
+  -- route returns, so each states its report (UNKNOWN-EVALUATION-SPEC
+  -- U7b), an undetermined result's 422 among the errors.
+  Right (Left err, _) ->
+    let encoded = Aeson.encode (SimpleError err)
+    in Left (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))
+  Right (Right rwr, _) ->
+    let encoded = Aeson.encode (SimpleResponse rwr)
+    in Right (Text.Encoding.decodeUtf8 (LBS.toStrict encoded))
 
 -- ----------------------------------------------------------------------------
 -- Tasks extension (2026-07-28)
@@ -609,18 +692,17 @@ spawnEvaluationTask
   :: Maybe Aeson.Value
   -> DeploymentId
   -> Text
-  -> Bool
   -> Map Text Text
-  -> [(Text, Maybe FnLiteral)]
+  -> McpCall
   -> AppM Aeson.Value
-spawnEvaluationTask reqId did fnName _isDeontic reverseMap argPairs = do
+spawnEvaluationTask reqId did fnName reverseMap call = do
   env <- ask
   taskIdRaw <- liftIO UUID.nextRandom
   now <- liftIO getCurrentTime
   let taskId = TaskId (UUID.toText taskIdRaw)
   let cfg = env.options
   -- Spawn the worker first so we can store its Async handle in the task.
-  workerAsync <- liftIO $ async $ runEvalWorker env cfg taskId did fnName reverseMap argPairs
+  workerAsync <- liftIO $ async $ runEvalWorker env cfg taskId did fnName reverseMap call
   let initial = TaskState
         { tsStatus = TaskPending
         , tsResult = Nothing
@@ -647,9 +729,9 @@ runEvalWorker
   -> DeploymentId
   -> Text
   -> Map Text Text
-  -> [(Text, Maybe FnLiteral)]
+  -> McpCall
   -> IO ()
-runEvalWorker env cfg taskId did fnName reverseMap argPairs = do
+runEvalWorker env cfg taskId did fnName reverseMap call = do
   outcome <- catchSomeException $ waitForCompileAndEval
   finaliseTask env taskId outcome
  where
@@ -664,7 +746,7 @@ runEvalWorker env cfg taskId did fnName reverseMap argPairs = do
           (\t -> t { tsStatus = TaskWorking }) taskId
         case Map.lookup fnName fns of
           Nothing -> pure $ Left ("Function not found: " <> fnName)
-          Just vf -> runMcpEvaluationIO cfg vf argPairs
+          Just vf -> runMcpEvaluationIO cfg vf call
 
   catchSomeException io = io `catch` \(e :: SomeException) ->
     pure $ Left ("Task crashed: " <> Text.pack (show e))
@@ -797,13 +879,24 @@ handleTasksCancel reqId params = case parseTaskId params of
 -- File browsing tool handlers
 -- ----------------------------------------------------------------------------
 
-callListFiles :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callListFiles reqId arguments = do
+-- | Does the endpoint's scope admit this deployment? On the org-wide endpoint
+-- every deployment; on a scoped one (@/{id}/.mcp@) only the scope itself.
+--
+-- The file tools name their deployment in an argument, not in the route, so
+-- they check it here: a caller with a grant for one deployment reaches that
+-- deployment's route only, and an argument naming another
+-- deployment must not reach past it. A deployment outside the scope is treated
+-- as one that does not exist.
+inScope :: Maybe Text -> Text -> Bool
+inScope mScope deployId = maybe True (== deployId) mScope
+
+callListFiles :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callListFiles mScope reqId arguments = do
   env <- ask
   let mDeployment = getStringArg "deployment" arguments
   registry <- liftIO $ readTVarIO env.deploymentRegistry
 
-  let deployIds = case mDeployment of
+  let deployIds = filter (inScope mScope) $ case mDeployment of
         Nothing -> [did.unDeploymentId | (did, _) <- Map.toList registry]
         Just d  -> [d]
 
@@ -833,8 +926,8 @@ callListFiles reqId arguments = do
       ]
     ]
 
-callReadFile :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callReadFile reqId arguments = do
+callReadFile :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callReadFile mScope reqId arguments = do
   env <- ask
   let mDeployment = getStringArg "deployment" arguments
       mPath = getStringArg "path" arguments
@@ -843,7 +936,9 @@ callReadFile reqId arguments = do
   case (mDeployment, mPath) of
     (Just deployId, Just rawPath) -> do
       let path = normalizeReadFilePath deployId rawPath
-      mContent <- liftIO $ BundleStore.loadSingleFile env.bundleStore deployId (Text.unpack path)
+      mContent <- if inScope mScope deployId
+        then liftIO $ BundleStore.loadSingleFile env.bundleStore deployId (Text.unpack path)
+        else pure Nothing
       case mContent of
         Nothing ->
           pure $ mcpTextResult reqId "File not found" True
@@ -871,8 +966,8 @@ normalizeReadFilePath deployId path
   | Just rest <- Text.stripPrefix "/" path = rest
   | otherwise = path
 
-callSearchIdentifier :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callSearchIdentifier reqId arguments = do
+callSearchIdentifier :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callSearchIdentifier mScope reqId arguments = do
   env <- ask
   let mIdentifier = getStringArg "identifier" arguments
       mDeployment = getStringArg "deployment" arguments
@@ -882,13 +977,14 @@ callSearchIdentifier reqId arguments = do
     Nothing ->
       pure $ jsonRpcError reqId (-32602) "Missing required argument: identifier"
     Just identifier -> do
-      sources <- loadSourcesForSearch env mDeployment mFile
+      sources <- loadSourcesForSearch env mScope mDeployment mFile
       let matches = searchIdentifier identifier sources
-          result = Aeson.encode (map matchToJson matches)
-      pure $ mcpTextResult reqId (Text.Encoding.decodeUtf8 (LBS.toStrict result)) False
+          hint = "No definitions or references. " <> identifierSyntax
+      pure $ mcpTextResults reqId $
+        matchesJson matches : [hint | null matches]
 
-callSearchText :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callSearchText reqId arguments = do
+callSearchText :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callSearchText mScope reqId arguments = do
   env <- ask
   let mQuery = getStringArg "query" arguments
       mDeployment = getStringArg "deployment" arguments
@@ -898,15 +994,27 @@ callSearchText reqId arguments = do
     Nothing ->
       pure $ jsonRpcError reqId (-32602) "Missing required argument: query"
     Just query -> do
-      sources <- loadSourcesForSearch env mDeployment mFile
-      let matches = searchText query sources
-          result = Aeson.encode (map matchToJson matches)
-      pure $ mcpTextResult reqId (Text.Encoding.decodeUtf8 (LBS.toStrict result)) False
+      sources <- loadSourcesForSearch env mScope mDeployment mFile
+      let pats = compilePatterns query
+          matches = searchTextWith pats sources
+          -- never the query: a scoped endpoint's answer mustn't show it
+          elsewhere = case (mFile, mDeployment) of
+            (Just _, _) -> "drop `file` to search every file"
+            (Nothing, Just _) -> "drop `deployment` to search every deployment"
+            _ -> "search_identifier for one whole L4 name"
+      pure $ mcpTextResults reqId $
+        matchesJson matches
+          : maybe [] pure (invalidPatternNote pats)
+          <> [noMatchHint elsewhere | null matches]
 
-loadSourcesForSearch :: AppEnv -> Maybe Text -> Maybe Text -> AppM (Map FilePath Text)
-loadSourcesForSearch env mDeployment mFile = do
+-- | The matches as JSON: always the first content item of a search result.
+matchesJson :: [SearchMatch] -> Text
+matchesJson = Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode . map matchToJson
+
+loadSourcesForSearch :: AppEnv -> Maybe Text -> Maybe Text -> Maybe Text -> AppM (Map FilePath Text)
+loadSourcesForSearch env mScope mDeployment mFile = do
   registry <- liftIO $ readTVarIO env.deploymentRegistry
-  let deployIds = case mDeployment of
+  let deployIds = filter (inScope mScope) $ case mDeployment of
         Nothing -> [did.unDeploymentId | (did, _) <- Map.toList registry]
         Just d  -> [d]
 
@@ -937,6 +1045,13 @@ matchToJson m = Aeson.object
   , "lineEnd" .= m.smLineEnd
   , "content" .= m.smContent
   , "isDefinition" .= m.smIsDefinition
+  ]
+
+-- | A successful result of several text items, in order. Clients that read
+-- only the first still get what 'mcpTextResult' would have given them.
+mcpTextResults :: Maybe Aeson.Value -> [Text] -> Aeson.Value
+mcpTextResults reqId texts = jsonRpcResult reqId $ Aeson.object
+  [ "content" .= [ Aeson.object [ "type" .= ("text" :: Text), "text" .= t ] | t <- texts ]
   ]
 
 mcpTextResult :: Maybe Aeson.Value -> Text -> Bool -> Aeson.Value

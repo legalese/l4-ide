@@ -20,6 +20,7 @@ DECLARE `Message` HAS
 
 GIVEN role IS A STRING
       content IS A STRING
+@nlg the language model message with role %role% and content %content%
 createMessage MEANS
   `Message` WITH
     `role` IS role
@@ -28,18 +29,22 @@ createMessage MEANS
 §§ `Anthropic Claude API`
 
 DECIDE anthropicEndpoint IS
+  @nlg the Anthropic API endpoint
   "https://api.anthropic.com/v1/messages"
 
+@nlg the Anthropic API version
 DECIDE anthropicVersion IS
   "2023-06-01"
 
 DECIDE buildAnthropicHeaders apiKey IS
+  @nlg the request headers for the Anthropic API, authenticated with %apiKey%
   CONCAT
     "x-api-key: ", apiKey, "\n",
     "anthropic-version: ", anthropicVersion, "\n",
     "content-type: application/json"
 
 DECIDE buildAnthropicBody model prompt maxTokens IS
+  @nlg the Anthropic API request putting %prompt% to %model%, for a reply of at most %maxTokens% tokens
   CONCAT
     "{\"model\":\"", model,
     "\",\"max_tokens\":", (maxTokens AS STRING),
@@ -48,6 +53,7 @@ DECIDE buildAnthropicBody model prompt maxTokens IS
     "]}"
 
 DECIDE callAnthropic apiKey model prompt maxTokens IS
+  @nlg the raw Anthropic API response to %prompt% from %model%, within %maxTokens% tokens, authenticated with %apiKey%
   POST
     anthropicEndpoint
     (buildAnthropicHeaders apiKey)
@@ -55,19 +61,23 @@ DECIDE callAnthropic apiKey model prompt maxTokens IS
 
 -- Convenience: Claude 3.5 Sonnet with sensible defaults
 DECIDE callClaude apiKey prompt IS
+  @nlg the raw Anthropic API response to %prompt% from Claude Sonnet 4.5, within 1,000 tokens, authenticated with %apiKey%
   callAnthropic apiKey "claude-sonnet-4-5-20250929" prompt 1000
 
 §§ `OpenAI API`
 
 DECIDE openaiEndpoint IS
+  @nlg the OpenAI API endpoint
   "https://api.openai.com/v1/chat/completions"
 
 DECIDE buildOpenAIHeaders apiKey IS
+  @nlg the request headers for the OpenAI API, authenticated with %apiKey%
   CONCAT
     "content-type: application/json\n",
     "authorization: Bearer ", apiKey
 
 DECIDE buildOpenAIBody model prompt maxTokens IS
+  @nlg the OpenAI API request putting %prompt% to %model%, for a reply of at most %maxTokens% tokens
   CONCAT
     "{\"model\":\"", model,
     "\",\"max_tokens\":", (maxTokens AS STRING),
@@ -76,6 +86,7 @@ DECIDE buildOpenAIBody model prompt maxTokens IS
     "]}"
 
 DECIDE callOpenAI apiKey model prompt maxTokens IS
+  @nlg the raw OpenAI API response to %prompt% from %model%, within %maxTokens% tokens, authenticated with %apiKey%
   POST
     openaiEndpoint
     (buildOpenAIHeaders apiKey)
@@ -83,14 +94,17 @@ DECIDE callOpenAI apiKey model prompt maxTokens IS
 
 -- Convenience: GPT-4 with sensible defaults
 DECIDE callGPT4 apiKey prompt IS
+  @nlg the raw OpenAI API response to %prompt% from GPT-4, within 1,000 tokens, authenticated with %apiKey%
   callOpenAI apiKey "gpt-4" prompt 1000
 
 §§ `OpenRouter (Unified Gateway for 500+ Models)`
 
 DECIDE openrouterEndpoint IS
+  @nlg the OpenRouter API endpoint
   "https://openrouter.ai/api/v1/chat/completions"
 
 DECIDE buildOpenRouterHeaders apiKey IS
+  @nlg the request headers for the OpenRouter API, authenticated with %apiKey% and naming L4 as the caller
   CONCAT
     "content-type: application/json\n",
     "authorization: Bearer ", apiKey, "\n",
@@ -98,6 +112,7 @@ DECIDE buildOpenRouterHeaders apiKey IS
     "x-title: L4 Legal DSL"
 
 DECIDE buildOpenRouterBody model prompt maxTokens IS
+  @nlg the OpenRouter API request putting %prompt% to %model%, for a reply of at most %maxTokens% tokens
   CONCAT
     "{\"model\":\"", model,
     "\",\"max_tokens\":", (maxTokens AS STRING),
@@ -106,6 +121,7 @@ DECIDE buildOpenRouterBody model prompt maxTokens IS
     "]}"
 
 DECIDE callOpenRouter apiKey model prompt maxTokens IS
+  @nlg the raw OpenRouter API response to %prompt% from %model%, within %maxTokens% tokens, authenticated with %apiKey%
   POST
     openrouterEndpoint
     (buildOpenRouterHeaders apiKey)
@@ -116,6 +132,7 @@ DECIDE callOpenRouter apiKey model prompt maxTokens IS
 -- Query with automatic provider fallback
 -- Tries: OpenRouter → OpenAI → Anthropic
 DECIDE queryLLM model prompt maxTokens IS
+  @nlg the raw response to %prompt% from %model%, within %maxTokens% tokens, via the first of OpenRouter, OpenAI and Anthropic with a configured key, otherwise an error message
   CONSIDER ENV "OPENROUTER_API_KEY"
     WHEN JUST openrouterKey THEN
       callOpenRouter openrouterKey model prompt maxTokens
@@ -132,6 +149,7 @@ DECIDE queryLLM model prompt maxTokens IS
 
 -- Helper: Try to call OpenRouter if key available
 DECIDE tryOpenRouter prompt IS
+  @nlg the raw OpenRouter API response to %prompt% from Claude 3.5 Sonnet, within 1,000 tokens, if an OpenRouter key is configured
   CONSIDER ENV "OPENROUTER_API_KEY"
     WHEN JUST key THEN
       JUST (callOpenRouter key "anthropic/claude-3.5-sonnet" prompt 1000)
@@ -139,6 +157,7 @@ DECIDE tryOpenRouter prompt IS
 
 -- Helper: Try to call OpenAI if key available
 DECIDE tryOpenAI prompt IS
+  @nlg the raw OpenAI API response to %prompt% from GPT-4, within 1,000 tokens, if an OpenAI key is configured
   CONSIDER ENV "OPENAI_API_KEY"
     WHEN JUST key THEN
       JUST (callOpenAI key "gpt-4" prompt 1000)
@@ -146,6 +165,7 @@ DECIDE tryOpenAI prompt IS
 
 -- Helper: Try to call Anthropic if key available
 DECIDE tryAnthropic prompt IS
+  @nlg the raw Anthropic API response to %prompt% from Claude Sonnet 4.5, within 1,000 tokens, if an Anthropic key is configured
   CONSIDER ENV "ANTHROPIC_API_KEY"
     WHEN JUST key THEN
       JUST (callAnthropic key "claude-sonnet-4-5-20250929" prompt 1000)
@@ -154,6 +174,7 @@ DECIDE tryAnthropic prompt IS
 -- Convenience: Query with sensible model defaults per provider
 -- Uses firstJust to find first successful provider attempt
 DECIDE queryLLMWithDefaults prompt IS
+  @nlg the raw response to %prompt%, within 1,000 tokens, from the default model of the first of OpenRouter, OpenAI and Anthropic with a configured key, otherwise an error message
   LET attempts BE
     LIST
       tryOpenRouter prompt
@@ -165,6 +186,7 @@ DECIDE queryLLMWithDefaults prompt IS
 
 -- Parse JSON response (returns EITHER STRING value)
 DECIDE parseResponse jsonString IS
+  @nlg the data decoded from the JSON text %jsonString%
   JSONDECODE jsonString
 
 §§ `Response Parsing (Future Work)`
@@ -183,13 +205,21 @@ DECIDE parseResponse jsonString IS
 
 §§ `Common LLM Models (for OpenRouter)`
 
+@nlg the OpenRouter model name for Claude 3 Opus
 DECIDE claudeOpusModel IS "anthropic/claude-3-opus"
+@nlg the OpenRouter model name for Claude 3.5 Sonnet
 DECIDE claudeSonnetModel IS "anthropic/claude-3.5-sonnet"
+@nlg the OpenRouter model name for GPT-4
 DECIDE gpt4Model IS "openai/gpt-4"
+@nlg the OpenRouter model name for GPT-4 Turbo
 DECIDE gpt4TurboModel IS "openai/gpt-4-turbo"
+@nlg the OpenRouter model name for GPT-3.5 Turbo
 DECIDE gpt35Model IS "openai/gpt-3.5-turbo"
+@nlg the OpenRouter model name for Llama 3.1 70B Instruct
 DECIDE llama3Model IS "meta-llama/llama-3.1-70b-instruct"
+@nlg the OpenRouter model name for the free tier of Llama 3.1 70B Instruct
 DECIDE llama3FreeModel IS "meta-llama/llama-3.1-70b-instruct:free"
+@nlg the OpenRouter model name for Gemini Pro
 DECIDE geminiProModel IS "google/gemini-pro"
 
 §§ `Usage Examples (commented out)`

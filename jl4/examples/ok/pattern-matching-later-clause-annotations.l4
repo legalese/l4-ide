@@ -1,0 +1,77 @@
+-- An annotation written between two clauses of a rule written as clauses is
+-- not used: the rule takes its @desc and @export from above its GIVEN, and its
+-- @nlg from the line above its first clause, as a rule written as one
+-- definition does (pattern-matching-first-clause-annotations.l4). Each one
+-- draws a warning at the annotation (refutation of legalese/l4-ide#545's
+-- review, round 3). Overloads written one after another use theirs and draw
+-- none (pattern-matching-overloads-own-annotations.l4).
+
+-- A group over numbers, with one of each above its second, third and fourth
+-- clauses. The @desc above the GIVEN is the rule's own.
+@desc how many there are
+GIVEN n IS A NUMBER
+GIVETH A STRING
+DECIDE `how many` 0 IS "none"
+@desc not used
+DECIDE `how many` 1 IS "one"
+@export not used either
+DECIDE `how many` 2 IS "two"
+@nlg many things
+DECIDE `how many` other IS "many"
+
+#EVAL `how many` 2   -- "two"
+
+-- Several annotations above one later clause: a warning at each.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE stacked 0 IS 1
+@desc stacked one
+@desc stacked two
+DECIDE stacked 1 IS 2
+@export stacked three
+@nlg stacked four
+DECIDE stacked other IS 3
+
+#EVAL stacked 1   -- 2
+
+-- A group over the values of a type, whose patterns are bare names, as the
+-- patterns of overloads are; this one stays a group, so its @export is not
+-- used and the rule is not published.
+DECLARE Colour IS ONE OF Red, Green
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE `colour code` Red IS 1
+@export the green code
+DECIDE `colour code` Green IS 2
+
+#EVAL `colour code` Green   -- 2
+
+-- A stray annotation indented past the head of the clause below it is still
+-- written between two clauses: a warning at each.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+indented 0 MEANS 1
+  @desc indented stray
+indented 1 MEANS 2
+  @export indented export
+  @nlg indented nlg %n%
+indented other MEANS 3
+
+#EVAL indented 1   -- 2
+
+-- An annotation inside a WHERE of an earlier clause is inside that clause, not
+-- written between two: it is the local definition's, and draws no warning.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE helped 0 IS g 1
+  WHERE
+    @desc local helper of clause one
+    g x MEANS x + 1
+DECIDE helped 1 IS h 2
+  WHERE
+    @desc local helper of clause two
+    h y MEANS y + 2
+DECIDE helped other IS 2
+
+#EVAL helped 0   -- 2

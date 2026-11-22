@@ -7,7 +7,7 @@
  * vendoring PR lands there is no copy in this tree, so this script zips the
  * modules straight from the canon clone and POSTs them as one deployment.
  *
- *   CANON_DIR=~/src/legalese/canon JL4_BASE_URL=http://127.0.0.1:18099 node scripts/seed.mjs
+ *   CANON_DIR=~/src/legalese/commons JL4_BASE_URL=http://127.0.0.1:18099 node scripts/seed.mjs
  *
  * Deploy = multipart POST /deployments with `id` and a zip under `sources`; the
  * job is polled at …/updates/{job} until `applied` (recipe measured on the
@@ -24,7 +24,8 @@ import { tmpdir } from 'node:os'
 // Not a turbo task: this script is run by hand, so its env vars are not turbo inputs.
 /* eslint-disable turbo/no-undeclared-env-vars */
 
-const CANON_DIR = process.env.CANON_DIR ?? join(homedir(), 'src/legalese/canon')
+const CANON_DIR =
+  process.env.CANON_DIR ?? join(homedir(), 'src/legalese/commons')
 const BASE = process.env.JL4_BASE_URL ?? 'http://127.0.0.1:18099'
 const ID = process.env.JL4_DEPLOYMENT ?? 'sg-penal-code'
 const ROW = join(CANON_DIR, 'subjects/sg/penal-code-1871/encodings/legalese')

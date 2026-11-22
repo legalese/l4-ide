@@ -1,0 +1,26 @@
+-- `l4 verify` reads each call through, and joins the atoms of what it reads into
+-- the caller's by atomId. `f a` and `f b` each unfold into `loop 3`, where `loop`
+-- is a recursive WHERE local that cannot be inlined, so both copies keep the
+-- local's one name though one reads a and the other b. Keyed by that name, they
+-- were one atom, and `top`, which is TRUE for a = TRUE, b = FALSE, was reported
+-- unsatisfiable (found by adversarial review of smucclaw/l4-ide#1013).
+-- `same` is the control: there the two copies ARE one proposition.
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE f x IF loop 3
+  WHERE
+    GIVEN n IS A NUMBER
+    GIVETH A BOOLEAN
+    loop n MEANS IF n EQUALS 0 THEN x ELSE loop (n - 1)
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE top IF f a AND NOT f b
+
+GIVEN a IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE same IF f a AND NOT f a
+
+#EVAL top TRUE FALSE

@@ -36,6 +36,7 @@ DECLARE RoseTree OF a
 GIVEN  a IS A TYPE
        t IS A RoseTree OF a
 GIVETH A NUMBER
+@nlg the number of nodes in %t%
 `count nodes` t MEANS
   1 + sum (map (GIVEN c YIELD `count nodes` c) (t's children))
 
@@ -43,6 +44,7 @@ GIVETH A NUMBER
 GIVEN  a IS A TYPE
        t IS A RoseTree OF a
 GIVETH A NUMBER
+@nlg the number of levels in %t%
 depth t MEANS
   CONSIDER t's children
     WHEN EMPTY THEN 1
@@ -52,6 +54,7 @@ depth t MEANS
 GIVEN  a IS A TYPE
        t IS A RoseTree OF a
 GIVETH A LIST OF a
+@nlg every value in %t%, in reading order
 flatten t MEANS
   (t's value) FOLLOWED BY concat (map (GIVEN c YIELD flatten c) (t's children))
 
@@ -61,6 +64,7 @@ GIVEN  a IS A TYPE
        f IS A FUNCTION FROM a TO b
        t IS A RoseTree OF a
 GIVETH A RoseTree OF b
+@nlg %t% with %f% applied to every value
 `map tree` f t MEANS
   RoseTree OF f (t's value), map (GIVEN c YIELD `map tree` f c) (t's children)
 
@@ -105,17 +109,20 @@ DECLARE Outline IS RoseTree OF Item
 -- types of the arguments.
 GIVEN  txt IS A STRING
 GIVETH AN Outline
+@nlg the numbered outline entry %txt%
 item txt MEANS RoseTree OF (Item OF txt, Auto), EMPTY
 
 GIVEN  txt IS A STRING
        c1  IS AN Outline
 GIVETH AN Outline
+@nlg the numbered outline entry %txt% with %c1% under it
 item txt c1 MEANS RoseTree OF (Item OF txt, Auto), (LIST c1)
 
 GIVEN  txt IS A STRING
        c1  IS AN Outline
        c2  IS AN Outline
 GIVETH AN Outline
+@nlg the numbered outline entry %txt% with %c1% and %c2% under it
 item txt c1 c2 MEANS RoseTree OF (Item OF txt, Auto), (LIST c1, c2)
 
 GIVEN  txt IS A STRING
@@ -123,6 +130,7 @@ GIVEN  txt IS A STRING
        c2  IS AN Outline
        c3  IS AN Outline
 GIVETH AN Outline
+@nlg the numbered outline entry %txt% with %c1%, %c2% and %c3% under it
 item txt c1 c2 c3 MEANS RoseTree OF (Item OF txt, Auto), (LIST c1, c2, c3)
 
 GIVEN  txt IS A STRING
@@ -131,12 +139,14 @@ GIVEN  txt IS A STRING
        c3  IS AN Outline
        c4  IS AN Outline
 GIVETH AN Outline
+@nlg the numbered outline entry %txt% with %c1%, %c2%, %c3% and %c4% under it
 item txt c1 c2 c3 c4 MEANS RoseTree OF (Item OF txt, Auto), (LIST c1, c2, c3, c4)
 
 -- Wide fan-out: pass the sub-items as an explicit list.
 GIVEN  txt  IS A STRING
        kids IS A LIST OF Outline
 GIVETH AN Outline
+@nlg the numbered outline entry %txt% with the entries %kids% under it
 item txt kids MEANS RoseTree OF (Item OF txt, Auto), kids
 
 -- The explicit-marker exceptions, for the irregular numbering legal drafting
@@ -148,11 +158,13 @@ item txt kids MEANS RoseTree OF (Item OF txt, Auto), kids
 GIVEN  lbl IS A STRING
        txt IS A STRING
 GIVETH AN Outline
+@nlg the outline entry %txt% marked %lbl% outside the count
 labeled lbl txt MEANS RoseTree OF (Item OF txt, (Pinned OF lbl, FALSE)), EMPTY
 
 GIVEN  lbl IS A STRING
        txt IS A STRING
 GIVETH AN Outline
+@nlg the outline entry %txt% marked %lbl% in place of the next number
 numbered lbl txt MEANS RoseTree OF (Item OF txt, (Pinned OF lbl, TRUE)), EMPTY
 
 -- `restartAt` resumes auto-numbering from a chosen value — the list-style
@@ -160,6 +172,7 @@ numbered lbl txt MEANS RoseTree OF (Item OF txt, (Pinned OF lbl, TRUE)), EMPTY
 GIVEN  n   IS A NUMBER
        txt IS A STRING
 GIVETH AN Outline
+@nlg the outline entry %txt% renumbered from %n%
 restartAt n txt MEANS RoseTree OF (Item OF txt, (Restart OF n)), EMPTY
 
 § `Numbering`
@@ -176,12 +189,14 @@ DECLARE NumberStyle IS ONE OF
 
 -- The conventional legal cascade: 1 / A / i / a, repeating Decimal for any
 -- depth beyond the fourth.
+@nlg the usual numbering of legal paragraphs (1, A, i, a)
 `default scheme` MEANS LIST Decimal, UpperAlpha, LowerRoman, LowerAlpha
 
 -- The 1-based position `n` rendered in the upper-case alphabet (1 -> "A").
 -- (Single letter only; positions beyond 26 are out of scope here.)
 GIVEN  n IS A NUMBER
 GIVETH A STRING
+@nlg the capital letter at position %n% in the alphabet
 `alpha` n MEANS SUBSTRING "ABCDEFGHIJKLMNOPQRSTUVWXYZ" (n - 1) 1
 
 -- The number `n` as an upper-case Roman numeral, by the standard subtractive
@@ -190,6 +205,7 @@ GIVETH A STRING
 -- so the guards stack vertically instead of forcing an indented ELSE-IF cascade.
 GIVEN  n IS A NUMBER
 GIVETH A STRING
+@nlg %n% in capital Roman numerals
 `roman` n MEANS
   BRANCH IF n AT LEAST 1000 THEN "M"  APPEND `roman` (n - 1000)
          IF n AT LEAST 900  THEN "CM" APPEND `roman` (n - 900)
@@ -210,6 +226,7 @@ GIVETH A STRING
 GIVEN  style IS A NumberStyle
        n     IS A NUMBER
 GIVETH A STRING
+@nlg the marker for position %n% in the style %style%
 `marker for` style n MEANS
   CONSIDER style
     WHEN Decimal    THEN TOSTRING n
@@ -224,6 +241,7 @@ GIVETH A STRING
 GIVEN  scheme IS A LIST OF NumberStyle
        d      IS A NUMBER
 GIVETH A NumberStyle
+@nlg the numbering style of %scheme% at depth %d%
 `style at` scheme d MEANS
   CONSIDER scheme
     WHEN EMPTY            THEN Decimal
@@ -240,6 +258,7 @@ GIVETH A NumberStyle
 GIVEN  scheme IS A LIST OF NumberStyle
        root   IS AN Outline
 GIVETH A LIST OF STRING
+@nlg the numbered lines of %root% under %scheme%
 `render outline` scheme root MEANS
   (root's value's text) FOLLOWED BY forest "" 0 (root's children)
   WHERE
@@ -277,6 +296,7 @@ GIVETH A LIST OF STRING
 --       i   fair wear and tear excepted
 --       ii  damage by insured risks excepted
 --   c   not assign or sublet without the Landlord's consent
+@nlg the example outline of a Tenant's covenants
 `sample` MEANS
   item "Tenant's covenants"
     (item "pay the Rent when due")
@@ -287,6 +307,7 @@ GIVETH A LIST OF STRING
 
 -- Inside a body paragraph the enumeration runs lettered, then roman — the clause
 -- number itself sits on the § heading, not here.
+@nlg the numbering of paragraphs inside a clause (a, i, A)
 `body scheme` MEANS LIST LowerAlpha, LowerRoman, UpperAlpha
 
 #EVAL `count nodes` `sample`               -- 6 (heading + 5 entries)
@@ -295,6 +316,7 @@ GIVETH A LIST OF STRING
 
 -- The "2b" exception, no-bump: `labeled` slots the pinned marker in without
 -- disturbing its neighbours, so Delivery keeps "2".
+@nlg the example outline with an entry 2b outside the count
 `amended` MEANS
   item "Clauses"
     (item "Payment")
@@ -304,6 +326,7 @@ GIVETH A LIST OF STRING
 #EVAL `render outline` `default scheme` `amended`   -- "1 Payment", "2b Late payment", "2 Delivery"
 
 -- The bump variant: `numbered` consumes a slot, so Delivery moves to "3".
+@nlg the example outline with an entry 2b in place of the next number
 `amended bumping` MEANS
   item "Clauses"
     (item "Payment")
@@ -313,6 +336,7 @@ GIVETH A LIST OF STRING
 #EVAL `render outline` `default scheme` `amended bumping`   -- "1 …", "2b …", "3 …"
 
 -- restart-at: the counter resumes from 7.
+@nlg the example outline of recitals 1, 2, 7 and 8
 `renumbered` MEANS
   item "Recitals"
     (item "Recital one")
@@ -324,6 +348,7 @@ GIVETH A LIST OF STRING
 
 -- Wide fan-out: `item` carries up to 4 children positionally; for more, pass
 -- them as an explicit LIST (which may equally hold labeled / restartAt nodes).
+@nlg the example outline of six defined terms
 `definitions` MEANS
   item "Definitions" (LIST
     item "Affiliate" ,

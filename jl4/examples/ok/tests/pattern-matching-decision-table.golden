@@ -1,6 +1,11 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+pattern-matching-decision-table.l4:27:8-14:
+  I found a problem while checking the definition of `tariff`:
+    This clause of `tariff` is never used.
+    Every input it matches is already matched by a clause above it, and the first clause that matches is the one that applies.
+    Remove it, or change its patterns.
 pattern-matching-decision-table.l4:30:1-23:
   10
 pattern-matching-decision-table.l4:31:1-23:

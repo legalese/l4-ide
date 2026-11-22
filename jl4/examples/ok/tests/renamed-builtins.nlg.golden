@@ -1,0 +1,6 @@
+executing contract `rent` at 0 with the following events: `WAIT UNTIL` with 8
+executing contract `rent` at 0 with the following events: `WAITUNTIL` with 8
+`both whole` with 3
+`both whole` with 2.5
+`ISINTEGER` with 3
+`ISINTEGER` with 2.5

@@ -2,7 +2,7 @@
 
 **Status:** 🏗️ v1 LANDED IN TS (unmerged, branch `mengwong/question-ordering-v1`); v2 (priors) SPEC'd + UNBLOCKED once PR #92 lands.
 **Goal:** Make the auto-generated citizen wizard ask the _fewest, most-relevant_ questions to reach a determined outcome.
-**Related:** `specs/done/BOOLEAN-MINIMIZATION-SPEC.md` (§"TYPICALLY: Overrideable Defaults"), `specs/done/PARTIAL-EVAL-VISUALIZER-SPEC.md`, `specs/todo/TYPICALLY-DEFAULTS-SPEC.md`; `doc/reference/query-planning/{README,robdd}.md` (the reference docs); PR #92 (TYPICALLY metadata-only).
+**Related:** `specs/done/BOOLEAN-MINIMIZATION-SPEC.md` (§"TYPICALLY: Overrideable Defaults"), `specs/done/PARTIAL-EVAL-VISUALIZER-SPEC.md`, `specs/todo/TYPICALLY-DEFAULTS-SPEC.md`; `doc/reference/query-planning/README.md` (the reference doc); PR #92 (TYPICALLY metadata-only).
 **Touches:** `ts-shared/boolean-analysis/src/{robdd.ts,decision-query.ts}`, `jl4-query-plan/src/L4/Decision/{BooleanDecisionQuery,QueryPlan}.hs`, `jl4-lsp/src/LSP/L4/Viz/QueryPlan.hs` (the weight seam), `jl4-core/src/L4/FunctionSchema.hs` (the TYPICALLY-extraction model to copy).
 
 ---

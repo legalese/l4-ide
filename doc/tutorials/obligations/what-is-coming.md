@@ -50,6 +50,16 @@ Read `EVERY Flatmate f` as "for every flatmate, call them f": one obligation per
 
 The thing to see is the clock on the follow-on: the landlord's five days start on day 9, the last signature, and not on day 1 or day 2. (The compiler's own picture of the rule's _shape_ — one edge for the whole group, with `ONCE ALL HAVE` written on it — is on the reference page, under [Seen as a diagram](../../reference/regulative/EVERY.md#seen-as-a-diagram).) If somebody does not sign, the `LEST` fires once for the group. And here the third gap this page opened with is half closed (15 September 2026). Leave the `LEST` off, and the breach names **every** flatmate who did not sign, in the order the list gave them. Write a `LEST`, as above, and what fires is the `LEST` you wrote: it belongs to the group and not to any one member, so there is no member for it to name — `LEST BREACH BY f` is refused when the rule is run — and a bare `LEST BREACH` is a bare breach. You may name people in it yourself, one or several (`LEST BREACH BY LIST alice, bob`), but those are names you chose. If you need to know who did not sign and the `LEST` has to stay, ask the rule what is still outstanding instead — that answer does list them by name.
 
+**Only some of them.** A group is often narrower than the list it is drawn from — the flatmates whose share is at least $500, say, when the flatmates carry their shares with them. `WHO` takes a condition naming the member, and `WHOSE` is the same condition with the member filled in, the first word of each line being something the member has:
+
+```l4
+-- BUILT. These two lines mean the same thing.
+EVERY Flatmate f IN flatmates WHO   f's share AT LEAST 500
+EVERY Flatmate f IN flatmates WHOSE share AT LEAST 500
+```
+
+Several conditions go one per line, joined by `...` (and) or `..` (or). `WHOSE` reads only the first word of each line as the member's, so nothing else in the condition changes meaning; anything that does not start with one of the member's own names is written with `WHO`. The [reference page](../../reference/regulative/EVERY.md#whose-the-same-filter-without-spelling-out-the-member) has the rest, including what `WHOSE` refuses and why.
+
 ---
 
 ## 2. Each With Its Own
@@ -126,7 +136,7 @@ And all three sit beside `RAND` and `ROR` rather than replacing them. `RAND` and
 
 Pieces 1 and 2 landed on 8 September 2026, and what remains is piece 3, "enough of them". The specification lists what it needs, and this page repeats it so that a reader can check the state of things without opening the design document: a way for L4 to read a `ONCE` line that carries a count or a total rather than the word `ALL`; a way to run it, which is a running total kept where the group is counted; a breach that carries a set of people rather than one — **built on 15 September 2026**: a breach now carries a list of failures, one per person and per way they failed, and `BREACH BY LIST …` writes one by hand; and test files for the rent by total and by share and for the quorum.
 
-What is still missing of the third gap is narrower than an earlier version of this page said. A group obligation with no `LEST` now names everyone who did not act. What no `LEST` can yet do is name them itself: `LEST BREACH BY EVERY Flatmate`, in the block above, is the spelling the design proposes for that, and it is not ruled. Until it is, a barrier's `LEST` names whom you wrote, or nobody.
+What is still missing of the third gap is narrower than an earlier version of this page said. A group obligation with no `LEST` now names everyone who did not act. What no `LEST` can yet do is name them itself: `LEST BREACH BY EVERY Flatmate`, in the block above, is the spelling the design proposes for that, and it was deferred on 21 September 2026 rather than ruled — until there is a case that needs "everyone who failed" as a value of its own. Until then, a barrier's `LEST` names whom you wrote, or nobody; leave the `LEST` off and the breach names every flatmate who did not act.
 
 When piece 3 lands, this page is deleted and the material moves into [Several Parties](several-parties.md), where the gaps it fills were shown.
 

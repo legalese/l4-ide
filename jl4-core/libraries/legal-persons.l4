@@ -11,7 +11,9 @@ IMPORT jurisdiction
 
 §§ `Version`
 
+@nlg the version of the Legal Persons Library
 `Legal Persons Library Version` MEANS "1.0.0"
+@nlg the version date of the Legal Persons Library
 `Legal Persons Library Date` MEANS "2024-12-16"
 
 
@@ -22,6 +24,7 @@ IMPORT jurisdiction
 GIVEN firstName IS A STRING
       lastName IS A STRING
 GIVETH A STRING
+@nlg the full name comprising first name %firstName% and last name %lastName%
 `full name` MEANS
     CONCAT firstName, CONCAT " ", lastName
 
@@ -29,6 +32,7 @@ GIVEN firstName IS A STRING
       middleName IS A STRING
       lastName IS A STRING
 GIVETH A STRING
+@nlg the full name comprising first name %firstName%, middle name %middleName% and last name %lastName%
 `full name with middle` MEANS
     CONCAT firstName, CONCAT " ", CONCAT middleName, CONCAT " ", lastName
 
@@ -36,6 +40,7 @@ GIVEN prefix IS A STRING
       firstName IS A STRING
       lastName IS A STRING
 GIVETH A STRING
+@nlg the formal name comprising prefix %prefix%, first name %firstName% and last name %lastName%
 `formal name` MEANS
     CONCAT prefix, CONCAT " ", CONCAT firstName, CONCAT " ", lastName
 
@@ -50,6 +55,7 @@ GIVEN street IS A STRING
       postalCode IS A STRING
       countryCode IS A STRING
 GIVETH A STRING
+@nlg the address comprising street %street%, city %city%, state %state%, postal code %postalCode% and country code %countryCode%
 `format address` MEANS
     CONCAT stateWithPostal, CONCAT ", ", countryCode
     WHERE
@@ -59,18 +65,21 @@ GIVETH A STRING
 
 GIVEN postalCode IS A STRING
 GIVETH A BOOLEAN
+@nlg %postalCode% has 5 or 10 characters, the length of a US ZIP code
 `is valid US zip code` MEANS
     STRINGLENGTH postalCode EQUALS 5
     OR STRINGLENGTH postalCode EQUALS 10  -- ZIP+4 format: 12345-6789
 
 GIVEN postalCode IS A STRING
 GIVETH A BOOLEAN
+@nlg %postalCode% has 5 to 8 characters, the length of a UK postcode
 `is valid UK postcode` MEANS
     STRINGLENGTH postalCode AT LEAST 5
     AND STRINGLENGTH postalCode AT MOST 8
 
 GIVEN postalCode IS A STRING
 GIVETH A BOOLEAN
+@nlg %postalCode% has 7 characters, the length of a Canadian postal code
 `is valid Canadian postal code` MEANS
     STRINGLENGTH postalCode EQUALS 7  -- Format: A1A 1A1
 
@@ -79,16 +88,23 @@ GIVETH A BOOLEAN
 
 -- Common identity document types and validation
 
+@nlg the identity document type for a passport
 `Passport type` MEANS "PASSPORT"
+@nlg the identity document type for a national ID
 `National ID type` MEANS "NATIONAL_ID"
+@nlg the identity document type for a driver's license
 `Drivers License type` MEANS "DRIVERS_LICENSE"
+@nlg the identity document type for a Social Security number
 `Social Security type` MEANS "SSN"
+@nlg the identity document type for a tax identification number
 `Tax ID type` MEANS "TAX_ID"
+@nlg the identity document type for a residence permit
 `Residence Permit type` MEANS "RESIDENCE_PERMIT"
 
 
 GIVEN ssn IS A STRING
 GIVETH A BOOLEAN
+@nlg %ssn% has 11 characters with hyphens placed as in a US Social Security number
 `is valid US SSN format` MEANS
     STRINGLENGTH ssn EQUALS 11  -- Format: XXX-XX-XXXX
     AND SUBSTRING ssn 3 1 EQUALS "-"
@@ -96,6 +112,7 @@ GIVETH A BOOLEAN
 
 GIVEN sin IS A STRING
 GIVETH A BOOLEAN
+@nlg %sin% has 11 characters with hyphens placed as in a Canadian Social Insurance Number
 `is valid Canadian SIN format` MEANS
     STRINGLENGTH sin EQUALS 11  -- Format: XXX-XXX-XXX
     AND SUBSTRING sin 3 1 EQUALS "-"
@@ -103,6 +120,7 @@ GIVETH A BOOLEAN
 
 GIVEN nino IS A STRING
 GIVETH A BOOLEAN
+@nlg %nino% has 9 characters, the length of a UK National Insurance number
 `is valid UK NINO format` MEANS
     STRINGLENGTH nino EQUALS 9  -- Format: AB123456C
 
@@ -112,6 +130,7 @@ GIVETH A BOOLEAN
 GIVEN birthDate IS A DATE
       referenceDate IS A DATE
 GIVETH A NUMBER
+@nlg the age in completed years on %referenceDate% of a person born on %birthDate%
 `age in years` MEANS
     years MINUS adjustment
     WHERE
@@ -127,6 +146,7 @@ GIVETH A NUMBER
 
 GIVEN birthDate IS A DATE
 GIVETH A NUMBER
+@nlg the present age in completed years of a person born on %birthDate%
 `current age` MEANS
     `age in years` birthDate TODAY
 
@@ -134,12 +154,14 @@ GIVEN birthDate IS A DATE
       minimumAge IS A NUMBER
       referenceDate IS A DATE
 GIVETH A BOOLEAN
+@nlg a person born on %birthDate% is at least %minimumAge% years old on %referenceDate%
 `is at least age` MEANS
     `age in years` birthDate referenceDate AT LEAST minimumAge
 
 GIVEN birthDate IS A DATE
       minimumAge IS A NUMBER
 GIVETH A BOOLEAN
+@nlg a person born on %birthDate% is at least %minimumAge% years old today
 `is currently at least age` MEANS
     `is at least age` birthDate minimumAge TODAY
 
@@ -149,6 +171,7 @@ GIVETH A BOOLEAN
 GIVEN birthDate IS A DATE
       jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg a person born on %birthDate% has reached the age of majority in %jurisdictionCode%, 18 by default
 `is adult` MEANS
     BRANCH
         IF jurisdictionCode EQUALS `United States alpha-2`
@@ -166,18 +189,21 @@ GIVETH A BOOLEAN
 GIVEN birthDate IS A DATE
       jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg a person born on %birthDate% is under the age of majority in %jurisdictionCode%, 18 by default
 `is minor` MEANS
     NOT `is adult` birthDate jurisdictionCode
 
 GIVEN birthDate IS A DATE
       jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg a person born on %birthDate% is of age to contract in %jurisdictionCode%, 18 by default
 `can enter contract` MEANS
     `is adult` birthDate jurisdictionCode
 
 GIVEN birthDate IS A DATE
       jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg a person born on %birthDate% is of voting age in %jurisdictionCode%, 18 by default
 `can vote` MEANS
     BRANCH
         IF jurisdictionCode EQUALS `United States alpha-2`
@@ -200,12 +226,14 @@ GIVETH A BOOLEAN
 GIVEN citizenshipCode IS A STRING
       countryCode IS A STRING
 GIVETH A BOOLEAN
+@nlg citizenship %citizenshipCode% is that of %countryCode%
 `is citizen of` MEANS
     citizenshipCode EQUALS countryCode
 
 GIVEN citizenships IS A LIST OF STRING
       countryCode IS A STRING
 GIVETH A BOOLEAN
+@nlg %citizenships% lists the citizenship of %countryCode%
 `has citizenship in` MEANS
     CONSIDER citizenships
     WHEN EMPTY THEN FALSE
@@ -217,6 +245,7 @@ GIVETH A BOOLEAN
 
 GIVEN citizenships IS A LIST OF STRING
 GIVETH A BOOLEAN
+@nlg %citizenships% lists more than one citizenship
 `has multiple citizenships` MEANS
     CONSIDER citizenships
     WHEN EMPTY THEN FALSE
@@ -227,6 +256,7 @@ GIVETH A BOOLEAN
 
 GIVEN citizenships IS A LIST OF STRING
 GIVETH A NUMBER
+@nlg the number of citizenships listed in %citizenships%
 `citizenship count` MEANS
     CONSIDER citizenships
     WHEN EMPTY THEN 0
@@ -237,14 +267,23 @@ GIVETH A NUMBER
 
 -- Common corporate entity structures
 
+@nlg the entity type for a corporation
 `Corporation type` MEANS "CORPORATION"
+@nlg the entity type for a limited liability company
 `LLC type` MEANS "LLC"
+@nlg the entity type for a limited liability partnership
 `LLP type` MEANS "LLP"
+@nlg the entity type for a partnership
 `Partnership type` MEANS "PARTNERSHIP"
+@nlg the entity type for a sole proprietorship
 `Sole Proprietorship type` MEANS "SOLE_PROPRIETORSHIP"
+@nlg the entity type for a non-profit organization
 `Non-Profit type` MEANS "NON_PROFIT"
+@nlg the entity type for a cooperative
 `Cooperative type` MEANS "COOPERATIVE"
+@nlg the entity type for a trust
 `Trust type` MEANS "TRUST"
+@nlg the entity type for a foundation
 `Foundation type` MEANS "FOUNDATION"
 
 
@@ -252,17 +291,20 @@ GIVETH A NUMBER
 
 GIVEN ein IS A STRING
 GIVETH A BOOLEAN
+@nlg %ein% has 10 characters with a hyphen placed as in a US Employer Identification Number
 `is valid US EIN format` MEANS
     STRINGLENGTH ein EQUALS 10  -- Format: XX-XXXXXXX
     AND SUBSTRING ein 2 1 EQUALS "-"
 
 GIVEN crn IS A STRING
 GIVETH A BOOLEAN
+@nlg %crn% has 8 characters, the length of a UK company registration number
 `is valid UK CRN format` MEANS
     STRINGLENGTH crn EQUALS 8  -- Format: 8 digits or 2 letters + 6 digits
 
 GIVEN bn IS A STRING
 GIVETH A BOOLEAN
+@nlg %bn% has 9 characters, the length of a Canadian Business Number
 `is valid Canadian BN format` MEANS
     STRINGLENGTH bn EQUALS 9  -- Format: 9 digits
 
@@ -271,35 +313,46 @@ GIVETH A BOOLEAN
 
 GIVEN incorporationDate IS A DATE
 GIVETH A NUMBER
+@nlg the current year less the year of incorporation on %incorporationDate%
 `years since incorporation` MEANS
     DATE_YEAR TODAY MINUS DATE_YEAR incorporationDate
 
 GIVEN incorporationDate IS A DATE
       minimumYears IS A NUMBER
 GIVETH A BOOLEAN
+@nlg the year of incorporation on %incorporationDate% is at least %minimumYears% years before the current year
 `established for at least` MEANS
     `years since incorporation` incorporationDate AT LEAST minimumYears
 
 GIVEN incorporationDate IS A DATE
       dissolutionDate IS A DATE
 GIVETH A BOOLEAN
+@nlg the dissolution date %dissolutionDate% of a company incorporated on %incorporationDate% is before today
 `is dissolved` MEANS
     `__LT__` dissolutionDate TODAY
 
 GIVEN incorporationDate IS A DATE
 GIVETH A BOOLEAN
+@nlg the date of incorporation %incorporationDate% is before today
 `is active corporation` MEANS
     `__LT__` incorporationDate TODAY
 
 
 §§ `Corporate Relationship Types`
 
+@nlg the corporate relationship type for a wholly-owned subsidiary
 `Wholly-owned subsidiary relationship` MEANS "WHOLLY_OWNED_SUBSIDIARY"
+@nlg the corporate relationship type for a majority-owned subsidiary
 `Majority-owned subsidiary relationship` MEANS "MAJORITY_OWNED_SUBSIDIARY"
+@nlg the corporate relationship type for a minority stake
 `Minority stake relationship` MEANS "MINORITY_STAKE"
+@nlg the corporate relationship type for a joint venture
 `Joint venture relationship` MEANS "JOINT_VENTURE"
+@nlg the corporate relationship type for a parent company
 `Parent company relationship` MEANS "PARENT_COMPANY"
+@nlg the corporate relationship type for a sister company
 `Sister company relationship` MEANS "SISTER_COMPANY"
+@nlg the corporate relationship type for an affiliated entity
 `Affiliated entity relationship` MEANS "AFFILIATED_ENTITY"
 
 
@@ -307,21 +360,25 @@ GIVETH A BOOLEAN
 
 GIVEN ownershipPercentage IS A NUMBER
 GIVETH A BOOLEAN
+@nlg an ownership percentage of %ownershipPercentage% meets the 25 percent threshold for beneficial ownership
 `is beneficial owner` MEANS
     ownershipPercentage AT LEAST 25  -- Common threshold: 25%
 
 GIVEN ownershipPercentage IS A NUMBER
 GIVETH A BOOLEAN
+@nlg an ownership percentage of %ownershipPercentage% exceeds 50 percent, giving majority ownership
 `is majority owner` MEANS
     ownershipPercentage GREATER THAN 50
 
 GIVEN ownershipPercentage IS A NUMBER
 GIVETH A BOOLEAN
+@nlg an ownership percentage of %ownershipPercentage% exceeds 50 percent, giving a controlling interest
 `is controlling owner` MEANS
     ownershipPercentage GREATER THAN 50
 
 GIVEN ownershipPercentage IS A NUMBER
 GIVETH A BOOLEAN
+@nlg an ownership percentage of %ownershipPercentage% meets the 25 percent threshold for significant control
 `has significant control` MEANS
     ownershipPercentage AT LEAST 25
 
@@ -330,11 +387,13 @@ GIVETH A BOOLEAN
 
 GIVEN jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg the jurisdiction code %jurisdictionCode% is that of Delaware
 `is Delaware corporation` MEANS
     jurisdictionCode EQUALS `Delaware code`
 
 GIVEN jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg the jurisdiction code %jurisdictionCode% is that of the United Kingdom or one of its constituent countries
 `is UK corporation` MEANS
     jurisdictionCode EQUALS `United Kingdom alpha-2`
     OR jurisdictionCode EQUALS `England code`
@@ -344,11 +403,13 @@ GIVETH A BOOLEAN
 
 GIVEN jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg the jurisdiction code %jurisdictionCode% begins with the alpha-2 code for Canada
 `is Canadian corporation` MEANS
     SUBSTRING jurisdictionCode 0 2 EQUALS `Canada alpha-2`
 
 GIVEN jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg the jurisdiction code %jurisdictionCode% begins with the alpha-2 code for the United States
 `is US corporation` MEANS
     SUBSTRING jurisdictionCode 0 2 EQUALS `United States alpha-2`
 
@@ -359,6 +420,7 @@ GIVETH A BOOLEAN
 
 GIVEN jurisdictionCode IS A STRING
 GIVETH A BOOLEAN
+@nlg a registered agent is required in %jurisdictionCode%, as a US, UK or Canadian jurisdiction
 `requires registered agent` MEANS
     `is US corporation` jurisdictionCode
     OR `is UK corporation` jurisdictionCode
@@ -367,6 +429,7 @@ GIVETH A BOOLEAN
 GIVEN businessJurisdiction IS A STRING
       operatingJurisdiction IS A STRING
 GIVETH A BOOLEAN
+@nlg foreign qualification is required, as home jurisdiction %businessJurisdiction% and operating jurisdiction %operatingJurisdiction% are different US jurisdictions
 `is foreign qualification required` MEANS
     NOT businessJurisdiction EQUALS operatingJurisdiction
     AND `is US corporation` businessJurisdiction

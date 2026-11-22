@@ -8,6 +8,7 @@ module QueryPlanSpec (spec) where
 import Test.Hspec
 
 import Data.Either (isLeft, isRight)
+import Data.Foldable (for_)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -105,9 +106,9 @@ DECIDE d IF presumed OR a OR b
 -- @n GREATER THAN 5@ is not a bare boolean binder, so each occurrence goes through
 -- 'L4.Viz.Ladder.leafFromExpr', which mints a FRESH unique per occurrence — unlike
 -- a bare @Ref@, which reuses the resolved name's unique and so is shared. Both
--- occurrences carry the same label and the same input-ref closure, so
--- 'L4.Viz.Ladder.generateAtomId' gives them the SAME atomId. One question, two BDD
--- variables: the shape 'atomIdentityTests' exists to pin.
+-- occurrences are the same term, so they carry the same C1 key and the SAME
+-- atomId ("L4.Viz.AtomKey", R3). One question, two BDD variables: the shape
+-- 'atomIdentityTests' exists to pin.
 --
 -- The decision is arranged so that answering that one question DETERMINES the
 -- outcome, but only if both variables are bound: @n > 5@ false refutes both
@@ -142,6 +143,17 @@ GIVEN a IS A BOOLEAN
       c IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `app leaf` IF (`both of` a b) OR c
+|]
+
+-- | A rule that reaches a refusal through a rule of no inputs (R7).
+refusingL4 :: Text
+refusingL4 = [i|
+GIVETH A BOOLEAN
+`not modelled` MEANS REFUSE "the other conditions are not modelled"
+
+GIVEN adult IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE eligible IF adult AND `not modelled`
 |]
 
 -- A rule with the shape of a real one: a scope, a requirement, and a seam between
@@ -219,7 +231,7 @@ svcQP = svcQPNamed "test"
 -- | Run a jl4-service query plan under a given function name.
 --
 -- The name is not decoration: it is the first component of every atomId
--- ('L4.Viz.Ladder.generateAtomId'), so any test that compares atomIds across
+-- ('L4.Viz.AtomKey.atomIdOfKey'), so any test that compares atomIds across
 -- surfaces must pass the name the ladder was built under. 'DataPlane' does this
 -- by construction — @requireDecisionQueryCache@ and @queryPlan@ are handed the
 -- same @fnName@ — which 'svcQP' (fixed at @"test"@) does not model.
@@ -230,6 +242,7 @@ svcQPNamed name cache bindings =
     , fnArguments = Map.fromList [(k, Just (FnLitBool v)) | (k, v) <- bindings]
     , startTime = Nothing
     , events = Nothing
+    , presumption = Nothing
     }
 
 -- | Run an LSP query plan.
@@ -247,11 +260,39 @@ ladderAtomIdsOf info = go info.funDecl.body
     VizExpr.Or _ xs -> concatMap go xs
     VizExpr.Not _ x -> go x
     VizExpr.Implies _ scope requirement _ -> go scope <> go requirement
-    VizExpr.UBoolVar _ _ _ _ aid _ -> [aid]
-    VizExpr.App _ _ args aid -> aid : concatMap go args
+    VizExpr.UBoolVar _ _ _ _ aid _ _ -> [aid]
+    VizExpr.App _ _ args aid _ -> aid : concatMap go args
     VizExpr.TrueE{} -> []
     VizExpr.FalseE{} -> []
     VizExpr.InertE{} -> []
+
+-- | Every leaf's @atomId@ with its @unique@, in traversal order.
+ladderAtomsOf :: VizExpr.RenderAsLadderInfo -> [(Text, Int)]
+ladderAtomsOf info = go info.funDecl.body
+ where
+  go :: VizExpr.IRExpr -> [(Text, Int)]
+  go = \case
+    VizExpr.And _ xs -> concatMap go xs
+    VizExpr.Or _ xs -> concatMap go xs
+    VizExpr.Not _ x -> go x
+    VizExpr.Implies _ scope requirement _ -> go scope <> go requirement
+    VizExpr.UBoolVar _ nm _ _ aid _ _ -> [(aid, nm.unique)]
+    VizExpr.App _ nm args aid _ -> (aid, nm.unique) : concatMap go args
+    VizExpr.TrueE{} -> []
+    VizExpr.FalseE{} -> []
+    VizExpr.InertE{} -> []
+
+-- | The atomIds that name TWINS: one question held by two or more different
+-- uniques, so two variables to the planner. A bare name drawn twice is not a
+-- twin: both copies carry the name's own unique, one variable. Picking "any
+-- atomId drawn twice" used to work only because of how the ids happened to
+-- sort; under 'Transform.simplify' the bare inputs are drawn twice too.
+twinsOf :: [(Text, Int)] -> [Text]
+twinsOf atoms =
+  [ a
+  | (a, us) <- Map.toList (Map.fromListWith (<>) [(a, [u]) | (a, u) <- atoms])
+  , length (List.nub us) >= 2
+  ]
 
 -- | A UUID in the 8-4-4-4-12 shape 'L4.Crypto.UUID5' emits.
 looksLikeUuid :: Text -> Bool
@@ -296,10 +337,10 @@ spec = do
 --
 -- FACE 2. 'L4.Decision.QueryPlan.queryPlan' inverted its @unique -> atomId@ map
 -- with @Map.fromList@, which is last-wins. Twin atoms — two occurrences of one
--- compound leaf, which share an atomId by construction because 'generateAtomId'
--- is a function of (function, label, refs) — collapsed to whichever unique came
--- last, so answering that question bound one occurrence and left the other
--- unknown forever.
+-- compound leaf, which share an atomId by construction because the atomId is a
+-- function of (function, term) — collapsed to whichever unique came last, so
+-- answering that question bound one occurrence and left the other unknown
+-- forever.
 --
 -- Both faces are about the SAME invariant, which is what these tests state
 -- directly: an atomId names a question, a question may have more than one
@@ -327,9 +368,7 @@ atomIdentityTests = do
     -- Guards the two tests below: if a future change to leafFromExpr or to
     -- L4.Transform.simplify stops producing twins, they would pass vacuously.
     cache <- serviceCache "twins" twinLeavesL4
-    let ids = ladderAtomIdsOf cache.ladderInfo
-        dupes = [a | (a : _ : _) <- List.group (List.sort ids)]
-    dupes `shouldSatisfy` (not . null)
+    twinsOf (ladderAtomsOf cache.ladderInfo) `shouldSatisfy` (not . null)
     twinAtomIdOf (svcQPNamed "twins" cache []).ranked `shouldSatisfy` Maybe.isJust
 
   it "binding a twin by the query plan's own atomId binds EVERY occurrence" do
@@ -346,9 +385,8 @@ atomIdentityTests = do
   it "binding a twin by the LADDER's atomId binds EVERY occurrence" do
     -- The two faces composed: this is what the wizard actually does.
     cache <- serviceCache "twins" twinLeavesL4
-    let ids = ladderAtomIdsOf cache.ladderInfo
-    twinId <- case [a | (a : _ : _) <- List.group (List.sort ids)] of
-      [] -> fail "the ladder carries no duplicated atomId"
+    twinId <- case twinsOf (ladderAtomsOf cache.ladderInfo) of
+      [] -> fail "the ladder carries no twin atomId"
       (t : _) -> pure t
     (svcQPNamed "twins" cache [(twinId, False)]).determined `shouldBe` Just False
 
@@ -376,6 +414,23 @@ atomIdentityTests = do
           List.sort (List.nub [a.atomId | a <- (lspQP "compute_qualifies" params info vizState []).ranked])
     svcIds `shouldBe` lspIds
     svcIds `shouldBe` lspPlanIds
+
+  it "LSP and service paths agree on atom identity for an App's arguments too" do
+    -- The arguments of an all-BOOLEAN App are ladder leaves but not plan
+    -- variables. jl4-lsp names them with 'LspQP.ladderAtomIds'; the service used
+    -- the plan-only map and left them the visualiser's numeric-ref ids, so the
+    -- IDE and the service gave `a` two different atomIds (measured 2026-10-05).
+    -- The parity test above has no App, so it could not see that.
+    -- Both under the name the service serves it by: the diagram's own label is
+    -- backticked, and the name is the first component of every atomId.
+    cache <- serviceCache "app leaf" appOfBooleansL4
+    (info, vizState, _params) <- lspCache "app leaf" appOfBooleansL4
+    let lspMap = LspQP.ladderAtomIds "app leaf" (LspQP.buildQueryPlanCache info vizState)
+        annotated = LspQP.annotateLadderWithAtomIdsUsing lspMap info
+        svcIds = List.sort (List.nub (ladderAtomIdsOf cache.ladderInfo))
+    -- the App, its two arguments, and c
+    length svcIds `shouldBe` 4
+    svcIds `shouldBe` List.sort (List.nub (ladderAtomIdsOf annotated))
 
 
 -- | The ladder is built by distributing OR over AND to reach a normal form, so
@@ -550,6 +605,26 @@ serviceTests = do
           rPartial = svcQP c [("walks", True)]
       length rPartial.asks `shouldSatisfy` (<= length rNone.asks)
 
+  -- The guard for a corpus that refuses on one path only: Reg CF's money rules
+  -- refuse for a rule date before 2022-09-20 (`the aggregate offering cap`, a
+  -- NUMBER that refuses on one arm of a BRANCH). None of its boolean decisions has
+  -- a leaf the plan treats as a refusal, so every one is planned exactly as before.
+  describe "regcf-denovo: no boolean decision has a refusing leaf" do
+    let exports =
+          [ "the exemption is available"
+          , "the ongoing reporting obligation continues"
+          , "the resale is permitted"
+          , "the person is a disqualifying covered person"
+          , "the offering may be closed early"
+          , "the person may act as an intermediary"
+          , "the funding portal activity is within the safe harbour"
+          ]
+    for_ exports \fn ->
+      it (Text.unpack fn) do
+        src <- Text.pack <$> readFile "../jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4"
+        c <- serviceCache fn src
+        c.core.refusalsByUnique `shouldBe` mempty
+
   -- The VERDICT, end to end from L4 source (DESIGN §25.7). `determined` is the
   -- function's truth value and stays correct throughout; what these pin is that it is
   -- NOT the thing to show a user, and that the planner now knows the difference.
@@ -640,6 +715,22 @@ lspTests = do
       let r = lspQP "simple and" params info state [("a", True), ("b", True)]
       r.determined `shouldBe` Just True
       r.stillNeeded `shouldBe` []
+
+  -- The editor's wizard plans from the same ladder state the service does, so it
+  -- reaches a refusal where evaluation does too, and never asks the rule that
+  -- refuses.
+  describe "a refusal" do
+    it "is reached where evaluation reaches it, and the refusing rule is never asked" do
+      (info, state, params) <- lspCache "eligible" refusingL4
+      let ask = lspQP "eligible" params info state []
+          refused = lspQP "eligible" params info state [("adult", True)]
+          fails = lspQP "eligible" params info state [("adult", False)]
+      map (.label) ask.stillNeeded `shouldBe` ["adult"]
+      refused.verdict `shouldBe` QP.Refused
+      refused.determined `shouldBe` Nothing
+      fmap (.reasons) refused.refusal `shouldBe` Just ["the other conditions are not modelled"]
+      fails.verdict `shouldBe` QP.Fails
+      fails.refusal `shouldBe` Nothing
 
   describe "OR" do
     it "determined True on short-circuit" do
@@ -856,9 +947,10 @@ atomIdentityShapeTests = do
   -- `l4-ladder-visualizer` turns them into child nodes) but they are not BDD
   -- variables: 'vizExprToBoolExpr' compiles the whole application to one @BVar@
   -- and does not descend. So they are not in the atomId map, are not plan atoms,
-  -- and are not answerable — before this change or after it. They keep the
-  -- visualiser's UUID, which is what makes them distinguishable from an atom
-  -- rather than colliding with the decimal `unique` binding key.
+  -- and are not answerable — before this change or after it. They carry a UUID
+  -- minted the way a plan atom's is ('LspQP.ladderAtomIds'), which is what makes
+  -- them distinguishable from an atom rather than colliding with the decimal
+  -- `unique` binding key.
   it "an App's boolean arguments are ladder leaves but NOT plan atoms" do
     cache <- serviceCache "app leaf" appOfBooleansL4
     let plan = svcQPNamed "app leaf" cache []
@@ -872,16 +964,22 @@ atomIdentityShapeTests = do
 
   -- The only atomIds committed anywhere in this repo are the four in
   -- `ts-shared/ladder-core/test/fixtures/may-purchase-alcohol.viz.json`, a viz
-  -- payload captured from a live jl4-lsp. They are the ANNOTATED ids, so this
-  -- change must leave them exactly where they are; if it ever moves them, the TS
-  -- consumer test breaks in a repo that this suite cannot see.
+  -- payload captured from a live jl4-lsp. They are the ANNOTATED ids, and a TS
+  -- consumer in another repo pins the same ones, so a change that moves them
+  -- moves them for that consumer too. They have moved twice, each time
+  -- deliberately, and the fixture was restamped in the same change: when an
+  -- atomId became the hash of the leaf's term rather than its label (R3,
+  -- smucclaw/l4-ide#1013), and when `Extension` gained the `@nonassertable`
+  -- fields (the key is `show` of the AST with its annotations emptied, and
+  -- `show` of an `Extension` lists every field it has, so a new field moves
+  -- every id).
   it "the atomIds committed in the ladder-core TS fixture are unmoved" do
     src <- Text.pack <$> readFile "../jl4/examples/ok/typically-basic.l4"
     (info, vizState, _params) <- lspCache "may purchase alcohol" src
     let annotated = List.sort (List.nub (ladderAtomIdsOf (LspQP.annotateLadderWithAtomIds info vizState)))
     annotated
-      `shouldBe` [ "6326bf0e-555f-51cc-8c60-8f958d7825c5"
-                 , "a5cd464e-b7c1-5e50-9afd-6965842b9386"
-                 , "e5ac8240-0124-50f5-a0be-b3fdd4cee33b"
-                 , "f94522fa-cdea-5274-944d-99fdb5ba24c8"
+      `shouldBe` [ "1e91cf87-7f70-5d77-bb64-c7fc5812072d"
+                 , "4dc37cfa-2efe-563b-a9f2-957c2285b149"
+                 , "53fd1fd0-6832-52fb-b9ab-3d5e073c71e3"
+                 , "6ed1531c-0dbc-53e2-ab1b-253baf8d2543"
                  ]

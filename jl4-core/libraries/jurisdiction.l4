@@ -9,7 +9,9 @@ IMPORT prelude
 
 §§ `Version`
 
+@nlg the version of the Jurisdiction Library
 `Jurisdiction Library Version` MEANS "1.0.0"
+@nlg the version date of the Jurisdiction Library
 `Jurisdiction Library Date` MEANS "2024-12-16"
 
 
@@ -18,156 +20,256 @@ IMPORT prelude
 -- Major countries with both alpha-2 and alpha-3 codes
 -- Format: Country name, 2-letter code, 3-letter code, numeric code
 
+@nlg the ISO 3166 alpha-2 code for the United States
 `United States alpha-2` MEANS "US"
+@nlg the ISO 3166 alpha-3 code for the United States
 `United States alpha-3` MEANS "USA"
+@nlg the ISO 3166 numeric code for the United States
 `United States numeric` MEANS 840
 
+@nlg the ISO 3166 alpha-2 code for the United Kingdom
 `United Kingdom alpha-2` MEANS "GB"
+@nlg the ISO 3166 alpha-3 code for the United Kingdom
 `United Kingdom alpha-3` MEANS "GBR"
+@nlg the ISO 3166 numeric code for the United Kingdom
 `United Kingdom numeric` MEANS 826
 
+@nlg the ISO 3166 alpha-2 code for Canada
 `Canada alpha-2` MEANS "CA"
+@nlg the ISO 3166 alpha-3 code for Canada
 `Canada alpha-3` MEANS "CAN"
+@nlg the ISO 3166 numeric code for Canada
 `Canada numeric` MEANS 124
 
+@nlg the ISO 3166 alpha-2 code for Australia
 `Australia alpha-2` MEANS "AU"
+@nlg the ISO 3166 alpha-3 code for Australia
 `Australia alpha-3` MEANS "AUS"
+@nlg the ISO 3166 numeric code for Australia
 `Australia numeric` MEANS 36
 
+@nlg the ISO 3166 alpha-2 code for Germany
 `Germany alpha-2` MEANS "DE"
+@nlg the ISO 3166 alpha-3 code for Germany
 `Germany alpha-3` MEANS "DEU"
+@nlg the ISO 3166 numeric code for Germany
 `Germany numeric` MEANS 276
 
+@nlg the ISO 3166 alpha-2 code for France
 `France alpha-2` MEANS "FR"
+@nlg the ISO 3166 alpha-3 code for France
 `France alpha-3` MEANS "FRA"
+@nlg the ISO 3166 numeric code for France
 `France numeric` MEANS 250
 
+@nlg the ISO 3166 alpha-2 code for China
 `China alpha-2` MEANS "CN"
+@nlg the ISO 3166 alpha-3 code for China
 `China alpha-3` MEANS "CHN"
+@nlg the ISO 3166 numeric code for China
 `China numeric` MEANS 156
 
+@nlg the ISO 3166 alpha-2 code for Japan
 `Japan alpha-2` MEANS "JP"
+@nlg the ISO 3166 alpha-3 code for Japan
 `Japan alpha-3` MEANS "JPN"
+@nlg the ISO 3166 numeric code for Japan
 `Japan numeric` MEANS 392
 
+@nlg the ISO 3166 alpha-2 code for Singapore
 `Singapore alpha-2` MEANS "SG"
+@nlg the ISO 3166 alpha-3 code for Singapore
 `Singapore alpha-3` MEANS "SGP"
+@nlg the ISO 3166 numeric code for Singapore
 `Singapore numeric` MEANS 702
 
+@nlg the ISO 3166 alpha-2 code for India
 `India alpha-2` MEANS "IN"
+@nlg the ISO 3166 alpha-3 code for India
 `India alpha-3` MEANS "IND"
+@nlg the ISO 3166 numeric code for India
 `India numeric` MEANS 356
 
+@nlg the ISO 3166 alpha-2 code for Brazil
 `Brazil alpha-2` MEANS "BR"
+@nlg the ISO 3166 alpha-3 code for Brazil
 `Brazil alpha-3` MEANS "BRA"
+@nlg the ISO 3166 numeric code for Brazil
 `Brazil numeric` MEANS 76
 
+@nlg the ISO 3166 alpha-2 code for Mexico
 `Mexico alpha-2` MEANS "MX"
+@nlg the ISO 3166 alpha-3 code for Mexico
 `Mexico alpha-3` MEANS "MEX"
+@nlg the ISO 3166 numeric code for Mexico
 `Mexico numeric` MEANS 484
 
+@nlg the ISO 3166 alpha-2 code for Switzerland
 `Switzerland alpha-2` MEANS "CH"
+@nlg the ISO 3166 alpha-3 code for Switzerland
 `Switzerland alpha-3` MEANS "CHE"
+@nlg the ISO 3166 numeric code for Switzerland
 `Switzerland numeric` MEANS 756
 
+@nlg the ISO 3166 alpha-2 code for the Netherlands
 `Netherlands alpha-2` MEANS "NL"
+@nlg the ISO 3166 alpha-3 code for the Netherlands
 `Netherlands alpha-3` MEANS "NLD"
+@nlg the ISO 3166 numeric code for the Netherlands
 `Netherlands numeric` MEANS 528
 
+@nlg the ISO 3166 alpha-2 code for Sweden
 `Sweden alpha-2` MEANS "SE"
+@nlg the ISO 3166 alpha-3 code for Sweden
 `Sweden alpha-3` MEANS "SWE"
+@nlg the ISO 3166 numeric code for Sweden
 `Sweden numeric` MEANS 752
 
+@nlg the ISO 3166 alpha-2 code for New Zealand
 `New Zealand alpha-2` MEANS "NZ"
+@nlg the ISO 3166 alpha-3 code for New Zealand
 `New Zealand alpha-3` MEANS "NZL"
+@nlg the ISO 3166 numeric code for New Zealand
 `New Zealand numeric` MEANS 554
 
+@nlg the ISO 3166 alpha-2 code for South Korea
 `South Korea alpha-2` MEANS "KR"
+@nlg the ISO 3166 alpha-3 code for South Korea
 `South Korea alpha-3` MEANS "KOR"
+@nlg the ISO 3166 numeric code for South Korea
 `South Korea numeric` MEANS 410
 
+@nlg the ISO 3166 alpha-2 code for Italy
 `Italy alpha-2` MEANS "IT"
+@nlg the ISO 3166 alpha-3 code for Italy
 `Italy alpha-3` MEANS "ITA"
+@nlg the ISO 3166 numeric code for Italy
 `Italy numeric` MEANS 380
 
+@nlg the ISO 3166 alpha-2 code for Spain
 `Spain alpha-2` MEANS "ES"
+@nlg the ISO 3166 alpha-3 code for Spain
 `Spain alpha-3` MEANS "ESP"
+@nlg the ISO 3166 numeric code for Spain
 `Spain numeric` MEANS 724
 
+@nlg the ISO 3166 alpha-2 code for Hong Kong
 `Hong Kong alpha-2` MEANS "HK"
+@nlg the ISO 3166 alpha-3 code for Hong Kong
 `Hong Kong alpha-3` MEANS "HKG"
+@nlg the ISO 3166 numeric code for Hong Kong
 `Hong Kong numeric` MEANS 344
 
 
 §§ `Supranational Regions`
 
+@nlg the code for the European Union
 `European Union code` MEANS "EU"
+@nlg the name of the European Union
 `European Union name` MEANS "European Union"
 
+@nlg the code for the Association of Southeast Asian Nations
 `ASEAN code` MEANS "ASEAN"
+@nlg the full name of ASEAN
 `ASEAN name` MEANS "Association of Southeast Asian Nations"
 
+@nlg the code for the United States-Mexico-Canada Agreement
 `NAFTA code` MEANS "USMCA"
+@nlg the full name of the USMCA
 `NAFTA name` MEANS "United States-Mexico-Canada Agreement"
 
 
 §§ `Common US State Codes - ISO 3166-2:US`
 
+@nlg the ISO 3166-2 code for the US state of California
 `California code` MEANS "US-CA"
+@nlg the name of the US state of California
 `California name` MEANS "California"
 
+@nlg the ISO 3166-2 code for the US state of New York
 `New York code` MEANS "US-NY"
+@nlg the name of the US state of New York
 `New York name` MEANS "New York"
 
+@nlg the ISO 3166-2 code for the US state of Texas
 `Texas code` MEANS "US-TX"
+@nlg the name of the US state of Texas
 `Texas name` MEANS "Texas"
 
+@nlg the ISO 3166-2 code for the US state of Florida
 `Florida code` MEANS "US-FL"
+@nlg the name of the US state of Florida
 `Florida name` MEANS "Florida"
 
+@nlg the ISO 3166-2 code for the US state of Illinois
 `Illinois code` MEANS "US-IL"
+@nlg the name of the US state of Illinois
 `Illinois name` MEANS "Illinois"
 
+@nlg the ISO 3166-2 code for the US state of Pennsylvania
 `Pennsylvania code` MEANS "US-PA"
+@nlg the name of the US state of Pennsylvania
 `Pennsylvania name` MEANS "Pennsylvania"
 
+@nlg the ISO 3166-2 code for the US state of Massachusetts
 `Massachusetts code` MEANS "US-MA"
+@nlg the name of the US state of Massachusetts
 `Massachusetts name` MEANS "Massachusetts"
 
+@nlg the ISO 3166-2 code for the US state of Washington
 `Washington code` MEANS "US-WA"
+@nlg the name of the US state of Washington
 `Washington name` MEANS "Washington"
 
+@nlg the ISO 3166-2 code for the US state of Delaware
 `Delaware code` MEANS "US-DE"
+@nlg the name of the US state of Delaware
 `Delaware name` MEANS "Delaware"
 
 
 §§ `Common Canadian Province Codes - ISO 3166-2:CA`
 
+@nlg the ISO 3166-2 code for the Canadian province of Ontario
 `Ontario code` MEANS "CA-ON"
+@nlg the name of the Canadian province of Ontario
 `Ontario name` MEANS "Ontario"
 
+@nlg the ISO 3166-2 code for the Canadian province of Quebec
 `Quebec code` MEANS "CA-QC"
+@nlg the name of the Canadian province of Quebec
 `Quebec name` MEANS "Quebec"
 
+@nlg the ISO 3166-2 code for the Canadian province of British Columbia
 `British Columbia code` MEANS "CA-BC"
+@nlg the name of the Canadian province of British Columbia
 `British Columbia name` MEANS "British Columbia"
 
+@nlg the ISO 3166-2 code for the Canadian province of Alberta
 `Alberta code` MEANS "CA-AB"
+@nlg the name of the Canadian province of Alberta
 `Alberta name` MEANS "Alberta"
 
 
 §§ `Common UK Constituent Countries - ISO 3166-2:GB`
 
+@nlg the ISO 3166-2 code for England
 `England code` MEANS "GB-ENG"
+@nlg the name of England
 `England name` MEANS "England"
 
+@nlg the ISO 3166-2 code for Scotland
 `Scotland code` MEANS "GB-SCT"
+@nlg the name of Scotland
 `Scotland name` MEANS "Scotland"
 
+@nlg the ISO 3166-2 code for Wales
 `Wales code` MEANS "GB-WLS"
+@nlg the name of Wales
 `Wales name` MEANS "Wales"
 
+@nlg the ISO 3166-2 code for Northern Ireland
 `Northern Ireland code` MEANS "GB-NIR"
+@nlg the name of Northern Ireland
 `Northern Ireland name` MEANS "Northern Ireland"
 
 
@@ -175,18 +277,21 @@ IMPORT prelude
 
 GIVEN code IS A STRING
 GIVETH A BOOLEAN
+@nlg %code% has two characters and no lower-case letters, like an ISO 3166-1 alpha-2 code
 `is valid ISO 3166-1 alpha-2` MEANS
     STRINGLENGTH code EQUALS 2
     AND code EQUALS TOUPPER code
 
 GIVEN code IS A STRING
 GIVETH A BOOLEAN
+@nlg %code% has three characters and no lower-case letters, like an ISO 3166-1 alpha-3 code
 `is valid ISO 3166-1 alpha-3` MEANS
     STRINGLENGTH code EQUALS 3
     AND code EQUALS TOUPPER code
 
 GIVEN code IS A STRING
 GIVETH A BOOLEAN
+@nlg %code% has two non-lower-case characters, a hyphen and at least one more character, like an ISO 3166-2 code
 `is valid ISO 3166-2` MEANS
     STRINGLENGTH code AT LEAST 4
     AND SUBSTRING code 0 2 EQUALS TOUPPER (SUBSTRING code 0 2)
@@ -197,6 +302,7 @@ GIVETH A BOOLEAN
 
 GIVEN code IS A STRING
 GIVETH AN EITHER STRING STRING
+@nlg the country name for alpha-2 code %code%
 `country name from alpha-2` MEANS
     BRANCH
         IF code EQUALS `United States alpha-2` THEN RIGHT "United States"
@@ -223,6 +329,7 @@ GIVETH AN EITHER STRING STRING
 
 GIVEN code IS A STRING
 GIVETH AN EITHER STRING STRING
+@nlg the country name for alpha-3 code %code%
 `country name from alpha-3` MEANS
     BRANCH
         IF code EQUALS `United States alpha-3` THEN RIGHT "United States"
@@ -252,6 +359,7 @@ GIVETH AN EITHER STRING STRING
 
 GIVEN alpha2 IS A STRING
 GIVETH AN EITHER STRING STRING
+@nlg the alpha-3 code matching alpha-2 code %alpha2%
 `alpha-2 to alpha-3` MEANS
     BRANCH
         IF alpha2 EQUALS `United States alpha-2` THEN RIGHT `United States alpha-3`
@@ -278,6 +386,7 @@ GIVETH AN EITHER STRING STRING
 
 GIVEN alpha3 IS A STRING
 GIVETH AN EITHER STRING STRING
+@nlg the alpha-2 code matching alpha-3 code %alpha3%
 `alpha-3 to alpha-2` MEANS
     BRANCH
         IF alpha3 EQUALS `United States alpha-3` THEN RIGHT `United States alpha-2`

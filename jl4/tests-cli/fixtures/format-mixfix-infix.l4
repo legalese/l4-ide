@@ -1,0 +1,23 @@
+-- `l4 format` prints a mixfix call written between its arguments back in
+-- source order: a binary call (Alice `knows` Bob) and a chain
+-- (2 `scaled` 3 `shifted` 4). It used to print the head first
+-- (`knows` Alice Bob) and the keywords of a chain twice (smucclaw/l4-ide#918).
+DECLARE Person IS ONE OF Alice, Bob
+
+GIVEN a IS A Person
+      b IS A Person
+GIVETH A BOOLEAN
+a `knows` b MEANS a EQUALS b
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+a `scaled` b `shifted` c MEANS a * b + c
+
+GIVEN q IS A Person
+GIVETH A BOOLEAN
+chk q MEANS q `knows` Bob
+
+#EVAL Alice `knows` Bob
+#EVAL 2 `scaled` 3 `shifted` 4

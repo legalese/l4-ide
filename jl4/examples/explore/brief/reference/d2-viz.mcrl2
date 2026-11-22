@@ -1,0 +1,120 @@
+% The dinner race of jl4/examples/explore/brief/, in mCRL2: design D2.
+% Alice means to buy dinner for both unless Bob already has; the dinner ledger records each purchase.
+% This is the probes' hand model, relabelled: the same sorts, transitions, guards and effects,
+% with the dinner names of REGULATIVE-LOWERING-SPEC.md. See PROVENANCE.md beside it.
+%
+% Shape: the system is a transition system over one state record.
+%   * State        - the six variables of the brief.
+%   * Tr           - one constructor per transition of the brief (all three designs).
+%   * enabled(t,s) - the guard of transition t in state s.
+%   * fire(t,s)    - the state after t fires in s.
+%   * Sys(s)       - one generic process: fire any enabled transition that the chosen
+%                    design contains.  The design is chosen by inDesign and fairs at the end.
+%
+% This is the data-free build: every action is step(t), so the LTS carries one label per transition name.
+
+sort
+  Status  = struct Open | Taken;                        % what the dinner ledger has recorded (ledger)
+  Message = struct None | InTransit | Delivered;        % the message "I bought it", from Bob to Alice
+  Belief  = struct Unknown | Known(believed: Status);   % Alice's last-learned copy of Status
+  Plan    = struct Planning | Checked | Reading | Bought | Stopped;
+  State   = struct st(ledger: Status, message: Message, belief: Belief, alice: Plan,
+                      dinners: Nat, okAtBuy: Bool);
+
+  % All the transitions of the brief; a design uses a subset (inDesign).
+  Tr = struct BobBuys | Deliver | CheckBought | Done     % common to every design
+            | Buy | Abandon                              % D1 (from Checked)
+            | ReadAgain | NoAnswer | Send | AbandonR     % D2 (Send/AbandonR from Reading)
+            | BuyChecked                                 % D3 (NoAnswer shared with D2)
+            | Expire;                                    % timed variant only: closing time passes
+
+map
+  init0    : State;
+  terminal : State -> Bool;                  % Bought or Stopped
+  enabled  : Tr # State -> Bool;
+  fire     : Tr # State -> State;
+  inDesign : Tr -> Bool;                     % chosen per design, at the end
+  fairs    : List(Tr);                       % chosen per design: weakly fair transitions
+  nFair    : Pos;
+  fairOK   : Nat # Tr # State -> Bool;       % the i-th fairness constraint holds on a step
+
+var s: State;
+    t: Tr;
+    i: Nat;
+eqn
+  init0       = st(Open, None, Unknown, Planning, 0, true);
+  terminal(s) = alice(s) == Bought || alice(s) == Stopped;
+
+  % Weak fairness of the i-th fair transition f along a path, as a repeated condition:
+  %   "f is taken, or f is not enabled", infinitely often.
+  % (If f were enabled from some point on and never taken, it would fail.)
+  nFair       = Nat2Pos(#fairs);
+  fairOK(i, t, s) = t == fairs . i || !enabled(fairs . i, s);
+
+  % ---- common to every design --------------------------------------------------------
+  % BobBuys: Bob's purchase, recorded by the dinner ledger; at most once.
+  enabled(BobBuys, s) = ledger(s) == Open;
+  fire(BobBuys, s)    = st(Taken, InTransit, belief(s), alice(s), dinners(s), okAtBuy(s));
+
+  % Deliver: the message reaches Alice; she stops if she was still on her way to buying.
+  enabled(Deliver, s) = message(s) == InTransit;
+  fire(Deliver, s)    = st(ledger(s), Delivered, Known(Taken),
+                           if(alice(s) == Planning || alice(s) == Checked || alice(s) == Reading,
+                              Stopped, alice(s)),
+                           dinners(s), okAtBuy(s));
+
+  % CheckBought: Alice checks whether dinner is bought, reading the ledger.
+  enabled(CheckBought, s) = alice(s) == Planning;
+  fire(CheckBought, s)    = st(ledger(s), message(s), Known(ledger(s)), Checked, dinners(s), okAtBuy(s));
+
+  % Done: terminal self-loop, so Bought and Stopped are not deadlocks.
+  enabled(Done, s) = terminal(s);
+  fire(Done, s)    = s;
+
+  % ---- D1: trust the bought-check and the message ------------------------------------
+  enabled(Buy, s)     = alice(s) == Checked && belief(s) == Known(Open);
+  fire(Buy, s)        = st(ledger(s), message(s), belief(s), Bought, dinners(s) + 1, ledger(s) == Open);
+  enabled(Abandon, s) = alice(s) == Checked && belief(s) == Known(Taken);
+  fire(Abandon, s)    = st(ledger(s), message(s), belief(s), Stopped, dinners(s), okAtBuy(s));
+
+  % ---- D2: re-read, then buy as a separate step ---------------------------------------
+  enabled(ReadAgain, s) = alice(s) == Checked;
+  fire(ReadAgain, s)    = st(ledger(s), message(s), Known(ledger(s)), Reading, dinners(s), okAtBuy(s));
+  enabled(NoAnswer, s)  = alice(s) == Checked;       % D2 and D3: the pause
+  fire(NoAnswer, s)     = s;
+  enabled(Send, s)      = alice(s) == Reading && belief(s) == Known(Open);
+  fire(Send, s)         = st(ledger(s), message(s), belief(s), Bought, dinners(s) + 1, ledger(s) == Open);
+  enabled(AbandonR, s)  = alice(s) == Reading && belief(s) == Known(Taken);
+  fire(AbandonR, s)     = st(ledger(s), message(s), belief(s), Stopped, dinners(s), okAtBuy(s));
+
+  % ---- timed variant only: closing time passes while Alice is undecided ---------------
+  enabled(Expire, s) = !terminal(s);
+  fire(Expire, s)    = st(ledger(s), message(s), belief(s), Stopped, dinners(s), okAtBuy(s));
+
+  % ---- D3: atomic check-and-buy -------------------------------------------------------
+  enabled(BuyChecked, s) = alice(s) == Checked;
+  fire(BuyChecked, s)    =
+    if(ledger(s) == Open,
+       st(ledger(s), message(s), belief(s), Bought, dinners(s) + 1, ledger(s) == Open),
+       st(ledger(s), message(s), Known(Taken), Stopped, dinners(s), okAtBuy(s)));
+
+% D2, re-read, then buy as a separate step.
+% Weakly fair: the ledger answering (ReadAgain) and Alice's steps (CheckBought, Send, AbandonR).
+% Not fair: NoAnswer (the pause), BobBuys, Deliver.
+var t: Tr;
+eqn
+  inDesign(t) = t in [BobBuys, Deliver, CheckBought, Done, ReadAgain, NoAnswer, Send, AbandonR];
+  fairs       = [CheckBought, ReadAgain, Send, AbandonR];
+% The process half.
+%
+% Every action is step(t): the data-free build. The initial state is on no action.
+
+act
+  step : Tr;
+
+proc
+  Sys(s: State) =
+    sum t: Tr. (inDesign(t) && enabled(t, s)) -> step(t) . Sys(fire(t, s));
+
+init
+  Sys(init0);

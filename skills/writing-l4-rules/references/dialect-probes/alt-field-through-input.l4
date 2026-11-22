@@ -1,0 +1,9 @@
+DECLARE Person HAS
+    `the age` IS A NUMBER
+    `bankrupt` IS A BOOLEAN
+
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `is eligible` IF
+        person's `the age` >= 21
+    AND NOT person's `bankrupt`

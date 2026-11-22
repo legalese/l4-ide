@@ -1,0 +1,6 @@
+-- One input, so a CSV file for it has one column. A row whose one cell is ""
+-- is still a row, and its cell is absent (T3c): the input is then missing.
+@export Echo a name
+GIVEN name IS A STRING
+GIVETH A STRING
+echoName name MEANS name

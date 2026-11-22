@@ -1,0 +1,18 @@
+-- A mixfix rule such as `p `is eligible`` is one definition, found by its word.
+-- A different rule may still have an input named like that word: `decision`
+-- below takes one input, called `is eligible`, so the line that defines it is
+-- an ordinary rule, not a line written like the mixfix rule. It was refused
+-- as if it were (found by the review of legalese/l4-ide#545, round 4).
+DECLARE Person IS ONE OF Alice, Bob
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+p `is eligible` MEANS p EQUALS Alice
+
+GIVEN `is eligible` IS A BOOLEAN
+GIVETH A STRING
+decision `is eligible` MEANS IF `is eligible` THEN "yes" ELSE "no"
+
+#EVAL Alice `is eligible`    -- TRUE
+#EVAL decision TRUE          -- "yes"
+#EVAL decision FALSE         -- "no"

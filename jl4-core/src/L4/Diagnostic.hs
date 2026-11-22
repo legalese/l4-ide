@@ -16,6 +16,7 @@ module L4.Diagnostic
   , checkErrorToDiagnostic
   , parseErrorToDiagnostic
   , evalResultToDiagnostic
+  , evalResultSeverity
     -- * Severity conversion
   , fromCheckSeverity
     -- * Helpers
@@ -107,26 +108,42 @@ parseErrorToDiagnostic err = SimpleDiagnostic
   , sdSource   = "parser"
   }
 
--- | Convert an evaluation result to a platform-agnostic diagnostic.
---
--- Failed assertions, and assertions whose expression raised, get Error
--- severity; a REFUSED assertion gets Warning; successful evaluations get Info.
+-- | Convert an evaluation result to a platform-agnostic diagnostic, with the
+-- severity 'evalResultSeverity' gives it.
 evalResultToDiagnostic :: EL.EvalDirectiveResult -> SimpleDiagnostic
-evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger _notes) = SimpleDiagnostic
+evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger _notes _) = SimpleDiagnostic
   { sdLocation = RangeLoc <$> mrange
-  , sdSeverity = case res of
-      -- A refusal is a DESIGNED outcome, not a defect: the model declined to
-      -- answer and said why. Error severity would squiggle every deliberate
-      -- refusal in the editor and read as a broken program.
-      EL.Assertion (EL.Refused _)      -> DSWarning
-      EL.Assertion EL.Fails            -> DSError
-      EL.Assertion (EL.FailsBecause _) -> DSError
-      EL.Assertion (EL.Errored _)      -> DSError
-      EL.Assertion EL.Holds            -> DSInformation
-      -- Reductions keep their pre-existing uniform Information severity —
-      -- including a raising one. That asymmetry with assertions predates
-      -- REFUSE and is deliberately not changed here.
-      EL.Reduction _                   -> DSInformation
+  , sdSeverity = evalResultSeverity res
   , sdMessage  = EL.prettyEvalDirectiveResult r
   , sdSource   = "eval"
   }
+
+-- | The severity with which an editor shows a directive's result.
+--
+-- A refusal is a DESIGNED outcome, not a defect: the model declined to answer
+-- and said why. Error severity would squiggle every deliberate refusal in the
+-- editor and read as a broken program.
+--
+-- Reductions keep their pre-existing uniform Information severity, including
+-- a raising one, and an undetermined one, which was a raising Stuck. That
+-- asymmetry with assertions predates REFUSE and is deliberately not changed
+-- here (main, #762, makes a refused #EVAL a warning and a raising one an
+-- error; not carried, see the 2026-11 sync's D4). One arm each, no wildcard,
+-- so a new outcome must choose (UNKNOWN-EVALUATION-SPEC §4.7.4, U1b).
+--
+-- The language server and the browser editor both take a result's severity
+-- from here.
+evalResultSeverity :: EL.EvalDirectiveValue -> DiagnosticSeverity
+evalResultSeverity = \case
+  EL.Assertion (EL.Refused _)             -> DSWarning
+  EL.Assertion EL.Fails                   -> DSError
+  EL.Assertion (EL.FailsBecause _)        -> DSError
+  EL.Assertion (EL.Errored _)             -> DSError
+  -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+  EL.Assertion (EL.Undetermined _)        -> DSError
+  EL.Assertion EL.Holds                   -> DSInformation
+  EL.Reduction (EL.Reduced _)             -> DSInformation
+  EL.Reduction (EL.ReducedRefused _)      -> DSInformation
+  EL.Reduction (EL.ReducedErrored _)      -> DSInformation
+  EL.Reduction (EL.ReducedUndetermined _) -> DSInformation
+

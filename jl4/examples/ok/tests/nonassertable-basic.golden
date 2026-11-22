@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+nonassertable-basic.l4:33:1-104:
+  TRUE
+nonassertable-basic.l4:48:1-99:
+  FALSE
+nonassertable-basic.l4:49:1-23:
+  TRUE
+nonassertable-basic.l4:50:1-18:
+  1
+nonassertable-basic.l4:51:1-18:
+  7

@@ -6,7 +6,7 @@
  * own header says so) "the statutory phrases, TRIMMED FOR THE PAGE", this one
  * reads the real corpus. Nothing here is retyped, so nothing here can drift
  * from the L4: every label, every ordering, every inert chapeau comes out of
- * `jl4/examples/legal/regcf/regcf.l4` through the LSP. That is the whole point
+ * `jl4/examples/canon/us/regcf/regcf.l4` through the LSP. That is the whole point
  * — the competitive thesis is single-sourcing, and a figure a human transcribed
  * is a second source.
  *
@@ -68,7 +68,7 @@ import { sceneToSvg } from "../src/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "../../..");
-const CORPUS = resolve(REPO, "jl4/examples/legal/regcf/regcf.l4");
+const CORPUS = resolve(REPO, "jl4/examples/canon/us/regcf/regcf.l4");
 const OUT = resolve(REPO, "jl4/examples/legal/regcf/figures");
 const LSP_PORT = Number(process.env.JL4_LSP_PORT || 5019);
 /**

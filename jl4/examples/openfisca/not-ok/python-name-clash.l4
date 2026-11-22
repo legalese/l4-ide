@@ -1,0 +1,14 @@
+-- An enum named `Person` beside a decision with no record subject, which
+-- lives on the default `Person` entity. Both would be bound to the Python
+-- name `Person` in the emitted module, and the second would replace the
+-- first. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person IS ONE OF Alice, Bob
+
+@export A constant
+GIVEN period IS A STRING
+GIVETH A NUMBER
+`answer` period MEANS 42
+
+#ASSERT (`answer` OF "2026-01") EQUALS 42

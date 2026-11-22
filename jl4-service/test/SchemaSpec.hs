@@ -9,7 +9,7 @@ import qualified Test.QuickCheck as Q
 import Test.QuickCheck.Instances ()
 
 import Backend.Api
-import Backend.DecisionQueryPlan (QueryAtom (..), QueryOutcome (..), QueryImpact (..), QueryInput (..), QueryAsk (..), QueryPlanResponse (..))
+import Backend.DecisionQueryPlan (QueryAtom (..), QueryOutcome (..), QueryImpact (..), QueryInput (..), QueryAsk (..), QueryRefusal (..), QueryPlanResponse (..))
 import qualified L4.Decision.QueryPlan as QP
 import L4.FunctionSchema (Parameters (..), Parameter (..))
 import ControlPlane (DeploymentStatusResponse (..))
@@ -17,7 +17,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.Map as Map
 import qualified Data.Text as Text
-import Schema ()
+import Schema (serverOpenApi)
 import Servant.API (FromHttpApiData (..))
 import Types
 import qualified Test.Hspec.QuickCheck as Hspec
@@ -28,6 +28,15 @@ import Data.Time.Calendar (fromGregorian)
 spec :: Spec
 spec = do
   describe "Schema" do
+    describe "BatchResponse" do
+      it "describes the report every batch response states (UNKNOWN-EVALUATION-SPEC U7b)" do
+        let at k v = case v of
+              Aeson.Object o -> Aeson.KeyMap.lookup k o
+              _              -> Nothing
+            report = at "components" (Aeson.toJSON (serverOpenApi Nothing))
+              >>= at "schemas" >>= at "BatchResponse" >>= at "properties" >>= at "report"
+        (report >>= at "enum") `shouldBe` Just (Aeson.toJSON ["default" :: Text.Text])
+
     describe "Param Schema" do
       describe "FnLiteral" do
         Hspec.prop "Int" $ \(n :: Integer) ->
@@ -76,6 +85,26 @@ spec = do
       Hspec.prop "round-trips through JSON" $ \p ->
         Aeson.fromJSON (Aeson.toJSON (p :: Parameter)) === Aeson.Success p
 
+    -- A batch case that failed is written with @error and no value, and read
+    -- back as failed rather than as an answer whose result is named "@error".
+    describe "OutputCase" do
+      let errored = OutputCase
+            { id = 1, attributes = Map.empty, graphviz = Nothing, presumed = []
+            , outcome = CaseErrored "Parameter 'n': missing required parameter" }
+          answered = OutputCase
+            { id = 2, attributes = Map.singleton "value" (FnLitInt 8), graphviz = Nothing, presumed = []
+            , outcome = CaseAnswered }
+      it "writes an errored case as @id and @error" do
+        Aeson.toJSON errored `shouldBe` Aeson.object
+          [ "@id" Aeson..= (1 :: Int)
+          , "@presumed" Aeson..= ([] :: [Text.Text])
+          , "@error" Aeson..= ("Parameter 'n': missing required parameter" :: Text.Text) ]
+      it "writes an answered case as @id and its result" do
+        Aeson.toJSON answered `shouldBe` Aeson.object
+          [ "@id" Aeson..= (2 :: Int), "@presumed" Aeson..= ([] :: [Text.Text]), "value" Aeson..= (8 :: Int) ]
+      it "reads both back as they were written" do
+        Aeson.fromJSON (Aeson.toJSON [errored, answered]) `shouldBe` Aeson.Success [errored, answered]
+
 -- ----------------------------------------------------------------------------
 -- Arbitrary instances
 -- ----------------------------------------------------------------------------
@@ -117,10 +146,12 @@ instance Arbitrary Reasoning where
         Q.shuffle (first : rest)
 
 instance Arbitrary ResponseWithReason where
-  arbitrary = ResponseWithReason <$> arbitrary <*> pure emptyTree <*> pure Nothing
+  arbitrary = ResponseWithReason <$> arbitrary <*> pure emptyTree <*> pure Nothing <*> arbitrary
 
 instance Arbitrary EvaluatorError where
-  arbitrary = Q.oneof [InterpreterError <$> arbitrary]
+  arbitrary = Q.oneof
+    [ InterpreterError <$> arbitrary
+    , EvaluatorLimited <$> Q.arbitraryBoundedEnum <*> arbitrary ]
 
 instance Arbitrary SimpleResponse where
   arbitrary =
@@ -162,7 +193,10 @@ instance Arbitrary TraceEvent where
   arbitrary = TraceEvent <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary FnArguments where
-  arbitrary = FnArguments <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+  arbitrary = FnArguments <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
+
+instance Arbitrary Presumption where
+  arbitrary = Q.chooseEnum (minBound, maxBound)
 
 instance Arbitrary SimpleFunction where
   arbitrary = SimpleFunction <$> arbitrary <*> arbitrary
@@ -185,6 +219,7 @@ instance Arbitrary BatchRequest where
     BatchRequest
       <$> arbitrary
       <*> arbitrary
+      <*> arbitrary
 
 instance Arbitrary BatchResponse where
   arbitrary =
@@ -204,6 +239,10 @@ instance Arbitrary OutputCase where
       <$> arbitrary
       <*> arbitrary
       <*> pure Nothing  -- Exclude GraphViz from QuickCheck
+      <*> arbitrary
+      <*> Q.oneof
+            [ pure CaseAnswered, CaseRefused <$> arbitrary, CaseErrored <$> arbitrary
+            , CaseLimited <$> Q.arbitraryBoundedEnum <*> arbitrary ]
 
 instance Arbitrary OutputSummary where
   arbitrary =
@@ -257,7 +296,11 @@ instance Arbitrary QueryPlanResponse where
       <*> arbitrary
       <*> arbitrary
       <*> arbitrary
+      <*> arbitrary
       <*> pure Nothing
+
+instance Arbitrary QueryRefusal where
+  arbitrary = QueryRefusal <$> arbitrary <*> arbitrary
 
 instance Arbitrary StateGraphInfo where
   arbitrary = StateGraphInfo <$> arbitrary <*> arbitrary

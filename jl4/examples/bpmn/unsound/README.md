@@ -202,7 +202,7 @@ time. To reproduce:
 #      in if length arrivals >= 2 then Right arrivals else Left "..."
 #
 cabal build jl4:l4
-cd jl4 && l4 export --to=bpmn examples/bpmn/handover.l4 -o /tmp/handover.bpmn
+cd jl4 && l4 export bpmn examples/bpmn/handover.l4 -o /tmp/handover.bpmn
 ```
 
 What the three checkers say about that file:

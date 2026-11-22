@@ -1,0 +1,22 @@
+-- l4 batch over record-field defaults, an enum default on a field, and an
+-- enum default on a rule GIVEN (specs/todo/TYPICALLY-ONE-BEHAVIOUR-SPEC.md,
+-- W3 and T1b). The JSON decoder fills a field the row leaves out from this
+-- DECLARE, and `presumed` names it by its path, `cfg.timeout`.
+
+DECLARE Colour IS ONE OF Red, Green
+
+DECLARE Config HAS
+  timeout IS A NUMBER TYPICALLY 30
+  retries IS A NUMBER
+  colour  IS A Colour TYPICALLY Red
+
+@export Budget
+GIVEN cfg IS A Config
+      shade IS A Colour TYPICALLY Green
+GIVETH A NUMBER
+budget MEANS
+  IF cfg's colour EQUALS Red AND shade EQUALS Green
+  THEN cfg's timeout PLUS cfg's retries
+  ELSE 0
+
+#EVAL budget (Config 30 2 Red) Green

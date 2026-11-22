@@ -1,0 +1,27 @@
+Checks (7): 4 hold, 3 unknown
+
+always `every dinner was accepted while open`: holds in every one of the 10 states explored; within the clock bound 75600 (10 ticks past it not taken)
+  reads `open at acceptance` (every entry, in OFFICIAL's ledger)
+
+always `at most one dinner is bought`: holds in every one of the 10 states explored; within the clock bound 75600 (10 ticks past it not taken)
+  reads `dinners bought` (every entry, in OFFICIAL's ledger); `dinners cancelled` (every entry, never written in any state explored; no RECORD, COMMIT or ATTEST in the file or its imports writes a cell of this name)
+
+reachable `Alice's belief is stale`: holds: reached after 2 events (state s5)
+  reads `belief` (the latest entry, in Alice's ledger); `dinner status record` (every entry, in OFFICIAL's ledger)
+
+-- `Alice's belief is stale` is TRUE after the 2 events below (l4 explore; replayed on the evaluator)
+#TRACE `the arrangement` AT 64800 WITH
+    PARTY World DOES `Alice checks whether dinner is bought` AT 64800
+    PARTY World DOES `ledger records Bob's purchase` AT 64800
+
+stays `one dinner is bought`: holds on every one of the 13 steps between states explored; within the clock bound 75600 (10 ticks past it not taken)
+  reads `dinners bought` (every entry, in OFFICIAL's ledger); `dinners cancelled` (every entry, never written in any state explored; no RECORD, COMMIT or ATTEST in the file or its imports writes a cell of this name)
+
+eventually `Alice has bought or stopped`: unknown (liveness: run the emitted model)
+  reads `plan` (the latest entry, in Alice's ledger)
+
+eventually `one dinner is bought` if always `the ledger is open`: unknown (liveness: run the emitted model)
+  reads `dinners bought` (every entry, in OFFICIAL's ledger); `dinners cancelled` (every entry, never written in any state explored; no RECORD, COMMIT or ATTEST in the file or its imports writes a cell of this name); `dinner status record` (every entry, in OFFICIAL's ledger)
+
+eventually `Bob has bought`: unknown (liveness: run the emitted model)
+  reads `dinner status record` (every entry, in OFFICIAL's ledger)

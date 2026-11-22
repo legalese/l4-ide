@@ -1,0 +1,16 @@
+-- A LIST OF field named `status` is not a plural: its role key stays
+-- `status` (it used to become `statu`).
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Household HAS
+    status   IS A LIST OF Person
+    children IS A LIST OF Person
+
+@export Income of the status members
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`status income` h period MEANS sum (map (GIVEN m YIELD m's salary) (h's status))
+
+#ASSERT (`status income` OF (Household WITH status IS (LIST (Person WITH salary IS 1000)), children IS (LIST (Person WITH salary IS 5))), "2026-01") EQUALS 1000

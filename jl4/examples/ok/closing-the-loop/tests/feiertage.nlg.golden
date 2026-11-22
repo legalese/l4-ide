@@ -1,21 +1,21 @@
-`der Ostersonntag im Jahr` with 2026 is equal to `YMD` with 2026, 4 and 5
-`der Ostersonntag im Jahr` with 2024 is equal to `YMD` with 2024, 3 and 31
-`der Karfreitag im Jahr` with 2026 is equal to `YMD` with 2026, 4 and 3
-`der Ostermontag im Jahr` with 2026 is equal to `YMD` with 2026, 4 and 6
-`Fronleichnam im Jahr` with 2026 is equal to `YMD` with 2026, 6 and 4
-`der Buß- und Bettag im Jahr` with 2026 is equal to `YMD` with 2026, 11 and 18
+`der Ostersonntag im Jahr` with 2026 is equal to 5 April 2026
+`der Ostersonntag im Jahr` with 2024 is equal to 31 March 2024
+`der Karfreitag im Jahr` with 2026 is equal to 3 April 2026
+`der Ostermontag im Jahr` with 2026 is equal to 6 April 2026
+`Fronleichnam im Jahr` with 2026 is equal to 4 June 2026
+`der Buß- und Bettag im Jahr` with 2026 is equal to 18 November 2026
 given `y` then `Computus und Tabelle stimmen überein für` with `y` holds for every item of `die Jahre 2015 bis 2035`
-`ein gesetzlicher Feiertag am Tag _ im Land _` with `YMD` with 2026, 6 and 4 and `Bayern`
-not `ein gesetzlicher Feiertag am Tag _ im Land _` with `YMD` with 2026, 6 and 4 and `Berlin`
-not `ein gesetzlicher Feiertag am Tag _ im Land _` with `YMD` with 2026, 10 and 31 and `Bayern`
-not `ein gesetzlicher Feiertag am Tag _ im Land _` with `YMD` with 2006, 3 and 8 and `Berlin`
-`ein gesetzlicher Feiertag am Tag _ im Land _` with `YMD` with 2026, 3 and 8 and `Berlin`
-not `ein gesetzlicher Feiertag am Tag _ im Land _` with `YMD` with 2006, 10 and 31 and `Bremen`
-`ein gesetzlicher Feiertag am Tag _ im Land _` with `YMD` with 2026, 10 and 31 and `Bremen`
-`ein gesetzlicher Feiertag am Tag _ im Land _` with `YMD` with 2006, 10 and 31 and `Brandenburg`
-not `die Feiertagsangabe ist gesichert am Tag _ im Land _` with `YMD` with 2026, 8 and 15 and `Bayern`
-`die Feiertagsangabe ist gesichert am Tag _ im Land _` with `YMD` with 2026, 6 and 4 and `Bayern`
-not `die Feiertagsangabe ist gesichert am Tag _ im Land _` with `YMD` with 1999, 6 and 4 and `Bayern`
+`ein gesetzlicher Feiertag am Tag _ im Land _` with 4 June 2026 and `Bayern`
+not `ein gesetzlicher Feiertag am Tag _ im Land _` with 4 June 2026 and `Berlin`
+not `ein gesetzlicher Feiertag am Tag _ im Land _` with 31 October 2026 and `Bayern`
+not `ein gesetzlicher Feiertag am Tag _ im Land _` with 8 March 2006 and `Berlin`
+`ein gesetzlicher Feiertag am Tag _ im Land _` with 8 March 2026 and `Berlin`
+not `ein gesetzlicher Feiertag am Tag _ im Land _` with 31 October 2006 and `Bremen`
+`ein gesetzlicher Feiertag am Tag _ im Land _` with 31 October 2026 and `Bremen`
+`ein gesetzlicher Feiertag am Tag _ im Land _` with 31 October 2006 and `Brandenburg`
+not `die Feiertagsangabe ist gesichert am Tag _ im Land _` with 15 August 2026 and `Bayern`
+`die Feiertagsangabe ist gesichert am Tag _ im Land _` with 4 June 2026 and `Bayern`
+not `die Feiertagsangabe ist gesichert am Tag _ im Land _` with 4 June 1999 and `Bayern`
 the number of items in `die gesetzlichen Feiertage im Land _ im Jahr _` with `Bayern` and 2026
 given `l` then the number of items in `die gesetzlichen Feiertage im Land _ im Jahr _` with `l` and 2026 is at most 14 holds for every item of `alle Länder`
 the number of items in `alle Länder` is equal to 16

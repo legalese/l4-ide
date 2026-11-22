@@ -889,6 +889,18 @@ ever contains the keyword. One pre-existing limit is kept and now documented in 
 whose type is left as an inference variable (the overloaded `>=` does this to `age >= 18`) earns no
 fix, since LSP 3.17 has no snippet support to leave a hole; the old action had the same guard.
 
+**The type role, 2026-10-07.** The repointing above covered the term role only.
+An unknown type name raises the same `OutOfScopeError`, told apart only by the `KindInfo` the checker puts on the name (`resolveType` in `jl4-core/src/L4/TypeCheck.hs`), so it took the term's path.
+Measured by failing tests before the change: for `GIVEN w IS A Widget` with no `Widget` declared, the fix offered "Add `Widget` to the GIVEN of the rule `is shiny`", inserting `Widget IS A TYPE`, which makes `Widget` a type variable and not the opaque type §11.1.1 rules for the type role; under a heading it offered a section `GIVEN` of the same shape; and for the type of a `DECLARE`'s field, with no `DECIDE` or `MEANS` around it, it offered nothing.
+A type now gets a bodiless `DECLARE T` (`outOfScopeDeclareFix` in `jl4-lsp/src/LSP/L4/Actions.hs`), on a new line directly above the top-level declaration that contains the use, at its indentation, followed by a blank line.
+A use in a section's own `GIVEN` is contained by the section, so the line goes above its `§` heading.
+The line also goes above every annotation between that declaration and whatever precedes it, because a leading annotation attaches to the next declaration below it and a `DECLARE` inserted under one takes it over: a positive control that inserted one line lower moved the `@desc` onto the new `DECLARE`.
+It also takes in the run of comment lines directly over the declaration, or over its first annotation, since a leading comment reads as the declaration's own; a comment with a blank line under it stays where it is (assumed, not ruled, and in a commit of its own).
+A type applied to arguments gets one parameter per argument, named apart from every name the module spells (`DECLARE Box b c` in a module that already uses `a`); offering nothing instead was rejected, because §11.1.1 already makes a parameterised bodiless head the declaration of a type of exactly that arity.
+The term role, and its five tests, are unchanged.
+The handler kept the name `outOfScopeAssumeQuickFix` after the 2026-09-06 repointing, though it had stopped inserting an `ASSUME`; it is now `outOfScopeDeclarationQuickFix` in `jl4-lsp/app/LSP/L4/Handlers.hs`.
+`jl4-lsp/test/OutOfScopeGivenFixSpec.hs` pins each position, and re-checks every edited module requiring no error at all.
+
 **Refuted and repaired, 2026-09-07.** Under the standing authorisation for adversarial workflows
 (BRIEF §14), ten Opus refuters attacked three claims about the warning — the role and line are right
 (A), every author-written `ASSUME` warns exactly once (B), nothing else ever warns (C) — plus a
@@ -1104,6 +1116,16 @@ that ruling is `TYPICALLY-DEFAULTS-SPEC.md:420-428` and the record is
 reach: the JSON and service boundary keeps defaulting an absent `MAYBE` field to `NOTHING`
 (`Machine.hs:2282`, `Backend/Jl4.hs:436-441`, `JsonSchema.hs:264`), and `TYPICALLY NOTHING` does not
 gate it.
+
+**EXTENDED 2026-10-01 by `TYPICALLY-ONE-BEHAVIOUR-SPEC.md` §5 (PR #525), ruled on bench "Unknowns and Defaults".**
+T1: any field declared `TYPICALLY`, not only a `MAYBE … TYPICALLY NOTHING` field, may be omitted at construction and may be absent in JSON, taking its default.
+T2: a module-level `ASSUME … TYPICALLY` takes its default at the root.
+T3: on the wire, absent means not asked and takes the default, `null` means "don't know" and never does, and `fromMaybe FALSE` leaves the service.
+T4: one switch turns presumption off for every evaluation.
+T5: exporters map a default or report dropping it.
+T6: responses list the defaults actually forced.
+The rulings, with their conditions, are recorded there; this section remains the ruling they extend.
+Each was amended the same day by its bench amendment card (T1b, T2b, T5b, T6b, TU-wire-b, TU-presume-b), recorded under the ruling it amends.
 
 ### 11.6 R4 — The section binder is the indented `GIVEN` on the line after the heading. RULED 2026-09-04.
 
@@ -1612,6 +1634,48 @@ canon's `sg-csp.l4:79`, whose own comment at `:70-78` says the encoding lacks th
 Those are the `REFUSE` row of R7's taxonomy, not the gate row, even though both are guarded on a
 date — and canon's is guarded on the **child's date of birth**, not on `RULES EFFECTIVE DATE`, so no
 rule-version axis can answer it at all.
+
+### 11.9.4 The query plan's image of a refusal. Built 2026-10-14; assumed, not ruled.
+
+R7's list of per-surface images had none for the decision service's query plan, which a wizard
+uses to choose its next question. It treated every bare reference to a rule of no inputs as a
+yes/no question, so for `` eligible adult MEANS adult AND `not modelled` ``, with `` `not modelled` ``
+a `REFUSE`, answering both questions gave `determined: true`, where `/evaluation` of the same case
+answers 422 `EvaluatorRefused`. A `REFUSE` written in the rule was a question too: it reads no
+input, so it was in no `asks` entry, but it was in `stillNeeded` and `ranked`, and an answer bound
+by its label was used. Measured on main with the REFUSE carve and on unstable `3823e590d`, and for
+the `REFUSE` leaf on unstable `8aeab916a` (`ok/refuse-uncatchable.l4`).
+
+Built on unstable (branch `fix/query-plan-refusal`):
+
+- **What counts as refusing.** `L4.Refusal.alwaysRefusing`: the module's own definitions, local
+  ones included, whose body is a `REFUSE`, or a bare reference to a definition already counted,
+  under any `WHERE` or `LET`; the least fixed point. Narrower than §2.8's `Ref(f)`, which is "can
+  reach". A definition that refuses on only some paths is not counted (the Reg CF cleanroom's
+  `` `the aggregate offering cap` ``, a NUMBER that refuses for a rule date before 2022-09-20, is
+  one); a BOOLEAN one stays a question, as before, since whether it refuses can turn on what the
+  plan does not see, such as the rule date. Names from other
+  modules are not followed, so the prelude's `TBD`, which this section already sets apart, is not
+  seen. A `REFUSE` leaf, and a bare reference to a counted rule of no inputs, are refusing leaves.
+  They are never asked.
+- **In evaluation's order.** An expression with a refusing leaf is planned as evaluation reads it,
+  left to right and stopping as soon as the answer is known (`connectiveLeft`): as three diagrams
+  over the askable atoms, TRUE, FALSE, and one per refusing leaf for "reaches this one first". So
+  the plan and `/evaluation` agree case by case, order-dependence included: `adult AND r` is
+  `Fails` where `adult` is FALSE, `r AND adult` is `Refused` either way. The order-dependence this
+  section writes down is honoured, not removed. An expression with no refusing leaf is planned as
+  it always was, by the same code.
+- **The answer.** A `refusal` field carrying the reasons evaluation can reach first, set wherever
+  evaluation is sure to refuse, and `verdict` gains `Refused`, with `determined: null`. In the
+  service and the browser editor, a ladder with a refusing leaf is drawn again unsimplified, since
+  distributing `OR` over `AND` can change which refusal evaluation reaches; every other ladder is
+  drawn as before. jl4-lsp plans from the ladder the reader is shown, which is unsimplified unless
+  they switch simplification on.
+
+Not covered, and stated on `doc/reference/control-flow/REFUSE.md`: a definition that refuses on
+only some paths; a refusal behind a leaf the plan holds as one question (a comparison reading a
+refusing rule, a call with inputs to one); a refusal reached only through an import; and, in the
+editor with simplification on, the simplified order.
 
 ### 11.10 R10 — Backends. RULED 2026-09-04 (marked accept).
 

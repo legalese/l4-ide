@@ -17,6 +17,7 @@ module L4.Crypto.SHA1
 
 import Data.Bits
 import Data.Word
+import Data.List (zipWith4)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.ByteString (ByteString)
@@ -81,22 +82,28 @@ processBlock :: (Word32, Word32, Word32, Word32, Word32)
              -> ByteString
              -> (Word32, Word32, Word32, Word32, Word32)
 processBlock (!h0, !h1, !h2, !h3, !h4) block =
-  let -- Expand 16 words to 80 words
-      w = expandWords block
+  let -- The 80-word message schedule, each word computed once and shared
+      ws = expandWords block
 
       -- 80 rounds
-      (!a, !b, !c, !d, !e) = foldl' (sha1Round w) (h0, h1, h2, h3, h4) [0..79]
+      (!a, !b, !c, !d, !e) = foldl' sha1Round (h0, h1, h2, h3, h4) (zip [0..79] ws)
 
   in (h0 + a, h1 + b, h2 + c, h3 + d, h4 + e)
 
--- | Expand 16 32-bit words to 80 words
-expandWords :: ByteString -> Int -> Word32
-expandWords block i
-  | i < 16    = getWord32BE block (i * 4)
-  | otherwise = rotateL (expandWords block (i-3) `xor`
-                         expandWords block (i-8) `xor`
-                         expandWords block (i-14) `xor`
-                         expandWords block (i-16)) 1
+-- | The 80 words of the message schedule. A lazy list that refers to itself, so
+-- every word is computed once.
+--
+-- This used to be a function from the word's index, each word defined by the four
+-- before it and recomputed from the message on every read: about 1.4 million word
+-- computations for each 64-byte block. That is 3.4 ms a block, which went
+-- unnoticed while the only input was a short label (one block), and made every
+-- 'L4.Viz.AtomKey' atomId expensive once the input was the key of a whole term:
+-- 65 ms per leaf of the form @n EQUALS 5@ (measured 2026-10-12).
+expandWords :: ByteString -> [Word32]
+expandWords block = ws
+  where
+    ws = [getWord32BE block (i * 4) | i <- [0 .. 15]]
+      ++ zipWith4 (\a b c d -> rotateL (a `xor` b `xor` c `xor` d) 1) (drop 13 ws) (drop 8 ws) (drop 2 ws) ws
 
 -- | Get a big-endian Word32 from ByteString at given offset
 getWord32BE :: ByteString -> Int -> Word32
@@ -108,13 +115,12 @@ getWord32BE bs offset =
   in b0 .|. b1 .|. b2 .|. b3
 
 -- | One round of SHA-1
-sha1Round :: (Int -> Word32)  -- ^ Word schedule
+sha1Round :: (Word32, Word32, Word32, Word32, Word32)
+          -> (Int, Word32)
           -> (Word32, Word32, Word32, Word32, Word32)
-          -> Int
-          -> (Word32, Word32, Word32, Word32, Word32)
-sha1Round w (!a, !b, !c, !d, !e) i =
+sha1Round (!a, !b, !c, !d, !e) (i, wi) =
   let (!f, !k) = roundConstants i b c d
-      temp = rotateL a 5 + f + e + k + w i
+      temp = rotateL a 5 + f + e + k + wi
   in (temp, a, rotateL b 30, c, d)
 
 -- | Round constants and mixing function based on round number

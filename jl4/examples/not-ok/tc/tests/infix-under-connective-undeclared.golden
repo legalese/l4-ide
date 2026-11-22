@@ -6,13 +6,9 @@ File: infix-under-connective-undeclared.l4
   Range: 11:7-11:27
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
-    The first input of function 
-
-      `__OR__` (predefined)
-
-    is expected to be of type
+    The first input of OR is expected to be of type
 
       BOOLEAN
 
@@ -25,7 +21,7 @@ File: infix-under-connective-undeclared.l4
   Range: 11:7-11:27
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 

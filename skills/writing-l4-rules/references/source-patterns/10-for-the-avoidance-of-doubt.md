@@ -50,7 +50,7 @@ directive stays on one line.
 @ref Charitable Fundraising Act s 4(1)
 GIVEN a IS AN Applicant
 GIVETH A BOOLEAN
-DECIDE `eligible to register` a IF
+DECIDE `eligible to register` IF
         a's `aged 18 or over`
     AND a's `resident in Singapore`
 
@@ -127,7 +127,7 @@ boundary case the failing assertion did not cover.
 @ref Charitable Fundraising Act s 4(1), s 4(4)
 GIVEN a IS AN Applicant
 GIVETH A BOOLEAN
-DECIDE `eligible to register` a IF
+DECIDE `eligible to register` IF
         a's `aged 18 or over`
     AND a's `resident in Singapore`
     AND "(4)" ... a's `months of residence in Singapore` AT LEAST 6
@@ -167,7 +167,7 @@ what a failing assertion looks like when the expression refuses instead of retur
 > will annexed before the expiration of a period of 6 months of the death of the deceased."
 >
 > — Probate and Administration Act 1934 s 55(2), at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2465`
+> `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2465`
 
 or, in a contract, "Nothing in this clause prevents the Company from terminating immediately for
 material breach."
@@ -189,7 +189,7 @@ The corpus's statutory witness for that fork is British Nationality Act 1981 s 1
 citizenship acquired under subsection (5) survives the adoption order later ceasing to have effect.
 The encoder's note states the technique exactly: "Encoded by deliberately NOT reading the cesser
 field — the predicate below equals `a British citizen by virtue of subsection (5)` whatever the
-cesser flag says, and the tests assert exactly that" (`jl4/examples/legal/bna/bna.l4:564-568`).
+cesser flag says, and the tests assert exactly that" (`jl4/examples/canon/uk/bna-1981/bna.l4:564-568`).
 
 **Write** the surviving right as a rule that does not read the field the other clause turns on, and
 assert that it answers the same way whichever way that field goes.
@@ -202,7 +202,7 @@ assert that it answers the same way whichever way that field goes.
 @ref Consultancy Agreement cl 11.4
 GIVEN e IS AN Engagement
 GIVETH A BOOLEAN
-DECIDE `the Company may terminate for material breach` e IF
+DECIDE `the Company may terminate for material breach` IF
     "11.4" ... e's `the Consultant is in material breach`
 
 #ASSERT `the Company may terminate for material breach` `in breach, notice period running`
@@ -232,7 +232,7 @@ obvious to whoever edits the notice rule next quarter. The pair of assertions is
 > "Without prejudice to subsection (2), the following shall be treated as properly executed:"
 >
 > — Wills Act 1838 s 5(3), carried as the chapeau of both halves of the encoding at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/wills-act.l4:911` and `:930`
+> `jl4/examples/canon/sg/succession/cleanroom/wills-act.l4:911` and `:930`
 
 or, in a contract, "It is hereby declared that a payment made under protest does not waive any
 claim", or "The remedies in this clause are without prejudice to any other remedy available at law."
@@ -291,8 +291,8 @@ threshold must be registered" — where "the prescribed threshold" is a figure t
 caller for rather than one it knows.
 
 **It is doing** fixing a **boundary**: at, not above. That is the class of clause most worth testing
-and, in the house style, the one you most often cannot test as written — because no directive inside
-the file can supply a section `GIVEN`.
+and, in the house style, the one you most often cannot test as written — because the assertion below
+leaves the section `GIVEN` unsupplied.
 
 The assertion does not fail. It cannot run (probe `a5-input-blocked.l4`, exit 1):
 
@@ -336,16 +336,21 @@ DECIDE `the appeal must be registered` `the amount solicited` IF
 
 (Probe `a6-input-repaired.l4`, exit 0. `#CHECK` reports
 `FUNCTION FROM NUMBER TO BOOLEAN` at information severity and, crucially, does **not** force the
-section `GIVEN` — which is the only reason the delegating rule can be exercised at all in a file that
-must exit 0.)
+section `GIVEN` — which is why the delegating rule can be checked, with no value for the section
+`GIVEN`, in a file that must exit 0.)
 
 The clause said "exactly the threshold", so the pair is `50000` against `50000` and `49999` against
 `50000`. One assertion on its own does not pin a boundary.
 
-**Not** a `WITH` that supplies the section `GIVEN` at the directive. _Proposed, not landed
-(2026-09-04)_ — it lands with the discharge change. Today `WITH` names only a rule's **own** inputs,
-and both spellings a model reaches for are errors. With a positional value in front of it, the
-parser stops (probe `a8-with-positional.l4`, exit 1):
+**Or** supply the section `GIVEN` at the directive, by name, beside the rule's own input. On the
+file above this is satisfied:
+
+```
+#ASSERT `the appeal must be registered` WITH `the amount solicited` IS 50000, `the prescribed threshold` IS 50000
+```
+
+**Not** either of the two spellings a model reaches for first. With a positional value in front of
+the `WITH`, the parser stops (probe `a8-with-positional.l4`, exit 1):
 
 ```
 11 | #ASSERT `the appeal must be registered` 50000 WITH `the prescribed threshold` IS 50000
@@ -353,8 +358,8 @@ parser stops (probe `a8-with-positional.l4`, exit 1):
 unexpected WITH
 ```
 
-Without one, it parses and the type checker reports two things — the rule's real input unsupplied,
-and the name you tried to bind undefined (probe `a9-with-named.l4`, exit 1):
+Naming only the section `GIVEN`, it parses and the type checker reports the rule's own input
+unsupplied (probe `a9-with-named.l4`, exit 1):
 
 ```
 In this use of
@@ -366,14 +371,8 @@ you have not supplied these inputs:
   `the amount solicited` of type NUMBER
 ```
 
-```
-I could not find a definition for the identifier
-
-  `the prescribed threshold`
-```
-
-Until discharge lands, values for section `GIVEN`s come from outside the file: a web form,
-`l4 batch FILE --inputs cases.json`, or the service request.
+Values for a real case come from outside the file: a web form, `l4 batch FILE --inputs cases.json`,
+or the service request.
 
 **Not** an arbitrary constant substituted into the rule so the assertion runs. That silently answers
 a different question — one where the threshold is fixed — and the file will keep passing after the

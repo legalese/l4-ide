@@ -8,9 +8,9 @@ run-stack.l4:71:47-58:
       theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:73:1-77:20:
+run-stack.l4:73:1-77:17:
   FULFILLED
-run-stack.l4:79:1-83:20:
+run-stack.l4:79:1-83:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -24,9 +24,9 @@ run-stack.l4:79:1-83:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:89:1-93:20:
+run-stack.l4:89:1-93:17:
   FULFILLED
-run-stack.l4:95:1-99:20:
+run-stack.l4:95:1-99:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -75,9 +75,9 @@ run-stack.l4:148:47-58:
       theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:150:1-154:20:
+run-stack.l4:150:1-154:17:
   FULFILLED
-run-stack.l4:156:1-160:20:
+run-stack.l4:156:1-160:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -91,7 +91,7 @@ run-stack.l4:156:1-160:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:162:1-166:20:
+run-stack.l4:162:1-166:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -142,9 +142,9 @@ run-stack.l4:199:47-58:
       theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:201:1-205:20:
+run-stack.l4:201:1-205:17:
   FULFILLED
-run-stack.l4:207:1-211:20:
+run-stack.l4:207:1-211:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -158,7 +158,7 @@ run-stack.l4:207:1-211:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:213:1-217:20:
+run-stack.l4:213:1-217:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -179,9 +179,9 @@ run-stack.l4:236:47-58:
       theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:238:1-242:20:
+run-stack.l4:238:1-242:17:
   FULFILLED
-run-stack.l4:244:1-248:20:
+run-stack.l4:244:1-248:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -195,7 +195,7 @@ run-stack.l4:244:1-248:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:250:1-254:20:
+run-stack.l4:250:1-254:17:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -209,11 +209,11 @@ run-stack.l4:250:1-254:20:
       MUST Refund theLandlord
     before their deadline, which was at
       10
-run-stack.l4:270:1-274:20:
+run-stack.l4:270:1-274:17:
   FULFILLED
-run-stack.l4:276:1-280:20:
+run-stack.l4:276:1-280:17:
   FULFILLED
-run-stack.l4:287:1-291:20:
+run-stack.l4:287:1-291:17:
   FULFILLED
 run-stack.l4:293:1-296:50:
   DEONTIC BREACHED:
@@ -243,28 +243,28 @@ run-stack.l4:298:1-301:50:
       MUST Refund theLandlord
     before their deadline, which was at
       19
-run-stack.l4:314:27-32:
+run-stack.l4:315:27-32:
   I found a problem while checking the definition of `both anchored`:
     In this action, `alice` refers to
     
       alice (at run-stack.l4:42:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:315:44-55:
+run-stack.l4:316:44-55:
   I found a problem while checking the definition of `both anchored`:
     In this action, `theLandlord` refers to
     
       theLandlord (at run-stack.l4:41:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:316:38-41:
+run-stack.l4:317:38-41:
   I found a problem while checking the definition of `both anchored`:
     In this action, `bob` refers to
     
       bob (at run-stack.l4:43:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-stack.l4:319:1-321:20:
+run-stack.l4:320:1-322:17:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -273,11 +273,11 @@ run-stack.l4:319:1-321:20:
     at
       20
     surpassed the deadline of party
-      Landlord OF "Ms Ng"
+      Tenant OF "Bob"
     who had to do obligatory action
-      MUST Deliver theLandlord
+      MUST Sign bob
     before their deadline, which was at
-      15
+      7
     and the breach names, in order
       Landlord OF "Ms Ng"
         who had to do obligatory action

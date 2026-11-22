@@ -1,0 +1,28 @@
+-- smucclaw/l4-ide#1069: one event at 10. Taking it, `settler` finds that its
+-- deadline of 2 has passed and records `x` = 1 at 2; `matcher` takes the act
+-- and records `x` = 2 at 10. Nothing inside the RAND reads `x`. In time the
+-- record is 1 then 2 (NORM-LOG-SPEC N20, ruled 2026-10-26: every deadline an
+-- event reveals is settled before the event is matched).
+-- Here the left side records `x` for the event at 10 before the right side, settling its missed deadline, records it for 2, so L4 refuses: the cell's last entry would be the older one.
+IMPORT prelude
+DECLARE Party IS ONE OF P
+DECLARE Act IS ONE OF go, stay
+
+GIVETH A DEONTIC Party Act
+`matcher` MEANS
+    PARTY P
+    MAY go
+    WITHIN 100
+    HENCE COMMIT `x` IS 2 HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`settler` MEANS
+    PARTY P
+    MUST stay
+    WITHIN 2
+    HENCE FULFILLED
+    LEST (COMMIT `x` IS 1 HENCE FULFILLED)
+
+#TRACE `matcher` RAND `settler` AT 0 WITH
+    PARTY P DOES go AT 10

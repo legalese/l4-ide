@@ -29,9 +29,9 @@ DECIDE `double number` IS GIVEN n IS A NUMBER YIELD n * 2
 
 -- Multiple typed parameters
 DECIDE `format pair` IS
-  GIVEN personName IS A STRING
-        personAge IS A NUMBER
-  YIELD personName
+  GIVEN `person name` IS A STRING
+        `person age` IS A NUMBER
+  YIELD `person name`
 
 
 -- LAMBDAS WITH HIGHER-ORDER FUNCTIONS

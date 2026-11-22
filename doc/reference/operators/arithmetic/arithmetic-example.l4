@@ -56,9 +56,9 @@
 
 -- Circle area: pi * r^2
 GIVEN r IS A NUMBER
-circleArea r MEANS 3.14159 TIMES r TIMES r
+`area of a circle` r MEANS 3.14159 TIMES r TIMES r
 
-#EVAL circleArea 5
+#EVAL `area of a circle` 5
 
 -- Quadratic formula discriminant: b^2 - 4ac
 GIVEN a IS A NUMBER
@@ -73,23 +73,23 @@ discriminant a b c MEANS
 
 -- Calculate tax
 GIVEN price IS A NUMBER
-      taxRate IS A NUMBER
-calculateTax price taxRate MEANS
-  price TIMES taxRate / 100
+      `tax rate` IS A NUMBER
+`tax on` price `tax rate` MEANS
+  price TIMES `tax rate` / 100
 
-#EVAL calculateTax 100 8.5
+#EVAL `tax on` 100 8.5
 
 -- Calculate discount
-GIVEN originalPrice IS A NUMBER
-      discountPercent IS A NUMBER
-applyDiscount originalPrice discountPercent MEANS
-  originalPrice MINUS (originalPrice TIMES discountPercent / 100)
+GIVEN `original price` IS A NUMBER
+      `discount percent` IS A NUMBER
+`discounted price` `original price` `discount percent` MEANS
+  `original price` MINUS (`original price` TIMES `discount percent` / 100)
 
-#EVAL applyDiscount 200 25
+#EVAL `discounted price` 200 25
 
 -- Combining with Comparisons
 
 DECIDE profit IS income MINUS expenses
-DECIDE isProfitable IS profit GREATER THAN 0
+DECIDE `is profitable` IS profit GREATER THAN 0
 
-#CHECK isProfitable
+#CHECK `is profitable`

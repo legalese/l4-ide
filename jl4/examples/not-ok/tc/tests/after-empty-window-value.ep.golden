@@ -1,0 +1,47 @@
+-- The empty-window refusal of after-empty-window.l4 and
+-- after-empty-window-lest.l4, with the anchor noun written as a VALUE in
+-- brackets (EVERY-EACH-QUANTIFIER-SPEC §2.6 card B1). OF (THE JOIN) is the
+-- same anchor as OF THE JOIN, so each window below closes before it opens
+-- and each is refused, as its bare twin is (§5.1.2.2). Until 2026-10-24
+-- the checker matched the bare spelling only, and all five passed `l4
+-- check` with exit 0, leaving the empty window to a run-time note.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+-- the closing edge bracketed, the AFTER bare: under HENCE a bare AFTER
+-- counts from the join
+GIVETH A DEONTIC Actor Action
+`closing edge bracketed` MEANS
+    PARTY Seller MUST Deliver WITHIN 10
+    HENCE (PARTY Buyer MUST Pay AFTER 30 WITHIN 5 OF (THE JOIN))
+
+-- both edges bracketed
+GIVETH A DEONTIC Actor Action
+`both edges bracketed` MEANS
+    PARTY Seller MUST Deliver WITHIN 10
+    HENCE (PARTY Buyer MUST Pay AFTER 30 OF (THE JOIN) WITHIN 5 OF (THE JOIN))
+
+-- one edge bare, the other bracketed: still one noun
+GIVETH A DEONTIC Actor Action
+`one bare, one bracketed` MEANS
+    PARTY Seller MUST Deliver WITHIN 10
+    HENCE (PARTY Buyer MUST Pay AFTER 30 OF THE JOIN WITHIN 5 OF (THE JOIN))
+
+-- under the LEST of a MUST, a bare AFTER counts from the missed deadline
+GIVETH A DEONTIC Actor Action
+`deadline bracketed under LEST` MEANS
+    PARTY Seller MUST Deliver WITHIN 10
+    HENCE FULFILLED
+    LEST (PARTY Buyer MUST Pay AFTER 3 WITHIN 2 OF (THE DEADLINE))
+
+-- THE ARMING precedes every default origin, so it is compared everywhere
+GIVETH A DEONTIC Actor Action
+`arming bracketed` MEANS
+    PARTY Seller MUST Deliver WITHIN 10
+    HENCE (PARTY Buyer MUST Pay AFTER 30 WITHIN 5 OF (THE ARMING))

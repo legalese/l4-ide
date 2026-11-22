@@ -1,0 +1,28 @@
+-- `l4 prove` over NUMBER: each #ASSERT below reads a section GIVEN, so the
+-- evaluator cannot decide it, and the solver must.
+§ `Arithmetic`
+    GIVEN x IS A NUMBER
+          pi IS A NUMBER
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`twice` n MEANS n PLUS n
+
+-- proved: `twice` is unfolded
+#ASSERT `twice` x EQUALS 2 TIMES x
+
+-- proved: linear arithmetic
+#ASSERT x GREATER THAN 5 IMPLIES x GREATER THAN 3
+
+-- proved: banker's rounding never moves a number by more than a half
+#ASSERT ROUND x AT MOST x PLUS 0.5
+
+-- refuted: `pi` is any number here; it is also a solver built-in name,
+-- so its SMT-LIB2 symbol must carry the l4_ prefix
+#ASSERT pi GREATER THAN 3
+
+-- refuted: at x = 0 the division raises
+#ASSERT x DIVIDED BY x EQUALS 1
+
+-- decided by evaluation: reads no section GIVEN, so not an obligation
+#ASSERT 2 PLUS 2 EQUALS 4

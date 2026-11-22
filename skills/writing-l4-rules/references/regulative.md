@@ -19,6 +19,7 @@ Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, 
   - [The group must be given as a list, after `IN`](#1-the-group-must-be-given-as-a-list-after-in)
   - [The join line is mandatory whenever there is a `HENCE` or a `LEST`](#2-the-join-line-is-mandatory-whenever-there-is-a-hence-or-a-lest)
   - [`t` already refers to the member — no `EXACTLY` needed](#3-t-already-refers-to-the-member--no-exactly-needed)
+  - [`WHOSE`: the same, with the member filled in](#whose-the-same-with-the-member-filled-in)
   - [Do not write the deprecated `WHO elem` roll](#do-not-write-the-deprecated-who-elem-roll)
 - [Recursive obligations](#recursive-obligations)
 - [#TRACE — simulating contract execution](#trace--simulating-contract-execution)
@@ -45,9 +46,9 @@ Only `PARTY` + modal + action are required. `WITHIN`, `HENCE`, and `LEST` all ha
 
 | Keyword | Meaning                   | Reference                                               |
 | ------- | ------------------------- | ------------------------------------------------------- |
-| `MUST`  | Obligation (required)     | <https://legalese.com/l4/reference/regulative/MUST.md>  |
-| `MAY`   | Permission (allowed)      | <https://legalese.com/l4/reference/regulative/MAY.md>   |
-| `SHANT` | Prohibition (forbidden)   | <https://legalese.com/l4/reference/regulative/SHANT.md> |
+| `MUST`  | Obligation (required)     | <https://legalese.com/l4/reference/regulative/PARTY.md> |
+| `MAY`   | Permission (allowed)      | <https://legalese.com/l4/reference/regulative/PARTY.md> |
+| `SHANT` | Prohibition (forbidden)   | <https://legalese.com/l4/reference/regulative/PARTY.md> |
 | `DO`    | Optionality / possibility |                                                         |
 
 ```l4
@@ -390,6 +391,19 @@ EVERY Tenant t IN tenants
 
 `WHO` takes any Boolean expression in which the member is free — a field comparison, a prelude call, a named helper applied to it.
 
+### `WHOSE`: the same, with the member filled in
+
+When the condition is about the member's own fields, `WHOSE` saves writing the member on every line (built 2026-09-21):
+
+```l4
+EVERY Tenant t IN tenants
+    WHOSE arrears AT LEAST 1000
+          ...
+          standing EQUALS "current"
+```
+
+is `WHO t's arrears AT LEAST 1000 AND t's standing EQUALS "current"`. The rule is **positional**: the FIRST word of each operand of the top-level `AND`/`OR` chain (so each `...`/`..` line) is read as a field of the cast — here `Tenant`, whose fields come from its constructor, so the value-actor style (`Tenant` an arm of `Actor`) works. No other name in the condition changes meaning. Three things are refused, each pointing at `WHO`: a first word that is not a field of the cast (the message lists the fields), `WHOSE` with no cast (`EVERY t IN …`), and an operand that does not begin with a word (`NOT …`, a call, a bracket). **Prefer `WHO` for anything but plain field comparisons.** Opened fields elsewhere in the condition are a backlogged design, not built.
+
 ### Do not write the deprecated `WHO elem` roll
 
 Before `IN` existed the roll had to be smuggled into the `WHO` condition:
@@ -427,18 +441,30 @@ Full treatment, including the state-graph behaviour and the measured sharp edges
 For recurring payments (loans, subscriptions, installments), define a function that emits the next period's obligation:
 
 ```l4
+DECLARE Party IS ONE OF `The Borrower`
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+
+`monthly installment` MEANS 100
+`late penalty` MEANS 10
+
 GIVEN remainingBalance IS A NUMBER
+GIVETH A DEONTIC Party Action
 `monthly payments` remainingBalance MEANS
     IF remainingBalance GREATER THAN 0
     THEN PARTY `The Borrower`
          MUST pay `monthly installment`
-         WITHIN `next due date`
+         WITHIN 30
          HENCE `monthly payments` (remainingBalance MINUS `monthly installment`)
          LEST  `monthly payments` (remainingBalance PLUS `late penalty`)
     ELSE FULFILLED
+
+#TRACE `monthly payments` 200 AT 0 WITH
+    PARTY `The Borrower` DOES pay 100 AT 20
+    PARTY `The Borrower` DOES pay 100 AT 45
+-- Result: FULFILLED
 ```
 
-The `HENCE` branch reduces the balance; the `LEST` branch increases it with a penalty and re-emits the obligation. The recursion base is `FULFILLED`.
+The `HENCE` branch reduces the balance; the `LEST` branch increases it with a penalty and re-emits the obligation. The recursion base is `FULFILLED`. `` `monthly installment` `` names a constant, so the action refers to it ([Reference and wildcard names](#reference-and-wildcard-names)): a payment of 50 does not discharge a rung.
 
 ---
 
@@ -467,23 +493,23 @@ One event per line, in the order they happen. There are exactly **two** kinds an
 #TRACE `the payment duty` AT 0 WITH
     PARTY `the Company` DOES `pay the invoice` AT 12
 
--- A clock advance with no act: `WAIT UNTIL` n
+-- A clock advance with no act: WAITUNTIL n
 #TRACE `the payment duty` AT 0 WITH
-    (`WAIT UNTIL` 31)
+    (WAITUNTIL 31)
 
 -- Both kinds in one block, in authored order — the only way to show a LEST
 -- chain expiring on its first rung and then discharging on its second.
 #TRACE `the payment duty` AT 0 WITH
-    (`WAIT UNTIL` 45)
+    (WAITUNTIL 45)
     PARTY `the Company` DOES `pay the unpaid amount with interest` AT 50
 ```
 
-- **`` `WAIT UNTIL` `` is built into the compiler, not a library name.** The probe above has no
+- **`WAITUNTIL` is built into the compiler, not a library name.** The probe above has no
   `IMPORT` line at all and every trace runs. The parentheses are the house form and what the corpus
-  writes; a bare `` `WAIT UNTIL` 31 `` on its own line also parses and gives the same result
+  writes; a bare `WAITUNTIL 31` on its own line also parses and gives the same result
   (probes `g11b`, `g11c`).
 - **The deadline is inclusive.** An act `AT 30` against `WITHIN 30` is timely; it takes
-  ``(`WAIT UNTIL` 31)`` to expire it.
+  `(WAITUNTIL 31)` to expire it.
 - **A rule that takes arguments is applied before `AT`, and more than one argument is fine.**
   ``#TRACE `cl 6 -- confidentiality` `the Contractor` (`disclose` "the world") AT 0 WITH`` runs and
   produces the breach. Parenthesise a constructed argument.
@@ -550,7 +576,7 @@ saleContract MEANS
 -- Result: FULFILLED
 
 #TRACE saleContract AT 0 WITH
-    (`WAIT UNTIL` 4)
+    (WAITUNTIL 4)
 -- Result: DEONTIC BREACHED: BREACH BY Seller
 --         BECAUSE "the goods were not delivered within 3 days"
 ```
@@ -560,11 +586,9 @@ saleContract MEANS
 ## See also
 
 - <https://legalese.com/l4/reference/regulative.md> — full keyword reference
-- <https://legalese.com/l4/reference/regulative/MUST.md>
-- <https://legalese.com/l4/reference/regulative/MAY.md>
-- <https://legalese.com/l4/reference/regulative/SHANT.md>
-- <https://legalese.com/l4/reference/regulative/PARTY.md>
+- <https://legalese.com/l4/reference/regulative/PARTY.md> — PARTY, MUST, MAY, SHANT
+- <https://legalese.com/l4/reference/regulative/consequences.md> — WITHIN, HENCE, LEST, RAND, ROR
 - <https://legalese.com/l4/reference/regulative/BECAUSE.md>
 - <https://legalese.com/l4/reference/regulative/DEONTIC.md>
 - <https://legalese.com/l4/concepts/legal-modeling/regulative-rules.md> — conceptual overview
-- <https://legalese.com/l4/courses/foundation/module-5-regulative.md> — foundation course module
+- <https://legalese.com/l4/courses/foundation/module-6-regulative.md> — foundation course module

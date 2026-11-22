@@ -1,0 +1,6 @@
+-- Two #ASSERTs on one line, separated by `;`: their --emit-smt scripts must
+-- not share a name.
+§ `Two on a line`
+    GIVEN b IS A BOOLEAN
+
+#ASSERT b ; #ASSERT NOT b

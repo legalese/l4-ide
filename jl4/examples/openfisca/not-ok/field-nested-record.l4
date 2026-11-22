@@ -1,0 +1,17 @@
+-- An input field whose type is another record. Nested records are not
+-- supported, and the export used to emit the field as a float. The export
+-- must REFUSE it.
+IMPORT prelude
+
+DECLARE Address HAS postcode IS A NUMBER
+DECLARE Person HAS
+    salary IS A NUMBER
+    home   IS AN Address
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`tax` p period MEANS p's salary TIMES 0.1
+
+#ASSERT (`tax` OF (Person WITH salary IS 1000, home IS Address WITH postcode IS 1), "2026-01") EQUALS 100

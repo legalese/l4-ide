@@ -1,0 +1,31 @@
+-- Two definitions of one name, told apart by their types, are overloads, not
+-- the clauses of one rule, even when their arguments are bare names that
+-- differ. The parser cannot tell which they are, because a bare name could
+-- be a value; the checker can, once names are resolved, and reads a run of
+-- clauses whose patterns are all bare names, none of them a value, as the
+-- separate definitions they are (review of legalese/l4-ide#545, round 2).
+
+-- Without a GIVEN, each type comes from the body.
+DECIDE show n IS n + 1
+DECIDE show b IS b AND TRUE
+
+#EVAL show 3      -- 4
+#EVAL show TRUE   -- TRUE
+
+-- The same in the MEANS form.
+opposite n MEANS 0 - n
+opposite b MEANS NOT b
+
+#EVAL opposite 3      -- -3
+#EVAL opposite TRUE   -- FALSE
+
+-- A run whose names include a value is one rule, as before.
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE rank Red   IS 1
+DECIDE rank other IS 2
+
+#EVAL rank Red    -- 1
+#EVAL rank Blue   -- 2

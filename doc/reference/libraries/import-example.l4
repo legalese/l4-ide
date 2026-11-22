@@ -1,29 +1,22 @@
--- IMPORT keyword examples
+-- IMPORT examples
 
--- Importing Standard Libraries
-
--- Import math library for mathematical functions
+-- One module per line, at the top of the file.
+IMPORT prelude
 IMPORT math
+IMPORT daydate
 
--- Use functions from math library
-#EVAL exp 1
+-- A name with a hyphen goes in backticks.
+IMPORT `legal-persons`
+
+-- prelude: list functions
+#EVAL sum (LIST 1, 2, 3)
+
+-- math: functions that give NOTHING instead of failing
 #EVAL sqrt 16
--- Using Imported Functions
+#EVAL sqrt (0 - 1)
 
--- Math functions become available after import
-GIVEN r IS A NUMBER
-circleArea r MEANS 3.14159 TIMES r TIMES r
+-- daydate: dates
+#EVAL `the day after` (Date 31 12 2024)
 
-#EVAL circleArea 5
-
--- Import Syntax Notes
-
--- For hyphenated library names, use backticks:
--- IMPORT `some-library`
-
--- Multiple imports can appear in sequence:
--- IMPORT math
--- IMPORT daydate
-
--- Libraries are resolved from the jl4-core/libraries/ directory
--- or relative to the current file
+-- legal-persons: age on a given date
+#EVAL `age in years` (Date 15 3 1990) (Date 1 1 2025)

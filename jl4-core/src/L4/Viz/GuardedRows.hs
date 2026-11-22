@@ -205,7 +205,7 @@ exclusive a b = case (a, b) of
 -- | @BRANCH@ short-circuits; the And\/Or expansion does not. Expanding a chain whose
 -- guards perform I\/O would therefore change how often the effect runs, so bail.
 hasEffectfulNode :: Expr Resolved -> Bool
-hasEffectfulNode = anyOf (cosmosOf (gplate @(Expr Resolved))) $ \case
+hasEffectfulNode = anyOf cosmosExpr $ \case
   Fetch {} -> True
   Post {}  -> True
   _        -> False
@@ -272,10 +272,12 @@ guardedToLadder fresh go rows = do
         | rows.grDisjoint = pure []
         | otherwise       = traverse negatedAt [0 .. i - 1]
 
+      -- A guard written @NOT x@ fails where @x@ holds: 'V.negateIR' cancels the
+      -- pair, and the @x@ it returns is the guard's own copy, so its Unique is shared.
       negatedAt :: Int -> m IRExpr
       negatedAt j = do
         nid <- fresh
-        V.Not nid <$> guardAt j
+        V.negateIR nid <$> guardAt j
 
       allNegated :: m [IRExpr]
       allNegated = traverse negatedAt [0 .. length guards - 1]
@@ -323,8 +325,8 @@ guardedToLadder fresh go rows = do
       V.Or _ xs                 -> V.Or <$> fresh <*> traverse copyOf xs
       V.Not _ x                 -> V.Not <$> fresh <*> copyOf x
       V.Implies _ p q seam      -> (\i p' q' -> V.Implies i p' q' seam) <$> fresh <*> copyOf p <*> copyOf q
-      V.UBoolVar _ nm v ci a ty -> (\i -> V.UBoolVar i nm v ci a ty) <$> fresh
-      V.App _ nm xs a           -> (\i xs' -> V.App i nm xs' a) <$> fresh <*> traverse copyOf xs
+      V.UBoolVar _ nm v ci a ty x -> (\i x' -> V.UBoolVar i nm v ci a ty x') <$> fresh <*> traverse copyOf x
+      V.App _ nm xs a x           -> (\i xs' x' -> V.App i nm xs' a x') <$> fresh <*> traverse copyOf xs <*> traverse copyOf x
       V.TrueE _ nm              -> (`V.TrueE` nm) <$> fresh
       V.FalseE _ nm             -> (`V.FalseE` nm) <$> fresh
       V.InertE _ t c            -> (\i -> V.InertE i t c) <$> fresh

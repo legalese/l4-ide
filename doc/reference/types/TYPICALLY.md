@@ -4,17 +4,17 @@ Attaches a default value to a name. The default is a _rebuttable presumption_:
 it records what should be presumed when nobody supplies a value.
 
 **On a section `GIVEN` the default is used when nobody supplies a value.**
-Everywhere else it records what should be presumed without changing what the
-rules work out. That split is new, and the two halves are described separately
-below.
+**At the boundary — `l4 batch` and the decision service — it is also used for a
+rule's own `GIVEN` and for a record field, when a case leaves the fact out.**
+Inside a file, everywhere else, it records what should be presumed without
+changing what the rules work out.
+The parts are described separately below.
 
 ## Syntax
 
 ```l4
 name IS A Type TYPICALLY literal
 ```
-
-TYPICALLY may appear on:
 
 A rule is told some facts about the case in front of it (its **"inputs"**, the
 names listed after `GIVEN`). `TYPICALLY` may appear on:
@@ -25,7 +25,7 @@ names listed after `GIVEN`). `TYPICALLY` may appear on:
 3. **A `GIVEN` under a section heading** (a **"section `GIVEN`"**) — default
    values for a name declared once for every rule in the section
 4. **`ASSUME` declarations, in older files** — default values for assumed
-   names. `ASSUME` is deprecated (ruled 2026-09-04) and still works; a fact
+   names. `ASSUME` is deprecated and still works; a fact
    supplied for each case belongs under its section's heading instead. See
    [the section `GIVEN`](../syntax/section-given.md) and
    [ASSUME (deprecated)](ASSUME.md).
@@ -67,10 +67,8 @@ Three things follow from where the default is applied:
 - **A name with no default that nobody supplies is still an assumed fact**, and
   a rule that reads it says so at the point where it is needed.
 
-This is a change in what `TYPICALLY` means, and it is confined to this one
-place: a `TYPICALLY` on a `DECLARE` field, on a rule's own `GIVEN`, or on an
-`ASSUME` behaves exactly as it did before, as the next section describes. A
-rule's own defaulted `GIVEN` still cannot be omitted at a call.
+Inside a file, only a section `GIVEN` works this way: a `TYPICALLY` on a `DECLARE` field, on a rule's own `GIVEN`, or on an `ASSUME` does not change what a rule works out, as the next section describes.
+A rule's own defaulted `GIVEN` cannot be omitted at a call.
 
 ## Everywhere else: metadata only
 
@@ -86,20 +84,46 @@ b)` is an error).
 - It cannot appear on a name that stands for a **kind of thing** rather than a
   value: `ASSUME Foo IS A TYPE TYPICALLY 42` is an error.
 - **On a section `GIVEN` it changes what a rule works out**: a rule that reads
-  the name, and is given no value for it, uses the default. Everywhere else it
-  does not. Nothing is substituted when such a rule is run; whatever reads the
-  file afterwards (a form generator, a decision service, a question-ordering
-  policy) decides how to use the stored default. The list of facts a published
-  rule asks for carries it as the JavaScript Object Notation (JSON) Schema
-  `default` keyword, and the defaulted name is still listed under `required`:
-  whoever asks the question must still send a value for it.
+  the name, and is given no value for it, uses the default. Inside a file,
+  everywhere else, it does not: a rule's own defaulted `GIVEN` still cannot be
+  left out at a call, and a record cannot be built with a defaulted field left
+  out.
 
-_Partly landed (2026-09-05). Of the four things proposed on 2026-09-04, one has
-landed: a **section** `GIVEN` may be left out, and a rule that reads it then uses
-the default. The other three have not. A rule's own `GIVEN` still cannot be left
-out at a call. The default still must be a fixed value written out, so it cannot
-name another `GIVEN`. And the published list of facts still asks for it as
-required rather than optional._
+## At the boundary: `l4 batch` and the decision service
+
+A case sent to `l4 batch`, or a request sent to the decision service, may leave
+out any fact that has a default, whether the `TYPICALLY` is on a section
+`GIVEN`, on the exported rule's own `GIVEN`, or on a field of a record the rule
+takes as an input. The default is filled in where the case arrives, and the
+answer lists it under **`presumed`**, by name (or, for a field, by its path, such
+as `config.timeout`) — but only if the answer actually used it. These rules
+govern what counts as leaving a fact out:
+
+- **Leaving the name out** is leaving it out. So is an empty cell in a CSV file
+  given to `l4 batch`. A `MAYBE` fact with no default, left out, is `NOTHING`,
+  and is listed under `presumed` like a default.
+- **`null` is not.** `null` means _not known_, and a fact that is not known never
+  takes its default: the case is refused, naming the fact. `{}` means the same,
+  for a record too. The one exception is a `MAYBE` fact, which is allowed to
+  have no value: `null` on it is `NOTHING`, a value, and nothing is presumed or
+  refused.
+- **A name that matches nothing is refused where a default is taken.** In a
+  case that leaves out a fact with a default, a name that is not a fact is
+  refused, naming the nearest one, since it may misspell the fact left out.
+  Where no default is taken, it is ignored.
+- **The presumption can be switched off.** `l4 batch --presumption hard`, or
+  `"presumption": "hard"` in a service request, uses no defaults: a fact left
+  out is missing, and the case is refused, naming it. The default is `soft`.
+  The switch reaches only the facts a case can supply. A record the rules
+  decode from JSON of their own (`JSONDECODE`) still takes its defaults, and
+  under `hard` the answer lists them under `presumed` as
+  `JSONDECODE <type>: <field>`, because nothing the case says could replace
+  them.
+
+The list of facts a published rule asks for carries each default as the
+JavaScript Object Notation (JSON) Schema `default` keyword, and a defaulted fact
+is not listed under `required`. A `TYPICALLY` on an `ASSUME` is not used here
+either, and is not published, in the service's schema or in the query plan's.
 
 ## Examples
 
@@ -138,8 +162,8 @@ DECIDE `contract is binding` IF
 ```
 
 Every rule in Part 3 reads those two names without re-declaring them. A
-published rule that reads them asks for both, and carries `"Singapore"` and
-`TRUE` as their JSON Schema defaults.
+published rule that reads them offers both as optional, carrying `"Singapore"`
+and `TRUE` as their JSON Schema defaults.
 
 ### In older files: `ASSUME`
 
@@ -148,16 +172,16 @@ ASSUME `applicable law` IS A STRING TYPICALLY "Singapore"
 ASSUME `person has capacity` IS A BOOLEAN TYPICALLY TRUE
 ```
 
-`ASSUME` is deprecated (ruled 2026-09-04) and still works. On an `ASSUME` the
+`ASSUME` is deprecated and still works. On an `ASSUME` the
 default stays metadata, as everywhere outside a section `GIVEN`; moving the
 declaration under its section's heading, as the previous example does, is what
-makes the default take effect for a rule given no value. The companion file no
-longer carries this spelling.
+makes the default take effect for a rule given no value.
 
 ## Behavior
 
 - TYPICALLY only adds, except on a section `GIVEN`, where it decides what a rule
-  that is given no value for the name works out.
+  that is given no value for the name works out, and at the boundary, where it
+  decides what a case that leaves the fact out works out.
 - The default must match the annotated type, or type checking fails.
 - The default must be a fixed value written out, like `18` or `"yes"`.
 - On a computed field (one with a MEANS clause), the MEANS definition governs
@@ -173,7 +197,6 @@ longer carries this spelling.
 - [WITH](../functions/WITH.md) — supplying, and overriding, an input by name
 - [DECLARE](DECLARE.md) — declaring record types
 - [GIVEN](../functions/GIVEN.md) — the inputs of one rule
-- [Query Planning](../query-planning/README.md) — how a stored default becomes
-  the per-atom prior `w_v` for the question-ordering wizard
-- [Web Form Generation](../../courses/advanced/module-a4-production.md#web-form-generation)
-  — using TYPICALLY defaults in an autogenerated wizard
+- [Query Planning](../query-planning/README.md) — the planner that decides which question to ask next, and takes a `BOOLEAN` input on a rule's own `GIVEN`, or an `ASSUME`, as likely to have its usual value
+- [Getting Ready to Deploy](../../courses/advanced/module-a4-production.md#getting-ready-to-deploy)
+  — TYPICALLY in a published rule

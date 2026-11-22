@@ -16,7 +16,7 @@ first `yes` — six of its seven rows send you somewhere else.
 
 > `6(3)-(4) (the States' power to add heads by Regulations)` — listed among the parts that "are out of scope"
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:22-25`
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:22-25`
 
 **It is doing** one of two things, and you must decide which before writing anything:
 
@@ -179,7 +179,7 @@ compute with, and a draft that silently prices a blank at zero is worse than one
 
 > `s 7 rule 3 — "Subject to the rights of the surviving spouse, if any, the estate (both as to the undistributed portion and the reversionary interest) of an intestate who leaves issue shall be distributed by equal portions per stirpes"`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/intestate-succession-act.l4:1126`
+> — `jl4/examples/canon/sg/succession/cleanroom/intestate-succession-act.l4:1126`
 
 **It is doing** the drafter's own hedge that a thing may not exist, together with an instruction on
 what follows when it does not. The absence is a fact about the case, as solid as any number.
@@ -195,7 +195,7 @@ DECLARE Estate HAS
 @ref Intestate Succession Act 1967 s 7 rule 3
 GIVEN e IS AN Estate
 GIVETH A NUMBER
-`the portion distributable among the issue of` e MEANS
+`the portion distributable among the issue of` MEANS
     e's `the net value of the estate`
     MINUS
     CONSIDER e's `the share of the surviving spouse`
@@ -299,7 +299,7 @@ prose in the corpus — 25-plus sites. One of them:
 
 > `-- ... the honest answer is a refusal, not a guess. Outside the band the ordinary tiers were unaffected and the answer stands.`
 >
-> — `jl4/examples/legal/regcf/regcf.l4:482-484`, on the temporary rules made during the coronavirus
+> — `jl4/examples/canon/us/regcf/regcf.l4:482-484`, on the temporary rules made during the coronavirus
 > disease 2019 pandemic
 
 **It is doing** marking the boundary of the model. The question is only whether a rule can **reach**
@@ -384,7 +384,7 @@ GIVETH A NUMBER
 
 GIVEN y IS A NUMBER
 GIVETH A NUMBER
-`offering maximum in a 12-month period, in year` y MEANS
+`offering maximum in a 12-month period, in year` MEANS
     BRANCH IF y AT LEAST 2021 THEN 5000000
            IF y AT LEAST 2016 THEN 1000000
            OTHERWISE `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
@@ -402,7 +402,7 @@ directive may be split over two lines, as above, and asserts equally on a named 
 an argument and on one called bare.
 
 The year parameter above is this page's simplification. The corpus selects the figure on a rule
-date rather than a year — `jl4/examples/legal/regcf/regcf.l4:148-154`, whose `OTHERWISE` arm over
+date rather than a year — `jl4/examples/canon/us/regcf/regcf.l4:148-154`, whose `OTHERWISE` arm over
 `` `the rules in force include` `` is reached through `EVAL UNDER RULES EFFECTIVE AT`. That arm is
 still an `ASSUME`, not yet a refusal; the shape is what to copy, not the keyword.
 `jl4/examples/ok/refuse.l4:25-26` is the smallest runnable pair in the tree.
@@ -666,7 +666,7 @@ a rule with an unsupplied section `GIVEN`**, and it is what keeps a file in the 
 
 The delegation is not scaffolding you delete later. It is the same split the statute makes: a test
 stated in general terms, and a Part that applies it to the person the Part is about. Both names are
-worth having, and when supply lands the second becomes callable as it stands.
+worth having, and the second is callable as it stands, by supplying the section `GIVEN` with `WITH`.
 
 **Not** a `#EVAL` or `#ASSERT` on the section-`GIVEN` rule **without a `WITH`**. Exit 1, and on a
 page under `doc/` it fails the docs harness.
@@ -693,7 +693,7 @@ the delegating rule's `GIVEN`-parameterised twin and not on the section `GIVEN`;
 `GIVEN` there is a check error, not a parse error.
 [Entry 1.5](01-definitions-and-scope.md#e1-5) has the detail.
 
-**Not, yet, in a module whose deliverable is a Catala export.** `l4 catala` refuses a section
+**Not, yet, in a module whose deliverable is a Catala export.** `l4 export catala` refuses a section
 `GIVEN` read by anything other than the exported decision itself, so the delegating twin does not
 rescue you there unless every delegating rule is `@export`. The parser elaborates a section `GIVEN`
 into a 0-ary `ASSUME` at the head of its section (`jl4-core/src/L4/Names.hs:61-65`), and the
@@ -704,7 +704,7 @@ exported decision's own lowering (`jl4-core/src/L4/Catala/Lower.hs:1677-1683`, s
 The refusal reads:
 
 ```
-l4 catala: cannot compile these decisions to Catala:
+l4 export catala: cannot compile these decisions to Catala:
   - in `the rank of the teacher`: ASSUMEd input `the teacher` is only readable inside an
     @export decision's scope (where it becomes a scope `input`); pass it to this helper as
     a parameter instead
@@ -744,8 +744,8 @@ The statutory form is common:
 
 > `(a) to pay to the other party the sum which it is agreed in the contract by which the marriage was arranged is to be paid by the party in breach of the contract`
 >
-> — Administration of Muslim Law Act 1966 (Singapore) s 94(1)(a), in the repository at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/source/AMLA1966.txt:4166-4168`
+> — Administration of Muslim Law Act 1966 (Singapore) s 94(1)(a), at
+> `AMLA1966.txt:4166-4168` of the `pdftotext -layout` rendering that legalese/canon's `subjects/sg/succession/encodings/cleanroom-2026-08/source/fetch-sso.py` re-creates byte for byte
 
 and the contract form — "the renewal fee shall be such amount as the parties may agree", "on terms
 to be agreed" — is the same words from the other side.
@@ -775,7 +775,7 @@ DECLARE Renewal HAS
 -- 7.4 Failing agreement, the renewal fee is the fee for the preceding year.
 GIVEN r IS A Renewal
 GIVETH A NUMBER
-`clause 7.4 — the renewal fee` r MEANS
+`clause 7.4 — the renewal fee` MEANS
     CONSIDER r's `the sum agreed by the parties`
     WHEN JUST s  THEN s
     WHEN NOTHING THEN `the fee for the preceding year`

@@ -25,6 +25,7 @@ import Compatibility (FnIface, ifaceFromFunction, ifaceFromSummary, detectBreaki
 import Compiler (compileBundle, computeVersion)
 import qualified Version
 import DeploymentLoader (triggerCompilationIfPending)
+import Ledger (refuseIfInstancesHeld, withCreationLock)
 import Logging (logInfo, logWarn)
 import Options (Options (..))
 import Shared (jsonError, encodeMetadataCache)
@@ -54,7 +55,6 @@ import qualified Data.UUID as UUID
 import GHC.Generics (Generic)
 import Servant
 import Servant.Multipart
-import System.FilePath (splitDirectories)
 import Control.Exception (SomeException, catch, displayException)
 import Data.Int (Int64)
 import GHC.Conc (setAllocationCounter, enableAllocationLimit)
@@ -166,27 +166,30 @@ postDeploymentHandler multipart = do
   -- The recompile shortcut is keyed on the CONTENT hash, so it must also be
   -- keyed on the requested id. Matching content alone meant that asking for a
   -- new deployment whose bytes happened to equal an existing one returned HTTP
-  -- 200 naming the OTHER deployment, and created nothing: a subsequent
-  -- @GET /deployments/<the id you asked for>@ 404s. Documented as "skips
-  -- recompilation", it actually skipped deployment creation. Deploying the
-  -- same bundle twice under two names is exactly what you do to compare them,
-  -- and the caller had no way to tell it had not happened.
-  let existingMatch =
-        [ (did, meta)
-        | (did, DeploymentReady _ meta) <- Map.toList registry
-        , meta.metaVersion == version
-        , did == deployId
-        ]
-
-  case existingMatch of
-    ((existingId, existingMeta):_) ->
-      -- Identical sources already deployed UNDER THIS ID — no recompile, no job.
-      pure (mkStatus existingId.unDeploymentId "ready" (Just existingMeta) Nothing)
-    [] -> do
+  -- 202 naming the OTHER deployment, with its metadata, and created nothing: a
+  -- subsequent @GET /deployments/<the id you asked for>@ 404s. Documented as
+  -- "skips recompilation", it actually skipped deployment creation. Deploying
+  -- the same bundle twice under two names is exactly what you do to compare
+  -- them, and the caller had no way to tell it had not happened.
+  --
+  -- An upload without an id was given a fresh UUID above, so it never matches
+  -- here: it always compiles and takes a deployment slot (README, "Validation
+  -- rules").
+  case Map.lookup deployId registry of
+    Just (DeploymentReady _ existingMeta)
+      | existingMeta.metaVersion == version ->
+        -- Identical sources already deployed UNDER THIS ID — no recompile, no job.
+        pure (mkStatus deployId.unDeploymentId "ready" (Just existingMeta) Nothing)
+    _ -> do
       let cfg = env.options
           isNew = not (Map.member deployId registry)
       when (isNew && Map.size registry >= cfg.maxDeployments) $
         throwError err400 { errBody = jsonError "Maximum deployment limit reached" }
+      -- A POST with the id of a deployment the instance ledger holds
+      -- instances of would put another contract under their rows, ungated
+      -- (OPERATIONAL-LOWERING-SPEC R-O5). Checked when the POST arrives: an
+      -- instance created while this job compiles is not looked for again.
+      refuseIfInstancesHeld deployId.unDeploymentId "overwritten by an ungated POST (PUT updates it through the compatibility check)"
 
       now <- liftIO getCurrentTime
       let storedMeta = BundleStore.StoredMetadata
@@ -364,7 +367,10 @@ deleteDeploymentHandler deployIdText = do
   registry <- liftIO $ readTVarIO env.deploymentRegistry
   case Map.lookup deployId registry of
     Nothing -> throwError err404
-    Just _ -> do
+    -- Not while the instance ledger holds instances of it (R-O5), checked
+    -- and deleted under the lock an instance is created under.
+    Just _ -> withCreationLock do
+      refuseIfInstancesHeld deployIdText "deleted"
       ok <- liftIO $ BundleStore.deleteBundle env.bundleStore (deployId.unDeploymentId)
       if ok
         then do
@@ -452,7 +458,7 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
       reject "Update rejected: compilation timed out or exceeded the memory limit"
     Just (Left err) ->
       reject ("Update rejected: compilation failed: " <> err)
-    Just (Right (fns, meta0, bundles)) -> do
+    Just (Right (fns, meta0)) -> do
       let newIfaces = map (ifaceFromFunction . (.fnImpl)) (Map.elems fns)
           breaking = maybe [] (`detectBreakingChanges` newIfaces) mGate
       case breaking of
@@ -498,7 +504,6 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
                 , BundleStore.smDeploymentVersion = Just depVersion
                 }
           BundleStore.saveBundle env.bundleStore deployId.unDeploymentId sourceMap storedMeta'
-          BundleStore.saveBundleCbor env.bundleStore deployId.unDeploymentId bundles
           BundleStore.saveMetadataCache env.bundleStore deployId.unDeploymentId (encodeMetadataCache meta)
             `catch` \(e :: SomeException) ->
               logWarn env.logger "Failed to save metadata cache (non-fatal)"
@@ -609,7 +614,7 @@ deploymentIdError deployId
           <> Text.pack (show maxDeploymentIdLength) <> " characters"
   | Text.isInfixOf ".." deployId =
       Just "Deployment ID contains invalid sequence"
-  | not (Text.all isValidIdChar deployId) =
+  | not (BundleStore.isSafeDeploymentId deployId && Text.all isValidIdChar deployId) =
       Just "Deployment ID contains invalid characters (allowed: a-z, A-Z, 0-9, -, _)"
   | otherwise = Nothing
  where
@@ -621,9 +626,9 @@ validateDeploymentId deployId =
     Nothing -> pure ()
     Just msg -> throwError err400 { errBody = jsonError msg }
 
--- | Check if a zip entry path is safe (no path traversal).
+-- | Check if a zip entry path is safe: relative, and staying inside the bundle.
 isPathSafe :: FilePath -> Bool
-isPathSafe path = ".." `notElem` splitDirectories path
+isPathSafe = BundleStore.isSafeRelativePath
 
 -- | Maximum stored length of the operator-supplied deployment description.
 -- Bounds the downstream system-prompt token budget and the
@@ -695,9 +700,9 @@ extractSourcesFromMultipart multipart = do
             ]
           unsafePaths = [Zip.eRelativePath entry | entry <- entries, not (isPathSafe (Zip.eRelativePath entry))]
 
-      -- Reject if any paths contain ".."
+      -- Reject any entry that is not a safe relative path
       when (not (null unsafePaths)) $
-        throwError $ err400 { errBody = jsonError "Zip entry contains path traversal" }
+        throwError $ err400 { errBody = jsonError "Zip entry path must be relative and stay inside the archive" }
 
       if null l4Entries
         then throwError $ err400 { errBody = jsonError "Zip archive contains no files" }

@@ -1,10 +1,10 @@
--- | @l4 yscript FILE@ — compile the pure-propositional-logic fragment of an
+-- | @l4 export yscript FILE@ — compile the pure-propositional-logic fragment of an
 -- L4 module to AustLII DataLex's @yscript@ rule language.
 --
 -- One-way only (no import), and all-or-nothing (R5, spec §5): selection and
 -- lowering live in @jl4-core@ ('L4.Yscript.Lower' \/ 'L4.Yscript.Emit') so the
 -- CLI only handles option parsing, loading + type checking the file, and
--- writing the output. Unlike @l4 docassemble@\/@l4 export@ there is no
+-- writing the output. Unlike @l4 export docassemble@\/@l4 export@ there is no
 -- fidelity report and no @--fail-on@ severity ladder to gate on — a refusal
 -- here means the module could not be compiled at all, not that something was
 -- carried with degraded fidelity, so the only outcomes are "wrote the file"
@@ -66,7 +66,7 @@ yscriptCmd opts = do
       case lowerModule tc.module' of
         Left lerrs -> do
           putDiagnostics
-            ( "l4 yscript: cannot compile this module to yscript:"
+            ( "l4 export yscript: cannot compile this module to yscript:"
             : map (("  - " <>) . renderLowerError) lerrs
             )
           exitFailure

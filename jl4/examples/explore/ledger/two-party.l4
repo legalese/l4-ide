@@ -1,0 +1,63 @@
+IMPORT prelude
+
+-- A two-party contract for the instance ledger's MCP write tools
+-- (OPERATIONAL-LOWERING-SPEC section 9, WPO6; D-O13). An operational-
+-- lowering fixture only, written for those tools' tests.
+--
+-- Alice quotes a price with a note, and Bob answers within the day by
+-- accepting it. Each obligation names the party who must perform it, and
+-- each act is named in the obligation by its constructor, so an MCP caller
+-- who is Alice is offered the quote and none of Bob's acts, and one who
+-- is Bob the reverse. The dinner fixtures cannot show that: every one of
+-- their acts is by World (companion REGULATIVE-LOWERING-SPEC, option C).
+--
+-- The quote carries a NUMBER and a STRING and Bob's acceptance a BOOLEAN,
+-- the three field types a write tool takes. Two acts get no write tool,
+-- and are never performed in the tests: `Alice asks to see the terms` has
+-- a field of a list type, and `Alice files a reference` has a field named
+-- like one of the write tool's own arguments (idempotencyKey).
+
+DECLARE Party IS ONE OF Alice, Bob
+
+DECLARE Act IS ONE OF
+    `Alice quotes`
+        HAS price IS A NUMBER
+            note IS A STRING
+    `Bob accepts`
+        HAS agreed IS A BOOLEAN
+    `Alice asks to see the terms`
+        HAS clauses IS A LIST OF STRING
+    `Alice files a reference`
+        HAS idempotencyKey IS A STRING
+
+GIVETH A DEONTIC Party Act
+`the exchange` MEANS
+    PARTY Alice
+    MUST `Alice quotes` price note
+    WITHIN 86400
+    HENCE `Bob answers`
+    LEST BREACH
+
+GIVETH A DEONTIC Party Act
+`Bob answers` MEANS
+    PARTY Bob
+    MUST `Bob accepts` agreed
+    WITHIN 86400
+    HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`Alice may ask` MEANS
+    PARTY Alice
+    MAY `Alice asks to see the terms` clauses
+    WITHIN 86400
+    HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`Alice may file` MEANS
+    PARTY Alice
+    MAY `Alice files a reference` idempotencyKey
+    WITHIN 86400
+    HENCE FULFILLED
+    LEST FULFILLED

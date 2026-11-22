@@ -28,16 +28,16 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#f8d7da"];
-    0 -> 1 [label="serviceProvider MUST ProvideService ... [7]"
+    0 -> 1 [label="serviceProvider MUST ProvideService\nserviceType 30 [7]"
            ,color="#28a745"
            ,style=solid];
-    0 -> 3 [label=timeout
+    0 -> 3 [label="timeout [7]"
            ,color="#dc3545"
            ,style=dashed];
-    1 -> 2 [label="client MUST PayMoney ... [30]"
+    1 -> 2 [label="client MUST PayMoney (Money 1000\n\"USD\") provider [30]"
            ,color="#28a745"
            ,style=solid];
-    1 -> 3 [label=timeout
+    1 -> 3 [label="timeout [30]"
            ,color="#dc3545"
            ,style=dashed];
 }

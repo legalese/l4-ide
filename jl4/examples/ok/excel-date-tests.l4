@@ -52,6 +52,12 @@ TIMEZONE IS "Etc/UTC"
 #EVAL ExcelEDate `Late Jan 24` -1
 #EVAL ExcelEOMonth `Jan 2024` 0
 #EVAL ExcelEOMonth `Jan 2024` 1
+#EVAL ExcelEOMonth (Date 15 1 2025) 1
+#EVAL ExcelEOMonth (Date 31 1 2025) 0
+#EVAL ExcelEOMonth (Date 15 1 2024) 1
+#EVAL ExcelEOMonth (Date 30 11 2026) 3
+#EVAL ExcelEOMonth (Date 15 3 2025) -1
+#EVAL ExcelEOMonth (Date 31 12 2025) -12
 
 #EVAL ExcelWorkday `Jan 2024` 10
 #EVAL ExcelWorkday `Late Jan 24` -5

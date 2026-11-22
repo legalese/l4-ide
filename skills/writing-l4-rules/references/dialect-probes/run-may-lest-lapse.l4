@@ -1,0 +1,41 @@
+DECLARE Party IS ONE OF Borrower, Lender
+DECLARE Act IS ONE OF Pay HAS payer IS A Party, to IS A Party, amount IS A NUMBER
+
+GIVETH A DEONTIC Party Act
+`may pay, lest breach` MEANS
+  PARTY Borrower
+  MAY Pay Borrower Lender 10
+  WITHIN 5
+  HENCE FULFILLED
+  LEST BREACH
+
+GIVETH A DEONTIC Party Act
+`may pay, no lest` MEANS
+  PARTY Borrower
+  MAY Pay Borrower Lender 10
+  WITHIN 5
+  HENCE FULFILLED
+
+GIVETH A DEONTIC Party Act
+`must pay, lest breach` MEANS
+  PARTY Borrower
+  MUST Pay Borrower Lender 10
+  WITHIN 5
+  HENCE FULFILLED
+  LEST BREACH
+
+-- 1: may, lest breach, paid late
+#TRACE `may pay, lest breach` AT 0 WITH
+  PARTY Borrower DOES Pay Borrower Lender 10 AT 9
+
+-- 2: may, no lest, paid late
+#TRACE `may pay, no lest` AT 0 WITH
+  PARTY Borrower DOES Pay Borrower Lender 10 AT 9
+
+-- 3: must, lest breach, paid late
+#TRACE `must pay, lest breach` AT 0 WITH
+  PARTY Borrower DOES Pay Borrower Lender 10 AT 9
+
+-- 4: may, lest breach, paid in time
+#TRACE `may pay, lest breach` AT 0 WITH
+  PARTY Borrower DOES Pay Borrower Lender 10 AT 3

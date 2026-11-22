@@ -22,6 +22,8 @@ export {
   SCREEN_PALETTE,
   INK_PALETTE,
   DARK_PALETTE,
+  panelShade,
+  panelBackdrop,
 } from "./palette.js";
 export type { Palette } from "./palette.js";
 

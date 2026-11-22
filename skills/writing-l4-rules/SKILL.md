@@ -1,6 +1,6 @@
 ---
 name: writing-l4-rules
-description: Writes, validates, and deploys L4 — a typed functional language for computational law — encoding contracts, regulations, and policy logic as executable rules with type-checked decisions and formally-modeled obligations. Use when the user asks to formalise legal text, draft rules with deadlines and reparations, mark functions for deployment with `@export`/`@desc`, run the `l4` CLI (`l4 run`, `l4 check`), or deploy to `jl4-service`/Legalese Cloud.
+description: Writes, validates, and deploys L4 — a typed functional language for computational law — encoding contracts, regulations, and policy logic as executable rules with type-checked decisions and formally-modeled obligations. Use when the user asks to formalise legal text, draft rules with deadlines and reparations, mark functions for deployment with `@export`/`@desc`, run the `l4` CLI (`l4 run`, `l4 check`), or deploy to `jl4-service`/Legalese Cloud (`l4 deploy`).
 ---
 
 # Writing L4 Rules
@@ -11,11 +11,12 @@ L4 is a statically-typed, pure-functional language for computational law. It is 
 
 <https://legalese.com/l4/README.md>
 
-This file is a compact operational guide. For anything syntactic you do not remember, link through to the corresponding page on `legalese.com/l4/...` rather than guessing. Seven deeper references ship in this skill:
+This file is a compact operational guide. For anything syntactic you do not remember, link through to the corresponding page on `legalese.com/l4/...` rather than guessing. Eight deeper references ship in this skill:
 
+- [references/dialects.md](references/dialects.md) — `main` and `unstable` are two compilers: what `main` rejects or reads differently, and what to write instead (read step 0 first)
 - [references/regulative.md](references/regulative.md) — deep dive on obligations, `#TRACE`, and the `MUST`/`MAY`/`SHANT`/`DO` `HENCE` `LEST` `BREACH` machinery
 - [references/builtins.md](references/builtins.md) — coercions, HTTP (Hypertext Transfer Protocol) / JSON (JavaScript Object Notation), temporal globals, and the library index
-- [references/gotchas.md](references/gotchas.md) — traps a general-purpose LLM (large language model) will not get right (ditto `^`, asyndetic `...`/`..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix)
+- [references/gotchas.md](references/gotchas.md) — traps a general-purpose LLM (large language model) will not get right (ditto `^`, asyndetic `...`/`..`, `§` sections, computed fields, `IS` vs `MEANS` vs `IF`, mixfix, and four errors whose message points away from the fix)
 - [references/state-ledger.md](references/state-ledger.md) — the append-only state ledger: `RECORD`/`COMMIT`/`ATTEST`, `RECALL` (last-write-wins) vs `RECALL ALL` (collect-all), recipient-qualified `RECORD … 's` (NOTIFY)
 - [references/sets.md](references/sets.md) — `SET OF a`: `UNION`/`INTERSECT`/`` `LESS` ``/`WITHOUT`, the set-aware `AND`/`OR`/`PLUS`/`MINUS` overloads, `set equals` (bare `EQUALS` on sets is a deliberate error), and the one-level-quotient caveat
 - [references/drafting-patterns.md](references/drafting-patterns.md) — hard-won idioms for formalizing statute (proviso/negative/gate limbs, enumerated cases, statutory tables, leap-safe dates, mandatory vs discretionary outcomes)
@@ -46,6 +47,25 @@ L4 is the wrong tool for imperative scripting, user-interface code, numerical co
 ---
 
 ## Core workflow
+
+### 0. Which compiler do you run, and which dialect do you write?
+
+This skill describes L4 as it is on `unstable`.
+`main` is a different compiler that rejects much of it, with errors that read like mistakes in your file, and in a few places accepts it and reads it differently.
+Two questions decide what you may write, and they are not the same question.
+
+- **The compiler you run** is the `l4` you test with.
+  `l4 --version` names it.
+  A leading number, as in `1.6.98 (main, 7689b0d, 2026-10-19)`, is a `main` build.
+  `unstable-` and a date, as in `unstable-20261015-8730d3f (unstable, 8730d3f, 2026-10-15)`, is the prerelease shelf.
+  `dev` is a build from a working tree and does not say, and a build older than 2026-10-14 may not answer `--version` at all; for either, run `l4 check` on [references/dialect-probes/02-refuse.l4](references/dialect-probes/02-refuse.l4), which passes on `unstable` and on `main` fails with `I could not find a definition for the identifier REFUSE`.
+- **The dialect you write** is the target, the compiler that has to read the finished file.
+  The brief names it.
+  If the brief is silent, the target is `main`; it is `unstable` only when the brief says so.
+  With no brief at all, assume `main` and say that you did.
+
+Running an `unstable` binary does not license `unstable` syntax.
+For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too, and goes red when `main` reads it differently.
 
 ### 1. Analyse the source
 
@@ -88,7 +108,7 @@ L4 has three function-definition forms. Use whichever reads most like the source
 -- General form: DECIDE … IS / … MEANS
 GIVEN driver IS A Driver
 GIVETH A RiskCategory
-DECIDE `assess risk` driver IS
+DECIDE `assess risk` IS
     CONSIDER driver's `accident count`
     WHEN 0 THEN IF driver's `ticketed`
                 THEN MediumRisk
@@ -105,8 +125,15 @@ DECIDE `meets minimum age` IF
 
 -- Plain MEANS
 GIVEN n IS A NUMBER
-`square of` n MEANS n TIMES n
+`square of` MEANS n TIMES n
 ```
+
+**Name the inputs once, in the `GIVEN`; do not repeat them in the head.**
+Write ``DECIDE `assess risk` IS``, not ``DECIDE `assess risk` driver IS``, and the same for `IF` and `MEANS`.
+Callers are unaffected: a head without arguments still takes them positionally in `GIVEN` order (`` `square of` 4 ``, `` `square of` OF 4 ``), and by name with `WITH`.
+Repeating the names buys nothing, because the head must list every `GIVEN` name in `GIVEN` order or `l4 check` rejects it ("The names in a type signature must match those in the definition"), and it costs something: when the head repeats its inputs, `l4 nlg` renders them by their bare names and every `@nlg` gloss on the `GIVEN` is lost (`` `is big` where `floor` is 100 `` rather than `` `is big` where the threshold is 100 ``; [references/gotchas.md](references/gotchas.md), smucclaw/l4-ide#995).
+**The one exception is mixfix**, where the names in the head are the notation: `` `employee` `works for` `employer` MEANS … `` needs them to say where each argument goes.
+A local helper under `WHERE` with no `GIVEN` of its own (``WHERE `inc` x MEANS x PLUS 1``) also names its inputs in the head, since there is nowhere else to name them.
 
 **Key idioms:**
 
@@ -261,14 +288,18 @@ DECLARE PaymentAction IS ONE OF
     `pay invoice`   HAS amount IS A NUMBER, recipient IS AN Actor
     `waive payment` HAS reason IS A STRING
 
+DECLARE Invoice HAS
+    customer IS AN Actor
+    amount   IS A NUMBER
+
 GIVEN invoice IS AN Invoice
 GIVETH A DEONTIC Actor PaymentAction
 DECIDE obligation IS
-    PARTY Customer
-    MUST  (`pay invoice` (invoice's amount) Company)
+    PARTY invoice's customer
+    MUST  `pay invoice` (invoice's amount) Company
     WITHIN 30
     HENCE FULFILLED
-    LEST  BREACH BY Customer BECAUSE "payment overdue"
+    LEST  BREACH BY (invoice's customer) BECAUSE "payment overdue"
 ```
 
 Both type names may be backticked multi-word names, as in `` GIVETH A DEONTIC `A party under this Part` `An act under section 8` ``.
@@ -323,13 +354,14 @@ provided at [scripts/validate.sh](scripts/validate.sh) for environments
 where `PATH` is problematic. Type errors are reported with line numbers —
 iterate until the check passes.
 
-**Read the diagnostics, not the exit code.** `l4 run` exits 0 on a failing
-`#ASSERT` (it prints `assertion failed` at `DiagnosticSeverity_Error` and
-carries on) and on a refusing `#EVAL`. It exits non-zero on a parse or check
-error and on an `#EVAL` that reaches an unsupplied section `GIVEN`. So
-`l4 run f.l4 && echo green` reports a file with failing assertions as green;
-check the output for `DiagnosticSeverity_Error` as well, which is what
-`doc/test-docs.sh` does.
+**Read the diagnostics as well as the exit code.** `l4 run` exits non-zero on
+a parse or check error, on an `#EVAL` that crashes (one that reaches an
+unsupplied section `GIVEN` is one), and on an `#ASSERT` that fails or cannot be
+evaluated. It exits 0 on a refusing `#EVAL` or `#ASSERT`. A binary built before
+legalese/l4-ide#518 exits 0 on a failing `#ASSERT`, so on one of those
+`l4 run f.l4 && echo green` reports a file with failing assertions as green.
+Only the diagnostics say which directive failed: check the output for
+`DiagnosticSeverity_Error`, which is what `doc/test-docs.sh` does.
 
 **Every result is printed twice, and `#CHECK` is the exception.** `l4 run`
 emits a diagnostics section first, then one `Evaluation[n]` block per directive
@@ -341,21 +373,34 @@ gap as a dropped directive.
 
 **Other subcommands** (run `l4 <command> --help` for details):
 
-- `l4 format FILE` — reformat an `.l4` file to stdout (`gofmt`-style).
+- `l4 format FILE` — print an `.l4` file to stdout exactly as written
+  (it does not change the layout; exits 1 if the file does not parse).
 - `l4 ast FILE` — dump the parsed AST (debugging L4 itself or tooling).
 - `l4 batch FILE --inputs rows.{json,yaml,csv}` — evaluate an `@export`
   function against many rows, streaming NDJSON (newline-delimited JSON) output (one object per
-  row).
+  row). `--format json|csv|yaml` and `--output FILE` change the output.
+  The run stops at the first failing row and exits 1, unless
+  `--continue-on-error`; `--validate-only` checks the rows against the
+  function's inputs without evaluating.
 - `l4 trace FILE [--format dot|png|svg] [-o DIR]` — render
   `#EVALTRACE` evaluation traces as GraphViz (PNG (Portable Network Graphics) and SVG (Scalable Vector Graphics) output needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
   graphs as GraphViz DOT (its graph-description language).
-- `l4 export --to=dmn|dmn-md|bpmn FILE [--fidelity-report]` — write the
+- `l4 export dmn|dmn-md|bpmn FILE [--fidelity-report]` — write the
   module out as DMN (Decision Model and Notation) 1.3 in XML (Extensible Markup Language), dmnmd markdown, or BPMN (Business Process Model and Notation) 2.0 XML. The
   document goes to stdout (or `-o FILE`); `--fidelity-report` adds the
   list of what the target notation could not carry, to `FILE.fidelity.txt`
   beside `-o` or to stderr otherwise. A one-line tally of the losses is
   printed to stderr either way.
+- `l4 export FORMAT FILE` — the other notations: `openfisca`, `catala`,
+  `blawx`, `docassemble`, `yscript`. `l4 export --help` lists every format and
+  `l4 export FORMAT --help` its options. `l4 import blawx FILE` reads a Blawx
+  project back into L4. There is no top-level `l4 openfisca`, `l4 blawx` and
+  so on: each notation is a subcommand of `export` (or `import`).
+- `l4 deploy FILE [--name NAME] [--description TEXT]` — typecheck, then
+  deploy the file and everything it imports as a new API (see
+  [8. Deploy](#8-deploy)). `l4 redeploy FILE` updates it, `l4 deployments`
+  lists them, `l4 undeploy NAME` deletes one.
 
 ### 7. Test with `#EVAL`, `#ASSERT`, `#TRACE`
 
@@ -371,7 +416,7 @@ gap as a dropped directive.
 #ASSERT `assess risk` `Alice` EQUALS LowRisk
 ```
 
-Available directives: `#EVAL`, `#EVALTRACE`, `#TRACE`, `#CHECK`, `#ASSERT`.
+Available directives: `#EVAL`, `#EVALTRACE`, `#TRACE`, `#CHECK`, `#ASSERT`, `#ASSERT REFUSED`.
 
 `#CHECK expr` prints the expression's type (`BOOLEAN `, at Information
 severity) and never makes the run exit 1, even when the rule reads a section
@@ -400,6 +445,22 @@ has the worked file.
 
 See the **Deployment** section below. In short: add `@export` above the functions that should become API endpoints, add `@desc` to their parameters. Exported functions should answer the highest utility questions a reader of the rules might have. Often the rule definition is not written as such and a separate file importing the rules needs to decorate those export functions.
 
+From a terminal, deploy with the `l4` CLI:
+
+```bash
+l4 install legalese    # once: the legalese CLI holds the Legalese Cloud sign-in
+legalese login         # once: sign in and pick the organization
+
+l4 deploy path/to/file.l4 --description "Who uses these rules, and for what"
+l4 redeploy path/to/file.l4            # update; refused if it would break callers
+l4 deployments                         # list
+l4 undeploy NAME --yes                 # delete
+
+l4 deploy path/to/file.l4 --server http://localhost:8080   # self-hosted jl4-service
+```
+
+The name defaults to the file name (`--name` overrides). `l4 redeploy` is rejected when it removes or changes an exported function; `--force` applies it anyway. A deployment is a live API other people and agents may call: confirm with the user before deploying under a new name, forcing a breaking redeploy, or undeploying.
+
 ---
 
 ## Deployment with `jl4-service`
@@ -414,7 +475,7 @@ See the **Deployment** section below. In short: add `@export` above the function
 - **WebMCP** — `<script src="/.webmcp/embed.js">` for browser AI agents
 - **Traces** — `?trace=full&graphviz=true` on any evaluation
 
-**Self-hosted or managed.** You can run `jl4-service` yourself (`cabal run jl4-service`), or use the managed [Legalese Cloud](https://legalese.cloud) offering, which gives each org a subdomain (`https://{org-slug}.legalese.cloud`), handled compilation, OAuth protection, and one-click deployment from the VS Code extension's Deploy tab. Both expose the same API shape, so annotations and client code are portable.
+**Self-hosted or managed.** You can run `jl4-service` yourself (`cabal run jl4-service`), or use the managed [Legalese Cloud](https://legalese.cloud) offering, which gives each org a subdomain (`https://{org-slug}.legalese.cloud`), handled compilation, OAuth protection, and one-click deployment from the VS Code extension's Deploy tab or `l4 deploy`. Both expose the same API shape, so annotations and client code are portable.
 
 ### `@export` — publish a function
 
@@ -425,6 +486,8 @@ Only functions marked `@export` are visible to the service. Place it directly ab
 | `@export <description>`         | Export this function with a human-readable description |
 | `@export default <description>` | Export as the bundle's **default** function            |
 | `@desc <description>`           | Internal description only — does **not** export        |
+
+A misspelt annotation (`@exprot`) is not an error to `l4 check`, `l4 run` or the editor, which warn `Unknown annotation` and ignore the line, so the rule is **not** published: read the warnings, not only the exit status. `jl4-service` refuses a deployment that holds one, with the same message, `l4 batch` prints it on stderr, and the browser editor shows the line like a comment. A name that merely begins with a known annotation's, such as `@exports` or `@descr`, is that annotation followed by stray text, with no warning anywhere, and `@exports` publishes nothing: spell `@export` exactly. Run `l4 check` before you deploy.
 
 The description is the single highest-value sentence in the whole file: it is what an LLM agent sees in its tool list when deciding whether to call this rule. Write it as if the agent has no other context.
 
@@ -494,7 +557,7 @@ which is assumed and takes 1 input of its own`. This one used to pass
 
 An `ASSUME` of **no** inputs is a value and stays publishable. The check follows
 every rule the export reaches, so hiding one behind a helper does not help. The
-typechecker and the `jl4-service` deploy both reject such bundles; `l4 blawx` is
+typechecker and the `jl4-service` deploy both reject such bundles; `l4 export blawx` is
 the exception and compiles them, because a Blawx interview asks a person for the
 answer rather than receiving it in a request.
 
@@ -609,7 +672,7 @@ Construct literals (after `IMPORT daydate`) with `YMD year month day` — e.g. `
 
 The older `Date`/`DATE` constructors are **little-endian** — `Date day month year`, e.g. `Date 15 1 2025`. So writing year-first with them is a bug: `Date 2025 1 15` is read as day 2025 of month 1 and silently evaluates to `0020-07-17`, not 2025-01-15.
 
-The two constructors split strict/lenient deliberately: `YMD` bounds-checks — a transposed `YMD 2025 15 1` produces no date, and neither does `YMD 2023 2 29` (no such leap day); both are invalid input, and evaluate to the distinguished assumed term `` `YMD refused an out-of-range month or day` ``, which is what the result shows. Despite the name, that is not a `REFUSE`: out-of-range date components were deliberately left as invalid input. `Date` stays lenient and rolls overflow silently, which month arithmetic relies on. Strict literals via `YMD`; lenient arithmetic via `Date`.
+The two constructors split strict/lenient deliberately: `YMD` bounds-checks — a transposed `YMD 2025 15 1` produces no date, and neither does `YMD 2023 2 29` (no such leap day); both refuse, with the reason `YMD refused an out-of-range month or day`, which is what the result shows. It is a `REFUSE`, so no rule can turn it back into a date. `Date` stays lenient and rolls overflow silently, which month arithmetic relies on. Strict literals via `YMD`; lenient arithmetic via `Date`.
 
 Also: `Time hour minute second`, `DateTime date time`.
 
@@ -704,8 +767,8 @@ Entry 6.2 of the phrasebook, [references/source-patterns/06-parties-and-things.m
 - `#EVAL expr` — evaluate and print
 - `#EVALTRACE expr` — evaluate with execution trace
 - `#CHECK expr` — print the type without evaluating; never exits 1 (see §7)
-- `#ASSERT bool_expr` — assert must be TRUE; a failure prints `assertion failed` at Error severity and the exit code stays 0
-- `#ASSERT REFUSED expr [BECAUSE "message"]` — assert that evaluating the expression refuses, optionally with that exact message (a string literal)
+- `#ASSERT bool_expr` — assert must be TRUE; a failure prints `assertion failed` at Error severity and `l4 run` exits 1
+- `#ASSERT REFUSED expr [BECAUSE "message"]` — assert that evaluating the expression refuses, optionally with that exact message (a string literal, on the `#ASSERT`'s line or indented on the next)
 - `#TRACE contract AT time WITH ...` — simulate a regulative rule; see [references/regulative.md](references/regulative.md)
 
 A directive is one line. Continuing an `#ASSERT` onto a second line that begins
@@ -724,8 +787,56 @@ that back typechecks and evaluates. See [Record construction and access](#record
 
 - `@desc` — human-readable description behind any line or `GIVEN` parameter (internal unless paired with `@export`)
 - `@export` — atop the `GIVEN`. mark a function for deployment
-- `@nlg` — natural-language generation hint. A rule's goes on its own line immediately ABOVE the definition — trailing the definition line never reaches the rule, and can silently land on the next `DECLARE`. A parameter's trails its own line; a record field's goes on its own line BELOW the field. Takes a language subtag and several per name — `@nlg:he`, `@nlg:en` — selected with `l4 nlg --lang he` or `l4 render --lang he`, and `@lang he` sets what an untagged one means. [gotchas](references/gotchas.md) has the measured placements and what the tag does not buy.
-- `@ref`, `@ref-src`, `@ref-map` — cross-reference to a legal source
+- `@nlg` — the wording `l4 nlg` and `l4 render` print for a rule, an input or a field; where it sits and how to tag its language are below, and [gotchas](references/gotchas.md) has the measured placements
+- `@lang` — the language an untagged `@nlg` in the module is written in
+- `@ref`, `@ref-map` — cross-reference to a legal source.
+  An `@ref` on its own line binds to the next syntax node, so it goes above the rule it cites.
+  To tie an `@ref` to lines of a raw source text with `src:` locators that a script can check, see [`source-locators.md`](../encoding-a-subject/references/source-locators.md) in the `encoding-a-subject` skill.
+- `@ref-src` — accepted and ignored.
+  It once loaded a CSV of citation links, and that loading was removed; `@ref-src missing.csv` passes `l4 check` without a message.
+  [gotchas](references/gotchas.md) has the evidence.
+
+#### `@nlg`: where a wording sits, and its language
+
+An `@nlg` gives a rule, an input or a record field the words that `l4 nlg` and `l4 render` print for it, with `%name%` slots for a rule's inputs.
+What it describes depends on where it sits.
+Trailing a line, it describes what is on that line.
+On a line of its own, it describes what follows.
+
+```l4
+GIVEN amount IS A NUMBER @nlg the claim amount
+GIVETH A BOOLEAN
+@nlg the claim of %amount% is large
+DECIDE `is large` IF amount GREATER THAN 100
+```
+
+- **A rule's sentence** goes trailing the head, or on its own line between the `GIVEN` block and the `DECIDE`.
+  Never above the `GIVEN`: the `GIVEN` comes between them, so the wording is not the rule's.
+  When nothing written just before it can take it, L4 warns "Not attached to any valid syntax node"; when an `IMPORT` or a `§` heading comes just before it, that one takes the wording and nothing is reported.
+- **An input's gloss** trails the input's name in the `GIVEN`, or sits on its own line under the input, indented further than the `GIVEN` keyword.
+  It labels the input in a `WITH` call's `where` clause, and it is never the rule's sentence.
+- **A field's gloss** trails the field, `HAS dob IS A DATE @nlg date of birth`, or sits on its own line under the field, indented further than the `DECLARE` keyword.
+  It is read after the owner's name, so `@nlg date of birth` on `dob` reads "the employee's date of birth"; do not repeat the owner in it.
+- **One wording per language.**
+  Write the language subtag straight after `@nlg`, joined by a colon, as in `@nlg:he …`, and put each further wording on a continuation line under the first.
+  `l4 nlg --lang he` and `l4 render --lang he` pick the Hebrew wording, `he` or `he-IL` alike, and a rule with none keeps its default one.
+  A word glued to the colon is always a tag: `@nlg:the employee pays` has the tag `the` and reads `employee pays`, so write `@nlg the employee pays`, with no colon, for a sentence that starts with that word.
+  `l4 check` warns when a rule, input or field has only one wording and nothing backs its tag as a language: no `@lang` line declares it, nothing else has a wording in it beside one in another language, and it is not `en`, `he` or a declared language with only a region or script after it (`en-GB`, `he-IL`). So `@nlg:en-route …` and the same word used as the tag of several rules draw it too.
+- **A module in one language says so once**, on a line of its own: `@lang he` makes every untagged `@nlg` Hebrew.
+  Do not write `@lang en`: a module without a declaration is English, and `l4 check` hints that the line can go.
+  Two `@lang` lines that name different languages draw a warning on the earlier one, and the last is used.
+- **Two wordings in the same language on one rule** draw a warning, `l4 check` succeeds, and neither is used.
+- **A literal `%` or `]` inside an `@nlg`** is written `\%` or `\]`.
+  A bare `%and%` is read as the input `and`, and nothing is reported.
+- **A percent pair with spaces inside it**, `% amount %`, is plain text and draws a warning: write the slot as `%amount%`.
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the claim of %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
 
 ### Imports
 
@@ -792,8 +903,8 @@ All documentation for the currently-published L4 release lives under `https://le
 - **Libraries:** <https://legalese.com/l4/reference/libraries.md>
 - **Tutorials — first L4 file:** <https://legalese.com/l4/tutorials/getting-started/first-l4-file.md>
 - **Tutorials — common patterns:** <https://legalese.com/l4/tutorials/getting-started/common-patterns.md>
-- **Tutorials — deploying functions:** <https://legalese.com/l4/tutorials/deploying-functions/exporting-functions-for-deployment.md>
+- **Tutorials — deploying rules:** <https://legalese.com/l4/tutorials/deploying-rules/exporting-rules-for-deployment.md>
 - **Concepts — regulative rules:** <https://legalese.com/l4/concepts/legal-modeling/regulative-rules.md>
-- **Foundation course (Module 5 — regulative rules):** <https://legalese.com/l4/courses/foundation/module-5-regulative.md>
+- **Foundation course (Module 6 — regulative rules):** <https://legalese.com/l4/courses/foundation/module-6-regulative.md>
 
 The website tracks the currently-published L4 version; treat it as ground truth over any snippet in this skill.

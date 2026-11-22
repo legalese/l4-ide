@@ -44,6 +44,7 @@ DECLARE `FXOUT Terms` HAS
 -- Calculate exchange rate from FXOUT terms
 GIVEN fxTerms IS AN `FXOUT Terms`
 GIVETH A NUMBER
+@nlg the implied exchange rate of %fxTerms%, being the second amount per unit of the first, or zero if the first is zero
 `implied exchange rate` MEANS
     IF fxTerms's amount1 EQUALS 0
     THEN 0
@@ -53,4 +54,5 @@ GIVETH A NUMBER
 §§ `Version Information`
 -- =============================================================================
 
+@nlg the version of the ACTUS terms library
 `ACTUS Terms Library Version` MEANS "1.0.0"

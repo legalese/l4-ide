@@ -1,0 +1,99 @@
+-- The example on explore.md: Alice and Bob each mean to buy dinner tonight,
+-- and neither wants to buy it if the other already has. Alice checks whether
+-- dinner is bought and, if her check found it unbought, buys. If Bob's
+-- purchase is recorded between her check and her purchase, two dinners are
+-- bought. That is a race condition, and this file is WRONG ON PURPOSE, so
+-- that `l4 explore` has something to find. It models Alice's side only:
+-- Bob's purchase is an act of the world, recorded by the dinner ledger.
+--
+-- Everything that can happen is one permission held by `World`, which
+-- recurs on itself, and each act names its actor. Bob's purchase has to be
+-- an act in the contract, or no exploration could vary when it lands: the
+-- explorer tries only the acts that an obligation in force offers. Keep
+-- the permission a MAY at every point. While a MUST or SHANT is pending in
+-- it, the other actors' acts get no edge in that position, and nothing
+-- says so (explore.md, "Loud and silent failures").
+
+IMPORT prelude
+
+DECLARE Party IS ONE OF
+    World      -- the one party that acts; each act names its actor
+    Alice      -- whose own ledger holds what she believes
+
+DECLARE Act IS ONE OF
+    `Alice checks whether dinner is bought`
+    `Bob buys dinner`
+    `Alice buys dinner`
+
+DECLARE Status IS ONE OF
+    opened     -- nobody has bought dinner
+    taken      -- Bob has
+
+DECLARE Dinner IS ONE OF
+    `dinner for two`
+
+`closing` MEANS 100
+
+§ `Reading the ledgers`
+
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A BOOLEAN
+`the ledger is open` MEANS NOT (elem taken `dinner status record`)
+
+GIVEN `dinner status record` IS A LIST OF Status
+GIVETH A Status
+`the ledger's status` MEANS
+    IF elem taken `dinner status record` THEN taken ELSE opened
+
+§ `The race`
+
+GIVEN act IS AN Act
+GIVETH A BOOLEAN
+`the dinner rules allow` MEANS
+    CONSIDER act
+    WHEN `Alice checks whether dinner is bought` THEN (RECALL Alice's `belief`) EQUALS NOTHING
+    WHEN `Bob buys dinner`                       THEN `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`)
+    WHEN `Alice buys dinner`                     THEN (RECALL Alice's `belief`) EQUALS JUST opened
+                                                      AND count (RECALL ALL OFFICIAL's `dinners bought`) EQUALS 0
+
+-- The arrangement opens with dinner unbought: the ledger's first record.
+GIVETH A DEONTIC Party Act
+`the arrangement` MEANS
+    COMMIT `dinner status record` IS opened
+    HENCE `the evening`
+
+GIVETH A DEONTIC Party Act
+`the evening` MEANS
+    PARTY World
+    MAY   act PROVIDED `the dinner rules allow` act
+    WITHIN 0 OF closing
+    HENCE CONSIDER act
+          WHEN `Alice checks whether dinner is bought` THEN
+              RECORD Alice's `belief` IS `the ledger's status` (RECALL ALL OFFICIAL's `dinner status record`)
+              HENCE `the evening`
+          WHEN `Bob buys dinner` THEN
+              COMMIT `dinner status record` IS taken
+              HENCE `the evening`
+          WHEN `Alice buys dinner` THEN
+              COMMIT `dinners bought` IS `dinner for two`
+              HENCE COMMIT `open at acceptance` IS `the ledger is open` (RECALL ALL OFFICIAL's `dinner status record`)
+              HENCE `the evening`
+    LEST  FULFILLED
+
+§ `The property`
+
+-- Safe means: a dinner is bought only if the ledger said unbought at the
+-- instant the purchase took effect. `open at acceptance` holds one entry
+-- per purchase, TRUE or FALSE. A property is an ordinary rule that gives a
+-- BOOLEAN, and takes as inputs the ledger cells it reads, each named for
+-- its cell.
+GIVEN `open at acceptance` IS A LIST OF BOOLEAN
+GIVETH A BOOLEAN
+`every dinner was accepted while open` MEANS all (GIVEN ok YIELD ok) `open at acceptance`
+
+-- Sequence A: Alice checks, Bob's purchase is recorded, Alice buys on what
+-- her check told her. Two dinners.
+#TRACE `the arrangement` AT 0 WITH
+    PARTY World DOES `Alice checks whether dinner is bought` AT 10
+    PARTY World DOES `Bob buys dinner`                       AT 11
+    PARTY World DOES `Alice buys dinner`                     AT 12

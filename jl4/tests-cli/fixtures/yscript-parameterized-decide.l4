@@ -1,6 +1,6 @@
 -- R1 shape probe: a Decide reached from the @export closure carries a
 -- parameter (a GIVEN), so it is outside yscript's propositional fragment.
--- `l4 yscript` must refuse by name rather than silently drop or inline it.
+-- `l4 export yscript` must refuse by name rather than silently drop or inline it.
 
 ASSUME `the amount is disclosed` IS A BOOLEAN
 

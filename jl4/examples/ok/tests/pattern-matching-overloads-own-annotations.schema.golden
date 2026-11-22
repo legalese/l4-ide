@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "the boolean version",
+    "properties": {
+        "b": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "b"
+    ],
+    "title": "twice",
+    "type": "object"
+}

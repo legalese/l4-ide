@@ -29,6 +29,7 @@ import {
   SyncInspectorResults,
   ToggleSimplify,
   EvalDirectiveResultRequestType,
+  EmbeddedLibraryRequestType,
   makeLspRelayRequestType,
   makeL4RpcRequestType,
   isStateGraphResponse,
@@ -39,6 +40,11 @@ import {
   type StateGraphResponse,
 } from 'jl4-client-rpc'
 import { cmdRenderResult, cmdStateGraph } from './commands.js'
+import {
+  EMBEDDED_LIBRARY_SCHEME,
+  embeddedLibraryProvider,
+  l4DocumentSelector,
+} from './embedded-library.js'
 import { StateGraphPanel } from './state-graph-panel.js'
 import {
   SidebarProvider,
@@ -48,18 +54,33 @@ import {
 } from './sidebar-provider.js'
 import { AuthManager } from './auth.js'
 import { ServiceClient } from './service-client.js'
+import {
+  AiClient,
+  BuiltinTools,
+  ChatService,
+  FileConversationStore,
+  McpToolClient,
+  ToolDispatcher,
+} from '@repo/legalese-agent'
 import { AiLogger } from './ai/logger.js'
-import { AiProxyClient } from './ai/ai-proxy-client.js'
+import { vscodeAiEndpoint } from './ai/ai-endpoint.js'
 import { registerChatParticipant } from './chat-participant.js'
-import { ConversationStore } from './ai/conversation-store.js'
-import { ChatService } from './ai/chat-service.js'
-import { ToolDispatcher } from './ai/tool-dispatcher.js'
 import { registerAiChatHandlers } from './ai/register.js'
-import { recordDirectiveResults } from './ai/tools/l4-evaluate.js'
-import { commandRenameIdentifier } from './ai/tools/refactor.js'
-import { McpToolClient } from './ai/mcp-client.js'
+import { commandRenameIdentifier } from './ai/rename-command.js'
 import { VsCodeMcpTools } from './ai/vscode-mcp.js'
-import { McpOAuthManager } from './ai/mcp-oauth.js'
+import { WebFetchTools } from './ai/web-fetch-tool.js'
+import { vscodeLmTools } from './ai/vscode-lm.js'
+import { McpOAuthManager, type McpOAuthCallbackResult } from './ai/mcp-oauth.js'
+import { VsCodeWorkspace } from './ai/vscode-workspace.js'
+import {
+  VsCodeL4Language,
+  type WireDiagnostic,
+} from './ai/vscode-l4-language.js'
+import { VsCodeEditorContext } from './ai/editor-context.js'
+import { SettingsPermissionPolicy } from './ai/vscode-permissions.js'
+import { WebviewUserInteraction } from './ai/vscode-user-interaction.js'
+import { createCloudSessions } from './cloud/vscode-cloud.js'
+import { registerCloudHandlers } from './cloud/register-cloud.js'
 
 /***********************************************
      decode for RenderAsLadderInfo
@@ -323,7 +344,7 @@ export async function activate(context: ExtensionContext) {
   }
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: langId, pattern: '**/*' }],
+    documentSelector: l4DocumentSelector(langId),
     diagnosticCollectionName: langName,
     revealOutputChannelOn: RevealOutputChannelOn.Never,
     outputChannel,
@@ -490,6 +511,28 @@ export async function activate(context: ExtensionContext) {
     new LanguageClient(langId, langName, serverOptions, clientOptions)
   )
 
+  // The stdlib jl4-lsp carries inside its binary has no file on disk, and
+  // go-to-definition into it answers with a `jl4-embedded:` URI. Serve those
+  // read-only, with the text the server itself holds.
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      EMBEDDED_LIBRARY_SCHEME,
+      embeddedLibraryProvider(
+        () => client.start(),
+        (uri) => client.sendRequest(EmbeddedLibraryRequestType, { uri })
+      )
+    )
+  )
+
+  // Legalese AI agent-core ports shared by every agent session in this
+  // window (@repo/legalese-agent). Each session — the sidebar chat, the
+  // @legalese participant, the l4_evaluate LM tool — gets its own
+  // BuiltinTools instance on top of these, so their directive
+  // snapshots stay independent.
+  const aiWorkspace = new VsCodeWorkspace()
+  const aiL4Language = new VsCodeL4Language(client)
+  const aiPermissions = new SettingsPermissionPolicy()
+
   // Register the l4.renderResult command
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -608,18 +651,31 @@ export async function activate(context: ExtensionContext) {
   mcpProxy.start()
 
   // L4 tools for Copilot agent mode (and any other vscode.lm client).
-  context.subscriptions.push(registerLanguageModelTools(outputChannel))
+  context.subscriptions.push(
+    registerLanguageModelTools(
+      outputChannel,
+      new BuiltinTools(aiWorkspace, aiL4Language)
+    )
+  )
 
-  // Register the extension's single URI handler. `/mcp-oauth` routes
-  // to the MCP OAuth client (created further down — late-bound ref);
-  // everything else is the legalese.cloud login callback.
-  const mcpOAuthRef: { handleCallback: (uri: vscode.Uri) => boolean } = {
-    handleCallback: () => false,
-  }
+  // Register the extension's single URI handler. `/mcp-oauth` goes to
+  // the MCP OAuth client (created further down — late-bound ref), and
+  // only there: it carries a `code` the legalese.cloud login would take
+  // for its own. Everything else is the legalese.cloud login callback.
+  const mcpOAuthRef: {
+    handleCallback: (uri: vscode.Uri) => Promise<McpOAuthCallbackResult>
+  } = { handleCallback: async () => 'unknown' }
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri: (uri: vscode.Uri) => {
-        if (uri.path === '/mcp-oauth' && mcpOAuthRef.handleCallback(uri)) {
+        if (uri.path === '/mcp-oauth') {
+          void mcpOAuthRef.handleCallback(uri).then((result) => {
+            if (result === 'unknown') {
+              void vscode.window.showWarningMessage(
+                'This MCP sign-in link has expired or was used already. Sign in again from the Legalese AI settings.'
+              )
+            }
+          })
           return
         }
         void auth.handleAuthCallback(uri)
@@ -642,7 +698,7 @@ export async function activate(context: ExtensionContext) {
   // for L4 files — see package.json `commands` / `menus` entries.
   context.subscriptions.push(
     vscode.commands.registerCommand('l4.renameIdentifier', async () => {
-      await commandRenameIdentifier()
+      await commandRenameIdentifier(new BuiltinTools(aiWorkspace, aiL4Language))
     })
   )
 
@@ -670,11 +726,15 @@ export async function activate(context: ExtensionContext) {
   )
 
   // Legalese AI services — independent from the jl4 service URL flow.
-  // The proxy endpoint is hardcoded (see ai-proxy-client.ts) and only
+  // The endpoint is hardcoded (see ai-client.ts) and only
   // overridable via the LEGALESE_AI_ENDPOINT env var for local dev.
   const aiLogger = new AiLogger()
   context.subscriptions.push(aiLogger)
-  const aiProxy = new AiProxyClient({ auth, logger: aiLogger })
+  const aiClient = new AiClient({
+    auth,
+    logger: aiLogger,
+    endpoint: vscodeAiEndpoint,
+  })
 
   // `l4.login` is the stable command id the `@legalese` chat participant
   // hands to `stream.button` when the user isn't signed in. The sidebar
@@ -684,46 +744,16 @@ export async function activate(context: ExtensionContext) {
     vscode.commands.registerCommand('l4.login', () => auth.login())
   )
 
-  const aiStore = new ConversationStore(context, aiLogger, () =>
-    auth.getUserStorageKey()
+  const aiStore = new FileConversationStore(
+    path.join(context.globalStorageUri.fsPath, 'ai', 'conversations'),
+    aiLogger,
+    () => auth.getUserStorageKey()
   )
-  // The tool dispatcher needs a handle on the messenger + service to
-  // request approval and emit status updates, so we register with
-  // setter-injection after construction: the dispatcher takes a
-  // callback pair, both of which get filled in below by the
-  // registerAiChatHandlers pipeline.
-  const approvalPending = new Map<
-    string,
-    (decision: 'allow' | 'deny') => void
-  >()
-  // Decisions the user made BEFORE the dispatcher asked for them. The
-  // webview shows Allow/Deny buttons as soon as the tool-call frame
-  // streams in, but the dispatcher only registers its resolver when it
-  // actually dispatches that call (after the stream ends, and
-  // sequentially per call) — clicks in that window used to be dropped,
-  // forcing the user to click repeatedly. Stashed here instead and
-  // consumed by requestApproval below.
-  const earlyToolDecisions = new Map<string, 'allow' | 'deny'>()
-  const askUserPending = new Map<string, (answer: string) => void>()
-  // The dispatcher emits tool status updates through this channel; the
-  // sidebar's registerAiChatHandlers replaces the stub `emit` with one
-  // that forwards to the webview via the shared messenger.
-  const toolStatusChannel: {
-    emit: (
-      callId: string,
-      status: 'pending-approval' | 'running' | 'done' | 'error',
-      detail?: { result?: string; error?: string }
-    ) => void
-  } = {
-    emit: () => undefined,
-  }
-  // Channel the dispatcher uses to push a meta__ask_user question to
-  // the webview. register.ts fills this in once the messenger exists.
-  const askUserChannel: {
-    ask: (callId: string, question: string, choices?: string[]) => void
-  } = {
-    ask: () => undefined,
-  }
+  // UserInteraction port for the sidebar chat. The chat service and
+  // dispatcher are built before the sidebar messenger, so its outbound
+  // channels start as no-ops; registerAiChatHandlers plugs in the
+  // webview senders and resolves its pending approvals / questions.
+  const aiInteraction = new WebviewUserInteraction()
   const aiMcpClient = new McpToolClient(mcpProxy, aiLogger)
   // OAuth client for protected MCP servers: discovery, dynamic client
   // registration, PKCE browser flow (redirect through the extension's
@@ -769,32 +799,23 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(
     registerChatParticipant({
       auth,
-      proxy: aiProxy,
+      aiClient,
       logger: aiLogger,
+      tools: new BuiltinTools(aiWorkspace, aiL4Language),
+      permissions: aiPermissions,
       iconPath: vscode.Uri.joinPath(context.extensionUri, 'static', 'icon.png'),
     })
   )
   const dispatcher = new ToolDispatcher({
     logger: aiLogger,
-    requestApproval: async (call) => {
-      const early = earlyToolDecisions.get(call.callId)
-      if (early) {
-        earlyToolDecisions.delete(call.callId)
-        return early
-      }
-      return new Promise<'allow' | 'deny'>((resolve) => {
-        approvalPending.set(call.callId, resolve)
-      })
-    },
-    notifyStatus: (callId, status, detail) =>
-      toolStatusChannel.emit(callId, status, detail),
-    mcp: aiMcpClient,
-    vsMcp: vsMcpTools,
-    askUser: (callId, question, choices) =>
-      new Promise<string>((resolve) => {
-        askUserPending.set(callId, resolve)
-        askUserChannel.ask(callId, question, choices)
-      }),
+    tools: new BuiltinTools(aiWorkspace, aiL4Language),
+    permissions: aiPermissions,
+    interaction: aiInteraction,
+    // Deployed rules (l4-rules__*), the user's MCP servers (vsmcp__*),
+    // then web fetch through VS Code (web__fetch), advertised after the
+    // built-ins in this order. Sidebar only: cloud sessions fetch through
+    // the AI service instead.
+    providers: [aiMcpClient, vsMcpTools, new WebFetchTools(vscodeLmTools)],
   })
   // Pulled from the extension's own packageJSON so a bumped release
   // (and users running older pre-release builds) are both stamped
@@ -804,15 +825,32 @@ export async function activate(context: ExtensionContext) {
       ?.version ?? 'unknown'
   const chatService = new ChatService({
     auth,
-    client,
     store: aiStore,
-    proxy: aiProxy,
+    aiClient,
     logger: aiLogger,
     dispatcher,
-    mcp: aiMcpClient,
-    vsMcp: vsMcpTools,
+    interaction: aiInteraction,
+    l4: aiL4Language,
+    editor: new VsCodeEditorContext(),
+    getMethodology: () =>
+      vscode.workspace.getConfiguration().get<string>('legaleseAi.methodology'),
     extensionVersion,
   })
+
+  // Cloud sessions: inert until
+  // `legaleseAi.cloudSessions.enabled` is on —
+  // nothing polls or calls out before a session is started or opened.
+  // Their chat events take the same path as the local chat service's.
+  const cloudSessions = createCloudSessions({
+    auth,
+    client,
+    mcp: vsMcpTools,
+    emitChat: (event) => aiInteraction.emit(event),
+    logger: aiLogger,
+    storage: context.globalState,
+    summarizeTitle: (text) => aiClient.summarizeTitle(text),
+  })
+  context.subscriptions.push(cloudSessions)
 
   // Instantiate the sidebar provider BEFORE wiring AI chat handlers
   // so the handlers can subscribe to its visibility event and buffer
@@ -834,18 +872,37 @@ export async function activate(context: ExtensionContext) {
       auth,
       service: chatService,
       store: aiStore,
-      proxy: aiProxy,
+      aiClient,
       logger: aiLogger,
-      approvalPending,
-      earlyToolDecisions,
-      askUserPending,
-      toolStatusChannel,
-      askUserChannel,
+      interaction: aiInteraction,
+      permissions: aiPermissions,
       dispatcher,
       visibility: sidebarProvider,
       mcp: aiMcpClient,
       vsMcp: vsMcpTools,
       serviceClient,
+      extensionPath: context.extensionPath,
+    })
+  )
+
+  context.subscriptions.push(
+    registerCloudHandlers({
+      messenger: sidebarMessenger,
+      frontend: sidebarWebviewFrontend,
+      cloud: cloudSessions,
+      logger: aiLogger,
+      storage: context.globalState,
+      account: () => {
+        const user = auth.getUserId()
+        const org = auth.getCloudOrgSlug()
+        return user && org ? `${user}:${org}` : undefined
+      },
+      visibility: sidebarProvider,
+      reveal: async () => {
+        await sidebarProvider.revealSidebar()
+        await sidebarProvider.waitUntilReady()
+        sidebarProvider.switchToTab('ai-chat')
+      },
     })
   )
 
@@ -993,6 +1050,18 @@ export async function activate(context: ExtensionContext) {
     vscode.window.onDidChangeActiveTextEditor(notifySidebarActiveFile)
   )
 
+  // An error appearing or clearing in the active file, or in a module it
+  // imports, changes whether the file can be deployed. The LSP sends no
+  // l4/directiveResultsUpdated for a file that fails to typecheck, so the
+  // diagnostics are what tell the sidebar to ask again.
+  context.subscriptions.push(
+    vscode.languages.onDidChangeDiagnostics((e) => {
+      if (e.uris.some((u) => u.path.endsWith('.l4'))) {
+        sidebarProvider.refreshExportedFunctions()
+      }
+    })
+  )
+
   // Start the client. This will also launch the server
   try {
     await client.start()
@@ -1010,6 +1079,27 @@ export async function activate(context: ExtensionContext) {
   // This replaces the old onDidChangeDiagnostics + per-directive request approach,
   // eliminating the race condition where evaluation hadn't completed yet.
   context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      aiL4Language.forgetDocument(doc.uri.toString())
+    })
+  )
+  context.subscriptions.push(
+    client.onNotification(
+      'l4/fileChecked',
+      (params: {
+        uri: string
+        version: number | null
+        diagnostics: WireDiagnostic[]
+      }) => {
+        aiL4Language.recordFileChecked(
+          params.uri,
+          params.version ?? null,
+          params.diagnostics ?? []
+        )
+      }
+    )
+  )
+  context.subscriptions.push(
     client.onNotification(
       'l4/directiveResultsUpdated',
       (params: {
@@ -1023,7 +1113,7 @@ export async function activate(context: ExtensionContext) {
       }) => {
         // Mirror the results into the AI tool's cache so a later
         // l4__evaluate call can surface them without a second compile.
-        recordDirectiveResults(params.uri, params.results)
+        aiL4Language.recordDirectiveResults(params.uri, params.results)
 
         // Refresh sidebar — the LSP just finished compiling this file,
         // so exported functions may have changed

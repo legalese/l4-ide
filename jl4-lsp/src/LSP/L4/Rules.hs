@@ -9,14 +9,19 @@ import L4.Annotation
 import L4.Citations
 import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
+import qualified L4.Diagnostic as Diagnostic
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
+import L4.Nlg (promoteHeadInputNlg)
+import Optics (gplate, toListOf, (%), (^.))
 import qualified L4.Lexer as Lexer
+import qualified L4.SmartPunctuation as SP
+import qualified L4.IgnoredAnnotation as IA
 import qualified L4.Parser as Parser
+import L4.Parser.AnnotationWarning (annotationWarningCode, annotationWarningMessage, annotationWarningSpan)
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
-import qualified L4.Print as Print
 import L4.Syntax
 import L4.TypeCheck (CheckErrorWithContext (..), CheckResult (..), Substitution, applyFinalSubstitution, toResolved)
 import qualified L4.TypeCheck as TypeCheck
@@ -59,6 +64,18 @@ data GetLexTokens = GetLexTokens
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The typed source ('messageOfL') attached to a no-break-space (U+00A0)
+-- lint diagnostic, carrying just enough for a code action to build its fix:
+-- the single character's own range (never the whole whitespace token's), so
+-- the fix touches exactly the offending character. Produced by 'jl4Rules'\'s
+-- @GetLexTokens@ rule (the AndOr lint at 'mkAndOrLintWarning' is the sibling
+-- plumbing this follows) from 'L4.SmartPunctuation.nbspHitsInToken'.
+data NbspLint = MkNbspLint
+  { range :: SrcRange
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
 type instance RuleResult GetParsedAst = Module Name
 data GetParsedAst = GetParsedAst
   deriving stock (Generic, Show, Eq)
@@ -96,16 +113,33 @@ data GetImports = GetImports
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The modules a file imports, each with the range of its @IMPORT@, from a
+-- first parse that needs no mixfix hints. Unlike 'GetImports', whose full parse
+-- needs the hints of every imported module, this has an answer for a file in an
+-- import cycle. An @IMPORT@ that resolves to no module is left out.
+type instance RuleResult GetImportEdges = [(Maybe SrcRange, NormalizedUri)]
+data GetImportEdges = GetImportEdges
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
+
 type instance RuleResult GetMixfixRegistry = Parser.MixfixHintRegistry
 data GetMixfixRegistry = GetMixfixRegistry
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
-type instance RuleResult GetTypeCheckDependencies = [(ImportResult, TypeCheckResult)]
+-- | Each of a module's direct imports with its typecheck, 'Nothing' when it
+-- has none (it does not parse, it is in an import cycle, or it resolves to the
+-- importing file, which is not checked). Keyed by file alone: see
+-- 'CheckModule'.
+type instance RuleResult GetTypeCheckDependencies = [(ImportResult, Maybe TypeCheckResult)]
 data GetTypeCheckDependencies = GetTypeCheckDependencies
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The entry point callers use. Its key still carries a call stack (callers
+-- construct it as 'TypeCheck', i.e. with an empty one), but the rule ignores
+-- the stack and reads 'CheckModule', so every path to a module shares one
+-- typecheck.
 type instance RuleResult TypeCheck = TypeCheckResult
 data TypeCheck = TypeCheckNoCallstack
   deriving stock (Generic, Show, Eq)
@@ -113,6 +147,49 @@ data TypeCheck = TypeCheckNoCallstack
 
 pattern TypeCheck :: WithCallStack TypeCheck
 pattern TypeCheck = AttachCallStack [] TypeCheckNoCallstack
+
+-- | Typecheck one module, keyed by its file alone: the per-file memo behind
+-- 'TypeCheck' (smucclaw\/l4-ide#1008).
+--
+-- Imports recurse through this key, never through 'TypeCheck'. Until #1008 they
+-- recursed through 'TypeCheck' with the importer pushed onto the call stack,
+-- and since the stack is part of the key, a module was typechecked once per
+-- import PATH rather than once per file: under @l4 check@, 2^(n-2) times for
+-- the bottom module of n modules that each import every earlier one. Shake's
+-- own value store is the memo table, so a module reached a second way reuses
+-- the first result, and an edit to the file invalidates it exactly as it
+-- invalidates any other rule.
+--
+-- The name is part of the output. A file's diagnostics are stored in groups
+-- named by the 'Show' of the rule key that produced them, and printed and
+-- published in the order of those names ('setStageDiagnostics',
+-- 'getDiagnosticsFromStore'). The typechecker's group used to be named
+-- @AttachCallStack {...}@, which sorts ahead of @EvaluateLazy@ and of every
+-- @Get...@ rule. A name that sorts the same keeps a type error printed ahead
+-- of the parser's warnings and the evaluator's results, as before; named
+-- @TypeCheckFile@, it reordered the goldens of
+-- @not-ok/tc/fixity-no-leak.l4@ and @not-ok/import/unresolved-referenced.l4@.
+--
+-- Nothing is lost by dropping the stack from the recursion. Apart from passing
+-- it on, the only thing that read it was the cycle check in
+-- 'defineWithCallStack', and an import cycle never reaches that check: no rule
+-- follows an import that leads back to its file ('importsThatDoNotLeadBack').
+-- The message on the IMPORT that names the files of the ring follows
+-- 'GetImportEdges' ('firstImportCycleFrom'), which reads no typecheck and no
+-- call stack.
+--
+-- A module on a ring has no typecheck ('onImportRing'), like a module that does
+-- not parse. It would have to be checked with an import left out, and a result
+-- like that is not one to act on: a name from the module left out reads as
+-- undefined, which @jl4-service@ takes for an input the caller must supply.
+--
+-- What this rule says about an import ('importsOk', and the messages on the
+-- IMPORT lines) is computed from that import's own 'CheckModule' result, which
+-- this rule depends on, so an edit to an imported file recomputes it here too.
+type instance RuleResult CheckModule = TypeCheckResult
+data CheckModule = CheckModule
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
 
 type instance RuleResult SuccessfulTypeCheck = TypeCheckResult
 data SuccessfulTypeCheck = SuccessfulTypeCheck
@@ -132,6 +209,16 @@ data TypeCheckResult = TypeCheckResult
   , infos :: [TypeCheck.CheckErrorWithContext]  -- ^ Non-fatal diagnostics ('SInfo' and 'SWarn'); don't block 'success'
   , errors :: [TypeCheck.CheckErrorWithContext]  -- ^ Actual errors ('SError' only, e.g. OutOfScopeError) for implicit ASSUME extraction
   , dependencies :: [TypeCheckResult]
+    -- ^ Every module this one reaches through IMPORT, transitively and ONCE
+    -- each: the direct imports first, in import order, then the rest in the
+    -- order the old per-path tree first met them ('closeDependencies'). Each
+    -- entry carries its own closure, so walking it recursively visits a module
+    -- once per path; use 'transitiveDependencies' for a walk. An import with
+    -- no typecheck is not in it; 'importsOk' is what records one.
+  , importsOk :: Bool
+  -- ^ Every module this one imports, transitively, was found and typechecks.
+  -- 'success' doesn't depend on it: a module checks against what its imports
+  -- did provide.
   , mixfixRegistry :: TypeCheck.MixfixRegistry
   , sectionPaths :: TypeCheck.SectionPaths
     -- ^ Where each binding this module can see was defined, section-wise,
@@ -147,6 +234,14 @@ data TypeCheckResult = TypeCheckResult
   deriving stock (Generic)
 
 -- | instance that doesn't force the intervalmaps because they're very large and their values are sometimes expensive
+--
+-- Nor does it force INTO 'dependencies': only the list's spine and each entry
+-- to weak head normal form. Every entry is the result of the 'CheckModule'
+-- rule for that module, which 'defineEarlyCutoff'' already forced to normal
+-- form when the rule produced it. Forcing it again only re-walks it, and since
+-- each entry carries its own closure, @rnf dependencies@ walked the import
+-- graph as a tree: about 2^k entries for the k-th module of a plain chain
+-- (smucclaw\/l4-ide#1008, where that walk was most of the CPU time).
 instance NFData TypeCheckResult where
   rnf TypeCheckResult {..} =
     rnf module'
@@ -156,22 +251,74 @@ instance NFData TypeCheckResult where
     `seq` scopeMap
     `seq` descMap
     `seq` rnf success
+    `seq` rnf importsOk
     `seq` rnf environment
     `seq` rnf entityInfo
     `seq` rnf infos
     `seq` rnf errors
-    `seq` rnf dependencies
+    `seq` foldr seq () dependencies
     `seq` rnf mixfixRegistry
     `seq` rnf sectionPaths
     `seq` rnf implicitReaders
+
+-- | The module a result belongs to.
+moduleUriOf :: TypeCheckResult -> NormalizedUri
+moduleUriOf tc = case tc.module' of MkModule _ u _ -> u
+
+-- | The 'dependencies' of a module whose direct imports typechecked to these:
+-- the imports, then each one's own closure, keeping only the first entry for
+-- each module.
+--
+-- That is exactly the old list (@direct <> foldMap (.dependencies) direct@)
+-- with its later duplicates removed, because each import's own list was
+-- built the same way: removing later duplicates from a piece of a list never
+-- changes which entry of the whole is first. The old list held a module once
+-- per import path, and every one of them was forced and walked.
+closeDependencies :: [TypeCheckResult] -> [TypeCheckResult]
+closeDependencies direct = go Set.empty (direct <> foldMap (.dependencies) direct)
+ where
+  go _ [] = []
+  go seen (d : ds)
+    | moduleUriOf d `Set.member` seen = go seen ds
+    | otherwise = d : go (Set.insert (moduleUriOf d) seen) ds
+
+-- | Every module a result reaches through IMPORT, once each, in the order a
+-- depth-first pre-order walk of the import tree first meets it.
+--
+-- This is the order the CLI's recursive walks over 'dependencies' produced
+-- (@concatMap (\\d -> d : go d.dependencies)@) with the repeats dropped, but it
+-- visits each module once. Those walks recursed into lists that are already
+-- transitive, so they visited a module once per path; a later duplicate is
+-- always a module whose own walk has finished, so dropping it drops only
+-- repeats.
+transitiveDependencies :: TypeCheckResult -> [TypeCheckResult]
+transitiveDependencies root = snd (walk (Set.singleton (moduleUriOf root)) root.dependencies)
+ where
+  walk seen [] = (seen, [])
+  walk seen (d : ds)
+    | moduleUriOf d `Set.member` seen = walk seen ds
+    | otherwise =
+        let (seen', fromD) = walk (Set.insert (moduleUriOf d) seen) d.dependencies
+            (seen'', fromDs) = walk seen' ds
+        in  (seen'', d : fromD <> fromDs)
 
 type instance RuleResult EvaluateLazy = [EvaluateLazy.EvalDirectiveResult]
 data EvaluateLazy = EvaluateLazy
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The entry point callers use, always wrapped in 'AttachCallStack'. The rule
+-- ignores the stack and reads 'GetLazyEvaluationDependenciesFile'.
 type instance RuleResult GetLazyEvaluationDependencies = (EvaluateLazy.Environment, [EvaluateLazy.EvalDirectiveResult])
 data GetLazyEvaluationDependencies = GetLazyEvaluationDependencies
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
+
+-- | A module's evaluated heap on top of its imports', and its own directives'
+-- results, keyed by file alone: the per-file memo behind
+-- 'GetLazyEvaluationDependencies', as 'CheckModule' is behind 'TypeCheck'.
+type instance RuleResult GetLazyEvaluationDependenciesFile = (EvaluateLazy.Environment, [EvaluateLazy.EvalDirectiveResult])
+data GetLazyEvaluationDependenciesFile = GetLazyEvaluationDependenciesFile
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
@@ -247,17 +394,44 @@ instance Pretty Log where
             <+> pretty s.category
     LogImportResolution msg -> "[Import Resolution]" <+> pretty msg
 
+-- | Which tiers of the library ladder an import may fall through to once the
+-- in-memory (VFS) tier has missed. See 'resolveLibrary'.
+data LibraryScope
+  = AmbientLibraries
+    -- ^ The whole ladder: @$JL4_LIBRARY_PATH@, the project root, the importing
+    -- file's directory, the embedded stdlib, the per-user XDG store and the
+    -- editor extension's bundle. The CLI, the REPL and the language server run
+    -- on a person's own machine, where the project directory, the environment
+    -- and their own stores are theirs to use.
+  | EmbeddedStdlibOnly
+    -- ^ The stdlib built into this binary, and nothing else: no environment
+    -- variable, no working directory, no per-user store, no extension bundle.
+    -- For a host that serves bundles somebody else uploaded. The bundle's own
+    -- files sit in the VFS tier, which is consulted first, so what is left for
+    -- the ladder to find is the stdlib; and a file that happens to sit in the
+    -- host's working directory, or a library directory an operator exported,
+    -- must not be able to replace it for every deployment (jl4-service).
+    -- Ruled 2026-10-12 (bench "Main Wave Rulings", card R5, option A), with
+    -- conditions; see specs\/todo\/LIBRARY-RESOLUTION-SHADOW-SPEC.md §10: a
+    -- deployment resolves its own files and the built-in stdlib, nothing from the
+    -- host; an IMPORT that resolves to nothing is logged at WARN when a bundle is
+    -- compiled or rebuilt after a restart, and refused only if a later ruling
+    -- says so.
+  deriving stock (Eq, Show)
+
 -- | One candidate source for a bare-module-name import.
 data LibraryCandidate
   = FileCandidate !Text !FilePath
     -- ^ label (for logs) and filesystem path to probe
   | EmbeddedCandidate
     -- ^ the stdlib copy compiled into this binary ('L4.API.EmbeddedLibraries').
-    -- NOTE: the embed is frozen at /build/ time from the Cabal datadir the TH
-    -- splice resolved then (often @~/.cabal/share@) — editing a checkout's
-    -- @jl4-core/libraries/*.l4@ does NOT refresh it on a plain @cabal build@.
-    -- When developing the stdlib itself, pin @JL4_LIBRARY_PATH@ at your
-    -- worktree's @jl4-core/libraries@ (see @jl4-core/libraries/README.md@).
+    -- NOTE: the embed is read when GHC compiles "L4.API.EmbeddedLibraries".
+    -- Editing a checkout's @jl4-core/libraries/*.l4@ alone does NOT refresh it
+    -- on a plain @cabal build@, which prints @Up to date@ and never calls GHC
+    -- (a real change to any jl4-core source file does; measured 2026-10-13, see
+    -- @L4.API.EmbeddedLibraries.TH@). When developing the stdlib itself, pin
+    -- @JL4_LIBRARY_PATH@ at your worktree's @jl4-core/libraries@ (see
+    -- @jl4-core/libraries/README.md@).
   deriving stock (Eq, Show)
 
 candidateDisplay :: LibraryCandidate -> Text
@@ -283,7 +457,9 @@ data LibraryResolution = LibraryResolution
     -- than the probe list, because it claims to print the locations in the order
     -- they were tried, and the embedded tier's rank is 4 of 6 -- it used to be
     -- appended last whatever its rank.
-  , hasExplicitPath :: !Bool                -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted)
+  , hasExplicitPath :: !Bool
+    -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted). Always
+    -- False under 'EmbeddedStdlibOnly', which does not read the variable.
   }
 
 -- | Resolve a library module across the filesystem and the embedded stdlib.
@@ -299,14 +475,29 @@ data LibraryResolution = LibraryResolution
 -- The project-scoped tiers (1–3) rank above the embedded copy so intentional
 -- overrides keep working; the ambient machine-global tiers (5–6) rank /below/
 -- it so a stray XDG symlink or stale bundle can no longer silently shadow the
--- stdlib the binary was built with (LIBRARY-RESOLUTION-SHADOW-SPEC, Option B′).
+-- stdlib the binary was built with (Option B′, specs/as-built/import-resolution.md).
 -- The ambient tiers still matter for modules the embed does not carry — e.g. a
 -- bundle shipping extra libraries.
 --
 -- When JL4_LIBRARY_PATH is set, the embedded copy is not consulted at all —
 -- the operator has taken explicit control of the library store.
-resolveLibrary :: FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
-resolveLibrary rootDirectory mImportingFile modName = do
+--
+-- Under 'EmbeddedStdlibOnly' the ladder is the embedded copy alone, whatever the
+-- environment and the working directory hold.
+resolveLibrary :: LibraryScope -> FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
+resolveLibrary EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
+  pure LibraryResolution
+    { winner = Maybe.listToMaybe present
+    , existing = present
+    , candidates = [EmbeddedCandidate]
+    , searchedPaths = []
+    , tiersInOrder = [EmbeddedCandidate]
+    , hasExplicitPath = False
+    }
+  where
+    present = [ (1, EmbeddedCandidate)
+              | Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName)) ]
+resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
   mEnvPath <- lookupEnv "JL4_LIBRARY_PATH"
   xdgDataDir <- getXdgDirectory XdgData "jl4"
   exePath <- getExecutablePath
@@ -367,6 +558,28 @@ candidateDisplayCanonical c = case c of
   FileCandidate _ p -> do
     real <- either (\(_ :: SomeException) -> p) id <$> tryAny (canonicalizePath p)
     pure $ candidateDisplay c <> if real == p then "" else " -> " <> Text.pack real
+
+-- | The existing candidates with each FILE kept once, at the rank of its first
+-- appearance.
+--
+-- Two tiers can name one file: the CLI sets the project root to the importing
+-- file's own directory, so the root tier and the importer-relative tier probe
+-- the same path, and an XDG symlink can point at a copy another tier also
+-- reaches. Left in, the shadow warning listed that file twice, once as
+-- [chosen] and once as [shadowed], which reads as a copy shadowing itself.
+-- Files are compared by canonical path, so a symlink and its target are one
+-- file; the embedded stdlib is not a file and is never merged with anything.
+distinctCopies :: [(Int, LibraryCandidate)] -> IO [(Int, LibraryCandidate)]
+distinctCopies existing = do
+  keyed <- traverse (\ic -> (,ic) <$> fileKey (snd ic)) existing
+  pure (map snd (List.nubBy sameFile keyed))
+  where
+    fileKey = \case
+      EmbeddedCandidate -> pure Nothing
+      FileCandidate _ p ->
+        Just . either (\ (_ :: SomeException) -> normalise p) id <$> tryAny (canonicalizePath p)
+    sameFile (Just a, _) (Just b, _) = a == b
+    sameFile _ _ = False
 
 -- | A @file:@ URI that reads back as the path it was built from.
 --
@@ -537,6 +750,57 @@ triedLocations outcome = do
           , sameFileAs = Just key
           , spelledAsPath = True
           }
+-- | The first ring of imports reachable from a module, as the files around it
+-- with the first repeated at the end (@[a, b, a]@), following 'GetImportEdges'.
+firstImportCycleFrom :: NormalizedUri -> Action (Maybe [NormalizedUri])
+firstImportCycleFrom start = snd <$> go Set.empty [] start
+  where
+    go done path u
+      | u `elem` path = pure (done, Just (dropWhile (/= u) (reverse path) <> [u]))
+      | u `Set.member` done = pure (done, Nothing)
+      | otherwise = do
+          targets <- maybe [] (map snd) <$> use GetImportEdges u
+          let step (d, found@(Just _)) _ = pure (d, found)
+              step (d, Nothing) t = go d (u : path) t
+          (done', found) <- foldM step (done, Nothing) targets
+          pure (Set.insert u done', found)
+
+-- | The file and every module it imports, transitively, root first. Each module
+-- appears once. The walk follows 'GetImportEdges', which needs only a first
+-- parse of each module, so it reaches modules whose typecheck failed or that sit
+-- in a cycle. A module that does not parse is included but not walked further.
+importClosure :: NormalizedUri -> Action [NormalizedUri]
+importClosure root = reverse . snd <$> go (Set.empty, []) root
+  where
+    go acc@(seen, out) uri
+      | uri `Set.member` seen = pure acc
+      | otherwise = do
+          edges <- Maybe.fromMaybe [] <$> use GetImportEdges uri
+          foldM go (Set.insert uri seen, uri : out) (map snd edges)
+
+-- | Those of a file's imports that a rule may follow: the ones that do not lead
+-- back to the file.
+--
+-- Every rule that recurses over imports must go through this, because a ring
+-- of imports must never become a ring of Shake keys. hls-graph stops a key that
+-- waits on itself in one chain of calls, but not two threads that enter a ring
+-- at different files: each waits for the key the other is running, for ever,
+-- and nothing is reported, not even for an edit, which only starts it again.
+-- The language server does that as soon as two files of a ring are open, and
+-- a service that checks a whole bundle at once does too.
+-- 'GetImportEdges' does not recurse, so walking it is safe.
+importsThatDoNotLeadBack :: NormalizedUri -> [NormalizedUri] -> Action [NormalizedUri]
+importsThatDoNotLeadBack uri imported =
+  firstImportCycleFrom uri >>= \ case
+    Nothing -> pure imported
+    Just _ -> filterM (fmap (uri `notElem`) . importClosure) imported
+
+-- | Whether following IMPORT from a module leads back to it: it is on a ring of
+-- imports, or it imports itself. Such a module has no typecheck.
+onImportRing :: NormalizedUri -> Action Bool
+onImportRing uri = do
+  imported <- maybe [] (map snd) <$> use GetImportEdges uri
+  (/= imported) <$> importsThatDoNotLeadBack uri imported
 
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
@@ -546,16 +810,50 @@ triedLocations outcome = do
 --
 -- VFS candidates (web/editor in-memory overlays) are checked first, then the
 -- filesystem + embedded tiers via 'resolveLibrary'. An embedded winner is
--- registered as a Shake virtual file, exactly as a VFS hit would be.
+-- /not/ registered anywhere: it is handed back as its 'Shake.embeddedLibraryUri',
+-- which 'Shake.getVirtualFile' serves from a pure map.
+--
+-- An import that resolves to nothing is announced at Warning, once per
+-- importing module and module name until it resolves. Both rules above ask
+-- about every IMPORT, so announcing on each ask printed one mistake twice, and
+-- both copies reached @--json@ diagnostics. The key is cleared when the import
+-- resolves, so breaking it again later warns again.
 resolveImportShared
   :: Recorder (WithPriority Log)
   -> IORef (Set.Set (String, [Text]))
      -- ^ shadow configurations already warned about this session (warn-once)
+  -> IORef (Set.Set (Text, String))
+     -- ^ (importing module, module name) pairs already announced as not found
+  -> LibraryScope
   -> FilePath          -- ^ root directory
   -> NormalizedUri     -- ^ importing module
   -> String            -- ^ bare module name
   -> Action ImportOutcome
-resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName = do
+resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory importerUri modName = do
+  outcome <- resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName
+  let key = ((fromNormalizedUri importerUri).getUri, modName)
+  case outcome.importUri of
+    Just _ ->
+      UnliftIO.atomicModifyIORef' notFoundWarnedRef \s -> (Set.delete key s, ())
+    Nothing -> do
+      fresh <- UnliftIO.atomicModifyIORef' notFoundWarnedRef \s ->
+        if Set.member key s then (s, False) else (Set.insert key s, True)
+      when fresh $ logWith recorder Warning $ LogImportResolution $
+        case outcome.embedTried of
+          EmbedSkipped -> "Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): " <> Text.pack modName
+          _            -> "Module not found: " <> Text.pack modName
+  pure outcome
+
+-- | 'resolveImportShared' without the not-found announcement.
+resolveImportQuietly
+  :: Recorder (WithPriority Log)
+  -> IORef (Set.Set (String, [Text]))
+  -> LibraryScope
+  -> FilePath
+  -> NormalizedUri
+  -> String
+  -> Action ImportOutcome
+resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName = do
   logWith recorder Info $ LogImportResolution $
     "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri importerUri).getUri
 
@@ -612,7 +910,7 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
                          , embedTried = EmbedSkipped }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
-      res <- liftIO $ resolveLibrary rootDirectory mImportingNfp modName
+      res <- liftIO $ resolveLibrary scope rootDirectory mImportingNfp modName
 
       -- Detailed candidate accounting + the shadow warning run only when
       -- JL4_LIBRARY_PATH is unset: with the env var set the operator has
@@ -667,39 +965,35 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
               -- No VFS write: the embedded copy is already readable at its
               -- canonical URI via 'Shake.embeddedLibraryVfs'. Registering it
               -- here would only re-introduce the mid-rule VFS mutation whose
-              -- ordering-dependence caused #906 in the first place.
+              -- ordering-dependence caused smucclaw/l4-ide#906 in the first place.
               pure $ outcome $ Just $ Shake.embeddedLibraryUri (Text.pack modName)
             Nothing ->
               -- Cannot happen: 'resolveLibrary' only lists 'EmbeddedCandidate'
               -- as existing when the lookup succeeds. Fail soft regardless.
               pure $ outcome Nothing
-        Nothing
-          | res.hasExplicitPath -> do
-              logWith recorder Warning $ LogImportResolution $
-                "Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): " <> Text.pack modName
-              pure $ outcome Nothing
-          | otherwise -> do
-              logWith recorder Warning $ LogImportResolution $
-                "Module not found: " <> Text.pack modName
-              pure $ outcome Nothing
+        -- Not announced here: 'resolveImportShared' does that, once.
+        Nothing -> pure $ outcome Nothing
   where
-    -- Option E of LIBRARY-RESOLUTION-SHADOW-SPEC: when several copies of the
+    -- Option E (specs/as-built/import-resolution.md): when several copies of the
     -- same module are visible AND their contents differ, name them all (with
     -- symlinks dereferenced) and say which one wins. Identical copies (e.g. an
     -- XDG symlink pointing at the very sources the embed was built from) stay
     -- silent. Warned once per distinct configuration per session.
-    warnOnLibraryShadow res =
-      when (length res.existing >= 2) $ do
-        contents <- liftIO $ traverse (\(_, c) -> candidateContent modName c) res.existing
+    warnOnLibraryShadow res = do
+      -- Each file once: see 'distinctCopies'. Counting copies, and listing
+      -- them, both go by the deduplicated list.
+      copies <- liftIO $ distinctCopies res.existing
+      when (length copies >= 2) $ do
+        contents <- liftIO $ traverse (\(_, c) -> candidateContent modName c) copies
         let distinct = List.nub (catMaybes contents)
         when (length distinct >= 2) $ do
-          shownAll <- liftIO $ traverse (candidateDisplayCanonical . snd) res.existing
+          shownAll <- liftIO $ traverse (candidateDisplayCanonical . snd) copies
           let key = (modName, shownAll)
           fresh <- UnliftIO.atomicModifyIORef' shadowWarnedRef $ \s ->
             if Set.member key s then (s, False) else (Set.insert key s, True)
           when fresh $ do
             let mark i = if Just i == fmap fst res.winner then "[chosen]   " else "[shadowed] "
-                rows = zipWith (\(i, _) shown -> "  " <> mark i <> shown) res.existing shownAll
+                rows = zipWith (\(i, _) shown -> "  " <> mark i <> shown) copies shownAll
             logWith recorder Warning $ LogImportResolution $ Text.unlines $
               [ "Multiple differing copies of module `" <> Text.pack modName <> "` are visible:" ]
               <> rows
@@ -708,13 +1002,68 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
                    <> ".l4 in the project root or beside the importing file."
                  ]
 
+-- | The modules a file imports that resolved to nothing, by bare name, in the
+-- order they are written, each once.
+--
+-- 'GetImports' reports an unresolvable IMPORT as a diagnostic and leaves it out
+-- of its result, so what it did not resolve is what the file declares minus
+-- what it returned. The names are computed the way 'GetImports' computes them,
+-- so the two cannot disagree about which module an IMPORT names. A file that
+-- does not parse has declared nothing and yields @[]@: its own error is the
+-- one to read.
+--
+-- For a host that must say so when an uploaded bundle imports something it
+-- does not carry (jl4-service), where the diagnostic itself is not in reach.
+unresolvedImports :: NormalizedUri -> Action [Text]
+unresolvedImports uri = do
+  mProg <- use GetParsedAst uri
+  mResolved <- use GetImports uri
+  pure $ case (mProg, mResolved) of
+    (Just prog, Just resolved) ->
+      let resolvedNames = Set.fromList (map (moduleBaseName . (.importName)) resolved)
+       in List.nub
+            [ n
+            | n <- foldTopDecls declaredImport prog
+            , not (Set.member n resolvedNames)
+            ]
+    _ -> []
+  where
+    declaredImport :: TopDecl Name -> [Text]
+    declaredImport = \ case
+      Import _ (MkImport _ n _) -> [moduleBaseName n]
+      _ -> []
+    moduleBaseName :: Name -> Text
+    moduleBaseName n = Text.pack $ takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+
+-- | The imports of a file that name another module, in the order they are
+-- written: 'GetImports' (which leaves out an IMPORT that resolved to nothing,
+-- see 'unresolvedImports') without an IMPORT of the file itself.
+-- 'GetLazyEvaluationDependenciesFile' evaluates these. 'GetTypeCheckDependencies'
+-- leaves a self-import unchecked, but keeps it in its list with no typecheck,
+-- so that 'importsOk' counts it.
+--
+-- 'CheckModule' and 'GetLazyEvaluationDependenciesFile' are keyed by file
+-- alone, so reading a self-import as a dependency would be a cycle in the
+-- engine's own keys. 'GetImportEdges' reports the self-import on the IMPORT,
+-- and a module on a ring has no typecheck ('onImportRing'), so evaluating one
+-- stops there, before it follows any import.
+dependencyImports :: NormalizedUri -> Action [ImportResult]
+dependencyImports uri = filter (\r -> r.moduleUri /= uri) <$> use_ GetImports uri
+
+-- | The rules of a session that may use every tier of the library ladder: the
+-- CLI, the REPL and the language server. See 'LibraryScope'.
 jl4Rules :: EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
-jl4Rules evalConfig rootDirectory recorder = do
+jl4Rules = jl4RulesIn AmbientLibraries
+
+jl4RulesIn :: LibraryScope -> EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
+jl4RulesIn scope evalConfig rootDirectory recorder = do
   -- Session-scoped memory for 'resolveImportShared''s shadow warning, so a
   -- given shadow configuration is reported once, not on every re-resolution.
   shadowWarnedRef <- UnliftIO.newIORef Set.empty
+  -- ...and for its not-found warning, which two rules would otherwise each print.
+  notFoundWarnedRef <- UnliftIO.newIORef Set.empty
   let resolveImport :: NormalizedUri -> String -> Action ImportOutcome
-      resolveImport = resolveImportShared recorder shadowWarnedRef rootDirectory
+      resolveImport = resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory
 
   define shakeRecorder $ \GetLexTokens uri -> do
     mRope <- runMaybeT $
@@ -729,15 +1078,44 @@ jl4Rules evalConfig rootDirectory recorder = do
         lift $ addVirtualFileFromFS file
 
     case mRope of
-      Nothing -> pure ([mkSimpleFileDiagnostic uri (mkSimpleDiagnostic (fromNormalizedUri uri).getUri "could not obtain file contents" Nothing)], Nothing)
+      Nothing -> pure ([mkSimpleFileDiagnostic uri (mkSimpleDiagnostic "file/unreadable" (fromNormalizedUri uri).getUri "could not obtain file contents" Nothing)], Nothing)
       Just rope -> do
         let contents = Rope.toText rope
         case Lexer.execLexer uri contents of
           Left errs -> do
-            let diags = toList $ fmap mkParseErrorDiagnostic errs
-            pure (fmap (mkSimpleFileDiagnostic uri) diags, Nothing)
-          Right ts ->
-            pure ([], Just (ts, contents))
+            -- Each error keeps its 'PError' as the diagnostic's typed source
+            -- (as 'checkErrorToDiagnostic' does for 'CheckErrorWithContext'
+            -- below), so 'outOfScopeDeclarationQuickFix''s sibling in
+            -- "LSP.L4.Handlers" can find a confusable-character error's
+            -- structured 'Lexer.fixes' again via @messageOfL \@PError@.
+            let mk pErr = mkFileDiagnosticWithSource uri (mkParseErrorDiagnostic pErr) pErr
+            pure (toList (fmap mk errs), Nothing)
+          Right ts -> do
+            -- The NBSP lint: a warning, never blocking, for a no-break space
+            -- (U+00A0) sitting inside ordinary whitespace — the lexer accepts
+            -- it silently (`Data.Char.isSpace` is true for it) and layout
+            -- still works, so this is advisory only (CLAUDE.md task: "Swift
+            -- treats it as a warning, and so do we").
+            let nbspRanges =
+                  [ range
+                  | pt <- ts
+                  , Lexer.TSpaces (Lexer.TSpace txt) <- [Lexer.computedPayload pt]
+                  , range <- SP.nbspHitsInToken uri pt.range.start txt
+                  ]
+                mk range = mkFileDiagnosticWithSource uri (mkNbspLintDiagnostic range) (MkNbspLint range)
+                -- An annotation line this version of L4 cannot use (an unknown
+                -- name, or a known one without the form it needs) is trivia to
+                -- the parser (see 'Lexer.TIgnoredAnnotation'); this is the
+                -- only place it is mentioned. A warning, so the rest of the
+                -- file is still checked and highlighted.
+                ignoredAnnotation a = mkFileDiagnosticWithSource uri (mkIgnoredAnnotationDiagnostic a) a
+                -- The redundant-@lang hint: a module that declares nothing is
+                -- English (R-M2), so `@lang en` can go. A hint, below the NBSP
+                -- lint's warning: it exists so that a stale skill or generator
+                -- cannot quietly put the line back, and it changes nothing
+                -- about exit codes or evaluation.
+                langHints = map (mkSimpleFileDiagnostic uri . mkRedundantLangEnHint) (Parser.redundantLangEnRanges ts)
+            pure (map mk nbspRanges <> map ignoredAnnotation (IA.ignoredAnnotations ts) <> langHints, Just (ts, contents))
 
   -- | GetMixfixRegistry collects mixfix hints from the current module AND all imports.
   -- This enables cross-module mixfix resolution.
@@ -760,7 +1138,7 @@ jl4Rules evalConfig rootDirectory recorder = do
 
         -- Resolve import URIs via the exact code path GetImports uses
         -- ('resolveImportShared'), so parser-hint resolution can never pick a
-        -- different source than typecheck resolution (spec §3.3).
+        -- different source than typecheck resolution (specs/as-built/import-resolution.md §3.3).
         let resolveImportUri :: Name -> Action (Maybe NormalizedUri)
             resolveImportUri n = do
               let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
@@ -771,11 +1149,33 @@ jl4Rules evalConfig rootDirectory recorder = do
         resolvedUris <- catMaybes <$> traverse resolveImportUri importNames
 
         -- Recursively get mixfix hints from imported modules
-        importedHints <- mconcat . catMaybes <$> uses GetMixfixRegistry resolvedUris
+        importedHints <- mconcat . catMaybes <$> (uses GetMixfixRegistry =<< importsThatDoNotLeadBack uri resolvedUris)
 
         -- Combine local + imported hints
         let combinedHints = localHints <> importedHints
         pure ([], Just combinedHints)
+
+  define shakeRecorder $ \GetImportEdges uri -> do
+    (tokens, contents) <- use_ GetLexTokens uri
+    case Parser.execProgramParserForTokens uri contents tokens of
+      Left _errs -> pure ([], Just [])
+      Right (firstProg, _) -> do
+        let extractImport :: TopDecl Name -> [(Maybe SrcRange, Name)]
+            extractImport = \case
+              Import _ (MkImport a n _) -> [(rangeOf a, n)]
+              _ -> []
+            resolveEdge (range, n) = do
+              let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+              outcome <- resolveImport uri modName
+              pure (fmap (\u -> (range, u)) outcome.importUri)
+        edges <- catMaybes <$> traverse resolveEdge (foldTopDecls extractImport firstProg)
+        let selfImportDiags =
+              [ mkSimpleFileDiagnostic uri
+                  (mkSimpleDiagnostic "import/self-import" "import" "This IMPORT names the file it is in. A file cannot import itself." (fromSrcRange <$> range))
+              | (range, target) <- edges
+              , target == uri
+              ]
+        pure (selfImportDiags, Just edges)
 
   define shakeRecorder $ \GetParsedAst uri -> do
     (tokens, contents) <- use_ GetLexTokens uri
@@ -821,6 +1221,7 @@ jl4Rules evalConfig rootDirectory recorder = do
             allPaths <- liftIO $ triedLocations outcome
             let diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
+                    "import/module-not-found"
                     (fromNormalizedUri uri).getUri
                     (Text.unlines
                       [ "I could not find a module with this name: " <> Text.pack modName
@@ -844,14 +1245,86 @@ jl4Rules evalConfig rootDirectory recorder = do
     (diags, imports) <- fmap unzip $ getAp $ foldTopDecls mkDiagsAndImports prog
     pure (concat diags, Just (Maybe.catMaybes imports))
 
-  defineWithCallStack shakeRecorder $ \GetTypeCheckDependencies cs uri -> do
+  define shakeRecorder $ \GetTypeCheckDependencies uri -> do
     imports <- use_  GetImports uri
-    ress    <- fmap catMaybes $ zipWith (\res mres -> (res,) <$> mres) imports <$> uses (AttachCallStack cs TypeCheckNoCallstack) (map (.moduleUri) imports)
+    -- An import that resolves to this file is the file importing itself
+    -- ('GetImportEdges' reports that; 'GetImports' leaves out an IMPORT that
+    -- finds no module, and reports it). It is not typechecked:
+    -- 'CheckModule' is keyed by file alone, so that would be the rule waiting
+    -- on itself (see 'dependencyImports', which drops the same imports from the
+    -- evaluation). Nor is an import that leads back to this file
+    -- ('importsThatDoNotLeadBack'); 'CheckModule' reports that. Each is kept in
+    -- the list, with no typecheck, so that 'importsOk' counts it.
+    checkable <- importsThatDoNotLeadBack uri (filter (/= uri) (map (.moduleUri) imports))
+    results <- uses CheckModule checkable
+    let byUri = Map.fromList (zip checkable results)
+        ress = [ (i, join (Map.lookup i.moduleUri byUri)) | i <- imports ]
     pure ([], Just ress)
 
-  defineWithCallStack shakeRecorder $ \TypeCheckNoCallstack cs uri -> do
+  -- The call stack is ignored, and nothing is reported here: the diagnostics
+  -- belong to 'CheckModule', so a module's errors are stored once, not once
+  -- per key that reads it.
+  define shakeRecorder $ \(AttachCallStack _cs TypeCheckNoCallstack) uri ->
+    ([],) <$> use CheckModule uri
+
+  define shakeRecorder $ \CheckModule uri -> do
+    -- This publishes the error for a file that imports itself.
+    _            <- use GetImportEdges uri
     parsed       <- use_ GetParsedAst uri
-    (imported, dependencies) <- unzip <$> use_ (AttachCallStack (uri : cs) GetTypeCheckDependencies) uri
+    importResults <- use_ GetTypeCheckDependencies uri
+    onRing       <- onImportRing uri
+    -- An import with no typecheck is usually in a ring of imports. Find it, so
+    -- the message can name the files instead of the engine's rule names.
+    rings <- traverse
+      (\(imp, mTc) -> case mTc of
+          Nothing | imp.moduleUri /= uri -> firstImportCycleFrom imp.moduleUri
+          _ -> pure Nothing)
+      importResults
+    let (imported, dependencies) = unzip [ (i, tc) | (i, Just tc) <- importResults ]
+        fileName u = Text.takeWhileEnd (/= '/') (getUri (fromNormalizedUri u))
+        arrows = Text.intercalate " -> " . map fileName
+        -- What is wrong with an imported module, if anything, as its diagnostic
+        -- code and message. The error itself is reported in that module; this
+        -- points at it from the IMPORT.
+        importProblem :: ImportResult -> Maybe [NormalizedUri] -> Maybe TypeCheckResult -> Maybe (Text, Text)
+        importProblem imp ring = \case
+          Nothing -> Just $ case ring of
+            Just r
+              | uri `elem` r ->
+                  ( "import/cycle"
+                  , "This IMPORT makes a ring of imports: " <> arrows (startingAt uri r)
+                    <> ". Files cannot import each other in a ring."
+                  )
+              | otherwise ->
+                  ( "import/cycle"
+                  , "The imported module " <> modName <> " is in a ring of imports: " <> arrows r
+                    <> ". Files cannot import each other in a ring."
+                  )
+            Nothing -> ("import/module-has-errors", "The imported module " <> modName <> " could not be checked; see the errors in it.")
+          Just tc
+            | e : _ <- tc.errors ->
+                Just
+                  ( "import/module-has-errors"
+                  , "The imported module " <> modName <> " has errors"
+                      <> maybe "" (\r -> " (line " <> Text.pack (show r.start.line) <> ": " <> firstLine e <> ")") (rangeOf e)
+                  )
+            | not tc.success -> Just ("import/module-has-errors", "The imported module " <> modName <> " has errors.")
+            | not tc.importsOk -> Just ("import/module-has-errors", "The imported module " <> modName <> " imports a module with errors.")
+            | otherwise -> Nothing
+          where
+            modName = rawNameToText (rawName imp.importName)
+            -- The same ring, read from @u@: [b, a, b] from a is [a, b, a].
+            startingAt u r = case break (== u) (List.init r) of
+              (before, after) -> after <> before <> take 1 after
+            firstLine e = Text.strip $ Maybe.fromMaybe "" $ Maybe.listToMaybe $ concatMap Text.lines $ TypeCheck.prettyCheckError e.kind
+        importDiags =
+          [ mkSimpleFileDiagnostic uri (mkSimpleDiagnostic code "import" msg (fromSrcRange <$> imp.importRange))
+          | ((imp, mTc), ring) <- zip importResults rings
+          -- An IMPORT of the file itself is reported on that IMPORT by
+          -- 'GetImportEdges'.
+          , imp.moduleUri /= uri
+          , Just (code, msg) <- [importProblem imp ring mTc]
+          ]
 
     let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
 
@@ -873,6 +1346,9 @@ jl4Rules evalConfig rootDirectory recorder = do
             -- co-equal for overload resolution (spec §5.5, FIX C).
           , sectionPaths = Map.union cState.sectionPaths tcRes.sectionPaths
           , deferredChoices = 0
+          , plural = False
+          , bindLog = []
+          , bindLogLen = 0
           }
         -- NOTE: tcRes.entityInfo is already zonked (the final substitution is
         -- applied when the TypeCheckResult is built below), as
@@ -886,10 +1362,10 @@ jl4Rules evalConfig rootDirectory recorder = do
         -- NOTE: only 'SError' diagnostics count against 'success'; 'SInfo' and
         -- 'SWarn' (e.g. exhaustiveness/redundancy warnings) are non-fatal.
         -- All diagnostics are still published to the editor below regardless
-        -- of this partition — it only decides what blocks 'SuccessfulTypeCheck'.
+        -- of this partition — it decides which go to 'infos' and which to 'errors'.
         (infos, errors) = partition ((/= TypeCheck.SError) . TypeCheck.severity) result.errors
-    pure
-      ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
+    pure $ if onRing then (importDiags, Nothing) else
+      ( importDiags <> fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
       , Just TypeCheckResult
         { module' = result.program
         , substitution = result.substitution
@@ -899,10 +1375,11 @@ jl4Rules evalConfig rootDirectory recorder = do
         , infos
         , errors  -- Include actual errors (OutOfScopeError etc.) for implicit ASSUME extraction
         , infoMap = result.infoMap
-        , nlgMap = result.nlgMap
+        , nlgMap = outputNlgMap result.program result.nlgMap
         , scopeMap = result.scopeMap
         , descMap = result.descMap
-        , dependencies = dependencies <> foldMap (.dependencies) dependencies
+        , dependencies = closeDependencies dependencies
+        , importsOk = all (\(_, mTc) -> maybe False (\tc -> tc.success && tc.importsOk) mTc) importResults
         , mixfixRegistry = result.mixfixRegistry
         , sectionPaths = result.sectionPaths
         , implicitReaders = result.implicitReaders
@@ -940,16 +1417,39 @@ jl4Rules evalConfig rootDirectory recorder = do
       then pure ([], Just typeCheckResult)
       else pure ([], Nothing)
 
-  defineWithCallStack shakeRecorder $ \GetLazyEvaluationDependencies cs f -> do
-    imports <- use_  GetImports f
+  -- Callers build this key with a call stack ('EvaluateLazy' below, @l4 lts@,
+  -- the service, the LSP's visualiser); it is ignored, and the work is done
+  -- once per file by 'GetLazyEvaluationDependenciesFile'.
+  define shakeRecorder $ \(AttachCallStack _cs GetLazyEvaluationDependencies) f ->
+    ([],) <$> use GetLazyEvaluationDependenciesFile f
+
+  -- Evaluates a module on top of its imports' heaps, keyed by file alone, for
+  -- the reason given at 'CheckModule'. Until smucclaw\/l4-ide#1008 the
+  -- imports recursed with a growing call stack in the key, so an imported
+  -- module, and every #EVAL and #ASSERT in it, was evaluated once per import
+  -- path, each time into a heap of its own. Everything above a module now
+  -- shares its one heap, as everything above a module in a chain always did; a
+  -- thunk forced from one importer is forced for all of them. Two importers
+  -- forcing one thunk at once is the case the NOTE above 'evalRef' allows for:
+  -- a thunk is blackholed per thread, so the second thread evaluates it too.
+  define shakeRecorder $ \GetLazyEvaluationDependenciesFile f -> do
+    imports <- dependencyImports f
     tcRes   <- use_  SuccessfulTypeCheck f
-    -- TODO: when checking for cycles, we should check which one is the
-    -- first element in the cycle that is, i.e. which IMPORT, then scan
-    -- for the IMPORT again and
-    -- put the diagnostic on that IMPORT
-    deps    <- fmap catMaybes $ uses (AttachCallStack (f : cs) GetLazyEvaluationDependencies) $ map (.moduleUri) imports
+    deps    <- fmap catMaybes $ uses GetLazyEvaluationDependenciesFile $ map (.moduleUri) imports
     let environment = mconcat (fst <$> deps)
-    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnv evalConfig tcRes.entityInfo environment tcRes.module')
+        -- the modules this one imports, transitively and once each (a diamond of
+        -- imports would otherwise list a module once per path): the JSON decoder
+        -- fills an absent field of a record declared in any of them from its
+        -- DECLARE (T1b)
+        importedModules = go Map.empty tcRes.dependencies
+          where
+            go seen [] = Map.elems seen
+            go seen (d : ds) =
+              let MkModule _ depUri _ = d.module'
+              in if Map.member depUri seen
+                   then go seen ds
+                   else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
+    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports evalConfig tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
     pure ([], Just (ownEnv <> environment, ownDirectives))
 
   define shakeRecorder $ \EvaluateLazy uri -> do
@@ -1042,7 +1542,7 @@ jl4Rules evalConfig rootDirectory recorder = do
     parsed <- use_ GetParsedAst f
     let pfp = (fromNormalizedUri f).getUri
     pure case ExactPrint.exactprint parsed of
-      Left trErr -> ([mkSimpleFileDiagnostic f $ mkSimpleDiagnostic pfp (prettyTraverseAnnoError trErr) Nothing], Nothing)
+      Left trErr -> ([mkSimpleFileDiagnostic f $ mkSimpleDiagnostic "internal/exactprint-failed" pfp (prettyTraverseAnnoError trErr) Nothing], Nothing)
       Right ep'd -> ([], Just ep'd)
 
   where
@@ -1068,22 +1568,24 @@ jl4Rules evalConfig rootDirectory recorder = do
         Diagnostic
           { _range = rangeOfResolveWarning warn
           , _severity = Just LSP.DiagnosticSeverity_Warning
-          , _code = Nothing
-          , _codeDescription = Nothing
+          , _code = diagnosticCode code
+          , _codeDescription = diagnosticCodeDescription code
           , _source = Just "parser"
           , _message = prettyNlgResolveWarning warn
           , _tags = Nothing
           , _relatedInformation = Nothing
           , _data_ = Nothing
           }
+      where
+        code = annotationWarningCode warn
 
     mkAndOrLintWarning :: Lint.AndOrWarning -> Diagnostic
     mkAndOrLintWarning warn =
         Diagnostic
           { _range = srcRangeToLspRange warn.warningRange
           , _severity = Just LSP.DiagnosticSeverity_Warning
-          , _code = Nothing
-          , _codeDescription = Nothing
+          , _code = diagnosticCode "lint/and-or-same-indentation"
+          , _codeDescription = diagnosticCodeDescription "lint/and-or-same-indentation"
           , _source = Just "linter"
           , _message = Text.pack $ "AND and OR operators appear at the same indentation level (column " <> show warn.conflictingColumn <> "). This may indicate a precedence error - please use indentation to clarify precedence; in a pinch, parentheses may also be used."
           , _tags = Nothing
@@ -1092,15 +1594,15 @@ jl4Rules evalConfig rootDirectory recorder = do
           }
 
     mkParseErrorDiagnostic :: PError -> Diagnostic
-    mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.origin parseError.message (Just parseError.range)
+    mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.code parseError.origin parseError.message (Just parseError.range)
 
-    mkSimpleDiagnostic :: Text -> Text -> Maybe SrcSpan -> Diagnostic
-    mkSimpleDiagnostic origin _message range =
+    mkSimpleDiagnostic :: Text -> Text -> Text -> Maybe SrcSpan -> Diagnostic
+    mkSimpleDiagnostic code origin _message range =
       Diagnostic
         { _range = srcSpanToLspRange range
         , _severity = Just LSP.DiagnosticSeverity_Error
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just origin
         , _message
         , _tags = Nothing
@@ -1108,8 +1610,56 @@ jl4Rules evalConfig rootDirectory recorder = do
         , _data_ = Nothing
         }
 
+    -- | The NBSP lint's diagnostic: a warning (never an error — the lexer
+    -- accepts a no-break space in whitespace today, and keeps doing so; this
+    -- is advisory only), sourced "linter" like 'mkAndOrLintWarning'.
+    mkNbspLintDiagnostic :: SrcRange -> Diagnostic
+    mkNbspLintDiagnostic range =
+      Diagnostic
+        { _range = srcRangeToLspRange (Just range)
+        , _severity = Just LSP.DiagnosticSeverity_Warning
+        , _code = Nothing
+        , _codeDescription = Nothing
+        , _source = Just "linter"
+        , _message = "non-breaking space (U+00A0) used where a normal space was expected — this usually comes from pasted text; replace it with an ordinary space."
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+
+    mkIgnoredAnnotationDiagnostic :: IA.IgnoredAnnotation -> Diagnostic
+    mkIgnoredAnnotationDiagnostic a =
+      Diagnostic
+        { _range = srcRangeToLspRange (Just a.range)
+        , _severity = Just LSP.DiagnosticSeverity_Warning
+        , _code = Nothing
+        , _codeDescription = Nothing
+        , _source = Just "lexer"
+        , _message = IA.ignoredAnnotationMessage a
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+
+    -- | The redundant @\@lang en@ hint: severity Hint, the lowest the LSP
+    -- has, sourced "linter" like the lints above. The range is the whole
+    -- @\@lang@ line, which is the thing to delete.
+    mkRedundantLangEnHint :: SrcRange -> Diagnostic
+    mkRedundantLangEnHint range =
+      Diagnostic
+        { _range = srcRangeToLspRange (Just range)
+        , _severity = Just LSP.DiagnosticSeverity_Hint
+        , _code = diagnosticCode "lint/redundant-lang-en"
+        , _codeDescription = diagnosticCodeDescription "lint/redundant-lang-en"
+        , _source = Just "linter"
+        , _message = "A module that declares nothing is English; this line can go."
+        , _tags = Nothing
+        , _relatedInformation = Nothing
+        , _data_ = Nothing
+        }
+
     evalLazyResultToDiagnostic :: EvaluateLazy.EvalDirectiveResult -> Diagnostic
-    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger _notes) = do
+    evalLazyResultToDiagnostic r@(EvaluateLazy.MkEvalDirectiveResult range res _mtrace _ledger _notes _) = do
       Diagnostic
         { _range = srcRangeToLspRange range
         , _severity =
@@ -1124,37 +1674,58 @@ jl4Rules evalConfig rootDirectory recorder = do
               EvaluateLazy.Assertion (EvaluateLazy.FailsBecause _)   -> Just LSP.DiagnosticSeverity_Error
               EvaluateLazy.Assertion (EvaluateLazy.Errored _)        -> Just LSP.DiagnosticSeverity_Error
               EvaluateLazy.Reduction (EvaluateLazy.ReducedErrored _) -> Just LSP.DiagnosticSeverity_Error
-              _                                    -> Just LSP.DiagnosticSeverity_Information
-        , _code = Nothing
-        , _codeDescription = Nothing
+              -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+              EvaluateLazy.Assertion (EvaluateLazy.Undetermined _)        -> Just LSP.DiagnosticSeverity_Error
+              EvaluateLazy.Reduction (EvaluateLazy.ReducedUndetermined _) -> Just LSP.DiagnosticSeverity_Error
+              -- one arm each, no wildcard, so a new outcome must choose
+              -- (UNKNOWN-EVALUATION-SPEC §4.7.4, U1b)
+              EvaluateLazy.Assertion EvaluateLazy.Holds              -> Just LSP.DiagnosticSeverity_Information
+              EvaluateLazy.Reduction (EvaluateLazy.Reduced _)        -> Just LSP.DiagnosticSeverity_Information
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just "eval"
         , _message = EvaluateLazy.prettyEvalDirectiveResult r
         , _tags = Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }
+      where
+        code = EvaluateLazy.evalDirectiveCode res
 
     checkErrorToDiagnostic :: CheckErrorWithContext -> Diagnostic
     checkErrorToDiagnostic checkError =
       Diagnostic
         { _range = srcRangeToLspRange (rangeOf checkError)
         , _severity = Just (translateSeverity (TypeCheck.severity checkError))
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just "check"
         , _message = Text.unlines (TypeCheck.prettyCheckError checkError.kind)
           -- A deprecation warning is tagged so that editors render the retired
           -- spelling the way they render any other deprecated one (typically
-          -- struck through), on top of the warning squiggle. Two spellings are
-          -- being retired: ASSUME, and EXACTLY in a regulative action (R3 of
-          -- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md).
+          -- struck through), on top of the warning squiggle. The spellings being
+          -- retired: ASSUME, EXACTLY in a regulative action (R3 of
+          -- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md), and the old names of
+          -- two built-ins, `IS INTEGER` and `WAIT UNTIL` (Note [Renamed
+          -- built-ins] in L4.TypeCheck.Environment).
         , _tags = case checkError.kind of
             TypeCheck.CheckWarning (TypeCheck.DeprecatedAssume {}) -> Just [LSP.DiagnosticTag_Deprecated]
             TypeCheck.CheckWarning (TypeCheck.DeprecatedExactly {}) -> Just [LSP.DiagnosticTag_Deprecated]
+            TypeCheck.CheckWarning (TypeCheck.RenamedBuiltin {})    -> Just [LSP.DiagnosticTag_Deprecated]
             _                                                      -> Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }
+      where
+        code = TypeCheck.checkErrorCode checkError.kind
+
+-- | The language server's severity for one of L4's own.
+diagnosticSeverityToLsp :: Diagnostic.DiagnosticSeverity -> DiagnosticSeverity
+diagnosticSeverityToLsp = \case
+  Diagnostic.DSError       -> LSP.DiagnosticSeverity_Error
+  Diagnostic.DSWarning     -> LSP.DiagnosticSeverity_Warning
+  Diagnostic.DSInformation -> LSP.DiagnosticSeverity_Information
+  Diagnostic.DSHint        -> LSP.DiagnosticSeverity_Hint
 
 translateSeverity :: TypeCheck.Severity -> DiagnosticSeverity
 translateSeverity TypeCheck.SInfo  = LSP.DiagnosticSeverity_Information
@@ -1183,47 +1754,10 @@ lspPositionToSrcPos :: LSP.Position -> SrcPos
 lspPositionToSrcPos (LSP.Position { _character = c, _line = l }) =
   MkSrcPos (fromIntegral $ l + 1) (fromIntegral $ c + 1)
 
+-- | The text of an annotation warning, shared with the web editor's check
+-- ('L4.API.l4Check').
 prettyNlgResolveWarning :: Resolve.Warning -> Text
-prettyNlgResolveWarning = \ case
-  Resolve.NotAttached _ ->
-    "Not attached to any valid syntax node."
-  Resolve.UnknownLocation nlg -> Text.unlines
-    [ "The following NLG Annotation has no source location. This might be an internal compiler error."
-    , "```"
-    , Print.prettyLayout nlg
-    , "```"
-    ]
-  Resolve.EmptyNlg name _ ->
-    "This @nlg annotation has no text, so it is ignored: "
-      <> Print.prettyLayout name
-      <> " would otherwise render as nothing at all, because an annotation replaces what it annotates."
-  Resolve.Ambiguous name mtag nlgs -> Text.unlines $
-    ( case mtag of
-        -- Every parsed annotation carries a language by the time it gets
-        -- here: an untagged one is stamped with the module's `@lang`, or with
-        -- `en`. So the hint has to cover BOTH shapes at once — it is wrong to
-        -- say "tag these" to someone who already tagged them `:he` twice, and
-        -- wrong to talk about `en` without saying where `en` came from.
-        Just (Lexer.MkLangTag tag) ->
-          [ "More than one NLG annotation in language `" <> tag <> "` attached to: "
-              <> Print.prettyLayout name
-          , "An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags."
-          ]
-        -- Only an annotation we could not parse reaches here without one.
-        Nothing ->
-          [ "More than one NLG annotation attached to: " <> Print.prettyLayout name ]
-    ) <>
-    [ "The following annotations would be attached:"
-    , ""
-    ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
-  Resolve.RefUnattached r ->
-    "@ref `" <> getRef r.payload <> "` could not be attached to any following syntax node."
-  Resolve.RefNoLocation ref ->
-    "@ref `" <> getRef ref <> "` has no source location. This might be an internal compiler error."
-  Resolve.FixityAnnotationMisplaced _ ->
-    "This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition."
-  Resolve.FixityAnnotationNoLocation _ ->
-    "A fixity annotation has no source location. This might be an internal compiler error."
+prettyNlgResolveWarning = annotationWarningMessage
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1235,23 +1769,41 @@ listL4Files dir = do
 
 
 rangeOfResolveWarning :: Resolve.Warning -> LSP.Range
-rangeOfResolveWarning = \ case
-  Resolve.NotAttached nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.UnknownLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.EmptyNlg _ nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.Ambiguous name _ _ ->
-    srcRangeToLspRange $ rangeOf name
-  Resolve.RefUnattached r ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefNoLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.FixityAnnotationMisplaced fx ->
-    srcSpanToLspRange $ Just fx.range
-  Resolve.FixityAnnotationNoLocation _ ->
-    srcSpanToLspRange Nothing
+rangeOfResolveWarning = srcSpanToLspRange . annotationWarningSpan
+
+-- ----------------------------------------------------------------------------
+-- The nlg map hover reads
+-- ----------------------------------------------------------------------------
+
+-- | The type checker's 'TypeCheck.NlgMap', restamped to where the projections
+-- read each herald, so hover shows what @l4 nlg@ and @l4 render@ print.
+--
+-- The type checker records a herald at the node it is attached to. For a herald
+-- written after a rule head's INPUT that is the input, but the projections read
+-- it as the RULE's sentence ('promoteHeadInputNlg', smucclaw\/l4-ide#972). Ruled
+-- 2026-09-26 on smucclaw\/l4-ide#979: hover shows the output meaning, so
+-- hovering the rule shows the sentence and hovering the input shows no gloss.
+--
+-- The decision is not re-made here. 'promoteHeadInputNlg' runs over the module,
+-- and every defining name whose herald it changed is restamped at that name's
+-- range. A herald in the @GIVEN@ is left where it is because the promotion
+-- leaves it alone (smucclaw\/l4-ide#977). The zip is aligned because the
+-- promotion only rewrites the annotations of 'Resolved' nodes and never the
+-- tree's shape.
+outputNlgMap :: Module Resolved -> TypeCheck.NlgMap -> TypeCheck.NlgMap
+outputNlgMap m nlgs = foldl' restamp nlgs moved
+ where
+  resolveds = toListOf (gplate @Resolved)
+  moved =
+    [ (range, after)
+    | (Def _ n, Def _ n') <- zip (resolveds m) (resolveds (promoteHeadInputNlg m))
+    , let after = n' ^. annoOf % annNlg
+    , n ^. annoOf % annNlg /= after
+    , Just range <- [rangeOf n]
+    ]
+  restamp acc (range, mnlg) =
+    let iv = IV.srcRangeToInterval range
+    in  maybe id (IV.insert iv) mnlg (IV.deleteInterval iv acc)
 
 -- ----------------------------------------------------------------------------
 -- Helpers for implementing syntax highlighting

@@ -1,0 +1,24 @@
+-- Semantic tokens over mixfix calls: one written between its arguments, one
+-- after its argument (postfix), a chain of two keywords, and a call whose
+-- arguments and keyword sit on separate lines with comments between them.
+GIVEN a IS A NUMBER, b IS A NUMBER
+GIVETH A NUMBER
+a `plus` b MEANS a + b
+
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+a `percent` MEANS a / 100
+
+GIVEN a IS A NUMBER, b IS A NUMBER, c IS A NUMBER
+GIVETH A NUMBER
+a `scaled` b `shifted` c MEANS a * b + c
+
+c1 MEANS 1 `plus` 2
+c2 MEANS 50 `percent`
+c3 MEANS 1 `scaled` 2 `shifted` 3
+c4 MEANS 1 `plus` 2 -- trailing
+
+DECIDE m3 x y IS
+  x -- one
+  `plus` -- kw
+  y -- three

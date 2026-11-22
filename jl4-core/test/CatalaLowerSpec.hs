@@ -510,7 +510,7 @@ spec = do
     -- smucclaw/l4-ide#958, both emission sites. R1 puts an @export'd decision in
     -- a Catala SCOPE and every other reachable decision in a TOPLEVEL, and
     -- Catala allows `output of S with { … }` only inside a scope. Until these
-    -- refusals, both shapes below lowered clean, `l4 catala` exited 0 in
+    -- refusals, both shapes below lowered clean, `l4 export catala` exited 0 in
     -- silence, and `catala typecheck` rejected the file it had just written with
     -- "Scope calls are not allowed outside of a scope" (measured on the pristine
     -- tree at 6e9b57bb against catala 1.2.1, exit 123).
@@ -671,6 +671,46 @@ spec = do
     it "renders a @ref citation, with the annotation keyword stripped" $ do
       m <- lowerOk statute
       concat [ ls | SegProse ls <- m.modSegments ] `shouldSatisfy` elem "*Source: s1(1).*"
+
+    -- A stack of @refs shows its nearest, the one written closest above the
+    -- rule (ruled 2026-10-12, bench "Main Wave Rulings" card R1).
+    it "cites the nearest of several @refs written above a rule" $ do
+      m <- lowerOk $ Text.unlines
+        [ "§ `Winter allowance`"
+        , ""
+        , "@ref s1(1)"
+        , "@ref s1(2)"
+        , "@export Whether the household qualifies."
+        , "GIVEN h IS A BOOLEAN"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `qualifies` IF"
+        , "    h"
+        ]
+      let prose = concat [ ls | SegProse ls <- m.modSegments ]
+      prose `shouldSatisfy` elem "*Source: s1(2).*"
+      prose `shouldNotSatisfy` elem "*Source: s1(1).*"
+
+    -- A @ref refers to what FOLLOWS it. One written after code on its line is
+    -- attached to nothing, not to the next rule, whose citation it would
+    -- otherwise become with no one the wiser (card R1, option A).
+    it "cites nothing for a @ref written after code on its line" $ do
+      m <- lowerOk $ Text.unlines
+        [ "§ `Winter allowance`"
+        , ""
+        , "@export Whether the household qualifies."
+        , "GIVEN h IS A BOOLEAN"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `qualifies` IF"
+        , "    h @ref s1(1)"
+        , ""
+        , "@export Whether the household is large."
+        , "GIVEN h IS A BOOLEAN"
+        , "GIVETH A BOOLEAN"
+        , "DECIDE `is large` IF"
+        , "    h"
+        ]
+      let prose = concat [ ls | SegProse ls <- m.modSegments ]
+      filter ("*Source:" `Text.isPrefixOf`) prose `shouldBe` []
 
     it "puts an @export description on the scope as #[description]" $ do
       m <- lowerOk statute

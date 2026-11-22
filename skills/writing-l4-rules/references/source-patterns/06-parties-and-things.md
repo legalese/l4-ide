@@ -82,7 +82,7 @@ passive "may be granted" is a boolean, not a permission.
 
 > `DECLARE Constitution HAS` … `` `express permission for the entity's activities to be directed or otherwise controlled by a Minister` IS A BOOLEAN -- 5(2), limb (a), direction mode ``
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:146-154`, where Article 5(2)'s "three
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:146-154`, where Article 5(2)'s "three
 > listed persons x two modes of involvement" becomes six fields, each tagged with the limb it came
 > from.
 
@@ -105,7 +105,7 @@ DECLARE Notice HAS
 
 GIVEN n IS A Notice
 GIVETH A BOOLEAN
-DECIDE `the notice contains the particulars subsection (2) requires` n IF
+DECIDE `the notice contains the particulars subsection (2) requires` IF
         isJust (n's `the name of the licensee`)
     AND isJust (n's `the address of the premises`)
     AND isJust (n's `the date of the change`)
@@ -191,7 +191,7 @@ DECLARE Person IS ONE OF
 
 GIVEN p IS A Person
 GIVETH A BOOLEAN
-`s 6(1) -- old enough for a licence` p MEANS
+`s 6(1) -- old enough for a licence` MEANS
     CONSIDER p
     WHEN `an individual` i    THEN i's `age in years` AT LEAST 18
     WHEN `a body corporate` b THEN TRUE
@@ -210,7 +210,7 @@ DECLARE Person HAS
 
 GIVEN p IS A Person
 GIVETH A BOOLEAN
-`s 6(1) -- old enough for a licence` p MEANS
+`s 6(1) -- old enough for a licence` MEANS
     IF   p's `the person is a body corporate`
     THEN TRUE
     ELSE p's `age in years` AT LEAST 18
@@ -252,7 +252,7 @@ DECLARE Executor HAS
 
 GIVEN executors IS A LIST OF Executor
 GIVETH A BOOLEAN
-`s 13(1)(b) -- every executor appointed by the will has renounced` executors MEANS
+`s 13(1)(b) -- every executor appointed by the will has renounced` MEANS
     all (GIVEN p YIELD p's `renounced the right to such grant`) executors
 ```
 
@@ -264,7 +264,7 @@ GIVETH A BOOLEAN
 
 passes. That is the standard reading of a universal, and it is the reading `all` implements — but it
 is a reading, and where it matters the corpus records the choice rather than letting it happen
-silently: `jl4/examples/legal/charities-cleanroom/charity-test.l4:554-567` registers it as an
+silently: `jl4/examples/canon/je/charities-2014/charity-test.l4:554-567` registers it as an
 ambiguity, Article 5(1)(a) applied to an entity with no purposes at all, and pins the behaviour with
 a scenario so a later change to `all` is caught. Do the same: if "all of its purposes are
 charitable" ought to fail for an entity with no purposes, say so and add the guard.
@@ -313,7 +313,7 @@ DECLARE Person HAS
 
 GIVEN people IS A LIST OF Person
 GIVETH A BOOLEAN
-`any of the issue survived the intestate` people MEANS
+`any of the issue survived the intestate` MEANS
     any (GIVEN p YIELD p's `survived the deceased`) people
 ```
 
@@ -340,7 +340,7 @@ row + enums + membership via `any`".
 --       silently disagree — and the four Acts join across records constantly
 ```
 
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/family-domain.l4:54-57`, with the three
+> — `jl4/examples/canon/sg/succession/cleanroom/family-domain.l4:54-57`, with the three
 > provisions that force the point: a Wills Act section that must know the witness's spouse is the
 > donee, a Guardianship of Infants Act section that must know two appointees are guardians of the
 > same infant, a Probate and Administration Act section that must know the executor who died is one
@@ -360,7 +360,7 @@ DECLARE Person HAS
 GIVEN a IS A Person
       b IS A Person
 GIVETH A BOOLEAN
-`the same person as` a b MEANS
+`the same person as` MEANS
     a's `the reference for this person` EQUALS b's `the reference for this person`
 ```
 
@@ -407,7 +407,7 @@ residue its own number rather than treating it as an error.
 ```l4
 GIVEN p IS AN Applicant
 GIVETH A NUMBER
-`the section 13(2) rank of` p MEANS
+`the section 13(2) rank of` MEANS
   BRANCH
     IF p's `a universal or residuary legatee`       THEN 1
     IF p's `a legatee having a beneficial interest` THEN 4
@@ -416,7 +416,7 @@ GIVETH A NUMBER
 
 GIVEN candidates IS A LIST OF Applicant
 GIVETH A LIST OF Applicant
-`those with a prior right under section 13(2) among` candidates MEANS
+`those with a prior right under section 13(2) among` MEANS
     filter (GIVEN p YIELD `the section 13(2) rank of` p EQUALS best) candidates
     WHERE
       best MEANS minimum1 6 (map (GIVEN p YIELD `the section 13(2) rank of` p) candidates)
@@ -499,7 +499,7 @@ must be backticked, and that bare `EQUALS` between sets is a deliberate ambiguit
 
 > `DECLARE Actor IS ONE OF` / `Issuer` / `Intermediary` / `Investor` / `Purchaser`
 >
-> — `jl4/examples/legal/regcf/regcf.l4:89-93`. Not one human is named; the cast is the roles the
+> — `jl4/examples/canon/us/regcf/regcf.l4:89-93`. Not one human is named; the cast is the roles the
 > Code of Federal Regulations part creates.
 
 **It is doing** conferring a power on an **office**. Who holds it today is irrelevant to the rule and
@@ -525,7 +525,7 @@ DECLARE Matter HAS
 --  any of the powers conferred upon the court ..."
 GIVEN m IS A Matter
 GIVETH A DEONTIC Actor Action
-`s 69 -- the registrar may exercise the court's powers in` m MEANS
+`s 69 -- the registrar may exercise the court's powers in` MEANS
     IF   m's `the matter is uncontested`
     THEN PARTY `the registrar` MAY `make the grant` WITHIN 30
     ELSE PARTY `the court`     MAY `make the grant` WITHIN 30

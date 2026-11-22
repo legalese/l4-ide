@@ -22,6 +22,10 @@ module L4.OpenFisca.IR
   , OFScalarParam (..)
   , OFEnumDef (..)
   , OFPackage (..)
+  , subExprs
+  , readsVariables
+  , usesParams
+  , variableRefs
   ) where
 
 import Base
@@ -110,6 +114,50 @@ data OFExpr
   | OFPeriodField Text              -- ^ @period.start.<field>@ — e.g. period's year
   | OFParamRef Text                 -- ^ @parameters(period).<path>@ — a scalar parameter
   deriving stock (Eq, Show, Generic)
+
+-- | The immediate subexpressions of an expression.
+subExprs :: OFExpr -> [OFExpr]
+subExprs = \case
+  OFSum _ e       -> [e]
+  OFAny _ e       -> [e]
+  OFAll _ e       -> [e]
+  OFBin _ a b     -> [a, b]
+  OFCmp _ a b     -> [a, b]
+  OFAnd a b       -> [a, b]
+  OFOr a b        -> [a, b]
+  OFNot a         -> [a]
+  OFNeg a         -> [a]
+  OFCond a b c    -> [a, b, c]
+  OFScaleCalc _ a -> [a]
+  OFNpCall _ as   -> as
+  _               -> []
+
+-- | Does the expression read a variable of some entity? One that does is an
+-- array of the entity's size; one that does not is a Python or numpy scalar.
+readsVariables :: OFExpr -> Bool
+readsVariables = \case
+  OFVarRef _     -> True
+  OFMembersVar _ -> True
+  OFNbPersons _  -> True
+  OFSum _ _      -> True
+  OFAny _ _      -> True
+  OFAll _ _      -> True
+  e              -> any readsVariables (subExprs e)
+
+-- | Does the expression read a legislation parameter?
+usesParams :: OFExpr -> Bool
+usesParams = \case
+  OFScaleCalc _ _ -> True
+  OFParamRef _    -> True
+  e               -> any usesParams (subExprs e)
+
+-- | The names of the variables the expression reads, of its own entity or of
+-- the members.
+variableRefs :: OFExpr -> [Text]
+variableRefs = \case
+  OFVarRef n     -> [n]
+  OFMembersVar n -> [n]
+  e              -> concatMap variableRefs (subExprs e)
 
 -- | One bracket of a marginal-rate scale. Threshold and rate are date-indexed
 -- time-series (ISO @YYYY-MM-DD@ → value), mirroring OpenFisca's parameter YAML.

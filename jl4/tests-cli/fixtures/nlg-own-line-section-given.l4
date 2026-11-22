@@ -1,0 +1,38 @@
+-- An @nlg on its own line above a rule under a section GIVEN.
+--
+-- Such a rule has no GIVEN of its own: it reads the section's. So it is treated
+-- as any rule with no GIVEN, and an @nlg on its own line above its head is its
+-- sentence (assumed, not ruled, 2026-11-01, porting legalese/l4-ide#802; the
+-- rule for a rule with no GIVEN is main's 98edd9c83). An @nlg indented under the
+-- section GIVEN describes the binder and stays the binder's.
+--
+-- Before the port, the last name in the rule above took the annotation, so
+-- `age again` and `seven` read as their bare names.
+
+DECLARE Person HAS
+  age IS A NUMBER
+
+§ `Section given`
+    GIVEN applicant IS A Person
+@nlg the age of the applicant
+`applicant age` MEANS applicant's age
+
+@nlg the applicant's age again
+`age again` MEANS `applicant age`
+
+§ `Indented under the GIVEN`
+    GIVEN claimant IS A NUMBER
+          @nlg the claimant's age in years
+
+@nlg the claimant is a minor
+`is minor` MEANS claimant < 18
+
+§ `Bare heading`
+
+@nlg the constant seven
+seven MEANS 7
+
+#EVAL `applicant age` WITH applicant IS Person 20
+#EVAL `age again` WITH applicant IS Person 20
+#EVAL `is minor` WITH claimant IS 3
+#EVAL seven

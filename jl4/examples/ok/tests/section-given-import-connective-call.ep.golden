@@ -1,0 +1,41 @@
+-- An imported rule that reads a section GIVEN, as each operand of each
+-- built-in connective (UNKNOWN-EVALUATION-SPEC §8 step 2).
+--
+-- `rate is high` and `rate is low` come from
+-- ok/section-given-import-connective-def.l4, where `the rate` is 5 by default,
+-- so the first is TRUE and the second FALSE. Named here, each is a closure
+-- that has to be applied to that module's own cell before it is a BOOLEAN. A
+-- connective must apply it, on either side, whether it is called by name or
+-- through a parameter; handing the closure on unapplied would make the right
+-- operand of a TRUE AND the closure itself, which no assertion below accepts.
+
+IMPORT `section-given-import-connective-def`
+
+GIVEN f IS A FUNCTION FROM BOOLEAN AND BOOLEAN TO BOOLEAN
+      p IS A BOOLEAN
+      q IS A BOOLEAN
+GIVETH A BOOLEAN
+combine f p q MEANS f p q
+
+GIVEN g IS A FUNCTION FROM BOOLEAN TO BOOLEAN
+      p IS A BOOLEAN
+GIVETH A BOOLEAN
+apply g p MEANS g p
+
+-- Called by name.
+#ASSERT `rate is high` AND TRUE
+#ASSERT TRUE AND `rate is high`
+#ASSERT NOT (`rate is low` OR FALSE)
+#ASSERT NOT (FALSE OR `rate is low`)
+#ASSERT `rate is low` IMPLIES FALSE
+#ASSERT TRUE IMPLIES `rate is high`
+#ASSERT NOT `rate is low`
+
+-- Through a parameter.
+#ASSERT combine `__AND__` `rate is high` TRUE
+#ASSERT combine `__AND__` TRUE `rate is high`
+#ASSERT NOT (combine `__OR__` `rate is low` FALSE)
+#ASSERT NOT (combine `__OR__` FALSE `rate is low`)
+#ASSERT combine `__IMPLIES__` `rate is low` FALSE
+#ASSERT combine `__IMPLIES__` TRUE `rate is high`
+#ASSERT apply `__NOT__` `rate is low`

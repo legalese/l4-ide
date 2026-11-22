@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 
--- | @l4 catala FILE@ — compile the constitutive subset of an L4 file to a
+-- | @l4 export catala FILE@ — compile the constitutive subset of an L4 file to a
 -- literate Catala @.catala_en@ module.
 --
 -- Selection, lowering and emission live in @jl4-core@ ('L4.Catala.Lower' /
@@ -29,7 +29,6 @@ module L4.Cli.Catala
 
 import Base (Map, Text)
 import Data.Char (isAlpha, isAlphaNum, isAscii, toUpper)
-import qualified Data.List as List
 import qualified Base.Text as Text
 import Data.Ratio (denominator, numerator)
 import qualified Data.Map.Strict as Map
@@ -54,7 +53,9 @@ import L4.Print (ConstructorFieldNames, extractConstructorFieldNames, prettyLayo
 import L4.Syntax (Module (..), Resolved, getUnique, rawName, rawNameToText, getOriginal)
 import qualified L4.TypeCheck.Environment as TC
 
+import L4.Cli.CatalaWitness (witnessGates)
 import L4.Cli.Common
+import L4.Cli.Prove (findZ3)
 
 data CatalaOptions = CatalaOptions
   { catFile        :: FilePath
@@ -83,12 +84,14 @@ catalaOptionsParser = CatalaOptions
 catalaCmd :: CatalaOptions -> IO ()
 catalaCmd opts = do
   evalConfig <- makeEvalConfig opts.catFixedNow
-  (errs, (mTc, mEval)) <- runOneshot evalConfig opts.catFile \nfp -> do
+  (errs, (mTc, mEval, importEnv)) <- runOneshot evalConfig opts.catFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     tc   <- Shake.use Rules.SuccessfulTypeCheck uri
     eval <- Shake.use Rules.EvaluateLazy uri
-    pure (tc, eval)
+    imports <- maybe [] id <$> Shake.use Rules.GetImports uri
+    deps <- Shake.uses Rules.GetLazyEvaluationDependenciesFile (map (.moduleUri) imports)
+    pure (tc, eval, mconcat [ fst d | Just d <- deps ])
 
   case mTc of
     Nothing -> do
@@ -98,26 +101,37 @@ catalaCmd opts = do
       -- Surface non-fatal diagnostics, but proceed: a clean type-check is the
       -- precondition that matters for lowering.
       putDiagnostics errs
-      let lowerOpts = LowerOptions { loBooleanOnly = opts.catBooleanOnly }
+      let fields = extractConstructorFieldNames tc.entityInfo
+      -- §8.4's witness gate (R-V10). The candidates and the evaluator decide
+      -- the witnesses; the solver only proves the remaining combinations
+      -- impossible, so without one a ladder that has any keeps the grid.
+      (gates, gateNotes) <-
+        if opts.catBooleanOnly
+          then pure (Map.empty, [])
+          else do
+            msolver <- either (const Nothing) Just <$> findZ3
+            witnessGates evalConfig tc importEnv msolver 10
+              (catalaJson fields) (Text.strip . prettyLayoutNF fields)
+      mapM_ (\w -> hPutStrLn stderr ("l4 export catala: " <> Text.unpack w)) gateNotes
+      let lowerOpts = LowerOptions { loBooleanOnly = opts.catBooleanOnly, loWitnessGates = gates }
       case lowerModuleWith lowerOpts (importClosure tc) tc.module' of
         Left lerrs -> do
           putDiagnostics
-            ( "l4 catala: cannot compile these decisions to Catala:"
+            ( "l4 export catala: cannot compile these decisions to Catala:"
             : map (("  - " <>) . renderLowerError) lerrs
             )
           exitFailure
         Right m0 -> do
-          let fields       = extractConstructorFieldNames tc.entityInfo
-              oracle       = evalOracle (fromMaybe [] mEval)
+          let oracle       = evalOracle (fromMaybe [] mEval)
               (m1, tNotes) = fillTests fields oracle m0
           case nameFor opts.catOutput m1 of
             Left err -> do
-              putDiagnostics ["l4 catala: " <> err]
+              putDiagnostics ["l4 export catala: " <> err]
               exitFailure
             Right m -> do
               -- Warnings are advice, not failure: fallbacks and elisions must
               -- be visible (R4, R11), but they do not stop emission.
-              mapM_ (\w -> hPutStrLn stderr ("l4 catala: " <> Text.unpack w))
+              mapM_ (\w -> hPutStrLn stderr ("l4 export catala: " <> Text.unpack w))
                     (m.modWarnings <> tNotes)
               let out = renderModule m
               case opts.catOutput of
@@ -156,14 +170,10 @@ catalaCmd opts = do
 -- the v1 Catala fragment (§6)", which reads as a language limit rather than a
 -- missing scan.
 --
--- Same shape as 'L4.Cli.Render.transitiveDeps'; the MLIR pipeline takes only
--- @tc.dependencies@'s first level, which would miss a type two imports away.
+-- The same list as 'L4.Cli.Common.transitiveDeps': each module once, in the
+-- order a depth-first walk of the imports meets it.
 importClosure :: Rules.TypeCheckResult -> [Module Resolved]
-importClosure tc = nubOnUri (go tc.dependencies)
- where
-  go = concatMap (\d -> d.module' : go d.dependencies)
-  nubOnUri = List.nubBy (\a b -> muri a == muri b)
-  muri (MkModule _ u _) = u
+importClosure tc = map (.module') (Rules.transitiveDependencies tc)
 
 -- | The module name Catala will demand for a file with this basename, or
 -- 'Nothing' when no module can live in a file so named.
@@ -207,6 +217,11 @@ fillTests fields oracle m =
         Just (Reduction (ReducedErrored _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
         Just (Assertion (Errored _)) ->
+          ([], [ note t "evaluating it in L4 raised" ])
+        -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
+        Just (Reduction (ReducedUndetermined _)) ->
+          ([], [ note t "evaluating it in L4 raised" ])
+        Just (Assertion (Undetermined _)) ->
           ([], [ note t "evaluating it in L4 raised" ])
         -- A refusal is not an oracle either, and it is not a raise: say which,
         -- so a reader of the run does not go hunting for a crash.

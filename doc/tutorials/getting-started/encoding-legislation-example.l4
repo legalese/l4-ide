@@ -1,87 +1,83 @@
--- Companion file for encoding-legislation.md
---
--- Section 3 of the Imaginary Alcohol Act 2024, encoded twice: once as a single
--- rule that mirrors the provision clause by clause, and once broken into named
--- sub-rules that say each idea once.
---
--- The seven facts about the person -- the inputs of section 3 -- are declared
--- once, as a section GIVEN indented under the section heading. Every rule below
--- reads them; none of them repeats the list.
+-- encoding-legislation-example.l4
+-- Section 3 of the (imaginary) Alcohol Act 2024: who must not sell alcohol.
 
-§ `Imaginary Alcohol Act - Section 3`
-    GIVEN `the person is a body corporate` IS A BOOLEAN @desc Is the person a body corporate?
-          `the person engages in business for profit` IS A BOOLEAN @desc Does the person engage in business for profit?
-          `the person is a public house` IS A BOOLEAN @desc Is the person a public house?
-          `the person is a hotel` IS A BOOLEAN @desc Is the person a hotel?
-          `the person has an unspent conviction for fraud` IS A BOOLEAN @desc Does the person have an unspent conviction for fraud?
-          `the person has an unspent conviction for providing misleading information` IS A BOOLEAN @desc Does the person have an unspent conviction for providing misleading information?
-          `the person has an alcohol banning order` IS A BOOLEAN @desc Is the person subject to an alcohol banning order?
+§ `Imaginary Alcohol Act 2024, section 3`
 
 {-
-Imaginary Alcohol Act 2024
-==========================
-
-Section 3 - Prohibition on Sale of Alcohol
-
-This section implements the prohibition in s.3, which prevents certain
-commercial entities from selling alcohol if they have disqualifying factors
-(fraud, misleading information, or banning orders).
-
-Exemptions:
-- Public houses (s.3(c))
-- Hotels (s.3(c))
-
-"Unspent conviction" follows the Rehabilitation of Offenders Act
-interpretation - see s.2 for definitions.
+Section 3. A person must not sell alcohol if:
+(a) the person is a body corporate;
+(b) the person engages in business for profit;
+(c) the person is not a public house or hotel; and
+(d) any of the following applies:
+    (i)   the person has an unspent conviction for fraud;
+    (ii)  the person has an unspent conviction for providing misleading information; or
+    (iii) the person has an alcohol banning order.
 -}
 
-§§ `Main rule`
+GIVEN `the person is a body corporate`                                            IS A BOOLEAN
+      `the person engages in business for profit`                                 IS A BOOLEAN
+      `the person is a public house`                                              IS A BOOLEAN
+      `the person is a hotel`                                                     IS A BOOLEAN
+      `the person has an unspent conviction for fraud`                            IS A BOOLEAN
+      `the person has an unspent conviction for providing misleading information` IS A BOOLEAN
+      `the person has an alcohol banning order`                                   IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the person must not sell alcohol` IF
+        `is a commercial enterprise`          -- (a) and (b)
+    AND NOT `is an exempt establishment`      -- (c)
+    AND `has a disqualifying factor`          -- (d)
+    WHERE
+        `is a commercial enterprise` MEANS
+                `the person is a body corporate`
+            AND `the person engages in business for profit`
 
-@export Decide whether a person is prohibited from selling alcohol under s.3
-DECIDE `the person must not sell alcohol`
-IF  `the person is a body corporate`
-    AND `the person engages in business for profit`
-    AND NOT `the person is a public house`
-    AND NOT `the person is a hotel`
-    AND (
-        `the person has an unspent conviction for fraud`
-        OR `the person has an unspent conviction for providing misleading information`
-        OR `the person has an alcohol banning order`
-    )
+        `is an exempt establishment` MEANS
+                `the person is a public house`
+            OR  `the person is a hotel`
 
-§§ `Sub-rules`
+        `has a disqualifying factor` MEANS
+                `the person has an unspent conviction for fraud`
+            OR  `the person has an unspent conviction for providing misleading information`
+            OR  `the person has an alcohol banning order`
 
--- Sub-rule: Is this a commercial enterprise?
-DECIDE `is commercial enterprise`
-IF  `the person is a body corporate`
-    AND `the person engages in business for profit`
+§§ `Tests`
 
--- Sub-rule: Is this an exempt establishment?
-DECIDE `is exempt establishment`
-IF  `the person is a public house`
-    OR `the person is a hotel`
+-- A corporate pub is exempt under (c), even with a fraud conviction.
+#ASSERT NOT `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS TRUE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS TRUE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS TRUE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS FALSE
 
--- Sub-rule: Does the person have disqualifying factors?
-DECIDE `has disqualifying factors`
-IF  `the person has an unspent conviction for fraud`
-    OR `the person has an unspent conviction for providing misleading information`
-    OR `the person has an alcohol banning order`
+-- A company with a banning order is prohibited.
+#ASSERT `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS TRUE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS FALSE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS FALSE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS TRUE
 
--- The same prohibition, assembled from the sub-rules.
-DECIDE `the person must not sell alcohol (tidied)`
-IF  `is commercial enterprise`
-    AND NOT `is exempt establishment`
-    AND `has disqualifying factors`
+-- A company with no disqualifying factor under (d) is not prohibited.
+#ASSERT NOT `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS TRUE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS FALSE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS FALSE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS FALSE
 
-§§ `Checks`
-
--- #CHECK reports what kind of thing a rule answers with. Every rule below
--- answers a yes-or-no question (a BOOLEAN), and every one of them has the same
--- seven blanks, filled from outside the file: by a web form, by
--- `l4 batch FILE --inputs cases.json`, or by a caller of the published service.
-
-#CHECK `the person must not sell alcohol`
-#CHECK `the person must not sell alcohol (tidied)`
-#CHECK `is commercial enterprise`
-#CHECK `is exempt establishment`
-#CHECK `has disqualifying factors`
+-- A natural person is not covered by (a).
+#EVAL `the person must not sell alcohol` WITH
+    `the person is a body corporate`                                            IS FALSE
+    `the person engages in business for profit`                                 IS TRUE
+    `the person is a public house`                                              IS FALSE
+    `the person is a hotel`                                                     IS FALSE
+    `the person has an unspent conviction for fraud`                            IS TRUE
+    `the person has an unspent conviction for providing misleading information` IS FALSE
+    `the person has an alcohol banning order`                                   IS FALSE

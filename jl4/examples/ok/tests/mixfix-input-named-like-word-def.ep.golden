@@ -1,0 +1,7 @@
+-- The mixfix rule for mixfix-input-named-like-word-import.l4, in a file of its own.
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+a `plus` b MEANS a + b
+
+#EVAL 3 `plus` 4    -- 7

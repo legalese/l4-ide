@@ -6,14 +6,27 @@ module L4.Parser.ResolveAnnotation (
   addNlgCommentsToAst,
   HasDesc(..),
   addDescCommentsToAst,
+  pickDesc,
   HasFixity(..),
   addFixityCommentsToAst,
   renderFixityWarning,
   FixityS(..),
   FixityWarning(..),
   FixityWithSpan,
+  HasNonassertable(..),
+  addNonassertableCommentsToAst,
+  renderNonassertableWarning,
+  NonassertableS(..),
+  NonassertableWarning(..),
+  NonassertableWithSpan,
   HasRef(..),
   addRefCommentsToAst,
+  TrailingRefs,
+  trailingRefsOf,
+  refWarningMessage,
+  refUnattachedMessage,
+  refTrailingMessage,
+  refNoLocationMessage,
   -- * Annotate Syntax Nodes with definite 'SrcSpan's.
   WithSpan (..),
   NlgWithSpan,
@@ -42,17 +55,20 @@ module L4.Parser.ResolveAnnotation (
   locRangeTo,
   LowerBound(..),
   locRangeFrom,
+  splitNlgsInRange,
 )
 where
 
 import Base
 
-import Data.Char (isSpace)
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit, isSpace)
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import L4.Annotation
-import L4.Lexer (LangTag)
+import L4.Lexer (AnnoType (..), LangTag (..), PosToken (..), langPrimary, TAnnotations (..), TokenType (..), displayTokenType)
 import L4.Syntax
 import L4.Parser.SrcSpan
 
@@ -73,8 +89,40 @@ data Warning
     -- ^ Two or more annotations on one name IN THE SAME LANGUAGE (the tag, or
     -- 'Nothing' for untagged). Must be at least two. Annotations in other
     -- languages on the same name are unaffected and still attach.
+  | LangOverridden (WithSpan LangTag) (WithSpan LangTag)
+    -- ^ A @\@lang@ line that names a different language from the LAST @\@lang@
+    -- line in the module, which is the one in force. The first is the
+    -- overridden line and the second is the line that wins. One per
+    -- overridden line; a line that repeats the winning tag contradicts
+    -- nothing and is not reported.
+  | LoneLangTag Name (Maybe Name) NlgWithSpan (Maybe LangTag)
+    -- ^ A wording tagged with a language that nothing in the module backs
+    -- ('isBackedLangTag'): it is the name's only wording, and the tag is not
+    -- one a @\@lang@ line declares, not English or Hebrew, not one of those
+    -- with a region or script added, and not carried by any name that also
+    -- has a wording in another language. A tag exists to tell renderings of
+    -- one name apart, so this is the shape of a sentence whose first word was
+    -- joined to the colon (@\@nlg:the employee pays@, @\@nlg:en-route for
+    -- …@). The wording is attached all the same.
+    --
+    -- The second field is the rule whose sentence the wording is, when it is
+    -- written after an input in the rule's head ('addNlgRuleHead'). The last
+    -- is the module's language, when it differs from this tag only in case:
+    -- tags are compared exactly, so @FR@ is not @fr@.
+  | SpacedSlot (WithSpan Text) Text
+    -- ^ A percent pair with spaces inside it around one name, such as
+    -- @% amount %@, in an annotation. It prints as plain text, because a slot
+    -- is @%amount%@ with no spaces. The first is the pair as written, with the
+    -- range of the whole annotation; the second is the name between the signs.
   | RefUnattached RefWithSpan
-    -- ^ A @ref could not be attached to any following AST node.
+    -- ^ A @ref has no AST node after it to attach to: it comes after the last
+    -- one, at the end of the file.
+  | RefTrailing RefWithSpan (Maybe Text)
+    -- ^ A @ref follows code on its line, with nothing after it there. A @ref
+    -- refers to what FOLLOWS it, so it cannot cite the code it trails, and it
+    -- is attached to nothing rather than to the next construct (ruled
+    -- 2026-10-12, bench "Main Wave Rulings" card R1). The text is that code,
+    -- when there is some on the line to quote.
   | RefNoLocation Ref
     -- ^ A @ref had no source location. That's a bug.
   | FixityAnnotationMisplaced FixityWithSpan
@@ -82,6 +130,18 @@ data Warning
     -- directly above a binary operator definition; it is ignored.
   | FixityAnnotationNoLocation Fixity
     -- ^ A fixity annotation had no source location. That's a bug.
+  | NonassertableAnnotationMisplaced NonassertableWithSpan
+    -- ^ An @\@nonassertable@ sits inside a definition's body (after its name
+    -- line, a WHERE local included), or after the last construct, so no
+    -- definition claims it.
+  | NonassertableAnnotationSameLine NonassertableWithSpan
+    -- ^ An @\@nonassertable@ is on the same line as the construct before it
+    -- (at the end of a definition's line), so nothing carries it.
+  | NonassertableAnnotationSuperseded NonassertableWithSpan
+    -- ^ Two or more marks sit above one construct; this is one of the
+    -- earlier ones, and the closest attaches.
+  | NonassertableAnnotationNoLocation Nonassertable
+    -- ^ An @\@nonassertable@ had no source location. That's a bug.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
@@ -138,13 +198,20 @@ data WithSpan a = WithSpan
 --
 -- Note, the 'Program Name's exactprint annotations are not modified,
 -- we merely add structured data to the ast node's respective 'Anno'.
-addNlgCommentsToAst :: HasNlg a => LangTag -> [Nlg] -> a -> (a, NlgS)
-addNlgCommentsToAst moduleLang nlgs p = do
+--
+-- The declared languages are the module's @\@lang@ lines, newest first, so the
+-- head is the module's language.
+addNlgCommentsToAst :: HasNlg a => LangTag -> [LangTag] -> [Nlg] -> a -> (a, NlgS)
+addNlgCommentsToAst moduleLang declared nlgs p = do
   let
     (nlgWithSpan, unfindable) = preprocessNlgs nlgs
 
     initialNlgS = NlgS
       { moduleLang = moduleLang
+      , declaredLangs = declared
+      , multilingualTags = Set.empty
+      , loneCandidates = []
+      , sentenceOf = Nothing
       , nlgs = nlgWithSpan
       , warnings = fmap UnknownLocation unfindable
       }
@@ -152,6 +219,7 @@ addNlgCommentsToAst moduleLang nlgs p = do
   runNlg initialNlgS $ do
     a <- addNlg p
     leftoversToWarnings
+    loneTagsToWarnings
     pure a
  where
   locRange = MkLocRange StartOfFile EndOfFile
@@ -166,6 +234,58 @@ leftoversToWarnings = do
   liftNlgA $ do
     ns <- use #nlgs
     traverse_ addWarning $ fmap NotAttached ns
+
+-- | Report the lone wordings whose tag nothing in the module backs. Only now,
+-- with every name visited, is it known which tags some name carries beside a
+-- wording in another language.
+loneTagsToWarnings :: NlgA ()
+loneTagsToWarnings = liftNlgA $ do
+  declared <- use #declaredLangs
+  multi <- use #multilingualTags
+  candidates <- use #loneCandidates
+  for_ (reverse candidates) $ \ (name, rule, one) ->
+    for_ (nlgLangTag one.payload) $ \ tag ->
+      unless (isBackedLangTag declared multi tag) $
+        addWarning $ LoneLangTag name rule one (caseTwinOf declared tag)
+
+-- | Does something in the module back this tag as a language, rather than it
+-- being the first word of a sentence joined to the colon?
+--
+-- * a @\@lang@ line declares it;
+--
+-- * some name carries it beside a wording in another language, which is what
+--   a tag is for; or
+--
+-- * it is a language the module declares, or English (the default) or Hebrew
+--   (which has a phrasebook, 'L4.Nlg.Phrasebook.phrasebookFor'), with nothing
+--   after it but a script or a region: @en-GB@, @he-IL@, @pt-BR@ in a module
+--   that declares @pt@, @zh-Hant@. English and Hebrew are matched in any case.
+--   A word after the hyphen that is neither a script nor a region is not a
+--   language, so @en-route@ is reported.
+isBackedLangTag :: [LangTag] -> Set.Set LangTag -> LangTag -> Bool
+isBackedLangTag declared multi tag@(MkLangTag t) =
+  tag `elem` declared
+    || tag `Set.member` multi
+    || (all isScriptOrRegion subtags && knownLanguage)
+ where
+  (primary, afterPrimary) = Text.breakOn "-" t
+  subtags = if Text.null afterPrimary then [] else Text.splitOn "-" (Text.drop 1 afterPrimary)
+  knownLanguage =
+    Text.toLower primary `elem` ["en", "he"]
+      || primary `elem` map langPrimary declared
+  isScriptOrRegion st =
+       (Text.length st == 4 && Text.all isAsciiLetter st)
+    || (Text.length st == 2 && Text.all isAsciiLetter st)
+    || (Text.length st == 3 && Text.all isDigit st)
+  isAsciiLetter c = isAsciiLower c || isAsciiUpper c
+
+-- | The module's language, when a tag differs from it only in case. Only the
+-- module's language, the newest declaration, is offered: an earlier @\@lang@
+-- line that the last one overrides is not the language the author is writing
+-- in.
+caseTwinOf :: [LangTag] -> LangTag -> Maybe LangTag
+caseTwinOf declared (MkLangTag t) =
+  List.find (\ (MkLangTag d) -> Text.toLower d == Text.toLower t) (take 1 declared)
 
 addWarning :: Warning -> NlgM ()
 addWarning warn = do
@@ -196,18 +316,18 @@ class HasNlg a where
   -- based on the 'SrcSpan' of 'a' and its neighbours.
   addNlg :: a -> NlgA a
 
-  -- | The claim a RECORD FIELD's name makes, given the span of its type.
-  --
-  -- Two disjoint regions, which is why it needs the type's span rather than
-  -- just a range: everything BEFORE the type (the field's own trailing
-  -- gloss, as always), plus everything on a LATER LINE than the field
-  -- (ruled 2026-09-19 — an annotation written underneath a field describes
-  -- that field). What falls between — trailing the type on the field's own
-  -- line — is left for the type, which runs next.
+  -- | The ordinary claim, narrowed to the annotations that satisfy a
+  -- predicate; the rest stay for a later node. This is how a name claims a
+  -- region that is not one contiguous range — see 'addNlgTypedName' and
+  -- 'addNlgInput'.
   --
   -- Defaults to the ordinary claim, so only the 'Name' instance has to care.
-  addNlgFieldName :: Maybe SrcSpan -> a -> NlgA a
-  addNlgFieldName _ = addNlg
+  addNlgWhere :: (NlgWithSpan -> Bool) -> a -> NlgA a
+  addNlgWhere _ = addNlg
+
+  -- | The name this node is, for a warning to name. Only 'Name' is one.
+  nlgNameOf :: a -> Maybe Name
+  nlgNameOf _ = Nothing
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
   addNlg a = extendNlgA a $ case a of
@@ -216,11 +336,22 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Section n) where
   addNlg a = extendNlgA a $ case a of
     MkSection ann lbl maka mgiven topDecls -> do
-      lbl' <- traverse addNlg lbl
+      -- An annotation on its own line describes what follows, so with a
+      -- declaration below it, the line under a heading is that declaration's.
+      -- A section with nothing in it has only its heading to describe.
+      lbl' <- case (topDecls, lbl) of
+        (_ : _, Just l) -> Just <$> confineToEndOfLine l (addNlg l)
+        _               -> traverse addNlg lbl
       maka' <- traverse addNlg maka
       -- The section's own GIVEN is traversed BEFORE the declarations: these
       -- passes consume a range-sorted annotation list in source order, and the
       -- section binder is written above the first declaration.
+      --
+      -- A rule under a section GIVEN has no GIVEN of its own, so an @\@nlg@ on
+      -- its own line above it is its sentence, as for any rule with no GIVEN;
+      -- one indented under the section GIVEN is a binder's (assumed, not
+      -- ruled, 2026-11-01, porting legalese/l4-ide#802; witnessed by
+      -- @jl4/tests-cli/fixtures/nlg-own-line-section-given.l4@).
       mgiven' <- traverse addNlg mgiven
       topDecls' <- traverse addNlg topDecls
       pure (MkSection ann lbl' maka' mgiven' topDecls')
@@ -251,29 +382,205 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TopDecl n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Declare n) where
   addNlg a = extendNlgA a $ case a of
     MkDeclare ann tySig appFormAka tyDecl -> do
-      tySig' <- addNlg tySig
+      tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- addNlg appFormAka
-      tyDecl' <- addNlg tyDecl
+      tyDecl' <- hoistNlgA (leavingTheNextRuleItsNlg a tyDecl)
+        (addNlgTypeDecl (maybe (const True) indentedPast (fromSrcRange <$> rangeOf a)) tyDecl)
       pure $ MkDeclare ann tySig' appFormAka' tyDecl'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
   addNlg a = extendNlgA a $ case a of
     MkDecide ann tySig appFormAka expr -> do
-      tySig' <- addNlg tySig
-      appFormAka' <- addNlg appFormAka
-      expr' <- addNlg expr
-      pure $ MkDecide ann tySig' appFormAka' expr'
+      tySig' <- signatureBeforeKeyword ann (addNlg tySig)
+      appFormAka' <- case view annPmMatrix ann of
+        -- A group's head form claims its head and its AKA only
+        -- ('addNlgGroupHead'); a plain definition's head keeps track of whose
+        -- sentence a wording on an input is ('addNlgRuleHead').
+        Just _ -> addNlgGroupHead appFormAka
+        Nothing -> addNlgRuleHead appFormAka
+      -- Inside the body's region, which runs from the first clause's body to
+      -- the last's, so that an annotation between two clauses is in reach.
+      -- The ones between two clauses are claimed first, before a name of the
+      -- clause below (a pattern, say) can take the one written above it.
+      (expr', ann') <- hoistNlgA (\ m -> do
+        ann'' <- claimLaterClauseNlgs ann
+        e <- leavingTheNextRuleItsNlg a expr m
+        pure (e, ann'')) (addNlg expr)
+      pure $ MkDecide ann' tySig' appFormAka' expr'
+
+-- | Keep a rule's body from taking what is written below it at the rule's own
+-- column. The last name in a body has no node after it to bound its region, so
+-- it reached as far as the next rule's head, and an @\@nlg@ on its own line above
+-- that head, the placement the reference recommends, landed on a name in the rule
+-- before it. That rule then read the sentence and the next rule had none.
+--
+-- An annotation indented under the body is still the body's.
+leavingTheNextRuleItsNlg :: (HasSrcRange rule, HasSrcRange body) => rule -> body -> NlgM a -> NlgM a
+leavingTheNextRuleItsNlg rule body m =
+  case (fromSrcRange <$> rangeOf rule, fromSrcRange <$> rangeOf body) of
+    (Just ruleSpan, Just bodySpan) -> do
+      pending <- use #nlgs
+      let nextRules =
+            [ w.range.start
+            | w <- pending
+            , w.range.start.line > bodySpan.end.line
+            , w.range.start.column <= ruleSpan.start.column
+            ]
+      case nextRules of
+        [] -> m
+        _  -> inLocRange (locRangeTo (Just (minimum nextRules))) m
+    _ -> m
+
+-- | The head form of a group of clauses: its head and its @AKA@. Its inputs
+-- are the @GIVEN@'s, copied into it with the @GIVEN@'s own location
+-- ('L4.Parser.givenInputBinding') and claimed there, so they are left alone
+-- here. Claiming them again made the head form's region start above the head,
+-- which left the head none of the annotations around it (an @\@nlg@ written
+-- above the first clause, a herald written on the head), and gave them to the
+-- first input instead. Without them the head claims what a plain
+-- definition's head claims, and an @\@nlg@ and a herald that are both the
+-- head's collide there, as they do on a plain definition's.
+addNlgGroupHead :: (HasSrcRange n, HasNlg n) => AppForm n -> NlgA (AppForm n)
+addNlgGroupHead a = extendNlgA a $ case a of
+  MkAppForm ann n ns maka -> do
+    n' <- addNlg n
+    maka' <- traverse addNlg maka
+    pure $ MkAppForm ann n' ns maka'
+
+-- | A rule's head, visited as any 'AppForm' is, keeping track of whose
+-- sentence a wording on an input is.
+--
+-- A wording written after an input in the head is read as the rule's sentence
+-- when the rule's name has none and no input before it has one
+-- ('L4.Nlg.promoteHeadInputNlg'). While the inputs are visited, 'sentenceOf'
+-- names the rule for as long as that holds, so that a warning about such a
+-- wording ('LoneLangTag') names the rule the author wrote it for, and not the
+-- input it sits after.
+addNlgRuleHead :: (HasSrcRange n, HasNlg n) => AppForm n -> NlgA (AppForm n)
+addNlgRuleHead a = extendNlgA a $ case a of
+  MkAppForm ann n ns maka -> do
+    n' <- hoistNlgA (>>= \ r -> r <$ assign' #sentenceOf (mfilter (not . hasWording) (nlgNameOf r))) (addNlg n)
+    ns' <- traverse (hoistNlgA (>>= \ r -> r <$ when (any hasWording (nlgNameOf r)) (assign' #sentenceOf Nothing)) . addNlg) ns
+    maka' <- hoistNlgA (assign' #sentenceOf Nothing *>) (traverse addNlg maka)
+    pure $ MkAppForm ann n' ns' maka'
+ where
+  hasWording nm = isJust (view annNlg (getAnno nm))
+
+-- | Is this the @LET@ that a group of clauses is lowered to, binding the clauses
+-- after the first ('L4.Parser.bindFallthrough')? Its declaration holds the
+-- LATER clauses and its body the first, so the usual descent, declarations
+-- before body, would visit the clauses last to first. The declaration has the
+-- range of the second clause's body, and its claim took the @\@desc@s written
+-- before it, among them the helper of the first clause's; the regions between
+-- neighbouring nodes, which an @\@nlg@ is claimed by, were empty for a
+-- declaration that precedes its body in the tree and follows it in the file.
+-- The descent into this @LET@ takes its body first.
+bindsLaterClauses :: [LocalDecl n] -> Bool
+bindsLaterClauses = any \ case
+  LocalDecide _ (MkDecide dann _ _ _) -> isJust (view annPmSynthetic dann)
+  LocalAssume{} -> False
+
+-- | In a group of clauses, an @\@nlg@ written above a later clause belongs to
+-- that clause's head ('PmMatrixClause' @clauseHead@). A run of bare names may
+-- be overloads, each with its own annotations
+-- ('L4.TypeCheck.separateOverloads'); a group that stays a group warns about
+-- each ('PmMatrixClause' @clauseNlgs@, 'L4.TypeCheck.checkClauseMatrix').
+-- Nothing else in the group's tree is a node it could attach to.
+claimLaterClauseNlgs :: Anno -> NlgM Anno
+claimLaterClauseNlgs ann = case view annPmMatrix ann of
+  Just m | length m.clauses >= 2 -> do
+    later <- for (zip m.clauses (drop 1 m.clauses)) \ (prev, cl) ->
+      case betweenClauses prev cl of
+        Just between -> do
+          nlgs <- takeNlgCommentsWhere between
+          -- As 'HasNlg Name' attaches them: per language.
+          hdAnn <- attachNlgsByLanguage cl.clauseHead (getAnno cl.clauseHead) nlgs
+          pure (MkPmMatrixClause cl.headRange cl.patterns (setAnno hdAnn cl.clauseHead) cl.clauseAka cl.clauseDescs (map (.payload) nlgs) cl.bodyRange)
+        Nothing -> pure cl
+    pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
+  _ -> pure ann
+
+-- | Is this annotation written between two clauses: on a line after the one
+-- where the clause above ends, its body and the definitions of a @WHERE@ in
+-- it included, and ending before the head of this one? Nothing inside the
+-- clause above is between the two, whatever its indentation, and nothing
+-- written after the clause above is inside it, whatever its indentation. One
+-- written on the line where the clause above ends, after its body
+-- (@DECIDE f n IS n + 1 \@export ...@), stays with that clause, as it does
+-- after a rule written as one definition.
+--
+-- Nothing if either clause has no range to measure by.
+betweenClauses :: PmMatrixClause -> PmMatrixClause -> Maybe (WithSpan a -> Bool)
+betweenClauses prev cl = do
+  h <- cl.headRange
+  prevEnd <- (.end) . fromSrcRange <$> maybe prev.headRange Just prev.bodyRange
+  let hs = (fromSrcRange h).start
+  pure \ w ->
+    let we = w.range.end
+    in w.range.start.line > prevEnd.line
+         && (we.line < hs.line || (we.line == hs.line && we.column <= hs.column))
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Assume n) where
   addNlg a = extendNlgA a $ case a of
+    -- An ASSUME is one declaration, so an annotation on a line of its own
+    -- BELOW it is the next declaration's, as it is below a DECIDE. The test is
+    -- the one the last input of a GIVEN list and the last field of a record
+    -- have: what is indented past the declaration's start describes the
+    -- ASSUME. That keeps a TYPICALLY default on a line of its own, with a gloss
+    -- trailing it, the assumption's, and a TYPICALLY default takes no
+    -- annotation (see 'addNlgInput'), so adding one moves nothing.
     MkAssume ann tySig appFormAka order mTypically -> do
-      tySig' <- addNlg tySig
-      appFormAka' <- addNlg appFormAka
-      mTypically' <- traverse addNlg mTypically
-      pure $ MkAssume ann tySig' appFormAka' order mTypically'
+      tySig' <- signatureBeforeKeyword ann (addNlg tySig)
+      appFormAka' <- addNlgAppFormWhere claims appFormAka
+      pure $ MkAssume ann tySig' appFormAka' order mTypically
+     where
+      headEnds = [ (fromSrcRange r).end | Just r <- [rangeOf appFormAka, order >>= rangeOf] ]
+      belowHead w = not (null headEnds) && all (\ e -> w.range.start.line > e.line) headEnds
+      claims w
+        | belowHead w = maybe True (\ s -> indentedPast s w) (fromSrcRange <$> rangeOf a)
+        | otherwise   = True
+
+-- | An application form whose names claim what @p@ accepts. The head of an
+-- ASSUME is the last thing in it that can reach down the file.
+addNlgAppFormWhere ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> AppForm n -> NlgA (AppForm n)
+addNlgAppFormWhere p a = extendNlgA a $ case a of
+  MkAppForm ann n ns maka -> do
+    n' <- addNlgWhere p n
+    ns' <- traverse (addNlgWhere p) ns
+    maka' <- traverse addAka maka
+    pure $ MkAppForm ann n' ns' maka'
+ where
+  addAka k = extendNlgA k $ case k of
+    MkAka ann ns -> do
+      ns' <- traverse (addNlgWhere p) ns
+      pure $ MkAka ann ns'
+
+-- | Cut a declaration's signature off where the declaration's own keyword
+-- starts: the DECIDE of @GIVEN … DECIDE `r` IF …@, and likewise ASSUME,
+-- DECLARE and a lambda's YIELD. The keyword is a token of the declaration,
+-- not a node with a span, so nothing else stops a GIVEN list's last input —
+-- which reaches down to the next node ('addNlgInput') — from reaching past a
+-- keyword written on a line of its own to an annotation under it.
+--
+-- The signature is the declaration's first hole, so its keyword is the first
+-- token after it. In a @`r` MEANS …@ rule that token is MEANS, which comes
+-- after the head, so it bounds nothing the head does not already.
+signatureBeforeKeyword :: Anno -> NlgA a -> NlgA a
+signatureBeforeKeyword ann =
+  hoistNlgA (inLocRange (locRangeTo (listToMaybe keywords)))
+ where
+  keywords = [ r.start | AnnoCsn (Just r) _ <- drop 1 ann.payload ]
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Directive n) where
-  addNlg a = extendNlgA a $ case a of
+  -- A directive, like a rule's body, stops short of an annotation written
+  -- below it at its own column: its last name has no node after it to bound
+  -- its region either, so an @\@nlg@ on its own line above the next rule
+  -- landed on the directive's expression (porting legalese/l4-ide#802, where
+  -- main bounds bodies and type declarations the same way; the libraries'
+  -- worked examples put an #EVAL before a rule).
+  addNlg a = extendNlgA a $ hoistNlgA (leavingTheNextRuleItsNlg a a) $ case a of
     LazyEval ann e -> do
       e' <- addNlg e
       pure $ LazyEval ann e'
@@ -311,28 +618,64 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Import n) where
       pure $ MkImport ann n' mr
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
-  addNlg a = extendNlgA a $ case a of
+  addNlg = addNlgTypeDecl (const True)
+
+-- | A type declaration, given what the LAST field of its field list may take
+-- from a later line. 'Declare' passes the column test; see 'addNlgFields'.
+addNlgTypeDecl ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> TypeDecl n -> NlgA (TypeDecl n)
+addNlgTypeDecl claimsBelow a = extendNlgA a $ case a of
     RecordDecl ann mcon typedNames -> do
-      typedNames' <- traverse addNlg typedNames
+      typedNames' <- addNlgFields claimsBelow typedNames
       pure $ RecordDecl ann mcon typedNames'
-    EnumDecl ann conDecls -> do
-      conDecls' <- traverse addNlg conDecls
-      pure $ EnumDecl ann conDecls'
+    EnumDecl ann conDecls
+      | Just (cons, lastCon) <- List.unsnoc conDecls -> do
+          cons' <- traverse addNlg cons
+          lastCon' <- addNlgConDecl claimsBelow lastCon
+          pure $ EnumDecl ann (cons' <> [lastCon'])
+      | otherwise ->
+          pure $ EnumDecl ann conDecls
     SynonymDecl ann ty -> do
       ty' <- addNlg ty
       pure $ SynonymDecl ann ty'
     OpaqueDecl ann ->
       pure $ OpaqueDecl ann
 
--- | Run a computation but advertise NO span for it, so a sibling's range is
--- not cut short by it.
+-- | A field list. Every field but the last is bounded by the field after it;
+-- the last is bounded only by whatever follows the declaration, so it takes
+-- from a later line only what @claimsBelow@ accepts.
 --
--- 'extendNlgA' inside each instance advertises the node's own span, which is
--- what delimits its neighbours. A record field's NAME has to be able to reach
--- PAST its type to the line below, so the type must stop advertising — while
--- still claiming, which is why this is not 'unclaimedSignatureType'.
-unspanned :: NlgA a -> NlgA a
-unspanned a = liftNlgA a.computation
+-- __The last field takes only an annotation indented past the declaration's
+-- keyword__, the column test the last input of a GIVEN list has (ruled
+-- 2026-10-02). An annotation at the keyword's column or left of it is the
+-- NEXT declaration's herald, as it is anywhere else in a file:
+--
+-- @
+-- DECLARE Rec HAS
+--     base IS A NUMBER TYPICALLY 5
+--
+-- \@nlg the answer           -- the rule's, not @base@'s
+-- DECIDE `answer` IS 42
+-- @
+--
+-- Until this was written a field with no default took that herald silently
+-- (smucclaw/l4-ide#976), and a field with a default did not only by accident:
+-- the default's span used to cut its name off. Making a default claim nothing
+-- (#994, #997) removed the accident, so the test had to be written.
+--
+-- The test is the declaration's, so it applies to the last field of the last
+-- constructor of an enum too. A herald indented past the keyword is the last
+-- field's wherever it is, as before.
+addNlgFields ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> [TypedName n] -> NlgA [TypedName n]
+addNlgFields claimsBelow typedNames = case List.unsnoc typedNames of
+  Just (fields, lastField) -> do
+    fields' <- traverse addNlg fields
+    lastField' <- addNlgTypedName claimsBelow lastField
+    pure (fields' <> [lastField'])
+  Nothing -> pure []
 
 -- | A type mentioned in a SIGNATURE claims no @\@nlg@ annotation and registers
 -- no span, so the name it belongs to claims the whole binder instead.
@@ -365,14 +708,22 @@ unclaimedSignatureType :: t -> NlgA t
 unclaimedSignatureType = pure
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
-  addNlg a = extendNlgA a $ case a of
+  addNlg = addNlgTypedName (const True)
+
+-- | One field of a record or constructor, given what its name may take from a
+-- later line ('addNlgFields').
+addNlgTypedName ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> TypedName n -> NlgA (TypedName n)
+addNlgTypedName claimsBelow a = extendNlgA a $ case a of
     -- A RECORD FIELD splits its two lines between the two claimants (ruled
     -- 2026-09-19, Meng). An annotation written UNDERNEATH a field describes
     -- that field:
     --
     -- @
     -- HAS `full name`  IS A STRING
-    --     \@nlg the employee's full name      -- describes `full name`
+    --     -- describes `full name`
+    --     \@nlg the employee's full name
     --     `start date` IS A DATE
     -- @
     --
@@ -385,22 +736,70 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
     -- and on purpose, both TRAILING, and letting the name take the whole
     -- line would make them collide and lose both.
     --
-    -- This is the one exception to "own line describes what follows". A
-    -- field list is a column of things rather than a sequence of
-    -- declarations, and all three independently generated Hebrew encodings
-    -- measured in 2026-09 annotate fields this way — 100 heralds, every one
-    -- below its field.
+    -- This is one of the two exceptions to "own line describes what
+    -- follows"; the other is a GIVEN list ('addNlgInput'). A field list is a
+    -- column of things rather than a sequence of declarations, and all three
+    -- independently generated Hebrew encodings measured in 2026-09 annotate
+    -- fields this way — 100 heralds, every one below its field.
     MkTypedName ann n ty mTypically mExpr -> do
-      n' <- addNlgFieldName (fromSrcRange <$> rangeOf ty) n
-      ty' <- unspanned (addNlg ty)
-      mTypically' <- traverse addNlg mTypically
-      pure $ MkTypedName ann n' ty' mTypically' mExpr
+      n' <- addNlgFieldName claimsBelow (fromSrcRange <$> rangeOf ty) n
+      -- The type claims what is left on the field's own line, and no further:
+      -- it runs second, so with nothing after it, a type that reached down
+      -- would take the herald the last field's name has just declined
+      -- ('addNlgFields'), and nothing reads an annotation on a type.
+      ty' <- unspanned (maybe id (hoistNlgA . inLocRange . upToEndOfLineOf) (rangeOf ty) (addNlg ty))
+      -- The field's TYPICALLY default takes no annotation (see 'addNlgInput'):
+      -- traversing it made it a sibling whose span cut the name off from the
+      -- line below, so an own-line herald under a field with a default went to
+      -- the NEXT field, or to nothing (smucclaw/l4-ide#997).
+      pure $ MkTypedName ann n' ty' mTypically mExpr
+
+-- | The claim a RECORD FIELD's name makes, given the span of its type.
+--
+-- Two disjoint regions, which is why it needs the type's span rather than
+-- just a range: everything BEFORE the type (the field's own trailing
+-- gloss, as always), plus everything on a LATER LINE than the field
+-- (ruled 2026-09-19 — an annotation written underneath a field describes
+-- that field), as far as @claimsBelow@ accepts: everything, for a field with
+-- another after it, and for the last field only what 'addNlgFields' lets it
+-- have. What falls between — trailing the type on the field's own line — is
+-- left for the type, which runs next.
+addNlgFieldName ::
+  (HasSrcRange a, HasNlg a) =>
+  (NlgWithSpan -> Bool) -> Maybe SrcSpan -> a -> NlgA a
+addNlgFieldName claimsBelow mTySpan a =
+  addNlgWhere (\ w -> startsBefore mTySpan w || (startsBelow a w && claimsBelow w)) a
+
+-- | Does this annotation begin before the given span starts? A missing span
+-- means "no type to be before", so nothing qualifies on that ground.
+startsBefore :: Maybe SrcSpan -> NlgWithSpan -> Bool
+startsBefore Nothing      _ = False
+startsBefore (Just span') w = w.range.start < span'.start
+
+-- | Run a computation but advertise NO span for it, so a sibling's range is
+-- not cut short by it.
+--
+-- 'extendNlgA' inside each instance advertises the node's own span, which is
+-- what delimits its neighbours. A record field's NAME has to be able to reach
+-- PAST its type to the line below, so the type must stop advertising — while
+-- still claiming, which is why this is not 'unclaimedSignatureType'.
+unspanned :: NlgA a -> NlgA a
+unspanned a = liftNlgA a.computation
+
+-- | The lookup range that stops at the end of the line a node ends on.
+upToEndOfLineOf :: SrcRange -> LocRange
+upToEndOfLineOf r = locRangeTo (Just (endOfLine (fromSrcRange r).end))
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (ConDecl n) where
-  addNlg a = extendNlgA a $ case a of
+  addNlg = addNlgConDecl (const True)
+
+addNlgConDecl ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> ConDecl n -> NlgA (ConDecl n)
+addNlgConDecl claimsBelow a = extendNlgA a $ case a of
     MkConDecl ann n typedNames -> do
       n' <- addNlg n
-      typedNames' <- traverse addNlg typedNames
+      typedNames' <- addNlgFields claimsBelow typedNames
       pure $ MkConDecl ann n' typedNames'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
@@ -415,14 +814,18 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
 --
 -- __The line, not the span, and that boundary is the whole rule.__ An
 -- annotation TRAILING a construct on the same line describes that construct;
--- an annotation starting a line of its own describes what FOLLOWS it. Those
--- are the two shapes authors actually write:
+-- an annotation starting a line of its own describes what FOLLOWS it, except
+-- inside a field list or a GIVEN list, where it describes the item above
+-- ('addNlgTypedName', 'addNlgInput'). Those are the two shapes authors
+-- actually write:
 --
 -- @
--- GIVEN a IS A STRING \@nlg the amount    -- trailing: describes `a`
+-- -- trailing: describes `a`
+-- GIVEN a IS A STRING \@nlg the amount
 --
 -- GIVETH A BOOLEAN
--- \@nlg 5% with %amount%                  -- own line: describes the rule below
+-- -- own line: describes the rule below
+-- \@nlg 5% with %amount%
 -- DECIDE `over threshold` IF …
 -- @
 --
@@ -435,7 +838,8 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
 -- the last child of the last child reaches as far as the enclosing context
 -- allows. That is how a @GIVEN@ parameter came to claim an annotation written
 -- on its own line BELOW the whole signature, in a rule with no @GIVETH@ whose
--- span would have stopped it.
+-- span would have stopped it. The last input of a GIVEN list now takes such an
+-- annotation only when it is indented past the keyword ('addNlgInput').
 confineToEndOfLine :: HasSrcRange e => e -> NlgA a -> NlgA a
 confineToEndOfLine e = hoistNlgA (inLocRange r)
  where
@@ -444,29 +848,94 @@ confineToEndOfLine e = hoistNlgA (inLocRange r)
     Just span' ->
       locRangeFrom (Just span'.start)
         <> locRangeTo (Just (endOfLine span'.end))
-  -- The last column of a line, expressed as the first column of the next.
-  -- Cheaper and more robust than asking how long the line actually is, and
-  -- the only annotations between the two are on the trailing line by
-  -- construction.
-  endOfLine pos = MkSrcPos {line = pos.line + 1, column = 1}
+
+-- | The last column of a line, expressed as the first column of the next.
+-- Cheaper and more robust than asking how long the line actually is, and
+-- the only annotations between the two are on the trailing line by
+-- construction.
+endOfLine :: SrcPos -> SrcPos
+endOfLine pos = MkSrcPos {line = pos.line + 1, column = 1}
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivenSig n) where
   addNlg a = extendNlgA a $ case a of
-    MkGivenSig ann tys -> confineToEndOfLine a $ do
-      -- A GIVEN block's annotations stay inside the GIVEN block. Without this,
-      -- the last parameter claims everything up to the next node with a span —
-      -- which, in a rule with no GIVETH, is the rule's own name, so an @nlg
-      -- written on its own line above the DECIDE landed on a parameter.
-      tys' <- traverse addNlg tys
-      pure $ MkGivenSig ann tys'
+    -- A GIVEN list is a column, like a record's field list, so an annotation
+    -- on its own line UNDER an input describes that input — the last input
+    -- included (ruled 2026-10-02, Meng):
+    --
+    -- @
+    -- GIVEN floor  IS A NUMBER
+    --       amount IS A NUMBER
+    --       \@nlg the sum of money
+    -- \@nlg the claim of %amount% is large
+    -- DECIDE `is large` IF amount GREATER THAN floor
+    -- @
+    --
+    -- The first annotation describes `amount`, the second the rule. An input
+    -- before the last gets that for free: the input after it bounds its range.
+    -- The last input is bounded only by whatever follows the list — the next
+    -- node, or the declaration's own keyword ('signatureBeforeKeyword') — and
+    -- with no GIVETH between them the slot under it is also the slot above the
+    -- rule. So it takes only an annotation indented further than the GIVEN
+    -- keyword, and one at the keyword's column or left of it describes what
+    -- follows, as it always did. The keyword's column, not column 1, so a
+    -- GIVEN indented under a section heading or a WHERE works the same way.
+    --
+    -- The range still starts at the keyword: an annotation written ABOVE the
+    -- GIVEN is not the first input's to take.
+    MkGivenSig ann tys
+      | Just (inputs, lastInput) <- List.unsnoc tys
+      , Just sigSpan <- fromSrcRange <$> rangeOf a ->
+          hoistNlgA (inLocRange (locRangeFrom (Just sigSpan.start))) $ do
+            inputs' <- traverse addNlg inputs
+            lastInput' <- addNlgInput (indentedPast sigSpan) lastInput
+            pure $ MkGivenSig ann (inputs' <> [lastInput'])
+      | otherwise -> confineToEndOfLine a $ do
+          tys' <- traverse addNlg tys
+          pure $ MkGivenSig ann tys'
+
+-- | Does this annotation start at a column further right than where @span'@
+-- starts?
+indentedPast :: SrcSpan -> NlgWithSpan -> Bool
+indentedPast span' w = w.range.start.column > span'.start.column
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (OptionallyTypedName n) where
-  addNlg a = extendNlgA a $ case a of
-    MkOptionallyTypedName ann n mty mTypically -> do
-      n' <- addNlg n
-      tys' <- traverse unclaimedSignatureType mty
-      mTypically' <- traverse addNlg mTypically
-      pure $ MkOptionallyTypedName ann n' tys' mTypically'
+  addNlg = addNlgInput (const True)
+
+-- | One input of a GIVEN list. Its name claims what is on the input's own
+-- lines, plus whatever on a LATER line @claimsBelow@ accepts: everything,
+-- for an input with another after it; only what is indented past the GIVEN
+-- keyword, for the last (see the 'GivenSig' instance).
+--
+-- __A TYPICALLY default takes no annotation.__ It is a value the author
+-- supplies, not a thing the author describes, and nothing reads a gloss on
+-- it. So it is not traversed, registers no span, and the input behaves as if
+-- it were not there: a gloss trailing @b IS A NUMBER TYPICALLY 5@, or
+-- trailing @a IS A BOOLEAN TYPICALLY TRUE@, describes the input, and so does
+-- one on the line below. The test for this is metamorphic: adding or removing
+-- a TYPICALLY clause must not change where any annotation lands.
+--
+-- It used to be traversed, clamped to its own line, and a default that was a
+-- name (@TRUE@, @Red@) claimed whatever trailed it. That annotation attached
+-- to a node nothing renders, so the gloss vanished with no diagnostic
+-- (smucclaw/l4-ide#994). A literal claims nothing, which is why the same gloss
+-- behind @TYPICALLY 5@ always reached the input.
+addNlgInput ::
+  (HasSrcRange n, HasNlg n) =>
+  (NlgWithSpan -> Bool) -> OptionallyTypedName n -> NlgA (OptionallyTypedName n)
+addNlgInput claimsBelow o = extendNlgA o $ case o of
+  MkOptionallyTypedName ann n mty mTypically -> do
+    n' <- addNlgWhere claims n
+    tys' <- traverse unclaimedSignatureType mty
+    pure $ MkOptionallyTypedName ann n' tys' mTypically
+   where
+    -- Below the input's name and type, not below its default: an annotation
+    -- written between the type and a TYPICALLY on a later line is not below
+    -- the input, whether or not the default is there.
+    headEnds = [ (fromSrcRange r).end | Just r <- [rangeOf n, mty >>= rangeOf] ]
+    belowHead w = not (null headEnds) && all (\ e -> w.range.start.line > e.line) headEnds
+    claims w
+      | belowHead w = claimsBelow w
+      | otherwise   = True
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivethSig n) where
   addNlg a = extendNlgA a $ case a of
@@ -519,27 +988,27 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Aka n) where
 
 instance HasNlg Name where
   addNlg = addNlgNameWhere (const True)
-  addNlgFieldName mTySpan a =
-    addNlgNameWhere (\ w -> startsBefore mTySpan w || startsBelow a w) a
+  addNlgWhere = addNlgNameWhere
+  nlgNameOf = Just
 
 -- | The shared body of both of 'Name'\'s claims.
 addNlgNameWhere :: (NlgWithSpan -> Bool) -> Name -> NlgA Name
 addNlgNameWhere p a = extendNlgA a $ case a of
-  MkName ann raw -> do
-    ann' <- liftNlgA (attachNlgsByLanguage a ann =<< takeNlgCommentsWhere p)
-    pure $ MkName ann' raw
+  MkName ann raw
+    -- A name with no location was made up by the desugarer (the CONSIDERs a
+    -- group of clauses is lowered to are full of them). Having no range, its
+    -- region is not bounded by its neighbours', so it would take every
+    -- annotation up to the end of the file, among them the next rule's own.
+    | Nothing <- rangeOf a -> pure a
+    | otherwise -> do
+        ann' <- liftNlgA (attachNlgsByLanguage a ann =<< takeNlgCommentsWhere p)
+        pure $ MkName ann' raw
 
 -- | Does this annotation begin on a line strictly below where @e@ ends?
 startsBelow :: HasSrcRange e => e -> NlgWithSpan -> Bool
 startsBelow e w = case fromSrcRange <$> rangeOf e of
   Nothing    -> False
   Just span' -> w.range.start.line > span'.end.line
-
--- | Does this annotation begin before the given span starts? A missing span
--- means "no type to be before", so nothing qualifies on that ground.
-startsBefore :: Maybe SrcSpan -> NlgWithSpan -> Bool
-startsBefore Nothing      _ = False
-startsBefore (Just span') w = w.range.start < span'.start
 
 -- | Attach the annotations in scope for one name, partitioned by the language
 -- each one declares.
@@ -589,6 +1058,20 @@ attachNlgsByLanguage a ann nlgs0 = do
     case grp of
       (_ : _ : _) -> addWarning $ Ambiguous a tag grp
       _           -> pure ()
+  -- A name with wordings in two or more languages is what backs a tag
+  -- ('isBackedLangTag'); a name with one tagged wording is a candidate for a
+  -- 'LoneLangTag', decided once every name has been seen
+  -- ('loneTagsToWarnings').
+  case grouped of
+    _ : _ : _ -> modifying' #multilingualTags (Set.union (Set.fromList (mapMaybe fst grouped)))
+    _         -> pure ()
+  case nlgs0 of
+    [one]
+      | isJust (nlgLangTag one.payload)
+      , not (nlgIsBlank one.payload) -> do
+          rule <- use #sentenceOf
+          modifying' #loneCandidates ((a, rule, one) :)
+    _ -> pure ()
   lang <- use #moduleLang
   pure $ case pickDefault lang unique of
     Nothing         -> ann
@@ -718,7 +1201,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       v' <- addNlg v
       pure $ Var ann v'
     Lam ann sig body -> do
-      sig' <- addNlg sig
+      sig' <- signatureBeforeKeyword ann (addNlg sig)
       body' <- addNlg body
       pure $ Lam ann sig' body'
     App ann n ns -> do
@@ -759,10 +1242,17 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       e' <- addNlg e
       lcl' <- traverse addNlg lcl
       pure $ Where ann e' lcl'
-    LetIn ann lcl e -> do
-      lcl' <- traverse addNlg lcl
-      e' <- addNlg e
-      pure $ LetIn ann lcl' e'
+    -- The LET a group of clauses is lowered to binds the clauses after the
+    -- first, which are written after its body: source order is the body's.
+    LetIn ann lcl e
+      | bindsLaterClauses lcl -> do
+          e' <- addNlg e
+          lcl' <- traverse addNlg lcl
+          pure $ LetIn ann lcl' e'
+      | otherwise -> do
+          lcl' <- traverse addNlg lcl
+          e' <- addNlg e
+          pure $ LetIn ann lcl' e'
     Event ann e -> Event ann <$> addNlg e
     Fetch ann e -> Fetch ann <$> addNlg e
     Env ann e -> Env ann <$> addNlg e
@@ -791,6 +1281,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       pure $ Breach ann mParty' mReason'
     Refuse ann msg -> Refuse ann <$> addNlg msg
     Inert ann txt ctx -> pure $ Inert ann txt ctx
+    Lifecycle ann p -> pure $ Lifecycle ann p
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
   addNlg (MkDeonton ann' subj event opens deadline mjoin followup lest) = do
@@ -815,6 +1306,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Deadline n) where
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Opening n) where
   addNlg (MkOpening ann d ma) = MkOpening ann <$> addNlg d <*> traverse addNlg ma
+
+instance (HasSrcRange n, HasNlg n) => HasNlg (Filter n) where
+  addNlg (Who ann e)   = Who ann <$> addNlg e
+  addNlg (Whose ann e) = Whose ann <$> addNlg e
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Anchor n) where
   addNlg = \ case
@@ -919,11 +1414,48 @@ instance HasDesc (Decide n) where
     -- Attach leading desc to Decide FIRST, before processing children.
     -- This ensures @export annotations are claimed by Decide before
     -- parameters in the tySig can consume them.
-    ann' <- attachLeadingDesc dec ann
+    ann0 <- attachLeadingDesc dec ann
+    -- Then the descs above the later clauses of a group, before the body,
+    -- whose generated bindings would otherwise claim them.
+    ann' <- claimLaterClauseDescs ann0
     tySig' <- addDesc tySig
     app' <- addDesc appForm
     expr' <- addDesc expr
+    dropUnclaimedWithinGroup dec ann'
     pure $ MkDecide ann' tySig' app' expr'
+
+-- | A group of clauses claims no @\@desc@ or @\@export@ written inside its
+-- own range that is not its own, a clause's ('claimLaterClauseDescs') or an
+-- input's: between the @GIVETH@ and the first clause, say. It runs after the
+-- descent into the clauses' bodies, which has already given a @WHERE@ local its
+-- own, so what is left would be the next top-level rule's, which takes every
+-- @\@desc@ written before it ('descPrecedesNode'), and a group published the
+-- rule after it under a description of its own. They are dropped.
+dropUnclaimedWithinGroup :: (HasSrcRange a) => a -> Anno -> State DescS ()
+dropUnclaimedWithinGroup node ann =
+  case (view annPmMatrix ann, nodeSpan node) of
+    (Just _, Just span') ->
+      void (takeMatchingDescs \ w -> span'.start <= w.range.start && w.range.end <= span'.end)
+    _ -> pure ()
+
+-- | In a group of clauses, the @\@desc@s and @\@export@s written between the
+-- clause above and a later clause belong to that clause ('PmMatrixClause'
+-- @clauseDescs@): a run of bare names may be overloads, each with its own
+-- annotations ('L4.TypeCheck.separateOverloads'), and a group that stays a
+-- group warns about each ('L4.TypeCheck.checkClauseMatrix'). Those above the
+-- first clause's head are not taken here: they are the group's own, read as
+-- a plain definition's are.
+claimLaterClauseDescs :: Anno -> State DescS Anno
+claimLaterClauseDescs ann = case view annPmMatrix ann of
+  Just m | length m.clauses >= 2 -> do
+    later <- for (zip m.clauses (drop 1 m.clauses)) \ (prev, cl) ->
+      case betweenClauses prev cl of
+        Just between -> do
+          matches <- takeMatchingDescs between
+          pure (MkPmMatrixClause cl.headRange cl.patterns cl.clauseHead cl.clauseAka (map (.payload) matches) cl.clauseNlgs cl.bodyRange)
+        Nothing -> pure cl
+    pure (setPmMatrix (MkPmMatrix m.scrutinees m.synthesizedScrutinees (take 1 m.clauses <> later) m.catchAll) ann)
+  _ -> pure ann
 
 instance HasDesc (Assume n) where
   addDesc asm@(MkAssume ann tySig appForm mType mTypically) = do
@@ -1008,7 +1540,8 @@ instance HasDesc (Aka n) where
 --
 -- The descent is /structural and exhaustive/, mirroring 'HasRef' @(Expr n)@,
 -- and always in source order — a @WHERE@\'s body precedes its declarations, a
--- @LET@\'s declarations precede its body — so a desc is always claimed by the
+-- @LET@\'s declarations precede its body (but for the @LET@ a group of clauses
+-- is lowered to, 'bindsLaterClauses') — so a desc is always claimed by the
 -- nearest following declaration, exactly as at top level. Exhaustiveness is the
 -- point, and it is enforced by @-Wincomplete-patterns@: the first version of
 -- this instance handled only @Where@ and @LetIn@ at the top of a body and ended
@@ -1050,7 +1583,9 @@ instance HasDesc (Expr n) where
     Percent    ann e     -> Percent    ann <$> addDesc e
     List       ann es    -> List       ann <$> traverse addDesc es
     Where      ann b ds  -> Where      ann <$> addDesc b <*> traverse addDesc ds
-    LetIn      ann ds b  -> LetIn      ann <$> traverse addDesc ds <*> addDesc b
+    LetIn      ann ds b
+      | bindsLaterClauses ds -> (\ b' ds' -> LetIn ann ds' b') <$> addDesc b <*> traverse addDesc ds
+      | otherwise -> LetIn ann <$> traverse addDesc ds <*> addDesc b
     Event      ann e     -> Event      ann <$> addDesc e
     Fetch      ann e     -> Fetch      ann <$> addDesc e
     Env        ann e     -> Env        ann <$> addDesc e
@@ -1066,6 +1601,7 @@ instance HasDesc (Expr n) where
     Breach     ann mp mr -> Breach     ann <$> traverse addDesc mp <*> traverse addDesc mr
     Refuse     ann msg   -> Refuse     ann <$> addDesc msg
     Inert      ann t c   -> pure (Inert ann t c)
+    Lifecycle  ann p     -> pure (Lifecycle ann p)
 
 instance HasDesc (GuardedExpr n) where
   addDesc (MkGuardedExpr ann g r) = MkGuardedExpr ann <$> addDesc g <*> addDesc r
@@ -1112,6 +1648,10 @@ instance HasDesc (Deadline n) where
 
 instance HasDesc (Opening n) where
   addDesc (MkOpening ann d ma) = MkOpening ann <$> addDesc d <*> traverse addDesc ma
+
+instance HasDesc (Filter n) where
+  addDesc (Who ann e)   = Who ann <$> addDesc e
+  addDesc (Whose ann e) = Whose ann <$> addDesc e
 
 instance HasDesc (Anchor n) where
   addDesc = \ case
@@ -1181,6 +1721,14 @@ pickLeadingDesc matches =
   case lastMaybe (filter (descIsExportMarked . (.payload)) matches) of
     Just d  -> Just d
     Nothing -> lastMaybe matches
+
+-- | 'pickLeadingDesc' for descs already taken, in source order: the one a
+-- definition keeps when several are written above it.
+pickDesc :: [Desc] -> Maybe Desc
+pickDesc ds =
+  case lastMaybe (filter descIsExportMarked ds) of
+    Just d  -> Just d
+    Nothing -> lastMaybe ds
 
 -- | True if a Desc's text begins with the @export, @default or @nonexhaustive
 -- keyword, mirroring how 'L4.Export.parseDescText' consumes the leading
@@ -1394,13 +1942,17 @@ data RefWarning
   = RefMissingLocation Ref
     -- ^ A 'Ref' had no 'SrcRange', so we could not place it. That's a bug.
   | RefNotAttached RefWithSpan
-    -- ^ A 'Ref' could not be attached to any following AST node.
+    -- ^ A 'Ref' has no AST node after it. See 'RefUnattached'.
+  | RefAfterCode RefWithSpan (Maybe Text)
+    -- ^ A 'Ref' follows code on its line, and is attached to nothing. See
+    -- 'RefTrailing'.
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
 
 data RefS = RefS
   { refs :: ![RefWithSpan]
-    -- ^ Refs that have not yet been attached to an AST node.
+    -- ^ Refs that have not yet been attached to an AST node, sorted by the
+    -- position where they END. See 'takeMatchingRefs'.
   , refWarnings :: ![RefWarning]
   }
   deriving stock (Generic, Eq, Show)
@@ -1412,13 +1964,49 @@ data RefS = RefS
 renderRefWarning :: RefWarning -> Warning
 renderRefWarning = \ case
   RefNotAttached r     -> RefUnattached r
+  RefAfterCode r code  -> RefTrailing r code
   RefMissingLocation r -> RefNoLocation r
+
+-- | The words for a warning about where a @ref sits; 'Nothing' for any other
+-- warning. What @l4 check@, @l4 run@ and the IDE print, and what
+-- @doc\/reference\/syntax\/README.md@ quotes: change the one, change the other.
+refWarningMessage :: Warning -> Maybe Text
+refWarningMessage = \ case
+  RefUnattached r   -> Just (refUnattachedMessage r.payload)
+  RefTrailing r code -> Just (refTrailingMessage r.payload code)
+  RefNoLocation r   -> Just (refNoLocationMessage r)
+  _                 -> Nothing
+
+refUnattachedMessage :: Ref -> Text
+refUnattachedMessage r =
+  "This @ref" <> quotedCitation r <> " is at the end of the file, so there is nothing after it to attach to."
+
+refTrailingMessage :: Ref -> Maybe Text -> Text
+refTrailingMessage r code =
+  "This @ref" <> quotedCitation r
+    <> " follows code on its line, but a @ref refers to what follows it, so this one is attached to nothing. Put it on the line above "
+    <> maybe "the code it cites" (\c -> "`" <> c <> "`") code
+    <> "."
+
+refNoLocationMessage :: Ref -> Text
+refNoLocationMessage r =
+  "This @ref" <> quotedCitation r <> " has no source location. This might be an internal compiler error."
+
+-- | @ (`the citation`)@, ready to follow \"This @ref\"; nothing for a @ref with no text.
+quotedCitation :: Ref -> Text
+quotedCitation r = case refCitation r of
+  "" -> ""
+  c  -> " (`" <> c <> "`)"
 
 -- | Attach @ref annotations to the AST nodes that immediately follow them.
 --
 -- Unlike @nlg (which targets 'Name' nodes) or @desc (which targets top-level
 -- declarations), a @ref can attach to /any/ AST node. The attachment rule is
--- \"the immediately following AST node, regardless of type\".
+-- \"the immediately following AST node, regardless of type\", and a node keeps
+-- EVERY ref that precedes it, in source order. It used to keep one, the
+-- nearest, and report each of the others as unattached, which they were not:
+-- they had been outranked, and a stack of refs above a definition is how the
+-- corpus writes several citations for it.
 --
 -- We rely on the fact that a pre-order traversal of a well-formed AST visits
 -- nodes in non-decreasing start position. Therefore, the first node whose
@@ -1426,22 +2014,114 @@ renderRefWarning = \ case
 -- following node, and it claims the ref. Refs are removed from the state as
 -- soon as they are claimed, so each ref is used at most once.
 --
+-- Two warnings come out of this pass, both about a ref that cannot do what
+-- its author meant, and a ref that draws one is attached to nothing. A ref
+-- with nothing after it ('RefNotAttached') has no node to attach to. A ref
+-- that follows code on its line ('RefAfterCode'; the 'TrailingRefs' say
+-- which, because only the tokens know) is not offered to any node, and not to
+-- the next construct either, which would make it that construct's citation;
+-- the warning says to put it on the line above (ruled 2026-10-12, bench
+-- "Main Wave Rulings" card R1, option A).
+--
 -- Like 'addNlgCommentsToAst', we merely add structured data to the ast node's
 -- respective 'Anno'; the exact-print annotations are left untouched.
-addRefCommentsToAst :: HasRef a => [Ref] -> a -> (a, RefS)
-addRefCommentsToAst refs0 ast =
+addRefCommentsToAst :: HasRef a => TrailingRefs -> [Ref] -> a -> (a, RefS)
+addRefCommentsToAst trailing refs0 ast =
   let
     (withSpan, missing) = preprocessRefs refs0
+    isTrailing r = Map.member r.range.start trailing
+    -- A ref that trails code is offered to no node, so it cannot be claimed.
     initialS =
       RefS
-        { refs = List.sortOn (.range.start) withSpan
-        , refWarnings = fmap RefMissingLocation missing
+        { refs = List.sortOn (.range.end) (filter (not . isTrailing) withSpan)
+        , refWarnings = []
         }
     (ast', s') = runState (addRef ast) initialS
+    afterCode =
+      [ (r.range.start, RefAfterCode r code)
+      | r <- withSpan
+      , Just code <- [Map.lookup r.range.start trailing]
+      ]
     -- Any refs that were never claimed become warnings.
-    leftovers = fmap RefNotAttached s'.refs
+    leftovers = [ (r.range.start, RefNotAttached r) | r <- s'.refs ]
+    -- In source order.
+    placed = fmap snd (List.sortOn fst (afterCode <> leftovers))
   in
-    (ast', s'{refs = [], refWarnings = s'.refWarnings <> leftovers})
+    (ast', s'{refs = [], refWarnings = fmap RefMissingLocation missing <> placed})
+
+-- | The @ref tokens that follow code on their line and have nothing after
+-- them there, each by where it starts, with the code before it (when there is
+-- some to quote).
+--
+-- Only the token stream can say this: by the time a ref is a 'Ref' it has an
+-- 'Anno' and a range and no memory of its neighbours. The line form, @\@ref
+-- ...@, runs to the end of the line, so code before it is enough. The inline
+-- form, @\<\<...\>\>@, can sit in the middle of an expression, where it binds to
+-- the word after it and is right to; it is flagged only when no code follows
+-- it on its line. (Card R1 asks about a ref \"written at the end of a code
+-- line\", and its census counts the inline ones that end one; a mid-line
+-- @\<\<...\>\>@ is outside the ruling and keeps attaching to what follows it.)
+type TrailingRefs = Map SrcPos (Maybe Text)
+
+-- | Where the scan for 'TrailingRefs' has got to.
+data TrailScan = TrailScan
+  { lastCodeLine :: !Int
+    -- ^ The line the latest code token ENDED on; 0 before there is one. A
+    -- multi-line token ends where code on that line begins to follow it.
+  , lineStart    :: !Int
+    -- ^ The line 'linePrefix' belongs to.
+  , linePrefix   :: [Text]
+    -- ^ What the tokens that START on 'lineStart' say, latest first.
+  , awaiting     :: [(SrcPos, Maybe Text, Int)]
+    -- ^ Inline refs that follow code, with the line they END on, until the
+    -- next code token shows whether anything follows them there.
+  , found        :: !TrailingRefs
+  }
+
+trailingRefsOf :: [PosToken] -> TrailingRefs
+trailingRefsOf toks = finish (List.foldl' step start toks)
+ where
+  start = TrailScan 0 0 [] [] Map.empty
+
+  finish st = List.foldl' (\m (pos, quoted, _) -> Map.insert pos quoted m) st.found st.awaiting
+
+  -- Neither whitespace and comments nor annotations are code. A ref that
+  -- follows another ref, or a comment, on a line of its own is on a line of
+  -- its own.
+  isCode tok = case tok.payload of
+    TSpaces _      -> False
+    TAnnotations _ -> False
+    _              -> True
+
+  step st tok =
+    let
+      begins = tok.range.start
+      ends = tok.range.end
+      -- A code token shows what follows each inline ref waiting on one: more
+      -- code on the ref's own line, and it is mid-line; or none.
+      resolved
+        | isCode tok =
+            st { awaiting = []
+               , found = List.foldl' (\m (pos, quoted, endLine) ->
+                           if begins.line == endLine then m else Map.insert pos quoted m)
+                           st.found st.awaiting }
+        | otherwise = st
+      sameLine
+        | begins.line == resolved.lineStart = resolved
+        | otherwise = resolved { lineStart = begins.line, linePrefix = [] }
+      beforeRef = Text.strip (Text.concat (reverse sameLine.linePrefix))
+      codeBefore = if Text.null beforeRef then Nothing else Just beforeRef
+      scanned = case tok.payload of
+        TAnnotations (TRef _ ty) | sameLine.lastCodeLine == begins.line ->
+          case ty of
+            LineAnno   -> sameLine { found = Map.insert begins codeBefore sameLine.found }
+            InlineAnno -> sameLine { awaiting = (begins, codeBefore, ends.line) : sameLine.awaiting }
+        _ -> sameLine
+    in
+      scanned
+        { linePrefix = displayTokenType tok.payload : scanned.linePrefix
+        , lastCodeLine = if isCode tok then ends.line else scanned.lastCodeLine
+        }
 
 preprocessRefs :: [Ref] -> ([RefWithSpan], [Ref])
 preprocessRefs = foldl' go ([], [])
@@ -1451,15 +2131,27 @@ preprocessRefs = foldl' go ([], [])
       Nothing -> (located, ref : missing)
       Just r -> (WithSpan (fromSrcRange r) ref : located, missing)
 
-takeMatchingRefs :: (RefWithSpan -> Bool) -> State RefS [RefWithSpan]
-takeMatchingRefs predicate = do
+-- | Remove and return every pending ref that precedes the node
+-- ('refPrecedesNode'), still in the order they are kept.
+--
+-- A ref precedes a node exactly when it ENDS at or before the node's start,
+-- and the pending refs are sorted by where they end. So for any node the refs
+-- that precede it are a prefix of the list, and 'List.span' finds them by
+-- looking at that prefix and one ref more. 'List.partition' looked at every
+-- pending ref for every node, so a file with n refs cost n times its number
+-- of nodes: 16,000 refs took 38 seconds to check, where the same 16,000
+-- definitions without them took 4.
+--
+-- The list is sorted by end, not by start, so that this holds of any refs and
+-- not only of the ones the lexer produces today. Sorted by start, a ref that
+-- encloses another would end after it, fail the test, and hide the ref behind
+-- it. No ref encloses another now, since each is one lexer token.
+takeMatchingRefs :: SrcSpan -> State RefS [RefWithSpan]
+takeMatchingRefs nodeRange = do
   s <- get
-  let (matches, rest) = List.partition predicate s.refs
+  let (matches, rest) = List.span (refPrecedesNode nodeRange) s.refs
   put s{refs = rest}
   pure matches
-
-addRefWarning :: RefWarning -> State RefS ()
-addRefWarning w = modify' $ \s -> s{refWarnings = w : s.refWarnings}
 
 -- | True if a ref sits (entirely) before the given node's start position, i.e.
 -- the node is a candidate for being the ref's \"immediately following node\".
@@ -1472,21 +2164,17 @@ refPrecedesNode nodeRange ref =
     refEnd.line < nodeStart.line
       || (refEnd.line == nodeStart.line && refEnd.column <= nodeStart.column)
 
--- | Attach at most one pending ref (the one closest to the node) to the node's
--- 'Anno'. When multiple refs precede the same node, the nearest one wins and
--- the others are reported as 'RefNotAttached' warnings (a node's 'Anno' can
--- only carry a single 'Ref').
+-- | Hold on the node's 'Anno' every pending ref that precedes the node, in
+-- source order.
 attachRef :: HasSrcRange a => a -> Anno -> State RefS Anno
 attachRef node ann =
   case nodeSpan node of
     Nothing -> pure ann
     Just nodeRange -> do
-      matches <- takeMatchingRefs (refPrecedesNode nodeRange)
-      case reverse (List.sortOn (.range.start) matches) of
-        [] -> pure ann
-        (nearest : extras) -> do
-          traverse_ (addRefWarning . RefNotAttached) extras
-          pure $ setRef nearest.payload ann
+      matches <- takeMatchingRefs nodeRange
+      pure $ case List.sortOn (.range.start) matches of
+        [] -> ann
+        rs -> addRefs (fmap (.payload) rs) ann
 
 -- ----------------------------------------------------------------------------
 -- HasRef Class and Instances
@@ -1537,7 +2225,12 @@ instance (HasSrcRange n, HasRef n) => HasRef (Declare n) where
 
 instance (HasSrcRange n, HasRef n) => HasRef (Decide n) where
   addRef d@(MkDecide ann tySig appForm expr) = do
-    ann' <- attachRef d ann
+    -- The local definition a group of clauses is lowered to holds the clauses
+    -- after the first ('L4.Parser.bindFallthrough'). It is generated and
+    -- marked, and its range, the next clause's body, is there to key the
+    -- checker. It claims no ref: a ref above that clause is the first node
+    -- written in it, which the descent below reaches.
+    ann' <- if isJust (view annPmSynthetic ann) then pure ann else attachRef d ann
     tySig' <- addRef tySig
     appForm' <- addRef appForm
     expr' <- addRef expr
@@ -1701,10 +2394,25 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       sig' <- addRef sig
       body' <- addRef body
       pure $ Lam ann' sig' body'
-    App ann n ns -> attachRef expr ann >>= \ann' -> do
+    App ann n ns -> do
+      -- The range of an infix (mixfix) call is its keyword and no more, so an
+      -- operand to the LEFT of the keyword starts before the call does. The
+      -- call is where its first left operand begins, so it claims the refs
+      -- that precede that operand first. The operands then come before the
+      -- call in the walk, so that a ref inside one is claimed by the node it
+      -- precedes and not by the whole call.
+      let beginsBeforeCall a = case (nodeSpan a, nodeSpan expr) of
+            (Just sa, Just se) -> sa.start < se.start
+            _                  -> False
+          (leftOperands, rest) = span beginsBeforeCall ns
+      annAbove <- case leftOperands of
+        []      -> pure ann
+        l : _   -> attachRef l ann
+      leftOperands' <- traverse addRef leftOperands
+      ann' <- attachRef expr annAbove
       n' <- addRef n
-      ns' <- traverse addRef ns
-      pure $ App ann' n' ns'
+      rest' <- traverse addRef rest
+      pure $ App ann' n' (leftOperands' <> rest')
     AppNamed ann n ns order -> attachRef expr ann >>= \ann' -> do
       n' <- addRef n
       ns' <- traverse addRef ns
@@ -1744,10 +2452,20 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       e' <- addRef e
       lcl' <- traverse addRef lcl
       pure $ Where ann' e' lcl'
-    LetIn ann lcl e -> attachRef expr ann >>= \ann' -> do
-      lcl' <- traverse addRef lcl
-      e' <- addRef e
-      pure $ LetIn ann' lcl' e'
+    -- The LET a group of clauses is lowered to binds the clauses after the
+    -- first, which are written after its body: source order is the body's
+    -- ('bindsLaterClauses'). Taken in the other order, the later clauses claim
+    -- the refs written inside the first.
+    LetIn ann lcl e -> attachRef expr ann >>= \ann' ->
+      if bindsLaterClauses lcl
+        then do
+          e' <- addRef e
+          lcl' <- traverse addRef lcl
+          pure $ LetIn ann' lcl' e'
+        else do
+          lcl' <- traverse addRef lcl
+          e' <- addRef e
+          pure $ LetIn ann' lcl' e'
     Event ann e -> attachRef expr ann >>= \ann' -> Event ann' <$> addRef e
     Fetch ann e -> attachRef expr ann >>= \ann' -> Fetch ann' <$> addRef e
     Env ann e -> attachRef expr ann >>= \ann' -> Env ann' <$> addRef e
@@ -1764,6 +2482,7 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       pure $ Breach ann' mParty' mReason'
     Refuse ann msg -> attachRef expr ann >>= \ann' -> Refuse ann' <$> addRef msg
     Inert ann txt ctx -> attachRef expr ann >>= \ann' -> pure (Inert ann' txt ctx)
+    Lifecycle ann p -> attachRef expr ann >>= \ann' -> pure (Lifecycle ann' p)
    where
     bin f ann e1 e2 = do
       ann' <- attachRef expr ann
@@ -1795,6 +2514,10 @@ instance (HasSrcRange n, HasRef n) => HasRef (Deadline n) where
 
 instance (HasSrcRange n, HasRef n) => HasRef (Opening n) where
   addRef (MkOpening ann d ma) = MkOpening ann <$> addRef d <*> traverse addRef ma
+
+instance (HasSrcRange n, HasRef n) => HasRef (Filter n) where
+  addRef (Who ann e)   = Who ann <$> addRef e
+  addRef (Whose ann e) = Whose ann <$> addRef e
 
 instance (HasSrcRange n, HasRef n) => HasRef (Anchor n) where
   addRef = \ case
@@ -1938,7 +2661,7 @@ registerNlgA a = registerSrcSpanNlgA (fromSrcRange <$> rangeOf a)
 -- ----------------------------------------------------------------------------
 
 -- | The state of 'NlgM' contains a list of pending 'Nlg' comments. We go
--- over the AST, looking up these comments using 'takeNlgComments' and removing
+-- over the AST, looking up these comments using 'takeNlgCommentsWhere' and removing
 -- them from the state. Also, using a state means we never use the same
 -- 'Nlg' twice.
 --
@@ -1951,6 +2674,18 @@ data NlgS = NlgS
     -- ^ The module's declared @\@lang@, or 'defaultModuleLang'. Read by
     -- 'pickDefault' to decide which of several renderings is the one a caller
     -- who named no language should get.
+  , declaredLangs :: ![LangTag]
+    -- ^ The module's @\@lang@ lines, newest first. Read by 'isBackedLangTag'.
+  , multilingualTags :: !(Set.Set LangTag)
+    -- ^ The tags carried by a name that also has a wording in another
+    -- language. Each is backed as a language ('isBackedLangTag').
+  , loneCandidates :: ![(Name, Maybe Name, NlgWithSpan)]
+    -- ^ The names whose only wording is tagged, newest first, each with the
+    -- rule whose sentence it is ('sentenceOf'). Reported as a 'LoneLangTag'
+    -- after the traversal, when the tag turns out to be backed by nothing.
+  , sentenceOf :: !(Maybe Name)
+    -- ^ While the inputs of a rule's head are visited, the rule whose sentence
+    -- a wording on one of them would be ('addNlgRuleHead').
   , nlgs :: ![NlgWithSpan]
     -- ^ Nlg annotations that haven't been assigned to a specific 'Name' or
     -- other abstract syntax node.
@@ -2064,7 +2799,7 @@ prettyLocRange locRange =
 --
 --   inLocRange r1 $
 --   inLocRange r2 $
---     takeNlgComments ...  -- Only takes comments in the (r1 <> r2) location range.
+--     takeNlgCommentsWhere ...  -- Only takes comments in the (r1 <> r2) location range.
 --
 -- Note that it does not blindly override the range but tightens it using (<>).
 -- At many use sites, you will see something along the lines of:
@@ -2086,39 +2821,53 @@ prettyLocRange locRange =
 inLocRange :: LocRange -> NlgM a -> NlgM a
 inLocRange r (MkNlgM m) = MkNlgM $ \r' -> m (r <> r')
 
--- | Get all the 'Nlg' comments that are within
--- the range of 'LocRange'.
+-- | Split the 'Nlg' comments for one node.
 --
 -- @
---   'takeNlgsInRange' locRange nlgs
+--   'splitNlgsInRange' locRange p nlgs
 -- @
 --
--- The first component of the result are the 'nlgs' within the 'LocRange',
--- and the second component are the nlgs that aren't within the 'LocRange'.
-takeNlgsInRange :: LocRange -> [NlgWithSpan] -> ([NlgWithSpan], [NlgWithSpan])
-takeNlgsInRange locRange nlgs =
-  partition
-    (\nlg -> nlg.range `subRangeOf` desiredRange)
-    nlgs
+-- The first component of the result are the 'nlgs' that are within the
+-- 'LocRange' and satisfy @p@, in the order they came. The second component is
+-- what stays for a later node to claim: first the ones within the 'LocRange'
+-- that @p@ declined, then the ones outside it, each group in the order it came.
+--
+-- One strict pass, and the tail of the list after the last annotation in range
+-- is shared with the input rather than copied. A module with thousands of
+-- annotations asks this once per name, so what a call allocates is what sets
+-- how much the garbage collector has to copy.
+splitNlgsInRange ::
+  LocRange -> (NlgWithSpan -> Bool) -> [NlgWithSpan] -> ([NlgWithSpan], [NlgWithSpan])
+splitNlgsInRange locRange p nlgs0 = go [] [] [] 0 nlgs0 nlgs0
  where
   desiredRange = MkSrcSpan start end
   end = upperBoundToSrcSpan locRange.rangeTo
   start = lowerBoundToSrcSpan locRange.rangeFrom
+  within nlg = nlg.range `subRangeOf` desiredRange
 
--- | Monadic version of 'takeNlgsInRange'.
--- Takes the 'Nlg's that are currently in scope and removes
--- them from the internal state.
---
--- | 'takeNlgComments', but only those in range that also satisfy @p@. The rest
--- stay in the state for a later node to claim.
+  -- @taken@ and @declined@ are the ones in range so far, newest first.
+  -- @before@ is the ones out of range that precede the last one in range,
+  -- newest first, and @skipped@ counts the out-of-range ones after it, which
+  -- are the front of @shared@: the input from just after the last one in range.
+  go !taken !declined !before !skipped shared = \ case
+    [] -> (reverse taken, reverse declined <> (reverse before <> shared))
+    n : ns
+      | within n ->
+          let before' = reverse (List.take skipped shared) <> before
+          in if p n
+               then go (n : taken) declined before' 0 ns ns
+               else go taken (n : declined) before' 0 ns ns
+      | otherwise -> go taken declined before (skipped + 1) shared ns
+
+-- | Take the 'Nlg' comments that are within the range of the current
+-- 'LocRange' and satisfy @p@, and remove them from the internal state. The
+-- rest stay in the state for a later node to claim.
 takeNlgCommentsWhere :: (NlgWithSpan -> Bool) -> NlgM [NlgWithSpan]
 takeNlgCommentsWhere p = do
   s <- get
   locRange <- ask
-  let
-    (here, elsewhere) = takeNlgsInRange locRange s.nlgs
-    (taken, declined) = List.partition p here
-  put (s{nlgs = declined <> elsewhere})
+  let (taken, rest) = splitNlgsInRange locRange p s.nlgs
+  put (s{nlgs = rest})
   pure taken
 
 {- Note [Adding Haddock comments to the syntax tree]
@@ -2220,3 +2969,176 @@ Violation of this assumption would lead to bugs, and care must be taken to
 traverse the AST correctly. For example, when dealing with class declarations,
 we have to use 'flattenBindsAndSigs' to traverse it in the correct order.
 -}
+
+-- ----------------------------------------------------------------------------
+-- @nonassertable attachment
+-- ----------------------------------------------------------------------------
+
+-- A mark is attached to the nearest following top-level or section-level
+-- construct, whatever it is: a definition honours it, and the typechecker
+-- reports it on anything else ('L4.TypeCheck', NonassertableOnNonDefinition),
+-- so a misplaced one is loud rather than a warning CI never sees.
+--
+-- Where "above a definition" ends: at the definition's NAME line. A definition
+-- with a GIVEN or GIVETH starts there, and a mark written between the GIVETH
+-- and the MEANS is still above the name, so it counts (the fixity pass, which
+-- this one was modelled on, treats that span as interior; for this mark that
+-- would drop it with a warning). A mark after the name line is inside the body
+-- and is a parser warning, as is one on the same line as the construct before
+-- it (lineAnno takes the rest of the line, so such a mark would otherwise land
+-- on the NEXT definition in silence), and one after the last construct.
+--
+-- A section claims the marks above its heading and up to the end of its own
+-- GIVEN, on its own Anno, which the typechecker rejects: a section is not a
+-- named step, and letting such a mark pass to the first definition below
+-- would close a node its author did not name (review of 55249fc4c).
+--
+-- WHERE locals are not reached by this pass (PRESUMPTION-ASSERTION contract
+-- §6 allows the mark on them; that half lands with the assertion slice), so a
+-- mark inside a WHERE is reported as misplaced, and the warning says so.
+
+type NonassertableWithSpan = WithSpan Nonassertable
+
+data NonassertableWarning
+  = NonassertableMissingLocation Nonassertable
+  | NonassertableMisplaced NonassertableWithSpan
+  | NonassertableSameLine NonassertableWithSpan
+  | NonassertableSuperseded NonassertableWithSpan
+  deriving stock (Generic, Eq, Show)
+  deriving anyclass (SOP.Generic)
+
+data NonassertableS = NonassertableS
+  { nonassertables :: ![NonassertableWithSpan]
+  , nonassertableWarnings :: ![NonassertableWarning]
+  , nonassertableLastEnd :: !(Maybe SrcPos)
+    -- ^ Where the previous construct ended, for the same-line check.
+  }
+  deriving stock (Generic, Eq, Show)
+  deriving anyclass (SOP.Generic)
+
+addNonassertableCommentsToAst :: HasNonassertable a => [Nonassertable] -> a -> (a, NonassertableS)
+addNonassertableCommentsToAst nas ast =
+  let
+    (withSpan, missing) = foldl' go ([], []) nas
+    go (located, miss) na = case rangeOf na of
+      Nothing -> (located, na : miss)
+      Just r  -> (WithSpan (fromSrcRange r) na : located, miss)
+    initialS =
+      NonassertableS
+        { nonassertables = List.sortOn (.range.start) withSpan
+        , nonassertableWarnings = fmap NonassertableMissingLocation missing
+        , nonassertableLastEnd = Nothing
+        }
+    (ast', s) = runState (addNonassertable ast) initialS
+  in
+    ( ast'
+    , s { nonassertables = []
+        , nonassertableWarnings = fmap NonassertableMisplaced s.nonassertables <> s.nonassertableWarnings
+        }
+    )
+
+renderNonassertableWarning :: NonassertableWarning -> Warning
+renderNonassertableWarning = \ case
+  NonassertableMissingLocation na -> NonassertableAnnotationNoLocation na
+  NonassertableMisplaced na       -> NonassertableAnnotationMisplaced na
+  NonassertableSameLine na        -> NonassertableAnnotationSameLine na
+  NonassertableSuperseded na      -> NonassertableAnnotationSuperseded na
+
+class HasNonassertable a where
+  addNonassertable :: a -> State NonassertableS a
+
+instance HasSrcRange n => HasNonassertable (Module n) where
+  addNonassertable (MkModule uri ann sect) =
+    MkModule uri ann <$> addNonassertable sect
+
+instance HasSrcRange n => HasNonassertable (Section n) where
+  addNonassertable (MkSection ann lbl maka mgiven decls) = do
+    -- The module's root section has no heading and no GIVEN of its own; a
+    -- headed section claims everything up to the end of its heading, or of
+    -- its GIVEN when it has one.
+    let headerEnd = maximumMay (mapMaybe (fmap (.end) . nodeSpan) [SomeSpan lbl, SomeSpan maka, SomeSpan mgiven])
+    ann' <- case headerEnd of
+      Nothing -> pure ann
+      Just he -> claimNonassertableUpTo he ann
+    decls' <- traverse addNonassertable decls
+    pure $ MkSection ann' lbl maka mgiven decls'
+   where
+    maximumMay [] = Nothing
+    maximumMay xs = Just (List.maximumBy (\ a b -> if posLt a b then LT else if a == b then EQ else GT) xs)
+
+-- | A span-bearing thing of any type, for folding the header's parts together.
+data SomeSpan = forall a. HasSrcRange a => SomeSpan a
+instance HasSrcRange SomeSpan where
+  rangeOf (SomeSpan a) = rangeOf a
+
+instance HasSrcRange n => HasNonassertable (TopDecl n) where
+  -- Every construct claims the marks before it, so that none leaks past to a
+  -- later definition; which constructs may carry one is the typechecker's
+  -- question. A definition carries the mark on its OWN Anno, where
+  -- 'L4.Export.isNonassertableDecide' and the printer read it; the others
+  -- carry it on the wrapper's, which the typechecker inspects, and they take
+  -- every mark on them, above or among their lines, since each is an error.
+  addNonassertable = \ case
+    Declare ann decl  -> (\ a -> Declare a decl) <$> claimAll (nodeSpan decl) ann
+    Decide ann (MkDecide dann tySig@(MkTypeSig _ givenSig _) appForm expr) ->
+      (\ dann' -> Decide ann (MkDecide dann' tySig appForm expr))
+        <$> claimNonassertable (nodeSpan (MkDecide dann tySig appForm expr)) (fmap (.start) (nodeSpan appForm)) (nodeSpan givenSig) dann
+    Assume ann asm    -> (\ a -> Assume a asm) <$> claimAll (nodeSpan asm) ann
+    Directive ann dir -> (\ a -> Directive a dir) <$> claimAll (nodeSpan dir) ann
+    Import ann imp    -> (\ a -> Import a imp) <$> claimAll (nodeSpan imp) ann
+    Section ann sect  -> Section ann <$> addNonassertable sect
+    Timezone ann e    -> (\ a -> Timezone a e) <$> claimAll (nodeSpan e) ann
+   where
+    claimAll mspan ann = claimNonassertable mspan (fmap (.end) mspan) Nothing ann
+
+-- | Claim every mark positioned before the construct ends. Those ending at or
+-- before its head (the name line for a definition, the end otherwise) are
+-- leading: the closest attaches, earlier stacked ones are superseded. A mark
+-- at the end of the previous construct's last line is not on a line of its
+-- own and is reported as such; those among a definition's GIVEN lines are
+-- kept apart ('annNonassertableOnInputs'), each for the typechecker to refuse
+-- on every surface; marks inside the body are misplaced.
+claimNonassertable :: Maybe SrcSpan -> Maybe SrcPos -> Maybe SrcSpan -> Anno -> State NonassertableS Anno
+claimNonassertable mspan mhead mgiven ann =
+  case mspan of
+    Nothing -> pure ann
+    Just r -> do
+      s <- get
+      let headPos = maybe r.start id mhead
+          (claimed, rest) = List.partition (\ na -> posLt na.range.start r.end) s.nonassertables
+          (leading, interior) = List.partition (\ na -> posLe na.range.end headPos) claimed
+          notOwnLine :: NonassertableWithSpan -> Bool
+          notOwnLine na = maybe False (\ e -> na.range.start.line == e.line) s.nonassertableLastEnd
+          -- On one of the GIVEN's lines: from its first token to the end of
+          -- its last line. A mark on its own line after the GIVEN, or between
+          -- GIVETH and the name line, is above the definition.
+          inSignature :: NonassertableWithSpan -> Bool
+          inSignature na = case mgiven of
+            Just g -> posLe g.start na.range.start && na.range.start.line <= g.end.line
+            Nothing -> False
+          (sameLine, leading0) = List.partition notOwnLine leading
+          (onInput, leading') = List.partition inSignature leading0
+      put s { nonassertables = rest, nonassertableLastEnd = Just r.end }
+      warnNa (fmap NonassertableMisplaced interior <> fmap NonassertableSameLine sameLine)
+      let ann' = addNonassertableOnInputs (fmap (.payload) onInput) ann
+      case reverse leading' of
+        closest : superseded -> do
+          warnNa (fmap NonassertableSuperseded superseded)
+          pure (setNonassertable closest.payload ann')
+        [] -> pure ann'
+
+-- | A section's claim: every mark before the end of its header.
+claimNonassertableUpTo :: SrcPos -> Anno -> State NonassertableS Anno
+claimNonassertableUpTo he ann = do
+  s <- get
+  -- A mark at the end of the header's last line is on the header too.
+  let (claimed, rest) = List.partition (\ na -> posLt na.range.start he || na.range.start.line == he.line) s.nonassertables
+  put s { nonassertables = rest, nonassertableLastEnd = Just he }
+  case reverse claimed of
+    closest : superseded -> do
+      warnNa (fmap NonassertableSuperseded superseded)
+      pure (setNonassertable closest.payload ann)
+    [] -> pure ann
+
+warnNa :: [NonassertableWarning] -> State NonassertableS ()
+warnNa ws = modify' (\ st -> st { nonassertableWarnings = ws <> st.nonassertableWarnings })

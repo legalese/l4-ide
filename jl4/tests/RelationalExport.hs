@@ -143,7 +143,7 @@ spec examplesRoot = describe "relational export" $ do
 -- arrow spelling — is refused, because a JSON request can carry a value and not
 -- a rule. This middle end emits a logic program, where an assumed predicate is
 -- an ordinary input (the Blawx leg makes it an @#abducible@), so that refusal
--- is not about anything asserted here. @l4 blawx@ steps over the same two
+-- is not about anything asserted here. @l4 export blawx@ steps over the same two
 -- diagnostics and for the same reason; see its 'loadBlawxDoc' and
 -- @specs\/todo\/IMPLICIT-PROPS-DESIGN.md@ §11.21. Every other 'SError' still
 -- aborts, so the guard above keeps doing its job.

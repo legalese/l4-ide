@@ -1,0 +1,16 @@
+-- A LIST OF NUMBER field. Only a LIST OF a record declared in the module is a
+-- member list; this one used to turn Person into a group entity, and
+-- OpenFisca then failed with StopIteration. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS
+    salary IS A NUMBER
+    scores IS A LIST OF NUMBER
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`tax` p period MEANS p's salary TIMES 0.1
+
+#ASSERT (`tax` OF (Person WITH salary IS 1000, scores IS LIST 1, 2), "2026-01") EQUALS 100

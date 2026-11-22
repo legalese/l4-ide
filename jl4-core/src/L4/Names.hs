@@ -186,8 +186,8 @@ filterGivenSigTo keep = \ case
 -- For consumers that render the module as a /document/ rather than execute it:
 -- the elaborations exist so the checker and the evaluator see an @ASSUME@, and
 -- a reader-facing rendering that showed them would grow a phantom @ASSUME@ line
--- under every heading whose source says @GIVEN@. Rendering the binder itself is
--- separate work and is not in this release.
+-- under every heading whose source says @GIVEN@. The document states the binder's
+-- inputs itself, from the section's own @GIVEN@ ('L4.Export.Document.givenBlocks').
 stripSectionBinderElaborations :: HasName n => Module n -> Module n
 stripSectionBinderElaborations (MkModule ann uri sect) = MkModule ann uri (goSection sect)
  where

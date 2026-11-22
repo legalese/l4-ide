@@ -1,0 +1,47 @@
+-- An ROR on one side of a RAND. `b` records `x` at 10, `a` is fulfilled at
+-- 20, and `c`, on the other side of the RAND, reads `x` at 30. L4 runs no
+-- more of an ROR once an earlier alternative is fulfilled, so it never runs
+-- `b`, and `c` cannot see its record; written `b` ROR `a`, it would run `b`
+-- first and `c` would see it (ror-in-rand-swapped.l4). What `c` saw depends
+-- on how the ROR is written, so evaluation stops with an error naming the
+-- record, the read and the alternative L4 did not run. (smucclaw/l4-ide#1069)
+
+DECLARE Party IS ONE OF P, Q, R
+DECLARE Act IS ONE OF actA, actB, actZ, actR
+
+GIVETH A DEONTIC Party Act
+`a` MEANS
+    PARTY P
+    MUST actA
+    WITHIN 100
+
+GIVETH A DEONTIC Party Act
+`b` MEANS
+    PARTY Q
+    MAY actB
+    WITHIN 100
+    HENCE COMMIT `x` IS TRUE
+          HENCE `z`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`z` MEANS
+    PARTY Q
+    MUST actZ
+    WITHIN 100
+
+GIVETH A DEONTIC Party Act
+`c` MEANS
+    PARTY R
+    MUST actR PROVIDED (RECALL OFFICIAL's `x`) EQUALS JUST TRUE
+    WITHIN 40
+    HENCE COMMIT `c saw x` IS TRUE HENCE FULFILLED
+
+GIVETH A DEONTIC Party Act
+`whole` MEANS (`a` ROR `b`) RAND `c`
+
+#TRACE `whole` AT 0 WITH
+    PARTY Q DOES actB AT 10
+    PARTY P DOES actA AT 20
+    PARTY R DOES actR AT 30
+    PARTY P DOES actA AT 50

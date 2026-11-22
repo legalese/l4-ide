@@ -629,17 +629,17 @@ GIVETH A DEONTIC Actor Action
   PARTY theLandlord DOES Deliver theLandlord AT 60
 
 
-§ `A prohibition kept: the join is the event that revealed it`
+§ `A prohibition kept: the join is the end of its window`
 
--- Alice must not smoke for ten days. Nothing happens on day 10 itself; the
--- machine learns the prohibition was kept when the next event arrives, and
--- that revealing event is where the HENCE's clock starts when the WITHIN is
--- unanchored or anchored OF THE JOIN: below, Bob's signature at 30 reveals
--- it, so delivery is due 33 and at 34 the breach reports 33. To count from
--- the day the prohibition was discharged instead, anchor to THE DEADLINE:
--- 10 + 3 = 13, whatever event reveals the kept prohibition — in the second
--- trace the landlord's own delivery at 14 is that event, and it is already
--- late, reporting 13.
+-- Alice must not smoke for ten days. Nothing happens on day 10 itself, and
+-- the machine learns the prohibition was kept only when the next event
+-- arrives; but it was discharged on day 10, so that is THE JOIN and where
+-- the HENCE's clock starts (EVERY-EACH-QUANTIFIER-SPEC §2.6 card A3). Below,
+-- delivery is due 10 + 3 = 13 whichever event reveals the kept prohibition:
+-- Bob's signature at 30 shows it already missed, and the breach reports 13.
+-- Anchored to THE DEADLINE it is the same instant — in the second trace the
+-- landlord's own delivery at 14 is the revealing event, and it is late too,
+-- reporting 13.
 GIVETH A DEONTIC Actor Action
 `kept, the join` MEANS
     PARTY alice SHANT Smoke alice WITHIN 10

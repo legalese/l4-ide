@@ -1,0 +1,19 @@
+-- Two decisions that call each other. As with direct recursion, OpenFisca
+-- fails with CycleError whatever the input. The export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+
+@export Ping
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`ping` p period MEANS IF p's salary GREATER THAN 100 THEN 1 ELSE `pong` OF p, period
+
+@export Pong
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`pong` p period MEANS IF p's salary GREATER THAN 100 THEN 2 ELSE `ping` OF p, period
+
+#ASSERT (`ping` OF (Person WITH salary IS 500), "2026-01") EQUALS 1

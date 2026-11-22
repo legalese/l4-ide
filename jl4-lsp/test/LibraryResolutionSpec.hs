@@ -1,7 +1,7 @@
 -- | Table-driven unit tests for 'LSP.L4.Rules.resolveLibrary' — the ordered
 -- candidate walk behind bare-module-name @IMPORT@ resolution.
 --
--- These pin the LIBRARY-RESOLUTION-SHADOW-SPEC Option B′ ordering:
+-- These pin the Option B′ ordering (specs/as-built/import-resolution.md):
 --
 --   $JL4_LIBRARY_PATH > project root > importer-relative > EMBEDDED > XDG > bundle
 --
@@ -13,23 +13,31 @@
 -- hspec runs items sequentially so this does not race.
 module LibraryResolutionSpec (spec) where
 
-import Control.Exception (bracket)
+import Control.Exception (IOException, bracket, finally, throwIO, try)
 import Control.Monad (forM_)
 import Data.Maybe (isNothing)
 import System.Directory
   ( canonicalizePath
   , createDirectoryIfMissing
   , createFileLink
+  , emptyPermissions
   , getTemporaryDirectory
   , removePathForcibly
+  , setOwnerReadable
+  , setOwnerSearchable
+  , setOwnerWritable
+  , setPermissions
   )
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>), (<.>))
+import System.IO.Error (isPermissionError)
 
 import Language.LSP.Protocol.Types (toNormalizedFilePath)
 import LSP.L4.Rules
   ( LibraryCandidate (..)
   , LibraryResolution (..)
+  , LibraryScope (..)
+  , distinctCopies
   , resolveLibrary
   )
 
@@ -79,8 +87,29 @@ withSandbox act = bracket acquire release (act . fst)
 
 -- | Resolve @modName@ as if imported by a file in the sandbox's sibling dir.
 resolveIn :: Sandbox -> String -> IO LibraryResolution
-resolveIn sb modName =
-  resolveLibrary sb.rootDir (Just (toNormalizedFilePath (sb.siblingDir </> "importer.l4"))) modName
+resolveIn = resolveInScope AmbientLibraries
+
+resolveInScope :: LibraryScope -> Sandbox -> String -> IO LibraryResolution
+resolveInScope scope sb modName =
+  resolveLibrary scope sb.rootDir (Just (toNormalizedFilePath (sb.siblingDir </> "importer.l4"))) modName
+
+-- | Try to create a symbolic link; 'Left' says why it could not be made. On
+-- Windows an account without the symlink privilege gets "permission denied".
+-- Any other failure is a real one and is rethrown.
+tryLink :: FilePath -> FilePath -> IO (Either String ())
+tryLink target link = do
+  r <- try (createFileLink target link) :: IO (Either IOException ())
+  case r of
+    Right () -> pure (Right ())
+    Left e
+      | isPermissionError e -> pure (Left ("cannot create a symbolic link here (" <> show e <> ")"))
+      | otherwise -> throwIO e
+
+-- | Create a symbolic link, or mark the example pending where this account may
+-- not: the example is about what the resolver does with a link, not about
+-- whether the platform lets a test make one.
+linkOrPending :: FilePath -> FilePath -> IO ()
+linkOrPending target link = tryLink target link >>= either pendingWith pure
 
 plant :: FilePath -> String -> IO FilePath
 plant dir modName = do
@@ -100,7 +129,7 @@ winnerIsEmbedded res = case res.winner of
 
 spec :: Spec
 spec = around withSandbox $
-  describe "resolveLibrary (LIBRARY-RESOLUTION-SHADOW-SPEC, Option B′)" $ do
+  describe "resolveLibrary (Option B′, specs/as-built/import-resolution.md)" $ do
 
     it "candidate order is env? > root > sibling > embedded > XDG > bundle" $ \sb -> do
       res <- resolveIn sb embeddedMod
@@ -163,9 +192,69 @@ spec = around withSandbox $
     it "symlinked XDG entries canonicalize to their real target" $ \sb -> do
       target <- plant sb.elsewhere strayMod
       let link = sb.xdgLibs </> strayMod <.> "l4"
-      createFileLink target link
+      linkOrPending target link
       res <- resolveIn sb strayMod
       winnerFile res `shouldBe` Just link
       realWinner <- traverse canonicalizePath (winnerFile res)
       realTarget <- canonicalizePath target
       realWinner `shouldBe` Just realTarget
+
+    -- The examples that need a symbolic link are marked pending where the account
+    -- may not make one (Windows without the symlink privilege), instead of
+    -- failing. This pins the path they take: a link made in a folder the account
+    -- may not write to is reported, not thrown.
+    it "reports a link it may not create, instead of throwing" $ \sb -> do
+      target <- plant sb.elsewhere strayMod
+      let locked = sb.elsewhere </> "locked"
+          open' = setOwnerWritable True (setOwnerSearchable True (setOwnerReadable True emptyPermissions))
+      createDirectoryIfMissing True locked
+      setPermissions locked emptyPermissions
+      r <- tryLink target (locked </> strayMod <.> "l4") `finally` setPermissions locked open'
+      case r of
+        Left why -> why `shouldContain` "cannot create a symbolic link"
+        Right () -> pendingWith "this account can make a link in a read-only folder (root, or a platform that ignores the mode)"
+
+    -- A host that serves uploaded bundles must not let its own files or
+    -- environment replace the stdlib (jl4-service). Every tier but the embedded
+    -- copy is switched off, whatever is planted where.
+    describe "EmbeddedStdlibOnly" $ do
+      it "ignores JL4_LIBRARY_PATH, the project root, the importer's directory and the XDG store" $ \sb -> do
+        _ <- plant sb.envLibs embeddedMod
+        _ <- plant sb.rootDir embeddedMod
+        _ <- plant sb.siblingDir embeddedMod
+        _ <- plant sb.xdgLibs embeddedMod
+        setEnv "JL4_LIBRARY_PATH" sb.envLibs
+        res <- resolveInScope EmbeddedStdlibOnly sb embeddedMod
+        winnerIsEmbedded res `shouldBe` True
+        res.candidates `shouldBe` [EmbeddedCandidate]
+        res.searchedPaths `shouldBe` []
+        res.tiersInOrder `shouldBe` [EmbeddedCandidate]
+        -- the variable is set but this scope does not read it, so the embed
+        -- is consulted and the logs take the ordinary (unpinned) form
+        res.hasExplicitPath `shouldBe` False
+
+      it "does not find a module the embed lacks, even where the ambient tiers hold one" $ \sb -> do
+        _ <- plant sb.rootDir strayMod
+        _ <- plant sb.xdgLibs strayMod
+        res <- resolveInScope EmbeddedStdlibOnly sb strayMod
+        res.winner `shouldSatisfy` isNothing
+        res.existing `shouldBe` []
+
+    describe "distinctCopies" $ do
+      it "keeps a file once when two tiers name it, at the rank of the first" $ \sb -> do
+        p <- plant sb.rootDir embeddedMod
+        let existing = [(1, FileCandidate "project root" p), (2, FileCandidate "importer-relative" p), (3, EmbeddedCandidate)]
+        distinctCopies existing `shouldReturn` [(1, FileCandidate "project root" p), (3, EmbeddedCandidate)]
+
+      it "merges a symlink with its target" $ \sb -> do
+        target <- plant sb.elsewhere strayMod
+        let link = sb.xdgLibs </> strayMod <.> "l4"
+        linkOrPending target link
+        let existing = [(1, FileCandidate "project root" target), (2, FileCandidate "XDG data dir" link)]
+        distinctCopies existing `shouldReturn` [(1, FileCandidate "project root" target)]
+
+      it "keeps two different files, and never merges the embed with a file" $ \sb -> do
+        a <- plant sb.rootDir strayMod
+        b <- plant sb.siblingDir strayMod
+        let existing = [(1, FileCandidate "project root" a), (2, FileCandidate "importer-relative" b), (3, EmbeddedCandidate)]
+        distinctCopies existing `shouldReturn` existing

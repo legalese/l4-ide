@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+synonym-shares-record-name.l4:42:1-31:
+  42
+synonym-shares-record-name.l4:43:1-17:
+  "x"
+synonym-shares-record-name.l4:44:1-20:
+  100

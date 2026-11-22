@@ -482,7 +482,7 @@ blameOf reason = case reason of
     , blStamp    = Just stamp
     , blReason   = case blame.anchor of
         MissedDeadline {} -> Just ("revealed by " <> prettyLayout evParty <> " doing " <> prettyLayout evAction)
-        DeclaredBreach _ mReason -> prettyLayout <$> mReason
+        DeclaredBreach _ mReason _ -> prettyLayout <$> mReason
     , blNamed    = named
     , blAnchor   = anchorIndex blame
     }
@@ -493,7 +493,7 @@ blameOf reason = case reason of
     named = map entry (toList (blameList (breachBlame reason)))
     -- the scalars describe the anchor, whichever kind it is
     anchored = \ case
-      MissedDeadline party act deadline -> MkBlame
+      MissedDeadline party act deadline _ -> MkBlame
         { blParty    = Just (prettyLayout party)
         , blAction   = Nothing
         , blStamp    = Nothing
@@ -504,7 +504,7 @@ blameOf reason = case reason of
         , blNamed    = []
         , blAnchor   = 0
         }
-      DeclaredBreach mParty mReason -> MkBlame
+      DeclaredBreach mParty mReason _ -> MkBlame
         { blParty    = prettyLayout <$> mParty
         , blAction   = Nothing
         , blStamp    = Nothing
@@ -516,10 +516,10 @@ blameOf reason = case reason of
         , blAnchor   = 0
         }
     entry = \ case
-      MissedDeadline party act deadline -> MkBlameEntry
+      MissedDeadline party act deadline _ -> MkBlameEntry
         { beParty = Just (prettyLayout party), beObliged = Just (prettyLayout act)
         , beDeadline = Just deadline, beReason = Nothing }
-      DeclaredBreach mParty mReason -> MkBlameEntry
+      DeclaredBreach mParty mReason _ -> MkBlameEntry
         { beParty = prettyLayout <$> mParty, beObliged = Nothing
         , beDeadline = Nothing, beReason = prettyLayout <$> mReason }
 

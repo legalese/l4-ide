@@ -67,7 +67,7 @@ emitMarkdown drg =
   --
   -- __Why this exists.__ Every omission below is already named in the fidelity
   -- report, and that was treated as sufficient until it was measured: a user
-  -- running @l4 export --to dmn-md@ gets exit 0, a one-line tally on STDERR,
+  -- running @l4 export dmn-md@ gets exit 0, a one-line tally on STDERR,
   -- and a FILE containing a heading and nothing else. The report travels
   -- separately from the artifact and is not written at all without
   -- @--fidelity-report@ — so the committed @.md@, the thing a reader opens and

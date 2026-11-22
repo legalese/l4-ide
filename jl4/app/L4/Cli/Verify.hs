@@ -64,7 +64,9 @@ import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import qualified Data.IntSet as IntSet
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Options.Applicative
 import System.Exit (ExitCode (..), exitSuccess, exitWith)
 
@@ -76,6 +78,8 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import qualified L4.Decision.QueryPlan as QP
 import qualified L4.Transform as Transform
+import qualified L4.TypeCheck as TC
+import L4.Annotation (Anno_ (..), getAnno)
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as VizQP
 import qualified LSP.L4.Viz.VizExpr as VizExpr
@@ -100,7 +104,8 @@ propositionalBound =
     [ "WHAT A CLEAN RUN PROVES, AND WHAT IT DOES NOT"
     , ""
     , "  The analysis is PROPOSITIONAL. Every leaf of a decision -- a record"
-    , "  projection, a comparison, a call, an arithmetic test -- is an opaque"
+    , "  projection, a comparison, an arithmetic test, a call that is not read"
+    , "  through (below) -- is an opaque"
     , "  atom. `amount > 5000000' and `amount > 1000000' are two unrelated"
     , "  atoms, so no numeric, interval, string or date contradiction is"
     , "  visible to this command. Neither is anything about the world."
@@ -116,25 +121,34 @@ propositionalBound =
     , "  leaf here too. A DECIDE that does not return BOOLEAN is not analysed,"
     , "  and is reported as skipped rather than as clean."
     , ""
-    , "  A local WHERE / LET binding that takes no parameters is INLINED before"
-    , "  analysis, so a decision is read with its helpers substituted in rather"
-    , "  than as opaque atoms: `m AND NOT e WHERE e MEANS m' is found unsat, as"
-    , "  the same rule written flat always was. Bindings that take parameters,"
-    , "  and recursive ones, stay opaque -- the first wants beta reduction, the"
-    , "  second would not terminate."
+    , "  A local WHERE / LET binding is substituted into the rule before"
+    , "  analysis, with arguments put in place of parameters, so"
+    , "  `m AND NOT e WHERE e MEANS m' is found unsat, as the same rule written"
+    , "  flat always was."
     , ""
-    , "  Those nested definitions are still not visited AS DECISIONS OF THEIR"
-    , "  OWN, so `analysed + skipped' does NOT total the decisions in the file."
+    , "  A call to another DECIDE that returns BOOLEAN -- in this file or in one"
+    , "  it imports -- stays ONE leaf of the ladder, but not an opaque one: it is"
+    , "  READ THROUGH. Its meaning (the called rule, unfolded all the way down,"
+    , "  arguments in place of parameters) is used in every satisfiability"
+    , "  check. So a rule that calls an exception and the offence it defeats and"
+    , "  asks for both is found unsat. Findings are still reported only at this"
+    , "  rule's own sites: a limb of the CALLED rule that is dead only in this"
+    , "  caller's context is not reported here -- the called rule has its own"
+    , "  entry. Recursive rules, and rules that do not return BOOLEAN, stay"
+    , "  opaque leaves. Reading through needs atoms matched across rules by"
+    , "  atomId, so --no-coalesce-atoms turns it off."
+    , ""
+    , "  A call whose meaning is too large to draw (past --max-nodes) stays an"
+    , "  opaque leaf, and the report NAMES it on its rule (`call left as a"
+    , "  leaf') and counts it in summary.callsLeftOpaque. At that atom the"
+    , "  analysis is the weaker, per-rule one, and it says so."
+    , ""
+    , "  A definition nested in a WHERE clause is still not visited AS A"
+    , "  DECISION OF ITS OWN, so `analysed + skipped' does NOT total the"
+    , "  decisions in the file."
     , "  The count that is missing is reported as summary.nestedNotVisited, and"
     , "  it is a number rather than a caveat because an exclusion nobody can"
     , "  size is an exclusion nobody believes."
-    , ""
-    , "  Each decision is read ON ITS OWN. A call to another DECIDE is a leaf,"
-    , "  not an inlined body, so a contradiction that only appears once two"
-    , "  named rules are unfolded against each other is out of range. In a"
-    , "  corpus written as many small named limbs -- which is the house style --"
-    , "  that is most of the corpus, and it is why a clean run over such a file"
-    , "  is a weak statement."
     , ""
     , "  The normal form is CONJUNCTIVE, and reaching it MANUFACTURES clauses"
     , "  the draftsman never wrote: `x XOR y' distributes into a conjunction"
@@ -250,7 +264,22 @@ data DecisionReport = DecisionReport
   , drResult :: Either Text Analysis
   -- ^ @Left@ names why the decision was not analysed. Never silently dropped:
   -- a decision this command cannot read is a hole in what a clean run means.
+  , drUnfolding :: Unfolding
+  -- ^ Whether calls to other rules were read through, or left as leaves.
   }
+
+-- | What happened to a decision's calls to other rules. See 'callMeanings' and
+-- specs/todo/WHERE-INLINING-SPEC.md §9.
+data Unfolding = Unfolding
+  { readThrough :: Int
+  -- ^ Call atoms whose meaning the satisfiability checks used.
+  , leftOpaque :: [Text]
+  -- ^ Call atoms that stayed opaque, each with the reason. Reported, never
+  -- silent: each one is a place where the analysis is the weaker, per-rule one.
+  }
+
+noUnfolding :: Unfolding
+noUnfolding = Unfolding 0 []
 
 instance Aeson.ToJSON DecisionReport where
   toJSON d = case d.drResult of
@@ -267,6 +296,8 @@ instance Aeson.ToJSON DecisionReport where
         , "atoms" .= a.anAtoms
         , "atomClasses" .= a.anAtomClasses
         , "ladderNodes" .= a.anLadderNodes
+        , "callsReadThrough" .= d.drUnfolding.readThrough
+        , "callsLeftOpaque" .= d.drUnfolding.leftOpaque
         , "findings" .= a.anFindings
         ]
 
@@ -312,12 +343,19 @@ emit opts = \case
 
 analyseModule :: VerifyOptions -> Rules.TypeCheckResult -> [DecisionReport]
 analyseModule opts tc =
-  [ r
+  [ analyseDecide opts callees cfg decide
   | decide <- topLevelDecides tc
-  , let r = analyseDecide opts tc decide
-  , wanted r.drName
+  -- Filter on the name as written BEFORE analysing: a report's name comes out of
+  -- the analysis, so filtering on it analysed every decision just to discard
+  -- most of them.
+  , wanted (decideName decide)
   ]
   where
+    callees = unfoldableRules tc
+    -- ONE config for the whole file. It carries the key environment, which walks
+    -- the module, so a config made per decision (or per call a decision reads
+    -- through) paid for that walk each time: quadratic in the size of the file.
+    cfg = vizConfig opts tc
     wanted nm
       | null opts.verifyDecisions = True
       | otherwise = any (`matches` nm) opts.verifyDecisions
@@ -346,25 +384,67 @@ topLevelDecides tc = foldTopLevelDecides (\d -> [d]) tc.module'
 -- That reasoning used to be given for leaving them opaque INSIDE their callers
 -- too, and there it was wrong: a rule and the same rule with one limb named are
 -- the same program, so reading them differently was the disagreement, not the
--- fix for it. Zero-arity bindings are now inlined before analysis
--- ('L4.Transform.inlineLocalBindingsInDecide'; specs/todo/WHERE-INLINING-SPEC.md).
+-- fix for it. Local bindings are now inlined before analysis, parameterised
+-- ones by beta reduction ('L4.Transform.inlineLocalBindingsInDecide';
+-- specs/todo/WHERE-INLINING-SPEC.md §5 and §9).
 -- What the ladder and the verifier must agree about is what a rule MEANS; how
 -- much of it either chooses to draw at once is a separate question, and the
 -- @l4\/inlineExprs@ gesture exists precisely so a reader can choose.
+--
+-- A definition the clause desugarer generated is not counted: the @LET@ that
+-- binds "the clauses not yet tried" of a rule written as DECIDE clauses
+-- ('PmSynthetic'). No drafter wrote it, and the rule around it is analysed as
+-- the CONSIDER it stands for, with that @LET@ read through
+-- ('L4.Transform.inlineLetsForViz'), so nothing in it went unvisited.
 nestedNotVisited :: Rules.TypeCheckResult -> Int
 nestedNotVisited tc =
-  sum [length (foldDecides (\_ -> [() :: ()]) d) | d <- tops] - length tops
+  sum [length (foldDecides drafted d) - length (drafted d) | d <- topLevelDecides tc]
   where
-    tops = topLevelDecides tc
+    drafted :: Decide Resolved -> [()]
+    drafted (MkDecide ann _ _ _) = [() | isNothing (view annPmSynthetic ann)]
 
-analyseDecide :: VerifyOptions -> Rules.TypeCheckResult -> Decide Resolved -> DecisionReport
-analyseDecide opts tc decide0 =
-  case LadderViz.doVisualize decide vizCfg of
+-- | A decision's name as the drafter wrote it.
+decideName :: Decide Resolved -> Text
+decideName (MkDecide _ _ (MkAppForm _ n _ _) _) = prettyLayout (getOriginal n)
+
+-- | Analyse one decision.
+--
+-- The unit of analysis is the decision's OWN ladder, as written: every finding
+-- names a site in this rule's text. Local @WHERE@ / @LET@ bindings are substituted
+-- first ('Transform.inlineLocalBindingsInDecide'), because a rule means the same
+-- thing however its limbs are named.
+--
+-- A call to another boolean rule is still one leaf of that ladder, but it is no
+-- longer an OPAQUE leaf: 'callMeanings' works out what it means, and every
+-- satisfiability check below uses that meaning. So a rule that calls an exception
+-- and the offence it defeats and asks for both is found unsatisfiable, while the
+-- callee's own internal structure — a limb that is dead only in THIS caller's
+-- context, say — is not reported here. The callee has its own entry in the report,
+-- where its structure is its own text. See specs/todo/WHERE-INLINING-SPEC.md §9.
+analyseDecide
+  :: VerifyOptions -> Callees -> LadderViz.VizConfig -> Decide Resolved -> DecisionReport
+analyseDecide opts callees cfg decide0 =
+  case LadderViz.doVisualize decide cfg of
     Left err ->
       DecisionReport
-        { drName = astName
+        { drName = decideName decide
         , drResult = Left (LadderViz.prettyPrintVizError err)
+        , drUnfolding = noUnfolding
         }
+    -- A rule written as clauses whose whole ladder is one box holding the
+    -- CONSIDER the clauses compile to: the ladder could not break it down (a
+    -- column matches JUST x, a list or the like), so there is nothing here to
+    -- check, and "no findings" would read as a clean bill.
+    Right (ladderInfo, vizState)
+      | Transform.writtenAsClauses decide
+      , VizExpr.UBoolVar _ leaf _ _ _ _ _ <- ladderInfo.funDecl.body
+      , Just (Consider leafAnn _ _) <- LadderViz.getLeafExpr vizState leaf.unique
+      , Just PmConsider{} <- view annPmSynthetic leafAnn ->
+          DecisionReport
+            { drName = ladderInfo.funDecl.fnName.label
+            , drResult = Left notBrokenDown
+            , drUnfolding = noUnfolding
+            }
     Right (ladderInfo, vizState) ->
       let fnName = ladderInfo.funDecl.fnName.label
           nodes = ladderNodeCount opts.verifyMaxNodes ladderInfo.funDecl.body
@@ -377,16 +457,20 @@ analyseDecide opts tc decide0 =
                       "ladder exceeds --max-nodes="
                         <> Text.pack (show opts.verifyMaxNodes)
                         <> "; the AND/OR normal form is exponential in the width of a disjunction of conjunctions, so this is refused rather than attempted"
+                , drUnfolding = noUnfolding
                 }
             else
               let (boolExpr, labels, order) = VizQP.vizExprToBoolExpr ladderInfo.funDecl.body
+                  atomIds = atomIdsOf fnName ladderInfo vizState
                   (expr', labels', order')
-                    | opts.verifyCoalesce =
-                        let cache = VizQP.buildQueryPlanCache ladderInfo vizState
-                            paramsBy = VizQP.buildParamsByUnique ladderInfo
-                            atomIds = QP.atomIdByUnique fnName paramsBy cache
-                         in coalesceByAtomId atomIds boolExpr labels order
+                    | opts.verifyCoalesce = coalesceByAtomId atomIds boolExpr labels order
                     | otherwise = (boolExpr, labels, order)
+                  -- Reading through needs atoms to be matched across rules, and
+                  -- the atomId is the only identity that crosses a rule boundary,
+                  -- so --no-coalesce-atoms turns it off too.
+                  meanings
+                    | opts.verifyCoalesce = callMeanings opts callees cfg decide fnName atomIds labels' vizState order'
+                    | otherwise = noMeanings
                in DecisionReport
                     { drName = fnName
                     , drResult =
@@ -395,24 +479,275 @@ analyseDecide opts tc decide0 =
                             { anAtoms = length order
                             , anAtomClasses = length order'
                             , anLadderNodes = nodes
-                            , anFindings = analyseBody labels' order' expr'
+                            , anFindings =
+                                analyseBody labels' (if null meanings.cmOrder then order' else meanings.cmOrder) meanings.cmDefs expr'
                             }
+                    , drUnfolding = Unfolding (Map.size meanings.cmDefs) meanings.cmOpaque
                     }
   where
-    vizCfg = LadderViz.mkVizConfig verDocId tc.module' tc.substitution True
+    -- Local bindings put in before analysis, a rule written as clauses read as
+    -- its CONSIDER first ('Transform.inlineLocalBindingsForDrawing'). A rule
+    -- written as clauses too long to read through is left as written, and the
+    -- ladder refuses it ('LadderViz.ClauseGroupTooLong'); a call to one is
+    -- left as a box ('callMeanings').
+    decide = case decide0 of
+      MkDecide ann sig af body -> MkDecide ann sig af (fromMaybe body (Transform.inlineLocalBindingsForDrawing body))
+    notBrokenDown =
+      "these clauses were not broken down into questions: a column matches a pattern other than an enum value or a literal (JUST x, a list, and the like), so the whole rule is one box and there is nothing in it to check"
+
+-- | The config every decision of the file is drawn from, with simplification on
+-- (a call's meaning is drawn without it: 'LadderViz.withSimplification', which
+-- keeps the key environment).
+vizConfig :: VerifyOptions -> Rules.TypeCheckResult -> LadderViz.VizConfig
+vizConfig opts tc = LadderViz.mkVizConfig verDocId tc.module' tc.substitution True
+  where
     verDocId =
       LSP.VersionedTextDocumentIdentifier
         { LSP._uri = LSP.filePathToUri opts.verifyFile
         , LSP._version = 1
         }
-    -- Referential transparency: `x WHERE x MEANS e` must be analysed as `e`.
-    -- Without this a one-line WHERE turns a proposition into an opaque atom and
-    -- silently defeats the analysis of the rule that uses it — see
-    -- specs/todo/WHERE-INLINING-SPEC.md.
-    decide = Transform.inlineLocalBindingsInDecide decide0
 
-    astName = case decide of
-      MkDecide _ _ (MkAppForm _ n _ _) _ -> prettyLayout (getOriginal n)
+-- | Each leaf's stable atomId: the identity the wizard asks one question for,
+-- and the only identity that is the same for one proposition in two rules.
+atomIdsOf :: Text -> VizExpr.RenderAsLadderInfo -> LadderViz.VizState -> Map Int Text
+atomIdsOf fnName ladderInfo vizState =
+  QP.atomIdByUnique fnName (VizQP.buildQueryPlanCache ladderInfo vizState)
+
+-- | What the call atoms of one decision mean, in that decision's atom space.
+data CallMeanings = CallMeanings
+  { cmDefs :: Map Int (BDQ.BoolExpr Int)
+  -- ^ A call atom -> its meaning: the called rule's body, unfolded all the way
+  -- down, arguments in place of parameters, over the caller's atoms.
+  , cmOrder :: [Int]
+  -- ^ The variable order for the whole analysis: the caller's atoms, each call
+  -- atom followed at once by the atoms its meaning introduces. A decision
+  -- diagram's size depends on its order, and appending those atoms at the end
+  -- instead (sorted, as they came out of a map) separated each CONSIDER arm from
+  -- its own guard: a 22-arm rule in the miles-card corpus went from 5 s to past
+  -- ten minutes. Measured 2026-09-29.
+  , cmOpaque :: [Text]
+  -- ^ Call atoms that stayed opaque, each with the reason.
+  }
+
+noMeanings :: CallMeanings
+noMeanings = CallMeanings Map.empty [] []
+
+-- | Work out what each call atom of a decision means.
+--
+-- For every atom whose leaf is a call to a rule in @callees@: unfold the call
+-- ('Transform.unfoldCalls'), substitute local bindings, and draw the result as a
+-- ladder of its own — under the caller's name and parameters, so a leaf such as
+-- @f's `harm was caused`@ gets the SAME atomId it has in the caller — WITHOUT the
+-- CNF simplification. The decision diagram does not need a normal form, and the
+-- normal form is where the size goes: s 325 of the Penal Code has four atoms and an
+-- unfolded CNF past 4096 nodes. Its atoms are then renumbered into the caller's
+-- space by atomId, fresh numbers for atoms the caller does not mention.
+--
+-- A call whose meaning cannot be drawn, or is over @--max-nodes@ even without the
+-- normal form, stays opaque and is named in 'cmOpaque'.
+callMeanings
+  :: VerifyOptions
+  -> Callees
+  -> LadderViz.VizConfig
+  -> Decide Resolved
+  -> Text
+  -> Map Int Text
+  -> Map Int Text
+  -> LadderViz.VizState
+  -> [Int]
+  -> CallMeanings
+callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels vizState order =
+  CallMeanings
+    { cmDefs = Map.fromList [(v, renumber d) | (v, Right d) <- attempts]
+    , cmOrder = placed
+    , cmOpaque = [label v <> " \8212 " <> why | (v, Left why) <- attempts]
+    }
+  where
+    label v = stripBackticks (Map.findWithDefault (Text.pack (show v)) v labels)
+    tooLongReason =
+      "its meaning could not be drawn: " <> LadderViz.prettyPrintVizError (LadderViz.ClauseGroupTooLong Transform.letInliningNodeBudget)
+
+    attempts :: [(Int, Either Text (BDQ.BoolExpr Text))]
+    attempts =
+      [ (v, meaningOf v x)
+      | v <- order
+      , Just e <- [LadderViz.getLeafExpr vizState v]
+      , Just x <- [unfolded e]
+      ]
+
+    -- The call unfolded, or Nothing if the leaf is not a call to a known rule.
+    -- A call to a rule written as clauses too long to read through is left as a
+    -- box before anything is unfolded, so that refusing it costs only the
+    -- bounded reading of its clauses ('Callees'), not the callee's size.
+    unfolded e = case Transform.positionalCall e of
+      Just (r, _) | Set.member (getUnique r) callees.tooLong -> Just (Left tooLongReason)
+      _ -> unfoldedReadable e
+    unfoldedReadable e = case Transform.unfoldCalls unfoldBudget callees.readable e of
+      Right (_, 0) -> Nothing
+      Right (x, _) -> Just (Right x)
+      Left size ->
+        Just (Left ("unfolding it grew past " <> Text.pack (show unfoldBudget) <> " expression nodes (it reached " <> Text.pack (show size) <> ")"))
+
+    meaningOf :: Int -> Either Text (Expr Resolved) -> Either Text (BDQ.BoolExpr Text)
+    meaningOf v = \case
+      Left why -> Left why
+      Right x -> case Transform.inlineLocalBindingsForDrawing x of
+        -- It calls a rule written as clauses too long to read through. Drawn
+        -- as it is, the clauses' LETs would be one leaf whose key reads them
+        -- through, which does not finish; the call stays a box instead.
+        Nothing -> Left tooLongReason
+        Just x' -> case LadderViz.doVisualize (MkDecide ann sig appForm x') (LadderViz.withSimplification False cfg) of
+          Left err -> Left ("its meaning could not be drawn: " <> LadderViz.prettyPrintVizError err)
+          Right (li, vs)
+            | ladderNodeCount opts.verifyMaxNodes li.funDecl.body > opts.verifyMaxNodes ->
+                Left ("its meaning exceeds --max-nodes=" <> Text.pack (show opts.verifyMaxNodes))
+            | otherwise ->
+                let (bx, _, _) = VizQP.vizExprToBoolExpr li.funDecl.body
+                    aids = atomIdsOf fnName li vs
+                    fresh = LadderViz.getFreshLeaves vs
+                    key u
+                      | IntSet.member u fresh = localKey "fresh" v u
+                      | otherwise = Map.findWithDefault (localKey "local" v u) u aids
+                 in Right (mapVarsTo key bx)
+
+    -- An atom with no atomId is its own proposition; key it so it cannot meet
+    -- anything else. So is an atom whose value depends on when it is evaluated
+    -- (a ledger read): its atomId is numbered within its own diagram, and two
+    -- meanings drawn apart would otherwise share it. Uniques from different
+    -- ladders must not be compared, so the key carries the call atom @v@ whose
+    -- meaning drew it.
+    localKey :: Text -> Int -> Int -> Text
+    localKey kind v u = "\0" <> kind <> ":" <> Text.pack (show v) <> ":" <> Text.pack (show u)
+
+    -- The caller's atoms, by atomId.
+    callerIndex :: Map Text Int
+    callerIndex = Map.fromList [(aid, v) | v <- order, Just aid <- [Map.lookup v atomIds]]
+
+    -- Fresh numbers for the atoms only meanings mention, minted in the order
+    -- they are first met walking the caller's atoms: each call atom's meaning in
+    -- turn, its atoms in ladder order.
+    meaningKeys = nubOrd [k | (_, Right d) <- attempts, k <- varsOfT d, not (Map.member k callerIndex)]
+    freshFor :: Map Text Int
+    freshFor = Map.fromList (zip meaningKeys [firstFresh ..])
+    firstFresh = 1 + maximum (0 : order)
+
+    -- Each caller atom, then the fresh atoms its own meaning introduces.
+    placed = go Map.empty order
+      where
+        meaningOfAtom = Map.fromList [(v, d) | (v, Right d) <- attempts]
+        go _ [] = []
+        go seen (v : vs) =
+          let new = case Map.lookup v meaningOfAtom of
+                Nothing -> []
+                Just d -> nubOrd [n | k <- varsOfT d, Just n <- [Map.lookup k freshFor], not (Map.member n seen)]
+              seen' = foldr (\n -> Map.insert n ()) seen new
+           in v : new <> go seen' vs
+
+    renumber = mapVarsTo (\k -> Map.findWithDefault (freshFor Map.! k) k callerIndex)
+
+    varsOfT :: BDQ.BoolExpr Text -> [Text]
+    varsOfT = \case
+      BDQ.BTrue -> []
+      BDQ.BFalse -> []
+      BDQ.BVar k -> [k]
+      BDQ.BRefuse k -> [k]  -- never built here: the query plan's, not verify's
+      BDQ.BNot x -> varsOfT x
+      BDQ.BAnd xs -> concatMap varsOfT xs
+      BDQ.BOr xs -> concatMap varsOfT xs
+      BDQ.BImplies x y -> varsOfT x <> varsOfT y
+
+mapVarsTo :: (a -> b) -> BDQ.BoolExpr a -> BDQ.BoolExpr b
+mapVarsTo f = \case
+  BDQ.BTrue -> BDQ.BTrue
+  BDQ.BFalse -> BDQ.BFalse
+  BDQ.BVar v -> BDQ.BVar (f v)
+  BDQ.BRefuse v -> BDQ.BRefuse (f v)
+  BDQ.BNot x -> BDQ.BNot (mapVarsTo f x)
+  BDQ.BAnd xs -> BDQ.BAnd (map (mapVarsTo f) xs)
+  BDQ.BOr xs -> BDQ.BOr (map (mapVarsTo f) xs)
+  BDQ.BImplies x y -> BDQ.BImplies (mapVarsTo f x) (mapVarsTo f y)
+
+-- | A memory guard on unfolding one call, in expression nodes. Not a tuning knob
+-- and it has no flag: a call past it simply stays opaque, and is named.
+unfoldBudget :: Int
+unfoldBudget = 200000
+
+-- | The rules a call may be read through to, and the rules written as clauses
+-- too long to read through ('Transform.clausesReadThrough'), a call to which is
+-- left as a box.
+data Callees = Callees
+  { readable :: Map Unique Transform.Unfoldable
+  , tooLong :: Set Unique
+  }
+
+-- | The rules a call may be unfolded into: every top-level DECIDE that returns a
+-- BOOLEAN, in this module and in every module it imports (transitively), minus the
+-- recursive ones ('Transform.pruneRecursive').
+--
+-- Boolean only, because the point is the propositional structure: a numeric
+-- helper unfolded into a comparison leaves the leaf a leaf, just with a longer
+-- label.
+--
+-- Each body is first zonked with its OWN module's substitution. The checked
+-- program's annotations are not zonked when the result is built, and an importer
+-- starts from an EMPTY substitution (see "LSP.L4.Rules"), so a rule whose return
+-- type was inferred rather than declared (no @GIVETH@) carries an inference
+-- variable. Measured: without the zonk such an imported rule is never recognised
+-- as boolean, is never unfolded, and a contradiction through it is missed
+-- (tests-cli/fixtures/verify-unfold-rules.l4 is written that way on purpose).
+unfoldableRules :: Rules.TypeCheckResult -> Callees
+unfoldableRules tc0 =
+  -- Recursion is a property of which calls a body makes, which zonking does not
+  -- change, so prune on the bodies as checked. The zonk itself is left as a thunk
+  -- in each surviving entry ('Transform.MkUnfoldable' has lazy fields), so a body
+  -- is only ever zonked if some call is actually read through to it. Zonking every
+  -- rule of every imported module up front, the prelude included, cost seconds
+  -- per file for rules nobody called.
+  Callees
+    { readable = Map.mapWithKey (\u (Transform.MkUnfoldable ps rhs) -> Transform.MkUnfoldable ps (zonkFor u rhs)) readsThrough
+    , tooLong = Map.keysSet tooLongToRead
+    }
+  where
+    -- Which rules written as clauses read through is decided on the bodies as
+    -- checked too, before any is zonked or unfolded, and on each rule's own body,
+    -- as the IDE decides whether to offer a call for expansion. A rule that calls
+    -- one that does not read through is still read through itself, with that
+    -- call left inside it as a box.
+    (readsThrough, tooLongToRead) = Map.partition (\ (Transform.MkUnfoldable _ rhs) -> Transform.clausesReadThrough rhs) kept
+    candidates :: [(Unique, (Transform.Unfoldable, Rules.TypeCheckResult))]
+    candidates = concatMap fromModule (Map.elems modules)
+    kept = Transform.pruneRecursive (Map.fromList [(u, unf) | (u, (unf, _)) <- candidates])
+    owners = Map.fromList [(u, m) | (u, (_, m)) <- candidates]
+    zonkFor u rhs = case Map.lookup u owners of
+      Just m -> TC.applyFinalSubstitution m.substitution (moduleUri m) rhs
+      Nothing -> rhs
+
+    modules :: Map LSP.NormalizedUri Rules.TypeCheckResult
+    modules = collect Map.empty [tc0]
+
+    collect acc [] = acc
+    collect acc (m : ms)
+      | moduleUri m `Map.member` acc = collect acc ms
+      | otherwise = collect (Map.insert (moduleUri m) m acc) (m.dependencies ++ ms)
+
+    moduleUri :: Rules.TypeCheckResult -> LSP.NormalizedUri
+    moduleUri m = case m.module' of MkModule _ uri _ -> uri
+
+    fromModule m =
+      [ (u, (unf, m))
+      | d <- topLevelDecides m
+      , Just (u, unf@(Transform.MkUnfoldable _ rhs)) <- [Transform.unfoldableDecide d]
+      , returnsBoolean m rhs
+      ]
+
+    -- Only the body's TYPE is zonked for this test: that is what an inferred
+    -- return type needs, and it is cheap.
+    returnsBoolean m e = case getAnno e of
+      Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} ->
+        case TC.applyFinalSubstitution m.substitution (moduleUri m) ty of
+          TyApp _ (Ref _ u _) [] -> u == TC.booleanUnique
+          _ -> False
+      _ -> False
 
 -- | Node count of a ladder body, fuel-limited: it stops the moment @budget@ is
 -- blown, so an oversized ladder costs @O(budget)@ to refuse rather than
@@ -429,7 +764,7 @@ ladderNodeCount budget root = go 0 [root]
       VizExpr.Or _ xs -> xs
       VizExpr.Not _ x -> [x]
       VizExpr.Implies _ s r _ -> [s, r]
-      VizExpr.App _ _ args _ -> args
+      VizExpr.App _ _ args _ _ -> args
       VizExpr.UBoolVar{} -> []
       VizExpr.TrueE{} -> []
       VizExpr.FalseE{} -> []
@@ -447,8 +782,14 @@ ladderNodeCount budget root = go 0 [root]
 -- independent variables and is satisfiable. That is not a soundness bug —
 -- independence only ever makes a formula more satisfiable, so findings stay true
 -- — but it is a large hole in coverage, and closing it does not require
--- inventing a notion of sameness: @generateAtomId@ already defines one, and it
--- is the one a wizard user answers once.
+-- inventing a notion of sameness: the atomId already defines one, and it is the
+-- one a wizard user answers once.
+--
+-- Coalescing IS sound only if two different propositions never share an atomId.
+-- That held only approximately while the atomId was a hash of the PRINTED label
+-- (two mixfix calls sharing a head keyword printed alike: smucclaw/l4-ide#1004);
+-- it is the hash of the leaf's term now ("L4.Viz.AtomKey", R3), which names
+-- every name by its own binder.
 --
 -- The representative of an atomId class is its first unique in variable order,
 -- so the coalesced order is a subsequence of the original and the planner's
@@ -482,6 +823,7 @@ mapVars f = \case
   BDQ.BTrue -> BDQ.BTrue
   BDQ.BFalse -> BDQ.BFalse
   BDQ.BVar v -> BDQ.BVar (f v)
+  BDQ.BRefuse v -> BDQ.BRefuse (f v)
   BDQ.BNot e -> BDQ.BNot (mapVars f e)
   BDQ.BAnd es -> BDQ.BAnd (fmap (mapVars f) es)
   BDQ.BOr es -> BDQ.BOr (fmap (mapVars f) es)
@@ -500,9 +842,19 @@ mapVars f = \case
 --
 -- @order@ must list every variable occurring in @ctx@ and @e@, or the compiler
 -- errors; callers pass the decision's whole variable order.
-satisfiable :: [Int] -> [BDQ.BoolExpr Int] -> BDQ.BoolExpr Int -> Bool
-satisfiable order ctx e =
-  let compiled = BDQ.compileDecisionQuery order (BDQ.BAnd (e : ctx))
+-- | Is @e@, together with the context, satisfiable? Every call atom with a
+-- meaning in @defs@ is replaced by that meaning first ('callMeanings'); the
+-- meanings are fully unfolded already, so one pass suffices.
+satisfiable :: [Int] -> Map Int (BDQ.BoolExpr Int) -> [BDQ.BoolExpr Int] -> BDQ.BoolExpr Int -> Bool
+satisfiable order defs ctx e =
+  let expand = \case
+        BDQ.BVar v -> Map.findWithDefault (BDQ.BVar v) v defs
+        BDQ.BNot x -> BDQ.BNot (expand x)
+        BDQ.BAnd xs -> BDQ.BAnd (map expand xs)
+        BDQ.BOr xs -> BDQ.BOr (map expand xs)
+        BDQ.BImplies x y -> BDQ.BImplies (expand x) (expand y)
+        other -> other
+      compiled = BDQ.compileDecisionQuery order (expand (BDQ.BAnd (e : ctx)))
       result = BDQ.queryDecision compiled mempty mempty
    in result.determined /= Just False
 
@@ -511,6 +863,7 @@ varsOf = \case
   BDQ.BTrue -> []
   BDQ.BFalse -> []
   BDQ.BVar v -> [v]
+  BDQ.BRefuse v -> [v]
   BDQ.BNot e -> varsOf e
   BDQ.BAnd es -> concatMap varsOf es
   BDQ.BOr es -> concatMap varsOf es
@@ -525,8 +878,8 @@ varsOf = \case
 interesting :: BDQ.BoolExpr Int -> Bool
 interesting = not . null . varsOf
 
-analyseBody :: Map Int Text -> [Int] -> BDQ.BoolExpr Int -> [Finding]
-analyseBody labels order body
+analyseBody :: Map Int Text -> [Int] -> Map Int (BDQ.BoolExpr Int) -> BDQ.BoolExpr Int -> [Finding]
+analyseBody labels order defs body
   | not (sat [] body) =
       [ Finding
           { findingKind = "unsat"
@@ -538,7 +891,7 @@ analyseBody labels order body
       ]
   | otherwise = topTautology <> go [] "body" body
   where
-    sat = satisfiable order
+    sat = satisfiable order defs
     atomLabels e = [label u | u <- nubOrd (varsOf e)]
     label u = stripBackticks (Map.findWithDefault (Text.pack (show u)) u labels)
 
@@ -664,6 +1017,7 @@ analyseBody labels order body
       -- same word would be worse than not reporting it.
       BDQ.BNot _ -> []
       BDQ.BVar _ -> []
+      BDQ.BRefuse _ -> []
       BDQ.BTrue -> []
       BDQ.BFalse -> []
 
@@ -692,6 +1046,10 @@ jsonEnvelope opts reports total nested =
           , "findings" .= total
           , "byKind" .= Map.fromListWith (+) [(f.findingKind, 1 :: Int) | f <- allFindings]
           , "mergedAtomOccurrences" .= sum [a.anAtoms - a.anAtomClasses | a <- analysed]
+          , -- Call atoms read through to the rules they call, and those left
+            -- opaque. Every opaque one is also named on its decision.
+            "callsReadThrough" .= sum [r.drUnfolding.readThrough | r <- reports]
+          , "callsLeftOpaque" .= sum [length r.drUnfolding.leftOpaque | r <- reports]
           , -- Decisions nested in a WHERE clause: neither analysed nor skipped,
             -- because never visited. Reported so that the three numbers above
             -- cannot be mistaken for a total. See 'nestedNotVisited'.
@@ -738,12 +1096,18 @@ textReport opts reports total nested =
                )
             <> ", "
             <> Text.pack (show a.anLadderNodes)
-            <> " ladder nodes) — "
+            <> " ladder nodes"
+            <> ( if r.drUnfolding.readThrough == 0
+                  then ""
+                  else ", " <> Text.pack (show r.drUnfolding.readThrough) <> " call(s) read through"
+               )
+            <> ") — "
             <> ( if null a.anFindings
                   then "no propositional findings"
                   else Text.pack (show (length a.anFindings)) <> " finding(s)"
                )
         ]
+          <> [ "    call left as a leaf: " <> why | why <- r.drUnfolding.leftOpaque ]
           <> concatMap finding a.anFindings
 
     finding f =
@@ -767,6 +1131,15 @@ textReport opts reports total nested =
                   <> " further decision(s) nested in a WHERE clause were NOT visited\n  \
                      \(neither analysed nor skipped) \8212 see the bound below."
            )
+        <> ( if opaque == 0
+              then ""
+              else
+                " "
+                  <> Text.pack (show opaque)
+                  <> " call(s) were left as leaves rather than read through \8212 the\n  \
+                     \weaker analysis at those atoms; each is named on its rule."
+           )
+    opaque = sum [length r.drUnfolding.leftOpaque | r <- reports]
 
 -- | Strip the backticks L4 uses to quote identifiers containing spaces. The
 -- wizard's JSON does the same thing for the same reason.

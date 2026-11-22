@@ -1,0 +1,17 @@
+-- Genuine loops, each used by two directives. Giving a raised thunk its mark
+-- back must not turn the loop check off: every use is still reported as an
+-- infinite loop. (A definition that is its own operand, and a pair that are
+-- each other's.)
+GIVETH A NUMBER
+`self loop` MEANS `self loop` PLUS 1
+
+GIVETH A NUMBER
+`ping` MEANS `pong` PLUS 1
+
+GIVETH A NUMBER
+`pong` MEANS `ping` PLUS 1
+
+#EVAL `self loop`
+#EVAL `self loop`
+#EVAL `ping`
+#EVAL `ping`

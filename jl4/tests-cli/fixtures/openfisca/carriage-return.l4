@@ -1,0 +1,13 @@
+-- A string literal holding a carriage return. The emitted Python must
+-- escape it (an unescaped one ends the literal and the module will not load).
+IMPORT prelude
+
+DECLARE Person HAS job IS A STRING
+
+@export Whether the person is a paid worker
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A BOOLEAN
+`paid` p period MEANS p's job EQUALS "paid\rworker"
+
+#ASSERT (`paid` OF (Person WITH job IS "paid\rworker"), "2026-01") EQUALS TRUE

@@ -1,0 +1,27 @@
+-- smucclaw/l4-ide#1069, NORM-LOG-SPEC N19 (ruled 2026-10-26): two sides of a
+-- RAND record one cell with different values while they take one event, and
+-- nothing inside the RAND reads it. Nothing in the trace orders the two
+-- records, so the run stops, naming the cell and both sides, whichever side
+-- is written first. Equal values would not be an error.
+IMPORT prelude
+DECLARE Party IS ONE OF P
+DECLARE Act IS ONE OF go
+
+GIVETH A DEONTIC Party Act
+`one` MEANS
+    PARTY P
+    MAY go
+    WITHIN 100
+    HENCE COMMIT `x` IS 1 HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Party Act
+`two` MEANS
+    PARTY P
+    MAY go
+    WITHIN 100
+    HENCE COMMIT `x` IS 2 HENCE FULFILLED
+    LEST FULFILLED
+
+#TRACE `one` RAND `two` AT 0 WITH
+    PARTY P DOES go AT 10

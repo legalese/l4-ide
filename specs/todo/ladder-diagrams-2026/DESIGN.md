@@ -1,6 +1,6 @@
 # Ladder Diagrams 2026 — Design Document
 
-**Status:** Draft v1 (design-first; no code yet)
+**Status:** Draft v1, written design-first; much of it has since been built. §14 is the status board, and §22, §24's I-b and I-d, §25's "What was built", §26 and §27 each say what shipped.
 **Branch:** `mengwong/ladder-diagrams-3` · worktree `~/src/legalese/l4wt/ladder-diagrams-3`
 **Author of record:** Meng (design), drafted with Claude
 **Supersedes:** the Dagre + SvelteFlow layout path in `ts-shared/l4-ladder-visualizer`
@@ -468,6 +468,12 @@ the IMPLIES seam (§25), the `ladder-svg` split, the R1 spike, and **E1 Steps 1 
 production IDE still renders Dagre, so a user still sees the bare-TRUE §25f bug — that is
 the gap between built and shipped, and it is exactly E1 Step 4→8._
 
+**✅ Call panels and the NOT output bubble (§27): merged into `unstable` on 2026-10-06 by PR #561 (`e6e037d81`).**
+PR #561 also carried `l4 verify`'s call read-through from `feat/verify-beta-reduction`, whose PR #520 was closed in favour of it.
+A call can be drawn open in place, in a panel shaded by layer; one click sets every copy of a term; a NOT's bubble shows its output.
+Server half `afffcb6e5`, client half `ec7cae39e`, plus a Chromium click fix (`463a8a949`): the controller took pointer capture at `pointerdown`, so Chromium retargeted every click to the host and no box cycled or folded; capture now starts only once a gesture is a pan.
+☐ Not built: TB panels, FLIP of a panel's rectangle, panels in the IDE (§27.3).
+
 **✅ P0 — Kernel (DONE).** Pure `IRExpr × TextMetrics × ViewSpec → Scene IR → SVG`,
 no DOM (`ts-shared/ladder-core/`, `7136ec92`). Centering thesis proven on the s415
 fixture — the Dagre right-alignment is gone. Scene IR (§4.2) + ViewSpec (§4.3)
@@ -622,6 +628,11 @@ the lost inline name; and broadening to functions-with-args / imported / `WHERE`
 falls out for free. So #630's fix is **"adopt the §16 fold model"**, not another
 patch to `canInline` — and #630 is an _enhancement_, not a bug.
 
+The line citations in that paragraph are to the `jl4-core` mirror as it stood when it was written.
+On the LSP ladder, which is what the IDE draws, a call with arguments to a same-module rule expands through `l4/inlineExprs` (`WHERE-INLINING-SPEC.md` §9.7), except a call whose arguments are all `BOOLEAN`, which is drawn as a `V.App` with no `canInline` and so offers no expand.
+Since PR #561 (merged into `unstable` on 2026-10-06), the LSP sends every such call's expansion, the all-`BOOLEAN` call included, to a client that asks for it, and the standalone playground draws it as a call panel (§27); the IDE's displayers do not ask and draw no panels.
+The `jl4-core` mirror does neither.
+
 ---
 
 ## 17. Unboxed elements (inert content) — PrePost generalized
@@ -716,7 +727,7 @@ stay linear). One reading: boxes + spine are rigid structure, curves are flow.
   unknown / ghost dead", which was **wrong in two directions at once** and is corrected
   in §26: `dead` had no colour of its own at all (it fell through to the unknown grey),
   and it is not a ghost either — ghost belongs to `eliminable` (§15.1). Four states,
-  four inks: green live / light-grey unknown / **firm slate dead** / ghost eliminable.
+  four inks: green live / light-grey unknown / **dead** (mild red on screen; see §26.1) / ghost eliminable.
 
 ---
 
@@ -747,6 +758,8 @@ This makes "value the parent" need no new concept — it's just "click a box," b
 folded subtree _is_ a box. Proven live in `standalone/` and the `s415-interactive`
 snapshot: `harm` folded and pinned true renders a green `▸ ANY of 4` while its children
 stay unknown.
+
+**Request-side assertion (proposed 2026-10-09, not built).** An override from a request is an _assertion_, and this section is the reference model for it: `presumption-assertion/CONTRACT.md` §2 copies the override semantics above (a group with a value does not consult its children) and `UNKNOWN-EVALUATION-SPEC.md` §5 records the ruling (Meng, 2026-10-09: every named node assertable, `@nonassertable` opts out, `asserted` listed beside `presumed`). What it does not copy is drawing: `dropOpenPanels` (§27.1) and `spreadValue` stay UI rules.
 
 **Next (P1): current flow.** The energization pass (DESIGN discussion): propagate
 current from the source — closed paths drawn **thick + dark**, open ones thin + light,
@@ -822,6 +835,8 @@ flow), the bubble, and the bubble→output segment (inverted flow). Scene IR gai
 
 Verified: `not-nested` — `not(And[registered, not(Or[sat, submitted])])`, leader thick
 to the inner bubble, thin between the bubbles, thick past the outer one.
+
+Since 2026-10-05 the bubble is also filled with the NOT's output value, green when the NOT holds and red when it fails, on screen and in dark; in print it is near-black when the NOT holds and light grey when it fails (§27.2, Meng's ruling).
 
 _Alternatives (not chosen): **evaluate-aside** — pull the negand off the main rung as
 a sub-circuit driving a normally-closed contact (relay-accurate, more layout); **De
@@ -1203,7 +1218,7 @@ ship a VS Code extension. Rode on the §13.1 `ladder-svg` split — **which is n
 
 ---
 
-## 25. IMPLIES — the seam between scope and requirement _(proposed; not built)_
+## 25. IMPLIES — the seam between scope and requirement _(proposed; partly built, see "What was built" and "Still open" below)_
 
 **The question (Meng, 2026-07-14):** _"do we draw implication as a new thing, or as a rung that
 fits into our current formalisms?"_
@@ -1571,11 +1586,14 @@ that is `?` is grey"). With one grey and no break, the two-lamp form had lost it
 say which of those a reader was looking at. The ASCII carrier had honoured the design all
 along (`✓ / ✗ / ?`, §24.3); the SVG had not.
 
-Now: four states, four inks — green `live` / light-grey `inert` / **firm slate `dead`** /
-ghost `eliminable`. Determinacy is what the ink tracks: a settled fact is drawn firmly, an
-open question faintly, a don't-care fainter still. Red is deliberately unused (it belongs to
-the breach lamp, and a false atom is very often the _good_ outcome — an exception that did
-not apply). And a dead leaf draws the §15.1 **open gap** at its own out-port, offset clear of
+Now: four states, four inks — green `live` / light-grey `inert` / **`dead`** / ghost
+`eliminable`. Determinacy is what the ink tracks: a settled fact is drawn firmly, an open
+question faintly, a don't-care fainter still. **On screen `dead` is a mild red** (stroke
+`#a8483e`, wash `#f9e6e3`), ruled by Meng 2026-10-05 after seeing it live; it had been dark
+slate, with red withheld because red belongs to the breach lamp and a false atom is very often
+the _good_ outcome — an exception that did not apply. The mild red keeps that distinction: it
+is paler and browner than `coilRed`, so a false box does not read as a breach. Print
+(`INK_PALETTE`) and dark (`DARK_PALETTE`) are unchanged. And a dead leaf draws the §15.1 **open gap** at its own out-port, offset clear of
 the box, so the break sits where the current actually stopped rather than on some enclosing
 group. `Measured.ownBreak` stops the OR fan double-reporting the same failure.
 
@@ -1610,6 +1628,8 @@ since the decode path marked provenance while dropping the payload, that was the
 the switch could ever do. `defaults` (the presumed values) now sits under `valuation` (the
 answers), an answer always wins, and withdrawing presumptions touches no answer.
 
+**Asserted nodes (proposed 2026-10-09).** A request-side assertion on a node is a `valuation` entry, as a click is; because `provenance` marks a declaration site, the fact that a node was _told_ rather than worked out needs its own mark, a `ViewSpec.asserted: ReadonlySet<NodeId>` (`presumption-assertion/CONTRACT.md` §2), so the renderer can draw an asserted leaf or group as told. Not built.
+
 ### 26.4 `Scene.provisional` — "made" and "made out of what" are two questions
 
 A circuit can be complete on atoms nobody answered. `provisional` reports that, and renderers
@@ -1638,6 +1658,63 @@ our own fixture, and the identity test painted it full made-green while resting 
   still not representable.
 - `verdictFor` takes an optional `reading`. Its contract is "says exactly what the ladder
   shows", which is false the moment header and picture evaluate under different epistemics.
+
+---
+
+## 27. Call panels and the NOT output bubble
+
+_Merged into `unstable` on 2026-10-06 by PR #561 (client half `ec7cae39e`, merge commit `e6e037d81`).
+Line citations are to the tree at `e6e037d81`._
+
+A call to another rule of the module can be drawn **open, in place**: the server sends the called rule's body with the call's arguments substituted, as the call leaf's `expansion`, and the client draws it inside a **panel** named after the call as written, which folds back to one box.
+What the server sends, how its `atomId`s are chosen, and what was measured are in `WHERE-INLINING-SPEC.md` §10; this section is how it is drawn.
+It is §16's fold model applied to calls, and it gives a folded call §16.1's Tier 2 label by another route: the panel's name is the call itself, so no `NamedExpr` is needed for it.
+
+### 27.1 Panels
+
+**Ruled by Meng, 2026-10-05**, in chat, on the hand-built page `foldable-ladder.html` (session `ed4dacbb`'s scratchpad): _"Suggest we reverse the color order so the innermost functions are lighter shades. Then the terms start out white. The background of the diagram would be the shade past the darkest group"_.
+
+As built:
+
+- **Shape.** A panel is a filled rounded box measured like the NOT scope frame (§21): padding on every side, a name band at the top mirrored at the bottom so the ports sit on the panel's own axis, and wire stubs from the panel's edge to its contents (`measurePanel`, `ts-shared/ladder-core/src/layout.ts:1072`).
+  It is at least as wide as its name.
+  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:110-113`) and `ASCII_GEOMETRY` (`ascii.ts:92-95`); the ASCII carrier draws the panel's outline and name.
+- **Name.** The call's wire label, prefix-normalised and without backticks, prefixed `▾`: `` `is creditworthy` OF a `` on the wire reads `is creditworthy a` (`callLabel` in `ts-shared/ladder-core/src/viz-adapter.ts`).
+  It is not the call as the drafter wrote it; in leaf mode the same call is one box showing its wire label as it is, backticks and `OF` included.
+  Clicking the name folds the panel, which is an ordinary `foldSet` fold; folded, it is §16's placeholder, whose `▸` opens it again and whose box takes a value click.
+- **Shade, darkest outside.** The innermost panels are `panelNear`, each layer outward is one fixed step darker (the step is `panelNear` → `panelDeep`), and the diagram's backdrop is one step darker than the outermost panel (`panelShade` and `panelBackdrop`, `ladder-svg/src/palette.ts:367-391`).
+  A panel `d` levels deep is `panelDepth − 1 − d` steps darker than `panelNear`, where `Scene.panelDepth` counts the panel levels of the whole decision with folds ignored, so folding one panel changes no other panel's shade.
+  Rule boxes keep `boxFill`: white on screen, so the terms are the lightest surface on the page.
+  On screen the step is 4.5 lightness points from 95, reproducing the approved page (`palette.ts:228-233`); print and dark keep the same order (`palette.ts:266-270`, `:318-326`).
+- **Open wire on a shaded backdrop.** The plain open-wire ink nearly disappears on the backdrop, so a diagram with panels draws open wire in `wireOpenPanel`, and a diagram without panels is byte for byte as before.
+- **A value on a call is set aside while its panel is open** (`dropOpenPanels`, `layout.ts:1042`).
+  A value on a group is an override (§19); on an open panel it would make the circuit conduct through contents that say otherwise, so it holds only while the panel is folded.
+  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:462-514`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
+- **One click, every copy.** A click on a term sets, or clears, the value on every box with the same `atomId` and no other (`spreadValue`, also in `viz-adapter.ts`), so the `a` inside `is creditworthy a` and the caller's own `a` change together, and `b`'s copy does not.
+  Which boxes share an `atomId` is `WHERE-INLINING-SPEC.md` §10.1's identity rule.
+- **Wires stay outside panels they do not enter.** An OR whose branches draw panels routes its fan clear of them (`ladder-core/test/call-panels.test.ts`, "no wire runs through a panel it neither starts nor ends at").
+
+### 27.2 The NOT bubble shows the NOT's output
+
+**Ruled by Meng, 2026-10-05**, in chat: _"When a NOTted term is set to red let’s fill the exit circle with a green and vice versa"_.
+
+As built: the layout puts the NOT's own output value on its inverter glyph, read from the honest three-valued evaluation like box ink and never from a grounding assumption (§26.2), and omits it while unknown (`layout.ts:916-926`).
+The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:175`).
+
+| palette | `inverterTrue`      | `inverterFalse`                 | source               |
+| ------- | ------------------- | ------------------------------- | -------------------- |
+| screen  | `#1a7f37`, = `live` | `#a8483e`, §26.1's mild red     | `palette.ts:237-238` |
+| dark    | `#4ec97a`, = `live` | `#e0786a`, a red bright on dark | `palette.ts:328-329` |
+| ink     | `#222`, solid black | `#a8a8a8`, mid grey             | `palette.ts:274-275` |
+
+They are fields of their own rather than `live` and `dead` because those are text inks: in dark `dead` is a bright grey, not a red, and in print `live` and `dead` (`#222` and `#333`) would make the first two the same dot.
+
+### 27.3 Not built
+
+- **Top-to-bottom orientation.** A panel's stubs follow its contents' ports so none crosses the name band, but TB panels are not designed, and the series zig-zag predates them.
+- **FLIP** does not animate a panel's own rectangle.
+- **The IDE does not draw panels.** The "Show decision graph" lens does not ask for expansions (`WHERE-INLINING-SPEC.md` §10.3).
+  The panels are drawn today by `ts-shared/ladder-svg/standalone/playground.ts`, which `npm run playground` in `ts-shared/ladder-svg` serves (`standalone/serve.mjs`), with three example modules under `standalone/examples/`.
 
 ---
 

@@ -1,0 +1,15 @@
+-- Typechecks cleanly. An export with no inputs answers a list inside its own
+-- JUST, and the list ends in a refusal one level below the depth a directive
+-- reads, because the rule's JUST takes a level. `l4 run` answers it, and
+-- `l4 batch` must too: with no inputs it asks for the export bare, so there
+-- is no JUST of its own to see through.
+GIVEN n IS A NUMBER
+GIVETH A LIST OF NUMBER
+`refusal in the list` n MEANS
+  IF n EQUALS 0 THEN LIST (REFUSE "deep") ELSE n FOLLOWED BY `refusal in the list` (n MINUS 1)
+
+@export a list in the rule's own JUST, ending in a refusal below the depth read
+GIVETH A MAYBE (LIST OF NUMBER)
+`wrapped` MEANS JUST (`refusal in the list` 200)
+
+#EVAL `wrapped`

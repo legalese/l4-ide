@@ -1,6 +1,6 @@
 -- REJECTED (§4.3), the constructor-pattern twin of otherwise-not-last.l4.
 -- `l4 check` does warn here ("the following CONSIDER branch is redundant"),
--- but `l4 catala` proceeds past non-fatal diagnostics by design, so the
+-- but `l4 export catala` proceeds past non-fatal diagnostics by design, so the
 -- lowering has to reject it itself.
 
 DECLARE Colour IS ONE OF red, green, blue

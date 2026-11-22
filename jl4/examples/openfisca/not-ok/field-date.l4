@@ -1,0 +1,16 @@
+-- An input field of type DATE. OpenFisca has no value type for it here, and
+-- the export used to emit it as a float. The export must REFUSE it.
+IMPORT prelude
+IMPORT daydate
+
+DECLARE Person HAS
+    salary    IS A NUMBER
+    `born on` IS A DATE
+
+@export Tax
+GIVEN p      IS A Person
+      period IS A STRING
+GIVETH A NUMBER
+`tax` p period MEANS p's salary TIMES 0.1
+
+#ASSERT (`tax` OF (Person WITH salary IS 1000, `born on` IS Date 1 1 2000), "2026-01") EQUALS 100

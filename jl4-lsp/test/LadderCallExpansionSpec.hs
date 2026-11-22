@@ -1,0 +1,929 @@
+{-# LANGUAGE OverloadedRecordDot, OverloadedStrings, PatternSynonyms, TupleSections #-}
+-- | Call expansions on the ladder's render path (WHERE-INLINING-SPEC §10).
+--
+-- A call leaf carries the called rule's body with the call's arguments put in
+-- place of its parameters, translated in the CALLER's context. The identity rule
+-- under test: two boxes are the same proposition exactly when they carry the
+-- same atomId, and an inlined box is the same proposition as a direct one
+-- exactly when, after substitution, they say the same thing about the same
+-- inputs.
+module LadderCallExpansionSpec (spec) where
+
+import Control.Exception (evaluate)
+import Data.List (nub, (\\))
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.ByteString.Lazy.Char8 as BL
+import Data.Maybe (isJust)
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import System.Directory (createDirectoryIfMissing, getTemporaryDirectory)
+import System.FilePath (takeDirectory, (</>))
+import System.Timeout (timeout)
+
+import Language.LSP.Protocol.Types (VersionedTextDocumentIdentifier (..), fromNormalizedUri, normalizedFilePathToUri)
+
+import L4.EvaluateLazy (resolveEvalConfig)
+import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
+import L4.Syntax (Decide, Resolved, foldTopLevelDecides)
+import L4.TracePolicy (lspDefaultPolicy)
+import qualified L4.Viz.VizExpr as V
+import qualified LSP.Core.Shake as Shake
+import LSP.L4.Actions (renderAfterInlining)
+import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
+import LSP.L4.Rules (TypeCheckResult (..), pattern TypeCheck)
+import qualified LSP.L4.Viz.Ladder as Ladder
+import qualified LSP.L4.Viz.QueryPlan as VizQueryPlan
+
+import Test.Hspec
+
+checkSource :: FilePath -> T.Text -> IO (VersionedTextDocumentIdentifier, TypeCheckResult)
+checkSource path source = do
+  createDirectoryIfMissing True (takeDirectory path)
+  T.writeFile path source
+  evalConfig <- resolveEvalConfig Nothing (lspDefaultPolicy defaultGraphVizOptions)
+  (_, mRes) <- oneshotL4ActionAndErrors evalConfig path \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _   <- Shake.addVirtualFileFromFS nfp
+    mTc <- Shake.use TypeCheck uri
+    pure $ fmap (VersionedTextDocumentIdentifier (fromNormalizedUri uri) 0,) mTc
+  maybe (fail "fixture did not type-check") pure mRes
+
+scratch :: String -> IO FilePath
+scratch stem = do
+  tmp <- getTemporaryDirectory
+  pure (tmp </> "jl4-ladder-call-expansion-spec" </> (stem <> ".l4"))
+
+-- | What a client that asks for expansions gets (@l4.visualize@ with
+-- @{"expandCalls": true}@; the "Show decision graph" lens does not ask):
+-- expansions on, no simplification, atomIds annotated.
+data Rendered = MkRendered
+  { funDecl :: V.FunDecl
+  , decide :: Decide Resolved
+  , vizState :: Ladder.VizState
+  }
+
+-- | Every decision of the module, optionally with 'Transform.simplify' on, as
+-- the IDE's own lens asks for. A leaf must be keyed alike either way: an expansion is
+-- simplified on its own, and R3's "two copies of limb a b share every atom" has
+-- to hold for whatever shape that leaves.
+renderAllWith :: Bool -> String -> T.Text -> IO [Rendered]
+renderAllWith simplify stem source = do
+  path <- scratch stem
+  (verId, tc) <- checkSource path source
+  let cfg = Ladder.withCallExpansions (Ladder.mkVizConfig verId tc.module' tc.substitution simplify)
+  pure
+    [ MkRendered (VizQueryPlan.annotateLadderWithAtomIds info st).funDecl d st
+    | d <- foldTopLevelDecides (\d -> [d]) tc.module'
+    , Right (info, st) <- [Ladder.doVisualize d cfg]
+    ]
+
+render :: String -> T.Text -> T.Text -> IO Rendered
+render = renderWith False
+
+renderWith :: Bool -> String -> T.Text -> T.Text -> IO Rendered
+renderWith simplify stem source target = do
+  rs <- renderAllWith simplify stem source
+  case [r | r <- rs, r.funDecl.fnName.label == target] of
+    [r] -> pure r
+    other -> fail ("expected one rule named " <> T.unpack target <> ", found " <> show (length other))
+
+-- | Leaves drawn directly (an App's arguments included), not inside expansions.
+directLeaves :: V.IRExpr -> [(T.Text, T.Text)]
+directLeaves = \case
+  V.And _ xs -> concatMap directLeaves xs
+  V.Or _ xs -> concatMap directLeaves xs
+  V.Not _ x -> directLeaves x
+  V.Implies _ p q _ -> directLeaves p <> directLeaves q
+  V.UBoolVar _ nm _ _ a _ _ -> [(nm.label, a)]
+  V.App _ nm args a _ -> (nm.label, a) : concatMap directLeaves args
+  _ -> []
+
+-- | Every leaf, through every expansion.
+allLeaves :: V.IRExpr -> [(T.Text, T.Text)]
+allLeaves = \case
+  V.And _ xs -> concatMap allLeaves xs
+  V.Or _ xs -> concatMap allLeaves xs
+  V.Not _ x -> allLeaves x
+  V.Implies _ p q _ -> allLeaves p <> allLeaves q
+  V.UBoolVar _ nm _ _ a _ x -> (nm.label, a) : foldMap allLeaves x
+  V.App _ nm args a x -> (nm.label, a) : concatMap allLeaves args <> foldMap allLeaves x
+  _ -> []
+
+-- | The call leaves drawn directly, with their expansions.
+calls :: V.IRExpr -> [(T.Text, Maybe V.IRExpr)]
+calls = \case
+  V.And _ xs -> concatMap calls xs
+  V.Or _ xs -> concatMap calls xs
+  V.Not _ x -> calls x
+  V.Implies _ p q _ -> calls p <> calls q
+  V.UBoolVar _ nm _ True _ _ x -> [(nm.label, x)]
+  V.App _ nm args _ x -> (nm.label, x) : concatMap calls args
+  _ -> []
+
+expansionOf :: T.Text -> V.FunDecl -> IO V.IRExpr
+expansionOf label fd = case [x | (l, x) <- calls fd.body, l == label] of
+  [Just x] -> pure x
+  other -> fail ("expected one expanded call " <> T.unpack label <> ", found " <> show (length other, map isJust other))
+
+-- | How deep expansions nest.
+expansionDepth :: V.IRExpr -> Int
+expansionDepth = \case
+  V.And _ xs -> maximum (0 : map expansionDepth xs)
+  V.Or _ xs -> maximum (0 : map expansionDepth xs)
+  V.Not _ x -> expansionDepth x
+  V.Implies _ p q _ -> max (expansionDepth p) (expansionDepth q)
+  V.UBoolVar _ _ _ _ _ _ x -> maybe 0 ((+ 1) . expansionDepth) x
+  V.App _ _ args _ x -> maximum (maybe 0 ((+ 1) . expansionDepth) x : map expansionDepth args)
+  _ -> 0
+
+atomIdsOf :: T.Text -> [(T.Text, T.Text)] -> [T.Text]
+atomIdsOf label ls = nub [a | (l, a) <- ls, l == label]
+
+limb :: [T.Text]
+limb =
+  [ "GIVEN p IS A BOOLEAN"
+  , "      q IS A BOOLEAN"
+  , "DECIDE `limb` p q IF p AND q"
+  , ""
+  ]
+
+-- | @leading@ inputs shift every resolver unique after them (as in
+-- "LadderAtomIdSpec"), so a test that passes by a coincidence of numbering
+-- fails under one of the two.
+booleans :: [T.Text] -> [T.Text]
+booleans [] = []
+booleans (n : ns) = ("GIVEN " <> n <> " IS A BOOLEAN") : map (\m -> "      " <> m <> " IS A BOOLEAN") ns
+
+caller :: [T.Text] -> T.Text -> [T.Text] -> [T.Text] -> T.Text
+caller leading name inputs body =
+  T.unlines $ limb <> booleans (leading <> inputs) <>
+    ["DECIDE `" <> name <> "` " <> T.unwords (leading <> inputs) <> " IF"] <> body
+
+creditworthy :: T.Text
+creditworthy = T.unlines
+  [ "DECLARE Person"
+  , "  HAS `has stable income`   IS A BOOLEAN"
+  , "      `has recent default`  IS A BOOLEAN"
+  , "      `has collateral`      IS A BOOLEAN"
+  , ""
+  , "GIVEN p IS A Person"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE `is creditworthy` p IF"
+  , "      p's `has stable income`"
+  , "  AND NOT p's `has recent default`"
+  , ""
+  , "GIVEN a IS A Person"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE `record pass through` a IF"
+  , "      `is creditworthy` a"
+  , "  AND a's `has stable income`"
+  , ""
+  , "GIVEN a IS A Person"
+  , "      b IS A Person"
+  , "GIVETH A BOOLEAN"
+  , "DECIDE `may lend jointly` a b IF"
+  , "      `is creditworthy` a"
+  , "  AND `is creditworthy` b"
+  , "  AND (   a's `has collateral`"
+  , "       OR b's `has collateral`"
+  , "       OR `is creditworthy` a )"
+  ]
+
+spec :: Spec
+spec = describe "call expansions on the ladder's render path (WHERE-INLINING-SPEC §10)" $ do
+  let numberings =
+        [ (name <> simplified, leading, simplify)
+        | (name, leading) <- [("as written", []), ("shifted by one unused input", ["z"])]
+        , (simplified, simplify) <- [("", False), (", simplified", True)]
+        ]
+
+  mapM_ (\(numbering, leading, simplify) -> describe numbering $ do
+    let n = show (length leading) <> (if simplify then "s" else "")
+        renderS = renderWith simplify
+
+    it "(i) an argument inlined from `limb a b AND a` is the caller's own `a`" $ do
+      r <- renderS ("pass-" <> n) (caller leading "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
+      x <- expansionOf "limb OF a, b" r.funDecl
+      let direct = [a | (V.UBoolVar _ nm _ _ a _ _) <- topConjuncts r.funDecl.body, nm.label == "a"]
+      direct `shouldSatisfy` ((== 1) . length)
+      atomIdsOf "a" (allLeaves x) `shouldBe` direct
+
+    it "(ii) `limb a b AND limb c d`: the two expansions share no atomId" $ do
+      r <- renderS ("diff-" <> n) (caller leading "different actuals" ["a", "b", "c", "d"] ["      `limb` a b", "  AND `limb` c d"]) "`different actuals`"
+      x1 <- expansionOf "limb OF a, b" r.funDecl
+      x2 <- expansionOf "limb OF c, d" r.funDecl
+      let ids1 = map snd (allLeaves x1)
+          ids2 = map snd (allLeaves x2)
+      [i | i <- ids1, i `elem` ids2] `shouldBe` []
+      map fst (allLeaves x1) `shouldBe` ["a", "b"]
+      map fst (allLeaves x2) `shouldBe` ["c", "d"]
+
+    it "(iii) `limb a b AND limb a b`: the two expansions are pairwise the same atoms" $ do
+      r <- renderS ("same-" <> n) (caller leading "same actuals" ["a", "b"] ["      `limb` a b", "  AND `limb` a b"]) "`same actuals`"
+      case [x | (l, Just x) <- calls r.funDecl.body, l == "limb OF a, b"] of
+        [x1, x2] -> do
+          allLeaves x1 `shouldBe` allLeaves x2
+          length (allLeaves x1) `shouldBe` 2
+        other -> expectationFailure ("expected two expanded calls, found " <> show (length other))
+    ) numberings
+
+  it "(iv) a record argument: the inlined `a's has stable income` links to the direct one" $ do
+    r <- render "record" creditworthy "`record pass through`"
+    x <- expansionOf "`is creditworthy` OF a" r.funDecl
+    let inlined = [l | (l, _) <- allLeaves x]
+    inlined `shouldSatisfy` all ("a's " `T.isPrefixOf`)
+    let direct = atomIdsOf "a's `has stable income`" (directLeaves r.funDecl.body)
+    direct `shouldSatisfy` ((== 1) . length)
+    atomIdsOf "a's `has stable income`" (allLeaves x) `shouldBe` direct
+    -- and the other inlined atom is a different proposition
+    let recentDefault = atomIdsOf "a's `has recent default`" (allLeaves x)
+    recentDefault `shouldSatisfy` ((== 1) . length)
+    recentDefault `shouldSatisfy` all (`notElem` direct)
+
+  it "(v) an all-BOOLEAN call (a V.App) has an expansion" $ do
+    r <- render "app" (caller [] "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
+    [isJust x | V.App _ nm _ _ x <- topConjuncts r.funDecl.body, nm.label == "limb OF a, b"] `shouldBe` [True]
+
+  it "(vi) a recursive rule terminates and is expanded exactly one level" $ do
+    let src = T.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `counts down` n IF"
+          , "      n <= 0"
+          , "   OR `counts down` (n - 1)"
+          ]
+    -- Under a timeout, so a guard that fails reports instead of hanging: the
+    -- whole render runs inside it, since knowing that 'Ladder.doVisualize'
+    -- succeeded already means translating every expansion.
+    depth <- timeout 20000000 (render "recursive" src "`counts down`" >>= evaluate . expansionDepth . (.funDecl.body))
+    depth `shouldBe` Just 1
+
+  it "(vii) l4/inlineExprs keeps every atomId of the render path" $ do
+    r <- render "joint" creditworthy "`may lend jointly`"
+    let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body, nm.label == "`is creditworthy` OF a"]
+    u <- case callUniques of
+      (u : _) -> pure u
+      [] -> fail "no `is creditworthy` OF a call leaf"
+    case renderAfterInlining r.vizState r.decide [u] of
+      Left e -> expectationFailure (show e)
+      Right (_, info, _, _) -> do
+        let drawn = allLeaves r.funDecl.body
+            unfolded = directLeaves info.funDecl.body
+            -- untouched by the expand
+            untouched = ["a's `has collateral`", "b's `has collateral`"]
+        mapM_ (\l -> atomIdsOf l unfolded `shouldBe` atomIdsOf l drawn) untouched
+        mapM_ (\l -> atomIdsOf l drawn `shouldSatisfy` ((== 1) . length)) untouched
+        -- and what the expand drew directly is what the expansion drew inline
+        atomIdsOf "a's `has stable income`" unfolded `shouldBe` atomIdsOf "a's `has stable income`" drawn
+
+  it "(vii-b) l4/inlineExprs: two calls' copies of a callee's WHERE local are two propositions" $ do
+    -- Unfolding copied the callee's body WITH its WHERE block, once per call, and
+    -- each copy kept the local's one unique, so `big` from `ok x` and `big` from
+    -- `ok y` were one atom though one means x > 3 and the other y > 3 (found by
+    -- adversarial review of smucclaw/l4-ide#1013). The locals are inlined first now.
+    let src = T.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `ok` n IF `big`"
+          , "  WHERE `big` MEANS n GREATER THAN 3"
+          , ""
+          , "GIVEN x IS A NUMBER"
+          , "      y IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `x qualifies and y does not` x y IF `ok` x AND NOT `ok` y"
+          ]
+    r <- render "inline-where" src "`x qualifies and y does not`"
+    let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+    callUniques `shouldSatisfy` (not . null)
+    case renderAfterInlining r.vizState r.decide callUniques of
+      Left e -> expectationFailure (show e)
+      Right (_, info, _, _) -> do
+        let ls = directLeaves info.funDecl.body
+        length ls `shouldBe` 2
+        length (nub (map snd ls)) `shouldBe` 2
+
+  describe "(viii) a callee's WHERE definitions are inlined, not drawn as names (A1)" $ do
+    -- A local name has ONE unique in every call of its rule and means something
+    -- different in each. Drawn as a leaf keyed by its name, it linked
+    -- propositions that are not the same; each case below did, measured on the
+    -- wire 2026-10-05 (scratchpad ladder/attack-identity/, confrev-where.l4).
+    let localNames = ["ok", "both", "helper OF b", "helper OF q", "p", "q", "r"]
+        expansionLabels rr = nub [l | (Just x) <- map snd (calls rr.funDecl.body), (l, _) <- allLeaves x]
+
+    it "`ok WHERE ok MEANS p`, called with a and with b: two propositions, each the caller's input" $ do
+      let src = T.unlines $
+            [ "GIVEN p IS A BOOLEAN"
+            , "DECIDE `callee ok` p IF ok"
+            , "  WHERE ok MEANS p"
+            , ""
+            ] <> booleans ["a", "b"] <>
+            [ "DECIDE `two actuals` a b IF `callee ok` a AND `callee ok` b" ]
+      r <- render "where-ok" src "`two actuals`"
+      xa <- expansionOf "`callee ok` OF a" r.funDecl
+      xb <- expansionOf "`callee ok` OF b" r.funDecl
+      let directA = atomIdsOf "a" (directLeaves r.funDecl.body)
+          directB = atomIdsOf "b" (directLeaves r.funDecl.body)
+      directA `shouldSatisfy` ((== 1) . length)
+      directB `shouldSatisfy` ((== 1) . length)
+      allLeaves xa `shouldBe` map ("a",) directA
+      allLeaves xb `shouldBe` map ("b",) directB
+
+    it "a callee's local named like the caller's input is drawn as what it means, under its NOT" $ do
+      let src = T.unlines $
+            [ "GIVEN p IS A BOOLEAN"
+            , "DECIDE contrary p IF a"
+            , "  WHERE a MEANS NOT p"
+            , ""
+            ] <> booleans ["a"] <>
+            [ "DECIDE `shadowing local` a IF contrary a OR a" ]
+      r <- render "where-shadow" src "`shadowing local`"
+      x <- expansionOf "contrary OF a" r.funDecl
+      let direct = [i | (V.UBoolVar _ nm _ _ i _ _) <- topDisjuncts r.funDecl.body, nm.label == "a"]
+      direct `shouldSatisfy` ((== 1) . length)
+      case x of
+        V.Not _ (V.UBoolVar _ nm _ _ i _ _) -> (nm.label, [i]) `shouldBe` ("a", direct)
+        other -> expectationFailure ("expected NOT a, got " <> show other)
+
+    it "caller and callee both define `both`, with different bodies: no expansion leaf is the caller's `both`" $ do
+      let src = T.unlines $
+            [ "GIVEN p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "DECIDE guarded p q IF both"
+            , "  WHERE both MEANS p AND q"
+            , ""
+            ] <> booleans ["a", "b"] <>
+            [ "DECIDE `two boths` a b IF guarded a b AND both"
+            , "  WHERE both MEANS a OR b"
+            ]
+      r <- render "where-both" src "`two boths`"
+      x <- expansionOf "guarded OF a, b" r.funDecl
+      let callers = atomIdsOf "both" (directLeaves r.funDecl.body)
+      callers `shouldSatisfy` ((== 1) . length)
+      map fst (allLeaves x) `shouldBe` ["a", "b"]
+      map snd (allLeaves x) `shouldSatisfy` all (`notElem` callers)
+
+    it "two callees whose locals alias different fields of one record: different propositions" $ do
+      let src = T.unlines
+            [ "DECLARE Person"
+            , "  HAS `is resident` IS A BOOLEAN"
+            , "      `is adult`    IS A BOOLEAN"
+            , ""
+            , "GIVEN p IS A Person"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `resident check` p IF ok"
+            , "  WHERE ok MEANS p's `is resident`"
+            , ""
+            , "GIVEN p IS A Person"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `adult check` p IF ok"
+            , "  WHERE ok MEANS p's `is adult`"
+            , ""
+            , "GIVEN a IS A Person"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `two field locals` a IF `resident check` a AND `adult check` a"
+            ]
+      r <- render "where-fields" src "`two field locals`"
+      xr <- expansionOf "`resident check` OF a" r.funDecl
+      xa <- expansionOf "`adult check` OF a" r.funDecl
+      map fst (allLeaves xr) `shouldBe` ["a's `is resident`"]
+      map fst (allLeaves xa) `shouldBe` ["a's `is adult`"]
+      [i | (_, i) <- allLeaves xr, i `elem` map snd (allLeaves xa)] `shouldBe` []
+
+    it "a parameterised local is beta-reduced too: different actuals share only the shared input" $ do
+      let src args2 = T.unlines $
+            [ "GIVEN p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "DECIDE `guarded` p q IF both AND `helper` q"
+            , "  WHERE"
+            , "    both MEANS p AND q"
+            , "    GIVEN r IS A BOOLEAN"
+            , "    `helper` r MEANS p AND r"
+            , ""
+            ] <> booleans ["a", "b", "c", "d"] <>
+            [ "DECIDE `two calls` a b c d IF"
+            , "      `guarded` a b"
+            , "  AND `guarded` " <> args2
+            ]
+      rDiff <- render "where-diff" (src "c b") "`two calls`"
+      rSame <- render "where-same" (src "a b") "`two calls`"
+      expansionLabels rDiff `shouldSatisfy` all (`notElem` localNames)
+      expansionLabels rSame `shouldSatisfy` all (`notElem` localNames)
+      case [x | (_, Just x) <- calls rDiff.funDecl.body] of
+        [x1, x2] -> do
+          let shared = nub [i | (_, i) <- allLeaves x1, i `elem` map snd (allLeaves x2)]
+          shared `shouldBe` atomIdsOf "b" (directLeaves rDiff.funDecl.body)
+          shared `shouldSatisfy` ((== 1) . length)
+        other -> expectationFailure ("expected two expansions, found " <> show (length other))
+      case [x | (_, Just x) <- calls rSame.funDecl.body] of
+        [x1, x2] -> allLeaves x1 `shouldBe` allLeaves x2
+        other -> expectationFailure ("expected two expansions, found " <> show (length other))
+
+    it "a call whose body keeps a local binding (a recursive WHERE) is not expanded" $ do
+      let src = T.unlines $
+            [ "GIVEN p IS A BOOLEAN"
+            , "DECIDE `loops` p IF spin"
+            , "  WHERE spin MEANS p AND spin"
+            , ""
+            ] <> booleans ["a"] <>
+            [ "DECIDE `calls a loop` a IF `loops` a AND a" ]
+      r <- render "where-recursive" src "`calls a loop`"
+      [x | (l, x) <- calls r.funDecl.body, l == "loops OF a"] `shouldBe` [Nothing]
+      -- positive control: the same call to a body without the local IS expanded
+      r' <- render "where-recursive-ctl" (T.replace "spin\n  WHERE spin MEANS p AND spin" "p" src) "`calls a loop`"
+      [isJust x | (l, x) <- calls r'.funDecl.body, l == "loops OF a"] `shouldBe` [True]
+
+  describe "atomIds of rules a callee reads (S5)" $ do
+    -- That the rule's atomId survives a line added above it is pinned below. It
+    -- used not to: a ref to a module rule that was not a plan variable rendered
+    -- by its unique. An atomId is now the hash of the leaf's term, which names a
+    -- module rule by its path (R3, "L4.Viz.AtomKey").
+    let shadowSrc = T.unlines
+          [ "DECIDE ready IF TRUE"
+          , ""
+          , "GIVEN p IS A BOOLEAN"
+          , "DECIDE gate p IF p AND ready"
+          , ""
+          , "GIVEN a IS A BOOLEAN"
+          , "      ready IS A BOOLEAN"
+          , "DECIDE `shadow caller` a ready IF gate a AND ready"
+          ]
+        inlinedReady rr = do
+          x <- expansionOf "gate OF a" rr.funDecl
+          pure (atomIdsOf "ready" (allLeaves x))
+
+    it "a caller's input that shadows the module's rule is not the rule the callee reads" $ do
+      r <- render "global-shadow" shadowSrc "`shadow caller`"
+      inlined <- inlinedReady r
+      let direct = atomIdsOf "ready" (directLeaves r.funDecl.body)
+      direct `shouldSatisfy` ((== 1) . length)
+      inlined `shouldSatisfy` ((== 1) . length)
+      inlined `shouldSatisfy` all (`notElem` direct)
+
+    it "the module rule's atomId survives a line added above it" $ do
+      r <- render "global-shadow" shadowSrc "`shadow caller`"
+      r' <- render "global-shadow-shifted" (T.unlines ["GIVEN z IS A BOOLEAN", "DECIDE unrelated z IF z", ""] <> shadowSrc) "`shadow caller`"
+      inlined <- inlinedReady r
+      inlined' <- inlinedReady r'
+      inlined `shouldSatisfy` ((== 1) . length)
+      inlined' `shouldBe` inlined
+      allLeaves r'.funDecl.body `shouldBe` allLeaves r.funDecl.body
+
+    it "a call with a module rule as its argument has one atomId drawn directly and inside another call's expansion" $ do
+      let src = T.unlines
+            [ "GIVEN p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "DECIDE limb p q IF p AND q"
+            , ""
+            , "DECIDE `the season is open` IF TRUE"
+            , ""
+            , "GIVEN r IS A BOOLEAN"
+            , "DECIDE wrap r IF limb `the season is open` r"
+            , ""
+            , "GIVEN a IS A BOOLEAN"
+            , "DECIDE outer a IF limb `the season is open` a AND wrap a"
+            ]
+      r <- render "global-arg" src "outer"
+      let label = "limb OF `the season is open`, a"
+          ids = atomIdsOf label (allLeaves r.funDecl.body)
+      length [() | (l, _) <- allLeaves r.funDecl.body, l == label] `shouldBe` 2
+      ids `shouldSatisfy` ((== 1) . length)
+
+  it "an expansion's atomIds do not move when a line is added above" $ do
+    let src = T.unlines $
+          [ "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "DECIDE c1 p q IF `helper` q"
+          , "  WHERE"
+          , "    GIVEN x IS A BOOLEAN"
+          , "    `helper` x MEANS x AND p"
+          , ""
+          , "GIVEN p IS A BOOLEAN"
+          , "      q IS A BOOLEAN"
+          , "DECIDE c2 p q IF `helper` q"
+          , "  WHERE"
+          , "    GIVEN x IS A BOOLEAN"
+          , "    `helper` x MEANS x AND NOT p"
+          , ""
+          ] <> booleans ["a", "b"] <>
+          [ "DECIDE `two helpers` a b IF c1 a b AND c2 a b" ]
+    r <- render "helper" src "`two helpers`"
+    r' <- render "helper-shifted" (T.unlines ["GIVEN z IS A BOOLEAN", "DECIDE unrelated z IF z", ""] <> src) "`two helpers`"
+    allLeaves r.funDecl.body `shouldSatisfy` (not . null)
+    allLeaves r'.funDecl.body `shouldBe` allLeaves r.funDecl.body
+
+  it "expansions stop at the decision's node budget" $ do
+    -- Each level calls the one below twice, so fully expanded the top call
+    -- would draw 2^12 leaves: far past the budget.
+    let level :: Int -> [T.Text]
+        level 0 = ["GIVEN a IS A BOOLEAN", "      b IS A BOOLEAN", "DECIDE `r0` a b IF a AND b", ""]
+        level k =
+          [ "GIVEN a IS A BOOLEAN", "      b IS A BOOLEAN"
+          , "DECIDE `r" <> T.pack (show k) <> "` a b IF `r" <> T.pack (show (k - 1)) <> "` a b OR `r" <> T.pack (show (k - 1)) <> "` b a"
+          , "" ]
+        src = T.unlines (concatMap level [0 .. 12])
+    r <- render "budget" src "r12"
+    let inExpansions = length (universeIR r.funDecl.body) - length (directUniverse r.funDecl.body)
+    inExpansions `shouldSatisfy` (<= Ladder.expansionNodeBudget)
+    inExpansions `shouldSatisfy` (> 0)
+    -- some call somewhere was left unexpanded
+    [() | V.App _ _ _ _ Nothing <- universeIR r.funDecl.body] `shouldSatisfy` (not . null)
+    -- and the depth is uniform: both calls the rule makes are expanded, so the
+    -- first in reading order did not eat the budget
+    map (isJust . snd) (calls r.funDecl.body) `shouldBe` [True, True]
+
+  describe "a call with named arguments is expanded as its positional call (smucclaw/l4-ide#1033, gap 1)" $ do
+    let big = T.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `caller` IF"
+          , "      `big` WITH k IS n"
+          , "  AND `big` n"
+          , ""
+          , "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `named alone` IF `big` WITH k IS n"
+          , ""
+          , "GIVEN k IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `big` k IF k > 3"
+          ]
+
+    it "the issue's repro: both spellings open, onto the same atoms" $ do
+      r <- render "named-big" big "caller"
+      named <- expansionOf "big WITH k IS n" r.funDecl
+      positional <- expansionOf "big OF n" r.funDecl
+      allLeaves named `shouldBe` allLeaves positional
+      length (allLeaves named) `shouldBe` 1
+      -- and the two call boxes are one atom, as R3 already keyed them
+      atomIdsOf "big WITH k IS n" (directLeaves r.funDecl.body)
+        `shouldBe` atomIdsOf "big OF n" (directLeaves r.funDecl.body)
+
+    it "written alone, a named call opens" $ do
+      r <- render "named-alone" big "`named alone`"
+      x <- expansionOf "big WITH k IS n" r.funDecl
+      length (allLeaves x) `shouldBe` 1
+
+    it "an all-BOOLEAN named call, arguments out of order: each is put in for the parameter it names" $ do
+      let src = caller [] "named limb" ["a", "b"]
+            [ "      `limb` WITH q IS b, p IS a"
+            , "  AND a"
+            , "  AND b"
+            ]
+      r <- render "named-limb" src "`named limb`"
+      case [(nm.label, args, x) | V.App _ nm args _ x <- topConjuncts r.funDecl.body] of
+        [(label, args, Just x)] -> do
+          label `shouldSatisfy` ("limb WITH" `T.isPrefixOf`)
+          -- the argument boxes are drawn as written: q's first
+          map fst (concatMap directLeaves args) `shouldBe` ["b", "a"]
+          -- the expansion is p AND q with p := a and q := b, each the caller's own
+          map fst (allLeaves x) `shouldBe` ["a", "b"]
+          map snd (allLeaves x) `shouldBe` (atomIdsOf "a" (directLeaves r.funDecl.body) <> atomIdsOf "b" (directLeaves r.funDecl.body))
+        other -> expectationFailure ("expected one expanded limb call, found " <> show (length other))
+
+    it "a named call and the positional call it stands for share their atomId; the swapped call does not" $ do
+      let src = caller [] "named and swapped" ["a", "b"]
+            [ "      `limb` WITH q IS b, p IS a"
+            , "  AND `limb` a b"
+            , "  AND `limb` WITH q IS a, p IS b"
+            ]
+      r <- render "named-swapped" src "`named and swapped`"
+      case [(nm.label, i) | V.App _ nm _ i _ <- topConjuncts r.funDecl.body] of
+        [(_, named), (_, positional), (_, swapped)] -> do
+          named `shouldBe` positional
+          swapped `shouldNotBe` positional
+        other -> expectationFailure ("expected three calls, found " <> show (length other))
+
+    it "l4/inlineExprs unfolds a named call leaf" $ do
+      r <- render "named-inline" big "`named alone`"
+      x <- expansionOf "big WITH k IS n" r.funDecl
+      let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+      callUniques `shouldSatisfy` ((== 1) . length)
+      case renderAfterInlining r.vizState r.decide callUniques of
+        Left e -> expectationFailure (show e)
+        Right (_, info, _, _) -> directLeaves info.funDecl.body `shouldBe` allLeaves x
+
+    it "a named call the checker rejected stays a closed leaf" $ do
+      -- The IDE draws a module with type errors in it. The checker recovers from
+      -- a misspelt or repeated argument name, and from a named call to a rule of
+      -- no parameters, with an order that can look complete; such a call opened
+      -- onto a meaning the checker refused (found by adversarial review).
+      let src = T.unlines
+            [ "GIVEN a IS A BOOLEAN"
+            , "      b IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `asym` IF a AND (NOT b)"
+            , ""
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `nullary` IF TRUE AND FALSE"
+            , ""
+            , "GIVEN p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `rejected` IF"
+            , "      (`asym` WITH b IS q, aa IS p)"
+            , "  AND (`asym` WITH b IS q, b IS p)"
+            , "  AND (`nullary` WITH zz IS p)"
+            , "  AND (`asym` WITH b IS q, a IS p)"
+            ]
+      r <- render "named-rejected" src "rejected"
+      -- every named call is drawn; only the last, which the checker accepted,
+      -- is a call, and opens
+      let drawn = flip concatMap (directUniverse r.funDecl.body) \case
+            V.UBoolVar _ nm _ ci _ _ x | "WITH" `T.isInfixOf` nm.label -> [(ci, isJust x)]
+            V.App _ _ _ _ x -> [(True, isJust x)]
+            _ -> []
+      drawn `shouldBe` [(False, False), (False, False), (False, False), (True, True)]
+
+    it "a WHERE helper called by name is keyed as its unfolding, as one called positionally is" $ do
+      let src spelling = T.unlines
+            [ "GIVEN x IS A NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `local helper` x IF " <> spelling <> " OR x > 3"
+            , "  WHERE"
+            , "    GIVEN r IS A NUMBER"
+            , "    `helper` r MEANS r > 3"
+            ]
+      -- parenthesised: a WITH argument runs to the end of the line, OR included
+      rNamed <- render "named-local" (src "(`helper` WITH r IS x)") "`local helper`"
+      rPositional <- render "positional-local" (src "(`helper` x)") "`local helper`"
+      let ids rr = nub (map snd (directLeaves rr.funDecl.body))
+      ids rNamed `shouldSatisfy` ((== 1) . length)
+      ids rNamed `shouldBe` ids rPositional
+
+  describe "a polymorphic callee's IF is drawn as structure (smucclaw/l4-ide#1033, gap 2)" $ do
+    let src polymorphic = T.unlines $
+          (if polymorphic
+             then [ "GIVEN a    IS A TYPE"
+                  , "      cond IS A BOOLEAN"
+                  , "      x    IS AN a"
+                  , "      y    IS AN a"
+                  , "GIVETH AN a"
+                  ]
+             else [ "GIVEN cond IS A BOOLEAN"
+                  , "      x    IS A BOOLEAN"
+                  , "      y    IS A BOOLEAN"
+                  , "GIVETH A BOOLEAN"
+                  ]) <>
+          [ "`whichever applies` cond x y MEANS IF cond THEN x ELSE y"
+          , ""
+          , "GIVEN `is a resident`       IS A BOOLEAN"
+          , "      `holds a work pass`   IS A BOOLEAN"
+          , "      `has a local sponsor` IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `may apply` IF"
+          , "      `whichever applies` `is a resident` `holds a work pass` `has a local sponsor`"
+          , "  OR  (IF `is a resident` THEN `holds a work pass` ELSE `has a local sponsor`)"
+          ]
+        callLabel = "`whichever applies` OF `is a resident`, `holds a work pass`, `has a local sponsor`"
+        inputs = ["`is a resident`", "`holds a work pass`", "`has a local sponsor`"]
+
+    it "the issue's repro: the expansion's leaves are the caller's own inputs" $ do
+      r <- render "poly-if" (src True) "`may apply`"
+      x <- expansionOf callLabel r.funDecl
+      nub (map fst (allLeaves x)) `shouldMatchList` inputs
+      let direct = [l | l <- directLeaves r.funDecl.body, fst l `elem` inputs]
+      nub (allLeaves x) `shouldMatchList` nub direct
+
+    it "control: the monomorphic callee draws the same leaves" $ do
+      r <- render "poly-if-mono" (src False) "`may apply`"
+      rPoly <- render "poly-if" (src True) "`may apply`"
+      x <- expansionOf callLabel r.funDecl
+      xPoly <- expansionOf callLabel rPoly.funDecl
+      map fst (allLeaves xPoly) `shouldBe` map fst (allLeaves x)
+
+    it "an untyped lambda in a polymorphic body keys as the caller's identical lambda" $ do
+      -- The lambda's parameter type is an inference variable in the syntax, in the
+      -- callee and in the caller alike; resolving it in the callee's copy only
+      -- printed and keyed it as NUMBER (found by adversarial review).
+      let lambdaSrc = T.unlines
+            [ "GIVEN f  IS A FUNCTION FROM NUMBER TO BOOLEAN"
+            , "      xs IS A LIST OF NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "`every number` f xs MEANS"
+            , "  CONSIDER xs"
+            , "  WHEN EMPTY THEN TRUE"
+            , "  WHEN h FOLLOWED BY t THEN f h AND `every number` f t"
+            , ""
+            , "GIVEN a    IS A TYPE"
+            , "      cond IS A BOOLEAN"
+            , "      nums IS A LIST OF NUMBER"
+            , "      x    IS AN a"
+            , "      y    IS AN a"
+            , "GIVETH AN a"
+            , "`pick` cond nums x y MEANS IF cond AND `every number` (GIVEN n YIELD n > 0) nums THEN x ELSE y"
+            , ""
+            , "GIVEN p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "      r IS A BOOLEAN"
+            , "      ns IS A LIST OF NUMBER"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `caller` IF"
+            , "      (`pick` p ns q r)"
+            , "  OR  (`every number` (GIVEN n YIELD n > 0) ns)"
+            ]
+          everyNumber = T.isPrefixOf "`every number`" . fst
+      r <- render "poly-lambda" lambdaSrc "caller"
+      let direct = filter everyNumber (directLeaves r.funDecl.body)
+          inside = filter everyNumber (allLeaves r.funDecl.body) \\ direct
+      direct `shouldSatisfy` ((== 1) . length)
+      inside `shouldSatisfy` (not . null)
+      nub inside `shouldBe` direct
+
+    it "l4/inlineExprs on a polymorphic call draws what its expansion drew" $ do
+      let colourSrc = T.unlines
+            [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+            , ""
+            , "GIVEN a IS A TYPE"
+            , "      k IS A Colour"
+            , "      x IS AN a"
+            , "      y IS AN a"
+            , "GIVETH AN a"
+            , "`by colour` k x y MEANS IF k EQUALS Red THEN x ELSE y"
+            , ""
+            , "GIVEN k IS A Colour"
+            , "      p IS A BOOLEAN"
+            , "      q IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE `caller` IF `by colour` k p q"
+            ]
+      r <- render "poly-inline" colourSrc "caller"
+      let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+      callUniques `shouldSatisfy` ((== 1) . length)
+      x <- case [x | V.UBoolVar _ _ _ True _ _ (Just x) <- universeIR r.funDecl.body] of
+        [x] -> pure x
+        other -> fail ("expected one expanded call, found " <> show (length other))
+      length (allLeaves x) `shouldSatisfy` (> 1)
+      case renderAfterInlining r.vizState r.decide callUniques of
+        Left e -> expectationFailure (show e)
+        Right (_, info, _, _) -> directLeaves info.funDecl.body `shouldBe` allLeaves x
+
+  -- A BOOLEAN rule written as DECIDE clauses is read through to the CONSIDER it
+  -- stands for before it is drawn, so a call in one of its clauses is the call
+  -- box of the hand-written CONSIDER: the same label, the same atomId and the
+  -- same panel. Each form is its own module with the same names, as two
+  -- deployments of one rule are, so that their atomIds can be compared.
+  describe "a rule written as DECIDE clauses" $ do
+    let header =
+          [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+          , ""
+          , "GIVEN x IS A BOOLEAN"
+          , "      y IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE `both hold` x y IS x AND y"
+          , ""
+          , "GIVEN c IS A Colour"
+          , "      a IS A BOOLEAN"
+          , "      b IS A BOOLEAN"
+          , "GIVETH A BOOLEAN"
+          ]
+        clauses =
+          [ "DECIDE rule Red a b IS `both hold` a b"
+          , "DECIDE rule c a b IS a OR b"
+          ]
+        hand =
+          [ "DECIDE rule c a b IS"
+          , "  CONSIDER c"
+          , "    WHEN Red THEN `both hold` a b"
+          , "    OTHERWISE a OR b"
+          ]
+    it "draws a call in a clause as the hand-written CONSIDER draws it: box, atomIds and panel" $ do
+      rC <- render "clauses-call" (T.unlines (header <> clauses)) "rule"
+      rH <- render "hand-call" (T.unlines (header <> hand)) "rule"
+      -- the call is a box that opens, so the comparison below covers a panel
+      [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+      withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
+    -- A called rule written as clauses opens onto the CONSIDER it stands for, as
+    -- it is drawn on its own, not onto the nested CONSIDERs it compiles to.
+    it "opens a call to a clause group onto the panel of a call to its hand-written CONSIDER" $ do
+      let calling callee = T.unlines $
+            [ "DECLARE Colour IS ONE OF Red, Green, Blue", "", "GIVEN c IS A Colour", "GIVETH A BOOLEAN" ]
+            <> callee
+            <> [ "", "GIVEN c IS A Colour", "      a IS A BOOLEAN", "GIVETH A BOOLEAN", "DECIDE rule c a IS warm c AND a" ]
+      rC <- render "calls-clauses" (calling ["DECIDE warm Red IS TRUE", "DECIDE warm Green IS FALSE", "DECIDE warm Blue IS FALSE"]) "rule"
+      rH <- render "calls-hand" (calling ["DECIDE warm c IS", "  CONSIDER c", "    WHEN Red THEN TRUE", "    WHEN Green THEN FALSE", "    WHEN Blue THEN FALSE"]) "rule"
+      [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+      withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
+    -- A called rule written as a table of clauses is read as its CONSIDER before
+    -- anything else is put in. In the other order the clauses' shared
+    -- fall-through was walked once for every branch that reached it: a rule
+    -- written by hand calling a four-by-four table took 44 s to draw, and a
+    -- five-by-five one did not finish in two minutes.
+    it "draws a call to a 25-row table of two enums in moments, opening onto its CONSIDER" $ do
+      let values prefix = [prefix <> T.pack (show i) | i <- [0 .. 4 :: Int]]
+          table = [(a, b, if (i * 3 + j) `mod` 4 == 0 then "FALSE" else "TRUE") | (i, a) <- zip [0 :: Int ..] (values "A"), (j, b) <- zip [0 :: Int ..] (values "B")]
+          calling callee = T.unlines $
+            [ "DECLARE C1 IS ONE OF " <> T.intercalate ", " (values "A")
+            , "DECLARE C2 IS ONE OF " <> T.intercalate ", " (values "B")
+            , ""
+            , "GIVEN x IS A C1"
+            , "      y IS A C2"
+            , "GIVETH A BOOLEAN" ]
+            <> callee
+            <> [ "", "GIVEN p IS A C1", "      q IS A C2", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE rule p q f IS callee p q OR f" ]
+          clauseTable = ["DECIDE callee " <> a <> " " <> b <> " IS " <> v | (a, b, v) <- table]
+          handTable =
+            ["DECIDE callee x y IS", "  CONSIDER x"]
+              <> concat
+                   [ ["    WHEN " <> a <> " THEN", "      CONSIDER y"] <> ["        WHEN " <> b <> " THEN " <> v | (a', b, v) <- table, a' == a]
+                   | a <- values "A" ]
+      drawn <- timeout 60000000 $ do
+        rC <- render "calls-table" (calling clauseTable) "rule"
+        rH <- render "calls-table-hand" (calling handTable) "rule"
+        _ <- evaluate (BL.length (Aeson.encode rC.funDecl.body) + BL.length (Aeson.encode rH.funDecl.body))
+        pure (rC, rH)
+      case drawn of
+        Nothing -> expectationFailure "drawing a call to a 25-row clause table did not finish within 60 s"
+        Just (rC, rH) -> do
+          [isJust x | (_, x) <- calls rC.funDecl.body] `shouldBe` [True]
+          withoutIds (Aeson.toJSON rC.funDecl.body) `shouldBe` withoutIds (Aeson.toJSON rH.funDecl.body)
+
+    -- A call to a rule written as clauses too long to read through is not
+    -- offered for expansion, and the expand gesture leaves it as it is. The
+    -- gesture used to unfold it raw, its clauses' LETs drawn as one leaf, and
+    -- with long clause bodies gave no answer in 100 s (review).
+    it "does not offer to expand a call to clauses too long to read through, and leaves it as it is" $ do
+      -- Eleven clauses over two MAYBE inputs, whose binding patterns the pruning
+      -- learns nothing from, pass the 20,000-part bound (as in l4-cli-test).
+      let src = T.unlines $
+            [ "GIVEN m IS A MAYBE NUMBER", "      k IS A MAYBE NUMBER", "GIVETH A BOOLEAN" ]
+            <> [ "DECIDE bigrule (JUST x) (JUST y) IS x GREATER THAN " <> T.pack (show i) <> " AND y GREATER THAN " <> T.pack (show i) | i <- [0 .. 10 :: Int] ]
+            <> [ "DECIDE bigrule m k IS FALSE", ""
+               , "GIVEN p IS A MAYBE NUMBER", "      q IS A MAYBE NUMBER", "      f IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE caller p q f IS bigrule p q OR f" ]
+      done <- timeout 60000000 $ do
+        r <- render "too-long-callee" src "caller"
+        let callLeaves = [(nm.unique, offered) | V.UBoolVar _ nm _ offered _ _ _ <- universeIR r.funDecl.body, "bigrule" `T.isInfixOf` nm.label]
+        _ <- evaluate (length callLeaves)
+        let unfolded = case renderAfterInlining r.vizState r.decide (map fst callLeaves) of
+              Left _ -> Nothing
+              Right (_, info, _, _) -> Just (withoutIds (Aeson.toJSON info.funDecl.body))
+        _ <- evaluate (BL.length (Aeson.encode unfolded))
+        pure (withoutIds (Aeson.toJSON r.funDecl.body), callLeaves, unfolded)
+      case done of
+        Nothing -> expectationFailure "drawing, or expanding, a call to clauses too long to read through did not finish within 60 s"
+        Just (drawnBody, callLeaves, unfolded) -> do
+          map snd callLeaves `shouldBe` [False]
+          unfolded `shouldBe` Just drawnBody
+
+    -- The limit on a ladder drawn from clauses is about the rule as written. A
+    -- rule written by hand that has a large clause group unfolded into it by the
+    -- expand gesture is still a rule written by hand, and is drawn.
+    it "l4/inlineExprs on a hand-written caller of a large clause group is drawn, not refused" $ do
+      let src = T.unlines $
+            [ "GIVEN n IS A NUMBER", "GIVETH A BOOLEAN" ]
+            <> [ "DECIDE callee " <> T.pack (show i) <> " IS " <> (if even i then "TRUE" else "FALSE") | i <- [0 .. 599 :: Int] ]
+            <> [ "DECIDE callee n IS FALSE", ""
+               , "GIVEN q IS A NUMBER", "      flag IS A BOOLEAN", "GIVETH A BOOLEAN"
+               , "DECIDE caller q flag IS callee q OR flag" ]
+      r <- render "inline-large-group" src "caller"
+      let callUniques = [nm.unique | V.UBoolVar _ nm _ True _ _ _ <- universeIR r.funDecl.body]
+      callUniques `shouldSatisfy` ((== 1) . length)
+      case renderAfterInlining r.vizState r.decide callUniques of
+        Left e -> expectationFailure ("the unfolded caller was refused: " <> show e)
+        Right (_, info, _, _) -> length (directLeaves info.funDecl.body) `shouldSatisfy` (> 300)
+
+  it "the wire omits `expansion` when a leaf has none" $ do
+    r <- render "wire" (caller [] "pass through" ["a", "b"] ["      `limb` a b", "  AND a"]) "`pass through`"
+    let direct = [e | e@(V.UBoolVar _ nm _ _ _ _ _) <- topConjuncts r.funDecl.body, nm.label == "a"]
+    map (T.isInfixOf "expansion" . T.pack . BL.unpack . Aeson.encode) direct `shouldBe` [False]
+    -- and carries it when it has one
+    [T.isInfixOf "\"expansion\"" (T.pack (BL.unpack (Aeson.encode e))) | e@(V.App _ nm _ _ _) <- topConjuncts r.funDecl.body, nm.label == "limb OF a, b"] `shouldBe` [True]
+  where
+    topConjuncts = \case
+      V.And _ xs -> xs
+      e -> [e]
+    topDisjuncts = \case
+      V.Or _ xs -> xs
+      e -> [e]
+
+-- | A drawing as it goes on the wire, less the numbering of its nodes.
+withoutIds :: Aeson.Value -> Aeson.Value
+withoutIds = \case
+  Aeson.Object o -> Aeson.Object (KeyMap.map withoutIds (KeyMap.filterWithKey (\k _ -> k `notElem` ["id", "unique"]) o))
+  Aeson.Array xs -> Aeson.Array (fmap withoutIds xs)
+  v -> v
+
+-- | Every node drawn directly: through App arguments, not into expansions.
+directUniverse :: V.IRExpr -> [V.IRExpr]
+directUniverse e = e : case e of
+  V.And _ xs -> concatMap directUniverse xs
+  V.Or _ xs -> concatMap directUniverse xs
+  V.Not _ x -> directUniverse x
+  V.Implies _ p q _ -> directUniverse p <> directUniverse q
+  V.App _ _ args _ _ -> concatMap directUniverse args
+  _ -> []
+
+-- | Every node, through App arguments and expansions.
+universeIR :: V.IRExpr -> [V.IRExpr]
+universeIR e = e : case e of
+  V.And _ xs -> concatMap universeIR xs
+  V.Or _ xs -> concatMap universeIR xs
+  V.Not _ x -> universeIR x
+  V.Implies _ p q _ -> universeIR p <> universeIR q
+  V.UBoolVar _ _ _ _ _ _ x -> foldMap universeIR x
+  V.App _ _ args _ x -> concatMap universeIR args <> foldMap universeIR x
+  _ -> []

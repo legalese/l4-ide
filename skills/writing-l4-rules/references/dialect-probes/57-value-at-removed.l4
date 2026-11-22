@@ -1,0 +1,3 @@
+IMPORT daydate
+
+#EVAL `VALUE AT` (Date 4 7 1776) (GIVEN d YIELD d)

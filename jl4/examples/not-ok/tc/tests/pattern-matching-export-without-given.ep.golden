@@ -1,0 +1,35 @@
+-- A definition written as clauses with patterns and no GIVEN has inputs that
+-- only L4 has named (`input 1`, `input 2`), and nothing declares their types.
+-- Published with @export, no request could name them or send a value of a
+-- declared type, so `l4 check` refuses each definition below, in each
+-- spelling of @export, at the @export (ruling M2, option A, 2026-10-08).
+-- ok/pattern-matching-export-given.l4 is the same group with a GIVEN.
+
+DECLARE Colour IS ONE OF Red, Green, Blue
+
+@export
+DECIDE size Red   n IS n
+DECIDE size Green n IS n + 1
+DECIDE size Blue  n IS 0
+
+@export default The fee, by colour
+DECIDE fee Red   IS 1
+DECIDE fee Green IS 2
+DECIDE fee Blue  IS 3
+
+@desc export The weight, by colour
+weight Red   MEANS 10
+weight Green MEANS 20
+weight Blue  MEANS 30
+
+-- One clause with a pattern is a definition written as clauses too, and is
+-- refused the same way.
+@export
+DECIDE discount 0 IS 1
+
+-- A GIVEN that names too few inputs is already an error, and is reported
+-- once, not refused a second time for having no names.
+@export
+GIVEN c IS A Colour
+DECIDE width Red   n IS n
+DECIDE width Green n IS 0

@@ -1,0 +1,18 @@
+-- A group whose LIST OF fields name different records. An OpenFisca group
+-- entity has one member entity, whose roles are the LIST OF fields. The
+-- export must REFUSE it.
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Pet    HAS age IS A NUMBER
+DECLARE Household HAS
+    members IS A LIST OF Person
+    pets    IS A LIST OF Pet
+
+@export Number of members
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`number of members` h period MEANS count (h's members)
+
+#ASSERT (`number of members` OF (Household WITH members IS (LIST (Person WITH salary IS 1)), pets IS (LIST (Pet WITH age IS 3))), "2026-01") EQUALS 1

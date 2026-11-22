@@ -1,0 +1,27 @@
+-- A WHERE under the last arm of a CONSIDER.
+-- `l4 batch` and the REPL re-print the module and run the printed text, and an
+-- arm's later lines have to sit past its WHEN: a WHERE printed at the arm's own
+-- column ends the definition, and an arm after it is a parse error.
+
+DECLARE Band IS ONE OF Early, Late, Defaulted
+
+GIVEN days IS A NUMBER
+GIVETH A Band
+bandOf days MEANS IF days AT MOST 0 THEN Early ELSE IF days AT MOST 30 THEN Late ELSE Defaulted
+
+@export A late fee
+GIVEN amount IS A NUMBER
+      days IS A NUMBER
+GIVETH A NUMBER
+`late fee` MEANS
+  CONSIDER bandOf days
+    WHEN Early THEN 0
+    WHEN Late THEN amount TIMES 0.02
+    WHEN Defaulted THEN
+      amount TIMES rate
+      WHERE
+        rate MEANS 0.05
+
+#EVAL `late fee` 1000 0
+#EVAL `late fee` 1000 10
+#EVAL `late fee` 1000 45

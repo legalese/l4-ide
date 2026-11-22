@@ -43,7 +43,8 @@ To enable clean WASM compilation, the following changes will be made to jl4-core
 
 ```l4
 -- @ref with a filename becomes a clickable link (Ctrl+click to open)
-DECIDE foo IS TRUE @ref some-legal-doc.pdf
+@ref some-legal-doc.pdf
+DECIDE foo IS TRUE
 
 -- @ref-map still works for inline URL mappings
 @ref-map "1981/61 sec. 2" https://www.legislation.gov.uk/ukpga/1981/61/section/2

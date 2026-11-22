@@ -20,6 +20,7 @@ GIVEN startDate IS A DATE
       endDate IS A DATE
       convention IS A `Day Count Convention`
 GIVETH A NUMBER
+@nlg the year fraction from %startDate% to %endDate% under %convention%, using actual/365 fixed unless that is actual/360
 `year fraction` MEANS
     CONSIDER convention
     WHEN A360  THEN `year fraction A360` startDate endDate
@@ -33,6 +34,7 @@ GIVETH A NUMBER
 GIVEN startDate IS A DATE
       endDate IS A DATE
 GIVETH A NUMBER
+@nlg the actual/365 fixed year fraction from %startDate% to %endDate%
 `year fraction A365` MEANS
     daysBetween DIVIDED BY 365
     WHERE
@@ -45,6 +47,7 @@ GIVETH A NUMBER
 GIVEN startDate IS A DATE
       endDate IS A DATE
 GIVETH A NUMBER
+@nlg the actual/360 year fraction from %startDate% to %endDate%
 `year fraction A360` MEANS
     daysBetween DIVIDED BY 360
     WHERE
@@ -57,6 +60,7 @@ GIVETH A NUMBER
 GIVEN startDate IS A DATE
       endDate IS A DATE
 GIVETH A NUMBER
+@nlg the number of days elapsed from %startDate% to %endDate%, negative if the end is earlier
 `days between` MEANS
     (DATE_SERIAL endDate) MINUS (DATE_SERIAL startDate)
 
@@ -70,6 +74,7 @@ GIVEN principal IS A NUMBER
       endDate IS A DATE
       convention IS A `Day Count Convention`
 GIVETH A NUMBER
+@nlg the simple interest accrued on %principal% at %rate% per annum from %startDate% to %endDate% under %convention%, using actual/365 fixed unless that is actual/360
 `accrued interest for period` MEANS
     principal TIMES rate TIMES (`year fraction` startDate endDate convention)
 
@@ -77,4 +82,5 @@ GIVETH A NUMBER
 §§ `Version Information`
 -- =============================================================================
 
+@nlg the version of the ACTUS day count library
 `ACTUS Day Count Library Version` MEANS "1.0.0"

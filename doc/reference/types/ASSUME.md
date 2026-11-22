@@ -191,7 +191,9 @@ form, a `GIVEN a IS A TYPE` and a `GIVETH` heading an `ASSUME f` with no type
 of its own; `jl4/examples/ok/tbd.l4` keeps it for that reason. Write the rule
 out instead of assuming it wherever you can.
 
-**The limit is at the export boundary.** A published rule cannot accept an
+### Function-typed inputs are not supported for `@export`
+
+A published rule cannot accept an
 input that is itself a rule, because a rule cannot be sent as JavaScript Object
 Notation (JSON), which is what a request carries. A request carries **values** —
 a number, a date, a yes or no, a record of those — and a rule is not a value.
@@ -233,7 +235,7 @@ and the relational middle end turn a predicate written as
 `GIVEN p IS A Person` / ``ASSUME `is authorised` p IS A BOOLEAN`` into an input
 predicate — something a person answers in an interview rather than something a
 request sends. They are not publishing a web API, so the refusal above does not
-apply to them, and `l4 blawx` still compiles those files. What you cannot do is
+apply to them, and `l4 export blawx` still compiles those files. What you cannot do is
 publish one of them as a web API. The shipped Blawx seeds keep the `ASSUME`
 form for that reason and say so in their headers; see
 [L4 to Blawx](../../tutorials/blawx/l4-to-blawx.md).
@@ -245,7 +247,8 @@ been migrated.
 
 - An assumed name says what kind of thing it is, but carries no value. L4
   accepts a rule that reads one, and that rule can be quoted, published and
-  reasoned about, but it cannot be run to an answer until the value is supplied.
+  reasoned about, but it cannot be run to an answer that depends on the name
+  until the value is supplied.
 - `#EVAL` on such a rule stops at the name and says so:
 
   ```
@@ -280,7 +283,8 @@ for comparison.
 - **[DECLARE](DECLARE.md)** — records, enumerations and, with no body, opaque
   types
 - **[REFUSE](../control-flow/REFUSE.md)** — a case the encoding declines
-- **[TYPE-KEYWORDS](keywords.md)** — type syntax (IS, FUNCTION, and the rest)
+- **[DECLARE: Type expressions](DECLARE.md#type-expressions)** — type syntax (IS, FUNCTION, and the rest)
+- **[FOR ALL](for-all.md)** — type variables in the type of an assumed or given function
 
 ## See Also
 

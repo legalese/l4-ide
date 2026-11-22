@@ -63,13 +63,14 @@ test('every-barrier: terminals are double-ringed, LEST is dashed red, EVERY carr
   assert.equal(count(svg, /<ellipse fill="#f8d7da"/g), 1, 'Breach inner')
   // the two LEST edges: red, dashed
   assert.equal(count(svg, /stroke="#dc3545" stroke-dasharray="5,2"/g), 2)
-  // the EVERY edge's label is two <text> lines, the second the join line
+  // the EVERY edge's label is three <text> lines: the wrapped rule text, then the join line
   const everyEdge = svg.match(/<g id="edge1" class="edge">[\s\S]*?<\/g>/)?.[0]
   assert.ok(everyEdge, 'edge1 present')
   const lines = everyEdge.match(/<text [^>]*>([^<]*)<\/text>/g) ?? []
-  assert.equal(lines.length, 2)
+  assert.equal(lines.length, 3)
   assert.match(lines[0], /EVERY Tenant t IN tenants MUST Sign/)
-  assert.match(lines[1], />ONCE ALL HAVE</)
+  assert.match(lines[1], /t \[14\]/)
+  assert.match(lines[2], />ONCE ALL HAVE</)
   // the title is the rule's name
   assert.match(svg, />the tenancy</)
 })

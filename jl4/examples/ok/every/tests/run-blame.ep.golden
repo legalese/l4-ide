@@ -48,7 +48,7 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `all sign` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- 2. The same failure over the reversed roll: the same two parties, in the
 --    reversed order. The order is the roll's, nothing else.
@@ -62,12 +62,12 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `all sign, reversed` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- 3. A later-in-roll member fails EARLIER in time. Carol, last on the roll,
 --    has five days; Bob, before her, has fourteen. Neither signs. The
 --    barrier's LEST is anchored at Carol's failure — her missed deadline,
---    day 5 (§5.2, since 2026-09-16; until then the stamp of the WAIT UNTIL 8
+--    day 5 (§5.2, since 2026-09-16; until then the stamp of the WAITUNTIL 8
 --    that revealed it) — so the landlord's three days to refund run out at
 --    day 8, and a refund at day 12 is late. Anchored at the first failure
 --    in roll order (Bob's, deadline 14) the refund would have been due at
@@ -87,9 +87,9 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `staggered signing` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
+  (WAITUNTIL 8)
   PARTY theLandlord DOES Refund theLandlord AT 12
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- The same staggered deadlines with no LEST: the breach is anchored at the
 -- earliest failure (Carol's deadline, day 5, revealed at day 8) and names
@@ -105,8 +105,8 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `staggered signing, no reparation` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
-  (`WAIT UNTIL` 8)
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 8)
+  (WAITUNTIL 20)
 
 -- 4. RAND of two single-party obligations, both missed: both failures are
 --    named, left operand first. The anchor is the earliest breach as before
@@ -118,7 +118,7 @@ GIVETH A DEONTIC Actor Action
     (PARTY bob   MUST Sign bob   WITHIN 14)
 
 #TRACE `both sign` AT 0 WITH
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- The same party on both sides of a RAND is named TWICE, once per way: Alice
 -- missed the signing and Alice missed the refund, and the answer says both.
@@ -131,7 +131,7 @@ GIVETH A DEONTIC Actor Action
     (PARTY alice MUST Refund alice WITHIN 14)
 
 #TRACE `alice twice` AT 0 WITH
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- 5. BREACH BY a LIST of parties: the drafter names several, and the answer
 --    names them as written — one entry each, in order, duplicates kept, each
@@ -144,7 +144,7 @@ GIVETH A DEONTIC Actor Action
         LEST   BREACH BY LIST alice, bob, alice BECAUSE "the tenants carry it"
 
 #TRACE `joint and several` AT 0 WITH
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- A computed LIST with nobody in it is refused at run time, by name: a breach
 -- blames at least one party. (A literal empty list — `BY EMPTY` — is refused
@@ -161,7 +161,7 @@ GIVETH A DEONTIC Actor Action
         LEST   BREACH BY filter nobody tenants
 
 #TRACE `blame nobody` AT 0 WITH
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- 6. One member fails: the text is unchanged from before the blame set —
 --    "party", singular, and one name.
@@ -176,7 +176,7 @@ GIVETH A DEONTIC Actor Action
 #TRACE `one misses` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
   PARTY bob   DOES Sign bob   AT 2
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- 7. A party that is itself a LIST. `BY` then names the one party, not its
 --    elements: the checker reads a LIST at the party type as that party
@@ -191,7 +191,7 @@ GIVETH A DEONTIC (LIST OF STRING) Step
         LEST   BREACH BY (LIST "a", "b") BECAUSE "the pair did not deliver"
 
 #TRACE `the pair delivers` AT 0 WITH
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)
 
 -- 8. The same list-typed party, but the BREACH is the LEFT operand of a RAND
 --    and the definition has a GIVETH. The GIVETH's DEONTIC type is pushed
@@ -206,4 +206,4 @@ GIVETH A DEONTIC (LIST OF STRING) Step
     (PARTY (LIST "a", "b") MUST deliver WITHIN 5)
 
 #TRACE `the pair, breach first` AT 0 WITH
-  (`WAIT UNTIL` 20)
+  (WAITUNTIL 20)

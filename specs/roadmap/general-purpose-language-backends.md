@@ -341,6 +341,11 @@ invent a third — verified in `jl4/app/Main.hs:76-130` **[E 2026-09-07]**:
 
 Workable answers: `l4 export --to=ts|go`, or `l4 typescript` / `l4 golang`. Not `l4 go`.
 
+**Answered 2026-09-24** by `specs/todo/CLI-SURFACE-SPEC.md` C1, which picked one convention for
+every target: `l4 export typescript` and `l4 export golang`. A format name cannot collide with the
+`etc/go/go.sh` pipeline the way a top-level `l4 go` verb would, but `golang` stays the unambiguous
+spelling.
+
 **Q8 — Distribution and regeneration.** This question exists only because of the library framing,
 and it is the one with no in-tree precedent at all, since every existing backend emits an artifact
 we hand over once.
@@ -431,8 +436,8 @@ Per CLAUDE.md §4, a decision is recorded in its owning document in the same PR 
    the `X-EXPORT-SPEC` house style already set by DMN, Catala and Blawx.
 2. **The tiering position in §3 is not recorded by living here.** This is a roadmap note; it does
    not get to set company policy. The two nearest owners, neither of which currently covers
-   runtimes: `specs/todo/PROVABLE-MARKETPLACE-SPEC.md` owns the commercial access model and
-   metering (§3, §2.5), and `specs/todo/PRODUCT-STRATEGY-2025-01.md` owns the open-core framing
+   runtimes: the Provable marketplace spec (kept outside this repo) owns the commercial access
+   model and metering (§3, §2.5), and `specs/todo/PRODUCT-STRATEGY-2025-01.md` owns the open-core framing
    (the paragraph at line 823) **[E 2026-09-07]**. Whichever takes it, the ruling and the first emitter
    should land in the same PR — a shipped open PoC with the line still unwritten _is_ the ruling,
    made by default.

@@ -5,12 +5,14 @@ module LSP.L4.Viz.QueryPlan (
   buildParamsByUnique,
   annotateLadderWithAtomIds,
   annotateLadderWithAtomIdsUsing,
+  ladderAtomIds,
   queryPlanFromLadder,
   vizExprToBoolExpr,
 ) where
 
 import Base
 import Data.IntMap.Lazy (IntMap)
+import qualified Data.IntMap.Lazy as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -18,6 +20,7 @@ import qualified Data.Set as Set
 
 import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import qualified L4.Decision.QueryPlan as QP
+import L4.Viz.AtomKey (atomIdOfKey)
 
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.VizExpr as VizExpr
@@ -30,43 +33,51 @@ buildParamsByUnique ladderInfo =
     | p <- ladderInfo.funDecl.params
     ]
 
--- | Rewrite every leaf's @atomId@ into the query plan's namespace, deriving that
--- namespace from the ladder itself.
+-- | Stamp every leaf's @atomId@ from the keys the ladder recorded, under the
+-- diagram's own function name.
 --
--- Convenience wrapper over 'annotateLadderWithAtomIdsUsing' for callers that do
--- not already hold a compiled cache; it pays for a fresh BDD compile. A caller
--- that has one — jl4-service does — should call the @Using@ form and hand over
--- the function name it will later run the plan under, since the name is the
--- first component of every atomId and taking it from the diagram instead is an
--- assumption, not a fact.
+-- The ladder already names its atoms this way ('LadderViz.getLeafKeys'), so for
+-- a diagram drawn under its own name this changes nothing. It is kept for
+-- callers that hold a diagram and a state that may have come apart; a caller
+-- that serves the function under some other name — jl4-service does — should
+-- call the @Using@ form with 'ladderAtomIds' under THAT name, since the name is
+-- the first component of every atomId.
 annotateLadderWithAtomIds ::
   VizExpr.RenderAsLadderInfo ->
   LadderViz.VizState ->
   VizExpr.RenderAsLadderInfo
 annotateLadderWithAtomIds ladderInfo vizState =
   annotateLadderWithAtomIdsUsing
-    (QP.atomIdByUnique ladderInfo.funDecl.fnName.label (buildParamsByUnique ladderInfo) cache)
+    (Map.fromList
+      [ (u, atomIdOfKey ladderInfo.funDecl.fnName.label key)
+      | (u, key) <- IntMap.toList (LadderViz.getLeafKeys vizState)
+      ])
     ladderInfo
- where
-  cache = buildQueryPlanCache ladderInfo vizState
+
+-- | The atomId of EVERY leaf on the wire, not only of the plan's variables
+-- (WHERE-INLINING-SPEC §10): an App's arguments and the leaves of a call's
+-- expansion are leaves too, though the planner does not see them as variables.
+--
+-- Each is the hash of the leaf's C1 term key (R3, "L4.Viz.AtomKey"), recorded
+-- by the ladder while it drew, so a leaf inside an expansion is keyed in the
+-- caller's context: the @a@ inlined from @limb a b@ IS the caller's @a@, and
+-- gets its id because it is the same term, not because it carries the same
+-- unique.
+ladderAtomIds ::
+  -- | The function name the plan runs under.
+  Text ->
+  QP.CachedDecisionQuery ->
+  Map Int Text
+ladderAtomIds = QP.leafAtomIds
 
 -- | Rewrite every leaf's @atomId@ using a precomputed @unique -> atomId@ map.
 --
--- WHY THIS EXISTS AT ALL. The ladder and the query plan both mint atomIds as a
--- UUID5 over @"fn|label|refs=…"@, but they disagree on how a ref renders:
--- 'L4.Viz.Ladder.generateAtomId' writes each ref as its numeric @rootUnique@
--- over the atom's DIRECT refs, while 'QP.atomIdByUnique' writes it as the ref's
--- LABEL over the TRANSITIVE closure. They therefore differ for every atom with a
--- non-empty ref set — which is every ordinary leaf.
---
--- The query plan's rendering is the one to keep, and not merely because it came
--- second: a @unique@ is a compilation artefact that moves when an unrelated
--- declaration is added to the file, so a numeric-ref atomId is not stable across
--- recompiles, and an id whose whole job is to survive a redeploy must be.
---
--- Reconciling here rather than in 'generateAtomId' is deliberate: the visualiser
--- runs before the dependency closure exists, so it cannot compute this id, only
--- be corrected with it.
+-- History. The ladder and the query plan once minted atomIds by two different
+-- hashes of a leaf's printed label and input refs, and disagreed on every
+-- ordinary leaf (smucclaw/l4-ide#935); this function was the reconciliation.
+-- Both now name an atom by the hash of its term's C1 key, recorded once by the
+-- ladder (R3), so what is left for this to do is restamp a diagram under a
+-- different function name ('ladderAtomIds').
 annotateLadderWithAtomIdsUsing ::
   Map Int Text ->
   VizExpr.RenderAsLadderInfo ->
@@ -87,19 +98,23 @@ annotateLadderWithAtomIdsUsing atomIds ladderInfo =
         VizExpr.TrueE uid nm
       VizExpr.FalseE uid nm ->
         VizExpr.FalseE uid nm
-      VizExpr.UBoolVar uid nm val canInline oldAtomId typically ->
-        VizExpr.UBoolVar uid nm val canInline (reAtom nm.unique oldAtomId) typically
-      VizExpr.App uid nm args oldAtomId ->
-        VizExpr.App uid nm (map annotateExpr args) (reAtom nm.unique oldAtomId)
+      -- Into expansions too: an inlined leaf is a leaf on the wire like any other.
+      VizExpr.UBoolVar uid nm val canInline oldAtomId typically expansion ->
+        VizExpr.UBoolVar uid nm val canInline (reAtom nm.unique oldAtomId) typically (fmap annotateExpr expansion)
+      VizExpr.App uid nm args oldAtomId expansion ->
+        VizExpr.App uid nm (map annotateExpr args) (reAtom nm.unique oldAtomId) (fmap annotateExpr expansion)
       VizExpr.InertE uid txt ctx ->
         VizExpr.InertE uid txt ctx  -- Inert elements pass through unchanged
 
-    -- | Not every ladder leaf is a BDD variable, so not every leaf has an entry
-    -- here. The children of an @App@ are the standing case: 'vizExprToBoolExpr'
-    -- turns the whole application into ONE variable and does not descend, so its
-    -- arguments never reach @varLabelByUnique@ and never get a plan-side id.
+    -- | Not every ladder leaf is a BDD variable, so a map built by
+    -- 'QP.atomIdByUnique' alone has no entry for some leaves. The children of an
+    -- @App@ and the leaves of an expansion are the standing case:
+    -- 'vizExprToBoolExpr' turns the whole application into ONE variable and does
+    -- not descend. 'ladderAtomIds' covers them, and both jl4-lsp and jl4-service
+    -- pass its map; a caller that passes a plan-only map does not.
     --
-    -- Such a leaf keeps the id the visualiser gave it. This used to fall back to
+    -- Such a leaf keeps the id the ladder gave it, which is already the hash of
+    -- its term under the diagram's own name. This used to fall back to
     -- @show unique@, which was wrong twice over: it threw away a perfectly good
     -- UUID for a decimal that is not stable across recompiles, and it made the
     -- leaf's @atomId@ collide with the OTHER thing @query-plan@ accepts as a
@@ -120,7 +135,9 @@ buildQueryPlanCache :: VizExpr.RenderAsLadderInfo -> LadderViz.VizState -> QP.Ca
 buildQueryPlanCache ladderInfo vizState =
   let
     (boolExpr, labels, order) = vizExprToBoolExpr ladderInfo.funDecl.body
-    compiled = BDQ.compileDecisionQuery order boolExpr
+    -- A leaf evaluation can only refuse at is not a question (R7).
+    refusals = LadderViz.getRefusingAtoms vizState
+    compiled = BDQ.compileDecisionQuery order (BDQ.refusing (Set.fromList (IntMap.keys refusals)) boolExpr)
     deps :: IntMap IntSet
     deps = LadderViz.getAtomDeps vizState
     inputRefs = LadderViz.getAtomInputRefs vizState
@@ -134,6 +151,8 @@ buildQueryPlanCache ladderInfo vizState =
             inputRefs
       , compiled
       , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
+      , refusalsByUnique = refusals
+      , leafKeyByUnique = LadderViz.getLeafKeys vizState
       }
 
 queryPlanFromLadder ::
@@ -158,10 +177,12 @@ vizExprToBoolExpr expr =
   go = \case
     VizExpr.TrueE _ _ -> (BDQ.BTrue, mempty, [])
     VizExpr.FalseE _ _ -> (BDQ.BFalse, mempty, [])
-    VizExpr.UBoolVar _ nm _ _ _ _ ->
+    VizExpr.UBoolVar _ nm _ _ _ _ _ ->
       let u = nm.unique
        in (BDQ.BVar u, Map.singleton u nm.label, [u])
-    VizExpr.App _ nm _args _ ->
+    -- A call is ONE variable to the planner; its expansion is a picture of what
+    -- the variable means, not more variables.
+    VizExpr.App _ nm _args _ _ ->
       let u = nm.unique
        in (BDQ.BVar u, Map.singleton u nm.label, [u])
     VizExpr.Not _ x ->

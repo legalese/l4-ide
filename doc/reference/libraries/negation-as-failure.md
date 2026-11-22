@@ -57,10 +57,16 @@ citizen-facing wizards and audit-grade explanations, not just source code.
 
 ### Worked example
 
-For a runnable demo -- including a legal breach-vs-permission example and an
-optional Kleene three-valued lift (`kand` / `kor` / `knot`) that propagates
-"unknown" through the connectives -- see
-[negation-as-failure-examples.l4](https://github.com/legalese/l4-ide/blob/main/jl4/experiments/negation-as-failure-examples.l4).
+For a runnable demo -- including a legal breach-vs-permission example and
+`kand` / `kor` / `knot`, which carry "unknown" through the connectives by
+truth-functional strong Kleene (#526 §4.1(a)) -- see
+[negation-as-failure-examples.l4](../../../jl4/examples/ok/negation-as-failure-examples.l4).
+
+`kand`, `kor` and `knot` are a pattern you copy, not part of this library, and
+they will not be added to it: the evaluator itself is to carry an unknown input
+through `AND`, `OR` and `NOT` (#526). A `NOTHING` that is data -- a `MAYBE
+BOOLEAN` field, or the result of a lookup -- still needs `CONSIDER`, or one of
+the three functions above, to become a `BOOLEAN`.
 
 ### Relation to logic-programming output
 

@@ -86,6 +86,7 @@ DECLARE `Contract Role` IS ONE OF
 -- Role sign multiplier for payoff calculations
 GIVEN role IS A `Contract Role`
 GIVETH A NUMBER
+@nlg the contract role sign of %role%, plus or minus one
 `role sign` MEANS
     CONSIDER role
     WHEN RPA THEN 1
@@ -118,6 +119,7 @@ DECLARE `Contract Performance` IS ONE OF
 -- Check if contract is in a non-performing state
 GIVEN perf IS A `Contract Performance`
 GIVETH A BOOLEAN
+@nlg %perf% is a non-performing status, being delinquent or in default
 `is non-performing` MEANS
     CONSIDER perf
     WHEN PF THEN FALSE
@@ -130,6 +132,7 @@ GIVETH A BOOLEAN
 -- Check if contract is still active
 GIVEN perf IS A `Contract Performance`
 GIVETH A BOOLEAN
+@nlg %perf% is an active status, being performant, delayed or delinquent
 `is active` MEANS
     CONSIDER perf
     WHEN PF THEN TRUE
@@ -156,6 +159,7 @@ DECLARE `Day Count Convention` IS ONE OF
 -- Days in year for each convention
 GIVEN dcc IS A `Day Count Convention`
 GIVETH A NUMBER
+@nlg the number of days in a year under %dcc%, taking actual/actual as 365.25
 `days in year for` MEANS
     CONSIDER dcc
     WHEN AA THEN 365.25       -- Approximation for Actual/Actual
@@ -224,9 +228,13 @@ DECLARE Cycle HAS
     stub        IS A `Stub Convention`
 
 -- Convenience constructors for common cycles
+@nlg the monthly cycle with a short final stub
 `Monthly Cycle` MEANS Cycle WITH period IS 1, periodUnit IS Months, stub IS `Short Final`
+@nlg the quarterly cycle with a short final stub
 `Quarterly Cycle` MEANS Cycle WITH period IS 3, periodUnit IS Months, stub IS `Short Final`
+@nlg the semi-annual cycle with a short final stub
 `Semi-Annual Cycle` MEANS Cycle WITH period IS 6, periodUnit IS Months, stub IS `Short Final`
+@nlg the annual cycle with a short final stub
 `Annual Cycle` MEANS Cycle WITH period IS 1, periodUnit IS Years, stub IS `Short Final`
 
 -- =============================================================================
@@ -296,6 +304,7 @@ DECLARE `ACTUS Currency` IS ONE OF
 -- Get ISO 4217 code string
 GIVEN ccy IS AN `ACTUS Currency`
 GIVETH A STRING
+@nlg the ISO 4217 code of %ccy%
 `currency code` MEANS
     CONSIDER ccy
     WHEN `ACTUS USD` THEN "USD"
@@ -321,22 +330,30 @@ DECLARE `ACTUS Amount` HAS
 
 -- Constructors for common currencies
 GIVEN n IS A NUMBER
+@nlg %n% United States dollars
 `ACTUS_USD` MEANS `ACTUS Amount` WITH value IS n, currency IS `ACTUS USD`
 
 GIVEN n IS A NUMBER
+@nlg %n% euros
 `ACTUS_EUR` MEANS `ACTUS Amount` WITH value IS n, currency IS `ACTUS EUR`
 
 GIVEN n IS A NUMBER
+@nlg %n% pounds sterling
 `ACTUS_GBP` MEANS `ACTUS Amount` WITH value IS n, currency IS `ACTUS GBP`
 
 GIVEN n IS A NUMBER
+@nlg %n% Singapore dollars
 `ACTUS_SGD` MEANS `ACTUS Amount` WITH value IS n, currency IS `ACTUS SGD`
 
 -- =============================================================================
 §§ `Version Information`
 -- =============================================================================
 
+@nlg the version of the ACTUS core library
 `ACTUS Core Library Version` MEANS "1.0.0"
+@nlg the date of the ACTUS core library
 `ACTUS Core Library Date` MEANS "2025-01-28"
+@nlg the version of the ACTUS Technical Specification this library follows
 `ACTUS Specification Version` MEANS "1.1"
+@nlg the version of the ACTUS Data Dictionary this library follows
 `ACTUS Dictionary Version` MEANS "1.4"

@@ -1,0 +1,74 @@
+-- An EVERY's IN roll and its WHO or WHOSE filter are not among its own
+-- slots: the roll call reads them in the environment the EVERY is written
+-- in, before any member's obligation is armed. So THE ARMING there names
+-- an arming only when the EVERY sits under a HENCE or LEST, where the
+-- hand-off bound one; at the top level it is refused (refusal 8 of
+-- EVERY-EACH-QUANTIFIER-SPEC §5.1.1.1, card B1c, RULED 2026-10-24). Each of
+-- the three used to check clean and be refused by the run on every input.
+--
+-- The two filters also report that `AT MOST` is ambiguous. That is not part
+-- of refusal 8: a refused lifecycle value under an overloaded operator does
+-- the same under refusal 1 (THE JOIN PLUS 1 at the top level, with the
+-- prelude imported), because the refusal is raised inside every
+-- candidate's branch, so no candidate comes out free of errors.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS lname IS A STRING
+    Tenant   HAS tname IS A STRING
+                 since IS A NUMBER
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant WITH tname IS "Alice", since IS 0
+bob         MEANS Tenant WITH tname IS "Bob",   since IS 20
+tenants     MEANS LIST alice, bob
+
+GIVEN n IS A NUMBER
+GIVETH A LIST OF Actor
+`tenants by` MEANS IF n GREATER THAN 10 THEN LIST alice ELSE tenants
+
+-- refused: THE ARMING in the IN roll of a top-level EVERY
+GIVETH A DEONTIC Actor Action
+`roll at the top` MEANS
+    EVERY Tenant t IN (`tenants by` THE ARMING)
+        MUST   Sign t
+        WITHIN 10
+
+-- refused: THE ARMING in the WHO filter of a top-level EVERY
+GIVETH A DEONTIC Actor Action
+`who at the top` MEANS
+    EVERY Tenant t IN tenants
+        WHO    t's since AT MOST THE ARMING
+        MUST   Sign t
+        WITHIN 10
+
+-- refused: THE ARMING in the WHOSE filter of a top-level EVERY
+GIVETH A DEONTIC Actor Action
+`whose at the top` MEANS
+    EVERY Tenant t IN tenants
+        WHOSE  since AT MOST THE ARMING
+        MUST   Sign t
+        WITHIN 10
+
+-- not refused: the same roll and filter under the landlord's HENCE, where
+-- THE ARMING is when the landlord's obligation was entered
+GIVETH A DEONTIC Actor Action
+`roll under a HENCE` MEANS
+    PARTY theLandlord MUST Deliver theLandlord WITHIN 10
+    HENCE (EVERY Tenant t IN (`tenants by` THE ARMING)
+               WHOSE  since AT MOST THE ARMING
+               MUST   Sign t
+               WITHIN 10)
+
+-- not refused: the EVERY's own act WITHIN and join line
+GIVETH A DEONTIC Actor Action
+`own slots at the top` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign t
+        WITHIN 0 OF (THE ARMING PLUS 10)
+        ONCE   ALL HAVE
+        WITHIN 0 OF (THE ARMING PLUS 20)
+        HENCE  FULFILLED

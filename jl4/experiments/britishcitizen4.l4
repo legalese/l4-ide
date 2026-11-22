@@ -14,13 +14,13 @@ DECLARE Date
       month   IS A NUMBER
       day     ^  ^ ^
 
-BNA_commencement    MEANS Date OF 1983, 1, 1  -- of the main British Nationality Act 1981
 @ref source: section 1 of British Nationality Act 1981 c.61 @ 2021-07-01
 @ref url: https://www.legislation.gov.uk/ukpga/1981/61/section/1
+BNA_commencement    MEANS Date OF 1983, 1, 1  -- of the main British Nationality Act 1981
 
-`appointed day` MEANS Date OF 2002, 2, 21 -- from various acts that subsequently updated the British Nationality Act 1981
 @ref source: section 1 of British Overseas Territories Act 2002 c.8 @ 2002-02-26
 @ref url: https://www.legislation.gov.uk/ukpga/2002/8/section/1
+`appointed day` MEANS Date OF 2002, 2, 21 -- from various acts that subsequently updated the British Nationality Act 1981
 
 DECLARE Place
   HAS `English name` IS A STRING
@@ -47,12 +47,12 @@ GIVETH A BOOLEAN
    ^  ^^  ^              = "Turks and Caicos Islands"
    ^  ^^  ^              = "Virgin Islands"
 
+@ref url: https://www.legislation.gov.uk/ukpga/1981/61/section/50#term-qualifying-territory
 GIVEN p IS A Place
 GIVETH A BOOLEAN
 DECIDE `is a qualifying territory` p IF
            `is British Overseas Territory` p
    AND NOT (`English name` OF p) = "Sovereign Base Areas of Akrotiri and Dhekelia"
-@ref url: https://www.legislation.gov.uk/ukpga/1981/61/section/50#term-qualifying-territory
 
 DECLARE NaturalPerson
   HAS name         IS A   STRING

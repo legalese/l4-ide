@@ -1,0 +1,53 @@
+-- =============================================================================
+-- A multi-clause DECIDE is compiled to CONSIDERs that read its inputs, and to
+-- local definitions holding the later clauses. None of the names those use
+-- can meet a name the drafter wrote, in either direction (review of
+-- legalese/l4-ide#545). Each #EVAL's answer is in its comment.
+--
+-- Printed back as source (`l4 batch`, the REPL, and the corpus's own re-print
+-- check), a group is its clauses as written, so this holds there too.
+-- =============================================================================
+DECLARE Colour IS ONE OF Red, Green, Blue
+DECLARE Shape IS ONE OF
+  Circle HAS colour IS A Colour
+  Square
+
+-- A pattern variable named like a later input. The second column still tests
+-- the second input, not the circle's colour. An earlier build reported both
+-- groups as ambiguous at 1:1.
+GIVEN s IS A Shape
+      c IS A Colour
+GIVETH A STRING
+DECIDE paint (Circle c) Red IS "circle, paint red"
+DECIDE paint s          c   IS "anything else"
+
+GIVEN a IS A BOOLEAN
+      b IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE f b TRUE  IS 1
+DECIDE f a FALSE IS 2
+
+-- A definition named like the binding of the later clauses, read by the
+-- first clause.
+`the result of clauses 2 to 3` MEANS 7
+
+GIVEN c IS A Colour
+GIVETH A NUMBER
+DECIDE u Red   IS `the result of clauses 2 to 3`
+DECIDE u Green IS 2
+DECIDE u Blue  IS 3
+
+-- A definition named like an input of a group with no GIVEN.
+`input 1` MEANS 9
+
+DECIDE h Red   IS `input 1`
+DECIDE h Green IS 2
+DECIDE h Blue  IS 3
+
+#EVAL paint (Circle Red)  Green -- "anything else"
+#EVAL paint (Circle Blue) Red   -- "circle, paint red"
+#EVAL f TRUE  FALSE             -- 2
+#EVAL f FALSE TRUE              -- 1
+#EVAL u Red                     -- 7
+#EVAL u Green                   -- 2
+#EVAL h Red                     -- 9
