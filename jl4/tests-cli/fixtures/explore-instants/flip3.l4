@@ -1,0 +1,39 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1081 and the explorer's state key. Q's deadline is
+-- anchored on P's (WITHIN 3 OF THE DEADLINE), so it is fixed in absolute
+-- time (7), while P's second deadline moves with P's first act: done at 0 it
+-- falls at 4, done at 4 it falls at 8. The two positions print the same
+-- residual; only the second has Q's deadline pass while P's rule is still in
+-- force, and `q missed` is written there and `p missed` is not.
+
+DECLARE Person IS ONE OF P, Q
+DECLARE Action IS ONE OF a, b, c
+
+GIVETH A DEONTIC Person Action
+flip MEANS
+  PARTY P
+  MUST a
+  WITHIN 4
+  HENCE
+    (PARTY P
+     MUST b
+     WITHIN 4
+     HENCE FULFILLED
+     LEST (COMMIT `p missed` IS TRUE HENCE BREACH BY P))
+    ROR
+    (PARTY Q
+     MUST c
+     WITHIN 3 OF THE DEADLINE
+     HENCE FULFILLED
+     LEST (COMMIT `q missed` IS TRUE HENCE BREACH BY Q))
+  LEST BREACH BY P
+
+GIVEN `q missed` IS A LIST OF BOOLEAN
+      `p missed` IS A LIST OF BOOLEAN
+GIVETH A BOOLEAN
+`Q missed first` MEANS (NOT (null `q missed`)) AND (null `p missed`)
+
+#TRACE flip AT 0 WITH
+  PARTY P DOES a AT 4
+  (WAITUNTIL 8)

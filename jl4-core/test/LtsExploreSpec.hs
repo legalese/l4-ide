@@ -410,6 +410,54 @@ halfSrc = Text.unlines
   , "`half` MEANS PARTY P MUST a WITHIN 2.5 HENCE FULFILLED LEST BREACH BY P"
   ]
 
+-- | The review of the first pass found these. A chain: an act that starts a
+-- deadline (Q, 2 days) which becomes the limit of the next act (u, which
+-- starts V, 1 day), beside a fixed deadline (R at 4). `u` at 3 puts V on R,
+-- and it is reachable only if `a` was done at 1 or later, so `a` at 1 is a
+-- boundary no tie of `a`'s own offset names.
+roomSrc :: Text.Text
+roomSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF P, Q, R, U, V"
+  , "DECLARE Action IS ONE OF a, b, r, u, v"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`room` MEANS"
+  , "        (PARTY R MUST r WITHIN 4 HENCE FULFILLED LEST BREACH BY R)"
+  , "  RAND  (PARTY P MUST a WITHIN 100 HENCE (PARTY Q MUST b WITHIN 2 HENCE FULFILLED LEST BREACH BY Q) LEST BREACH BY P)"
+  , "  RAND  (PARTY U MUST u WITHIN 100 HENCE (PARTY V MUST v WITHIN 1 HENCE FULFILLED LEST BREACH BY V) LEST BREACH BY U)"
+  ]
+
+-- | A deadline that is fixed in absolute time and only the successor holds
+-- (an anchor on the arming of the outset): Q's is at 3, S's at 7, whichever
+-- instant `a` is done at, so `a` at 3 and at 7 are boundaries.
+anchoredSrc :: Text.Text
+anchoredSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF P, Q, S"
+  , "DECLARE Action IS ONE OF a, b, s"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`anchored` MEANS"
+  , "  PARTY P MUST a WITHIN 10"
+  , "    HENCE (     (PARTY Q MUST b WITHIN 3 OF THE ARMING HENCE FULFILLED LEST BREACH BY Q)"
+  , "           RAND (PARTY S MUST s WITHIN 7 OF THE ARMING HENCE FULFILLED LEST BREACH BY S))"
+  , "    LEST BREACH BY P"
+  ]
+
+-- | Two fixed deadlines and an offset (the review's cascade): a fixed deadline
+-- plus an offset is one instant, not a cascade of them.
+cascadeSrc :: Int -> Text.Text
+cascadeSrc k = Text.unlines
+  [ "DECLARE Person IS ONE OF P, Q, R, S"
+  , "DECLARE Action IS ONE OF a, b, r, s"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`cascade` MEANS"
+  , "        (PARTY R MUST r WITHIN " <> n (20 * k) <> " HENCE FULFILLED LEST BREACH BY R)"
+  , "  RAND  (PARTY S MUST s WITHIN " <> n (25 * k) <> " HENCE FULFILLED LEST BREACH BY S)"
+  , "  RAND  (PARTY P MUST a WITHIN 1000 HENCE (PARTY Q MUST b WITHIN " <> n (10 * k) <> " HENCE FULFILLED LEST BREACH BY Q) LEST BREACH BY P)"
+  ]
+  where n = Text.pack . show
+
 -- | The rig, the read sites and the start 'exploreSrc' builds, kept.
 setupSrc :: Text.Text -> Text.Text -> IO (Rig, ReadSites, Start)
 setupSrc src name = do
@@ -425,7 +473,7 @@ setupSrc src name = do
 -- position the evaluator reaches in at most @depth@ events when each act the
 -- contract offers is tried at EVERY whole instant from the clock to the
 -- earliest live deadline (to the clock plus @horizon@ when none is live), and
--- each deadline is ticked past. It does not call 'actInstants'. Its answer is
+-- each deadline is ticked past. It does not call 'instantsFor'. Its answer is
 -- the positions' time-abstract signatures ('timeSignature') and their keys
 -- ('keyText'). A position reached again under the same key is expanded once,
 -- which is the explorer's own merge and not what is under test.
@@ -703,6 +751,8 @@ spec = describe "l4 explore" do
           | "`clocks`" `Text.isInfixOf` src = "clocks"
           | "`adjacent`" `Text.isInfixOf` src = "adjacent"
           | "`half`" `Text.isInfixOf` src = "half"
+          | "`room`" `Text.isInfixOf` src = "room"
+          | "`anchored`" `Text.isInfixOf` src = "anchored"
           | otherwise = "deal"
         clocks = clocksSrc 3 5 7
         wide = clocksSrc 8 10 15
@@ -715,6 +765,33 @@ spec = describe "l4 explore" do
       holdsEvery "two clocks with wide gaps, so the scheme does not try every instant" wide regions Nothing 2 3
       holdsEvery "a window that opens at 3 and closes at 5" windowSrc regions Nothing 2 3
       holdsEvery "a window that opens at 3 and never closes, bounded at 10" openSrc regions (Just 10) 1 10
+      -- the review of the first pass (2026-11-22)
+      holdsEvery "with --chains: a tie that a LATER act's offset puts in reach (u at 3 puts V on R, and only if a was done at 1 or later)" roomSrc regions {eoChains = True} Nothing 2 3
+      holdsEvery "deadlines that are fixed in absolute time and that only the successor holds (OF THE ARMING)" anchoredSrc regions Nothing 2 3
+
+    describe "a tie through a chain of acts is searched only on request, and never silently left out" do
+      it "without --chains the position is left out, and the coverage line says which act and that --chains tries it" do
+        g <- exploreSrc roomSrc "room" regions []
+        coverageComplete g.gCoverage `shouldBe` False
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "ties through chains of acts"
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "--chains tries them"
+      it "with --chains it is searched, and nothing is left out" do
+        g <- exploreSrc roomSrc "room" regions {eoChains = True} []
+        coverageComplete g.gCoverage `shouldBe` True
+      it "a contract with no chain says nothing about chains" do
+        g <- exploreSrc clocks "clocks" regions []
+        coverageComplete g.gCoverage `shouldBe` True
+        coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "chains")
+
+    describe "the instants one act is tried at do not snowball" do
+      it "two fixed deadlines and one offset: the whole graph of the review's cascade (20, 25 and 10) is small" do
+        g <- exploreSrc (cascadeSrc 1) "cascade" regions []
+        g.gCoverage.cvStates `shouldSatisfy` (< 200)
+        coverageComplete g.gCoverage `shouldBe` True
+      it "the same at ten times the size is no larger in instants, and not cut at the cap" do
+        g <- exploreSrc (cascadeSrc 10) "cascade" regions []
+        coverageComplete g.gCoverage `shouldBe` True
+        g.gCoverage.cvInstants.isInstants `shouldSatisfy` (< 400)
 
     describe "--grid 1: the graph holds every position the evaluator reaches" do
       holdsEvery "two clocks" clocks grid1 Nothing 3 3

@@ -30,7 +30,7 @@ instants = "tests-cli" </> "fixtures" </> "explore-instants"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -419,6 +419,10 @@ spec bin = describe "l4 explore" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "clocks.l4", "--grid", "2"]
       code `shouldBe` ExitFailure 2
       lastLine sout `shouldSatisfy` ("off the grid of 2" `isInfixOf`)
+
+    it "flip3.l4: the state where Q's deadline passed alone (an anchored deadline) is reachable, and the explorer finds it" $ do
+      Output _ sout _ <- runL4 bin ["explore", instants </> "flip3.l4", "--reachable", "Q missed first"]
+      sout `shouldSatisfy` ("reachable `Q missed first`: holds" `isInfixOf`)
 
     it "l4 lts on adjacent.l4: the tick past the deadline at 3 is the clock reaching 4, not 3.5, and does not reach the deadline at 4" $ do
       Output code sout _ <- runL4 bin ["lts", instants </> "adjacent.l4", "--contract", "adjacent"]

@@ -110,6 +110,7 @@ data ExploreCliOptions = ExploreCliOptions
   , exMaxStates :: Int
   , exMaxActs   :: Int
   , exMaxInstants :: Int
+  , exChains    :: Bool
   , exGrid      :: Maybe Rational
   , exKeep      :: [Text.Text]
   , exKeepLatest :: [Text.Text]
@@ -170,6 +171,10 @@ exploreOptionsParser = ExploreCliOptions
         <> metavar "N"
         <> value defaultExploreOptions.eoMaxInstants
         <> help "Try one act at no more than N instants in one state; the rest are named on the coverage line as untried (default 256)"
+        )
+  <*> switch
+        ( long "chains"
+        <> help "Also search the ties that need a chain of acts: an act that starts a deadline sets the limit the next act's tie must be inside, so where the first act falls decides whether the second can tie. Larger graphs; without it the coverage line says which acts it would add instants to"
         )
   <*> optional (option rationalReader
         ( long "grid"
@@ -327,6 +332,7 @@ exploreCmd opts = do
             , eoTime = maybe Regions Grid opts.exGrid
             , eoMaxActs = opts.exMaxActs
             , eoMaxInstants = opts.exMaxInstants
+            , eoChains = opts.exChains
             }
       results <- for starts \ s -> explore options sites rig s
       graphs <- fmap catMaybes $ for (zip starts results) \ (s, r) -> case r of
