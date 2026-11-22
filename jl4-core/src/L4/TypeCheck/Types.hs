@@ -207,6 +207,14 @@ data CheckError =
     -- Arguments: the @JSONDECODE@ itself, the type it would decode into, and
     -- the type parameters that type mentions. Not raised for a type that is
     -- only unsolved. See 'L4.TypeCheck.decodesAtTypeParameters'.
+  | JsonDecodePassedAtTypeParameter Resolved (Type' Resolved) [Resolved] (Maybe (Resolved, Maybe SrcRange, Type' Resolved))
+    -- ^ A bare @JSONDECODE@, handed on as a function, at a function type that
+    -- mentions a type parameter (smucclaw/l4-ide#1078, option C extended to
+    -- the bare reference; decided by Claude 2026-11-21, pending Meng's review).
+    -- Arguments: the @JSONDECODE@, the function type it is handed on at, the
+    -- type parameters that type mentions, and the innermost definition around
+    -- it whose @GIVETH@ mentions one of them (its name, where that @GIVETH@
+    -- is, and its type), which is where the message says to write the type.
   | ImplicitCrossesImport Resolved Name
     -- ^ An @\@export@ed definition reaches a definition in an IMPORTED module
     -- that takes section binders as implicit inputs. Arguments: the exported
@@ -959,6 +967,7 @@ instance HasSrcRange CheckError where
   rangeOf (ImplicitCrossesImport r _)       = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf (JsonDecodeAtTypeParameter r _ _) = rangeOf r
+  rangeOf (JsonDecodePassedAtTypeParameter r _ _ _) = rangeOf r
   rangeOf (NotReachesConnective site)       = Just site.range
   rangeOf (OpenedFieldCollisionAtRead c)    = rangeOf c.fieldRead
   rangeOf (OpenedFieldCollisionAtOpening _ b _) = rangeOf b.binderName

@@ -13,11 +13,11 @@
 -- xs`, where the decode happens inside `map`.
 --
 -- The CONTROLS at the end pin answers that did not change and must not change
--- by accident: JSONDECODE handed on bare from a definition GIVEN a type
--- (GIVEN a IS A TYPE), a decode whose type nothing fixes, and a decode whose
--- type a signature already gave. A JSONDECODE APPLIED at a type parameter,
--- which is the issue's own repro, is refused before the rules run; those are
--- in not-ok/tc/jsondecode-at-type-parameter.l4.
+-- by accident: a decode whose type nothing fixes, and a decode whose type a
+-- signature already gave. A JSONDECODE at a type parameter (GIVEN a IS A
+-- TYPE), which is the issue's own repro, is refused before the rules run;
+-- those are in not-ok/tc/jsondecode-at-type-parameter.l4 and, for JSONDECODE
+-- handed on bare, not-ok/tc/jsondecode-passed-at-type-parameter.l4.
 
 IMPORT prelude
 
@@ -166,37 +166,6 @@ GIVETH A NUMBER
 --------------------------------------------------------------------------------
 -- CONTROLS: answers that did not change.
 --------------------------------------------------------------------------------
-
--- JSONDECODE as the body of a polymorphic definition, applied at Tree. The
--- reference is typed at the type parameter `a`; the application is typed at
--- Tree, and that is what it decodes into, as before.
-GIVEN a IS A TYPE
-GIVETH A FUNCTION FROM STRING TO EITHER STRING a
-`decode any` MEANS JSONDECODE
-
-GIVETH AN EITHER STRING Tree
-`one tree` MEANS `decode any` "{\"label\":2,\"kids\":[]}"
-
-GIVETH A NUMBER
-`label of one tree` MEANS
-  CONSIDER `one tree`
-    WHEN RIGHT t THEN t's label
-    WHEN LEFT problem THEN 0 - 1
-
-#ASSERT `label of one tree` EQUALS 2
-
--- The same definition passed to `map`: nothing guides this decode, and a
--- JSON number happens to come out as a NUMBER, as before.
-GIVEN r IS AN EITHER STRING NUMBER GIVETH A NUMBER
-`number in` r MEANS
-  CONSIDER r
-    WHEN RIGHT x THEN x
-    WHEN LEFT problem THEN 0 - 1
-
-GIVETH A LIST OF EITHER STRING NUMBER
-`numbers via map` MEANS map `decode any` (LIST "42")
-
-#ASSERT sum (map `number in` `numbers via map`) EQUALS 42
 
 -- JSONDECODE as the body of a definition whose signature gives the type.
 GIVETH A FUNCTION FROM STRING TO EITHER STRING Tree

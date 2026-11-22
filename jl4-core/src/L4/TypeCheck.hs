@@ -103,7 +103,7 @@ import qualified Base.Text as Text
 import L4.Annotation
 import L4.Names
 import L4.Parser.ResolveAnnotation (pickDesc)
-import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcPos (..), SrcRange (..), zeroSrcPos)
+import L4.Parser.SrcSpan (inRange, prettySrcRange, prettySrcRangeM, SrcPos (..), SrcRange (..), zeroSrcPos)
 import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
@@ -392,9 +392,8 @@ doCheckProgramWithDependencies checkState checkEnv program =
 -- A type that is not concrete keeps the annotation it had, exactly, and with
 -- it the behaviour it had. Concrete means no inference variable is left, and
 -- no type parameter: a name some @GIVEN a IS A TYPE@ in this module binds
--- ('moduleTypeParameters'). An applied decode at a type parameter is refused
--- instead ('decodesAtTypeParameters'); one at a type nothing fixes is left as
--- it was.
+-- ('moduleTypeParameters'). A decode at a type parameter is refused instead
+-- ('decodesAtTypeParameters'); one at a type nothing fixes is left as it was.
 zonkDecodeTargets :: Substitution -> Set Unique -> Module Resolved -> Module Resolved
 zonkDecodeTargets subst typeParams m
   | mentionsJsonDecode m =
@@ -436,24 +435,49 @@ zonkDecodeTargets subst typeParams m
 -- library wrapper that its importers use) is not: refusing that would refuse
 -- every importer of it.
 --
--- Only an applied @JSONDECODE@ is refused. A bare one, handed on as a
--- function, decodes at the type of whatever finally applies it
--- ('L4.EvaluateLazy.Machine', the 'App' case), which may be written down.
+-- A bare @JSONDECODE@, handed on as a function at a type that mentions a
+-- type parameter, is refused too, with its own message (decided by Claude
+-- 2026-11-21, pending Meng's review). It decodes at the type of whatever finally
+-- applies it ('L4.EvaluateLazy.Machine', the 'App' case): right where that is
+-- written down, as in @decode s@ under @GIVETH AN EITHER STRING Tree@, and
+-- untyped where it is a type parameter again, as inside the prelude's @map@.
+-- Nothing here can tell which of the two a use will be.
 decodesAtTypeParameters :: Substitution -> Set Unique -> Module Resolved -> [CheckErrorWithContext]
 decodesAtTypeParameters subst typeParams m =
-  [ MkCheckErrorWithContext (JsonDecodeAtTypeParameter r target params) None
+  [ MkCheckErrorWithContext err None
   | mentionsJsonDecode m
-  , App ann r (_ : _) <- jsonDecodeNodes m
+  , App ann r es <- jsonDecodeNodes m
   , Just (TypeInfo ty _) <- [ann ^. annInfo]
-  , let target = decodedInto (substituteInfVars subst ty)
+  , let ty' = substituteInfVars subst ty
+  , let target = if null es then ty' else decodedInto ty'
   , let params = nubOrdOn getUnique (filter (\ n -> Set.member (getUnique n) typeParams) (typeHeads target))
   , not (null params)
+  , let err
+          | null es = JsonDecodePassedAtTypeParameter r target params (givethToRewrite r params)
+          | otherwise = JsonDecodeAtTypeParameter r target params
   ]
   where
     -- The @T@ of the @EITHER STRING T@ an applied JSONDECODE gives.
     decodedInto = \ case
       TyApp _ e [_, t] | getUnique e == eitherUnique -> t
       t -> t
+    -- For a bare JSONDECODE refused here, the innermost definition around it
+    -- whose GIVETH mentions one of the type parameters: writing the type
+    -- there is the fix its message shows. Read only for such a JSONDECODE,
+    -- so no other module walks its definitions for it.
+    givethToRewrite r params =
+      case [ ((d, rangeOf gann, gty), dr.start)
+           | Just here <- [rangeOf r]
+           , MkDecide dann (MkTypeSig _ _ (Just (MkGivethSig gann gty))) (MkAppForm _ d _ _) _ <- everyDecide
+           , Just dr <- [rangeOf dann]
+           , inRange here.start dr
+           , any (\ n -> getUnique n `elem` map getUnique params) (typeHeads gty)
+           ] of
+        [] -> Nothing
+        found -> case List.sortOn (\ (_, st) -> (negate st.line, negate st.column)) found of
+          (innermost, _) : _ -> Just innermost
+          [] -> Nothing
+    everyDecide = Optics.toListOf (gplate @(Decide Resolved) Optics.% Optics.cosmosOf (gplate @(Decide Resolved))) m
 
 -- | Does the module use JSONDECODE anywhere? The two passes
 -- above ask this first and do nothing more when the answer is no, as it is
@@ -7967,6 +7991,33 @@ typeParameterLines params =
   | p <- params
   ]
 
+-- | The type parameters a JSONDECODE's message names, as a reader would list
+-- them: @a@, @a and b@, @a, b and c@.
+parameterList :: [Resolved] -> Text
+parameterList params = case reverse (map (prettyLayout . getName) params) of
+  [] -> ""
+  [one] -> one
+  lastOne : rest -> Text.intercalate ", " (reverse rest) <> " and " <> lastOne
+
+-- | A type as it would be written after GIVETH, article included, with each
+-- of the type parameters replaced by a stand-in for the type the reader
+-- expects there: @A FUNCTION FROM STRING TO EITHER OF STRING, <the type you
+-- expect>@. Printed as source ('prettyLayout'), so the line can be copied.
+withTypesYouExpect :: [Resolved] -> Type' Resolved -> Text
+withTypesYouExpect params ty = article <> printed
+  where
+    stands = [ (getUnique p, "jsondecodeStandIn" <> Text.pack (show i), standIn p) | (i, p) <- zip [(1 :: Int) ..] params ]
+    standIn p = case params of
+      [_] -> "<the type you expect>"
+      _ -> "<the type you expect for " <> prettyLayout (getName p) <> ">"
+    rename r = case [ mark | (u, mark, _) <- stands, u == getUnique r ] of
+      mark : _ -> Def (getUnique r) (MkName emptyAnno (NormalName mark))
+      [] -> r
+    printed = List.foldl' (\ t (_, mark, text) -> Text.replace mark text t) (prettyLayout (Optics.over (gplate @Resolved) rename ty)) stands
+    article = case Text.uncons printed of
+      Just (c, _) | c `elem` ("AEIOU" :: String) -> "AN "
+      _ -> "A "
+
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousClausePattern headName hasGiven binder ctor) =
   [ "The pattern " <> quotedName (getName binder) <> " in this clause of " <> quotedName headName
@@ -8109,6 +8160,40 @@ prettyCheckError (JsonDecodeAtTypeParameter _ target params) =
   , ""
   , "and hand the decoded value on as an input."
   ]
+prettyCheckError (JsonDecodePassedAtTypeParameter _ fnType params rewrite) =
+  [ "This hands JSONDECODE on, to be used on a text later, at the type"
+  , ""
+  , "  " <> prettyTypeForDisplay fnType
+  , ""
+  , case params of
+      [_] -> "which mentions a type given with"
+      _ -> "which mentions types given with"
+  , ""
+  ]
+  <> typeParameterLines params <>
+  [ ""
+  , "Used on a text where the type to decode into is written down, it works."
+  , ""
+  , "Handed on again to a rule that works for any type, such as map, it does"
+  , "not: nothing there says which type is meant, so a JSON object would not"
+  , "become a record, and a string would not become one of the choices of an"
+  , "IS ONE OF type."
+  , ""
+  , "L4 cannot tell here which of the two will happen, so it refuses this."
+  ]
+  <> case rewrite of
+    Just (d, grng, gty) ->
+      [ "Write the type you expect in place of " <> parameterList params <> ", in the GIVETH of"
+      , prettyLayout (getName d) <> maybe "" (\ rng -> ", on line " <> Text.pack (show rng.start.line)) grng <> ":"
+      , ""
+      , "  GIVETH " <> withTypesYouExpect params gty
+      ]
+    Nothing ->
+      [ "Write the type you expect in place of " <> parameterList params <> " where JSONDECODE"
+      , "is handed on, for example in a rule with"
+      , ""
+      , "  GIVETH " <> withTypesYouExpect params fnType
+      ]
 prettyCheckError (MisattachedSectionGiven n mSection)       =
   [ "This GIVEN starts at column 1, so it is the signature of the declaration"
   , "below it -- and that declaration never uses"

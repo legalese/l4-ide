@@ -190,6 +190,9 @@ When checking `JSONDECODE s ⇐ MAYBE Person`:
 
 **Ruling, smucclaw/l4-ide#1078 option C, which type parameters count (decided by Claude 2026-11-21, pending Meng's review):** every type parameter declared in the module counts (`moduleTypeParameters`, read from each `GIVEN … IS A TYPE`), not only one in a `GIVEN` around the decode, because a `DECIDE` with no signature that applies `JSONDECODE` takes the `a` of the rule that uses it, as the definition `` `the decode` `` in `jl4/examples/not-ok/tc/jsondecode-at-type-parameter.l4` does, and counting only a `GIVEN` around the decode would leave that one decoding untyped.
 
+**Ruling, smucclaw/l4-ide#1078 option C, the bare case (decided by Claude 2026-11-21, pending Meng's review):** a bare `JSONDECODE` handed on as a function at a type that mentions a type parameter is refused too, as an error (`JsonDecodePassedAtTypeParameter`), although it decodes correctly wherever it is finally used at a written-down type; that was chosen over dropping the check or making it a warning.
+The evidence for the bare case: in `jl4/examples/not-ok/tc/jsondecode-passed-at-type-parameter.l4`, `` `label of one tree` ``, which uses the bare `JSONDECODE` at a type written down, gave 2 before this check, and `` `numbers via map` ``, which hands it on to `map`, was right only by luck, because a JSON number decodes the same with no type. This check refuses `` `decode any` ``, the definition both go through, so neither runs now; reverting the commit that adds the check, alone, restores the 2.
+
 #### 4.2 Future: Overloaded Literals
 
 Expected types could guide interpretation of numeric literals:

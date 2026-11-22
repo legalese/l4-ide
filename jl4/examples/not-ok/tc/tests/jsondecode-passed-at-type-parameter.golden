@@ -1,0 +1,86 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: prelude from jsondecode-passed-at-type-parameter.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from jsondecode-passed-at-type-parameter.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: jsondecode-passed-at-type-parameter.l4
+  Hidden: no
+  Range: 24:20-24:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This hands JSONDECODE on, to be used on a text later, at the type
+
+      FUNCTION FROM STRING TO EITHER OF STRING, a
+
+    which mentions a type given with
+
+      GIVEN a IS A TYPE, on line 22
+
+    Used on a text where the type to decode into is written down, it works.
+
+    Handed on again to a rule that works for any type, such as map, it does
+    not: nothing there says which type is meant, so a JSON object would not
+    become a record, and a string would not become one of the choices of an
+    IS ONE OF type.
+
+    L4 cannot tell here which of the two will happen, so it refuses this.
+    Write the type you expect in place of a, in the GIVETH of
+    `decode any`, on line 23:
+
+      GIVETH A FUNCTION FROM STRING TO EITHER OF STRING, <the type you expect>
+
+File: jsondecode-passed-at-type-parameter.l4
+  Hidden: no
+  Range: 43:31-43:41
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This hands JSONDECODE on, to be used on a text later, at the type
+
+      FUNCTION FROM STRING TO EITHER OF STRING, a
+
+    which mentions a type given with
+
+      GIVEN a IS A TYPE, on line 40
+
+    Used on a text where the type to decode into is written down, it works.
+
+    Handed on again to a rule that works for any type, such as map, it does
+    not: nothing there says which type is meant, so a JSON object would not
+    become a record, and a string would not become one of the choices of an
+    IS ONE OF type.
+
+    L4 cannot tell here which of the two will happen, so it refuses this.
+    Write the type you expect in place of a, in the GIVETH of
+    `decode each`, on line 42:
+
+      GIVETH A LIST OF (EITHER OF STRING, <the type you expect>)
+
+File: jsondecode-passed-at-type-parameter.l4
+  Hidden: no
+  Range: 48:25-48:35
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This hands JSONDECODE on, to be used on a text later, at the type
+
+      FUNCTION FROM STRING TO EITHER OF STRING, a
+
+    which mentions a type given with
+
+      GIVEN a IS A TYPE, on line 50
+
+    Used on a text where the type to decode into is written down, it works.
+
+    Handed on again to a rule that works for any type, such as map, it does
+    not: nothing there says which type is meant, so a JSON object would not
+    become a record, and a string would not become one of the choices of an
+    IS ONE OF type.
+
+    L4 cannot tell here which of the two will happen, so it refuses this.
+    Write the type you expect in place of a where JSONDECODE
+    is handed on, for example in a rule with
+
+      GIVETH A FUNCTION FROM STRING TO EITHER OF STRING, <the type you expect>

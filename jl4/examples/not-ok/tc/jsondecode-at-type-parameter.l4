@@ -10,9 +10,9 @@
 -- rule was used at, as in `decoded passes`, which answered TRUE.
 --
 -- Not refused, and so not here: a decode whose type nothing fixes at all (a
--- definition with no signature that nothing uses), and JSONDECODE handed on
--- bare from a definition GIVEN a type. Both are in
--- ok/jsondecode-inferred-target.l4.
+-- definition with no signature that nothing uses), in
+-- ok/jsondecode-inferred-target.l4. JSONDECODE handed on bare is refused too,
+-- in not-ok/tc/jsondecode-passed-at-type-parameter.l4.
 
 IMPORT prelude
 

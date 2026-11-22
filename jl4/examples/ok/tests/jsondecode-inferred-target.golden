@@ -25,13 +25,9 @@ jsondecode-inferred-target.l4:155:1-62:
   assertion satisfied
 jsondecode-inferred-target.l4:164:1-43:
   assertion satisfied
-jsondecode-inferred-target.l4:186:1-37:
+jsondecode-inferred-target.l4:180:1-41:
   assertion satisfied
-jsondecode-inferred-target.l4:199:1-58:
+jsondecode-inferred-target.l4:206:1-34:
   assertion satisfied
-jsondecode-inferred-target.l4:211:1-41:
-  assertion satisfied
-jsondecode-inferred-target.l4:237:1-34:
-  assertion satisfied
-jsondecode-inferred-target.l4:245:1-32:
+jsondecode-inferred-target.l4:214:1-32:
   assertion satisfied
