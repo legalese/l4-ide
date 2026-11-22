@@ -1232,6 +1232,13 @@ data Node = MkNode
   , ndDepth  :: !Int
   , ndEvents :: ![Expr Resolved]
   , ndPos    :: !Position
+  , ndRe     :: !Bool
+    -- ^ this position reached a state that was already known, at an EARLIER
+    -- clock than the one explored from: it is explored again, for the acts
+    -- and instants the later clock no longer allows. A key says nothing of
+    -- how far the clock is from a deadline that is anchored in absolute time,
+    -- so two positions with one key can differ in what is still possible; the
+    -- earlier clock allows all the later one does
   }
 
 -- | What one try of one candidate came to.
@@ -1269,6 +1276,8 @@ data Accum = MkAccum
   , acUnspell    :: !Int
   , acByForm     :: !(Set Text)
   , acInstants   :: !InstantStats
+  , acBest       :: !(Map Int Rational)
+    -- ^ per state, the earliest clock any position of it was queued at
   }
 
 -- | What one exploration shares, ready to explore or, for a test, to look at
@@ -1423,7 +1432,7 @@ exploreWith ex = do
               <> ", so no act could fire and every property would hold of the one state"))
       Just _ -> do
         (key0, notes0) <- stateKey ex pos0
-        let node0 = MkNode {ndId = 0, ndDepth = 0, ndEvents = [], ndPos = pos0}
+        let node0 = MkNode {ndId = 0, ndDepth = 0, ndEvents = [], ndPos = pos0, ndRe = False}
             acc0 = noteKey notes0 MkAccum
               { acSeen = Map.singleton key0 0
               , acNodes = [stateNode 0 0 [] key0 pos0]
@@ -1443,6 +1452,7 @@ exploreWith ex = do
               , acUnspell = 0
               , acByForm = Set.empty
               , acInstants = mempty
+              , acBest = Map.singleton 0 pos0.posClock
               }
         acc <- loop ex acc0
         pure (Right (finish ex acc))
@@ -1475,20 +1485,21 @@ loop ex acc = case acc.acQueue of
     | otherwise -> do
         tried <- expand ex node
         acc' <- foldM (record ex node) acc {acQueue = rest} tried
-        let fired = not (null [ () | TriedEdge {} <- tried ])
-            blocked = not (null [ () | t <- tried, isBlocked t ])
-            acc'' = if fired || blocked then acc' else terminal node acc'
-            -- a pass-over counts once per state and act, and only if no
-            -- instant took the act
-            firedLabels = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
-            passed = Set.fromList [ l | TriedPassed l _ <- tried, not (Set.member l firedLabels) ]
-            -- an untried candidate counts once per state and reason
-            untriedHere = Set.fromList [ (l, why) | TriedUntried l why <- tried ]
-        loop ex acc''
-          { acPassed = acc''.acPassed + Set.size passed
-          , acUntried = foldl' (\ m k -> Map.insertWith (+) k 1 m) acc''.acUntried (Set.toList untriedHere)
-          , acRefused = foldl' mergeRefusal acc''.acRefused (nubOrdOn refusalKey [ r | TriedRefused r <- tried ])
-          }
+        if node.ndRe then loop ex acc' else do
+          let fired = not (null [ () | TriedEdge {} <- tried ])
+              blocked = not (null [ () | t <- tried, isBlocked t ])
+              acc'' = if fired || blocked then acc' else terminal node acc'
+              -- a pass-over counts once per state and act, and only if no
+              -- instant took the act
+              firedLabels = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
+              passed = Set.fromList [ l | TriedPassed l _ <- tried, not (Set.member l firedLabels) ]
+              -- an untried candidate counts once per state and reason
+              untriedHere = Set.fromList [ (l, why) | TriedUntried l why <- tried ]
+          loop ex acc''
+            { acPassed = acc''.acPassed + Set.size passed
+            , acUntried = foldl' (\ m k -> Map.insertWith (+) k 1 m) acc''.acUntried (Set.toList untriedHere)
+            , acRefused = foldl' mergeRefusal acc''.acRefused (nubOrdOn refusalKey [ r | TriedRefused r <- tried ])
+            }
   where
     isBlocked = \ case
       TriedUntried {} -> True
@@ -1513,16 +1524,24 @@ record ex node acc = \ case
   TriedEdge label kind event pos' -> do
     (key, notes) <- stateKey ex pos'
     case Map.lookup key acc.acSeen of
-      Just j -> pure (addEdge (noteKey notes acc) (Just event) (MkTransition node.ndId label j kind))
+      Just j -> do
+        let acc1 = addEdge (noteKey notes acc) (Just event) (MkTransition node.ndId label j kind)
+            earlier = maybe False (pos'.posClock <) (Map.lookup j acc.acBest)
+        pure if earlier && node.ndDepth + 1 < ex.exOptions.eoMaxDepth
+          then acc1
+            { acBest = Map.insert j pos'.posClock acc.acBest
+            , acQueue = acc.acQueue :|> MkNode {ndId = j, ndDepth = node.ndDepth + 1, ndEvents = node.ndEvents <> [event], ndPos = pos', ndRe = True} }
+          else acc1
       Nothing
         | Map.size acc.acSeen >= ex.exOptions.eoMaxStates ->
             pure acc {acStatesCut = acc.acStatesCut + 1}
         | otherwise -> do
             let j = acc.acNext
                 events = node.ndEvents <> [event]
-                new = MkNode {ndId = j, ndDepth = node.ndDepth + 1, ndEvents = events, ndPos = pos'}
+                new = MkNode {ndId = j, ndDepth = node.ndDepth + 1, ndEvents = events, ndPos = pos', ndRe = False}
             pure $ addEdge (noteKey notes acc
               { acSeen = Map.insert key j acc.acSeen
+              , acBest = Map.insert j pos'.posClock acc.acBest
               , acNodes = stateNode j (node.ndDepth + 1) events key pos' : acc.acNodes
               , acNext = j + 1
               , acQueue = acc.acQueue :|> new
@@ -1612,12 +1631,13 @@ expand ex node = do
       offeredTicks = [ d | MkCandidate {cdKind = TickPast d _} <- cands ]
       -- the stamp that reveals deadline d: one unit past it, or, on a grid,
       -- the next point of the grid past it
-      tickTime d = case ex.exOptions.eoTime of
+      -- (never earlier than the clock: a deadline the clock has already passed
+      -- is revealed by an event at the clock, and a tick that ran time
+      -- backwards reached positions no run of the contract reaches)
+      tickTime d = max pos.posClock case ex.exOptions.eoTime of
         Regions -> tickPast known d
         Grid n  -> (fromInteger (floor (d / n)) + 1) * n
-      retimed d cand = case ex.exOptions.eoTime of
-        Regions -> cand
-        Grid _  -> cand {cdHypothetical = Right (Tick (tickTime d))}
+      retimed d cand = cand {cdHypothetical = Right (Tick (tickTime d))}
       run label kind cand = do
         (outcome, mpos) <- tryCandidateFrom rig tr pos cand
         pure case outcome.ocVerdict of
@@ -1626,16 +1646,43 @@ expand ex node = do
           _ -> case (cand.cdHypothetical, mpos) of
             (Right hyp, Just pos') | isJust pos'.posResidual -> TriedEdge label kind (hypotheticalExpr hyp) pos'
             _ -> TriedUntried label "the replay produced no position"
-      tick label cand = case cand.cdHypothetical of
+      tick label d cand = case cand.cdHypothetical of
         Right (Tick t) | Just u <- ex.exOptions.eoUntil, t > u -> pure [TriedBeyond]
+        Right (Tick t) -> do
+          r <- run label EdgeTick cand
+          case r of
+            TriedEdge _ _ _ pos' | Regions <- ex.exOptions.eoTime -> tickRecord label d t pos'
+            _ -> pure ()
+          pure [r]
         _ -> pure <$> run label EdgeTick cand
+      -- A deadline started by a LAPSE (a LEST that arms a cure) is not started
+      -- by an act, so the act that led here never saw it move; it is read here,
+      -- at the tick that revealed the lapse, as an act's successor is read, and
+      -- kept as the offsets (relative to the deadline that lapsed, which the
+      -- act's own offset already reaches) and fixed instants that the paths
+      -- through this state carry ('pathPools')
+      tickRecord label d t pos' = do
+        before <- thresholdsOf ex pos
+        after <- thresholdsOf ex pos'
+        let new = [ h | h <- after, h.heldKind == HeldDeadline, not (any (sameHeld h) before) ]
+            anchoredH h = case h.heldNorm.lnDue of
+              UnforcedDeadline _ (Just _) -> True
+              _                           -> False
+            movesH h = case h.heldNorm.lnDue of
+              UnforcedDeadline _ (Just _) -> False
+              _                           -> True
+        modifyIORef' ex.exRecords (MkActRecord
+          { arState = node.ndId, arLabel = label, arClock = t, arLimit = Just t
+          , arTried = Set.singleton t, arFixed = []
+          , arOffsets = [ h.heldAt - d | h <- new, movesH h ]
+          , arLearnedFixed = [ h.heldAt | h <- new, anchoredH h || not (movesH h) ] } :)
   moves <- fmap concat $ for cands \ cand -> case cand.cdKind of
-    TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) cand'
+    TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) d cand'
     NoTick live -> case snd <$> lookup live lives of
       Just (Just (Right d))
         | d `notElem` offeredTicks ->
             let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickTime d))}
-            in tick (tickLabel cand' d) cand'
+            in tick (tickLabel cand' d) d cand'
         | otherwise -> pure []
       _ -> pure [TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)]
     ActBy live -> case lookup live lives of

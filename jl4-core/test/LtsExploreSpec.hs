@@ -43,9 +43,11 @@ module LtsExploreSpec (spec) where
 
 import Data.List (nub, sort)
 import Data.Maybe (isJust)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Control.Monad (forM)
+import Text.Read (readMaybe)
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
@@ -431,6 +433,47 @@ roomSrc = Text.unlines
   , "  RAND  (PARTY U MUST u WITHIN 9 HENCE (PARTY V MUST v WITHIN 2 HENCE FULFILLED LEST BREACH BY V) LEST BREACH BY U)"
   ]
 
+-- | A deadline STARTED BY A LAPSE: Q's deadline is 3 after `a`; when it passes,
+-- W's cure starts, 2 after it. R's is fixed at 7, and the cure falls on it when
+-- `a` is done at 2. No act starts W's deadline, so no act's offset names the tie.
+lapseSrc :: Text.Text
+lapseSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF P, Q, R, W"
+  , "DECLARE Action IS ONE OF a, b, r, w"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`lapsed` MEANS"
+  , "       (PARTY R MUST r WITHIN 7 HENCE FULFILLED LEST BREACH BY R)"
+  , "  RAND (PARTY P MUST a WITHIN 9"
+  , "          HENCE (PARTY Q MUST b WITHIN 3 HENCE FULFILLED"
+  , "                   LEST (PARTY W MUST w WITHIN 2 HENCE FULFILLED LEST BREACH BY W))"
+  , "          LEST BREACH BY P)"
+  ]
+
+-- | Two positions with ONE key and different clocks (`WITHIN 6 OF 0` is
+-- anchored: it prints the same at every clock). `WAITUNTIL 5` then `q` at 5 and
+-- `t`, `confirm`, `q` at 0 reach one key; from clock 0 `b` can still be done at
+-- 0 to 3, and V's deadline can fall before S1's.
+remergedSrc :: Text.Text
+remergedSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF T, Q, B, V, W, S1"
+  , "DECLARE Action IS ONE OF t, confirm, q, b, v, w, s1"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`rest` MEANS"
+  , "       (PARTY B MUST b WITHIN 20"
+  , "          HENCE (PARTY V MUST v WITHIN 2 HENCE FULFILLED"
+  , "                   LEST (PARTY W MUST w WITHIN 1 HENCE FULFILLED LEST BREACH BY W))"
+  , "          LEST BREACH BY B)"
+  , "  RAND (PARTY S1 MUST s1 WITHIN 6 OF 0 HENCE FULFILLED LEST BREACH BY S1)"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`remerged` MEANS"
+  , "  PARTY T MUST t WITHIN 4"
+  , "    HENCE (PARTY T MUST confirm WITHIN 1 HENCE (PARTY Q MUST q WITHIN 10 HENCE `rest` LEST BREACH BY Q) LEST BREACH BY T)"
+  , "    LEST (PARTY Q MUST q WITHIN 10 HENCE `rest` LEST BREACH BY Q)"
+  ]
+
 -- | A deadline that is fixed in absolute time and only the successor holds
 -- (an anchor on the arming of the outset): Q's is at 3, S's at 7, whichever
 -- instant `a` is done at, so `a` at 3 and at 7 are boundaries.
@@ -487,25 +530,29 @@ enumerated ex depth horizon = do
   pos0 <- position rig0 tr0 >>= maybe (fail "the outset gave no position") pure
   go (0 :: Int) [([], pos0)] Set.empty Set.empty
   where
+    -- a position is expanded once per key AND CLOCK: two positions with one key
+    -- can differ in how far the clock is from a deadline anchored in absolute
+    -- time, and so in what they can still reach; expanding only the first one
+    -- met would be the blind spot the graph itself used to have
     go d frontier seen sigs
-      | null frontier = pure (sigs, seen)
+      | null frontier = pure (sigs, Set.map fst seen)
       | otherwise = do
           keyed <- forM frontier \ (ev, pos) -> do
             k <- keyText ex pos
             sg <- timeSignature ex pos
             pure (k, sg, ev, pos)
           let fresh = firstByKey seen keyed
-              seen' = seen <> Set.fromList [ k | (k, _, _, _) <- fresh ]
+              seen' = seen <> Set.fromList [ (k, p.posClock) | (k, _, _, p) <- fresh ]
               sigs' = sigs <> Set.fromList [ sg | (_, sg, _, _) <- keyed ]
           if d >= depth
-            then pure (sigs', seen')
+            then pure (sigs', Set.map fst seen')
             else do
               next <- concat <$> forM fresh \ (_, _, ev, pos) -> successors ev pos
               go (d + 1) next seen' sigs'
     firstByKey _ [] = []
-    firstByKey seen (x@(k, _, _, _) : xs)
-      | Set.member k seen = firstByKey seen xs
-      | otherwise = x : firstByKey (Set.insert k seen) xs
+    firstByKey seen (x@(k, _, _, p) : xs)
+      | Set.member (k, p.posClock) seen = firstByKey seen xs
+      | otherwise = x : firstByKey (Set.insert (k, p.posClock) seen) xs
     successors ev pos = do
       let (rig, tr) = rigFor ex ev
           c = pos.posClock
@@ -524,7 +571,10 @@ enumerated ex depth horizon = do
         (ActBy _, Right act@Act {}) ->
           concat <$> forM [ceiling c .. floor limit :: Integer] \ t ->
             try cand {cdHypothetical = Right act {hyAt = fromInteger t}}
-        (TickPast _ _, Right (Tick _)) -> try cand
+        (TickPast d _, Right (Tick _)) ->
+          -- the tick the explorer takes: one unit past the deadline, and never
+          -- earlier than the clock
+          try cand {cdHypothetical = Right (Tick (max c (d + 1)))}
         _ -> pure []
 
 -- | The graph's states, each replayed from its own path, as the signatures
@@ -773,6 +823,8 @@ spec = describe "l4 explore" do
           | "`room`" `Text.isInfixOf` src = "room"
           | "`anchored`" `Text.isInfixOf` src = "anchored"
           | "`cascade`" `Text.isInfixOf` src = "cascade"
+          | "`lapsed`" `Text.isInfixOf` src = "lapsed"
+          | "`remerged`" `Text.isInfixOf` src = "remerged"
           | otherwise = "deal"
         clocks = clocksSrc 3 5 7
         wide = clocksSrc 8 10 15
@@ -789,6 +841,29 @@ spec = describe "l4 explore" do
       holdsEvery "with --chains: a tie that a LATER act's offset puts in reach (u at 5 puts V on R, and only if a was done at 2 or later)" roomSrc regions {eoChains = True} Nothing 2 5
       holdsEvery "deadlines that are fixed in absolute time and that only the successor holds (OF THE ARMING)" anchoredSrc regions Nothing 2 3
       holdsEvery "two fixed deadlines and one offset (the review's cascade): no chain, so nothing is missing and nothing is said" (cascadeSrc 8 10 4) regions Nothing 2 11
+
+    describe "the second review's findings (2026-11-23)" do
+      -- a deadline started by a lapse is on the chain, searched with --chains
+      holdsEvery "a deadline started by a LAPSE, with --chains" lapseSrc regions {eoChains = True} Nothing 2 9
+      honest "a deadline started by a LAPSE" lapseSrc regions Nothing 2 9
+      it "without --chains the lapse is named, and the oracle finds the position missing" do
+        (missing, g) <- auditOf "lapsed" lapseSrc regions Nothing 2 9
+        missing `shouldSatisfy` (not . null)
+        coverageComplete g.gCoverage `shouldBe` False
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "ties through chains of acts"
+      -- two positions with one key at different clocks: the graph is explored
+      -- again from the earlier one
+      honest "two positions with one key at different clocks" remergedSrc regions Nothing 4 5
+      holdsEvery "two positions with one key at different clocks, with --chains" remergedSrc regions {eoChains = True} Nothing 4 5
+      it "no tick runs time backwards (the anchored deadlines)" do
+        g <- exploreSrc anchoredSrc "anchored" regions []
+        let clockOf = Map.fromList [ (s.snId, s.snClock) | s <- g.gStates ]
+            stampOf l = case Text.breakOnEnd "(WAITUNTIL " l of
+              (_, rest) | not (Text.null rest) -> readMaybe (Text.unpack (Text.takeWhile (/= ')') rest)) :: Maybe Integer
+              _ -> Nothing
+            backwards = [ (t.tnFrom, t.tnLabel) | t <- g.gTransitions, t.tnKind == EdgeTick
+                        , Just stamp <- [stampOf t.tnLabel], Just c <- [Map.lookup t.tnFrom clockOf], fromInteger stamp < c ]
+        backwards `shouldBe` []
 
     describe "the coverage line is honest about time" do
       honest "two clocks" clocks regions Nothing 3 3

@@ -11,6 +11,7 @@
 -- @--fair@ that names nothing.
 module CliTest.Explore (spec, fixtures) where
 
+import Control.Monad (forM_)
 import Data.List (isInfixOf, isPrefixOf, sort)
 import System.Directory (copyFile, listDirectory)
 import System.Exit (ExitCode (..))
@@ -30,7 +31,7 @@ instants = "tests-cli" </> "fixtures" </> "explore-instants"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -78,6 +79,17 @@ traceAfter property out =
   case dropWhile (not . (("-- `" <> property <> "`") `isPrefixOf`)) (lines out) of
     comment : rest -> comment : takeWhile (\ l -> "#TRACE" `isPrefixOf` l || "    " `isPrefixOf` l) rest
     [] -> []
+
+-- | The residual `l4 run` reaches by these events from the outset of this
+-- fixture's contract, as one line.
+reachedBy :: FilePath -> FilePath -> String -> [String] -> IO String
+reachedBy bin fixture name events = withSystemTempDirectory "l4-explore-reach" \ dir -> do
+  original <- readFile fixture
+  let own = takeWhile (not . ("#TRACE" `isPrefixOf`)) (lines original)
+  writeFile (dir </> "t.l4") (unlines (own <> ["#TRACE " <> name <> " AT 0 WITH"] <> map ("  " <>) events))
+  Output rcode rout _ <- runL4 bin ["run", dir </> "t.l4"]
+  rcode `shouldBe` ExitSuccess
+  pure (unwords (words (filter (/= '\r') (unlines (takeWhile (not . null) (drop 1 (dropWhile (/= "Result:") (lines rout))))))))
 
 lastLine :: String -> String
 lastLine = \ s -> case lines s of
@@ -441,6 +453,26 @@ spec bin = describe "l4 explore" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "clocks.l4"]
       code `shouldBe` ExitSuccess
       lastLine sout `shouldSatisfy` (not . ("chains" `isInfixOf`))
+
+    it "lapse.l4: a deadline started by a lapse is named by default (exit 2), and --chains holds the positions the evaluator reaches by it" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "lapse.l4"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("UNTRIED 1: ties through chains of acts, for PARTY P DOES a" `isInfixOf`)
+      Output ccode csout _ <- runL4 bin ["explore", instants </> "lapse.l4", "--chains"]
+      ccode `shouldBe` ExitSuccess
+      lastLine csout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      forM_ [ ["PARTY P DOES a AT 2", "(WAITUNTIL 6)"], ["PARTY P DOES a AT 3", "(WAITUNTIL 7)"] ] \ events -> do
+        got <- reachedBy bin (instants </> "lapse.l4") "lapse" events
+        unwords (words (filter (/= '\r') csout)) `shouldSatisfy` (got `isInfixOf`)
+
+    it "merged.l4: a state reached again at an earlier clock is explored again, so the positions the evaluator reaches by 4 and 5 events are in the graph" $
+      forM_ [[], ["--chains"]] \ flags -> do
+        Output _ sout _ <- runL4 bin (["explore", instants </> "merged.l4"] <> flags)
+        forM_ [ [ "PARTY T DOES t AT 0", "PARTY T DOES confirm AT 0", "PARTY Q DOES q AT 0", "PARTY B DOES b AT 0" ]
+              , [ "PARTY T DOES t AT 0", "PARTY T DOES confirm AT 0", "PARTY Q DOES q AT 0", "PARTY B DOES b AT 0", "(WAITUNTIL 3)" ]
+              , [ "PARTY T DOES t AT 0", "PARTY T DOES confirm AT 0", "PARTY Q DOES q AT 0", "PARTY B DOES b AT 3", "(WAITUNTIL 7)" ] ] \ events -> do
+          got <- reachedBy bin (instants </> "merged.l4") "m" events
+          unwords (words (filter (/= '\r') sout)) `shouldSatisfy` (got `isInfixOf`)
 
     it "l4 lts on adjacent.l4: the tick past the deadline at 3 is the clock reaching 4, not 3.5, and does not reach the deadline at 4" $ do
       Output code sout _ <- runL4 bin ["lts", instants </> "adjacent.l4", "--contract", "adjacent"]

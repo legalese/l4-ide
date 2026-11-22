@@ -168,10 +168,10 @@ It says so only for an act that a later act's offset could reach, so a contract 
 It costs a larger graph, so it is not the default.
 Measured on the 78 files in this repository's examples and docs that carry a `#TRACE` (2026-11-23, against `unstable` before this change):
 
-- by default, 3 files exit 2 where they exited 0 before, and 1 that ran past a 300 second limit now ends at the state bound.
+- by default, 3 files exit 2 where they exited 0 before.
   `jl4/examples/ok/every/run-in.l4` and `run-modals.l4` name a chain, and `--chains` finds what they left out (795 states become 2086, and 58 become 153, in the larger graphs of each file).
   `doc/reference/regulative/must-example.l4` names a chain that adds nothing: `--chains` explores the same 8 states and exits 0, because the line says what _could_ put a tie in reach and does not know that it does.
-  `jl4/examples/explore/ledger/d3-reopen.l4` is the one that ran past the limit; it now stops at the state bound (exit 3);
+  `jl4/examples/explore/ledger/d3-reopen.l4` takes about five minutes before and after, at the 300 second limit the sweep ran under (it ended at that limit before and at the state bound in one run after), so its exit status is not a comparison;
 - of the 405 graphs those files explore (leaving out the one that timed out), 354 have the same number of states as before, 42 have more and 9 have fewer.
   The largest growth is a block of `run-after.l4`, `EVERY Tenant t IN tenants MUST Sign t AFTER 3 WITHIN 30`, from 1 state to 11: the old explorer passed both acts over at every instant it tried and stopped at the outset, and the new one tries them at the instant the window opens;
 - `--chains` costs time as well as states: `run-in.l4` takes 149 seconds against 27, and the whole set 592 seconds against 455.
@@ -193,7 +193,8 @@ Two positions with the same order of deadlines and different gaps between them h
 Regions is the cheaper graph that tries to find every position the evaluator can reach, and where it knows it may not have (a chain tie, a fraction, the instant cap) the line says "UNTRIED" and never "nothing untried".
 
 `--grid N` is the alternative, for a rule whose guard reads the clock arithmetically: it tries every multiple of N from the first instant the act's window is open up to the next deadline, and keeps the clock in the state.
-Its soundness condition, that every event time, deadline and window opening is a multiple of N, is checked: a position that breaks it is named as untried, and so is a run with no deadline and no `--until`, because a grid has no end to try up to then.
+It explores the model in which every event happens at a multiple of N, so an act at any other instant is outside it, and the explorer cannot say what it did not try: `--grid 2` on a contract whose numbers are all even does not hold the position an act at 1 reaches (a review found one, 2026-11-23); use `--grid 1` to hold every whole instant.
+What it does check is the other half of the condition: a clock, a deadline or a window opening that is not a multiple of N, in a position it reaches, is named as untried, and so is a run with no deadline and no `--until`, because a grid has no end to try up to then.
 The cost is the whole window: `--grid 1` on an obligation that is `WITHIN 365` tries 366 instants per act in each state, and the clock tells states apart, so the graph is several times larger than the regions graph for the same contract.
 **One act is tried at no more than 256 instants in one state**, so that run exits 2 and says how many it did not try; `--max-instants 400` lifts the bound.
 (On the dinner example below, `--grid 50` gives 20 states against 8; measured 2026-10-26, before the grid tried every multiple.)
@@ -435,6 +436,9 @@ These are all in the output, on the coverage line or the property's own line, an
   The line names the scheme and that is all it does.
   What it does say, loudly (exit 2): a tie that needs a chain of acts (above), a deadline or stamp that is not a whole number, and a state that needs more instants than the cap.
   What it does not say: an act whose behaviour changes at some instant for a reason that is neither a deadline nor a window opening, and a window opening the explorer cannot read (an `AFTER` that names a date).
+  Two cases a review found (2026-11-23) were silent and are now handled, and are listed so that the next one is looked for in the same places.
+  A deadline started by a lapse (a `LEST` that arms a cure) is not started by an act, so no act's own offset named the tie it makes: ticks are read the way an act's successors are, and the chain they make is named like any other.
+  Two positions with one state key can be at different clocks, and a deadline anchored in absolute time prints the same at every clock, so the later one first found stood for the earlier one, which can still do more: a state reached again at an earlier clock is explored again from there.
   (Read from the code, not measured, 2026-11-22: a deadline the explorer cannot read is listed as untried, so that case is loud; an opening it cannot read is left out without a word.)
   The exact graph, for a contract small enough, is `--grid 1`.
 
