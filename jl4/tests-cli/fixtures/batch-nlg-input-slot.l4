@@ -1,0 +1,12 @@
+-- `l4 batch` prints the checked module back and checks it again next to a
+-- generated record that has a field for each input. If the printer wrote this
+-- annotation back, `%a%` would have two candidates, the input and the field,
+-- and no expected type to choose between them; the checker refuses that
+-- ("multiple definitions") and every row would be an `error`. The printer
+-- writes no annotation back, so the row runs.
+
+@export Whether the amount is large
+GIVEN a IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg the amount %a% is large
+  IF a GREATER THAN 100

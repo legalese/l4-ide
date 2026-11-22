@@ -1,0 +1,2 @@
+-- Intentionally unreadable: the string is never closed. Imported by main.l4, which is itself fine.
+foo MEANS "unterminated

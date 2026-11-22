@@ -6,7 +6,7 @@ File: typically-on-type.l4
   Range: 8:11-8:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-on-type-variable
   Message:
     `some type` is a type, which cannot carry a TYPICALLY default value.
     TYPICALLY can give a default to a DECLARE field, a GIVEN input, or an ASSUME.
@@ -16,7 +16,7 @@ File: typically-on-type.l4
   Range: 13:8-13:24
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-on-type-variable
   Message:
     `a` is a type, which cannot carry a TYPICALLY default value.
     TYPICALLY can give a default to a DECLARE field, a GIVEN input, or an ASSUME.

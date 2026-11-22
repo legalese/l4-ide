@@ -6,7 +6,7 @@ File: every-unbound-variable.l4
   Range: 11:31-11:38
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/deprecated-exactly
   Message:
     EXACTLY is being retired, but here it cannot simply be dropped.
 
@@ -23,7 +23,7 @@ File: every-unbound-variable.l4
   Range: 11:39-11:40
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 

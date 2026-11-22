@@ -9,7 +9,7 @@ import {
   type Check,
 } from './validate.js'
 
-/** Session ids are ULIDs: 26 characters of Crockford base32 (§15.5);
+/** Session ids are ULIDs: 26 characters of Crockford base32;
  *  the first is 0–7 (48-bit timestamp). */
 export const ULID_RE = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/
 
@@ -17,10 +17,10 @@ export function isSessionId(value: unknown): value is string {
   return typeof value === 'string' && ULID_RE.test(value)
 }
 
-/** WorkOS user-scoped API keys as handed to a task in `AGENT_KEY`. */
+/** User-scoped API keys as handed to a task in `AGENT_KEY`. */
 export const AGENT_KEY_RE = /^sk_[A-Za-z0-9_-]{8,512}$/
 
-/** Conversation / turn / call ids minted by clients, the proxy or the
+/** Conversation / turn / call ids minted by clients, the AI service or the
  *  model: opaque, but bounded and path-safe. */
 export const OPAQUE_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/
 
@@ -30,11 +30,11 @@ export const FILE_NAME_RE = /^(?!\.)[^/\\\0\r\n]{1,255}$/
 export const sessionId: Check<string> = str({ pattern: ULID_RE })
 export const opaqueId: Check<string> = str({ pattern: OPAQUE_ID_RE })
 export const fileName: Check<string> = str({ pattern: FILE_NAME_RE })
-/** Epoch milliseconds — every timestamp in the protocol (§15.5). */
+/** Epoch milliseconds — every timestamp in the protocol. */
 export const epochMs: Check<number> = int({ min: 0 })
 
 /**
- * Session states as the Sessions API derives them (§7.3). `running`,
+ * Session states as the Sessions API derives them. `running`,
  * `busy` and `waiting` need a live lease; `parked` comes from
  * `session.json`. `waiting` means a turn is blocked on an `ask-user`
  * question (there are no tool approvals in cloud sessions).
@@ -58,7 +58,7 @@ export const SESSION_STATES: readonly SessionState[] = [
 
 export const sessionState: Check<SessionState> = literal(...SESSION_STATES)
 
-/** A user's HTTP / SSE MCP server as passed to a cloud session (§6.4).
+/** A user's HTTP / SSE MCP server as passed to a cloud session.
  *  Names, URLs and enabled tools only — never secrets. */
 export interface McpServerConfig {
   /** Unique within the session; tools appear as `vsmcp__<name>__<tool>`. */
@@ -88,7 +88,7 @@ export interface AttachmentRef {
   size: number
 }
 
-/** Attachments are capped at 10 MB, the seed at 50 MB (§10). */
+/** Attachments are capped at 10 MB, the seed at 50 MB. */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 export const MAX_SEED_BYTES = 50 * 1024 * 1024
 

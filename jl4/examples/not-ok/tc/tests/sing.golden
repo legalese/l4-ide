@@ -6,7 +6,7 @@ File: sing.l4
   Range: 3:14-3:20
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -21,7 +21,7 @@ File: sing.l4
   Range: 5:15-5:20
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -36,7 +36,7 @@ File: sing.l4
   Range: 6:15-6:19
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -51,7 +51,7 @@ File: sing.l4
   Range: 7:15-7:21
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 

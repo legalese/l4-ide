@@ -5,14 +5,14 @@ File: nlg_group_neighbours.l4
   Range: 14:1-14:56
   Source: parser
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/annotation-not-attached
   Message: Not attached to any valid syntax node.
 File: nlg_group_neighbours.l4
   Hidden: no
   Range: 22:8-22:13
   Source: parser
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/ambiguous-nlg
   Message:
     More than one NLG annotation in language `en` attached to: three
     An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags.
@@ -26,7 +26,7 @@ File: nlg_group_neighbours.l4
   Range: 28:8-28:12
   Source: parser
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/ambiguous-nlg
   Message:
     More than one NLG annotation in language `en` attached to: four
     An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags.
@@ -40,5 +40,5 @@ File: nlg_group_neighbours.l4
   Range: 45:1-45:37
   Source: parser
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/annotation-not-attached
   Message: Not attached to any valid syntax node.

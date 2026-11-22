@@ -1,0 +1,17 @@
+-- Regression fixture for issue #920, for a name that is not in scope at all
+-- (a misspelt or undeclared type) rather than an ambiguous one.
+--
+-- `Money` is never declared, so the ONE error the user should see is that it
+-- cannot be found.
+--
+-- What used to happen instead: resolution handed back an `OutOfScope` sentinel
+-- with an unregistered unique, and checking the body against it produced two
+-- more diagnostics -- an accusation that "this is an error in this system and
+-- should be reported as a bug", and a type mismatch between NUMBER and `Money`
+-- that only restates the first error.
+--
+-- The golden for this file must therefore contain exactly the one error.
+
+GIVEN amount IS A Money
+GIVETH A NUMBER
+`total due` MEANS amount

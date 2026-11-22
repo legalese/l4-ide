@@ -37,25 +37,6 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # Websessions Service
-  jl4-websessions:
-    build:
-      context: .
-      dockerfile: Dockerfile.jl4-websessions
-    container_name: jl4-websessions
-    ports:
-      - "8002:8002"
-    volumes:
-      - websessions-data:/data
-    healthcheck:
-      test:
-        ["CMD", "sh", "-c", "wget --spider http://localhost:8002/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    restart: unless-stopped
-
   # Web Frontend
   jl4-web:
     build:
@@ -64,11 +45,6 @@ services:
     container_name: jl4-web
     ports:
       - "5173:5173"
-    depends_on:
-      jl4-lsp:
-        condition: service_healthy
-      jl4-websessions:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:5173"]
       interval: 10s
@@ -77,8 +53,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  websessions-data:
-    driver: local
   jl4-service-data:
     driver: local
 

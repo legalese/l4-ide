@@ -1,11 +1,11 @@
 -- Nothing in the language observes a refusal or converts it into an answer:
 -- not a CONSIDER over a MAYBE, not a boolean connective, not a LET, not a
--- WHERE. The only thing that "catches" one is the directive boundary, which
--- reports it as its own outcome.
+-- WHERE. A refusal stops at the directive that asked for the answer, which
+-- reports it with its reason.
 --
 -- The ONE thing that changes the answer is DEMAND ORDER. AND and OR are lazy
 -- and left to right, so `FALSE AND <refusing>` answers FALSE while
--- `<refusing> AND FALSE` refuses. That is documented, not fixed.
+-- `<refusing> AND FALSE` refuses. The examples below pin that order.
 
 IMPORT prelude
 
@@ -18,7 +18,7 @@ GIVETH A NUMBER
 GIVETH A MAYBE NUMBER
 `not modelled (maybe)` MEANS REFUSE "not modelled: the maybe case"
 
--- A CONSIDER must force its scrutinee, so neither arm is reached.
+-- Matching on a constructor forces the scrutinee, so neither arm is reached.
 GIVETH A NUMBER
 `consider over a refusing maybe` MEANS
     CONSIDER `not modelled (maybe)`
@@ -34,7 +34,7 @@ GIVETH A NUMBER
 #ASSERT REFUSED (NOT `not modelled (boolean)`)
 
 -- ...and the order that does not. These are ordinary verdicts, and pinning
--- them here is what makes the order-dependence a documented property rather
+-- them here is what makes the order-dependence a stated property rather
 -- than a surprise.
 #ASSERT NOT (FALSE AND `not modelled (boolean)`)
 #ASSERT TRUE OR `not modelled (boolean)`
@@ -54,3 +54,9 @@ GIVETH A NUMBER
         y MEANS `not modelled (number)`
 
 #ASSERT REFUSED `where over a refusal`
+
+-- A plain #ASSERT that refuses is not decided, in either polarity: it reports
+-- "assertion refused" and the reason, never "assertion satisfied" and never
+-- "assertion failed".
+#ASSERT `not modelled (boolean)`
+#ASSERT NOT `not modelled (boolean)`

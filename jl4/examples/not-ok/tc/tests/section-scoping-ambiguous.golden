@@ -6,14 +6,14 @@ File: section-scoping-ambiguous.l4
   Range: 12:1-12:9
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: check/result
   Message: a
 File: section-scoping-ambiguous.l4
   Hidden: no
   Range: 12:8-12:9
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

@@ -121,7 +121,7 @@ Three levers, from the cheapest to the most precise:
 2. **Shape**: mixfix word order, control flow, arithmetic and section headings.
 3. **`@nlg`**: a sentence you write that replaces the generated one.
 
-Two more sections follow the levers: [One encoding, two documents](#one-encoding-two-documents) renders the same rules in more than one language, and [Literal recitals](#literal-recitals--carrying-prose-that-isnt-computed) carries prose that is not computed.
+Two more sections follow the levers: [One encoding, several languages](#one-encoding-several-languages) renders the same rules in more than one language, and [Literal recitals](#literal-recitals--carrying-prose-that-isnt-computed) carries prose that is not computed.
 
 ---
 
@@ -259,266 +259,54 @@ Headings are numbered by default, in the Render tab and on the command line (tur
 
 ## `@nlg` annotations
 
-When names and shape are not enough (a recursive helper, a term of art, a formula you would rather state in words), add an `@nlg` annotation. It is the natural-language form of the definition and replaces the generated sentence.
-
-Write `@nlg` at the end of the definition's line, after the name and inputs, with the body on the next line. Inside the sentence, `%name%` is a slot for an input; an input whose name has spaces keeps its backticks: ``%`the principal`%``.
+When names and shape are not enough, write the sentence yourself. Put `@nlg` on its own line above the rule, with a `%name%` slot for each input:
 
 ```l4
 GIVEN x IS A NUMBER
       y IS A NUMBER
 GIVETH A NUMBER
-`bigger` x y @nlg whichever is larger of %x% and %y%
-  MEANS IF x >= y THEN x ELSE y
+@nlg whichever is larger of %x% and %y%
+`bigger` x y MEANS IF x >= y THEN x ELSE y
 
 `start date` MEANS 3
 `end date`   MEANS 7
 `the deadline` MEANS `bigger` `start date` `end date`
 ```
 
-Each slot reads as a blank in the definition itself, and as the actual argument at each call:
+The sentence heads the rule, its logic follows, and every call reads as the sentence:
 
 ```text
 1. Whichever is larger of [x] and [y] is:
     (a) If x is at least y: x;
     (b) Otherwise: y.
-…
+
 4. The deadline means whichever is larger of start date and end date.
 ```
 
-The sentence heads the definition and its body follows; a call reads as the sentence alone.
-
-A slot is **tight**: `%amount%`, with no spaces inside the delimiters. That is
-what keeps a written-out percentage from being mistaken for one. In
-
-```l4
-@nlg a 5% levy on %amount%
-```
-
-the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it
-and so is not a slot; `%amount%` still is one. Where a percent sign would end up
-flush against a word — `5%levy` — wrap it in backticks (`` `5%` ``) or spell it
-out ("5 percent"), either of which puts it beyond doubt.
-
-**The renderer never rewrites your words.** It prints a name as you wrote it and arranges what is around it. So a negation stays outside the statement: `NOT` `` `the person is a hotel` `` reads "it is not the case that the person is a hotel". If you want a negative wording, write it as a rule with an `@nlg`, and call that rule:
-
-```l4
-GIVETH A BOOLEAN
-@nlg the person is not a hotel
-`not a hotel` MEANS NOT `the person is a hotel`
-```
-
-**An input in a sentence reads as a blank.** Beside your words, an input's name would read as more of them: "when assessed on assessed on". So where a mixfix heading or an `@nlg` sentence names an input of a built-in type, it reads in square brackets: "when assessed on [assessed on]". An input of one of your own types reads as the rule's body calls it: "the application kind". A rule whose name ends in a preposition takes its inputs the same way: "The rate for [n] means…". To avoid the brackets' repetition, name the input as a noun, such as `` `the assessment date` ``.
-
-**It heads the rule, and the logic stays.** A rule with `@nlg` opens with its sentence, and its body follows as usual, so annotating a rule never removes a condition from the document:
-
-```l4
-GIVEN `the applicant` IS AN Applicant
-GIVETH A BOOLEAN
-@nlg %`the applicant`% qualifies for the grant
-DECIDE `qualifies` IF
-      `the applicant`'s `is a citizen`
-  AND `the applicant`'s `age` >= 21
-```
-
-renders as
-
-```text
-The applicant qualifies for the grant if:
-    (a) the applicant is a citizen; and
-    (b) the applicant's age is at least 21.
-```
-
-The sentence stands in for the body only where the body would not help a reader: in a rule that calls itself, and in a rule from an imported module. The prelude's `filter` has `@nlg the items of %list% for which %f% holds`, so it reads as that sentence and does not expose the recursion. Every rule in the standard libraries has a sentence, so a call to one reads as prose.
-
-| Situation                                            | Why `@nlg` helps                                   |
-| ---------------------------------------------------- | -------------------------------------------------- |
-| Recursive or higher-order helpers                    | Describes the result, hides the recursion          |
-| A rule called from other rules                       | Every call reads as the sentence                   |
-| Terms of art                                         | Matches the exact statutory or contractual wording |
-| A name that cannot be both valid code and good prose | Separates the two                                  |
-
-Tips:
-
-- Use only the function's own inputs as slots, and write the sentence so that it reads well with each slot as a noun phrase.
-- Try names and shape first. An `@nlg` sentence can drift away from the logic it describes, so use it where it pays off.
-- One sentence per definition. For branching prose, let `CONSIDER` or `IF` render as an outline instead.
+Use it for recursive helpers, for rules called from other rules, and for terms of art. Every rule in the standard libraries has a sentence.
 
 - **Fix wording that reads badly:** [Fix wording with @nlg](fix-wording-with-nlg.md)
 - **All the rules:** [@nlg](../../reference/syntax/nlg.md)
 
 ---
 
-## One encoding, two documents
+## One encoding, several languages
 
-Everything above produces _a_ document. The same machinery produces a **set** of
-them, one per language, from a single encoding — because a rule can carry more
-than one rendering, and each says which language it is in.
-
-### Write both renderings
-
-A language subtag goes straight after the herald, and the second rendering goes
-on the continuation line under the first:
+Give a rule one sentence per language, and ask for the one you want:
 
 ```l4
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
-DECIDE `is large` @nlg:en the claim of %amount% exceeds the threshold
+DECIDE `is large` @nlg:en the amount %amount% is large
                   @nlg:he %amount% עולה על הסף
   IF amount GREATER THAN 100
 ```
 
-Only the wording is duplicated. There is one rule, one set of tests, one thing
-to get right; the second language cannot drift away from the logic, because
-there is no second logic for it to drift from. That is the whole argument for
-doing it this way rather than maintaining two documents.
-
-### Say the language once, not on every rule
-
-A whole module in one language does not need a tag per rule. Declare it:
-
-```l4
-@lang he
+```bash
+l4 render --lang he --format html contract.l4 > contract.he.html
 ```
 
-Every untagged `@nlg` below then means Hebrew — the declaration is exactly
-equivalent to writing `:he` on each herald, so you can still tag individual
-rules where you want a second language. A module that declares nothing means
-English, which is why everything above this section worked without one.
-
-### Ask for each one
-
-```console
-$ l4 nlg --lang en contract.l4  > contract.en.txt
-$ l4 nlg --lang he contract.l4  > contract.he.txt
-```
-
-Two runs, one argument apart. That is the bilingual set.
-
-`l4 render` takes the same flag, and that is the one you want for a document
-somebody reads — the prose above is the linearizer's output, while `render`
-produces the formatted article:
-
-```console
-$ l4 render --format html --lang en contract.l4 -o contract.en.html
-$ l4 render --format html --lang he contract.l4 -o contract.he.html
-```
-
-Every format `render` supports — `text`, `html`, `akn`, `json`, `plan` —
-follows the flag, because the language is chosen before the document is built
-rather than inside each writer.
-
-### The HTML document says which language it is in
-
-The `html` format labels the document itself, not just its sentences.
-
-```
-<html lang="he" dir="rtl">
-```
-
-`lang` is the language the document was rendered in: the `--lang` you asked for, or the module's own `@lang` when you asked for nothing, or `en` when the module declares nothing either.
-It is what a screen reader picks a voice from, what a browser hyphenates and spell-checks by, and what a translation tool decides to leave alone.
-
-**A language nothing in the module renders does not relabel the document.**
-`--lang he` on an encoding with no Hebrew in it at all would otherwise produce a document labelled Hebrew in which every sentence is the English fallback — and, worse, laid out right to left.
-So when no rule in the module or its imports has a rendering in the language you asked for, the document keeps the language it declares, and `render` says so on stderr:
-
-```console
-$ l4 render --format html --lang he english-only.l4 > out.html
-l4 render: no renderings in "he"; document labelled "en" instead.
-```
-
-A **partial** translation is different, and still labels the document by what you asked for: `--lang he` on a module with two Hebrew rules out of ten gives you `lang="he"` and eight English paragraphs, which is the same partial-translation story as the section above, told in the wrapper.
-The line between the two is whether the module renders _anything_ in that language.
-
-The label follows the request in the other direction too.
-`--lang en` on a module that declares `@lang he` gives you `lang="en"`, and the clauses that have an English rendering in English — but a clause with only a Hebrew herald still renders in Hebrew, because that is the fallback.
-That document is genuinely mixed, and `lang` records what was asked for rather than a measurement of what came out.
-
-`dir="rtl"` appears only for a right-to-left language — Hebrew, Arabic, Persian, Dari, Urdu, Yiddish, Pashto, Central Kurdish, Sindhi, Uyghur, Kashmiri, Divehi, Aramaic, Syriac, N'Ko.
-For everything else there is no `dir` at all, because left-to-right is already HTML's default and the attribute appearing is the signal.
-
-**The script subtag wins when the tag has one**, because the script is the part of a language tag that actually decides direction.
-`--lang he-Latn` is Hebrew romanised in Latin letters and gets no `dir`; `--lang az-Arab` is Azerbaijani written in Arabic script and gets `dir="rtl"`, even though neither `he-Latn` nor `az-Arab` could be read off its first subtag.
-A region or a case difference is not a direction: `he-IL`, `HE` and `he` are one answer.
-That is about direction only — the document is _labelled_ `he-IL` just when the module actually carries `@nlg:he-IL` renderings, since (above) a tag nothing renders does not relabel; `--lang he-IL` on a module whose heralds are tagged `he` gives you `lang="he"` and says so.
-
-**What `dir` does, exactly**, because it is easy to expect too much of it.
-It sets the document's _base_ direction, and the base direction decides where the neutral characters at the edges of a line go and in which order whole runs of the other direction sit.
-It is not a per-line guess, and without it a browser does not make one either: HTML's default base is left-to-right, full stop.
-So for a clause whose prose is Hebrew, `dir="rtl"` is the difference between a full stop at the end of the sentence and one stranded at the start of it.
-Reproduce it on any Hebrew line with `fribidi`, which resolves the same algorithm a browser does — `fribidi --ltr line.txt` against `fribidi --rtl line.txt`:
-
-```
-base ltr:  ⟨Hebrew clause, laid out right to left⟩ .   <- the full stop at the right-hand end: wrong
-base rtl: . ⟨Hebrew clause, laid out right to left⟩    <- at the left-hand end, where a right-to-left line ends
-```
-
-(The Hebrew is stood in for here because `fribidi` prints _visual_ order, and a visual-order line pasted into a page is re-ordered again by the browser rendering it.)
-
-The corollary is that a line which _begins_ in the other direction is laid out as a line of the base direction containing a foreign run.
-An L4 clause heading is the rule's own name, which is usually an English identifier, so in a Hebrew document `Is large if amount עולה על הסף.` is a right-to-left line whose Latin run and full stop sit on the left.
-That is correct for a Hebrew document and looks wrong if you read the line as an English sentence; judging each element on its own characters is what `dir="auto"` is for, and L4 does not emit it on individual clauses today.
-
-The stylesheet mirrors along with `dir`: clause numbers, indents and table alignment move to the other side, because every rule that has a side is written in terms of the start and end of a line rather than of left and right.
-
-**`--lang` is validated before it reaches the markup.**
-Surrounding whitespace is trimmed and the primary subtag is lowercased, so `--lang 'he '` and `--lang HE` are the tag you meant — the first of those used to label the document `he ` and then silently lose `dir="rtl"`.
-An empty value, one with anything in it but letters, digits and `-`, and one whose `-`-separated parts are not each one to eight characters (`he-`, `he--IL`) are refused with a message instead of being pasted into the attribute.
-That is a check on the shape of a tag rather than a check against the register of real ones: `xx-Qrst` is shaped like a language tag and is accepted.
-
-### The Akoma Ntoso document says the same thing, in FRBR
-
-`--format akn` identifies what it emits the way Akoma Ntoso does, as a Work, an Expression of that work in one language, and a Manifestation of that expression as a file:
-
-```xml
-<FRBRExpression><FRBRthis value="/akn/doc/main/heb@"/><FRBRuri value="/akn/doc/heb@"/>…
-```
-
-The `heb` is the document's language — the same choice `<html lang>` reports, translated from the BCP 47 subtag you write (`he`) to the ISO 639-2 code AKN's URIs use (`heb`).
-Where ISO 639-2 has two codes for a language, this is the terminological one: `deu`, not `ger`.
-A subtag with no entry in that table is passed through as it stands, which is honest about which language was meant even though it is not a valid ISO 639-2 code.
-
-### Translate incrementally
-
-A rule with no rendering in the language you asked for falls back to its default
-one. A half-translated encoding therefore produces a **whole** document with
-some paragraphs still in the original language — which is what you want while
-the translation is in progress, and is very different from a document with
-holes in it. You can ship after the first pass and keep going.
-
-### Then there is the case where you do nothing
-
-Now read the same rule with the tags taken off:
-
-```l4
-DECIDE `is large` @nlg the claim of %amount% exceeds the threshold
-  IF amount GREATER THAN 100
-```
-
-Ask for no language, and you get that sentence. Ask for `--lang he`, and you
-get that sentence too, because there is no Hebrew rendering to prefer and the
-fallback is the default.
-
-**So "L4 documents come out in English" is not a rule — it is the degenerate
-case of the rule above.** What you actually get is _the default rendering_: the
-untagged annotation if there is one, otherwise the first in the file. Our corpus
-is written in English, so its default renderings are English sentences, and the
-output looks like a language setting nobody configured. It is not one. A corpus
-whose annotations are written in Hebrew has always produced Hebrew documents,
-with no tags and no flag, and did so before tags existed at all — see
-[Several languages](../../reference/syntax/nlg.md#several-languages).
-
-The practical consequence: **you never have to start tagging.** Tags earn their
-keep at the moment a second language appears, and not before. An encoding with
-one language wants no tags at all, and adding them changes nothing about what it
-prints.
-
-### One clash to know about
-
-Two renderings in the _same_ language on one rule — two `@nlg:he`, or two
-untagged — is an ambiguity, not a choice. L4 warns and attaches neither, because
-silently keeping one would discard a sentence you wrote. A clash in one language
-leaves the others alone.
+L4 does not translate: it prints the words you wrote. See [Several languages](../../reference/syntax/nlg.md#several-languages).
 
 ---
 

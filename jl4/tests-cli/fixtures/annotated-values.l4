@@ -1,0 +1,26 @@
+-- An `@nlg` annotation is wording for whoever reads a rule. It is not part of
+-- what the rule evaluates to, so `l4 run` prints a value without it. Each
+-- annotation below sits where an evaluation result would print it if the
+-- printer wrote annotations back.
+
+DECLARE Colour IS ONE OF
+  Red [a red colour]
+  Green [a green colour]
+
+DECLARE Shape HAS
+  colour IS A Colour
+  sides IS A NUMBER
+
+DECLARE Person IS ONE OF Alice, Bob
+
+DECLARE Action IS ONE OF
+  `pay the price`
+
+pay MEANS
+  PARTY Alice [the payer]
+  MUST `pay the price` [paying]
+  WITHIN 30
+
+#EVAL Shape OF Red, 3
+#EVAL JUST OF Green
+#EVAL pay

@@ -262,7 +262,7 @@ Measured on this branch against `36c549226`:
 - The same three clauses with a `GIVEN`: 5 under run, batch and the REPL, before and after; jl4-service publishes `c` ("string") and `n` ("number") and answers 5.
 - Every file under `jl4/examples`, `jl4/tests-cli`, `jl4/experiments` and `doc` that publishes something (43 with the two new corpus files) checks the same way on both binaries; the new error fires only in the new not-ok file.
 
-Tests: `not-ok/tc/pattern-matching-export-without-given.l4` and `ok/pattern-matching-export-given.l4`, whose goldens equal unstable's except that main's schema writes `n` as `{"$ref": "#/$defs/NUMBER"}`; and the jl4-service cases "refuses a module that @exports a clause group with no GIVEN" and "publishes the same clause group with a GIVEN, under the names it gives".
+Tests: `not-ok/tc/pattern-matching-export-without-given.l4` and `ok/pattern-matching-export-given.l4`, whose goldens equal unstable's (until the eval-robustness change, main's schema wrote `n` as `{"$ref": "#/$defs/NUMBER"}`); and the jl4-service cases "refuses a module that @exports a clause group with no GIVEN" and "publishes the same clause group with a GIVEN, under the names it gives".
 User documentation: `doc/reference/errors/README.md` ("An @export of clauses with no GIVEN") and one sentence under "Syntax" in `doc/reference/functions/multi-clause-DECIDE.md`.
 
 ## Review round 2 (items 1, 2, 3, 5 and 6)

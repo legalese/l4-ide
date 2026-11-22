@@ -174,7 +174,7 @@ GIVETH A NUMBER
 
 `#EVAL` on `Agreement OF NOTHING` gives `0.05`; on `Agreement OF (JUST (8%))` it gives `0.08`.
 Those inner parentheses are load-bearing — `%` is a **postfix operator**, so `JUST 8%` reads as
-`(JUST 8)%` and is rejected with "The argument of '%' is expected to be of type NUMBER but is here
+`(JUST 8)%` and is rejected with "The input to '%' is expected to be of type NUMBER but is here
 of type MAYBE OF NUMBER".
 
 **Not** `TYPICALLY` for this job. It looks like the same idea and is not — see [7.4](#e7-4).

@@ -6,7 +6,7 @@ File: section-scoping-sibling-flat-fallback.l4
   Range: 11:9-11:10
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

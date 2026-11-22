@@ -1,10 +1,10 @@
+IMPORT daydate
+
 § `DateTime Definitions and Helpers`
 
 -- DATETIME is an absolute point in time.
 -- Uses document TIMEZONE by default; can override with explicit tz parameter (IANA string).
 -- Stored internally as UTC; extractors return LOCAL values in the stored timezone.
-
-IMPORT daydate
 
 
 §§ `DateTime Constructors`

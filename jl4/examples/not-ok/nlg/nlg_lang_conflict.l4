@@ -1,0 +1,10 @@
+-- Two `@lang` lines that name different languages. The last one wins, so this
+-- module is Hebrew and the `@lang en` line has no effect; the diagnostic says so,
+-- naming both languages and the line that is used.
+@lang en
+@lang he
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg the amount is large
+  IF amount GREATER THAN 100

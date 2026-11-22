@@ -1,5 +1,5 @@
 /**
- * Sealed secrets for cloud sessions (spec §6.4).
+ * Sealed secrets for cloud sessions.
  *
  * The harness generates an ephemeral X25519 key pair at start and
  * publishes the public key in its `session-state: running` event. The

@@ -1,0 +1,14 @@
+-- A BECAUSE that starts a line of its own belongs to the `#ASSERT REFUSED`
+-- above it only when it is indented further than the `#ASSERT`. Here it is at
+-- the left margin, so it is a parse error, at the BECAUSE.
+--
+-- The service evaluates a module with its directives taken out, line by line,
+-- and a directive's lines end at the first line that is neither blank nor
+-- indented further than the directive. A BECAUSE at the margin would be left
+-- behind there, so the parser and the service would read it differently.
+
+GIVETH A NUMBER
+`nope` MEANS REFUSE "the real reason"
+
+#ASSERT REFUSED `nope`
+BECAUSE "the real reason"

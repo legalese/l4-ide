@@ -283,10 +283,11 @@ isEmptyReasoning r =
 emptyTree :: Reasoning
 emptyTree = emptyReasoning
 
--- | An 'EvaluatorError' is some form of panic thrown by an evaluator.
--- The execution of a function had to be interrupted for /some/ reason.
--- Such an exception is unrecoverable.
--- The error message may contain hints of what might have gone wrong.
+-- | Why an evaluation came back with no answer. Most constructors are some
+-- form of panic: the execution of a function had to be interrupted for
+-- /some/ reason, and the message may hint at what went wrong.
+-- 'EvaluatorRefused' is not a panic: the model declined to answer, with the
+-- reason its author wrote.
 data EvaluatorError
   = InterpreterError !Text
   | EvaluatorRefused !Text ![Text]

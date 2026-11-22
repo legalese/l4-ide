@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+nlg-literals.l4:9:1-20:
+  100
+nlg-literals.l4:13:1-21:
+  DATE OF 16, 7, 2025
+nlg-literals.l4:14:1-30:
+  DATE OF 1, 1, 2026
+nlg-literals.l4:23:1-24:
+  DATE OF 16, 7, 2025
+nlg-literals.l4:28:1-21:
+  DATE OF 3, 3, 2025
+nlg-literals.l4:31:1-23:
+  DATE OF 16, 7, 2025

@@ -1,0 +1,148 @@
+{
+    "$defs": {
+        "Colour": {
+            "enum": [
+                "Red",
+                "Green"
+            ],
+            "type": "string"
+        },
+        "Order": {
+            "properties": {
+                "colours": {
+                    "items": {
+                        "$ref": "#/$defs/Colour"
+                    },
+                    "type": "array"
+                },
+                "note": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "placed": {
+                    "format": "date-time",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "placed",
+                "colours"
+            ],
+            "type": "object"
+        },
+        "Shape": {
+            "oneOf": [
+                {
+                    "properties": {
+                        "radius": {
+                            "type": "number"
+                        },
+                        "tag": {
+                            "const": "Circle"
+                        }
+                    },
+                    "required": [
+                        "tag",
+                        "radius"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "label": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ]
+                        },
+                        "side": {
+                            "type": "number"
+                        },
+                        "tag": {
+                            "const": "Square"
+                        }
+                    },
+                    "required": [
+                        "tag",
+                        "side"
+                    ],
+                    "type": "object"
+                }
+            ]
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "shows every builtin type and declared shape",
+    "properties": {
+        "b": {
+            "type": "boolean"
+        },
+        "c": {
+            "$ref": "#/$defs/Colour"
+        },
+        "d": {
+            "format": "date",
+            "type": "string"
+        },
+        "dt": {
+            "format": "date-time",
+            "type": "string"
+        },
+        "l": {
+            "items": {
+                "type": "number"
+            },
+            "type": "array"
+        },
+        "m": {
+            "anyOf": [
+                {
+                    "type": "number"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "n": {
+            "type": "number"
+        },
+        "o": {
+            "$ref": "#/$defs/Order"
+        },
+        "s": {
+            "type": "string"
+        },
+        "sh": {
+            "$ref": "#/$defs/Shape"
+        },
+        "t": {
+            "format": "time",
+            "type": "string"
+        }
+    },
+    "required": [
+        "n",
+        "s",
+        "b",
+        "d",
+        "t",
+        "dt",
+        "l",
+        "c",
+        "sh",
+        "o"
+    ],
+    "title": "f",
+    "type": "object"
+}

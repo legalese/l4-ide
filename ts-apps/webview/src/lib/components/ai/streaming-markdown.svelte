@@ -3,6 +3,7 @@
   import markedKatex from 'marked-katex-extension'
   import 'katex/dist/katex.min.css'
   import { colorize } from '@repo/l4-highlight'
+  import { escapeHtml, safeHtml, safeLink } from './markdown-safety'
 
   // Wire KaTeX through marked so `$…$` / `$$…$$` in an assistant
   // response renders as math instead of literal dollar signs. `throwOnError`
@@ -24,7 +25,7 @@
     const highlighted =
       lang === 'l4' || lang === 'l4-file'
         ? `<code class="language-l4">${colorize(code)}</code>`
-        : `<code${lang ? ` class="language-${lang}"` : ''}>${code
+        : `<code${lang ? ` class="language-${escapeHtml(lang)}"` : ''}>${code
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')}</code>`
@@ -35,8 +36,15 @@
     const encodedSource = encodeURIComponent(code)
     return `<div class="code-block-wrap"><pre>${highlighted}</pre><button type="button" class="code-copy-btn" data-copy-src="${encodedSource}" title="Copy code" aria-label="Copy code"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="9" height="9" rx="1.5"/><path d="M4 10H3V3.5A1.5 1.5 0 0 1 4.5 2H10"/></svg><span class="code-copy-label">Copy</span></button></div>`
   }
-  // Links open externally — but the webview host intercepts clicks on
-  // http(s) links via VSCode; keep default rendering.
+  // The model's text is untrusted (markdown-safety.ts): raw HTML shows
+  // as text, links keep safe targets only, images become links. Links
+  // open externally — the webview host intercepts clicks on http(s)
+  // links via VSCode.
+  renderer.html = ({ text: raw }) => safeHtml(raw)
+  renderer.link = ({ href, title, tokens }) =>
+    safeLink(href, title, renderer.parser.parseInline(tokens))
+  renderer.image = ({ href, title, text: alt }) =>
+    safeLink(href, title, escapeHtml(alt || href))
   marked.setOptions({ breaks: false, gfm: true })
 
   const CURSOR = '<span class="cursor">▋</span>'

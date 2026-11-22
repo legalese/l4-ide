@@ -6,7 +6,7 @@ File: every-continuation-without-join.l4
   Range: 15:48-15:57
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/continuation-without-join
   Message:
     An EVERY with a HENCE or LEST needs a join line saying when it fires.
 
@@ -24,7 +24,7 @@ File: every-continuation-without-join.l4
   Range: 22:16-22:27
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/continuation-without-join
   Message:
     An EVERY with a HENCE or LEST needs a join line saying when it fires.
 
