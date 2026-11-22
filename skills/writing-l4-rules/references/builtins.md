@@ -61,7 +61,7 @@ The bridge from L4 rules to real-world data. No `IMPORT` required.
 | `POST`       | `STRING → STRING → STRING → STRING` | HTTP POST: `POST url headers body` where `headers` is a JSON string                                                         |
 | `ENV`        | `STRING → STRING`                   | Read environment variable; returns `""` if unset. Use this for application programming interface (API) keys.                |
 | `JSONENCODE` | `a → STRING`                        | Serialize a value to a JSON string                                                                                          |
-| `JSONDECODE` | `STRING → a`                        | Parse a JSON string into a typed value                                                                                      |
+| `JSONDECODE` | `STRING → EITHER STRING a`          | Parse a JSON string into a typed value: `RIGHT value`, or `LEFT message` when the text is not valid JSON                    |
 
 ```l4
 DECIDE uuid     IS FETCH "https://www.uuidtools.com/api/generate/v4"
