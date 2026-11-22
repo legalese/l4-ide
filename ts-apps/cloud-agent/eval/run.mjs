@@ -85,6 +85,32 @@ function assertions(report) {
   return (report.results ?? []).filter((r) => r.kind === 'assertion')
 }
 
+/** Did the file check and evaluate without breaking? `l4 run` also reports
+ *  "ok": false when an #ASSERT comes out false (legalese/l4-ide#518), but a
+ *  solution's own failing checks are counted in `ownChecksFailing`, not here.
+ *  So a report that is not ok still ran cleanly when every result is a value or
+ *  an assertion with an answer, and no diagnostic outside the evaluator's own
+ *  is an error. */
+function ranCleanly(report) {
+  if (report.ok === true) return true
+  const results = report.results ?? []
+  const answered = results.every(
+    (r) =>
+      r.kind === 'value' ||
+      r.kind === 'refused' ||
+      (r.kind === 'assertion' && (r.value !== null || r.refused !== undefined))
+  )
+  const blocks = (report.diagnostics ?? []).flatMap((d) =>
+    String(d).split(/\n(?=File:)/)
+  )
+  const otherError = blocks.some(
+    (b) =>
+      /Severity:\s*DiagnosticSeverity_Error/.test(b) &&
+      !/Source:\s*eval\b/.test(b)
+  )
+  return results.length > 0 && answered && !otherError
+}
+
 /** Score a solution against the task's oracle. The oracle's expected values
  *  are hand-written, so a model can't pass by writing its own tests. */
 export async function score(task, solution, opts) {
@@ -99,14 +125,14 @@ export async function score(task, solution, opts) {
     const ownResults = assertions(own)
     const kept = (task.keepLines ?? []).every((line) => solution.includes(line))
     return {
-      compiles: own.ok === true,
+      compiles: ranCleanly(own),
       oraclePassed: passed,
       oracleTotal: results.length,
       ownChecks: ownResults.length,
       ownChecksFailing: ownResults.filter((r) => r.value === false).length,
       keptRequiredLines: kept,
       correct:
-        own.ok === true &&
+        ranCleanly(own) &&
         results.length > 0 &&
         passed === results.length &&
         kept,
