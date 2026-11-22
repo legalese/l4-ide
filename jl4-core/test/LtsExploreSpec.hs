@@ -70,6 +70,33 @@ exploreSrc src name opts keep = do
   start <- either (fail . Text.unpack) pure (startNamed r.tcdModule name 0)
   explore opts sites rig start >>= either (fail . Text.unpack) pure
 
+-- | Explore from the start the source's own @#TRACE@ gives, which may be
+-- negative or not a literal.
+exploreTraced :: Text.Text -> ExploreOptions -> IO Graph
+exploreTraced src opts = do
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  r <- case checkWithImports (vfsFromList []) src of
+    Left errs -> fail ("typecheck failed: " <> show errs)
+    Right r -> pure r
+  let rig = MkRig {rigConfig = cfg, rigEntityInfo = r.tcdEntityInfo, rigEnv = emptyEnvironment, rigModule = r.tcdModule}
+      sites = keepCells [] (readSitesOf r.tcdModule [])
+  start <- case startsOf r.tcdModule of
+    [s] -> pure s
+    other -> fail ("expected one start, got " <> show (length other))
+  explore opts sites rig start >>= either (fail . Text.unpack) pure
+
+-- | The deadline is 3 after the start, whatever the start is.
+startedSrc :: Text.Text -> Text.Text
+startedSrc at = Text.unlines
+  [ "DECLARE Person IS ONE OF P"
+  , "DECLARE Action IS ONE OF a"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`started` MEANS PARTY P MUST a WITHIN 3 HENCE FULFILLED LEST BREACH BY P"
+  , ""
+  , "#TRACE `started` AT " <> at <> " WITH"
+  ]
+
 -- | Explore the named rule from 0 and check these properties on it, the
 -- cells they read kept; with a source replay, or none.
 checkSrc :: Text.Text -> Text.Text -> ExploreOptions -> Maybe SourceReplay -> [Request] -> IO (Graph, [CheckResult])
@@ -515,6 +542,29 @@ spec = describe "l4 explore" do
       -- Move, `no inputs` has none and `reads itself` reads a ledger, so
       -- none of those is a property
       sort (nub (allPropertyCells r.tcdEntityInfo [r.tcdModule])) `shouldBe` [("missed", False), ("missed", True)]
+
+  describe "8. the clock the exploration starts at (the explorer's X2)" do
+    -- the replay's clock was floored at 0, so a start below 0 explored a
+    -- contract that had already begun at 0, and a start that is not a
+    -- literal (`AT (10 + 5)`) explored one that began at 0
+    let clocksOf g = [ (s.snClock, s.snResidual == "FULFILLED", "DEONTIC BREACHED" `Text.isInfixOf` s.snResidual) | s <- g.gStates ]
+        holdsFrom start deadline g = do
+          map (.snClock) (take 1 g.gStates) `shouldBe` [start]
+          let cs = clocksOf g
+          -- an act in time fulfils, and only before the deadline's tick
+          [ c | (c, True, _) <- cs, c > deadline ] `shouldBe` []
+          [ c | (c, True, _) <- cs ] `shouldSatisfy` (not . null)
+          -- the tick past the deadline breaches, one unit after it
+          [ c | (c, _, True) <- cs ] `shouldSatisfy` (\ xs -> not (null xs) && all (> deadline) xs)
+    it "a start below 0 is the clock: the deadline is 3 after it, and an act in time fulfils" do
+      g <- exploreTraced (startedSrc "-5") defaultExploreOptions
+      holdsFrom (-5) (-2) g
+    it "a start that is not a literal is read: AT (10 + 5) puts the deadline at 18" do
+      g <- exploreTraced (startedSrc "(10 + 5)") defaultExploreOptions
+      holdsFrom 15 18 g
+    it "a literal start is as before: AT 4 puts the deadline at 7" do
+      g <- exploreTraced (startedSrc "4") defaultExploreOptions
+      holdsFrom 4 7 g
   where
     decisionArgsText store = do
       r <- either (fail . show) pure (checkWithImports (vfsFromList []) (lateSrc "FULFILLED"))

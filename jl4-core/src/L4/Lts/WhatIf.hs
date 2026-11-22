@@ -210,7 +210,14 @@ positionFrom rig tr extra (topLevel, mres) = flip fmap mres \ (res, steps) ->
       , posResidual = residual
       , posContext  = ctx
       , posMarking  = maybe [] (markingOf ctx) residual
-      , posClock    = maximum (0 : literalStamps <> loggedClocks)
+      -- no floor: a trace that starts below 0 has its clock below 0. A trace
+      -- with no stamp the replay can read at all (a start that is not a
+      -- literal, no event yet) is read as 0, which is the one case left where the
+      -- clock is a guess; "L4.Lts.Explore" reads such a start first and hands
+      -- the replay a literal
+      , posClock    = case literalStamps <> loggedClocks of
+          [] -> 0
+          stamps -> maximum stamps
       , posReplayScope = Map.keysSet topLevel <> Map.keysSet rig.rigEnv
       }
 

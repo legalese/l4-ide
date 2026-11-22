@@ -23,6 +23,9 @@ import CliTest.Common
 brief :: FilePath
 brief = "examples" </> "explore" </> "brief"
 
+startFixtures :: FilePath
+startFixtures = "tests-cli" </> "fixtures" </> "explore-start"
+
 fixtures :: [FilePath]
 fixtures = [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
 
@@ -323,6 +326,28 @@ spec bin = describe "l4 explore" $ do
         Output code' _ serr' <- runL4 bin ["explore", brief </> "d3-atomic.l4", "--fair", "Alice"]
         code' `shouldBe` ExitFailure 1
         serr' `shouldSatisfy` ("needs --emit" `isInfixOf`)
+
+  -- the explorer's X2: the clock an exploration starts at
+  describe "the clock an exploration starts at (X2)" $ do
+    it "negstart.l4: a start of -5 is the clock, so an act at -5 is in time and the tick past the deadline is at -1" $ do
+      Output code sout _ <- runL4 bin ["explore", startFixtures </> "negstart.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("explored from its outset at -5" `isInfixOf`)
+      sout `shouldSatisfy` ("PARTY P DOES a AT -5" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("AT 0" `isInfixOf`))
+      sout `shouldSatisfy` ("WAITUNTIL OF -1" `isInfixOf`)
+
+    it "nonliteral.l4: a start that is not a literal is read: AT (10 + 5) is 15, and the tick is at 19" $ do
+      Output code sout _ <- runL4 bin ["explore", startFixtures </> "nonliteral.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("PARTY P DOES a AT 15" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("AT 0" `isInfixOf`))
+      sout `shouldSatisfy` ("WAITUNTIL OF 19" `isInfixOf`)
+
+    it "unreadable.l4: a start that has no value is refused (exit 1), not taken for 0" $ do
+      Output code sout serr <- runL4 bin ["explore", startFixtures </> "unreadable.l4"]
+      code `shouldBe` ExitFailure 1
+      (sout <> serr) `shouldSatisfy` ("is neither a number nor a date the explorer can read" `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"

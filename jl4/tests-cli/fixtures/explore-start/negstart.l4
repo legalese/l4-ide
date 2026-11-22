@@ -1,0 +1,15 @@
+IMPORT prelude
+
+-- The explorer's X2: the contract starts at -5, so P's deadline (3 after
+-- the start) is at -2. An act at -5 or at -2 is in time and fulfils; the
+-- tick past the deadline is at -1. The explorer's clock used to be floored at
+-- 0, so it explored a contract that had already begun at 0 and every act it
+-- tried was too late.
+
+DECLARE Person IS ONE OF P
+DECLARE Action IS ONE OF a
+
+GIVETH A DEONTIC Person Action
+negstart MEANS PARTY P MUST a WITHIN 3 HENCE FULFILLED LEST BREACH BY P
+
+#TRACE negstart AT -5 WITH
