@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
--- | What the pass over JSONDECODE costs a module that has none
+-- | What the passes over JSONDECODE cost a module that has none
 -- (smucclaw/l4-ide#1078).
 module JsonDecodeCostSpec (spec) where
 
@@ -16,48 +16,66 @@ import Test.Hspec
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Syntax (Expr, Module, Resolved, cosmosExpr)
-import L4.TypeCheck (zonkDecodeTargets)
+import L4.TypeCheck (decodesAtTypeParameters, moduleTypeParameters, zonkDecodeTargets)
 
 spec :: Spec
-spec = describe "the pass over JSONDECODE" $ do
-  -- It runs on every module checked, the prelude included, so a module with
-  -- no JSONDECODE must pay next to nothing for it: it first asks whether the
-  -- module mentions JSONDECODE at all, from its names alone
-  -- ('L4.TypeCheck.mentionsJsonDecode'). While JSONDECODE's passes found
-  -- their nodes by walking every expression, ledger requests in
-  -- jl4-service-test went over the ledger's limit of 8192 MB.
+spec = describe "the passes over JSONDECODE" $ do
+  -- They run on every module checked, the prelude included, so a module with
+  -- no JSONDECODE must pay next to nothing for them: each first asks whether
+  -- the module mentions JSONDECODE at all, from its names alone
+  -- ('L4.TypeCheck.mentionsJsonDecode'). While they found their nodes by
+  -- walking every expression, ledger requests in jl4-service-test went over
+  -- the ledger's limit of 8192 MB.
   --
   -- Counted in the bytes this thread allocates, which nothing else running
   -- changes, as a share of what checking the same module allocates. Not
   -- against a walk of its own: what one walk costs depends on how GHC
   -- compiles it, and the same walk was measured at 41 MB and at 561 MB on the
-  -- prelude in different builds. The pass builds its result lazily, so the
+  -- prelude in different builds. The zonk builds its result lazily, so the
   -- result is forced in full: unforced, only its first constructor would be
   -- counted, and a pass that rebuilt every expression would still look free.
   -- Forcing a module costs 0.1% of checking it by itself. Measured on the
-  -- change that made the pass ask: 0.2%; with the question answered yes for
-  -- every module, 2.7%.
-  it "costs a module with none under 1% of checking it" $ do
+  -- change that added the second pass: 0.3%.
+  it "cost a module with none under 1% of checking it" $ do
     (checkCost, r, m) <- checkedModule (manyRules 400)
-    passCost <- allocated (evaluate (force (zonkDecodeTargets r.tcdSubstitution m)))
+    passCost <- allocated (passes r m)
     passCost / checkCost `shouldSatisfy` (< 0.01)
 
   -- The control: on the same module and limit, one walk over every
-  -- expression, the cheapest way the pass has found its nodes, is over it,
-  -- so a pass that walked again would fail the test above. Measured: 2.0%.
-  it "would not if it walked every expression (the control)" $ do
+  -- expression, the cheapest way the passes have found their nodes, is over
+  -- it, so passes that walked again would fail the test above. Measured: 2.0%.
+  it "would not if they walked every expression (the control)" $ do
     (checkCost, _, m) <- checkedModule (manyRules 400)
     walkCost <- allocated (evaluate (length (Optics.toListOf (Optics.gplate @(Expr Resolved) Optics.% cosmosExpr) m)))
     walkCost / checkCost `shouldSatisfy` (> 0.01)
 
-  -- The second control: the pass itself, on the same rules and one
-  -- JSONDECODE more, is over the limit, so the test above sees the pass's
-  -- work, and what keeps a module with none under it is the question the
-  -- pass asks first. Measured: 6.5%.
-  it "is over it on the same rules and one JSONDECODE more (the second control)" $ do
+  -- A module that has one pays little more: the passes walk only the parts of
+  -- it that name JSONDECODE, and collect only the type parameters its types
+  -- mention ('L4.TypeCheck.modulePieces'). While they walked the whole module
+  -- instead, checking these rules with one JSONDECODE more allocated 21% more
+  -- than checking them with none, and the passes cost 33% of it. Measured on
+  -- the change that made them walk less: 0.4%.
+  it "cost the same rules and one JSONDECODE more under 1% of checking it" $ do
     (checkCost, r, m) <- checkedModule (manyRules 400 <> oneDecode)
-    passCost <- allocated (evaluate (force (zonkDecodeTargets r.tcdSubstitution m)))
+    passCost <- allocated (passes r m)
+    passCost / checkCost `shouldSatisfy` (< 0.01)
+
+  -- The second control: where every rule names JSONDECODE, the passes walk
+  -- all of it, and are over the limit, so the two tests above see the
+  -- passes' work. Measured: 12.4%.
+  it "are over it when every rule has one (the second control)" $ do
+    (checkCost, r, m) <- checkedModule (manyDecodes 400)
+    passCost <- allocated (passes r m)
     passCost / checkCost `shouldSatisfy` (> 0.01)
+
+-- | Both passes over a checked module: the zonked module forced in full, and
+-- the errors counted.
+passes :: TypeCheckWithDepsResult -> Module Resolved -> IO Int
+passes r m = do
+  let subst = r.tcdSubstitution
+      typeParams = moduleTypeParameters subst m
+  _ <- evaluate (force (zonkDecodeTargets subst typeParams m))
+  evaluate (length (decodesAtTypeParameters subst typeParams m))
 
 -- | What checking a module allocates, and the module it gives, forced
 -- in full so that measuring a pass over it counts only the pass.
@@ -102,3 +120,15 @@ oneDecode = Text.unlines
   , "GIVETH AN EITHER STRING NUMBER"
   , "`decode it` s MEANS JSONDECODE s"
   ]
+
+-- | @k@ rules that each decode JSON, at a type written down.
+manyDecodes :: Int -> Text
+manyDecodes k = Text.unlines (concatMap rule [1 .. k])
+  where
+    rule i =
+      let n = Text.pack (show i)
+      in [ "GIVEN s IS A STRING"
+         , "GIVETH AN EITHER STRING NUMBER"
+         , "`decode " <> n <> "` s MEANS JSONDECODE s"
+         , ""
+         ]

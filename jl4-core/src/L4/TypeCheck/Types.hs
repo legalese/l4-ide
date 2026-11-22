@@ -199,6 +199,14 @@ data CheckError =
   | RestatedSectionBinder Name
     -- ^ A function's own @GIVEN@ restates a name a section-level @GIVEN@
     -- already binds (R2). Carries the parameter name.
+  | JsonDecodeAtTypeParameter Resolved (Type' Resolved) [Resolved]
+    -- ^ A @JSONDECODE@ applied to its text whose type to decode into mentions
+    -- a type parameter (a @GIVEN a IS A TYPE@), which has no value when the
+    -- rules run, so nothing can guide the decode (smucclaw/l4-ide#1078,
+    -- option C).
+    -- Arguments: the @JSONDECODE@ itself, the type it would decode into, and
+    -- the type parameters that type mentions. Not raised for a type that is
+    -- only unsolved. See 'L4.TypeCheck.decodesAtTypeParameters'.
   | ImplicitCrossesImport Resolved Name
     -- ^ An @\@export@ed definition reaches a definition in an IMPORTED module
     -- that takes section binders as implicit inputs. Arguments: the exported
@@ -950,6 +958,7 @@ instance HasSrcRange CheckError where
   rangeOf (AmbiguousRootBinders r _ _)      = rangeOf r
   rangeOf (ImplicitCrossesImport r _)       = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
+  rangeOf (JsonDecodeAtTypeParameter r _ _) = rangeOf r
   rangeOf (NotReachesConnective site)       = Just site.range
   rangeOf (OpenedFieldCollisionAtRead c)    = rangeOf c.fieldRead
   rangeOf (OpenedFieldCollisionAtOpening _ b _) = rangeOf b.binderName

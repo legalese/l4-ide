@@ -186,6 +186,10 @@ When checking `JSONDECODE s ⇐ MAYBE Person`:
 - During type checking, store expected type in Anno's resolvedInfo
 - Evaluation reads this type from Anno to guide decoding
 
+**Ruling, smucclaw/l4-ide#1078 option C (decided by Claude 2026-11-21, pending Meng's review):** a `JSONDECODE` applied where its type mentions a type parameter (`GIVEN a IS A TYPE`) is refused at check time (`JsonDecodeAtTypeParameter`, raised by `decodesAtTypeParameters` in `jl4-core/src/L4/TypeCheck.hs`), and one whose type is only unsolved is not.
+
+**Ruling, smucclaw/l4-ide#1078 option C, which type parameters count (decided by Claude 2026-11-21, pending Meng's review):** every type parameter declared in the module counts (`moduleTypeParameters`, read from each `GIVEN … IS A TYPE`), not only one in a `GIVEN` around the decode, because a `DECIDE` with no signature that applies `JSONDECODE` takes the `a` of the rule that uses it, as the definition `` `the decode` `` in `jl4/examples/not-ok/tc/jsondecode-at-type-parameter.l4` does, and counting only a `GIVEN` around the decode would leave that one decoding untyped.
+
 #### 4.2 Future: Overloaded Literals
 
 Expected types could guide interpretation of numeric literals:

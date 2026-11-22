@@ -13,9 +13,11 @@
 -- xs`, where the decode happens inside `map`.
 --
 -- The CONTROLS at the end pin answers that did not change and must not change
--- by accident: decodes whose type is a type parameter (GIVEN a IS A TYPE),
--- which is the issue's own repro and is still open, and decodes whose type a
--- signature already gave.
+-- by accident: JSONDECODE handed on bare from a definition GIVEN a type
+-- (GIVEN a IS A TYPE), a decode whose type nothing fixes, and a decode whose
+-- type a signature already gave. A JSONDECODE APPLIED at a type parameter,
+-- which is the issue's own repro, is refused before the rules run; those are
+-- in not-ok/tc/jsondecode-at-type-parameter.l4.
 
 IMPORT prelude
 
@@ -165,38 +167,6 @@ GIVETH A NUMBER
 -- CONTROLS: answers that did not change.
 --------------------------------------------------------------------------------
 
--- A type parameter: the decode is at `a`, which has no value when the rules
--- run. A JSON number happens to come out as a NUMBER, so this is TRUE, as
--- it was before the fix. Whether to refuse a decode at a type parameter is
--- open (smucclaw/l4-ide#1078).
-GIVEN a IS A TYPE
-      test IS A FUNCTION FROM a TO BOOLEAN
-GIVETH A BOOLEAN
-`decoded passes` test MEANS
-  CONSIDER JSONDECODE "42"
-    WHEN RIGHT v THEN test v
-    WHEN LEFT problem THEN FALSE
-
-GIVEN n IS A NUMBER GIVETH A BOOLEAN
-`is big` n MEANS n > 40
-
-#ASSERT `decoded passes` `is big`
-
--- The same at a record, with a test that ignores its input: TRUE, as before,
--- although the value it was handed is not a Tree.
-GIVEN a IS A TYPE
-      test IS A FUNCTION FROM a TO BOOLEAN
-GIVETH A BOOLEAN
-`some of` test MEANS
-  CONSIDER JSONDECODE "{\"label\":2,\"kids\":[]}"
-    WHEN RIGHT v THEN test v
-    WHEN LEFT problem THEN FALSE
-
-GIVEN t IS A Tree GIVETH A BOOLEAN
-`always` t MEANS TRUE
-
-#ASSERT `some of` `always`
-
 -- JSONDECODE as the body of a polymorphic definition, applied at Tree. The
 -- reference is typed at the type parameter `a`; the application is typed at
 -- Tree, and that is what it decodes into, as before.
@@ -239,6 +209,12 @@ GIVETH A NUMBER
     WHEN LEFT problem THEN 0 - 1
 
 #ASSERT `label via decode tree` EQUALS 7
+
+-- A decode whose type nothing fixes: a definition with no signature that
+-- nothing here uses. It is not refused. Its type is not a type parameter,
+-- only unknown, and a library wrapper written like this is used by its
+-- importers, as `parseResponse` in the llm library is.
+DECIDE `decode whatever` s IS JSONDECODE s
 
 --------------------------------------------------------------------------------
 -- Types declared under a section. This comes last, because everything after a

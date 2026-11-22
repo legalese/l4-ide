@@ -25,8 +25,10 @@ module L4.TypeCheck
   , quietly
   , settleOneClause
   , speculatively
-  -- The pass over JSONDECODE, run on every module checked; exported to be
-  -- tested for what it costs a module that has none.
+  -- The passes over JSONDECODE, run on every module checked; exported to be
+  -- tested for what they cost a module that has none.
+  , decodesAtTypeParameters
+  , moduleTypeParameters
   , zonkDecodeTargets
   )
   where
@@ -344,11 +346,16 @@ doCheckProgramWithDependencies checkState checkEnv program =
                   [ MkCheckErrorWithContext (CheckWarning (SiblingLedgerRead sr)) None
                   | sr <- siblingReads rprog
                   ]
+                -- smucclaw/l4-ide#1078. Read by both: a decode is either typed
+                -- (its type is concrete), refused (it mentions one of these),
+                -- or left as it was (its type is unsolved).
+                typeParams = moduleTypeParameters s'.substitution rprog
+                decodeErrs = decodesAtTypeParameters s'.substitution typeParams rprog
             in MkCheckResult
-              { program = zonkDecodeTargets s'.substitution rprog
+              { program = zonkDecodeTargets s'.substitution typeParams rprog
               , implicitReaders =
                   Discharge.implicitReaders checkEnv.importedImplicitReaders rprog
-              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns)
+              , errors = suppressResolutionCascade (substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns ++ decodeErrs)
               , substitution = s'.substitution
               , environment = env.environment
               , entityInfo = env.entityInfo
@@ -384,15 +391,14 @@ doCheckProgramWithDependencies checkState checkEnv program =
 --
 -- A type that is not concrete keeps the annotation it had, exactly, and with
 -- it the behaviour it had. Concrete means no inference variable is left, and
--- no type parameter: a name some @GIVEN a IS A TYPE@ in this module binds,
--- found from the binders themselves ('isQuantifier'), not from the absence of
--- a declaration, because a type declared under a @§@ can be absent from a
--- table too. A decode at a type parameter has no type to decode into when the
--- rules run; what to do with it is open (smucclaw/l4-ide#1078, option C).
-zonkDecodeTargets :: Substitution -> Module Resolved -> Module Resolved
-zonkDecodeTargets subst m
+-- no type parameter: a name some @GIVEN a IS A TYPE@ in this module binds
+-- ('moduleTypeParameters'). An applied decode at a type parameter is refused
+-- instead ('decodesAtTypeParameters'); one at a type nothing fixes is left as
+-- it was.
+zonkDecodeTargets :: Substitution -> Set Unique -> Module Resolved -> Module Resolved
+zonkDecodeTargets subst typeParams m
   | mentionsJsonDecode m =
-      Optics.over (gplate @(Expr Resolved)) (Optics.transformOf (gplate @(Expr Resolved)) zonkNode) m
+      overJsonDecodeExprs (Optics.transformOf (gplate @(Expr Resolved)) zonkNode) m
   | otherwise = m
   where
     zonkNode e = case e of
@@ -403,14 +409,6 @@ zonkDecodeTargets subst m
         , concrete ty' ->
             App (Optics.set annInfo (Just (TypeInfo ty' k)) ann) r es
       _ -> e
-    -- Every type parameter of the module, wherever it is bound: a top-level
-    -- or local definition, a lambda, a section's GIVEN. A superset of the
-    -- ones in scope at any one node, which can only make fewer types concrete.
-    typeParams = Set.fromList
-      [ getUnique n
-      | otn <- toListOf (gplate @(OptionallyTypedName Resolved) Optics.% Optics.cosmosOf (gplate @(OptionallyTypedName Resolved))) m
-      , Left n <- [isQuantifier otn]
-      ]
     concrete = \ case
       Type _ -> False
       TyApp _ n ts -> not (Set.member (getUnique n) typeParams) && all concrete ts
@@ -418,10 +416,49 @@ zonkDecodeTargets subst m
       Forall {} -> False
       InfVar {} -> False
 
--- | Does the module use JSONDECODE anywhere? 'zonkDecodeTargets'
--- asks this first and does nothing more when the answer is no, as it is for
--- nearly every module, the prelude included, because it runs on every module
--- checked.
+-- | Refuse each JSONDECODE applied to its text whose type to decode into,
+-- resolved with this module's final substitution, mentions a type parameter
+-- (smucclaw/l4-ide#1078, option C; decided by Claude 2026-11-21, pending Meng's
+-- review).
+--
+-- A type parameter has no value when the rules run ('matchGivens' in
+-- 'L4.EvaluateLazy.Machine' keeps only the other inputs), so the decoder has
+-- nothing to decode into. Before this check such a decode ran untyped, and
+-- gave a value of the wrong type with no error: a JSON object became NOTHING,
+-- an enumeration's name stayed a STRING. That was right only when the JSON's
+-- own type happened to be the one the rule was used at, as for a number used
+-- as a NUMBER.
+--
+-- The type parameters are 'moduleTypeParameters', the same set that keeps
+-- 'zonkDecodeTargets' from treating a type as concrete, so a decode it leaves
+-- alone because of a type parameter is refused here. One whose type is only
+-- unsolved (nothing in the module says what it is, as for a signature-less
+-- library wrapper that its importers use) is not: refusing that would refuse
+-- every importer of it.
+--
+-- Only an applied @JSONDECODE@ is refused. A bare one, handed on as a
+-- function, decodes at the type of whatever finally applies it
+-- ('L4.EvaluateLazy.Machine', the 'App' case), which may be written down.
+decodesAtTypeParameters :: Substitution -> Set Unique -> Module Resolved -> [CheckErrorWithContext]
+decodesAtTypeParameters subst typeParams m =
+  [ MkCheckErrorWithContext (JsonDecodeAtTypeParameter r target params) None
+  | mentionsJsonDecode m
+  , App ann r (_ : _) <- jsonDecodeNodes m
+  , Just (TypeInfo ty _) <- [ann ^. annInfo]
+  , let target = decodedInto (substituteInfVars subst ty)
+  , let params = nubOrdOn getUnique (filter (\ n -> Set.member (getUnique n) typeParams) (typeHeads target))
+  , not (null params)
+  ]
+  where
+    -- The @T@ of the @EITHER STRING T@ an applied JSONDECODE gives.
+    decodedInto = \ case
+      TyApp _ e [_, t] | getUnique e == eitherUnique -> t
+      t -> t
+
+-- | Does the module use JSONDECODE anywhere? The two passes
+-- above ask this first and do nothing more when the answer is no, as it is
+-- for nearly every module, the prelude included, because they run on every
+-- module checked.
 -- The ledger service checks a module per request under a memory limit
 -- (@--ledger-max-eval-memory-mb@, 8192 MB by default) that some of
 -- @jl4-service-test@'s requests come close to, and three of them went over
@@ -438,6 +475,108 @@ zonkDecodeTargets subst m
 -- relied on to be cheap: keep this question in front of it.
 mentionsJsonDecode :: Module Resolved -> Bool
 mentionsJsonDecode = Optics.anyOf (gplate @Resolved) (\ r -> getUnique r == jsonDecodeUnique)
+
+-- | Each JSONDECODE node of a module, applied or bare. Only the declarations
+-- that name JSONDECODE are walked ('overJsonDecodeExprs' says why).
+jsonDecodeNodes :: Module Resolved -> [Expr Resolved]
+jsonDecodeNodes m =
+  [ e
+  | piece <- modulePieces m
+  , any (\ r -> getUnique r == jsonDecodeUnique) (pieceNames piece)
+  , top <- either exprs exprs piece
+  , e <- Optics.toListOf cosmosExpr top
+  , isJsonDecode e
+  ]
+  where
+    exprs :: Optics.GPlate (Expr Resolved) x => x -> [Expr Resolved]
+    exprs = Optics.toListOf (gplate @(Expr Resolved))
+
+-- | A module in the pieces the passes over JSONDECODE look into one at a time:
+-- each section's GIVEN, and each declaration, sections opened up. Every
+-- expression and every binder of the module is in exactly one piece.
+modulePieces :: Module Resolved -> [Either (GivenSig Resolved) (TopDecl Resolved)]
+modulePieces (MkModule _ _ s) = section s
+  where
+    section (MkSection _ _ _ given decls) = map Left (maybeToList given) <> concatMap decl decls
+    decl = \ case
+      Section _ sub -> section sub
+      d -> [Right d]
+
+-- | Every name in a piece, read through its derived 'Foldable'.
+pieceNames :: Either (GivenSig Resolved) (TopDecl Resolved) -> [Resolved]
+pieceNames = either toList toList
+
+-- | Apply a function to every outermost expression of each declaration of a
+-- module that names JSONDECODE, sections opened up, and of each section's
+-- GIVEN that does (its TYPICALLY defaults are expressions); everything else is
+-- kept as it is.
+--
+-- Which declarations name it is asked of each one's names ('namesJsonDecode',
+-- through its derived 'Foldable'), and only those are walked by 'gplate'. A walk
+-- of the whole module costs more than the question, and how much more depends
+-- on how GHC compiles the walk: on 400 rules with one JSONDECODE, the same
+-- 'cosmosExpr' walk allocated 46 MB in one place and 408 MB in another
+-- (jl4-core-test JsonDecodeCostSpec, 2026-11-22).
+overJsonDecodeExprs :: (Expr Resolved -> Expr Resolved) -> Module Resolved -> Module Resolved
+overJsonDecodeExprs f (MkModule ann uri s) = MkModule ann uri (section s)
+  where
+    section (MkSection sann n aka given decls) =
+      MkSection sann n aka (fmap givenSig given) (map decl decls)
+    givenSig g
+      | namesJsonDecode g = Optics.over (gplate @(Expr Resolved)) f g
+      | otherwise = g
+    decl = \ case
+      Section dann sub -> Section dann (section sub)
+      d | namesJsonDecode d -> Optics.over (gplate @(Expr Resolved)) f d
+        | otherwise -> d
+
+-- | Does this name JSONDECODE anywhere, read from its names alone?
+namesJsonDecode :: Foldable t => t Resolved -> Bool
+namesJsonDecode = any (\ r -> getUnique r == jsonDecodeUnique)
+
+isJsonDecode :: Expr Resolved -> Bool
+isJsonDecode = \ case
+  App _ r _ -> getUnique r == jsonDecodeUnique
+  _ -> False
+
+-- | Every type parameter of a module: each name a @GIVEN a IS A TYPE@ binds
+-- ('isQuantifier'), wherever it is, in a top-level or local definition, a
+-- lambda or a section's GIVEN. Found from the binders themselves, not from the
+-- absence of a declaration, because a type declared under a @§@ can be absent
+-- from a table too.
+--
+-- All of the module's, not only those in scope at a node: a definition with
+-- no signature can be given a type parameter of the definition that uses it,
+-- as @DECIDE d IS JSONDECODE …@ is by a CONSIDER on @d@ under
+-- @GIVETH AN EITHER STRING a@ in another definition (measured 2026-11-21).
+--
+-- Only those that the type of one of its JSONDECODEs mentions are collected,
+-- because they are all that the two passes ask about. Such a name is made in
+-- this module, so a name made elsewhere (a builtin or an import) is not one,
+-- and only the parts of the module that name one of the others are walked
+-- ('modulePieces'). On 400 rules with one JSONDECODE, at a type made of
+-- builtins, walking every binder of the module allocated 84 MB, 3.6% of
+-- checking it (jl4-core-test JsonDecodeCostSpec, 2026-11-22).
+moduleTypeParameters :: Substitution -> Module Resolved -> Set Unique
+moduleTypeParameters subst m@(MkModule _ uri _) = Set.fromList
+  [ getUnique n
+  | not (Set.null candidates)
+  , piece <- modulePieces m
+  , any (\ r -> Set.member (getUnique r) candidates) (pieceNames piece)
+  , otn <- either binders binders piece
+  , Left n <- [isQuantifier otn]
+  , Set.member (getUnique n) candidates
+  ]
+  where
+    candidates = Set.fromList
+      [ getUnique h
+      | App ann _ _ <- jsonDecodeNodes m
+      , Just (TypeInfo ty _) <- [ann ^. annInfo]
+      , h <- typeHeads (substituteInfVars subst ty)
+      , (getUnique h).moduleUri == uri
+      ]
+    binders :: Optics.GPlate (OptionallyTypedName Resolved) x => x -> [OptionallyTypedName Resolved]
+    binders = toListOf (gplate @(OptionallyTypedName Resolved) Optics.% Optics.cosmosOf (gplate @(OptionallyTypedName Resolved)))
 
 -- | Drop diagnostics that are pure fallout from a name-resolution failure that
 -- has already been reported (issue #920).
@@ -7818,6 +7957,16 @@ forkWordsText = Text.strip (prettyLayout (MkUponEach emptyAnno))
 anchorWords :: Anchor n -> Text
 anchorWords = maybe "…" lifecyclePointWords . lifecyclePointOfAnchor
 
+-- | One line per type parameter a JSONDECODE's type mentions, each with the
+-- line it is given on, as in @GIVEN a IS A TYPE, on line 3@: the GIVEN can be
+-- in another definition than the decode (smucclaw/l4-ide#1078).
+typeParameterLines :: [Resolved] -> [Text]
+typeParameterLines params =
+  [ "  GIVEN " <> prettyLayout (getName p) <> " IS A TYPE"
+      <> maybe "" (\ rng -> ", on line " <> Text.pack (show rng.start.line)) (rangeOf (getOriginal p))
+  | p <- params
+  ]
+
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousClausePattern headName hasGiven binder ctor) =
   [ "The pattern " <> quotedName (getName binder) <> " in this clause of " <> quotedName headName
@@ -7933,6 +8082,32 @@ prettyCheckError (RestatedSectionBinder n)                 =
   , "write the variation at the call:"
   , ""
   , "  <callee> WITH " <> prettyLayout n <> " IS <value>"
+  ]
+prettyCheckError (JsonDecodeAtTypeParameter _ target params) =
+  [ "JSONDECODE turns JSON text into a value of the type its result is used as."
+  , "Here that type is"
+  , ""
+  , "  " <> prettyTypeForDisplay target
+  , ""
+  , case (target, params) of
+      (TyApp _ n [], [p]) | getUnique n == getUnique p -> "which is a type given with"
+      (_, [_]) -> "which mentions a type given with"
+      _ -> "which mentions types given with"
+  , ""
+  ]
+  <> typeParameterLines params <>
+  [ ""
+  , "A type given that way can be a different type each time the rule it belongs"
+  , "to is used, and when the rules run nothing says which type it is. So this"
+  , "JSONDECODE has nothing to go by: a JSON object would not become a record,"
+  , "and a string would not become one of the choices of an IS ONE OF type."
+  , ""
+  , "Decode the JSON where its type is written down instead, for example in a"
+  , "rule with"
+  , ""
+  , "  GIVETH AN EITHER STRING <the type you expect>"
+  , ""
+  , "and hand the decoded value on as an input."
   ]
 prettyCheckError (MisattachedSectionGiven n mSection)       =
   [ "This GIVEN starts at column 1, so it is the signature of the declaration"
