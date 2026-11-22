@@ -445,8 +445,9 @@ spec bin = describe "l4 explore" $ do
     it "l4 lts on adjacent.l4: the tick past the deadline at 3 is the clock reaching 4, not 3.5, and does not reach the deadline at 4" $ do
       Output code sout _ <- runL4 bin ["lts", instants </> "adjacent.l4", "--contract", "adjacent"]
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("nothing happens by 3 (the clock reaches 4) \8594 P is in breach\n" `isInfixOf`)
-      sout `shouldSatisfy` (not . ("3.5" `isInfixOf`))
+      let out = filter (/= '\r') sout
+      out `shouldSatisfy` ("nothing happens by 3 (the clock reaches 4) \8594 P is in breach\n" `isInfixOf`)
+      out `shouldSatisfy` (not . ("3.5" `isInfixOf`))
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"
