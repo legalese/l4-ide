@@ -466,6 +466,9 @@ data RBinOp2 = MkRBinOp2
   { op :: RBinOp
   , rval1 :: WHNF
   , env :: Environment
+  , scope :: Int
+    -- ^ the application's sibling-check scope ('MkRBinOp1'), which is also
+    -- what the norm log's entry for the compound is found by
   }
   deriving stock Show
 

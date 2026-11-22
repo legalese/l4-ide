@@ -23,11 +23,14 @@ module L4.EvaluateLazy.Fates
   , breachedEntry
   , normBearerOf
   , normRefOf
+  , operandsSite
   ) where
 
+import Control.Monad (mplus)
 import L4.Evaluate.NormLog
 import L4.Evaluate.ValueLazy (RBinOp (..))
 import L4.EvaluateLazy.DeonticStep
+import L4.Parser.SrcSpan (SrcRange (..))
 import L4.Syntax (DeonticModal (..))
 
 -- | The party a norm key knows, as far as the machine has forced it.
@@ -60,8 +63,26 @@ entryFor k fate effective observed = MkNormEntry
 -- | The entry written when a norm is armed: it has met its event stream and
 -- nothing has happened to it. The clock is the arming instant, peeked by the
 -- caller ('Nothing' while it is still a thunk).
-armedEntry :: NormKey -> Maybe Rational -> NormEntry
-armedEntry k clock = entryFor k FateArmed clock clock
+--
+-- A norm that a @HENCE@ or @LEST@ armed took effect at the hand-off's clock
+-- and was seen on the event that revealed the hand-off, which for a @LEST@ is
+-- later (N3, review of P1 W2): @handoff@ is that event's stamp. A root norm
+-- has no hand-off, and is seen when it is armed.
+armedEntry :: NormKey -> Maybe Rational -> Maybe Rational -> NormEntry
+armedEntry k clock handoff = entryFor k FateArmed clock (handoff `mplus` clock)
+
+-- | The source range an @AND@\/@OR@ compound is known by: the span of its
+-- operands' expressions, where both are still expressions. A compound whose
+-- operand arrived as a value has only the other's range, and one with neither
+-- has none.
+operandsSite :: Maybe SrcRange -> Maybe SrcRange -> Maybe SrcRange
+operandsSite (Just a) (Just b)
+  | a.moduleUri == b.moduleUri = Just MkSrcRange
+      { start = min a.start b.start, end = max a.end b.end
+      , length = a.length + b.length, moduleUri = a.moduleUri }
+operandsSite a Nothing = a
+operandsSite Nothing b = b
+operandsSite a _       = a
 
 -- | The entry for a declared @BREACH@ that a continuation has just reached.
 -- It names no norm (a terminal is not an obligation); its bearer is whom
@@ -100,10 +121,13 @@ fatesOfStep s = case (s.dsNorm, s.dsOutcome) of
   (Just k, outcome)         -> case outcome of
     Matched br  -> matched k br
     Expired br deadline -> expired k br deadline
-    JoinReleased -> [joinEntry k FateJoinReleased]
-    JoinExpired {} -> [joinEntry k FateJoinExpired]
-    JoinFailed {} -> [joinEntry k FateJoinFailed]
-    JoinStalled  -> [joinEntry k FateJoinStalled]
+    JoinReleased -> [joinEntry k FateJoinReleased s.dsClock s.dsClock]
+    -- the barrier was lost at its ONCE deadline and seen at the last
+    -- completion, which is the step's clock
+    JoinExpired _ deadline -> [joinEntry k FateJoinExpired (Just deadline) s.dsClock]
+    JoinFailed {} -> [joinEntry k FateJoinFailed (s.dsEffective `mplus` s.dsClock) (s.dsObserved `mplus` s.dsClock)]
+    -- a lapsed MAY member's FULFILLED carries no time: not built (spec 6.2, N1)
+    JoinStalled  -> [joinEntry k FateJoinStalled s.dsClock s.dsClock]
     -- looks, and the steps that are not a norm's fate
     Waiting -> []
     PartyMismatch -> []
@@ -139,14 +163,19 @@ fatesOfStep s = case (s.dsNorm, s.dsOutcome) of
       _ | Just m <- k.nkMember, isBarrier m.moJoin -> FailedToJoin
         | otherwise -> FailedToLest
 
-    joinEntry k fate = entryFor k fate s.dsClock s.dsClock
+    -- a barrier's own entry names nobody: a join is not a party's norm
+    -- (review of P1, W3d)
+    joinEntry k fate lostAt seenAt = (entryFor k fate lostAt seenAt) {neBearer = NobodyBearer}
 
+    -- a compound's own entry: its identity and parent link, and the two
+    -- instants of the breach it reduced to (SEESAW rule 2). A fulfilled
+    -- compound has none: FULFILLED carries no time (review of P1, W3a)
     joinedEntry op note =
       let jop = case op of { ValRAnd -> JoinAnd; ValROr -> JoinOr }
           mk fate = [MkNormEntry
-            { neFate = fate, neNorm = Nothing, neModal = Nothing, neBearer = NobodyBearer
-            , neAction = Nothing, neOrigin = Nothing, neMember = Nothing
-            , neEffective = s.dsClock, neObserved = s.dsClock }]
+            { neFate = fate, neNorm = note.jnRef, neModal = Nothing, neBearer = NobodyBearer
+            , neAction = Nothing, neOrigin = note.jnOrigin, neMember = Nothing
+            , neEffective = note.jnEffective, neObserved = note.jnObserved }]
       in case note.jnResult of
         JoinFulfilled  -> mk (FateJoinedFulfilled jop)
         JoinBreached _ -> mk (FateJoinedBreached jop)

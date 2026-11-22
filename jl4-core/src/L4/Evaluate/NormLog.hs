@@ -36,7 +36,7 @@ module L4.Evaluate.NormLog
 import Base
 import qualified Data.Text as Text
 import Data.Ratio (denominator, numerator)
-import L4.Parser.SrcSpan (SrcRange)
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.Syntax (DeonticModal (..))
 
 -- | What happened to a norm (N1), keyed on the modal: @MUST@ and @DO@ are
@@ -161,17 +161,35 @@ data NormMember = MkNormMember
 
 -- | One fate of one norm instance, on the contract clock.
 --
--- Entries are ordered by log position. 'neObserved' is non-decreasing in log
--- position on a stream whose stamps never go backwards, and several entries
--- can share one stamp, so a consumer that needs a total order uses
--- (observed, log position). Where both instants are present,
--- @neEffective <= neObserved@ (N3's invariant).
+-- Entries are ordered by log position, and log position is not time. Things
+-- a reader that windows on time must know (review of P1, S4):
+--
+--   * the 'neObserved' of the fate of a norm (performed, failed, violated,
+--     kept, exercised, lapsed) is non-decreasing in log position on a stream
+--     whose stamps never go backwards, except under an @ROR@, which still runs
+--     its left operand over the whole trace before its right (N17 is not
+--     built);
+--   * an 'FateArmed' entry is written when the machine first forces the clock
+--     the norm was armed at, which can be after a fate of another norm with a
+--     later stamp (a barrier's second member is armed at the start and written
+--     when its own first event is looked at);
+--   * a compound's entry and a declared @BREACH@'s carry SEESAW's instants,
+--     which are the earliest moment the breach could be known, so they can be
+--     earlier than the entries written before them;
+--   * several entries can share one stamp.
+--
+-- So a consumer that needs a total order uses (observed, log position), and
+-- must not read position as time. Where both instants are present,
+-- @neEffective <= neObserved@ (N3's invariant; 'NormLogSpec' pins it on every
+-- entry of every fixture).
 data NormEntry = MkNormEntry
   { neFate      :: !Fate
   , neNorm      :: !(Maybe NormRef)
     -- ^ the norm instance the fate belongs to; 'Nothing' for a declared
-    -- @BREACH@ (a terminal, not an obligation) and for an @AND@/@OR@
-    -- compound, which are not norm instances
+    -- @BREACH@ (a terminal, not an obligation). For an @AND@/@OR@ compound,
+    -- which is not a norm instance, it names the application of the compound:
+    -- its site is the span of its operands' expressions (when both were still
+    -- expressions), so two compounds in one trace are told apart
   , neModal     :: !(Maybe DeonticModal)
   , neBearer    :: !NormBearer
   , neAction    :: !(Maybe Text)
@@ -181,9 +199,14 @@ data NormEntry = MkNormEntry
   , neMember    :: !(Maybe NormMember)
   , neEffective :: !(Maybe Rational)
     -- ^ N3: when the fate took effect. For a failure, the missed deadline,
-    -- no earlier than the obligation's own arming
+    -- no earlier than the obligation's own arming. For a norm armed by a
+    -- hand-off, the hand-off's clock. For a breached compound, SEESAW's rule
+    -- 2: a @RAND@ at the earlier of its operands' effective instants, an @ROR@
+    -- at the later. 'Nothing' for a fulfilled compound (@FULFILLED@ carries no
+    -- time) and for a lapsed @MAY@ under a barrier
   , neObserved  :: !(Maybe Rational)
-    -- ^ N3: the stamp of the event on which the machine saw it
+    -- ^ N3: the stamp of the event on which the machine saw it. For a norm
+    -- armed by a hand-off, the event that revealed the hand-off
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -199,7 +222,15 @@ normLogVerb = "FATE"
 --
 -- > FATE failed (to reparation) MUST pay   [bearer=Alice, effective=5, observed=7, origin=LEST of #1]
 prettyNormEntry :: NormEntry -> Text
-prettyNormEntry e =
+prettyNormEntry = oneLine . prettyNormEntry'
+  where
+    -- a party or an action can print over several lines (a string with a
+    -- newline in it, a CONSIDER); a row is one line, because a reader of the
+    -- listing and the test that strips it both take it as one (review of P1, L1)
+    oneLine = Text.replace "\r" "\\r" . Text.replace "\n" "\\n"
+
+prettyNormEntry' :: NormEntry -> Text
+prettyNormEntry' e =
   "  " <> normLogVerb <> " " <> fateText e.neFate
     <> maybe "" (\m -> " " <> modalText m) e.neModal
     <> maybe "" (" " <>) e.neAction
@@ -259,3 +290,6 @@ originText :: NormOrigin -> Text
 originText o =
   (case o.noBranch of { ViaHence -> "HENCE"; ViaLest -> "LEST" })
     <> " of activation " <> Text.pack (show o.noParent.nrActivation)
+    -- where the parent was written, so a link that points at the wrong norm
+    -- can be seen to (review of P1, L2)
+    <> maybe "" (\ r -> " (line " <> Text.pack (show r.start.line) <> ")") o.noParent.nrSite

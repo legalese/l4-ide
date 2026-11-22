@@ -32,7 +32,7 @@ module NormLogSpec (spec) where
 import qualified Data.Text as Text
 
 import L4.API.VirtualFS (VFS, vfsFromList, checkWithImports)
-import L4.Import.Resolution (TypeCheckWithDepsResult (..))
+import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..))
 import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..))
 import L4.Evaluate.NormLog
 import L4.EvaluateLazy
@@ -43,13 +43,14 @@ import L4.EvaluateLazy
   , prettyEvalDirectiveResult
   , resolveEvalConfig
   )
-import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Syntax (DeonticModal (..))
+import L4.TypeCheck.Types (CheckResult (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
 import qualified Data.Text.IO as TextIO
+import Control.Monad (forM, when)
 import Data.Foldable (for_, toList)
-import Data.List (isSuffixOf, sort)
+import Data.List (findIndex, isSuffixOf, sort)
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import System.Directory (listDirectory)
 import System.Environment (lookupEnv)
@@ -76,7 +77,14 @@ runIn vfs tweak src = do
       expectationFailure ("typecheck failed: " <> show errs)
       pure []
     Right r -> do
-      (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo emptyEnvironment r.tcdModule
+      -- what @l4 run@ does: each import is evaluated first, and its
+      -- environment is what the module's own definitions see. With an empty
+      -- environment an imported definition is never evaluated, which is how
+      -- the extra corpus once passed without running the writer over a
+      -- single imported rule (review of P1, M1)
+      importEnv <- mconcat <$> forM r.tcdResolvedImports \ ri ->
+        fst <$> execEvalModuleWithEnv cfg ri.riTypeChecked.entityInfo mempty ri.riTypeChecked.program
+      (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo importEnv r.tcdModule
       pure results
 
 -- | The norm entries of the n-th directive, oldest first.
@@ -110,8 +118,25 @@ row e = Row
   , origin = (\ o -> (o.noBranch, o.noParent.nrActivation)) <$> e.neOrigin
   }
 
+-- | A fate of a norm instance in its own right: not its arming, not a join,
+-- not a declared breach.
+isNormFate :: Fate -> Bool
+isNormFate = \case
+  FatePerformed -> True
+  FateFailed _  -> True
+  FateViolated  -> True
+  FateKept      -> True
+  FateExercised -> True
+  FateLapsed    -> True
+  _             -> False
+
+uniqueOf :: Eq a => [a] -> [a]
+uniqueOf = foldr (\ x acc -> if x `elem` acc then acc else x : acc) []
+
 isJoinFate :: Fate -> Bool
 isJoinFate = \case
+  FateJoinedFulfilled _ -> True
+  FateJoinedBreached _  -> True
   FateJoinReleased -> True
   FateJoinExpired  -> True
   FateJoinFailed   -> True
@@ -485,6 +510,139 @@ everyPrologue =
   , ""
   ]
 
+-- | A prologue with four parties, for the fixtures of the review of P1.
+prologue4 :: [Text.Text]
+prologue4 =
+  [ "DECLARE Person IS ONE OF Alice, Bob, Carol, Dan"
+  , "DECLARE Action IS ONE OF"
+  , "  deliver"
+  , "  pay HAS amount IS A NUMBER"
+  , ""
+  ]
+
+-- review of P1, W4: a declared BREACH is reached while the clock of a norm
+-- armed before it is still unforced; the norm's Armed entry must still come first
+breachFirstSrc :: Text.Text
+breachFirstSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  (PARTY Alice MUST deliver WITHIN 3) RAND (BREACH BY Carol)"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 1"
+  ]
+
+-- review of P1, W2: a LEST reached on an event long after the deadline; the
+-- continuation's norm is armed at the missed deadline and SEEN on that event
+lateRevealSrc :: Text.Text
+lateRevealSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver WITHIN 3"
+  , "  HENCE PARTY Bob MUST pay 50 WITHIN 10"
+  , "  LEST PARTY Alice MUST pay 100 WITHIN 10"
+  , "       LEST BREACH"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Bob DOES deliver AT 100"
+  ]
+
+-- review of P1, W3: compounds whose operands both miss, revealed by one event
+randJoinSrc, rorJoinSrc, lestJoinSrc, nestedJoinSrc :: Text.Text
+randJoinSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  (PARTY Alice MUST deliver WITHIN 3) RAND (PARTY Bob MUST pay 1 WITHIN 5)"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Dan DOES deliver AT 10"
+  ]
+rorJoinSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  (PARTY Alice MUST deliver WITHIN 3) ROR (PARTY Bob MUST pay 1 WITHIN 5)"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Dan DOES deliver AT 10"
+  ]
+lestJoinSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Carol MUST deliver WITHIN 3"
+  , "  LEST ((PARTY Alice MUST pay 1 WITHIN 5) RAND (PARTY Bob MUST pay 2 WITHIN 5))"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Dan DOES deliver AT 20"
+  ]
+nestedJoinSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  ((PARTY Alice MUST deliver WITHIN 3) RAND (PARTY Bob MUST pay 1 WITHIN 4))"
+  , "  RAND ((PARTY Alice MUST pay 2 WITHIN 5) RAND (PARTY Bob MUST deliver WITHIN 6))"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Dan DOES deliver AT 20"
+  ]
+
+-- review of P1, W3(e): an EVERY barrier met after its ONCE ... WITHIN deadline
+barrierExpiredSrc :: Text.Text
+barrierExpiredSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "c MEANS"
+  , "    PARTY theLandlord MUST Deliver theLandlord WITHIN 1"
+  , "    HENCE (EVERY Tenant t IN tenants"
+  , "              MUST   Sign (EXACTLY t)"
+  , "              WITHIN 14"
+  , "              ONCE   ALL HAVE WITHIN 5"
+  , "              HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 5)"
+  , "              LEST   BREACH)"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY theLandlord DOES Deliver theLandlord AT 0"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY bob DOES Sign bob AT 8"
+  ]
+
+-- review of P1, M1 and W1: a rule in an imported module, whose residual is
+-- shared between directives
+importLibSrc, importUserSrc :: Text.Text
+importLibSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver WITHIN 3"
+  , "  HENCE PARTY Bob MUST pay 50 WITHIN 10 LEST BREACH"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "other MEANS"
+  , "  PARTY Carol MUST deliver WITHIN 3"
+  , "  LEST PARTY Dan MUST deliver WITHIN 30"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "r MEANS EVALTRACE c 0 (LIST EVENT Alice deliver 1)"
+  ]
+importUserSrc = Text.unlines
+  [ "IMPORT wlib"
+  , ""
+  , "#EVAL r"
+  , "#EVAL EVALTRACE r 1 (LIST EVENT Bob (pay 50) 2)"
+  , "#EVAL LIST (EVALTRACE other 0 (LIST EVENT Carol deliver 5)), (EVALTRACE r 1 (LIST EVENT Bob (pay 50) 2))"
+  ]
+
+-- review of P1, L1: a party that prints over more than one line
+multilineSrc :: Text.Text
+multilineSrc = Text.unlines
+  [ "DECLARE Action IS ONE OF"
+  , "  deliver"
+  , "  pay HAS amount IS A NUMBER"
+  , ""
+  , "GIVETH DEONTIC STRING Action"
+  , "c MEANS"
+  , "  PARTY \"Alice\\n\" MUST deliver WITHIN 3"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY \"Alice\\n\" DOES deliver AT 1"
+  ]
+
 allSources :: [(String, Text.Text)]
 allSources =
   [ ("hence", henceSrc), ("lest", lestSrc), ("lest breach", lestBreachSrc)
@@ -497,7 +655,11 @@ allSources =
   , ("record in a hence", recordSrc)
   , ("unforced party", unforcedPartySrc)
   , ("every after hence (fork)", everyAfterHenceForkSrc)
-  , ("every after hence (barrier)", everyAfterHenceBarrierSrc) ]
+  , ("every after hence (barrier)", everyAfterHenceBarrierSrc)
+  , ("breach first", breachFirstSrc), ("late reveal", lateRevealSrc)
+  , ("rand join", randJoinSrc), ("ror join", rorJoinSrc)
+  , ("join in a lest", lestJoinSrc), ("nested joins", nestedJoinSrc)
+  , ("barrier expired", barrierExpiredSrc) ]
 
 -- | An opt-in extra corpus: when @NORMLOG_EXTRA_DIR@ names a directory, every
 -- @.l4@ file in it is run with the writer on and off, and the printed results
@@ -517,12 +679,14 @@ extraCorpus = do
           on <- runIn vfs (\ cfg -> cfg {normLog = True}) src
           off <- runIn vfs (\ cfg -> cfg {normLog = False}) src
           map (prettyEvalDirectiveResult . withoutNormLog) on `shouldBe` map prettyEvalDirectiveResult off
-      -- the positive control: a differential over files that write no fate
-      -- would pass whatever the writer did
-      it "the writer wrote fates somewhere in it, so the comparison above is not vacuous" do
-        counts <- mapM (\ (_, src) -> length . concatMap (\ r -> [ () | Fate _ <- toList r.ledger.normLedger ]) <$>
-                          runIn vfs (\ cfg -> cfg {normLog = True}) src) modules
-        sum counts `shouldSatisfy` (> 0)
+      -- the positive control, one per file that runs a trace: a differential
+      -- over a file that writes no fate would pass whatever the writer did,
+      -- and a control for the directory as a whole is satisfied by one file
+      -- and hides the others (review of P1, M1)
+      for_ modules \ (name, src) -> when (any (\ l -> "#" `Text.isPrefixOf` l && "TRACE" `Text.isInfixOf` l) (Text.lines src)) do
+        it (Text.unpack name <> ": it runs a trace, so the writer wrote fates there") do
+          on <- runIn vfs (\ cfg -> cfg {normLog = True}) src
+          length [ () | r <- on, Fate _ <- toList r.ledger.normLedger ] `shouldSatisfy` (> 0)
 
 spec :: Spec
 spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
@@ -541,7 +705,7 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
     map row (fatesOf 0 rs) `shouldBe`
       [ Row FateArmed (Just DMust) (Just "Alice") (Just 0) (Just 0) Nothing
       , Row (FateFailed FailedToLest) (Just DMust) (Just "Alice") (Just 3) (Just 5) Nothing
-      , Row FateArmed (Just DMust) (Just "Alice") (Just 3) (Just 3) (Just (ViaLest, 1))
+      , Row FateArmed (Just DMust) (Just "Alice") (Just 3) (Just 5) (Just (ViaLest, 1))
       , Row FatePerformed (Just DMust) (Just "Alice") (Just 5) (Just 5) (Just (ViaLest, 1))
       ]
 
@@ -677,6 +841,88 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
     [ (e.neEffective, e.neObserved) | e <- es, e.neFate == FateFailed FailedToBreach ]
       `shouldBe` [(Just 4, Just 5)]
 
+  describe "the review of P1 (2026-11-23)" do
+    let importVfs = vfsFromList [("wlib", importLibSrc)]
+        runImports = runIn importVfs (\ cfg -> cfg {normLog = True}) importUserSrc
+
+    it "M1: an imported rule is evaluated, so the writer runs over it" do
+      rs <- runImports
+      length rs `shouldBe` 3
+      length (fatesOf 0 rs) `shouldSatisfy` (> 0)
+
+    it "W1: a residual defined in an imported module does not take a parent from another directive's hand-offs" do
+      rs <- runImports
+      -- the one LEST hand-off in the third directive is Carol's, and Dan's norm hangs from it
+      [ o.noBranch | e <- fatesOf 2 rs, e.neFate == FateArmed, keyPrefix' e.neBearer == "Dan", Just o <- [e.neOrigin] ]
+        `shouldBe` [ViaLest]
+      -- Bob's norm was armed by Alice's HENCE when the residual was first made,
+      -- in another evaluation; this directive must not read that hand-off as its own
+      let bob = [ e.neOrigin | e <- fatesOf 2 rs, keyPrefix' e.neBearer == "Bob" ]
+      length bob `shouldSatisfy` (> 0)
+      bob `shouldBe` map (const Nothing) bob
+
+    it "W4: a declared BREACH reached before a norm's clock is forced is written after that norm's Armed entry" do
+      rs <- run True breachFirstSrc
+      let fates = map (.neFate) (fatesOf 0 rs)
+      length (filter (== FateBreached) fates) `shouldBe` 1
+      findIndex (== FateArmed) fates `shouldSatisfy` (< findIndex (== FateBreached) fates)
+
+    it "W2: a norm armed by a LEST is armed at the missed deadline and seen on the event that revealed the miss" do
+      rs <- run True lateRevealSrc
+      [ (e.neFate, e.neEffective, e.neObserved) | e <- fatesOf 0 rs ] `shouldBe`
+        [ (FateArmed, Just 0, Just 0)
+        , (FateFailed FailedToLest, Just 3, Just 100)
+        , (FateArmed, Just 3, Just 100)
+        , (FateFailed FailedToLest, Just 13, Just 100)
+        , (FateBreached, Just 13, Just 100) ]
+
+    it "W3a: a compound's breach is dated along its operands: RAND at the earlier effective instant, ROR at the later" do
+      randRs <- run True randJoinSrc
+      rorRs <- run True rorJoinSrc
+      [ (e.neFate, e.neEffective, e.neObserved) | e <- fatesOf 0 randRs, isJoinFate e.neFate ]
+        `shouldBe` [(FateJoinedBreached JoinAnd, Just 3, Just 10)]
+      [ (e.neFate, e.neEffective, e.neObserved) | e <- fatesOf 0 rorRs, isJoinFate e.neFate ]
+        `shouldBe` [(FateJoinedBreached JoinOr, Just 5, Just 10)]
+
+    it "W3b: a compound armed by a LEST hangs from the norm whose LEST armed it, as its operands do" do
+      rs <- run True lestJoinSrc
+      let es = fatesOf 0 rs
+          joins = [ e | e <- es, isJoinFate e.neFate ]
+          operands = [ e | e <- es, e.neFate == FateArmed, e.neOrigin /= Nothing ]
+      length joins `shouldBe` 1
+      length operands `shouldBe` 2
+      map (.neOrigin) joins `shouldBe` take 1 (map (.neOrigin) operands)
+      map (.neOrigin) joins `shouldNotBe` [Nothing]
+
+    it "W3c: two compounds in one trace are two joins, each with a site" do
+      rs <- run True nestedJoinSrc
+      let joins = [ e | e <- fatesOf 0 rs, isJoinFate e.neFate ]
+      length joins `shouldBe` 3
+      length (uniqueOf (map (.neNorm) joins)) `shouldBe` 3
+      [ e.neNorm >>= (.nrSite) | e <- joins ] `shouldSatisfy` all (/= Nothing)
+
+    it "W3d: a barrier's join names nobody as its bearer" do
+      rs <- run True barrierSrc
+      [ e.neBearer | d <- [0, 1], e <- fatesOf d rs, e.neFate `elem` [FateJoinReleased, FateJoinFailed] ]
+        `shouldBe` [NobodyBearer, NobodyBearer]
+
+    it "W3e: a barrier's failure has the instants of the member failure that caused it; an expiry is at the ONCE deadline and seen at the last completion" do
+      rs <- run True barrierSrc
+      let es = fatesOf 1 rs
+      [ (e.neEffective, e.neObserved) | e <- es, e.neFate == FateJoinFailed ]
+        `shouldBe` [ (e.neEffective, e.neObserved) | e <- es, e.neFate == FateFailed FailedToJoin ]
+      [ (e.neEffective, e.neObserved) | e <- es, e.neFate == FateJoinFailed ] `shouldBe` [(Just 14, Just 20)]
+      expired <- run True barrierExpiredSrc
+      [ (e.neEffective, e.neObserved) | e <- fatesOf 0 expired, e.neFate == FateJoinExpired ]
+        `shouldBe` [(Just 5, Just 8)]
+
+    it "L1: a bearer that prints over several lines still prints one row per line" do
+      rs <- run True multilineSrc
+      let ls = Text.lines (prettyEvalDirectiveResult (rs !! 0))
+          block = filter (not . Text.null . Text.strip) (drop 1 (dropWhile (\ l -> Text.strip l /= "Norm log:") ls))
+      length block `shouldSatisfy` (> 0)
+      for_ block \ l -> Text.strip l `shouldSatisfy` ("FATE " `Text.isPrefixOf`)
+
   describe "properties of every entry" do
     for_ allSources \ (name, src) -> do
       it (name <> ": effective is never after observed (N3)") do
@@ -685,6 +931,28 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
           case (e.neEffective, e.neObserved) of
             (Just a, Just b) -> a `shouldSatisfy` (<= b)
             _                -> pure ()
+
+      it (name <> ": a norm's Armed entry comes before any other fate of it") do
+        rs <- run True src
+        let indexed = zip [0 :: Int ..] (fatesOf 0 rs)
+        for_ indexed \ (i, e) ->
+          for_ e.neNorm \ r -> when (e.neFate /= FateArmed && not (isJoinFate e.neFate)) do
+            [ j | (j, a) <- indexed, a.neFate == FateArmed, a.neNorm == Just r ] `shouldSatisfy` any (< i)
+
+      -- The fate of a norm (performed, failed, violated, kept, exercised,
+      -- lapsed) is written where the machine sees it, so its observed stamp
+      -- never goes backwards. The other rows are not so ordered, each for its
+      -- own reason (see 'neObserved'): an Armed entry is written when the
+      -- machine first forces the clock the norm was armed at, which can be
+      -- after a fate of another norm with a later stamp; a compound's or a
+      -- declared BREACH's instants are SEESAW's, the earliest moment the
+      -- breach could be known, which can be earlier than the rows written
+      -- before it. A reader that windows on time orders by (observed, log
+      -- position).
+      it (name <> ": the fates of norms never go backwards in observed time") do
+        rs <- run True src
+        let observed = [ o | e <- fatesOf 0 rs, isNormFate e.neFate, Just o <- [e.neObserved] ]
+        observed `shouldBe` sort observed
 
       it (name <> ": every norm is armed exactly once and has at most one fate of its own") do
         rs <- run True src
