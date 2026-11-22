@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+prelude-aliases-two-types.l4:9:1-52:
+  PAIR OF "a", 2
+prelude-aliases-two-types.l4:10:1-61:
+  PAIR OF "a", TRUE
+prelude-aliases-two-types.l4:12:1-79:
+  LIST PAIR OF "a", 2, PAIR OF "b", 3
+prelude-aliases-two-types.l4:13:1-90:
+  LIST PAIR OF "a", TRUE, PAIR OF "b", FALSE
+prelude-aliases-two-types.l4:15:1-80:
+  assertion satisfied
+prelude-aliases-two-types.l4:16:1-92:
+  assertion satisfied
+prelude-aliases-two-types.l4:17:1-132:
+  assertion satisfied
+prelude-aliases-two-types.l4:18:1-150:
+  assertion satisfied
