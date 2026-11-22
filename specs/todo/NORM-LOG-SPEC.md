@@ -629,7 +629,10 @@ No syntax, CLI flag or printed output of `l4 run` depends on it, which is why P1
 The first such run found one real difference, in `ok/every/run-lifecycle-values.l4`: the carrier of N8's parent link took an address from the evaluation's supply, which moved the heap address that a ledger listing prints for a party with an unforced field.
 The carrier now takes none, and `NormLogSpec` has the shape as a fixture.
 The same run with `JL4_TEST_NORM_LOG=mutant`, a deliberately wrong writer that also writes the official record, fails 38 goldens, so the differential can go red.
-The mutant is a test-only field of `EvalConfig` (`normLogMutant`); nothing reads it outside a test.
+That mutant is not the one the ruling cares about, which is a writer that forces a thunk.
+The corpus has no file whose answer changes when a party is evaluated early, so the golden differential alone would not catch that writer: `NormLogSpec` carries a fixture with a party that cannot be evaluated (a trace with no events, so nothing needs it) and a second mutant, `MutantForce`, that evaluates the party at arming.
+The test shows the mutant's printed result differs from the writer-off result, and that the real writer's does not.
+Both mutants are values of a test-only field of `EvalConfig` (`normLogMutant`); nothing reads it outside a test, and the `jl4-test` run with the forcing mutant (`JL4_TEST_NORM_LOG=mutant-force`) was not made.
 
 **Overhead (N6).**
 Wall time of `jl4-test` on `lhs`, writer forced on: 1,291 s; writer off: 1,301 s on the run of 2026-11-22, before the carrier fix below.
