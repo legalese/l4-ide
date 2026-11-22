@@ -68,7 +68,9 @@ DECIDE `the API key` IS
 | `LEFT x`, `RIGHT x`                       | an object with the side as its one key: `{"LEFT": x}`           |
 
 A DATE is written as `"2026-01-31"` and a TIME as `"10:30:00"`, with the fraction of a second after the seconds when there is one (`"10:30:00.5"`).
-A DATETIME is written as its local date and time in its own timezone, followed by the offset from UTC: `"2026-01-31T10:30:00+0800"`.
+A DATETIME is written as RFC 3339 in UTC, whatever timezone it carries: 10:30 on 31 January 2026 in `Asia/Singapore` is `"2026-01-31T02:30:00Z"`, with the fraction of a second after the seconds when there is one (`"2026-01-31T02:30:00.5Z"`).
+Meng ruled on 2026-11-22 (card W1, option B) that every writer of a DATETIME as JSON uses this text; this page describes `JSONENCODE`, and the other writers' pages say what they write.
+It differs from `TOSTRING`, which writes a DATETIME in its own timezone with the offset from UTC (`"2026-01-31T10:30:00+0800"`, and `"...+0000"` for UTC).
 `JSONDECODE` reads each of these back at the same type.
 
 ```l4
@@ -92,7 +94,7 @@ The type you expect guides the decoding, so say it, with `GIVETH` or by the way 
 - An array decodes to a LIST, a number to a NUMBER, a string to a STRING, `true` and `false` to a BOOLEAN.
 - `null` decodes to `NOTHING` for a MAYBE type; any other value decodes to `JUST` it.
 - A string with a constructor's name decodes to that constructor of an enumeration.
-- A string written as a date (`2026-01-31`), a time (`10:30:00`) or a datetime (`2026-01-31T10:30:00+0800`, or ending in `Z`) decodes to a DATE, a TIME or a DATETIME. A DATETIME is read as the same instant, with the `TIMEZONE` of the document (UTC when it has none).
+- A string written as a date (`2026-01-31`), a time (`10:30:00`) or a datetime (`2026-01-31T02:30:00Z`, or ending in an offset such as `+0800`) decodes to a DATE, a TIME or a DATETIME. A DATETIME is read as the same instant, with the `TIMEZONE` of the document (UTC when it has none).
 - A type declared as another name for a type (`DECLARE Year IS A NUMBER`) decodes as that type, and so does one for a MAYBE: with `DECLARE MaybeYear IS A MAYBE NUMBER`, `null` decodes to `NOTHING` and `2026` to `JUST 2026`.
 
 ```l4

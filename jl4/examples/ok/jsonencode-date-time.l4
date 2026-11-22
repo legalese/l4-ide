@@ -1,6 +1,7 @@
 -- JSONENCODE of a DATE, a TIME and a DATETIME (smucclaw/l4-ide#1083). Each
--- is written as a string, in the text form the language prints the value in,
--- and JSONDECODE reads that string back at the same type. It used to stop
+-- is written as a string, and JSONDECODE reads that string back at the same
+-- type. A DATE and a TIME are written as the language prints them; a DATETIME
+-- is written as RFC 3339 in UTC, whatever zone it carries. It used to stop
 -- with an internal error ("Cannot encode value to JSON").
 IMPORT prelude
 
@@ -24,6 +25,9 @@ GIVETH A TIME
 -- JSONDECODE gives it back.
 GIVETH A DATETIME
 `the datetime` MEANS DATETIME_FROM_DTZ `the date` `the time` "Asia/Singapore"
+
+GIVETH A DATETIME
+`the datetime with a fraction` MEANS DATETIME_FROM_DTZ `the date` `a time with a fraction` "Asia/Singapore"
 
 GIVETH A DATETIME
 `the datetime in UTC` MEANS DATETIME_FROM_DTZ `the date` `the time` "UTC"
@@ -51,8 +55,9 @@ GIVETH AN EITHER STRING Meeting
 #EVAL JSONENCODE `the date`                    -- "2026-01-31"
 #EVAL JSONENCODE `the time`                    -- "10:30:00"
 #EVAL JSONENCODE `a time with a fraction`      -- "10:30:00.5"
-#EVAL JSONENCODE `the datetime`                -- "2026-01-31T10:30:00+0800"
-#EVAL JSONENCODE `the datetime in UTC`         -- "2026-01-31T10:30:00+0000"
+#EVAL JSONENCODE `the datetime`                -- "2026-01-31T02:30:00Z", in UTC whatever the zone
+#EVAL JSONENCODE `the datetime with a fraction` -- "2026-01-31T02:30:00.5Z"
+#EVAL JSONENCODE `the datetime in UTC`         -- "2026-01-31T10:30:00Z"
 #EVAL JSONENCODE `the meeting`
 #EVAL JSONENCODE (LIST `the date`, `the date`)
 #EVAL JSONENCODE (JUST `the time`)
@@ -62,4 +67,5 @@ GIVETH AN EITHER STRING Meeting
 #ASSERT `decode a time` (JSONENCODE `the time`) EQUALS RIGHT `the time`
 #ASSERT `decode a time` (JSONENCODE `a time with a fraction`) EQUALS RIGHT `a time with a fraction`
 #ASSERT `decode a datetime` (JSONENCODE `the datetime`) EQUALS RIGHT `the datetime`
+#ASSERT `decode a datetime` (JSONENCODE `the datetime with a fraction`) EQUALS RIGHT `the datetime with a fraction`
 #ASSERT `decode a meeting` (JSONENCODE `the meeting`) EQUALS RIGHT `the meeting`

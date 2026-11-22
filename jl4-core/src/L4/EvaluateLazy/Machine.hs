@@ -5617,13 +5617,15 @@ encodeValueToJson = \case
     | otherwise -> pure $ Text.pack $ show (fromRational n :: Double)
   ValBool True -> pure "true"
   ValBool False -> pure "false"
-  -- A DATE, a TIME and a DATETIME are written as strings in the text form the
-  -- language prints them in (@2026-01-31@, @10:30:00@,
-  -- @2026-01-31T18:30:00+0800@), which 'parseDateText', 'parseTimeText' and
-  -- 'parseDatetimeText' read back at the same type (smucclaw/l4-ide#1083).
+  -- A DATE and a TIME are written as strings in the text form the language
+  -- prints them in (@2026-01-31@, @10:30:00@), and a DATETIME as RFC 3339 in
+  -- UTC, whatever its own zone (@2026-01-31T10:30:00Z@), the one text every
+  -- writer of a DATETIME uses (W1, option B: smucclaw/l4-ide#1083).
+  -- 'parseDateText', 'parseTimeText' and 'parseDatetimeText' read each back at
+  -- the same type.
   ValDate day -> pure $ quoted (formatDateIso day)
   ValTime tod -> pure $ quoted (formatTimeOfDayExact tod)
-  ValDateTime utc tzName -> pure $ quoted (formatDateTimeIsoExact utc tzName)
+  ValDateTime utc _tz -> pure $ quoted (formatUTCTimeIsoExact utc)
   ValNil -> pure "[]"
   ValCons _x _xs ->
     -- This should not be reached as lists are handled in runBuiltin with frames
@@ -8701,10 +8703,12 @@ formatUTCTimeIso utc =
 formatDateTimeIso :: UTCTime -> Text -> Text
 formatDateTimeIso = formatDateTimeIsoWith "%S"
 
--- | 'formatDateTimeIso', with the fraction of a second after the seconds when
--- there is one, so that 'parseDatetimeText' reads back the same instant.
-formatDateTimeIsoExact :: UTCTime -> Text -> Text
-formatDateTimeIsoExact = formatDateTimeIsoWith "%S%Q"
+-- | 'formatUTCTimeIso', with the fraction of a second after the seconds when
+-- there is one (@2026-01-31T10:30:00.5Z@), so that 'parseDatetimeText' reads
+-- back the same instant.
+formatUTCTimeIsoExact :: UTCTime -> Text
+formatUTCTimeIsoExact utc =
+  Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%S%QZ" utc
 
 -- | The datetime in the given timezone as @YYYY-MM-DDTHH:MM:SS@ followed by its
 -- UTC offset, the seconds written with the given format.
