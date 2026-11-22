@@ -1107,7 +1107,7 @@ x MEANS x + 1
 To find `x`, L4 needs `x + 1`, which needs `x` again. L4 notices this for a value defined in terms of itself and stops with this error.
 
 A function that calls itself with new inputs, and never reaches a case that stops, is not caught as a loop.
-If each call waits for the next one's answer, as in `1 + f (n + 1)`, L4 stops a million calls deep with `Stack overflow: Recursion depth of 1000000 exceeded.` (set `JL4_MAX_FRAME_DEPTH` to change the limit).
+If each call waits for the next one's answer, as in `1 + f (n + 1)`, L4 stops a million calls deep with `Stack overflow: Recursion depth of 1000000 exceeded.` (set `JL4_MAX_FRAME_DEPTH` to change the limit); in a line that collects a trace, such as an `#EVALTRACE`, the step count stops it sooner, at 100,000 steps.
 If the call is the last thing the function does, as in `f n MEANS f (n + 1)`, it is caught differently: see [It took more than so many steps](#it-took-more-than-so-many-steps).
 
 **How to fix it:** If you meant recursion, give it a case that stops:
