@@ -1,0 +1,29 @@
+-- JSONDECODE of a DATETIME written as the text jl4-service answers a DATETIME
+-- with, and `l4 batch` writes one as: the instant in UTC, with a space and not
+-- a T before the time and the zone after it (smucclaw/l4-ide#1085). It was
+-- refused ("Could not parse datetime string"), so a result of either could not
+-- be fed back in as a fact.
+IMPORT prelude
+
+TIMEZONE IS "Asia/Singapore"
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING DATETIME
+`decode` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING NUMBER
+`hour of` s MEANS
+  CONSIDER `decode` s
+    WHEN RIGHT w THEN RIGHT (TIME_HOUR (DATETIME_TIME w))
+    WHEN LEFT e THEN LEFT e
+
+-- The same instant in the three forms, read in the document's timezone
+-- (Singapore is eight hours ahead of UTC): 10:30 UTC is 18:30 there.
+#EVAL `hour of` "\"2026-01-31 10:30:00 UTC\""      -- RIGHT 18
+#EVAL `hour of` "\"2026-01-31 10:30:00.5 UTC\""    -- RIGHT 18
+#EVAL `hour of` "\"2026-01-31T10:30:00Z\""         -- RIGHT 18
+#EVAL `hour of` "\"2026-01-31T18:30:00+0800\""     -- RIGHT 18
+
+#ASSERT `decode` "\"2026-01-31 10:30:00 UTC\"" EQUALS `decode` "\"2026-01-31T10:30:00Z\""
+#ASSERT `decode` "\"2026-01-31 10:30:00 UTC\"" EQUALS `decode` "\"2026-01-31T18:30:00+0800\""

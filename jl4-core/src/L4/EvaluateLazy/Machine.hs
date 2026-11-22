@@ -8661,6 +8661,11 @@ parseDatetimeText raw =
         , "%Y-%m-%dT%H:%M:%S%Q%z"
         , "%Y-%m-%d %H:%M:%S%Z"
         , "%Y-%m-%d %H:%M:%S%z"
+        -- the text of a UTCTime, which jl4-service answers a DATETIME with and
+        -- @l4 batch@ writes one as: @2026-01-31 10:30:00 UTC@, with a fraction
+        -- of a second after the seconds when there is one (smucclaw/l4-ide#1085)
+        , "%Y-%m-%d %H:%M:%S %Z"
+        , "%Y-%m-%d %H:%M:%S%Q %Z"
         ]
   in listToMaybe
        [ utc
