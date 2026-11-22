@@ -177,13 +177,16 @@ Severity Information for `eval/result` and `eval/assertion-passed`, Warning for 
 
 ## import/
 
-| Code                       | Meaning                                                                                                                                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `import/cycle`             | Files import each other in a ring.                                                                                                             |
-| `import/module-has-errors` | An imported module has errors, or could not be checked.                                                                                        |
-| `import/module-not-found`  | No module has this name.                                                                                                                       |
-| `import/self-import`       | A file imports itself.                                                                                                                         |
-| `import/self-dependency`   | Walking the files that depend on this one came back to it. A file that imports itself does that, and so does an `IMPORT` that finds no module. |
+Errors, except `import/case-variant-skipped`, which is a warning.
+
+| Code                          | Meaning                                                                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `import/case-variant-skipped` | An `IMPORT` used another module, passing over a file whose name differs from it only in its capitals.                                          |
+| `import/cycle`                | Files import each other in a ring.                                                                                                             |
+| `import/module-has-errors`    | An imported module has errors, or could not be checked.                                                                                        |
+| `import/module-not-found`     | No module has this name, spelled with these capitals.                                                                                          |
+| `import/self-import`          | A file imports itself.                                                                                                                         |
+| `import/self-dependency`      | Walking the files that depend on this one came back to it. A file that imports itself does that, and so does an `IMPORT` that finds no module. |
 
 ## file/
 

@@ -5167,6 +5167,143 @@ spec bin = do
           Output _ _ astErr <- runIn dir ["ast", "importer.l4"]
           occurrences warning astErr `shouldBe` 1
 
+  -- smucclaw/l4-ide#1080: capitals count in a module name. `IMPORT dayDate`
+  -- does not load `daydate.l4`, whatever the disk, and the error says what to
+  -- type. Every example writes its files into a fresh temporary folder, so the
+  -- repository tracks no file whose name differs from a module only in
+  -- capitals. This suite runs on Linux in PR CI and on macOS and Windows in
+  -- the release workflow; each example says what it proves on which.
+  describe "l4 IMPORT: capitals count in a module name (#1080)" $ do
+    let sandbox name files act = withSystemTempDirectory name \dir -> do
+          mapM_ (\(nm, body) -> writeFile (dir </> nm) body) files
+          act dir
+        checkIn dir = do
+          absDir <- makeAbsolute dir
+          runL4EmbeddedOnlyIn (Just absDir) bin ["check", "main.l4"]
+        dayDateHint =
+          "Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?"
+        helperHint =
+          "Capital letters count in a module name: `Helper` and `helper` are different names. Did you mean `helper`?"
+        occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+        helper = "DECIDE helperValue IS 42\n"
+
+    -- Linux: the embedded tier refused `dayDate` before the rule too, so the
+    -- exit code proves nothing there and the hint line is the evidence.
+    it "names the stdlib spelling when only the capitals differ" $
+      sandbox "l4-1080-embedded" [("main.l4", "IMPORT dayDate\n")] \dir -> do
+        Output code _ serr <- checkIn dir
+        code `shouldNotBe` ExitSuccess
+        serr `shouldSatisfy` ("I could not find a module with this name: dayDate" `isInfixOf`)
+        serr `shouldSatisfy` (dayDateHint `isInfixOf`)
+
+    -- Linux: the folder JL4_LIBRARY_PATH names was already exact there, so the
+    -- hint is the evidence; macOS and Windows: this run exited 0 before the
+    -- rule, loading `daydate.l4` under the name `dayDate.l4`.
+    it "refuses it through JL4_LIBRARY_PATH as well, with the same hint" $
+      sandbox "l4-1080-envpath" [("main.l4", "IMPORT dayDate\n")] \dir -> do
+        absDir <- makeAbsolute dir
+        libs <- makeAbsolute (".." </> "jl4-core" </> "libraries")
+        parentEnv <- getEnvironment
+        let childEnv = ("JL4_LIBRARY_PATH", libs) : ("XDG_DATA_HOME", absDir </> "no-xdg")
+              : filter (\ (k, _) -> k `notElem` ["JL4_LIBRARY_PATH", "XDG_DATA_HOME"]) parentEnv
+        Output code _ serr <- runL4In (Just absDir) (Just childEnv) bin ["check", "main.l4"]
+        code `shouldNotBe` ExitSuccess
+        serr `shouldSatisfy` (dayDateHint `isInfixOf`)
+
+    -- Linux: the hint is the evidence; macOS and Windows: this exited 0.
+    it "refuses a project file whose name differs from the IMPORT only in capitals" $
+      sandbox "l4-1080-sibling" [("helper.l4", helper), ("main.l4", "IMPORT Helper\n#EVAL helperValue\n")] \dir -> do
+        Output code _ serr <- checkIn dir
+        code `shouldNotBe` ExitSuccess
+        serr `shouldSatisfy` (helperHint `isInfixOf`)
+
+    -- macOS and Windows: two spellings used to load the one file twice, and
+    -- every name it defines became ambiguous ("multiple definitions",
+    -- naming `Helper.l4` and `helper.l4`). Linux: the hint is the evidence.
+    it "does not load one file twice under two spellings" $
+      sandbox "l4-1080-twice" [("helper.l4", helper), ("main.l4", "IMPORT Helper\nIMPORT helper\n#EVAL helperValue\n")] \dir -> do
+        Output _ _ serr <- checkIn dir
+        serr `shouldSatisfy` (not . ("multiple definitions" `isInfixOf`))
+        occurrences helperHint serr `shouldSatisfy` (>= 1)
+
+    -- The skipped-variant warning (design probe P12). Linux: this resolved to
+    -- the embedded `math` silently before, so the warning is the evidence;
+    -- macOS and Windows: `Math.l4` was used, with the shadow warning.
+    it "warns, once, when a file is passed over because of its capitals" $
+      sandbox "l4-1080-skipped" [("Math.l4", "DECIDE siblingMarker IS 11\n"), ("main.l4", "IMPORT math\n#EVAL 1 PLUS 1\n")] \dir -> do
+        Output code _ serr <- checkIn dir
+        code `shouldBe` ExitSuccess
+        -- The log line, counted with its prefix: "once" is about the log.
+        let first = "Warning | [Import Resolution] `IMPORT math` did not use `Math.l4` beside the importing file, because capital letters count in a module name: `Math` and `math` are different names."
+        occurrences first serr `shouldBe` 1
+        serr `shouldSatisfy` ("It used the standard library's `math` instead." `isInfixOf`)
+        serr `shouldSatisfy` (not . ("Multiple differing copies" `isInfixOf`))
+
+    -- The control for it: a variant ranked BELOW the copy used could not have
+    -- won under any rule, so nothing was passed over and nothing is said.
+    it "says nothing about a variant below the copy it used" $
+      sandbox "l4-1080-below" [("zzmod.l4", "DECIDE zzValue IS 1\n"), ("main.l4", "IMPORT zzmod\n#EVAL zzValue\n")] \dir -> do
+        absDir <- makeAbsolute dir
+        let store = absDir </> "xdg" </> "jl4" </> "libraries"
+        createDirectoryIfMissing True store
+        writeFile (store </> "Zzmod.l4") "DECIDE zzValue IS 2\n"
+        Output code _ serr <- runL4WithXdgHomeIn (Just absDir) (absDir </> "xdg") bin ["check", "main.l4"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` (not . ("did not use" `isInfixOf`))
+
+    -- Review finding A, for the warning, as revised by GM (2026-11-21):
+    -- `Math.l4` that writes `IMPORT math` passes over only itself. It is told
+    -- that, and that a module cannot import itself, and is never told to
+    -- change the IMPORT to `Math` or to rename itself to `math.l4`. macOS: an
+    -- `l4` from before the rule loaded the file as its own import and failed
+    -- with a GraphException (measured 2026-11-21 UTC on HFS+). Linux: the
+    -- warning is the evidence.
+    it "tells a file that imports its own name under other capitals what is true" $
+      sandbox "l4-1080-self-warn" [("Math.l4", "IMPORT math\n#EVAL 1 PLUS 1\n")] \dir -> do
+        absDir <- makeAbsolute dir
+        Output code _ serr <- runL4EmbeddedOnlyIn (Just absDir) bin ["check", "Math.l4"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("Warning | [Import Resolution] `IMPORT math` did not use `Math.l4`, which is the importing file itself: `math` differs from `Math`, the name of this file's own module, only in its capitals." `isInfixOf`)
+        serr `shouldSatisfy` ("It used the standard library's `math` instead." `isInfixOf`)
+        serr `shouldSatisfy` ("If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT. If you meant the standard library's `math`, nothing needs to change." `isInfixOf`)
+        serr `shouldSatisfy` (not . ("change the IMPORT to" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("rename the file" `isInfixOf`))
+
+    -- Review finding B: `currency`, in the embedded library, writes `IMPORT
+    -- jurisdiction`. A user's `Jurisdiction.l4` in the project root is kept
+    -- from that import, and nothing tells the user to change an IMPORT they
+    -- did not write.
+    it "says nothing about an IMPORT written inside the standard library" $
+      sandbox "l4-1080-stdlib-import" [("Jurisdiction.l4", "DECIDE userMarker IS 1\n"), ("main.l4", "IMPORT currency\n#EVAL 1 PLUS 1\n")] \dir -> do
+        Output code _ serr <- checkIn dir
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` (not . ("did not use" `isInfixOf`))
+
+    -- The control: a name with no near twin gets the message it always had.
+    it "adds nothing to the message when no module is that close" $
+      sandbox "l4-1080-control" [("main.l4", "IMPORT zzNothingLikeIt\n")] \dir -> do
+        Output code _ serr <- checkIn dir
+        code `shouldNotBe` ExitSuccess
+        serr `shouldSatisfy` ("I could not find a module with this name: zzNothingLikeIt" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("Capital letters count" `isInfixOf`))
+
+    -- A file is never offered itself: `Foo.l4` told "Did you mean `Foo`?"
+    -- would import itself (CLAUDE.md §5). It is told what is true instead
+    -- (review finding A, as revised by GM on 2026-11-21; wording assumed, not
+    -- ruled). macOS: an `l4` from before the rule loaded the file as its own
+    -- import and failed with a GraphException (measured on HFS+ for
+    -- `Zzself.l4` and for this `Foo.l4` on 2026-11-21 UTC, and on
+    -- APFS for `Zzself.l4`). Linux: the line is the evidence.
+    it "tells a file whose IMPORT is its own name under other capitals that it cannot import itself" $
+      sandbox "l4-1080-self" [("Foo.l4", "IMPORT foo\n")] \dir -> do
+        absDir <- makeAbsolute dir
+        Output code _ serr <- runL4EmbeddedOnlyIn (Just absDir) bin ["check", "Foo.l4"]
+        code `shouldNotBe` ExitSuccess
+        serr `shouldSatisfy` ("I could not find a module with this name: foo" `isInfixOf`)
+        serr `shouldSatisfy` ("`foo` differs from `Foo`, the name of this file's own module, only in its capitals. If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT." `isInfixOf`)
+        serr `shouldSatisfy` (not . ("Did you mean" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("GraphException" `isInfixOf`))
+
   -- `l4 export` and the DMN engine checks. Called here rather than with the
   -- other backends below because this is where those describes have always
   -- run, so the suite's output order is unchanged.
