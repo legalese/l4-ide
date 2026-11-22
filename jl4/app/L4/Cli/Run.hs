@@ -49,7 +49,7 @@ runOptionsParser = RunOptions
         <> metavar "MODE"
         <> value TraceTextFull
         <> showDefaultWith renderTraceTextMode
-        <> help "Trace text mode for #EVALTRACE: none | full"
+        <> help "Show the trace of each #EVALTRACE directive in the text output: none | full (--json output carries no trace)"
         )
   <*> fixedNowParser
 
@@ -59,7 +59,12 @@ runOptionsParser = RunOptions
 
 runCmd :: RunOptions -> IO ()
 runCmd opts = do
-  evalConfig <- makeEvalConfig opts.runFixedNow
+  -- A trace is collected only to be printed, and only by the text output:
+  -- 'evalResultToJson' carries none, and collecting one under --json would cost
+  -- time and memory for a value that is dropped (and put its text into the
+  -- diagnostics). So --json asks for none.
+  let traceMode = if opts.runJsonOut then TraceTextNone else opts.runTrace
+  evalConfig <- makeRunEvalConfig traceMode opts.runFixedNow
   (errs, diags, (mTc, mEval)) <- runOneshotWithDiagnostics evalConfig opts.runFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
@@ -78,30 +83,19 @@ runCmd opts = do
       -- diagnostics via the logger, so a file with passing `#EVAL`s still
       -- produces non-empty `errs` — treating that as failure would be a
       -- false positive. A directive that crashed during evaluation
-      -- (e.g. a CONSIDER hole) is a real failure, though. So is an #ASSERT
-      -- whose expression RAISED: it did not evaluate cleanly, and it was
-      -- exiting 0 only because the exception was hidden inside
-      -- @Assertion False@. A clean @Assertion Fails@ stays exit 0, and so does
-      -- an @Assertion (FailsBecause _)@, a failed @#ASSERT REFUSED@.
-      --
-      -- A REFUSAL is not a crash. The model declined to answer and said why:
-      -- that is a determinate outcome of the program, so @l4 run@ exits 0.
-      -- (Errors keep exit 1; the two must not be conflated, which is the whole
-      -- point of REFUSE.)
-      evalOk = all
-        (\r -> case r.result of
-          Reduction (ReducedErrored _) -> False
-          Assertion (Errored _)        -> False
-          _                            -> True)
-        evalResults
+      -- (e.g. a CONSIDER hole) is a real failure, though (ruled by Meng
+      -- 2026-08-01). So is a FAILED #ASSERT (ruled by Meng 2026-09-29): an
+      -- assertion is a test, and a test runner that exits 0 on a failing test
+      -- cannot gate anything. See 'evalDirectiveFailsRun' for which outcomes
+      -- count; a REFUSED assertion and every other #EVAL value do not.
+      evalFailed = any evalDirectiveFailsRun evalResults
       -- A module the file imports can be broken while the file's own typecheck
       -- still reports success (a module on a ring of imports has no typecheck, so
       -- its importer is checked without it), so also require that no blocking Error diagnostic was published
       -- anywhere in the import closure. 'hasBlockingError' leaves out the
-      -- evaluator's own diagnostics (source "eval"), so a failed #ASSERT, which
-      -- is published as one at Error severity, still exits 0; a directive that
-      -- crashed is what 'evalOk' is for.
-      overallOk = typecheckOk && evalOk && not (hasBlockingError diags)
+      -- evaluator's own diagnostics (source "eval"), so #EVAL and #ASSERT
+      -- outcomes reach the exit code only through 'evalFailed' above.
+      overallOk = typecheckOk && not evalFailed && not (hasBlockingError diags)
 
   if opts.runJsonOut
     then do
@@ -131,6 +125,29 @@ runCmd opts = do
                  Text.hPutStrLn stderr "Run failed (file may be empty, unparseable, or not found)"
             _ -> pure ()
           exitFailure
+
+-- | Does this directive fail @l4 run@ (see 'runCmd')? It does if it crashed
+-- during evaluation, or if it is an @#ASSERT@ that evaluated to false. A value,
+-- a refusal, and a satisfied assertion do not.
+evalDirectiveFailsRun :: EvalDirectiveResult -> Bool
+evalDirectiveFailsRun r = case r.result of
+  Reduction (ReducedErrored _) -> True
+  Reduction (Reduced _)        -> False
+  -- A REFUSAL is not a crash. The model declined to answer and said why: that
+  -- is a determinate outcome of the program, so @l4 run@ exits 0. (Errors keep
+  -- exit 1; the two must not be conflated, which is the whole point of REFUSE.)
+  Reduction (ReducedRefused _) -> False
+  -- An assertion whose expression RAISED did not evaluate cleanly: it is the
+  -- same crash as a raising #EVAL.
+  Assertion (Errored _)      -> True
+  -- A refused assertion is neither true nor false: the model declined to
+  -- answer, which is a designed outcome, as for a refusing #EVAL above.
+  Assertion (Refused _)      -> False
+  Assertion Holds            -> False
+  -- A clean false is a failed test (ruled by Meng 2026-09-29), and so is a
+  -- failed @#ASSERT REFUSED@.
+  Assertion Fails            -> True
+  Assertion (FailsBecause _) -> True
 
 ----------------------------------------------------------------------------
 -- JSON shape

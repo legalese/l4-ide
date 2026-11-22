@@ -12,7 +12,9 @@ module L4.Cli.Common
 
     -- * Evaluation config
   , makeEvalConfig
+  , makeRunEvalConfig
   , makeTracePolicyForEval
+  , makeTracePolicyForRun
   , makeTracePolicyForTrace
 
     -- * Running the LSP pipeline
@@ -181,18 +183,45 @@ langOption what = optional $
 ----------------------------------------------------------------------------
 
 -- | Build an `EvalConfig` honoring either the `--fixed-now` flag or the
--- `L4_NOW` environment variable. Use this for `run`, `check`, `batch`.
+-- `L4_NOW` environment variable. Use this for the verbs that never print a
+-- trace (`check`, `batch`, the exporters); `l4 run` uses 'makeRunEvalConfig'.
 makeEvalConfig :: FixedNowOpt -> IO EvalConfig
 makeEvalConfig (FixedNowOpt mClock) = do
   envFixed <- readFixedNowEnv
   resolveEvalConfig (mClock <|> envFixed) makeTracePolicyForEval
 
+-- | The `EvalConfig` for `l4 run`. Same clock handling as 'makeEvalConfig';
+-- the trace policy follows the @--trace@ mode, see 'makeTracePolicyForRun'.
+makeRunEvalConfig :: TraceTextMode -> FixedNowOpt -> IO EvalConfig
+makeRunEvalConfig traceMode (FixedNowOpt mClock) = do
+  envFixed <- readFixedNowEnv
+  resolveEvalConfig (mClock <|> envFixed) (makeTracePolicyForRun traceMode)
+
+-- | No trace for anything: the policy of every verb that prints only results.
 makeTracePolicyForEval :: TracePolicy
 makeTracePolicyForEval =
   TracePolicy
     { evalDirectiveTrace = NoTrace
     , evaltraceDirectiveTrace = NoTrace
     }
+
+-- | Trace policy used by `l4 run`. Collecting a trace costs time and memory, so
+-- it is collected for @#EVALTRACE@ directives only, and only when @--trace@ is
+-- @full@. A plain @#EVAL@ (or @#ASSERT@) never collects one, whatever the mode,
+-- and keeps its "no trace captured" line.
+--
+-- The policy is global, not per module. 'LSP.L4.Rules' evaluates every module
+-- in the import closure with the one 'EvalConfig', and @l4 run@ prints only the
+-- entry module's results, so an @#EVALTRACE@ inside an IMPORTed module is
+-- collected and then discarded: its cost is paid and its trace shown nowhere.
+-- (Measured on unstable for legalese/l4-ide#555, on a 100000-step
+-- @#EVALTRACE@ in a library: 0.57 s and 205 MB before this policy, 2.59 s and
+-- 1.4 GB after.) A policy that depends on the module is the real fix; it is
+-- not built.
+makeTracePolicyForRun :: TraceTextMode -> TracePolicy
+makeTracePolicyForRun = \case
+  TraceTextNone -> makeTracePolicyForEval
+  TraceTextFull -> TracePolicy.withTextTrace GraphViz2.defaultGraphVizOptions
 
 -- | Trace policy used by `l4 trace`. `#EVAL` stays silent so the user can
 -- still author `#EVAL` directives without being drowned in trace output;
@@ -272,9 +301,10 @@ runOneshotWithDiagnostics evalConfig fp act = do
 -- should make a CLI command exit non-zero. It lives in jl4-lsp so that the
 -- editor's Deploy buttons refuse exactly what @l4 check@ and @l4 deploy@ do.
 -- It leaves out the evaluator's diagnostics (source @\"eval\"@): a failed
--- @#ASSERT@ is one, at Error severity, and keeps @l4 run@ at exit 0. A
--- directive that CRASHES does fail the run, but @l4 run@ decides that from the
--- directive results, not from here.
+-- @#ASSERT@ is one, at Error severity. A directive that CRASHES fails the run
+-- (ruled by Meng 2026-08-01), and so does an @#ASSERT@ that evaluates to false
+-- (ruled 2026-09-29), but @l4 run@ decides both from the directive results
+-- ('L4.Cli.Run.evalDirectiveFailsRun'), not from here.
 
 -- | Returns True for rendered log lines that represent internal
 -- bookkeeping (import resolution, VFS lookups, Shake db progress) rather

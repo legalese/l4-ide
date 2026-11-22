@@ -1,0 +1,10 @@
+-- Typechecks cleanly. The first #ASSERT holds; the second evaluates cleanly
+-- to FALSE. A failed assertion is a failed test, so `l4 run` on this file
+-- exits 1. `l4 check` does not evaluate, so it succeeds.
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`twice` x MEANS x TIMES 2
+
+#ASSERT `twice` 2 EQUALS 4
+#ASSERT `twice` 2 EQUALS 5
