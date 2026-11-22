@@ -41,6 +41,7 @@ module L4.EvaluateLazy.Machine
 -- * The deontic step log (LTS-VISUALISER §4.3, P2b). 'tellDeonticStep' is
 -- the write; the capture lives in 'L4.EvaluateLazy'.
 , tellDeonticStep
+, flushArmedFinal
 , partyKeyWHNF
 -- * What the marking (LTS-VISUALISER §4.2a, P2c) needs to read a residual:
 -- the barrier sentinels' names and the FULFILLED view.
@@ -120,6 +121,7 @@ import L4.Evaluate.Ledger
   , anonymousParty
   , readCellBitemporal
   , readCellAllBitemporal
+  , storeAppendNorm
   , storeAppendOfficial
   , storeAppendOwn
   , storeOwnLedger
@@ -133,7 +135,9 @@ import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.EvaluateLazy.ContractFrame
+import L4.Evaluate.NormLog
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
+import L4.EvaluateLazy.Fates
 import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
 import L4.EvaluateLazy.SiblingReads
@@ -431,6 +435,13 @@ data EvalState =
                                      -- ^ the time of each compound that started while
                                      -- its time was still a thunk, by scope, until it is
                                      -- found evaluated ('siblingCheck')
+    , normLog :: !Bool
+                                     -- ^ NORM-LOG-SPEC N6: the norm log writer is on for this
+                                     -- evaluation ('L4.EvaluateLazy.EvalConfig'); read by
+                                     -- the directive driver, which then installs a log that
+                                     -- writes fates
+    , normLogMutant :: !Bool
+                                     -- ^ TEST ONLY: see 'L4.EvaluateLazy.EvalConfig'
     , operandsInStep :: !Bool
                                      -- ^ smucclaw/l4-ide#1069: run a @RAND@'s operands in
                                      -- step (Note [Operands in step]). 'False' only to
@@ -764,7 +775,130 @@ tellDeonticStep :: DeonticStep -> Eval ()
 tellDeonticStep step = whenDeonticLog \ l -> logStep l step
 
 logStep :: DeonticLog -> DeonticStep -> Eval ()
-logStep l step = liftIO (modifyIORef' l.dlSteps (`DList.snoc` step))
+logStep l step = do
+  when l.dlKeepSteps (liftIO (modifyIORef' l.dlSteps (`DList.snoc` step)))
+  when l.dlWriteFates do
+    flushArmed l
+    for_ (fatesOfStep step) tellFate
+
+-- | NORM-LOG-SPEC N1/N13: a norm met its event stream, and nothing has
+-- happened to it yet. If its arming clock has been forced the entry is
+-- written now; if not (a root norm's clock is forced at its first event, and
+-- the writer never forces) it waits in 'dlPendingArmed' for 'flushArmed'.
+tellArmed :: DeonticLog -> NormKey -> Reference -> Eval ()
+tellArmed l norm time = do
+  at <- peekClock time
+  case at of
+    Just _  -> flushArmed l >> tellFate (armedEntry norm at)
+    Nothing -> liftIO (modifyIORef' l.dlPendingArmed (<> [(norm, time)]))
+
+-- | Write the pending 'Armed' entries whose clock has been forced since,
+-- oldest first, and keep the rest.
+flushArmed :: DeonticLog -> Eval ()
+flushArmed l = do
+  pending <- liftIO (readIORef l.dlPendingArmed)
+  unless (null pending) do
+    liftIO (writeIORef l.dlPendingArmed [])
+    results <- for pending \ (norm, time) -> do
+      at <- peekClock time
+      case at of
+        Just _  -> Nothing <$ tellFate (armedEntry norm at)
+        Nothing -> pure (Just (norm, time))
+    liftIO (modifyIORef' l.dlPendingArmed (catMaybes results <>))
+
+-- | At the end of a directive: write what is still pending with the clock
+-- as far as it is known, which for a norm that never saw an event is 'Nothing'.
+flushArmedFinal :: DeonticLog -> Eval ()
+flushArmedFinal l = do
+  flushArmed l
+  pending <- liftIO (readIORef l.dlPendingArmed)
+  liftIO (writeIORef l.dlPendingArmed [])
+  for_ pending \ (norm, _) -> tellFate (armedEntry norm Nothing)
+
+-- | Append a fate to the norm ledger (NORM-LOG-SPEC N5). Unlike a drafter's
+-- write it does not poison the force span ('noteLedgerWrite') and does not
+-- refuse under an unknown: the writer is an observer, and a fate is written
+-- exactly where the machine has already decided it, so re-forcing a thunk
+-- never re-writes one.
+tellFate :: NormEntry -> Eval ()
+tellFate e = do
+  store <- asks (.envLedger)
+  liftIO (modifyIORef' store (storeAppendNorm e))
+  -- the deliberately wrong writer of the observer test: it also writes where
+  -- a drafter's read and the printed listing can see it
+  mutant <- asks (.normLogMutant)
+  when mutant do
+    now <- asks (.evalTime)
+    let prov = MkProvenance {party = "", source = "COMMIT", txTime = now, vtFrom = Nothing}
+    liftIO (modifyIORef' store (storeAppendOfficial (Assign ["norm log"] (ValNumber 1) prov)))
+
+-- | A lifecycle with its parent link replaced. A constructor call, because
+-- a record update on @origin@ is ambiguous: 'CheckTiming' and 'Presumed' have
+-- a field of that name too.
+withOrigin :: Lifecycle -> Maybe Reference -> Lifecycle
+withOrigin lc o = MkLifecycle {join = lc.join, deadline = lc.deadline, armed = lc.armed, origin = o}
+
+-- | N8: register the norm a hand-off hands off from, and return the
+-- reference the continuation's environment binds ('lifecycleOriginUnique').
+-- 'Nothing' unless the norm log writer is on.
+handoffOrigin :: NormKey -> OriginBranch -> Eval (Maybe Reference)
+handoffOrigin norm = registerOrigin (normBearerOf norm) norm
+
+-- | The same for an @EVERY@ join, which has no party: a bare @BREACH@ under
+-- a barrier names nobody (N7 rule 2).
+handoffOriginJoin :: NormKey -> OriginBranch -> Eval (Maybe Reference)
+handoffOriginJoin = registerOrigin NobodyBearer
+
+registerOrigin :: NormBearer -> NormKey -> OriginBranch -> Eval (Maybe Reference)
+registerOrigin bearer norm branch = asks (.deonticLog) >>= \ case
+  Just l | l.dlWriteFates -> do
+    let origin = MkNormOrigin
+          { noParent = normRefOf norm, noParentModal = norm.nkModal
+          , noParentBearer = bearer, noBranch = branch }
+    n <- liftIO (atomicModifyIORef' l.dlOrigins \ m -> let k = Map.size m in (Map.insert k origin m, k))
+    -- Not 'allocateValue': that takes the next address from the evaluation's
+    -- supply, and every printed party key that holds an unforced field names
+    -- its address, so a writer that allocated would change what a ledger
+    -- listing prints (found by the forced-on jl4-test run on
+    -- ok/every/run-lifecycle-values.l4). A negative address cannot clash.
+    uri <- asks (.moduleUri)
+    pointer <- liftIO (newIORef (WHNF (ValNumber (fromIntegral n))))
+    pure (Just (MkReference (MkAddress uri (negate (n + 1))) pointer))
+  _ -> pure Nothing
+
+-- | The origin a continuation's environment carries, if the writer is on and
+-- a hand-off bound one ('lifecycleOriginUnique').
+originFromEnv :: DeonticLog -> Environment -> Eval (Maybe NormOrigin)
+originFromEnv l env = case Map.lookup lifecycleOriginUnique env of
+  Nothing  -> pure Nothing
+  Just rf -> peekWHNF rf >>= \ case
+    Just (ValNumber n) -> liftIO (Map.lookup (truncate n) <$> readIORef l.dlOrigins)
+    _                  -> pure Nothing
+
+-- | N7 rule 2: a declared @BREACH@ about to be stamped remembers the
+-- hand-off that reached it, until 'tellBreached' reads it. Set when the
+-- continuation has evaluated to the breach and nothing can run between that
+-- and the stamping, so no other operand's hand-off can intervene.
+setBreachOrigin :: Maybe Reference -> Eval ()
+setBreachOrigin mref = whenDeonticLog \ l -> when l.dlWriteFates do
+  origin <- case mref of
+    Nothing  -> pure Nothing
+    Just rf -> peekWHNF rf >>= \ case
+      Just (ValNumber n) -> liftIO (Map.lookup (truncate n) <$> readIORef l.dlOrigins)
+      _                  -> pure Nothing
+  liftIO (writeIORef l.dlBreachOrigin origin)
+
+-- | Write the fate of a declared @BREACH@ each time a continuation reaches
+-- it (N7 rule 1), with the instants SEESAW stamped on it. Peeks and never
+-- forces.
+tellBreached :: ReasonForBreach Reference -> Maybe Rational -> Maybe Rational -> Eval ()
+tellBreached reason effective observed = whenDeonticLog \ l -> when l.dlWriteFates do
+  summary <- breachSummary reason
+  origin <- liftIO (atomicModifyIORef' l.dlBreachOrigin \ o -> (Nothing, o))
+  let named = case drop summary.bsAnchor summary.bsFailures of
+        DeclaredSummary n _ : _ -> n
+        _                       -> NobodyNamed
+  tellFate (breachedEntry origin named effective observed)
 
 -- | Log a step that ROUTES control (a 'Matched' or 'Expired'), filling in
 -- §4.9's join progress from the norm's membership: a barrier member's
@@ -925,8 +1059,8 @@ leaveRelookScope = whenDeonticLog \ l -> liftIO (modifyIORef' l.dlRelookScope (d
 -- @App1@ arm below). With the log off this is a lazy record that nothing
 -- forces; with it on, the site's activation counter is bumped and the cast
 -- register consulted for §4.9's per-member identity.
-armNormKey :: MaybeEvaluated -> RAction Resolved -> Eval NormKey
-armNormKey party act = do
+armNormKey :: Environment -> MaybeEvaluated -> RAction Resolved -> Eval NormKey
+armNormKey env party act = do
   mlog <- asks (.deonticLog)
   let site   = rangeOf act
       bearer = either (const Nothing) (Just . partyKeyWHNF) party
@@ -946,9 +1080,14 @@ armNormKey party act = do
       -- name is first learned at Contract8 ('naming')
       nm <- either (const (pure Nothing)) peekName party
       pure (n, m, nm)
+  -- N8: the norm whose hand-off armed this one, when the writer is on
+  origin <- case mlog of
+    Just l | l.dlWriteFates -> originFromEnv l env
+    _                       -> pure Nothing
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = bearer, nkBearerName = name
-    , nkBearerSource = source, nkModal = act.modal, nkMember = member }
+    , nkBearerSource = source, nkModal = act.modal, nkMember = member
+    , nkAction = Just (prettyLayout act.action), nkOrigin = origin }
 
 -- | Refresh a key's bearer once the machine has forced the party to WHNF.
 -- Pure and lazy, so the log-off path pays nothing for it.
@@ -975,16 +1114,20 @@ joinSiteOf d = maybe (rangeOf d) rangeOf d.join
 -- | The join's own key, made when the quantified obligation is armed
 -- ('startRollCall'); it is what the barrier's 'JoinReleased' /
 -- 'JoinExpired' / 'JoinFailed' steps carry.
-armJoinKey :: Deonton Resolved -> Eval NormKey
-armJoinKey d = do
+armJoinKey :: Environment -> Deonton Resolved -> Eval NormKey
+armJoinKey env d = do
   mlog <- asks (.deonticLog)
   let site = joinSiteOf d
   activation <- case mlog of
     Nothing -> pure 0
     Just l  -> liftIO (bumpCounter l.dlActivations site)
+  origin <- case mlog of
+    Just l | l.dlWriteFates -> originFromEnv l env
+    _                       -> pure Nothing
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = Nothing, nkBearerName = Nothing
-    , nkBearerSource = Nothing, nkModal = d.action.modal, nkMember = Nothing }
+    , nkBearerSource = Nothing, nkModal = d.action.modal, nkMember = Nothing
+    , nkAction = Nothing, nkOrigin = origin }
 
 -- | Register an @EVERY@'s cast, so each member's obligation can find its
 -- membership when it is armed ('armNormKey'). A barrier's arm count starts
@@ -1050,7 +1193,7 @@ declareBreach reason = do
     summary <- breachSummary reason
     logStep l MkDeonticStep
       { dsClock = Nothing, dsEvent = Nothing, dsScrutiny = NoEvent, dsNorm = Nothing
-      , dsOutcome = Breached summary, dsJoin = Nothing }
+      , dsOutcome = Breached summary, dsJoin = Nothing, dsEffective = Nothing }
   continueBackward (ValBreached reason)
 
 -- | A step with no event and no join progress, for the sites that have
@@ -1058,7 +1201,7 @@ declareBreach reason = do
 plainStep :: Maybe Rational -> Maybe EventKey -> Scrutiny -> NormKey -> StepOutcome -> DeonticStep
 plainStep clock ev scrutiny norm outcome = MkDeonticStep
   { dsClock = clock, dsEvent = ev, dsScrutiny = scrutiny
-  , dsNorm = Just norm, dsOutcome = outcome, dsJoin = Nothing }
+  , dsNorm = Just norm, dsOutcome = outcome, dsJoin = Nothing, dsEffective = Nothing }
 
 -- | Throw an evaluation exception: unwind the stack frame by frame (so an
 -- active trace records the pops, mirroring the historical behaviour),
@@ -2535,7 +2678,10 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
         -- P2b: this is the ENTRY into the obligation's site — the activation
         -- the step log's key counts. Lazy when the log is off.
-        norm <- armNormKey party act
+        norm <- armNormKey env party act
+        -- NORM-LOG-SPEC N1/N13: the norm has met its stream and nothing has
+        -- happened to it; the entry an "outstanding" read is made through
+        whenDeonticLog \ l -> when l.dlWriteFates (tellArmed l norm time)
         -- smucclaw/l4-ide#1069: the sibling-read check's clock is the arming
         -- time until an event is taken
         noteClock time
@@ -3288,12 +3434,15 @@ backwardContractFrame val = \ case
                 mParty <- peekWHNF ev'party
                 ev <- eventKeyAt stamp mParty ev'act
                 norm' <- maybe (pure norm) (`naming` norm) mBearer
-                pure $ Just $ plainStep (Just time') (Just ev)
-                  (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm' (Expired branch deadline)
+                pure $ Just $
+                  (plainStep (Just time') (Just ev)
+                    (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm' (Expired branch deadline))
+                    {dsEffective = Just effective}
         let lifecycleAt isHence = MkLifecycle
               { join = if isHence then Just clockR else Nothing
               , deadline = Just deadlineR
-              , armed }
+              , armed
+              , origin = Nothing } -- set at 'ResolveParty', once the party is keyed
             reofferResolve isHence followup' branch = do
               pending <- expiredStep branch Nothing
               -- The mark the copy carries on: a fresh event starts the walk
@@ -3459,7 +3608,8 @@ backwardContractFrame val = \ case
               -- or MAY's there is none, and the checker refuses THE JOIN
               -- there); THE DEADLINE is the window's end, which is NOT the
               -- clock here
-              let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed}
+              origin <- handoffOrigin norm ViaLest
+              let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed, origin}
               continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR seen
             -- No LEST clause: immediate breach
             Nothing -> do
@@ -3489,7 +3639,8 @@ backwardContractFrame val = \ case
             -- HENCE: the join is this completion (R-Q7, §5.1: an unanchored
             -- continuation counts from here, so OF THE JOIN is the default
             -- said out loud)
-            let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed}
+            origin <- handoffOrigin norm ViaHence
+            let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed, origin}
             continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) followup events timeR seen
       ValBool False -> do
         -- P2b: the action matched but the PROVIDED did not hold; next event.
@@ -3510,16 +3661,30 @@ backwardContractFrame val = \ case
       for_ (expiredBranch step.dsOutcome) \ branch -> do
         named <- naming val norm
         tellRoutedStep named branch step
+    -- N8: the continuation's parent link names the norm as the party's
+    -- forcing has just refreshed it (the expiry path builds the lifecycle
+    -- before the party is known)
+    lifecycle' <- case pending >>= \ step -> (,) <$> step.dsNorm <*> expiredBranch step.dsOutcome of
+      Just (norm, branch) -> do
+        named <- naming val norm
+        origin <- handoffOrigin named case branch of { ToHence -> ViaHence; _ -> ViaLest }
+        pure (withOrigin lifecycle origin)
+      Nothing -> pure lifecycle
     -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
     -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
     -- does, so a RECORD in the followup/reparation attributes to the real party.
     -- 'time' is the continuation's clock as 'Contract5' chose it: the
     -- missed deadline under LEST, the revealing event's stamp under HENCE.
-    continueWithFollowup (Just (partyKeyWHNF val)) lifecycle env followup events time seen
+    continueWithFollowup (Just (partyKeyWHNF val)) lifecycle' env followup events time seen
   -- R-Q7B: the continuation's value, about to meet its [time, events]: make
   -- the anchors inside it name THIS hand-off's obligation, whatever
   -- environment the value happened to capture ('rebindLifecycle').
-  Handoff lifecycle ->
+  Handoff lifecycle -> do
+    -- N7 rule 2: a declared BREACH about to meet its time and events
+    -- remembers the hand-off that reached it
+    case val of
+      ValBreached _ -> setBreachOrigin lifecycle.origin
+      _             -> pure ()
     continueBackward (rebindLifecycle lifecycle val)
   -- SEESAW: the hand-off clock a declared breach takes ('StampBreach'). It
   -- is observed at that clock too, unless the stream it was handed starts
@@ -3532,8 +3697,11 @@ backwardContractFrame val = \ case
       let timing = case revealed of
             Just (p, a, stamp) -> Timing {effective = clock, observed = max clock stamp, revealedBy = Just (p, a)}
             Nothing            -> Timing {effective = clock, observed = clock, revealedBy = Nothing}
+      tellBreached reason (Just timing.effective) (Just timing.observed)
       continueBackward (ValBreached (restamp timing reason))
-    _ -> continueBackward (ValBreached reason)
+    _ -> do
+      tellBreached reason Nothing Nothing
+      continueBackward (ValBreached reason)
   -- EVERY, the roll call. One cons cell of the roll per step. A roll, or the
   -- rest of one, that is not known is Stuck on it: nobody can say who the
   -- group is.
@@ -3992,7 +4160,7 @@ backwardContractFrame val = \ case
     joinedStep op result winner tieBreak = tellDeonticStep MkDeonticStep
       { dsClock = Nothing, dsEvent = Nothing, dsScrutiny = NoEvent, dsNorm = Nothing
       , dsOutcome = Joined op MkJoinNote {jnResult = result, jnWinner = winner, jnTieBreak = tieBreak}
-      , dsJoin = Nothing }
+      , dsJoin = Nothing, dsEffective = Nothing }
 
     -- M4 party-threading hinge: set the acting party for the DURATION of the
     -- HENCE/LEST body, so a RECORD fired inside it routes to that party's own
@@ -4198,7 +4366,7 @@ startRollCall env deonton time events =
       "a PARTY obligation reached the quantifier's roll call"
     Every _ cast var roll mFilt -> do
       -- P2b: arming is the join's own entry into its site.
-      norm <- armJoinKey deonton
+      norm <- armJoinKey env deonton
       -- WHO and WHOSE are one filter to the machine: the checker has already
       -- rewritten a WHOSE operand's first word into @v's field@ (§13.6), so
       -- what runs here is a Boolean expression either way.
@@ -4678,7 +4846,8 @@ fireBarrierHence ctx deadlineRef timeRef eventsRef = do
   noteClock timeRef -- smucclaw/l4-ide#1069: the join's clock
   pushFrame (RestoreCurrentParty mOriginal False)
   pushFrame (App1 [timeRef, eventsRef] Nothing)
-  let lifecycle = MkLifecycle {join = Just timeRef, deadline = deadlineRef, armed = ctx.time}
+  origin <- handoffOriginJoin ctx.norm ViaHence
+  let lifecycle = MkLifecycle {join = Just timeRef, deadline = deadlineRef, armed = ctx.time, origin}
   pushFrame (ContractFrame (Handoff lifecycle))
   continueExpr (bindLifecycle lifecycle ctx.env) (fromMaybe fulfilExpr ctx.deonton.hence)
 
@@ -4723,7 +4892,8 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
     noteClock timeRef -- smucclaw/l4-ide#1069: the failure's clock
     pushFrame (RestoreCurrentParty mOriginal False)
     pushFrame (App1 [timeRef, eventsRef] Nothing)
-    let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineRef, armed = ctx.time}
+    origin <- handoffOriginJoin ctx.norm ViaLest
+    let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineRef, armed = ctx.time, origin}
     pushFrame (ContractFrame (Handoff lifecycle))
     continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
 
@@ -4784,7 +4954,8 @@ barrierStateLest ctx lestExpr tRef cellRef = do
   scoped <- enterRelookScope (joinSiteOf ctx.deonton)
   pushFrame (RestoreCurrentParty mOriginal scoped)
   pushFrame (App1 [tRef, cellRef] Nothing)
-  let lifecycle = MkLifecycle {join = Nothing, deadline = Just tRef, armed = ctx.time}
+  origin <- handoffOriginJoin ctx.norm ViaLest
+  let lifecycle = MkLifecycle {join = Nothing, deadline = Just tRef, armed = ctx.time, origin}
   pushFrame (ContractFrame (Handoff lifecycle))
   continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
 
@@ -4815,10 +4986,14 @@ barrierStateLest ctx lestExpr tRef cellRef = do
 
 -- | The three uniques. Sort @l@ is used nowhere else (@b@ builtins, @c@
 -- checker, @d@ discharge, @e@ evaluator, @s@ the barrier's sentinels).
-lifecycleJoinUnique, lifecycleDeadlineUnique, lifecycleArmingUnique :: Unique
+lifecycleJoinUnique, lifecycleDeadlineUnique, lifecycleArmingUnique, lifecycleOriginUnique :: Unique
 lifecycleJoinUnique     = MkUnique 'l' 1 lifecycleUri
 lifecycleDeadlineUnique = MkUnique 'l' 2 lifecycleUri
 lifecycleArmingUnique   = MkUnique 'l' 3 lifecycleUri
+-- | NORM-LOG-SPEC N8: the norm log writer's parent link, bound beside the
+-- anchors so that it travels exactly as they do ('bindLifecycle',
+-- 'rebindLifecycle', 'operandHandoff'). Not an anchor: no program can read it.
+lifecycleOriginUnique   = MkUnique 'l' 4 lifecycleUri
 
 lifecycleUri :: NormalizedUri
 lifecycleUri = toNormalizedUri (Uri "jl4:lifecycle")
@@ -4832,6 +5007,7 @@ lifecycleUri = toNormalizedUri (Uri "jl4:lifecycle")
 bindLifecycle :: Lifecycle -> Environment -> Environment
 bindLifecycle lc =
   Map.insert lifecycleArmingUnique lc.armed
+  . maybe (Map.delete lifecycleOriginUnique) (Map.insert lifecycleOriginUnique) lc.origin
   . maybe (Map.delete lifecycleDeadlineUnique) (Map.insert lifecycleDeadlineUnique) lc.deadline
   . maybe (Map.delete lifecycleJoinUnique) (Map.insert lifecycleJoinUnique) lc.join
 
@@ -4869,6 +5045,7 @@ lifecycleOf env = do
     { join     = Map.lookup lifecycleJoinUnique env
     , deadline = Map.lookup lifecycleDeadlineUnique env
     , armed
+    , origin   = Map.lookup lifecycleOriginUnique env
     }
 
 -- | Hand an operand of a compound off before it is evaluated and applied:
