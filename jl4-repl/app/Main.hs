@@ -290,6 +290,15 @@ loadFile st fp = do
     Just _tc -> pure (Left "Type checking failed (see diagnostics above)")
     Nothing -> pure (Left "Failed to type check file")
 
+-- | Say that the REPL's in-memory file @replNfp@ stands in for the loaded file
+-- @contextFile@, whose text it copies, so that an IMPORT of the loaded file's own
+-- name under other capitals is still told that a module cannot import itself
+-- (smucclaw/l4-ide#1080; assumed, not ruled).
+standInFor :: ReplState -> LSP.NormalizedFilePath -> FilePath -> IO ()
+standInFor st replNfp contextFile = do
+  Rules.ImporterStandIns ref <- Shake.getIdeGlobalState st.ideState
+  atomicModifyIORef' ref (\ m -> (MapStrict.insert replNfp (toNormalizedFilePath contextFile) m, ()))
+
 -- | Process a single REPL input
 processInput :: ReplState -> Text -> IO (Text, ReplState, Bool)
 processInput st input
@@ -687,6 +696,7 @@ evalExpression st contextFile exprText = do
       replUri = normalizedFilePathToUri replNfp
 
   -- Add the virtual file
+  standInFor st replNfp contextFile
   _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFile replNfp replContent]
 
   -- Type check and evaluate
@@ -788,6 +798,7 @@ evalWithTrace st contextFile exprText = do
       replNfp = toNormalizedFilePath replPath
       replUri = normalizedFilePathToUri replNfp
   
+  standInFor st replNfp contextFile
   _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFile replNfp replContent]
   
   -- Type check and evaluate
@@ -837,6 +848,7 @@ evalWithTraceAscii st contextFile exprText = do
       replNfp = toNormalizedFilePath replPath
       replUri = normalizedFilePathToUri replNfp
 
+  standInFor st replNfp contextFile
   _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFile replNfp replContent]
 
   -- Type check and evaluate
@@ -1090,6 +1102,7 @@ getExpressionType st contextFile exprText = do
       replUri = normalizedFilePathToUri replNfp
 
   -- Add the virtual file
+  standInFor st replNfp contextFile
   _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFile replNfp replContent]
 
   -- Type check (no evaluation needed)

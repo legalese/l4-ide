@@ -119,6 +119,83 @@ spec = describe "a bundle IMPORT that resolves to nothing is logged at WARN" do
                       , any (\l -> hasField "module" (BS8.pack m) l) (unresolvedLines logLines) ]
       named `shouldBe` ["zzone", "zztwo"]
 
+  -- smucclaw/l4-ide#1080. The service always compared module names exactly;
+  -- what it lacked was the hint. No disk is involved (a bundle is in memory),
+  -- so these give the same answer on every OS.
+  describe "when only the capitals differ from a module it could have found" do
+    it "adds a hint naming the standard library's spelling" do
+      (_, logLines) <- withLog \logger ->
+        compileBundle logger "spec" (Map.singleton "main.l4" (importing ["dayDate"]))
+      case unresolvedLines logLines of
+        [line] -> do
+          line `shouldSatisfy` hasField "module" "dayDate"
+          line `shouldSatisfy` hasField "hint"
+            "Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?"
+        other -> expectationFailure ("expected exactly one such line, got " <> show (length other))
+
+    it "adds a hint naming a bundle file's spelling" do
+      let sources = Map.fromList
+            [ ("main.l4", importing ["Helper"])
+            , ("helper.l4", Text.unlines ["GIVEN n IS A NUMBER", "GIVETH A NUMBER", "`plus one` n MEANS n PLUS 1"])
+            ]
+      (_, logLines) <- withLog \logger -> compileBundle logger "spec" sources
+      case unresolvedLines logLines of
+        [line] -> do
+          line `shouldSatisfy` hasField "module" "Helper"
+          line `shouldSatisfy` hasField "hint"
+            "Capital letters count in a module name: `Helper` and `helper` are different names. Did you mean `helper`?"
+        other -> expectationFailure ("expected exactly one such line, got " <> show (length other))
+
+    it "does not offer a bundle file the import could not have found under any spelling" do
+      -- The session root is the first path's folder, `a`; `main.l4` is in
+      -- the top folder, so `b/helper.l4` is in neither folder it searches.
+      -- The exact spelling is checked first, to show the file is out of reach.
+      let layout imports = Map.fromList
+            [ ("a/x.l4", "DECIDE xx IS 1")
+            , ("b/helper.l4", Text.unlines ["GIVEN n IS A NUMBER", "GIVETH A NUMBER", "`plus one` n MEANS n PLUS 1"])
+            , ("main.l4", importing imports)
+            ]
+      (_, exactLog) <- withLog \logger -> compileBundle logger "spec" (layout ["helper"])
+      map (hasField "module" "helper") (unresolvedLines exactLog) `shouldBe` [True]
+      (_, logLines) <- withLog \logger -> compileBundle logger "spec" (layout ["Helper"])
+      case unresolvedLines logLines of
+        [line] -> line `shouldSatisfy` (not . BS8.isInfixOf "\"hint\"")
+        other -> expectationFailure ("expected exactly one such line, got " <> show (length other))
+
+    it "adds no hint when no module is that close" do
+      (_, logLines) <- withLog \logger ->
+        compileBundle logger "spec" (Map.singleton "main.l4" (importing ["zznope"]))
+      map (BS8.isInfixOf "\"hint\"") (unresolvedLines logLines) `shouldBe` [False]
+
+    -- Review finding I: deleting the session root from the folders the hint
+    -- searches left every example above green. Here the file is ONLY in the
+    -- root: the root is `a`, the first path's folder, and the importer is in
+    -- `b`. The exact spelling is checked first, to show the root is searched.
+    it "offers a bundle file in the session root" do
+      let layout imports = Map.fromList
+            [ ("a/helper.l4", Text.unlines ["GIVEN n IS A NUMBER", "GIVETH A NUMBER", "`plus one` n MEANS n PLUS 1"])
+            , ("b/main.l4", importing imports)
+            ]
+      (_, exactLog) <- withLog \logger -> compileBundle logger "spec" (layout ["helper"])
+      unresolvedLines exactLog `shouldBe` []
+      (_, logLines) <- withLog \logger -> compileBundle logger "spec" (layout ["Helper"])
+      case unresolvedLines logLines of
+        [line] -> line `shouldSatisfy` hasField "hint"
+          "Capital letters count in a module name: `Helper` and `helper` are different names. Did you mean `helper`?"
+        other -> expectationFailure ("expected exactly one such line, got " <> show (length other))
+
+    -- Review finding A, as revised by GM (2026-11-21): a file is never
+    -- offered itself, and is told what is true instead.
+    it "tells the importing file that it cannot import itself" do
+      (_, logLines) <- withLog \logger ->
+        compileBundle logger "spec" (Map.singleton "Foo.l4" (importing ["foo"]))
+      case unresolvedLines logLines of
+        [line] -> do
+          line `shouldSatisfy` hasField "module" "foo"
+          line `shouldSatisfy` hasField "hint" "`foo` differs from `Foo`, the name of this file's own module, only in its capitals. If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT."
+          line `shouldSatisfy` (not . BS8.isInfixOf "Did you mean")
+        other -> expectationFailure ("expected exactly one such line, got " <> show (length other))
+
   describe "when the deployment is loaded after a restart" do
     it "says it again, on the restart path's own log" do
       (compiled, compileLog, restarted, restartLog) <-

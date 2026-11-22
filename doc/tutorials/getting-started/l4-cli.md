@@ -376,6 +376,9 @@ When a file says `IMPORT daydate` (or `time`, `currency`, ...), the tools resolv
 5. The XDG data directory (`~/.local/share/jl4/libraries/`)
 6. The libraries bundled with the VS Code extension
 
+At each place the name must match exactly, capital letters included: `IMPORT daydate` finds `daydate.l4`, and `IMPORT dayDate` finds nothing, on every computer.
+When the capitals are all that is wrong, the error says which spelling to use; see [Module not found](../../reference/errors/README.md#module-not-found).
+
 When `JL4_LIBRARY_PATH` is set, it takes explicit control: the built-in standard library is skipped. This matters when you work from a source checkout and want the CLI to use the checkout's libraries rather than a previously installed copy:
 
 ```bash
