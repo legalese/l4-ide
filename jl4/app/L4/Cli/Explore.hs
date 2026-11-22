@@ -109,6 +109,7 @@ data ExploreCliOptions = ExploreCliOptions
   , exMaxDepth  :: Int
   , exMaxStates :: Int
   , exMaxActs   :: Int
+  , exMaxInstants :: Int
   , exGrid      :: Maybe Rational
   , exKeep      :: [Text.Text]
   , exKeepLatest :: [Text.Text]
@@ -164,10 +165,16 @@ exploreOptionsParser = ExploreCliOptions
         <> value defaultExploreOptions.eoMaxActs
         <> help "Refuse a variable whose type names more than N acts (default 4096)"
         )
+  <*> option auto
+        ( long "max-instants"
+        <> metavar "N"
+        <> value defaultExploreOptions.eoMaxInstants
+        <> help "Try one act at no more than N instants in one state; the rest are named on the coverage line as untried (default 256)"
+        )
   <*> optional (option rationalReader
         ( long "grid"
         <> metavar "N"
-        <> help "Fire acts on a grid of N and keep the clock in the state, for a guard that reads the clock arithmetically; sound only when every event time and deadline is a multiple of N"
+        <> help "Fire acts at every multiple of N from the first instant their window is open to the next deadline, and keep the clock in the state, for a guard that reads the clock arithmetically. A deadline or opening that is not a multiple of N, or no deadline and no --until, is named on the coverage line as untried"
         ))
   <*> many (strOption
         ( long "keep"
@@ -307,6 +314,10 @@ exploreCmd opts = do
       unless (null emitCells) $
         hPutStrLn stderr ("--emit with no property named keeps, in the state, every cell a property of the file or its imports reads: "
           <> Text.unpack (Text.intercalate ", " [ "`" <> c <> "`" | c <- Set.toList (Set.fromList (map fst emitCells)) ]))
+      -- a grid of 0 or less has no points to try acts at
+      unless (maybe True (> 0) opts.exGrid) do
+        hPutStrLn stderr "--grid N: N must be a positive number"
+        exitWith (ExitFailure 1)
       let sites = keepCells ([ (c, True) | c <- opts.exKeep ] <> [ (c, False) | c <- opts.exKeepLatest ] <> propertyCells props <> emitCells)
                     (readSitesOf rig.rigModule imported)
           options = defaultExploreOptions
@@ -315,6 +326,7 @@ exploreCmd opts = do
             , eoUntil = opts.exUntil
             , eoTime = maybe Regions Grid opts.exGrid
             , eoMaxActs = opts.exMaxActs
+            , eoMaxInstants = opts.exMaxInstants
             }
       results <- for starts \ s -> explore options sites rig s
       graphs <- fmap catMaybes $ for (zip starts results) \ (s, r) -> case r of

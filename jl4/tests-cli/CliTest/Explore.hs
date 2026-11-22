@@ -393,14 +393,16 @@ spec bin = describe "l4 explore" $ do
       sout `shouldSatisfy` ("PARTY Ben DOES ship" `isInfixOf`)
       lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
 
-    it "open.l4: --grid 1 with no deadline and no --until says it stopped, and exits 2; with --until 10 it reaches FULFILLED and exits 0" $ do
+    it "open.l4: --grid 1 with no deadline and no --until says it stopped, and exits 2; with --until 10 it reaches FULFILLED, and the only thing untried is what was untried before" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "open.l4", "--grid", "1"]
       code `shouldBe` ExitFailure 2
       lastLine sout `shouldSatisfy` ("no deadline and no --until" `isInfixOf`)
       lastLine sout `shouldSatisfy` (not . ("nothing untried" `isInfixOf`))
       Output code' sout' _ <- runL4 bin ["explore", instants </> "open.l4", "--grid", "1", "--until", "10"]
-      code' `shouldBe` ExitSuccess
       sout' `shouldSatisfy` ("PARTY Ben DOES ship" `isInfixOf`)
+      -- a MAY with no WITHIN has no deadline to tick past, which the explorer has always listed as untried
+      code' `shouldBe` ExitFailure 2
+      lastLine sout' `shouldSatisfy` ("UNTRIED 1: time runs out on ship (no WITHIN" `isInfixOf`)
 
     it "half.l4: a deadline that is not a whole number leaves instants untried, says so, and exits 2" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "half.l4"]

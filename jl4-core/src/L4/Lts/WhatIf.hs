@@ -506,10 +506,16 @@ openingOf clock raw = case raw.roOpens of
 
 -- | The stamp that reveals the expiry of deadline @d@ and of no later one:
 -- the machine expires on @stamp > deadline@, so a tick AT @d@ shows
--- nothing. One unit past @d@ (the corpus clock counts days), or half-way to
--- the next live deadline when that is nearer.
+-- nothing, and a tick one unit past @d@ shows @d@'s expiry and not that of a
+-- deadline a unit later (measured 2026-11-22: deadlines 3 and 4, a tick at 4
+-- breaches the first alone, a tick at 5 both). Contract time is discrete
+-- (T2), so one unit past @d@ is the answer; it is only when the next live
+-- deadline is LESS than a unit away, which a whole-numbered contract does not
+-- have, that the tick goes half-way to it. (Until smucclaw/l4-ide#1081 it
+-- went half-way whenever the next deadline was less than TWO units away, so
+-- two deadlines a unit apart gave the tick @d + 0.5@.)
 tickPast :: [Rational] -> Rational -> Rational
-tickPast deadlines d = d + minimum (1 : [ (d' - d) / 2 | d' <- deadlines, d' > d ])
+tickPast deadlines d = d + minimum (1 : [ gap / 2 | d' <- deadlines, let gap = d' - d, gap > 0, gap < 1 ])
 
 -- | What the evaluator said the hypothetical does. Only the machine's own
 -- terminals are read: @FULFILLED@ discharges, @BREACHED@ breaches, and

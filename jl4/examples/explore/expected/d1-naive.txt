@@ -139,4 +139,4 @@ Residuals (1):
                  WHEN `Alice gives up` THEN RECORD Alice's "plan" IS stopped HENCE `the evening`)
         LEST FULFILLED
 
-Coverage: 12 states, 21 transitions; frontier exhausted; nothing refused; nothing untried; 51 acts passed over; 12 ticks past the clock bound not taken; no write-only cell dropped; time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state), clock bounded at 75600
+Coverage: 12 states, 21 transitions; frontier exhausted; nothing refused; nothing untried; 51 acts passed over; 12 ticks past the clock bound not taken; no write-only cell dropped; time by regions (whole instants: the last event, the deadline, window openings, the ties between a deadline an act starts and one already live, and one between each; the clock is not in the state), clock bounded at 75600; instants: 72 acts tried at 216 instants (0 ties, 72 gaps)

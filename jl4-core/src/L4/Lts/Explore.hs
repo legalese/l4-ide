@@ -97,6 +97,7 @@ module L4.Lts.Explore
   , LedgerCell (..)
   , Keep (..)
   , Coverage (..)
+  , InstantStats (..)
   , Stop (..)
   , Refusal (..)
   , UntriedNote (..)
@@ -132,6 +133,7 @@ import qualified Base.Text as Text
 import Base.Text (textShow)
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
+import Data.Ratio (denominator)
 import qualified Data.Sequence as Seq
 import Data.Sequence (Seq (..))
 import qualified Optics
@@ -401,6 +403,8 @@ data Coverage = MkCoverage
   , cvAnswersByForm :: ![Text]
     -- ^ ledger-reading rules with no inputs whose answer has no literal
     -- form, compared by its printed form
+  , cvInstants     :: !InstantStats
+    -- ^ how many acts were tried at how many instants, and why those
   }
 
 data Stop
@@ -862,24 +866,206 @@ evalNumber ex e = do
     ((res, _) : _) | Reduction (Reduced (MkNF (ValNumber r))) <- res.result -> Just r
     _ -> Nothing
 
--- | The instants an act is fired at (§4.5), from the clock and the known
--- live deadlines.
-actInstants :: ExploreOptions -> Rational -> [Rational] -> [Rational]
-actInstants opts clock deadlines =
-  let ahead = [ d | d <- deadlines, d >= clock ]
-      limit = case (ahead, opts.eoUntil) of
-        ([], Nothing) -> Nothing
-        ([], Just u)  -> Just u
-        (ds, Nothing) -> Just (minimum ds)
-        (ds, Just u)  -> Just (min u (minimum ds))
-      within t = maybe True (t <=) limit
-  in nubOrd $ filter within $ case opts.eoTime of
-       Regions -> case limit of
-         Nothing -> [clock, clock + 1]
-         Just e
-           | e > clock -> [clock, (clock + e) / 2, e]
-           | otherwise -> [clock]
-       Grid n -> [clock, (fromIntegral (floor (clock / n) :: Integer) + 1) * n]
+----------------------------------------------------------------------------
+-- The instants an act is tried at
+----------------------------------------------------------------------------
+
+-- | What an act's instants are chosen from, at one position.
+data Window = MkWindow
+  { wnClock      :: !Rational
+    -- ^ the instant of the last event: an act is never tried before it
+  , wnLimit      :: !(Maybe Rational)
+    -- ^ the earliest live deadline, or the clock bound if that is sooner: an
+    -- act is never tried past it, because the machine would expire the
+    -- deadline first and the edge would carry the act's name for the
+    -- deadline's effect. 'Nothing': no live deadline and no bound
+  , wnOpen       :: !(Maybe Rational)
+    -- ^ the instant the act's own window opens, when the obligation has an
+    -- opening edge and its instant is known: before it the act is a nullity
+  , wnFixed      :: ![Rational]
+    -- ^ the instants OTHER live obligations hold in absolute time: their
+    -- deadlines and openings. An act that starts a deadline of its own ties
+    -- with one of these at one instant
+  , wnOtherOpens :: ![Rational]
+    -- ^ the others' openings: an act that two obligations would take is
+    -- taken by one of them or both according to which side of its opening it
+    -- falls on
+  }
+
+-- | What choosing the instants of one act came to.
+data Instants = MkInstants
+  { inRuns   :: ![(Rational, Tried)]
+    -- ^ every instant tried, in order, with what came of it
+  , inCuts   :: ![(Text, Text)]
+    -- ^ what could not be tried, as an untried candidate's (what, why)
+  , inStats  :: !InstantStats
+  }
+
+-- | How many acts were tried, at how many instants, and why those: the
+-- coverage's account of the scheme (an information clause: what was left out
+-- is in the untried ones).
+data InstantStats = MkInstantStats
+  { isActs     :: !Int
+  , isInstants :: !Int
+  , isTies     :: !Int
+    -- ^ instants chosen because a deadline the act starts meets another
+  , isGaps     :: !Int
+    -- ^ instants chosen to stand for the whole numbers between two others
+  }
+  deriving stock (Eq, Show)
+
+instance Semigroup InstantStats where
+  MkInstantStats a b c d <> MkInstantStats a' b' c' d' = MkInstantStats (a + a') (b + b') (c + c') (d + d')
+
+instance Monoid InstantStats where
+  mempty = MkInstantStats 0 0 0 0
+
+-- | The instants of one act, by the scheme the run was asked for. @probe@
+-- tries the act at one instant.
+--
+-- 'Regions' (§4.5): an act is tried at the instants where something can
+-- change, and at one whole instant in each gap between them. After an act at
+-- @t@ the live deadlines are of two kinds: instants fixed in absolute time
+-- (those already live, and those anchored to one) and those the act starts,
+-- which move with @t@. How @t@ orders against the fixed instants decides
+-- what happens next, and the tie @t + w = d@ is a case of its own: it is where
+-- two deadlines fall together, and a breach names both parties. So the
+-- instants are the clock; the limit; the act's own opening; every other
+-- opening between the clock and the limit; every tie; and one whole instant
+-- inside each gap between two of those that has one. Only whole instants
+-- are tried (contract time is discrete, T2).
+--
+-- The offsets @w@ and the fixed instants are READ from the replays, not from
+-- the text of the @HENCE@: the act is tried at the clock and at the limit,
+-- and the known deadlines and openings of the positions that come back are
+-- compared: a value that is found again, shifted by the difference of the
+-- two instants, moved with @t@ (an offset), and one that is found again as it
+-- was did not (a fixed instant). A value that matches both ways, or neither
+-- (the contract answered differently at the two instants), counts as both,
+-- which costs an instant and never a tie. The set is closed under what later
+-- replays show, within 'eoMaxInstants'.
+--
+-- 'Grid' n: the clock, and every multiple of n from the first instant the
+-- act's window is open to the limit. With no limit, only up to one step past
+-- that instant, which is said.
+instantsFor :: Explorer -> Window -> (Rational -> IO Tried) -> IO Instants
+instantsFor ex w probe = case ex.exOptions.eoTime of
+  Regions -> regionInstants ex w probe
+  Grid n  -> gridInstants ex n w probe
+
+isWhole :: Rational -> Bool
+isWhole x = denominator x == 1
+
+-- | The first instant the window is open: the opening, if it is after the clock.
+openFrom :: Window -> Rational
+openFrom w = maybe w.wnClock (max w.wnClock) w.wnOpen
+
+gridInstants :: Explorer -> Rational -> Window -> (Rational -> IO Tried) -> IO Instants
+gridInstants ex n w probe = do
+  let cap = ex.exOptions.eoMaxInstants
+      c = w.wnClock
+      firstMultiple = fromInteger (ceiling (openFrom w / n)) * n
+      multiples = case w.wnLimit of
+        Just l  -> takeWhile (<= l) (iterate (+ n) firstMultiple)
+        Nothing -> [firstMultiple, firstMultiple + n]
+      wanted = nubOrd (c : multiples)
+      (kept, cutOff) = splitAt cap wanted
+      noLimit = isNothing w.wnLimit
+  runs <- for kept \ t -> (t,) <$> probe t
+  pure MkInstants
+    { inRuns = runs
+    , inCuts =
+        [ ("at the grid points past the instant cap", "it needs more instants than the instant cap of " <> textShow cap <> "; the rest were not tried (--max-instants raises the bound)")
+        | not (null cutOff) ]
+        <> [ ("at the grid points past one step after its window opens", "there is no deadline and no --until, so the clock has no end to try up to (--until bounds it)")
+           | noLimit ]
+    , inStats = MkInstantStats {isActs = 1, isInstants = length runs, isTies = 0, isGaps = 0}
+    }
+
+regionInstants :: Explorer -> Window -> (Rational -> IO Tried) -> IO Instants
+regionInstants ex w probe = go Map.empty
+  where
+    c = w.wnClock
+    cap = ex.exOptions.eoMaxInstants
+    inRange t = t >= c && maybe True (t <=) w.wnLimit
+    lo = openFrom w
+    -- the instants the position itself names
+    base = nubOrd (filter inRange ([c, lo] <> maybeToList w.wnLimit <> w.wnOtherOpens)
+                   <> [ lo + 1 | isNothing w.wnLimit ])
+
+    -- @tried@: each instant tried, what came of it, and the instants the
+    -- position it led to holds in absolute time
+    go :: Map Rational (Tried, [Rational]) -> IO Instants
+    go tried = do
+      let seen = [ (t, th) | (t, (TriedEdge {}, th)) <- Map.toList tried ]
+          (offsets, fixed) = shiftOrStay seen
+          early = [ o | (TriedPassed _ (Just o), _) <- Map.elems tried ]
+          fixedAll = nubOrd (fixed <> w.wnFixed)
+          ties = [ f - o | f <- fixedAll, o <- offsets ]
+          named = nubOrd (base <> filter inRange early <> filter inRange ties)
+          (wholeNamed, notWhole) = partition (\ t -> t == c || isWhole t) named
+          critical = sort wholeNamed
+          gapReps =
+            [ rep
+            | (x, y) <- zip critical (drop 1 critical)
+            , y - x >= 2
+            , let rep = fromInteger (floor x + 1)
+            , rep < y
+            , not (any (\ t -> t > x && t < y) (Map.keys tried)) ]
+          wanted = filter (`Map.notMember` tried) (critical <> gapReps)
+          room = max 0 (cap - Map.size tried)
+          (now, cutOff) = splitAt room wanted
+      if null now
+        then settle tried (Set.fromList critical) (Set.fromList ties) notWhole (length cutOff)
+        else do
+          ran <- for now \ t -> do
+            r <- probe t
+            th <- case r of
+              TriedEdge _ _ _ p -> thresholdsOf ex p
+              _                 -> pure []
+            pure (t, (r, th))
+          go (foldl' (\ m (t, r) -> Map.insert t r m) tried ran)
+
+    settle tried critical ties notWhole cutN = do
+      let runs = [ (t, r) | (t, (r, _)) <- Map.toList tried ]
+          ts = map fst runs
+          tieHits = length [ () | t <- ts, Set.member t ties, t `notElem` base ]
+          gapHits = length [ () | t <- ts, Set.notMember t critical ]
+      pure MkInstants
+        { inRuns = runs
+        , inCuts =
+            [ ("at instants that are not whole numbers"
+              , "an instant it needs (" <> prettyRatio (minimum notWhole) <> ") is not a whole number, and only whole instants are tried")
+            | not (null notWhole) ]
+            <> [ ("at the instants past the instant cap", "it needs more instants than the instant cap of " <> textShow cap <> "; the rest were not tried (--max-instants raises the bound)")
+               | cutN > 0 ]
+        , inStats = MkInstantStats {isActs = 1, isInstants = length runs, isTies = tieHits, isGaps = gapHits}
+        }
+
+-- | The instants a position holds in absolute time, as far as they are
+-- known: its live deadlines and the openings of its windows.
+thresholdsOf :: Explorer -> Position -> IO [Rational]
+thresholdsOf ex pos = do
+  deadlines <- liveDeadlines ex pos
+  openings <- for (maybe [] liveObligations pos.posResidual) (openingOf pos.posClock)
+  pure ([ d | (_, Just (Right d)) <- deadlines ] <> [ o | Just (Right o) <- openings ])
+
+-- | From the instants an act was tried at and the instants each position it
+-- led to holds: the offsets by which it starts deadlines (they moved with the
+-- instant) and the instants that were fixed (they did not). See 'instantsFor'.
+shiftOrStay :: [(Rational, [Rational])] -> ([Rational], [Rational])
+shiftOrStay seen = (nubOrd offsets, nubOrd fixed)
+  where
+    (offsets, fixed) = foldMap one seen
+    one (t, vs) = foldMap (value t vs) vs
+    value t _ v =
+      let others = [ (t', vs') | (t', vs') <- seen, t' /= t ]
+          stays  = any (elem v . snd) others
+          moves  = or [ (v + (t' - t)) `elem` vs' | (t', vs') <- others ]
+          -- one probe, or a value that matches neither way: it may be either
+          both   = null others || (not stays && not moves)
+      in ( [ v - t | moves || both ]
+         , [ v | stays || both ] )
 
 ----------------------------------------------------------------------------
 -- Exploring
@@ -896,7 +1082,11 @@ data Node = MkNode
 data Tried
   = TriedEdge !Text !EdgeKind !(Expr Resolved) !Position
     -- ^ taken: the label, the event appended, the position it led to
-  | TriedPassed !Text
+  | TriedPassed !Text !(Maybe Rational)
+    -- ^ passed over; when the act came before its window opened, the
+    -- instant it opens
+  | TriedStats !InstantStats
+    -- ^ how many instants one act was tried at, and why those
   | TriedUntried !Text !Text
   | TriedBeyond
     -- ^ a tick past the clock bound, not taken
@@ -922,6 +1112,7 @@ data Accum = MkAccum
   , acMerged     :: !(Set Text)
   , acUnspell    :: !Int
   , acByForm     :: !(Set Text)
+  , acInstants   :: !InstantStats
   }
 
 -- | What one exploration shares, ready to explore or, for a test, to look at
@@ -974,6 +1165,7 @@ explore opts sites rig0 start = do
               , acMerged = Set.empty
               , acUnspell = 0
               , acByForm = Set.empty
+              , acInstants = mempty
               }
         acc <- loop ex acc0
         pure (Right (finish ex acc))
@@ -1012,7 +1204,7 @@ loop ex acc = case acc.acQueue of
             -- a pass-over counts once per state and act, and only if no
             -- instant took the act
             firedLabels = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
-            passed = Set.fromList [ l | TriedPassed l <- tried, not (Set.member l firedLabels) ]
+            passed = Set.fromList [ l | TriedPassed l _ <- tried, not (Set.member l firedLabels) ]
             -- an untried candidate counts once per state and reason
             untriedHere = Set.fromList [ (l, why) | TriedUntried l why <- tried ]
         loop ex acc''
@@ -1059,6 +1251,7 @@ record ex node acc = \ case
               , acQueue = acc.acQueue :|> new
               }) (Just event) (MkTransition node.ndId label j kind)
   TriedBeyond -> pure acc {acBeyond = acc.acBeyond + 1}
+  TriedStats st -> pure acc {acInstants = acc.acInstants <> st}
   _ -> pure acc
 
 -- | An edge, once; the event it was first taken by is kept beside it.
@@ -1114,13 +1307,14 @@ finish ex acc = MkGraph
       , cvMergedByName = Set.toList acc.acMerged
       , cvUnspellable = acc.acUnspell
       , cvAnswersByForm = Set.toList acc.acByForm
+      , cvInstants = acc.acInstants
       }
   }
 
 timeText :: ExploreOptions -> Text
 timeText opts = Text.concat
   [ case opts.eoTime of
-      Regions -> "time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state)"
+      Regions -> "time by regions (whole instants: the last event, the deadline, window openings, the ties between a deadline an act starts and one already live, and one between each; the clock is not in the state)"
       Grid n  -> "time on a grid of " <> prettyRatio n <> " (the clock is in the state)"
   , maybe "" (\ u -> ", clock bounded at " <> prettyRatio u) opts.eoUntil
   ]
@@ -1138,42 +1332,56 @@ expand ex node = do
   let lives :: [(LiveNorm, (RawObligation NF, Maybe (Either Text Rational)))]
       lives = [ (renderLive pos.posContext raw, (raw, due)) | (raw, due) <- deadlines ]
       known = nubOrd [ d | (_, Just (Right d)) <- deadlines ]
-      instants = actInstants ex.exOptions pos.posClock known
       offeredTicks = [ d | MkCandidate {cdKind = TickPast d _} <- cands ]
+      -- the stamp that reveals deadline d: one unit past it, or, on a grid,
+      -- the next point of the grid past it
+      tickTime d = case ex.exOptions.eoTime of
+        Regions -> tickPast known d
+        Grid n  -> (fromInteger (floor (d / n)) + 1) * n
+      retimed d cand = case ex.exOptions.eoTime of
+        Regions -> cand
+        Grid _  -> cand {cdHypothetical = Right (Tick (tickTime d))}
       run label kind cand = do
         (outcome, mpos) <- tryCandidateFrom rig tr pos cand
         pure case outcome.ocVerdict of
           Untried why  -> TriedUntried label why
-          PassedOver _ -> TriedPassed label
+          PassedOver r -> TriedPassed label (case r of TooEarly open -> Just open; _ -> Nothing)
           _ -> case (cand.cdHypothetical, mpos) of
             (Right hyp, Just pos') | isJust pos'.posResidual -> TriedEdge label kind (hypotheticalExpr hyp) pos'
             _ -> TriedUntried label "the replay produced no position"
       tick label cand = case cand.cdHypothetical of
         Right (Tick t) | Just u <- ex.exOptions.eoUntil, t > u -> pure [TriedBeyond]
         _ -> pure <$> run label EdgeTick cand
-  fmap concat $ for cands \ cand -> case cand.cdKind of
-    TickPast d _ -> tick (tickLabel cand d) cand
+  moves <- fmap concat $ for cands \ cand -> case cand.cdKind of
+    TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) cand'
     NoTick live -> case snd <$> lookup live lives of
       Just (Just (Right d))
         | d `notElem` offeredTicks ->
-            let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickPast known d))}
+            let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickTime d))}
             in tick (tickLabel cand' d) cand'
         | otherwise -> pure []
       _ -> pure [TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)]
-    ActBy live -> case fst <$> lookup live lives of
+    ActBy live -> case lookup live lives of
       Nothing -> pure [TriedUntried live.lnAction "the obligation could not be found in the residual again"]
-      Just raw -> do
+      Just (raw, _) -> do
         mparty <- partyOf raw
         acts <- actsOf ex pos raw cand
         case (mparty, acts) of
           (Nothing, _) -> pure [TriedUntried live.lnAction "the party was never forced and could not be read back"]
           (Just party, Left why) -> pure [TriedUntried (obligationText party raw) why]
           (Just party, Right (actions, refusals)) -> do
-            ran <- for [ (a, t) | a <- actions, t <- instants ] \ (a, t) ->
-              run (actLabel party a) EdgeAct cand
-                { cdHypothetical = Right Act {hyParty = party, hyAction = a, hyAt = t}
-                , cdBound = Nothing }
-            pure (ran <> map (TriedRefused . refusalFor party raw) refusals)
+            win <- windowOf ex pos live lives raw
+            ran <- for actions \ a -> do
+              let label = actLabel party a
+                  probe t = run label EdgeAct cand
+                    { cdHypothetical = Right Act {hyParty = party, hyAction = a, hyAt = t}
+                    , cdBound = Nothing }
+              ins <- instantsFor ex win probe
+              pure (map snd ins.inRuns <> [TriedStats ins.inStats]
+                      <> [ TriedUntried (label <> " " <> what) why | (what, why) <- ins.inCuts ])
+            pure (concat ran <> map (TriedRefused . refusalFor party raw) refusals)
+  grid <- offGrid ex pos
+  pure (moves <> grid)
   where
     tickLabel cand d = case cand.cdHypothetical of
       Right (Tick t) -> "time passes the deadline " <> prettyRatio d <> " (WAITUNTIL " <> prettyRatio t <> ")"
@@ -1187,6 +1395,46 @@ expand ex node = do
       , rfReason = why
       , rfStates = 1
       }
+
+-- | What the instants of one act are chosen from, at one position.
+windowOf
+  :: Explorer -> Position -> LiveNorm
+  -> [(LiveNorm, (RawObligation NF, Maybe (Either Text Rational)))]
+  -> RawObligation NF -> IO Window
+windowOf ex pos live lives own = do
+  let c = pos.posClock
+      ahead = [ d | (_, (_, Just (Right d))) <- lives, d >= c ]
+      limit = case (ahead, ex.exOptions.eoUntil) of
+        ([], Nothing) -> Nothing
+        ([], Just u)  -> Just u
+        (ds, Nothing) -> Just (minimum ds)
+        (ds, Just u)  -> Just (min u (minimum ds))
+      others = [ (raw, due) | (l, (raw, due)) <- lives, l /= live ]
+  ownOpen <- openingOf c own
+  otherOpens <- for others \ (raw, _) -> openingOf c raw
+  let opens = [ o | Just (Right o) <- otherOpens ]
+  pure MkWindow
+    { wnClock = c
+    , wnLimit = limit
+    , wnOpen = case ownOpen of
+        Just (Right o) -> Just o
+        _              -> Nothing
+    , wnFixed = [ d | (_, Just (Right d)) <- others ] <> opens
+    , wnOtherOpens = filter (> c) opens
+    }
+
+-- | On a grid, a position whose clock, deadline or window opening is not a
+-- multiple of the step cannot be explored by acts at the grid's points alone:
+-- the soundness condition of @--grid@ is checked here, not assumed.
+offGrid :: Explorer -> Position -> IO [Tried]
+offGrid ex pos = case ex.exOptions.eoTime of
+  Regions -> pure []
+  Grid n -> do
+    held <- thresholdsOf ex pos
+    let off = [ x | x <- pos.posClock : held, denominator (x / n) /= 1 ]
+    pure [ TriedUntried ("acts between the points of the grid of " <> prettyRatio n)
+             ("the clock, a deadline or a window opening (" <> prettyRatio (minimum off) <> ") is off the grid of " <> prettyRatio n)
+         | not (null off) ]
 
 -- | @PARTY World MAY act@, for naming an obligation in the coverage.
 obligationText :: Expr Resolved -> RawObligation NF -> Text
@@ -1364,8 +1612,15 @@ coverageLine cv = "Coverage: " <> Text.intercalate "; " (filter (not . Text.null
   , if cv.cvUnspellable > 0 then count cv.cvUnspellable "ledger value" <> " compared by printed form" else ""
   , if null cv.cvAnswersByForm then "" else "answers compared by printed form: " <> Text.intercalate ", " (map (\ n -> "`" <> n <> "`") cv.cvAnswersByForm)
   , cv.cvTime
+  , instantsClause cv.cvInstants
   ])
   where
+    -- what the scheme tried, after everything else: an account, not a
+    -- verdict (what it could not try is among the untried above)
+    instantsClause st
+      | st.isActs == 0 = ""
+      | otherwise = "instants: " <> count st.isActs "act" <> " tried at " <> count st.isInstants "instant"
+          <> (if st.isTies + st.isGaps > 0 then " (" <> count st.isTies "tie" <> ", " <> count st.isGaps "gap" <> ")" else "")
     stopText = \ case
       StopDepth b n  -> count n "state" <> " at the depth bound " <> textShow b <> " not expanded"
       StopStates b n -> count n "new state" <> " past the state bound " <> textShow b <> " not added"
@@ -1421,6 +1676,12 @@ coverageJson cv = Aeson.object
   , "ledgerValuesComparedByPrintedForm" .= cv.cvUnspellable
   , "answersComparedByPrintedForm" .= cv.cvAnswersByForm
   , "time" .= cv.cvTime
+  , "instants" .= Aeson.object
+      [ "acts" .= cv.cvInstants.isActs
+      , "instants" .= cv.cvInstants.isInstants
+      , "ties" .= cv.cvInstants.isTies
+      , "gaps" .= cv.cvInstants.isGaps
+      ]
   , "line" .= coverageLine cv
   ]
   where
