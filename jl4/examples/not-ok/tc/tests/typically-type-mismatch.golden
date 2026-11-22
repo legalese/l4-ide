@@ -6,7 +6,7 @@ File: typically-type-mismatch.l4
   Range: 4:50-4:52
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The TYPICALLY value for `applicable law` is expected to be of type
 
@@ -21,7 +21,7 @@ File: typically-type-mismatch.l4
   Range: 8:34-8:36
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The TYPICALLY value for `enabled` is expected to be of type
 
@@ -36,7 +36,7 @@ File: typically-type-mismatch.l4
   Range: 12:27-12:32
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The TYPICALLY value for `n` is expected to be of type
 
@@ -51,7 +51,7 @@ File: typically-type-mismatch.l4
   Range: 16:27-16:31
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The TYPICALLY value for `s` is expected to be of type
 
@@ -66,7 +66,7 @@ File: typically-type-mismatch.l4
   Range: 19:38-19:39
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     The TYPICALLY value for `married` is expected to be of type
 

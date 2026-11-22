@@ -1,0 +1,8 @@
+-- The middle #EVAL is a POST to an address that does not start with https://.
+-- That is not a failed request: nothing is sent, and the evaluator reports it
+-- in that directive's own result.
+#EVAL 1 PLUS 1
+
+#EVAL POST "http://127.0.0.1/" "" "hello"
+
+#EVAL 2 PLUS 2

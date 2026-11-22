@@ -1,5 +1,5 @@
 /**
- * Files in a session folder (spec §4.2, §7.3, §8).
+ * Files in a session folder.
  *
  *   sessions/<sid>/
  *     session.json                  SessionFile          (Sessions API creates; harness updates)
@@ -11,18 +11,22 @@
  *     attachments/<name>            prompt attachments
  *     incoming/files/<batchId>/<path>  files added mid-session (Sessions API; outside repo/;
  *                                   <path> is repo-relative, under data/)
- *     state/lease.json              LeaseFile            (harness; temp file + rename)
+ *     state/runs/<n>.json           RunRecordFile        (Sessions API `start`; exclusive create)
+ *     state/runs/<n>.lease.json     RunLeaseFile         (Sessions API as `starting`, then run n's
+ *                                   harness; temp file + rename)
+ *     state/runs.seq                latest run number    (Sessions API; the harness ignores it)
  *     state/head.json               HeadFile             (harness; temp file + rename)
  *     state/events/<n>.jsonl        CloudEvent lines     (harness; append)
  *     state/commands.seq            decimal integer      (Sessions API)
  *     state/commands/<n>.json       CloudCommand         (Sessions API; exclusive create)
  *     state/git/main.bundle         bundle of main       (harness)
- *     state/git/incoming/<ulid>.bundle                   (Sessions API; exclusive create)
+ *     state/git/incoming/<ulid>.bundle                   (Sessions API; exclusive create;
+ *                                   the harness deletes it once merged or refused)
  *     state/init.json, state/stop-requested.json, state/git/local.json
  *                                   Sessions API bookkeeping; the harness ignores them
  *
  * Readers only open known names built from validated parts; they never
- * list directories (§7.2, §8).
+ * list directories.
  */
 import {
   FILE_NAME_RE,
@@ -51,35 +55,29 @@ import {
 
 /**
  * What `session.json` says about the session's lifecycle. The state the
- * user sees is derived (§7.3); only `parked` here changes it.
+ * user sees is derived; only `parked` here changes it.
  *
  * - `new`      — written by `POST /sessions`; no harness has run yet
- * - `running`  — a harness took the lease (written by the harness)
+ * - `running`  — a harness runs the session (written by the harness)
  * - `sleeping` — the harness exited after the idle timeout or a stop
  * - `parked`   — the key chain couldn't be renewed; needs a new chain
  */
 export type SessionFileStatus = 'new' | 'running' | 'sleeping' | 'parked'
 
-/** Why a session is parked or needs auth (renew errors, §15.5). */
-export type AgentKeyFailure =
-  | 'invalid_key'
-  | 'chain_expired'
-  | 'inactive'
-  | 'chain_forked'
+/** Why a session is parked or needs auth (renew errors). */
+export type AgentKeyFailure = 'invalid_key' | 'chain_expired' | 'chain_forked'
 
 export const AGENT_KEY_FAILURES: readonly AgentKeyFailure[] = [
   'invalid_key',
   'chain_expired',
-  'inactive',
   'chain_forked',
 ]
 
 export interface SessionFile {
   sessionId: string
-  /** WorkOS user id of the owner; lets break-glass recovery attribute
-   *  a folder (§4.3). */
+  /** User id of the owner. */
   ownerUserId: string
-  /** WorkOS organisation of the owner at creation, when known
+  /** Organisation of the owner at creation, when known
    *  (`null` in the file reads as absent). */
   orgId?: string
   title: string
@@ -87,15 +85,15 @@ export interface SessionFile {
   created: number
   /** Epoch ms of the last command or turn activity. */
   lastActivity: number
-  /** ai-proxy conversation id, set once the first turn gets one. The
+  /** AI service conversation id, set once the first turn gets one. The
    *  Sessions API writes `null` until then, which reads as absent. */
   conversationId?: string
   status: SessionFileStatus
   /** Set with `status: 'parked'`. */
   parkedReason?: AgentKeyFailure
-  /** The user's HTTP/SSE MCP servers — names and URLs only (§6.4). */
+  /** The user's HTTP/SSE MCP servers — names and URLs only. */
   mcpServers: McpServerConfig[]
-  /** Where the seed came from locally (§10); later files map through
+  /** Where the seed came from locally; later files map through
    *  it on any machine. */
   seedBase?: SeedBase
 }
@@ -112,7 +110,7 @@ export const sessionFile: Check<SessionFile> = obj({
   conversationId: optional(opaqueId),
   status: literal('new', 'running', 'sleeping', 'parked'),
   parkedReason: optional(
-    literal('invalid_key', 'chain_expired', 'inactive', 'chain_forked')
+    literal('invalid_key', 'chain_expired', 'chain_forked')
   ),
   seedBase: optional(seedBase),
   mcpServers: (v, path) => {
@@ -128,19 +126,38 @@ export const sessionFile: Check<SessionFile> = obj({
   },
 })
 
-// ── state/lease.json ──────────────────────────────────────────────────
+// ── state/runs/: who runs a session ────────────────────────────
 
-/** Lease validity and renewal cadence (§7.3). */
-export const LEASE_TTL_MS = 90_000
-export const LEASE_RENEW_MS = 30_000
+/** A run number: 1, 2, … (as in `runs/<n>.json`, `SESSION_RUN`). */
+export const RUN_RE = /^[1-9][0-9]{0,8}$/
+export const isRunNumber = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v >= 1 && v <= 999_999_999
 
-export type LeaseState = 'running' | 'busy' | 'waiting'
+/**
+ * `state/runs/<n>.json`: created by the Sessions API's `start` with
+ * exclusive create, so one start wins each number; never changed while
+ * the session exists. The latest run is the session's only writer.
+ */
+export interface RunRecordFile {
+  run: number
+  /** Epoch ms. */
+  createdAt: number
+}
 
-/** Written by the running harness every 30 s (temp file + rename). */
-export interface LeaseFile {
-  /** ECS task id (or `dev-<pid>` in --dev mode). */
+export type RunLeaseState = 'starting' | 'running' | 'busy' | 'waiting'
+
+/**
+ * `state/runs/<n>.lease.json`: written by the Sessions API as `starting`
+ * when it creates run n, then by run n's harness every 30 s with 90 s
+ * validity (temp file + rename), and expired when that run ends (or
+ * when starting the task fails).
+ */
+export interface RunLeaseFile {
+  run: number
+  /** Task id (`dev-…` in --dev mode; `sessions-api` while starting). */
   taskId: string
-  state: LeaseState
+  /** `starting` is written by the Sessions API only. */
+  state: RunLeaseState
   /** The running turn, while `busy` or `waiting` (`waiting` = a
    *  pending `ask-user` question). */
   turnId?: string
@@ -148,20 +165,36 @@ export interface LeaseFile {
   expiresAt: number
 }
 
-export const leaseFile: Check<LeaseFile> = obj({
+/** How long a started run counts as `starting` before its harness writes. */
+export const START_GRACE_MS = 3 * 60 * 1000
+/** The harness's lease validity and renewal interval. */
+export const LEASE_TTL_MS = 90_000
+export const LEASE_RENEW_MS = 30_000
+/** `taskId` in a lease the Sessions API writes (a run not yet taken over). */
+export const API_LEASE_TASK_ID = 'sessions-api'
+
+const runNumber: Check<number> = int({ min: 1, max: 999_999_999 })
+
+export const runRecordFile: Check<RunRecordFile> = obj({
+  run: runNumber,
+  createdAt: epochMs,
+})
+
+export const runLeaseFile: Check<RunLeaseFile> = obj({
+  run: runNumber,
   taskId: str({ min: 1, max: 128, pattern: /^[A-Za-z0-9_.:/-]+$/ }),
-  state: literal('running', 'busy', 'waiting'),
+  state: literal('starting', 'running', 'busy', 'waiting'),
   turnId: optional(opaqueId),
   expiresAt: epochMs,
 })
 
-export function isLeaseLive(lease: LeaseFile, now = Date.now()): boolean {
+export function isLeaseLive(lease: RunLeaseFile, now = Date.now()): boolean {
   return lease.expiresAt > now
 }
 
 // ── state/head.json and events ────────────────────────────────────────
 
-/** The harness starts a new event segment past this size (§8). */
+/** The harness starts a new event segment past this size. */
 export const EVENT_SEGMENT_MAX_BYTES = 1024 * 1024
 
 /** Event segments are `state/events/<n>.jsonl`, numbered from 1. */
@@ -180,7 +213,7 @@ export const headFile: Check<HeadFile> = obj({
 })
 
 /**
- * An event cursor, `<segment>:<byteOffset>` (§8). `0` (segment 0,
+ * An event cursor, `<segment>:<byteOffset>`. `0` (segment 0,
  * before the first segment) reads from the start: `GET /events?s=<sid>:0`.
  */
 export interface EventCursor {
@@ -232,6 +265,11 @@ function nonNegInt(n: number, what: string): number {
   return n
 }
 
+function runNum(n: number): number {
+  if (!isRunNumber(n)) throw new Error('invalid run number')
+  return n
+}
+
 /**
  * Paths of a session's files, relative to the user's folder (the
  * access-point root, `/workspace` in the task). Every part is validated,
@@ -252,14 +290,6 @@ export const MODEL_WRITABLE_REPO_DIRS: readonly string[] = [
   REPO_DATA_DIR,
   REPO_TMP_DIR,
 ]
-
-/**
- * The Sessions API sweep clears `repo/tmp/` of sessions whose
- * `session.json` `lastActivity` is older than this many days (while no
- * task runs); the harness commits the deletion on its next start.
- */
-export const ABANDONED_TMP_DAYS = 30
-export const ABANDONED_TMP_MS = ABANDONED_TMP_DAYS * 24 * 60 * 60 * 1000
 
 /** Validate a relative path (`/`-separated, no `.`/`..`/empty parts). */
 function relativePath(p: string, what: string): string {
@@ -349,7 +379,12 @@ export function sessionPaths(sid: string): {
   attachments: string
   attachment: (name: string) => string
   state: string
-  lease: string
+  /** `state/runs/`, and run n's record and lease in it. */
+  runs: string
+  runRecord: (n: number) => string
+  runLease: (n: number) => string
+  /** `state/runs.seq`: the Sessions API's latest-run pointer. */
+  runsSeq: string
   head: string
   eventSegment: (n: number) => string
   commandSeq: string
@@ -388,7 +423,10 @@ export function sessionPaths(sid: string): {
       return `${dir}/attachments/${name}`
     },
     state,
-    lease: `${state}/lease.json`,
+    runs: `${state}/runs`,
+    runRecord: (n) => `${state}/runs/${runNum(n)}.json`,
+    runLease: (n) => `${state}/runs/${runNum(n)}.lease.json`,
+    runsSeq: `${state}/runs.seq`,
     head: `${state}/head.json`,
     eventSegment: (n) => `${state}/events/${nonNegInt(n, 'segment')}.jsonl`,
     commandSeq: `${state}/commands.seq`,
@@ -419,8 +457,23 @@ export function parseSessionFile(text: string): SessionFile {
   return sessionFile(parseJsonText(text), 'session.json')
 }
 
-export function parseLeaseFile(text: string): LeaseFile {
-  return leaseFile(parseJsonText(text), 'lease.json')
+/** `runs/<n>.json` for run `n` (throws {@link ProtocolError}, also when
+ *  it names another run). */
+export function parseRunRecordFile(text: string, n: number): RunRecordFile {
+  const r = runRecordFile(parseJsonText(text), `runs/${n}.json`)
+  if (r.run !== n)
+    throw new ProtocolError(`run ${r.run}, not ${n}`, `runs/${n}.json`)
+  return r
+}
+
+/** `runs/<n>.lease.json` for run `n` (throws {@link ProtocolError}, also
+ *  when it names another run). */
+export function parseRunLeaseFile(text: string, n: number): RunLeaseFile {
+  const l = runLeaseFile(parseJsonText(text), `runs/${n}.lease.json`)
+  if (l.run !== n) {
+    throw new ProtocolError(`run ${l.run}, not ${n}`, `runs/${n}.lease.json`)
+  }
+  return l
 }
 
 export function parseHeadFile(text: string): HeadFile {

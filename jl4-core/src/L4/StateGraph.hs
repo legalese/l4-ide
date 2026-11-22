@@ -1291,7 +1291,9 @@ classifyTarget rules = \case
   App _ name [] | isFulfilled name -> TargetFulfilled
   App _ name _ | Just (nm, body) <- Map.lookup (getUnique name) rules -> TargetNamed (getUnique name) nm body
   Breach{} -> TargetBreach
-  -- Not a breach: a refusal is not a deontic outcome at all.
+  -- Not a breach: a refusal is not a deontic outcome at all. It is drawn as
+  -- any other target is, so a refusal written here and one reached through a
+  -- name draw the same graph.
   Refuse{} -> TargetOther
   Regulative _ obl -> TargetDeonton obl
   Where _ e _ -> classifyTarget rules e

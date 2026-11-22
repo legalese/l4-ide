@@ -1,0 +1,5 @@
+{
+  "file": "data/solution.l4",
+  "seed": "seed.l4",
+  "keepLines": ["#ASSERT `is overtime` 40 EQUALS FALSE"]
+}

@@ -6,7 +6,7 @@ File: section-given-unread-supply.l4
   Range: 18:22-18:32
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unread-implicit-supply
   Message:
     This call supplies
 
@@ -23,7 +23,7 @@ File: section-given-unread-supply.l4
   Range: 19:34-19:44
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unread-implicit-supply
   Message:
     This call supplies
 

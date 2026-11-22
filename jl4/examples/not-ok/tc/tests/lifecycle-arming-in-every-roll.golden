@@ -6,7 +6,7 @@ File: lifecycle-arming-in-every-roll.l4
   Range: 36:37-36:47
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/arming-unavailable
   Message:
     THE ARMING cannot be read here: no obligation has been entered where this
     is written.
@@ -26,7 +26,7 @@ File: lifecycle-arming-in-every-roll.l4
   Range: 44:16-44:44
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -44,7 +44,7 @@ File: lifecycle-arming-in-every-roll.l4
   Range: 44:34-44:44
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/arming-unavailable
   Message:
     THE ARMING cannot be read here: no obligation has been entered where this
     is written.
@@ -64,7 +64,7 @@ File: lifecycle-arming-in-every-roll.l4
   Range: 52:16-52:40
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -82,7 +82,7 @@ File: lifecycle-arming-in-every-roll.l4
   Range: 52:30-52:40
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/arming-unavailable
   Message:
     THE ARMING cannot be read here: no obligation has been entered where this
     is written.
@@ -102,7 +102,7 @@ File: lifecycle-arming-in-every-roll.l4
   Range: 60:36-60:47
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `theLandlord` refers to
 

@@ -6,7 +6,7 @@ File: fixity-nonassoc-chain.l4
   Range: 10:7-10:24
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/fixity-reassociation-clash
   Message:
     I cannot group this operator chain without parentheses:
 

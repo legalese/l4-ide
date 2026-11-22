@@ -1,0 +1,8 @@
+-- Fixture for `l4 trace`: a recursion that overflows the stack at the update
+-- frame of the recursive call, so the force raises before pushing that frame.
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`count up` n MEANS IF n EQUALS 0 THEN 0 ELSE 1 + `count up` (n + 1)
+
+#EVALTRACE `count up` 1

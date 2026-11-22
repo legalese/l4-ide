@@ -1,17 +1,13 @@
 -- | @l4 nlg FILE@ — linearize a module's directives to natural-language prose.
 --
--- This is the CLI footing for the TNR/NLG round-trip leg. It is deliberately a
--- thin wrapper: the payload is 'L4.Nlg.linearizeDirectives', which is the same
--- function @jl4-test@'s @jl4NlgAnnotationsGolden@ calls to write
--- @\<stem\>.nlg.golden@.
+-- This is deliberately a thin wrapper: the payload is 'L4.Nlg.linearizeDirectives',
+-- which is the same function @jl4-test@'s @jl4NlgAnnotationsGolden@ calls to
+-- write @\<stem\>.nlg.golden@.
 --
 -- Sameness with the golden producer is the whole point of the command, and it is
--- load-bearing rather than incidental: before this existed, the only way to
--- regenerate an @.nlg.golden@ was @cabal test jl4:jl4-test@, which the @go@
--- orchestrator will not run (it never invokes cabal — the build lock is a shared
--- resource). That is why @etc\/go\/phases\/p7-tnr.sh@ could only ever report
--- @NOT-REGENERATED@. With this command the leg gets a real differential oracle:
--- regenerate, then diff against the committed golden.
+-- load-bearing rather than incidental: it lets anyone regenerate an
+-- @.nlg.golden@ without running the whole golden suite, and compare it with the
+-- committed one. @l4-cli-test@ pins the equality on two corpus modules.
 --
 -- __Both sides used to spell the payload out__, and this comment asked whoever
 -- edited one to remember the other. They now call one function, so the invariant

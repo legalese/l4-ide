@@ -5,10 +5,10 @@ File: refuse-computed-message.l4
   Range: 11:28-11:29
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-open-paren
   Message:
        |
     11 | `bad refusal` MEANS REFUSE (1 PLUS 1)
        |                            ^
     unexpected (
-    expecting Float Literal, Numeric Literal, String Literal, or space token
+    expecting String Literal or space token

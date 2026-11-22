@@ -1,0 +1,6 @@
+GIVEN hours IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is overtime` hours IF hours GREATER THAN 40
+
+#ASSERT `is overtime` 40 EQUALS FALSE
+#ASSERT `is overtime` 41 EQUALS TRUE

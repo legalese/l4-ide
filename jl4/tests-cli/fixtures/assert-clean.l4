@@ -1,0 +1,3 @@
+-- Typechecks cleanly; every #ASSERT here decides. One holds and one does not.
+#ASSERT 1 EQUALS 1
+#ASSERT 1 EQUALS 2

@@ -30,6 +30,8 @@ module L4.EvaluateLazy
 , prettyEvalException
 , prettyRefusal
 , Refusal(..)
+, evalDirectiveCode
+, evalExceptionCode
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
 , prettyNotes
@@ -40,6 +42,8 @@ module L4.EvaluateLazy
 , postprocessTrace
 , safePostprocessTrace
 , tracePostprocessFailed
+, traceUnavailable
+, parseMaxFrameDepth
 , prettyLedger
   -- * Ledger substrate (M0). Exposed for the test suite; not part of the
   -- stable public API.
@@ -80,6 +84,7 @@ import L4.Parser.SrcSpan (SrcRange)
 import L4.Annotation
 import L4.Print
 import L4.Syntax
+import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.TemporalContext (EvalClause, TemporalContext, applyEvalClauses, initialTemporalContext, noReads)
 import L4.TracePolicy (TracePolicy)
@@ -136,6 +141,17 @@ data EvalConfig = EvalConfig
     -- them ran before, one operand over the whole stream and then the other,
     -- where the sibling-read check refuses what that order gets wrong; it is
     -- there only so that tests can compare the two orders.
+  , answerInJust :: !Bool
+    -- ^ When True, a directive that answers @JUST x@ reads @x@ as deep as a
+    -- directive that answers @x@ alone reads it: the JUST takes no level of
+    -- the depth. A caller that asks for an answer as @JUST (f args)@, as
+    -- @l4 batch@ and jl4-service's generated wrapper do, sets it, so that it
+    -- reaches the same depth of the answer as a directive that asks for
+    -- @f args@, and gives the same verdict.
+  , tracePostprocessor :: [EvalTraceAction] -> EvalTrace
+    -- ^ How a directive's trace is built from what the evaluation recorded:
+    -- 'postprocessTrace'. A test replaces it with one that fails, to follow
+    -- the fallback 'tracePostprocessFailed' out through a surface.
   }
 
 -- | A cap, in bytes, on what an evaluation may allocate.
@@ -153,7 +169,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True False postprocessTrace)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -328,16 +344,18 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
       then second Just <$> do
         captureTrace $ tryEval $ do
           whnf <- runConfig $ ForwardMachine env expr
-          nf whnf
+          nfAnswer whnf
       else fmap (, Nothing) $ tryEval $ do
         whnf <- runConfig $ ForwardMachine env expr
-        nf whnf
+        nfAnswer whnf
   -- T6: restore the ambient temporal context unconditionally after the
   -- directive (belt-and-braces; independent of the ledger/trace snapshots below).
   putTemporalContext ambientCtx
-  finalTrace <- case mt of
+  postprocessed <- case mt of
     Nothing      -> pure Nothing
-    Just actions -> Just <$> liftIO (safePostprocessTrace actions)
+    Just actions -> do
+      postprocess <- asks (.tracePostprocessor)
+      Just <$> liftIO (safePostprocessTrace postprocess actions)
   -- STATE-AS-LEDGER M2/M4: snapshot the per-directive ledger STORE (per-party
   -- own ledgers + the official record) BEFORE 'withFreshLedger' restores the
   -- caller's (empty) store and discards this one. This is the directive's whole
@@ -360,6 +378,18 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
       UserEvalException (Stuck ns)    -> Just ns
       UserEvalException RanOutOfSteps -> nonEmpty reached
       _                               -> Nothing
+    -- The root of the trace carries the outcome of the directive's expression.
+    -- The trace records the reduction to weak head normal form, so an
+    -- exception met only while the answer is read to normal form (a refusal
+    -- inside a JUST, or at the end of a list) is not in it, and its root would
+    -- show the answer's head as though it were the answer.
+    finalTrace = rootCarriesOutcome v <$> postprocessed
+    -- ... except the fallback for a trace that could not be built, whose only
+    -- content is that it could not be: rewriting it leaves a node with no label
+    -- and no reason, which reads as a trace of nothing.
+    rootCarriesOutcome (Left exc) t@(Trace l steps' (Right _))
+      | not (traceUnavailable t) = Trace l steps' (Left exc)
+    rootCarriesOutcome _ t = t
     v' = case assertKind of
       NotAnAssert -> Reduction
         case v of
@@ -420,6 +450,10 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           -- an input never refuses and, before build step 5, no residual
           -- holds a refusal (row 72; decided by Claude overnight 2026-10-02,
           -- pending Meng's review).
+          -- A value read only to the depth a directive reads may refuse
+          -- below it, so it is no evidence that the expression does not
+          -- refuse: the assertion is undecided (main, #762).
+          Right nfv | reachesOmitted nfv -> Errored (UserEvalException ValueTooDeep)
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
   pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed, steps)
@@ -457,11 +491,14 @@ resultUnknowns = \ case
 -- post-processing throws (e.g. a malformed action sequence produced by an
 -- unbalanced push/pop), degrade to a one-node fallback trace instead of letting
 -- an ErrorCall abort the surrounding evaluation and discard the already-computed
--- #EVAL result (see T7). Catches 'ErrorCall' specifically — not 'SomeException'
+-- #EVAL result. Catches 'ErrorCall' specifically — not 'SomeException'
 -- — so asynchronous exceptions (request cancellation, timeouts) still propagate.
-safePostprocessTrace :: [EvalTraceAction] -> IO EvalTrace
-safePostprocessTrace actions = do
-  r <- try (evaluate (force (postprocessTrace actions)))
+--
+-- It takes the post-processing to run, normally 'postprocessTrace': no known
+-- input makes that fail any more, so a test passes one that does.
+safePostprocessTrace :: ([EvalTraceAction] -> EvalTrace) -> [EvalTraceAction] -> IO EvalTrace
+safePostprocessTrace postprocess actions = do
+  r <- try (evaluate (force (postprocess actions)))
   pure $ case r of
     Right t               -> t
     Left (_ :: ErrorCall) -> tracePostprocessFailed
@@ -470,8 +507,17 @@ safePostprocessTrace actions = do
 -- directive's result intact and degrades only the trace to a single marker
 -- node, instead of letting the failure abort the surrounding evaluation.
 tracePostprocessFailed :: EvalTrace
-tracePostprocessFailed =
-  Trace Nothing [] (Right (MkNF (ValString "trace unavailable (internal error during trace post-processing)")))
+tracePostprocessFailed = Trace Nothing [] (Right (MkNF (ValString traceUnavailableMessage)))
+
+traceUnavailableMessage :: Text
+traceUnavailableMessage = "trace unavailable (internal error during trace post-processing)"
+
+-- | Is this the fallback, rather than a trace? A surface that hands the trace to
+-- a person has to say so: the fallback is a graph with one node.
+traceUnavailable :: EvalTrace -> Bool
+traceUnavailable = \ case
+  Trace Nothing [] (Right (MkNF (ValString s))) -> s == traceUnavailableMessage
+  _ -> False
 
 postprocessTrace :: [EvalTraceAction] -> EvalTrace
 postprocessTrace actions =
@@ -565,6 +611,24 @@ data ReductionOutcome
     -- is what the default report shows; not an error.
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | The stable diagnostic code of a directive's outcome. See
+-- 'L4.TypeCheck.Types.checkErrorCode' for what a code promises. A directive
+-- that raised has the code of what it raised, an @#ASSERT@ included: that is
+-- neither a pass nor a failed verdict.
+evalDirectiveCode :: EvalDirectiveValue -> Text
+evalDirectiveCode = \ case
+  Assertion Holds              -> "eval/assertion-passed"
+  Assertion Fails              -> "eval/assertion-failed"
+  Assertion (FailsBecause _)   -> "eval/assertion-failed"
+  Assertion (Refused _)        -> "eval/refused"
+  Assertion (Errored exc)      -> evalExceptionCode exc
+  Reduction (Reduced _)        -> "eval/result"
+  Reduction (ReducedRefused _) -> "eval/refused"
+  Reduction (ReducedErrored exc) -> evalExceptionCode exc
+  -- an undetermined outcome is what a Stuck used to be, and reads as one
+  Assertion (Undetermined _)   -> "eval/stuck"
+  Reduction (ReducedUndetermined _) -> "eval/stuck"
 
 prettyEvalDirectiveValue :: EvalDirectiveValue -> Text
 prettyEvalDirectiveValue (Assertion a) = prettyAssertionOutcome a
@@ -696,6 +760,10 @@ prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
 
 -- ----------------------------------------------------------------------------
 -- ToJSON instances for batch --json output
+--
+-- `l4 batch` removes a module's #ASSERTs before it runs a row, so a batch row
+-- meets only the Reduction arms below; the Assertion arms keep the encoding
+-- total.
 -- ----------------------------------------------------------------------------
 
 instance Aeson.ToJSON EvalDirectiveResult where
@@ -781,6 +849,28 @@ prettyEvalDirectiveValueWithFields fields  (Reduction (Reduced v))          = pr
 -- | Evaluate WHNF to NF, with a cutoff (which possibly could be made configurable).
 nf :: WHNF -> Eval NF
 nf = nfAux maximumStackSize
+
+-- | Whether a normal form stops anywhere at the depth a directive reads,
+-- leaving a part of the value unread.
+reachesOmitted :: NF -> Bool
+reachesOmitted Omitted = True
+reachesOmitted (MkNF v) = any reachesOmitted v
+
+-- | The normal form of a directive's answer. Under 'answerInJust' a @JUST x@
+-- answer is the caller's envelope, so @x@ is read from the full depth, as a
+-- directive that asked for @x@ alone reads it.
+nfAnswer :: WHNF -> Eval NF
+nfAnswer whnf = do
+  wrapped <- getAnswerInJust
+  case whnf of
+    -- Only a JUST is the caller's envelope; any other constructor of one
+    -- field is the rule's, and takes a level as it does without the setting.
+    ValConstructor con [r]
+      | wrapped, getUnique con == TypeCheck.justUnique -> do
+          inner <- runConfig (EvalRefMachine r)
+          v <- nf inner
+          pure (MkNF (ValConstructor con [v]))
+    _ -> nf whnf
 
 nfAux :: Int -> WHNF -> Eval NF
 nfAux  d _v | d < 0                  = pure Omitted
@@ -940,6 +1030,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   unknownReached <- newIORef []
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
+  maxFrameDepth <- readMaxFrameDepthEnv
   pure MkEvalState
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, siblings, siblingStarts, traceMuted, entityInfo
     , operandsInStep = evalConfig.operandsInStep
@@ -950,7 +1041,27 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
     , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, presumed
+    , answerInJust = evalConfig.answerInJust, maxFrameDepth
+    , tracePostprocessor = evalConfig.tracePostprocessor
     }
+
+-- | @JL4_MAX_FRAME_DEPTH@, a whole number from 1 to the largest 'Int',
+-- replaces 'maximumFrameDepth'. Anything else leaves the default.
+readMaxFrameDepthEnv :: IO Int
+readMaxFrameDepthEnv = do
+  menv <- lookupEnv "JL4_MAX_FRAME_DEPTH"
+  pure $ fromMaybe maximumFrameDepth (menv >>= parseMaxFrameDepth)
+
+-- | Only ASCII decimal digits, with no leading zero, from 1 to the largest
+-- 'Int'. 'readMaybe' alone reads Haskell syntax (@0x12C@, @(300)@, @ 300@),
+-- and read as an 'Int', 2^64 + 1 wraps to 1, so the digits are checked first
+-- and the number is read as an 'Integer'.
+parseMaxFrameDepth :: String -> Maybe Int
+parseMaxFrameDepth s = case s of
+  c : _ | c /= '0', all (\d -> d >= '0' && d <= '9') s
+        , n <- read s :: Integer
+        , n <= toInteger (maxBound :: Int) -> Just (fromInteger n)
+  _ -> Nothing
 
 -- | Tell a run where defaults come from: the section binders of the evaluated
 -- module whose default discharge fills (when presumption is on), the caller's

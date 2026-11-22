@@ -1,0 +1,15 @@
+DECLARE Applicant HAS
+    `years of continuous residence` IS A NUMBER
+    `months physically present`     IS A NUMBER
+    `months in the district`        IS A NUMBER
+    `resided since applying`        IS A BOOLEAN
+    `good moral character`          IS A BOOLEAN
+
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `may be naturalized` a IF
+        (a's `years of continuous residence`) AT LEAST 5
+    AND (a's `months physically present`) AT LEAST 30
+    AND (a's `months in the district`) AT LEAST 3
+    AND a's `resided since applying`
+    AND a's `good moral character`
