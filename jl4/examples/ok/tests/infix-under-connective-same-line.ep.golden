@@ -1,0 +1,40 @@
+-- A chain keyword in operand position must be on the operand's own line.
+-- A keyword on the next line is not absorbed into the operand, because there
+-- it is routinely the head of the next declaration.
+-- See infix-under-connective.l4 for the operators as later operands.
+--
+-- This file has no section headers on purpose: with one in the file, the
+-- definitions below stop telling apart an operand chain that may continue on
+-- the next line from one that may not.
+
+GIVEN x IS A NUMBER
+      lo IS A NUMBER
+      hi IS A NUMBER
+GIVETH A BOOLEAN
+x `lies from` lo `up to` hi MEANS x AT LEAST lo AND x AT MOST hi
+
+-- `up to` is a keyword of the operator above and is also the name of the
+-- definition that follows the operand `2`, which must still parse as a
+-- definition.
+qq MEANS 1 PLUS
+2
+`up to` a MEANS a
+
+-- The same holds for a bare-word keyword.
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+x BOUNDEDBY y MEANS IF x GREATER THAN y THEN y ELSE x
+
+pp MEANS 1 PLUS
+2
+BOUNDEDBY a MEANS a
+
+#EVAL qq
+#EVAL `up to` 7
+#EVAL pp
+#EVAL BOUNDEDBY 7
+#ASSERT qq EQUALS 3
+#ASSERT `up to` 7 EQUALS 7
+#ASSERT pp EQUALS 3
+#ASSERT BOUNDEDBY 7 EQUALS 7

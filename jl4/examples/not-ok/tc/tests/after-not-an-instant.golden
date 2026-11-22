@@ -6,7 +6,7 @@ File: after-not-an-instant.l4
   Range: 14:38-14:52
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opening-not-an-instant
   Message:
     AFTER opens the window: after a duration (a NUMBER, counted from the anchor
     or from the obligation's own clock) or after an instant (a DATE). Its

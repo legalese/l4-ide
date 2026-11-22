@@ -1,0 +1,16 @@
+-- The middle #EVAL cannot be evaluated: no branch of the CONSIDER matches.
+-- The #EVAL directives around it can.
+DECLARE Status IS ONE OF Active, Closed, Withdrawn
+
+GIVEN s IS A Status
+GIVETH A NUMBER
+`code` s MEANS
+  CONSIDER s
+  WHEN Active THEN 1
+  WHEN Closed THEN 2
+
+#EVAL 1 PLUS 1
+
+#EVAL `code` Withdrawn
+
+#EVAL 2 PLUS 2

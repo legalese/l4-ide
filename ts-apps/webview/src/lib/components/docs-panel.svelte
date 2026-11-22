@@ -331,8 +331,8 @@
 
   function openDocsWebsite() {
     // Map the in-panel markdown URL (…/l4/<path>.md[#anchor]) to the
-    // published page URL (…/l4/<slug>), mirroring legalese.github.io's
-    // routing (convertDocPathToSlug in src/lib/l4-docs.ts): drop the .md
+    // published page URL (…/l4/<slug>), mirroring the site's
+    // routing: drop the .md
     // extension, drop README (directory index), drop the trailing slash,
     // and keep any anchor.
     const rest = currentUrl.startsWith(`${DOCS_BASE}/`)

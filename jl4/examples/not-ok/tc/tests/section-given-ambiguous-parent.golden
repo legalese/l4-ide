@@ -6,7 +6,7 @@ File: section-given-ambiguous-parent.l4
   Range: 28:10-28:13
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

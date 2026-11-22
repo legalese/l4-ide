@@ -6,21 +6,7 @@ File: section-given-misattached.l4
   Range: 13:7-13:17
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
-  Message:
-    The names in a type signature must match those in the definition.
-
-    However, this name `the rate` appears in the signature,
-    and the corresponding name in the definition is
-
-      `the rate` (at <no location>)
-
-File: section-given-misattached.l4
-  Hidden: no
-  Range: 13:7-13:17
-  Source: check
-  Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/misattached-section-given
   Message:
     This GIVEN starts at column 1, so it is the signature of the declaration
     below it -- and that declaration never uses
@@ -38,10 +24,24 @@ File: section-given-misattached.l4
 
 File: section-given-misattached.l4
   Hidden: no
+  Range: 13:7-13:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/name-not-in-definition
+  Message:
+    The names in a type signature must match those in the definition.
+
+    However, this name `the rate` appears in the signature,
+    and the corresponding name in the definition is
+
+      `the rate` (at <no location>)
+
+File: section-given-misattached.l4
+  Hidden: no
   Range: 14:9-14:14
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/name-not-in-signature
   Message:
     The names in a definition must match those in the type signature.
 
@@ -55,7 +55,7 @@ File: section-given-misattached.l4
   Range: 18:7-18:23
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/misattached-section-given
   Message:
     This GIVEN starts at column 1, so it is the signature of the declaration
     below it -- and that declaration never uses
@@ -76,7 +76,7 @@ File: section-given-misattached.l4
   Range: 19:8-19:18
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/deprecated-assume
   Message:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.

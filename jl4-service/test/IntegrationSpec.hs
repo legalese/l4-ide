@@ -22,14 +22,16 @@ import Options (Options (..))
 import Ledger.Store.Config (defaultLedgerStoreConfig)
 import Shared (encodeMetadataCache)
 import Types
-import L4.FunctionSchema (Parameters (..))
+import WebMCPPage (mkOriginTrialToken)
+import L4.FunctionSchema (Parameter (..), Parameters (..))
 
 import Control.Concurrent.Async (concurrently, forConcurrently)
 import Control.Monad (forM, forM_, guard, replicateM, unless, when)
 import Control.Concurrent (getNumCapabilities, setNumCapabilities, threadDelay)
 import Control.Concurrent.STM (TVar, atomically, modifyTVar', newTVarIO, readTVarIO)
-import Control.Exception (bracket, throwIO, try)
+import Control.Exception (bracket, finally, throwIO, try)
 import Control.Monad.IO.Class (liftIO)
+import Data.Char (isSpace)
 import Data.Foldable (for_, toList)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.List as List
@@ -50,7 +52,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import Data.Time (diffUTCTime, getCurrentTime)
 import qualified Data.Text.Encoding as Text.Encoding
-import Network.HTTP.Client (defaultManagerSettings, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, responseHeaders, Manager)
+import Network.HTTP.Client (defaultManagerSettings, managerRetryableException, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, responseHeaders, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.FilePath (takeDirectory, (</>))
@@ -328,6 +330,35 @@ spec = describe "integration" do
               Map.lookup "extra_provided" fieldMap `shouldBe` Just (FnLitBool False)
             other ->
               expectationFailure ("Expected FnObject with named fields, got: " <> show other)
+
+    -- A synonym for a MAYBE twenty deep is a MAYBE too. The service's wrapper
+    -- and the decoder followed a chain for 16 steps, so past that a null for the
+    -- input was refused although JSONDECODE accepted one for a field.
+    it "reads a synonym for a MAYBE twenty deep as a MAYBE: a value, a null and an omitted one" do
+      let chain = Text.unlines $
+            [ "DECLARE S" <> tshow k <> " IS AN S" <> tshow (k + 1) | k <- [1 .. 19 :: Int] ]
+            <> [ "DECLARE S20 IS A MAYBE NUMBER"
+               , ""
+               , "@export a number that may be left out, through twenty synonyms"
+               , "GIVEN y IS AN S1"
+               , "GIVETH A NUMBER"
+               , "`deep maybe` y MEANS"
+               , "  CONSIDER y"
+               , "    WHEN JUST n THEN n PLUS 1"
+               , "    WHEN NOTHING THEN 0"
+               ]
+          tshow = Text.pack . show
+      withServiceFromSources "maybe-synonym-chain" [("chain.l4", chain)] \baseUrl mgr -> do
+        let answer args = do
+              resp <- evalFunction baseUrl mgr "maybe-synonym-chain" "deep maybe"
+                (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+              pure ( statusCode' resp
+                   , case Aeson.decode (responseBody resp) of
+                       Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                       _ -> Nothing )
+        answer [ "y" Aeson..= (2020 :: Int) ] >>= (`shouldBe` (200, Just (FnLitInt 2021)))
+        answer [ "y" Aeson..= Aeson.Null ]    >>= (`shouldBe` (200, Just (FnLitInt 0)))
+        answer []                             >>= (`shouldBe` (200, Just (FnLitInt 0)))
 
     -- Three kinds of request go through the generated wrapper and not the direct
     -- path: an input whose value is `{}`, a batch case with a `null`, and an MCP
@@ -1686,6 +1717,170 @@ spec = describe "integration" do
         (reportOfText . snd =<< waiting) `shouldBe` Just "default"
         (snd <$> waiting) `shouldSatisfy` maybe False ("I needed to know the value" `Text.isInfixOf`)
 
+  -- The wrapper path evaluates a module with its directives taken out line by
+  -- line, and a directive's lines end at the first line that is neither blank
+  -- nor indented further than the directive. A BECAUSE of an #ASSERT REFUSED
+  -- on a line of its own is indented further (the parser rejects one that is
+  -- not), so it is taken out with its directive, and the function answers on
+  -- both paths. Both measure indentation in columns, a tab reaching the next
+  -- multiple of eight, so they agree on a line indented by a tab as well.
+  -- A {} for a MAYBE input takes the wrapper, and a null stays direct.
+  describe "a module whose #ASSERT REFUSED has its BECAUSE on a line of its own" do
+    it "answers on the direct path and on the wrapper path" do
+      let src = Text.unlines
+            [ "GIVETH A NUMBER"
+            , "`not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "@export default the fee"
+            , "GIVEN y IS A NUMBER"
+            , "      pad IS A MAYBE NUMBER"
+            , "GIVETH A NUMBER"
+            , "fee y pad MEANS"
+            , "    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "#ASSERT REFUSED fee 1999 NOTHING"
+            , "  BECAUSE \"not modelled\""
+            , ""
+            , "#ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "because-line" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "because-line" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    it "answers on both paths in a section, for a BECAUSE indented by a tab and by spaces" do
+      let src = Text.unlines
+            [ "§ `Fees`"
+            , "    GIVETH A NUMBER"
+            , "    `not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "    @export default the fee"
+            , "    GIVEN y IS A NUMBER"
+            , "          pad IS A MAYBE NUMBER"
+            , "    GIVETH A NUMBER"
+            , "    fee y pad MEANS"
+            , "        IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "    #ASSERT REFUSED fee 1999 NOTHING"
+            , "\tBECAUSE \"not modelled\""
+            , ""
+            , "    #ASSERT REFUSED fee 1999 NOTHING"
+            , "      BECAUSE \"not modelled\""
+            , ""
+            , "    #ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "because-tab" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "because-tab" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    -- A line the filter keeps must not be read as a directive's continuation
+    -- either. Here the section's items stand at column 9, eight spaces in or
+    -- two spaces and a tab in, which the parser reads as the same column; the
+    -- function after the #ASSERT REFUSED is indented the second way, and the
+    -- filter keeps it, so the wrapper path finds the function.
+    it "answers on both paths in a section whose items are indented by spaces, and by spaces and a tab" do
+      let src = Text.unlines
+            [ "§ `Fees`"
+            , "        GIVETH A NUMBER"
+            , "        `not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "        #ASSERT REFUSED `not modelled` BECAUSE \"not modelled\""
+            , ""
+            , "  \t@export default the fee"
+            , "  \tGIVEN y IS A NUMBER"
+            , "  \t      pad IS A MAYBE NUMBER"
+            , "  \tGIVETH A NUMBER"
+            , "  \tfee y pad MEANS"
+            , "  \t    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "  \t#ASSERT fee 2001 NOTHING EQUALS 100"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "items-tab" "fee"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+      withServiceFromSources "items-tab" [("fee.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.Number 100)
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.Number 100)
+
+    -- The lexer takes every character that Data.Char.isSpace accepts as
+    -- whitespace, and a line of whitespace alone carries no token. So a
+    -- BECAUSE indented by two of any of them is indented further than the
+    -- #ASSERT, and the "\r" that is all a blank line of a CRLF file holds
+    -- makes a blank line; the filter reads both so, and both paths answer.
+    -- At the margin a "\r" line is indented further than the #ASSERT as
+    -- well, so the CRLF case runs in a section too, where only its being
+    -- blank keeps it in the directive, and so does a line of each other
+    -- whitespace character alone. A section indented by one tab, with a
+    -- BECAUSE indented by two, asks that a tab after a tab count to the next
+    -- multiple of eight as well.
+    let (feeHead, feeTail) =
+          ( [ "GIVETH A NUMBER"
+            , "`not modelled` MEANS REFUSE \"not modelled\""
+            , ""
+            , "@export default the fee"
+            , "GIVEN y IS A NUMBER"
+            , "      pad IS A MAYBE NUMBER"
+            , "GIVETH A NUMBER"
+            , "fee y pad MEANS"
+            , "    IF y AT LEAST 2000 THEN 100 ELSE `not modelled`"
+            , ""
+            , "#ASSERT REFUSED fee 1999 NOTHING"
+            ]
+          , [ ""
+            , "#ASSERT fee 2001 NOTHING EQUALS 100"
+            ] )
+        feeModule becauseLines = feeHead <> becauseLines <> feeTail
+        -- the same module as a section whose items are indented by
+        -- @indent@; the BECAUSE lines are given as they stand
+        sectionFeeModule indent becauseLines =
+          let indented l = if Text.null l then l else indent <> l
+          in "§ `Fees`" : map indented feeHead <> becauseLines <> map indented feeTail
+        -- the direct path's outcome, then the wrapper path's
+        bothPaths deployId src = withServiceFromSources deployId [("fee.l4", src)] \baseUrl mgr ->
+          forM [Aeson.Null, Aeson.object []] \pad -> do
+            resp <- evalFunction baseUrl mgr deployId "fee"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["y" Aeson..= (2001 :: Int), "pad" Aeson..= pad]])
+            pure (statusCode' resp, wireAt resp ["contents", "result", "value"])
+        answersOnBoth = replicate 2 (200, Right (Aeson.Number 100))
+
+    it "answers on both paths for a BECAUSE indented by two of any whitespace character but a newline" do
+      let whitespace = [ c | c <- [minBound .. maxBound], isSpace c, c /= '\n' ]
+      whitespace `shouldSatisfy` \cs -> all (`elem` cs) ("\t\v\f\r \x00A0\x2003\x3000" :: String)
+      outcomes <- forM whitespace \c ->
+        (,) c <$> bothPaths ("because-ws-" <> Text.pack (show (fromEnum c)))
+          (Text.unlines (feeModule [Text.pack [c, c] <> "BECAUSE \"not modelled\""]))
+      [ (c, outcome) | (c, outcome) <- outcomes, outcome /= answersOnBoth ] `shouldBe` []
+
+    it "answers on both paths for a BECAUSE after a blank line, in a file whose lines end in CRLF" do
+      outcome <- bothPaths "because-crlf"
+        (Text.concat [ l <> "\r\n" | l <- feeModule ["", "  BECAUSE \"not modelled\""] ])
+      outcome `shouldBe` answersOnBoth
+
+    it "answers on both paths in a section, for a BECAUSE after a blank line, in a file whose lines end in CRLF" do
+      outcome <- bothPaths "because-crlf-section"
+        (Text.concat [ l <> "\r\n" | l <- sectionFeeModule "    " ["", "      BECAUSE \"not modelled\""] ])
+      outcome `shouldBe` answersOnBoth
+
+    it "answers on both paths in a section, for a BECAUSE after a line of any one whitespace character but a newline" do
+      let whitespace = [ c | c <- [minBound .. maxBound], isSpace c, c /= '\n' ]
+      outcomes <- forM whitespace \c ->
+        (,) c <$> bothPaths ("blank-ws-" <> Text.pack (show (fromEnum c)))
+          (Text.unlines (sectionFeeModule "    " [Text.singleton c, "      BECAUSE \"not modelled\""]))
+      [ (c, outcome) | (c, outcome) <- outcomes, outcome /= answersOnBoth ] `shouldBe` []
+
+    it "answers on both paths in a section indented by a tab, for a BECAUSE indented by two" do
+      outcome <- bothPaths "because-tabs-section"
+        (Text.unlines (sectionFeeModule "\t" ["\t\tBECAUSE \"not modelled\""]))
+      outcome `shouldBe` answersOnBoth
+
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
       withEmptyService \baseUrl mgr -> do
@@ -1701,6 +1896,27 @@ spec = describe "integration" do
             status.dsStatus `shouldBe` "compiling"
 
         pollUntilReady baseUrl mgr "http-deploy" 60
+
+    it "accepts a zip entry in a sub-folder" do
+      withEmptyService \baseUrl mgr -> do
+        let zipBytes = createZipBundle [("rules/qualifies.l4", qualifiesJL4)]
+        postReq <- buildMultipartRequest (baseUrl <> "/deployments") "nested-entry" zipBytes
+        postResp <- httpLbs postReq mgr
+        statusCode' postResp `shouldBe` 202
+        pollUntilReady baseUrl mgr "nested-entry" 60
+
+    it "refuses a zip entry whose path is not relative, and writes nothing" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-zip-entry-spec"
+      (withEmptyService \baseUrl mgr -> do
+          let absolute = dir </> "outside.l4"
+          forM_ [absolute, "\\rooted.l4", "C:/drive.l4", "a/../../up.l4"] \name -> do
+            postReq <- buildMultipartRequest (baseUrl <> "/deployments") "bad-entry"
+              (createZipBundle [(name, qualifiesJL4)])
+            postResp <- httpLbs postReq mgr
+            statusCode' postResp `shouldBe` 400
+          doesFileExist absolute `shouldReturn` False)
+        `finally` removePathForcibly dir
 
     it "lists deployments" do
       withEmptyService \baseUrl mgr -> do
@@ -2017,6 +2233,30 @@ spec = describe "integration" do
             `shouldBe` Just (Aeson.String "Query plan timed out")
           -- The client gives up at 30 s, so a bound at that is no bound.
           diffUTCTime finished started `shouldSatisfy` (< 15)
+
+    it "is not held to the memory limit of an evaluation or a tool call before it on the same connection" do
+      -- The limit is the thread's, and Warp serves a kept-alive connection's
+      -- requests on one thread. Left on after an evaluation or an MCP tool
+      -- call that answered, what was left of it ran down over the requests
+      -- that followed, and the one that used it up lost its connection with
+      -- no answer. The client here does not retry such a request on a new
+      -- connection, as the default manager does, which hid it.
+      withServicesRestartedOpts testOptions {maxEvalMemoryMb = 1}
+        [("qp-after-limit", [("qualifies.l4", qualifiesJL4)])] (const (pure ())) \_ baseUrl _ -> do
+          mgr <- newManager defaultManagerSettings {managerRetryableException = const False}
+          let inputs = Aeson.object [ "walks" Aeson..= True, "eats" Aeson..= True, "drinks" Aeson..= True ]
+              allTrue = Aeson.object [ "arguments" Aeson..= inputs ]
+              plans = forM [1 .. 100 :: Int] \_ ->
+                statusCode' <$> queryPlan' baseUrl mgr "qp-after-limit" "compute_qualifies" allTrue
+          evaluated <- evalFunction baseUrl mgr "qp-after-limit" "compute_qualifies" allTrue
+          statusCode' evaluated `shouldBe` 200
+          afterEvaluation <- plans
+          afterEvaluation `shouldBe` replicate 100 200
+          called <- mcpRpc baseUrl mgr "qp-after-limit" "tools/call" $ Aeson.object
+            [ "name" Aeson..= ("compute_qualifies" :: Text), "arguments" Aeson..= inputs ]
+          fmap fst (mcpPayloadText =<< called) `shouldBe` Just False
+          afterToolCall <- plans
+          afterToolCall `shouldBe` replicate 100 200
 
     it "returns 404 for unknown function" do
       withServiceFromSources "qp-404" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -3694,7 +3934,7 @@ spec = describe "integration" do
 
       -- the page is a script in a string: this reads it, it does not run it
       it "is a DEONTIC to the WebMCP page, which reads the flag and not the display name" do
-        let RawJs js = renderOrgWebMCPScript
+        let RawJs js = renderOrgWebMCPScript Nothing
             script = Text.Encoding.decodeUtf8 (LBS.toStrict js)
             has needle = needle `Text.isInfixOf` script
         (has "startsWith('DEONTIC')", has "isDeontic: fn.isDeontic === true", has "fn.isDeontic ?")
@@ -4393,6 +4633,38 @@ spec = describe "integration" do
               _ -> expectationFailure "Expected tools array"
           _ -> expectationFailure "Expected result object"
 
+  describe "WebMCP embed script origin-trial token" do
+    let fetchEmbedScript baseUrl mgr headers = do
+          req <- parseRequest (baseUrl <> "/.webmcp/embed.js")
+          resp <- httpLbs req { requestHeaders = headers } mgr
+          statusCode' resp `shouldBe` 200
+          pure (Text.Encoding.decodeUtf8 (LBS.toStrict (responseBody resp)))
+        token = "AbCd0123+/EfGh4567==" :: BS.ByteString
+
+    it "adds no token when the request carries none" do
+      withServiceFromSources "ot-none" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr []
+        script `shouldSatisfy` (not . Text.isInfixOf "origin-trial")
+        script `shouldSatisfy` Text.isInfixOf "modelContext"
+
+    it "adds the token passed in X-Origin-Trial-Token" do
+      withServiceFromSources "ot-some" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr [("X-Origin-Trial-Token", token)]
+        script `shouldSatisfy` Text.isInfixOf "otMeta.httpEquiv = 'origin-trial';"
+        script `shouldSatisfy` Text.isInfixOf ("otMeta.content = '" <> Text.Encoding.decodeUtf8 token <> "';")
+
+    it "adds no token when the value is not base64" do
+      withServiceFromSources "ot-bad" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        script <- fetchEmbedScript baseUrl mgr [("X-Origin-Trial-Token", "x';alert(1);//")]
+        script `shouldSatisfy` (not . Text.isInfixOf "origin-trial")
+        script `shouldSatisfy` (not . Text.isInfixOf "alert(1)")
+
+    it "accepts only non-empty base64 of bounded length" do
+      Maybe.isJust (mkOriginTrialToken token) `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken "") `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken "abc def") `shouldBe` True
+      Maybe.isNothing (mkOriginTrialToken (BS8.replicate 4097 'A')) `shouldBe` True
+
   describe "deployments query params" do
     it "?functions=full includes parameters in listing" do
       withServiceFromSources "qp-full" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -4610,6 +4882,74 @@ spec = describe "integration" do
         -- Should find the function definition
         LBS.toStrict (responseBody resp) `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
 
+    it "MCP file tools on a scoped endpoint reach only the deployment of the scope" do
+      let marker = "scope_marker_rule" :: Text
+      withPendingServices "scope-files"
+        [ ("scope-own", [("qualifies.l4", qualifiesJL4)])
+        , ("scope-other", [("other.l4", "DECIDE " <> marker <> " IS TRUE\n")])
+        ] \baseUrl mgr -> do
+          let toolText endpoint name arguments = do
+                req <- buildJsonPost (baseUrl <> endpoint) $ Aeson.object
+                  [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                  , "id" Aeson..= (1 :: Int)
+                  , "method" Aeson..= ("tools/call" :: Text)
+                  , "params" Aeson..= Aeson.object
+                      [ "name" Aeson..= (name :: Text)
+                      , "arguments" Aeson..= Aeson.object arguments
+                      ]
+                  ]
+                maybe "" snd . mcpToolText . responseBody <$> httpLbs req mgr
+              reachesOther text = marker `Text.isInfixOf` text || "other.l4" `Text.isInfixOf` text
+              other = [ "deployment" Aeson..= ("scope-other" :: Text) ]
+              -- each file tool, naming the other deployment and naming none
+              calls =
+                [ ("read_file", other <> [ "path" Aeson..= ("other.l4" :: Text) ])
+                , ("list_files", other)
+                , ("list_files", [])
+                , ("search_text", other <> [ "query" Aeson..= marker ])
+                , ("search_text", [ "query" Aeson..= marker ])
+                , ("search_identifier", other <> [ "identifier" Aeson..= marker ])
+                , ("search_identifier", [ "identifier" Aeson..= marker ])
+                ]
+              scoped = "/deployments/scope-own/.mcp"
+          -- the controls: on the org-wide endpoint each call reaches the other
+          -- deployment, and the scoped endpoint reaches its own
+          forM_ calls \(name, arguments) -> do
+            text <- toolText "/.mcp" name arguments
+            (name, Aeson.object arguments, reachesOther text) `shouldBe` (name, Aeson.object arguments, True)
+          toolText scoped "read_file" [ "deployment" Aeson..= ("scope-own" :: Text), "path" Aeson..= ("qualifies.l4" :: Text) ]
+            >>= (`shouldSatisfy` ("compute_qualifies" `Text.isInfixOf`))
+          toolText scoped "list_files" [] >>= (`shouldSatisfy` ("qualifies.l4" `Text.isInfixOf`))
+          -- on the scoped endpoint none of them does
+          forM_ calls \(name, arguments) -> do
+            text <- toolText scoped name arguments
+            (name, Aeson.object arguments, reachesOther text) `shouldBe` (name, Aeson.object arguments, False)
+
+    it "MCP search_text keeps the matches first, and explains an empty result after them" do
+      withPendingService "search-hint" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+        let texts query = do
+              req <- buildJsonPost (baseUrl <> "/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                , "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= ("tools/call" :: Text)
+                , "params" Aeson..= Aeson.object
+                    [ "name" Aeson..= ("search_text" :: Text)
+                    , "arguments" Aeson..= Aeson.object [ "query" Aeson..= (query :: Text) ]
+                    ]
+                ]
+              mcpTexts . responseBody <$> httpLbs req mgr
+        found <- texts "^.*(compute_qualifies|no_such_rule)"
+        length found `shouldBe` 1
+        found `shouldSatisfy` all ("compute_qualifies" `Text.isInfixOf`)
+        empty <- texts "nothing_like_this_anywhere"
+        take 1 empty `shouldBe` ["[]"]
+        drop 1 empty `shouldSatisfy` \case
+          [hint] -> "No matches." `Text.isPrefixOf` hint
+                      && not ("nothing_like_this_anywhere" `Text.isInfixOf` hint)
+          _ -> False
+        invalid <- texts "f(x"
+        invalid `shouldSatisfy` any ("is not a valid regular expression" `Text.isInfixOf`)
+
     it "MCP read_file rejects path traversal (../)" do
       withPendingService "precomp-traversal" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         let rpcBody = Aeson.object
@@ -4630,6 +4970,87 @@ spec = describe "integration" do
         let body = decodeObject (responseBody resp)
         -- Should return a "File not found" result (path safety check rejects ../)
         lookupKey "result" body `shouldSatisfy` Maybe.isJust
+
+    it "MCP read_file does not read a file named by an absolute path" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-read-file-spec"
+      let planted = dir </> "planted.txt"
+      writeFile planted "PLANTED-CONTENT-FOR-THE-READ-FILE-SPEC\n"
+      (withPendingService "precomp-abs-read" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+          let readFileOf path = do
+                let rpcBody = Aeson.object
+                      [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                      , "id" Aeson..= (1 :: Int)
+                      , "method" Aeson..= ("tools/call" :: Text)
+                      , "params" Aeson..= Aeson.object
+                          [ "name" Aeson..= ("read_file" :: Text)
+                          , "arguments" Aeson..= Aeson.object
+                              [ "deployment" Aeson..= ("precomp-abs-read" :: Text)
+                              , "path" Aeson..= (Text.pack path :: Text)
+                              ]
+                          ]
+                      ]
+                req <- buildJsonPost (baseUrl <> "/.mcp") rpcBody
+                responseBody <$> httpLbs req mgr
+          -- the control: a file of the deployment is read
+          control <- readFileOf "qualifies.l4"
+          LBS.toStrict control `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
+          -- the planted file is reached by no spelling of its absolute path
+          -- (the route strips one leading slash, so two slashes used to be an
+          -- absolute path again)
+          forM_ [planted, "/" <> planted, "//" <> planted] \path -> do
+            body <- readFileOf path
+            LBS.toStrict body `shouldSatisfy` (not . BS.isInfixOf "PLANTED-CONTENT")
+            LBS.toStrict body `shouldSatisfy` BS.isInfixOf "File not found")
+        `finally` removePathForcibly dir
+
+    it "a deployment id that is not a plain name reaches nothing outside the store" do
+      tmp <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmp "jl4-service-deployment-id-spec"
+      -- a deployment of its own, in a store this test owns, apart from the service's
+      outsideStore <- initStore dir
+      BundleStore.saveBundle outsideStore "outside"
+        (Map.singleton "planted.l4" "PLANTED-CONTENT-FOR-THE-DEPLOYMENT-ID-SPEC\n")
+        (BundleStore.StoredMetadata "v" "2026-01-01T00:00:00Z" Nothing Nothing Nothing)
+      -- its absolute path, as the MCP argument that names it
+      let outsideId = dir </> "outside"
+      (withPendingService "precomp-idguard" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
+          let toolCall name arguments = do
+                let rpcBody = Aeson.object
+                      [ "jsonrpc" Aeson..= ("2.0" :: Text)
+                      , "id" Aeson..= (1 :: Int)
+                      , "method" Aeson..= ("tools/call" :: Text)
+                      , "params" Aeson..= Aeson.object
+                          [ "name" Aeson..= (name :: Text)
+                          , "arguments" Aeson..= Aeson.object arguments
+                          ]
+                      ]
+                req <- buildJsonPost (baseUrl <> "/.mcp") rpcBody
+                LBS.toStrict . responseBody <$> httpLbs req mgr
+              readFileOf deployment path = toolCall "read_file"
+                [ "deployment" Aeson..= (deployment :: Text)
+                , "path" Aeson..= (path :: Text) ]
+              listFilesOf deployment = toolCall "list_files"
+                [ "deployment" Aeson..= (deployment :: Text) ]
+          -- the controls: the deployment's own id works
+          control <- readFileOf "precomp-idguard" "qualifies.l4"
+          control `shouldSatisfy` ("compute_qualifies" `BS.isInfixOf`)
+          controlList <- listFilesOf "precomp-idguard"
+          controlList `shouldSatisfy` ("qualifies.l4" `BS.isInfixOf`)
+          -- the absolute path of the other deployment names nothing
+          readFileOf (Text.pack outsideId) "planted.l4" >>= \body -> do
+            body `shouldSatisfy` (not . BS.isInfixOf "PLANTED-CONTENT")
+            body `shouldSatisfy` BS.isInfixOf "File not found"
+          -- (Two routes are not tried here. The raw .l4 route is a middleware of
+          -- defaultMain, not of app, so this harness cannot reach it. For an id
+          -- that names nothing, the file browser fails inside its handler, and
+          -- testWithApplication rethrows that into the test, so it fails for a
+          -- refused id as for an unknown one. Both routes end in functions that
+          -- BundleStoreSpec covers: loadSingleFile, as read_file does, and
+          -- loadBundle.)
+          listFilesOf (Text.pack outsideId) >>= \body ->
+            body `shouldSatisfy` (not . BS.isInfixOf "planted.l4"))
+        `finally` removePathForcibly dir
 
     it "GET /deployments/{id}/files rejects path traversal in file param" do
       withPendingService "precomp-traversal2" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
@@ -4890,6 +5311,40 @@ spec = describe "integration" do
           Left err -> expectationFailure ("Expected the deployment, but it was refused: " <> Text.unpack err)
           Right (fns, _meta) -> Map.keys fns `shouldBe` ["add one"]
 
+    -- An input and a record field typed with the same imported synonym for a
+    -- MAYBE are both optional. The field was read with every module's
+    -- declarations, the input with the importing module's alone, so the input
+    -- was required.
+    it "reads an imported synonym for a MAYBE alike for an input and for a field" do
+      logger <- newLogger False
+      let lib = Text.unlines
+            [ "DECLARE Optional OF a IS A MAYBE a"
+            , "DECLARE OptNum IS A MAYBE NUMBER"
+            ]
+          entry = Text.unlines
+            [ "IMPORT optlib"
+            , ""
+            , "DECLARE Holder HAS"
+            , "  o IS AN Optional NUMBER"
+            , "  p IS AN OptNum"
+            , "  n IS A NUMBER"
+            , ""
+            , "@export default reads a holder"
+            , "GIVEN h IS A Holder"
+            , "      x IS AN Optional NUMBER"
+            , "      y IS AN OptNum"
+            , "GIVETH A NUMBER"
+            , "f h x y MEANS h's n"
+            ]
+      result <- compileBundle logger "test" (Map.fromList [("main.l4", entry), ("optlib.l4", lib)])
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_, meta) -> case [ fs | fs <- meta.metaFunctions, fs.fsName == "f" ] of
+          [fs] -> do
+            fs.fsParameters.required `shouldBe` ["h"]
+            fmap (.parameterRequired) (Map.lookup "h" fs.fsParameters.parameterMap) `shouldBe` Just (Just ["n"])
+          other -> expectationFailure ("expected one function f, got " <> show (length other))
+
     it "rejects empty bundles" do
       logger <- newLogger False
       let sources = Map.empty :: Map FilePath Text
@@ -4921,6 +5376,102 @@ spec = describe "integration" do
           expectationFailure $
             "Expected rejection, but compiled with return types: "
               <> show [fs.fsReturnType | fs <- meta.metaFunctions]
+    -- A type name nothing declares is reported as an out-of-scope error whose
+    -- type is TYPE, and the deploy must refuse it with that error. The deploy
+    -- tolerates out-of-scope errors for names that an @export reads without
+    -- declaring them (they become implicit inputs), and that tolerance must
+    -- not reach a type name: an undeclared result type was once refused only
+    -- because the checker went on to report a second, internal error about it.
+    it "rejects an @export whose result type was never declared" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "badreturn.l4" $ Text.unlines
+        [ "@export Double a number"
+        , "GIVEN n IS A NUMBER"
+        , "GIVETH A Numbr"
+        , "`double it` MEANS n * 2"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "I could not find a definition for the identifier"
+          err `shouldSatisfy` Text.isInfixOf "Numbr"
+          err `shouldNotSatisfy` Text.isInfixOf "should be reported as a bug"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export whose input type was never declared, even if the body never uses it" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "badinput.l4" $ Text.unlines
+        [ "@export Add one"
+        , "GIVEN n IS A Numbr"
+        , "GIVETH A NUMBER"
+        , "`add one` MEANS 1"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "I could not find a definition for the identifier"
+          err `shouldSatisfy` Text.isInfixOf "Numbr"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "still publishes an input the module never declared as a name, not as a type" do
+      -- The same out-of-scope error, raised for a name an expression reads:
+      -- the deploy turns it into an input (here `flag`), as it always did.
+      logger <- newLogger False
+      result <- compileBundle logger "test" (Map.singleton "flag.l4" implicitFlagJL4)
+      case result of
+        Left err -> expectationFailure ("Compilation failed: " <> Text.unpack err)
+        Right (_fns, meta) ->
+          [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+            `shouldBe` [["flag", "threshold"]]
+    -- An EVENT cannot be supplied by a request, and was published as an input
+    -- typed "object" (`typeToParameter` has no declaration for it). Since
+    -- the EVENT type resolves, nothing else stops it, so the deploy refuses it,
+    -- as an input and as a result.
+    it "rejects an @export that takes an EVENT" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventin.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , ""
+        , "@export Who acted"
+        , "GIVEN e IS AN EVENT Party Act"
+        , "GIVETH A Party"
+        , "`who acted` MEANS"
+        , "  CONSIDER e"
+        , "  WHEN EVENT p a n THEN p"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as an input yet"
+          err `shouldSatisfy` Text.isInfixOf "who acted"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published the inputs "
+              <> show [Map.keys fs.fsParameters.parameterMap | fs <- meta.metaFunctions]
+
+    it "rejects an @export that returns an EVENT" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "eventout.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , ""
+        , "@export Make an event"
+        , "GIVEN p IS A Party"
+        , "GIVETH AN EVENT Party Act"
+        , "`make event` MEANS EVENT p ping 0"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as a result yet"
+          err `shouldSatisfy` Text.isInfixOf "make event"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published "
+              <> show [fs.fsName | fs <- meta.metaFunctions]
 
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
@@ -5178,8 +5729,12 @@ expectBatchOutcomes resp expected = do
 -- | Save sources to the BundleStore and register as DeploymentPending,
 -- simulating a lazy-load restart. The sources exist on disk but are not compiled.
 withPendingService :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withPendingService deployId sources act = do
-  resOrExc <- try (withPendingService' deployId sources act)
+withPendingService deployId sources = withPendingServices deployId [(deployId, sources)]
+
+-- | 'withPendingService' with several deployments, in a store named by the first argument.
+withPendingServices :: Text -> [(Text, [(FilePath, Text)])] -> (String -> Manager -> IO a) -> IO a
+withPendingServices storeName deployments act = do
+  resOrExc <- try (withPendingServices' storeName deployments act)
   case resOrExc of
     Left ioe ->
       if isPermissionError ioe
@@ -5189,25 +5744,26 @@ withPendingService deployId sources act = do
           pure undefined
     Right result -> pure result
 
-withPendingService' :: Text -> [(FilePath, Text)] -> (String -> Manager -> IO a) -> IO a
-withPendingService' deployId sources act = withStoreDir (Text.unpack deployId) \tmpPath -> do
+withPendingServices' :: Text -> [(Text, [(FilePath, Text)])] -> (String -> Manager -> IO a) -> IO a
+withPendingServices' storeName deployments act = withStoreDir (Text.unpack storeName) \tmpPath -> do
   store <- initStore tmpPath
   logger <- newLogger False
 
   -- Save sources to the BundleStore (so loadAndRegister can find them)
-  let sourceMap = Map.fromList sources
-      version = computeVersion sourceMap
-      storedMeta = BundleStore.StoredMetadata
-        { BundleStore.smVersion = version
-        , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
-        , BundleStore.smDescription = Nothing
-        , BundleStore.smServiceVersion = Nothing
-        , BundleStore.smDeploymentVersion = Nothing
-        }
-  BundleStore.saveBundle store deployId sourceMap storedMeta
+  forM_ deployments \(deployId, sources) -> do
+    let sourceMap = Map.fromList sources
+        version = computeVersion sourceMap
+        storedMeta = BundleStore.StoredMetadata
+          { BundleStore.smVersion = version
+          , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
+          , BundleStore.smDescription = Nothing
+          , BundleStore.smServiceVersion = Nothing
+          , BundleStore.smDeploymentVersion = Nothing
+          }
+    BundleStore.saveBundle store deployId sourceMap storedMeta
 
   -- Register as Pending (not compiled)
-  registry <- newTVarIO $ Map.singleton (DeploymentId deployId) (DeploymentPending Nothing)
+  registry <- newTVarIO $ Map.fromList [(DeploymentId deployId, DeploymentPending Nothing) | (deployId, _) <- deployments]
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty
   slots <- newBatchSlots
@@ -6067,6 +6623,41 @@ decodeObject = Aeson.decode
 -- | Look up a key in a Maybe Object.
 lookupKey :: Text -> Maybe Aeson.Object -> Maybe Aeson.Value
 lookupKey k = (>>= Aeson.KeyMap.lookup (Aeson.Key.fromText k))
+
+-- | Every text item of an MCP tool result, in order.
+mcpTexts :: LBS.ByteString -> [Text]
+mcpTexts body = Maybe.fromMaybe [] do
+  Aeson.Object o <- Aeson.decode body
+  Aeson.Object r <- Aeson.KeyMap.lookup "result" o
+  Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
+  pure [ t | Aeson.Object c <- toList cs, Just (Aeson.String t) <- [Aeson.KeyMap.lookup "text" c] ]
+
+-- | The text of an MCP tool result, and whether it is an error: the result of a
+-- tools/call, or of a task that has completed.
+mcpPayloadText :: Aeson.Value -> Maybe (Bool, Text)
+mcpPayloadText payload = do
+  Aeson.Object r <- pure payload
+  Aeson.Array cs <- Aeson.KeyMap.lookup "content" r
+  Aeson.Object c : _ <- pure (toList cs)
+  Aeson.String t <- Aeson.KeyMap.lookup "text" c
+  let isErr = case Aeson.KeyMap.lookup "isError" r of
+        Just (Aeson.Bool b) -> b
+        _                   -> False
+  pure (isErr, t)
+
+-- | One JSON-RPC request to a deployment's MCP endpoint, and its result.
+mcpRpc :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Maybe Aeson.Value)
+mcpRpc baseUrl mgr deployId method' params = do
+  req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+    [ "jsonrpc" Aeson..= ("2.0" :: Text)
+    , "id" Aeson..= (1 :: Int)
+    , "method" Aeson..= method'
+    , "params" Aeson..= params
+    ]
+  resp <- httpLbs req mgr
+  statusCode' resp `shouldBe` 200
+  pure (lookupKey "result" (decodeObject (responseBody resp)))
+
 
 -- | Look up a JSON array in a Maybe Object, returning its length.
 lookupArrayLength :: Text -> Maybe Aeson.Object -> Maybe Int

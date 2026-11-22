@@ -228,27 +228,24 @@ A `@ref` after the last construct of the file has nothing to attach to:
 
 #### Writing a literal `>>`
 
-The inline form ends at `>>`, so a citation that contains those two characters
-would otherwise stop halfway. Put a backslash before the angle bracket:
+The inline form ends at `>>`, so a citation that contains those two characters would otherwise stop halfway.
+Put a backslash before the angle bracket:
 
 | you write                | you get             |
 | ------------------------ | ------------------- |
 | `<<see s.5 \>> onward>>` | `see s.5 >> onward` |
 | `<<\\>>`                 | `\`                 |
 
-**A single `>` needs nothing.** `<<s.5 > s.3>>` has always worked and still
-does — only the doubled `>>` closes a citation, so a lone one is ordinary
-text.
+**A single `>` needs nothing.**
+`<<s.5 > s.3>>` is one citation: only the doubled `>>` closes it, so a lone `>` is ordinary text.
 
-**What this costs.** A citation can no longer end with a backslash, because
-`\>` now means a literal `>`; write `\\` instead. Any other character after a
-backslash is left alone, so `\q` is still a backslash followed by a `q`.
+**To end a citation with a backslash, write `\\`.**
+A backslash immediately before `>>` is an escape, so `\>` is a literal `>` and the citation goes on.
+Any other character after a backslash is left alone, so `\q` is a backslash followed by a `q`.
 
-This is the same idea as the `\%`, `\]` and `\[` escapes in `@nlg` above, but
-the character set is deliberately different: `%`, `]` and `[` are ordinary
-text in a citation, and `>` is ordinary text in an `@nlg` annotation. Each
-annotation escapes only what would otherwise be read as punctuation in that
-annotation.
+This is the same idea as the `\%`, `\]` and `\[` escapes in `@nlg` above, but the set of characters is deliberately different.
+`%`, `]` and `[` are ordinary text in a citation, and `>` is ordinary text in an `@nlg` annotation.
+Each annotation escapes only what would otherwise be read as punctuation in that annotation.
 
 ### @export
 
@@ -344,19 +341,21 @@ The annotations this version knows are `@desc`, `@ends-because`, `@export`, `@in
 
 Directives are instructions to the tools, written at the top level of a file. `l4 run` and the editor carry them out; `l4 check` only type-checks them.
 
-| Directive    | What it does                                                                                                     |
-| ------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `#EVAL`      | evaluates an expression and shows the result                                                                     |
-| `#EVALTRACE` | evaluates an expression and also shows the steps that led to the result (`l4 trace` draws them)                  |
-| `#CHECK`     | type-checks an expression and shows its type, without evaluating it                                              |
-| `#ASSERT`    | evaluates an expression and reports "assertion failed" when it is not TRUE (`#ASSERT REFUSED` expects a refusal) |
-| `#TRACE`     | runs a regulative rule against a list of events (see [Regulative rules](../regulative/README.md))                |
+| Directive         | What it does                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#EVAL`           | evaluates an expression and shows the result                                                                                                                              |
+| `#EVALTRACE`      | evaluates an expression and also shows the steps that led to the result (`l4 trace` draws them)                                                                           |
+| `#CHECK`          | type-checks an expression and shows its type, without evaluating it                                                                                                       |
+| `#ASSERT`         | evaluates an expression and reports whether it is TRUE ([what it reports](#what-assert-reports))                                                                          |
+| `#ASSERT REFUSED` | evaluates an expression and reports whether it refuses to answer, with the reason after `BECAUSE` if there is one ([REFUSE](../control-flow/REFUSE.md#testing-a-refusal)) |
+| `#TRACE`          | runs a regulative rule against a list of events (see [Regulative rules](../regulative/README.md))                                                                         |
 
 ```text
 #EVAL expression
 #EVALTRACE expression
 #CHECK expression
 #ASSERT expression
+#ASSERT REFUSED expression BECAUSE "reason"
 #TRACE rule AT start-time WITH
   PARTY party DOES action AT time
 ```
@@ -478,57 +477,25 @@ One line in it is one you did not write.
 
 **See also:** [evaltrace-example.l4](evaltrace-example.l4)
 
-### #ASSERT
+### What `#ASSERT` reports
 
-`#ASSERT expression` and `#ASSERT NOT expression` check that an expression is TRUE, or not.
+An `#ASSERT` has one of four outcomes:
 
-**Outcomes.** An assertion reports one of four things: `assertion satisfied`; `assertion failed`;
-`assertion could not be evaluated`, when working the expression out stopped part-way — most often because it
-needed the value of a name nobody supplied; and _refused_, when the expression is one the model declines to answer (see
-[REFUSE](../control-flow/REFUSE.md)). A refusal is neither satisfied nor failed, and a plain
-`#ASSERT` is not the way to test for one:
+| When the expression…                                                                                         | It prints                                          | The editor shows           | `l4 run` exit code | In `l4 run --json`                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- | -------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| is TRUE                                                                                                      | `assertion satisfied`                              | information                | not affected       | `"value": true`                                                                                                           |
+| is FALSE                                                                                                     | `assertion failed`                                 | an error                   | non-zero           | `"value": false`                                                                                                          |
+| cannot be evaluated: a division by zero, a `CONSIDER` with no matching branch, a term that is only `ASSUME`d | `assertion could not be evaluated:` and the reason | an error, with the reason  | non-zero           | `"value": null`, with the reason under `"error"`, or under `"undetermined"` beside `"needs"` when a fact was not supplied |
+| reaches a `REFUSE`: the rules decline to answer                                                              | `assertion refused:` and the reason                | a warning, with the reason | not affected       | `"value": null`, with the reason under `"refused"`                                                                        |
 
-```
-Result:
-  assertion refused:
-  The model refuses to answer:
-    no Regulation Crowdfunding figure exists before commencement in 2016
-```
+In `--json` the result's `"kind"` is `"assertion"` in all four.
 
-### #ASSERT REFUSED
+An assertion that cannot be evaluated is not a verdict, so `#ASSERT P` and `#ASSERT NOT P` then report the same thing. Asserting an `ASSUME`d `BOOLEAN` directly, as in `#ASSERT b`, is one such case: `b` has no value to check.
+[Testing your rules](../../tutorials/getting-started/testing-your-rules.md#what-an-error-looks-like) shows an example.
 
-Assert that an expression _refuses_ — that the case is one the model declines to answer, and that
-declining is the expected outcome.
+A refused assertion is not a verdict either, and `l4 run` still exits `0`, so a CI job that looks for failures looks for `assertion refused` as well as `assertion failed`.
 
-**Syntax:**
-
-```l4
-#ASSERT REFUSED expression
-#ASSERT REFUSED expression BECAUSE "message"
-```
-
-`#ASSERT REFUSED e` passes when `e` refuses, whatever the message it carries. Adding
-`BECAUSE "message"` also requires the refusal to carry exactly that message, which pins down _which_
-refusal was reached when a rule has more than one.
-
-**Example:**
-
-```l4
-#ASSERT REFUSED `funding limit for` 2015
-#ASSERT REFUSED `funding limit for` 2015 BECAUSE "no Regulation Crowdfunding figure exists before commencement in 2016"
-```
-
-**Outcomes:**
-
-```
-assertion satisfied
-assertion failed: expected a refusal, but the expression produced a value
-assertion failed: expected the refusal "x", got "y"
-```
-
-The first is what a `#ASSERT REFUSED` reports when the expression refused and any `BECAUSE` message
-matched; the second when the expression produced an ordinary value instead; the third when it
-refused, but carrying a different message.
+To assert that an expression refuses, use `#ASSERT REFUSED`; [Testing a refusal](../control-flow/REFUSE.md#testing-a-refusal) lists what it reports.
 
 ## Sections
 

@@ -1,0 +1,5 @@
+IMPORT solution
+
+#ASSERT `last protected year` 2000 EQUALS 2070
+#ASSERT `is protected in` 2000 2070 EQUALS TRUE
+#ASSERT `is protected in` 2000 2071 EQUALS FALSE

@@ -1,0 +1,4 @@
+-- For the REPL's :type, which prints a residual inference variable as `a`,
+-- `b`, ..., as #CHECK does, and not as the checker's internal label (`x5`).
+
+DECLARE decision IS ONE OF granted, denied

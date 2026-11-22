@@ -59,6 +59,7 @@ import qualified BpmnExport
 import qualified LtsExplore
 import qualified LtsList
 import qualified Hover
+import qualified KeywordList
 import qualified SemanticTokens
 import qualified VizAutoRefresh
 import qualified VizImplies
@@ -229,6 +230,7 @@ main = do
     describe "bpmn export" BpmnExport.spec
     describe "lts list" LtsList.spec
     describe "lts explore" LtsExplore.spec
+    KeywordList.keywordListTests dataDir
   where
     tests memo evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do

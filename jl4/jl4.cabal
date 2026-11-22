@@ -135,6 +135,7 @@ test-suite jl4-test
     LtsExplore
     LtsList
     Hover
+    KeywordList
     SemanticTokens
     VizAutoRefresh
     VizImplies
@@ -189,6 +190,7 @@ test-suite l4-cli-test
   autogen-modules:
     Paths_jl4
   build-tool-depends:
+    jl4:jl4-schema,
     jl4:l4,
     jl4-lsp:jl4-lsp,
     jl4-repl:jl4-repl
@@ -199,6 +201,8 @@ test-suite l4-cli-test
     filepath,
     hspec,
     jl4-core,
+    lsp-types,
     process,
     temporary,
     text,
+

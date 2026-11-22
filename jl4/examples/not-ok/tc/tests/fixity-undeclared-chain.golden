@@ -6,7 +6,7 @@ File: fixity-undeclared-chain.l4
   Range: 11:7-11:24
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 

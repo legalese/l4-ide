@@ -11,6 +11,7 @@ import qualified Base.Map as Map
 import qualified Base.Set as Set
 import qualified Base.Text as Text
 
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Monoid (Alt (..))
 import qualified Data.Scientific as Sci
 import Data.Char hiding (Space)
@@ -64,6 +65,29 @@ data AnnoType
 newtype LangTag = MkLangTag Text
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (ToExpr, NFData)
+
+-- | The language part of a tag, before its first hyphen: the @he@ of @he-IL@.
+langPrimary :: LangTag -> Text
+langPrimary (MkLangTag t) = Text.takeWhile (/= '-') t
+
+-- | How closely a wording's language answers a request for another, or
+-- 'Nothing' when it does not answer it at all. Lower is closer:
+--
+-- * 0, the same tag;
+-- * 1, the wording's tag is a prefix of the request: @he@ answers @he-IL@;
+-- * 2, the two share their language: @he-IL@ answers @he@, and @he-IL@
+--   answers @he-XX@.
+--
+-- Every reader that asks "is this wording in that language" goes through
+-- this, so a wording tagged @he-IL@ is picked by @--lang he@, and the Hebrew
+-- frame words reach it, without each reader deciding that again. The tags are
+-- compared as written, as everywhere else: @HE@ is not @he@.
+langMatchRank :: LangTag -> LangTag -> Maybe Int
+langMatchRank want@(MkLangTag w) have@(MkLangTag h)
+  | want == have                        = Just 0
+  | (h <> "-") `Text.isPrefixOf` w      = Just 1
+  | langPrimary want == langPrimary have = Just 2
+  | otherwise                           = Nothing
 
 data TDirectives
   = TLazyEvalDirective
@@ -1039,7 +1063,9 @@ execLexer uri input =
         -- the first lexer error (its token stream is 'many'-based, not
         -- backtracking), so there is at most one lexer 'PError' either way.
         Just pErr -> pErr :| []
-        Nothing   -> fmap (mkPError "lexer") $ errorBundleToErrorMessages errs
+        -- A lexer error is about a raw character, which is user text: it has
+        -- no token kind to name.
+        Nothing   -> bundleToPErrors "lexer" (const Nothing) errs
 
 -- | When the lexer's first failure sits on a character
 -- 'L4.SmartPunctuation.lookupConfusable' recognises, build the
@@ -1095,6 +1121,7 @@ confusableLexError input ParseErrorBundle{ bundleErrors, bundlePosState } = do
     , range = span_
     , origin = "lexer"
     , fixes = pairFixes <> dashFixes
+    , code = parseErrorCode (const Nothing) err
     }
 
 -- | For an OPENING curly quote (@‘@ or @“@), look ahead on the REST OF THE
@@ -1392,6 +1419,8 @@ data PError
       -- itself, and every parser-level error in "L4.Parser" that goes
       -- through it — sets this to @[]@; a diagnostic with no fixes simply
       -- offers no code action.
+    , code :: Text
+      -- ^ The stable diagnostic code ('parseErrorCode').
     }
   deriving (Show, Eq, Ord, Generic)
   deriving anyclass (NFData)
@@ -1413,8 +1442,8 @@ data LexFix
   deriving (Show, Eq, Ord, Generic)
   deriving anyclass (NFData)
 
-mkPError :: Text -> (Text, SourcePos, SourcePos) -> PError
-mkPError orig (m, s, e) =
+mkPError :: Text -> Text -> (Text, SourcePos, SourcePos) -> PError
+mkPError orig errCode (m, s, e) =
   PError
     { message = m
     , range = MkSrcSpan
@@ -1431,7 +1460,111 @@ mkPError orig (m, s, e) =
       }
     , origin = orig
     , fixes = []
+    , code = errCode
     }
+
+-- | The errors of a bundle, in order, each with its code. The first argument
+-- says where they came from; the second names the kind of a token of the
+-- stream, or 'Nothing' if a token of this stream has no kind that is safe to
+-- put in a code.
+bundleToPErrors ::
+  ( VisualStream s
+  , TraversableStream s
+  , ShowErrorComponent e
+  ) =>
+  Text -> (Token s -> Maybe Text) -> ParseErrorBundle s e -> NonEmpty PError
+bundleToPErrors orig tokenKind bundle =
+  NonEmpty.zipWith
+    (mkPError orig . parseErrorCode tokenKind)
+    (bundleErrors bundle)
+    (errorBundleToErrorMessages bundle)
+
+-- | The stable diagnostic code of a parse error, read from the error itself and
+-- never from its rendered text. See 'L4.TypeCheck.Types.checkErrorCode' for
+-- what a code promises.
+--
+-- A code must not contain anything the user wrote, so that tools can group by
+-- it. An unexpected token contributes its KIND ('tokenKindSlug'). A 'Label' is
+-- free text from a parser, which may quote the source, so it is not used.
+-- Anything else, such as the messages of 'fail', is @parse/syntax-error@.
+parseErrorCode :: (Token s -> Maybe Text) -> ParseError s e -> Text
+parseErrorCode tokenKind = \ case
+  TrivialError _ (Just (Tokens (t :| _))) _ -> maybe syntaxError unexpectedCode (tokenKind t)
+  TrivialError _ (Just EndOfInput) _        -> unexpectedCode endOfInputSlug
+  TrivialError _ (Just (Label _)) _         -> syntaxError
+  TrivialError _ Nothing _                  -> syntaxError
+  FancyError _ fancy
+    | any isIndentationError fancy -> "parse/indentation"
+    | otherwise                    -> syntaxError
+ where
+  syntaxError = "parse/syntax-error"
+  unexpectedCode kind = "parse/unexpected-" <> kind
+  isIndentationError = \ case
+    ErrorIndentation {} -> True
+    _                   -> False
+
+endOfInputSlug :: Text
+endOfInputSlug = "end-of-input"
+
+-- | The kind of a token, for a code such as @parse/unexpected-WITH@. A keyword
+-- is its own kind, spelled as the language spells it. Every other token is
+-- named by a fixed word: an identifier or a literal must never appear as what
+-- the user wrote. Exhaustive on purpose, so that a new token has to be named.
+tokenKindSlug :: TokenType -> Text
+tokenKindSlug tt = case tt of
+  TKeywords _   -> displayTokenType tt
+  TDirectives _ -> "directive"
+  TAnnotations _ -> "annotation"
+  TLiterals lit -> case lit of
+    TIntLit {}      -> "number"
+    TRationalLit {} -> "number"
+    TStringLit {}   -> "string"
+  TSpaces spaces -> case spaces of
+    TSpace {}        -> "whitespace"
+    TLineComment {}  -> "comment"
+    TBlockComment {} -> "comment"
+    TIgnoredAnnotation {} -> "annotation"
+    EOF              -> endOfInputSlug
+  TIdentifiers ident -> case ident of
+    TIdentifier {} -> "identifier"
+    TQuoted {}     -> "identifier"
+    TGenitive      -> "genitive"
+  TSymbols sym -> case sym of
+    TRefOpen         -> "ref-open"
+    TRefClose        -> "ref-close"
+    TNlgOpen         -> "open-bracket"
+    TNlgClose        -> "close-bracket"
+    TParagraph       -> "section-sign"
+    TBullet          -> "bullet"
+    TPOpen           -> "open-paren"
+    TPClose          -> "close-paren"
+    TCOpen           -> "open-brace"
+    TCClose          -> "close-brace"
+    TComma           -> "comma"
+    TSemicolon       -> "semicolon"
+    TDot             -> "dot"
+    TEllipsis        -> "ellipsis"
+    TEllipsisOr      -> "ellipsis-or"
+    TColon           -> "colon"
+    TPercent         -> "percent"
+    TCopy (Just tt') -> tokenKindSlug tt'
+    TCopy Nothing    -> "caret"
+    TOtherSymbolic _ -> "symbol"
+  TOperators op -> case op of
+    TTimes         -> "times"
+    TPlus          -> "plus"
+    TMinus         -> "minus"
+    TGreaterEquals -> "greater-equals"
+    TLessEquals    -> "less-equals"
+    TGreaterThan   -> "greater-than"
+    TLessThan      -> "less-than"
+    TEquals        -> "equals"
+    TEqualsEquals  -> "double-equals"
+    TNotEquals     -> "not-equals"
+    TAnd           -> "and"
+    TOr            -> "or"
+    TImplies       -> "implies"
+    TDividedBy     -> "divided-by"
 
 errorBundleToErrorMessages ::
   forall s e.

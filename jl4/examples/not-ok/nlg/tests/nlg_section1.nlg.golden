@@ -5,5 +5,5 @@ File: nlg_section1.l4
   Range: 1:1-1:68
   Source: parser
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/annotation-not-attached
   Message: Not attached to any valid syntax node.

@@ -30,3 +30,10 @@ GIVETH A NUMBER
 -- a verdict.
 #ASSERT `the fee in year` 1999 EQUALS 100
 #ASSERT NOT (`the fee in year` 1999 EQUALS 100)
+
+-- A refusal written in place, with no name, reads the same way.
+#EVAL REFUSE "a reason written in place"
+
+-- The BECAUSE may start a line of its own, indented further than the #ASSERT.
+#ASSERT REFUSED `the fee in year` 1999
+  BECAUSE "this schedule is not encoded for years before 2000"

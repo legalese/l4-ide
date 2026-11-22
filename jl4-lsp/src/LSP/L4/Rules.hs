@@ -9,6 +9,7 @@ import L4.Annotation
 import L4.Citations
 import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
+import qualified L4.Diagnostic as Diagnostic
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
@@ -18,9 +19,9 @@ import qualified L4.Lexer as Lexer
 import qualified L4.SmartPunctuation as SP
 import qualified L4.IgnoredAnnotation as IA
 import qualified L4.Parser as Parser
+import L4.Parser.AnnotationWarning (annotationWarningCode, annotationWarningMessage, annotationWarningSpan)
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
-import qualified L4.Print as Print
 import L4.Syntax
 import L4.TypeCheck (CheckErrorWithContext (..), CheckResult (..), Substitution, applyFinalSubstitution, toResolved)
 import qualified L4.TypeCheck as TypeCheck
@@ -112,14 +113,25 @@ data GetImports = GetImports
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The modules a file imports, each with the range of its @IMPORT@, from a
+-- first parse that needs no mixfix hints. Unlike 'GetImports', whose full parse
+-- needs the hints of every imported module, this has an answer for a file in an
+-- import cycle. An @IMPORT@ that resolves to no module is left out.
+type instance RuleResult GetImportEdges = [(Maybe SrcRange, NormalizedUri)]
+data GetImportEdges = GetImportEdges
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
+
 type instance RuleResult GetMixfixRegistry = Parser.MixfixHintRegistry
 data GetMixfixRegistry = GetMixfixRegistry
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
--- | The typecheck results of a module's direct imports. Keyed by file alone:
--- see 'CheckModule'.
-type instance RuleResult GetTypeCheckDependencies = [(ImportResult, TypeCheckResult)]
+-- | Each of a module's direct imports with its typecheck, 'Nothing' when it
+-- has none (it does not parse, it is in an import cycle, or it resolves to the
+-- importing file, which is not checked). Keyed by file alone: see
+-- 'CheckModule'.
+type instance RuleResult GetTypeCheckDependencies = [(ImportResult, Maybe TypeCheckResult)]
 data GetTypeCheckDependencies = GetTypeCheckDependencies
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
@@ -160,11 +172,20 @@ pattern TypeCheck = AttachCallStack [] TypeCheckNoCallstack
 --
 -- Nothing is lost by dropping the stack from the recursion. Apart from passing
 -- it on, the only thing that read it was the cycle check in
--- 'defineWithCallStack', and an import cycle never reaches that check:
--- 'GetMixfixRegistry', keyed by file, recurses over the same imports first, and
--- hls-graph stops it with a 'StackException'. That is still what reports a
--- cycle, and hls-graph would stop a cycle through these per-file keys the same
--- way.
+-- 'defineWithCallStack', and an import cycle never reaches that check: no rule
+-- follows an import that leads back to its file ('importsThatDoNotLeadBack').
+-- The message on the IMPORT that names the files of the ring follows
+-- 'GetImportEdges' ('firstImportCycleFrom'), which reads no typecheck and no
+-- call stack.
+--
+-- A module on a ring has no typecheck ('onImportRing'), like a module that does
+-- not parse. It would have to be checked with an import left out, and a result
+-- like that is not one to act on: a name from the module left out reads as
+-- undefined, which @jl4-service@ takes for an input the caller must supply.
+--
+-- What this rule says about an import ('importsOk', and the messages on the
+-- IMPORT lines) is computed from that import's own 'CheckModule' result, which
+-- this rule depends on, so an edit to an imported file recomputes it here too.
 type instance RuleResult CheckModule = TypeCheckResult
 data CheckModule = CheckModule
   deriving stock (Generic, Show, Eq)
@@ -192,7 +213,12 @@ data TypeCheckResult = TypeCheckResult
     -- each: the direct imports first, in import order, then the rest in the
     -- order the old per-path tree first met them ('closeDependencies'). Each
     -- entry carries its own closure, so walking it recursively visits a module
-    -- once per path; use 'transitiveDependencies' for a walk.
+    -- once per path; use 'transitiveDependencies' for a walk. An import with
+    -- no typecheck is not in it; 'importsOk' is what records one.
+  , importsOk :: Bool
+  -- ^ Every module this one imports, transitively, was found and typechecks.
+  -- 'success' doesn't depend on it: a module checks against what its imports
+  -- did provide.
   , mixfixRegistry :: TypeCheck.MixfixRegistry
   , sectionPaths :: TypeCheck.SectionPaths
     -- ^ Where each binding this module can see was defined, section-wise,
@@ -225,6 +251,7 @@ instance NFData TypeCheckResult where
     `seq` scopeMap
     `seq` descMap
     `seq` rnf success
+    `seq` rnf importsOk
     `seq` rnf environment
     `seq` rnf entityInfo
     `seq` rnf infos
@@ -723,6 +750,57 @@ triedLocations outcome = do
           , sameFileAs = Just key
           , spelledAsPath = True
           }
+-- | The first ring of imports reachable from a module, as the files around it
+-- with the first repeated at the end (@[a, b, a]@), following 'GetImportEdges'.
+firstImportCycleFrom :: NormalizedUri -> Action (Maybe [NormalizedUri])
+firstImportCycleFrom start = snd <$> go Set.empty [] start
+  where
+    go done path u
+      | u `elem` path = pure (done, Just (dropWhile (/= u) (reverse path) <> [u]))
+      | u `Set.member` done = pure (done, Nothing)
+      | otherwise = do
+          targets <- maybe [] (map snd) <$> use GetImportEdges u
+          let step (d, found@(Just _)) _ = pure (d, found)
+              step (d, Nothing) t = go d (u : path) t
+          (done', found) <- foldM step (done, Nothing) targets
+          pure (Set.insert u done', found)
+
+-- | The file and every module it imports, transitively, root first. Each module
+-- appears once. The walk follows 'GetImportEdges', which needs only a first
+-- parse of each module, so it reaches modules whose typecheck failed or that sit
+-- in a cycle. A module that does not parse is included but not walked further.
+importClosure :: NormalizedUri -> Action [NormalizedUri]
+importClosure root = reverse . snd <$> go (Set.empty, []) root
+  where
+    go acc@(seen, out) uri
+      | uri `Set.member` seen = pure acc
+      | otherwise = do
+          edges <- Maybe.fromMaybe [] <$> use GetImportEdges uri
+          foldM go (Set.insert uri seen, uri : out) (map snd edges)
+
+-- | Those of a file's imports that a rule may follow: the ones that do not lead
+-- back to the file.
+--
+-- Every rule that recurses over imports must go through this, because a ring
+-- of imports must never become a ring of Shake keys. hls-graph stops a key that
+-- waits on itself in one chain of calls, but not two threads that enter a ring
+-- at different files: each waits for the key the other is running, for ever,
+-- and nothing is reported, not even for an edit, which only starts it again.
+-- The language server does that as soon as two files of a ring are open, and
+-- a service that checks a whole bundle at once does too.
+-- 'GetImportEdges' does not recurse, so walking it is safe.
+importsThatDoNotLeadBack :: NormalizedUri -> [NormalizedUri] -> Action [NormalizedUri]
+importsThatDoNotLeadBack uri imported =
+  firstImportCycleFrom uri >>= \ case
+    Nothing -> pure imported
+    Just _ -> filterM (fmap (uri `notElem`) . importClosure) imported
+
+-- | Whether following IMPORT from a module leads back to it: it is on a ring of
+-- imports, or it imports itself. Such a module has no typecheck.
+onImportRing :: NormalizedUri -> Action Bool
+onImportRing uri = do
+  imported <- maybe [] (map snd) <$> use GetImportEdges uri
+  (/= imported) <$> importsThatDoNotLeadBack uri imported
 
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
@@ -957,6 +1035,21 @@ unresolvedImports uri = do
     moduleBaseName :: Name -> Text
     moduleBaseName n = Text.pack $ takeBaseName $ Text.unpack $ rawNameToText $ rawName n
 
+-- | The imports of a file that name another module, in the order they are
+-- written: 'GetImports' (which leaves out an IMPORT that resolved to nothing,
+-- see 'unresolvedImports') without an IMPORT of the file itself.
+-- 'GetLazyEvaluationDependenciesFile' evaluates these. 'GetTypeCheckDependencies'
+-- leaves a self-import unchecked, but keeps it in its list with no typecheck,
+-- so that 'importsOk' counts it.
+--
+-- 'CheckModule' and 'GetLazyEvaluationDependenciesFile' are keyed by file
+-- alone, so reading a self-import as a dependency would be a cycle in the
+-- engine's own keys. 'GetImportEdges' reports the self-import on the IMPORT,
+-- and a module on a ring has no typecheck ('onImportRing'), so evaluating one
+-- stops there, before it follows any import.
+dependencyImports :: NormalizedUri -> Action [ImportResult]
+dependencyImports uri = filter (\r -> r.moduleUri /= uri) <$> use_ GetImports uri
+
 -- | The rules of a session that may use every tier of the library ladder: the
 -- CLI, the REPL and the language server. See 'LibraryScope'.
 jl4Rules :: EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
@@ -985,7 +1078,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         lift $ addVirtualFileFromFS file
 
     case mRope of
-      Nothing -> pure ([mkSimpleFileDiagnostic uri (mkSimpleDiagnostic (fromNormalizedUri uri).getUri "could not obtain file contents" Nothing)], Nothing)
+      Nothing -> pure ([mkSimpleFileDiagnostic uri (mkSimpleDiagnostic "file/unreadable" (fromNormalizedUri uri).getUri "could not obtain file contents" Nothing)], Nothing)
       Just rope -> do
         let contents = Rope.toText rope
         case Lexer.execLexer uri contents of
@@ -1056,11 +1149,33 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         resolvedUris <- catMaybes <$> traverse resolveImportUri importNames
 
         -- Recursively get mixfix hints from imported modules
-        importedHints <- mconcat . catMaybes <$> uses GetMixfixRegistry resolvedUris
+        importedHints <- mconcat . catMaybes <$> (uses GetMixfixRegistry =<< importsThatDoNotLeadBack uri resolvedUris)
 
         -- Combine local + imported hints
         let combinedHints = localHints <> importedHints
         pure ([], Just combinedHints)
+
+  define shakeRecorder $ \GetImportEdges uri -> do
+    (tokens, contents) <- use_ GetLexTokens uri
+    case Parser.execProgramParserForTokens uri contents tokens of
+      Left _errs -> pure ([], Just [])
+      Right (firstProg, _) -> do
+        let extractImport :: TopDecl Name -> [(Maybe SrcRange, Name)]
+            extractImport = \case
+              Import _ (MkImport a n _) -> [(rangeOf a, n)]
+              _ -> []
+            resolveEdge (range, n) = do
+              let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+              outcome <- resolveImport uri modName
+              pure (fmap (\u -> (range, u)) outcome.importUri)
+        edges <- catMaybes <$> traverse resolveEdge (foldTopDecls extractImport firstProg)
+        let selfImportDiags =
+              [ mkSimpleFileDiagnostic uri
+                  (mkSimpleDiagnostic "import/self-import" "import" "This IMPORT names the file it is in. A file cannot import itself." (fromSrcRange <$> range))
+              | (range, target) <- edges
+              , target == uri
+              ]
+        pure (selfImportDiags, Just edges)
 
   define shakeRecorder $ \GetParsedAst uri -> do
     (tokens, contents) <- use_ GetLexTokens uri
@@ -1106,6 +1221,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
             allPaths <- liftIO $ triedLocations outcome
             let diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
+                    "import/module-not-found"
                     (fromNormalizedUri uri).getUri
                     (Text.unlines
                       [ "I could not find a module with this name: " <> Text.pack modName
@@ -1131,7 +1247,18 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
 
   define shakeRecorder $ \GetTypeCheckDependencies uri -> do
     imports <- use_  GetImports uri
-    ress    <- fmap catMaybes $ zipWith (\res mres -> (res,) <$> mres) imports <$> uses CheckModule (map (.moduleUri) imports)
+    -- An import that resolves to this file is the file importing itself
+    -- ('GetImportEdges' reports that; 'GetImports' leaves out an IMPORT that
+    -- finds no module, and reports it). It is not typechecked:
+    -- 'CheckModule' is keyed by file alone, so that would be the rule waiting
+    -- on itself (see 'dependencyImports', which drops the same imports from the
+    -- evaluation). Nor is an import that leads back to this file
+    -- ('importsThatDoNotLeadBack'); 'CheckModule' reports that. Each is kept in
+    -- the list, with no typecheck, so that 'importsOk' counts it.
+    checkable <- importsThatDoNotLeadBack uri (filter (/= uri) (map (.moduleUri) imports))
+    results <- uses CheckModule checkable
+    let byUri = Map.fromList (zip checkable results)
+        ress = [ (i, join (Map.lookup i.moduleUri byUri)) | i <- imports ]
     pure ([], Just ress)
 
   -- The call stack is ignored, and nothing is reported here: the diagnostics
@@ -1141,8 +1268,63 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     ([],) <$> use CheckModule uri
 
   define shakeRecorder $ \CheckModule uri -> do
+    -- This publishes the error for a file that imports itself.
+    _            <- use GetImportEdges uri
     parsed       <- use_ GetParsedAst uri
-    (imported, dependencies) <- unzip <$> use_ GetTypeCheckDependencies uri
+    importResults <- use_ GetTypeCheckDependencies uri
+    onRing       <- onImportRing uri
+    -- An import with no typecheck is usually in a ring of imports. Find it, so
+    -- the message can name the files instead of the engine's rule names.
+    rings <- traverse
+      (\(imp, mTc) -> case mTc of
+          Nothing | imp.moduleUri /= uri -> firstImportCycleFrom imp.moduleUri
+          _ -> pure Nothing)
+      importResults
+    let (imported, dependencies) = unzip [ (i, tc) | (i, Just tc) <- importResults ]
+        fileName u = Text.takeWhileEnd (/= '/') (getUri (fromNormalizedUri u))
+        arrows = Text.intercalate " -> " . map fileName
+        -- What is wrong with an imported module, if anything, as its diagnostic
+        -- code and message. The error itself is reported in that module; this
+        -- points at it from the IMPORT.
+        importProblem :: ImportResult -> Maybe [NormalizedUri] -> Maybe TypeCheckResult -> Maybe (Text, Text)
+        importProblem imp ring = \case
+          Nothing -> Just $ case ring of
+            Just r
+              | uri `elem` r ->
+                  ( "import/cycle"
+                  , "This IMPORT makes a ring of imports: " <> arrows (startingAt uri r)
+                    <> ". Files cannot import each other in a ring."
+                  )
+              | otherwise ->
+                  ( "import/cycle"
+                  , "The imported module " <> modName <> " is in a ring of imports: " <> arrows r
+                    <> ". Files cannot import each other in a ring."
+                  )
+            Nothing -> ("import/module-has-errors", "The imported module " <> modName <> " could not be checked; see the errors in it.")
+          Just tc
+            | e : _ <- tc.errors ->
+                Just
+                  ( "import/module-has-errors"
+                  , "The imported module " <> modName <> " has errors"
+                      <> maybe "" (\r -> " (line " <> Text.pack (show r.start.line) <> ": " <> firstLine e <> ")") (rangeOf e)
+                  )
+            | not tc.success -> Just ("import/module-has-errors", "The imported module " <> modName <> " has errors.")
+            | not tc.importsOk -> Just ("import/module-has-errors", "The imported module " <> modName <> " imports a module with errors.")
+            | otherwise -> Nothing
+          where
+            modName = rawNameToText (rawName imp.importName)
+            -- The same ring, read from @u@: [b, a, b] from a is [a, b, a].
+            startingAt u r = case break (== u) (List.init r) of
+              (before, after) -> after <> before <> take 1 after
+            firstLine e = Text.strip $ Maybe.fromMaybe "" $ Maybe.listToMaybe $ concatMap Text.lines $ TypeCheck.prettyCheckError e.kind
+        importDiags =
+          [ mkSimpleFileDiagnostic uri (mkSimpleDiagnostic code "import" msg (fromSrcRange <$> imp.importRange))
+          | ((imp, mTc), ring) <- zip importResults rings
+          -- An IMPORT of the file itself is reported on that IMPORT by
+          -- 'GetImportEdges'.
+          , imp.moduleUri /= uri
+          , Just (code, msg) <- [importProblem imp ring mTc]
+          ]
 
     let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
 
@@ -1182,8 +1364,8 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- All diagnostics are still published to the editor below regardless
         -- of this partition — it decides which go to 'infos' and which to 'errors'.
         (infos, errors) = partition ((/= TypeCheck.SError) . TypeCheck.severity) result.errors
-    pure
-      ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
+    pure $ if onRing then (importDiags, Nothing) else
+      ( importDiags <> fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
       , Just TypeCheckResult
         { module' = result.program
         , substitution = result.substitution
@@ -1197,6 +1379,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , scopeMap = result.scopeMap
         , descMap = result.descMap
         , dependencies = closeDependencies dependencies
+        , importsOk = all (\(_, mTc) -> maybe False (\tc -> tc.success && tc.importsOk) mTc) importResults
         , mixfixRegistry = result.mixfixRegistry
         , sectionPaths = result.sectionPaths
         , implicitReaders = result.implicitReaders
@@ -1250,7 +1433,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
   -- forcing one thunk at once is the case the NOTE above 'evalRef' allows for:
   -- a thunk is blackholed per thread, so the second thread evaluates it too.
   define shakeRecorder $ \GetLazyEvaluationDependenciesFile f -> do
-    imports <- use_  GetImports f
+    imports <- dependencyImports f
     tcRes   <- use_  SuccessfulTypeCheck f
     deps    <- fmap catMaybes $ uses GetLazyEvaluationDependenciesFile $ map (.moduleUri) imports
     let environment = mconcat (fst <$> deps)
@@ -1359,7 +1542,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     parsed <- use_ GetParsedAst f
     let pfp = (fromNormalizedUri f).getUri
     pure case ExactPrint.exactprint parsed of
-      Left trErr -> ([mkSimpleFileDiagnostic f $ mkSimpleDiagnostic pfp (prettyTraverseAnnoError trErr) Nothing], Nothing)
+      Left trErr -> ([mkSimpleFileDiagnostic f $ mkSimpleDiagnostic "internal/exactprint-failed" pfp (prettyTraverseAnnoError trErr) Nothing], Nothing)
       Right ep'd -> ([], Just ep'd)
 
   where
@@ -1385,22 +1568,24 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         Diagnostic
           { _range = rangeOfResolveWarning warn
           , _severity = Just LSP.DiagnosticSeverity_Warning
-          , _code = Nothing
-          , _codeDescription = Nothing
+          , _code = diagnosticCode code
+          , _codeDescription = diagnosticCodeDescription code
           , _source = Just "parser"
           , _message = prettyNlgResolveWarning warn
           , _tags = Nothing
           , _relatedInformation = Nothing
           , _data_ = Nothing
           }
+      where
+        code = annotationWarningCode warn
 
     mkAndOrLintWarning :: Lint.AndOrWarning -> Diagnostic
     mkAndOrLintWarning warn =
         Diagnostic
           { _range = srcRangeToLspRange warn.warningRange
           , _severity = Just LSP.DiagnosticSeverity_Warning
-          , _code = Nothing
-          , _codeDescription = Nothing
+          , _code = diagnosticCode "lint/and-or-same-indentation"
+          , _codeDescription = diagnosticCodeDescription "lint/and-or-same-indentation"
           , _source = Just "linter"
           , _message = Text.pack $ "AND and OR operators appear at the same indentation level (column " <> show warn.conflictingColumn <> "). This may indicate a precedence error - please use indentation to clarify precedence; in a pinch, parentheses may also be used."
           , _tags = Nothing
@@ -1409,15 +1594,15 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
           }
 
     mkParseErrorDiagnostic :: PError -> Diagnostic
-    mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.origin parseError.message (Just parseError.range)
+    mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.code parseError.origin parseError.message (Just parseError.range)
 
-    mkSimpleDiagnostic :: Text -> Text -> Maybe SrcSpan -> Diagnostic
-    mkSimpleDiagnostic origin _message range =
+    mkSimpleDiagnostic :: Text -> Text -> Text -> Maybe SrcSpan -> Diagnostic
+    mkSimpleDiagnostic code origin _message range =
       Diagnostic
         { _range = srcSpanToLspRange range
         , _severity = Just LSP.DiagnosticSeverity_Error
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just origin
         , _message
         , _tags = Nothing
@@ -1464,8 +1649,8 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
       Diagnostic
         { _range = srcRangeToLspRange (Just range)
         , _severity = Just LSP.DiagnosticSeverity_Hint
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode "lint/redundant-lang-en"
+        , _codeDescription = diagnosticCodeDescription "lint/redundant-lang-en"
         , _source = Just "linter"
         , _message = "A module that declares nothing is English; this line can go."
         , _tags = Nothing
@@ -1496,22 +1681,24 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
               -- (UNKNOWN-EVALUATION-SPEC §4.7.4, U1b)
               EvaluateLazy.Assertion EvaluateLazy.Holds              -> Just LSP.DiagnosticSeverity_Information
               EvaluateLazy.Reduction (EvaluateLazy.Reduced _)        -> Just LSP.DiagnosticSeverity_Information
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just "eval"
         , _message = EvaluateLazy.prettyEvalDirectiveResult r
         , _tags = Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }
+      where
+        code = EvaluateLazy.evalDirectiveCode res
 
     checkErrorToDiagnostic :: CheckErrorWithContext -> Diagnostic
     checkErrorToDiagnostic checkError =
       Diagnostic
         { _range = srcRangeToLspRange (rangeOf checkError)
         , _severity = Just (translateSeverity (TypeCheck.severity checkError))
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just "check"
         , _message = Text.unlines (TypeCheck.prettyCheckError checkError.kind)
           -- A deprecation warning is tagged so that editors render the retired
@@ -1529,6 +1716,16 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }
+      where
+        code = TypeCheck.checkErrorCode checkError.kind
+
+-- | The language server's severity for one of L4's own.
+diagnosticSeverityToLsp :: Diagnostic.DiagnosticSeverity -> DiagnosticSeverity
+diagnosticSeverityToLsp = \case
+  Diagnostic.DSError       -> LSP.DiagnosticSeverity_Error
+  Diagnostic.DSWarning     -> LSP.DiagnosticSeverity_Warning
+  Diagnostic.DSInformation -> LSP.DiagnosticSeverity_Information
+  Diagnostic.DSHint        -> LSP.DiagnosticSeverity_Hint
 
 translateSeverity :: TypeCheck.Severity -> DiagnosticSeverity
 translateSeverity TypeCheck.SInfo  = LSP.DiagnosticSeverity_Information
@@ -1557,65 +1754,10 @@ lspPositionToSrcPos :: LSP.Position -> SrcPos
 lspPositionToSrcPos (LSP.Position { _character = c, _line = l }) =
   MkSrcPos (fromIntegral $ l + 1) (fromIntegral $ c + 1)
 
+-- | The text of an annotation warning, shared with the web editor's check
+-- ('L4.API.l4Check').
 prettyNlgResolveWarning :: Resolve.Warning -> Text
-prettyNlgResolveWarning = \ case
-  Resolve.NotAttached _ ->
-    "Not attached to any valid syntax node."
-  Resolve.UnknownLocation nlg -> Text.unlines
-    [ "The following NLG Annotation has no source location. This might be an internal compiler error."
-    , "```"
-    , Print.prettyLayout nlg
-    , "```"
-    ]
-  Resolve.EmptyNlg name _ ->
-    "This @nlg annotation has no text, so it is ignored: "
-      <> Print.prettyLayout name
-      <> " would otherwise render as nothing at all, because an annotation replaces what it annotates."
-  Resolve.Ambiguous name mtag nlgs -> Text.unlines $
-    ( case mtag of
-        -- Every parsed annotation carries a language by the time it gets
-        -- here: an untagged one is stamped with the module's `@lang`, or with
-        -- `en`. So the hint has to cover BOTH shapes at once — it is wrong to
-        -- say "tag these" to someone who already tagged them `:he` twice, and
-        -- wrong to talk about `en` without saying where `en` came from.
-        Just (Lexer.MkLangTag tag) ->
-          [ "More than one NLG annotation in language `" <> tag <> "` attached to: "
-              <> Print.prettyLayout name
-          , "An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags."
-          ]
-        -- Only an annotation we could not parse reaches here without one.
-        Nothing ->
-          [ "More than one NLG annotation attached to: " <> Print.prettyLayout name ]
-    ) <>
-    [ "The following annotations would be attached:"
-    , ""
-    ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
-  Resolve.RefUnattached r ->
-    Resolve.refUnattachedMessage r.payload
-  Resolve.RefTrailing r code ->
-    Resolve.refTrailingMessage r.payload code
-  Resolve.RefNoLocation ref ->
-    Resolve.refNoLocationMessage ref
-  Resolve.FixityAnnotationMisplaced _ ->
-    "This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition."
-  Resolve.FixityAnnotationNoLocation _ ->
-    "A fixity annotation has no source location. This might be an internal compiler error."
-  Resolve.NonassertableAnnotationMisplaced _ ->
-    "This @nonassertable sits inside a definition's body, or after the last construct of the file, so no definition carries it. Write it on a line of its own above the definition's GIVEN, or directly above its MEANS or DECIDE. A definition inside a WHERE or LET block cannot carry it yet."
-  Resolve.NonassertableAnnotationSuperseded _ ->
-    "Two or more @nonassertable marks sit above one construct; this one is an earlier one and is ignored, since the closest to the construct is the one that counts. One mark is enough."
-  Resolve.NonassertableAnnotationSameLine _ ->
-    "This @nonassertable shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
-  Resolve.NonassertableAnnotationNoLocation _ ->
-    "A @nonassertable annotation has no source location. This might be an internal compiler error."
-  Resolve.EndsBecauseAnnotationMisplaced _ ->
-    "This @ends-because sits inside a definition's body without being directly above a definition in a WHERE or LET block, or after the last construct of the file, so no definition carries it. Write it on a line of its own above the definition's GIVEN, or directly above its MEANS or DECIDE."
-  Resolve.EndsBecauseAnnotationSuperseded _ ->
-    "Two or more @ends-because marks sit above one construct; this one is an earlier one and is ignored, since the closest to the construct is the one that counts. One mark is enough."
-  Resolve.EndsBecauseAnnotationSameLine _ ->
-    "This @ends-because shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
-  Resolve.EndsBecauseAnnotationNoLocation _ ->
-    "An @ends-because annotation has no source location. This might be an internal compiler error."
+prettyNlgResolveWarning = annotationWarningMessage
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1627,41 +1769,7 @@ listL4Files dir = do
 
 
 rangeOfResolveWarning :: Resolve.Warning -> LSP.Range
-rangeOfResolveWarning = \ case
-  Resolve.NotAttached nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.UnknownLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.EmptyNlg _ nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.Ambiguous name _ _ ->
-    srcRangeToLspRange $ rangeOf name
-  Resolve.RefUnattached r ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefTrailing r _ ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefNoLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.FixityAnnotationMisplaced fx ->
-    srcSpanToLspRange $ Just fx.range
-  Resolve.FixityAnnotationNoLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.NonassertableAnnotationMisplaced na ->
-    srcSpanToLspRange $ Just na.range
-  Resolve.NonassertableAnnotationSameLine na ->
-    srcSpanToLspRange $ Just na.range
-  Resolve.NonassertableAnnotationSuperseded na ->
-    srcSpanToLspRange $ Just na.range
-  Resolve.NonassertableAnnotationNoLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.EndsBecauseAnnotationMisplaced eb ->
-    srcSpanToLspRange $ Just eb.range
-  Resolve.EndsBecauseAnnotationSameLine eb ->
-    srcSpanToLspRange $ Just eb.range
-  Resolve.EndsBecauseAnnotationSuperseded eb ->
-    srcSpanToLspRange $ Just eb.range
-  Resolve.EndsBecauseAnnotationNoLocation _ ->
-    srcSpanToLspRange Nothing
+rangeOfResolveWarning = srcSpanToLspRange . annotationWarningSpan
 
 -- ----------------------------------------------------------------------------
 -- The nlg map hover reads

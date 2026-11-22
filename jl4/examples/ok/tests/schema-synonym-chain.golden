@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+schema-synonym-chain.l4:65:1-46:
+  RIGHT OF (Holder OF (JUST OF 2), (JUST OF 3), 1)
+schema-synonym-chain.l4:66:1-52:
+  RIGHT OF (Holder OF NOTHING, NOTHING, 1)
+schema-synonym-chain.l4:67:1-26:
+  RIGHT OF (Holder OF NOTHING, NOTHING, 1)

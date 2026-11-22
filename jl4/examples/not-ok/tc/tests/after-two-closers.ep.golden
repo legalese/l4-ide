@@ -4,7 +4,7 @@ File: after-two-closers.l4
   Range: 16:42-16:48
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
        |
     16 | bad MEANS PARTY Buyer MUST Pay WITHIN 30 BEFORE (YMD 2026 6 30)

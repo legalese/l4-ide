@@ -6,7 +6,7 @@ File: ends-because-misplaced.l4
   Range: 9:1-9:39
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ends-because-on-non-definition
   Message:
     @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on `Person`, a declaration, which is not a definition; move it above the definition it is meant for, or remove it.
@@ -16,7 +16,7 @@ File: ends-because-misplaced.l4
   Range: 12:1-12:37
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ends-because-on-non-definition
   Message:
     @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on `is adult`, an assumption, which is not a definition; move it above the definition it is meant for, or remove it.
@@ -26,7 +26,7 @@ File: ends-because-misplaced.l4
   Range: 13:8-13:18
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/deprecated-assume
   Message:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
@@ -51,7 +51,7 @@ File: ends-because-misplaced.l4
   Range: 18:1-18:46
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ends-because-on-non-definition
   Message:
     @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on a section heading or its inputs, which is not a definition; move it above the definition it is meant for, or remove it.
@@ -61,7 +61,7 @@ File: ends-because-misplaced.l4
   Range: 25:1-25:46
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ends-because-on-non-definition
   Message:
     @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on a directive, which is not a definition; move it above the definition it is meant for, or remove it.
@@ -71,7 +71,7 @@ File: ends-because-misplaced.l4
   Range: 28:22-28:65
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ends-because-on-non-definition
   Message:
     @ends-because goes on a definition, a rule written with MEANS or DECIDE, whose author vouches that the rule's uses of itself come to an end.
     Here it is on `x`, an input, which is not a definition. A mark speaks for a whole definition, not for one of its inputs: to speak for the definition that reads this input, put the mark on a line of its own above that definition's GIVEN; otherwise remove it.
@@ -81,7 +81,7 @@ File: ends-because-misplaced.l4
   Range: 32:1-32:14
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ends-because-needs-reason
   Message:
     @ends-because needs a reason after it, on the same line. Here it has none, above `no reason given`.
     The reason is what a reader checks: a mark that says the calls end without saying why gives the reader nothing to check, so it is not accepted.
@@ -92,7 +92,7 @@ File: ends-because-misplaced.l4
   Range: 40:5-40:18
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ends-because-needs-reason
   Message:
     @ends-because needs a reason after it, on the same line. Here it has none, above `inner`.
     The reason is what a reader checks: a mark that says the calls end without saying why gives the reader nothing to check, so it is not accepted.

@@ -9,7 +9,7 @@ import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
-import L4.Cycles.Warning (CycleWarning (..), MarkNote (..))
+import L4.Cycles.Warning (CycleTrouble (..), CycleWarning (..), MarkNote (..))
 import L4.Lexer (PosToken, FixityDirection)
 import L4.Lint.NotReach (NotReachSite (..))
 import L4.Lint.SiblingReads (SiblingRead (..))
@@ -102,8 +102,11 @@ data CheckState =
     -- nothing after it can tell apart ('mergeAlike'), kept as one so that the
     -- rest of the check runs once instead of once per outcome. Everything
     -- that counts viable outcomes counts it as two ('outcomeWeight'): 'prune',
-    -- 'softprune' and 'forkWithLazyFallback'. It is never cleared, so an
-    -- outcome derived from a plural one is plural too.
+    -- 'softprune' and 'forkWithLazyFallback'. An outcome derived from a
+    -- plural one is plural too: each of those three runs its own search
+    -- without the flag it was entered with ('fromEntry'), so that it counts
+    -- only the merges of that search, and puts the flag back on what it
+    -- returns ('backToEntry').
     , bindLog :: ![Int]
     -- ^ The inference variables bound so far, latest first ('bindInfVar'), and
     -- how many ('bindLogLen'). The bindings an outcome made since an earlier
@@ -424,6 +427,11 @@ data CheckError =
     -- stacked on the identical range.
     -- Emitted only alongside an 'OpenedFieldCollisionAtRead' — two binders
     -- that merely share a field name and read it as @r's f@ are fine.
+  | ExportEventType (Maybe SrcRange) Resolved (Maybe Resolved)
+    -- ^ An @export-decorated DECIDE takes or returns an EVENT (see
+    -- 'L4.Export.mentionsEvent'). Arguments: the range of the @\@export@,
+    -- the exported function's name, and the input's name (Nothing when it is
+    -- the result).
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -664,7 +672,10 @@ data ExpectationContext =
     -- input it stands in for: the group's name, the input's 1-based
     -- position, and whether the GIVEN declares its type. See
     -- 'L4.TypeCheck.checkConsider'.
-  | ExpectNotArgumentContext -- arg of NOT
+  | ExpectOperatorArgContext Text (Maybe Int)
+    -- ^ an operand of an operator: the operator as written in the source
+    -- ('L4.TypeCheck.operatorAsWritten'), and the operand's 1-based position
+    -- ('Nothing' for the only operand of a prefix operator such as NOT)
   | ExpectPercentArgumentContext -- arg of '%'
   | ExpectConsArgument2Context -- second arg of cons
   | ExpectIfBranchesContext -- all branches of an if-then-else must have the same type
@@ -873,7 +884,134 @@ isExportPublicationRefusal :: CheckError -> Bool
 isExportPublicationRefusal = \ case
   ExportFunctionTypeInput {}  -> True
   ExportAssumeArityInput {}   -> True
+  ExportEventType {}          -> True
   _                           -> False
+
+-- | The stable diagnostic code of a checker diagnostic.
+--
+-- A code is what tools match on instead of a message, so codes are API:
+--
+--   * A code is a descriptive slug, @area/what-happened@, not a number.
+--   * A code is never renamed casually and never reused for something else,
+--     even after its diagnostic is gone. Rewording a message does not change
+--     its code.
+--   * A code never contains anything the user wrote.
+--   * Add a new code to @jl4-lsp/DIAGNOSTIC-CODES.md@ when you add it here.
+--
+-- The area says what kind of finding it is, not which stage reported it, so a
+-- checker warning about code that is probably wrong is a @lint/@ code. Parse
+-- errors, evaluation results and annotation warnings have the same promise:
+-- 'L4.Lexer.parseErrorCode', 'L4.EvaluateLazy.evalDirectiveCode' and
+-- 'L4.Parser.AnnotationWarning.annotationWarningCode'.
+--
+-- This match has no wildcard on purpose, so that a new constructor stops the
+-- build here until it has a code.
+checkErrorCode :: CheckError -> Text
+checkErrorCode = \ case
+  OutOfScopeError {}             -> "check/unknown-identifier"
+  KindError {}                   -> "check/wrong-type-argument-count"
+  TypeMismatch {}                -> "check/type-mismatch"
+  InconsistentNameInSignature {} -> "check/name-not-in-definition"
+  InconsistentNameInAppForm {}   -> "check/name-not-in-signature"
+  ClausePatternCountMismatch {}  -> "check/clause-pattern-count"
+  ExportedClausesWithoutGiven {} -> "check/export-clauses-without-given"
+  NonDistinctError {}            -> "check/duplicate-name"
+  AmbiguousTermError {}          -> "check/ambiguous-identifier"
+  AmbiguousOperatorError {}      -> "check/ambiguous-operator"
+  AmbiguousTypeError {}          -> "check/ambiguous-type"
+  InternalAmbiguityError         -> "check/internal-error"
+  IncorrectArgsNumberApp {}      -> "check/wrong-argument-count"
+  IllegalApp {}                  -> "check/not-a-function"
+  IllegalAppNamed {}             -> "check/not-a-function"
+  IncompleteAppNamed {}          -> "check/missing-named-arguments"
+  CheckInfo {}                   -> "check/result"
+  CheckWarning w                 -> checkWarningCode w
+  IllegalTypeInKindSignature {}  -> "check/invalid-type-parameter"
+  MissingEntityInfo {}           -> "check/internal-error"
+  DesugarAnnoRewritingError {}   -> "check/internal-error"
+  MixfixMatchErrorCheck {}       -> "check/mixfix-mismatch"
+  CyclicComputedFields {}        -> "check/cyclic-computed-fields"
+  CyclicTypeSynonyms {}          -> "check/cyclic-type-synonyms"
+  SynonymExpansionLimit {}       -> "check/type-synonym-chain-too-long"
+  SuppliedComputedField {}       -> "check/supplied-computed-field"
+  ExportFunctionTypeInput {}     -> "check/export-function-input"
+  ExportEventType {}             -> "check/export-event-type"
+  -- unstable-only constructors (2026-11 sync; codes assumed, not ruled)
+  MisattachedSectionGiven {}      -> "check/misattached-section-given"
+  UnreadImplicitSupply {}         -> "check/unread-implicit-supply"
+  AmbiguousImplicitSupply {}      -> "check/ambiguous-implicit-supply"
+  MisdeliveredImplicitSupply {}   -> "check/misdelivered-implicit-supply"
+  AmbiguousRootBinders {}         -> "check/ambiguous-root-binders"
+  RestatedSectionBinder {}        -> "check/restated-section-binder"
+  ImplicitCrossesImport {}        -> "check/implicit-crosses-import"
+  ExportAssumeArityInput {}       -> "check/export-assume-arity-input"
+  ExportAssumeNameClash {}        -> "check/export-assume-name-clash"
+  ActionPatternReference {}       -> "lint/action-pattern-reference"
+  ActionPatternNotComparable {}   -> "check/action-pattern-not-comparable"
+  JoinWithoutEvery {}             -> "check/join-without-every"
+  EmptyBreachBy {}                -> "check/empty-breach-by"
+  BreachByListNeedsPartyType {}   -> "check/breach-by-list-needs-party-type"
+  ContinuationWithoutJoin {}      -> "check/continuation-without-join"
+  WhoseWithoutCast {}             -> "check/whose-without-cast"
+  WhoseNotAField {}               -> "check/whose-not-a-field"
+  WhoseOperandNotBare {}          -> "check/whose-operand-not-bare"
+  AnchorUnavailable {}            -> "check/anchor-unavailable"
+  LifecycleUnavailable {}         -> "check/lifecycle-unavailable"
+  ArmingUnavailable {}            -> "check/arming-unavailable"
+  AnchorNotAnInstant {}           -> "check/anchor-not-an-instant"
+  OpeningNotAnInstant {}          -> "check/opening-not-an-instant"
+  AbsoluteEdgeAnchored {}         -> "check/absolute-edge-anchored"
+  EmptyWindow {}                  -> "check/empty-window"
+  BeforeOnJoinLine {}             -> "check/before-on-join-line"
+  RegulativeActorMismatch {}      -> "check/regulative-actor-mismatch"
+  TypicallyValueNotALiteral {}    -> "check/typically-value-not-a-literal"
+  TypicallyRequiresType {}        -> "check/typically-requires-type"
+  TypicallyOnTypeVariable {}      -> "check/typically-on-type-variable"
+  NonassertableOnNonDefinition {} -> "check/nonassertable-on-non-definition"
+  FixityAnnotationMalformed {}    -> "check/fixity-annotation-malformed"
+  FixityConflict {}               -> "check/fixity-conflict"
+  FixityReassociationClash {}     -> "check/fixity-reassociation-clash"
+  SuspiciousBinderPattern {}      -> "lint/suspicious-binder-pattern"
+  SuspiciousClausePattern {}      -> "lint/suspicious-clause-pattern"
+  NotReachesConnective {}         -> "check/not-reaches-connective"
+  OpenedFieldCollisionAtRead {}   -> "check/opened-field-collision-at-read"
+  OpenedFieldCollisionAtOpening {}-> "check/opened-field-collision-at-opening"
+  -- codes decided by Claude 2026-11-22, pending Meng's review
+  EndsBecauseOnNonDefinition {}   -> "check/ends-because-on-non-definition"
+  EndsBecauseNeedsReason {}       -> "check/ends-because-needs-reason"
+  EndsBecauseNoted {}             -> "lint/ends-because-noted"
+
+-- | The code of a checker warning. See 'checkErrorCode'.
+checkWarningCode :: CheckWarning -> Text
+checkWarningCode = \ case
+  PatternMatchRedundant {}    -> "lint/redundant-branch"
+  PatternMatchesMissing {}    -> "lint/non-exhaustive-match"
+  PatternClausesMissing {}    -> "lint/non-exhaustive-clauses"
+  PatternClauseUnreachable {} -> "lint/unreachable-clause"
+  ClauseAnnotationUnused {}   -> "lint/misplaced-clause-annotation"
+  ClauseArityChanged {}       -> "lint/clause-arity-changed"
+  -- unstable-only constructors (2026-11 sync; codes assumed, not ruled)
+  FixityIgnoredNonBinary {}       -> "lint/fixity-ignored-non-binary"
+  LifecycleNounHidesName {}       -> "lint/lifecycle-noun-hides-name"
+  OpenedFieldShadowsDefinition {} -> "lint/opened-field-shadows-definition"
+  DeprecatedAssume {}             -> "lint/deprecated-assume"
+  SiblingLedgerRead {}            -> "lint/sibling-ledger-read"
+  DeprecatedExactly {}            -> "lint/deprecated-exactly"
+  RenamedBuiltin {}               -> "lint/renamed-builtin"
+  -- codes decided by Claude 2026-11-22, pending Meng's review
+  CycleAlarm w                    -> cycleTroubleCode w.trouble
+
+-- | The code of each warning about a rule that starts itself again
+-- (smucclaw/l4-ide#1075; "L4.Cycles.Warning"). One code for each warning,
+-- so that a tool can tell the one an @\@ends-because@ silences from the two
+-- it never does. No wildcard, as in 'checkErrorCode' (codes decided by
+-- Claude 2026-11-22, pending Meng's review).
+cycleTroubleCode :: CycleTrouble -> Text
+cycleTroubleCode = \ case
+  CouldNotCheckThat {} -> "lint/not-shown-to-end"
+  GivesNoTime {}       -> "lint/starts-again-with-no-time"
+  StartsCopies {}      -> "lint/starts-copies-at-once"
+  NothingToExplain     -> "lint/ends-because-off-cycle"
 
 -- | Is this candidate still viable? Only 'SError'-severity diagnostics fail
 -- a candidate. Warnings and hints attached along the way must NOT influence
@@ -915,6 +1053,27 @@ bindInfVar i t =
     >> modifying' #bindLog (i :)
     >> modifying' #bindLogLen (+ 1)
 
+-- | The state a counting combinator ('prune', 'softprune',
+-- 'forkWithLazyFallback') runs its computation from: the state it was
+-- entered with, without 'CheckState.plural'. A combinator counts the viable
+-- outcomes OF ITS OWN SEARCH. A flag it was entered with says that the path
+-- around it stands for two, which the consumer that made the merge counts;
+-- read here, it counted that path again, once per combinator on the way,
+-- and a search with one viable outcome inside a plural path (a @WHERE@
+-- constant's own 'prune', in an operand after a merged one) was read as an
+-- ambiguity, which killed the path, and the module took the meaning that was
+-- left. (main 61c16b618, the soundness fix to legalese/l4-ide#683.)
+fromEntry :: CheckState -> CheckState
+fromEntry s = s { plural = False }
+
+-- | Put back on every outcome of a counting combinator the flag it was
+-- entered with ('fromEntry'), neither doubled nor cleared: an outcome of a
+-- path that stands for two still stands for two.
+backToEntry :: CheckState -> [(With CheckErrorWithContext a, CheckState)] -> [(With CheckErrorWithContext a, CheckState)]
+backToEntry s0
+  | s0.plural = map (\ (w, st) -> (w, st { plural = True }))
+  | otherwise = id
+
 instance HasSrcRange CheckErrorWithContext where
   rangeOf (MkCheckErrorWithContext e ctx) = rangeOf e <|> rangeOf ctx
 
@@ -933,6 +1092,7 @@ instance HasSrcRange CheckError where
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
   rangeOf (ExportedClausesWithoutGiven r _) = r
+  rangeOf (ExportEventType r _ _)           = r
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
@@ -1250,6 +1410,10 @@ data CheckEnv =
     -- 'L4.TypeCheck.leaveActionPattern' whenever the checker descends from a
     -- pattern into an /expression/, because an expression may contain a
     -- @CONSIDER@ of its own whose branch patterns are not action patterns.
+    , unlessOperand        :: !(Maybe SrcRange)
+    -- ^ The source range of @r@ while @l UNLESS r@ is checked. The checker
+    -- reads it as @l AND (NOT r)@ ('L4.Parser.infixUnless'), so that a type
+    -- error in @r@ names UNLESS rather than a NOT the author never wrote.
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
@@ -1324,6 +1488,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , sectionStack = []
     , localBindings = Set.empty
     , actionPatternPos = NotInActionPattern
+    , unlessOperand = Nothing
     }
 
 newtype SectionNames =
@@ -1555,66 +1720,6 @@ typeHeads (Fun _ onts t)  =
   concatMap (typeHeads . optionallyNamedTypeType) onts ++ typeHeads t
 typeHeads (Forall _ _ t)  = typeHeads t
 typeHeads (InfVar _ _ _)  = []
-
--- | Does this type mention a name-resolution failure sentinel anywhere?
--- Such a type is poisoned: we do not know what it was supposed to be.
-mentionsOutOfScope :: Type' Resolved -> Bool
-mentionsOutOfScope = any isOutOfScope . typeHeads
-
--- | Are these two types the same once every name-resolution sentinel is read as
--- a wildcard matching anything?
---
--- This is the test for \"the mismatch between them is /caused by/ a resolution
--- failure\", and it is much stronger than \"one of them /mentions/ a resolution
--- failure somewhere\" — which is all 'mentionsOutOfScope' can say, being a
--- whole-type predicate. A single poisoned sub-term is not licence to delete a
--- diagnostic whose actual discrepancy lies between two types we did resolve:
---
--- @
---   GIVEN xs IS A LIST OF Typo   -- Typo undeclared: LIST OF ⊥
---   GIVETH A NUMBER
---   h MEANS xs
--- @
---
--- reports both the undeclared @Typo@ /and/ NUMBER-versus-LIST, and the latter
--- is a genuine second defect: it survives verbatim once @Typo@ is declared. So
--- @NUMBER@ vs @LIST OF ⊥@ is not compatible here (the heads differ, and neither
--- head is a sentinel), whereas @⊥@ vs @Verdict@, @LIST OF ⊥@ vs
--- @LIST OF NUMBER@ and @FUNCTION FROM ⊥ TO NUMBER@ vs
--- @FUNCTION FROM Verdict TO NUMBER@ all are.
---
--- Conservative in the direction that matters: anything we cannot show to be
--- pure fallout (differing arities, differing shapes, 'Forall's we do not
--- alpha-rename) compares unequal, and the diagnostic is kept.
-sameModuloOutOfScope :: Type' Resolved -> Type' Resolved -> Bool
-sameModuloOutOfScope t1 t2
-  | poisonedHead t1 || poisonedHead t2 = True
-  | otherwise = case (t1, t2) of
-      (Type _, Type _) -> True
-      (TyApp _ r1 as1, TyApp _ r2 as2) ->
-        getUnique r1 == getUnique r2
-          && length as1 == length as2
-          && and (zipWith sameModuloOutOfScope as1 as2)
-      (Fun _ onts1 res1, Fun _ onts2 res2) ->
-        length onts1 == length onts2
-          && and
-               ( zipWith
-                   sameModuloOutOfScope
-                   (optionallyNamedTypeType <$> onts1)
-                   (optionallyNamedTypeType <$> onts2)
-               )
-          && sameModuloOutOfScope res1 res2
-      (Forall _ vs1 body1, Forall _ vs2 body2) ->
-        length vs1 == length vs2 && sameModuloOutOfScope body1 body2
-      (InfVar _ _ i1, InfVar _ _ i2) -> i1 == i2
-      _ -> False
-  where
-    -- Only a 'TyApp' can be headed by a sentinel: 'outOfScope' \/
-    -- 'ambiguousType' hand back a 'Resolved', and the only way one enters a
-    -- type is in type-constructor position.
-    poisonedHead :: Type' Resolved -> Bool
-    poisonedHead (TyApp _ r _) = isOutOfScope r
-    poisonedHead _             = False
 
 -- ----------------------------------------------------------------------------
 -- Info Map
@@ -2189,11 +2294,12 @@ forkWithLazyFallback :: forall a r. Bool -> [Check a] -> Check a -> (a -> Check 
 forkWithLazyFallback preambleErr cands fallback kont =
   MkCheck $ \ e s ->
     let
-      ks = runCheck (choose cands >>= kont) e s
+      -- Counted relative to the state at the fork ('fromEntry').
+      ks = runCheck (choose cands >>= kont) e (fromEntry s)
     in
-      case sum (map outcomeWeight ks) of
+      backToEntry s $ case sum (map outcomeWeight ks) of
         1 | not preambleErr -> ks
-        _                   -> ks ++ runCheck (fallback >>= kont) e s
+        _                   -> ks ++ runCheck (fallback >>= kont) e (fromEntry s)
 
 -- | Whether a 'TermKind' names a value in the ordinary term namespace (as
 -- opposed to a record selector or data constructor, which are reached through
@@ -2498,11 +2604,13 @@ orElseKeepAll m1 m2 = do
 prune :: forall a. Check a -> Check a
 prune m = do
   ctx <- asks (.errorContext)
-  MkCheck $ \ s env ->
+  MkCheck $ \ env s0 ->
     let
-      -- A plural outcome ('mergeAlike') is read as the two it stands for.
+      -- A plural outcome ('mergeAlike') is read as the two it stands for,
+      -- counted relative to the state the prune was entered with
+      -- ('fromEntry').
       candidates :: [(With CheckErrorWithContext a, CheckState)]
-      candidates = expandPlural (runCheck m s env)
+      candidates = expandPlural (runCheck m env (fromEntry s0))
 
       -- Lexical scoping across a forward reference (spec §12, FIX D). A
       -- branch that resolved a name to a not-yet-inferred binding OFF its
@@ -2547,13 +2655,17 @@ prune m = do
         | otherwise               = procFailed c cs
 
     in
-      -- What comes out of a prune is one outcome, and it is never plural: a
-      -- plural viable outcome is read as the two it stands for, so it is never
-      -- the single viable answer. It can still be the outcome that carries the
-      -- ambiguity (when every outcome after the second is viable), and that
-      -- state goes on to the next declaration, where the flag would make every
-      -- viable outcome count as two.
-      map (\ (w, st) -> (w, st { plural = False })) $
+      -- What comes out of a prune is one outcome, and it carries the flag it
+      -- was entered with and no other. The outcomes merged INSIDE the prune
+      -- have been counted here: a plural viable outcome is read as the two it
+      -- stands for, so it is never the single viable answer, and the one
+      -- outcome that would otherwise leave with such a flag is the ambiguity
+      -- of an all-viable list, a failure. The flag it was entered with belongs to
+      -- the path around the prune (a merge further out, still to be counted
+      -- by the consumer that made it), and goes back as it came. A top-level
+      -- declaration is entered with no flag, so its state goes on to the next
+      -- declaration with none. (main 61c16b618.)
+      map (\ (w, st) -> (w, st { plural = s0.plural })) $
         case leastDeferred of
           Just c  -> [c]
           Nothing -> proc candidates
@@ -2588,13 +2700,15 @@ softpruneWith
 softpruneWith merge m =
   MkCheck $ \ env st ->
     let
+      -- Counted relative to the state the softprune was entered with
+      -- ('fromEntry').
       candidates :: [(With CheckErrorWithContext a, CheckState)]
-      candidates = runCheck m env st
+      candidates = runCheck m env (fromEntry st)
     in
       -- The failures before the first viable outcome are dropped, as is every
       -- failure when exactly one viable outcome (counting a plural one as
       -- two) follows; with none, the last failure is kept.
-      case dropWhile ((== 0) . outcomeWeight) candidates of
+      backToEntry st $ case dropWhile ((== 0) . outcomeWeight) candidates of
         [] -> case candidates of
                 [] -> []
                 _  -> [last candidates]
@@ -2823,6 +2937,7 @@ extendEnv cis env =
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
     , actionPatternPos = e.actionPatternPos
+    , unlessOperand = e.unlessOperand
     }
     where
       u :: Unique

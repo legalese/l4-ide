@@ -1,0 +1,7 @@
+-- The middle #EVAL cannot be evaluated: it divides by zero.
+-- The #EVAL directives around it can.
+#EVAL 1 PLUS 1
+
+#EVAL 1 DIVIDED BY 0
+
+#EVAL 2 PLUS 2

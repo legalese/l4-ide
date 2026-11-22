@@ -3538,17 +3538,20 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               NotAnInteger _ _            -> "L4"
               UserError _                 -> "L4, L6, L8, L9, L10; JSON via PURE"
               BlackholeForced _           -> "L12"
-              StackOverflow               -> "TERMINATES (a resource bound, not a clause)"
+              StackOverflow _             -> "TERMINATES (a resource bound, not a clause)"
+              -- raised only by an #ASSERT REFUSED of a value read past a
+              -- directive's depth, which no DMN decision makes
+              ValueTooDeep                -> "not raised by an evaluation a DMN export answers"
               Stuck _                     -> "deliberately NOT foreclosed: the ASSUME input channel"
               -- raised only once a term has reached a site, which needs an
               -- unknown input, and never reported: the directive boundary
               -- rewrites it into 'Stuck' (UNKNOWN-EVALUATION-SPEC §4.5)
               RanOutOfSteps               -> "TERMINATES (a resource bound on an unknown; reported as Stuck)"
-            constructorCount = 9 :: Int
+            constructorCount = 10 :: Int
         -- the case above is TOTAL; -Werror's incomplete-pattern warning fires
-        -- on a tenth constructor before this assertion ever runs
-        coveredBy StackOverflow `shouldSatisfy` (not . Text.null)
-        constructorCount `shouldBe` 9
+        -- on an eleventh constructor before this assertion ever runs
+        coveredBy (StackOverflow 0) `shouldSatisfy` (not . Text.null)
+        constructorCount `shouldBe` 10
 
   -- smucclaw/l4-ide#936. Two gaps, one issue, and the tests are written in that
   -- order deliberately: the FEEL lowering alone would have removed a loud

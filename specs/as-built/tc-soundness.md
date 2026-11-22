@@ -16,7 +16,7 @@ Scope: unification (`TypeCheck/Unify.hs`), the detection of type synonym cycles 
   That includes a cycle hidden by a name: in `DECLARE W1 AKA B1 IS A Duo OF B1, B1` next to `DECLARE B1 a IS A LIST OF a`, the `B1` with no arguments is `W1`'s own alias.
   A synonym that merely shares its name with something else is not a cycle: `DECLARE Box IS A Box OF NUMBER` next to a record `DECLARE Box a HAS item IS AN a`, or next to a synonym `DECLARE Box a IS A LIST OF a`, is accepted whichever is declared first.
   A synonym that shares its name with an imported record of the same number of parameters is not accepted: the use is ambiguous, and the program gets the two ambiguity errors (`There are multiple definitions for the identifier`) and no cycle error.
-  With an alias (`DECLARE Cash AKA Money IS A Money`) and a use of it, the output also has a "must match" error and an internal-bug line, as on `main` (see the limits below).
+  With an alias (`DECLARE Cash AKA Money IS A Money`) and a definition that names `Cash` and `Money`, the program gets three ambiguity errors and nothing else (see the limits below).
 - Running out of the expansion limit (1000 synonyms in a row) is reported as a limit, not as a mismatch of types.
 - Unification no longer substitutes the whole type at every step of the descent, nor compares whole subtrees at every level, so a check does not grow with the square of the depth of a type nested on either side (measured below).
 - An ambiguous but well-typed expression under `#ASSERT` or `TIMEZONE IS` is reported as an ambiguity diagnostic instead of crashing the checker with `internal error: expected unique result, got several`.
@@ -110,9 +110,8 @@ Each use still unifies the whole type, so the cost grows with the depth times th
 - A synonym applied to a type nested deeply on the left is still compared as a whole at every synonym on the way down (`Unify.hs:118-120`); not measured here.
 - A chain of more than 1000 synonyms, each defined as the one before, is rejected with the limit message.
   `main` without this change accepts a chain of 1200 (measured above).
-- A program that uses an aliased synonym which collides with an imported record of the same number of parameters (`IMPORT lib` declaring `Money`, then `DECLARE Cash AKA Money IS A Money` and a definition that uses `Cash` and `Money`) gets the two ambiguity errors followed by "I've encountered a resolved name that has no additional information stored for it".
-  The output is the same on `main` and here; this change does not touch it, and it adds no cycle error to it.
-  `unstable` (at `786fcac59`) no longer prints the internal-bug line.
+- A program that uses an aliased synonym which collides with an imported record of the same number of parameters (`IMPORT lib` declaring `Money`, then `DECLARE Cash AKA Money IS A Money` and a definition with `GIVEN c IS A Cash` and `GIVETH A Money`) gets three ambiguity errors and no cycle error.
+  Before the name-resolution change (`resolution-diagnostics.md`) the same program also gave three "I've encountered a resolved name that has no additional information stored for it" errors and a "must match" error, seven diagnostics in all (measured with a build of `main` at `b179dc5de`).
 - `TIMEZONE IS` infers its expression with no expected type (`TypeCheck.hs:656`), so `TIMEZONE IS 42` checks clean.
   This is as it was before the change; `timezone-mixed-ambiguity.l4` pins the other side of the same fact.
 - `ok/tests/legal-persons-tests.ep.golden` still differs from its source file in the escaping of a non-ASCII string (`\206le` for `Île`); that comes from string-literal exact-print, which this change does not touch.

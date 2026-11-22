@@ -61,18 +61,20 @@ module L4.Parser.ResolveAnnotation (
   locRangeTo,
   LowerBound(..),
   locRangeFrom,
+  splitNlgsInRange,
 )
 where
 
 import Base
 
-import Data.Char (isSpace)
+import Data.Char (isAsciiLower, isAsciiUpper, isDigit, isSpace)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import L4.Annotation
-import L4.Lexer (AnnoType (..), LangTag, PosToken (..), TAnnotations (..), TokenType (..), displayTokenType)
+import L4.Lexer (AnnoType (..), LangTag (..), PosToken (..), langPrimary, TAnnotations (..), TokenType (..), displayTokenType)
 import L4.Syntax
 import L4.Parser.SrcSpan
 
@@ -93,6 +95,31 @@ data Warning
     -- ^ Two or more annotations on one name IN THE SAME LANGUAGE (the tag, or
     -- 'Nothing' for untagged). Must be at least two. Annotations in other
     -- languages on the same name are unaffected and still attach.
+  | LangOverridden (WithSpan LangTag) (WithSpan LangTag)
+    -- ^ A @\@lang@ line that names a different language from the LAST @\@lang@
+    -- line in the module, which is the one in force. The first is the
+    -- overridden line and the second is the line that wins. One per
+    -- overridden line; a line that repeats the winning tag contradicts
+    -- nothing and is not reported.
+  | LoneLangTag Name (Maybe Name) NlgWithSpan (Maybe LangTag)
+    -- ^ A wording tagged with a language that nothing in the module backs
+    -- ('isBackedLangTag'): it is the name's only wording, and the tag is not
+    -- one a @\@lang@ line declares, not English or Hebrew, not one of those
+    -- with a region or script added, and not carried by any name that also
+    -- has a wording in another language. A tag exists to tell renderings of
+    -- one name apart, so this is the shape of a sentence whose first word was
+    -- joined to the colon (@\@nlg:the employee pays@, @\@nlg:en-route for
+    -- …@). The wording is attached all the same.
+    --
+    -- The second field is the rule whose sentence the wording is, when it is
+    -- written after an input in the rule's head ('addNlgRuleHead'). The last
+    -- is the module's language, when it differs from this tag only in case:
+    -- tags are compared exactly, so @FR@ is not @fr@.
+  | SpacedSlot (WithSpan Text) Text
+    -- ^ A percent pair with spaces inside it around one name, such as
+    -- @% amount %@, in an annotation. It prints as plain text, because a slot
+    -- is @%amount%@ with no spaces. The first is the pair as written, with the
+    -- range of the whole annotation; the second is the name between the signs.
   | RefUnattached RefWithSpan
     -- ^ A @ref has no AST node after it to attach to: it comes after the last
     -- one, at the end of the file.
@@ -189,13 +216,20 @@ data WithSpan a = WithSpan
 --
 -- Note, the 'Program Name's exactprint annotations are not modified,
 -- we merely add structured data to the ast node's respective 'Anno'.
-addNlgCommentsToAst :: HasNlg a => LangTag -> [Nlg] -> a -> (a, NlgS)
-addNlgCommentsToAst moduleLang nlgs p = do
+--
+-- The declared languages are the module's @\@lang@ lines, newest first, so the
+-- head is the module's language.
+addNlgCommentsToAst :: HasNlg a => LangTag -> [LangTag] -> [Nlg] -> a -> (a, NlgS)
+addNlgCommentsToAst moduleLang declared nlgs p = do
   let
     (nlgWithSpan, unfindable) = preprocessNlgs nlgs
 
     initialNlgS = NlgS
       { moduleLang = moduleLang
+      , declaredLangs = declared
+      , multilingualTags = Set.empty
+      , loneCandidates = []
+      , sentenceOf = Nothing
       , nlgs = nlgWithSpan
       , warnings = fmap UnknownLocation unfindable
       }
@@ -203,6 +237,7 @@ addNlgCommentsToAst moduleLang nlgs p = do
   runNlg initialNlgS $ do
     a <- addNlg p
     leftoversToWarnings
+    loneTagsToWarnings
     pure a
  where
   locRange = MkLocRange StartOfFile EndOfFile
@@ -217,6 +252,58 @@ leftoversToWarnings = do
   liftNlgA $ do
     ns <- use #nlgs
     traverse_ addWarning $ fmap NotAttached ns
+
+-- | Report the lone wordings whose tag nothing in the module backs. Only now,
+-- with every name visited, is it known which tags some name carries beside a
+-- wording in another language.
+loneTagsToWarnings :: NlgA ()
+loneTagsToWarnings = liftNlgA $ do
+  declared <- use #declaredLangs
+  multi <- use #multilingualTags
+  candidates <- use #loneCandidates
+  for_ (reverse candidates) $ \ (name, rule, one) ->
+    for_ (nlgLangTag one.payload) $ \ tag ->
+      unless (isBackedLangTag declared multi tag) $
+        addWarning $ LoneLangTag name rule one (caseTwinOf declared tag)
+
+-- | Does something in the module back this tag as a language, rather than it
+-- being the first word of a sentence joined to the colon?
+--
+-- * a @\@lang@ line declares it;
+--
+-- * some name carries it beside a wording in another language, which is what
+--   a tag is for; or
+--
+-- * it is a language the module declares, or English (the default) or Hebrew
+--   (which has a phrasebook, 'L4.Nlg.Phrasebook.phrasebookFor'), with nothing
+--   after it but a script or a region: @en-GB@, @he-IL@, @pt-BR@ in a module
+--   that declares @pt@, @zh-Hant@. English and Hebrew are matched in any case.
+--   A word after the hyphen that is neither a script nor a region is not a
+--   language, so @en-route@ is reported.
+isBackedLangTag :: [LangTag] -> Set.Set LangTag -> LangTag -> Bool
+isBackedLangTag declared multi tag@(MkLangTag t) =
+  tag `elem` declared
+    || tag `Set.member` multi
+    || (all isScriptOrRegion subtags && knownLanguage)
+ where
+  (primary, afterPrimary) = Text.breakOn "-" t
+  subtags = if Text.null afterPrimary then [] else Text.splitOn "-" (Text.drop 1 afterPrimary)
+  knownLanguage =
+    Text.toLower primary `elem` ["en", "he"]
+      || primary `elem` map langPrimary declared
+  isScriptOrRegion st =
+       (Text.length st == 4 && Text.all isAsciiLetter st)
+    || (Text.length st == 2 && Text.all isAsciiLetter st)
+    || (Text.length st == 3 && Text.all isDigit st)
+  isAsciiLetter c = isAsciiLower c || isAsciiUpper c
+
+-- | The module's language, when a tag differs from it only in case. Only the
+-- module's language, the newest declaration, is offered: an earlier @\@lang@
+-- line that the last one overrides is not the language the author is writing
+-- in.
+caseTwinOf :: [LangTag] -> LangTag -> Maybe LangTag
+caseTwinOf declared (MkLangTag t) =
+  List.find (\ (MkLangTag d) -> Text.toLower d == Text.toLower t) (take 1 declared)
 
 addWarning :: Warning -> NlgM ()
 addWarning warn = do
@@ -249,12 +336,16 @@ class HasNlg a where
 
   -- | The ordinary claim, narrowed to the annotations that satisfy a
   -- predicate; the rest stay for a later node. This is how a name claims a
-  -- region that is not one contiguous range — see 'addNlgFieldName' and
+  -- region that is not one contiguous range — see 'addNlgTypedName' and
   -- 'addNlgInput'.
   --
   -- Defaults to the ordinary claim, so only the 'Name' instance has to care.
   addNlgWhere :: (NlgWithSpan -> Bool) -> a -> NlgA a
   addNlgWhere _ = addNlg
+
+  -- | The name this node is, for a warning to name. Only 'Name' is one.
+  nlgNameOf :: a -> Maybe Name
+  nlgNameOf _ = Nothing
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
   addNlg a = extendNlgA a $ case a of
@@ -320,8 +411,11 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Decide n) where
     MkDecide ann tySig appFormAka expr -> do
       tySig' <- signatureBeforeKeyword ann (addNlg tySig)
       appFormAka' <- case view annPmMatrix ann of
+        -- A group's head form claims its head and its AKA only
+        -- ('addNlgGroupHead'); a plain definition's head keeps track of whose
+        -- sentence a wording on an input is ('addNlgRuleHead').
         Just _ -> addNlgGroupHead appFormAka
-        Nothing -> addNlg appFormAka
+        Nothing -> addNlgRuleHead appFormAka
       -- Inside the body's region, which runs from the first clause's body to
       -- the last's, so that an annotation between two clauses is in reach.
       -- The ones between two clauses are claimed first, before a name of the
@@ -371,6 +465,25 @@ addNlgGroupHead a = extendNlgA a $ case a of
     maka' <- traverse addNlg maka
     pure $ MkAppForm ann n' ns maka'
 
+-- | A rule's head, visited as any 'AppForm' is, keeping track of whose
+-- sentence a wording on an input is.
+--
+-- A wording written after an input in the head is read as the rule's sentence
+-- when the rule's name has none and no input before it has one
+-- ('L4.Nlg.promoteHeadInputNlg'). While the inputs are visited, 'sentenceOf'
+-- names the rule for as long as that holds, so that a warning about such a
+-- wording ('LoneLangTag') names the rule the author wrote it for, and not the
+-- input it sits after.
+addNlgRuleHead :: (HasSrcRange n, HasNlg n) => AppForm n -> NlgA (AppForm n)
+addNlgRuleHead a = extendNlgA a $ case a of
+  MkAppForm ann n ns maka -> do
+    n' <- hoistNlgA (>>= \ r -> r <$ assign' #sentenceOf (mfilter (not . hasWording) (nlgNameOf r))) (addNlg n)
+    ns' <- traverse (hoistNlgA (>>= \ r -> r <$ when (any hasWording (nlgNameOf r)) (assign' #sentenceOf Nothing)) . addNlg) ns
+    maka' <- hoistNlgA (assign' #sentenceOf Nothing *>) (traverse addNlg maka)
+    pure $ MkAppForm ann n' ns' maka'
+ where
+  hasWording nm = isJust (view annNlg (getAnno nm))
+
 -- | Is this the @LET@ that a group of clauses is lowered to, binding the clauses
 -- after the first ('L4.Parser.bindFallthrough')? Its declaration holds the
 -- LATER clauses and its body the first, so the usual descent, declarations
@@ -398,6 +511,7 @@ claimLaterClauseNlgs ann = case view annPmMatrix ann of
       case betweenClauses prev cl of
         Just between -> do
           nlgs <- takeNlgCommentsWhere between
+          -- As 'HasNlg Name' attaches them: per language.
           hdAnn <- attachNlgsByLanguage cl.clauseHead (getAnno cl.clauseHead) nlgs
           pure (MkPmMatrixClause cl.headRange cl.patterns (setAnno hdAnn cl.clauseHead) cl.clauseAka cl.clauseDescs (map (.payload) nlgs) cl.bodyRange)
         Nothing -> pure cl
@@ -581,16 +695,6 @@ addNlgFields claimsBelow typedNames = case List.unsnoc typedNames of
     pure (fields' <> [lastField'])
   Nothing -> pure []
 
--- | Run a computation but advertise NO span for it, so a sibling's range is
--- not cut short by it.
---
--- 'extendNlgA' inside each instance advertises the node's own span, which is
--- what delimits its neighbours. A record field's NAME has to be able to reach
--- PAST its type to the line below, so the type must stop advertising — while
--- still claiming, which is why this is not 'unclaimedSignatureType'.
-unspanned :: NlgA a -> NlgA a
-unspanned a = liftNlgA a.computation
-
 -- | A type mentioned in a SIGNATURE claims no @\@nlg@ annotation and registers
 -- no span, so the name it belongs to claims the whole binder instead.
 --
@@ -668,6 +772,42 @@ addNlgTypedName claimsBelow a = extendNlgA a $ case a of
       -- the NEXT field, or to nothing (smucclaw/l4-ide#997).
       pure $ MkTypedName ann n' ty' mTypically mExpr
 
+-- | The claim a RECORD FIELD's name makes, given the span of its type.
+--
+-- Two disjoint regions, which is why it needs the type's span rather than
+-- just a range: everything BEFORE the type (the field's own trailing
+-- gloss, as always), plus everything on a LATER LINE than the field
+-- (ruled 2026-09-19 — an annotation written underneath a field describes
+-- that field), as far as @claimsBelow@ accepts: everything, for a field with
+-- another after it, and for the last field only what 'addNlgFields' lets it
+-- have. What falls between — trailing the type on the field's own line — is
+-- left for the type, which runs next.
+addNlgFieldName ::
+  (HasSrcRange a, HasNlg a) =>
+  (NlgWithSpan -> Bool) -> Maybe SrcSpan -> a -> NlgA a
+addNlgFieldName claimsBelow mTySpan a =
+  addNlgWhere (\ w -> startsBefore mTySpan w || (startsBelow a w && claimsBelow w)) a
+
+-- | Does this annotation begin before the given span starts? A missing span
+-- means "no type to be before", so nothing qualifies on that ground.
+startsBefore :: Maybe SrcSpan -> NlgWithSpan -> Bool
+startsBefore Nothing      _ = False
+startsBefore (Just span') w = w.range.start < span'.start
+
+-- | Run a computation but advertise NO span for it, so a sibling's range is
+-- not cut short by it.
+--
+-- 'extendNlgA' inside each instance advertises the node's own span, which is
+-- what delimits its neighbours. A record field's NAME has to be able to reach
+-- PAST its type to the line below, so the type must stop advertising — while
+-- still claiming, which is why this is not 'unclaimedSignatureType'.
+unspanned :: NlgA a -> NlgA a
+unspanned a = liftNlgA a.computation
+
+-- | The lookup range that stops at the end of the line a node ends on.
+upToEndOfLineOf :: SrcRange -> LocRange
+upToEndOfLineOf r = locRangeTo (Just (endOfLine (fromSrcRange r).end))
+
 instance (HasSrcRange n, HasNlg n) => HasNlg (ConDecl n) where
   addNlg = addNlgConDecl (const True)
 
@@ -694,7 +834,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
 -- annotation TRAILING a construct on the same line describes that construct;
 -- an annotation starting a line of its own describes what FOLLOWS it, except
 -- inside a field list or a GIVEN list, where it describes the item above
--- ('addNlgFieldName', 'addNlgInput'). Those are the two shapes authors
+-- ('addNlgTypedName', 'addNlgInput'). Those are the two shapes authors
 -- actually write:
 --
 -- @
@@ -726,10 +866,6 @@ confineToEndOfLine e = hoistNlgA (inLocRange r)
     Just span' ->
       locRangeFrom (Just span'.start)
         <> locRangeTo (Just (endOfLine span'.end))
-
--- | The lookup range that stops at the end of the line a node ends on.
-upToEndOfLineOf :: SrcRange -> LocRange
-upToEndOfLineOf r = locRangeTo (Just (endOfLine (fromSrcRange r).end))
 
 -- | The last column of a line, expressed as the first column of the next.
 -- Cheaper and more robust than asking how long the line actually is, and
@@ -871,22 +1007,7 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Aka n) where
 instance HasNlg Name where
   addNlg = addNlgNameWhere (const True)
   addNlgWhere = addNlgNameWhere
-
--- | The claim a RECORD FIELD's name makes, given the span of its type.
---
--- Two disjoint regions, which is why it needs the type's span rather than
--- just a range: everything BEFORE the type (the field's own trailing
--- gloss, as always), plus everything on a LATER LINE than the field
--- (ruled 2026-09-19 — an annotation written underneath a field describes
--- that field), as far as @claimsBelow@ accepts: everything, for a field with
--- another after it, and for the last field only what 'addNlgFields' lets it
--- have. What falls between — trailing the type on the field's own line — is
--- left for the type, which runs next.
-addNlgFieldName ::
-  (HasSrcRange a, HasNlg a) =>
-  (NlgWithSpan -> Bool) -> Maybe SrcSpan -> a -> NlgA a
-addNlgFieldName claimsBelow mTySpan a =
-  addNlgWhere (\ w -> startsBefore mTySpan w || (startsBelow a w && claimsBelow w)) a
+  nlgNameOf = Just
 
 -- | The shared body of both of 'Name'\'s claims.
 addNlgNameWhere :: (NlgWithSpan -> Bool) -> Name -> NlgA Name
@@ -906,12 +1027,6 @@ startsBelow :: HasSrcRange e => e -> NlgWithSpan -> Bool
 startsBelow e w = case fromSrcRange <$> rangeOf e of
   Nothing    -> False
   Just span' -> w.range.start.line > span'.end.line
-
--- | Does this annotation begin before the given span starts? A missing span
--- means "no type to be before", so nothing qualifies on that ground.
-startsBefore :: Maybe SrcSpan -> NlgWithSpan -> Bool
-startsBefore Nothing      _ = False
-startsBefore (Just span') w = w.range.start < span'.start
 
 -- | Attach the annotations in scope for one name, partitioned by the language
 -- each one declares.
@@ -961,6 +1076,20 @@ attachNlgsByLanguage a ann nlgs0 = do
     case grp of
       (_ : _ : _) -> addWarning $ Ambiguous a tag grp
       _           -> pure ()
+  -- A name with wordings in two or more languages is what backs a tag
+  -- ('isBackedLangTag'); a name with one tagged wording is a candidate for a
+  -- 'LoneLangTag', decided once every name has been seen
+  -- ('loneTagsToWarnings').
+  case grouped of
+    _ : _ : _ -> modifying' #multilingualTags (Set.union (Set.fromList (mapMaybe fst grouped)))
+    _         -> pure ()
+  case nlgs0 of
+    [one]
+      | isJust (nlgLangTag one.payload)
+      , not (nlgIsBlank one.payload) -> do
+          rule <- use #sentenceOf
+          modifying' #loneCandidates ((a, rule, one) :)
+    _ -> pure ()
   lang <- use #moduleLang
   pure $ case pickDefault lang unique of
     Nothing         -> ann
@@ -2550,7 +2679,7 @@ registerNlgA a = registerSrcSpanNlgA (fromSrcRange <$> rangeOf a)
 -- ----------------------------------------------------------------------------
 
 -- | The state of 'NlgM' contains a list of pending 'Nlg' comments. We go
--- over the AST, looking up these comments using 'takeNlgComments' and removing
+-- over the AST, looking up these comments using 'takeNlgCommentsWhere' and removing
 -- them from the state. Also, using a state means we never use the same
 -- 'Nlg' twice.
 --
@@ -2563,6 +2692,18 @@ data NlgS = NlgS
     -- ^ The module's declared @\@lang@, or 'defaultModuleLang'. Read by
     -- 'pickDefault' to decide which of several renderings is the one a caller
     -- who named no language should get.
+  , declaredLangs :: ![LangTag]
+    -- ^ The module's @\@lang@ lines, newest first. Read by 'isBackedLangTag'.
+  , multilingualTags :: !(Set.Set LangTag)
+    -- ^ The tags carried by a name that also has a wording in another
+    -- language. Each is backed as a language ('isBackedLangTag').
+  , loneCandidates :: ![(Name, Maybe Name, NlgWithSpan)]
+    -- ^ The names whose only wording is tagged, newest first, each with the
+    -- rule whose sentence it is ('sentenceOf'). Reported as a 'LoneLangTag'
+    -- after the traversal, when the tag turns out to be backed by nothing.
+  , sentenceOf :: !(Maybe Name)
+    -- ^ While the inputs of a rule's head are visited, the rule whose sentence
+    -- a wording on one of them would be ('addNlgRuleHead').
   , nlgs :: ![NlgWithSpan]
     -- ^ Nlg annotations that haven't been assigned to a specific 'Name' or
     -- other abstract syntax node.
@@ -2676,7 +2817,7 @@ prettyLocRange locRange =
 --
 --   inLocRange r1 $
 --   inLocRange r2 $
---     takeNlgComments ...  -- Only takes comments in the (r1 <> r2) location range.
+--     takeNlgCommentsWhere ...  -- Only takes comments in the (r1 <> r2) location range.
 --
 -- Note that it does not blindly override the range but tightens it using (<>).
 -- At many use sites, you will see something along the lines of:
@@ -2698,39 +2839,53 @@ prettyLocRange locRange =
 inLocRange :: LocRange -> NlgM a -> NlgM a
 inLocRange r (MkNlgM m) = MkNlgM $ \r' -> m (r <> r')
 
--- | Get all the 'Nlg' comments that are within
--- the range of 'LocRange'.
+-- | Split the 'Nlg' comments for one node.
 --
 -- @
---   'takeNlgsInRange' locRange nlgs
+--   'splitNlgsInRange' locRange p nlgs
 -- @
 --
--- The first component of the result are the 'nlgs' within the 'LocRange',
--- and the second component are the nlgs that aren't within the 'LocRange'.
-takeNlgsInRange :: LocRange -> [NlgWithSpan] -> ([NlgWithSpan], [NlgWithSpan])
-takeNlgsInRange locRange nlgs =
-  partition
-    (\nlg -> nlg.range `subRangeOf` desiredRange)
-    nlgs
+-- The first component of the result are the 'nlgs' that are within the
+-- 'LocRange' and satisfy @p@, in the order they came. The second component is
+-- what stays for a later node to claim: first the ones within the 'LocRange'
+-- that @p@ declined, then the ones outside it, each group in the order it came.
+--
+-- One strict pass, and the tail of the list after the last annotation in range
+-- is shared with the input rather than copied. A module with thousands of
+-- annotations asks this once per name, so what a call allocates is what sets
+-- how much the garbage collector has to copy.
+splitNlgsInRange ::
+  LocRange -> (NlgWithSpan -> Bool) -> [NlgWithSpan] -> ([NlgWithSpan], [NlgWithSpan])
+splitNlgsInRange locRange p nlgs0 = go [] [] [] 0 nlgs0 nlgs0
  where
   desiredRange = MkSrcSpan start end
   end = upperBoundToSrcSpan locRange.rangeTo
   start = lowerBoundToSrcSpan locRange.rangeFrom
+  within nlg = nlg.range `subRangeOf` desiredRange
 
--- | Monadic version of 'takeNlgsInRange'.
--- Takes the 'Nlg's that are currently in scope and removes
--- them from the internal state.
---
--- | 'takeNlgComments', but only those in range that also satisfy @p@. The rest
--- stay in the state for a later node to claim.
+  -- @taken@ and @declined@ are the ones in range so far, newest first.
+  -- @before@ is the ones out of range that precede the last one in range,
+  -- newest first, and @skipped@ counts the out-of-range ones after it, which
+  -- are the front of @shared@: the input from just after the last one in range.
+  go !taken !declined !before !skipped shared = \ case
+    [] -> (reverse taken, reverse declined <> (reverse before <> shared))
+    n : ns
+      | within n ->
+          let before' = reverse (List.take skipped shared) <> before
+          in if p n
+               then go (n : taken) declined before' 0 ns ns
+               else go taken (n : declined) before' 0 ns ns
+      | otherwise -> go taken declined before (skipped + 1) shared ns
+
+-- | Take the 'Nlg' comments that are within the range of the current
+-- 'LocRange' and satisfy @p@, and remove them from the internal state. The
+-- rest stay in the state for a later node to claim.
 takeNlgCommentsWhere :: (NlgWithSpan -> Bool) -> NlgM [NlgWithSpan]
 takeNlgCommentsWhere p = do
   s <- get
   locRange <- ask
-  let
-    (here, elsewhere) = takeNlgsInRange locRange s.nlgs
-    (taken, declined) = List.partition p here
-  put (s{nlgs = declined <> elsewhere})
+  let (taken, rest) = splitNlgsInRange locRange p s.nlgs
+  put (s{nlgs = rest})
   pure taken
 
 {- Note [Adding Haddock comments to the syntax tree]

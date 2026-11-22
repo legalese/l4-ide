@@ -1,0 +1,6 @@
+-- Typechecks cleanly. The only #ASSERT is on a bare assumed BOOLEAN, which
+-- reduces to the symbolic term WITHOUT raising. It cannot be decided, so it
+-- fails the run like any other undecided assertion: it used to be reported as a
+-- clean "assertion failed" and exit 0.
+ASSUME b IS A BOOLEAN
+#ASSERT b

@@ -99,6 +99,7 @@ library
     LSP.Core.Types.Shake
 
     LSP.L4.Actions
+    LSP.L4.BlockingErrors
     LSP.L4.BuildInfo
     LSP.L4.DocumentSymbols
     LSP.L4.EmbeddedLibrary
@@ -164,13 +165,16 @@ test-suite jl4-lsp-test
   other-modules:
     AtomKeySizeSpec
     AtomKeySweepSpec
+    BlockingErrorsSpec
     BuildInfoSpec
     CheckSource
     ClauseGeneratedNamesSpec
     ClauseGroupLadderSpec
     CorpusSweep
     CosmosExprSpec
+    DiagnosticCodesSpec
     EmbeddedLibrarySpec
+    FileCheckedSpec
     HoverDisplaySpec
     ImportDiagnosticSpec
     ImportUriSpec
@@ -178,6 +182,11 @@ test-suite jl4-lsp-test
     LadderAtomIdSpec
     LadderCallExpansionSpec
     LadderTermKeySpec
+    ImportClosureSpec
+    ImportOnceSpec
+    ImportSharedSpec
+    InspectorOutcomeSpec
+    LatestDiagnosticsSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
     ProvisionEditorSpec
@@ -185,12 +194,15 @@ test-suite jl4-lsp-test
     StateGraphLensSpec
     UnknownAnnotationLspSpec
     VisualiseExpansionOptInSpec
+  -- FileCheckedSpec talks to the server.
   build-tool-depends:
-    hspec-discover:hspec-discover
+    hspec-discover:hspec-discover,
+    jl4-lsp:jl4-lsp
   build-depends:
     aeson,
     bytestring,
     containers,
+    deepseq,
     directory,
     filepath,
     hspec,
@@ -200,5 +212,6 @@ test-suite jl4-lsp-test
     lsp-types,
     mtl,
     optics,
+    process,
     text,
     text-rope
