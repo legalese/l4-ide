@@ -9,6 +9,9 @@
 -- STRING where an enumeration or a DATE was expected, and a number was not
 -- wrapped in JUST. Each assertion here failed or stopped the run.
 --
+-- The same held for JSONDECODE passed as a function, as in `map JSONDECODE
+-- xs`, where the decode happens inside `map`.
+--
 -- The CONTROLS at the end pin answers that did not change and must not change
 -- by accident: decodes whose type is a type parameter (GIVEN a IS A TYPE),
 -- which is the issue's own repro and is still open, and decodes whose type a
@@ -106,6 +109,57 @@ GIVETH A NUMBER
     WHEN LEFT problem THEN 0 - 1
 
 #ASSERT `decoded labels` EQUALS 5
+
+--------------------------------------------------------------------------------
+-- JSONDECODE passed as a function. The decode happens where the function is
+-- finally applied, inside the prelude's `map`, whose types say nothing about
+-- these calls; the type comes from where JSONDECODE is written.
+--------------------------------------------------------------------------------
+
+-- At a record.
+GIVEN r IS AN EITHER STRING Tree GIVETH A NUMBER
+`label or minus one` r MEANS
+  CONSIDER r
+    WHEN RIGHT t THEN t's label
+    WHEN LEFT problem THEN 0 - 1
+
+GIVETH A LIST OF EITHER STRING Tree
+`trees via map` MEANS map JSONDECODE (LIST "{\"label\":2,\"kids\":[]}", "{\"label\":3,\"kids\":[]}")
+
+#ASSERT sum (map `label or minus one` `trees via map`) EQUALS 5
+
+-- At an enumeration.
+GIVEN r IS AN EITHER STRING Colour GIVETH A BOOLEAN
+`is blue` r MEANS
+  CONSIDER r
+    WHEN RIGHT c THEN c EQUALS Blue
+    WHEN LEFT problem THEN FALSE
+
+GIVETH A LIST OF EITHER STRING Colour
+`colours via map` MEANS map JSONDECODE (LIST "\"Red\"", "\"Blue\"")
+
+#ASSERT map `is blue` `colours via map` EQUALS (LIST FALSE, TRUE)
+
+-- At a DATE.
+GIVEN r IS AN EITHER STRING DATE GIVETH A NUMBER
+`day or minus one` r MEANS
+  CONSIDER r
+    WHEN RIGHT d THEN DATE_DAY d
+    WHEN LEFT problem THEN 0 - 1
+
+GIVETH A LIST OF EITHER STRING DATE
+`dates via map` MEANS map JSONDECODE (LIST "\"2026-03-04\"")
+
+#ASSERT sum (map `day or minus one` `dates via map`) EQUALS 4
+
+-- Through a definition with no signature, whose type its use fixes.
+DECIDE `decode a tree` IS JSONDECODE
+
+GIVETH A NUMBER
+`label via named decoder` MEANS
+  sum (map `label or minus one` (map `decode a tree` (LIST "{\"label\":6,\"kids\":[]}")))
+
+#ASSERT `label via named decoder` EQUALS 6
 
 --------------------------------------------------------------------------------
 -- CONTROLS: answers that did not change.

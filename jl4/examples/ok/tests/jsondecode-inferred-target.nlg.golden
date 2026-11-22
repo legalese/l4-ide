@@ -6,6 +6,10 @@
 `decoded day` is equal to 4
 `decoded maybe` is equal to 5
 `decoded labels` is equal to 5
+the sum of `label or minus one` applied to each item of `trees via map` is equal to 5
+`is blue` applied to each item of `colours via map` is equal to list of `FALSE` and `TRUE`
+the sum of `day or minus one` applied to each item of `dates via map` is equal to 4
+`label via named decoder` is equal to 6
 `decoded passes` with `is big`
 `some of` with `always`
 `label of one tree` is equal to 2
