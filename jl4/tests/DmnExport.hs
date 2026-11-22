@@ -3233,6 +3233,32 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               \  WHEN x FOLLOWED BY rest THEN x PLUS total rest\n"
         notesOf "D-PARTIAL" drg `shouldBe` []
 
+      -- A type parameter (@a IS A TYPE@) is a binder of the GIVEN and no
+      -- argument of a call, so it must not shift the positions the check
+      -- compares: with one first, the call that never ends was certified and
+      -- the call on the tail was refused (smucclaw/l4-ide#1077).
+      it "TERMINATES: a type parameter does not shift the argument positions" $ do
+        let source polymorphic call =
+              Text.unlines $
+                [ "IMPORT prelude", "" ]
+                  <> ( if polymorphic
+                         then [ "GIVEN a IS A TYPE", "      xs IS A LIST OF a", "      ys IS A LIST OF a" ]
+                         else [ "GIVEN xs IS A LIST OF NUMBER", "      ys IS A LIST OF NUMBER" ] )
+                  <> [ "GIVETH A NUMBER"
+                     , "f xs ys MEANS"
+                     , "  CONSIDER xs"
+                     , "    WHEN EMPTY THEN 0"
+                     , "    WHEN z FOLLOWED BY zs THEN f " <> call
+                     ]
+            refused src =
+              not (null [n | n <- notesOf "D-PARTIAL" (drgOf src), Text.isInfixOf "TERMINATES" n.message])
+        -- recurses on xs itself, so never ends on a non-empty list: refused
+        refused (source False "xs zs") `shouldBe` True
+        refused (source True  "xs zs") `shouldBe` True
+        -- recurses on the tail, so ends: certified
+        refused (source False "zs ys") `shouldBe` False
+        refused (source True  "zs ys") `shouldBe` False
+
       it "TERMINATES: rejects NUMBER-measure recursion (a don't-know, not a proof)" $ do
         let drg = drgOf
               "GIVEN n IS A NUMBER\n\
