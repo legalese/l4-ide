@@ -186,6 +186,7 @@ test-suite jl4-lsp-test
     ImportOnceSpec
     ImportSharedSpec
     InspectorOutcomeSpec
+    LatestDiagnosticsSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
     ProvisionEditorSpec

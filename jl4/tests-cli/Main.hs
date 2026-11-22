@@ -16,7 +16,7 @@ import Control.Exception (IOException, finally, try)
 import Control.Monad (forM, forM_, unless, void, when)
 import qualified Data.Char as Char
 import Data.Char (isAlpha, isDigit, isSpace, toLower)
-import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, tails)
+import Data.List (dropWhileEnd, isInfixOf, isPrefixOf, isSuffixOf, nub, sort, stripPrefix, tails)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy.Char8 as BSL8
@@ -1127,6 +1127,37 @@ spec bin = do
     it "runs a file whose @lang has no language" $
       expectOk bin ["run", malformedLangFixture] "Result:\n  2\n"
 
+    -- Each time a file's diagnostics change, the pipeline logs all of them
+    -- again, and l4 run and l4 check printed every list: l4 run printed a
+    -- type checker's warning three times and an export error and the
+    -- untyped-GIVEN warning twice, l4 check the type checker's warning twice
+    -- (review of #779, 2026-11-21). Only the last list of a file is printed.
+    --
+    -- Ported to unstable from the #779 line (af1a0bcca). Unstable has no
+    -- diagnostic codes ("Code: <none>") and no untyped-GIVEN warning, and its
+    -- export error fails the type check, so nothing is evaluated: the
+    -- assertions name each diagnostic by its message instead, and there is no
+    -- Result to check. On unstable this file's diagnostics were published once
+    -- even before the fix, so here these two are guards; the repeat is pinned
+    -- under "l4 check" below (smucclaw/l4-ide#1082).
+    it "prints each diagnostic once, on l4 run and l4 check, and in --json" $ do
+      let file = fixtureDir </> "run-diagnostics-once.l4"
+          occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+          messages = ["The following branches still need to be considered", "Function type inputs are not supported for @export"]
+      Output runCode _ runErr <- runL4 bin ["run", file]
+      runCode `shouldBe` ExitFailure 1
+      map (`occurrences` runErr) messages `shouldBe` [1, 1]
+      Output checkCode _ checkErr <- runL4 bin ["check", file]
+      checkCode `shouldBe` ExitFailure 1
+      map (`occurrences` checkErr) messages `shouldBe` [1, 1]
+      Output _ runJson _ <- runL4 bin ["run", "--json", file]
+      map (`occurrences` runJson) messages `shouldBe` [1, 1]
+    it "still prints a type error once, on l4 run and l4 check" $
+      forM_ ["run", "check"] \cmd -> do
+        Output code _ serr <- runL4 bin [cmd, errorFixture]
+        code `shouldBe` ExitFailure 1
+        length (filter ("The type of this definition must match its type signature" `isPrefixOf`) (tails serr)) `shouldBe` 1
+
     it "emits a well-shaped JSON envelope on a clean file" $ do
       env <- jsonEnvelope bin ["run", cleanFixture, "--json"]
       objField env "ok" `shouldBe` Just (Bool True)
@@ -1559,6 +1590,47 @@ spec bin = do
       err `shouldSatisfy` isInfixOf
         "This @ref (`Section 9`) is at the end of the file, so there is nothing after it to attach to."
       length (filter (isInfixOf "Severity: DiagnosticSeverity_Warning") (lines err)) `shouldBe` 2
+
+    -- smucclaw/l4-ide#1082: the parser publishes the warning, then the checker
+    -- publishes again with its own Information note added. The pipeline logs
+    -- each publish whole, and the CLI printed both, so the parser's warning was
+    -- printed once per stage. Only the last list of the file is printed now.
+    it "prints a parser warning once when the checker adds a diagnostic of its own" $ do
+      let fixture = fixtureDir </> "warning-printed-once.l4"
+          warning = "Two or more @nonassertable marks sit above one construct"
+          occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+      Output code sout serr <- runL4 bin ["check", fixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Check succeeded." `isInfixOf`)
+      occurrences warning serr `shouldBe` 1
+      -- Positive control: the checker's note on `#CHECK x` is still printed,
+      -- so the warning is single because the last list, which holds both, is
+      -- the one printed, not because the second publish was dropped.
+      let err = filter (/= '\r') serr
+      err `shouldSatisfy` isInfixOf "Range:    6:1-6:9"
+      length (filter (isInfixOf "Severity: DiagnosticSeverity_Information") (lines err)) `shouldBe` 1
+      -- `--json` carries one string per printed block; the warning is in one.
+      env <- jsonEnvelope bin ["check", fixture, "--json"]
+      case objField env "diagnostics" of
+        Just (Array v) ->
+          sum [occurrences warning (T.unpack t) | String t <- toList v] `shouldBe` 1
+        other -> expectationFailure ("Expected diagnostics array, got " ++ show other)
+
+    -- The same across an IMPORT: each file's last list once, where it fell in
+    -- the log, so the imported file's first.
+    it "prints each file's parser warning once when an imported file has one too" $
+      withSystemTempDirectory "l4-warning-printed-once" \dir -> do
+        let marks = "@nonassertable\n@nonassertable\nGIVETH A NUMBER\n"
+            occurrences needle hay = length (filter (needle `isPrefixOf`) (tails hay))
+        writeFile (dir </> "warnonce.l4") (marks <> "y MEANS 2\n\n#CHECK y\n")
+        writeFile (dir </> "main.l4") ("IMPORT warnonce\n\n" <> marks <> "x MEANS y\n\n#CHECK x\n")
+        Output code _ serr <- runL4 bin ["check", dir </> "main.l4"]
+        code `shouldBe` ExitSuccess
+        let err = filter (/= '\r') serr
+            files = [ f | l <- lines err, Just f <- [stripPrefix "File:" l] ]
+        occurrences "Two or more @nonassertable marks" err `shouldBe` 2
+        occurrences "Info | updateFileDiagnostics published different" err `shouldBe` 2
+        map (unwords . words) files `shouldBe` ["warnonce.l4", "warnonce.l4", "main.l4", "main.l4"]
 
     it "warns that a multi-clause DECIDE misses a case, and still succeeds" $ do
       let fixture = fixtureDir </> "multi-clause-missing.l4"
