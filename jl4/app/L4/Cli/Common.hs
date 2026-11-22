@@ -64,8 +64,7 @@ import LSP.Logger
   , Recorder
   , WithPriority(..)
   , cfilter
-  , cmapWithPrio
-  , makeRefRecorder
+  , makeKeyedRefRecorder
   , pretty
   )
 import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
@@ -262,15 +261,12 @@ runOneshot
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], b)
 runOneshot evalConfig fp act = do
-  (getLog, refRecorder) <- makeRefRecorder
-  let prettyRecorder = cmapWithPrio pretty refRecorder
-      -- Drop Debug-priority messages (very verbose Shake internals) but
-      -- keep Info/Warning/Error: real parse/type diagnostics come through
-      -- at Info priority via the LSP publishDiagnostics hook, so we can't
-      -- just filter by priority alone.  We scrub progress chatter out of
-      -- the rendered Text list below with `isProgressChatter`.
-      keep wp = wp.priority /= Debug
-      filteredRec = cfilter keep prettyRecorder
+  -- Debug-priority messages (very verbose Shake internals) are dropped, and
+  -- Info/Warning/Error kept: real parse/type diagnostics come through at Info
+  -- priority via the LSP publishDiagnostics hook, so we can't just filter by
+  -- priority alone.  We scrub progress chatter out of the rendered Text list
+  -- below with `isProgressChatter`.
+  (getLog, filteredRec) <- makeCliRecorder
   res <- oneshotL4Action filteredRec evalConfig fp act
   rawErrs <- getLog
   -- Post-filter: drop lines matching known progress-chatter prefixes.
@@ -291,13 +287,28 @@ runOneshotWithDiagnostics
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], [FileDiagnostic], b)
 runOneshotWithDiagnostics evalConfig fp act = do
-  (getLog, refRecorder) <- makeRefRecorder
-  let prettyRecorder = cmapWithPrio pretty refRecorder
-      keep wp = wp.priority /= Debug
-      filteredRec = cfilter keep prettyRecorder
+  (getLog, filteredRec) <- makeCliRecorder
   (diags, res) <- Oneshot.oneshotL4ActionWithDiags filteredRec evalConfig fp act
   rawErrs <- getLog
   pure (filter (not . isProgressChatter) rawErrs, diags, res)
+
+-- | The recorder a command collects the pipeline's log with, as text, without
+-- its Debug-priority messages.
+--
+-- With no editor to publish to, the pipeline logs every diagnostic of a file
+-- each time that file's diagnostics change ('Shake.LogDiagsDiffButNoLspEnv'),
+-- so a command that printed the log printed each diagnostic once for every
+-- later change to its file's diagnostics: @l4 run@ printed a type checker's
+-- warning three times and an error of the export check twice, and @l4 check@
+-- a type checker's warning twice (review of #779, 2026-11-21). Each list
+-- holds all of the file's diagnostics, so only the last one of each file is
+-- kept, where it falls in the log ('Oneshot.latestDiagnostics'); it is printed as it
+-- was.
+makeCliRecorder :: IO (IO [Text], Recorder (WithPriority Oneshot.Log))
+makeCliRecorder = do
+  (getLog, refRecorder) <- makeKeyedRefRecorder Oneshot.diagnosticsOf pretty
+  let keep wp = wp.priority /= Debug
+  pure (Oneshot.latestDiagnostics <$> getLog, cfilter keep refRecorder)
 
 -- | Does the diagnostics set contain an error that should make a CLI command
 -- fail (exit non-zero)?

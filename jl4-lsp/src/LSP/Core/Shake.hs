@@ -167,7 +167,8 @@ data Log
   | LogBuildSessionRestartTakingTooLong !Seconds
   | LogDelayedAction !(DelayedAction ()) !Seconds
   | LogBuildSessionFinish !(Maybe SomeException)
-  | LogDiagsDiffButNoLspEnv ![FileDiagnostic]
+  | LogDiagsDiffButNoLspEnv !NormalizedUri ![FileDiagnostic]
+    -- ^ every diagnostic of the file, as published
   | LogDefineEarlyCutoffRuleNoDiagHasDiag !FileDiagnostic
   | LogDefineEarlyCutoffRuleCustomNewnessHasDiag !FileDiagnostic
   | LogCancelledAction !T.Text
@@ -200,7 +201,7 @@ instance Pretty Log where
       vcat
         [ "Finished build session"
         , pretty (fmap displayException e) ]
-    LogDiagsDiffButNoLspEnv fileDiagnostics ->
+    LogDiagsDiffButNoLspEnv _uri fileDiagnostics ->
       "updateFileDiagnostics published different from new diagnostics - file diagnostics:" <> Pretty.line
       <> prettyDiagnostics fileDiagnostics
     LogDefineEarlyCutoffRuleNoDiagHasDiag fileDiagnostic ->
@@ -1423,7 +1424,7 @@ updateFileDiagnostics recorder uri ver k ShakeExtras{diagnostics, hiddenDiagnost
                 lastPublish <- atomicallyNamed "diagnostics - publish" $ STM.focus (Focus.lookupWithDefault [] <* Focus.insert newDiags) uri publishedDiagnostics
                 let action = when (lastPublish /= newDiags) $ case lspSink of
                         Nothing -> -- Print an LSP event.
-                            logWith recorder Info $ LogDiagsDiffButNoLspEnv newDiags
+                            logWith recorder Info $ LogDiagsDiffButNoLspEnv uri newDiags
                         Just sink ->
                             sendNotificationToClient sink SMethod_TextDocumentPublishDiagnostics $
                                 LSP.PublishDiagnosticsParams (fromNormalizedUri uri) (fmap fromIntegral ver) (map fdLspDiagnostic newDiags)
