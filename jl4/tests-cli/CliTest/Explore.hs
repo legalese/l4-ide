@@ -30,7 +30,7 @@ instants = "tests-cli" </> "fixtures" </> "explore-instants"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -423,6 +423,24 @@ spec bin = describe "l4 explore" $ do
     it "flip3.l4: the state where Q's deadline passed alone (an anchored deadline) is reachable, and the explorer finds it" $ do
       Output _ sout _ <- runL4 bin ["explore", instants </> "flip3.l4", "--reachable", "Q missed first"]
       sout `shouldSatisfy` ("reachable `Q missed first`: holds" `isInfixOf`)
+
+    it "room.l4: a tie that needs a chain of acts is named and not searched by default (exit 2), and --chains searches it" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "room.l4"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("UNTRIED 1: ties through chains of acts, for " `isInfixOf`)
+      lastLine sout `shouldSatisfy` ("--chains tries them" `isInfixOf`)
+      lastLine sout `shouldSatisfy` (not . ("nothing untried" `isInfixOf`))
+      Output ccode csout _ <- runL4 bin ["explore", instants </> "room.l4", "--chains"]
+      ccode `shouldBe` ExitSuccess
+      lastLine csout `shouldSatisfy` ("frontier exhausted; nothing refused; nothing untried" `isInfixOf`)
+      -- the chain made the graph larger, not smaller
+      let states l = read (takeWhile (/= ' ') (drop (length ("Coverage: " :: String)) l)) :: Int
+      states (lastLine csout) `shouldSatisfy` (> states (lastLine sout))
+
+    it "clocks.l4: no chain, so nothing is said about chains" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "clocks.l4"]
+      code `shouldBe` ExitSuccess
+      lastLine sout `shouldSatisfy` (not . ("chains" `isInfixOf`))
 
     it "l4 lts on adjacent.l4: the tick past the deadline at 3 is the clock reaching 4, not 3.5, and does not reach the deadline at 4" $ do
       Output code sout _ <- runL4 bin ["lts", instants </> "adjacent.l4", "--contract", "adjacent"]

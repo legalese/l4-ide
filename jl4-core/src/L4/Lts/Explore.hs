@@ -151,7 +151,7 @@ import L4.EvaluateLazy
   , execEvalModuleWithDeonticLog
   , prettyReductionOutcome
   )
-import L4.Lts.Marking (LiveNorm (..), RawObligation (..), liveObligations, renderLive)
+import L4.Lts.Marking (Bearer (..), Countdown (..), LiveNorm (..), RawObligation (..), liveObligations, renderLive)
 import L4.Lts.WhatIf
 import L4.Print (prettyLayout)
 import L4.Syntax
@@ -614,10 +614,11 @@ data Explorer = MkExplorer
     -- ^ closed anchors already evaluated ('resolveAnchor')
   , exHint       :: !(Map Text (Set Rational, Set Rational))
     -- ^ per act (as its edge is labelled), what the acts that can FOLLOW it
-    -- were found to do in an earlier pass over the same contract: the offsets
-    -- by which they start deadlines, and the instants fixed in absolute time
-    -- that their positions held. With 'eoChains', ties are searched over all
-    -- of them ('regionInstants'); without, they are only counted
+    -- were found to do in an earlier pass over the same contract: the sums of
+    -- the offsets by which they start deadlines along the paths of acts that
+    -- follow it ('pathPools'), and the instants fixed in absolute time that
+    -- their positions held. With 'eoChains', ties are searched over all of
+    -- them ('regionInstants'); without, they are only counted
     -- ('chainsLeftOut')
   , exRecords    :: !(IORef [ActRecord])
     -- ^ every act whose instants were chosen, newest first
@@ -1033,7 +1034,7 @@ regionInstants ex w probe = go Map.empty
     cap = ex.exOptions.eoMaxInstants
     inRange t = t >= c && maybe True (t <=) w.wnLimit
     lo = openFrom w
-    (hintOffsets, hintFixed) = Map.findWithDefault (Set.empty, Set.empty) w.wnLabel ex.exHint
+    (hintSums, hintFixed) = Map.findWithDefault (Set.empty, Set.empty) w.wnLabel ex.exHint
     -- the instants the position itself names
     base = nubOrd (filter inRange ([c, lo] <> maybeToList w.wnLimit <> w.wnOtherOpens)
                    <> [ lo + 1 | isNothing w.wnLimit ])
@@ -1046,12 +1047,12 @@ regionInstants ex w probe = go Map.empty
           (learnedOffsets, learnedFixed) = shiftOrStay w.wnHeld seen
       let -- the clock itself is an offset of 0: a deadline fixed in absolute
           -- time that only the successor holds is a boundary at its own instant
-          offsets = nubOrd (0 : learnedOffsets <> (if ex.exOptions.eoChains then Set.toList hintOffsets else []))
+          own = nubOrd (0 : learnedOffsets)
+          offsets = chainOffsets own (if ex.exOptions.eoChains then Set.toList hintSums else [0])
           fixedAll = nubOrd (learnedFixed <> w.wnFixed <> (if ex.exOptions.eoChains then Set.toList hintFixed else []) <> maybeToList w.wnLimit)
           early = [ o | (TriedPassed _ (Just o), _) <- Map.elems tried ]
-          (ties, sumsTruncated)
-            | ex.exOptions.eoChains = tiesThrough inRange c fixedAll offsets
-            | otherwise = (nubOrd [ x | f <- fixedAll, o <- offsets, let x = f - o, inRange x ], False)
+          ties = tiesOf inRange fixedAll offsets
+          sumsTruncated = False
           named = nubOrd (base <> filter inRange early <> ties)
           (wholeNamed, notWhole) = partition (\ t -> t == c || isWhole t) named
           critical = sort wholeNamed
@@ -1101,33 +1102,23 @@ regionInstants ex w probe = go Map.empty
         , inStats = MkInstantStats {isActs = 1, isInstants = length runs, isTies = tieHits, isGaps = gapHits}
         }
 
--- | The instants at which a deadline some chain of acts starts falls on a
--- fixed instant: @f - s@ for a fixed instant @f@ and a sum @s@ of any number
--- of the offsets by which acts start deadlines (none included: the instant
--- @f@ itself). One act's own offset is a chain of one. A chain matters
--- because an act is never tried past the earliest live deadline, and the
--- deadline the first act starts is that one: a later act's tie is in reach
--- only if the first act was done early enough, so the sum of both offsets is a
--- boundary of the first act's instants. The second component says the sums
--- were too many to list (the offsets are small and the instants far).
-tiesThrough :: (Rational -> Bool) -> Rational -> [Rational] -> [Rational] -> ([Rational], Bool)
-tiesThrough inRange c fixeds offsets = (nubOrd [ x | f <- fixeds, s <- sums, let x = f - s, inRange x ], truncated)
-  where
-    positive = nubOrd (filter (> 0) offsets)
-    reach = maximum (c : fixeds) - c
-    (sums, truncated) = chainSums 20000 reach positive
+-- | The sums by which a deadline can fall from the instant an act is done:
+-- the act's own offsets (and none) plus what follows it, one sum from each
+-- path of later acts ('pathPools'). A chain matters because an act is never
+-- tried past the earliest live deadline, and the deadline the first act
+-- starts is that one: a later act's tie is in reach only if the first act was
+-- done early enough, so the sum of both offsets is a boundary of the first
+-- act's instants. An act that starts no deadline adds no such boundary: what
+-- it leaves behind is a lower bound on the clock, so trying it early reaches
+-- everything trying it later does (the offset 0 stays bare, for a deadline
+-- fixed in absolute time that only its successor holds).
+chainOffsets :: [Rational] -> [Rational] -> [Rational]
+chainOffsets own following = nubOrd (own <> [ o + x | o <- own, o > 0, x <- following ])
 
--- | Every sum of zero or more of these offsets that is no more than the
--- bound, in order, and whether more than @room@ of them were left out.
-chainSums :: Int -> Rational -> [Rational] -> ([Rational], Bool)
-chainSums room bound offsets = go (Set.singleton 0) [0]
-  where
-    go found [] = (Set.toList found, False)
-    go found (x : rest)
-      | Set.size found >= room = (Set.toList found, True)
-      | otherwise =
-          let new = [ y | o <- offsets, let y = x + o, y <= bound, Set.notMember y found ]
-          in go (foldl' (flip Set.insert) found new) (rest <> nubOrd new)
+-- | The instants at which a deadline falls on a fixed one: @f - y@ for a
+-- fixed instant @f@ and a sum @y@, inside the window.
+tiesOf :: (Rational -> Bool) -> [Rational] -> [Rational] -> [Rational]
+tiesOf inRange fixeds sums = nubOrd [ x | f <- fixeds, y <- sums, let x = f - y, inRange x ]
 
 -- | An obligation in force at some position, by what identifies it across
 -- positions (its place in the contract, its bearer, its modal, its action,
@@ -1144,8 +1135,18 @@ data HeldKind = HeldDeadline | HeldOpening
 
 sameHeld :: Held -> Held -> Bool
 sameHeld a b = a.heldKind == b.heldKind && a.heldNth == b.heldNth && sameNorm a.heldNorm b.heldNorm
+
+-- | The same obligation, wherever it is met: its place in the contract, its
+-- modal and its action, and its bearer. The bearer is printed as the party's
+-- value once it has been forced and as the expression before, so a party
+-- forced between two positions is the same bearer; two printed alike in one
+-- form are the same, and one in each form is not told apart.
+sameNorm :: LiveNorm -> LiveNorm -> Bool
+sameNorm x y = (x.lnSite, x.lnModal, x.lnAction) == (y.lnSite, y.lnModal, y.lnAction) && sameBearer x.lnBearer y.lnBearer
   where
-    sameNorm x y = (x.lnSite, x.lnBearer, x.lnModal, x.lnAction) == (y.lnSite, y.lnBearer, y.lnModal, y.lnAction)
+    sameBearer (KnownParty p) (KnownParty q) = p == q
+    sameBearer (UnforcedParty p) (UnforcedParty q) = p == q
+    sameBearer _ _ = True
 
 -- | The instants a position holds in absolute time, as far as they are
 -- known: its live deadlines and the openings of its windows, each with the
@@ -1155,7 +1156,7 @@ thresholdsOf ex pos = do
   deadlines <- liveDeadlines ex pos
   openings <- for (maybe [] liveObligations pos.posResidual) (openingOf pos.posClock)
   let norms = [ renderLive pos.posContext raw | (raw, _) <- deadlines ]
-      nth i n = length [ () | n' <- take i norms, (n'.lnSite, n'.lnBearer, n'.lnModal, n'.lnAction) == (n.lnSite, n.lnBearer, n.lnModal, n.lnAction) ]
+      nth i n = length [ () | n' <- take i norms, sameNorm n' n ]
   pure
     [ MkHeld {heldNorm = n, heldNth = nth i n, heldKind = kind, heldAt = at}
     | (i, n, (_, due), open) <- zip4' [0 :: Int ..] norms deadlines (openings <> repeat Nothing)
@@ -1183,10 +1184,23 @@ shiftOrStay existing seen = (nubOrd (concat offs), nubOrd (concat fixs))
           values = nubOrd (map snd obs)
           shifts = nubOrd [ v - t | (t, v) <- obs ]
           unchanged = [ e.heldAt | e <- existing, sameHeld e th0, [e.heldAt] == values ]
+          -- what the residual itself says of a deadline seen at one probe only:
+          -- one counting from now moves with the act, one anchored does not
+          written = case th0.heldNorm.lnDue of
+            UnforcedDeadline _ Nothing  -> Just True
+            UnforcedDeadline _ (Just _) -> Just False
+            _                           -> Nothing
       in case (unchanged, length obs >= 2, values, shifts) of
-           (_ : _, _, _, _)    -> ([], values)       -- the act left it where it was: fixed
+           -- the act left it where it was. The position already held it (it is in
+           -- 'wnFixed' for this act's own ties), and it is not new with the act, so
+           -- it is not carried upstream: a deadline an EARLIER act started is held
+           -- by every later position and moves with that earlier act, which is not
+           -- to be told from a fixed one by looking at the later act's probes alone
+           (_ : _, _, _, _)    -> ([], [])
            (_, True, [_], _)   -> ([], values)
            (_, True, _, [_])   -> (shifts, [])
+           _ | th0.heldKind == HeldDeadline, written == Just True  -> (shifts, [])
+             | th0.heldKind == HeldDeadline, written == Just False -> ([], values)
            _                   -> (shifts, values)
 
 ----------------------------------------------------------------------------
@@ -1274,9 +1288,13 @@ explore opts sites rig0 start = case opts.eoTime of
         Left e -> pure (Left e)
         Right g -> do
           records <- readIORef ex.exRecords
-          let pools = downstreamPools g records
-              missing = if opts.eoChains then [] else chainsLeftOut records pools
-          pure (Right (g {gCoverage = g.gCoverage {cvUntried = g.gCoverage.cvUntried <> missing}}, hintsOf records pools))
+          let (pools, cut) = pathPools g records
+              after = actPools g records pools
+              missing = (if opts.eoChains then [] else chainsLeftOut after)
+                <> [ MkUntriedNote "ties through chains of acts"
+                       "the sums of offsets along the paths of acts were too many to list (20000 for one state), so the ties through the ones left out were not searched" 1
+                   | cut ]
+          pure (Right (g {gCoverage = g.gCoverage {cvUntried = g.gCoverage.cvUntried <> missing}}, hintsOf after))
     -- The ties an act is tried at depend on the offsets of the acts that can
     -- follow it, which a state only learns by exploring them. So with
     -- 'eoChains' the contract is explored again with what the last pass
@@ -1296,33 +1314,60 @@ explore opts sites rig0 start = case opts.eoTime of
                           "the offsets by which acts start deadlines were still growing after three passes, so the last pass searched ties with what the one before had learned" 1 ] } })
           | otherwise -> passes (Map.unionWith (\ (a, b) (c, d) -> (a <> c, b <> d)) hint learned) (left - 1)
 
--- | For each state, the offsets and fixed instants found at the acts tried
--- in it and in every state reachable from it: what the acts that can follow
--- a given act do, which is what a tie through a chain depends on.
-downstreamPools :: Graph -> [ActRecord] -> Map Int (Set Rational, Set Rational)
-downstreamPools g records = fixpoint own
+-- | For each state, what the acts that start there and after it were found to
+-- do: the sums of the offsets by which they start deadlines along each path of
+-- acts (every act on the path contributing its offset or nothing, and the
+-- empty path 0), and the instants fixed in absolute time their positions
+-- held. These are paths in the graph that was explored, not every sum of
+-- every offset: an offset repeats only where the graph loops. The sums are
+-- kept up to the furthest fixed instant and to 20000 values a state; the
+-- second component says that more were left out.
+pathPools :: Graph -> [ActRecord] -> (Map Int (Set Rational, Set Rational), Bool)
+pathPools g records = go start (0 :: Int) False
   where
-    own = Map.fromListWith (\ (a, b) (c, d) -> (a <> c, b <> d))
-      [ (r.arState, (Set.fromList r.arOffsets, Set.fromList r.arLearnedFixed)) | r <- records ]
-    succs = Map.fromListWith (<>) [ (t.tnFrom, [t.tnTo]) | t <- g.gTransitions, t.tnFrom /= t.tnTo ]
-    fixpoint pools =
-      let step s (o, f) = foldl' (\ (o', f') t -> case Map.lookup t pools of
-                                      Just (o'', f'') -> (o' <> o'', f' <> f'')
-                                      Nothing -> (o', f')) (o, f) (Map.findWithDefault [] s succs)
-          pools' = Map.mapWithKey step (Map.union pools (Map.fromList [ (st.snId, (Set.empty, Set.empty)) | st <- g.gStates ]))
-      in if pools' == pools then pools else fixpoint pools'
+    bound = maximum (0 : [ f - r.arClock | r <- records, f <- r.arFixed <> r.arLearnedFixed ])
+    leads = Map.fromListWith (<>) [ ((t.tnFrom, t.tnLabel), [t.tnTo]) | t <- g.gTransitions, t.tnFrom /= t.tnTo ]
+    recordsAt = Map.fromListWith (<>) [ (r.arState, [r]) | r <- records ]
+    start = Map.fromList [ (st.snId, (Set.singleton 0, Set.empty)) | st <- g.gStates ]
+    after pools r = followPool pools (Map.findWithDefault [] (r.arState, r.arLabel) leads)
+    step pools = Map.mapWithKey (\ st _ -> contribution pools st) pools
+    contribution pools st =
+      let rs = Map.findWithDefault [] st recordsAt
+          parts = [ (Set.fromList [ y | o <- 0 : r.arOffsets, x <- Set.toList xs, let y = o + x, y <= bound ]
+                    , Set.fromList r.arLearnedFixed <> fs)
+                  | r <- rs, let (xs, fs) = after pools r ]
+      in (Set.insert 0 (foldMap fst parts), foldMap snd parts)
+    go pools n cut
+      | pools' == pools = (pools, cut)
+      | n > 200 = (pools, True)
+      | otherwise = go capped (n + 1) (cut || trimmed)
+      where
+        pools' = step pools
+        trimmed = any ((> 20000) . Set.size . fst) (Map.elems pools')
+        capped = Map.map (\ (xs, fs) -> (Set.fromList (take 20000 (Set.toAscList xs)), fs)) pools'
+
+-- | For each act in each state, what the acts that can FOLLOW it were found to
+-- do: the paths and fixed instants of every state its edges lead to. Not the
+-- other acts of the same state, which are not after it.
+actPools :: Graph -> [ActRecord] -> Map Int (Set Rational, Set Rational) -> [(ActRecord, (Set Rational, Set Rational))]
+actPools g records pools = [ (r, pool r) | r <- records ]
+  where
+    leads = Map.fromListWith (<>) [ ((t.tnFrom, t.tnLabel), [t.tnTo]) | t <- g.gTransitions, t.tnFrom /= t.tnTo ]
+    pool r = followPool pools (Map.findWithDefault [] (r.arState, r.arLabel) leads)
+
+-- | What the states an act leads to hold, taken together.
+followPool :: Map Int (Set Rational, Set Rational) -> [Int] -> (Set Rational, Set Rational)
+followPool pools succs = foldMap (\ st -> Map.findWithDefault (Set.empty, Set.empty) st pools) (nubOrd succs)
 
 -- | What the acts that can follow each act were found to do, per act label.
-hintsOf :: [ActRecord] -> Map Int (Set Rational, Set Rational) -> Map Text (Set Rational, Set Rational)
-hintsOf records pools = Map.fromListWith (\ (a, b) (c, d) -> (a <> c, b <> d))
-  [ (r.arLabel, pools `at` r.arState) | r <- records ]
-  where at m k = Map.findWithDefault (Set.empty, Set.empty) k m
+hintsOf :: [(ActRecord, (Set Rational, Set Rational))] -> Map Text (Set Rational, Set Rational)
+hintsOf after = Map.fromListWith (\ (a, b) (c, d) -> (a <> c, b <> d)) [ (r.arLabel, p) | (r, p) <- after ]
 
 -- | The acts whose instants a tie through a chain of acts would have added to,
 -- as an untried entry (none when 'eoChains' searched them), judged with what
 -- the acts that can follow each one do.
-chainsLeftOut :: [ActRecord] -> Map Int (Set Rational, Set Rational) -> [UntriedNote]
-chainsLeftOut records pools =
+chainsLeftOut :: [(ActRecord, (Set Rational, Set Rational))] -> [UntriedNote]
+chainsLeftOut after =
   [ MkUntriedNote
       ("ties through chains of acts, for " <> Text.intercalate ", " (take 3 acts) <> (if length acts > 3 then ", …" else ""))
       ("an act that starts a deadline sets the limit the next act's tie must be inside, so the instants "
@@ -1334,11 +1379,10 @@ chainsLeftOut records pools =
   where
     perRecord =
       [ (r.arLabel, [ t | t <- ties, isWhole t, Set.notMember t r.arTried ])
-      | r <- records
-      , let (offsets, fixed) = Map.findWithDefault (Set.empty, Set.empty) r.arState pools
-            inRange t' = t' >= r.arClock && maybe True (t' <=) r.arLimit
+      | (r, (sums, fixed)) <- after
+      , let inRange t' = t' >= r.arClock && maybe True (t' <=) r.arLimit
             fixeds = nubOrd (r.arFixed <> r.arLearnedFixed <> Set.toList fixed <> maybeToList r.arLimit)
-            (ties, _) = tiesThrough inRange r.arClock fixeds (nubOrd (r.arOffsets <> Set.toList offsets)) ]
+            ties = tiesOf inRange fixeds (chainOffsets (0 : r.arOffsets) (Set.toList sums)) ]
     short = [ (l, ts) | (l, ts) <- perRecord, not (null ts) ]
     acts = nubOrd (map fst short)
     instants = nubOrd (sort (concatMap snd short))

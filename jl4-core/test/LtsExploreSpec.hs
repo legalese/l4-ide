@@ -411,10 +411,14 @@ halfSrc = Text.unlines
   ]
 
 -- | The review of the first pass found these. A chain: an act that starts a
--- deadline (Q, 2 days) which becomes the limit of the next act (u, which
--- starts V, 1 day), beside a fixed deadline (R at 4). `u` at 3 puts V on R,
--- and it is reachable only if `a` was done at 1 or later, so `a` at 1 is a
--- boundary no tie of `a`'s own offset names.
+-- deadline (Q, 3 days) which becomes the limit of the next act (u, which
+-- starts V, 2 days), beside a fixed deadline (R at 7). `u` at 5 puts V on R,
+-- and it is reachable only if `a` was done at 2 or later, so `a` at 2 is a
+-- boundary no tie of `a`'s own offset names (they are 4, where Q meets R, and
+-- 5, where u is done). The instants the explorer tries `a` at without
+-- chains are 0, 1, 4, 5 and 7, so `a` at 2 and at 3 are the ones missing,
+-- and they are not the same position: Q's deadline is at 5 (the clock) or
+-- at 6 (between the clock and R).
 roomSrc :: Text.Text
 roomSrc = Text.unlines
   [ "DECLARE Person IS ONE OF P, Q, R, U, V"
@@ -422,9 +426,9 @@ roomSrc = Text.unlines
   , ""
   , "GIVETH A DEONTIC Person Action"
   , "`room` MEANS"
-  , "        (PARTY R MUST r WITHIN 4 HENCE FULFILLED LEST BREACH BY R)"
-  , "  RAND  (PARTY P MUST a WITHIN 100 HENCE (PARTY Q MUST b WITHIN 2 HENCE FULFILLED LEST BREACH BY Q) LEST BREACH BY P)"
-  , "  RAND  (PARTY U MUST u WITHIN 100 HENCE (PARTY V MUST v WITHIN 1 HENCE FULFILLED LEST BREACH BY V) LEST BREACH BY U)"
+  , "        (PARTY R MUST r WITHIN 7 HENCE FULFILLED LEST BREACH BY R)"
+  , "  RAND  (PARTY P MUST a WITHIN 9 HENCE (PARTY Q MUST b WITHIN 3 HENCE FULFILLED LEST BREACH BY Q) LEST BREACH BY P)"
+  , "  RAND  (PARTY U MUST u WITHIN 9 HENCE (PARTY V MUST v WITHIN 2 HENCE FULFILLED LEST BREACH BY V) LEST BREACH BY U)"
   ]
 
 -- | A deadline that is fixed in absolute time and only the successor holds
@@ -445,16 +449,16 @@ anchoredSrc = Text.unlines
 
 -- | Two fixed deadlines and an offset (the review's cascade): a fixed deadline
 -- plus an offset is one instant, not a cascade of them.
-cascadeSrc :: Int -> Text.Text
-cascadeSrc k = Text.unlines
+cascadeSrc :: Int -> Int -> Int -> Text.Text
+cascadeSrc rd sd qd = Text.unlines
   [ "DECLARE Person IS ONE OF P, Q, R, S"
   , "DECLARE Action IS ONE OF a, b, r, s"
   , ""
   , "GIVETH A DEONTIC Person Action"
   , "`cascade` MEANS"
-  , "        (PARTY R MUST r WITHIN " <> n (20 * k) <> " HENCE FULFILLED LEST BREACH BY R)"
-  , "  RAND  (PARTY S MUST s WITHIN " <> n (25 * k) <> " HENCE FULFILLED LEST BREACH BY S)"
-  , "  RAND  (PARTY P MUST a WITHIN 1000 HENCE (PARTY Q MUST b WITHIN " <> n (10 * k) <> " HENCE FULFILLED LEST BREACH BY Q) LEST BREACH BY P)"
+  , "        (PARTY R MUST r WITHIN " <> n rd <> " HENCE FULFILLED LEST BREACH BY R)"
+  , "  RAND  (PARTY S MUST s WITHIN " <> n sd <> " HENCE FULFILLED LEST BREACH BY S)"
+  , "  RAND  (PARTY P MUST a WITHIN 1000 HENCE (PARTY Q MUST b WITHIN " <> n qd <> " HENCE FULFILLED LEST BREACH BY Q) LEST BREACH BY P)"
   ]
   where n = Text.pack . show
 
@@ -747,12 +751,28 @@ spec = describe "l4 explore" do
           case o.eoTime of
             Regions -> Set.toList (wantSigs `Set.difference` haveSigs) `shouldBe` []
             Grid _  -> Set.toList (wantKeys `Set.difference` haveKeys) `shouldBe` []
+        -- what the oracle finds missing from the graph, and whether the graph
+        -- says it is complete
+        auditOf name src opts until' depth horizon = do
+          (rig, sites, start) <- setupSrc src name
+          let o = opts {eoUntil = until'}
+          ex <- newExplorer o sites rig start
+          g <- explore o sites rig start >>= either (fail . Text.unpack) pure
+          (wantSigs, _) <- enumerated ex depth horizon
+          (haveSigs, _) <- graphViews ex g
+          pure (Set.toList (wantSigs `Set.difference` haveSigs), g)
+        -- the property the coverage line exists for: when it says nothing is
+        -- untried, nothing is missing
+        honest name src opts until' depth horizon = it ("never says complete with a position missing: " <> name) do
+          (missing, g) <- auditOf (contractOf src) src opts until' depth horizon
+          if coverageComplete g.gCoverage then missing `shouldBe` [] else pure ()
         contractOf src
           | "`clocks`" `Text.isInfixOf` src = "clocks"
           | "`adjacent`" `Text.isInfixOf` src = "adjacent"
           | "`half`" `Text.isInfixOf` src = "half"
           | "`room`" `Text.isInfixOf` src = "room"
           | "`anchored`" `Text.isInfixOf` src = "anchored"
+          | "`cascade`" `Text.isInfixOf` src = "cascade"
           | otherwise = "deal"
         clocks = clocksSrc 3 5 7
         wide = clocksSrc 8 10 15
@@ -766,12 +786,23 @@ spec = describe "l4 explore" do
       holdsEvery "a window that opens at 3 and closes at 5" windowSrc regions Nothing 2 3
       holdsEvery "a window that opens at 3 and never closes, bounded at 10" openSrc regions (Just 10) 1 10
       -- the review of the first pass (2026-11-22)
-      holdsEvery "with --chains: a tie that a LATER act's offset puts in reach (u at 3 puts V on R, and only if a was done at 1 or later)" roomSrc regions {eoChains = True} Nothing 2 3
+      holdsEvery "with --chains: a tie that a LATER act's offset puts in reach (u at 5 puts V on R, and only if a was done at 2 or later)" roomSrc regions {eoChains = True} Nothing 2 5
       holdsEvery "deadlines that are fixed in absolute time and that only the successor holds (OF THE ARMING)" anchoredSrc regions Nothing 2 3
+      holdsEvery "two fixed deadlines and one offset (the review's cascade): no chain, so nothing is missing and nothing is said" (cascadeSrc 8 10 4) regions Nothing 2 11
+
+    describe "the coverage line is honest about time" do
+      honest "two clocks" clocks regions Nothing 3 3
+      honest "two clocks with wide gaps" wide regions Nothing 2 3
+      honest "a window" windowSrc regions Nothing 2 3
+      honest "the room (a chain)" roomSrc regions Nothing 2 5
+      honest "the room (a chain), with --chains" roomSrc regions {eoChains = True} Nothing 2 5
+      honest "deadlines fixed in absolute time, held only by the successor" anchoredSrc regions Nothing 2 3
+      honest "the cascade" (cascadeSrc 8 10 4) regions Nothing 2 11
 
     describe "a tie through a chain of acts is searched only on request, and never silently left out" do
-      it "without --chains the position is left out, and the coverage line says which act and that --chains tries it" do
-        g <- exploreSrc roomSrc "room" regions []
+      it "without --chains the oracle finds the position the chain reaches missing, and the coverage line says which act and that --chains tries it" do
+        (missing, g) <- auditOf "room" roomSrc regions Nothing 2 5
+        missing `shouldSatisfy` (not . null)
         coverageComplete g.gCoverage `shouldBe` False
         coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "ties through chains of acts"
         coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "--chains tries them"
@@ -782,16 +813,26 @@ spec = describe "l4 explore" do
         g <- exploreSrc clocks "clocks" regions []
         coverageComplete g.gCoverage `shouldBe` True
         coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "chains")
+      it "the review's cascade, where one act starts a deadline and nothing follows it, says nothing about chains" do
+        g <- exploreSrc (cascadeSrc 20 25 10) "cascade" regions []
+        coverageComplete g.gCoverage `shouldBe` True
+        coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "chains")
 
     describe "the instants one act is tried at do not snowball" do
       it "two fixed deadlines and one offset: the whole graph of the review's cascade (20, 25 and 10) is small" do
-        g <- exploreSrc (cascadeSrc 1) "cascade" regions []
+        g <- exploreSrc (cascadeSrc 20 25 10) "cascade" regions []
         g.gCoverage.cvStates `shouldSatisfy` (< 200)
         coverageComplete g.gCoverage `shouldBe` True
       it "the same at ten times the size is no larger in instants, and not cut at the cap" do
-        g <- exploreSrc (cascadeSrc 10) "cascade" regions []
+        small <- exploreSrc (cascadeSrc 20 25 10) "cascade" regions []
+        g <- exploreSrc (cascadeSrc 200 250 100) "cascade" regions []
         coverageComplete g.gCoverage `shouldBe` True
-        g.gCoverage.cvInstants.isInstants `shouldSatisfy` (< 400)
+        g.gCoverage.cvInstants.isInstants `shouldSatisfy` (<= small.gCoverage.cvInstants.isInstants)
+        g.gCoverage.cvStates `shouldBe` small.gCoverage.cvStates
+      it "--chains on the cascade converges (it is a chain after all: r, then a) and is bounded" do
+        g <- exploreSrc (cascadeSrc 8 10 4) "cascade" regions {eoChains = True} []
+        coverageComplete g.gCoverage `shouldBe` True
+        g.gCoverage.cvStates `shouldSatisfy` (< 600)
 
     describe "--grid 1: the graph holds every position the evaluator reaches" do
       holdsEvery "two clocks" clocks grid1 Nothing 3 3

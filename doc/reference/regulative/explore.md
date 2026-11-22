@@ -152,15 +152,28 @@ So the explorer tries an act at:
 - the instant of the last event;
 - the earliest live deadline itself, and never past it, because the contract would expire the deadline first and the arrow would carry the act's name for the deadline's effect (a later instant is reached by the tick past the deadline, then the act);
 - the instant its own window opens, when it has one that has not opened yet (`AFTER`), and the instants other live windows open, since an act is taken or not according to which side of an opening it falls on;
-- each **tie**: the instant at which a deadline the act starts would fall on one already fixed;
+- each **tie**: the instant at which a deadline the act starts would fall on one already fixed, and the instant at which one already fixed, that only the position the act leads to holds (`WITHIN 3 OF THE ARMING`), is reached;
 - and one whole instant between each two of those, when there is one.
 
-The ties are found by running the contract, as everything else here is: the act is tried at the first and the last of those instants, and the deadlines of the positions it leads to say which moved with the act and which did not.
+The ties are found by running the contract, as everything else here is: the act is tried at the instants the position names, and the deadlines of the positions it leads to say, for each obligation, which moved with the act and which did not.
 It is never tried past `--until`.
+
+**A tie that needs a chain of acts is named and not searched, unless you ask.**
+An act is never tried past the earliest live deadline, and the deadline the first act starts is one of those, so where the first act falls decides whether a second act's tie can be reached at all.
+The first act's boundary is then the fixed instant minus both offsets, and a longer chain adds more.
+By default the explorer searches the ties of one act's own offsets only, and the coverage line says what it did not search: `UNTRIED 1: ties through chains of acts, for <acts> …`, with the instants that could put a tie in reach, and the exit status is 2.
+It says so only for an act that a later act's offset could reach, so a contract with no chain says nothing about chains.
+`--chains` searches them as well: the explorer runs again with what the acts that can follow each one were found to do, up to three times, until that stops growing.
+It costs a larger graph (measured on the corpus, 2026-11-22: see the table at the end of this section), so it is not the default.
 With no live deadline and no `--until`, the instants are the first one the act's window is open and the one after it.
 The boundaries matter: a rule that treats an act at exactly the deadline differently from one just before it is only visible if the explorer tries the deadline itself, and a breach that names two parties is only visible if it tries the instant at which the deadlines meet.
 The coverage line says which scheme was used (`time by regions`) and how many acts were tried at how many instants (`instants: …`).
 A fraction is never tried: a deadline or stamp that is not a whole number leaves the instants it needs untried, and the line says so.
+
+**What the regions graph is.**
+It is an abstraction of contract time, and it says what it skipped.
+Two positions with the same order of deadlines and different gaps between them have different futures, so the order alone is not enough, and the only exact abstraction is the graph of every whole instant: `--grid 1`, below.
+Regions is the cheaper graph that tries to find every position the evaluator can reach, and where it knows it may not have (a chain tie, a fraction, the instant cap) the line says "UNTRIED" and never "nothing untried".
 
 `--grid N` is the alternative, for a rule whose guard reads the clock arithmetically: it tries every multiple of N from the first instant the act's window is open up to the next deadline, and keeps the clock in the state.
 Its soundness condition, that every event time, deadline and window opening is a multiple of N, is checked: a position that breaks it is named as untried, and so is a run with no deadline and no `--until`, because a grid has no end to try up to then.
@@ -399,8 +412,10 @@ These are all in the output, on the coverage line or the property's own line, an
 - **Where the region scheme stops being exact.** Positions that differ only in the clock are merged under `time by regions`, and an act is tried only at the instants where something can change.
   Both are right while no guard reads the clock arithmetically, or compares it against a value the contract recorded, and the explorer does not check that none does.
   The line names the scheme and that is all it does.
-  Two more limits, each measured or read from the code and not both: the instants an act starts its own deadlines at are found by running it at the first and last instant it can be done, so an act whose behaviour changes at some instant between them for a reason that is neither a deadline nor a window opening is not seen to; and a window opening the explorer cannot read (an `AFTER` that names a date) is not an instant it knows about.
+  What it does say, loudly (exit 2): a tie that needs a chain of acts (above), a deadline or stamp that is not a whole number, and a state that needs more instants than the cap.
+  What it does not say: an act whose behaviour changes at some instant for a reason that is neither a deadline nor a window opening, and a window opening the explorer cannot read (an `AFTER` that names a date).
   (Read from the code, not measured, 2026-11-22: a deadline the explorer cannot read is listed as untried, so that case is loud; an opening it cannot read is left out without a word.)
+  The exact graph, for a contract small enough, is `--grid 1`.
 
 ## What the graph is not
 
