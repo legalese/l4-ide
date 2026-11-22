@@ -811,8 +811,11 @@ A rule whose words come first, `` `tax on` x `item costing` y ``, written as cla
 **What is not refused:** a line whose `GIVEN` names an input where the rule has its word is an ordinary rule, however much it looks like the mixfix one.
 Beside ``a `plus` b``, a rule `total plus y` with the `GIVEN` `plus` and `y` is a rule called `total` that takes two inputs, and so is ``decision `is eligible` `` when `` `is eligible` `` is one of its `GIVEN` inputs; the same goes for the clauses `DECIDE fee costs 0 IS 0` and `DECIDE fee costs n IS n` when the `GIVEN` names `costs`.
 The definition lines are left alone, and the rules they define are called as usual, `total 3 4`.
-A use of the word inside another rule is still read as a use of the mixfix rule: with ``a `plus` b`` in the file, the body `total plus y` of a rule whose inputs are `plus` and `y` is read as ``total `plus` y``, and fails to check ("The first input of function `plus` is expected to be of type NUMBER but is here of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER").
-Give that input another name, and the body means what it says.
+Inside the body of a rule, a name that is one of the rule's own `GIVEN` inputs is that input, and not the word of a mixfix rule: with ``a `plus` b`` in the file, the body `total plus y` of a rule whose inputs are `plus` and `y` is `total` applied to those two inputs, and so is the body of each of its clauses.
+The same holds for the call `` `inc` `the day` `` in a rule whose input is called `` `the day` `` when the file has a rule ``the day n `days before` s``, with or without a `§` around it ([Functions: mixfix functions](../functions/README.md#mixfix-functions)).
+It does not hold for a name bound in another way (the `GIVEN` of a section, a `LET`, the parameter of a `GIVEN ... YIELD` function, a variable in a `CONSIDER` pattern): that name is still read as the word of the mixfix rule, and a call with it fails to check (for a section's `GIVEN`, a `LET` or a `CONSIDER` pattern, with "You are giving 1 input to ... but it is not a function").
+Give such a name another name, and the body means what it says.
+The other side of the same rule: in a rule that has an input called `plus`, the text ``1 `plus` 2`` is not a call of ``a `plus` b``, and is refused ("unexpected `plus`"); call the rule from one that has no input of that name.
 
 ---
 
