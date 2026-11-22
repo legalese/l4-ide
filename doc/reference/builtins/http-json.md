@@ -103,6 +103,10 @@ DECIDE person IS
   WHEN LEFT problem THEN Person WITH name IS "Unknown", age IS 0
 ```
 
+A rule that works for any type, written with `GIVEN a IS A TYPE`, cannot decode into `a`.
+When the rules run nothing says which type `a` is, so the decoder would have nothing to go by, and L4 refuses such a decode before anything runs.
+Decode in a rule whose `GIVETH` names the type, and hand the decoded value on to the rule that works for any type.
+
 ## Example: an authenticated request
 
 ```l4

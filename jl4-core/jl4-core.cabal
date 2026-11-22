@@ -346,6 +346,7 @@ test-suite jl4-core-test
     SchemaBuiltinNameSpec
     MaxFrameDepthSpec
     HoverApiSpec
+    JsonDecodeCostSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
