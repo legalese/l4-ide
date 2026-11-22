@@ -213,7 +213,7 @@ An `#ASSERT` has one of four outcomes:
 | When the expression…                                                                                         | It prints                                          | The editor shows           | `l4 run` exit code | In `l4 run --json`                                 |
 | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- | -------------------------- | ------------------ | -------------------------------------------------- |
 | is TRUE                                                                                                      | `assertion satisfied`                              | information                | not affected       | `"value": true`                                    |
-| is FALSE                                                                                                     | `assertion failed`                                 | an error                   | not affected       | `"value": false`                                   |
+| is FALSE                                                                                                     | `assertion failed`                                 | an error                   | non-zero           | `"value": false`                                   |
 | cannot be evaluated: a division by zero, a `CONSIDER` with no matching branch, a term that is only `ASSUME`d | `assertion could not be evaluated:` and the reason | an error, with the reason  | non-zero           | `"value": null`, with the reason under `"error"`   |
 | reaches a `REFUSE`: the rules decline to answer                                                              | `assertion refused:` and the reason                | a warning, with the reason | not affected       | `"value": null`, with the reason under `"refused"` |
 
@@ -222,9 +222,77 @@ In `--json` the result's `"kind"` is `"assertion"` in all four.
 An assertion that cannot be evaluated is not a verdict, so `#ASSERT P` and `#ASSERT NOT P` then report the same thing. Asserting an `ASSUME`d `BOOLEAN` directly, as in `#ASSERT b`, is one such case: `b` has no value to check.
 [Testing your rules](../../tutorials/getting-started/testing-your-rules.md#what-an-error-looks-like) shows an example.
 
-A refused assertion is not a verdict either, and `l4 run` still exits `0`, so a CI job that looks for failures looks for `assertion refused` as well as `assertion failed`.
+A refused assertion is not a verdict either, but unlike a failed one it leaves `l4 run` at exit `0`, so a CI job that checks the exit code also looks for `assertion refused`.
 
 To assert that an expression refuses, use `#ASSERT REFUSED`; [Testing a refusal](../control-flow/REFUSE.md#testing-a-refusal-assert-refused) lists what it reports.
+
+### What `#EVALTRACE` shows
+
+`#EVALTRACE` gives the same answer as `#EVAL`, and also keeps the steps that led to it.
+
+```l4
+-- #EVALTRACE shows the steps behind an answer, not only the answer.
+
+GIVEN age IS A NUMBER
+      `is a resident` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may apply` MEANS age >= 18 AND `is a resident`
+
+#EVAL      `may apply` 25 TRUE
+#EVALTRACE `may apply` 25 TRUE
+```
+
+Both directives give `TRUE`.
+Only the `#EVALTRACE` also keeps its working, which `l4 run` prints under `Trace:` beneath the result:
+
+```
+Evaluation[2] @ evaltrace-example.l4:9:1-31
+
+Result:
+  TRUE
+
+
+Trace:
+  ┌ `may apply` OF 25, TRUE
+  │┌ `may apply`
+  │└ <function>
+  ├ age AT LEAST 18 AND `is a resident`
+  │┌ age AT LEAST 18
+  │└ TRUE
+  ├ IF a THEN b ELSE FALSE
+  │┌ a
+  │└ TRUE
+  ├ b
+  └ TRUE
+```
+
+Read it from the top: the first line is what was asked, each line starting `├` is one step in working it out, and the last line, `└ TRUE`, is the answer.
+The indented lines beside a step are the smaller questions that step had to answer first.
+
+Two lines in it are ones you did not write.
+`IF a THEN b ELSE FALSE` is how L4 itself works out an `AND`: `a` is the left side and `b` is the right, and if `a` is not true the answer is `FALSE`.
+`<function>` is a rule being looked up by its name; what is found is the rule itself, which has no answer of its own until it is given its inputs.
+
+`l4 run FILE` prints the trace of every `#EVALTRACE` in the file; this is the default, and `--trace none` leaves the traces out.
+`l4 trace FILE` draws the same traces as diagrams instead; see [Using the l4 CLI](../../tutorials/getting-started/l4-cli.md).
+
+What it does not do:
+
+- A plain `#EVAL` keeps no trace.
+  Its `Trace:` line says so: `(no trace captured; add #EVALTRACE to the directive)`.
+  That is not a fault in your file; change the `#EVAL` to `#EVALTRACE` to see the working.
+- `l4 run --json` carries no trace, whatever `--trace` says.
+- An `#EVALTRACE` inside a module that other files `IMPORT` is worked out but not shown: `l4 run` prints only the results of the file you gave it, yet still collects the trace, which costs time and memory for nothing.
+  Leave `#EVALTRACE` out of modules that other files import.
+- A trace grows with the work done: a rule that calls itself 100 times prints a trace of about a thousand lines.
+- A trace past a fixed size is cut off, and the cut is marked `• "… trace truncated (exceeded maximum display size)"`.
+  In a test with a rule that adds 1 each time it calls itself, 600 calls printed in full and 1,000 were cut.
+- Lines can be very wide: each level of nesting adds a character of indentation, so that rule called 600 times prints lines more than 600 characters wide.
+- Keeping a trace takes memory, and nothing limits it.
+  The cut-off limits what is shown, not what is kept: that rule called 100,000 times used about 1.3 GB, against about 0.2 GB without the trace.
+  For a large computation, run with `--trace none`.
+
+**Example:** [evaltrace-example.l4](evaltrace-example.l4)
 
 ## Sections
 

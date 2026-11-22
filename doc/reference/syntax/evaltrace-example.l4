@@ -1,0 +1,9 @@
+-- #EVALTRACE shows the steps behind an answer, not only the answer.
+
+GIVEN age IS A NUMBER
+      `is a resident` IS A BOOLEAN
+GIVETH A BOOLEAN
+`may apply` MEANS age >= 18 AND `is a resident`
+
+#EVAL      `may apply` 25 TRUE
+#EVALTRACE `may apply` 25 TRUE

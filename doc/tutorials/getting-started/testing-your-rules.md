@@ -147,7 +147,7 @@ This is a crash, not a verdict: `l4 run` exits non-zero, and in `--json` the res
 
 The same holds when you assert an `ASSUME`d `BOOLEAN` directly: `#ASSERT b` and `#ASSERT NOT b` both report `assertion could not be evaluated`, because `b` has no value to check.
 
-`l4 run` exits with a non-zero code for type errors and for directives whose evaluation raises an error, but **not** for a failed assertion, nor for an `#EVAL` or an `#ASSERT` the rules decline to answer with `REFUSE`: the file is still valid L4, so the exit code is `0`. In CI, look for those assertions explicitly: grep the output for `assertion failed` and `assertion refused`, or run `l4 run --json` and check that each result whose `"kind"` is `"assertion"` has `"value": true`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
+`l4 run` exits with a non-zero code for type errors, for directives whose evaluation raises an error, and for a failed assertion: an assertion is a test, so a failing one fails the run. It does **not** exit non-zero for an `#EVAL` or an `#ASSERT` the rules decline to answer with `REFUSE`: that is a designed outcome, not a failure, so the exit code is `0`. In CI, check the exit code, and also look for refused assertions explicitly: grep the output for `assertion refused`, or run `l4 run --json` and check that each result whose `"kind"` is `"assertion"` has `"value": true`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
 
 ---
 

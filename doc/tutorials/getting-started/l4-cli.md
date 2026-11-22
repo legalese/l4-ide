@@ -143,19 +143,115 @@ Result:
   20
 
 
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
+
+
 Evaluation[2] @ late-fee.l4:28:1-39
 
 Result:
   50
+
+
+Trace:
+  (no trace captured; add #EVALTRACE to the directive)
 ```
 
-Each `Evaluation[n]` block shows the result of one `#EVAL`, in file order. Results go to standard output; errors and warnings go to standard error.
+Each `Evaluation[n]` block shows the result of one `#EVAL` (or `#EVALTRACE`), in file order. The `Trace:` line under each result is explained below, in "Seeing how an answer was reached". Results go to standard output; errors and warnings go to standard error.
 
-`l4 run` fails when the file, or a file it imports, has an error, or when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero. The other directives still show their results. Warnings, and an `#ASSERT` that comes out false, don't make it fail.
+`l4 run` fails when the file, or a file it imports, has an error, when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero, or when an `#ASSERT` comes out false. The other directives still show their results. Warnings, and an `#ASSERT` the rules decline to answer with `REFUSE`, don't make it fail.
 
 If a `FETCH` or `POST` can't reach its server, `l4 run` fails and shows no results for any directive in the file. To see the other results, move the directives that make requests to a file of their own.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
+
+### Seeing how an answer was reached
+
+Under every result, `l4 run` prints a `Trace:` line.
+For an ordinary `#EVAL` it says `(no trace captured; add #EVALTRACE to the directive)`.
+That is not a fault in your file: an `#EVAL` gives you the answer only, and L4 does not keep a record of the steps.
+
+To see the steps, ask with `#EVALTRACE` instead.
+Add one more line to the end of `late-fee.l4`:
+
+```l4
+#EVALTRACE `late fee` `a slightly late invoice`
+```
+
+Run the file again.
+A third block appears, and this time its `Trace:` is the working itself:
+
+```
+Evaluation[3] @ late-fee.l4:29:1-48
+
+Result:
+  20
+
+
+Trace:
+  ┌ `late fee` OF `a slightly late invoice`
+  │┌ `late fee`
+  │└ <function>
+  ├ IF ((invoice's `days overdue`) AT MOST 0) THEN 0 ELSE (IF ((invoice's `days overdue`) AT MOST 30) THEN ((invoice's amount) TIMES 0.02) ELSE ((invoice's amount) TIMES 0.05))
+  │┌ (invoice's `days overdue`) AT MOST 0
+  ││┌ invoice's `days overdue`
+  ││├ `days overdue` OF invoice
+  │││┌ `days overdue`
+  │││└ <function>
+  ││├ CONSIDER Invoice
+  │││   WHEN Invoice amount
+  │││                 `days overdue` THEN `days overdue`
+  ││├ `days overdue`
+  ││└ 12
+  │└ FALSE
+  ├ IF ((invoice's `days overdue`) AT MOST 30) THEN ((invoice's amount) TIMES 0.02) ELSE ((invoice's amount) TIMES 0.05)
+  │┌ (invoice's `days overdue`) AT MOST 30
+  ││┌ invoice's `days overdue`
+  ││├ `days overdue` OF invoice
+  │││┌ `days overdue`
+  │││└ <function>
+  ││├ CONSIDER Invoice
+  │││   WHEN Invoice amount
+  │││                 `days overdue` THEN `days overdue`
+  ││├ `days overdue`
+  ││└ 12
+  │└ TRUE
+  ├ (invoice's amount) TIMES 0.02
+  │┌ invoice's amount
+  │├ amount OF invoice
+  ││┌ amount
+  ││└ <function>
+  │├ CONSIDER Invoice
+  ││   WHEN Invoice amount
+  ││                 `days overdue` THEN amount
+  │├ amount
+  │└ 1000
+  └ 20
+```
+
+Read it from the top.
+The first line is what you asked.
+Each line starting with `├` is one step toward the answer: here the rule first checks whether the invoice is 0 days overdue or fewer (`FALSE`, because it is 12), then whether it is 30 or fewer (`TRUE`), then multiplies the amount, 1000, by `0.02`.
+The indented lines beside a step are the smaller questions that step had to settle first.
+The last line, `└ 20`, is the answer.
+
+Two kinds of line in it are ones you did not write, and you can pass over both.
+A line reading `<function>` is a rule being looked up by its name; what is found is the rule itself, which has no answer of its own until it is given its inputs.
+A `CONSIDER Invoice` with a `WHEN Invoice amount …` beneath it is L4 reading one field out of the invoice: it matches the invoice against its list of fields and takes the one it needs.
+
+On a terminal you will see the trace twice.
+It also appears in the messages L4 prints on the error stream, where warnings and errors go, ahead of the results.
+Add `2>/dev/null` to the command to hide that stream and see the trace once.
+
+Traces are on by default.
+If a file has many `#EVALTRACE` lines and you want only the results, add `--trace none`:
+
+```bash
+l4 run --trace none late-fee.l4
+```
+
+Only the text output shows traces: `--json` (below) carries none, whatever `--trace` says.
+To see the same working as a diagram, use `l4 trace`, described further down.
 
 ### Machine-readable output
 
@@ -172,7 +268,8 @@ l4 run late-fee.l4 --json
   "diagnostics": ["..."],
   "results": [
     { "kind": "value", "range": "late-fee.l4:27:1-43", "value": "20" },
-    { "kind": "value", "range": "late-fee.l4:28:1-39", "value": "50" }
+    { "kind": "value", "range": "late-fee.l4:28:1-39", "value": "50" },
+    { "kind": "value", "range": "late-fee.l4:29:1-48", "value": "20" }
   ]
 }
 ```
@@ -450,7 +547,9 @@ A cases file or a rules file that does not exist ends the command with the opera
 
 ### `l4 trace` and `l4 state-graph` — visualization
 
-- `l4 trace myfile.l4` renders every `#EVALTRACE` in the file as GraphViz DOT (`--format dot|png|svg`, `-o DIR` for image output; PNG/SVG need GraphViz installed).
+- `l4 trace myfile.l4` draws every `#EVALTRACE` in the file as a diagram, where `l4 run` prints it as text.
+  It prints a description of the diagram in GraphViz DOT: GraphViz is a free diagram-drawing program, and DOT is its text format.
+  `--format dot|png|svg` chooses the output and `-o DIR` writes one file per `#EVALTRACE` into a directory; PNG and SVG pictures need GraphViz installed.
   If a trace cannot be built (an internal error), its graph says `trace unavailable` and the command exits with status 1.
 - `l4 state-graph myfile.l4` extracts the state transition graph of regulative rules (`PARTY ... MUST ...`) as GraphViz DOT.
 

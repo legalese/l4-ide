@@ -1,6 +1,6 @@
 -- Typechecks cleanly. Each #ASSERT REFUSED here fails, and none raises: a
--- failed assertion is a verdict, so `l4 run` on this file exits 0, and each
--- failure says why.
+-- failed assertion is a verdict, and `l4 run` on this file exits 1 as it does
+-- for any failed #ASSERT. Each failure says why.
 
 GIVETH A NUMBER
 `not modelled` MEANS REFUSE "this case is not modelled"
