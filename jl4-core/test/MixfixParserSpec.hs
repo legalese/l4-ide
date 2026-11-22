@@ -7,7 +7,8 @@ import Data.Maybe (listToMaybe)
 import qualified Data.Text as T
 import L4.ExactPrint (exactprint)
 import L4.Parser (buildMixfixHintRegistry, execProgramParserWithHintPass)
-import L4.Syntax (AppForm (..), Decide (..), Expr (..), Module (..), Name, Section (..), TopDecl (..), pattern Var, rawName, rawNameToText)
+import L4.Parser.MixfixRegistry (hasMixfixHints, isKnownMixfixKeyword, shadowMixfixWords)
+import L4.Syntax (AppForm (..), Decide (..), Expr (..), Module (..), Name, RawName (..), Section (..), TopDecl (..), pattern Var, rawName, rawNameToText)
 import Test.Hspec
 
 spec :: Spec
@@ -37,6 +38,47 @@ spec =
           assertPostfix postfixBody
           assertBinary mixfixBody
           assertChain chainBody
+
+    describe "an input named like a mixfix word (issue #1076)" $ do
+      -- With the mixfix rule `the day` n `days before` s in the file, the word
+      -- `the day` was taken for the rule's word wherever it stood, and in the
+      -- body of a rule whose input is called `the day` the call
+      -- `inc` `the day` was read as `the day` applied to `inc`.
+      it "reads the input as the input in the body of its rule, with and without a section" $
+        for_ [inputWordFixture, "§ `Lib`\n" <> inputWordFixture] \ src ->
+          case execProgramParserWithHintPass (toNormalizedUri (Uri "file:///mixfix-input-word-spec")) src of
+            Left errs -> expectationFailure $ "Parser failed with: " <> show errs
+            Right (moduleAst, _hints, _warnings) -> do
+              body <- expectBodyIn "twice" moduleAst
+              case body of
+                App _ funcName [Var _ argName] -> do
+                  rawNameText funcName `shouldBe` "inc"
+                  rawNameText argName `shouldBe` "the day"
+                _ -> expectationFailure $ "Expected `inc` applied to the input but got: " <> show body
+
+      it "still reads the word as the word in a rule that has no input of that name" $
+        case execProgramParserWithHintPass (toNormalizedUri (Uri "file:///mixfix-input-word-spec")) inputWordFixture of
+          Left errs -> expectationFailure $ "Parser failed with: " <> show errs
+          Right (moduleAst, _hints, _warnings) -> do
+            body <- expectBodyIn "seven" moduleAst
+            case body of
+              App _ funcName _ -> rawNameText funcName `shouldBe` "the day"
+              _ -> expectationFailure $ "Expected the mixfix rule applied to 3 and 10 but got: " <> show body
+
+      it "takes a shadowed word out of the keywords, and nothing else" $
+        case execProgramParserWithHintPass (toNormalizedUri (Uri "file:///mixfix-input-word-spec")) inputWordFixture of
+          Left errs -> expectationFailure $ "Parser failed with: " <> show errs
+          Right (moduleAst, registry, _warnings) -> do
+            let shadowed = shadowMixfixWords [NormalName "the day"] registry
+            isKnownMixfixKeyword (NormalName "the day") registry `shouldBe` True
+            isKnownMixfixKeyword (NormalName "the day") shadowed `shouldBe` False
+            isKnownMixfixKeyword (NormalName "days before") shadowed `shouldBe` True
+            -- a name that is no word leaves the registry as it was
+            shadowMixfixWords [NormalName "n"] registry `shouldBe` registry
+            -- shadowing every word does not empty the registry: an empty one
+            -- puts the parser in its permissive mode
+            hasMixfixHints (shadowMixfixWords [NormalName "the day", NormalName "days before"] registry) `shouldBe` True
+            buildMixfixHintRegistry moduleAst `shouldBe` registry
 
     describe "exact-print round-trip (issue #918)" $ do
       -- `l4 format` is exactprint of the parsed AST, so exactprint must be
@@ -122,6 +164,35 @@ assertChain expr =
       rawNameText keywordName `shouldBe` "to settle"
       rawNameText ledgerName `shouldBe` "ledger"
     _ -> expectationFailure $ "Expected ternary mixfix chain but got: " <> show expr
+
+-- | The source of #1076: a mixfix rule, and a rule with an input named like
+-- its first word that passes that input to another rule.
+inputWordFixture :: T.Text
+inputWordFixture =
+  T.unlines
+    [ "GIVEN n IS A NUMBER"
+    , "      s IS A NUMBER"
+    , "`the day` n `days before` s MEANS s MINUS n"
+    , ""
+    , "GIVEN `the day` IS A NUMBER"
+    , "GIVETH A NUMBER"
+    , "`inc` `the day` MEANS `the day` PLUS 1"
+    , ""
+    , "GIVEN `the day` IS A NUMBER"
+    , "GIVETH A NUMBER"
+    , "`twice` `the day` MEANS `inc` `the day`"
+    , ""
+    , "seven MEANS `the day` 3 `days before` 10"
+    ]
+
+-- | 'expectBody', for a module whose rules may sit under a section.
+expectBodyIn :: T.Text -> Module Name -> IO (Expr Name)
+expectBodyIn target (MkModule ann uri (MkSection sann sname aka given decls)) =
+  expectBody target (MkModule ann uri (MkSection sann sname aka given (concatMap flatten decls)))
+  where
+    flatten = \ case
+      Section _ (MkSection _ _ _ _ inner) -> concatMap flatten inner
+      d                                    -> [d]
 
 expectBody :: T.Text -> Module Name -> IO (Expr Name)
 expectBody target modu =

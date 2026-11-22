@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+mixfix-input-word-argument.l4:55:1-35:
+  7
+mixfix-input-word-argument.l4:56:1-14:
+  6
+mixfix-input-word-argument.l4:57:1-16:
+  6
+mixfix-input-word-argument.l4:58:1-17:
+  18
+mixfix-input-word-argument.l4:59:1-16:
+  6
+mixfix-input-word-argument.l4:60:1-18:
+  6
+mixfix-input-word-argument.l4:61:1-17:
+  7
+mixfix-input-word-argument.l4:62:1-16:
+  12
+mixfix-input-word-argument.l4:63:1-15:
+  12

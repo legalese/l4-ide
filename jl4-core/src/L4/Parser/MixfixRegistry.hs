@@ -5,6 +5,7 @@ module L4.Parser.MixfixRegistry
   , buildMixfixHintRegistry
   , hasMixfixHints
   , isKnownMixfixKeyword
+  , shadowMixfixWords
   , mixfixRulesWrittenAs
   , showMixfixPattern
   , showKeywords
@@ -21,6 +22,14 @@ import L4.Syntax
 data MixfixHintRegistry = MkMixfixHintRegistry
   { byFirstKeyword :: Map RawName [MixfixInfo]
   , keywordUniverse :: Set RawName
+  , shadowedWords :: Set RawName
+    -- ^ Words of 'keywordUniverse' that the text being read does not take for
+    -- mixfix words, because a rule around it has an input of that name
+    -- ('shadowMixfixWords'). Empty in a module's own registry and in every
+    -- registry merged from imports; only a rule's body reads a registry with
+    -- any. It is kept apart from 'keywordUniverse' because that set's being
+    -- empty is what puts the parser in its permissive mode ('hasMixfixHints'),
+    -- and shadowing the only word of a file must not do that.
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (NFData)
@@ -32,17 +41,18 @@ data MixfixHintRegistry = MkMixfixHintRegistry
 -- every earlier module (smucclaw\/l4-ide#1008). The parser reads only
 -- 'keywordUniverse', so no parse changes.
 instance Semigroup MixfixHintRegistry where
-  MkMixfixHintRegistry m1 s1 <> MkMixfixHintRegistry m2 s2 =
+  MkMixfixHintRegistry m1 s1 w1 <> MkMixfixHintRegistry m2 s2 w2 =
     MkMixfixHintRegistry
       (Map.unionWith List.union m1 m2)
       (Set.union s1 s2)
+      (Set.union w1 w2)
 
 instance Monoid MixfixHintRegistry where
   mempty = emptyMixfixHintRegistry
 
 emptyMixfixHintRegistry :: MixfixHintRegistry
 emptyMixfixHintRegistry =
-  MkMixfixHintRegistry Map.empty Set.empty
+  MkMixfixHintRegistry Map.empty Set.empty Set.empty
 
 registerMixfixInfo :: MixfixInfo -> MixfixHintRegistry
 registerMixfixInfo info =
@@ -52,13 +62,30 @@ registerMixfixInfo info =
       MkMixfixHintRegistry
         (Map.singleton kw [info])
         (Set.fromList info.keywords)
+        Set.empty
 
 hasMixfixHints :: MixfixHintRegistry -> Bool
 hasMixfixHints hints = not (Set.null hints.keywordUniverse)
 
 isKnownMixfixKeyword :: RawName -> MixfixHintRegistry -> Bool
 isKnownMixfixKeyword kw hints =
-  kw `Set.member` hints.keywordUniverse
+  kw `Set.member` hints.keywordUniverse && kw `Set.notMember` hints.shadowedWords
+
+-- | The registry as the body of a rule reads it, when the rule's own inputs
+-- have these names: a word that is the name of an input is that input there,
+-- and no longer a word of a mixfix rule. In a rule with an input called
+-- @the day@, in a file with a rule @the day n days before s@, the call
+-- @inc the day@ is @inc@ applied to the input, and not @the day@ applied to
+-- @inc@ (smucclaw\/l4-ide#1076). The same choice is made for the line that
+-- DEFINES a rule, by the first argument of 'mixfixRulesWrittenAs'.
+--
+-- The words stay in 'keywordUniverse', so a file whose only word is shadowed
+-- still has hints and the parser is not permissive in its rules.
+shadowMixfixWords :: [RawName] -> MixfixHintRegistry -> MixfixHintRegistry
+shadowMixfixWords names hints =
+  case filter (`Set.member` hints.keywordUniverse) names of
+    []    -> hints
+    words' -> hints { shadowedWords = Set.union (Set.fromList words') hints.shadowedWords }
 
 -- | The mixfix rules in scope that a run of tokens is written in the form of.
 --
