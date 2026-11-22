@@ -1,0 +1,13 @@
+`JSONENCODE` with `the date`
+`JSONENCODE` with `the time`
+`JSONENCODE` with `a time with a fraction`
+`JSONENCODE` with `the datetime`
+`JSONENCODE` with `the datetime in UTC`
+`JSONENCODE` with `the meeting`
+`JSONENCODE` with list of `the date` and `the date`
+`JSONENCODE` with `JUST` with `the time`
+`decode a date` with `JSONENCODE` with `the date` is equal to `RIGHT` with `the date`
+`decode a time` with `JSONENCODE` with `the time` is equal to `RIGHT` with `the time`
+`decode a time` with `JSONENCODE` with `a time with a fraction` is equal to `RIGHT` with `a time with a fraction`
+`decode a datetime` with `JSONENCODE` with `the datetime` is equal to `RIGHT` with `the datetime`
+`decode a meeting` with `JSONENCODE` with `the meeting` is equal to `RIGHT` with `the meeting`

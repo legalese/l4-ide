@@ -5617,6 +5617,13 @@ encodeValueToJson = \case
     | otherwise -> pure $ Text.pack $ show (fromRational n :: Double)
   ValBool True -> pure "true"
   ValBool False -> pure "false"
+  -- A DATE, a TIME and a DATETIME are written as strings in the text form the
+  -- language prints them in (@2026-01-31@, @10:30:00@,
+  -- @2026-01-31T18:30:00+0800@), which 'parseDateText', 'parseTimeText' and
+  -- 'parseDatetimeText' read back at the same type (smucclaw/l4-ide#1083).
+  ValDate day -> pure $ quoted (formatDateIso day)
+  ValTime tod -> pure $ quoted (formatTimeOfDayExact tod)
+  ValDateTime utc tzName -> pure $ quoted (formatDateTimeIsoExact utc tzName)
   ValNil -> pure "[]"
   ValCons _x _xs ->
     -- This should not be reached as lists are handled in runBuiltin with frames
@@ -5637,6 +5644,9 @@ encodeValueToJson = \case
   v | Just ns <- unknownNames v -> stuckOn ns
   val -> internalException $ RuntimeTypeError $ "Cannot encode value to JSON: " <> prettyLayout val
   where
+    quoted :: Text -> Text
+    quoted t = "\"" <> escapeJson t <> "\""
+
     escapeJson :: Text -> Text
     escapeJson = Text.concatMap \case
       '"' -> "\\\""
@@ -8673,6 +8683,13 @@ formatTimeOfDay :: TimeOfDay -> Text
 formatTimeOfDay tod =
   Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S" tod
 
+-- | 'formatTimeOfDay', with the fraction of a second after the seconds when
+-- there is one (@10:30:00.5@), so that 'parseTimeText' reads back the same
+-- time. A whole number of seconds is written as before.
+formatTimeOfDayExact :: TimeOfDay -> Text
+formatTimeOfDayExact tod =
+  Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S%Q" tod
+
 -- | Format a 'UTCTime' as a plain ISO-8601 UTC string (e.g.
 -- @2026-06-12T08:30:00Z@). Used for ledger provenance positions (M2), where we
 -- only have the evaluation clock and no tz context.
@@ -8682,16 +8699,26 @@ formatUTCTimeIso utc =
 
 -- | Format a UTCTime with timezone offset as ISO-8601
 formatDateTimeIso :: UTCTime -> Text -> Text
-formatDateTimeIso utc tzName =
+formatDateTimeIso = formatDateTimeIsoWith "%S"
+
+-- | 'formatDateTimeIso', with the fraction of a second after the seconds when
+-- there is one, so that 'parseDatetimeText' reads back the same instant.
+formatDateTimeIsoExact :: UTCTime -> Text -> Text
+formatDateTimeIsoExact = formatDateTimeIsoWith "%S%Q"
+
+-- | The datetime in the given timezone as @YYYY-MM-DDTHH:MM:SS@ followed by its
+-- UTC offset, the seconds written with the given format.
+formatDateTimeIsoWith :: String -> UTCTime -> Text -> Text
+formatDateTimeIsoWith secondsFmt utc tzName =
   case tryLoadTZPure tzName of
     Just tz ->
       let localTime' = TZ.utcToLocalTimeTZ tz utc
           offset = TZ.timeZoneForUTCTime tz utc
           offsetStr = TimeFormat.formatTime TimeFormat.defaultTimeLocale "%z" offset
-      in Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%S" localTime') <> Text.pack offsetStr
+      in Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale ("%Y-%m-%dT%H:%M:" <> secondsFmt) localTime') <> Text.pack offsetStr
     Nothing ->
       -- Fallback: format as UTC
-      Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" utc
+      Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale ("%Y-%m-%dT%H:%M:" <> secondsFmt <> "Z") utc
 
 -- | Pure-ish wrapper for TZ loading (uses unsafePerformIO since TZ data is static)
 tryLoadTZPure :: Text -> Maybe TZ.TZ

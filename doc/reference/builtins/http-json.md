@@ -58,6 +58,7 @@ DECIDE `the API key` IS
 | NUMBER                                    | a number                                                        |
 | STRING                                    | a string, with escapes                                          |
 | BOOLEAN                                   | `true` or `false`                                               |
+| DATE, TIME, DATETIME                      | a string, written as below                                      |
 | LIST                                      | an array                                                        |
 | record (`DECLARE ... HAS`)                | an object with one entry per field                              |
 | constructor without fields, such as `Red` | its name as a string: `"Red"`                                   |
@@ -65,6 +66,10 @@ DECIDE `the API key` IS
 | `NOTHING`                                 | `null`                                                          |
 | `JUST x`                                  | the JSON for `x`                                                |
 | `LEFT x`, `RIGHT x`                       | an object with the side as its one key: `{"LEFT": x}`           |
+
+A DATE is written as `"2026-01-31"` and a TIME as `"10:30:00"`, with the fraction of a second after the seconds when there is one (`"10:30:00.5"`).
+A DATETIME is written as its local date and time in its own timezone, followed by the offset from UTC: `"2026-01-31T10:30:00+0800"`.
+`JSONDECODE` reads each of these back at the same type.
 
 ```l4
 DECLARE Person HAS
@@ -87,6 +92,7 @@ The type you expect guides the decoding, so say it, with `GIVETH` or by the way 
 - An array decodes to a LIST, a number to a NUMBER, a string to a STRING, `true` and `false` to a BOOLEAN.
 - `null` decodes to `NOTHING` for a MAYBE type; any other value decodes to `JUST` it.
 - A string with a constructor's name decodes to that constructor of an enumeration.
+- A string written as a date (`2026-01-31`), a time (`10:30:00`) or a datetime (`2026-01-31T10:30:00+0800`, or ending in `Z`) decodes to a DATE, a TIME or a DATETIME. A DATETIME is read as the same instant, with the `TIMEZONE` of the document (UTC when it has none).
 - A type declared as another name for a type (`DECLARE Year IS A NUMBER`) decodes as that type, and so does one for a MAYBE: with `DECLARE MaybeYear IS A MAYBE NUMBER`, `null` decodes to `NOTHING` and `2026` to `JUST 2026`.
 
 ```l4

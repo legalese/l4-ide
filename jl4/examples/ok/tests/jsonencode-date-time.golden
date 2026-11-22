@@ -1,0 +1,29 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+jsonencode-date-time.l4:51:1-28:
+  "\"2026-01-31\""
+jsonencode-date-time.l4:52:1-28:
+  "\"10:30:00\""
+jsonencode-date-time.l4:53:1-42:
+  "\"10:30:00.5\""
+jsonencode-date-time.l4:54:1-32:
+  "\"2026-01-31T10:30:00+0800\""
+jsonencode-date-time.l4:55:1-39:
+  "\"2026-01-31T10:30:00+0000\""
+jsonencode-date-time.l4:56:1-31:
+  "{\"day\":\"2026-01-31\",\"starts\":\"10:30:00\",\"fixed at\":\"2026-01-31T10:30:00+0800\"}"
+jsonencode-date-time.l4:57:1-47:
+  "[\"2026-01-31\",\"2026-01-31\"]"
+jsonencode-date-time.l4:58:1-35:
+  "\"10:30:00\""
+jsonencode-date-time.l4:61:1-72:
+  assertion satisfied
+jsonencode-date-time.l4:62:1-72:
+  assertion satisfied
+jsonencode-date-time.l4:63:1-100:
+  assertion satisfied
+jsonencode-date-time.l4:64:1-84:
+  assertion satisfied
+jsonencode-date-time.l4:65:1-81:
+  assertion satisfied
