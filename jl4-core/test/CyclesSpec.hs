@@ -18,11 +18,11 @@ import qualified Data.Text.IO as Text
 import System.Directory (listDirectory)
 import System.Environment (lookupEnv)
 import System.FilePath (takeBaseName, takeDirectory, takeExtension, takeFileName, (</>))
+import Control.DeepSeq (NFData, force)
 import Control.Exception (evaluate)
-import Control.Monad (void)
+import System.Mem (getAllocationCounter)
 import Test.Hspec
 
-import LinearTime (cpuRatio, quadraticControl)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Base (Uri (..), toNormalizedUri)
@@ -792,21 +792,33 @@ spec = describe "cycle report (#1075 layer 2)" do
   -- own was quadratic in them: 150 uses took 18.4 s of report where the
   -- check took 0.08 s, and 300 did not finish in 60 s (2026-11-21 attack
   -- round, names d13, d14). The edges are counted, not the source's size.
-  describe "the report takes time near-linear in the edges of a cycle" $ do
-    it "judges a cycle of 1,000 and of 4,000 edges in near the ratio of the edges" $ do
-      let prepare k = do
-            r@(_, _, m) <- checked (namedTenTimes k)
-            void (evaluate m)
-            pure r
-          run (s, i, m@(MkModule _ uri _)) = do
-            let fs = cycleFindings (applyFinalSubstitution s uri) i m
-            -- the run happened, and judged the one cycle it was built for
-            map findingClass fs `shouldBe` ["function:unproved-mutual+fans"]
-      r <- cpuRatio prepare run 100 400
-      r `shouldSatisfy` (< 8)
+  --
+  -- Counted in the bytes this thread allocates while the report is made and
+  -- shown in full ('show'), which nothing else running on the machine
+  -- changes; the module is checked, and forced, before the count starts. For
+  -- 4 times the edges, a cost linear in them allocates about 4 times as much,
+  -- a quadratic one about 16, and one that does not grow about 1, so the
+  -- guard accepts a ratio over 2 and under 8. Measured on the change that
+  -- found the edges in one pass: 6.17 with it, 15.05 without it.
+  --
+  -- 6.17 is over 4 because this input's PLUS chain gets deeper as the edges
+  -- grow, and not all of the report's walk is linear in that depth: with the
+  -- chain held at 100 uses and t's calls taken from 10 to 40, the same 1,000
+  -- to 4,000 edges, the ratio is 2.80. 'universeExpr' appends each child's
+  -- list again at every level above it; a version that does not brings 6.17
+  -- to 5.05. The rest is not located (all measured 2026-11-22).
+  describe "the report's work does not grow with the square of the edges of a cycle" $ do
+    it "allocates for a cycle of 4,000 edges under 8 times what it does for one of 1,000" $ do
+      ((small, large), r) <- allocationRatio (checked . namedTenTimes) report 1 100 400
+      -- both runs happened, and judged the one cycle each was built for
+      map snd [small, large] `shouldBe` replicate 2 ["function:unproved-mutual+fans"]
+      r `shouldSatisfy` (\ x -> x > 2 && x < 8)
 
-    it "fails work quadratic in the edges on the same sizes (the control)" $
-      quadraticControl 100 400 8
+    it "and counted the same way, work quadratic in the edges is over 8, on the same sizes (the control)" $ do
+      (_, r) <- allocationRatio (pure . (* 10)) perEdgeRebuild 1 100 400
+      r `shouldSatisfy` (>= 8)
+      -- far over 16 would mean the small run reused work the large one did
+      r `shouldSatisfy` (< 64)
 
   -- What the checker says (recursion-limit rulings L3 and L4, and the
   -- scope ruling (ii); 'cycleNotices'). Each warning that fires has a fixture where
@@ -1153,6 +1165,40 @@ namedTenTimes k = Text.unlines
   , "GIVEN n IS A NUMBER GIVETH A NUMBER"
   , "g n MEANS f (n PLUS 1)"
   ]
+
+-- | @allocationRatio prepare compute warm small large@: the bytes this thread
+-- allocates to compute @compute@ in full on what @prepare large@ gives, over
+-- the same on what @prepare small@ gives, with the two results. One run on
+-- @prepare warm@ comes first, so that what the first run computes once, and
+-- keeps, is not counted against the small one. What @prepare@ gives is
+-- forced before the count starts.
+allocationRatio :: (NFData a, NFData b) => (k -> IO a) -> (a -> b) -> k -> k -> k -> IO ((b, b), Double)
+allocationRatio prepare compute warm small large = do
+  _ <- allocated warm
+  (s, sBytes) <- allocated small
+  (l, lBytes) <- allocated large
+  pure ((s, l), lBytes / sBytes)
+ where
+  allocated k = do
+    input <- prepare k >>= evaluate . force
+    a0 <- getAllocationCounter
+    y <- evaluate (force (compute input))
+    a1 <- getAllocationCounter
+    pure (y, fromIntegral (a0 - a1) :: Double)
+
+-- | The cycle report of a checked module, shown in full, and the class of
+-- each finding in it.
+report :: (Substitution, EntityInfo, Module Resolved) -> (String, [Text])
+report (s, i, m@(MkModule _ uri _)) = (show fs, map findingClass fs)
+ where
+  fs = cycleFindings (applyFinalSubstitution s uri) i m
+
+-- | Made-up work quadratic in @n@, of the shape the one-pass change removed:
+-- for each of @n@ edges, a map of all the others is built again, and its size
+-- read. It uses none of the code the guard counts.
+perEdgeRebuild :: Int -> Int
+perEdgeRebuild n = sum [Map.size (Map.fromList [(j, ()) | j <- [1 .. n], j /= i]) | i <- [1 .. n]]
+{-# NOINLINE perEdgeRebuild #-}
 
 -- | A function of @all@'s argument types that gives back the function it was
 -- given, and one that applies a function: together they apply the function
