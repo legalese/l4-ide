@@ -65,6 +65,7 @@ import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.Types as Aeson.Types
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio (numerator, denominator)
+import Data.Time.Format (defaultTimeLocale, formatTime)
 import qualified Data.Vector as Vector
 
 import L4.Evaluate.ValueLazy
@@ -93,11 +94,11 @@ instance ToJSON a => ToJSON (Value a) where
   toJSON (ValString s)            = toJSON s
   toJSON (ValDate d)              = toJSON (show d)
   toJSON (ValTime t)              = toJSON (show t)
-  -- A string, like a DATE and a TIME above, in the text jl4-service answers a
-  -- DATETIME with: the instant in UTC (@2026-01-31 10:30:00 UTC@). It was an
-  -- object, @{"utc": ..., "timezone": ...}@, which neither @l4 batch@ nor
-  -- JSONDECODE reads back (smucclaw/l4-ide#1085).
-  toJSON (ValDateTime utc _tz)    = toJSON (show utc)
+  -- A string, like a DATE and a TIME above: the instant as RFC 3339 in UTC
+  -- (@2026-01-31T10:30:00Z@), the one text every writer of a DATETIME uses
+  -- (W1, option B). It was an object, @{"utc": ..., "timezone": ...}@, which
+  -- neither @l4 batch@ nor JSONDECODE reads back (smucclaw/l4-ide#1085).
+  toJSON (ValDateTime utc _tz)    = toJSON (formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%QZ" utc)
   toJSON ValNil                   = toJSON ([] :: [Aeson.Value])
   toJSON (ValCons x xs)           = flattenList x xs
   toJSON (ValConstructor name [])

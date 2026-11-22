@@ -4055,20 +4055,21 @@ spec bin = do
       sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
       sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
 
-    it "writes a DATETIME result as the text jl4-service answers with, and reads that text back as a fact" $ do
+    it "writes a DATETIME result as RFC 3339 in UTC, and reads that text and the older \"... UTC\" text back as a fact" $ do
       -- #1085: the result was the object {"timezone": ..., "utc": ...}, which
       -- neither l4 batch nor JSONDECODE reads. Now it is a string, and the
-      -- string, given back as a row, is read as the same instant.
+      -- string, given back as a row, is read as the same instant; so is the
+      -- "2026-01-31 10:30:00 UTC" text jl4-service used to answer with.
       let resultOf file = do
             Output code sout _ <- runL4 bin ["batch", batchDatetimeFixture, "--inputs", file]
             code `shouldBe` ExitSuccess
             sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
             pure sout
       fromIso <- resultOf batchDatetimeIso
-      fromIso `shouldSatisfy` ("\"result\":\"2026-01-31 10:30:00 UTC\"" `isInfixOf`)
+      fromIso `shouldSatisfy` ("\"result\":\"2026-01-31T10:30:00Z\"" `isInfixOf`)
       fromIso `shouldSatisfy` (not . ("\"timezone\"" `isInfixOf`))
       fromService <- resultOf batchDatetimeService
-      fromService `shouldSatisfy` ("\"result\":\"2026-01-31 10:30:00 UTC\"" `isInfixOf`)
+      fromService `shouldSatisfy` ("\"result\":\"2026-01-31T10:30:00Z\"" `isInfixOf`)
 
     it "decodes a constructor of a choice type declared under a section by its bare name" $ do
       -- "Red" is what JSONENCODE writes for Red, and what a request sends;

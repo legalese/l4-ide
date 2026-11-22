@@ -1,6 +1,6 @@
 -- A DATETIME as an input and as a result. `l4 batch` wrote the result as an
 -- object, {"timezone": ..., "utc": ...}, which neither it nor JSONDECODE reads
--- back (smucclaw/l4-ide#1085); it writes the text jl4-service answers with.
+-- back (smucclaw/l4-ide#1085); it writes RFC 3339 in UTC.
 
 TIMEZONE IS "Asia/Singapore"
 
