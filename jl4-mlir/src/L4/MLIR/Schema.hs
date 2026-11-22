@@ -72,6 +72,7 @@ import L4.Parser.SrcSpan (SrcRange(..))
 import L4.TypeCheck.Types (InfoMap, EntityInfo)
 import qualified L4.Utils.IntervalMap as IV
 import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, enrichParamTypes)
+import L4.Refusal (refusalReasons)
 import qualified L4.Print as Print
 import L4.StateGraph
   ( extractStateGraphs
@@ -416,6 +417,9 @@ bundleExports wasmPath version infoMap entInfo resolvedModule depModules =
       -- EVERY input, silently.
       exports  = enrichParamTypes entInfo
                    (enrichReturnTypes entInfo (getExportedFunctions resolvedModule))
+      -- Whether evaluating a definition may reach a REFUSE, following the
+      -- names it calls through this module and every module it imports.
+      mayRefuse = not . Set.null . refusalReasons (resolvedModule : depModules)
       stateGraphs =
         [ StateGraphExport sg.sgName (stateGraphToDot defaultStateGraphOptions sg)
         | sg <- extractStateGraphs resolvedModule
@@ -515,7 +519,7 @@ bundleExports wasmPath version infoMap entInfo resolvedModule depModules =
   in WasmBundle
        { bundleWasmFile = wasmPath
        , bundleVersion  = version
-       , bundleExports  = map (buildExport infoMap declares fnReturnTypes unannotatedFnNames) exports
+       , bundleExports  = map (buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFnNames) exports
        , bundleStateGraphs = stateGraphs
        , bundleHelpers     = helperMetas
        }
@@ -739,8 +743,8 @@ decideWasmSymbol :: Decide Resolved -> Text
 decideWasmSymbol (MkDecide _ _ (MkAppForm _ headRes _ _) _) =
   sanitizeWasmSymbol (rawNameToText (rawName (getActual headRes)))
 
-buildExport :: InfoMap -> Map Text (Declare Resolved) -> Map Text (Type' Resolved) -> Set.Set Text -> ExportedFunction -> FunctionExport
-buildExport infoMap declares fnReturnTypes unannotatedFns ef =
+buildExport :: (Decide Resolved -> Bool) -> InfoMap -> Map Text (Declare Resolved) -> Map Text (Type' Resolved) -> Set.Set Text -> ExportedFunction -> FunctionExport
+buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
   let name        = ef.exportName
       isDeonticFn = case ef.exportReturnType of
         Just ty -> isDeonticType ty
@@ -842,10 +846,23 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
           -> Just (unmarshallableReturnReason (returnTypeDisplay (Just ty)))
         _ -> Nothing
 
-      -- The two schema-build refusal guards compose disjointly: the
-      -- deontic-extraction guard fires only when 'isDeonticFn', the
-      -- unmarshallable-return guard only when not.
+      -- A REFUSE has no WASM image: the compiled module cannot stop with a
+      -- reason. So an export from which evaluation may reach a REFUSE is
+      -- marked unsupported here, and the WASM backend does not run it: the
+      -- runtime's 'invokeFunction' declines it, and so does @jl4-mlir run@,
+      -- each naming this reason and sending the caller to jl4-service,
+      -- which raises the refusal. The REFUSE may be written in the export's
+      -- body, in any clause of a regulative rule, or in a definition the body
+      -- names, in this module or in one it imports ('refusalReasons'). The
+      -- lowering marks only a REFUSE in the body it lowers, so a REFUSE
+      -- reached through a called definition needs this mark.
+      refuseInBody = mayRefuse ef.exportDecide
+
+      -- The schema-build refusal guards: a REFUSE first; the other two
+      -- compose disjointly: the deontic-extraction guard fires only when
+      -- 'isDeonticFn', the unmarshallable-return guard only when not.
       (supported_, unsupportedReason_)
+        | refuseInBody = (False, Just refuseUnsupportedReason)
         | deonticExtractionFailed =
             ( False
             , Just "DEONTIC contract could not be extracted to a schema tree the \
@@ -869,7 +886,8 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
        , isDeontic   = isDeonticFn
        , paramOrder  = paramOrder_
        -- Assume compilable unless a schema-build guard above already
-       -- refused (DEONTIC extraction failure, or an unmarshallable ABI
+       -- refused (evaluation may reach a REFUSE, DEONTIC extraction failure,
+       -- or an unmarshallable ABI
        -- return); 'applyDiagnostics' additionally downgrades functions
        -- the lowering flagged as unsupported (that pass only ever
        -- downgrades, never re-upgrades).
@@ -878,6 +896,10 @@ buildExport infoMap declares fnReturnTypes unannotatedFns ef =
        , traceMeta   = Just traceMeta_
        , deonticContract = deonticContract_
        }
+
+-- | Why an export from which evaluation may reach a REFUSE is unsupported.
+refuseUnsupportedReason :: Text
+refuseUnsupportedReason = "REFUSE is not supported by the WASM backend"
 
 -- | M6: walk a 'Decide' body to extract a 'DeonticContract' tree.
 -- The body is a 'Regulative' wrapping a 'Deonton' record; the
@@ -1875,7 +1897,8 @@ kindFromL4Type t = case t of
 -- still sees it exists and can serve its read-only metadata — but
 -- @supported = False@ tells the proxy to route evaluation to a fallback
 -- engine rather than the WASM module, which cannot evaluate it
--- correctly. Functions absent from the map are left untouched.
+-- correctly. Functions absent from the map are left untouched. A reason
+-- 'buildExport' already gave (a REFUSE) is kept, ahead of the lowering's.
 applyDiagnostics :: Map Text [Text] -> WasmBundle -> WasmBundle
 applyDiagnostics diags wb =
   wb { bundleExports = map mark wb.bundleExports }

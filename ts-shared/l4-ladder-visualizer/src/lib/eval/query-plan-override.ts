@@ -1,7 +1,8 @@
-import type { QueryPlanResponse } from 'jl4-client-rpc'
+import type { QueryPlanDecline, QueryPlanResponse } from 'jl4-client-rpc'
 import type { LirContext } from '@repo/layout-ir'
 import type { Unique } from '@repo/viz-expr'
 import type { ElicitationAsk, PartialEvalAnalysis } from './partial-eval.js'
+import { UnknownVal } from './type.js'
 
 type AtomLike = {
   atomId: string
@@ -18,6 +19,46 @@ export type ElicitationOverride = {
   stillNeeded: Unique[]
   next: Unique[]
   askByUnique: PartialEvalAnalysis['askByUnique']
+  /** The sentence that says why there is no plan, for a rule that may refuse. */
+  declined?: string
+}
+
+/**
+ * The analysis the ladder shows once the query planner has answered: the
+ * planner's ranking and the inputs it still needs, in place of the ladder's
+ * own. For a rule the planner declines, because it may refuse to answer, no
+ * input is classed as moot either, the ladder gives no answer and no
+ * simplified rule, and the sentence that says why is carried.
+ */
+export function withElicitationOverride(
+  analysis: PartialEvalAnalysis,
+  override: {
+    ranked: Unique[]
+    stillNeeded: Unique[]
+    next?: Unique[]
+    askByUnique?: PartialEvalAnalysis['askByUnique']
+    declined?: string
+  } | null
+): PartialEvalAnalysis {
+  if (!override) return analysis
+  const declined = override.declined
+  const shown = {
+    ...analysis,
+    next: override.next ?? analysis.next,
+    ranked: override.ranked,
+    stillNeeded: override.stillNeeded,
+    askByUnique: override.askByUnique ?? analysis.askByUnique,
+    declined,
+  }
+  if (declined === undefined) return shown
+  return {
+    ...shown,
+    dontCare: [],
+    irrelevantRootIds: new Set(),
+    overallResult: new UnknownVal(),
+    isDetermined: false,
+    restrictedExprText: '',
+  }
 }
 
 function uniquesForAtom(
@@ -51,8 +92,20 @@ function uniquesForAtoms(
 export function elicitationOverrideFromQueryPlan(
   context: LirContext,
   ladderGraph: LadderGraphAtomLookup,
-  resp: QueryPlanResponse
+  resp: QueryPlanResponse | QueryPlanDecline
 ): ElicitationOverride {
+  // A rule that may refuse gets no plan: nothing is asked for, nothing is
+  // ranked, and the sentence that says why is carried instead.
+  if ('kind' in resp) {
+    return {
+      ranked: [],
+      stillNeeded: [],
+      next: [],
+      askByUnique: new Map(),
+      declined: resp.error,
+    }
+  }
+
   const askByUnique = new Map<Unique, ElicitationAsk[]>()
   const seenAskByUnique = new Map<Unique, Set<string>>()
 

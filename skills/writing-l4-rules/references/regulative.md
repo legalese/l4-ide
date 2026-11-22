@@ -441,18 +441,30 @@ Full treatment, including the state-graph behaviour and the measured sharp edges
 For recurring payments (loans, subscriptions, installments), define a function that emits the next period's obligation:
 
 ```l4
+DECLARE Party IS ONE OF `The Borrower`
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+
+`monthly installment` MEANS 100
+`late penalty` MEANS 10
+
 GIVEN remainingBalance IS A NUMBER
-`monthly payments` MEANS
+GIVETH A DEONTIC Party Action
+`monthly payments` remainingBalance MEANS
     IF remainingBalance GREATER THAN 0
     THEN PARTY `The Borrower`
          MUST pay `monthly installment`
-         WITHIN `next due date`
+         WITHIN 30
          HENCE `monthly payments` (remainingBalance MINUS `monthly installment`)
          LEST  `monthly payments` (remainingBalance PLUS `late penalty`)
     ELSE FULFILLED
+
+#TRACE `monthly payments` 200 AT 0 WITH
+    PARTY `The Borrower` DOES pay 100 AT 20
+    PARTY `The Borrower` DOES pay 100 AT 45
+-- Result: FULFILLED
 ```
 
-The `HENCE` branch reduces the balance; the `LEST` branch increases it with a penalty and re-emits the obligation. The recursion base is `FULFILLED`.
+The `HENCE` branch reduces the balance; the `LEST` branch increases it with a penalty and re-emits the obligation. The recursion base is `FULFILLED`. `` `monthly installment` `` names a constant, so the action refers to it ([Reference and wildcard names](#reference-and-wildcard-names)): a payment of 50 does not discharge a rung.
 
 ---
 

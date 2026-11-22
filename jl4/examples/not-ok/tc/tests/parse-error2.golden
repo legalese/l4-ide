@@ -5,7 +5,7 @@ File: parse-error2.l4
   Range: 10:1-10:7
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-ASSUME
   Message:
        |
     10 | ASSUME one IS A

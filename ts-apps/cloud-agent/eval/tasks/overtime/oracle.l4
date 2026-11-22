@@ -1,0 +1,6 @@
+IMPORT solution
+
+#ASSERT `weekly pay` 30 10 EQUALS 300
+#ASSERT `weekly pay` 40 10 EQUALS 400
+#ASSERT `weekly pay` 41 10 EQUALS 415
+#ASSERT `weekly pay` 50 20 EQUALS 1100

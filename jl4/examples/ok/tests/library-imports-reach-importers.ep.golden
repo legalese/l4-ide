@@ -1,0 +1,13 @@
+-- A library's IMPORT lines sit above its first section, so what the
+-- library imports also reaches the files that import it:
+-- IMPORT datetime brings daydate, and daydate brings date-compat.
+
+IMPORT datetime
+
+-- from daydate
+#EVAL Date 15 1 2026
+#EVAL `the year after` (Date 15 1 2026)
+
+-- from date-compat, through daydate
+#EVAL DATE 15 1 2026
+#EVAL `Day of` (Date 15 1 2026)

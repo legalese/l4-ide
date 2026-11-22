@@ -6,22 +6,7 @@ File: fixity-conflict.l4
   Range: 17:7-17:28
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
-  Message:
-    The operator `CLASHOP` has conflicting fixity declarations visible here:
-
-      @infixr 7
-      @infixl 6
-
-    so I cannot re-associate this operator chain. Parenthesize the
-    expression, or make the declarations agree.
-
-File: fixity-conflict.l4
-  Hidden: no
-  Range: 17:7-17:28
-  Source: check
-  Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -35,10 +20,25 @@ File: fixity-conflict.l4
 
 File: fixity-conflict.l4
   Hidden: no
+  Range: 17:7-17:28
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/fixity-conflict
+  Message:
+    The operator `CLASHOP` has conflicting fixity declarations visible here:
+
+      @infixr 7
+      @infixl 6
+
+    so I cannot re-associate this operator chain. Parenthesize the
+    expression, or make the declarations agree.
+
+File: fixity-conflict.l4
+  Hidden: no
   Range: 17:19-17:26
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

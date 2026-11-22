@@ -6,7 +6,7 @@ File: breach-by-list-needs-party-type.l4
   Range: 20:15-20:30
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/breach-by-list-needs-party-type
   Message:
     BREACH BY names a list, but the rule's party type is not known here.
 
@@ -25,7 +25,7 @@ File: breach-by-list-needs-party-type.l4
   Range: 26:16-26:31
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/breach-by-list-needs-party-type
   Message:
     BREACH BY names a list, but the rule's party type is not known here.
 

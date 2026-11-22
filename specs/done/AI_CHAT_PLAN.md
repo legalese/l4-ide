@@ -2,7 +2,7 @@
 
 A new first-position sidebar tab in the VSCode extension that runs an agent
 loop against `ai.legalese.cloud`. Tools execute locally (file ops, LSP,
-local MCP servers including the built-in `l4-rules` one); the ai-proxy only
+local MCP servers including the built-in `l4-rules` one); the AI service only
 handles LLM round-trips and passes client-declared tools through.
 
 Visuals inline with message flow, Continue/Claude Code style — not a
@@ -17,14 +17,14 @@ reference only; the implementation and layout here are fresh.
   host is the only side that touches disk, LSP, MCP, or the network.
 - **Side-effecting tools are client-side.** File edits, LSP calls, MCP
   invocations, and anything that touches the user's machine run in the
-  extension host — never on the proxy. Every side effect is visible
-  to the user through the approval UI and the diff tab. (The proxy
+  extension host — never on the AI service. Every side effect is visible
+  to the user through the approval UI and the diff tab. (The AI service
   _does_ run its own stateless server-side tools, like `search_l4_docs`,
   for things that need baked-in L4-version context. Those have no side
   effects and surface as `tool_activity` events only.)
 - **Visuals inline.** Tool calls appear in-line with the assistant message
   that spawned them — not in a separate panel.
-- **OpenAI-compatible, nothing bespoke.** The wire protocol with the proxy
+- **OpenAI-compatible, nothing bespoke.** The wire protocol with the AI service
   is standard OpenAI chat completions with `tools` and `tool_calls`. No
   L4-specific RPC.
 
@@ -55,7 +55,7 @@ reference only; the implementation and layout here are fresh.
 ┌─────────────────────────────────┴──────────────────────────────────────────┐
 │                        Extension host (Node.js)                             │
 │                                                                              │
-│   chat-service.ts ────── ai-proxy HTTP client (SSE parser)                  │
+│   chat-service.ts ────── AI HTTP client (SSE parser)                  │
 │        │                                                                     │
 │        ├── tool-registry.ts ── builtins + MCP tool lists → OpenAI `tools[]`│
 │        ├── tool-dispatcher.ts ── routes tool_call by name prefix             │
@@ -374,7 +374,7 @@ Pattern used by Cursor, Claude Code, Aider; worth matching.
 
 All paths resolve against workspace root; absolute paths outside the
 workspace are rejected. The `fs__` / `lsp__` / `l4__` / `meta__` prefixes
-stay safely clear of any future server-side tool (ai-proxy's
+stay safely clear of any future server-side tool (the AI service's
 `tool_name_disallowed` guard catches collisions anyway).
 
 ### 5.3 MCP tools
@@ -425,7 +425,7 @@ sync).
 
 ### 5.5 Client-tool parallelism
 
-The proxy may return multiple `tool_calls` in one round. Dispatch all in
+The AI service may return multiple `tool_calls` in one round. Dispatch all in
 parallel (respecting permissions), collect results, POST the batch back
 in one follow-up. Partial denials are fine — LLMs adapt.
 
@@ -463,7 +463,7 @@ maybe 100 lines of `marked` lexer plumbing.
 
 ### 6.2 Thinking blocks
 
-Requires an **ai-proxy addition** (not yet shipped): pass Claude extended
+Requires an **AI service addition** (not yet shipped): pass Claude extended
 thinking through as a custom SSE event (`event: thinking_delta`). On the
 webview side, thinking is collapsed by default; expanding shows the
 reasoning text. Non-reasoning providers simply omit the event.
@@ -536,13 +536,12 @@ write.
 }
 ```
 
-Server owns the full state via `conversationId` and handles compaction
-(sliding window + summary) for us — the local file is the render log for
+Server owns the full state via `conversationId` — the local file is the render log for
 UI restoration, not the LLM context. On resume we send only the new user
 turn (delta-mode, auto-detected). If the server returns 404 (TTL
 expired), start a new conversation and replay local history as messages.
 
-Because the server already compacts, we don't trim the local file. It
+We don't trim the local file. It
 stays unbounded and the history panel paginates on display.
 
 **Local tracking is the only way to reopen a conversation in Phase 1.**
@@ -629,17 +628,14 @@ openFiles:
 </editor-context>
 ```
 
-**Important: prompt-cache ordering.** The ai-proxy's compose pipeline
-relies on provider-side caching of the 22k L4 system prompt prefix for
-cost — a ~90% discount on cached input tokens that evaporates if any
-variable content sits in front of it. The extension therefore sends
+**Important: prompt-cache ordering.** Prompt caching stops working if any
+variable content sits in front of the system prompt. The extension therefore sends
 editor/workspace context as **an additional system message** in
-`body.messages`, which the proxy appends AFTER its cached prefix. Never
+`body.messages`, after that prompt. Never
 stuff dynamic content into the first system slot or into the body's
 `system` field.
 
-The proxy already handles additional system messages transparently — no
-proxy change needed. We just need to be disciplined about ordering.
+Additional system messages need no server change. We just need to be disciplined about ordering.
 
 ### 8.2 Workspace bootstrap
 
@@ -730,22 +726,21 @@ stance on abort semantics (see §13). The review card is pure display.
 
 ## 9. Attachments
 
-Simplest path: pass files straight through as Anthropic-native content
+Simplest path: pass files straight through as content
 blocks. No OCR, no text extraction.
 
 - **Text files** (`.l4`, `.txt`, `.md`, etc.): read as UTF-8, embed as a
   `text` block prefixed with the filename.
-- **PDFs**: base64 + Anthropic `document` block. Claude reads both the
-  text layer and the rendered pages (handles scanned PDFs via its vision
-  capability). Native; no OCR dep on our side.
-- **Word (`.docx`)**: Anthropic doesn't natively accept `.docx`. Two
+- **PDFs**: base64 `document` block. The model reads both the
+  text layer and the rendered pages. Native; no OCR dep on our side.
+- **Word (`.docx`)**: `.docx` isn't natively accepted. Two
   options, pick the simpler one when we get there:
   1. Convert to PDF in the extension (e.g. via LibreOffice headless) —
      adds a heavy dep.
   2. Show a UX nudge: "Word files aren't supported directly — save as
      PDF and attach that instead." My recommendation: (2) for v1.
 
-**Requires ai-proxy change** — currently only `content: string` is
+**Requires an AI service change** — currently only `content: string` is
 accepted on chat messages; need array-content with text + document parts
 passed through to the provider. See §10.
 
@@ -753,15 +748,14 @@ Permissions don't apply to attachments (user explicitly attached).
 
 ---
 
-## 10. Required ai-proxy changes (post the client-tool commit)
+## 10. Required AI service changes (post the client-tool commit)
 
-What the extension needs from the proxy, as the wire contract only. How
-the proxy implements it is specified with the proxy.
+What the extension needs from the AI service, as the wire contract only.
 
 1. **No fixed tool-round cap on compose.** A turn runs until the model
    calls no tools; the daily token quota bounds usage.
 2. **Multi-modal content on user messages.** Accept array content with
-   text + Anthropic `document` parts; pass through to the provider.
+   text + `document` parts; pass through to the provider.
    Required for PDF attachments.
 3. **Thinking pass-through** — new `event: thinking_delta` SSE frame
    streamed when the provider emits reasoning parts.
@@ -825,7 +819,7 @@ src/lib/ai/
 ```
 ai/
   chat-service.ts
-  ai-proxy-client.ts          # SSE parser
+  ai-client.ts                # SSE parser
   editor-context.ts           # per-turn <editor-context> builder
   workspace-bootstrap.ts      # first-turn <workspace-exports> builder
   tool-registry.ts            # merges builtins + MCP into OpenAI tools[]
@@ -858,7 +852,7 @@ Three shippable milestones. Each phase leaves the tab in a usable state.
 ### Phase 1 — Chat foundation (~8 days)
 
 **Goal:** the tab exists, authenticated users can have streaming
-conversations with the ai-proxy, editor/workspace context flows in, the
+conversations with the AI service, editor/workspace context flows in, the
 token gauge tells them how much runway they have, and runaway turns can
 be stopped cleanly.
 
@@ -907,7 +901,7 @@ be stopped cleanly.
 
 **Extension host**
 
-- `chat-service.ts` + `ai-proxy-client.ts` SSE parser.
+- `chat-service.ts` + `ai-client.ts` SSE parser.
 - `conversation-store.ts` (JSON in globalStorage, standard OpenAI
   message shape with thin envelope, delete-by-rename).
 - `title-generator.ts` (single summize call, non-blocking).
@@ -917,7 +911,7 @@ be stopped cleanly.
   system message from the existing exports index. Gracefully handles
   empty workspace / no-L4-files (emits the section with an explicit
   "(no L4 exports defined yet)" marker so the model knows).
-- Both context messages sent AFTER the ai-proxy's cached prefix (as
+- Both context messages sent AFTER the cached prefix (as
   extra system messages in `body.messages`, not prepended).
 - `@` mention expansion on send (chip → real content).
 - `auth-status` event to webview so it can enable/disable input and
@@ -927,7 +921,7 @@ be stopped cleanly.
 - Output-channel logging (`Legalese AI` channel) — request sent, chunks
   received, errors. First line of defense when users report issues.
 
-**Ai-proxy**
+**AI service**
 
 - No fixed tool-round cap on compose (§10.1).
 - Add `DELETE /v1/conversations/{id}` endpoint (§10.4).
@@ -985,7 +979,7 @@ option bumps the setting.
   (thin wrappers around the SDK).
 - `diff-tabs.ts` — `TextDocumentContentProvider` + `vscode.diff`.
 
-**Ai-proxy** — no changes this phase.
+**AI service** — no changes this phase.
 
 ---
 
@@ -1005,9 +999,9 @@ math rendering; final feature cleanup.
 **Extension host**
 
 - `attachments.ts` — read text as UTF-8, PDFs as base64; assemble
-  Anthropic-style array content on user messages.
+  Array content on user messages.
 
-**Ai-proxy**
+**AI service**
 
 - Multi-modal user-message content pass-through (§10.2).
 - Thinking/reasoning pass-through as `event: thinking_delta` SSE (§10.3).
@@ -1038,7 +1032,7 @@ math rendering; final feature cleanup.
 - **String-anchored edits** — `fs__edit_file({path, old, new})`, not
   line ranges.
 - **Prompt-cache ordering** — editor/workspace context goes in an extra
-  system message in `body.messages`, never prepended to the proxy's
+  system message in `body.messages`, never prepended to the
   cached prefix.
 - **MCP client** — `@modelcontextprotocol/sdk`; we don't hand-roll
   stdio transports.

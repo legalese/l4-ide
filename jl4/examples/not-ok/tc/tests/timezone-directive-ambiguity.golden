@@ -6,7 +6,7 @@ File: timezone-directive-ambiguity.l4
   Range: 12:13-12:21
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

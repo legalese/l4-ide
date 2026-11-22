@@ -317,6 +317,50 @@ evalDirectiveToUpdateItem fields getLines evalRes@(EL.MkEvalDirectiveResult (Jus
 evalDirectiveToUpdateItem _ _ _ = Nothing
 
 ------------------------------------------------------
+-- l4/fileChecked notification
+------------------------------------------------------
+
+type FileCheckedMethodName :: Symbol
+type FileCheckedMethodName = "l4/fileChecked"
+
+-- | Sent after every @didOpen@, @didChange@ and @didSave@ of a document, and
+-- for each open document that imports it, once checking and evaluation have
+-- finished, whatever they found. @textDocument/publishDiagnostics@ cannot say
+-- this: it is debounced, and it is not sent when the diagnostics did not change.
+--
+-- If a @l4/directiveResultsUpdated@ belongs to the same check, it is sent first.
+--
+-- @version@ is the version the check covered, read together with the
+-- diagnostics. It can be newer than the version of the edit that scheduled this
+-- notification, because an edit cancels the check before it, and then every
+-- pending notification reports the newer version. So a version that was
+-- superseded may never be reported, and a burst of edits may report its last
+-- version several times: to wait for an edit, wait for @version >= sent@. It is
+-- 'Nothing' only if the store has no version for the file.
+--
+-- @diagnostics@ is the full list for the file, from every source, in the shape
+-- and order of a publish, so a client need not wait for that publish.
+data FileCheckedParams = FileCheckedParams
+  { uri         :: Text
+  , version     :: Maybe Int32
+  , diagnostics :: [LSP.Diagnostic]
+  } deriving stock (Eq, Show, Generic)
+
+instance ToJSON FileCheckedParams where
+  toJSON p = object
+    [ "uri"         .= p.uri
+    , "version"     .= p.version
+    , "diagnostics" .= p.diagnostics
+    ]
+
+instance FromJSON FileCheckedParams where
+  parseJSON = withObject "FileCheckedParams" $ \obj ->
+    FileCheckedParams
+      <$> obj .: "uri"
+      <*> obj .: "version"
+      <*> obj .: "diagnostics"
+
+------------------------------------------------------
 -- l4/getExportedFunctions method name
 ------------------------------------------------------
 
@@ -376,9 +420,28 @@ instance ToJSON ExportedFunctionSummary where
       Nothing -> []
       Just l -> ["srcLine" .= l]
 
+-- | An error that stops the file from being deployed, in the file itself or in
+-- a module it imports (see "LSP.L4.BlockingErrors").
+data BlockingError = BlockingError
+  { uri :: !Text
+  , line :: !Int
+  -- ^ 1-based
+  , message :: !Text
+  }
+  deriving stock (Eq, Show, Generic)
+
+instance ToJSON BlockingError where
+  toJSON e = object
+    [ "uri" .= e.uri
+    , "line" .= e.line
+    , "message" .= e.message
+    ]
+
 data GetExportedFunctionsResponse = GetExportedFunctionsResponse
   { functions :: [ExportedFunctionSummary]
   , importedFiles :: [Text]
+  , blockingErrors :: [BlockingError]
+  -- ^ Non-empty when the file must not be deployed.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -386,6 +449,7 @@ instance ToJSON GetExportedFunctionsResponse where
   toJSON r = object
     [ "functions" .= r.functions
     , "importedFiles" .= r.importedFiles
+    , "blockingErrors" .= r.blockingErrors
     ]
 
 ------------------------------------------------------

@@ -5,7 +5,7 @@ File: smart-quote-genitive.l4
   Range: 16:23-16:24
   Source: lexer
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
     This is ’ (Right Single Quotation Mark, U+2019). It looks like `'`, but L4 only understands the plain one.
 

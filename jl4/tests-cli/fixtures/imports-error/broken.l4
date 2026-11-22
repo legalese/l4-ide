@@ -1,0 +1,5 @@
+-- Intentionally wrong: body is a number but the return type is BOOLEAN.
+-- Imported by main.l4, which is itself fine.
+GIVEN x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE badTyping x IS x

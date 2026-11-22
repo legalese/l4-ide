@@ -55,11 +55,15 @@ IMPORT `legal-persons`
 - `IMPORT` takes a module name, not a path or a quoted string. `IMPORT "helpers.l4"` is a parse error, and a folder in front of the name is ignored: ``IMPORT `rules/helpers` `` looks for `helpers.l4`.
 - A basename with spaces or non-ASCII letters goes in backticks too: ``IMPORT `my helpers` `` and ``IMPORT `hvac-law-he` ``. On a build older than the fix for [smucclaw/l4-ide#971](https://github.com/smucclaw/l4-ide/issues/971) these resolved to nothing, and said nothing about it; see [Module names that are not plain ASCII](resolution.md#module-names-that-are-not-plain-ascii).
 
+### Files cannot import each other in a ring
+
+A file can't import itself, and files can't import each other in a ring: if `a.l4` imports `b.l4`, then `b.l4`, and anything it imports, can't import `a.l4`. See [Import cycle](../errors/README.md#import-cycle) for how to fix it.
+
 ### What an import gives you
 
 - Every top-level definition of the imported file: its types, constructors, functions and constants.
 - Nothing is imported for you. A file that uses `map`, `sum` or `fromMaybe` needs `IMPORT prelude` like any other library.
-- Import each library you use by name. The definitions a library imports for itself also reach your file, but do not count on it: `IMPORT datetime`, for example, does not give you `Date`; that needs `IMPORT daydate`.
+- What a library imports also reaches your file: `IMPORT datetime` gives you `daydate` too, and `IMPORT daydate` gives you `date-compat`. Importing each library you use by name still makes a file easier to read.
 
 ### Where modules are found
 

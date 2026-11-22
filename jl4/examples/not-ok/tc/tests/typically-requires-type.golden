@@ -6,7 +6,7 @@ File: typically-requires-type.l4
   Range: 8:8-8:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-requires-type
   Message:
     `x` has a TYPICALLY default but no explicit type.
     Add a type annotation (for example IS A NUMBER) so the default can be type-checked.

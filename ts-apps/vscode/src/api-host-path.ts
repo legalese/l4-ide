@@ -1,7 +1,6 @@
 /**
  * Rewrite a canonical jl4-service dataplane path to the consolidated api
- * host's path-slug scheme (jl4-auth-proxy/src/routing/parse.ts ::
- * parseApiHostPath). The base URL already carries the /{slug} prefix.
+ * host's path-slug scheme. The base URL already carries the /{slug} prefix.
  *
  *   /deployments                                  →  ''
  *   /deployments?functions=full                   →  '?functions=full'

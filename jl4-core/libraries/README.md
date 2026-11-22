@@ -144,7 +144,7 @@ L4 distinguishes between **type constructors** and **value constructors** (data 
 
 - **`Date` function** (in `daydate.l4`) - supported little-endian constructor, used throughout existing corpora
 
-  - `Date 15 3 1990` - from day, month, year
+  - `Date 15 3 1990` - from day, month, year; a day past the end of the month, or a month past 12, rolls forward (`Date 29 2 2025` is 1 March 2025)
   - `Date 738000` - from serial number
   - `Date someDate` - identity/normalization
 
@@ -236,12 +236,12 @@ DECIDE modernDate IS YMD 1971 6 28
 
 ## Documentation
 
-Detailed documentation for each library is available in `doc/libraries/`:
+Detailed documentation for each library is available in `doc/reference/`:
 
-- [daydate.md](../../doc/libraries/daydate.md) - Comprehensive date/time documentation
-- [excel-date.md](../../doc/libraries/excel-date.md) - Excel compatibility guide
-- [coercions.md](../../doc/libraries/coercions.md) - Type coercion functions
-- [math.md](../../doc/libraries/math.md) - Mathematical functions reference
+- [daydate.md](../../doc/reference/libraries/daydate.md) - Comprehensive date/time documentation
+- [excel-date.md](../../doc/reference/libraries/excel-date.md) - Excel compatibility guide
+- [coercions.md](../../doc/reference/types/coercions.md) - Type coercion functions
+- [math.md](../../doc/reference/libraries/math.md) - Mathematical functions reference
 
 ## Testing
 

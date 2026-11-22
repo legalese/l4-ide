@@ -21,6 +21,7 @@ module LSP.Logger
   , makeDefaultStderrRecorder
   , makeDefaultHandleRecorder
   , makeRefRecorder
+  , makeKeyedRefRecorder
   , LoggingColumn(..)
   , cmapWithPrio
   , withBacklog
@@ -135,6 +136,18 @@ makeRefRecorder = do
         = Recorder \doc -> liftIO do
           rendered <- textWithPriorityToText [PriorityColumn, DataColumn] $ docToText <$> doc
           modifyIORef' ref (rendered :)
+   pure (reverse <$> readIORef ref, recorder)
+
+-- | Like 'makeRefRecorder', rendering each message the same way, and keeping
+-- with it what @keyOf@ picks out of it, so that a reader of the log can tell
+-- one message about a thing from another about the same thing.
+makeKeyedRefRecorder :: MonadIO m => (a -> Maybe k) -> (a -> Doc ann) -> m (m [(Maybe k, Text)], Recorder (WithPriority a))
+makeKeyedRefRecorder keyOf render = do
+   ref <- newIORef []
+   let recorder
+        = Recorder \msg -> liftIO do
+          rendered <- textWithPriorityToText [PriorityColumn, DataColumn] $ docToText . render <$> msg
+          modifyIORef' ref ((keyOf (payload msg), rendered) :)
    pure (reverse <$> readIORef ref, recorder)
 
 makeDefaultStderrRecorder :: MonadIO m => Maybe [LoggingColumn] -> m (Recorder (WithPriority (Doc a)))

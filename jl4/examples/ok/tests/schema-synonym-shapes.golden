@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+schema-synonym-shapes.l4:28:1-62:
+  RIGHT OF (Holder OF (JUST OF 5), (JUST OF 6), (LIST 1, 2), 1)
+schema-synonym-shapes.l4:29:1-64:
+  RIGHT OF (Holder OF NOTHING, NOTHING, EMPTY, 1)
+schema-synonym-shapes.l4:30:1-38:
+  RIGHT OF (Holder OF NOTHING, NOTHING, EMPTY, 1)

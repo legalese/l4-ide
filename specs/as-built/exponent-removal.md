@@ -31,7 +31,8 @@ The commit message says the deletion was driven by `-Wincomplete-patterns` under
 No test was added; the three core suites stayed green with zero golden changes (commit message).
 `jl4/examples/ok/numeric-domain-errors.l4:7-10 @ 73a953821` evaluates `EXPONENT` for a finite result and for two domain errors.
 `jl4-core/test/PrintRoundtripSpec.hs:23, 63 @ 73a953821` checks that `DECIDE e IS EXPONENT 2 10` prints back in prefix form and re-parses (added by #66 inside #77).
-Neither file is on main or in this PR: on unstable, `numeric-domain-errors.l4` and its golden came with #53, and `PrintRoundtripSpec.hs` with #66.
+Neither file was on main or in the PR that carried #83: on unstable, `numeric-domain-errors.l4` and its golden came with #53, and `PrintRoundtripSpec.hs` with #66.
+`numeric-domain-errors.l4` has since reached main with #53's carve; see [eval-robustness.md](eval-robustness.md).
 
 ## Limits and known defects on unstable (verified)
 
@@ -41,3 +42,4 @@ Two user-visible strings still use the old spelling `TO THE POWER OF`, which doe
 - the domain-error message reads "TO THE POWER OF produced a non-finite result (overflow, 0 to a negative power, or a negative base raised to a fractional power)" (`Machine.hs:4953`), pinned by `jl4/examples/ok/tests/numeric-domain-errors.golden:7, 9`.
 
 Neither string is #83's code: #83 deliberately kept `BinOpExponent`, and both strings predate it.
+On main, #53's carve has three domain-error messages that each name `EXPONENT` and what happened, so only the printer's string keeps the old spelling there.

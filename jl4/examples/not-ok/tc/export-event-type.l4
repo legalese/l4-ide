@@ -1,0 +1,34 @@
+-- An EVENT cannot be an input or the result of an @export rule yet: a request
+-- cannot supply one, and the schema would publish it as a bare object.
+-- Once the EVENT type could be named, nothing else stopped it, so the checker
+-- refuses it, at the @export of the rule that takes or returns it.
+--
+-- The golden holds one error each for the rule that takes an EVENT, the rule
+-- that takes a LIST OF EVENT and the rule that returns one, and none for the
+-- rule that builds and reads an EVENT inside its body.
+DECLARE Party IS ONE OF alice, bob
+DECLARE Act IS ONE OF ping, pong
+
+@export Who acted
+GIVEN e IS AN EVENT Party Act
+GIVETH A Party
+`who acted` MEANS
+  CONSIDER e
+  WHEN EVENT p a n THEN p
+
+@export How many events
+GIVEN es IS A LIST OF EVENT Party Act
+GIVETH A NUMBER
+`how many events` MEANS 0
+
+@export Make an event
+GIVEN p IS A Party
+GIVETH AN EVENT Party Act
+`make event` MEANS EVENT p ping 0
+
+@export Who acts first
+GIVEN p IS A Party
+GIVETH A Party
+`who acts first` MEANS
+  CONSIDER EVENT p ping 0
+  WHEN EVENT q a n THEN q

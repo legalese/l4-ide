@@ -6,7 +6,7 @@ File: pattern-matching-export-without-given.l4
   Range: 10:1-10:8
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/export-clauses-without-given
   Message:
     `size` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
 
@@ -15,7 +15,7 @@ File: pattern-matching-export-without-given.l4
   Range: 15:1-15:35
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/export-clauses-without-given
   Message:
     `fee` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
 
@@ -24,7 +24,7 @@ File: pattern-matching-export-without-given.l4
   Range: 20:1-20:35
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/export-clauses-without-given
   Message:
     `weight` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
 
@@ -33,7 +33,7 @@ File: pattern-matching-export-without-given.l4
   Range: 27:1-27:8
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/export-clauses-without-given
   Message:
     `discount` is published with @export, but its inputs have no names: add a GIVEN that names and types each one.
 
@@ -42,7 +42,7 @@ File: pattern-matching-export-without-given.l4
   Range: 28:8-28:16
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/non-exhaustive-clauses
   Message:
     This clause does not cover all cases. The following clauses are still needed:
 
@@ -54,7 +54,7 @@ File: pattern-matching-export-without-given.l4
   Range: 34:8-34:13
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/clause-pattern-count
   Message:
     Each clause of `width` has 2 patterns, but its GIVEN names 1 input.
     A clause needs one pattern for each input the GIVEN names, in the same order.

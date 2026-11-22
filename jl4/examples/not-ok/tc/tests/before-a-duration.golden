@@ -6,7 +6,7 @@ File: before-a-duration.l4
   Range: 13:39-13:41
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/type-mismatch
   Message:
     BEFORE closes the window at an instant, so it is expected to be of type
 

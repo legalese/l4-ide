@@ -1,0 +1,8 @@
+-- The module is in French and says so once, and the one wording is tagged `FR`.
+-- Tags are compared exactly, so `FR` is not `fr`.
+@lang fr
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `over limit` @nlg:FR le montant %amount% dépasse la limite
+  IF amount GREATER THAN 100

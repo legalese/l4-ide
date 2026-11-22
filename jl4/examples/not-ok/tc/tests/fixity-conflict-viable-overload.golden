@@ -6,22 +6,7 @@ File: fixity-conflict-viable-overload.l4
   Range: 33:13-33:26
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
-  Message:
-    The operator `VOP` has conflicting fixity declarations visible here:
-
-      @infixr 7
-      @infixl 6
-
-    so I cannot re-associate this operator chain. Parenthesize the
-    expression, or make the declarations agree.
-
-File: fixity-conflict-viable-overload.l4
-  Hidden: no
-  Range: 33:13-33:26
-  Source: check
-  Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -36,10 +21,25 @@ File: fixity-conflict-viable-overload.l4
 
 File: fixity-conflict-viable-overload.l4
   Hidden: no
+  Range: 33:13-33:26
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/fixity-conflict
+  Message:
+    The operator `VOP` has conflicting fixity declarations visible here:
+
+      @infixr 7
+      @infixl 6
+
+    so I cannot re-associate this operator chain. Parenthesize the
+    expression, or make the declarations agree.
+
+File: fixity-conflict-viable-overload.l4
+  Hidden: no
   Range: 33:21-33:24
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
