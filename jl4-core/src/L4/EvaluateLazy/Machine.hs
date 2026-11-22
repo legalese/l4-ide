@@ -5599,34 +5599,7 @@ extractFieldNamesAndTypes ty = case ty of
 cannotDecode :: DecodeAt -> Text -> Aeson.Value -> Text -> Machine a
 cannotDecode at typeName jsonValue why =
   userException $ UserError $
-    "Could not decode " <> TE.decodeUtf8 (BS.toStrict (Aeson.encode jsonValue))
-      <> " as " <> typeName <> atField at <> ": " <> why
-
--- | What a value of a choice type is given as in JSON, for 'cannotDecode':
--- the constructors without fields, by name, and those with fields, which
--- cannot be given at all.
-choiceExpectation :: Text -> [Text] -> [Text] -> Text
-choiceExpectation typeName withoutFields withFields = case (withoutFields, withFields) of
-  ([], [])  -> typeName <> " has no constructor that JSON input can name."
-  ([], _)   -> "every constructor of " <> typeName <> " has fields (" <> commas withFields
-                 <> "), and a constructor with fields cannot be given as JSON input."
-  (_, [])   -> "expected a string naming one of: " <> commas withoutFields <> "."
-  (_, _)    -> "expected a string naming one of: " <> commas withoutFields
-                 <> ". A constructor with fields (" <> commas withFields
-                 <> ") cannot be given as JSON input."
-  where commas = Text.intercalate ", "
-
--- | Why a JSON string is not a value of a choice type, for 'cannotDecode'.
-choiceNameMiss :: Text -> Text -> [Text] -> [Text] -> Text
-choiceNameMiss typeName name withoutFields withFields
-  | name `elem` withFields =
-      name <> " has fields, and a constructor with fields cannot be given as JSON input"
-        <> if null withoutFields
-             then "."
-             else "; expected a string naming one of: " <> Text.intercalate ", " withoutFields <> "."
-  | otherwise =
-      "it names no constructor of " <> typeName <> "; "
-        <> choiceExpectation typeName withoutFields withFields
+    couldNotDecodeText (TE.decodeUtf8 (BS.toStrict (Aeson.encode jsonValue))) typeName (atField at) why
 
 -- | Is this a constructor of the given type, with or without fields?
 constructorReturning :: Type' Resolved -> Resolved -> Bool

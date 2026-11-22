@@ -499,6 +499,10 @@ batchChoiceFixture, batchChoiceJson :: FilePath
 batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
 batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
 
+batchEnumValidateFixture, batchEnumValidateJson :: FilePath
+batchEnumValidateFixture = fixtureDir </> "batch-enum-validate.l4"
+batchEnumValidateJson    = fixtureDir </> "batch-enum-validate.json"
+
 -- | A choice type declared under a § section (smucclaw/l4-ide#947).
 batchSectionEnumFixture, batchSectionEnumJson :: FilePath
 batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
@@ -4051,6 +4055,37 @@ spec bin = do
         [] -> expectationFailure "l4 batch printed no rows"
       sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
       sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "refuses with --validate-only a row the run refuses for a choice type, with the run's words" $ do
+      -- #1086: --validate-only judged only NUMBER, BOOLEAN and STRING, so a
+      -- name that is no constructor of an enumeration was called valid and the
+      -- run refused it. Rows: one that is fine, then a bad name for an input,
+      -- for a record's field, for an element of a list and for a MAYBE, and a
+      -- number where a name belongs. Each refused row says, in both modes,
+      -- the same thing about the same place.
+      let rowsOf args = do
+            Output _ sout _ <- runL4 bin (["batch", batchEnumValidateFixture, "--inputs", batchEnumValidateJson] <> args)
+            let rows = filter (not . all isSpace) (lines sout)
+            length rows `shouldBe` 6
+            pure rows
+          refusals =
+            [ "Could not decode \\\"Lodger\\\" as Party for field 'p': it names no constructor of Party; expected a string naming one of: Landlord, Tenant."
+            , "Could not decode \\\"Lodger\\\" as Party for field 'l.payer': it names no constructor of Party; expected a string naming one of: Landlord, Tenant."
+            , "Could not decode \\\"Lodger\\\" as Party for field 'l.guests[1]': it names no constructor of Party; expected a string naming one of: Landlord, Tenant."
+            , "Could not decode \\\"Lodger\\\" as Party for field 'l.proxy': it names no constructor of Party; expected a string naming one of: Landlord, Tenant."
+            , "Could not decode 1 as Party for field 'p': expected a string naming one of: Landlord, Tenant."
+            ]
+      validated <- rowsOf ["--validate-only", "--continue-on-error"]
+      ran       <- rowsOf ["--continue-on-error"]
+      case (validated, ran) of
+        (v0 : vs, r0 : rs) -> do
+          v0 `shouldSatisfy` ("\"status\":\"valid\"" `isInfixOf`)
+          r0 `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+          flip mapM_ (zip3 refusals vs rs) $ \(msg, v, r) -> do
+            v `shouldSatisfy` ("\"status\":\"invalid\"" `isInfixOf`)
+            v `shouldSatisfy` (msg `isInfixOf`)
+            r `shouldSatisfy` (msg `isInfixOf`)
+        _ -> expectationFailure "l4 batch printed no rows"
 
     it "decodes a constructor of a choice type declared under a section by its bare name" $ do
       -- "Red" is what JSONENCODE writes for Red, and what a request sends;
