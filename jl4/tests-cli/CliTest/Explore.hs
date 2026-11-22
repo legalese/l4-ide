@@ -23,8 +23,14 @@ import CliTest.Common
 brief :: FilePath
 brief = "examples" </> "explore" </> "brief"
 
+-- | The fixtures of smucclaw/l4-ide#1081, the instants an act is tried at.
+instants :: FilePath
+instants = "tests-cli" </> "fixtures" </> "explore-instants"
+
 fixtures :: [FilePath]
-fixtures = [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
+fixtures =
+  [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -85,6 +91,35 @@ replaceAll from to = go
     go s@(c : cs)
       | from `isPrefixOf` s = to <> go (drop (length from) s)
       | otherwise = c : go cs
+
+-- | A number with a fractional part, anywhere in the text.
+hasFraction :: String -> Bool
+hasFraction s = or [ isDig a && b == '.' && isDig c | (a, b, c) <- zip3 s (drop 1 s) (drop 2 s) ]
+  where isDig ch = ch >= '0' && ch <= '9'
+
+-- | The events by which the graph first reaches the state whose residual
+-- holds all of these phrases, as the @#TRACE@ lines that replay them, and
+-- the residual itself on one line. @explore@'s text shows each state as
+-- @sN  depth D, residual rK@ then @first reached by:@ and the events, and
+-- each residual as @rK  text@.
+statePath :: [String] -> String -> Maybe ([String], String)
+statePath phrases out = do
+  (k, residual) <- case [ (takeWhile (/= ' ') (drop 3 l), unwords (words (drop 2 (dropWhile (/= ' ') (drop 2 l)))))
+                        | l <- residualBlock, all (`isInfixOf` l) phrases ] of
+    (hit : _) -> Just hit
+    []        -> Nothing
+  header <- case [ i | (i, l) <- zip [0 :: Int ..] ls, "  depth " `isInfixOf` l, residualId l == Just ("r" <> k) ] of
+    (i : _) -> Just i
+    []      -> Nothing
+  let events = takeWhile (not . ("    ledgers:" `isPrefixOf`)) (drop (header + 2) ls)
+  pure (map (drop 6) events, residual)
+  where
+    ls = lines out
+    -- "s7  depth 2, residual r7, terminal" names residual r7
+    residualId l = case dropWhile (/= "residual") (words (map (\ c -> if c == ',' then ' ' else c) l)) of
+      (_ : r : _) -> Just r
+      _           -> Nothing
+    residualBlock = takeWhile (not . null) (drop 1 (dropWhile (not . ("Residuals (" `isPrefixOf`)) ls))
 
 spec :: FilePath -> Spec
 spec bin = describe "l4 explore" $ do
@@ -323,6 +358,71 @@ spec bin = describe "l4 explore" $ do
         Output code' _ serr' <- runL4 bin ["explore", brief </> "d3-atomic.l4", "--fair", "Alice"]
         code' `shouldBe` ExitFailure 1
         serr' `shouldSatisfy` ("needs --emit" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1081: which instants an act is tried at.
+  describe "the instants an act is tried at (#1081)" $ do
+    it "clocks.l4: the position in which both deadlines fall together is in the graph, nothing is untried, and l4 run reaches the same position by the printed path" $
+      withSystemTempDirectory "l4-explore-instants" \ dir -> do
+        Output code sout _ <- runL4 bin ["explore", instants </> "clocks.l4"]
+        code `shouldBe` ExitSuccess
+        lastLine sout `shouldSatisfy` ("frontier exhausted; nothing refused; nothing untried" `isInfixOf`)
+        case statePath ["MUST b WITHIN 5 HENCE", "MUST c WITHIN 5 HENCE"] sout of
+          Nothing -> expectationFailure ("no state holds both deadlines at 5 days out:\n" <> sout)
+          Just (events, residual) -> do
+            original <- readFile (instants </> "clocks.l4")
+            let own = takeWhile (not . ("#TRACE" `isPrefixOf`)) (lines original)
+            writeFile (dir </> "clocks.l4") (unlines (own <> ["#TRACE clocks AT 0 WITH"] <> map ("  " <>) events))
+            Output rcode rout _ <- runL4 bin ["run", dir </> "clocks.l4"]
+            rcode `shouldBe` ExitSuccess
+            let got = unwords (words (unlines (takeWhile (not . null) (drop 1 (dropWhile (/= "Result:") (lines rout))))))
+            got `shouldBe` residual
+
+    it "clocks.l4 has no fractional instant, on a grid of 1 either, and says how many instants it tried" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "clocks.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` (not . hasFraction)
+      lastLine sout `shouldSatisfy` ("instants: " `isInfixOf`)
+      Output gcode gout _ <- runL4 bin ["explore", instants </> "clocks.l4", "--grid", "1"]
+      gcode `shouldBe` ExitSuccess
+      gout `shouldSatisfy` (not . hasFraction)
+      statePath ["MUST b WITHIN 5 HENCE", "MUST c WITHIN 5 HENCE"] gout `shouldSatisfy` (/= Nothing)
+
+    it "window.l4: --grid 1 tries ship inside the window that opens at 3 and reaches FULFILLED" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "window.l4", "--grid", "1"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("PARTY Ben DOES ship" `isInfixOf`)
+      lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+
+    it "open.l4: --grid 1 with no deadline and no --until says it stopped, and exits 2; with --until 10 it reaches FULFILLED and exits 0" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "open.l4", "--grid", "1"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("no deadline and no --until" `isInfixOf`)
+      lastLine sout `shouldSatisfy` (not . ("nothing untried" `isInfixOf`))
+      Output code' sout' _ <- runL4 bin ["explore", instants </> "open.l4", "--grid", "1", "--until", "10"]
+      code' `shouldBe` ExitSuccess
+      sout' `shouldSatisfy` ("PARTY Ben DOES ship" `isInfixOf`)
+
+    it "half.l4: a deadline that is not a whole number leaves instants untried, says so, and exits 2" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "half.l4"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("not a whole number" `isInfixOf`)
+      lastLine sout `shouldSatisfy` (not . ("nothing untried" `isInfixOf`))
+
+    it "--max-instants 2 cuts a grid of 1 on clocks.l4, says how, and exits 2" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "clocks.l4", "--grid", "1", "--max-instants", "2"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("instant cap of 2" `isInfixOf`)
+
+    it "--grid 2 on deadlines at 3 and 7 says they are off the grid, and exits 2" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "clocks.l4", "--grid", "2"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("off the grid of 2" `isInfixOf`)
+
+    it "l4 lts on adjacent.l4: the tick past the deadline at 3 is the clock reaching 4, not 3.5, and does not reach the deadline at 4" $ do
+      Output code sout _ <- runL4 bin ["lts", instants </> "adjacent.l4", "--contract", "adjacent"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("nothing happens by 3 (the clock reaches 4) \8594 P is in breach\n" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("3.5" `isInfixOf`))
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"

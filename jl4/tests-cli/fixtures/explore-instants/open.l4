@@ -1,0 +1,17 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1081 (X3). A window that opens at 3 and never closes: with
+-- no deadline and no --until a grid has no end to try up to, and says so.
+
+DECLARE Person IS ONE OF Ben
+DECLARE Action IS ONE OF ship
+
+GIVETH A DEONTIC Person Action
+deal MEANS
+  PARTY Ben
+  MAY ship
+  AFTER 3
+  HENCE FULFILLED
+
+#TRACE deal AT 0 WITH
+  PARTY Ben DOES ship AT 4

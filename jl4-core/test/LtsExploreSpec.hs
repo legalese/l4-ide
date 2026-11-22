@@ -33,11 +33,19 @@
 --   7. the cells a run keeps for its observers (§4.1, ruled 2026-10-26):
 --      an input named for a cell nothing writes is listed for refusal, and
 --      the cells an emitted model keeps are those of every property-shaped
---      rule that some write names.
+--      rule that some write names;
+--   8. the instants an act is tried at (smucclaw/l4-ide#1081): the graph
+--      holds every position the evaluator reaches, up to the time
+--      abstraction, checked against an enumeration of every act sequence at
+--      every whole instant; only whole instants are tried; a cut is named
+--      as untried, never "nothing untried".
 module LtsExploreSpec (spec) where
 
 import Data.List (nub, sort)
+import Data.Maybe (isJust)
+import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Control.Monad (forM)
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
@@ -46,7 +54,9 @@ import L4.EvaluateLazy (EvalDirectiveResult (..), execEvalModuleWithDeonticLog, 
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Lts.Explore
 import L4.Lts.Explore.Check
-import L4.Lts.WhatIf (Rig (..))
+import L4.Lts.WhatIf
+  ( Candidate (..), CandidateKind (..), Hypothetical (..), Outcome (..), Position (..), Rig (..), Verdict (..)
+  , candidatesOf, hypotheticalExpr, position, tryCandidateFrom )
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
@@ -328,6 +338,165 @@ uncheckedSrc src name = do
   (rs, _) <- checkGraph defaultExploreOptions rig Nothing g [p]
   pure (g, rs)
 
+-- 8. Two deadlines, and an act that starts a third. Where the act falls
+--    decides how the third orders against the second: `a` at 2, on the
+--    default numbers, puts b's deadline (2 + 5) on top of Q's (7).
+clocksSrc :: Int -> Int -> Int -> Text.Text
+clocksSrc a b c = Text.unlines
+  [ "DECLARE Person IS ONE OF P, Q"
+  , "DECLARE Action IS ONE OF a, b, c"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`clocks` MEANS"
+  , "    (PARTY P MUST a WITHIN " <> n a
+  , "       HENCE (PARTY P MUST b WITHIN " <> n b <> " HENCE FULFILLED LEST BREACH BY P)"
+  , "       LEST BREACH BY P)"
+  , "    RAND"
+  , "    (PARTY Q MUST c WITHIN " <> n c <> " HENCE FULFILLED LEST BREACH BY Q)"
+  ]
+  where n = Text.pack . show
+
+-- | A window that opens at 3 and closes at 5 (smucclaw/l4-ide#1081, X3).
+windowSrc :: Text.Text
+windowSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF Ben"
+  , "DECLARE Action IS ONE OF ship"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`deal` MEANS"
+  , "    PARTY Ben"
+  , "    MUST  ship"
+  , "    AFTER 3"
+  , "    WITHIN 2"
+  , "    HENCE FULFILLED"
+  , "    LEST  BREACH BY Ben"
+  ]
+
+-- | A window that opens at 3 and never closes.
+openSrc :: Text.Text
+openSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF Ben"
+  , "DECLARE Action IS ONE OF ship"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`deal` MEANS"
+  , "    PARTY Ben"
+  , "    MAY   ship"
+  , "    AFTER 3"
+  , "    HENCE FULFILLED"
+  ]
+
+-- | Two deadlines a unit apart: the tick past the first must not be a
+-- fraction, and must not reveal the second.
+adjacentSrc :: Text.Text
+adjacentSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF P, Q"
+  , "DECLARE Action IS ONE OF a, c"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`adjacent` MEANS"
+  , "    (PARTY P MUST a WITHIN 3 HENCE FULFILLED LEST BREACH BY P)"
+  , "    RAND"
+  , "    (PARTY Q MUST c WITHIN 4 HENCE FULFILLED LEST BREACH BY Q)"
+  ]
+
+-- | A deadline that is not a whole number of the contract's time unit.
+halfSrc :: Text.Text
+halfSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF P"
+  , "DECLARE Action IS ONE OF a"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`half` MEANS PARTY P MUST a WITHIN 2.5 HENCE FULFILLED LEST BREACH BY P"
+  ]
+
+-- | The rig, the read sites and the start 'exploreSrc' builds, kept.
+setupSrc :: Text.Text -> Text.Text -> IO (Rig, ReadSites, Start)
+setupSrc src name = do
+  cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  r <- case checkWithImports (vfsFromList []) src of
+    Left errs -> fail ("typecheck failed: " <> show errs)
+    Right r -> pure r
+  let rig = MkRig {rigConfig = cfg, rigEntityInfo = r.tcdEntityInfo, rigEnv = emptyEnvironment, rigModule = r.tcdModule}
+  start <- either (fail . Text.unpack) pure (startNamed r.tcdModule name 0)
+  pure (rig, readSitesOf r.tcdModule [], start)
+
+-- | What the instants scheme is held to, and not the scheme itself: every
+-- position the evaluator reaches in at most @depth@ events when each act the
+-- contract offers is tried at EVERY whole instant from the clock to the
+-- earliest live deadline (to the clock plus @horizon@ when none is live), and
+-- each deadline is ticked past. It does not call 'actInstants'. Its answer is
+-- the positions' time-abstract signatures ('timeSignature') and their keys
+-- ('keyText'). A position reached again under the same key is expanded once,
+-- which is the explorer's own merge and not what is under test.
+enumerated :: Explorer -> Int -> Integer -> IO (Set.Set Text.Text, Set.Set Text.Text)
+enumerated ex depth horizon = do
+  let (rig0, tr0) = rigFor ex []
+  pos0 <- position rig0 tr0 >>= maybe (fail "the outset gave no position") pure
+  go (0 :: Int) [([], pos0)] Set.empty Set.empty
+  where
+    go d frontier seen sigs
+      | null frontier = pure (sigs, seen)
+      | otherwise = do
+          keyed <- forM frontier \ (ev, pos) -> do
+            k <- keyText ex pos
+            sg <- timeSignature ex pos
+            pure (k, sg, ev, pos)
+          let fresh = firstByKey seen keyed
+              seen' = seen <> Set.fromList [ k | (k, _, _, _) <- fresh ]
+              sigs' = sigs <> Set.fromList [ sg | (_, sg, _, _) <- keyed ]
+          if d >= depth
+            then pure (sigs', seen')
+            else do
+              next <- concat <$> forM fresh \ (_, _, ev, pos) -> successors ev pos
+              go (d + 1) next seen' sigs'
+    firstByKey _ [] = []
+    firstByKey seen (x@(k, _, _, _) : xs)
+      | Set.member k seen = firstByKey seen xs
+      | otherwise = x : firstByKey (Set.insert k seen) xs
+    successors ev pos = do
+      let (rig, tr) = rigFor ex ev
+          c = pos.posClock
+      cands <- candidatesOf rig tr pos
+      deadlines <- liveDeadlines ex pos
+      let ahead = [ d | (_, Just (Right d)) <- deadlines, d >= c ]
+          limit = if null ahead then c + fromInteger horizon else minimum ahead
+          try cand = do
+            (outcome, mpos) <- tryCandidateFrom rig tr pos cand
+            pure case (outcome.ocVerdict, cand.cdHypothetical, mpos) of
+              (Untried _, _, _)    -> []
+              (PassedOver _, _, _) -> []
+              (_, Right hyp, Just pos') | isJust pos'.posResidual -> [(ev <> [hypotheticalExpr hyp], pos')]
+              _ -> []
+      concat <$> forM cands \ cand -> case (cand.cdKind, cand.cdHypothetical) of
+        (ActBy _, Right act@Act {}) ->
+          concat <$> forM [ceiling c .. floor limit :: Integer] \ t ->
+            try cand {cdHypothetical = Right act {hyAt = fromInteger t}}
+        (TickPast _ _, Right (Tick _)) -> try cand
+        _ -> pure []
+
+-- | The graph's states, each replayed from its own path, as the signatures
+-- and the keys 'enumerated' gives its positions.
+graphViews :: Explorer -> Graph -> IO (Set.Set Text.Text, Set.Set Text.Text)
+graphViews ex g = do
+  views <- forM g.gStates \ s -> do
+    let (rig, tr) = rigFor ex s.snPath
+    pos <- position rig tr >>= maybe (fail "a state's path gave no position") pure
+    (,) <$> timeSignature ex pos <*> keyText ex pos
+  pure (Set.fromList (map fst views), Set.fromList (map snd views))
+
+hasFraction :: Text.Text -> Bool
+hasFraction t = or [ isDigit' a && b == '.' && isDigit' c | (a, b, c) <- zip3 s (drop 1 s) (drop 2 s) ]
+  where
+    s = Text.unpack t
+    isDigit' ch = ch >= '0' && ch <= '9'
+
+-- | Every text a graph shows: labels, residuals and the events of paths.
+graphTexts :: Graph -> [Text.Text]
+graphTexts g = [ t.tnLabel | t <- g.gTransitions ]
+  <> [ s.snResidual | s <- g.gStates ]
+  <> concat [ s.snEvents | s <- g.gStates ]
+
 spec :: Spec
 spec = describe "l4 explore" do
   describe "1. a whole-action variable is enumerated; a NUMBER constructor is refused by name" do
@@ -515,6 +684,98 @@ spec = describe "l4 explore" do
       -- Move, `no inputs` has none and `reads itself` reads a ledger, so
       -- none of those is a property
       sort (nub (allPropertyCells r.tcdEntityInfo [r.tcdModule])) `shouldBe` [("missed", False), ("missed", True)]
+  describe "8. the instants an act is tried at (#1081)" do
+    let regions = defaultExploreOptions
+        grid1 = defaultExploreOptions {eoTime = Grid 1}
+        -- every position the evaluator reaches, up to the time abstraction,
+        -- is in the graph
+        holdsEvery name src opts until' depth horizon = it name do
+          (rig, sites, start) <- setupSrc src (contractOf src)
+          let o = opts {eoUntil = until'}
+          ex <- newExplorer o sites rig start
+          g <- explore o sites rig start >>= either (fail . Text.unpack) pure
+          (wantSigs, wantKeys) <- enumerated ex depth horizon
+          (haveSigs, haveKeys) <- graphViews ex g
+          case o.eoTime of
+            Regions -> Set.toList (wantSigs `Set.difference` haveSigs) `shouldBe` []
+            Grid _  -> Set.toList (wantKeys `Set.difference` haveKeys) `shouldBe` []
+        contractOf src
+          | "`clocks`" `Text.isInfixOf` src = "clocks"
+          | "`adjacent`" `Text.isInfixOf` src = "adjacent"
+          | "`half`" `Text.isInfixOf` src = "half"
+          | otherwise = "deal"
+        clocks = clocksSrc 3 5 7
+        wide = clocksSrc 8 10 15
+        -- the whole-instant pairs of the position in which the two
+        -- deadlines fall together
+        together g = [ s.snId | s <- g.gStates, "MUST b WITHIN 5 HENCE" `Text.isInfixOf` s.snResidual, "MUST c WITHIN 5 HENCE" `Text.isInfixOf` s.snResidual ]
+
+    describe "regions: the graph holds every position the evaluator reaches, up to the time abstraction" do
+      holdsEvery "two clocks, where the act that starts b meets Q's deadline at 2" clocks regions Nothing 3 3
+      holdsEvery "two clocks with wide gaps, so the scheme does not try every instant" wide regions Nothing 2 3
+      holdsEvery "a window that opens at 3 and closes at 5" windowSrc regions Nothing 2 3
+      holdsEvery "a window that opens at 3 and never closes, bounded at 10" openSrc regions (Just 10) 1 10
+
+    describe "--grid 1: the graph holds every position the evaluator reaches" do
+      holdsEvery "two clocks" clocks grid1 Nothing 3 3
+      holdsEvery "a window that opens at 3 and closes at 5" windowSrc grid1 Nothing 2 3
+      holdsEvery "a window that opens at 3 and never closes, bounded at 10" openSrc grid1 (Just 10) 1 10
+
+    describe "the position in which both deadlines fall together" do
+      it "is in the graph by regions" do
+        g <- exploreSrc clocks "clocks" regions []
+        together g `shouldSatisfy` (not . null)
+      it "is in the graph on a grid of 1" do
+        g <- exploreSrc clocks "clocks" grid1 []
+        together g `shouldSatisfy` (not . null)
+
+    describe "only whole instants" do
+      it "regions: no label, residual or event holds a fraction" do
+        g <- exploreSrc clocks "clocks" regions []
+        filter hasFraction (graphTexts g) `shouldBe` []
+      it "a grid of 1: no label, residual or event holds a fraction" do
+        g <- exploreSrc clocks "clocks" grid1 []
+        filter hasFraction (graphTexts g) `shouldBe` []
+      it "the tick past a deadline is one unit past it, even when the next deadline is one unit further" do
+        g <- exploreSrc adjacentSrc "adjacent" regions []
+        [ l | (_, l, _) <- labels g, "time passes" `Text.isInfixOf` l ] `shouldSatisfy` elem "time passes the deadline 3 (WAITUNTIL 4)"
+        filter hasFraction (graphTexts g) `shouldBe` []
+
+    describe "a window that opens later" do
+      it "--grid 1 reaches FULFILLED by ship inside the window" do
+        g <- exploreSrc windowSrc "deal" grid1 []
+        [ l | (_, l, _) <- labels g ] `shouldSatisfy` elem "PARTY Ben DOES ship"
+      it "regions and --grid 1 with a bound reach FULFILLED when the window never closes" do
+        gr <- exploreSrc openSrc "deal" regions {eoUntil = Just 10} []
+        gg <- exploreSrc openSrc "deal" grid1 {eoUntil = Just 10} []
+        [ l | (_, l, _) <- labels gr ] `shouldSatisfy` elem "PARTY Ben DOES ship"
+        [ l | (_, l, _) <- labels gg ] `shouldSatisfy` elem "PARTY Ben DOES ship"
+
+    describe "what is not tried is named, never 'nothing untried'" do
+      it "--grid 1 with no deadline and no bound says so and is not complete" do
+        g <- exploreSrc openSrc "deal" grid1 []
+        coverageComplete g.gCoverage `shouldBe` False
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "no deadline and no --until"
+        coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "nothing untried")
+      it "a deadline that is not a whole number: the instants it needs are untried, and counted" do
+        g <- exploreSrc halfSrc "half" regions []
+        coverageComplete g.gCoverage `shouldBe` False
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "not a whole number"
+        filter hasFraction [ l | t <- g.gTransitions, let l = t.tnLabel, "DOES" `Text.isInfixOf` l ] `shouldBe` []
+      it "--grid 2 on a deadline that is not a multiple of 2 says so" do
+        g <- exploreSrc clocks "clocks" regions {eoTime = Grid 2} []
+        coverageComplete g.gCoverage `shouldBe` False
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "off the grid of 2"
+      it "a cap on the instants cuts, and says how many" do
+        g <- exploreSrc (clocksSrc 3 5 700) "clocks" grid1 {eoMaxInstants = 2} []
+        coverageComplete g.gCoverage `shouldBe` False
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "cap"
+      it "a run with nothing cut says 'nothing untried' and how many instants it tried" do
+        g <- exploreSrc clocks "clocks" regions []
+        coverageComplete g.gCoverage `shouldBe` True
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "nothing untried"
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "instants:"
+
   where
     decisionArgsText store = do
       r <- either (fail . show) pure (checkWithImports (vfsFromList []) (lateSrc "FULFILLED"))

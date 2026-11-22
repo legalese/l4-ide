@@ -103,6 +103,13 @@ module L4.Lts.Explore
   , explore
   , coverageComplete
   , replayPath
+    -- * What tests hold the scheme to
+  , Explorer
+  , newExplorer
+  , rigFor
+  , liveDeadlines
+  , timeSignature
+  , keyText
   , withoutDirectives
   , decidesOf
     -- * Rendering
@@ -206,6 +213,9 @@ data ExploreOptions = MkExploreOptions
   , eoMaxActs   :: !Int
     -- ^ the most acts one variable's type may enumerate to before the
     -- variable is refused as too large
+  , eoMaxInstants :: !Int
+    -- ^ the most instants one act is tried at in one state; more are not
+    -- tried, and the coverage says so
   }
 
 -- | How the instant an act fires at is chosen (§4.5).
@@ -228,6 +238,7 @@ defaultExploreOptions = MkExploreOptions
   , eoUntil = Nothing
   , eoTime = Regions
   , eoMaxActs = 4096
+  , eoMaxInstants = 256
   }
 
 ----------------------------------------------------------------------------
@@ -645,6 +656,50 @@ stateKey ex pos = do
       ValQuantified{} -> pure (prettyLayout v, True)
       _               -> valueText v
 
+-- | The state key as text: two positions with the same text are one state.
+keyText :: Explorer -> Position -> IO Text
+keyText ex pos = textShow . fst <$> stateKey ex pos
+
+-- | A position up to time: what it IS, with the countdowns taken out and
+-- the ORDER of its instants kept. Two positions with the same signature
+-- behave alike while no guard reads the clock arithmetically, which is the
+-- region scheme's own condition ('TimeScheme'), so it is what a graph built
+-- on a sample of instants is held to, against every instant (the key itself
+-- holds the remaining @WITHIN@ numbers, which a sample cannot reproduce for
+-- an instant it did not try).
+--
+-- Its parts: the standing, or the residual with each live obligation's
+-- remaining due and opening taken out; the ledgers as the state keeps them;
+-- and the rank of the clock, of every known deadline and of every known
+-- opening among one another, ties equal.
+timeSignature :: Explorer -> Position -> IO Text
+timeSignature ex pos = do
+  (residual, _) <- case pos.posResidual of
+    Just v  -> canonResidual pos.posReplayScope (withoutTimes v)
+    Nothing -> pure (standingText pos.posResult, [])
+  (cells, _, _) <- projectLedger ex.exSites pos.posResult.ledger
+  deadlines <- liveDeadlines ex pos
+  openings <- for (maybe [] liveObligations pos.posResidual) (openingOf pos.posClock)
+  let dueOf = [ either (const Nothing) Just =<< d | (_, d) <- deadlines ]
+      openOf = [ either (const Nothing) Just =<< o | o <- openings ]
+      instants = sort (nubOrd (pos.posClock : catMaybes dueOf <> catMaybes openOf))
+      rank x = fmap fst (find ((== x) . snd) (zip [0 :: Int ..] instants))
+  pure (Text.unlines
+    [ residual
+    , textShow cells
+    , "clock rank " <> textShow (rank pos.posClock)
+    , "opening ranks " <> textShow (map (>>= rank) openOf)
+    , "deadline ranks " <> textShow (map (>>= rank) dueOf)
+    ])
+  where
+    withoutTimes = \ case
+      ValObligation env p a _ _ f l -> ValObligation env p a (Left Nothing) (Left Nothing) f l
+      ValROp env op l r -> ValROp env op (side l) (side r)
+      other -> other
+    side = \ case
+      Left e  -> Left e
+      Right x -> Right (withoutTimes x)
+
 -- | What a result that is not a residual says, for a state key.
 standingText :: EvalDirectiveResult -> Text
 standingText res = case res.result of
@@ -869,20 +924,26 @@ data Accum = MkAccum
   , acByForm     :: !(Set Text)
   }
 
+-- | What one exploration shares, ready to explore or, for a test, to look at
+-- single positions through ('timeSignature', 'keyText', 'rigFor').
+newExplorer :: ExploreOptions -> ReadSites -> Rig -> Start -> IO Explorer
+newExplorer opts sites rig0 start = do
+  anchors <- newIORef Map.empty
+  pure MkExplorer
+    { exOptions = opts
+    , exSites = sites
+    , exRig = rig0 {rigModule = withoutDirectives rig0.rigModule}
+    , exStart = start
+    , exActionType = contractActionType rig0.rigEntityInfo start.stContract
+    , exAnchors = anchors
+    }
+
 -- | Explore a contract from its outset. 'Left' when the outset itself
 -- cannot be run.
 explore :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)
 explore opts sites rig0 start = do
-  anchors <- newIORef Map.empty
-  let ex = MkExplorer
-        { exOptions = opts
-        , exSites = sites
-        , exRig = rig0 {rigModule = withoutDirectives rig0.rigModule}
-        , exStart = start
-        , exActionType = contractActionType rig0.rigEntityInfo start.stContract
-        , exAnchors = anchors
-        }
-      (rig, tr) = rigFor ex []
+  ex <- newExplorer opts sites rig0 start
+  let (rig, tr) = rigFor ex []
   mpos <- position rig tr
   case mpos of
     Nothing -> pure (Left "the contract produced no result at its outset")
