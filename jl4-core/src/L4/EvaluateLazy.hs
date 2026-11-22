@@ -705,9 +705,14 @@ prettyLedgerEvent (Assign path val prov) =
     <> "   " <> renderProvenance prov
   where
     -- The provenance source distinguishes RECORD (own ledger) from
-    -- COMMIT/ATTEST (official record); echo it as the surface verb.
+    -- COMMIT/ATTEST (official record: an ATTEST is stored with source
+    -- COMMIT) and from NOTIFY (a recipient-qualified RECORD, in the
+    -- recipient's ledger); echo it as the surface verb. A NOTIFY used to
+    -- print as RECORD (NORM-LOG-SPEC N5), which showed the actor asserting a
+    -- fact in its own ledger when it had written into someone else's.
     verb = case prov.source of
       "COMMIT" -> "COMMIT"
+      "NOTIFY" -> "NOTIFY"
       _        -> "RECORD"
 
 -- | Render a cell 'Path' back to its backtick surface form, e.g.
