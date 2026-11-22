@@ -3,7 +3,7 @@
 As built on `main` by the pull request that adds this page.
 Source spec: none.
 The change came from `unstable`: legalese/l4-ide#103 (`80217614c`, issue smucclaw/l4-ide#915) and legalese/l4-ide#152 (`a4471aeb6` and `daa7ee180`, issue smucclaw/l4-ide#920).
-`unstable` removes the follow-on errors from the finished error list (`suppressResolutionCascade`).
+`unstable` used to remove the follow-on errors from the finished error list (`suppressResolutionCascade`); since the sync of `main` into `unstable` of 2026-11-22 it has the unifier guard below instead, and that filter is gone (the change legalese/l4-ide#782 proposed).
 `main` does not: it makes the unifier let a type that stands for a name that did not resolve match anything, so the follow-on errors are never raised.
 This page describes only what `main` has.
 Line numbers are in this PR's tree, on `main` at `b179dc5de`.

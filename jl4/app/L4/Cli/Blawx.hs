@@ -196,13 +196,14 @@ exportCmd opts = do
 -- __Why this reads 'Rules.TypeCheck' and not 'Rules.SuccessfulTypeCheck'.__
 -- Every other error still stops us — the filter below re-imposes the same
 -- "no 'SError'" bar — but 'TypeCheck.isExportPublicationRefusal' is stepped
--- over, and only here. Those two diagnostics say a request cannot carry one of
+-- over, and only here. Those diagnostics say a request cannot carry one of
 -- the export's inputs because it is a rule rather than a value (R-X4,
--- 2026-09-07). That is true of a web API and false of an ASP program: an
+-- 2026-09-07), or has no form in a request because it is an EVENT. That is
+-- true of a web API and false of an ASP program: an
 -- assumed predicate is precisely what this leg turns into an @#abducible@ for
 -- the interview to ask about. @\@export@ means "publish over JSON" to
 -- @l4 batch@ and @jl4-service@, and only "root the lowering here" to us, and
--- those two readings part company at exactly these two diagnostics.
+-- those two readings part company at exactly these diagnostics.
 --
 -- The user is still told: @l4 check@ on the same file refuses it, and the
 -- diagnostics are printed here too. What this buys is that a seed written in
@@ -218,7 +219,7 @@ loadBlawxDoc file = do
     Shake.use Rules.TypeCheck uri
   -- 'Rules.TypeCheck' puts only the SError-severity diagnostics in @errors@
   -- (Rules.hs partitions on severity before building the result), so this is
-  -- @tc.success@ with the two publication refusals subtracted.
+  -- @tc.success@ with the publication refusals subtracted.
   case mTc of
     Just tc
       | all (TypeCheck.isExportPublicationRefusal . (.kind)) tc.errors -> do
@@ -232,9 +233,10 @@ loadBlawxDoc file = do
             0 -> pure ()
             n -> hPutStrLn stderr
                    ( "l4 export blawx: " <> show n <> " diagnostic(s) above refuse this module for \
-                     \publication as a web API, because an @export input must be a value and \
-                     \an assumed rule is not one. That does not apply to Blawx, where such a \
-                     \rule becomes an #abducible the interview asks about, so the export \
+                     \publication as a web API, because a request carries values and cannot \
+                     \supply an input that is an assumed rule, nor an EVENT. That does not \
+                     \apply to Blawx, which sends nothing in a request: an assumed rule \
+                     \becomes an #abducible the interview asks about, so the export \
                      \proceeds. `l4 check` will report the same diagnostics and exit 1." )
           case lowerModule defaultLowerOptions tc.entityInfo tc.module'
                  >>= lowerBlawx of
