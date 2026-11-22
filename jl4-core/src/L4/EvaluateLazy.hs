@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 module L4.EvaluateLazy
 ( EvalConfig(..)
+, NormLogMutant(..)
 , AllocationLimit(..)
 , resolveEvalConfig
 , resolveEvalConfigWithSafeMode
@@ -159,11 +160,12 @@ data EvalConfig = EvalConfig
     -- surface turns it on yet (the read side that needs it is a later phase);
     -- a test sets it to read the entries and to prove the writer changes no
     -- answer.
-  , normLogMutant :: !Bool
-    -- ^ TEST ONLY. A deliberately wrong writer: each fate it writes also
-    -- appends a record to the OFFICIAL ledger, where a drafter's @RECALL@ and
-    -- the printed listing see it. It exists so that the test that proves the
-    -- writer is an observer can be seen to fail: a differential that passes
+  , normLogMutant :: !NormLogMutant
+    -- ^ TEST ONLY. A deliberately wrong writer ('NormLogMutant'): one that
+    -- also writes the OFFICIAL ledger, where a drafter's @RECALL@ and the
+    -- printed listing see it, or one that evaluates a party nothing has asked
+    -- for. It exists so that the test that proves the writer is an observer
+    -- can be seen to fail: a differential that passes
     -- for a writer that cannot be wrong proves nothing. Never set outside a test.
   }
 
@@ -182,7 +184,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True False postprocessTrace False False)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True False postprocessTrace False NoMutant)
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -1068,6 +1070,9 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , operandsInStep = evalConfig.operandsInStep
     , normLog = evalConfig.normLog
     , normLogMutant = evalConfig.normLogMutant
+    , normLogForce = \ env e -> do
+        fresh <- liftIO (newIORef emptyStack)
+        void (local (\ st -> st {stack = fresh}) (runConfig (ForwardMachine env e)))
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
     , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog

@@ -9,6 +9,7 @@ module L4.EvaluateLazy.Machine
 , Machine
 , Eval
 , EvalState (..)
+, NormLogMutant (..)
 , Stack (..)
 , emptyStack
 , runEval
@@ -410,6 +411,22 @@ data DynState = MkDynState
 -- and caught at directive boundaries via 'tryEval'.
 -- ----------------------------------------------------------------------------
 
+-- | The deliberately wrong writers of the observer test (NORM-LOG-SPEC N6).
+-- A differential that can only pass proves nothing, so each of these makes
+-- the writer do something an observer must not, and the test that the
+-- writer is an observer is shown to fail on it. Never set outside a test.
+data NormLogMutant
+  = NoMutant
+  | MutantOfficial
+    -- ^ every fate also appends to the OFFICIAL ledger, where @RECALL@ and
+    -- the printed listing see it
+  | MutantForce
+    -- ^ a norm's party, when it is still an unevaluated expression, is
+    -- evaluated when the norm is armed, which the machine does not do
+    -- (O1): a party that cannot be evaluated then fails a run that did
+    -- not need it
+  deriving stock (Eq, Show)
+
 data EvalState =
   MkEvalState
     { moduleUri  :: !NormalizedUri
@@ -440,8 +457,12 @@ data EvalState =
                                      -- evaluation ('L4.EvaluateLazy.EvalConfig'); read by
                                      -- the directive driver, which then installs a log that
                                      -- writes fates
-    , normLogMutant :: !Bool
+    , normLogMutant :: !NormLogMutant
                                      -- ^ TEST ONLY: see 'L4.EvaluateLazy.EvalConfig'
+    , normLogForce :: !(Environment -> Expr Resolved -> Eval ())
+                                     -- ^ TEST ONLY: evaluates an expression on a stack of
+                                     -- its own; what 'MutantForce' calls. Set by the
+                                     -- directive driver, which is where 'runConfig' is
     , operandsInStep :: !Bool
                                      -- ^ smucclaw/l4-ide#1069: run a @RAND@'s operands in
                                      -- step (Note [Operands in step]). 'False' only to
@@ -827,7 +848,7 @@ tellFate e = do
   -- the deliberately wrong writer of the observer test: it also writes where
   -- a drafter's read and the printed listing can see it
   mutant <- asks (.normLogMutant)
-  when mutant do
+  when (mutant == MutantOfficial) do
     now <- asks (.evalTime)
     let prov = MkProvenance {party = "", source = "COMMIT", txTime = now, vtFrom = Nothing}
     liftIO (modifyIORef' store (storeAppendOfficial (Assign ["norm log"] (ValNumber 1) prov)))
@@ -2681,7 +2702,14 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         norm <- armNormKey env party act
         -- NORM-LOG-SPEC N1/N13: the norm has met its stream and nothing has
         -- happened to it; the entry an "outstanding" read is made through
-        whenDeonticLog \ l -> when l.dlWriteFates (tellArmed l norm time)
+        whenDeonticLog \ l -> when l.dlWriteFates do
+          tellArmed l norm time
+          -- the wrong writer of 'MutantForce': evaluate a party nothing
+          -- has asked for yet
+          forcing <- asks (.normLogMutant)
+          when (forcing == MutantForce) do
+            hook <- asks (.normLogForce)
+            for_ (either Just (const Nothing) party) (hook env)
         -- smucclaw/l4-ide#1069: the sibling-read check's clock is the arming
         -- time until an event is taken
         noteClock time

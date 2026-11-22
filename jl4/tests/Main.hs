@@ -96,7 +96,8 @@ main = do
   -- differential fail (see 'L4.EvaluateLazy.EvalConfig' normLogMutant)
   evalConfig <- (\cfg -> case normLogForced of
       Nothing       -> cfg
-      Just "mutant" -> cfg {JL4Lazy.normLog = True, JL4Lazy.normLogMutant = True}
+      Just "mutant" -> cfg {JL4Lazy.normLog = True, JL4Lazy.normLogMutant = JL4Lazy.MutantOfficial}
+      Just "mutant-force" -> cfg {JL4Lazy.normLog = True, JL4Lazy.normLogMutant = JL4Lazy.MutantForce}
       Just _        -> cfg {JL4Lazy.normLog = True})
     <$> JL4Lazy.resolveEvalConfig chosenNow tracePolicy
   let examplesRoot = dataDir </> "examples"

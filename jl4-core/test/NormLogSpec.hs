@@ -38,6 +38,7 @@ import L4.Evaluate.NormLog
 import L4.EvaluateLazy
   ( EvalConfig (..)
   , EvalDirectiveResult (..)
+  , NormLogMutant (..)
   , execEvalModuleWithEnv
   , prettyEvalDirectiveResult
   , resolveEvalConfig
@@ -445,6 +446,26 @@ everyAfterHenceBarrierSrc = Text.unlines $ everyPrologue <>
   , "  PARTY bob   DOES Sign bob   AT 3"
   ]
 
+-- 12. a party that cannot be evaluated, which the run never needs: a trace
+-- with no events never compares it, and the residual obligation prints the
+-- party as written. (With an event past the deadline the BREACH result prints
+-- the party, which evaluates it whatever the writer does: a first version of
+-- this fixture had that event and was no test of anything.) A writer that evaluated the party at arming (the MutantForce
+-- of the observer test) would fail this run with a division by zero; the
+-- real writer only peeks, so the run is unchanged. This is the fixture that
+-- shows the observer test is sensitive to a writer that forces a thunk.
+unforcedPartySrc :: Text.Text
+unforcedPartySrc = Text.unlines $ everyPrologue <>
+  [ "`a party nobody should evaluate` MEANS"
+  , "    IF (1 DIVIDED BY 0) EQUALS 0 THEN alice ELSE bob"
+  , ""
+  , "GIVETH A DEONTIC Actor Action"
+  , "`deliver by day 5` MEANS"
+  , "    PARTY `a party nobody should evaluate` MUST Deliver theLandlord WITHIN 5"
+  , ""
+  , "#TRACE `deliver by day 5` AT 0 WITH"
+  ]
+
 -- The EVERY shapes share a cast of two tenants.
 everyPrologue :: [Text.Text]
 everyPrologue =
@@ -474,6 +495,7 @@ allSources =
   , ("lapsed breach", lapsedBreachSrc), ("breach by", breachBySrc)
   , ("late arming", lateArmingSrc), ("computed party", computedPartySrc)
   , ("record in a hence", recordSrc)
+  , ("unforced party", unforcedPartySrc)
   , ("every after hence (fork)", everyAfterHenceForkSrc)
   , ("every after hence (barrier)", everyAfterHenceBarrierSrc) ]
 
@@ -690,9 +712,19 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
     it "mutant: a writer that also writes the official record turns the observer test red" do
       -- the proof that the test above can fail: with the deliberately wrong
       -- writer, the printed result is NOT the one the writer-off run prints
-      on <- runWith (\ cfg -> cfg {normLog = True, normLogMutant = True}) henceSrc
+      on <- runWith (\ cfg -> cfg {normLog = True, normLogMutant = MutantOfficial}) henceSrc
       off <- run False henceSrc
       map (prettyEvalDirectiveResult . withoutNormLog) on `shouldNotBe` map prettyEvalDirectiveResult off
+
+    it "mutant: a writer that evaluates a party nothing has asked for turns the observer test red" do
+      -- GM's requirement for P1: the differential must fail on a writer that
+      -- forces a thunk, not only on one that writes the wrong ledger
+      on <- runWith (\ cfg -> cfg {normLog = True, normLogMutant = MutantForce}) unforcedPartySrc
+      off <- run False unforcedPartySrc
+      map (prettyEvalDirectiveResult . withoutNormLog) on `shouldNotBe` map prettyEvalDirectiveResult off
+      -- and the real writer does not: the same run is unchanged
+      real <- run True unforcedPartySrc
+      map (prettyEvalDirectiveResult . withoutNormLog) real `shouldBe` map prettyEvalDirectiveResult off
 
     it "control: with the writer off, the norm ledger is empty" do
       rs <- run False henceSrc
