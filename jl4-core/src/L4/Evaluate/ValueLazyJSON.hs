@@ -93,7 +93,11 @@ instance ToJSON a => ToJSON (Value a) where
   toJSON (ValString s)            = toJSON s
   toJSON (ValDate d)              = toJSON (show d)
   toJSON (ValTime t)              = toJSON (show t)
-  toJSON (ValDateTime utc tz)     = object ["utc" .= utc, "timezone" .= tz]
+  -- A string, like a DATE and a TIME above, in the text jl4-service answers a
+  -- DATETIME with: the instant in UTC (@2026-01-31 10:30:00 UTC@). It was an
+  -- object, @{"utc": ..., "timezone": ...}@, which neither @l4 batch@ nor
+  -- JSONDECODE reads back (smucclaw/l4-ide#1085).
+  toJSON (ValDateTime utc _tz)    = toJSON (show utc)
   toJSON ValNil                   = toJSON ([] :: [Aeson.Value])
   toJSON (ValCons x xs)           = flattenList x xs
   toJSON (ValConstructor name [])

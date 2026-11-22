@@ -1,0 +1,12 @@
+-- A DATETIME as an input and as a result. `l4 batch` wrote the result as an
+-- object, {"timezone": ..., "utc": ...}, which neither it nor JSONDECODE reads
+-- back (smucclaw/l4-ide#1085); it writes the text jl4-service answers with.
+
+TIMEZONE IS "Asia/Singapore"
+
+@export default The moment itself
+GIVEN w IS A DATETIME
+GIVETH A DATETIME
+`moment` MEANS w
+
+#EVAL `moment` (DATETIME_FROM_DTZ (DATE_FROM_DMY 31 1 2026) (TIME_FROM_HMS 10 30 0) "UTC")

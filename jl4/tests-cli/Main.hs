@@ -498,6 +498,11 @@ batchChoiceFixture, batchChoiceJson :: FilePath
 batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
 batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
 
+batchDatetimeFixture, batchDatetimeIso, batchDatetimeService :: FilePath
+batchDatetimeFixture = fixtureDir </> "batch-datetime-result.l4"
+batchDatetimeIso     = fixtureDir </> "batch-datetime-iso.json"
+batchDatetimeService = fixtureDir </> "batch-datetime-service.json"
+
 -- | A choice type declared under a § section (smucclaw/l4-ide#947).
 batchSectionEnumFixture, batchSectionEnumJson :: FilePath
 batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
@@ -4049,6 +4054,21 @@ spec bin = do
         [] -> expectationFailure "l4 batch printed no rows"
       sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
       sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "writes a DATETIME result as the text jl4-service answers with, and reads that text back as a fact" $ do
+      -- #1085: the result was the object {"timezone": ..., "utc": ...}, which
+      -- neither l4 batch nor JSONDECODE reads. Now it is a string, and the
+      -- string, given back as a row, is read as the same instant.
+      let resultOf file = do
+            Output code sout _ <- runL4 bin ["batch", batchDatetimeFixture, "--inputs", file]
+            code `shouldBe` ExitSuccess
+            sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+            pure sout
+      fromIso <- resultOf batchDatetimeIso
+      fromIso `shouldSatisfy` ("\"result\":\"2026-01-31 10:30:00 UTC\"" `isInfixOf`)
+      fromIso `shouldSatisfy` (not . ("\"timezone\"" `isInfixOf`))
+      fromService <- resultOf batchDatetimeService
+      fromService `shouldSatisfy` ("\"result\":\"2026-01-31 10:30:00 UTC\"" `isInfixOf`)
 
     it "decodes a constructor of a choice type declared under a section by its bare name" $ do
       -- "Red" is what JSONENCODE writes for Red, and what a request sends;

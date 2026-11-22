@@ -485,6 +485,10 @@ A byte-order mark at the start of the file, which Excel's CSV UTF-8 export write
 A line with more or fewer cells than the header is refused and counted as an error, and the message gives its line number.
 A number given for a `STRING` parameter in a JSON or YAML file is an error, because those files already say which values are strings.
 
+A `DATE`, a `TIME` and a `DATETIME` are text in a case and in a result.
+A `DATETIME` is read from text that ends in `Z` or an offset from UTC (`2026-01-31T10:30:00Z`, `2026-01-31T18:30:00+0800`), or from the text a result is written as, and it takes the `TIMEZONE` of the file (UTC when the file has none).
+A result writes a `DATE` as `"2026-01-31"`, a `TIME` as `"10:30:00"` and a `DATETIME` as its instant in UTC, `"2026-01-31 10:30:00 UTC"`, which is the text `jl4-service` answers with; a result can be given back as a case.
+
 A fact whose type is a list of choices (`DECLARE Colour IS ONE OF Red, Green, Blue`) is given as the name of one choice, written as text: `"c": "Red"`, or a `Red` cell in a CSV file.
 A choice that carries facts of its own, such as `Circle HAS size IS A NUMBER`, cannot be given as input: there is no way yet to write one in a case.
 Anything else given for such a fact, a name that is not one of its choices, a number, or a record, is an error on that line, naming the fact and the choices it accepts:
