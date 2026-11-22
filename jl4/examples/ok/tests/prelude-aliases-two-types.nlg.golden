@@ -1,0 +1,8 @@
+a pair transformed in its second part with given `n` then the sum of `n` and 1 and `PAIR` with a and 1
+a pair transformed in its second part with given `s` then `s` is equal to x and `PAIR` with a and x
+pairs transformed in their second parts with given `n` then the sum of `n` and 1 and list of `PAIR` with a and 1 and `PAIR` with b and 2
+pairs transformed in their second parts with given `s` then `s` is equal to x and list of `PAIR` with a and x and `PAIR` with b and y
+a pair transformed in its second part with given `n` then the sum of `n` and 1 and `PAIR` with a and 1 is equal to `PAIR` with a and 2
+a pair transformed in its second part with given `s` then `s` is equal to x and `PAIR` with a and x is equal to `PAIR` with a and `TRUE`
+pairs transformed in their second parts with given `n` then the sum of `n` and 1 and list of `PAIR` with a and 1 and `PAIR` with b and 2 is equal to list of `PAIR` with a and 2 and `PAIR` with b and 3
+pairs transformed in their second parts with given `s` then `s` is equal to x and list of `PAIR` with a and x and `PAIR` with b and y is equal to list of `PAIR` with a and `TRUE` and `PAIR` with b and `FALSE`

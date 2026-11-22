@@ -1371,7 +1371,7 @@ were found false by measurement rather than by design:
   `null args`, and the build keeps that, so none of them changes meaning. The projection label
   and `WITH` labels are likewise not term occurrences.
 - **The declaration-site error is companion-only, or the prelude fails to type-check.**
-  `prelude.l4:1007-1023` (`dictUnion`, `dictUnionWith`) opens two `Dictionary` binders in one
+  `prelude.l4:1052-1069` (`dictUnion`, `dictUnionWith`) opens two `Dictionary` binders in one
   signature; 50 corpus rules in 19 files (38 under goldened globs) open two records sharing a
   field name and every one reads `r's f`. An unconditional error at the second binder would have
   turned the embedded prelude red and every file with it.
