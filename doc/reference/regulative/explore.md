@@ -174,7 +174,7 @@ Measured on the 78 files in this repository's examples and docs that carry a `#T
   `jl4/examples/explore/ledger/d3-reopen.l4` takes about five minutes before and after, at the 300 second limit the sweep ran under (it ended at that limit before and at the state bound in one run after), so its exit status is not a comparison;
 - of the 405 graphs those files explore (leaving out the one that timed out), 354 have the same number of states as before, 42 have more and 9 have fewer.
   The largest growth is a block of `run-after.l4`, `EVERY Tenant t IN tenants MUST Sign t AFTER 3 WITHIN 30`, from 1 state to 11: the old explorer passed both acts over at every instant it tried and stopped at the outset, and the new one tries them at the instant the window opens;
-- `--chains` costs time as well as states: `run-in.l4` takes 149 seconds against 27, and the whole set 592 seconds against 455.
+- `--chains` costs time as well as states: `run-in.l4` takes 254 seconds against 34, and the whole set 720 seconds against 505 (wall clock, four files at a time on a busy machine, so read the ratios and not the seconds).
   `run-modals.l4` still exits 2 under it, because the offsets kept growing after three passes, and the line says so.
   With no live deadline and no `--until`, the instants are the first one the act's window is open and the one after it.
   The boundaries matter: a rule that treats an act at exactly the deadline differently from one just before it is only visible if the explorer tries the deadline itself, and a breach that names two parties is only visible if it tries the instant at which the deadlines meet.
