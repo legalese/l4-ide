@@ -498,6 +498,10 @@ batchChoiceFixture, batchChoiceJson :: FilePath
 batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
 batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
 
+batchEitherFixture, batchEitherJson :: FilePath
+batchEitherFixture = fixtureDir </> "batch-either-input.l4"
+batchEitherJson    = fixtureDir </> "batch-either-input.json"
+
 -- | A choice type declared under a § section (smucclaw/l4-ide#947).
 batchSectionEnumFixture, batchSectionEnumJson :: FilePath
 batchSectionEnumFixture = fixtureDir </> "batch-section-enum.l4"
@@ -4049,6 +4053,23 @@ spec bin = do
         [] -> expectationFailure "l4 batch printed no rows"
       sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
       sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "refuses an EITHER input it cannot decode, instead of handing the rule a value of another type" $ do
+      -- Rows: {"RIGHT": 5}, {"LEFT": "no"}, {"RIGHT": [5]}, "RIGHT" and 5.
+      -- The typed decoder had no case for a type of two type arguments, so
+      -- each row took the untyped decode: NOTHING for an object, the string or
+      -- the number itself, none of them an EITHER (#1084).
+      Output code sout _ <-
+        runL4 bin ["batch", batchEitherFixture, "--inputs", batchEitherJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      let rows = filter (not . all isSpace) (lines sout)
+      length rows `shouldBe` 5
+      flip mapM_ rows $ \r -> do
+        r `shouldSatisfy` ("Could not decode" `isInfixOf`)
+        r `shouldSatisfy` ("as EITHER OF STRING, NUMBER for field 'e'" `isInfixOf`)
+        r `shouldSatisfy` ("every constructor of EITHER OF STRING, NUMBER has fields (LEFT, RIGHT)" `isInfixOf`)
+        r `shouldSatisfy` ("a constructor with fields cannot be given as JSON input" `isInfixOf`)
+        r `shouldSatisfy` (not . ("\"result\":\"" `isInfixOf`))
 
     it "decodes a constructor of a choice type declared under a section by its bare name" $ do
       -- "Red" is what JSONENCODE writes for Red, and what a request sends;

@@ -1,0 +1,16 @@
+-- An EITHER input. JSONDECODE and a request decode it with the typed decoder,
+-- which did not have a case for a type of two type arguments: it fell back to
+-- the untyped decode, which gives NOTHING for an object and passes a string or
+-- a number through as itself, so the rule below ran on a value of the wrong
+-- type and the row came back "status":"success" (smucclaw/l4-ide#1084).
+
+@export default Which side of an EITHER
+GIVEN e IS AN EITHER STRING NUMBER
+GIVETH A STRING
+DECIDE side e IS
+  CONSIDER e
+    WHEN LEFT message THEN "left"
+    WHEN RIGHT amount THEN "right"
+
+#EVAL side (LEFT "no")
+#EVAL side (RIGHT 5)

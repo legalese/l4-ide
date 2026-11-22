@@ -5746,6 +5746,16 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
             innerRef <- allocateValue innerVal
             pure $ ValConstructor TypeCheck.justRef [innerRef]
 
+    -- Handle EITHER α β. Without this case an EITHER took the untyped decode
+    -- below, which gave @NOTHING@ for an object, a value of the wrong type
+    -- handed on with no error (smucclaw/l4-ide#1084). LEFT and RIGHT carry a
+    -- field, and a constructor with a field is not read from JSON: the same
+    -- words as for any other choice type that has one.
+    TyApp _anno eitherRef [_leftType, _rightType]
+      | nameToText (TypeCheck.getName eitherRef) == "EITHER" ->
+        cannotDecode at (prettyLayout ty) jsonValue $
+          choiceExpectation (prettyLayout ty) [] ["LEFT", "RIGHT"]
+
     -- Handle custom record types and primitives: TyApp conRef []
     TyApp _anno tyRef [] -> do
       let typeName = nameToText (TypeCheck.getName tyRef)

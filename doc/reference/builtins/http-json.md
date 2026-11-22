@@ -87,6 +87,7 @@ The type you expect guides the decoding, so say it, with `GIVETH` or by the way 
 - An array decodes to a LIST, a number to a NUMBER, a string to a STRING, `true` and `false` to a BOOLEAN.
 - `null` decodes to `NOTHING` for a MAYBE type; any other value decodes to `JUST` it.
 - A string with a constructor's name decodes to that constructor of an enumeration.
+- A value of an EITHER type, like any constructor with fields, cannot be given as JSON: a decode at such a type stops with an error that says so, where it used to hand the rule a value of another type.
 - A type declared as another name for a type (`DECLARE Year IS A NUMBER`) decodes as that type, and so does one for a MAYBE: with `DECLARE MaybeYear IS A MAYBE NUMBER`, `null` decodes to `NOTHING` and `2026` to `JUST 2026`.
 
 ```l4
