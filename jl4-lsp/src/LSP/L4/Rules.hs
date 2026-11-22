@@ -1002,18 +1002,6 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
                    <> ".l4 in the project root or beside the importing file."
                  ]
 
--- | The modules a file imports that resolved to nothing, by bare name, in the
--- order they are written, each once.
---
--- 'GetImports' reports an unresolvable IMPORT as a diagnostic and leaves it out
--- of its result, so what it did not resolve is what the file declares minus
--- what it returned. The names are computed the way 'GetImports' computes them,
--- so the two cannot disagree about which module an IMPORT names. A file that
--- does not parse has declared nothing and yields @[]@: its own error is the
--- one to read.
---
--- For a host that must say so when an uploaded bundle imports something it
--- does not carry (jl4-service), where the diagnostic itself is not in reach.
 -- | A type-checked module evaluated on top of its imports' heaps, under the
 -- configuration given: the work of 'GetLazyEvaluationDependenciesFile', which
 -- passes the rules' own. The REPL's @:trace@ and @:traceascii@ call it with a
@@ -1040,6 +1028,18 @@ evaluateOn cfg imports tcRes = do
     (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports cfg tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
     pure (ownEnv <> environment, ownDirectives)
 
+-- | The modules a file imports that resolved to nothing, by bare name, in the
+-- order they are written, each once.
+--
+-- 'GetImports' reports an unresolvable IMPORT as a diagnostic and leaves it out
+-- of its result, so what it did not resolve is what the file declares minus
+-- what it returned. The names are computed the way 'GetImports' computes them,
+-- so the two cannot disagree about which module an IMPORT names. A file that
+-- does not parse has declared nothing and yields @[]@: its own error is the
+-- one to read.
+--
+-- For a host that must say so when an uploaded bundle imports something it
+-- does not carry (jl4-service), where the diagnostic itself is not in reach.
 unresolvedImports :: NormalizedUri -> Action [Text]
 unresolvedImports uri = do
   mProg <- use GetParsedAst uri
