@@ -562,7 +562,8 @@ The command exits with status 0 when every case was `success` or `refused`, and 
 
 It checks that every fact the rules need is in the case (with `--presumption soft`, a fact that has a usual value may be left out), that no fact other than a `MAYBE` is `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`. A synonym that takes a type (`Optional OF NUMBER`) is not: a case can be `valid` that a run refuses, and `invalid` that a run answers.
 
-**It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
+**It judges those three types, and the names of a choice type.** A fact whose type is a choice (`DECLARE Party IS ONE OF Landlord, Tenant`) must be the name of one of its choices, written as text, and a name that is none, or a value that is not text, is `invalid` with the message a run gives: `Could not decode "Lodger" as Party for field 'p': it names no constructor of Party; expected a string naming one of: Landlord, Tenant.` The same is checked for a choice in a record's field, in an element of a list and in a `MAYBE`, and the message names where it sits (`l.guests[1]`).
+For any other type, such as a `DATE` or a list of numbers, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
 
 ```l4
 @export Echo a date
