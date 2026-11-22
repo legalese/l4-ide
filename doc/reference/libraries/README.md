@@ -62,11 +62,15 @@ IMPORT `legal-persons`
   Write the name with the file's own capitals and the limit never matters.
   The rule has three smaller limits: a folder whose list of files L4 cannot read still accepts any capitals; a file ending in `.L4` is refused but never suggested; and in the editor, a module in an unsaved tab is not suggested. [Capitals count on every tier](resolution.md#the-resolution-order) explains each.
 
+### Files cannot import each other in a ring
+
+A file can't import itself, and files can't import each other in a ring: if `a.l4` imports `b.l4`, then `b.l4`, and anything it imports, can't import `a.l4`. See [Import cycle](../errors/README.md#import-cycle) for how to fix it.
+
 ### What an import gives you
 
 - Every top-level definition of the imported file: its types, constructors, functions and constants.
 - Nothing is imported for you. A file that uses `map`, `sum` or `fromMaybe` needs `IMPORT prelude` like any other library.
-- Import each library you use by name. The definitions a library imports for itself also reach your file, but do not count on it: `IMPORT datetime`, for example, does not give you `Date`; that needs `IMPORT daydate`.
+- What a library imports also reaches your file: `IMPORT datetime` gives you `daydate` too, and `IMPORT daydate` gives you `date-compat`. Importing each library you use by name still makes a file easier to read.
 
 ### Where modules are found
 

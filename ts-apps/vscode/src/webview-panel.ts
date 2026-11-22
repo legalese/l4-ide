@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
+import { randomBytes } from 'crypto'
 import * as path from 'path'
 import webviewHtml from '../static/webview/index.html'
 import { Uri } from 'vscode'
@@ -174,12 +175,19 @@ export function getWebviewContent(
   // `srcdoc` iframe (about:srcdoc inherits the webview origin). The inner
   // document inherits this CSP, so allow inline styles / data: images that
   // the rendered HTML may carry.
-  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: data:; font-src ${webview.cspSource} data:; frame-src 'self'; connect-src https://legalese.com;">`
+  // Scripts: the bundle, plus SvelteKit's inline bootstrap by nonce. No
+  // 'unsafe-inline', so injected markup (an `onerror=` attribute, an
+  // inline <script>) can't run. Images: the bundle, data: and the docs
+  // site (Docs tab), so a rendered image can't beacon anywhere else.
+  const nonce = randomBytes(16).toString('base64')
+  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'nonce-${nonce}'; img-src ${webview.cspSource} https://legalese.com data:; font-src ${webview.cspSource} data:; frame-src 'self'; connect-src https://legalese.com;">`
 
-  const postprocessedWebviewHtml = html.replace(
-    '<head>',
-    `<head><base href="${compatibleBasePath}/">${csp}${tokenCSS}`
-  )
+  const postprocessedWebviewHtml = html
+    .replace(
+      '<head>',
+      `<head><base href="${compatibleBasePath}/">${csp}${tokenCSS}`
+    )
+    .replace(/<script(?=[\s>])/g, `<script nonce="${nonce}"`)
 
   return postprocessedWebviewHtml
 }

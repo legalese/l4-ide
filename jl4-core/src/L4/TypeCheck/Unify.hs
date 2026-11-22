@@ -153,7 +153,24 @@ unify' fuel t1 t2 = do
   where
     go (InfVar _ann1 _pre1 i1) t2' = bindChecked i1 t2'
     go t1' (InfVar _ann2 _pre2 i2) = bindChecked i2 t1'
-    go t1' t2'                     = expandAndUnify fuel t1' t2'
+    go t1' t2'
+      | poisoned t1' || poisoned t2' = pure True
+      | otherwise                    = expandAndUnify fuel t1' t2'
+
+    -- A type whose head is the sentinel of a name that did not resolve (see
+    -- 'isOutOfScope'): the failure has been reported, and what the type was
+    -- meant to be is not known, so it matches anything and no second error
+    -- follows from it. Inference variables are bound above, so a variable
+    -- bound to such a type carries the sentinel on. Only the head matters:
+    -- @LIST OF Typo@ against @NUMBER@ still fails, because the outer types
+    -- differ.
+    --
+    -- A match is a success, so an overloaded name applied to a value of such a
+    -- type fits every one of its candidates, and the use is reported as
+    -- ambiguous besides the unresolved name; "ResolutionCascadeSpec" pins this.
+    poisoned :: Type' Resolved -> Bool
+    poisoned (TyApp _ r _) = isOutOfScope r
+    poisoned _             = False
 
 -- | Whether two types, heads already walked, are the same type as the
 -- substitution reads them, for the cases where answering is worth a

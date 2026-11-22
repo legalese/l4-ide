@@ -6,7 +6,7 @@ File: field-opening-collision.l4
   Range: 14:7-14:13
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-opening
   Message:
     This input has a field name that an earlier input of the rule also has:
 
@@ -25,7 +25,7 @@ File: field-opening-collision.l4
   Range: 16:19-16:23
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-read
   Message:
     Two inputs of this rule have a field named
 
@@ -43,7 +43,7 @@ File: field-opening-collision.l4
   Range: 35:7-35:12
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-opening
   Message:
     This input has field names that an earlier input of the rule also has:
 
@@ -64,7 +64,7 @@ File: field-opening-collision.l4
   Range: 37:14-37:18
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-read
   Message:
     Two inputs of this rule have a field named
 
@@ -82,7 +82,7 @@ File: field-opening-collision.l4
   Range: 37:34-37:38
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-read
   Message:
     Two inputs of this rule have a field named
 
@@ -100,7 +100,7 @@ File: field-opening-collision.l4
   Range: 44:7-44:8
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-opening
   Message:
     This input has a field name that an earlier input of the rule also has:
 
@@ -120,7 +120,7 @@ File: field-opening-collision.l4
   Range: 45:7-45:8
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-opening
   Message:
     This input has a field name that an earlier input of the rule also has:
 
@@ -140,7 +140,7 @@ File: field-opening-collision.l4
   Range: 47:13-47:14
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-read
   Message:
     Several inputs of this rule have a field named
 
@@ -159,7 +159,7 @@ File: field-opening-collision.l4
   Range: 59:11-59:17
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-opening
   Message:
     This input has a field name that an earlier input of the section also has:
 
@@ -178,7 +178,7 @@ File: field-opening-collision.l4
   Range: 62:19-62:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/opened-field-collision-at-read
   Message:
     Two inputs of this section have a field named
 

@@ -6,7 +6,7 @@ File: action-pinned-function.l4
   Range: 26:28-26:29
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/action-pattern-not-comparable
   Message:
     This pins a value that cannot be compared.
 
@@ -28,7 +28,7 @@ File: action-pinned-function.l4
   Range: 31:29-31:36
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/deprecated-exactly
   Message:
     EXACTLY is no longer needed here, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
@@ -45,7 +45,7 @@ File: action-pinned-function.l4
   Range: 31:37-31:38
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/action-pattern-not-comparable
   Message:
     This pins a value that cannot be compared.
 

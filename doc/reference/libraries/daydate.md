@@ -35,7 +35,10 @@ The month names also build dates: `January 15 2024` is 15 January 2024.
 | `Month` date, `Week` date, `Year` date | DATE       | The first day of the month, ISO week or year that contains `date`                                     |
 | `January` day year, ...                | DATE       | The date in that month: `March 1 2025`                                                                |
 
-`Date` rolls a day that does not exist in the month forward: `Date 29 2 2025` is 1 March 2025. `Days to date` is another name for `Date`.
+When the day is past the end of the month, or the month is past 12, `Date day month year` rolls forward: `Date 29 2 2025` is 1 March 2025, and `Date 7 28 2026` is 7 April 2028.
+`Days to date` is another name for `Date`.
+
+`Year month day` is another name for `YMD`.
 
 `YMD` is **recommended for new code**.
 It builds the candidate through `Date` and then requires its year, month and day to equal the arguments, so any rolled component, such as `YMD 2026 28 7` (a transposition), `YMD 2023 2 29` (no such leap day), month 0 or day 32, REFUSES: it stops with the reason `YMD refused an out-of-range month or day` instead of computing a wrong date.
@@ -95,7 +98,7 @@ To read the day, month or year of a date as a number, use the built-ins `DATE_DA
 
 ## date-compat
 
-`date-compat` is a separate library for files written before `DATE` became a built-in type. Import it with ``IMPORT `date-compat` `` (the backticks are needed because of the hyphen). `daydate` uses it internally, but importing `daydate` does not make its functions available to you.
+`date-compat` is a separate library for files written before `DATE` became a built-in type. Import it with ``IMPORT `date-compat` `` (the backticks are needed because of the hyphen). `IMPORT daydate` (and so `IMPORT datetime`) also gives you its functions.
 
 | Function                        | Gives  | What it does                                                  |
 | ------------------------------- | ------ | ------------------------------------------------------------- |
@@ -105,4 +108,4 @@ To read the day, month or year of a date as a number, use the built-ins `DATE_DA
 | `Month of` date (or `month of`) | NUMBER | The month, like `DATE_MONTH`                                  |
 | `Year of` date (or `year of`)   | NUMBER | The year, like `DATE_YEAR`                                    |
 
-New files should use `Date` from `daydate`, and `DATE_DAY`, `DATE_MONTH` and `DATE_YEAR`.
+New files should use `Date` or `YMD` from `daydate`, and `DATE_DAY`, `DATE_MONTH` and `DATE_YEAR`.

@@ -6,7 +6,7 @@ File: resolution-cascade.l4
   Range: 29:8-29:17
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-type
   Message:
     There are multiple definitions for the identifier
 

@@ -9,10 +9,11 @@
 -- it (@POST@), as the extension does once you confirm the breaking change.
 --
 -- The upload is the file plus its transitive imports, flat by file name,
--- typechecked locally first. It does not include the standard libraries the
--- file imports (prelude, daydate, …): a deployment resolves its IMPORTs
--- against its own files and the standard library built into the service, as
--- the extension's upload does.
+-- checked locally first by the rule @l4 check@ applies, so a file that
+-- @l4 check@ refuses is never uploaded. It does not include the standard
+-- libraries the file imports (prelude, daydate, …): a deployment resolves its
+-- IMPORTs against its own files and the standard library built into the
+-- service, as the extension's upload does.
 module L4.Cli.Deploy
   ( DeployOptions(..)
   , deployOptionsParser
@@ -65,7 +66,7 @@ import Language.LSP.Protocol.Types
 import L4.Syntax (Module(..))
 
 import L4.Cli.Cloud
-import L4.Cli.Common (FixedNowOpt(..), makeEvalConfig, putDiagnostics, runOneshot)
+import L4.Cli.Common (FixedNowOpt(..), hasBlockingError, makeEvalConfig, putDiagnostics, runOneshotWithDiagnostics)
 
 ----------------------------------------------------------------------------
 -- Options
@@ -272,19 +273,23 @@ deploymentName fp explicit
       Nothing -> Text.map (\c -> if validChar c then c else '-') (Text.pack (dropExtension (takeFileName fp)))
     validChar c = isAscii c && (isAlphaNum c || c == '-' || c == '_')
 
--- | Typecheck the file and collect it plus its transitive imports as
--- (name in the zip, contents), root first.
+-- | Check the file as @l4 check@ does, and collect it plus its transitive
+-- imports as (name in the zip, contents), root first.
 bundle :: FilePath -> IO [(FilePath, BSL.ByteString)]
 bundle fp = do
   absFp <- makeAbsolute fp
   present <- doesFileExist absFp
   unless present $ die ("No such file: " <> Text.pack fp)
   evalConfig <- makeEvalConfig (FixedNowOpt Nothing)
-  (errs, mTc) <- runOneshot evalConfig absFp \nfp -> do
+  (errs, diags, mTc) <- runOneshotWithDiagnostics evalConfig absFp \nfp -> do
     _ <- Shake.addVirtualFileFromFS nfp
     Shake.use Rules.SuccessfulTypeCheck (normalizedFilePathToUri nfp)
+  -- The rule of @l4 check@: the file typechecks and no blocking Error was
+  -- published anywhere in its import closure. The entry file's own result can
+  -- look fine when a file it imports is broken, when an IMPORT finds no module,
+  -- or when imports form a cycle.
   tc <- case mTc of
-    Just tc | tc.success -> pure tc
+    Just tc | tc.success, not (hasBlockingError diags) -> pure tc
     _ -> do
       putDiagnostics errs
       die (Text.pack fp <> " doesn't typecheck; fix it before deploying (see `l4 check`).")

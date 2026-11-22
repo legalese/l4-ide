@@ -6,7 +6,7 @@ File: section-given-restated.l4
   Range: 11:7-11:17
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/restated-section-binder
   Message:
     A section GIVEN already binds
 

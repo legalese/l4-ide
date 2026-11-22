@@ -180,6 +180,7 @@ library
     L4.FindDefinition
     L4.FindReferences
     L4.JsonSchema
+    L4.TypeSynonym
     L4.Lexer
     L4.Lint.AndOrDepth
     L4.Lint.NotReach
@@ -197,6 +198,7 @@ library
     L4.Parser
     L4.Parser.Anno
     L4.Parser.MixfixRegistry
+    L4.Parser.AnnotationWarning
     L4.Parser.ResolveAnnotation
     L4.Parser.SrcSpan
     L4.ParserCombinators
@@ -207,10 +209,10 @@ library
     L4.Print.Columnar
     L4.Print.Layout
     L4.SmartPunctuation
+    L4.Refusal
     L4.Syntax
     L4.TemporalContext
     L4.TracePolicy
-    L4.Refusal
     L4.Transform
     L4.TypeCheck
     L4.TypeCheck.Annotation
@@ -278,10 +280,15 @@ test-suite jl4-core-test
     ProveSmtSpec
     DisambiguationWarningsSpec
     NumberLiteralSpec
+    AssertRaisesSpec
     NlgLangTagSpec
     RenderLangDirSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
+    MultiClausePrintSpec
+    ConsiderScaleSpec
+    OverloadScaleSpec
+    YmdOwnDefinitionSpec
     CheckDirectiveResultsSpec
     ResolutionCascadeSpec
     RefAnnotationSpec
@@ -294,7 +301,6 @@ test-suite jl4-core-test
     GraphVizStubSpec
     EdgeCrashSpec
     PrintRoundtripSpec
-    MultiClausePrintSpec
     PrettyLayoutNlgSpec
     NlgMultiplicitySpec
     NlgAttachmentSpec
@@ -330,9 +336,16 @@ test-suite jl4-core-test
     ApiStateGraphLensSpec
     SmartPunctuationSpec
     TimezoneTimeoutSpec
-    ConsiderScaleSpec
     VariadicRescueScaleSpec
     PrintLayoutSpec
+    MayRefuseSpec
+    RefusalReportSpec
+    RefuseSpec
+    NlgSilentReadingSpec
+    ImportErrorRangeSpec
+    SchemaBuiltinNameSpec
+    MaxFrameDepthSpec
+    HoverApiSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

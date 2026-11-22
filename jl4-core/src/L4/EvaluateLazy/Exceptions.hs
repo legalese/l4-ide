@@ -6,6 +6,7 @@ module L4.EvaluateLazy.Exceptions
 , InternalEvalException (..)
 , UserEvalException (..)
 , Refusal (..)
+, evalExceptionCode
 , prettyEvalException
 , prettyRefusal
 , maximumStackSize
@@ -50,9 +51,11 @@ newtype Refusal =
   deriving stock (Generic, Show)
   deriving anyclass NFData
 
--- | Render a refusal for a user. Deliberately does NOT say \"error\".
+-- | Render a refusal for a user. Deliberately does NOT say "error". Every line
+-- of the reason is indented under the heading, and an empty reason is one
+-- line that holds only the indent.
 prettyRefusal :: Refusal -> [Text]
-prettyRefusal r = [ "The model refuses to answer:", indentSingle r.message ]
+prettyRefusal r = "The model refuses to answer:" : map indentSingle (Text.splitOn "\n" r.message)
 
 -- | Thrown as a (synchronous) IO exception by the evaluation machine and
 -- caught at directive boundaries; see 'L4.EvaluateLazy.Machine'.
@@ -76,7 +79,9 @@ data UserEvalException =
     -- ('PmConsider'), so that the message is about the clauses the drafter
     -- wrote. 'Right' the forced scrutinee value when available, 'Left' the
     -- raw reference otherwise.
-  | StackOverflow
+  | StackOverflow Int
+    -- ^ The frame limit that was reached: 'maximumFrameDepth', unless
+    -- @JL4_MAX_FRAME_DEPTH@ set another.
   | DivisionByZero BinOp
   | NotAnInteger BinOp Rational
   | Stuck (NonEmpty Term)
@@ -89,8 +94,38 @@ data UserEvalException =
     -- right operand ran out, or the directive boundary, rewrites it into
     -- 'Stuck' naming the inputs that started the count.
   | UserError Text -- ^ general user-facing error (e.g. missing TIMEZONE declaration)
+  | ValueTooDeep
+    -- ^ An @#ASSERT REFUSED@ of a value that goes deeper than a directive
+    -- reads ('maximumStackSize'): whether it refuses below that depth is not
+    -- known, so the assertion is undecided.
   deriving stock (Generic, Show)
   deriving anyclass NFData
+
+-- | The stable diagnostic code of an exception that stopped a directive. See
+-- 'L4.TypeCheck.Types.checkErrorCode' for what a code promises. No wildcard, so
+-- that a new exception has to be given a code.
+evalExceptionCode :: EvalException -> Text
+evalExceptionCode = \ case
+  InternalEvalException internal -> case internal of
+    RuntimeScopeError {}  -> "eval/internal-error"
+    RuntimeTypeError {}   -> "eval/internal-error"
+    PrematureGC           -> "eval/internal-error"
+    DanglingPointer       -> "eval/internal-error"
+    UnhandledPatternMatch -> "eval/internal-error"
+  UserEvalException user -> case user of
+    BlackholeForced {}           -> "eval/infinite-loop"
+    EqualityOnUnsupportedType {} -> "eval/unsupported-equality"
+    NonExhaustivePatterns {}     -> "eval/non-exhaustive-patterns"
+    StackOverflow _              -> "eval/stack-overflow"
+    DivisionByZero {}            -> "eval/division-by-zero"
+    NotAnInteger {}              -> "eval/not-an-integer"
+    Stuck {}                     -> "eval/stuck"
+    -- rewritten into an undetermined outcome before it is reported, which
+    -- is what eval/stuck reports
+    RanOutOfSteps                -> "eval/stuck"
+    UserError {}                 -> "eval/user-error"
+    ValueTooDeep                 -> "eval/value-too-deep"
+  RefusalException {} -> "eval/refused"
 
 prettyEvalException :: EvalException -> [Text]
 prettyEvalException (InternalEvalException exc) = wrapInternal (prettyInternalEvalException exc)
@@ -156,9 +191,9 @@ prettyUserEvalException = \ case
         <> [ "Add a clause for this case, or end the clauses with one that matches every input." ]
     where
       h = quotedName (MkName emptyAnno g.groupHead)
-  StackOverflow ->
+  StackOverflow depth ->
     [ "Stack overflow: "
-    , "Recursion depth of " <> Text.textShow maximumFrameDepth
+    , "Recursion depth of " <> Text.textShow depth
     , "exceeded." ]
   DivisionByZero op ->
     [ "Division by zero in the operation:"
@@ -187,6 +222,8 @@ prettyUserEvalException = \ case
       <> Text.textShow maximumUnknownSteps <> " steps." ]
   UserError msg ->
     [ msg ]
+  ValueTooDeep ->
+    [ "The value goes deeper than a directive reads, so whether it refuses below that depth is not known." ]
 
 -- | A name a 'Stuck' carries, as its message prints it. An input prints
 -- exactly as it always has, so the one-input message is unchanged.
@@ -214,6 +251,7 @@ maximumStackSize = 200
 -- against runaway recursion. (The historical 200-frame limit was never
 -- actually enforced due to an accounting bug, so legitimate deeply-recursive
 -- programs relied on an effectively unbounded stack; this bound is therefore
--- deliberately generous.)
+-- deliberately generous.) The environment variable @JL4_MAX_FRAME_DEPTH@
+-- sets another, so that a test can reach the limit without a million frames.
 maximumFrameDepth :: Int
 maximumFrameDepth = 1_000_000

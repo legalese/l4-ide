@@ -1,0 +1,26 @@
+IMPORT solution
+
+`eligible` MEANS Applicant WITH
+    `years of continuous residence` IS 5
+    `months physically present`     IS 30
+    `months in the district`        IS 3
+    `resided since applying`        IS TRUE
+    `good moral character`          IS TRUE
+
+`too little presence` MEANS Applicant WITH
+    `years of continuous residence` IS 5
+    `months physically present`     IS 29
+    `months in the district`        IS 3
+    `resided since applying`        IS TRUE
+    `good moral character`          IS TRUE
+
+`no good character` MEANS Applicant WITH
+    `years of continuous residence` IS 9
+    `months physically present`     IS 60
+    `months in the district`        IS 12
+    `resided since applying`        IS TRUE
+    `good moral character`          IS FALSE
+
+#ASSERT `may be naturalized` `eligible` EQUALS TRUE
+#ASSERT `may be naturalized` `too little presence` EQUALS FALSE
+#ASSERT `may be naturalized` `no good character` EQUALS FALSE

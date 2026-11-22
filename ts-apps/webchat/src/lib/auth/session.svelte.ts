@@ -1,7 +1,5 @@
-// Standalone port of legalese.github.io's /console auth flow.
-//
 // Auth is session-token only (no API key). Sign-in goes through the Legalese
-// Cloud AuthKit login with a PKCE challenge (pkce.ts), so it returns with a
+// Cloud login with a PKCE challenge (pkce.ts), so it returns with a
 // short-lived `?code=` — never the session token — which we exchange for the
 // sealed session at POST /auth/exchange. We persist that bearer in
 // localStorage and send it as `Authorization: Bearer …` on every request.
@@ -12,7 +10,7 @@ import { completeLogin, startLogin } from './pkce'
 
 export const SERVICE_DOMAIN = 'legalese.cloud'
 export const AUTH_API_URL = `https://${SERVICE_DOMAIN}`
-// ai-proxy: deployment-scoped chat lives at {AI_API_URL}/{org}/{deployment}/v1/…
+// AI service: deployment-scoped chat lives at {AI_API_URL}/{org}/{deployment}/v1/…
 export const AI_API_URL = 'https://ai.legalese.cloud'
 // Deployment API host: GET {API_BASE}/{org}/{deployment} → { metadata: { description } }
 export const API_BASE = 'https://api.legalese.cloud'
@@ -52,7 +50,7 @@ function readToken(): string | null {
   return localStorage.getItem(SESSION_TOKEN_KEY)
 }
 
-/** Bearer header for any authenticated fetch (ai-proxy + legalese.cloud). */
+/** Bearer header for any authenticated fetch (AI service + legalese.cloud). */
 export function authHeaders(): Record<string, string> {
   const token = readToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
@@ -128,7 +126,7 @@ class AuthStore {
     }
   }
 
-  /** Redirect to the AuthKit login, returning to the current URL with a
+  /** Redirect to the login page, returning to the current URL with a
    *  code afterwards (see init). */
   login(returnTo?: string): void {
     if (typeof window === 'undefined') return

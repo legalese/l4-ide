@@ -4,7 +4,7 @@ File: after-wrong-order.l4
   Range: 15:42-15:47
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
        |
     15 | bad MEANS PARTY Buyer MUST Pay WITHIN 30 AFTER 3

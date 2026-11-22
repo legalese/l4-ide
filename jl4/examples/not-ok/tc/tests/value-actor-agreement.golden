@@ -6,7 +6,7 @@ File: value-actor-agreement.l4
   Range: 20:27-20:34
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/regulative-actor-mismatch
   Message:
     An actor may only perform its own actions.
 
@@ -17,7 +17,7 @@ File: value-actor-agreement.l4
   Range: 27:9-27:16
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/regulative-actor-mismatch
   Message:
     An actor may only perform its own actions.
 

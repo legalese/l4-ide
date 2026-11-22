@@ -1,3 +1,4 @@
+{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -24,11 +25,14 @@ import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>))
 
 import Language.LSP.Protocol.Types
-  ( Diagnostic (..)
+  ( CodeDescription (..)
+  , Diagnostic (..)
   , DiagnosticSeverity (..)
   , Position (..)
   , Range (..)
+  , Uri (..)
   , normalizedFilePathToUri
+  , type (|?) (..)
   )
 
 import L4.EvaluateLazy (resolveEvalConfig)
@@ -75,6 +79,14 @@ withEnv vars act = bracket save restore (const (mapM_ set vars >> act))
 warnings :: [Diagnostic] -> [Diagnostic]
 warnings ds = [ d | d <- ds, d._severity == Just DiagnosticSeverity_Warning ]
 
+-- | The warning's stable code and its link (jl4-lsp/DIAGNOSTIC-CODES.md;
+-- code decided by Claude 2026-11-22, pending Meng's review).
+hasSkippedVariantCode :: Diagnostic -> Expectation
+hasSkippedVariantCode d = do
+  d._code `shouldBe` Just (InR "import/case-variant-skipped")
+  d._codeDescription `shouldBe`
+    Just CodeDescription { _href = Uri "https://legalese.com/l4/reference/errors#import-case-variant-skipped" }
+
 spec :: Spec
 spec = describe "a file passed over because of its capitals, in the editor (#1080)" $ do
   -- Design probe P12.
@@ -91,6 +103,7 @@ spec = describe "a file passed over because of its capitals, in the editor (#108
           , "To use that file, change the IMPORT to `Math`, or rename the file to `math.l4`."
           ]
         d._range `shouldBe` Range (Position 0 0) (Position 0 11)
+        hasSkippedVariantCode d
       other -> expectationFailure ("expected exactly one warning, got " <> show (map (._message) other))
 
   -- Review finding A, as revised by GM (2026-11-21): the file passed over is
@@ -106,6 +119,7 @@ spec = describe "a file passed over because of its capitals, in the editor (#108
           , "If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT. If you meant the standard library's `math`, nothing needs to change."
           ]
         d._range `shouldBe` Range (Position 0 0) (Position 0 11)
+        hasSkippedVariantCode d
       other -> expectationFailure ("expected exactly one warning, got " <> show (map (._message) other))
 
   -- The control: the same import with nothing passed over.

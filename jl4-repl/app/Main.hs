@@ -6,16 +6,21 @@ module Main where
 
 import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.ByteString.Char8 as BS8
 import Data.IORef
 import Data.List (sortOn, isPrefixOf)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text.Encoding
 import qualified Data.Text.IO as Text.IO
 import Data.Time (UTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Options.Applicative
 import System.Console.Haskeline
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory, makeAbsolute)
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
+import System.IO (hFlush, hIsEOF, hIsTerminalDevice, hSetEncoding, stdin, stdout, stderr)
+import System.Info (os)
 import System.FilePath (takeDirectory, takeBaseName)
 import Text.Printf (printf)
 
@@ -85,6 +90,16 @@ data TraceSink = TraceSink
 
 main :: IO ()
 main = do
+  -- UTF-8 everywhere, as `l4` does (jl4/app/Main.hs): on Windows the
+  -- locale encoding is the user's code page, so a trace saved with
+  -- :tracefile lost its header. New handles take the locale encoding; the
+  -- standard handles were opened before `main` and need setting one by one.
+  -- haskeline reads a query and writes a reply in an encoding of its own:
+  -- see `runRepl`.
+  setLocaleEncoding utf8
+  hSetEncoding stdin  utf8
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
   opts <- execParser optionsInfo
   curDir <- getCurrentDirectory
   -- REPL default: enable traces for exploration (TRACE-GRAPHVIZ-ARCHITECTURE.md)
@@ -174,19 +189,45 @@ runRepl replState = do
         { historyFile = Just ".jl4_history"
         , complete = completeFunc replState
         }
-  runInputT settings (loop replState)
+  fromConsole <- hIsTerminalDevice stdin
+  toConsole <- hIsTerminalDevice stdout
+  let write = writer toConsole
+  runInputT settings (loop (reader fromConsole write) (write . (<> "\n")) replState)
   where
-    loop :: ReplState -> InputT IO ()
-    loop st = do
-      minput <- getInputLine "jl4> "
+    -- On Windows haskeline writes to the console in Unicode, but to a pipe
+    -- or a file in the console's code page, whatever the encoding of
+    -- stdout, so a `↯` came out as `?`. There what is not for the console
+    -- goes to stdout, which is UTF-8.
+    writer :: Bool -> String -> InputT IO ()
+    writer toConsole
+      | os == "mingw32", not toConsole = \s -> liftIO (putStr s >> hFlush stdout)
+      | otherwise = outputStr
+    -- It reads a pipe or a file in that code page too, so a `§` came in as
+    -- `┬º`. There a line that is not from the console is read as haskeline
+    -- reads it, its bytes up to the newline after a prompt, and decoded as
+    -- UTF-8, a byte that is not UTF-8 as U+FFFD.
+    reader :: Bool -> (String -> InputT IO ()) -> String -> InputT IO (Maybe String)
+    reader fromConsole write
+      | os == "mingw32", not fromConsole = \prompt -> do
+          liftIO (hFlush stdout)
+          write prompt
+          liftIO $ do
+            eof <- hIsEOF stdin
+            if eof
+              then pure Nothing
+              else Just . Text.unpack . Text.Encoding.decodeUtf8Lenient <$> BS8.hGetLine stdin
+      | otherwise = getInputLine
+    loop :: (String -> InputT IO (Maybe String)) -> (String -> InputT IO ()) -> ReplState -> InputT IO ()
+    loop readInput say st = do
+      minput <- readInput "jl4> "
       case minput of
-        Nothing -> outputStrLn "Goodbye!"
+        Nothing -> say "Goodbye!"
         Just input -> do
           (output, newState, shouldQuit) <- liftIO $ processInput st (Text.pack input)
-          unless (Text.null output) $ outputStrLn (Text.unpack output)
+          unless (Text.null output) $ say (Text.unpack output)
           if shouldQuit
-            then outputStrLn "Goodbye!"
-            else loop newState
+            then say "Goodbye!"
+            else loop readInput say newState
 
 -- | Load a file and trigger type checking
 loadFile :: ReplState -> FilePath -> IO (Either Text ())
@@ -661,14 +702,22 @@ formatResult (MkEvalDirectiveResult _range res _trace _ledger ns _) = (<> pretty
   Assertion Fails            -> "False (assertion failed)"
   Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"
   -- A refusal is not an error: the model declined to answer and said why.
-  Assertion (Refused r)      -> "Refused: " <> r.message
+  Assertion (Refused r)      -> refusedReply r
   Assertion a@(Errored _)    -> "Error: " <> prettyAssertionOutcome a
   -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
   Assertion a@(Undetermined _) -> "Error: " <> prettyAssertionOutcome a
   Reduction (Reduced nf)     -> Print.prettyLayout nf
-  Reduction (ReducedRefused r) -> "Refused: " <> r.message
+  Reduction (ReducedRefused r) -> refusedReply r
   Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
   Reduction o@(ReducedUndetermined _) -> "Error: " <> prettyReductionOutcome o
+
+-- | "Refused: " and the reason, every further line of a reason that runs over
+-- several lines standing under its first.
+refusedReply :: Refusal -> Text
+refusedReply r =
+  prefix <> Text.intercalate ("\n" <> Text.map (const ' ') prefix) (Text.splitOn "\n" r.message)
+  where
+    prefix = "Refused: "
 
 -- | Evaluate an expression and show its GraphViz trace
 evalWithTrace :: ReplState -> FilePath -> Text -> IO Text
@@ -780,11 +829,11 @@ formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger _notes _
         Assertion Holds              -> "Result: True (assertion passed)"
         Assertion Fails              -> "Result: False (assertion failed)"
         Assertion a@(FailsBecause _) -> "Result: False (" <> prettyAssertionOutcome a <> ")"
-        Assertion (Refused r)        -> "Refused: " <> r.message
+        Assertion (Refused r)        -> refusedReply r
         Assertion a@(Errored _)      -> "Error: " <> prettyAssertionOutcome a
         Assertion a@(Undetermined _) -> "Error: " <> prettyAssertionOutcome a
         Reduction (Reduced nf)         -> "Result: " <> Print.prettyLayout nf
-        Reduction (ReducedRefused r)   -> "Refused: " <> r.message
+        Reduction (ReducedRefused r)   -> refusedReply r
         Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
         Reduction o@(ReducedUndetermined _) -> "Error: " <> prettyReductionOutcome o
   in case mtrace of
@@ -900,8 +949,10 @@ getNameInfo st contextFile nameText = do
       in case ce of
         KnownType _kind _params _mty ->
           nText <> " :: TYPE" <> location
+        -- An inferred polymorphic type carries the checker's labels (@z5@);
+        -- show @a@, @b@, … as #CHECK and :type do.
         KnownTerm ty _termKind ->
-          nText <> " :: " <> Print.prettyLayout ty <> location
+          nText <> " :: " <> Print.prettyTypeForDisplay ty <> location
         KnownSection _sec ->
           nText <> " :: SECTION" <> location
         KnownTypeVariable ->
@@ -956,7 +1007,7 @@ listEnvironment st contextFile = do
 
     formatShortInfo _n ce = case ce of
       KnownType _ _ _ -> "TYPE"
-      KnownTerm ty _ -> Print.prettyLayout ty
+      KnownTerm ty _ -> Print.prettyTypeForDisplay ty
       KnownSection _ -> "SECTION"
       KnownTypeVariable -> "TYPE_VAR"
 
@@ -1048,6 +1099,7 @@ helpText = Text.unlines
   , "  <expr>             Evaluate expression (implicit #EVAL)"
   , "  #EVAL <expr>       Evaluate expression and show result"
   , "  #ASSERT <expr>     Evaluate boolean expression, report pass/fail"
+  , "  #ASSERT REFUSED <expr> [BECAUSE \"reason\"]   Pass if the expression refuses (with that reason, if named)"
   , "  #EVALTRACE <expr>  Evaluate with trace output"
   , ""
   , "Trace visualization:"

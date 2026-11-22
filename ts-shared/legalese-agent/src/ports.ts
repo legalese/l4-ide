@@ -40,11 +40,12 @@ export interface Logger {
 // ── AuthProvider ──────────────────────────────────────────────────────
 
 export interface AuthProvider {
-  /** Headers attached to every ai-proxy request. Return `{}` when no
-   *  credential is available; the client then fails fast with
-   *  `unauthenticated` (or stamps a dev token in local mode). Extra
-   *  headers (e.g. `X-Legalese-Session`) may ride along. */
-  getAiAuthHeaders(): Promise<Record<string, string>>
+  /** Headers attached to an AI service request to `url`. Return `{}`
+   *  when no credential is available, or none may go to `url`; the
+   *  client then fails fast with `unauthenticated` (or stamps a dev
+   *  token in local mode). Extra headers (e.g. `X-Legalese-Session`)
+   *  may ride along. */
+  getAiAuthHeaders(url: string): Promise<Record<string, string>>
   /** The user's jl4-service URL, surfaced to the model in the first-turn
    *  `<session-context>` message. Empty/undefined when not signed in. */
   getEffectiveServiceUrl(): string | undefined
@@ -54,7 +55,8 @@ export interface AuthProvider {
 
 /** A tool-supplied path resolved against the workspace. */
 export interface ResolvedPath {
-  /** Display path, relative to the preferred workspace root. */
+  /** Path relative to the preferred workspace root (`.` for the root
+   *  itself), which a tool call can use as it stands. */
   relative: string
   /** URI string for this file, in the format the language server uses. */
   uri: string
@@ -65,6 +67,8 @@ export interface ResolvedPath {
 export interface WorkspaceStat {
   isDirectory: boolean
   isFile: boolean
+  /** Bytes, where known. */
+  size?: number
 }
 
 export interface WorkspaceDirEntry {
@@ -120,6 +124,27 @@ export interface Workspace {
   /** Delete a file. VS Code moves it to the Trash (`'trashed'`); a
    *  headless host removes it (`'deleted'`). */
   deleteFile(target: ResolvedPath): Promise<'trashed' | 'deleted'>
+  /**
+   * Whether two existing paths are one file on disk (a case-insensitive
+   * file system, other Unicode normalisation, a symlink or hard link).
+   * A host where only equal paths can be (case-sensitive, no symlinks
+   * followed) may leave it out.
+   */
+  sameFile?(a: string, b: string): Promise<boolean>
+  /**
+   * The folders a search of the whole workspace walks, for a host with
+   * more than `resolvePath('.')`: VS Code can have several loaded.
+   */
+  searchRoots?(): ResolvedPath[]
+  /** Whether a search passes over this path, for a host that keeps
+   *  something there that isn't the user's work. */
+  hiddenFromSearch?(fsPath: string): boolean
+  /**
+   * Whether a write to `target` must be confirmed by the user, whatever
+   * the category settings say (see `isSensitivePath`). A host whose
+   * layout already keeps the model away from such files leaves it out.
+   */
+  requiresWriteApproval?(target: ResolvedPath): boolean
 }
 
 // ── L4Language ────────────────────────────────────────────────────────
@@ -133,6 +158,17 @@ export interface L4Diagnostic {
   message: string
   source?: string
   code?: string
+}
+
+/** A file's diagnostics, and how far they can be trusted. */
+export interface CheckedDiagnostics {
+  diagnostics: L4Diagnostic[]
+  /** The check of the latest text didn't finish in time, so `diagnostics`
+   *  may describe an older version. Never read this as clean. */
+  pending: boolean
+  /** The server confirmed this check finished, so directive results for it
+   *  have already arrived. Unset for a server without that signal. */
+  confirmed?: boolean
 }
 
 /** One row of the jl4-lsp `l4/directiveResultsUpdated` payload. */
@@ -172,6 +208,13 @@ export interface L4Language {
   /** Current diagnostics for `uri`, after giving a fresh open a moment
    *  to settle. */
   getDiagnostics(uri: string): Promise<L4Diagnostic[]>
+  /** Diagnostics for the text the file has now: waits for that version's
+   *  check to finish, or reports `pending` if it takes too long. */
+  getCheckedDiagnostics(uri: string): Promise<CheckedDiagnostics>
+  /** Compile errors per open file, by URI, as last reported. Lets an edit's
+   *  effect on files that import it be seen. Optional: a host that can't
+   *  tell just doesn't report them. */
+  fileErrorCounts?(): Map<string, number>
   /** Latest `l4/directiveResultsUpdated` rows for `uri`, if any. */
   getDirectiveResults(uri: string): DirectiveResultRow[] | undefined
   /** Resolve on the next directive push for `uri`, or after the timeout. */
@@ -289,13 +332,22 @@ export interface ConversationStore {
     deploymentId?: string,
     apiBaseUrl?: string
   ): Promise<AiConversation>
-  setTitle(id: string, title: string): Promise<void>
+  /** Change a stored conversation, if it exists, with nothing else
+   *  writing it meanwhile. */
+  update(id: string, change: (conv: AiConversation) => void): Promise<void>
+  /** Set the title; with `replacing`, only while the title is still
+   *  that (an automatic title doesn't overwrite one the user chose). */
+  setTitle(
+    id: string,
+    title: string,
+    opts?: { replacing?: string }
+  ): Promise<void>
 }
 
 // ── Extra tool sources (MCP) ──────────────────────────────────────────
 
 /** A client-declared tool in the OpenAI function-tool shape. */
-export interface AiProxyTool {
+export interface AiTool {
   type: 'function'
   function: {
     name: string
@@ -312,8 +364,15 @@ export interface AiProxyTool {
 export interface ToolProvider {
   /** Tool-name prefix routed to this provider, e.g. `l4-rules__`. */
   readonly prefix: string
-  listTools(): Promise<AiProxyTool[]> | AiProxyTool[]
+  listTools(): Promise<AiTool[]> | AiTool[]
   callTool(name: string, argsJson: string): Promise<string>
-  /** `(deployId, fnName)` for deployed-rule tools, for display. */
-  getToolTarget?(name: string): { deployId: string; fnName: string } | null
+  /** `(deployId, fnName)` for deployed-rule tools, for display. A generic
+   *  tool like `evaluate` names its rule in `argsJson`. */
+  getToolTarget?(
+    name: string,
+    argsJson?: string
+  ): { deployId: string; fnName: string } | null
+  /** Text for the first turn that tells the model what this provider can
+   *  reach when it doesn't advertise everything as a tool. */
+  promptIndex?(): Promise<string | null>
 }

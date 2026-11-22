@@ -6,7 +6,7 @@ File: section-given-ambiguous-supply.l4
   Range: 24:16-24:19
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-implicit-supply
   Message:
     This call supplies
 

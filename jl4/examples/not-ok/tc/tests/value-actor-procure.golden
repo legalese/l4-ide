@@ -6,7 +6,7 @@ File: value-actor-procure.l4
   Range: 30:29-30:30
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/regulative-actor-mismatch
   Message:
     An actor may only perform its own actions.
 
@@ -17,7 +17,7 @@ File: value-actor-procure.l4
   Range: 33:29-33:30
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/regulative-actor-mismatch
   Message:
     An actor may only perform its own actions.
 

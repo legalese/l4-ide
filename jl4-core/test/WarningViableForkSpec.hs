@@ -403,6 +403,35 @@ spec = describe "A success that carries only a warning" $ do
     it "is reported ambiguous when both readings agree with the party" $ do
       diagnosticKinds (actionSourceWith "Eater" "Eater" ["act MEANS thing"]) `shouldReturn` ["ambiguous thing"]
 
+  describe "a name with two meanings in the argument of a name with two meanings" $ do
+    -- The CONSIDER over @thing@ is merged into one plural outcome, and it is
+    -- the only viable outcome of the call of @f@ ('forkWithLazyFallback').
+    -- Read as one success, the fork drops its fallback, and with it the
+    -- report that names @f@; read as the two it stands for, the report is
+    -- what it was before the merge.
+    forM_ meanings \ (label, m) -> describe label do
+      it "is reported as it was, with the fallback of the call kept" $ do
+        (kinds, _) <- checkedWithin 1 (forkArgSource m)
+        sort kinds `shouldBe` sort (forkArgKinds m)
+
+  describe "a name with two meanings before a WHERE constant" $ do
+    -- The WHERE constant's declaration is checked under a prune of its own,
+    -- inside the path of the operand before it. That prune counts its own
+    -- outcomes only: read with the merged operand's flag, its one outcome
+    -- was two, an ambiguity, the path died, and the module took the reading
+    -- that was left ('L4.TypeCheck.Types.fromEntry').
+    it "is reported in the argument of an overloaded call, as main reports it" $ do
+      kinds <- fst <$> checkedWithin 1 (whereAfterSource sizeOperand)
+      sort kinds `shouldBe` sort ["ambiguous size", "ambiguous thing"]
+
+    it "is reported in both branches of an IF, as main reports it" $ do
+      kinds <- fst <$> checkedWithin 1 ifThenWhereSource
+      sort kinds `shouldBe` sort ["ambiguous thing", "ambiguous thing"]
+
+    it "is reported the same with a plain operand in place of the WHERE (the control)" $ do
+      kinds <- fst <$> checkedWithin 1 (Text.replace "(z WHERE z MEANS 5)" "5" (whereAfterSource sizeOperand))
+      sort kinds `shouldBe` sort ["ambiguous size", "ambiguous thing"]
+
   describe "the growth guard" $ do
     -- The controls for the guards above: the one that is made to look at a
     -- cost that doubles with each step still fails it, and one whose clock
@@ -649,6 +678,87 @@ expectedKinds :: Meanings -> Int -> [Text]
 expectedKinds m k = concat (replicate k (warning <> ["ambiguous thing"]))
   where
     warning = if m == BothClean then [] else ["missing warning"]
+
+-- | @thing@ as in 'forkSource', and @f@ defined at NUMBER and at STRING,
+-- called on one CONSIDER over @thing@.
+forkArgSource :: Meanings -> Text
+forkArgSource m =
+  Text.unlines $
+    forkHeader m
+      <> [ "GIVEN n IS A NUMBER"
+         , "GIVETH A NUMBER"
+         , "DECIDE f n IS n"
+         , ""
+         , "GIVEN s IS A STRING"
+         , "GIVETH A NUMBER"
+         , "DECIDE f s IS 0"
+         , ""
+         , "GIVETH A NUMBER"
+         , "DECIDE score IS f " <> arm m 1
+         ]
+
+-- | What 'forkArgSource' is reported with, as main reports it without the
+-- merge (the port of #169 alone, d4102165d).
+forkArgKinds :: Meanings -> [Text]
+forkArgKinds m =
+  ["ambiguous f"] <> (if m == BothClean then [] else ["missing warning"]) <> ["ambiguous thing"]
+
+-- | @thing@ at Colour and at Light, @size@ at Colour and at every type, and
+-- a rule that adds @size thing@ to a WHERE constant (the refuter's c3).
+whereAfterSource :: Text -> Text
+whereAfterSource operand =
+  Text.unlines
+    [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+    , "DECLARE Light IS ONE OF Red, Green"
+    , ""
+    , "GIVETH A Colour"
+    , "DECIDE thing IS Blue"
+    , ""
+    , "GIVETH A Light"
+    , "DECIDE thing IS Green"
+    , ""
+    , "GIVEN x IS A Colour"
+    , "GIVETH A NUMBER"
+    , "DECIDE size x IS 2"
+    , ""
+    , "GIVEN a IS A TYPE"
+    , "      x IS AN a"
+    , "GIVETH A NUMBER"
+    , "DECIDE size x IS 1"
+    , ""
+    , "GIVETH A NUMBER"
+    , "DECIDE score IS " <> operand <> " PLUS (z WHERE z MEANS 5)"
+    ]
+
+sizeOperand :: Text
+sizeOperand = "(size thing)"
+
+-- | @thing@ twice at Colour and once at Light, read in both branches of an
+-- IF passed to a polymorphic function with a WHERE constant as its second
+-- argument (the refuter's c2).
+ifThenWhereSource :: Text
+ifThenWhereSource =
+  Text.unlines
+    [ "DECLARE Colour IS ONE OF Red, Green, Blue"
+    , "DECLARE Light IS ONE OF Red, Green"
+    , ""
+    , "GIVETH A Colour"
+    , "DECIDE thing IS Blue"
+    , ""
+    , "GIVETH A Colour"
+    , "DECIDE thing IS Red"
+    , ""
+    , "GIVETH A Light"
+    , "DECIDE thing IS Green"
+    , ""
+    , "GIVEN a IS A TYPE"
+    , "      x IS AN a"
+    , "      y IS A NUMBER"
+    , "GIVETH AN a"
+    , "DECIDE first2 x y IS x"
+    , ""
+    , "DECIDE score IS first2 (IF TRUE THEN thing ELSE thing) (z WHERE z MEANS 5)"
+    ]
 
 -- | The kinds of the diagnostics of a program.
 diagnosticKinds :: Text -> IO [Text]

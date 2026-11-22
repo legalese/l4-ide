@@ -264,8 +264,8 @@ To use that file, change the IMPORT to `Math`, or rename the file to `math.l4`.
 
 In the editor the same text is also a warning on the `IMPORT` line, in the list of problems, so you see it without opening the language server's log.
 `l4 check` and `l4 run` print that warning too, after the log line, as they print every other warning.
-They print the file's list of warnings and errors again each time it changes, so the same warning can appear more than once; it is still one problem.
-`l4 check --json` carries it the same way: in the log line's entry of `diagnostics`, and in each entry that lists the file's warnings.
+So the same warning appears twice, once as the log line and once in the file's list of warnings and errors; it is still one problem.
+`l4 check --json` carries it the same way: in the log line's entry of `diagnostics`, and in the entry that lists the file's warnings and errors.
 
 The reason and the fix depend on how the file's name differs:
 

@@ -1,0 +1,11 @@
+-- `exp` in the math library is `EXPONENT EULER x`, so it inherits the error when
+-- the result is too large. Its result is a plain NUMBER, not a MAYBE.
+-- The digits of e to the power 709 come from the platform's floating-point
+-- library and differ between platforms, so this file checks that the answer
+-- lies between two powers of 2, both exact on every platform, and never
+-- prints it.
+
+IMPORT math
+
+#EVAL exp 709 > EXPONENT 2 1022 AND exp 709 < EXPONENT 2 1023
+#EVAL exp 710

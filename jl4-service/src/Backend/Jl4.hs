@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module Backend.Jl4 (createFunction, createRunFunctionFromCompiled, getFunctionDefinition, buildFunDecide, ModuleContext, CompiledModule(..), SharedModuleContext(..), precompileModule, buildSharedContext, buildCompiledFromShared, evaluateWithCompiled, evaluateWithCompiledDeontic, typecheckModule, buildImportEnvironment, typecheckAndEvalBundle, emptyEvalEnvironment) where
+module Backend.Jl4 (createFunction, createRunFunctionFromCompiled, getFunctionDefinition, buildFunDecide, ModuleContext, CompiledModule(..), SharedModuleContext(..), precompileModule, buildSharedContext, buildCompiledFromShared, evaluateWithCompiled, evaluateWithCompiledDeontic, typecheckModule, buildImportEnvironment, typecheckAndEvalBundle, emptyEvalEnvironment, requiresWrapperEvaluation) where
 
 import Base hiding (trace)
 import qualified Base.DList as DList
@@ -22,6 +22,7 @@ import qualified L4.Print as Print
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo, Environment)
+import L4.TypeCheck.Unify (synonymExpansionFuel)
 import L4.Utils.Ratio
 import qualified LSP.Core.Shake as Shake
 import Control.Exception (throwIO)
@@ -36,6 +37,7 @@ import Optics ((^.), (%))
 
 import Language.LSP.Protocol.Types (Diagnostic (..), DiagnosticSeverity (..), normalizedFilePathToUri, toNormalizedFilePath)
 import System.FilePath ((<.>), takeExtension, takeFileName)
+import Data.Char (isSpace)
 import qualified Data.Map.Strict as StrictMap
 import qualified Data.Set as Set
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
@@ -489,7 +491,7 @@ stripList _ = Nothing
 -- expanded when every parameter is given. The JSON decoder does the same
 -- ('L4.EvaluateLazy.Machine.expandTypeSynonyms').
 expandSyn :: ModuleInfo -> Type' Resolved -> Type' Resolved
-expandSyn mi = go (16 :: Int)
+expandSyn mi = go synonymExpansionFuel
   where
     go 0 ty = ty
     go n ty@(TyApp _ name args)
@@ -1329,12 +1331,19 @@ filterIdeDirectivesText = Text.unlines . filterLines . Text.lines
       | lineIndentation line > baseIndent = True  -- More indented = continuation
       | otherwise = False
 
-    -- Get the indentation (number of leading spaces/tabs) of a line
+    -- The width of a line's indentation, in columns, counted as the lexer and
+    -- the parser count them. Whitespace is every character 'isSpace' accepts,
+    -- as it is to the lexer: a non-breaking space and a form feed are
+    -- whitespace, and so a line that holds nothing else, the "\r" of a blank
+    -- line in a CRLF file among them, is blank. A tab brings the width to the
+    -- next multiple of eight, and every other whitespace character adds one
+    -- column. So this filter and the parser agree on whether a line is
+    -- indented further than a directive.
     lineIndentation :: Text -> Int
-    lineIndentation = Text.length . Text.takeWhile isSpace
-
-    isSpace :: Char -> Bool
-    isSpace c = c == ' ' || c == '\t'
+    lineIndentation = Text.foldl' advance 0 . Text.takeWhile isSpace
+      where
+        advance width '\t' = width + 8 - width `mod` 8
+        advance width _    = width + 1
 
 -- | Convert FnLiteral parameters to Aeson.Value
 -- Missing parameters (Nothing) become FnUnknown -> Aeson.Null for partial evaluation

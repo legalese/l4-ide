@@ -1,6 +1,6 @@
 IMPORT prelude
 
--- Validation fixture for auth proxy integration tests.
+-- Validation fixture for integration tests.
 -- Tests deploy, evaluate, and permission flows.
 
 -- ==================================================================

@@ -394,6 +394,32 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
           ])
         `shouldReturn` [((6, 3), "branch")]
 
+    -- A @REFUSE@ is an expression like any other, and takes the ref above it.
+    it "is a REFUSE, when the ref sits above it" $ do
+      refPlacements
+        (Text.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE f n IS"
+          , "  @ref https://example.com/refusal"
+          , "  REFUSE \"not modelled\""
+          ])
+        `shouldReturn` [((5, 3), "refusal")]
+
+    it "is a REFUSE in a branch, when the ref sits above it" $ do
+      refPlacements
+        (Text.unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "DECIDE f n IS"
+          , "  IF n AT LEAST 18"
+          , "  THEN 1"
+          , "  ELSE"
+          , "    @ref https://example.com/refusal"
+          , "    REFUSE \"not modelled\""
+          ])
+        `shouldReturn` [((8, 5), "refusal")]
+
   -- A group of clauses is compiled to one definition: a CONSIDER on the first
   -- clause, and a local definition, with a range of its own, that holds the
   -- clauses after it and is written after the first clause's body. A ref
@@ -426,10 +452,9 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
   -- alone, so a backslash consumed on the ref path would be kept for ever and
   -- the pre-escape text would stop being writable.
   --
-  -- Both cases below pass on `unstable` and both were broken, briefly, by a
-  -- first cut of the `\%`/`\]` escape that let `refAnnotation` share the
-  -- escaping body. Neither had a witness anywhere in the corpus or the specs,
-  -- which is why they are here.
+  -- Both cases below were broken, briefly, by a first cut of the `\%`/`\]`
+  -- escape that let `refAnnotation` share the escaping body. Neither had a
+  -- witness anywhere in the corpus or the specs, which is why they are here.
   -- An inline @ref attaches to the node that FOLLOWS it, so these put the
   -- annotation above the body rather than after it; trailing it would leave it
   -- unattached and the assertion would be about nothing.
