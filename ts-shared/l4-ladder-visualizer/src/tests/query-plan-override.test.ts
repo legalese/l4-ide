@@ -23,6 +23,8 @@ const adult = { unique: 1, atomId: 'atom-adult', label: 'adult' }
 
 const plan: QueryPlanResponse = {
   determined: null,
+  // still asking: an undetermined plan's verdict, as decision-query.ts gives it
+  verdict: 'Undetermined',
   stillNeeded: [adult],
   ranked: [adult],
   inputs: [],
