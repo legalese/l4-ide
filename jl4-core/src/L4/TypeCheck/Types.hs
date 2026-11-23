@@ -265,6 +265,14 @@ data CheckError =
     --
     -- Arguments: the name as written in the pattern, and the referent's
     -- defining name (whose range is the definition site).
+  | FractionalTraceStamp Rational (Maybe SrcRange)
+    -- ^ A @#TRACE@'s start, or the time stamp of one of its events (@AT@ or
+    -- @WAITUNTIL@), is a literal that is not a whole number. A notice, never
+    -- an error: the evaluator uses the stamp as written, and the notice is
+    -- only to say what @l4 explore@ will not do with it, which is try
+    -- instants between whole ones. Severity 'SInfo'.
+    --
+    -- Arguments: the stamp, and where it is written.
   | ActionPatternNotComparable (Expr Name) (Type' Resolved)
     -- ^ An argument slot of a regulative action pins a value of a __function__
     -- type — @MUST apply g@ under @GIVEN g IS A FUNCTION FROM NUMBER TO
@@ -859,6 +867,7 @@ severity (MkCheckErrorWithContext e _) =
     SuspiciousClausePattern {} -> SInfo
     ActionPatternReference {}  -> SInfo
     EndsBecauseNoted {}        -> SInfo
+    FractionalTraceStamp {}    -> SInfo
     _                          -> SError
 
 -- | The answers to @#CHECK@ directives among a module's diagnostics.
@@ -963,6 +972,7 @@ checkErrorCode = \ case
   ExportAssumeArityInput {}       -> "check/export-assume-arity-input"
   ExportAssumeNameClash {}        -> "check/export-assume-name-clash"
   ActionPatternReference {}       -> "lint/action-pattern-reference"
+  FractionalTraceStamp {}         -> "lint/fractional-trace-stamp"
   ActionPatternNotComparable {}   -> "check/action-pattern-not-comparable"
   JoinWithoutEvery {}             -> "check/join-without-every"
   EmptyBreachBy {}                -> "check/empty-breach-by"
@@ -1122,6 +1132,7 @@ instance HasSrcRange CheckError where
   rangeOf (WhoseNotAField n _ _)            = rangeOf n
   rangeOf (WhoseOperandNotBare e)           = rangeOf e
   rangeOf (ActionPatternReference n _)      = rangeOf n
+  rangeOf (FractionalTraceStamp _ r)        = r
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
   rangeOf (AnchorUnavailable _ a _)         = rangeOf a
   rangeOf (LifecycleUnavailable _ e _)      = rangeOf e

@@ -105,6 +105,7 @@ import L4.Names
 import L4.Parser.ResolveAnnotation (pickDesc)
 import L4.Parser.SrcSpan (inRange, prettySrcRange, prettySrcRangeM, SrcPos (..), SrcRange (..), zeroSrcPos)
 import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
+import Data.Ratio (denominator)
 import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
 import L4.TypeCheck.Annotation
@@ -1307,6 +1308,17 @@ assumeReplacementLine dHead declaredType mTypically = \ case
       Forall _ _ t'  -> mentionsOwnTypeVariable t'
       InfVar {}      -> False
 
+-- | The literal time stamp a @#TRACE@'s start or event carries, when it is not
+-- a whole number: the @AT@ of the trace, the @AT@ of @PARTY p DOES a AT t@, or
+-- the argument of @WAITUNTIL t@. Anything that is not a literal is left alone:
+-- it has no value to read until it is evaluated.
+fractionalTraceStamp :: Expr Resolved -> Maybe (Rational, Maybe SrcRange)
+fractionalTraceStamp = \ case
+  lit@(Lit _ (NumericLit _ r)) | denominator r /= 1 -> Just (r, rangeOf lit)
+  Event _ (MkEvent _ _ _ at _) -> fractionalTraceStamp at
+  App _ f [at] | getUnique f == waitUntilUnique -> fractionalTraceStamp at
+  _ -> Nothing
+
 inferDirective :: Directive Name -> Check (Directive Resolved)
 inferDirective (LazyEval ann e) = errorContext (WhileCheckingExpression e) do
   (re, _) <- prune $ inferExpr e
@@ -1326,6 +1338,10 @@ inferDirective (Contract ann e t evs) = errorContext (WhileCheckingExpression e)
   re <- prune $ checkExpr ExpectRegulativeContractContext e contractT
   rt <- prune $ checkExpr ExpectRegulativeTimestampContext t number
   revs <- traverse (prune . flip (checkExpr ExpectRegulativeEventContext) eventT) evs
+  -- a stamp that is not a whole number is used as written; what is worth
+  -- saying is what @l4 explore@ will not do with it
+  for_ (mapMaybe fractionalTraceStamp (rt : revs)) \ (stamp, range) ->
+    addError (FractionalTraceStamp stamp range)
   pure (Contract ann re rt revs)
 inferDirective (AssertRefused ann e mmsg) = errorContext (WhileCheckingExpression e) do
   -- NOT checked against BOOLEAN: the asserted expression is expected to refuse,
@@ -8625,6 +8641,11 @@ prettyCheckError (ExportAssumeNameClash fnName paramName) =
       <> " with the same name as an ASSUME it reads."
   , "Both would be one input field, so a request could not supply them separately."
   , "Rename the input or the ASSUME."
+  ]
+prettyCheckError (FractionalTraceStamp stamp _) =
+  [ "This #TRACE has a time stamp of " <> prettyRatio stamp <> ", which is not a whole number."
+  , "`l4 run` uses it as written."
+  , "`l4 explore` tries whole instants only, so it does not explore the positions between them."
   ]
 prettyCheckError (ActionPatternReference n referent) =
   -- Wording ruled by Meng 2026-09-16 (PATTERN-REFERENCE-RULE-SPEC §4 R5): the fact,

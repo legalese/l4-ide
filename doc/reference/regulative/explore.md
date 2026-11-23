@@ -38,6 +38,12 @@ A start that is neither a number nor a date is refused with exit 1 and says so.
 (One exploration is made for each distinct contract and starting day among the file's traces.
 To explore a rule no trace names, give `--contract NAME`, with `--at T` for the day it starts, 0 if left out.)
 
+`l4 explore` tries whole instants only: a day is 3 or 4, never 3.8, and the positions between two whole days are not among the ones it explores.
+A `#TRACE` can still write a time stamp that is not a whole number, and `l4 run` uses it as written.
+So that this is not a surprise, `l4 run` and `l4 check` print a note (code `lint/fractional-trace-stamp`, severity Information) on each such stamp: in a `WAITUNTIL`, in the `AT` of an act, or in the start of the trace.
+It is a note and not an error: nothing is refused and the exit status is not changed.
+A stamp that is not a literal number, such as `WAITUNTIL (7 / 2)`, has no value until it is evaluated and gets no note.
+
 What comes back, abridged at the residuals (the contract as it stands in each state, which the next section explains):
 
 ```text

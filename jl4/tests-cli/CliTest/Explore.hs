@@ -180,6 +180,22 @@ statePath phrases out = do
 
 spec :: FilePath -> Spec
 spec bin = describe "l4 explore" $ do
+  -- a time stamp that is not a whole number is used as written; the note says
+  -- what `l4 explore` will not do with it
+  describe "a time stamp in a #TRACE that is not a whole number" $ do
+    it "breach-clocks.l4: `l4 run` and `l4 check` print a note, once for each such stamp, and the exit status is the same" $
+      forM_ ["run", "check"] \ verb -> do
+        Output code _ serr <- runL4 bin [verb, "examples" </> "ok" </> "breach-clocks.l4"]
+        code `shouldBe` ExitSuccess
+        length (filter ("lint/fractional-trace-stamp" `isInfixOf`) (lines serr)) `shouldBe` 2
+        serr `shouldSatisfy` ("`l4 explore` tries whole instants only" `isInfixOf`)
+        serr `shouldSatisfy` ("DiagnosticSeverity_Information" `isInfixOf`)
+
+    it "must-example.l4: whole stamps get no note" $ do
+      Output code _ serr <- runL4 bin ["run", ".." </> "doc" </> "reference" </> "regulative" </> "must-example.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` (not . ("fractional-trace-stamp" `isInfixOf`))
+
   it "explores D1 to the probes' 12 states and 21 transitions, ends with the coverage line, and exits 0" $ do
     Output code sout _ <- runL4 bin (["explore", brief </> "d1-naive.l4"] <> acceptance)
     code `shouldBe` ExitSuccess
