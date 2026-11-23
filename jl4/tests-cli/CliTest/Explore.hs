@@ -28,6 +28,9 @@ brief = "examples" </> "explore" </> "brief"
 instants :: FilePath
 instants = "tests-cli" </> "fixtures" </> "explore-instants"
 
+startFixtures :: FilePath
+startFixtures = "tests-cli" </> "fixtures" </> "explore-start"
+
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
@@ -575,6 +578,34 @@ spec bin = describe "l4 explore" $ do
       let ls = map (filter (/= '\r')) (lines sout)
       ls `shouldSatisfy` any ("nothing happens by 3 (the clock reaches 4) \8594 P is in breach" `isInfixOf`)
       ls `shouldSatisfy` all (not . ("3.5" `isInfixOf`))
+
+  -- the explorer's X2: the clock an exploration starts at
+  describe "the clock an exploration starts at (X2)" $ do
+    it "negstart.l4: a start of -5 is the clock, so an act at -5 is in time and the tick past the deadline is at -1" $ do
+      Output code sout _ <- runL4 bin ["explore", startFixtures </> "negstart.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("explored from its outset at -5" `isInfixOf`)
+      sout `shouldSatisfy` ("PARTY P DOES a AT -5" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("AT 0" `isInfixOf`))
+      sout `shouldSatisfy` ("WAITUNTIL OF -1" `isInfixOf`)
+
+    it "nonliteral.l4: a start that is not a literal is read: AT (10 + 5) is 15, and the tick is at 19" $ do
+      Output code sout _ <- runL4 bin ["explore", startFixtures </> "nonliteral.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("PARTY P DOES a AT 15" `isInfixOf`)
+      sout `shouldSatisfy` (not . ("AT 0" `isInfixOf`))
+      sout `shouldSatisfy` ("WAITUNTIL OF 19" `isInfixOf`)
+
+    it "unreadable.l4: a start that has no value is refused (exit 1), not taken for 0" $ do
+      Output code sout serr <- runL4 bin ["explore", startFixtures </> "unreadable.l4"]
+      code `shouldBe` ExitFailure 1
+      (sout <> serr) `shouldSatisfy` ("is neither a number nor a date the explorer can read" `isInfixOf`)
+
+    it "frac-neg.l4: below 0 a state reached again still names its fraction once, whatever its sign" $ do
+      Output code sout _ <- runL4 bin ["explore", startFixtures </> "frac-neg.l4"]
+      code `shouldBe` ExitFailure 2
+      let occurrences needle hay = length [ () | i <- [0 .. length hay - length needle], needle `isPrefixOf` drop i hay ]
+      occurrences "PARTY B DOES b at instants that are not whole numbers" (lastLine sout) `shouldBe` 1
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"

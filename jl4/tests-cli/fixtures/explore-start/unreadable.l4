@@ -1,0 +1,12 @@
+IMPORT prelude
+
+-- The explorer's X2: a start the explorer cannot read as a number or a date
+-- (here `1 / 0`, which has no value) is refused, not taken for 0.
+
+DECLARE Person IS ONE OF P
+DECLARE Action IS ONE OF a
+
+GIVETH A DEONTIC Person Action
+unreadable MEANS PARTY P MUST a WITHIN 3 HENCE FULFILLED LEST BREACH BY P
+
+#TRACE unreadable AT (1 / 0) WITH

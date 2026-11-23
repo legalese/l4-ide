@@ -145,6 +145,7 @@ import Control.Exception (handle, throwIO)
 import L4.Annotation (emptyAnno, getAnno)
 import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..), Provenance (..))
 import L4.Evaluate.ValueLazy hiding (Blame)
+import L4.EvaluateLazy.Machine (anchorInstant)
 import L4.EvaluateLazy
   ( EntityInfo
   , EvalDirectiveResult (..)
@@ -173,14 +174,24 @@ data Start = MkStart
     -- ^ the contract as written, for the reader
   , stContract :: !(Expr Resolved)
   , stAt       :: !(Expr Resolved)
+    -- ^ the @AT@ as written, for the reader
+  , stClock    :: !(Maybe Rational)
+    -- ^ the clock it is, once read ('explore' reads it): the replay is handed
+    -- this as a literal, so a start below 0, or one that is an expression
+    -- (@AT (10 + 5)@, @AT (DATE_SERIAL ...)@), is where the clock begins
   }
+
+-- | What the replay is told the start is: the clock when it is read, else the
+-- @AT@ as written.
+startExpr :: Start -> Expr Resolved
+startExpr s = maybe s.stAt (Lit emptyAnno . NumericLit emptyAnno) s.stClock
 
 -- | One start per distinct contract and @AT@ among the module's @#TRACE@s,
 -- in source order. The traces' events are not replayed: from the outset
 -- they are one path among those the exploration walks.
 startsOf :: Module Resolved -> [Start]
 startsOf m = nubOrdOn (\ s -> (s.stName, prettyLayout s.stAt))
-  [ MkStart {stName = prettyLayout tr.trContract, stContract = tr.trContract, stAt = tr.trStart}
+  [ MkStart {stName = prettyLayout tr.trContract, stContract = tr.trContract, stAt = tr.trStart, stClock = Nothing}
   | tr <- tracesOf m ]
 
 -- | A top-level rule with no inputs, at this @AT@. Unlike
@@ -194,6 +205,7 @@ startNamed (MkModule _ _ section) wanted at =
       { stName = wanted
       , stContract = Var emptyAnno (Ref n u n)
       , stAt = Lit emptyAnno (NumericLit emptyAnno at)
+      , stClock = Just at
       }
 
 -- | Every @DECIDE@ in a section and the sections under it.
@@ -656,11 +668,11 @@ data ActRecord = MkActRecord
 -- | The rig and trace that replay this path.
 rigFor :: Explorer -> [Expr Resolved] -> (Rig, Trace)
 rigFor ex events =
-  let directive = Contract emptyAnno ex.exStart.stContract ex.exStart.stAt events
+  let directive = Contract emptyAnno ex.exStart.stContract (startExpr ex.exStart) events
       MkModule a uri (MkSection sa sn saka sg decls) = ex.exRig.rigModule
       m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))
   in ( ex.exRig {rigModule = m'}
-     , MkTrace {trDirective = directive, trContract = ex.exStart.stContract, trStart = ex.exStart.stAt, trEvents = events} )
+     , MkTrace {trDirective = directive, trContract = ex.exStart.stContract, trStart = startExpr ex.exStart, trEvents = events} )
 
 -- | A module with no directives: the explorer adds the one it replays.
 withoutDirectives :: Module Resolved -> Module Resolved
@@ -932,6 +944,33 @@ evalNumber ex e = do
       | Reduction (ReducedErrored exc) <- res.result, isLimitStop exc ->
           throwIO (LimitStopped ("working out a deadline's anchor: " <> Text.unwords (prettyEvalException exc)))
     _ -> pure Nothing
+
+-- | One @#EVAL@ of a closed expression in the module, read as an instant: a
+-- NUMBER as it is, a DATE by its serial (as the machine lowers an anchor).
+evalInstantIn :: Rig -> Expr Resolved -> IO (Maybe Rational)
+evalInstantIn rig e = do
+  let MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
+      m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno (LazyEval emptyAnno e)]))
+  (_, results) <- execEvalModuleWithDeonticLog rig.rigConfig rig.rigEntityInfo rig.rigEnv m'
+  pure case results of
+    ((res, _) : _) | Reduction (Reduced (MkNF v)) <- res.result -> case v of
+      ValNumber r -> Just r
+      ValDate d   -> either (const Nothing) Just (anchorInstant (ValDate d))
+      _           -> Nothing
+    _ -> Nothing
+
+-- | The start with its clock read. A literal @AT@ is its own clock; any
+-- other is evaluated once, here, so that the replay is handed a number. A start
+-- that is neither a number nor a date is refused: the explorer would otherwise
+-- take it for 0 and explore a contract that had not begun where it says it did.
+resolveStart :: Rig -> Start -> IO (Either Text Start)
+resolveStart rig start = case start.stClock of
+  Just _ -> pure (Right start)
+  Nothing -> case start.stAt of
+    Lit _ (NumericLit _ r) -> pure (Right start {stClock = Just r})
+    e -> evalInstantIn rig e >>= \ case
+      Just r  -> pure (Right start {stClock = Just r})
+      Nothing -> pure (Left ("the start of the trace, `AT " <> prettyLayout e <> "`, is neither a number nor a date the explorer can read, so it cannot say where the clock begins"))
 
 ----------------------------------------------------------------------------
 -- The instants an act is tried at
@@ -1333,10 +1372,13 @@ newExplorerWith hint opts sites rig0 start = do
 -- stopped at a limit ('LimitStopped'): a graph built without it could be
 -- missing positions and still read as complete.
 explore :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)
-explore opts sites rig0 start =
-  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit " <> why)))
-    (exploreFrom opts sites rig0 start)
+explore opts sites rig0 start0 =
+  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit " <> why))) $
+    resolveStart rig0 start0 >>= \ case
+      Left e      -> pure (Left e)
+      Right start -> exploreFrom opts sites rig0 start
 
+-- | 'explore' from a start whose clock is read.
 exploreFrom :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)
 exploreFrom opts sites rig0 start = case opts.eoTime of
   Grid n | n <= 0 -> pure (Left "a grid needs a positive step")
@@ -1504,10 +1546,10 @@ exploreWith ex = do
 -- 'StateNode''s 'snPath', or that path and one edge's event after it.
 replayPath :: Rig -> Start -> [Expr Resolved] -> IO (Maybe Position)
 replayPath rig start events = do
-  let directive = Contract emptyAnno start.stContract start.stAt events
+  let directive = Contract emptyAnno start.stContract (startExpr start) events
       MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
       rig' = rig {rigModule = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))}
-  position rig' MkTrace {trDirective = directive, trContract = start.stContract, trStart = start.stAt, trEvents = events}
+  position rig' MkTrace {trDirective = directive, trContract = start.stContract, trStart = startExpr start, trEvents = events}
 
 loop :: Explorer -> Accum -> IO Accum
 loop ex acc = case acc.acQueue of
@@ -1672,10 +1714,14 @@ finish ex acc = MkGraph
 mergeReasons :: [Text] -> [Text] -> [Text]
 mergeReasons new old = Map.elems (Map.fromListWith larger [ (shape r, r) | r <- new <> old ])
   where
-    shape r = Text.pack (concatMap squash (groupBy (\ a b -> isDigit a == isDigit b) (Text.unpack r)))
-    squash g = case g of
-      c : _ | isDigit c -> "#"
-      _                 -> g
+    -- a number is its digits and a minus sign directly before them: below 0 an
+    -- instant is negative, and (-3.5) is the same reason as (1.5)
+    shape r = Text.pack (squash (Text.unpack r))
+    squash ('-' : c : rest) | isDigit c = '#' : squash (dropWhile isDigit rest)
+    squash (c : rest)
+      | isDigit c = '#' : squash (dropWhile isDigit rest)
+      | otherwise = c : squash rest
+    squash [] = []
     numbers r = [ read n :: Integer | n <- words (map (\ c -> if isDigit c then c else ' ') (Text.unpack r)) ]
     larger a b = if numbers a >= numbers b then a else b
 
