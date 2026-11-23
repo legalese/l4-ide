@@ -557,6 +557,10 @@ every list-touching decision, and the design collapses. The cheap check that sav
 > every recursive call to `f` passes, in position `k`, a variable bound by a `FOLLOWED BY` pattern
 > of a `CONSIDER` whose scrutinee is transitively parameter `k`.
 
+The positions are those of the call's arguments, so they number the value parameters of the `GIVEN`
+only: a type parameter (`a IS A TYPE`) is a binder with no argument, and counting it shifted every
+position by one (smucclaw/l4-ide#1077; `selfRecursionIssues`, `jl4-core/src/L4/Dmn/Analysis.hs`).
+
 That certifies `foldr`/`foldl`/`map`/`filter`/`sum`/`count`/`and`/`or`/`reverse`/`maximum1`/
 `minimum1`/`at` in `prelude.l4` automatically. Mutual recursion and `NUMBER`-measure recursion
 (`countdown (n - 1)`) reject in v1; the corpora contain neither — but see §2.4.3 on the fact that
