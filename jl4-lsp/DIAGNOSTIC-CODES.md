@@ -147,7 +147,7 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/fixity-ignored-non-binary`       | `check`  | A fixity annotation on a definition that is not a binary infix operator.                   |
 | `lint/fixity-not-attached`             | `parser` | A fixity annotation attached to nothing.                                                   |
 | `lint/lifecycle-noun-hides-name`       | `check`  | THE JOIN, THE DEADLINE, THE ARMING or THE INSTANT where the program defines that word.     |
-| `lint/now-in-provided`                 | `check`  | NOW inside a PROVIDED, which is the wall clock; THE INSTANT is the event's time.           |
+| `lint/now-in-provided`                 | `check`  | NOW, TODAY or CURRENTTIME in a PROVIDED, the wall clock; THE INSTANT is the event's time.  |
 | `lint/nonassertable-not-attached`      | `parser` | `@nonassertable` attached to nothing.                                                      |
 | `lint/nonassertable-same-line`         | `parser` | `@nonassertable` on the line of the definition it marks.                                   |
 | `lint/nonassertable-superseded`        | `parser` | A `@nonassertable` that a later one supersedes.                                            |
