@@ -45,7 +45,7 @@ import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Lint.SiblingReads (SiblingOperand (..), SiblingRead (..))
 import L4.Print (prettyLayout)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
-import L4.TracePolicy (TracePolicy, apiDefaultPolicy, replDefaultPolicy)
+import L4.TracePolicy (TracePolicy, apiDefaultPolicy, fullTracePolicy)
 import L4.TypeCheck (prettyCheckError)
 import L4.TypeCheck.Types (CheckError (..), CheckErrorWithContext (..), CheckWarning (..))
 
@@ -88,7 +88,7 @@ checked src = case checkWithImports (vfsFromList []) src of
 run :: Text.Text -> IO [Outcome]
 run = runWith apiDefaultPolicy
 
--- | 'run' under a trace policy: the REPL's traces every directive.
+-- | 'run' under a trace policy ('fullTracePolicy' traces every directive).
 runWith :: TracePolicy -> Text.Text -> IO [Outcome]
 runWith policy src = do
   r <- checked src
@@ -664,7 +664,7 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
 
     it "runs in step under an evaluation trace too, so a traced run gives the untraced answer" do
       for_ ["`notice` OP `possession`", "`possession` OP `notice`"] \ order -> do
-        traced <- runWith (replDefaultPolicy defaultGraphVizOptions) (notice "RAND" order noticeThenClaim)
+        traced <- runWith (fullTracePolicy defaultGraphVizOptions) (notice "RAND" order noticeThenClaim)
         untraced <- run (notice "RAND" order noticeThenClaim)
         (order, map isRefused traced) `shouldBe` (order, [False])
         (order, map ledgerOf traced) `shouldBe` (order, map ledgerOf untraced)

@@ -1,0 +1,10 @@
+-- smucclaw/l4-ide#1074 (F2): a HENCE after the LEST on a nested rule's first
+-- line is that rule's, and is refused naming it.
+
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+c MEANS
+  PARTY Seller
+  MUST delivery
+  HENCE PARTY Buyer MUST payment LEST BREACH BY Buyer HENCE FULFILLED

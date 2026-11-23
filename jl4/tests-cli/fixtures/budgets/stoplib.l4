@@ -1,0 +1,8 @@
+-- Imported by stopmain.l4. Its #EVAL never ends: counting up from 1 never
+-- meets 0. Under a time or memory limit it stops the run, so stopmain.l4's own
+-- #EVAL is not evaluated.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+countUp n MEANS IF n EQUALS 0 THEN 0 ELSE countUp (n + 1)
+
+#EVAL countUp 1

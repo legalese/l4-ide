@@ -1,0 +1,9 @@
+-- An #EVAL that never ends, then an #EVALTRACE. Under a time or memory limit
+-- the #EVALTRACE is not evaluated, so it has no trace, and says so.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+countDown n MEANS IF n EQUALS 0 THEN 0 ELSE countDown (n - 2)
+
+#EVAL countDown 5
+
+#EVALTRACE 2 PLUS 2

@@ -160,22 +160,28 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 
 Severity Information for `eval/result` and `eval/assertion-passed`, Warning for `eval/refused`, Error for the rest. An `#ASSERT` that raises has the code of what it raised, not `eval/assertion-failed`.
 
-| Code                           | Meaning                                                     |
-| ------------------------------ | ----------------------------------------------------------- |
-| `eval/assertion-failed`        | An `#ASSERT` evaluated to FALSE.                            |
-| `eval/assertion-passed`        | An `#ASSERT` evaluated to TRUE.                             |
-| `eval/division-by-zero`        | A division by zero.                                         |
-| `eval/infinite-loop`           | A value defined in terms of itself.                         |
-| `eval/internal-error`          | A bug in the evaluator.                                     |
-| `eval/non-exhaustive-patterns` | No branch or clause matched a value at run time.            |
-| `eval/not-an-integer`          | An operation that needs integers got something else.        |
-| `eval/refused`                 | A rule reached a REFUSE: it declined to answer.             |
-| `eval/result`                  | The result of a directive.                                  |
-| `eval/stack-overflow`          | Evaluation went too deep.                                   |
-| `eval/stuck`                   | Evaluation needs the value of an ASSUME'd term.             |
-| `eval/unsupported-equality`    | Equality on values that do not support it.                  |
-| `eval/user-error`              | A user-facing evaluation error, such as a missing TIMEZONE. |
-| `eval/value-too-deep`          | An #ASSERT REFUSED value too deep to read: undecided.       |
+| Code                             | Meaning                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `eval/assertion-failed`          | An `#ASSERT` evaluated to FALSE.                                                           |
+| `eval/assertion-passed`          | An `#ASSERT` evaluated to TRUE.                                                            |
+| `eval/division-by-zero`          | A division by zero.                                                                        |
+| `eval/infinite-loop`             | A value defined in terms of itself.                                                        |
+| `eval/internal-error`            | A bug in the evaluator.                                                                    |
+| `eval/non-exhaustive-patterns`   | No branch or clause matched a value at run time.                                           |
+| `eval/not-an-integer`            | An operation that needs integers got something else.                                       |
+| `eval/not-evaluated`             | Not evaluated: an earlier directive went over a time or memory limit, which stops the run. |
+| `eval/over-memory-limit`         | A directive allocated more than `--max-eval-memory-mb`; the run stops.                     |
+| `eval/over-time-limit`           | A directive ran longer than `--eval-timeout`; the run stops.                               |
+| `eval/refused`                   | A rule reached a REFUSE: it declined to answer.                                            |
+| `eval/result`                    | The result of a directive.                                                                 |
+| `eval/stack-overflow`            | Evaluation went too deep.                                                                  |
+| `eval/stuck`                     | Evaluation needs the value of an ASSUME'd term.                                            |
+| `eval/too-many-joined-failures`  | A RAND, ROR or EVERY would join more failures into one breach than `--max-open`.           |
+| `eval/too-many-open-obligations` | More obligations open at once than `--max-open`.                                           |
+| `eval/too-many-steps`            | More function applications and contract hand-offs than `--max-steps`.                      |
+| `eval/unsupported-equality`      | Equality on values that do not support it.                                                 |
+| `eval/user-error`                | A user-facing evaluation error, such as a missing TIMEZONE.                                |
+| `eval/value-too-deep`            | An #ASSERT REFUSED value too deep to read: undecided.                                      |
 
 ## import/
 
