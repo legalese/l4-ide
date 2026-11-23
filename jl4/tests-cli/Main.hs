@@ -836,6 +836,16 @@ lestLayoutFixture = fixtureDir </> "lest-layout.l4"
 lestLayoutHanging = fixtureDir </> "lest-layout-hanging.l4"
 lestLayoutHenceAfterLest = fixtureDir </> "lest-layout-hence-after-lest.l4"
 
+clauseLayoutOutside :: FilePath
+clauseLayoutOutside = fixtureDir </> "clause-layout-1074-outside.l4"
+
+clauseLayoutHeadline, clauseLayoutRecord :: FilePath
+clauseLayoutHeadline = fixtureDir </> "clause-layout-1074-headline.l4"
+clauseLayoutRecord = fixtureDir </> "clause-layout-1074-record.l4"
+
+clauseLayoutSecondLest :: FilePath
+clauseLayoutSecondLest = fixtureDir </> "clause-layout-1074-second-lest.l4"
+
 -- Library sentences at a call site, and library aliases used at two types.
 nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting :: FilePath
 nlgLibraryWording    = fixtureDir </> "nlg-library-wording.l4"
@@ -1031,7 +1041,10 @@ coreFixtures =
   , nlgArithGrouping, nlgArithOperands, renderArithOperands, renderNotScope
   , nlgLibraryWording, libraryAliasTwoTypes, renderDeepNesting
   , slotScope, slotScopeSentence, renderHoleAndClause, renderLedgerWriteOperand
+  , clauseLayoutOutside
   , lestLayoutRepro, lestLayoutFixture, lestLayoutHanging, lestLayoutHenceAfterLest
+  , clauseLayoutHeadline, clauseLayoutRecord
+  , clauseLayoutSecondLest
   , nlgPositionalMain, nlgPositionalLib
   , assertRaisesFixture, assertAssumedFixture, evalAssumedFixture
   , multiClauseRenderFixture
@@ -6587,7 +6600,40 @@ spec bin = do
       Output code _ serr <- runL4 bin ["check", lestLayoutHenceAfterLest]
       code `shouldBe` ExitFailure 1
       filter (/= '\r') serr `shouldSatisfy`
-        ("This HENCE lines up with the clauses of the rule that starts with PARTY at line 8, column 3. It comes after that rule's LEST. Write HENCE before LEST." `isInfixOf`)
+        ("This HENCE lines up with the clauses of the rule that starts with PARTY at line 8, column 3. It comes after that rule's LEST. Write HENCE before LEST. If what follows HENCE is a rule, or ends with one, put it in brackets, or that rule can take the LEST." `isInfixOf`)
+
+    -- smucclaw/l4-ide#1074 (F3, ruled by Meng 2026-11-22: Clause Layout
+    -- Rulings F3 A; this test goes with the commit that refuses it): a LEST
+    -- at column 1 used to be a bare "unexpected LEST".
+    it "refuses a LEST left of its definition, naming the rule above it and where to write it" $ do
+      Output code _ serr <- runL4 bin ["check", clauseLayoutOutside]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This LEST is at column 1, so it is not part of the rule that starts with PARTY at line 9, column 3: on a later line, a LEST at column 1, where its definition starts (or column 1 inside brackets), or left of both that column and that rule's clauses, ends the rule. To make it that rule's LEST, put what follows its HENCE in brackets, and write the LEST at column 3, in line with that rule's clauses." `isInfixOf`)
+
+    -- smucclaw/l4-ide#1074 (F2): on a rule's first line, a HENCE after its
+    -- LEST is that rule's, and the refusal names it; before, it named the
+    -- rule outside. Where something outside can still take the HENCE (a
+    -- RECORD's continuation), the rule leaves it there, as before.
+    it "refuses a HENCE after the LEST on a nested rule's first line, naming that rule" $ do
+      Output code _ serr <- runL4 bin ["check", clauseLayoutHeadline]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This HENCE is part of the rule that starts with PARTY at line 10, column 9, because it is on that rule's first line. It comes after that rule's LEST. Write HENCE before LEST. If what follows HENCE is a rule, or ends with one, put it in brackets, or that rule can take the LEST." `isInfixOf`)
+
+    it "leaves a HENCE on the first line of a RECORD's rule to the RECORD" $ do
+      Output code _ _ <- runL4 bin ["check", clauseLayoutRecord]
+      code `shouldBe` ExitSuccess
+
+    -- smucclaw/l4-ide#1074 (F1, ruled by Meng 2026-11-22: Clause Layout
+    -- Rulings F1 A; this test goes with the commit that refuses it): a second
+    -- LEST on a nested rule's first line is that rule's, where before it went
+    -- to the outer rule with exit 0.
+    it "refuses a second LEST on a nested rule's first line, naming that rule" $ do
+      Output code _ serr <- runL4 bin ["check", clauseLayoutSecondLest]
+      code `shouldBe` ExitFailure 1
+      filter (/= '\r') serr `shouldSatisfy`
+        ("This LEST is part of the rule that starts with PARTY at line 10, column 9, because it is on that rule's first line. That rule already has a LEST, and a rule has one. To give it to the rule that one is nested in, write it on a line of its own at column 3, in line with that rule's clauses." `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
