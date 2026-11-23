@@ -1,0 +1,52 @@
+-- JSONDECODE handed on bare, as a rule to be used on a text later, at a type
+-- the rule is GIVEN (GIVEN a IS A TYPE), is refused before the rules run
+-- (smucclaw/l4-ide#1078; decided by Claude 2026-11-21, pending Meng's review).
+--
+-- Such a JSONDECODE decodes at the type of whatever finally uses it on a
+-- text. In `label of one tree` that type is written down, Tree, and the
+-- answer was right: 2. Inside the prelude's `map` it is a type parameter
+-- again, and there the decode ran untyped: a JSON object became NOTHING. A
+-- JSON number used as a NUMBER, as in `numbers via map`, came out right by
+-- luck. Both are refused, because nothing here tells the two uses apart.
+--
+-- A JSONDECODE applied to its text at a type parameter is in
+-- not-ok/tc/jsondecode-at-type-parameter.l4.
+
+IMPORT prelude
+
+DECLARE Tree HAS
+  label IS A NUMBER
+  kids IS A LIST OF Tree
+
+-- The body of a definition GIVEN a type, used at Tree.
+GIVEN a IS A TYPE
+GIVETH A FUNCTION FROM STRING TO EITHER STRING a
+`decode any` MEANS JSONDECODE
+
+GIVETH AN EITHER STRING Tree
+`one tree` MEANS `decode any` "{\"label\":2,\"kids\":[]}"
+
+GIVETH A NUMBER
+`label of one tree` MEANS
+  CONSIDER `one tree`
+    WHEN RIGHT t THEN t's label
+    WHEN LEFT problem THEN 0 - 1
+
+-- The same definition handed on to `map`.
+GIVETH A LIST OF EITHER STRING NUMBER
+`numbers via map` MEANS map `decode any` (LIST "42")
+
+-- Handed straight to `map` inside a definition GIVEN a type.
+GIVEN a IS A TYPE
+      texts IS A LIST OF STRING
+GIVETH A LIST OF EITHER STRING a
+`decode each` texts MEANS map JSONDECODE texts
+
+-- Handed on from a definition with no GIVETH, which takes its type parameter
+-- from the definition that uses it: the message shows the type written in on
+-- a rule of its own.
+DECIDE `the decoder` IS JSONDECODE
+
+GIVEN a IS A TYPE
+GIVETH A LIST OF EITHER STRING a
+`decode all` MEANS map `the decoder` (LIST "1")

@@ -36,6 +36,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 
 - [I could not find a definition for the identifier](#i-could-not-find-a-definition-for-the-identifier)
 - [Module not found](#module-not-found)
+- [A file passed over because of its capitals](#a-file-passed-over-because-of-its-capitals)
 - [Import cycle](#import-cycle)
 
 **Definitions and clauses**
@@ -49,6 +50,8 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Unknown annotation](#unknown-annotation)
 - [Malformed annotation](#malformed-annotation)
 - [Infinite loop detected](#infinite-loop-detected)
+- [It took more than so many steps](#it-took-more-than-so-many-steps)
+- [Not evaluated because the run stopped](#not-evaluated-because-the-run-stopped)
 
 **Assumed terms and refusals**
 
@@ -65,6 +68,8 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 **Regulative rules**
 
 - [#EVAL shows the rule instead of an outcome](#eval-shows-the-rule-instead-of-an-outcome)
+- [More obligations were open at once than the limit](#more-obligations-were-open-at-once-than-the-limit)
+- [More failures were joined into one breach than the limit](#more-failures-were-joined-into-one-breach-than-the-limit)
 
 **Export**
 
@@ -145,7 +150,7 @@ BRANCH takes the first condition that is TRUE, and OTHERWISE covers the rest. Se
 
 Which rule a `HENCE` or `LEST` belongs to is decided by its column (see [Which rule a HENCE or LEST belongs to](../regulative/consequences.md#which-rule-a-hence-or-lest-belongs-to)).
 When that rule already has one, L4 refuses it rather than give it to another rule.
-The message names the rule and says why the keyword is that rule's: it lines up with the rule's clauses, or it is right of the clauses of the rule that one is nested in.
+The message names the rule and says why the keyword is that rule's: it lines up with the rule's clauses, it is right of the clauses of the rule that one is nested in, or it is on the rule's first line.
 
 ```l4
 DECLARE Party IS ONE OF Seller, Buyer
@@ -176,6 +181,7 @@ If it is the Seller's, do that:
 ```
 
 A second `HENCE` is refused the same way, and so is a `HENCE` written after the rule's `LEST`, with `It comes after that rule's LEST. Write HENCE before LEST.`
+When what follows that `HENCE` is not in brackets, the message adds `If what follows HENCE is a rule, or ends with one, put it in brackets, or that rule can take the LEST.`, because a rule written after the `HENCE`, moved before the `LEST` without brackets, can take the `LEST` itself.
 
 ---
 
@@ -646,13 +652,58 @@ This is an error, not a warning: it fails `l4 check` and `l4 run` even when noth
 An `IMPORT` names a module that is neither a standard library nor a file `helpers.l4` in your project's root folder or beside the importing file.
 This stops `l4 check`, `l4 run` and deploying, even if nothing from the module is used.
 
+Capital letters count in a module name, so `IMPORT dayDate` does not find `daydate.l4`, on any computer.
+When the name you wrote differs only in its capitals from a module L4 can see, the error has one more line, second, which names the spelling to use:
+
+```
+I could not find a module with this name: dayDate
+Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?
+Nothing it defines is in scope here; names you expected from it are reported as undefined.
+I have tried the following locations:
+...
+```
+
+When several modules differ from your spelling only in capitals, the line lists them all: ``Did you mean one of: `DayDate`, `daydate`?``.
+When a name differs by more than capitals, in a way some disks ignore, such as `ß` for `ss`, the line begins `Module names must match exactly, letter for letter:` instead.
+The line never suggests the file you are in, and never a file whose name ends in `.L4` rather than `.l4`: no `IMPORT` can reach such a file until it is renamed.
+When the only near match is the file you are in, as for `IMPORT foo` written in `Foo.l4`, the line says so instead: ```foo` differs from `Foo`, the name of this file's own module, only in its capitals. If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT.``
+
 **How to fix it:**
 
 - Check the name. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output. A name with a hyphen needs backticks: ``IMPORT `legal-persons` ``. `IMPORT` takes a module name, not a path: a folder in front of the name is ignored.
+- Check the capitals, and write the name exactly as the file spells it: `IMPORT daydate` for `daydate.l4`. A file that checked on a Mac or a Windows computer before this rule may stop checking there now; it already failed on Linux, in the web playground and on Legalese Cloud.
 - Put your own module in the project's root folder or beside the file that imports it.
 - If `JL4_LIBRARY_PATH` is set, the built-in standard library is not used at all, so that folder must hold every library you import, `prelude.l4` included.
 
 [IMPORT](../libraries/README.md#import) describes module names and where they are found; [How IMPORT finds libraries](../libraries/resolution.md) gives the full search order for operators and library developers.
+
+---
+
+<a id="import-case-variant-skipped"></a>
+
+### A file passed over because of its capitals
+
+**Warning:**
+
+```
+`IMPORT math` did not use `Math.l4` beside the importing file, because capital letters count in a module name: `Math` and `math` are different names.
+It used the standard library's `math` instead.
+To use that file, change the IMPORT to `Math`, or rename the file to `math.l4`.
+```
+
+An `IMPORT` found a module, but a folder that L4 searches before the place it found it holds a file of that name in other capitals.
+Capital letters count in a module name, so L4 did not use that file.
+Here the `IMPORT` says `math`, the file beside it is `Math.l4`, and L4 used the standard library's `math`; a name that only `Math.l4` defines is then reported as undefined.
+This is a warning: the file is still checked and run, with the module the `IMPORT` found.
+
+When the file passed over is the file the `IMPORT` is in, as for `Math.l4` that writes `IMPORT math`, the warning says so, and offers no fix that would make the file import itself.
+
+**How to fix it:**
+
+- To use your file, write the `IMPORT` with the file's exact capitals, `IMPORT Math`, or rename the file to match the `IMPORT`.
+- If you meant the module L4 used, nothing needs to change, but the warning stays until your file has a name that is not that module's in any capitals.
+
+[Reading the resolver's output](../libraries/resolution.md#reading-the-resolvers-output) gives every wording of this warning and when it appears.
 
 ---
 
@@ -765,8 +816,11 @@ A rule whose words come first, `` `tax on` x `item costing` y ``, written as cla
 **What is not refused:** a line whose `GIVEN` names an input where the rule has its word is an ordinary rule, however much it looks like the mixfix one.
 Beside ``a `plus` b``, a rule `total plus y` with the `GIVEN` `plus` and `y` is a rule called `total` that takes two inputs, and so is ``decision `is eligible` `` when `` `is eligible` `` is one of its `GIVEN` inputs; the same goes for the clauses `DECIDE fee costs 0 IS 0` and `DECIDE fee costs n IS n` when the `GIVEN` names `costs`.
 The definition lines are left alone, and the rules they define are called as usual, `total 3 4`.
-A use of the word inside another rule is still read as a use of the mixfix rule: with ``a `plus` b`` in the file, the body `total plus y` of a rule whose inputs are `plus` and `y` is read as ``total `plus` y``, and fails to check ("The first input of function `plus` is expected to be of type NUMBER but is here of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER").
-Give that input another name, and the body means what it says.
+Inside the body of a rule, a name that is one of the rule's own `GIVEN` inputs is that input, and not the word of a mixfix rule: with ``a `plus` b`` in the file, the body `total plus y` of a rule whose inputs are `plus` and `y` is `total` applied to those two inputs, and so is the body of each of its clauses.
+The same holds for the call `` `inc` `the day` `` in a rule whose input is called `` `the day` `` when the file has a rule ``the day n `days before` s``, with or without a `§` around it ([Functions: mixfix functions](../functions/README.md#mixfix-functions)).
+It does not hold for a name bound in another way (the `GIVEN` of a section, a `LET`, the parameter of a `GIVEN ... YIELD` function, a variable in a `CONSIDER` pattern): that name is still read as the word of the mixfix rule, and a call with it fails to check (for a section's `GIVEN`, a `LET` or a `CONSIDER` pattern, with "You are giving 1 input to ... but it is not a function").
+Give such a name another name, and the body means what it says.
+The other side of the same rule: in a rule that has an input called `plus`, the text ``1 `plus` 2`` is not a call of ``a `plus` b``, and is refused ("unexpected `plus`"); call the rule from one that has no input of that name.
 
 ---
 
@@ -1103,8 +1157,8 @@ x MEANS x + 1
 To find `x`, L4 needs `x + 1`, which needs `x` again. L4 notices this for a value defined in terms of itself and stops with this error.
 
 A function that calls itself with new inputs, and never reaches a case that stops, is not caught as a loop.
-If each call waits for the next one's answer, as in `1 + f (n + 1)`, L4 stops a million calls deep with `Stack overflow: Recursion depth of 1000000 exceeded.` (set `JL4_MAX_FRAME_DEPTH` to change the limit).
-If the call is the last thing the function does, as in `f n MEANS f (n + 1)`, its `#EVAL` never answers.
+If each call waits for the next one's answer, as in `1 + f (n + 1)`, L4 stops a million calls deep with `Stack overflow: Recursion depth of 1000000 exceeded.` (set `JL4_MAX_FRAME_DEPTH` to change the limit); in a line that collects a trace, such as an `#EVALTRACE`, the step count stops it sooner, at 100,000 steps.
+If the call is the last thing the function does, as in `f n MEANS f (n + 1)`, it is caught differently: see [It took more than so many steps](#it-took-more-than-so-many-steps).
 
 **How to fix it:** If you meant recursion, give it a case that stops:
 
@@ -1119,6 +1173,48 @@ factorial n MEANS
 ```
 
 If you did not, you probably meant another name on the right-hand side.
+
+---
+
+<a id="eval-too-many-steps"></a>
+
+### It took more than so many steps
+
+**Error:** `I stopped evaluating: it took more than 10000000 steps, counting each function applied and each contract handed the events.`, then `The last step was in`, the name of the function or rule, and its place in your file; when that place is in a file yours imports, such as the prelude, the message gives the place alone (`the definition at`). In `l4 batch` the place is in the copy of your file that L4 lays out for each row (`myfile.l4.batch2.l4`), so its line numbers are not your file's.
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+countDown n MEANS
+    IF n EQUALS 0 THEN 0
+    ELSE countDown (n - 2)
+
+#EVAL countDown 5
+```
+
+`countDown` stops when `n` is 0, but counting down by 2 from 5 goes 3, 1, -1, and never meets 0. Each call starts afresh rather than waiting on the one before, so L4 cannot see a loop the way it does for [Infinite loop detected](#infinite-loop-detected); it counts instead. One `#EVAL`, `#ASSERT` or `#TRACE` may take at most 10,000,000 steps, and past that it stops with this error. A step is a function written in L4 being applied, or a contract (an obligation, an `EVERY`, a `RAND` or `ROR`, a `FULFILLED` or a breach) being handed the events to check, so a `HENCE` or `LEST` that leads back to itself counts too, even when it applies no function.
+
+The count is of steps, not of time, so the same file stops at the same place on every computer. Only the line that went over the limit stops: the lines after it still run, and `l4 run` exits with an error. In `l4 batch` that row fails, as a row with any other error does. Every `l4` command that works out values counts, and so do the REPL and the editor; the commands and the REPL take `--max-steps N` to set the limit to N, and `--max-steps none` to remove it.
+
+The count limits how long a line runs, not how much memory it uses. A function that passes along a value it never looks at, such as `countUp n MEANS countUp (n + 1)`, where nothing reads `n`, keeps every one of those values, and can run out of memory long before it reaches the limit. The `--max-eval-memory-mb` option of `l4 run` stops it sooner: see [Stopping a line that runs too long](../../tutorials/getting-started/l4-cli.md#stopping-a-line-that-runs-too-long).
+
+An `#EVALTRACE`, and a `:trace` or `:traceascii` line in the REPL, keeps a record of every step for its trace, so it may take at most 100,000 steps: `#EVALTRACE countDown 5` stops at `more than 100000 steps`, and its message adds `This one collects a trace, which keeps a record of every step, so it has a lower limit than the 10000000 steps of one that collects none.` `--max-steps N` sets both limits to N.
+
+**How to fix it:** Make sure the function reaches its stopping case from every input: test with `AT MOST 0` rather than `EQUALS 0` when the input can step past 0. If the function does stop, but only after more than 10,000,000 steps (100,000 for one that collects a trace), the work is too big for one evaluation: split it into smaller questions, or raise the limit with `--max-steps`.
+
+---
+
+<a id="eval-not-evaluated"></a>
+<a id="eval-over-time-limit"></a>
+<a id="eval-over-memory-limit"></a>
+
+### Not evaluated because the run stopped
+
+**Error:** `I did not evaluate this: the run stopped at`, the place of an earlier line, and the limit it went over: `took longer than 10 seconds (--eval-timeout)` or `allocated more than 500 MB (--max-eval-memory-mb)`.
+
+You asked `l4 run` or `l4 batch` for a time or memory limit, and an earlier `#EVAL`, `#ASSERT` or `#TRACE` went over it. That line says `I stopped the run`, and every line after it carries this message instead of an answer: none of them was worked out, so none of them is wrong. The earlier line can be in a file this one imports: L4 works out an imported file's lines too, though `l4 run` prints only this file's. When no line of this file says so, `l4 run` says on its error output where the run stopped. `l4 batch` stops at that row, even with `--continue-on-error`, and says on its error output which row it was and where the run stopped; an imported file's own line is worked out with every row, so it stops the batch at row 1.
+
+**How to fix it:** Fix the line that stopped the run, or give it a larger limit; see [Stopping a line that runs too long](../../tutorials/getting-started/l4-cli.md#stopping-a-line-that-runs-too-long).
 
 ---
 
@@ -1375,6 +1471,61 @@ GIVETH A DEONTIC Party Action
 ```
 
 This gives `FULFILLED`. See [Regulative rules](../regulative/README.md) and [EVENT](../regulative/EVENT.md).
+
+---
+
+<a id="eval-too-many-open-obligations"></a>
+
+### More obligations were open at once than the limit
+
+**Error:** `I stopped evaluating: more than 10000 obligations were open at once.`, then `The last one was armed in`, the name of the rule, and its place in your file; when that place is in a file yours imports, the message gives the place alone (`the definition at`). In `l4 batch` the place is in the copy of your file that L4 lays out for each row (`myfile.l4.batch2.l4`), so its line numbers are not your file's.
+
+```l4
+DECLARE Person IS ONE OF Alice, Carol
+DECLARE Action IS ONE OF deliver, smoke
+
+w1 MEANS PARTY Carol MUST deliver WITHIN 2 LEST (w3 ROR w1)
+w3 MEANS PARTY Alice MAY smoke WITHIN 2 LEST (w1 RAND w3)
+
+#TRACE w1 AT 0 WITH
+  (WAITUNTIL 60)
+```
+
+Each time `w1`'s window closes, its `LEST` starts two obligations, `w3` and a new `w1`, and each of those does the same when its own window closes. What is open doubles every two units of time, so by time 60 it would be in the hundreds of millions. L4 counts the obligations a `#TRACE` or `#EVAL` has started and still holds, including any left waiting when the trace ends, and stops at 10,000. An obligation stops counting once it is handed on to its `HENCE` or `LEST`, once it is broken with no `LEST` to go to, or once the `RAND` or `ROR` it belongs to is decided without it, as when the other side of an `RAND` is broken or the other side of an `ROR` is kept. L4 does not decide an `RAND` or `ROR` while either side is still meeting events, so a side that can no longer matter may count until the trace ends.
+
+A rule that starts itself again in its `HENCE` or `LEST`, as monthly rent does, holds one obligation open at a time, however long its trace, and never comes near the limit. Only the line that went over the limit stops: the lines after it still run, and `l4 run` exits with an error. In `l4 batch` that row fails, as a row with any other error does. Every `l4` command that works out values counts, and so do the REPL and the editor; the commands and the REPL take `--max-open N` to set the limit to N, and `--max-open none` to remove it.
+
+**How to fix it:** Make sure that the `HENCE` or `LEST` of a rule that leads back to itself names one obligation, not two. If the rule really does mean that obligations multiply, give the trace fewer steps.
+
+---
+
+<a id="eval-too-many-joined-failures"></a>
+
+### More failures were joined into one breach than the limit
+
+**Error:** `I stopped evaluating: a RAND, an ROR or an EVERY would have joined more than 10000 failures into one breach.`, then `The join was in`, the name of the rule, and its place in your file; when that place is in a file yours imports, the message gives the place alone (`the definition at`).
+
+```l4
+DECLARE Actor IS ONE OF P, Q
+DECLARE Action IS ONE OF x, y
+
+GIVEN n IS A NUMBER
+GIVETH A DEONTIC Actor Action
+late n MEANS
+    IF n EQUALS 0
+    THEN BREACH BY P BECAUSE "late"
+    ELSE half RAND half
+    WHERE half MEANS late (n - 1)
+
+#TRACE late 14 AT 0 WITH
+  (WAITUNTIL 5)
+```
+
+A breach names every failure that caused it, and a breach of a `RAND` or an `ROR` names the failures of both sides. Here each `late n` joins `late (n - 1)` with itself, so the list of failures doubles at each level, to 16,384 at `late 14`, every one of them the same failure, and no obligation is ever open. L4 bounds the list one `RAND`, `ROR` or `EVERY` may gather with the same number that bounds the obligations open at once, 10,000, and stops at the join that would go past it.
+
+Only the line that went over the limit stops: the lines after it still run, and `l4 run` exits with an error. In `l4 batch` that row fails, as a row with any other error does. `--max-open N` sets this limit and the one on obligations open at once together, and `--max-open none` removes both.
+
+**How to fix it:** Joining a breach with itself repeats its failures, so join different obligations instead. If the list really is meant to be that long, raise the limit with `--max-open`.
 
 ---
 

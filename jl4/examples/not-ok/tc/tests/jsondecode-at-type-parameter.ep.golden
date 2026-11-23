@@ -1,0 +1,73 @@
+-- A JSONDECODE applied at a type the rule is GIVEN (GIVEN a IS A TYPE) is
+-- refused before the rules run (smucclaw/l4-ide#1078, option C; decided by Claude
+-- 2026-11-21, pending Meng's review).
+--
+-- A type given that way has no value when the rules run, so nothing tells
+-- the decoder what to build. Until this was refused, each decode below ran
+-- untyped and handed the rule a value of the wrong type with no error: a
+-- JSON object became NOTHING, and an enumeration's name stayed a STRING.
+-- It gave the right answer only when the JSON happened to be of the type the
+-- rule was used at, as in `decoded passes`, which answered TRUE.
+--
+-- Not refused, and so not here: a decode whose type nothing fixes at all (a
+-- definition with no signature that nothing uses), in
+-- ok/jsondecode-inferred-target.l4. JSONDECODE handed on bare is refused too,
+-- in not-ok/tc/jsondecode-passed-at-type-parameter.l4.
+
+IMPORT prelude
+
+DECLARE Tree HAS
+  label IS A NUMBER
+  kids IS A LIST OF Tree
+
+-- The issue's own program: the record comes back as NOTHING, so the
+-- CONSIDER on it stops the run.
+GIVEN a IS A TYPE
+      test IS A FUNCTION FROM a TO BOOLEAN
+      xs IS A LIST OF a
+GIVETH A BOOLEAN
+`some of` test xs MEANS
+  CONSIDER JSONDECODE "{\"label\":2,\"kids\":[{\"label\":3,\"kids\":[]}]}"
+    WHEN RIGHT v THEN test v
+    WHEN LEFT problem THEN FALSE
+
+GIVEN t IS A Tree GIVETH A BOOLEAN
+`has a marked node` t MEANS
+  t's label EQUALS 0 OR `some of` `has a marked node` (t's kids)
+
+-- A JSON number used as a NUMBER: this answered TRUE, and is refused all
+-- the same, because nothing in the rule says the type is NUMBER.
+GIVEN a IS A TYPE
+      test IS A FUNCTION FROM a TO BOOLEAN
+GIVETH A BOOLEAN
+`decoded passes` test MEANS
+  CONSIDER JSONDECODE "42"
+    WHEN RIGHT v THEN test v
+    WHEN LEFT problem THEN FALSE
+
+GIVEN n IS A NUMBER GIVETH A BOOLEAN
+`is big` n MEANS n > 40
+
+-- The type parameter in the result type.
+GIVEN a IS A TYPE
+GIVETH AN EITHER STRING a
+`decode one` MEANS JSONDECODE "{\"label\":2,\"kids\":[]}"
+
+-- A type that mentions type parameters, rather than being one.
+GIVEN a IS A TYPE
+      b IS A TYPE
+      s IS A STRING
+GIVETH AN EITHER STRING (PAIR OF a, LIST OF b)
+`decode pair` s MEANS JSONDECODE s
+
+-- A definition with no signature, used inside one GIVEN a type: the decode
+-- takes that definition's `a`, so it is refused here, where it is written.
+DECIDE `the decode` IS JSONDECODE "{\"label\":2,\"kids\":[]}"
+
+GIVEN a IS A TYPE
+      test IS A FUNCTION FROM a TO BOOLEAN
+GIVETH A BOOLEAN
+`check the decode` test MEANS
+  CONSIDER `the decode`
+    WHEN RIGHT v THEN test v
+    WHEN LEFT problem THEN FALSE

@@ -1,0 +1,11 @@
+-- The decode's type, NUMBER, comes from `n + 1`; the JSON is a string. The
+-- run stops with the decoder's error, which names the JSON number it expected.
+IMPORT prelude
+
+GIVETH A NUMBER
+`plus one` MEANS
+  CONSIDER JSONDECODE "\"seven\""
+    WHEN RIGHT n THEN n + 1
+    WHEN LEFT problem THEN 0 - 1
+
+#EVAL `plus one`

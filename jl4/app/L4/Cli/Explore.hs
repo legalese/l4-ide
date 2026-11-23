@@ -121,6 +121,7 @@ data ExploreCliOptions = ExploreCliOptions
   , exEmit      :: Maybe FilePath
   , exFair      :: [Text.Text]
   , exFixedNow  :: FixedNowOpt
+  , exLimits    :: EvalLimits
   }
 
 -- | One property flag, in the order given: an @--if-always@ is the premise
@@ -226,6 +227,7 @@ exploreOptionsParser = ExploreCliOptions
         <> help "With --emit: give weak fairness, in the TLA+ and NuSMV models, to every act of this actor that moves (a party, an act's constructor, or the first words of a constructor's name, as Alice in `Alice buys dinner`). No other act is fair; repeatable"
         ))
   <*> fixedNowParser
+  <*> evalLimitsParser
 
 -- | A number as a @#TRACE@ writes one: digits, an optional fraction.
 rationalReader :: ReadM Rational
@@ -251,7 +253,12 @@ exploreCmd opts = do
       hPutStrLn stderr "--fair says which acts the emitted models assume fair, so it needs --emit DIR"
       exitWith (ExitFailure 1)
     _ -> pure ()
-  evalConfig <- makeEvalConfig opts.exFixedNow
+  evalConfig <- withEvalLimits opts.exLimits =<< makeEvalConfig opts.exFixedNow
+  guardRunStop "l4 explore" evalConfig (exploreWith opts evalConfig)
+
+-- | 'exploreCmd' under the limits its flags set (ruled by Meng 2026-11-21, extending L2).
+exploreWith :: ExploreCliOptions -> EvalConfig -> IO ()
+exploreWith opts evalConfig = do
   (errs, mLoaded) <- runOneshot evalConfig opts.exFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp

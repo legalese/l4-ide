@@ -389,7 +389,7 @@ The whole rule, for a `HENCE` or `LEST` on a line of its own after a nested rule
 1. At the column of the nested rule's own clauses, it is the nested rule's.
 2. Otherwise, at the column of the outer rule's clauses, it is the outer rule's, and the nested rule ends.
 3. Otherwise, if it is right of either rule's clauses, it is the nested rule's, even at a column that lines up with nothing.
-4. Otherwise, left of both, it is the outer rule's.
+4. Otherwise, left of both, it is the outer rule's, unless it is also at or left of the column where the definition starts (column 1 inside brackets): then it ends the definition instead of going to the outer rule, as **What is refused** below says.
 
 With rules nested deeper, this is applied one level at a time, from the innermost rule out.
 Rule 1 comes first, so when the nested rule's clauses are at the same column as the outer rule's, a `HENCE` or `LEST` at that column is the nested rule's.
@@ -398,6 +398,17 @@ Brackets end a rule outright, as in `HENCE (PARTY Buyer MUST pay 100 WITHIN 7)`,
 
 **What is refused.** A `HENCE` or `LEST` that belongs to a rule by the steps above, when that rule already has one (a second `LEST`, a second `HENCE`, or a `HENCE` after the `LEST`), is refused with an error that names the rule, rather than given to another rule.
 `HENCE` comes before `LEST`.
+A second `LEST` on a rule's own first line is refused the same way: it belongs to the rule on that line, as above, even when a rule outside still has its `LEST` free.
+A `HENCE` or `LEST` on a line of its own at the column where its definition starts (column 1 inside brackets), or left of both that column and its rule's clauses, with no rule around that definition to take it, belongs to no rule, unless the rule's clause column is that column too, which makes it the rule's.
+It is refused with an error that names the outermost rule above it and says where to write it: at that rule's clauses, and, when what follows that rule's `HENCE` ends with a rule not in brackets, with what follows that `HENCE` in brackets too.
+When the keyword's body is on the next line, the body has to stay right of the keyword, so if the column the error gives is at or right of the body's column, move the body too.
+
+In a few places these refusals name no rule, and the error is a plain "unexpected" one instead; the file is refused all the same.
+For a second `LEST` on a rule's first line, that is when the rule is the right operand of an operator such as `RAND`, `ROR`, `OR`, `AND`, `PLUS` or `EQUALS` (the error is at the operator), the value in `f WITH x IS …` (at the `WITH`), the operand of an operator you defined yourself (at the rule's `PARTY`), or a function's argument written as a bullet (at the bullet).
+That holds inside brackets too: with the whole of a `HENCE` in brackets and the rule a `RAND` operand inside them, not in brackets of its own, the error is at the `RAND`.
+For a `HENCE` or `LEST` at or left of its definition's column, it is when the rule is the right operand of an operator, the operand of an operator you defined yourself, the value in `f WITH x IS …`, or a function's argument; the error is at the keyword.
+When the rule is the value of a `RECORD`, `COMMIT` or `ATTEST`, a definition inside that value included, a `LEST` there gets the same plain error, and a `HENCE` is not refused at all: it is the `RECORD`'s, `COMMIT`'s or `ATTEST`'s own `HENCE`.
+For a keyword at or left of its definition's column, a rule inside another rule's `AFTER`, `WITHIN` or `BEFORE` is not one of these places: the rule outside it names the keyword.
 
 **What is not placed this way.** Only the clauses of the rule a nested rule is written under count, not those of rules further out.
 In a layout where a rule two levels out has its clauses right of the rule one level out, a `HENCE` or `LEST` that lines up with the rule two levels out can stay with the innermost rule, with no error; brackets settle it.
@@ -411,6 +422,12 @@ So a `LEST` written at the outer rule's clauses could become the nested rule's, 
 A contract written that way now reads as its layout shows.
 Some layouts that earlier versions accepted are now refused, by the paragraph above: a second `LEST` or `HENCE`, or a `HENCE` after a `LEST`, written where the column points at a rule that already has one.
 Earlier versions gave such a keyword to another rule, with no error.
+
+**Rulings.** Two of the refusals in **What is refused** were put to Meng as cards on the Clause Layout Rulings page, and are recorded here with their conditions as printed, except that square brackets mark where an internal working name or label was replaced or left out.
+The ruling on card F1 also keeps the first sentence of **What is refused**, the refusal of a keyword whose rule already has that slot used, which came with legalese/l4-ide#825.
+
+- Card F1, Clause Layout Rulings: option A, accepted by Meng on 2026-11-22 at 13:48Z, with no note; conditions as printed: (1) Accepted limit, stated in the PR body and in the page’s “What is refused”: where the nested rule is an infix operator’s right operand (in the fuzz: `ROR`, `RAND`, `OR`, `PLUS`, `AND`, `EQUALS`), the value in `f WITH x IS …`, or under a user-defined infix operator, the refusal is bare and names no rule: at the operator, at `WITH`, or at `PARTY` respectively (18 of the 78 fuzz changes; K1). With the whole `HENCE` body in brackets and an unbracketed `RAND` inside, the bare error moves from the second `LEST` to the `RAND`. (2) A follow-up issue, owner […], to make the refusal survive the parser’s backtracking so those cases name the rule. Not on this branch. (3) Ruling A also keeps #825’s guard (a keyword whose rule’s slot is used is refused, not passed on), which was “[decided by Claude, pending Meng’s review]”; record it with this ruling in `consequences.md`’s “What is refused”, since no spec under `specs/` owns clause layout (a grep for `ownsAt` and #1068 there finds none). (4) On `main` this reaches users only if it is folded into #828 or ported after it lands: […]; https://claude.ai/artifact/E5mW1wi86puTKtE7FPC218 (collection l4-sidedoor-1119).
+- Card F3, Clause Layout Rulings: option A, accepted by Meng on 2026-11-22 at 13:48Z, with no note; conditions as printed: (1) The same commit amends `consequences.md:392`, step 4, so that a keyword at or left of the column where its definition starts ends the definition rather than going to the outer rule, and A’s new sentence keeps the exception the parser has: an earlier clause of that rule at that column makes the keyword the rule’s. The page and the parser then agree. (2) The page sentence A adds, and the PR body, say where the error stays bare, as on `unstable`: measured, when the rule is a `RAND` or `ROR` operand; by the code (A skips the refusal wherever `standAside` is set), also another operator’s operand, a `WITH` value, a function’s argument, and the value of a `RECORD`, `COMMIT` or `ATTEST`. (3) The wording can be tightened in review. Every column the message gives must, when followed, be accepted with the keyword on the rule named, except where the keyword’s body is on the next line and moving the keyword alone breaks its indentation; that exception is stated in the PR body, and “move the body too” goes to the follow-up list. (4) If F3 is ported to `main` (folded into #828: […]), its refusal carries the code #828’s body promises, `parse/unexpected-LEST` or `-HENCE`, or #828’s body is corrected to say `parse/syntax-error`; https://claude.ai/artifact/E5mW1wi86puTKtE7FPC218 (collection l4-sidedoor-1119).
 
 ### When the next clock starts
 

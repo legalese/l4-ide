@@ -1,0 +1,6 @@
+-- Used by the REPL test that a plain line keeps its answer, and :trace and
+-- :traceascii still show a trace, once the REPL stops collecting a trace for
+-- every plain line (decided by Claude 2026-11-21, pending Meng's review).
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`double` n MEANS n TIMES 2

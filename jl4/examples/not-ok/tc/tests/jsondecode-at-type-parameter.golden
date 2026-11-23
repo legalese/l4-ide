@@ -1,0 +1,143 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: prelude from jsondecode-at-type-parameter.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from jsondecode-at-type-parameter.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from jsondecode-at-type-parameter.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: jsondecode-at-type-parameter.l4
+  Hidden: no
+  Range: 30:12-30:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/jsondecode-at-type-parameter
+  Message:
+    JSONDECODE turns JSON text into a value of the type its result is used as.
+    Here that type is
+
+      a
+
+    which is a type given with
+
+      GIVEN a IS A TYPE, on line 25
+
+    A type given that way can be a different type each time the rule it belongs
+    to is used, and when the rules run nothing says which type it is. So this
+    JSONDECODE has nothing to go by: a JSON object would not become a record,
+    and a string would not become one of the choices of an IS ONE OF type.
+
+    Decode the JSON where its type is written down instead, for example in a
+    rule with
+
+      GIVETH AN EITHER STRING <the type you expect>
+
+    and hand the decoded value on as an input.
+
+File: jsondecode-at-type-parameter.l4
+  Hidden: no
+  Range: 44:12-44:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/jsondecode-at-type-parameter
+  Message:
+    JSONDECODE turns JSON text into a value of the type its result is used as.
+    Here that type is
+
+      a
+
+    which is a type given with
+
+      GIVEN a IS A TYPE, on line 40
+
+    A type given that way can be a different type each time the rule it belongs
+    to is used, and when the rules run nothing says which type it is. So this
+    JSONDECODE has nothing to go by: a JSON object would not become a record,
+    and a string would not become one of the choices of an IS ONE OF type.
+
+    Decode the JSON where its type is written down instead, for example in a
+    rule with
+
+      GIVETH AN EITHER STRING <the type you expect>
+
+    and hand the decoded value on as an input.
+
+File: jsondecode-at-type-parameter.l4
+  Hidden: no
+  Range: 54:20-54:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/jsondecode-at-type-parameter
+  Message:
+    JSONDECODE turns JSON text into a value of the type its result is used as.
+    Here that type is
+
+      a
+
+    which is a type given with
+
+      GIVEN a IS A TYPE, on line 52
+
+    A type given that way can be a different type each time the rule it belongs
+    to is used, and when the rules run nothing says which type it is. So this
+    JSONDECODE has nothing to go by: a JSON object would not become a record,
+    and a string would not become one of the choices of an IS ONE OF type.
+
+    Decode the JSON where its type is written down instead, for example in a
+    rule with
+
+      GIVETH AN EITHER STRING <the type you expect>
+
+    and hand the decoded value on as an input.
+
+File: jsondecode-at-type-parameter.l4
+  Hidden: no
+  Range: 61:23-61:33
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/jsondecode-at-type-parameter
+  Message:
+    JSONDECODE turns JSON text into a value of the type its result is used as.
+    Here that type is
+
+      PAIR OF a, LIST OF b
+
+    which mentions types given with
+
+      GIVEN a IS A TYPE, on line 57
+      GIVEN b IS A TYPE, on line 58
+
+    A type given that way can be a different type each time the rule it belongs
+    to is used, and when the rules run nothing says which type it is. So this
+    JSONDECODE has nothing to go by: a JSON object would not become a record,
+    and a string would not become one of the choices of an IS ONE OF type.
+
+    Decode the JSON where its type is written down instead, for example in a
+    rule with
+
+      GIVETH AN EITHER STRING <the type you expect>
+
+    and hand the decoded value on as an input.
+
+File: jsondecode-at-type-parameter.l4
+  Hidden: no
+  Range: 65:24-65:34
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/jsondecode-at-type-parameter
+  Message:
+    JSONDECODE turns JSON text into a value of the type its result is used as.
+    Here that type is
+
+      a
+
+    which is a type given with
+
+      GIVEN a IS A TYPE, on line 67
+
+    A type given that way can be a different type each time the rule it belongs
+    to is used, and when the rules run nothing says which type it is. So this
+    JSONDECODE has nothing to go by: a JSON object would not become a record,
+    and a string would not become one of the choices of an IS ONE OF type.
+
+    Decode the JSON where its type is written down instead, for example in a
+    rule with
+
+      GIVETH AN EITHER STRING <the type you expect>
+
+    and hand the decoded value on as an input.
