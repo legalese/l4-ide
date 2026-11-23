@@ -1,0 +1,86 @@
+-- Rules that start two copies of themselves at once, beside rules with the
+-- same RAND that start themselves only once, which draw no warning. Recursion-limit
+-- ruling L3 (2026-11-20) asks for a positive and a
+-- negative fixture for each shape a warning fires on, and ruling L4 says that
+-- @ends-because never silences this warning. Both are described in
+-- doc/reference/regulative/rules-that-start-themselves-again.md, and the
+-- golden pins the text of each message.
+--
+-- A marked rule here never follows one that draws this warning: after a
+-- comment, an annotation is counted into the range of the expression before
+-- it, which would stretch that warning down to the mark.
+
+DECLARE Person IS ONE OF Alex, Sam
+DECLARE Action IS ONE OF `pay rent`, `pay a fee`
+
+-- Warns: the mark answers "could not check" (the deadline is counted from a
+-- fixed moment), and that warning is gone, but not this one.
+@ends-because Alex pays before day 2
+GIVETH A DEONTIC Person Action
+`fixed chaser` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN 1 OF 2
+    LEST (`fixed chaser` RAND `fixed chaser`)
+
+-- Warns: every time the deadline is missed, the number of copies open doubles.
+GIVETH A DEONTIC Person Action
+`chaser` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN 7
+    LEST (`chaser` RAND `chaser`)
+
+-- No warning: the RAND joins one new copy of the rule with a different duty.
+GIVETH A DEONTIC Person Action
+`late fee` MEANS
+    PARTY Alex
+    MUST `pay a fee`
+    WITHIN 14
+
+GIVETH A DEONTIC Person Action
+`fee and reminder` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN 7
+    LEST (`late fee` RAND `fee and reminder`)
+
+-- Warns on `second chaser`, whose LEST starts the copies, and names the rules
+-- that lead back to each other on a line of their own. The mark above `first
+-- chaser` does not silence it.
+@ends-because Alex pays in the end
+GIVETH A DEONTIC Person Action
+`first chaser` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN 7
+    LEST `second chaser`
+
+GIVETH A DEONTIC Person Action
+`second chaser` MEANS
+    PARTY Sam
+    MUST `pay rent`
+    WITHIN 7
+    LEST (`first chaser` RAND `first chaser`)
+
+-- Warns, and says how far it can grow: `n` drops by 1 at each step down.
+GIVEN n IS A NUMBER
+GIVETH A DEONTIC Person Action
+`spreading chaser` n MEANS
+    IF n EQUALS 0
+    THEN FULFILLED
+    ELSE PARTY Alex
+         MUST `pay rent`
+         WITHIN 7
+         LEST (`spreading chaser` (n MINUS 1) RAND `spreading chaser` (n MINUS 1))
+
+-- Warns, and says how far it can grow when `n` drops by 2 at each step down.
+GIVEN n IS A NUMBER
+GIVETH A DEONTIC Person Action
+`faster chaser` n MEANS
+    IF n AT MOST 0
+    THEN FULFILLED
+    ELSE PARTY Alex
+         MUST `pay rent`
+         WITHIN 7
+         LEST (`faster chaser` (n MINUS 2) RAND `faster chaser` (n MINUS 2))

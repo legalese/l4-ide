@@ -740,6 +740,11 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
         <> [ "@nonassertable"
            | Just _ <- [Optics.view annNonassertable ann]
            ]
+        -- And for @ends-because: the reason is the author's, and a re-print
+        -- that dropped it would leave a definition vouched for by nobody.
+        <> [ endsBecauseLine eb
+           | Just eb <- [Optics.view annEndsBecause ann]
+           ]
         <> case writtenClauses ann appForm expr of
           -- A multi-clause group prints as the clauses the drafter wrote. Its
           -- tree is what they compile to, and that names things the desugarer
@@ -768,6 +773,14 @@ instance LayoutPrinterWithName a => LayoutPrinter (Decide a) where
             , "DECIDE" <+> printWithLayout appForm <+> "IS"
             , indent 2 (printWithLayout expr)
             ]
+
+-- | The line @\@ends-because <reason>@ a definition is printed under.
+endsBecauseLine :: EndsBecause -> Doc ann
+endsBecauseLine eb
+  | Text.null reason = "@ends-because"
+  | otherwise = "@ends-because" <+> pretty reason
+  where
+    reason = getEndsBecauseReason eb
 
 -- | The clauses of a multi-clause group, printed from the AST: each clause's
 -- patterns from the clause matrix the parser kept ('PmMatrix'), in which
@@ -1521,8 +1534,13 @@ instance LayoutPrinterWithName a => LayoutPrinter (NamedExpr a) where
 -- Uses "BE" as the binding keyword in honour of The Beatles' "Let It Be"
 printLetBinding :: LayoutPrinterWithName a => LocalDecl a -> Doc ann
 printLetBinding = \ case
-  LocalDecide _ (MkDecide _ _tySig appForm expr) ->
-    Prettyprinter.group $ printWithLayout appForm <+> "BE" <+> Prettyprinter.align (printWithLayout expr)
+  LocalDecide _ (MkDecide dann _tySig appForm expr) ->
+    let binding = Prettyprinter.group $ printWithLayout appForm <+> "BE" <+> Prettyprinter.align (printWithLayout expr)
+    in case Optics.view annEndsBecause dann of
+      -- The one annotation a LET binding keeps: a printed module must not
+      -- drop a reason its author wrote (see the 'Decide' instance).
+      Just eb -> vcatHard [endsBecauseLine eb, binding]
+      Nothing -> binding
   LocalAssume _ t -> printWithLayout t
 
 instance LayoutPrinterWithName a => LayoutPrinter (LocalDecl a) where

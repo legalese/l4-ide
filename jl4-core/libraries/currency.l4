@@ -240,15 +240,17 @@ GIVETH AN EITHER STRING STRING
                     divisor MEANS `power of 10` decs
                         majorUnits MEANS FLOOR (units DIVIDED BY divisor)
                         minorPart MEANS units MODULO divisor
-                        paddedMinor MEANS padLeft (numberToString minorPart) decs "0"
+                        paddedMinor MEANS padLeft (numberToString minorPart) (decs MINUS STRINGLENGTH (numberToString minorPart)) "0"
 
         numberToString n MEANS TOSTRING n
 
-        padLeft str targetLen padChar MEANS
+        -- adds padChar in front of str count times (the call works out the
+        -- count), so it ends even when padChar is empty
+        padLeft str count padChar MEANS
             BRANCH
-                IF STRINGLENGTH str AT LEAST targetLen
+                IF count AT MOST 0
                 THEN str
-                OTHERWISE padLeft (CONCAT padChar, str) targetLen padChar
+                OTHERWISE padLeft (CONCAT padChar, str) (count MINUS 1) padChar
 
 
 §§ `Amount Conversion Functions`

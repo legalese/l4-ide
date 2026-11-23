@@ -32,6 +32,9 @@ l4 explore lts-list-example.l4
 The file has a `#TRACE` in which the seller delivers on day 2.
 `l4 explore` does not replay that trace.
 It takes from each `#TRACE` only the contract and the day it starts, and explores from the outset, so the delivery on day 2 is one path among the paths it tries.
+The day it starts is read as the clock, whatever it is: negative (`AT -5`), a sum (`AT (10 + 5)`), or a date (`AT (DATE_SERIAL (YMD 2026 6 1))`), each evaluated once.
+A start that is neither a number nor a date is refused with exit 1 and says so.
+(Before 2026-11-23 the explorer read only a literal number, and took any other start for 0, and a start below 0 for 0 too: its clock began later than the contract's and every deadline was measured from the wrong place; one file among the 78 in the repository's examples and docs that carry a `#TRACE` explores a different graph for it, `every/run-anchors.l4` at `AT DATE_SERIAL (YMD 2026 7 1)`, from 2 states to 3.)
 (One exploration is made for each distinct contract and starting day among the file's traces.
 To explore a rule no trace names, give `--contract NAME`, with `--at T` for the day it starts, 0 if left out.)
 

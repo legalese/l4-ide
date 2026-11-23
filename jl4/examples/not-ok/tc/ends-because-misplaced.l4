@@ -1,0 +1,43 @@
+-- @ends-because vouches for a definition's recursion; above anything else it is a
+-- check error naming what it sits on, and with no reason after it the mark is
+-- refused too, because the reason is what a reader checks.
+-- Errors expected, one each: the DECLARE, the ASSUME, the section heading, the
+-- directive, a mark on a definition's GIVEN line (which names the input), the
+-- empty reason on a top-level definition, and the empty reason on a WHERE local.
+-- The marks above the two definitions with reasons are fine.
+
+@ends-because the name is only a label
+DECLARE Person HAS name IS A STRING
+
+@ends-because the answer is supplied
+ASSUME `is adult` IS A BOOLEAN
+
+@ends-because each step is nearer the end
+`can vote` MEANS `is adult`
+
+@ends-because the heading is not a definition
+§ `Part Two`
+    GIVEN `is resident` IS A BOOLEAN
+
+@ends-because each step is nearer the end
+`can stand` MEANS `is resident`
+
+@ends-because a directive is not a definition
+#EVAL `can vote`
+
+GIVEN x IS A BOOLEAN @ends-because the input is not a definition
+GIVETH A BOOLEAN
+`signature marked` MEANS x
+
+@ends-because
+`no reason given` MEANS `is resident`
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`outer` n MEANS
+  `inner` n
+  WHERE
+    @ends-because
+    GIVEN k IS A NUMBER
+    GIVETH A NUMBER
+    `inner` k MEANS IF k EQUALS 0 THEN 0 ELSE `inner` (k MINUS 1)
