@@ -31,7 +31,7 @@ instants = "tests-cli" </> "fixtures" </> "explore-instants"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -466,10 +466,37 @@ spec bin = describe "l4 explore" $ do
       wide `shouldBe` ExitSuccess
       lastLine wout `shouldSatisfy` ("nothing untried" `isInfixOf`)
 
-    it "own-lapse.l4: an act is not tied with the cure its own lapse would arm, so no chain is named for it (exit 0)" $ do
+    it "own-lapse.l4: the act whose own lapse arms a cure is tied with it in the chain note, a loud false alarm that --chains clears (exit 2, then exit 0)" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "own-lapse.l4"]
-      code `shouldBe` ExitSuccess
-      lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("ties through chains of acts, for PARTY T DOES t" `isInfixOf`)
+      Output ccode csout _ <- runL4 bin ["explore", instants </> "own-lapse.l4", "--chains"]
+      ccode `shouldBe` ExitSuccess
+      lastLine csout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+
+    it "succ4.l4: a chain tie with the cure of an act's own lapse, which the act's continuation re-arms, is named by default (exit 2) and --chains reaches it" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "succ4.l4"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("ties through chains of acts, for PARTY T DOES t" `isInfixOf`)
+      Output ccode csout _ <- runL4 bin ["explore", instants </> "succ4.l4", "--chains"]
+      ccode `shouldBe` ExitSuccess
+      lastLine csout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      let tAtTwo = [ l | l <- lines (filter (/= '\r') csout), "PARTY T DOES t AT 2" `isInfixOf` l ]
+      tAtTwo `shouldSatisfy` (not . null)
+
+    it "cap-shift.l4: a state reached again at a LATER window says the shortfall of the larger visit, whichever came first" $ do
+      let need k = do
+            Output code sout _ <- runL4 bin ["explore", instants </> "cap-shift.l4", "--max-instants", show (k :: Int)]
+            pure (code, lastLine sout)
+      (c2, l2) <- need 2
+      c2 `shouldBe` ExitFailure 2
+      l2 `shouldSatisfy` ("PARTY B DOES b at the instants past the instant cap (it needs 3 more instants than the instant cap of 2 allows" `isInfixOf`)
+      (c3, l3) <- need 3
+      c3 `shouldBe` ExitFailure 2
+      l3 `shouldSatisfy` ("it needs 2 more instants than the instant cap of 3 allows" `isInfixOf`)
+      (c5, l5) <- need 5
+      c5 `shouldBe` ExitSuccess
+      l5 `shouldSatisfy` ("nothing untried" `isInfixOf`)
 
     it "frac-re.l4: a state reached again names its fraction once, not once for each fraction its visits find" $ do
       Output _ sout _ <- runL4 bin ["explore", instants </> "frac-re.l4"]

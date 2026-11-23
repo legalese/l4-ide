@@ -604,6 +604,55 @@ famSrc = Text.unlines
   , "`fam` MEANS PARTY T1 MUST t1 WITHIN 2 HENCE (PARTY T2 MUST t2 WITHIN 1 HENCE qk LEST qk) LEST qk"
   ]
 
+-- | A CHAIN tie with the cure of t's own lapse, which t's continuation re-arms
+-- (t2: the same deadline, 6, and the same cure), so the cure stands: `t` at 2
+-- starts U's 1 (3), `u` at 3 starts V's 13 (16), and t2's lapse at 6 arms Q's 10
+-- after it (16). Only a chain names 2 or 3.
+succ4Src :: Text.Text
+succ4Src = Text.unlines
+  [ "DECLARE Person IS ONE OF T, U, V, Q, K"
+  , "DECLARE Action IS ONE OF t, t2, u, v, q, k"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "cure MEANS PARTY Q MUST q WITHIN 10 HENCE FULFILLED LEST BREACH BY Q"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`succ4` MEANS"
+  , "       (PARTY T MUST t WITHIN 6 OF 0"
+  , "          HENCE (     (PARTY T MUST t2 WITHIN 6 OF 0 HENCE FULFILLED LEST cure)"
+  , "                 RAND (PARTY U MUST u WITHIN 1"
+  , "                         HENCE (PARTY V MUST v WITHIN 13 HENCE FULFILLED LEST BREACH BY V)"
+  , "                         LEST BREACH BY U))"
+  , "          LEST cure)"
+  , "  RAND (PARTY K MUST k WITHIN 20 HENCE FULFILLED LEST BREACH BY K)"
+  ]
+
+-- | cap-re with B's deadline relative: from clock 2 b's window [2, 7] holds the
+-- ties 6 and 7 (V's 4 on the fixed 10 and 11), from clock 0 it is [0, 5] and
+-- holds neither, so the FIRST visit needs more instants than the last.
+capShiftSrc :: Text.Text
+capShiftSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF T, U, Q, B, V, S1, S2"
+  , "DECLARE Action IS ONE OF t, u, q, b, v, s1, s2"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "k MEANS"
+  , "       (PARTY B MUST b WITHIN 5"
+  , "          HENCE (PARTY V MUST v WITHIN 4 HENCE FULFILLED LEST BREACH BY V)"
+  , "          LEST BREACH BY B)"
+  , "  RAND (PARTY S1 SHANT s1 WITHIN 10 OF 0 HENCE FULFILLED LEST BREACH BY S1)"
+  , "  RAND (PARTY S2 SHANT s2 WITHIN 11 OF 0 HENCE FULFILLED LEST BREACH BY S2)"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "qk MEANS PARTY Q MUST q WITHIN 1 HENCE k LEST BREACH BY Q"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`rc` MEANS"
+  , "  PARTY T MUST t WITHIN 1"
+  , "    HENCE (PARTY U MUST u WITHIN 1 HENCE qk LEST BREACH BY U)"
+  , "    LEST qk"
+  ]
+
 -- | A deadline that is fixed in absolute time and only the successor holds
 -- (an anchor on the arming of the outset): Q's is at 3, S's at 7, whichever
 -- instant `a` is done at, so `a` at 3 and at 7 are boundaries.
@@ -955,6 +1004,7 @@ spec = describe "l4 explore" do
           | "`cascade`" `Text.isInfixOf` src = "cascade"
           | "`lapsed`" `Text.isInfixOf` src = "lapsed"
           | "`own`" `Text.isInfixOf` src = "own"
+          | "`succ4`" `Text.isInfixOf` src = "succ4"
           | "`succ2`" `Text.isInfixOf` src = "succ2"
           | "`fam`" `Text.isInfixOf` src = "fam"
           | "`lapsef`" `Text.isInfixOf` src = "lapsef"
@@ -997,13 +1047,26 @@ spec = describe "l4 explore" do
       holdsEvery "a lapse of a deadline FIXED at the outset, with --chains" lapseFixedSrc regions {eoChains = True} Nothing 4 9
       honest "a lapse of a deadline FIXED at the outset" lapseFixedSrc regions Nothing 4 9
       -- the act that discharges a deadline is not tied with the cure its lapse arms
-      it "the act whose own lapse arms a cure is not tied with that cure (no chain is named for it)" do
+      it "the act whose own lapse arms a cure is tied with it in the chain note: a loud false alarm that --chains clears" do
         g <- exploreSrc ownLapseSrc "own" regions []
-        coverageComplete g.gCoverage `shouldBe` True
+        coverageComplete g.gCoverage `shouldBe` False
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "ties through chains of acts, for PARTY T DOES t"
+        c <- exploreSrc ownLapseSrc "own" regions {eoChains = True} []
+        coverageComplete c.gCoverage `shouldBe` True
       holdsEvery "an act and the cure its own lapse would arm" ownLapseSrc regions Nothing 3 16
+      -- a chain tie with the cure of an act's own lapse that its continuation re-arms is real
+      honest "a chain tie with the cure of an act's own lapse, re-armed" succ4Src regions Nothing 3 17
+      holdsEvery "a chain tie with the cure of an act's own lapse, re-armed, with --chains" succ4Src regions {eoChains = True} Nothing 3 17
       holdsEvery "an act that re-arms its own lapse, by default" succ2Src regions Nothing 3 16
       holdsEvery "an act that re-arms its own lapse, with --chains" succ2Src regions {eoChains = True} Nothing 3 16
-      it "a state reached again says the larger shortfall of the instant cap, which its earlier clock has" do
+      it "a state reached again says the larger shortfall of the instant cap over its visits, whichever visit came first" do
+        forM_ [(2, "needs 3 more"), (3, "needs 2 more"), (4, "needs 1 more")] \ (k, expected) -> do
+          g <- exploreSrc capShiftSrc "rc" regions {eoMaxInstants = k} []
+          let caps = [ n | n <- g.gCoverage.cvUntried, "PARTY B DOES b" `Text.isInfixOf` n.unWhat, "instant cap" `Text.isInfixOf` n.unWhat ]
+          map (.unWhy) caps `shouldSatisfy` any (Text.isInfixOf expected)
+        full <- exploreSrc capShiftSrc "rc" regions {eoMaxInstants = 5} []
+        coverageComplete full.gCoverage `shouldBe` True
+      it "a state reached again says the larger shortfall of the instant cap, which its earlier clock has (cap-re)" do
         g <- exploreSrc capReSrc "rc" regions {eoMaxInstants = 2} []
         let caps = [ n | n <- g.gCoverage.cvUntried, "PARTY B DOES b" `Text.isInfixOf` n.unWhat, "instant cap" `Text.isInfixOf` n.unWhat ]
         -- the state reached again says 2 (another state can need less)

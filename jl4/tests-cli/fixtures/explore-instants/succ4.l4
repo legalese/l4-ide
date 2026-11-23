@@ -1,0 +1,28 @@
+-- smucclaw/l4-ide#1081, found by an independent re-check: a CHAIN tie with the
+-- cure of t's own lapse, which t's continuation re-arms (t2: same deadline 6,
+-- same cure), so the cure stands. `t` at 2 starts U's deadline of 1 (3); `u` at 3
+-- starts V's of 13 (16); t2's lapse at 6 arms Q's 10 after it (16): V and Q tie.
+-- t's own instants are 0, 1, 5, 6; only a chain names 2 or 3, so the coverage
+-- line names it (exit 2) and `--chains` reaches it. K's deadline keeps every
+-- clock a distinct state.
+IMPORT prelude
+DECLARE Person IS ONE OF T, U, V, Q, K
+DECLARE Action IS ONE OF t, t2, u, v, q, k
+
+GIVETH A DEONTIC Person Action
+cure MEANS PARTY Q MUST q WITHIN 10 HENCE FULFILLED LEST BREACH BY Q
+
+GIVETH A DEONTIC Person Action
+succ4 MEANS
+       (PARTY T MUST t WITHIN 6 OF 0
+          HENCE (     (PARTY T MUST t2 WITHIN 6 OF 0 HENCE FULFILLED LEST cure)
+                 RAND (PARTY U MUST u WITHIN 1
+                         HENCE (PARTY V MUST v WITHIN 13 HENCE FULFILLED LEST BREACH BY V)
+                         LEST BREACH BY U))
+          LEST cure)
+  RAND (PARTY K MUST k WITHIN 20 HENCE FULFILLED LEST BREACH BY K)
+
+#TRACE succ4 AT 0 WITH
+  PARTY T DOES t AT 2
+  PARTY U DOES u AT 3
+  (WAITUNTIL 7)
