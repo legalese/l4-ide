@@ -1,0 +1,20 @@
+-- smucclaw/l4-ide#1081, found by the second independent review: a deadline
+-- STARTED BY A LAPSE. Q's deadline is 3 after `a`; when Q lets it pass, W's
+-- cure starts (2 after the lapse). R's deadline is fixed at 7. The cure falls
+-- on R's deadline when `a` is done at 2, and the explorer tried `a` at 0, 1, 4,
+-- 5 and 7 only: no act starts W's deadline, so no act's own offset named the
+-- tie, and the chain went unnamed (default and --chains alike).
+IMPORT prelude
+DECLARE Person IS ONE OF P, Q, R, W
+DECLARE Action IS ONE OF a, b, r, w
+
+GIVETH A DEONTIC Person Action
+lapse MEANS
+       (PARTY R MUST r WITHIN 7 HENCE FULFILLED LEST BREACH BY R)
+  RAND (PARTY P MUST a WITHIN 9
+          HENCE (PARTY Q MUST b WITHIN 3 HENCE FULFILLED
+                   LEST (PARTY W MUST w WITHIN 2 HENCE FULFILLED LEST BREACH BY W))
+          LEST BREACH BY P)
+
+#TRACE lapse AT 0 WITH
+  PARTY P DOES a AT 0

@@ -1,0 +1,19 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1081 (X3). The window opens at 3 and closes at 5. An act
+-- before 3 is a nullity, so `--grid 1` has to look past the opening.
+
+DECLARE Person IS ONE OF Ben
+DECLARE Action IS ONE OF ship
+
+GIVETH A DEONTIC Person Action
+deal MEANS
+  PARTY Ben
+  MUST ship
+  AFTER 3
+  WITHIN 2
+  HENCE FULFILLED
+  LEST BREACH BY Ben
+
+#TRACE deal AT 0 WITH
+  PARTY Ben DOES ship AT 4

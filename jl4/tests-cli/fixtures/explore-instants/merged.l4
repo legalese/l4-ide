@@ -1,0 +1,26 @@
+-- smucclaw/l4-ide#1081, found by the second independent review: two positions
+-- with ONE state key and different clocks. `WITHIN 6 OF 0` is anchored (it prints
+-- the same at every clock) and fixed at 6. `WAITUNTIL 5` then `q AT 5` reaches a
+-- state at clock 5; `t, confirm, q` all at 0 reaches the same key at clock 0,
+-- from which `b` can be done at 0..3, and so V's deadline can fall before S1's.
+-- The graph was explored from the first one found (clock 5) only.
+IMPORT prelude
+DECLARE Person IS ONE OF T, Q, B, V, W, S1, S2
+DECLARE Action IS ONE OF t, confirm, q, b, v, w, s1, s2
+
+GIVETH A DEONTIC Person Action
+rest MEANS
+       (PARTY B MUST b WITHIN 20
+          HENCE (PARTY V MUST v WITHIN 2 HENCE FULFILLED
+                   LEST (PARTY W MUST w WITHIN 1 HENCE FULFILLED LEST BREACH BY W))
+          LEST BREACH BY B)
+  RAND (PARTY S1 MUST s1 WITHIN 6 OF 0 HENCE FULFILLED LEST BREACH BY S1)
+
+GIVETH A DEONTIC Person Action
+m MEANS
+  PARTY T MUST t WITHIN 4
+    HENCE (PARTY T MUST confirm WITHIN 1 HENCE (PARTY Q MUST q WITHIN 10 HENCE rest LEST BREACH BY Q) LEST BREACH BY T)
+    LEST (PARTY Q MUST q WITHIN 10 HENCE rest LEST BREACH BY Q)
+
+#TRACE m AT 0 WITH
+  PARTY T DOES t AT 0

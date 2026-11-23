@@ -75,6 +75,7 @@ module L4.Lts.WhatIf
   , candidatesOf
   , tickPast
   , deadlineOf
+  , openingOf
     -- * The replay
   , whatIf
   , tryCandidate
@@ -447,7 +448,7 @@ deadlineOf clock raw = case raw.roDue of
   Left (Just (MkBefore _ _)) ->
     pure (Left "the BEFORE date was never evaluated, so its deadline is not known here")
   where
-    lifecycle = lifecycleOf raw.roEnv
+    anchorOf = anchorInstantOf clock raw
     -- what a bare WITHIN counts from: the window's opening when the act
     -- has one that is still to open, the clock otherwise
     openingInstant = case raw.roOpens of
@@ -461,20 +462,29 @@ deadlineOf clock raw = case raw.roDue of
           _ -> Left "the AFTER was never evaluated and is not a literal (a date, or a computed offset), so its deadline is not known here"
         base <- maybe (pure (Right clock)) anchorOf mAnchor
         pure ((+) <$> base <*> off)
-    anchorOf = \ case
-      AnchorJoin _     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
-      AnchorDeadline _ -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
-      AnchorArming _   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
-      AnchorAt _ e     -> case e of
-        -- @OF (THE JOIN)@, a lifecycle value as the whole anchor (§2.6 B1),
-        -- names what the bare noun does
-        Lifecycle _ LifecycleJoin     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
-        Lifecycle _ LifecycleDeadline -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
-        Lifecycle _ LifecycleArming   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
-        Var _ r | Just rf <- Map.lookup (getUnique r) raw.roEnv -> instantOf "the anchor" rf
-        _ -> reifyExpr raw.roEnv e >>= pure . \ case
-          Lit _ (NumericLit _ r) -> Right r
-          _ -> Left "the anchor of the WITHIN is not a literal, so its deadline is not known here"
+
+-- | The instant an anchor names, read the way the machine resolves it at
+-- @Contract4@ (§2.4: not re-derived): a lifecycle anchor is the binding the
+-- enclosing obligation's hand-off left in the obligation's environment, THE
+-- ARMING with no enclosing obligation being the obligation's own arming (the
+-- clock), an @OF e@ is the value @e@ names.
+anchorInstantOf :: Rational -> RawObligation NF -> Anchor Resolved -> IO (Either Text Rational)
+anchorInstantOf clock raw = \ case
+  AnchorJoin _     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
+  AnchorDeadline _ -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
+  AnchorArming _   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
+  AnchorAt _ e     -> case e of
+    -- @OF (THE JOIN)@, a lifecycle value as the whole anchor (§2.6 B1),
+    -- names what the bare noun does
+    Lifecycle _ LifecycleJoin     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
+    Lifecycle _ LifecycleDeadline -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
+    Lifecycle _ LifecycleArming   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
+    Var _ r | Just rf <- Map.lookup (getUnique r) raw.roEnv -> instantOf "the anchor" rf
+    _ -> reifyExpr raw.roEnv e >>= pure . \ case
+      Lit _ (NumericLit _ r) -> Right r
+      _ -> Left "the anchor of the WITHIN is not a literal, so its deadline is not known here"
+  where
+    lifecycle = lifecycleOf raw.roEnv
     lifecyclePosition name = \ case
       Nothing -> pure (Left (name <> " names a position the enclosing obligation's hand-off did not have, so the deadline is not known here"))
       Just rf -> instantOf name rf
@@ -483,12 +493,36 @@ deadlineOf clock raw = case raw.roDue of
       WHNFWhen _ v _ _ -> anchorInstant v
       Unevaluated{}    -> Left (name <> " was never forced, so the deadline is not known here")
 
+-- | The absolute instant the obligation's window opens at (@AFTER@):
+-- 'Nothing' when it has no opening edge, 'Left' with the reason when it has
+-- one whose instant is not known here. Read as 'deadlineOf' reads the same
+-- edge: a residual opening is the time still to run, counted from the clock;
+-- an unforced one is an offset from its anchor, or from the clock.
+openingOf :: Rational -> RawObligation NF -> IO (Maybe (Either Text Rational))
+openingOf clock raw = case raw.roOpens of
+  Left Nothing  -> pure Nothing
+  Right Nothing -> pure Nothing
+  Right (Just (ValNumber untilOpen)) -> pure (Just (Right (clock + untilOpen)))
+  Right (Just other) -> pure (Just (Left ("the residual opening is not a number: " <> Text.pack (show other))))
+  Left (Just (MkOpening _ offset mAnchor)) -> fmap Just do
+    off <- reifyExpr raw.roEnv offset >>= pure . \ case
+      Lit _ (NumericLit _ r) -> Right r
+      _ -> Left "the AFTER was never evaluated and is not a literal (a date, or a computed offset), so its opening is not known here"
+    base <- maybe (pure (Right clock)) (anchorInstantOf clock raw) mAnchor
+    pure ((+) <$> base <*> off)
+
 -- | The stamp that reveals the expiry of deadline @d@ and of no later one:
 -- the machine expires on @stamp > deadline@, so a tick AT @d@ shows
--- nothing. One unit past @d@ (the corpus clock counts days), or half-way to
--- the next live deadline when that is nearer.
+-- nothing, and a tick one unit past @d@ shows @d@'s expiry and not that of a
+-- deadline a unit later (measured 2026-11-22: deadlines 3 and 4, a tick at 4
+-- breaches the first alone, a tick at 5 both). Contract time is discrete
+-- (T2), so one unit past @d@ is the answer; it is only when the next live
+-- deadline is LESS than a unit away, which a whole-numbered contract does not
+-- have, that the tick goes half-way to it. (Until smucclaw/l4-ide#1081 it
+-- went half-way whenever the next deadline was less than TWO units away, so
+-- two deadlines a unit apart gave the tick @d + 0.5@.)
 tickPast :: [Rational] -> Rational -> Rational
-tickPast deadlines d = d + minimum (1 : [ (d' - d) / 2 | d' <- deadlines, d' > d ])
+tickPast deadlines d = d + minimum (1 : [ gap / 2 | d' <- deadlines, let gap = d' - d, gap > 0, gap < 1 ])
 
 -- | What the evaluator said the hypothetical does. Only the machine's own
 -- terminals are read: @FULFILLED@ discharges, @BREACHED@ breaches, and

@@ -1,0 +1,20 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1081: a tie that needs a CHAIN of acts.
+-- R's deadline is fixed at 7. P's `a` starts Q's deadline (3 after it), which
+-- is the limit for U's `u`; `u` starts V's deadline (2 after it).
+-- `u` at 5 puts V's deadline on R's, and `u` can be at 5 only if `a` was done
+-- at 2 or later (Q's deadline is then at 5 or later), so `a` at 2 is a boundary
+-- that no single act's own offset names: it is 7 - 3 - 2.
+
+DECLARE Person IS ONE OF P, Q, R, U, V
+DECLARE Action IS ONE OF a, b, r, u, v
+
+GIVETH A DEONTIC Person Action
+room MEANS
+        (PARTY R MUST r WITHIN 7 HENCE FULFILLED LEST BREACH BY R)
+  RAND  (PARTY P MUST a WITHIN 9 HENCE (PARTY Q MUST b WITHIN 3 HENCE FULFILLED LEST BREACH BY Q) LEST BREACH BY P)
+  RAND  (PARTY U MUST u WITHIN 9 HENCE (PARTY V MUST v WITHIN 2 HENCE FULFILLED LEST BREACH BY V) LEST BREACH BY U)
+
+#TRACE room AT 0 WITH
+  PARTY P DOES a AT 0

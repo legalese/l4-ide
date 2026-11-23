@@ -118,6 +118,7 @@ import Data.Time (UTCTime)
 import qualified Data.Time as Time
 import Data.Time.LocalTime (TimeOfDay(..), LocalTime(..), timeToTimeOfDay, timeOfDayToTime)
 import qualified Data.Time.Format as TimeFormat
+import Data.Time.Format.ISO8601 (iso8601Show)
 import qualified Data.Time.Zones as TZ
 import L4.Annotation
 import L4.Evaluate.Ledger
@@ -6015,6 +6016,15 @@ encodeValueToJson = \case
     | otherwise -> pure $ Text.pack $ show (fromRational n :: Double)
   ValBool True -> pure "true"
   ValBool False -> pure "false"
+  -- A DATE and a TIME are written as strings in the text form the language
+  -- prints them in (@2026-01-31@, @10:30:00@), and a DATETIME as RFC 3339 in
+  -- UTC, whatever its own zone (@2026-01-31T10:30:00Z@), the one text every
+  -- writer of a DATETIME uses (W1, option B: smucclaw/l4-ide#1083).
+  -- 'parseDateText', 'parseTimeText' and 'parseDatetimeText' read each back at
+  -- the same type.
+  ValDate day -> pure $ quoted (formatDateIso day)
+  ValTime tod -> pure $ quoted (formatTimeOfDayExact tod)
+  ValDateTime utc _tz -> pure $ quoted (formatUTCTimeIsoExact utc)
   ValNil -> pure "[]"
   ValCons _x _xs ->
     -- This should not be reached as lists are handled in runBuiltin with frames
@@ -6035,6 +6045,9 @@ encodeValueToJson = \case
   v | Just ns <- unknownNames v -> stuckOn ns
   val -> internalException $ RuntimeTypeError $ "Cannot encode value to JSON: " <> prettyLayout val
   where
+    quoted :: Text -> Text
+    quoted t = "\"" <> escapeJson t <> "\""
+
     escapeJson :: Text -> Text
     escapeJson = Text.concatMap \case
       '"' -> "\\\""
@@ -6195,8 +6208,7 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                   mTzName <- readTcDocumentTimezone
                   let tzName = fromMaybe "Etc/UTC" mTzName
                   pure $ ValDateTime utc tzName
-                Nothing -> userException $ UserError $
-                  "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ"
+                Nothing -> userException $ UserError $ datetimeRefusal s
             _ -> userException $ UserError $
                   "Expected JSON string for DATETIME" <> atField at <> " but got: " <> Text.pack (show jsonValue)
 
@@ -9059,30 +9071,64 @@ parseTimeText raw =
        , Just tod <- [TimeFormat.parseTimeM True TimeFormat.defaultTimeLocale fmt (Text.unpack trimmed)]
        ]
 
--- | Parse an ISO-8601 datetime string to UTCTime
+-- | Parse an ISO-8601 datetime string to UTCTime. The time ends in @Z@, in a
+-- numeric offset (@+0800@ or @+08:00@), or in the word @UTC@ or @GMT@, which
+-- stand for the offset 0. No other zone name is read: @CST@ is US Central to
+-- one reader and China Standard Time to another, so the text does not fix an
+-- instant. 'datetimeRefusal' says so when a text is refused.
 parseDatetimeText :: Text -> Maybe UTCTime
 parseDatetimeText raw =
-  let trimmed = Text.strip raw
-      formats =
-        [ "%Y-%m-%dT%H:%M:%S%Z"
-        , "%Y-%m-%dT%H:%M:%S%Q%Z"
-        , "%Y-%m-%dT%H:%M:%SZ"
-        , "%Y-%m-%dT%H:%M:%S%QZ"
-        , "%Y-%m-%dT%H:%M:%S%z"
-        , "%Y-%m-%dT%H:%M:%S%Q%z"
-        , "%Y-%m-%d %H:%M:%S%Z"
-        , "%Y-%m-%d %H:%M:%S%z"
-        ]
-  in listToMaybe
-       [ utc
-       | fmt <- formats
-       , Just utc <- [TimeFormat.parseTimeM True TimeFormat.defaultTimeLocale fmt (Text.unpack trimmed)]
-       ]
+  listToMaybe
+    [ utc
+    | fmt <- formats
+    , Just utc <- [TimeFormat.parseTimeM True TimeFormat.defaultTimeLocale fmt (Text.unpack zoned)]
+    ]
+  where
+    trimmed = Text.strip raw
+    -- the word touches the time, as it did when the zone was read by name
+    zoned = case [ body
+                 | word <- ["UTC", "GMT"]
+                 , Just body <- [Text.stripSuffix word trimmed]
+                 , not (Text.null body)
+                 , not (Char.isSpace (Text.last body))
+                 ] of
+      body : _ -> body <> "Z"
+      []       -> trimmed
+    formats =
+      [ "%Y-%m-%dT%H:%M:%SZ"
+      , "%Y-%m-%dT%H:%M:%S%QZ"
+      , "%Y-%m-%dT%H:%M:%S%z"
+      , "%Y-%m-%dT%H:%M:%S%Q%z"
+      , "%Y-%m-%d %H:%M:%SZ"
+      , "%Y-%m-%d %H:%M:%S%z"
+      ]
+
+-- | What is said of a text that 'parseDatetimeText' refused. It names the fix:
+-- the time is followed by Z or by an offset such as @+08:00@. A text that
+-- would be read if its time zone abbreviation were a Z says that it is the
+-- abbreviation that is not read.
+datetimeRefusal :: Text -> Text
+datetimeRefusal s
+  | Text.length letters >= 2, isJust (parseDatetimeText (body <> "Z")) =
+      "Could not parse datetime string '" <> s <> "': the time zone abbreviation '" <> letters
+        <> "' is not read, because an abbreviation does not fix one offset. Write Z or an offset such as +08:00 after the time."
+  | otherwise =
+      "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SS followed by Z or an offset such as +08:00"
+  where
+    letters = Text.takeWhileEnd Char.isAlpha (Text.strip s)
+    body = Text.stripEnd (Text.dropWhileEnd Char.isAlpha (Text.strip s))
 
 -- | Format a TimeOfDay as HH:MM:SS
 formatTimeOfDay :: TimeOfDay -> Text
 formatTimeOfDay tod =
   Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S" tod
+
+-- | 'formatTimeOfDay', with the fraction of a second after the seconds when
+-- there is one (@10:30:00.5@), so that 'parseTimeText' reads back the same
+-- time. A whole number of seconds is written as before.
+formatTimeOfDayExact :: TimeOfDay -> Text
+formatTimeOfDayExact tod =
+  Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S%Q" tod
 
 -- | Format a 'UTCTime' as a plain ISO-8601 UTC string (e.g.
 -- @2026-06-12T08:30:00Z@). Used for ledger provenance positions (M2), where we
@@ -9093,16 +9139,29 @@ formatUTCTimeIso utc =
 
 -- | Format a UTCTime with timezone offset as ISO-8601
 formatDateTimeIso :: UTCTime -> Text -> Text
-formatDateTimeIso utc tzName =
+formatDateTimeIso = formatDateTimeIsoWith "%S"
+
+-- | An instant as RFC 3339 in UTC (@2026-01-31T10:30:00Z@), with the fraction
+-- of a second after the seconds when there is one (@2026-01-31T10:30:00.5Z@),
+-- so that 'parseDatetimeText' reads back the same instant. 'iso8601Show' keeps
+-- four digits for a year before 1000 (@0099-01-31T10:30:00Z@), which
+-- @formatTime@'s @%Y@ does not.
+formatUTCTimeIsoExact :: UTCTime -> Text
+formatUTCTimeIsoExact = Text.pack . iso8601Show
+
+-- | The datetime in the given timezone as @YYYY-MM-DDTHH:MM:SS@ followed by its
+-- UTC offset, the seconds written with the given format.
+formatDateTimeIsoWith :: String -> UTCTime -> Text -> Text
+formatDateTimeIsoWith secondsFmt utc tzName =
   case tryLoadTZPure tzName of
     Just tz ->
       let localTime' = TZ.utcToLocalTimeTZ tz utc
           offset = TZ.timeZoneForUTCTime tz utc
           offsetStr = TimeFormat.formatTime TimeFormat.defaultTimeLocale "%z" offset
-      in Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%S" localTime') <> Text.pack offsetStr
+      in Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale ("%Y-%m-%dT%H:%M:" <> secondsFmt) localTime') <> Text.pack offsetStr
     Nothing ->
       -- Fallback: format as UTC
-      Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" utc
+      Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale ("%Y-%m-%dT%H:%M:" <> secondsFmt <> "Z") utc
 
 -- | Pure-ish wrapper for TZ loading (uses unsafePerformIO since TZ data is static)
 tryLoadTZPure :: Text -> Maybe TZ.TZ

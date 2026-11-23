@@ -1,0 +1,14 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1081. A deadline that is not a whole number: contract time
+-- is discrete, so the explorer tries only whole instants and says what that
+-- left out.
+
+DECLARE Person IS ONE OF P
+DECLARE Action IS ONE OF a
+
+GIVETH A DEONTIC Person Action
+half MEANS PARTY P MUST a WITHIN 2.5 HENCE FULFILLED LEST BREACH BY P
+
+#TRACE half AT 0 WITH
+  PARTY P DOES a AT 2
