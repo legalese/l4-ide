@@ -1,0 +1,22 @@
+Parsing successful
+Typechecking successful
+no-time.l4:14:1-14:
+  `pay at once` starts itself again with no time passing: its deadline falls at the very moment each copy starts.
+  So the time of each copy is up the moment it starts, and the next copy starts straight away.
+  Waiting does not help, because no time passes between one copy and the next, so it does not stop by itself.
+  
+  To give each copy time, make its deadline fall after the moment it starts.
+no-time.l4:29:1-43:
+  The @ends-because above `chance at once` says why it comes to an end:
+  
+    Alex always takes the chance
+  
+  It silences nothing: the warning shown on `chance at once` is about something L4 has checked, and the mark answers only the warning that L4 could not check that a rule comes to an end.
+no-time.l4:31:1-17:
+  `chance at once` starts itself again with no time passing: its deadline falls at the very moment each copy starts.
+  So the time of each copy is up the moment it starts, and the next copy starts straight away.
+  Waiting does not help, because no time passes between one copy and the next, so it does not stop by itself.
+  
+  To give each copy time, make its deadline fall after the moment it starts.
+  
+  @ends-because does not silence this warning: L4 has checked that no time passes, and the mark answers only the warning that L4 could not check that a rule comes to an end.

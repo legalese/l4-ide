@@ -1,0 +1,29 @@
+-- smucclaw/l4-ide#1081, found by an independent re-check: cap-re.l4 with B's
+-- deadline RELATIVE (WITHIN 5 from k's entry) and the fixed instants at 10 and
+-- 11. k is reached at clock 2 first and at clock 0 again. From clock 2, b's
+-- window is [2, 7] and holds the ties 6 and 7 (V's 4 on 10 and 11); from clock 0
+-- it is [0, 5] and holds neither. The first visit, at the later clock, needs MORE
+-- instants than the last, so the cap's shortfall is the largest over the visits.
+IMPORT prelude
+DECLARE Person IS ONE OF T, U, Q, B, V, S1, S2
+DECLARE Action IS ONE OF t, u, q, b, v, s1, s2
+
+GIVETH A DEONTIC Person Action
+k MEANS
+       (PARTY B MUST b WITHIN 5
+          HENCE (PARTY V MUST v WITHIN 4 HENCE FULFILLED LEST BREACH BY V)
+          LEST BREACH BY B)
+  RAND (PARTY S1 SHANT s1 WITHIN 10 OF 0 HENCE FULFILLED LEST BREACH BY S1)
+  RAND (PARTY S2 SHANT s2 WITHIN 11 OF 0 HENCE FULFILLED LEST BREACH BY S2)
+
+GIVETH A DEONTIC Person Action
+qk MEANS PARTY Q MUST q WITHIN 1 HENCE k LEST BREACH BY Q
+
+GIVETH A DEONTIC Person Action
+rc MEANS
+  PARTY T MUST t WITHIN 1
+    HENCE (PARTY U MUST u WITHIN 1 HENCE qk LEST BREACH BY U)
+    LEST qk
+
+#TRACE rc AT 0 WITH
+  PARTY T DOES t AT 0

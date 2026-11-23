@@ -613,7 +613,7 @@ incompleteText cv = Text.intercalate "; " $ filter (not . Text.null)
   ]
   where
     stopText = \ case
-      StopDepth b n  -> count n "state" <> " at the depth bound " <> textShow b
+      StopDepth b n  -> count n "state" <> " with a visit at the depth bound " <> textShow b
       StopStates b n -> count n "new state" <> " past the state bound " <> textShow b
 
 ----------------------------------------------------------------------------

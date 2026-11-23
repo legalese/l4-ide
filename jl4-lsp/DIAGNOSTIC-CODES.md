@@ -119,6 +119,8 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/whose-not-a-field`                   | The first word of a WHOSE line is not a field of the cast.                               |
 | `check/whose-operand-not-bare`              | A WHOSE line does not begin with a bare word.                                            |
 | `check/whose-without-cast`                  | WHOSE under an EVERY with no cast to take fields from.                                   |
+| `check/ends-because-needs-reason`           | An `@ends-because` with no reason after it on its line.                                  |
+| `check/ends-because-on-non-definition`      | `@ends-because` above something that is not a definition, such as an input.              |
 | `check/withal-fields-without-default`       | A record's WITHAL names fields that declare no TYPICALLY.                                |
 | `check/withal-misused`                      | WITHAL on something that is not a record whose defaults it can take.                     |
 
@@ -159,6 +161,14 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/sibling-ledger-read`             | `check`  | Two operands of a RAND, ROR or UPON EACH can read and write one ledger cell.               |
 | `lint/suspicious-binder-pattern`       | `check`  | A CONSIDER branch binds a new name close to a value in scope. Severity Information.        |
 | `lint/suspicious-clause-pattern`       | `check`  | A clause pattern is a new name close to a value of its input's type. Severity Information. |
+| `lint/ends-because-noted`              | `check`  | What an `@ends-because` did, with its reason. Severity Information.                        |
+| `lint/ends-because-not-attached`       | `parser` | `@ends-because` attached to nothing.                                                       |
+| `lint/ends-because-off-cycle`          | `check`  | An `@ends-because` above a rule L4 finds no way back to itself from.                       |
+| `lint/ends-because-same-line`          | `parser` | `@ends-because` on the line of the definition it marks.                                    |
+| `lint/ends-because-superseded`         | `parser` | An `@ends-because` that a later one supersedes.                                            |
+| `lint/not-shown-to-end`                | `check`  | A rule whose HENCE or LEST leads back to it, not shown to come to an end.                  |
+| `lint/starts-again-with-no-time`       | `check`  | A rule that starts itself again with no time passing.                                      |
+| `lint/starts-copies-at-once`           | `check`  | A rule that starts two or more copies of itself at once.                                   |
 
 ## eval/
 

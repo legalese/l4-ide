@@ -171,7 +171,7 @@ What `main` says depends on what follows the `GIVEN`:
 | Spelling | `unstable` | `main` build 98 | On `main`, write instead |
 | --- | --- | --- | --- |
 | `@lang pt` as the first line of a module (01) | Accepted. | **rejects**: `unexpected '@'` | Nothing: leave it out. `main` has no module language declaration. |
-| An `@infixl`, `@infixr`, `@infix`, `@nonassertable` or `@nonexhaustive` line, or any `@word` `main` does not know (45 to 48) | Known, or a warning that the annotation is unknown and is ignored. | **rejects**: `unexpected '@'` | Drop the line, and bracket operator chains by hand. `@export`, `@desc`, `@nlg`, `@ref`, `@ref-map` and `@ref-src` are fine (`alt-annotations-main-knows`). |
+| An `@infixl`, `@infixr`, `@infix`, `@nonassertable`, `@nonexhaustive` or `@ends-because` line, or any `@word` `main` does not know (45 to 48; `@ends-because` has no probe of its own, and is a word `main` does not know) | Known, or a warning that the annotation is unknown and is ignored. | **rejects**: `unexpected '@'` | Drop the line, and bracket operator chains by hand. `@export`, `@desc`, `@nlg`, `@ref`, `@ref-map` and `@ref-src` are fine (`alt-annotations-main-knows`). |
 | `REFUSE "reason"` (02) | Accepted. | **rejects**: `I could not find a definition for the identifier REFUSE` | Return a `MAYBE`, with `NOTHING` for "this case is not covered" (`alt-maybe-nothing`). The rule's result type changes. |
 | `#ASSERT REFUSED e` (03) | Accepted. | **rejects**: `I could not find a definition for the identifier REFUSED` | On the `MAYBE` spelling, `#ASSERT e EQUALS NOTHING` (`alt-maybe-nothing`). |
 | `#ASSERT REFUSED e BECAUSE "reason"` (04) | Accepted. | **rejects**: `unexpected BECAUSE` | Nothing: a `MAYBE` carries no reason. Put the reason in a comment. |

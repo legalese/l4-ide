@@ -12,6 +12,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified L4.Annotation as JL4
+import qualified L4.Cycles as Cycles
 import qualified L4.EvaluateLazy as JL4Lazy
 import qualified L4.ExactPrint as ExactPrint
 import L4.TracePolicy (lspDefaultPolicy)
@@ -87,7 +88,19 @@ main = do
                   (JL4Lazy.parseFixedNow "2025-01-31T15:45:30Z")
   let chosenNow = maybe (Just fallbackNow) Just envFixed
   let tracePolicy = lspDefaultPolicy defaultGraphVizOptions
-  evalConfig <- JL4Lazy.resolveEvalConfig chosenNow tracePolicy
+  -- NORM-LOG-SPEC N6: with JL4_TEST_NORM_LOG set, every golden runs with the
+  -- norm log writer on and must still match its golden once the norm block is
+  -- removed from the output (see 'stripNormLogBlock'). That is the proof that
+  -- the writer is an observer; it is also the measurement of its overhead.
+  normLogForced <- lookupEnv "JL4_TEST_NORM_LOG"
+  -- JL4_TEST_NORM_LOG=mutant turns on a deliberately wrong writer, to see the
+  -- differential fail (see 'L4.EvaluateLazy.EvalConfig' normLogMutant)
+  evalConfig <- (\cfg -> case normLogForced of
+      Nothing       -> cfg
+      Just "mutant" -> cfg {JL4Lazy.normLog = True, JL4Lazy.normLogMutant = JL4Lazy.MutantOfficial}
+      Just "mutant-force" -> cfg {JL4Lazy.normLog = True, JL4Lazy.normLogMutant = JL4Lazy.MutantForce}
+      Just _        -> cfg {JL4Lazy.normLog = True})
+    <$> JL4Lazy.resolveEvalConfig chosenNow tracePolicy
   let examplesRoot = dataDir </> "examples"
   okFiles <- sort <$> globDir1 (compile "ok/**/*.l4") examplesRoot
   librariesFiles <- sort <$> globDir1 (compile "*.l4") (dataDirCore </> "libraries")
@@ -134,7 +147,9 @@ main = do
   -- @JL4_EVALDIFF@ needs the module itself, which is not what is held, so that
   -- mode takes the unshared path.
   evalDiff <- lookupEnv "JL4_EVALDIFF"
-  let keep = if isJust evalDiff then Set.empty else Set.fromList goldenCorpus
+  -- @JL4_CYCLE_REPORT@ needs the module too, for the same reason.
+  cycleReport <- lookupEnv "JL4_CYCLE_REPORT"
+  let keep = if isJust evalDiff || isJust cycleReport then Set.empty else Set.fromList goldenCorpus
   checkMemo <- newCheckMemo keep
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
@@ -248,6 +263,7 @@ l4Golden memo evalConfig isOk examplesRoot dir inputFile = do
   (output, _) <- capture (checkFile memo evalConfig isOk inputFile)
   scrubPaths <- mkPathScrubber examplesRoot
   let normalize = scrubPaths . normalizeWhitespaceString . stripAnsiCodesString
+        . (if evalConfig.normLog then stripNormLogBlock else id)
   pure
     Golden
       { output = normalize output
@@ -258,6 +274,21 @@ l4Golden memo evalConfig isOk examplesRoot dir inputFile = do
       , actualFile = Just (dir </> (takeFileName inputFile -<.> "actual"))
       , failFirstTime = True
       }
+
+-- | Remove the norm log's block from a directive's printed ledger
+-- (NORM-LOG-SPEC N5): the header line, its rows, and the blank line before
+-- it. Used only when the norm log writer is forced on, so a golden recorded
+-- with the writer off still matches.
+stripNormLogBlock :: String -> String
+stripNormLogBlock = unlines . go . lines
+  where
+    -- the listing is indented when it prints inside a directive's output
+    isHeader l = dropWhile (== ' ') l == "Norm log:"
+    isRow l = "FATE " `List.isPrefixOf` dropWhile (== ' ') l
+    go (blank : h : rest) | all (== ' ') blank, isHeader h = go (dropWhile isRow rest)
+    go (h : rest) | isHeader h = go (dropWhile isRow rest)
+    go (l : rest) = l : go rest
+    go [] = []
 
 -- | Build a scrubber that replaces the absolute, machine-specific path
 -- prefixes that reach golden output with stable tokens, so goldens capturing
@@ -476,6 +507,15 @@ jl4PrettyLayoutRoundTrip memo evalConfig inputFile = do
       mEvalDiff <- lookupEnv "JL4_EVALDIFF"
       for_ (mEvalDiff *> mtc) $ \tc ->
         Text.writeFile (inputFile <> ".evaldiff.l4") (prettyLayout (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
+      -- Third affordance: the cycle report (#1075, layer 2), which is not a
+      -- check yet. `JL4_CYCLE_REPORT=<dir>` writes, for each module, the
+      -- definitions that call themselves and what could be shown about each
+      -- ('L4.Cycles'), as one JSON file in <dir> named from the module's path
+      -- with `/` spelled `%`. Nothing is asserted, so no golden moves.
+      mCycleReport <- lookupEnv "JL4_CYCLE_REPORT"
+      for_ ((,) <$> mCycleReport <*> mtc) $ \(dir, tc) ->
+        BL.writeFile (dir </> concatMap (\c -> if c == '/' then "%" else [c]) inputFile <> ".json")
+          (AP.encodePretty (map Cycles.findingJSON (Cycles.cycleFindings (JL4.applyFinalSubstitution tc.substitution (case tc.module' of MkModule _ u _ -> u)) tc.entityInfo tc.module')))
       unless (null leaked) $
         expectationFailure $
           "prettyLayout leaked an inference variable (gensym) for " <> inputFile

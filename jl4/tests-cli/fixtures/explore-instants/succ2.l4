@@ -1,0 +1,26 @@
+-- smucclaw/l4-ide#1081, found by an independent re-check: doing `t` does NOT
+-- remove the cure of t's lapse, because t's continuation holds another norm
+-- with the same deadline (4, fixed) and the same cure. `t` at 3 starts U's
+-- deadline of 11 (14); then t2's lapse at 4 arms Q's 10 after it (14): U and Q
+-- tie. K's deadline (20) prints differently at every clock, so `t` at 0..4
+-- reach different states and no merge hides the tie: what is left is whether
+-- `t` is tried at 3. It is: the instants a lapse arms are tried for the act
+-- whose own lapse arms them, and only a chain of acts is kept off them.
+IMPORT prelude
+DECLARE Person IS ONE OF T, U, Q, K
+DECLARE Action IS ONE OF t, t2, u, q, k
+
+GIVETH A DEONTIC Person Action
+cure MEANS PARTY Q MUST q WITHIN 10 HENCE FULFILLED LEST BREACH BY Q
+
+GIVETH A DEONTIC Person Action
+succ2 MEANS
+       (PARTY T MUST t WITHIN 4 OF 0
+          HENCE (     (PARTY T MUST t2 WITHIN 4 OF 0 HENCE FULFILLED LEST cure)
+                 RAND (PARTY U MUST u WITHIN 11 HENCE FULFILLED LEST BREACH BY U))
+          LEST cure)
+  RAND (PARTY K MUST k WITHIN 20 HENCE FULFILLED LEST BREACH BY K)
+
+#TRACE succ2 AT 0 WITH
+  PARTY T DOES t AT 3
+  (WAITUNTIL 5)

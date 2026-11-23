@@ -618,7 +618,7 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
       -- X2: Alice reads at 65100, Bob buys at 65160, Alice reads at 65220
       for_ [("Alice, Bob" :: Text.Text, ab), ("Bob, Alice", ba)] \ (roll, outs) ->
         (roll, map (Text.takeWhile (/= '[')) (entriesOf "entries read" (outs !! 2)))
-          `shouldBe` (roll, ["RECORD `entries read` IS 1   ", "RECORD `entries read` IS 2   "])
+          `shouldBe` (roll, ["NOTIFY `entries read` IS 1   ", "NOTIFY `entries read` IS 2   "])
       map ledgerOf ab `shouldBe` map ledgerOf ba
 
     it "runs the distributive EVERY (no UPON EACH line) the same way, since it folds its members the same way" do
@@ -626,7 +626,7 @@ spec = describe "operands that read each other's records (smucclaw/l4-ide#1069)"
       ba <- run (distributive "Bob, Alice")
       (map isRefused ab, map isRefused ba) `shouldBe` (replicate 5 False, replicate 5 False)
       map (Text.takeWhile (/= '[')) (entriesOf "entries read" (ab !! 2))
-        `shouldBe` ["RECORD `entries read` IS 1   ", "RECORD `entries read` IS 2   "]
+        `shouldBe` ["NOTIFY `entries read` IS 1   ", "NOTIFY `entries read` IS 2   "]
       map ledgerOf ab `shouldBe` map ledgerOf ba
 
     it "reads the latest of two records made out of operand order (N12's probe), in either order" do

@@ -1,0 +1,56 @@
+-- @ends-because <reason> is written on a line of its own above a definition
+-- whose recursion its author vouches will end, and gives the reason a reader can
+-- check. It is an annotation of its own, kept by exactprint and re-emitted by the
+-- printer; this file checks that it parses, round-trips, and changes nothing a
+-- rule works out.
+
+-- At the top level of a file, above the GIVEN of a definition with inputs.
+@ends-because each step moves one day nearer the end date, and the end date is fixed
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`countdown` d MEANS
+  IF d EQUALS 0 THEN 0 ELSE `countdown` (d MINUS 1)
+
+-- A @desc whose first word is "ends-because" is a description, not the mark.
+@desc ends-because in name only
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`described countdown` d MEANS
+  IF d EQUALS 0 THEN 0 ELSE `described countdown` (d MINUS 1)
+
+§ `Inside a section`
+
+-- In a section, above the GIVEN of a definition.
+@ends-because the number of weeks drops by one each time, and a week count cannot be negative
+GIVEN w IS A NUMBER
+GIVETH A NUMBER
+`weeks to go` w MEANS
+  IF w EQUALS 0 THEN 0 ELSE `weeks to go` (w MINUS 1)
+
+-- On a definition in a WHERE: above its GIVEN, at the margin of its block.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`sum up to` n MEANS
+  `running total` n
+  WHERE
+    @ends-because the counter drops by one each step and stops at zero
+    GIVEN k IS A NUMBER
+    GIVETH A NUMBER
+    `running total` k MEANS
+      IF k EQUALS 0 THEN 0 ELSE k PLUS `running total` (k MINUS 1)
+
+-- On a definition in a LET, the second of two.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`halvings` n MEANS
+  LET
+    `twice` m IS m TIMES 2
+    @ends-because the number halves each step, and a number below one stops the count
+    `steps` m IS IF m < 1 THEN 0 ELSE 1 PLUS `steps` (m DIVIDED BY 2)
+  IN `steps` (`twice` n)
+
+#EVAL `countdown` 3
+#EVAL `weeks to go` 5
+#EVAL `described countdown` 4
+#EVAL `sum up to` 4
+#EVAL `halvings` 4

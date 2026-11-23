@@ -233,6 +233,7 @@ data PState = PState
   , descs :: [Desc]
   , fixities :: [Fixity]
   , nonassertables :: [Nonassertable]
+  , endsBecauses :: [EndsBecause]
   , langs :: [LangTag]
     -- ^ @\@lang@ declarations seen, most recent first. A list rather than a
     -- 'Maybe', so that a second declaration does not silently overwrite the
@@ -260,6 +261,9 @@ addFixity fx s = over #fixities (fx:) s
 addNonassertable :: Nonassertable -> PState -> PState
 addNonassertable n s = over #nonassertables (n:) s
 
+addEndsBecause :: EndsBecause -> PState -> PState
+addEndsBecause e s = over #endsBecauses (e:) s
+
 spaces :: Parser [PosToken]
 spaces =
   takeWhileP (Just "space token") isSpaceToken
@@ -267,7 +271,7 @@ spaces =
 spaceOrAnnotations :: Parser (Lexeme ())
 spaceOrAnnotations = do
   ws <- spaces
-  nlgs :: [NS Epa [Ref, Nlg, Desc, Fixity, (), LangTag, Nonassertable]] <- many (fmap (S . S . S . S . S . S . Z) nonassertableP <|> fmap (S . S . S . S . S . Z) langP <|> fmap (S . S . S . S . Z) refAdditionalP <|> fmap (S . S . S . Z) fixityP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
+  nlgs :: [NS Epa [Ref, Nlg, Desc, Fixity, (), LangTag, Nonassertable, EndsBecause]] <- many (fmap (S . S . S . S . S . S . S . Z) endsBecauseP <|> fmap (S . S . S . S . S . S . Z) nonassertableP <|> fmap (S . S . S . S . S . Z) langP <|> fmap (S . S . S . S . Z) refAdditionalP <|> fmap (S . S . S . Z) fixityP <|> fmap (S . S . Z) descP <|> fmap (S . Z) nlgAnnotationP <|> fmap Z refP)
   traverse_ addAnnotation nlgs
   let
     epaNlgs = fmap (collapse_NS . map_NS (K . epaToHiddenCluster)) nlgs
@@ -457,6 +461,17 @@ nonassertableP = do
     "Nonassertable annotation"
   pure $ MkNonassertable (mkSimpleEpaAnno e) <$ e
 
+-- | @\@ends-because <reason>@. The node keeps the reason with the spacing
+-- around it stripped; the token keeps the line as written, for exactprint.
+endsBecauseP :: Parser (Epa EndsBecause)
+endsBecauseP = do
+  e <- hidden $ spacedTokenWs (\ case
+    TAnnotations (TEndsBecause t) -> Just t
+    _ -> Nothing
+    )
+    "Ends-because annotation"
+  pure $ fmap (MkEndsBecause (mkSimpleEpaAnno e) . Text.strip) e
+
 fixityP :: Parser (Epa Fixity)
 fixityP = do
   e <- hidden $ spacedTokenWs (\ case
@@ -618,8 +633,9 @@ lexeme p = do
     , hiddenClusters = wsOrAnnotation.hiddenClusters
     }
 
-addAnnotation :: NS Epa (Ref : Nlg : Desc : Fixity : () : LangTag : Nonassertable : xs) -> Parser ()
+addAnnotation :: NS Epa (Ref : Nlg : Desc : Fixity : () : LangTag : Nonassertable : EndsBecause : xs) -> Parser ()
 addAnnotation = \ case
+  S (S (S (S (S (S (S (Z eb))))))) -> modify' (addEndsBecause eb.payload)
   S (S (S (S (S (S (Z na)))))) -> modify' (addNonassertable na.payload)
   S (S (S (Z fx))) -> modify' (addFixity fx.payload)
   S (S (Z desc)) -> modify' (addDesc desc.payload)
@@ -4594,6 +4610,7 @@ execNlgParserForTokens p uri input ts =
       , descs = []
       , fixities = []
       , nonassertables = []
+      , endsBecauses = []
       , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
@@ -4602,24 +4619,24 @@ execNlgParserForTokens p uri input ts =
 -- JL4 parsers
 -- ----------------------------------------------------------------------------
 
-execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParser :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a, Resolve.HasEndsBecause a) => Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParser = execParserWithHints mempty
 
-execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a, Resolve.HasEndsBecause a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserWithHints hints p uri input =
   case execLexer uri input of
     Left errs -> Left errs
     Right ts -> execParserForTokensWithHints hints p uri input ts
 
-execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokens :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a, Resolve.HasEndsBecause a) => Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokens = execParserForTokensWithHints mempty
 
-execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWithHints :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a, Resolve.HasEndsBecause a) => MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWithHints = execParserForTokensWith True
 
 -- | 'execParserForTokensWithHints', with 'memoGroup' on ('True') or off; see
 -- 'memoiseGroups'.
-execParserForTokensWith :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => Bool -> MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
+execParserForTokensWith :: (Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a, Resolve.HasEndsBecause a) => Bool -> MixfixHintRegistry -> Parser a -> NormalizedUri -> Text -> [PosToken] -> Either (NonEmpty PError) (a, [Resolve.Warning], PState)
 execParserForTokensWith memoise hints p file input ts =
   case runJl4Parser env st p (showNormalizedUri file) stream  of
     Left err -> Left (bundleToPErrors "parser" (Just . tokenKindSlug . computedPayload) err)
@@ -4640,12 +4657,14 @@ execParserForTokensWith memoise hints p file input ts =
         (withDesc, _descS) = Resolve.addDescCommentsToAst pstate.descs withNlg
         (withFixity, fixityS) = Resolve.addFixityCommentsToAst pstate.fixities withDesc
         (withNonassertable, naS) = Resolve.addNonassertableCommentsToAst pstate.nonassertables withFixity
-        (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withNonassertable
+        (withEndsBecause, ebS) = Resolve.addEndsBecauseCommentsToAst pstate.endsBecauses withNonassertable
+        (annotatedA, refS) = Resolve.addRefCommentsToAst (Resolve.trailingRefsOf ts) pstate.refs withEndsBecause
         refWarnings = fmap Resolve.renderRefWarning refS.refWarnings
         fixityWarnings = fmap Resolve.renderFixityWarning fixityS.fixityWarnings
         naWarnings = fmap Resolve.renderNonassertableWarning naS.nonassertableWarnings
+        ebWarnings = fmap Resolve.renderEndsBecauseWarning ebS.endsBecauseWarnings
       in
-        Right (annotatedA, overriddenLangWarnings ts ++ spacedSlotWarnings ts ++ nlgS.warnings ++ refWarnings ++ fixityWarnings ++ naWarnings, pstate)
+        Right (annotatedA, overriddenLangWarnings ts ++ spacedSlotWarnings ts ++ nlgS.warnings ++ refWarnings ++ fixityWarnings ++ naWarnings ++ ebWarnings, pstate)
   where
     env = Env
       { moduleUri = file
@@ -4661,6 +4680,7 @@ execParserForTokensWith memoise hints p file input ts =
       , descs = []
       , fixities = []
       , nonassertables = []
+      , endsBecauses = []
       , langs = []
       }
     stream = MkTokenStream (Text.unpack input) ts
@@ -4737,7 +4757,7 @@ programParserWithHintPass memoise uri input = do
 -- ----------------------------------------------------------------------------
 
 -- | Parse a source file and pretty-print the resulting syntax tree.
-parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a) => Parser a -> NormalizedUri -> Text -> IO ()
+parseFile :: (Show a, Resolve.HasNlg a, Resolve.HasDesc a, Resolve.HasRef a, Resolve.HasFixity a, Resolve.HasNonassertable a, Resolve.HasEndsBecause a) => Parser a -> NormalizedUri -> Text -> IO ()
 parseFile p uri input =
   case execParser p uri input of
     Left errs -> Text.putStr $ Text.unlines $ fmap (.message) (toList errs)

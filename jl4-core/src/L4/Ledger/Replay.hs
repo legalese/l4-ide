@@ -50,6 +50,7 @@ import Control.Exception (evaluate)
 
 import L4.API.VirtualFS (checkWithImports, vfsFromList)
 import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..), Path)
+import L4.Evaluate.NormLog (prettyNormEntry)
 import L4.Evaluate.ValueLazy (Environment)
 import L4.EvaluateLazy (EvalConfig, EvalDirectiveResult (..), execEvalModuleWithEnv)
 import L4.EvaluateLazy.DeonticStep (DeonticStep)
@@ -399,11 +400,16 @@ officialWrites before after =
 officialEntries :: LedgerStore -> [Commit]
 officialEntries store = [ commitOf e | e <- DList.toList store.officialLedger ]
 
+-- | A 'Fate' is the machine's own record and lives in the norm ledger, which
+-- neither a party's ledger nor the official record holds, so these two never
+-- see one; the arm exists so the match is total, and prints what it is.
 commitOf :: LedgerEvent -> Commit
 commitOf (Assign path val _) = MkCommit {cell = Text.intercalate "'s " path, value = prettyLayout val}
+commitOf (Fate e) = MkCommit {cell = "FATE", value = Text.strip (prettyNormEntry e)}
 
 entry :: LedgerEvent -> Text
 entry (Assign path val _) = pathText path <> " IS " <> prettyLayout val
+entry (Fate e) = Text.strip (prettyNormEntry e)
 
 pathText :: Path -> Text
 pathText segs = Text.intercalate "'s " (map (\ s -> "`" <> s <> "`") segs)

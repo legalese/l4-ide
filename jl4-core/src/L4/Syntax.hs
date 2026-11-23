@@ -1110,6 +1110,11 @@ data Extension = Extension
   , nonassertableOnInputs :: [Nonassertable]
     -- ^ Marks found on a definition's GIVEN lines, each an error the
     -- typechecker raises naming the input; none of them closes the definition.
+  , endsBecause  :: Maybe EndsBecause
+    -- ^ The @\@ends-because@ annotation above a definition. See 'annEndsBecause'.
+  , endsBecauseOnInputs :: [EndsBecause]
+    -- ^ Marks found on a definition's GIVEN lines, each an error the
+    -- typechecker raises naming the input; none of them vouches for the definition.
   , pmMatrix     :: Maybe PmMatrix
   , mixfixCanonical :: Maybe RawName
     -- ^ The CANONICAL mixfix pattern of the name this node applies, e.g.
@@ -1124,43 +1129,53 @@ data Extension = Extension
   deriving stock (GHC.Generic, Eq, Ord)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
--- | Written by hand so that @defaultFill@, which is 'Nothing' on every node the
--- author wrote, leaves the text of @show@ exactly as it was before the field
--- existed. An atomId is the hash of @show@ of a term with its annotations
--- emptied (L4.Viz.AtomKey), and a derived 'Show' lists every field, so adding
--- one would move every atomId a deployed service has handed out, though no leaf
--- changed (the same reason 'Refs' has its own 'Show'). A node that carries a
--- 'DefaultFill' shows the field, so two such nodes still differ from the node
--- without one.
+-- | Written by hand, and NOT derived, so that three fields (the two
+-- @\@ends-because@ fields and @defaultFill@) do not appear in it while they
+-- are empty. An atomId is the hash of 'show' of
+-- a term with its annotations emptied (L4.Viz.AtomKey), and a derived 'show'
+-- lists every field, so adding a field to 'Extension' moves every atomId a
+-- deployed service has handed out, though no leaf changed (the way 'Refs'
+-- avoids it for @ref@). A key only ever sees the empty case, because the
+-- annotations are emptied first; a non-empty mark shows as the field it is,
+-- last. @defaultFill@ is 'Nothing' on every node the author wrote, and a node
+-- that carries a 'DefaultFill' shows it, so two such nodes still differ from
+-- the node without one. Every other field is shown exactly as the derived
+-- instance showed it, so the keys that existed before @\@ends-because@ did
+-- are unmoved: the four atomIds pinned in "QueryPlanSpec" and the keys pinned
+-- in "AtomKeyDigestSpec" test that. The next field added to 'Extension' is
+-- added here too, and the same two tests say whether it moved anything.
+--
+-- Decided by Claude 2026-11-21, pending Meng's review: the alternative is the derived instance and a restamp of
+-- those pins and of the TS fixture another repository holds (as for
+-- @\@nonassertable@, c32814ccb).
 instance Show Extension where
-  showsPrec d e =
-    showParen (d >= 11) $
-      showString "Extension {"
-        . foldr (.) id (intersperse (showString ", ") (map (\ (n, v) -> showString n . showString " = " . v) fields))
-        . showString "}"
-   where
-    fields =
-      [ ("resolvedInfo", showsPrec 0 e.resolvedInfo)
-      , ("nlg", showsPrec 0 e.nlg)
-      , ("nlgAlts", showsPrec 0 e.nlgAlts)
-      , ("desc", showsPrec 0 e.desc)
-      , ("ref", showsPrec 0 e.ref)
-      , ("fixityAnn", showsPrec 0 e.fixityAnn)
-      , ("nonassertable", showsPrec 0 e.nonassertable)
-      , ("nonassertableOnInputs", showsPrec 0 e.nonassertableOnInputs)
-      , ("pmMatrix", showsPrec 0 e.pmMatrix)
-      , ("mixfixCanonical", showsPrec 0 e.mixfixCanonical)
-      , ("pmSynthetic", showsPrec 0 e.pmSynthetic)
-      ]
-      <> [ ("defaultFill", showsPrec 0 df) | Just df <- [e.defaultFill] ]
+  showsPrec d e = showParen (d >= 11) $
+    showString "Extension {resolvedInfo = " . showsPrec 0 e.resolvedInfo
+    . showString ", nlg = " . showsPrec 0 e.nlg
+    . showString ", nlgAlts = " . showsPrec 0 e.nlgAlts
+    . showString ", desc = " . showsPrec 0 e.desc
+    . showString ", ref = " . showsPrec 0 e.ref
+    . showString ", fixityAnn = " . showsPrec 0 e.fixityAnn
+    . showString ", nonassertable = " . showsPrec 0 e.nonassertable
+    . showString ", nonassertableOnInputs = " . showsPrec 0 e.nonassertableOnInputs
+    . showString ", pmMatrix = " . showsPrec 0 e.pmMatrix
+    . showString ", mixfixCanonical = " . showsPrec 0 e.mixfixCanonical
+    . showString ", pmSynthetic = " . showsPrec 0 e.pmSynthetic
+    . (if isJust e.endsBecause then showString ", endsBecause = " . showsPrec 0 e.endsBecause else id)
+    . (if null e.endsBecauseOnInputs then id else showString ", endsBecauseOnInputs = " . showsPrec 0 e.endsBecauseOnInputs)
+    . (case e.defaultFill of
+         Just df -> showString ", defaultFill = " . showsPrec 0 df
+         Nothing -> id)
+    . showString "}"
 
 -- | The refs a node holds; 'annRefs' reads them as a list.
 --
 -- A newtype only so that 'show' of an EMPTY one is @Nothing@, as it was when
 -- the field was a @Maybe Ref@. An atomId is the hash of 'show' of a term with
 -- its annotations emptied (L4.Viz.AtomKey), and 'show' of an 'Extension' lists
--- every field, so @ref = []@ where there was @ref = Nothing@ would move every
--- atomId a deployed service has handed out, though no leaf changed. A key only
+-- every field it shows ('Show Extension'), so @ref = []@ where there was
+-- @ref = Nothing@ would move every atomId a deployed service has handed out,
+-- though no leaf changed. A key only
 -- ever sees the empty case, because the annotations are emptied first; a
 -- non-empty one shows as the list it is.
 newtype Refs = MkRefs [Ref]
@@ -1175,11 +1190,11 @@ instance ToExpr Refs where
   toExpr (MkRefs rs) = toExpr rs
 
 instance Semigroup Extension where
-  Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 pm1 mx1 syn1 df1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 pm2 mx2 syn2 df2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2) (df1 <|> df2)
+  Extension i1 nlg1 alts1 desc ref1 fix1 na1 nai1 eb1 ebi1 pm1 mx1 syn1 df1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 na2 nai2 eb2 ebi2 pm2 mx2 syn2 df2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <> ref2) (fix1 <|> fix2) (na1 <|> na2) (nai1 <> nai2) (eb1 <|> eb2) (ebi1 <> ebi2) (pm1 <|> pm2) (mx1 <|> mx2) (syn1 <|> syn2) (df1 <|> df2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing [] Nothing Nothing Nothing Nothing
 
 -- | Marks a value the type checker put into a named application that the
 -- author did not write (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5).
@@ -1241,7 +1256,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing (MkRefs []) Nothing Nothing [] Nothing [] Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -1330,6 +1345,20 @@ annNonassertable = #extra % #nonassertable
 annNonassertableOnInputs :: Lens' Anno [Nonassertable]
 annNonassertableOnInputs = #extra % #nonassertableOnInputs
 
+-- | The @\@ends-because <reason>@ annotation written above a definition: its
+-- author vouches that the recursion in it ends, and gives the reason a reader
+-- can check. Attached by position
+-- ('L4.Parser.ResolveAnnotation.addEndsBecauseCommentsToAst') to the nearest
+-- following top-level, section-level or WHERE\/LET-local construct; the
+-- typechecker rejects it on anything that is not a definition, and rejects an
+-- empty reason.
+annEndsBecause :: Lens' Anno (Maybe EndsBecause)
+annEndsBecause = #extra % #endsBecause
+
+-- | The marks found on a definition's GIVEN lines (see 'Extension').
+annEndsBecauseOnInputs :: Lens' Anno [EndsBecause]
+annEndsBecauseOnInputs = #extra % #endsBecauseOnInputs
+
 annPmMatrix :: Lens' Anno (Maybe PmMatrix)
 annPmMatrix = #extra % #pmMatrix
 
@@ -1376,6 +1405,12 @@ setNonassertable n a = a & annNonassertable ?~ n
 
 addNonassertableOnInputs :: [Nonassertable] -> Anno -> Anno
 addNonassertableOnInputs ns a = a & annNonassertableOnInputs %~ (<> ns)
+
+setEndsBecause :: EndsBecause -> Anno -> Anno
+setEndsBecause e a = a & annEndsBecause ?~ e
+
+addEndsBecauseOnInputs :: [EndsBecause] -> Anno -> Anno
+addEndsBecauseOnInputs es a = a & annEndsBecauseOnInputs %~ (<> es)
 
 setPmMatrix :: PmMatrix -> Anno -> Anno
 setPmMatrix m a = a & annPmMatrix ?~ m
@@ -1763,6 +1798,21 @@ data Nonassertable = MkNonassertable Anno
   deriving stock (Show, Eq, Ord, GHC.Generic)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | The @\@ends-because <reason>@ mark: the author vouches that the recursion
+-- in the definition below ends, and says why. The 'Text' is the reason as
+-- written, with the spacing around it stripped; it is empty when nothing
+-- follows the herald, which the typechecker refuses ('L4.TypeCheck',
+-- EndsBecauseNeedsReason). Where it landed is which 'Extension' field holds
+-- it: 'endsBecause' above a definition, 'endsBecauseOnInputs' on one of its
+-- GIVEN lines. What it changes is not decided here: this is the syntax alone.
+data EndsBecause = MkEndsBecause Anno Text
+  deriving stock (Show, Eq, Ord, GHC.Generic)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The reason an @\@ends-because@ gives, spacing around it stripped.
+getEndsBecauseReason :: EndsBecause -> Text
+getEndsBecauseReason (MkEndsBecause _ reason) = reason
+
 deriving via L4Syntax Nlg
   instance HasAnno Nlg
 deriving via L4Syntax (NlgFragment n)
@@ -1777,6 +1827,8 @@ deriving via L4Syntax Fixity
   instance HasAnno Fixity
 deriving via L4Syntax Nonassertable
   instance HasAnno Nonassertable
+deriving via L4Syntax EndsBecause
+  instance HasAnno EndsBecause
 
 instance ToConcreteNodes PosToken Comment where
   toNodes (MkComment ann _) = flattenConcreteNodes ann []
@@ -1917,6 +1969,7 @@ deriving anyclass instance HasSrcRange Nlg
 deriving anyclass instance HasSrcRange Desc
 deriving anyclass instance HasSrcRange Fixity
 deriving anyclass instance HasSrcRange Nonassertable
+deriving anyclass instance HasSrcRange EndsBecause
 deriving anyclass instance HasSrcRange (NlgFragment n)
 deriving anyclass instance HasSrcRange Comment
 deriving anyclass instance HasSrcRange Ref
@@ -2037,6 +2090,7 @@ deriving anyclass instance Serialise Refs
 deriving anyclass instance Serialise Desc
 deriving anyclass instance Serialise Fixity
 deriving anyclass instance Serialise Nonassertable
+deriving anyclass instance Serialise EndsBecause
 deriving anyclass instance Serialise FixityDirection
 #endif
 

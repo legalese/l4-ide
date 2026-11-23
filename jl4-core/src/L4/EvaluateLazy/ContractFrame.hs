@@ -470,6 +470,9 @@ data RBinOp2 = MkRBinOp2
   { op :: RBinOp
   , rval1 :: WHNF
   , env :: Environment
+  , scope :: Int
+    -- ^ the application's sibling-check scope ('MkRBinOp1'), which is also
+    -- what the norm log's entry for the compound is found by
   , rsite :: Maybe SrcRange
     -- ^ as 'RBinOp1''s
   }
@@ -791,5 +794,13 @@ data Lifecycle = MkLifecycle
     --   * under a fork, the member's own.
   , armed    :: Reference
     -- ^ when the obligation was entered.
+  , origin   :: Maybe Reference
+    -- ^ NORM-LOG-SPEC N8: the key, in the norm log writer's origin table
+    -- ('L4.EvaluateLazy.DeonticStep.dlOrigins'), of the norm whose hand-off
+    -- this is and which continuation it hands to; a 'ValNumber'. The norm the
+    -- continuation arms reads it back from its environment at
+    -- 'L4.EvaluateLazy.Machine.armNormKey' and carries it as its parent link.
+    -- Always 'Nothing' unless the writer is on, so a hand-off with the writer
+    -- off binds nothing and pays nothing.
   }
   deriving stock Show

@@ -123,6 +123,12 @@ data TAnnotations
     -- ^ @\@nonassertable@: the definition below may not be asserted by a
     -- request (PRESUMPTION-ASSERTION contract §6). Its own token, so that a
     -- @\@desc@ whose text happens to start with the word cannot stand in for it.
+  | TEndsBecause  !Text
+    -- ^ @\@ends-because <reason>@: the author vouches that the recursion in the
+    -- definition below ends, and says why. The 'Text' is the RAW rest of the
+    -- line, spacing included, which 'displayTokenType' re-emits for exactprint.
+    -- Its own token, never folded into @\@desc@ the way @\@nonexhaustive@ is
+    -- ('L4.Parser.descP'), so that a @\@desc ends-because …@ cannot stand in for it.
   | TLang         !LangTag !Text
     -- ^ @\@lang he@ — the module's default language, the one an untagged
     -- @\@nlg@ in that module is written in. The 'Text' is the RAW remainder
@@ -505,7 +511,7 @@ annotations = ["nlg", "ref", "ref-map", "ref-src"]
 -- here and not to the lexer, fails that test.
 knownAnnotationHeralds :: [Text]
 knownAnnotationHeralds =
-  [ "desc", "export", "infix", "infixl", "infixr", "lang", "nlg"
+  [ "desc", "ends-because", "export", "infix", "infixl", "infixr", "lang", "nlg"
   , "nonassertable", "nonexhaustive", "ref", "ref-map", "ref-src"
   ]
 
@@ -641,6 +647,14 @@ fixityAnnotation =
 
 nonexhaustiveAnnotation :: Lexer Text
 nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
+
+-- | @\@ends-because <reason>@: the herald, then the rest of the line, which is
+-- the reason. A 'lineAnno', like @\@desc@, so the reason is free text that
+-- exactprint reproduces byte for byte. An empty reason lexes (a bare
+-- @\@ends-because@): the type checker refuses it, in words, rather than the
+-- lexer in a token error.
+endsBecauseAnnotation :: Lexer Text
+endsBecauseAnnotation = fst <$> lineAnno "@ends-because"
 
 -- | @\@nonassertable@ takes nothing: it is the herald alone, and whatever
 -- follows it on the line is read as source. So a definition written after it
@@ -954,6 +968,7 @@ annotationsPayload = asum
   , uncurry TFixity <$> fixityAnnotation
   , TNonexhaustive      <$> nonexhaustiveAnnotation
   , TNonassertable      <$  nonassertableAnnotation
+  , TEndsBecause        <$> endsBecauseAnnotation
   , (\ (mtag, t, ty) -> TNlg mtag t ty) <$> nlgAnnotation
   , uncurry TRef  <$> refAnnotation
   ]
@@ -1740,6 +1755,7 @@ displayTokenType = \case
     TFixity dir t     -> fixityHerald dir <> t
     TNonexhaustive t        -> "@nonexhaustive" <> t
     TNonassertable          -> "@nonassertable"
+    TEndsBecause t          -> "@ends-because" <> t
     TLang _ raw       -> "@lang" <> raw
   TIdentifiers i -> case i of
     TGenitive         -> "'s"

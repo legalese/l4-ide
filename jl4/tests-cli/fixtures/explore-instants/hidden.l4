@@ -1,0 +1,18 @@
+-- smucclaw/l4-ide#1081, found by an independent re-check: two norms on the same
+-- action `x` in one state, so both untried ticks carry the label "time runs out
+-- on x". Al's permission has no deadline at all, Bo's has one (a BEFORE date)
+-- that the explorer cannot compute. Two different reasons, the second a real
+-- gap, under one label: the coverage line names both.
+IMPORT prelude
+IMPORT daydate
+DECLARE Person IS ONE OF Al, Bo, Cy
+DECLARE Action IS ONE OF x, c
+
+GIVETH A DEONTIC Person Action
+h MEANS
+       (PARTY Al MAY x HENCE FULFILLED)
+  RAND (PARTY Bo MUST x BEFORE (YMD 2026 6 30) HENCE FULFILLED LEST BREACH BY Bo)
+  RAND (PARTY Cy MUST c WITHIN 3 HENCE FULFILLED LEST BREACH BY Cy)
+
+#TRACE h AT 0 WITH
+  PARTY Cy DOES c AT 1

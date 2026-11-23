@@ -1,0 +1,52 @@
+-- The text that TODATETIME and JSONDECODE read as a DATETIME ends in Z, in an
+-- offset (+0800 or +08:00), or in the word UTC or GMT. It does not end in a
+-- time zone abbreviation: CST is US Central to one reader and China Standard
+-- Time to another, so the same text could fix two different instants.
+-- An offset fixes an instant, but it is not a zone: "11pm local" carries a
+-- different offset in summer than in winter, and Arizona keeps one all year.
+-- A rule about local time takes an IANA zone name, as TIMEZONE IS does.
+-- (decided by Claude 2026-11-23, pending Meng's review)
+IMPORT prelude
+
+GIVEN s IS A STRING
+GIVETH A MAYBE DATETIME
+`read` s MEANS TODATETIME s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING DATETIME
+`decode` s MEANS JSONDECODE s
+
+GIVETH A DATETIME
+`ten thirty in UTC` MEANS DATETIME_FROM_DTZ (DATE_FROM_DMY 31 1 2026) (TIME_FROM_HMS 10 30 0) "Etc/UTC"
+
+GIVETH A DATETIME
+`two thirty in UTC` MEANS DATETIME_FROM_DTZ (DATE_FROM_DMY 31 1 2026) (TIME_FROM_HMS 2 30 0) "Etc/UTC"
+
+GIVETH A DATETIME
+`three thirty in UTC` MEANS DATETIME_FROM_DTZ (DATE_FROM_DMY 31 1 2026) (TIME_FROM_HMS 15 30 0) "Etc/UTC"
+
+-- Read: Z, an offset with or without a colon, UTC and GMT
+#ASSERT `read` "2026-01-31T10:30:00Z" EQUALS JUST `ten thirty in UTC`
+#ASSERT `read` "2026-01-31T10:30:00+0800" EQUALS JUST `two thirty in UTC`
+#ASSERT `read` "2026-01-31T10:30:00+08:00" EQUALS JUST `two thirty in UTC`
+#ASSERT `read` "2026-01-31 10:30:00+08:00" EQUALS JUST `two thirty in UTC`
+#ASSERT `read` "2026-01-31T10:30:00-0500" EQUALS JUST `three thirty in UTC`
+#ASSERT `read` "2026-01-31T10:30:00UTC" EQUALS JUST `ten thirty in UTC`
+#ASSERT `read` "2026-01-31T10:30:00GMT" EQUALS JUST `ten thirty in UTC`
+
+-- Refused: a zone abbreviation, whether the reader knows it or not
+#ASSERT `read` "2026-01-31T10:30:00CST" EQUALS NOTHING
+#ASSERT `read` "2026-01-31T10:30:00EST" EQUALS NOTHING
+#ASSERT `read` "2026-01-31T10:30:00PST" EQUALS NOTHING
+#ASSERT `read` "2026-01-31T10:30:00MDT" EQUALS NOTHING
+#ASSERT `read` "2026-01-31T10:30:00UT" EQUALS NOTHING
+#ASSERT `read` "2026-01-31T10:30:00SGT" EQUALS NOTHING
+
+-- Refused as before: no zone, and a space before the zone word
+#ASSERT `read` "2026-01-31T10:30:00" EQUALS NOTHING
+#ASSERT `read` "2026-01-31T10:30:00 UTC" EQUALS NOTHING
+
+-- The refusal names the fix
+#EVAL `decode` "\"2026-01-31T10:30:00CST\""
+#EVAL `decode` "\"2026-01-31T10:30:00\""
+#EVAL `decode` "\"2026-01-31T10:30:00+08:00\""

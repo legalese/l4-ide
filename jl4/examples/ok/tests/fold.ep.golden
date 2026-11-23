@@ -9,7 +9,7 @@ GIVETH AN r
 foldr cons nil list MEANS
   CONSIDER list
   WHEN EMPTY THEN nil
-  WHEN x FOLLOWED BY xs THEN cons OF x, foldr cons nil list
+  WHEN x FOLLOWED BY xs THEN cons OF x, foldr cons nil xs
 
 GIVEN a IS A TYPE
       r IS A TYPE

@@ -16,4 +16,4 @@ record-flat.l4:11:1-22:
 record-flat.l4:12:1-26:
   4
   Ledger (q):
-    RECORD `d` IS 4   [source=NOTIFY, at=2025-01-31T15:45:30Z]
+    NOTIFY `d` IS 4   [source=NOTIFY, at=2025-01-31T15:45:30Z]
