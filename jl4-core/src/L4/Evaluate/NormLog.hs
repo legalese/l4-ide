@@ -31,6 +31,7 @@ module L4.Evaluate.NormLog
   , NormMember (..)
   , normLogVerb
   , prettyNormEntry
+  , fateText
   ) where
 
 import Base

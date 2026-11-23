@@ -143,6 +143,7 @@ library
     L4.Evaluate.ValueLazyJSON
     L4.Evaluate.Ledger
     L4.Evaluate.NormLog
+    L4.Evaluate.NormLog.Read
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.SiblingReads
@@ -323,6 +324,7 @@ test-suite jl4-core-test
     StateGraphSpec
     DeonticStepSpec
     NormLogSpec
+    NormLogReadSpec
     LtsEmitSpec
     LtsExploreSpec
     LtsListSpec
