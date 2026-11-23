@@ -304,7 +304,7 @@ The options are:
   `__LEQ__` (predefined) of type FUNCTION FROM NUMBER AND NUMBER TO BOOLEAN
   `__LEQ__` (predefined) of type FUNCTION FROM STRING AND STRING TO BOOLEAN
   `__LEQ__` (predefined) of type FUNCTION FROM BOOLEAN AND BOOLEAN TO BOOLEAN
-  `__LEQ__` (defined at prelude.l4:785:1-10) of type FUNCTION FROM MAYBE OF NUMBER AND MAYBE OF NUMBER TO BOOLEAN
+  `__LEQ__` (defined at prelude.l4:796:1-10) of type FUNCTION FROM MAYBE OF NUMBER AND MAYBE OF NUMBER TO BOOLEAN
   `__LEQ__` (defined at daydate.l4:704:1-10) of type FUNCTION FROM DATE AND DATE TO BOOLEAN
 ```
 

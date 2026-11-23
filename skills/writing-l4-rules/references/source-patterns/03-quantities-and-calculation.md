@@ -292,8 +292,8 @@ There are multiple definitions for the identifier
 and I do not have sufficient information to make a choice between them.
 The options are:
 
-  min (defined at prelude.l4:373:1-4) of type FUNCTION FROM MAYBE OF NUMBER AND MAYBE OF NUMBER TO MAYBE OF NUMBER
-  min (defined at prelude.l4:309:1-4) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
+  min (defined at prelude.l4:376:1-4) of type FUNCTION FROM MAYBE OF NUMBER AND MAYBE OF NUMBER TO MAYBE OF NUMBER
+  min (defined at prelude.l4:312:1-4) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
 ```
 
 _(Probe `q03b-min-on-list.l4`, exit 1, one check error. When you see "multiple definitions … and I
@@ -373,7 +373,7 @@ GIVETH A NUMBER
 ```text
 The first argument of function
 
-  sum (defined at prelude.l4:265:1-4)
+  sum (defined at prelude.l4:268:1-4)
 
 is expected to be of type
 
@@ -905,7 +905,7 @@ and I do not have sufficient information to make a choice between them.
 The options are:
 
   `__PLUS__` (predefined) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
-  `__PLUS__` (defined at prelude.l4:1283:1-11) of type FOR ALL a FUNCTION FROM SET OF a AND SET OF a TO SET OF a
+  `__PLUS__` (defined at prelude.l4:1357:1-11) of type FOR ALL a FUNCTION FROM SET OF a AND SET OF a TO SET OF a
 ```
 
 _(Probe `q08b-money-plus.l4`, exit 1.)_

@@ -51,9 +51,16 @@ IMPORT `legal-persons`
 ### Module names
 
 - A module is named by its file name without `.l4`: `IMPORT daydate` loads `daydate.l4`.
+- Capital letters count, on every computer and everywhere L4 runs: `IMPORT daydate` loads `daydate.l4`, and `IMPORT dayDate` does not.
+  When the name you wrote differs only in its capitals from a module L4 can see, the error says so and names the spelling to use; see [Module not found](../errors/README.md#module-not-found).
+  Until this rule, a Mac or Windows computer could find `daydate.l4` for `IMPORT dayDate` in some folders, so a file that checked there failed on Linux, in the web playground and on Legalese Cloud.
 - A name with a hyphen goes in backticks: ``IMPORT `excel-date` ``, ``IMPORT `legal-persons` ``, ``IMPORT `date-compat` ``. Without them, `IMPORT excel-date` is a parse error ("unexpected -").
 - `IMPORT` takes a module name, not a path or a quoted string. `IMPORT "helpers.l4"` is a parse error, and a folder in front of the name is ignored: ``IMPORT `rules/helpers` `` looks for `helpers.l4`.
 - A basename with spaces or non-ASCII letters goes in backticks too: ``IMPORT `my helpers` `` and ``IMPORT `hvac-law-he` ``. On a build older than the fix for [smucclaw/l4-ide#971](https://github.com/smucclaw/l4-ide/issues/971) these resolved to nothing, and said nothing about it; see [Module names that are not plain ASCII](resolution.md#module-names-that-are-not-plain-ascii).
+- One limit to the capitals rule: in a name with accented letters, such as `café`, L4 cannot compare the capitals on a disk that stores those letters taken apart into a plain letter and an accent, which the older Mac OS Extended (HFS+) format does.
+  There, `` IMPORT `CAFÉ` `` may still find `café.l4`; on other disks it does not.
+  Write the name with the file's own capitals and the limit never matters.
+  The rule has three smaller limits: a folder whose list of files L4 cannot read still accepts any capitals; a file ending in `.L4` is refused but never suggested; and in the editor, a module in an unsaved tab is not suggested. [Capitals count on every tier](resolution.md#the-resolution-order) explains each.
 
 ### Files cannot import each other in a ring
 
@@ -72,7 +79,9 @@ For `IMPORT helpers`, L4 uses the first of these that exists:
 1. `helpers.l4` in your project's root folder, or in the folder of the file that writes the `IMPORT`.
 2. The standard library built into the `l4` you are running. It needs no files on disk and always matches that `l4`.
 
-So a file of your own with the name of a standard library, such as `prelude.l4` beside your rules, is used instead of the standard one. Operators and library developers can change the search with the `JL4_LIBRARY_PATH` environment variable; [How IMPORT finds libraries](resolution.md) gives the full order, what Legalese Cloud does, and the warning shown when two different copies of a module are visible. When nothing is found, the error is [Module not found](../errors/README.md#module-not-found).
+So a file of your own with the name of a standard library, such as `prelude.l4` beside your rules, is used instead of the standard one.
+A file whose name differs from the `IMPORT` only in its capitals, such as `Math.l4` beside a file that writes `IMPORT math`, is not used: L4 goes on down the list, here to the standard library's `math`, and prints a warning that names the file it passed over and how to use it instead.
+Operators and library developers can change the search with the `JL4_LIBRARY_PATH` environment variable; [How IMPORT finds libraries](resolution.md) gives the full order, what Legalese Cloud does, and the warning shown when two different copies of a module are visible. When nothing is found, the error is [Module not found](../errors/README.md#module-not-found).
 An `IMPORT` that resolves to nothing is an error even if your file never uses anything from it: the message names the module and every location that was searched.
 It fails `l4 check` and `l4 run`; other commands print it and still exit 0.
 See [When nothing resolves](resolution.md#when-nothing-resolves).

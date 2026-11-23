@@ -366,12 +366,12 @@ def resolved_decide_head(d):
     with the GIVEN names as its arguments. Naively using the raw parsed head
     (`d.args[2].args[1]`), as this script's first draft and the 2026-09-16
     memo's `exactly_survey.py` both did, registers the WRONG name at module
-    scope: e.g. `jl4-core/libraries/prelude.l4:76`'s `x APPEND y MEANS CONCAT
+    scope: e.g. `jl4-core/libraries/prelude.l4:79`'s `x APPEND y MEANS CONCAT
     x, y` would register a top-level term literally named `x` (colliding
     with any pattern binder anywhere named `x`), when the real binding the
     checker creates is named `APPEND` and `x` is never a standalone term at
     all. Confirmed empirically: prelude.l4 has exactly two Decides whose
-    parsed head is the bare name `x` (lines 76 and 1209), both mixfix
+    parsed head is the bare name `x` (lines 79 and 1282), both mixfix
     head-as-parameter definitions, zero of which are real `x` bindings."""
     tysig = d.args[1]
     appform = d.args[2]

@@ -182,6 +182,7 @@ test-suite l4-cli-test
     CliTest.Docassemble
     CliTest.Ledger
     CliTest.Explore
+    CliTest.JsonDecode
     CliTest.SiblingReads
     CliTest.OpenFisca
     CliTest.Prove

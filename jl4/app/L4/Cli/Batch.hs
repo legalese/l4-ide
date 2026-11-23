@@ -105,12 +105,12 @@ import L4.EvaluateLazy
   )
 import L4.IgnoredAnnotation (ignoredAnnotations, renderIgnoredAnnotation)
 import L4.Lexer (execLexer, showStringLit)
-import L4.Presumption (nearestName, requestRecordName, unrecognisedMessage)
+import L4.Presumption (choiceExpectation, choiceNameMiss, couldNotDecodeText, nearestName, requestRecordName, unrecognisedMessage)
 import L4.Print (prettyLayout, restoreMixfixPatterns)
 import L4.Syntax
-  ( AppForm(..), Assume(..), Declare(..), Decide(..), Expr, GivenSig(..), Module(..), Resolved
+  ( AppForm(..), Assume(..), ConDecl(..), Declare(..), Decide(..), Expr, GivenSig(..), Module(..), Resolved
   , Type'(..), TypeDecl(..), TypedName(..), TypeSig(..), Unique, getActual, getUnique, rawName
-  , rawNameToText
+  , rawNameToText, unqualifiedRawNameToText
   )
 import L4.TypeCheck.Environment (listUnique, maybeUnique)
 
@@ -342,9 +342,10 @@ batchCmd opts = do
   -- Step 3: process each row into an envelope, honoring stop-on-error, and
   -- write the results in the requested format.
       declares       = concatMap (moduleDeclares . (.module')) (tcRes : allDependencies tcRes)
-      -- every record an input may hold, this module's and its imports', for
-      -- --validate-only's check of an unknown key (review M1)
-      shapes         = recordShapes declares
+      -- every record and choice type an input may hold, this module's and its
+      -- imports', for --validate-only's check of an unknown key (review M1)
+      -- and of a name that is no constructor of a choice type (#1086)
+      shapes         = typeShapes declares
       -- what each input declares, for reading a case against it (the synonyms
       -- are this module's and its imports', as the records are)
       synonyms       = typeSynonyms declares
@@ -446,7 +447,7 @@ processRow
   -> [(Text, Maybe (Type' Resolved))]        -- ^ read ASSUMEs (bound by name)
   -> Map.Map Text (Expr Resolved)            -- ^ the defaults a row may take, by input
   -> [ExportedParam]                         -- ^ full schema for validation
-  -> RecordShapes                            -- ^ the records an input may hold, for validation
+  -> TypeShapes                              -- ^ the records and choice types an input may hold, for validation
   -> Map.Map Unique (Type' Resolved)         -- ^ the type synonyms, for validation
   -> DeclaredInputs                          -- ^ what each input declares, for reading a case
   -> Int
@@ -626,10 +627,12 @@ resultRefusalMsgs (MkEvalDirectiveResult _ res _ _ _ _) = case res of
 -- refused, naming it and the nearest input, as evaluation refuses it (review
 -- M1), and likewise inside a record an input holds, where a field left out
 -- takes its default.
-validateRow :: Presumption -> Map.Map Unique (Type' Resolved) -> [ExportedParam] -> RecordShapes -> Aeson.Value -> [Text]
+validateRow :: Presumption -> Map.Map Unique (Type' Resolved) -> [ExportedParam] -> TypeShapes -> Aeson.Value -> [Text]
 validateRow presumption synonyms schema shapes (Aeson.Object o) =
   unknownAtRoot <> concatMap checkParam schema
-    <> concat [ unknownIn presumption shapes [p.paramName] ty v
+    <> concat [ unknownIn presumption shapes.records [p.paramName] ty v
+              | p <- schema, Just ty <- [p.paramType], Just v <- [KeyMap.lookup (Key.fromText p.paramName) o] ]
+    <> concat [ choiceIssues synonyms shapes [p.paramName] ty v
               | p <- schema, Just ty <- [p.paramType], Just v <- [KeyMap.lookup (Key.fromText p.paramName) o] ]
   where
     names = map (.paramName) schema
@@ -685,6 +688,58 @@ allDependencies = go Set.empty . (.dependencies)
       | otherwise = d : go (Set.insert key seen) (d.dependencies <> ds)
       where key = moduleKey d.module'
     moduleKey (MkModule _ uri _) = uri
+
+-- | The choice types (@DECLARE ... IS ONE OF@) an input may hold, keyed by the
+-- type's 'Unique': the type's name, the names of its constructors that carry no
+-- fields, which are the ones JSON can name, and of those that do.
+type ChoiceShapes = Map.Map Unique (Text, [Text], [Text])
+
+-- | The types an input may hold that @--validate-only@ looks into.
+data TypeShapes = MkTypeShapes
+  { records :: RecordShapes
+  , choices :: ChoiceShapes
+  }
+
+typeShapes :: [Declare Resolved] -> TypeShapes
+typeShapes decls = MkTypeShapes (recordShapes decls) choiceShapes
+  where
+    choiceShapes = Map.fromList
+      [ (getUnique tyName, (typeText, [ n | (n, False) <- cons ], [ n | (n, True) <- cons ]))
+      | MkDeclare _ _ (MkAppForm _ tyName _ _) (EnumDecl _ conDecls) <- decls
+      , let typeText = rawNameToText (rawName (getActual tyName))
+            cons = [ (unqualifiedRawNameToText (rawName (getActual cn)), not (null fields))
+                   | MkConDecl _ cn fields <- conDecls ]
+      ]
+
+-- | The refusals of a value for a choice type, wherever one sits in one value
+-- of an input: through a @MAYBE@, in the elements of a list, in the fields of a
+-- record. A JSON string that names no constructor of the type without fields,
+-- and any other kind of JSON, is refused with the words the run refuses it
+-- with ('couldNotDecodeText', 'choiceNameMiss', 'choiceExpectation'), so a row
+-- is called valid only if it would decode (smucclaw/l4-ide#1086). @null@ is
+-- judged where nullability is, and a type it cannot see into is left alone.
+choiceIssues :: Map.Map Unique (Type' Resolved) -> TypeShapes -> [Text] -> Type' Resolved -> Aeson.Value -> [Text]
+choiceIssues synonyms shapes = go
+  where
+    go path ty0 v = case (expandSynonyms synonyms ty0, v) of
+      (_, Aeson.Null) -> []
+      (TyApp _ name [inner], _) | getUnique name == maybeUnique -> go path inner v
+      (TyApp _ name [inner], Aeson.Array xs) | getUnique name == listUnique ->
+        concat [ go (path <> ["[" <> Text.pack (show i) <> "]"]) inner x
+               | (i, x) <- zip [0 :: Int ..] (Vector.toList xs) ]
+      (TyApp _ name [], _)
+        | Just (typeName, withoutFields, withFields) <- Map.lookup (getUnique name) shapes.choices ->
+            case v of
+              Aeson.String s
+                | s `elem` withoutFields -> []
+                | otherwise -> [refused path v typeName (choiceNameMiss typeName s withoutFields withFields)]
+              _ -> [refused path v typeName (choiceExpectation typeName withoutFields withFields)]
+        | Just fields <- Map.lookup (getUnique name) shapes.records, Aeson.Object o <- v ->
+            concat [ go (path <> [f]) fty x | (f, fty, _) <- fields, Just x <- [KeyMap.lookup (Key.fromText f) o] ]
+      _ -> []
+    refused path v typeName why =
+      couldNotDecodeText (decodeUtf8 (BSL.toStrict (Aeson.encode v))) typeName
+        (" for field '" <> renderPresumedPath path <> "'") why
 
 -- | The unknown-key refusals inside one value of an input, at @path@: in a
 -- record object where a field left out takes its default (with presumption
