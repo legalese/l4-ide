@@ -967,20 +967,44 @@ originKey l n = fromIntegral l.dlEpoch * 1099511627776 + fromIntegral n
 
 registerOrigin :: NormBearer -> NormKey -> OriginBranch -> Maybe Rational -> Eval (Maybe Reference)
 registerOrigin bearer norm branch observed = asks (.deonticLog) >>= \ case
-  Just l | l.dlWriteFates -> do
-    let origin = MkNormOrigin
-          { noParent = normRefOf norm, noParentModal = norm.nkModal
-          , noParentBearer = bearer, noBranch = branch }
-    n <- liftIO (atomicModifyIORef' l.dlOrigins \ m -> let k = Map.size m in (Map.insert k (origin, observed) m, k))
-    -- Not 'allocateValue': that takes the next address from the evaluation's
-    -- supply, and every printed party key that holds an unforced field names
-    -- its address, so a writer that allocated would change what a ledger
-    -- listing prints (found by the forced-on jl4-test run on
-    -- ok/every/run-lifecycle-values.l4). A negative address cannot clash.
-    uri <- asks (.moduleUri)
-    pointer <- liftIO (newIORef (WHNF (ValNumber (originKey l n))))
-    pure (Just (MkReference (MkAddress uri (negate (n + 1))) pointer))
+  Just l | l.dlWriteFates ->
+    Just <$> newCarrier l MkNormOrigin
+      { noParent = normRefOf norm, noParentModal = norm.nkModal
+      , noParentBearer = bearer, noBranch = branch } observed
   _ -> pure Nothing
+
+-- | Register a parent link, with the stamp of the event that revealed the
+-- hand-off, and make the reference a continuation's environment binds for it.
+newCarrier :: DeonticLog -> NormOrigin -> Maybe Rational -> Eval Reference
+newCarrier l origin observed = do
+  n <- liftIO (atomicModifyIORef' l.dlOrigins \ m -> let k = Map.size m in (Map.insert k (origin, observed) m, k))
+  -- Not 'allocateValue': that takes the next address from the evaluation's
+  -- supply, and every printed party key that holds an unforced field names
+  -- its address, so a writer that allocated would change what a ledger
+  -- listing prints (found by the forced-on jl4-test run on
+  -- ok/every/run-lifecycle-values.l4). A negative address cannot clash.
+  uri <- asks (.moduleUri)
+  pointer <- liftIO (newIORef (WHNF (ValNumber (originKey l n))))
+  pure (MkReference (MkAddress uri (negate (n + 1))) pointer)
+
+-- | The environment a residual obligation keeps when its events run out. The
+-- parent link stays, because the residual descends from the same hand-off
+-- wherever it is armed again; the stamp of the event that revealed the
+-- hand-off does not, because it is an instant of the trace the hand-off
+-- happened in. Armed again in another trace, the norm is seen where it is
+-- armed, and not at an instant that trace may not have: a norm a @LEST@
+-- armed at 3, revealed at 5, and re-traced from 9 was written effective 9 and
+-- observed 5 ('NormLogSpec' "W2b"). Unchanged when the writer is off, or when
+-- no hand-off armed the norm.
+withoutHandoffStamp :: Environment -> Eval Environment
+withoutHandoffStamp env = asks (.deonticLog) >>= \ case
+  Just l | l.dlWriteFates, Just carrier <- Map.lookup lifecycleOriginUnique env ->
+    decodeOrigin l carrier >>= \ case
+      Just (origin, Just _) -> do
+        carrier' <- newCarrier l origin Nothing
+        pure (Map.insert lifecycleOriginUnique carrier' env)
+      _ -> pure env
+  _ -> pure env
 
 -- | The origin a continuation's environment carries, if the writer is on and
 -- a hand-off bound one ('lifecycleOriginUnique').
@@ -3649,7 +3673,9 @@ backwardContractFrame val = \ case
         whenDeonticLog \ l -> do
           clock <- peekClock time
           logStep l (plainStep clock Nothing NoEvent norm Waiting)
-        continueBackward (ValObligation env party act opens due followup lest)
+        -- NORM-LOG-SPEC N3: the residual may be armed again in another trace
+        residualEnv <- withoutHandoffStamp env
+        continueBackward (ValObligation residualEnv party act opens due followup lest)
       _ -> internalException $ RuntimeTypeError $
         "expected LIST EVENT but found: " <> prettyLayout val <> " when scrutinizing regulative events"
   Contract2 ScrutinizeEvent {..} -> case val of

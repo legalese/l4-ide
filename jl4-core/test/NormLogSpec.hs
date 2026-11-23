@@ -630,6 +630,56 @@ importUserSrc = Text.unlines
   , "#EVAL LIST (EVALTRACE other 0 (LIST EVENT Carol deliver 5)), (EVALTRACE r 1 (LIST EVENT Bob (pay 50) 2))"
   ]
 
+-- review of P1, re-verification (np10): a residual that a hand-off armed is
+-- armed again, in another trace. The hand-off's stamp belongs to the trace it
+-- came from: in this one there is no event at 5, or at 1.
+retraceSrc :: Text.Text
+retraceSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver WITHIN 3"
+  , "  LEST PARTY Bob MUST pay 2 WITHIN 10"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "r MEANS EVALTRACE c 0 (LIST EVENT Carol deliver 5)"
+  , ""
+  , "#EVAL EVALTRACE r 9 (LIST EVENT Bob (pay 2) 12)"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "h MEANS"
+  , "  PARTY Alice MUST deliver WITHIN 3"
+  , "  HENCE PARTY Bob MUST pay 2 WITHIN 10"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "rh MEANS EVALTRACE h 0 (LIST EVENT Alice deliver 1)"
+  , ""
+  , "#EVAL EVALTRACE rh 9 (LIST EVENT Bob (pay 2) 12)"
+  ]
+
+-- the same residual, defined in an imported module and re-traced twice, and a
+-- user whose only directive names it
+retraceLibSrc, retraceUserSrc, holeUserSrc :: Text.Text
+retraceLibSrc = Text.unlines $ prologue4 <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver WITHIN 3"
+  , "  LEST PARTY Bob MUST pay 2 WITHIN 10"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "r MEANS EVALTRACE c 0 (LIST EVENT Carol deliver 5)"
+  ]
+retraceUserSrc = Text.unlines
+  [ "IMPORT rtlib"
+  , ""
+  , "#EVAL EVALTRACE r 0 (LIST EVENT Bob (pay 2) 7)"
+  , "#EVAL EVALTRACE r 0 (LIST EVENT Bob (pay 2) 7)"
+  ]
+holeUserSrc = Text.unlines
+  [ "IMPORT rtlib"
+  , ""
+  , "#EVAL r"
+  ]
+
 -- review of P1, L1: a party that prints over more than one line
 multilineSrc :: Text.Text
 multilineSrc = Text.unlines
@@ -661,7 +711,26 @@ allSources =
   , ("breach first", breachFirstSrc), ("late reveal", lateRevealSrc)
   , ("rand join", randJoinSrc), ("ror join", rorJoinSrc)
   , ("join in a lest", lestJoinSrc), ("nested joins", nestedJoinSrc)
-  , ("barrier expired", barrierExpiredSrc) ]
+  , ("barrier expired", barrierExpiredSrc), ("retrace", retraceSrc) ]
+
+-- | Whether a file of the corpus runs a trace, so that the writer should write
+-- a fate there: it has a directive, and a trace is run in it or in a module it
+-- imports, however far back. A file whose only directive is @#EVAL r@, with
+-- @r@ an @EVALTRACE@ in an imported module, writes fates, and had no control
+-- (re-verification of P1). The test is on the text, so it can be wrong in the
+-- other direction: a file that imports a module with a trace and never forces
+-- it is called a trace here, and its control fails; that is a file to look at.
+runsATrace :: [(Text.Text, Text.Text)] -> (Text.Text, Text.Text) -> Bool
+runsATrace modules (_, src) =
+  any ("#" `Text.isPrefixOf`) (Text.lines src)
+    && any (Text.isInfixOf "TRACE") (src : [ t | m <- closure, Just t <- [lookup m modules] ])
+  where
+    importsIn t = [ Text.strip rest | l <- Text.lines t, Just rest <- [Text.stripPrefix "IMPORT " (Text.strip l)] ]
+    closure = go [] (importsIn src)
+    go seen [] = seen
+    go seen (m : todo)
+      | m `elem` seen = go seen todo
+      | otherwise = go (m : seen) (todo <> maybe [] importsIn (lookup m modules))
 
 -- | An opt-in extra corpus: when @NORMLOG_EXTRA_DIR@ names a directory, every
 -- @.l4@ file in it is run with the writer on and off, and the printed results
@@ -685,7 +754,7 @@ extraCorpus = do
       -- over a file that writes no fate would pass whatever the writer did,
       -- and a control for the directory as a whole is satisfied by one file
       -- and hides the others (review of P1, M1)
-      for_ modules \ (name, src) -> when (any (\ l -> "#" `Text.isPrefixOf` l && "TRACE" `Text.isInfixOf` l) (Text.lines src)) do
+      for_ modules \ (name, src) -> when (runsATrace modules (name, src)) do
         it (Text.unpack name <> ": it runs a trace, so the writer wrote fates there") do
           on <- runIn vfs (\ cfg -> cfg {normLog = True}) src
           length [ () | r <- on, Fate _ <- toList r.ledger.normLedger ] `shouldSatisfy` (> 0)
@@ -929,6 +998,40 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         , (FateFailed FailedToLest, Just 13, Just 100)
         , (FateBreached, Just 13, Just 100) ]
 
+    -- the Armed entries of Bob's norm in the n-th directive: when it took
+    -- effect, when it was seen, and how it was armed
+    let bobArmed d rs =
+          [ (e.neEffective, e.neObserved, (.noBranch) <$> e.neOrigin)
+          | e <- fatesOf d rs, e.neFate == FateArmed, keyPrefix' e.neBearer == "Bob" ]
+
+    it "W2b: a residual armed by a hand-off is armed again at its new clock, and the hand-off's stamp is not carried into the new trace" do
+      rs <- run True retraceSrc
+      length rs `shouldBe` 2
+      for_ [0, 1] \ d -> for_ (fatesOf d rs) \ e -> case (e.neEffective, e.neObserved) of
+        (Just a, Just b) -> a `shouldSatisfy` (<= b)
+        _                -> pure ()
+      -- armed by a LEST at the missed deadline 3, seen at 5; armed again at 9
+      bobArmed 0 rs `shouldBe` [(Just 3, Just 5, Just ViaLest), (Just 9, Just 9, Just ViaLest)]
+      -- armed by a HENCE at 1; armed again at 9
+      bobArmed 1 rs `shouldBe` [(Just 1, Just 1, Just ViaHence), (Just 9, Just 9, Just ViaHence)]
+
+    it "W2c: an imported residual re-traced in two identical directives is armed at the same instants in both" do
+      rs <- runIn (vfsFromList [("rtlib", retraceLibSrc)]) (\ cfg -> cfg {normLog = True}) retraceUserSrc
+      length rs `shouldBe` 2
+      let instants d = [ (a, b) | (a, b, _) <- bobArmed d rs ]
+      -- the first directive makes the residual, then re-traces it; the second
+      -- only re-traces it, and its parent link is another evaluation's (W1)
+      instants 0 `shouldBe` [(Just 3, Just 5), (Just 0, Just 0)]
+      instants 1 `shouldBe` [(Just 0, Just 0)]
+
+    it "M1b: the extra corpus's control reaches a file whose only trace is an imported EVALTRACE" do
+      let modules = [("rtlib", retraceLibSrc), ("rtuser", holeUserSrc)]
+      runsATrace modules ("rtuser", holeUserSrc) `shouldBe` True
+      runsATrace modules ("rtlib", retraceLibSrc) `shouldBe` False
+      -- and the file does write fates, which is what the control asks of it
+      rs <- runIn (vfsFromList modules) (\ cfg -> cfg {normLog = True}) holeUserSrc
+      length (fatesOf 0 rs) `shouldSatisfy` (> 0)
+
     it "W3a: a compound's breach is dated along its operands: RAND at the earlier effective instant, ROR at the later" do
       randRs <- run True randJoinSrc
       rorRs <- run True rorJoinSrc
@@ -1001,9 +1104,9 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
 
   describe "properties of every entry" do
     for_ allSources \ (name, src) -> do
-      it (name <> ": effective is never after observed (N3)") do
+      it (name <> ": effective is never after observed (N3), in every directive") do
         rs <- run True src
-        for_ (fatesOf 0 rs) \ e ->
+        for_ [ e | d <- [0 .. length rs - 1], e <- fatesOf d rs ] \ e ->
           case (e.neEffective, e.neObserved) of
             (Just a, Just b) -> a `shouldSatisfy` (<= b)
             _                -> pure ()

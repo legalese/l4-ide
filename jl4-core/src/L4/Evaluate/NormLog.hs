@@ -181,15 +181,17 @@ data NormMember = MkNormMember
 -- So a consumer that needs a total order uses (observed, log position), and
 -- must not read position as time. Where both instants are present,
 -- @neEffective <= neObserved@ (N3's invariant; 'NormLogSpec' pins it on every
--- entry of every fixture).
+-- entry of every directive of every fixture).
 data NormEntry = MkNormEntry
   { neFate      :: !Fate
   , neNorm      :: !(Maybe NormRef)
     -- ^ the norm instance the fate belongs to; 'Nothing' for a declared
     -- @BREACH@ (a terminal, not an obligation). For an @AND@/@OR@ compound,
     -- which is not a norm instance, it names the application of the compound:
-    -- its site is the span of its operands' expressions (when both were still
-    -- expressions), so two compounds in one trace are told apart
+    -- its site is the place of its first operand that was still an expression
+    -- (the one the machine keeps for the compound, and none when both were
+    -- values), and its activation counts the times that site was entered, so
+    -- two compounds in one trace are told apart
   , neModal     :: !(Maybe DeonticModal)
   , neBearer    :: !NormBearer
   , neAction    :: !(Maybe Text)
