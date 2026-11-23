@@ -988,12 +988,18 @@ spec = describe "l4 explore" do
         coverageComplete roomy.gCoverage `shouldBe` True
       -- the tallies are per state: a state reached again adds what the first visit
       -- did not find and repeats nothing
-      it "the chain note counts the states in which the act is tried, not the records of its visits" do
+      it "the chain note counts states, not the records of their visits: no more than the states in which the act is tried" do
         g <- exploreSrc famSrc "fam" regions []
         let notes = [ n | n <- g.gCoverage.cvUntried, "ties through chains of acts, for PARTY B DOES b" `Text.isInfixOf` n.unWhat ]
             statesWithB = Set.fromList [ t.tnFrom | t <- g.gTransitions, t.tnKind == EdgeAct, "PARTY B DOES b" `Text.isInfixOf` t.tnLabel ]
-        map (.unStates) notes `shouldBe` [Set.size statesWithB]
-        Set.size statesWithB `shouldSatisfy` (> 0)
+        -- a state is counted only if something was left out there, so the count is
+        -- at most the states in which the act is tried (before: one per record, so
+        -- more than the states: 8 against 4 here)
+        case map (.unStates) notes of
+          [n] -> do
+            n `shouldSatisfy` (> 0)
+            n `shouldSatisfy` (<= Set.size statesWithB)
+          other -> expectationFailure ("expected one note for b, got counts " <> show other)
       it "a state reached again names a fraction once, whatever fraction its visit finds" do
         g <- exploreSrc fracReSrc "rc" regions []
         let fractions = [ n | n <- g.gCoverage.cvUntried, "PARTY B DOES b" `Text.isInfixOf` n.unWhat, "not whole numbers" `Text.isInfixOf` n.unWhat ]
