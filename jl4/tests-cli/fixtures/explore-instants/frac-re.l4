@@ -1,0 +1,28 @@
+-- smucclaw/l4-ide#1081, found by an independent re-check: ONE state, `k`, is
+-- reached at clock 2 first (T lapses at 1, a tick to 2, then q at 2) and again
+-- at clock 0 (t, u, q at 0), as in cap-re. S1's deadline is fixed at 6.5, so
+-- b's window always holds a fraction: from clock 2 the first is the limit
+-- 6.5, from clock 0 it is also the tie 1.5. The reason names the fraction, and
+-- a state is named once for a label whatever fraction its visit finds.
+IMPORT prelude
+DECLARE Person IS ONE OF T, U, Q, B, V, S1
+DECLARE Action IS ONE OF t, u, q, b, v, s1
+
+GIVETH A DEONTIC Person Action
+k MEANS
+       (PARTY B MUST b WITHIN 20
+          HENCE (PARTY V MUST v WITHIN 5 HENCE FULFILLED LEST BREACH BY V)
+          LEST BREACH BY B)
+  RAND (PARTY S1 MUST s1 WITHIN 6.5 OF 0 HENCE FULFILLED LEST BREACH BY S1)
+
+GIVETH A DEONTIC Person Action
+qk MEANS PARTY Q MUST q WITHIN 1 HENCE k LEST BREACH BY Q
+
+GIVETH A DEONTIC Person Action
+rc MEANS
+  PARTY T MUST t WITHIN 1
+    HENCE (PARTY U MUST u WITHIN 1 HENCE qk LEST BREACH BY U)
+    LEST qk
+
+#TRACE rc AT 0 WITH
+  PARTY T DOES t AT 0

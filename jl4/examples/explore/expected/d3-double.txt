@@ -115,4 +115,4 @@ Residuals (1):
                  WHEN `Alice buys dinner` answered THEN IF (NOT answered) THEN `the evening` ELSE (`the ledger answers the purchase` OF (RECALL ALL OFFICIAL's "dinner status record")))
         LEST FULFILLED
 
-Coverage: 10 states, 21 transitions; frontier exhausted; nothing refused; nothing untried; 39 acts passed over; 10 ticks past the clock bound not taken; no write-only cell dropped; time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state), clock bounded at 75600
+Coverage: 10 states, 21 transitions; frontier exhausted; nothing refused; nothing untried; 39 acts passed over; 10 ticks past the clock bound not taken; no write-only cell dropped; time by regions (whole instants: the last event, the deadline, window openings, the ties between a deadline an act starts and one already live, and one between each; the clock is not in the state), clock bounded at 75600; instants: 60 acts tried at 180 instants (0 ties, 60 gaps)

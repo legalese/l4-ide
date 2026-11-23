@@ -1,0 +1,17 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1081. Two deadlines a unit apart. The tick past the first
+-- is the instant 4, not the half-way 3.5: contract time is discrete, and 4
+-- passes the deadline at 3 without passing the one at 4.
+
+DECLARE Person IS ONE OF P, Q
+DECLARE Action IS ONE OF a, c
+
+GIVETH A DEONTIC Person Action
+adjacent MEANS
+  (PARTY P MUST a WITHIN 3 HENCE FULFILLED LEST BREACH BY P)
+  RAND
+  (PARTY Q MUST c WITHIN 4 HENCE FULFILLED LEST BREACH BY Q)
+
+#TRACE adjacent AT 0 WITH
+  PARTY P DOES a AT 1

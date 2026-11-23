@@ -1,0 +1,19 @@
+-- smucclaw/l4-ide#1081, found by an independent re-check: the deadline that
+-- LAPSES is fixed (R's, at 6, started by no act), and its cure (W, 2 after it)
+-- falls at 8. P's act `a` starts Q's deadline 3 after it, so `a` at 5 puts Q's
+-- deadline on W's cure. The tick that reveals the lapse is where the cure's
+-- instant is learned, and the acts tried at that state are tied with it.
+IMPORT prelude
+DECLARE Person IS ONE OF P, Q, R, W
+DECLARE Action IS ONE OF a, b, r, w
+
+GIVETH A DEONTIC Person Action
+lapsef MEANS
+       (PARTY R MUST r WITHIN 6 HENCE FULFILLED
+          LEST (PARTY W MUST w WITHIN 2 HENCE FULFILLED LEST BREACH BY W))
+  RAND (PARTY P MUST a WITHIN 9
+          HENCE (PARTY Q MUST b WITHIN 3 HENCE FULFILLED LEST BREACH BY Q)
+          LEST BREACH BY P)
+
+#TRACE lapsef AT 0 WITH
+  PARTY P DOES a AT 0

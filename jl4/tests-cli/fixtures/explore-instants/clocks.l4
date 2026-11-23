@@ -1,0 +1,19 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1081. Two deadlines, and an act that starts a third.
+-- `a` at 2 puts b's deadline (2 + 5) on top of Q's (7), and a breach on that
+-- day names both parties. The explorer has to try `a` at 2 to show it.
+
+DECLARE Person IS ONE OF P, Q
+DECLARE Action IS ONE OF a, b, c
+
+GIVETH A DEONTIC Person Action
+clocks MEANS
+  (PARTY P MUST a WITHIN 3
+     HENCE (PARTY P MUST b WITHIN 5 HENCE FULFILLED LEST BREACH BY P)
+     LEST BREACH BY P)
+  RAND
+  (PARTY Q MUST c WITHIN 7 HENCE FULFILLED LEST BREACH BY Q)
+
+#TRACE clocks AT 0 WITH
+  PARTY P DOES a AT 2
