@@ -1,7 +1,7 @@
 # Specification: the norm log — letting a contract read its own deontic history
 
 > **Status (2026-11-23): P1, the fates writer, is built in this change (branch `feat/norm-log-fates`); nothing a user can invoke is on `unstable` yet, and P2 onwards is proposed, not landed.**
-> The text below P1 was checked 2026-11-22 against `origin/unstable` @ `a12991789`, by reading the code and the landed commits; P1's own claims (§6.2 and §6.3) were checked 2026-11-23 by running `NormLogSpec` and `jl4-test`.
+> The text below P1 was checked 2026-11-22 against `origin/unstable` @ `a12991789`, by reading the code and the landed commits; P1's own claims (§6.2 and §6.3) were checked 2026-11-23, on `lhs`, by running `etc/verify-branch.sh`, `NormLogSpec` and `jl4-test` with the writer forced on, in the final gate; §6.3 says what that did not cover.
 > The measurements in §7 and in the notes of §6.1 were not re-run unless an entry says so.
 > All twenty rulings are answered (§6.1): N1–N6 by Meng on 2026-09-27, N8 on 2026-09-28, N10 and N11 on 2026-10-11, N13 and N14 on 2026-10-14, and N7, N9, N12 (option D only), N15, N16 and N17–N20 on 2026-10-26; N20 amends N10.
 > N12's contract instants are held, not ruled.
@@ -612,7 +612,7 @@ The phase column is the build plan of the status header (decided by Claude 2026-
 | **N3**  | built in P1: `neEffective` and `neObserved` on every entry; a failure's effective instant is the missed deadline floored at the arming, its observed instant the stamp of the revealing event; a norm armed by a `HENCE` or `LEST` is effective at the hand-off clock and observed at the event that revealed the hand-off (§6.1 N3, decided by the GM session 2026-11-23, assumed); a breached compound is dated by SEESAW's rule 2 (a `RAND` at the earlier effective instant, an `ROR` at the later), and a barrier's failure by its failing member's instants; `observed` does not go backwards in log position, with three exceptions (§6.1 N3) | P1 (built)                                         |
 | **N4**  | nothing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | P2                                                 |
 | **N5**  | built in P1: `LedgerEvent` has the constructor `Fate`, `LedgerStore` a `normLedger` that `RECALL` does not read, the listing a "Norm log:" block with its own verb, and a `NOTIFY` entry prints as `NOTIFY` (its own commit)                                                                                                                                                                                                                                                                                                                                                                                                                         | P1 (built)                                         |
-| **N6**  | built in P1 as ruled: a separate always-available writer, off unless `EvalConfig.normLog`; the overhead on `jl4-test` is in §6.3; the fallback (on only when a module has a fate read) is not needed yet                                                                                                                                                                                                                                                                                                                                                                                                                                             | P1 (built)                                         |
+| **N6**  | built in P1 as ruled: a separate always-available writer, off unless `EvalConfig.normLog`; what it costs is in §6.3, and whether that is material is not ruled; the fallback (on only when a module in the import closure has a fate read) is not built                                                                                                                                                                                                                                                                                                                                                                                              | P1 (built)                                         |
 | **N7**  | built in P1: a declared breach is written once per reach (`tellBreached`, at the `StampBreach` frame), with the bearer of rules (2) and (4); rule (3) waits for N12's instants and an unforced party is stored as written                                                                                                                                                                                                                                                                                                                                                                                                                            | P1 (rules (1), (2), (4), built)                    |
 | **N8**  | built in P1: each entry names the norm whose `HENCE` or `LEST` armed it, and which of the two (`NormOrigin`), carried as a fourth lifecycle unique, for a compound's entry as for its operands'; the three open cases are settled as the note under N8 says; a link made in another evaluation (a continuation shared from an imported module) is dropped; not built: the observed instant of a norm armed by a barrier's state-layer `LEST`                                                                                                                                                                                                         | P1 (built)                                         |
 | **N9**  | the draft `norm-log-waiver-userspace-draft.md` and its experiment; no doc page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | P4 (the page waits for N4's name and N12)          |
@@ -628,9 +628,12 @@ The phase column is the build plan of the status header (decided by Claude 2026-
 | **N19** | the refusal of two sides' records of one cell, not the snapshot rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | P6                                                 |
 | **N20** | nothing of the settle-first round or the backward-stamp run note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | P6                                                 |
 
-### 6.3 What P1's gate measured (2026-11-23, on `lhs`, at `16c5e4b53`)
+### 6.3 What P1's gate measured (2026-11-23, on `lhs`, after the review of P1)
 
 Read from the run logs, not recalled.
+The gate ran four times on `lhs`: on the first build, after the forcing mutant was added, after the review's fixes (the third gate), and after the cost fix (the final gate).
+A figure the reviewers measured says so, and says on which build.
+The branch's own commits are not cited by hash; a figure says which gate it came from.
 
 **What the writer is.**
 It is off unless `EvalConfig.normLog` is set, and only tests set it (`NormLogSpec`, and `jl4-test` when `JL4_TEST_NORM_LOG` is in the environment).
@@ -640,30 +643,103 @@ No syntax, CLI flag or printed output of `l4 run` depends on it, which is why P1
 `jl4-test` with `JL4_TEST_NORM_LOG=1` reproduces every golden once the "Norm log:" block is removed from the output: 5,031 examples, 0 failures.
 The first such run found one real difference, in `ok/every/run-lifecycle-values.l4`: the carrier of N8's parent link took an address from the evaluation's supply, which moved the heap address that a ledger listing prints for a party with an unforced field.
 The carrier now takes none, and `NormLogSpec` has the shape as a fixture.
-The same run with `JL4_TEST_NORM_LOG=mutant`, a deliberately wrong writer that also writes the official record, fails 38 goldens, so the differential can go red.
-That mutant is not the one the ruling cares about, which is a writer that forces a thunk.
-The corpus has no file whose answer changes when a party is evaluated early, so the golden differential alone would not catch that writer: `NormLogSpec` carries a fixture with a party that cannot be evaluated (a trace with no events, so nothing needs it) and a second mutant, `MutantForce`, that evaluates the party at arming.
-The test shows the mutant's printed result differs from the writer-off result, and that the real writer's does not.
-Both mutants are values of a test-only field of `EvalConfig` (`normLogMutant`); nothing reads it outside a test, and the `jl4-test` run with the forcing mutant (`JL4_TEST_NORM_LOG=mutant-force`) was not made.
+Two deliberately wrong writers show that the differential can go red.
+`JL4_TEST_NORM_LOG=mutant` also writes the official record, and fails 38 goldens (run in the first gate, not repeated since).
+`JL4_TEST_NORM_LOG=mutant-force` evaluates a party at arming, which is the writer the ruling cares about.
+It fails exactly one golden, `ok/every/run-lifecycle-values.l4` (run in the final gate): the heap address of the unforced party moves, from `&1436@` to `&1432@` in the reviewers' run.
+No corpus file's answer changes when a party is evaluated early, so the differential catches that writer by one printed address and by nothing else.
+An earlier version of this section said the golden differential alone would not catch it; the review of P1 showed that was wrong.
+The fixture where the answer does change stays: `NormLogSpec` carries a party that cannot be evaluated (a trace with no events, so nothing needs it), where the forcing writer's printed result differs from the writer-off result and the real writer's does not.
+Both mutants are values of a test-only field of `EvalConfig` (`normLogMutant`); nothing reads it outside a test, but it is a field of a production type.
+
+**What the observer property does not cover.**
+`jl4-test`'s goldens print the answer, the trace and the ledger listing.
+They do not print a directive's list of `TYPICALLY` defaults it forced (`EvalState.presumed`, shown by `l4 batch` and `jl4-service`), so a writer that changed that list would not move a golden, and the differential did not run those two surfaces.
+The step log and the norm log are not both on in any run made here: `NormLogSpec` never calls `captureDeonticSteps`, and whether the forced-on `jl4-test` reaches `execEvalModuleWithDeonticLog` was not checked.
+The writer was not run through `jl4-service`, `l4 batch`, the REPL or the ledger replay (`L4.Ledger.Replay`), under an allocation limit, or with an exception escaping a directive.
 
 **Overhead (N6).**
-Wall time of `jl4-test` on `lhs`: writer off 1,301 s (the run of 2026-11-22); writer forced on 1,291 s at `d438f73e0` and 1,312 s at `16c5e4b53`, the commit this section describes.
-The two forced-on runs differ from each other by more than either differs from the off run, so that is no measurable difference, and it is the whole corpus: the suite is dominated by parsing and type-checking, so the figure bounds the cost of the writer over a corpus, not over one long trace.
-Allocations were not measured, and neither was a deontic-heavy trace by itself.
-Both are owed before the writer is turned on for anything but a test, and N6's fallback (on only when a module in the import closure has a fate read) is the plan if either is material; P2 adds that reader.
+Wall time of `jl4-test` on `lhs`, one run each: writer off 1,301 s (an earlier draft of the branch, in a job that began 2026-11-22 at 23:42, +08:00); writer forced on 1,291 s, 1,312 s and 1,323 s in the first three gates.
+The load average printed at the start of those jobs was between 0.02 and 0.42.
+In the final gate the forced-on run took 1,721 s and the `mutant-force` run 1,746 s, in one job that shared `lhs` with a second job (load 1.08 at its start, 2.00 at its end).
+Both runs are about 30 per cent slower than the earlier ones, and the cost fix removes work, so the difference is probably the load; that is an inference, because the writer-off suite was not run under that load.
+The wall times of different jobs are not comparable, and the suite is dominated by parsing and type-checking, so the wall time over the corpus says little about the writer's cost on one long trace; the allocation figures below are the measure.
+
+The cost on one long trace is the heap allocated by one `jl4-test` process on one file with `+RTS -s`, the writer on less the writer off, less the same difference for a twin of the same file size whose trace writes no fate (the twin's difference is under 0.2 MB).
+The scripts that made them are not in the repository; the long traces are the reviewers' generator, and the `EVERY` is the one below.
+The reviewers measured on their own machine and the other columns on `lhs`, so only the last two columns compare with each other.
+
+An `EVERY` of N members traced with no events, so that every member is armed with its clock still a thunk (the worst case for the Armed rows that wait for a clock):
+
+| members                        | reviewers' build                     | third gate                           | final gate                         |
+| ------------------------------ | ------------------------------------ | ------------------------------------ | ---------------------------------- |
+| 800                            | +346 MB                              | +447 MB (whole process 1.14 times)   | +191 MB (whole process 1.06 times) |
+| 3,200                          | +3,903 MB (whole process 1.31 times) | +5,502 MB (whole process 1.44 times) | +776 MB (whole process 1.06 times) |
+| growth for 4 times the members | 11.3                                 | 12.3                                 | 4.06                               |
+
+The reviewers found it superlinear.
+The first fix, holding the waiting rows newest first, did not remove it: at the third gate it was still superlinear, 12.3 for a step of 4.
+The cause was that each member logs a `Waiting` step when its events run out and every logged step walked all the waiting rows; a step that writes no fate now skips the walk (`NormLogSpec` "S2/cost" compares the evaluation's allocation with the writer on and off at 400 members and at 1,600, and asks the excess to grow by less than 6 for a step of 4; it measured 16.5 before the fix).
+
+The reviewers' long traces, at 400 and at 800 norms:
+
+| trace   | 400: excess | 400: whole process | 800: excess | 800: whole process | growth for 2 times |
+| ------- | ----------- | ------------------ | ----------- | ------------------ | ------------------ |
+| chain   | +159 MB     | 1.11 times         | +320 MB     | 1.12 times         | 2.01               |
+| lest    | +238 MB     | 1.17 times         | +480 MB     | 1.17 times         | 2.02               |
+| fork    | +745 MB     | 1.11 times         | +2,160 MB   | 1.11 times         | 2.90               |
+| barrier | +341 MB     | 1.10 times         | +1,067 MB   | 1.14 times         | 3.12               |
+
+`chain` and `lest` are linear.
+`fork` and `barrier` are not: the excess grows by about 2.9 and 3.1 for a doubling.
+The evaluation's own allocation on those files grows by 2.7 and 2.2, so the writer's excess keeps pace with it on `fork` and outruns it on `barrier`, where the whole-process ratio rises from 1.10 to 1.14.
+That is not fixed and its cause is not found: the next step would be to count what the writer does per member inside a barrier.
+These excesses include rendering the "Norm log:" block, which `jl4-test` prints when the writer is on; that is not separated from the writer's own cost.
+`chain` at 400 costs 159 MB for what the shape of its file makes 800 fates (400 norms, each armed and performed), about 0.2 MB each; the fates were not counted by running.
+The reviewers also measured their purity probe `n6000` at 2.07 GB allocated with the writer off and 5.43 GB on, on their build.
+It was not re-run, so it is the largest whole-process ratio in this section and has not been re-measured since the cost fix.
+
+Whether that is material is N6's question and Meng's to answer, and it is owed before the writer is on for anything but a test.
+N6's fallback (on only when a module in the import closure has a fate read) is the plan if it is material; P2 adds that reader.
 
 **The laptop files.**
-`l4 run` on the five agent-shopping laptop files and the `shopping-rules` module they import (`legalese/solutions` @ `4041f63`), with `JL4_FIXED_NOW` pinned, before (unstable @ `a12991789`) and after, on snapshot binaries: every run exits 0 on both, and the output differs only in the verb of a `NOTIFY` line, in two files.
+`l4 run` on the five agent-shopping laptop files and the `shopping-rules` module they import (`legalese/solutions` @ `4041f63`), with `JL4_FIXED_NOW` pinned, before (unstable @ `a12991789`) and after, on snapshot binaries: every run exits 0 on both, and the output differs only in the verb of a `NOTIFY` line, in two of the six files, `laptop-party-reread` (38 lines) and `laptop-service-party` (54 lines).
+That verb is N5's printer fix (a `NOTIFY` entry used to print as `RECORD`, §6.1 N5).
 The check normalises that verb in the new output and requires the rest to be byte-identical; it ran, and did not just find no difference, because each old output is between 178 and 530 lines.
 
 **The gate.**
 `etc/verify-branch.sh` passed on `lhs`: build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `jl4-service-test`, `check-corpus-goldens`, `check-canon-citations`, the canon mirror, `doc/test-docs.sh`, prettier and the commit trailers.
 It did not run `jl4-lsp-test`, `jl4-mlir-test`, `jl4-websessions-test`, the proleg suites, the DMN harnesses, WASM or TypeScript, and a green run is not a green CI.
+`lhs` builds with GHC 9.10.3 and CI pins 9.10.2.
 
-**What an entry cannot say yet.**
-A norm armed on a trace that never forces its clock (no events at all) has no instants: `neEffective` and `neObserved` are `Nothing` (`NormLogSpec` example 7).
-A compound's join outcome (`FateJoinedFulfilled`, `FateJoinedBreached`) carries no instants, because a `FULFILLED` value carries no time; N7's rule (4) makes a time-windowed read of one an error when the reader lands in P2.
-A party the machine never forced is stored as written (`WrittenBearer`), and N7's rule (3) waits for N12's instants.
+**What an entry cannot say yet, and why.**
+Each of these is "not built, because", not a gap nobody saw.
+
+- A norm armed on a trace that never forces its clock (no events at all) has no instants: `neEffective` and `neObserved` are `Nothing` (`NormLogSpec` example 7).
+  The writer never forces, and nothing has asked the clock.
+- A compound's join outcome (`FateJoinedFulfilled`) carries no instants, because a `FULFILLED` value carries no time; N7's rule (4) makes a time-windowed read of one an error when the reader lands in P2.
+  A barrier whose `MAY` member lapsed has none either (`barrierFinish` keeps only a flag for the lapsed member).
+- A compound is named by the span of its operands' source, where the machine still has the expressions: an operand that arrived as a value gives only the other's range, and two values give none (`operandsSite`).
+- A norm armed by a barrier's state-layer `LEST` has no observed instant of its own from the hand-off: `barrierStateLest` has no revealing event in hand, so its entry is observed at its arming clock.
+  N17 moves barrier members into the step layer, and the instant arrives with it.
+- `observed` goes backwards in log position under `ROR`, whose left side still runs over the whole trace first (§6.1 N3); N17 is the phase that ends it.
+- A parent link made in another evaluation is dropped: a continuation shared from an imported module carries the link of the evaluation that made it, and N11 makes the norm log per evaluation (§6.1 N8).
+- A party the machine never forced is stored as written (`WrittenBearer`), and N7's rule (3) waits for N12's instants.
+
+**What the review of P1 changed (2026-11-23).**
+Kept so that a later editor does not un-change a repair.
+
+- M1: `NormLogSpec` evaluated no import, because `runIn` used an empty environment; it now evaluates them as `l4 run` does, and the extra-corpus control is per file.
+- L1: a bearer that prints over several lines now prints one row per line, so the "Norm log:" block can be stripped by line.
+- S1: the sentence on the forcing mutant above.
+- S2: the figures above, which replace "allocations were not measured".
+- L2: the `origin=` field of a row names the parent's line as well as its activation.
+- S3 and S4: the N8 row of §6.2 and the invariant on `neNorm` in `L4.Evaluate.NormLog` now describe what is built.
+- W1: a foreign parent link is dropped (the origin key carries the evaluation's epoch).
+- W2: a norm armed by a `HENCE` or `LEST` is observed at the event that revealed the hand-off (§6.1 N3, decided by the GM session, assumed).
+- W3: a compound's entry has its identity, its parent link and the two instants of the breach it reduced to; a barrier's entries name nobody.
+- W4: a declared `BREACH` flushes the waiting Armed rows first, so the Armed row precedes it.
+- Cost: the `Waiting` walk above.
 
 ---
 
