@@ -48,12 +48,14 @@ import L4.TypeCheck.Types (CheckResult (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
 import qualified Data.Text.IO as TextIO
+import Control.Exception (evaluate)
 import Control.Monad (forM, when)
 import Data.Foldable (for_, toList)
 import Data.List (findIndex, isSuffixOf, sort)
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import System.Directory (listDirectory)
 import System.Environment (lookupEnv)
+import System.Mem (getAllocationCounter)
 import System.FilePath (dropExtension, (</>))
 import Test.Hspec
 
@@ -688,6 +690,57 @@ extraCorpus = do
           on <- runIn vfs (\ cfg -> cfg {normLog = True}) src
           length [ () | r <- on, Fate _ <- toList r.ledger.normLedger ] `shouldSatisfy` (> 0)
 
+-- | The bytes this thread allocates evaluating a module's directives with the
+-- writer off and on, from one type check, and the number of fates the writer
+-- wrote.
+evalAllocated :: Text.Text -> IO (Double, Double, Int)
+evalAllocated src = do
+  cfg0 <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+  case checkWithImports (vfsFromList []) src of
+    Left errs -> fail ("the module failed to check: " <> show errs)
+    Right r -> do
+      let measure on = do
+            a0 <- getAllocationCounter
+            (_, results) <- execEvalModuleWithEnv (cfg0 {normLog = on}) r.tcdEntityInfo mempty r.tcdModule
+            n <- evaluate (length (fatesOf 0 results))
+            a1 <- getAllocationCounter
+            pure (fromIntegral (a0 - a1) :: Double, n)
+      -- the first evaluation of a type-checked module computes what its lazy
+      -- parts hold once, so it is not the one that is counted
+      _ <- measure False
+      (off, _) <- measure False
+      (on, n) <- measure True
+      pure (off, on, n)
+
+-- | An EVERY of @n@ tenants, each owing a payment with a HENCE and a LEST,
+-- traced against no events: every member is armed with its clock still a
+-- thunk, and logs a Waiting step.
+everyEmptySrc :: Int -> Text.Text
+everyEmptySrc n = Text.unlines $
+  [ "DECLARE Actor IS ONE OF"
+  , "    Landlord HAS name IS A STRING"
+  , "    Tenant   HAS name IS A STRING"
+  , "DECLARE Action IS ONE OF"
+  , "    Pay     HAS payer  IS AN Actor"
+  , "    Receipt HAS issuer IS AN Actor, to IS AN Actor"
+  , ""
+  , "ll MEANS Landlord OF \"L\""
+  ]
+  <> [ "t" <> i <> " MEANS Tenant OF \"T" <> i <> "\"" | k <- [0 .. n - 1], let i = Text.pack (show k) ]
+  <> [ "tenants MEANS LIST " <> Text.intercalate ", " [ "t" <> Text.pack (show k) | k <- [0 .. n - 1] ]
+     , ""
+     , "GIVETH A DEONTIC Actor Action"
+     , "receipts MEANS"
+     , "    EVERY Tenant t IN tenants"
+     , "        MUST   Pay t"
+     , "        WITHIN 100000"
+     , "        UPON   EACH"
+     , "        HENCE  (PARTY ll MUST Receipt ll t WITHIN 5)"
+     , "        LEST   BREACH BY t"
+     , ""
+     , "#TRACE receipts AT 0 WITH"
+     ]
+
 spec :: Spec
 spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
   extraCorpus
@@ -915,6 +968,29 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
       expired <- run True barrierExpiredSrc
       [ (e.neEffective, e.neObserved) | e <- fatesOf 0 expired, e.neFate == FateJoinExpired ]
         `shouldBe` [(Just 5, Just 8)]
+
+    -- The writer's cost must be linear in the norms it writes. An EVERY of N
+    -- members traced with no events logs one Waiting step per member, and each
+    -- step walked the whole list of Armed rows still waiting on a clock (all N
+    -- of them): +346 MB at 800 members and +3,903 MB at 3,200, 11.3 times the
+    -- excess for a step of 4 in N (the reviewers' figures, 2b155b2f5). A step
+    -- that writes no fate has nothing to put the waiting rows before, so it
+    -- no longer walks them.
+    --
+    -- Counted in the bytes this thread allocates, as ConsiderScaleSpec does:
+    -- the writer's excess is the evaluation with the writer on less the same
+    -- evaluation with it off, from one type check. Linear is 4 for a step of
+    -- 4 in N, quadratic 16.
+    it "S2/cost: the writer's allocation on an EVERY with no events grows linearly in its members" do
+      _ <- evalAllocated (everyEmptySrc 1)
+      (off1, on1, n1) <- evalAllocated (everyEmptySrc 400)
+      (off2, on2, n2) <- evalAllocated (everyEmptySrc 1600)
+      -- the writer wrote the Armed rows it is being measured for
+      (n1 >= 400, n2 >= 1600) `shouldBe` (True, True)
+      let excess1 = on1 - off1
+          excess2 = on2 - off2
+      excess1 `shouldSatisfy` (> 0)
+      excess2 / excess1 `shouldSatisfy` (< 6)
 
     it "L1: a bearer that prints over several lines still prints one row per line" do
       rs <- run True multilineSrc

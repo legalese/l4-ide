@@ -799,8 +799,13 @@ logStep :: DeonticLog -> DeonticStep -> Eval ()
 logStep l step = do
   when l.dlKeepSteps (liftIO (modifyIORef' l.dlSteps (`DList.snoc` step)))
   when l.dlWriteFates do
-    flushArmed l
-    for_ (fatesOfStep step) tellFate
+    -- a step that writes no fate (a look, such as the Waiting step a norm logs
+    -- when its events run out) has nothing to put the waiting 'Armed' rows
+    -- before, so it does not walk them: an EVERY of N members traced with no
+    -- events logs N such steps, and each walked all N (review of P1, cost)
+    case fatesOfStep step of
+      []    -> pure ()
+      fates -> flushArmed l >> for_ fates tellFate
 
 -- | NORM-LOG-SPEC N1/N13: a norm met its event stream, and nothing has
 -- happened to it yet. If its arming clock has been forced the entry is
@@ -823,7 +828,9 @@ tellArmed l norm time handoff = do
 flushArmed :: DeonticLog -> Eval ()
 flushArmed l = do
   pending <- liftIO (readIORef l.dlPendingArmed)
-  unless (null pending) do
+  -- nothing is rebuilt unless some clock has been forced since
+  ready <- anyClockForced pending
+  when ready do
     liftIO (writeIORef l.dlPendingArmed [])
     results <- for (reverse pending) \ (norm, time, handoff) -> do
       at <- peekClock time
@@ -831,6 +838,18 @@ flushArmed l = do
         Just _  -> Nothing <$ tellFate (armedEntry norm at handoff)
         Nothing -> pure (Just (norm, time, handoff))
     liftIO (modifyIORef' l.dlPendingArmed (reverse (catMaybes results) <>))
+
+-- | Has any of the waiting rows' clocks been forced? Peeks, allocates nothing
+-- that outlives the walk.
+anyClockForced :: [(NormKey, Reference, Maybe Rational)] -> Eval Bool
+anyClockForced = go
+  where
+    go [] = pure False
+    go ((_, time, _) : rest) = do
+      at <- peekClock time
+      case at of
+        Just _  -> pure True
+        Nothing -> go rest
 
 -- | At the end of a directive: write what is still pending with the clock
 -- as far as it is known, which for a norm that never saw an event is 'Nothing'.
