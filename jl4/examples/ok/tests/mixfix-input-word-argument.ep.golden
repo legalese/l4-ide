@@ -1,0 +1,63 @@
+-- A rule's own inputs are inputs inside the rule, even when one is named like
+-- a word of a mixfix rule in the same file (smucclaw/l4-ide#1076). No `§`
+-- here: the collision is older than the mixfix rules under a `§` being seen
+-- by the parser.
+GIVEN n IS A NUMBER
+      s IS A NUMBER
+`the day` n `days before` s MEANS s MINUS n
+
+GIVEN `the day` IS A NUMBER
+GIVETH A NUMBER
+`inc` `the day` MEANS `the day` PLUS 1
+
+GIVEN `the day` IS A NUMBER
+GIVETH A NUMBER
+`twice` `the day` MEANS `inc` `the day`
+
+-- The input is the first operand of the call, and of an operator.
+GIVEN `the day` IS A NUMBER
+GIVETH A NUMBER
+`thrice` `the day` MEANS `inc` `the day` PLUS `inc` `the day` PLUS `inc` `the day`
+
+-- A rule of its own inside the body, with an input of its own of that name.
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`outer` d MEANS `inner` d
+  WHERE
+    GIVEN `the day` IS A NUMBER
+    GIVETH A NUMBER
+    `inner` `the day` MEANS `inc` `the day`
+
+-- The clauses of a rule, with the input named by its GIVEN.
+GIVEN `the day` IS A NUMBER
+GIVETH A NUMBER
+`clausey` 0 MEANS 0
+`clausey` `the day` MEANS `inc` `the day`
+
+-- The word of an infix mixfix rule, the same way (the example of
+-- doc/reference/errors/README.md, "A clause written like a rule with a word
+-- between its inputs").
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+a `plus` b MEANS a + b
+
+GIVEN plus IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+total plus y MEANS plus * y
+
+GIVEN plus IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+wrap plus y MEANS total plus y
+
+#EVAL `the day` 3 `days before` 10    -- 7
+#EVAL `inc` 5                         -- 6
+#EVAL `twice` 5                       -- 6
+#EVAL `thrice` 5                      -- 18
+#EVAL `outer` 5                       -- 6
+#EVAL `clausey` 5                      -- 6
+#EVAL 3 `plus` 4                      -- 7
+#EVAL total 3 4                       -- 12
+#EVAL wrap 3 4                        -- 12

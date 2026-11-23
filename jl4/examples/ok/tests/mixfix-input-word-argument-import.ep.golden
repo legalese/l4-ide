@@ -1,0 +1,9 @@
+-- The file imported here is refused if an input named like a mixfix word, in a
+-- rule under a `§`, is passed on to another rule (smucclaw/l4-ide#1076). The
+-- importer then reported #1025's internal error for every name it imported,
+-- including the ones whose own definitions were accepted.
+IMPORT `mixfix-input-word-argument-def`
+
+#ASSERT `inc` 5 EQUALS 6
+#ASSERT `twice` 5 EQUALS 6
+#ASSERT `the day` 3 `days before` 10 EQUALS 7
