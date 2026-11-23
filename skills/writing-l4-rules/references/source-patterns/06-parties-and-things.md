@@ -275,7 +275,7 @@ rejected:
 ```
 The second argument of function
 
-  all (defined at prelude.l4:243:1-4)
+  all (defined at prelude.l4:246:1-4)
 
 is expected to be of type
 

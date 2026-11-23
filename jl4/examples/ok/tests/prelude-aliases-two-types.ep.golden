@@ -1,0 +1,18 @@
+-- `mapSnd` and `mapPairs` are the prelude's other names for `pmap` and
+-- `fmap`. Each is used below at two different types in one file, as
+-- `pmap` and `fmap` can be. That needs their types to be declared:
+-- without a GIVEN and GIVETH, the first use settled the type and the
+-- second use was refused (smucclaw/l4-ide#1079).
+
+IMPORT prelude
+
+#EVAL mapSnd (GIVEN n YIELD n + 1) (PAIR OF "a", 1)
+#EVAL mapSnd (GIVEN s YIELD s EQUALS "x") (PAIR OF "a", "x")
+
+#EVAL mapPairs (GIVEN n YIELD n + 1) (LIST (PAIR OF "a", 1), (PAIR OF "b", 2))
+#EVAL mapPairs (GIVEN s YIELD s EQUALS "x") (LIST (PAIR OF "a", "x"), (PAIR OF "b", "y"))
+
+#ASSERT (mapSnd (GIVEN n YIELD n + 1) (PAIR OF "a", 1)) EQUALS (PAIR OF "a", 2)
+#ASSERT (mapSnd (GIVEN s YIELD s EQUALS "x") (PAIR OF "a", "x")) EQUALS (PAIR OF "a", TRUE)
+#ASSERT (mapPairs (GIVEN n YIELD n + 1) (LIST (PAIR OF "a", 1), (PAIR OF "b", 2))) EQUALS (LIST (PAIR OF "a", 2), (PAIR OF "b", 3))
+#ASSERT (mapPairs (GIVEN s YIELD s EQUALS "x") (LIST (PAIR OF "a", "x"), (PAIR OF "b", "y"))) EQUALS (LIST (PAIR OF "a", TRUE), (PAIR OF "b", FALSE))

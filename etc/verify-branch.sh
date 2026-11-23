@@ -125,8 +125,8 @@ if [ -n "$STRAY" ]; then
 fi
 
 # ---------------------------------------------------------------- logs
-# Each test suite's output goes to a log in a directory made for this run. A
-# suite that passes deletes its log. A suite that fails keeps it, prints its
+# Each test suite's output, and the build's, goes to a log in a directory made
+# for this run. A suite that passes deletes its log. A suite that fails keeps it, prints its
 # path and the failing examples, and the summary names it again.
 #
 # The log's path is chosen HERE and handed to the step. Until 2026-10-08 each
@@ -165,8 +165,33 @@ suite() { # suite <label> <cabal test target> <summary lines to show>
   return 1
 }
 
+# The build passes or fails on cabal's exit code. Until 2026-11-23 it failed on
+# any output line containing "error" in any case and ignored the exit code, so
+# it failed every build that compiled the module LSP.L4.BlockingErrors (added
+# 2026-10-24), whose progress line is `Compiling LSP.L4.BlockingErrors`, and
+# it would have passed a build that failed without printing the word. The
+# output goes to a log in the run's directory, kept only if the build fails;
+# GHC's own errors (`<file>:<line>:<col>: error:`) are shown from it.
+build_all() {
+  local log="$LOGDIR/build.log" rc
+  ( cd "$WT" && cabal build all ) >"$log" 2>&1
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
+    rm -f "$log"
+    return 0
+  fi
+  KEPT+=("$log")
+  echo "  cabal build all exited $rc; full log: $log"
+  if grep -qE '^[^[:space:]].*: error:' "$log"; then
+    grep -A8 -E '^[^[:space:]].*: error:' "$log" | head -60 | sed 's/^/  | /'
+  else
+    tail -15 "$log" | sed 's/^/  | /'
+  fi
+  return 1
+}
+
 # ---------------------------------------------------------------- the gate
-step "cabal build all" bash -c "cd '$WT' && cabal build all 2>&1 | grep -viE '^ *ld: warning' | grep -iE 'error' && exit 1 || exit 0"
+step "cabal build all" build_all
 
 if [ "$QUICK" = 1 ]; then
   note "jl4-test SKIPPED (--quick)"
@@ -317,7 +342,7 @@ echo "  RESULTS"
 for r in "${RESULTS[@]}"; do echo "    $r"; done
 if [ "${#KEPT[@]}" -gt 0 ]; then
   echo
-  echo "  LOGS of the failed suites, kept:"
+  echo "  LOGS of the failed steps, kept:"
   for k in "${KEPT[@]}"; do echo "    $k"; done
 fi
 echo

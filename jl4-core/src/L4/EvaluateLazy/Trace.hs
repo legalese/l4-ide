@@ -8,7 +8,7 @@ import qualified Base.Text as Text
 import L4.Annotation (emptyAnno)
 import L4.Syntax
 import L4.Evaluate.ValueLazy
-import L4.EvaluateLazy.Exceptions (EvalException(..), InternalEvalException(..), UserEvalException(..), Refusal(..), prettyEvalException)
+import L4.EvaluateLazy.Exceptions (Budget (..), EvalException(..), InternalEvalException(..), UserEvalException(..), Refusal(..), prettyEvalException)
 import L4.Print
 import L4.TypeCheck.Environment.TH (builtinUri)
 import L4.Utils.RevList
@@ -322,6 +322,13 @@ printUserEvalExceptionShort (NotAnInteger _ _)              = "not an integer"
 printUserEvalExceptionShort (Stuck _)                       = "stuck"
 printUserEvalExceptionShort RanOutOfSteps                   = "gave up"
 printUserEvalExceptionShort (UserError _)                   = "user error"
+printUserEvalExceptionShort (OverBudget b)                  = case b of
+  OpenObligations _ _     -> "stopped: too many obligations open"
+  JoinedBreaches _ _      -> "stopped: too many failures joined"
+  ClosureApplications {}  -> "stopped: too many steps"
+  TimeLimit _             -> "stopped: time limit"
+  MemoryLimit _           -> "stopped: memory limit"
+printUserEvalExceptionShort (NotEvaluated _ _)              = "not evaluated: the run stopped"
 -- 'ValueTooDeep' is the outcome of an #ASSERT REFUSED, not of an evaluation,
 -- and a trace carries the evaluation's, so no trace holds it.
 printUserEvalExceptionShort ValueTooDeep                    = "value deeper than read"

@@ -93,6 +93,8 @@ Then the ladder, first existing copy wins (`Rules.hs:339-348`):
 5. `<XDG data>/jl4/libraries/<mod>.l4`;
 6. `<exeDir>/../../libraries/<mod>.l4`.
 
+Whether a folder tier holds `<mod>.l4` is asked of the operating system (`doesFileExist`, `git show origin/main:jl4-lsp/src/LSP/L4/Rules.hs`, line 483), so on a case-insensitive disk, the macOS and Windows default, `IMPORT dayDate` can load `daydate.l4`; see Later changes for the case rule, which `main` does not have.
+
 Under `EmbeddedStdlibOnly` the ladder is tier 4 alone, whatever the environment and the working directory hold; `JL4_LIBRARY_PATH` is not read, so `hasExplicitPath` is `False` (`Rules.hs:318-328`).
 `jl4-service` runs every session under that scope.
 Before this PR it registered the stdlib up front at `./<name>.l4`, a key the in-memory tier hits first, so the host's files could not stand in for the stdlib; registering it at `jl4-embedded:` made the host's `prelude.l4` (in the working directory, or in a directory named by `JL4_LIBRARY_PATH`) win silently, and the scope is what keeps `main`'s deployments immune.
@@ -171,3 +173,4 @@ The fixture-existence pre-check in the suite's `main` (`jl4/tests-cli/Main.hs:44
 
 - #451, a separate change on unstable that is not on `main`, adds `tiersInOrder` and `roundTrippingFileUri` (smucclaw/l4-ide#971), lists the not-found locations in ladder order deduplicated by file, adds the line "Nothing it defines is in scope here; ...", stops an unresolved import from producing the importer's own URI (the source of "Your module depends on itself"), and adds `ImportDiagnosticSpec` and `ImportUriSpec` to `jl4-lsp-test`.
 - On unstable the CLI runner `runL4EmbeddedOnly` (added by #87) later moved to a `CliTest/Common.hs`; `main` has no such file, and the runner is in `jl4/tests-cli/Main.hs:208-209`.
+- smucclaw/l4-ide#1080 (branch `fix/import-case-1080`), not on `main`: capitals count in a module name on every tier. A folder tier holds `<mod>` only when its folder lists an entry spelled exactly `<mod>.l4`; the not-found message gains a line naming any module whose name differs only in capitals, in the CLI, the language server, the API/WASM checker (`typecheckWithDependenciesKnowingLocated`, which `typecheckWithDependenciesKnowing` wraps) and the `hint` field of `jl4-service`'s `Bundle IMPORT resolves to nothing` `WARN`; and a Warning names a file passed over because of its capitals. The rule, its measurements and its rulings, each assumed by GM on 2026-11-21 for Meng's review, are `specs/todo/LIBRARY-RESOLUTION-SHADOW-SPEC.md` §11.

@@ -23,14 +23,12 @@ module L4.EvaluateLazy.Fates
   , breachedEntry
   , normBearerOf
   , normRefOf
-  , operandsSite
   ) where
 
 import Control.Monad (mplus)
 import L4.Evaluate.NormLog
 import L4.Evaluate.ValueLazy (RBinOp (..))
 import L4.EvaluateLazy.DeonticStep
-import L4.Parser.SrcSpan (SrcRange (..))
 import L4.Syntax (DeonticModal (..))
 
 -- | The party a norm key knows, as far as the machine has forced it.
@@ -70,19 +68,6 @@ entryFor k fate effective observed = MkNormEntry
 -- has no hand-off, and is seen when it is armed.
 armedEntry :: NormKey -> Maybe Rational -> Maybe Rational -> NormEntry
 armedEntry k clock handoff = entryFor k FateArmed clock (handoff `mplus` clock)
-
--- | The source range an @AND@\/@OR@ compound is known by: the span of its
--- operands' expressions, where both are still expressions. A compound whose
--- operand arrived as a value has only the other's range, and one with neither
--- has none.
-operandsSite :: Maybe SrcRange -> Maybe SrcRange -> Maybe SrcRange
-operandsSite (Just a) (Just b)
-  | a.moduleUri == b.moduleUri = Just MkSrcRange
-      { start = min a.start b.start, end = max a.end b.end
-      , length = a.length + b.length, moduleUri = a.moduleUri }
-operandsSite a Nothing = a
-operandsSite Nothing b = b
-operandsSite a _       = a
 
 -- | The entry for a declared @BREACH@ that a continuation has just reached.
 -- It names no norm (a terminal is not an obligation); its bearer is whom

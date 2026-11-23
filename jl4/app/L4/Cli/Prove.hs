@@ -63,7 +63,7 @@ import L4.EvaluateLazy
   , execEvalExprInContextOfModule
   , prettyAssertionOutcome
   )
-import L4.EvaluateLazy.Exceptions (prettyEvalException, prettyRefusal)
+import L4.EvaluateLazy.Exceptions (isLimitStop, prettyEvalException, prettyRefusal)
 import L4.Export (AssumeRewrite (..), rewriteModuleAssumes)
 import qualified L4.Dmn.Analysis as Safety
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..), prettySrcRange)
@@ -125,6 +125,7 @@ data ProveOptions = ProveOptions
   , proveTimeout  :: Int
   , proveEmitSmt  :: Maybe FilePath
   , proveFixedNow :: FixedNowOpt
+  , proveLimits   :: EvalLimits
   }
 
 proveOptionsParser :: Parser ProveOptions
@@ -145,6 +146,7 @@ proveOptionsParser = ProveOptions
             )
         )
   <*> fixedNowParser
+  <*> evalLimitsParser
 
 ----------------------------------------------------------------------------
 -- The solver (R-V6): text in, text out, behind one record
@@ -208,7 +210,12 @@ data Row = Row
 
 proveCmd :: ProveOptions -> IO ()
 proveCmd opts = do
-  evalConfig <- makeEvalConfig opts.proveFixedNow
+  evalConfig <- withEvalLimits opts.proveLimits =<< makeEvalConfig opts.proveFixedNow
+  guardRunStop "l4 prove" evalConfig (proveWith opts evalConfig)
+
+-- | 'proveCmd' under the limits its flags set (ruled by Meng 2026-11-21, extending L2).
+proveWith :: ProveOptions -> EvalConfig -> IO ()
+proveWith opts evalConfig = do
   (errs, res) <- runOneshot evalConfig opts.proveFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
@@ -298,6 +305,12 @@ classify entryUri env outcomes safety mr e = case outcome of
   -- An error that is not "waiting for an input" is the evaluator's answer
   -- whatever the assertion reads (R-V3: every other way of being stuck stays
   -- Errored), so it is not re-proved.
+  -- A limit is not the evaluator's answer: it stopped before it had one
+  -- (ruled by Meng 2026-11-21, extending L2).
+  Just (Assertion (Errored exc))
+    | isLimitStop exc ->
+        Left (Unknown ("the evaluator stopped at a limit before it could decide it: "
+                       <> oneLine (Text.unlines (prettyEvalException exc))))
   Just (Assertion (Errored exc)) ->
     Left (Decided True ("not an obligation: the evaluator reports an error: "
                    <> oneLine (Text.unlines (prettyEvalException exc))))
@@ -403,26 +416,34 @@ solve opts evalConfig tc importEnv solver mr e ob = do
                             <> ", but the evaluator says it holds there")
           EvOther what -> Defect ("the solver says the assertion fails at " <> showBinding shown
                                   <> ", but the evaluator " <> what)
+          EvStopped msg -> Unknown ("the solver says the assertion fails at " <> showBinding shown
+                                    <> ", but the evaluator stopped at a limit there before it could say: " <> msg)
 
   -- unsat: the encoding says the assertion holds everywhere, so the evaluator
   -- must say TRUE at every point it is asked about. A point where it does not
   -- is an over-constrained encoding, which would otherwise prove everything.
   sampleCheck = do
     let points = samplePoints [ (fv, proofSampleValues ob fv.fvSort) | fv <- ob.obFree ]
-    bad <- firstBad points
+    bad <- firstBad Nothing points
     pure case bad of
       Nothing -> Proved (length points)
-      Just (shown, what) -> Defect ("the solver proved it, but at " <> showBinding shown <> " the evaluator " <> what)
+      Just (shown, Right what) -> Defect ("the solver proved it, but at " <> showBinding shown <> " the evaluator " <> what)
+      Just (shown, Left msg) -> Unknown ("the solver proved it, but at " <> showBinding shown
+                                         <> " the evaluator stopped at a limit before it could check it: " <> msg)
 
-  firstBad [] = pure Nothing
-  firstBad (p : ps) = do
+  -- The first point the evaluator disagrees at. A point it stopped at is
+  -- not a disagreement, so the check goes on past it, and reports the first
+  -- such point only when no later one disagrees.
+  firstBad stop [] = pure (fmap (fmap Left) stop)
+  firstBad stop (p : ps) = do
     r <- evalAt p
     let shown = [ (fv.fvName, oneLine (prettyLayout (exactValue x))) | (fv, x) <- p ]
     case r of
-      EvTrue -> firstBad ps
-      EvFalse -> pure (Just (shown, "says it is FALSE"))
-      EvRaised msg -> pure (Just (shown, "says it raises: " <> msg))
-      EvOther what -> pure (Just (shown, what))
+      EvTrue -> firstBad stop ps
+      EvStopped msg -> firstBad (maybe (Just (shown, msg)) Just stop) ps
+      EvFalse -> pure (Just (shown, Right "says it is FALSE"))
+      EvRaised msg -> pure (Just (shown, Right ("says it raises: " <> msg)))
+      EvOther what -> pure (Just (shown, Right what))
 
   -- Bind each ASSUME to its value by replacing it with a definition at its
   -- own address (as @l4 batch@ and the service do), then evaluate the
@@ -441,12 +462,16 @@ solve opts evalConfig tc importEnv solver mr e ob = do
         Reduction (Reduced (MkNF (ValBool True))) -> EvTrue
         Reduction (Reduced (MkNF (ValBool False))) -> EvFalse
         Reduction (Reduced _) -> EvOther "returned a value that is not BOOLEAN"
-        Reduction (ReducedErrored exc) -> EvRaised (oneLine (Text.unlines (prettyEvalException exc)))
+        Reduction (ReducedErrored exc)
+          | isLimitStop exc -> EvStopped (oneLine (Text.unlines (prettyEvalException exc)))
+          | otherwise -> EvRaised (oneLine (Text.unlines (prettyEvalException exc)))
         Reduction (ReducedRefused r) -> EvOther ("refuses there: " <> oneLine (Text.unlines (prettyRefusal r)))
         Reduction (ReducedUndetermined _) -> EvOther "still cannot decide it there, so the lowering missed an input"
         Assertion _ -> EvOther "returned an assertion outcome for an expression"
 
-data EvalAt = EvTrue | EvFalse | EvRaised Text | EvOther Text
+-- | What the evaluator said at one point. 'EvStopped' is a limit (a count,
+-- time or memory), which is not an answer about the assertion.
+data EvalAt = EvTrue | EvFalse | EvRaised Text | EvOther Text | EvStopped Text
 
 -- | At most 64 points of the product of the sample sets: all of it when it is
 -- that small, otherwise a deterministic spread across it.

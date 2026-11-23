@@ -1,0 +1,9 @@
+-- smucclaw/l4-ide#1074: a rule written as a RECORD's value leaves a HENCE on
+-- its first line to the RECORD, as it did before #1074.
+
+DECLARE Person IS ONE OF Seller
+DECLARE Action IS ONE OF delivery
+
+GIVETH A DEONTIC Person Action
+c MEANS
+  RECORD `x` IS PARTY Seller MUST delivery HENCE FULFILLED HENCE FULFILLED

@@ -1,0 +1,14 @@
+-- smucclaw/l4-ide#1074 (F3, ruled by Meng 2026-11-22: Clause Layout Rulings
+-- F3 A): a LEST at or left of the column its definition starts at belongs to
+-- no rule, and is refused naming the rule above it, with where to write it.
+
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF delivery, payment
+
+c MEANS
+  PARTY Seller
+  MUST delivery
+  HENCE
+    PARTY Buyer
+    MUST payment
+LEST BREACH BY Seller

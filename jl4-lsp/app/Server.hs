@@ -206,7 +206,9 @@ getDefaultArguments recorder = do
   fixedNow <- EvaluateLazy.readFixedNowEnv
   -- LSP default: avoid editor noise (TRACE-GRAPHVIZ-ARCHITECTURE.md)
   let tracePolicy = lspDefaultPolicy defaultGraphVizOptions
-  evalConfig <- EvaluateLazy.resolveEvalConfig fixedNow tracePolicy
+  -- smucclaw/l4-ide#1075, ruling L2: the editor evaluates under the counted
+  -- budgets ('EvaluateLazy.withCountedBudgets'), as l4 run and l4 batch do
+  evalConfig <- EvaluateLazy.withCountedBudgets <$> EvaluateLazy.resolveEvalConfig fixedNow tracePolicy
   logWith recorder Debug $ LogWorkingDirectory projectRoot
   pure Arguments
     { projectRoot

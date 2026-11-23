@@ -5,6 +5,11 @@ module L4.EvaluateLazy
 , AllocationLimit(..)
 , resolveEvalConfig
 , resolveEvalConfigWithSafeMode
+, withCountedBudgets
+, EvalLimits (..)
+, applyEvalLimits
+, withTracedWorkNumber
+, withRunStop
 , parseFixedNow
 , readFixedNowEnv
 , EvalDirectiveResult (..)
@@ -154,6 +159,36 @@ data EvalConfig = EvalConfig
     -- ^ How a directive's trace is built from what the evaluation recorded:
     -- 'postprocessTrace'. A test replaces it with one that fails, to follow
     -- the fallback 'tracePostprocessFailed' out through a surface.
+  , maxOpenObligations :: !(Maybe Int)
+    -- ^ smucclaw/l4-ide#1075: the most obligations one directive may have
+    -- open at once ('OpenObligations'); 'Nothing' sets no limit. The shared
+    -- default ('resolveEvalConfig') sets none; 'withCountedBudgets' sets
+    -- 'maximumOpenObligations'.
+  , maxClosureApplications :: !(Maybe Int)
+    -- ^ the most applications of L4 functions one directive may make
+    -- ('ClosureApplications'); 'Nothing' sets no limit. Set as
+    -- 'maxOpenObligations' is, to 'maximumClosureApplications'.
+  , directiveSeconds :: !(Maybe Int)
+    -- ^ the opt-in wall-clock limit on each directive, in seconds
+    -- ('TimeLimit'; @--eval-timeout@). 'Nothing' by default.
+  , directiveMegabytes :: !(Maybe Int)
+    -- ^ the opt-in allocation limit on each directive, in megabytes
+    -- ('MemoryLimit'; @--max-eval-memory-mb@). 'Nothing' by default. Unlike
+    -- 'allocationLimit', which caps a whole module from outside, this one is
+    -- measured from each directive's start; going over it, or over
+    -- 'directiveSeconds', stops the run (ruling L2), and no directive after
+    -- that one is evaluated.
+  , runStop :: !(Maybe (IORef (Maybe (Budget, Maybe SrcRange))))
+    -- ^ what says the run has stopped, shared by every module evaluated
+    -- under this configuration ('withRunStop'), so that a stop in an
+    -- imported module's directive stops the importing module's too.
+    -- 'Nothing' (the default) gives each module's evaluation its own.
+  , maxTracedClosureApplications :: !(Maybe (Maybe Int))
+    -- ^ the work number for a directive that collects a trace, where it is
+    -- not 'maxClosureApplications' ('withTracedWorkNumber'). 'Nothing' (the
+    -- shared default, so jl4-service's) uses 'maxClosureApplications';
+    -- @Just Nothing@ sets no limit. 'withCountedBudgets' sets
+    -- 'maximumTracedClosureApplications'.
   , normLog :: !Bool
     -- ^ NORM-LOG-SPEC N6: write each norm's fates into the directive's norm
     -- ledger ('L4.Evaluate.Ledger.normLedger'). Off by default, and no
@@ -182,9 +217,74 @@ data AllocationLimit = MkAllocationLimit
 resolveEvalConfig :: Maybe UTCTime -> TracePolicy -> IO EvalConfig
 resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime tracePolicy False
 
+-- | The shared configuration, which every caller starts from: no counted
+-- budget, and no time or allocation limit on a directive. jl4-service, which
+-- sets its own limits on each request, evaluates under it as it did before
+-- the budgets existed.
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True False postprocessTrace False NoMutant)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True False postprocessTrace Nothing Nothing Nothing Nothing Nothing Nothing False NoMutant)
+
+-- | The counted budgets at their defaults: what every @l4@ command that
+-- evaluates, the REPL and the editor (jl4-lsp, and the browser's through
+-- "L4.API") evaluate under. Ruling L2 of the Recursion Limits bench
+-- (2026-11-20) puts the count on by default in @l4 run@, @l4 batch@ and the
+-- editor, and Meng's ruling of 2026-11-21 in the other commands and the REPL; it
+-- is set in their configuration rather than the shared one, so that
+-- jl4-service is unchanged. A flag changes it ('applyEvalLimits'). A
+-- directive that collects a trace has a lower work number of its own,
+-- 'maximumTracedClosureApplications' (decided by Claude 2026-11-21, pending Meng's
+-- review).
+withCountedBudgets :: EvalConfig -> EvalConfig
+withCountedBudgets cfg = cfg
+  { maxOpenObligations = Just maximumOpenObligations
+  , maxClosureApplications = Just maximumClosureApplications
+  , maxTracedClosureApplications = Just (Just maximumTracedClosureApplications)
+  }
+
+-- | The limits a command or the REPL was given on its command line
+-- (@--max-open@, @--max-steps@, @--eval-timeout@, @--max-eval-memory-mb@).
+data EvalLimits = EvalLimits
+  { limitOpen      :: Maybe (Maybe Int)
+    -- ^ @--max-open@: 'Nothing' keeps the default, @Just Nothing@ is @none@
+  , limitSteps     :: Maybe (Maybe Int)
+    -- ^ @--max-steps@, read the same way
+  , limitSeconds   :: Maybe Int
+  , limitMegabytes :: Maybe Int
+  }
+
+-- | A work number of its own for a directive that collects a trace. A trace
+-- holds about 10 KB a step (measured 2026-11-21: 10.6 GB at 1,000,000 steps),
+-- so 'withCountedBudgets' gives such a directive a lower number than one
+-- that collects none. 'Nothing' takes 'maxClosureApplications'.
+withTracedWorkNumber :: Maybe (Maybe Int) -> EvalConfig -> EvalConfig
+withTracedWorkNumber n cfg = cfg {maxTracedClosureApplications = n}
+
+-- | The counted budgets at their defaults, then whatever the flags say.
+-- @--max-steps@ sets the traced work number too, so that it is one number.
+-- This sets no run stop: a command that runs once adds one ('withRunStop');
+-- the REPL does not, so that a stop ends only the line that went over.
+applyEvalLimits :: EvalLimits -> EvalConfig -> EvalConfig
+applyEvalLimits lims cfg0 = cfg
+  { maxOpenObligations     = fromMaybe cfg.maxOpenObligations lims.limitOpen
+  , maxClosureApplications = fromMaybe cfg.maxClosureApplications lims.limitSteps
+  , maxTracedClosureApplications = maybe cfg.maxTracedClosureApplications (const Nothing) lims.limitSteps
+  , directiveSeconds       = lims.limitSeconds
+  , directiveMegabytes     = lims.limitMegabytes
+  }
+  where
+    cfg = withCountedBudgets cfg0
+
+-- | One run: a time or memory stop in any module evaluated under the
+-- configuration this returns, an import's directive included, stops every
+-- directive after it, in that module and in the modules after it. For one
+-- invocation of an @l4@ command; a configuration that lives longer
+-- (an editor's, a service's) must not carry one, or one stop would refuse
+-- everything evaluated after it.
+withRunStop :: EvalConfig -> IO EvalConfig
+withRunStop cfg = do
+  ref <- newIORef Nothing
+  pure cfg {runStop = Just ref}
 
 -- | Resolve the eval time: use the fixed time if set, otherwise get the wall clock.
 resolveEvalTime :: EvalConfig -> IO UTCTime
@@ -304,6 +404,8 @@ runConfig = \ case
     -- UNKNOWN-EVALUATION-SPEC §4.5: every step counts once the counter has
     -- started, and none before
     tickUnknownSteps
+    -- smucclaw/l4-ide#1075: and the opt-in time and allocation limits
+    tickLimits
     runConfigStep config
 
 runConfigStep :: Config -> Eval WHNF
@@ -349,6 +451,8 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- UNKNOWN-EVALUATION-SPEC §4.5 (C4): the step counter starts afresh, and
   -- stopped, for every directive.
   resetUnknownSteps
+  -- smucclaw/l4-ide#1075: and so do the budgets
+  resetBudget
   -- Snapshot the ambient temporal context and restore it unconditionally
   -- after the directive. 'unwindFrame' already restores saved contexts
   -- frame by frame during exceptional unwinding; this directive boundary is
@@ -356,15 +460,26 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- during THIS directive can leak into subsequent directives, whatever the
   -- unwind path.
   ambientCtx <- getTemporalContext
-  ((v, mt), steps) <- captureSteps $
-    if traced
-      then second Just <$> do
-        captureTrace $ tryEval $ do
+  -- smucclaw/l4-ide#1075, ruling L2: after a time or memory stop nothing is
+  -- evaluated, so nothing is traced either: a trace with no step in it is
+  -- one the trace builder cannot read (review of 2026-11-21)
+  stopped <- runStoppedAt
+  ((v, mt), steps) <- case stopped of
+    Just (b, at) -> pure ((Left (UserEvalException (NotEvaluated b at)), Nothing), [])
+    Nothing -> captureSteps $
+      if traced
+        then second Just <$> withTracedWorkLimit do
+          captureTrace $ tryEval $ do
+            whnf <- runConfig $ ForwardMachine env expr
+            nfAnswer whnf
+        else fmap (, Nothing) $ tryEval $ do
           whnf <- runConfig $ ForwardMachine env expr
           nfAnswer whnf
-      else fmap (, Nothing) $ tryEval $ do
-        whnf <- runConfig $ ForwardMachine env expr
-        nfAnswer whnf
+  -- smucclaw/l4-ide#1075, ruling L2: going over the opt-in time or memory
+  -- limit stops the run, so every directive after this one is refused
+  case v of
+    Left (UserEvalException (OverBudget b)) | stopsTheRun b -> noteRunStopped b r
+    _ -> pure ()
   -- T6: restore the ambient temporal context unconditionally after the
   -- directive (belt-and-braces; independent of the ledger/trace snapshots below).
   putTemporalContext ambientCtx
@@ -1021,7 +1136,7 @@ execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo
   -- one that nothing supplies stays an assumed term.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  let st = withDefaultsKnown evalConfig rootFills m0 imported st0
+  let st = (withDefaultsKnown evalConfig rootFills m0 imported st0) {budgetRules = moduleRules m0}
   r <- try (withAllocationLimit evalConfig.allocationLimit (runEval st (evalModuleAndDirectivesWith runDirective env m)))
   case r of
     Left exc -> do
@@ -1062,6 +1177,15 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   -- UNKNOWN-EVALUATION-SPEC §4.5: stopped until a directive's first term
   unknownSteps   <- newIORef (-1)
   unknownReached <- newIORef []
+  -- smucclaw/l4-ide#1075: reset per directive ('resetBudget'). The clock
+  -- reads nothing until then: a step taken outside any directive is under
+  -- no time or allocation limit, rather than measured from zero, which
+  -- would stop it at once.
+  armings      <- newIORef 0
+  closes       <- newIORef 0
+  applications <- newIORef 0
+  limitClock   <- newIORef (MkLimitClock maxBound 0 0)
+  runStopped   <- maybe (newIORef Nothing) pure evalConfig.runStop
   presumable <- newIORef IntMap.empty
   presumed   <- newIORef emptyPresumedLog
   maxFrameDepth <- readMaxFrameDepthEnv
@@ -1076,6 +1200,17 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
     , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog
+    , armings, closes, applications
+    , openLimit = evalConfig.maxOpenObligations
+    , applicationLimit = evalConfig.maxClosureApplications
+    , tracedApplicationLimit = fromMaybe evalConfig.maxClosureApplications evalConfig.maxTracedClosureApplications
+    , usualApplicationLimit = Nothing
+    , directiveLimits = case (evalConfig.directiveSeconds, evalConfig.directiveMegabytes) of
+        (Nothing, Nothing) -> Nothing
+        (secs, mbs)        -> Just MkDirectiveLimits {seconds = secs, megabytes = mbs}
+    , limitClock
+    , budgetRules = []
+    , runStopped
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
@@ -1308,7 +1443,7 @@ execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = 
   -- parameter is handed at the root is the one the request supplied.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  let st = withDefaultsKnown evalConfig noRootFills m0 [] st0
+  let st = (withDefaultsKnown evalConfig noRootFills m0 [] st0) {budgetRules = moduleRules m0}
   r <- try (runEval st (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
   case r of
     Left exc -> do
