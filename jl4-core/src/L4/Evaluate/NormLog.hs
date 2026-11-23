@@ -128,7 +128,7 @@ data NormRef = MkNormRef
   { nrSite       :: !(Maybe SrcRange)
   , nrActivation :: !Int
   }
-  deriving stock (Eq, Show, Generic)
+  deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass NFData
 
 -- | Which continuation of its parent armed a norm (N8).
@@ -195,6 +195,20 @@ data NormEntry = MkNormEntry
   , neModal     :: !(Maybe DeonticModal)
   , neBearer    :: !NormBearer
   , neAction    :: !(Maybe Text)
+  , neActionHead :: !(Maybe Text)
+    -- ^ N2 (P2): the constructor the norm's action pattern names, from the
+    -- syntax, which is what a read's action pattern matches on. 'Nothing'
+    -- where 'neAction' is, and for an action pattern with no constructor
+  , neEnclosing :: ![NormRef]
+    -- ^ N13 (P2): the compounds (@AND@\/@OR@ applications, each named by the
+    -- 'NormRef' of its own join entry) whose operand this norm was armed
+    -- inside, innermost first. A compound that has decided leaves its other
+    -- operands armed with no fate, and this is how a read tells such a norm
+    -- from one that is still owed. The whole chain is here and not only the
+    -- innermost, because a compound that has not reduced writes no entry, so
+    -- a read could not climb from it to the one outside. A compound's own
+    -- entry carries the same field for the compounds it sits in. Empty
+    -- outside every compound
     -- ^ the action the norm owed or permitted, printed; 'Nothing' where
     -- there is none (a declared @BREACH@, a join)
   , neOrigin    :: !(Maybe NormOrigin)

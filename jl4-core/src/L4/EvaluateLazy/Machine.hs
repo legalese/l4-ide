@@ -1245,10 +1245,37 @@ armNormKey env party act = do
   origin <- case mlog of
     Just l | l.dlWriteFates -> originFromEnv l env
     _                       -> pure Nothing
+  -- N13 (P2): the compound whose operand this norm is armed inside
+  enclosing <- case mlog of
+    Just l | l.dlWriteFates -> enclosingNow l
+    _                       -> pure []
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = bearer, nkBearerName = name
     , nkBearerSource = source, nkModal = act.modal, nkMember = member
-    , nkAction = Just (prettyLayout act.action), nkOrigin = origin }
+    , nkAction = Just (prettyLayout act.action), nkOrigin = origin
+    , nkActionHead = actionHeadOf act.action, nkEnclosing = enclosing }
+
+-- | The constructor an action pattern names: what a read of the norm log
+-- matches the action on (NORM-LOG-SPEC N2, P2). Read from the syntax, not
+-- from the printed action.
+actionHeadOf :: Pattern Resolved -> Maybe Text
+actionHeadOf = \ case
+  PatApp _ n _ -> Just (nameToText (getOriginal n))
+  _            -> Nothing
+
+-- | The compounds the evaluation is inside an operand of, innermost first,
+-- as the norm log names them (NORM-LOG-SPEC N13, P2): the sibling check's own
+-- scope path, whose head is the innermost scope, looked up in the writer's
+-- table of the compounds it has seen start. The table keeps each compound's
+-- own chain, so the answer is one lookup and shares its tail. Reads and
+-- writes nothing else, and forces nothing.
+enclosingNow :: DeonticLog -> Eval [NormRef]
+enclosingNow l = do
+  sref <- asks (.siblings)
+  st <- liftIO (readIORef sref)
+  case st.ssPath of
+    (scope, _) : _ -> maybe [] (uncurry (:)) . Map.lookup scope <$> liftIO (readIORef l.dlCompounds)
+    []             -> pure []
 
 -- | Refresh a key's bearer once the machine has forced the party to WHNF.
 -- Pure and lazy, so the log-off path pays nothing for it.
@@ -1285,10 +1312,13 @@ armJoinKey env d = do
   origin <- case mlog of
     Just l | l.dlWriteFates -> originFromEnv l env
     _                       -> pure Nothing
+  enclosing <- case mlog of
+    Just l | l.dlWriteFates -> enclosingNow l
+    _                       -> pure []
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = Nothing, nkBearerName = Nothing
     , nkBearerSource = Nothing, nkModal = d.action.modal, nkMember = Nothing
-    , nkAction = Nothing, nkOrigin = origin }
+    , nkAction = Nothing, nkOrigin = origin, nkActionHead = Nothing, nkEnclosing = enclosing }
 
 -- | Register an @EVERY@'s cast, so each member's obligation can find its
 -- membership when it is armed ('armNormKey'). A barrier's arm count starts
@@ -2344,7 +2374,12 @@ startCompound env op rexpr1 rexpr2 rs appType = do
   -- place of its first operand that is still an expression
   whenDeonticLog \ l -> when l.dlWriteFates do
     n <- liftIO (bumpCounter l.dlActivations rsite)
-    liftIO (modifyIORef' l.dlCompounds (Map.insert scope (MkNormRef {nrSite = rsite, nrActivation = n})))
+    -- the compounds this one is an operand of: the path as it stood before
+    -- this compound opened its own scope, innermost first
+    enclosing <- case outerPath of
+      (s, _) : _ -> maybe [] (uncurry (:)) . Map.lookup s <$> liftIO (readIORef l.dlCompounds)
+      []         -> pure []
+    liftIO (modifyIORef' l.dlCompounds (Map.insert scope (MkNormRef {nrSite = rsite, nrActivation = n}, enclosing)))
   case (clock, rs) of
     (Nothing, t : _) -> do
       tref <- asks (.siblingStarts)
@@ -4658,13 +4693,15 @@ backwardContractFrame val = \ case
     -- hand-off that armed it, and, for a breach, SEESAW's two instants.
     joinedStep :: Int -> Environment -> RBinOp -> JoinResult -> (Maybe Rational, Maybe Rational) -> Maybe Side -> Bool -> Eval ()
     joinedStep scope env op result (effective, observed) winner tieBreak = whenDeonticLog \ l -> do
-      (site, origin) <- if l.dlWriteFates
+      (entry, origin) <- if l.dlWriteFates
         then (,) <$> liftIO (Map.lookup scope <$> readIORef l.dlCompounds) <*> originFromEnv l env
         else pure (Nothing, Nothing)
+      let site = fst <$> entry
+          enclosing = maybe [] snd entry
       logStep l MkDeonticStep
         { dsClock = Nothing, dsEvent = Nothing, dsScrutiny = NoEvent, dsNorm = Nothing
         , dsOutcome = Joined op MkJoinNote
-            { jnResult = result, jnRef = site, jnOrigin = origin
+            { jnResult = result, jnRef = site, jnOrigin = origin, jnEnclosing = enclosing
             , jnEffective = if l.dlWriteFates then effective else Nothing
             , jnObserved = if l.dlWriteFates then observed else Nothing
             , jnWinner = winner, jnTieBreak = tieBreak }

@@ -1072,6 +1072,47 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
       [ (e.neEffective, e.neObserved) | e <- fatesOf 0 expired, e.neFate == FateJoinExpired ]
         `shouldBe` [(Just 5, Just 8)]
 
+    -- NORM-LOG-SPEC P2: two things a read of the log needs and P1 did not write
+
+    it "R1: an operand's entry names the compound it is armed inside, and a compound's names the one it sits in (N13)" do
+      rs <- run True nestedJoinSrc
+      let es = fatesOf 0 rs
+          joins = [ e | e <- es, isJoinFate e.neFate ]
+          armed = [ e | e <- es, e.neFate == FateArmed ]
+          outers = [ e | e <- joins, null e.neEnclosing ]
+          inners = [ e | e <- joins, not (null e.neEnclosing) ]
+      length outers `shouldBe` 1
+      length inners `shouldBe` 2
+      -- the two inner compounds sit in the one outer
+      let outerRefs = [ r | o <- outers, Just r <- [o.neNorm] ]
+      length outerRefs `shouldBe` 1
+      map (.neEnclosing) inners `shouldBe` [outerRefs, outerRefs]
+      -- each of the four operands is armed inside the inner compound it belongs
+      -- to, two to each, and inside the outer one: innermost first
+      length armed `shouldBe` 4
+      [ length [ a | a <- armed, Just r <- [i.neNorm], a.neEnclosing == r : outerRefs ] | i <- inners ] `shouldBe` [2, 2]
+
+    it "R2: a norm outside every compound has no enclosing compound, and a compound in a LEST names none either" do
+      hs <- run True henceSrc
+      map (.neEnclosing) (fatesOf 0 hs) `shouldSatisfy` all null
+      rs <- run True lestJoinSrc
+      let es = fatesOf 0 rs
+          joins = [ e | e <- es, isJoinFate e.neFate ]
+          operands = [ e | e <- es, e.neFate == FateArmed, e.neOrigin /= Nothing ]
+          carol = [ e | e <- es, e.neFate == FateArmed, e.neOrigin == Nothing ]
+      map (.neEnclosing) joins `shouldBe` [[]]
+      map (.neEnclosing) carol `shouldBe` [[]]
+      let joinRefs = [ r | j <- joins, Just r <- [j.neNorm] ]
+      length joinRefs `shouldBe` 1
+      map (.neEnclosing) operands `shouldBe` [joinRefs, joinRefs]
+
+    it "R3: an entry carries the constructor of its action, from the syntax (N2)" do
+      rs <- run True randJoinSrc
+      let es = fatesOf 0 rs
+      sort [ e.neActionHead | e <- es, e.neFate == FateArmed ] `shouldBe` [Just "deliver", Just "pay"]
+      [ e.neActionHead | e <- es, isJoinFate e.neFate ] `shouldBe` [Nothing]
+      [ e.neActionHead | e <- es, e.neFate == FateBreached ] `shouldBe` []
+
     -- The writer's cost must be linear in the norms it writes. An EVERY of N
     -- members traced with no events logs one Waiting step per member, and each
     -- step walked the whole list of Armed rows still waiting on a clock (all N

@@ -221,6 +221,20 @@ data NormKey = MkNormKey
     -- and which. 'Nothing' for a norm armed from the top level, and always
     -- 'Nothing' unless the norm log writer is on, because the hand-off only
     -- registers an origin for a writer to read ('dlOrigins').
+  , nkActionHead :: !(Maybe Text)
+    -- ^ NORM-LOG-SPEC N2 (P2): the constructor the action pattern names (the
+    -- head of a 'PatApp'), taken from the syntax, so a read can match on it
+    -- without taking a head out of printed text. 'Nothing' for a join's own
+    -- key and for an action pattern with no constructor (a variable, a
+    -- literal)
+  , nkEnclosing :: ![NormRef]
+    -- ^ NORM-LOG-SPEC N13 (P2): the @AND@\/@OR@ applications whose operand
+    -- this norm is armed inside, innermost first, so a read can tell that a
+    -- compound has already decided it. The tail is shared with the compound
+    -- the head names, so the chain of an @EVERY@'s n members, which fold into
+    -- n nested compounds, is built once per compound and not copied per norm.
+    -- Empty outside every
+    -- compound, and always empty unless the norm log writer is on
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -415,6 +429,10 @@ data JoinNote = MkJoinNote
     -- ^ the hand-off that armed the compound (review of P1, W3b): the same
     -- parent link its operands carry. 'Nothing' for a compound armed from
     -- the top level, and when the writer is off
+  , jnEnclosing :: ![NormRef]
+    -- ^ the compounds this one is an operand of, innermost first, as
+    -- 'nkEnclosing' is for a norm (P2). Empty for a compound outside every
+    -- other, and when the writer is off
   , jnEffective :: !(Maybe Rational)
   , jnObserved  :: !(Maybe Rational)
     -- ^ SEESAW rule 2 (review of P1, W3a): a breached compound's own two
@@ -537,10 +555,11 @@ data DeonticLog = MkDeonticLog
   , dlEpoch       :: !Int
     -- ^ which evaluation's table a key in 'dlOrigins' belongs to: unique per
     -- log, so a key made by another directive's log is told from this one's
-  , dlCompounds   :: !(IORef (Map Int NormRef))
+  , dlCompounds   :: !(IORef (Map Int (NormRef, [NormRef])))
     -- ^ the sibling-check scope of each @AND@\/@OR@ application the writer
     -- has seen start, with the identity its join entry carries (review of P1,
-    -- W3c). Written only when 'dlWriteFates' is on
+    -- W3c) and the compounds it is an operand of, innermost first (P2).
+    -- Written only when 'dlWriteFates' is on
   , dlPendingArmed :: !(IORef [(NormKey, Reference, Maybe Rational)])
     -- ^ norms armed while their arming clock was still an unevaluated thunk,
     -- NEWEST first (an append here made an @EVERY@ with many members
