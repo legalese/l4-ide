@@ -808,6 +808,27 @@ A new lint code must also be in `jl4-lsp/DIAGNOSTIC-CODES.md`, and the test that
 That was found after the gate, by a search for the lifecycle noun `ARMING`; the row was added, and `jl4-lsp-test` then ran on `lhs`: 336 examples, no failure.
 `jl4-mlir-test` and `jl4-websessions-test` exited 0; their example counts were not read.
 
+**The review of the first half, and the second gate (2026-11-24).**
+An independent reviewer built the head in its own worktree and probed the reader and `THE INSTANT` on real traces with the writer on.
+`THE INSTANT` and the `NOW` warning stood: in every guard path tried it read the stamp of the matched event, and it was refused everywhere else.
+The reader did not, in four answers that were wrong with exit 0:
+
+- **S0.** A member of an `EVERY ... ONCE` barrier, left armed when the barrier failed, read as outstanding for ever in a contract that was breached, whenever the members' deadlines differ (equal deadlines hide it, which is why the fixtures missed it). A barrier is not an `AND` or an `OR`, so no compound named it. A member now carries its barrier in `neEnclosing`, and a barrier's failure, expiry, release or stall counts as its decision.
+- **S1.** The machine runs an `ROR`'s left operand over the whole trace, so a fulfilled contract had a failure in its log, and the reader reported it as a failure, where the first commit of the reader said it would refuse. It refuses now.
+- **S2.** A failure cured through `LEST (x ROR y)` read as not cured when the losing alternative had failed first. The cure is read from the alternative fulfilled first.
+- **S3.** A violated `SHANT` whose own `LEST` was performed by the failing party read as not cured, against N8's text. It is repaired by its continuation as a failed `MUST` is (§6.1 N8, decided by Claude 2026-11-24, pending Meng's review).
+
+Each was reproduced as a failing example on a real trace before it was fixed: 11 of 268 examples were red.
+Two written claims were false and are corrected: that a read of one bearer is not stopped by another's unknown party (it is, until N7's rule (3) is built), and that a settled `ROR` refused by name.
+The reviewer's four mutants of the cure survived the first 32 examples of `NormLogReadSpec`; there are now eleven mutants of the reader, each caught: a kept or lapsed norm's continuation ignored, an exercised one's, a violated `SHANT` not recursed into and one recursed into when nothing followed it, a breached compound not counted, a miss under a fulfilled `ROR` not refused, a barrier's failure not a decision, the `RAND` bound ignored, the latest alternative taken as the one that settled an `ROR`, a nested alternative not refused, and an unknown settler guessed.
+One of those survived once, because the nested alternative's own norm refused by another route; the example was changed so that the nested check is the only thing that refuses.
+
+The second gate ran at the head that carries the fixes (`etc/verify-branch.sh` against the P1 head): `jl4-test` 5,077 examples, `l4-cli-test` 1,185, `jl4-core-test` 2,398, `jl4-service-test` 877, no failure, and every other step passes except the parse-time probe, which cannot run on `lhs` (no `/usr/bin/time`).
+Run there with the shim described above it gives 0.94 s and 3.74 s of CPU for distinct names (ratio 4.0) and 0.88 s and 3.57 s for one repeated name (ratio 4.1).
+`jl4-test` with the writer forced on is 5,077 examples with no failure, in 1,361 s at a load of 1.0.
+`jl4-lsp-test` is 336 examples with no failure; `jl4-mlir-test` and `jl4-websessions-test` exited 0.
+That a guard that does not mention `THE INSTANT` prints what it printed before rests on the unchanged goldens: the reviewer did not re-run them.
+
 ## 7. Probe — what a crude projection shows
 
 Measured 2026-09-23 on the local branch `probe/norm-log` @ `65fb65201` (never pushed, never merges), built from `unstable` @ `20e71b65d`.
