@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 module L4.EvaluateLazy
 ( EvalConfig(..)
+, NormLogMutant(..)
 , AllocationLimit(..)
 , resolveEvalConfig
 , resolveEvalConfigWithSafeMode
@@ -72,7 +73,7 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
 import L4.EvaluateLazy.SiblingReads (emptySiblingState)
-import L4.EvaluateLazy.DeonticStep (DeonticLog (..), DeonticStep, newDeonticLog)
+import L4.EvaluateLazy.DeonticStep (DeonticLog (..), DeonticStep, newDeonticLogWith)
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.Ledger
   ( EventRoute (..)
@@ -83,6 +84,7 @@ import L4.Evaluate.Ledger
   , Provenance (..)
   , emptyStore
   )
+import L4.Evaluate.NormLog (prettyNormEntry)
 import L4.Evaluate.ValueLazy
 import L4.Evaluate.ValueLazyJSON () -- ToJSON instances for NF/Value/ReasonForBreach (batch --json)
 import L4.Parser.SrcSpan (SrcRange)
@@ -187,6 +189,19 @@ data EvalConfig = EvalConfig
     -- shared default, so jl4-service's) uses 'maxClosureApplications';
     -- @Just Nothing@ sets no limit. 'withCountedBudgets' sets
     -- 'maximumTracedClosureApplications'.
+  , normLog :: !Bool
+    -- ^ NORM-LOG-SPEC N6: write each norm's fates into the directive's norm
+    -- ledger ('L4.Evaluate.Ledger.normLedger'). Off by default, and no
+    -- surface turns it on yet (the read side that needs it is a later phase);
+    -- a test sets it to read the entries and to prove the writer changes no
+    -- answer.
+  , normLogMutant :: !NormLogMutant
+    -- ^ TEST ONLY. A deliberately wrong writer ('NormLogMutant'): one that
+    -- also writes the OFFICIAL ledger, where a drafter's @RECALL@ and the
+    -- printed listing see it, or one that evaluates a party nothing has asked
+    -- for. It exists so that the test that proves the writer is an observer
+    -- can be seen to fail: a differential that passes
+    -- for a writer that cannot be wrong proves nothing. Never set outside a test.
   }
 
 -- | A cap, in bytes, on what an evaluation may allocate.
@@ -208,7 +223,7 @@ resolveEvalConfig mTime tracePolicy = resolveEvalConfigWithSafeMode mTime traceP
 -- the budgets existed.
 resolveEvalConfigWithSafeMode :: Maybe UTCTime -> TracePolicy -> Bool -> IO EvalConfig
 resolveEvalConfigWithSafeMode mTime tracePolicy safe =
-  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True False postprocessTrace Nothing Nothing Nothing Nothing Nothing Nothing)
+  pure (EvalConfig mTime tracePolicy safe Nothing True Nothing True False postprocessTrace Nothing Nothing Nothing Nothing Nothing Nothing False NoMutant)
 
 -- | The counted budgets at their defaults: what every @l4@ command that
 -- evaluates, the REPL and the editor (jl4-lsp, and the browser's through
@@ -374,8 +389,10 @@ captureTrace m = do
 -- capture once at the outermost directive.
 captureDeonticSteps :: Eval a -> Eval (a, [DeonticStep])
 captureDeonticSteps m = do
-  l <- liftIO newDeonticLog
+  normOn <- asks (.normLog)
+  l <- liftIO (newDeonticLogWith True normOn)
   r <- local (\ s -> s { deonticLog = Just l }) m
+  flushArmedFinal l
   steps <- liftIO (readIORef l.dlSteps)
   pure (r, toList steps)
 
@@ -574,9 +591,17 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes directivePresumed, steps)
   where
     captureSteps :: Eval a -> Eval (a, [DeonticStep])
-    captureSteps
-      | withSteps = captureDeonticSteps
-      | otherwise = fmap (, [])
+    captureSteps m
+      | withSteps = captureDeonticSteps m
+      | otherwise = asks (.normLog) >>= \ case
+          False -> (, []) <$> m
+          -- the norm log writer alone: a log that keeps no steps and writes
+          -- fates (NORM-LOG-SPEC N6)
+          True  -> do
+            l <- liftIO (newDeonticLogWith False True)
+            v <- local (\ st -> st {deonticLog = Just l}) m
+            flushArmedFinal l
+            pure (v, [])
 
 -- | What a directive's result waits on, if it is not a value
 -- (UNKNOWN-EVALUATION-SPEC §4.7.4, build step 3): a result that is itself an
@@ -794,7 +819,7 @@ prettyReductionOutcome (ReducedUndetermined ns) =
 -- >   COMMIT `fp` IS 273.15   [party=Court, source=COMMIT, at=...]
 prettyLedger :: LedgerStore -> Text
 prettyLedger store =
-  Text.concat (ownBlocks <> [officialBlock])
+  Text.concat (ownBlocks <> [officialBlock, normBlock])
   where
     ownBlocks =
       [ renderBlock (ownHeader party) led
@@ -802,6 +827,9 @@ prettyLedger store =
       , not (null (DList.toList led))
       ]
     officialBlock = renderBlock "Official record" store.officialLedger
+    -- NORM-LOG-SPEC N5: the machine's own record, printed only when the
+    -- writer wrote something, so nothing changes while it is off
+    normBlock = renderBlock "Norm log" store.normLedger
 
     -- The anonymous own ledger (top-level RECORD, empty party key) has no party
     -- name, so it renders as a bare "Ledger:" header.
@@ -815,14 +843,20 @@ prettyLedger store =
         events -> "\n" <> header <> ":\n" <> Text.intercalate "\n" (map prettyLedgerEvent events)
 
 prettyLedgerEvent :: LedgerEvent -> Text
+prettyLedgerEvent (Fate e) = prettyNormEntry e
 prettyLedgerEvent (Assign path val prov) =
   "  " <> verb <> " " <> renderPath path <> " IS " <> prettyLayout val
     <> "   " <> renderProvenance prov
   where
     -- The provenance source distinguishes RECORD (own ledger) from
-    -- COMMIT/ATTEST (official record); echo it as the surface verb.
+    -- COMMIT/ATTEST (official record: an ATTEST is stored with source
+    -- COMMIT) and from NOTIFY (a recipient-qualified RECORD, in the
+    -- recipient's ledger); echo it as the surface verb. A NOTIFY used to
+    -- print as RECORD (NORM-LOG-SPEC N5), which showed the actor asserting a
+    -- fact in its own ledger when it had written into someone else's.
     verb = case prov.source of
       "COMMIT" -> "COMMIT"
+      "NOTIFY" -> "NOTIFY"
       _        -> "RECORD"
 
 -- | Render a cell 'Path' back to its backtick surface form, e.g.
@@ -1158,6 +1192,11 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   pure MkEvalState
     { moduleUri, stack, supply, evalTrace, envLedger, currentParty, siblings, siblingStarts, traceMuted, entityInfo
     , operandsInStep = evalConfig.operandsInStep
+    , normLog = evalConfig.normLog
+    , normLogMutant = evalConfig.normLogMutant
+    , normLogForce = \ env e -> do
+        fresh <- liftIO (newIORef emptyStack)
+        void (local (\ st -> st {stack = fresh}) (runConfig (ForwardMachine env e)))
     , evalTime = actualTime, temporalContext, ctxReads
     , tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode
     , reofferedEvents, notes, unknownSteps, unknownReached, deonticLog

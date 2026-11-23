@@ -83,12 +83,15 @@ module L4.EvaluateLazy.DeonticStep
     -- * The log
   , DeonticLog (..)
   , newDeonticLog
+  , newDeonticLogWith
   ) where
 
 import Base
+import Data.Unique (hashUnique, newUnique)
 import qualified Base.Map as Map
 import qualified Base.Set as Set
-import L4.Evaluate.ValueLazy (Address, RBinOp (..))
+import L4.Evaluate.NormLog (NormOrigin, NormRef)
+import L4.Evaluate.ValueLazy (Address, RBinOp (..), Reference)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax (DeonticModal (..), Resolved, Threshold (..))
 
@@ -120,12 +123,26 @@ data DeonticStep = MkDeonticStep
     -- 'NormKey'; it is a @Maybe@ because a 'Joined' step belongs to an
     -- @AND@\/@OR@ compound, which is not a norm instance (§2.3 gives places
     -- to obligations, not to connectives) and, as 'ValROp' carries no
-    -- annotation, has no site either. Every other step has a key.
+    -- annotation, has no site either (the norm log's writer gives it one in
+    -- 'jnRef'). Every other step has a key.
   , dsOutcome  :: !StepOutcome
   , dsJoin     :: !(Maybe JoinProgress)
     -- ^ §4.9's amendment: what this step did to an @EVERY@ join, when the
     -- norm is a member of one. See 'JoinProgress' for why the join's own
     -- release is NOT recorded here.
+  , dsEffective :: !(Maybe Rational)
+    -- ^ NORM-LOG-SPEC N3: the instant the step's fate took effect, where it
+    -- is not 'dsClock'. Set on an 'Expired' step (the missed deadline, no
+    -- earlier than the obligation's own arming) and on a barrier's
+    -- 'JoinFailed' and 'JoinExpired' steps (the failure time of the member
+    -- that decided it; the @ONCE … WITHIN@ deadline). The norm log writer
+    -- reads it; the step log's consumers never do, and 'Nothing' everywhere
+    -- else
+  , dsObserved :: !(Maybe Rational)
+    -- ^ NORM-LOG-SPEC N3: the stamp of the event on which the machine saw the
+    -- step's fate, where it is not 'dsClock'. Set on a barrier's 'JoinFailed'
+    -- step only: the member failure's revealing event. 'Nothing' everywhere
+    -- else, and the step log's consumers never read it
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -195,6 +212,15 @@ data NormKey = MkNormKey
     -- ^ §4.9 "Sequencing": which @EVERY@ this obligation is a member of, if
     -- any. The site and bearer alone cannot say whether a join is waiting
     -- on this norm; this can.
+  , nkAction     :: !(Maybe Text)
+    -- ^ the action pattern the norm owes or permits, as written
+    -- ('L4.Print.prettyLayout' of the pattern): a rendering of source, so it
+    -- forces nothing. 'Nothing' for a join's own key
+  , nkOrigin     :: !(Maybe NormOrigin)
+    -- ^ NORM-LOG-SPEC N8: the norm whose @HENCE@ or @LEST@ armed this one,
+    -- and which. 'Nothing' for a norm armed from the top level, and always
+    -- 'Nothing' unless the norm log writer is on, because the hand-off only
+    -- registers an origin for a writer to read ('dlOrigins').
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -378,6 +404,25 @@ data JoinProgress
 -- | What an @RBinOp2@ reduction did.
 data JoinNote = MkJoinNote
   { jnResult   :: !JoinResult
+  , jnRef      :: !(Maybe NormRef)
+    -- ^ NORM-LOG-SPEC N8, review of P1 (W3c): which application of which
+    -- compound this is. The site is the source range of the compound, where
+    -- the machine still has the operands' expressions ('Nothing' otherwise),
+    -- and the activation counts the times that site was entered, as a norm's
+    -- does. 'Nothing' unless the norm log writer is on. Written for the norm
+    -- log only; the step log's consumers never read it
+  , jnOrigin   :: !(Maybe NormOrigin)
+    -- ^ the hand-off that armed the compound (review of P1, W3b): the same
+    -- parent link its operands carry. 'Nothing' for a compound armed from
+    -- the top level, and when the writer is off
+  , jnEffective :: !(Maybe Rational)
+  , jnObserved  :: !(Maybe Rational)
+    -- ^ SEESAW rule 2 (review of P1, W3a): a breached compound's own two
+    -- instants, along its operand tree, a @RAND@ at the earlier effective
+    -- instant and an @ROR@ at the later ('L4.Evaluate.ValueLazy.breachEffective',
+    -- 'L4.Evaluate.ValueLazy.breachObserved' of the breach the compound
+    -- reduced to). 'Nothing' for a fulfilled compound, because
+    -- @FULFILLED@ carries no time; not built (NORM-LOG-SPEC §6.2, N1)
   , jnWinner   :: !(Maybe Side)
     -- ^ the operand whose value became the compound's; 'Nothing' when
     -- 'JoinPending'
@@ -473,6 +518,45 @@ data DeonticLog = MkDeonticLog
     -- the machine never reads. Keyed by the join too, so that a sibling
     -- barrier's members, or an @AND@ operand that scanned the same cells
     -- earlier, do not make a fresh look read as a second one.
+  , dlKeepSteps   :: !Bool
+    -- ^ keep the steps in 'dlSteps'. 'True' for the step log
+    -- ('L4.EvaluateLazy.captureDeonticSteps'); 'False' when the log is here
+    -- only to feed the norm log writer, which keeps no look steps (N6)
+  , dlWriteFates  :: !Bool
+    -- ^ project every fate-bearing step to a 'L4.Evaluate.NormLog.NormEntry'
+    -- in the evaluation's norm ledger (NORM-LOG-SPEC N5, N6). Off in P1
+    -- unless the evaluation's configuration turns the writer on
+  , dlOrigins     :: !(IORef (Map Int (NormOrigin, Maybe Rational)))
+    -- ^ N8's carrier: a hand-off registers the parent it hands off from here,
+    -- with the stamp of the event that revealed the hand-off (review of P1,
+    -- W2), and binds the key in the continuation's environment; the norm that
+    -- the continuation arms reads it back at 'armNormKey'. Written only when
+    -- 'dlWriteFates' is on. The key carries 'dlEpoch', so that a continuation
+    -- shared from another evaluation (a residual defined in an imported
+    -- module) is not read against this evaluation's table (review of P1, W1)
+  , dlEpoch       :: !Int
+    -- ^ which evaluation's table a key in 'dlOrigins' belongs to: unique per
+    -- log, so a key made by another directive's log is told from this one's
+  , dlCompounds   :: !(IORef (Map Int NormRef))
+    -- ^ the sibling-check scope of each @AND@\/@OR@ application the writer
+    -- has seen start, with the identity its join entry carries (review of P1,
+    -- W3c). Written only when 'dlWriteFates' is on
+  , dlPendingArmed :: !(IORef [(NormKey, Reference, Maybe Rational)])
+    -- ^ norms armed while their arming clock was still an unevaluated thunk,
+    -- NEWEST first (an append here made an @EVERY@ with many members
+    -- quadratic: review of P1, cost), each with the reference holding that
+    -- clock and the observed stamp of the hand-off that armed it, if there
+    -- was one. The writer only peeks, and a root norm's clock is forced at
+    -- its first event, so an 'Armed' entry written at the moment of arming
+    -- would carry no instant exactly when it matters. It is written instead
+    -- before the next entry once the clock has been forced
+    -- ('L4.EvaluateLazy.Machine.flushArmed'), or at the end of the directive
+    -- with whatever is known
+  , dlBreachOrigin :: !(IORef (Maybe NormOrigin))
+    -- ^ the origin of the hand-off whose continuation has just evaluated to a
+    -- declared @BREACH@, until the breach is stamped and logged (N7 rule 2).
+    -- Set and read with no event taken between, so a paused operand never
+    -- sees another's
   , dlRelookScope :: !(IORef [Maybe SrcRange])
     -- ^ the joins whose state-layer @LEST@ hand-off the machine is
     -- currently inside, innermost first: pushed by @barrierStateLest@ and
@@ -485,7 +569,15 @@ data DeonticLog = MkDeonticLog
     -- members' own parallel looks at one stream are never marked.
   }
 
+-- | The step log: steps kept, no fates written.
 newDeonticLog :: IO DeonticLog
-newDeonticLog =
+newDeonticLog = newDeonticLogWith True False
+
+-- | A log that keeps its steps ('True') and/or writes fates ('True'). With
+-- neither it is inert and callers should not install it.
+newDeonticLogWith :: Bool -> Bool -> IO DeonticLog
+newDeonticLogWith keep write =
   MkDeonticLog <$> newIORef mempty <*> newIORef Map.empty <*> newIORef Map.empty <*> newIORef Map.empty
-    <*> newIORef Set.empty <*> newIORef []
+    <*> newIORef Set.empty <*> pure keep <*> pure write <*> newIORef Map.empty
+    <*> (hashUnique <$> newUnique) <*> newIORef Map.empty <*> newIORef []
+    <*> newIORef Nothing <*> newIORef []

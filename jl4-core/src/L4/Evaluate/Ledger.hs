@@ -42,6 +42,7 @@ module L4.Evaluate.Ledger
   , EventRoute (..)
   , storeAppendOwn
   , storeAppendOfficial
+  , storeAppendNorm
   , storeOwnLedger
   ) where
 
@@ -51,6 +52,7 @@ import qualified Base.Map as Map
 
 import Data.Time (Day, UTCTime, utctDay)
 
+import L4.Evaluate.NormLog (NormEntry)
 import L4.Evaluate.ValueLazy (WHNF)
 
 -- | The address of a cell in the ledger. A list of path segments, e.g.
@@ -91,10 +93,14 @@ effectiveVt prov = fromMaybe (utctDay prov.txTime) prov.vtFrom
 
 -- | A single entry in the event log.
 --
--- Only 'Assign' exists at M0. The type is intentionally a sum so that later
--- milestones can add @Obliged@, @Breach@, etc. without disturbing callers.
+-- 'Assign' is the drafter's: a @RECORD@, @COMMIT@, @ATTEST@ or @NOTIFY@. The
+-- type is intentionally a sum so that later milestones can add @Obliged@,
+-- @Breach@, etc. without disturbing callers; 'Fate' is the first (NORM-LOG-SPEC
+-- N5): a fate the MACHINE decided, kept apart from what a party asserted. A
+-- 'Fate' lives only in 'normLedger', which no read of a cell ever consults.
 data LedgerEvent =
     Assign !Path !WHNF !Provenance
+  | Fate !NormEntry
   deriving stock (Show, Generic)
   deriving anyclass NFData
 
@@ -119,7 +125,7 @@ emptyLedger = mempty
 -- folding the other way would give first-write-wins.
 snapshot :: Ledger -> Map Path WHNF
 snapshot =
-  foldl' (\acc ev -> case ev of Assign p v _ -> Map.insert p v acc) Map.empty . toList
+  foldl' (\acc ev -> case ev of { Assign p v _ -> Map.insert p v acc; Fate _ -> acc }) Map.empty . toList
 
 -- | Read the current (latest) value of a single cell, or 'Nothing' if the
 -- cell has never been assigned.
@@ -237,6 +243,11 @@ data LedgerStore =
       -- ^ per-party private ledgers, keyed by the rendered acting party
     , officialLedger :: !Ledger
       -- ^ the single shared record (COMMIT/ATTEST target)
+    , normLedger     :: !Ledger
+      -- ^ the machine's own record of each norm's fates (NORM-LOG-SPEC N5):
+      -- neither a party's nor the official record. 'Fate' entries only, and
+      -- empty unless the norm log writer is on. @RECALL@ reads the two
+      -- ledgers above and never this one.
     }
   deriving stock (Show, Generic)
   deriving anyclass NFData
@@ -244,7 +255,7 @@ data LedgerStore =
 -- | The empty store: no party has recorded anything, and the official record
 -- is empty.
 emptyStore :: LedgerStore
-emptyStore = MkLedgerStore Map.empty emptyLedger
+emptyStore = MkLedgerStore Map.empty emptyLedger emptyLedger
 
 -- | The key used for an own write that has no enclosing acting party (a
 -- top-level @#EVAL RECORD@). Kept as the empty string so it is visually
@@ -273,6 +284,11 @@ storeAppendOwn party ev store =
 storeAppendOfficial :: LedgerEvent -> LedgerStore -> LedgerStore
 storeAppendOfficial ev store =
   store { officialLedger = store.officialLedger `DList.snoc` ev }
+
+-- | Append a norm entry to the norm ledger.
+storeAppendNorm :: NormEntry -> LedgerStore -> LedgerStore
+storeAppendNorm e store =
+  store { normLedger = store.normLedger `DList.snoc` Fate e }
 
 -- | Read one party's own ledger (empty if that party has recorded nothing).
 storeOwnLedger :: Text -> LedgerStore -> Ledger

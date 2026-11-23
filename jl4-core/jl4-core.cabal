@@ -142,11 +142,13 @@ library
     L4.Evaluate.ValueLazy
     L4.Evaluate.ValueLazyJSON
     L4.Evaluate.Ledger
+    L4.Evaluate.NormLog
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.SiblingReads
     L4.EvaluateLazy.ContractFrame
     L4.EvaluateLazy.DeonticStep
+    L4.EvaluateLazy.Fates
     L4.EvaluateLazy.Exceptions
     L4.EvaluateLazy.GraphViz2
     L4.EvaluateLazy.GraphVizOptions
@@ -320,6 +322,7 @@ test-suite jl4-core-test
     TraceOrderingSpec
     StateGraphSpec
     DeonticStepSpec
+    NormLogSpec
     LtsEmitSpec
     LtsExploreSpec
     LtsListSpec
