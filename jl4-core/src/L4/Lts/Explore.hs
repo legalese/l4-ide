@@ -128,6 +128,7 @@ import Data.Aeson ((.=))
 import qualified Data.Sequence as Seq
 import Data.Sequence (Seq (..))
 import qualified Optics
+import Control.Exception (handle, throwIO)
 
 import L4.Annotation (emptyAnno, getAnno)
 import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..), Provenance (..))
@@ -139,8 +140,10 @@ import L4.EvaluateLazy
   , EvalDirectiveValue (..)
   , ReductionOutcome (..)
   , execEvalModuleWithDeonticLog
+  , prettyEvalException
   , prettyReductionOutcome
   )
+import L4.EvaluateLazy.Exceptions (LimitStopped (..), isLimitStop)
 import L4.Lts.Marking (LiveNorm (..), RawObligation (..), liveObligations, renderLive)
 import L4.Lts.WhatIf
 import L4.Print (prettyLayout)
@@ -809,15 +812,21 @@ resolveAnchor ex pos raw = case (raw.roDue, raw.roOpens) of
           modifyIORef' ex.exAnchors (Map.insert key r)
           pure r
 
--- | One @#EVAL@ of a closed expression in the module.
+-- | One @#EVAL@ of a closed expression in the module. An evaluation
+-- stopped at a limit raises 'LimitStopped' rather than answer 'Nothing':
+-- an anchor read as unknown would leave a deadline out of the instants
+-- tried, and the graph would be missing positions with nothing to say so.
 evalNumber :: Explorer -> Expr Resolved -> IO (Maybe Rational)
 evalNumber ex e = do
   let MkModule a uri (MkSection sa sn saka sg decls) = ex.exRig.rigModule
       m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno (LazyEval emptyAnno e)]))
   (_, results) <- execEvalModuleWithDeonticLog ex.exRig.rigConfig ex.exRig.rigEntityInfo ex.exRig.rigEnv m'
-  pure case results of
-    ((res, _) : _) | Reduction (Reduced (MkNF (ValNumber r))) <- res.result -> Just r
-    _ -> Nothing
+  case results of
+    ((res, _) : _)
+      | Reduction (Reduced (MkNF (ValNumber r))) <- res.result -> pure (Just r)
+      | Reduction (ReducedErrored exc) <- res.result, isLimitStop exc ->
+          throwIO (LimitStopped ("working out a deadline's anchor: " <> Text.unwords (prettyEvalException exc)))
+    _ -> pure Nothing
 
 -- | One @#EVAL@ of a closed expression in the module, read as an instant: a
 -- NUMBER as it is, a DATE by its serial (as the machine lowers an anchor).
@@ -909,11 +918,15 @@ data Accum = MkAccum
   }
 
 -- | Explore a contract from its outset. 'Left' when the outset itself
--- cannot be run.
+-- cannot be run, or when an evaluation the graph's instants depend on was
+-- stopped at a limit ('LimitStopped'): a graph built without it could be
+-- missing positions and still read as complete.
 explore :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)
-explore opts sites rig0 start0 = resolveStart rig0 start0 >>= \ case
-  Left e      -> pure (Left e)
-  Right start -> exploreFrom opts sites rig0 start
+explore opts sites rig0 start0 =
+  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit " <> why))) $
+    resolveStart rig0 start0 >>= \ case
+      Left e      -> pure (Left e)
+      Right start -> exploreFrom opts sites rig0 start
 
 -- | 'explore' from a start whose clock is read.
 exploreFrom :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)

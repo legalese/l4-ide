@@ -135,7 +135,7 @@ example MEANS
 The `WHO` clause takes a **Boolean expression in which the bound variable is free**. The variable is
 written where it is used, as in any other L4 expression; nothing is inserted for the drafter.
 
-For set membership, apply the prelude's `elem` (`jl4-core/libraries/prelude.l4:465`) to the variable
+For set membership, apply the prelude's `elem` (`jl4-core/libraries/prelude.l4:468`) to the variable
 (this document's `member_of` is `elem` under an illustrative name):
 
 > **Read the example below for what a `WHO` condition is, NOT for how to give a rule its group.**
@@ -3320,6 +3320,20 @@ parties, deduplicated by ledger key, beside ONE anchoring action and deadline); 
 pass found it (eleven blockers from three checkers, eight of them this one defect and three the
 written claims that went with it) and replaced it.
 
+**The same rule on both sides.**
+Recursion Limits bench, card L1, **RULED 2026-11-20, option A** (Meng; note: none; bench https://claude.ai/artifact/GaRTioL8pgDR5sHbEe8fKY): when the same rule, armed at the same moment on the same events, is on both sides of an `RAND` or `ROR`, the breach report names it twice, on every surface, as unstable does today (`entries = ls ++ rs`, `jl4-core/src/L4/Evaluate/ValueLazy.hs`).
+Conditions: legalese/l4-ide#842 states #817's single count (both `sameRule` and the memo merge) as a known divergence from this ruling; main drops both collapses only after it has a runtime budget or sharing that keeps the count; any later sharing on unstable keeps the count, with an on/off differential.
+Consequence accepted with it: until printing is fixed and budgets exist, smucclaw/l4-ide#1075 ends in a named limit rather than an answer.
+
+**A very long breach list.**
+Recursion Limits bench, card L5, **RULED 2026-11-20, option C** (Meng; note: none; bench https://claude.ai/artifact/GaRTioL8pgDR5sHbEe8fKY): no separate list limit; card L2's count bounds the list.
+Conditions: L2's count includes every failure built, not only obligations open at once, so `ROR` cannot slip past it; unstable's quadratic tie handling is fixed the way the port fixed it (no change to output); this card is revisited if any later sharing lets the list outgrow the work; #1005 is fixed separately; the card assumes L1 is A.
+**AMENDED 2026-11-21** by Meng (at 2026-11-21T09:03:09Z, with no note on it), because the revisit condition was met: sharing exists now, so a nullary definition's breach joined with itself (`d MEANS c RAND c`) gathers 32,768 failures from one built at 16 levels, with no obligation open (found 2026-11-21).
+The list is now bounded by L2's open number: an `RAND`, an `ROR` or a barrier that would join more failures into one breach than the open number (default 10,000) stops that directive with an error naming the limit and the rule (`JoinedBreaches`; `noteJoin`, `jl4-core/src/L4/EvaluateLazy/Machine.hs`); every list under it is printed in full, as before.
+The first condition is replaced, not met: no count of failures built was added, since the join's own check bounds the list wherever it was built.
+The second is met ("eval: look up a breach's decisive entries in an IntSet, so a tied RAND chain is not cubic", the IntSet port, on `fix/runaway-lest-1075`); #1005 stays separate.
+A barrier's join gathers one failure per member, and its members are armed together, so the open count stops it first; its check is a guard.
+
 **The representation is a non-empty list of failures, not `Set`.** Meng, 2026-09-15: _"did we
 consider a NonEmpty list?"_ The sketch said `Set Party`, and a non-empty list had not been
 considered. It was built as a non-empty list, for three reasons. (1) A failed barrier has at least
@@ -5756,7 +5770,7 @@ EVERY Tenant t IN arrears WHOSE monthly_rent AT LEAST 1000 MUST …
 
 — where `arrears` is a dynamically constructed LIST of tenants behind on rent (the roll), not a
 number. As sugar this is `WHOSE f` ≡ `WHO t's f`, and every part it needs already exists: `AT LEAST`
-is an infix operator (`jl4-core/libraries/prelude.l4:780`), possessive projection is idiomatic
+is an infix operator (`jl4-core/libraries/prelude.l4:790`), possessive projection is idiomatic
 (`a's age`, `a's income`), and computed fields are implemented (`COMPUTED-FIELDS-SPEC.md`).
 
 #### The objection, and why it does not land as stated

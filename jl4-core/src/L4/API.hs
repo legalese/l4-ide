@@ -261,7 +261,9 @@ l4Eval source =
             ]
         else do
           -- First, evaluate all imported modules to build up the evaluation environment
-          evalConfig <- EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True  -- safe mode = True
+          -- safe mode = True; the counted budgets, as in every editor
+          -- (smucclaw/l4-ide#1075, ruling L2)
+          evalConfig <- EL.withCountedBudgets <$> EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True
           
           -- Evaluate each import and collect their environments
           -- We evaluate in order (dependencies first)
@@ -299,7 +301,7 @@ l4EvalDirective source line col directiveType =
       pure $ encodeJson $ Aeson.object
         [ "error" .= ("Parse/import errors prevent evaluation" :: Text) ]
     Right result -> do
-      evalConfig <- EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True
+      evalConfig <- EL.withCountedBudgets <$> EL.resolveEvalConfigWithSafeMode Nothing (lspDefaultPolicy defaultGraphVizOptions) True
       importEnv <- evaluateImports evalConfig result.tcdResolvedImports
       (_env, results) <- EL.execEvalModuleWithEnv evalConfig result.tcdEntityInfo importEnv result.tcdModule
       let conFields = extractConstructorFieldNames result.tcdEntityInfo

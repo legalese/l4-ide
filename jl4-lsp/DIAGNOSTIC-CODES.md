@@ -53,68 +53,70 @@ Match it with `^\s*Code:\s+(\S+)$`.
 
 ## check/
 
-| Code                                      | Meaning                                                                                  |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `check/ambiguous-identifier`              | Several definitions fit this name, and none can be chosen.                               |
-| `check/ambiguous-operator`                | Several types fit this operator, and none can be chosen.                                 |
-| `check/ambiguous-type`                    | Several types have this name, and none can be chosen.                                    |
-| `check/clause-pattern-count`              | Clauses have another number of patterns than the GIVEN has inputs.                       |
-| `check/cyclic-computed-fields`            | Computed fields depend on each other in a ring.                                          |
-| `check/cyclic-type-synonyms`              | Type synonyms refer to each other in a ring.                                             |
-| `check/duplicate-name`                    | A name occurs twice where names must be distinct.                                        |
-| `check/export-clauses-without-given`      | An `@export` of clauses with no GIVEN.                                                   |
-| `check/export-event-type`                 | An `@export` takes or returns an EVENT.                                                  |
-| `check/export-function-input`             | An `@export` has an input of a function type.                                            |
-| `check/internal-error`                    | A bug in the checker.                                                                    |
-| `check/invalid-type-parameter`            | A parameter of a type declaration is not of type TYPE.                                   |
-| `check/missing-named-arguments`           | A call with named arguments leaves some out.                                             |
-| `check/mixfix-mismatch`                   | An expression does not match the mixfix form of a rule.                                  |
-| `check/name-not-in-definition`            | A name in the signature is not in the definition.                                        |
-| `check/name-not-in-signature`             | A name in the definition is not in the signature.                                        |
-| `check/not-a-function`                    | Something that is not a function is applied to arguments.                                |
-| `check/result`                            | The answer to a `#CHECK`. Severity Information.                                          |
-| `check/supplied-computed-field`           | A record constructor supplies a computed field.                                          |
-| `check/type-mismatch`                     | A value has another type than the place it is in requires.                               |
-| `check/type-synonym-chain-too-long`       | A chain of type synonyms is too long to follow.                                          |
-| `check/unknown-identifier`                | Nothing in scope defines this name.                                                      |
-| `check/wrong-argument-count`              | A function is applied to the wrong number of arguments.                                  |
-| `check/wrong-type-argument-count`         | A type is applied to the wrong number of arguments.                                      |
-| `check/absolute-edge-anchored`            | AFTER a DATE given an OF anchor.                                                         |
-| `check/action-pattern-not-comparable`     | An action pattern pins a value that cannot be compared, such as a function.              |
-| `check/ambiguous-implicit-supply`         | A WITH names an input the callee reads under several same-spelled section inputs.        |
-| `check/ambiguous-root-binders`            | A directive or `@export` reads several same-spelled section inputs.                      |
-| `check/anchor-not-an-instant`             | The anchor after OF in a WITHIN or AFTER is neither a NUMBER nor a DATE.                 |
-| `check/anchor-unavailable`                | OF THE JOIN, THE DEADLINE or THE ARMING where that position does not exist.              |
-| `check/arming-unavailable`                | THE ARMING as a value where no obligation has been entered.                              |
-| `check/before-on-join-line`               | BEFORE a date on a join line.                                                            |
-| `check/breach-by-list-needs-party-type`   | BREACH BY names a list where the rule's party type is not known.                         |
-| `check/continuation-without-join`         | An EVERY with a HENCE or LEST has no join line.                                          |
-| `check/empty-breach-by`                   | BREACH BY names an empty list.                                                           |
-| `check/empty-window`                      | A window that closes before it opens.                                                    |
-| `check/export-assume-arity-input`         | An `@export` reads an ASSUME that takes inputs.                                          |
-| `check/export-assume-name-clash`          | An `@export` has an input spelled as an ASSUME it reads.                                 |
-| `check/fixity-annotation-malformed`       | A fixity annotation whose level is not a whole number from 1 to 9.                       |
-| `check/fixity-conflict`                   | An operator with disagreeing fixity declarations in scope.                               |
-| `check/fixity-reassociation-clash`        | An operator chain that fixity cannot group without parentheses.                          |
-| `check/implicit-crosses-import`           | An `@export` reaches an imported definition that takes section inputs.                   |
-| `check/join-without-every`                | A join line (ONCE ...) under a single PARTY, not an EVERY.                               |
-| `check/lifecycle-unavailable`             | THE JOIN or THE DEADLINE as a value where that position does not exist.                  |
-| `check/misattached-section-given`         | A column-1 GIVEN declares a name the declaration below it never uses.                    |
-| `check/misdelivered-implicit-supply`      | A WITH value checked against one section input would reach another of the same spelling. |
-| `check/nonassertable-on-non-definition`   | `@nonassertable` above something that is not a definition.                               |
-| `check/not-reaches-connective`            | NOT on one line reaches over an AND, OR or IMPLIES after it.                             |
-| `check/opened-field-collision-at-opening` | An input opens a field name an earlier input already opens.                              |
-| `check/opened-field-collision-at-read`    | A bare field name that several opened inputs have, at the read.                          |
-| `check/opening-not-an-instant`            | The value after AFTER is neither a NUMBER nor a DATE.                                    |
-| `check/regulative-actor-mismatch`         | A party performs an action that belongs to another actor.                                |
-| `check/restated-section-binder`           | A definition's GIVEN restates a name a section GIVEN binds.                              |
-| `check/typically-on-type-variable`        | A TYPICALLY default on a type.                                                           |
-| `check/typically-requires-type`           | A TYPICALLY default on a name with no explicit type.                                     |
-| `check/typically-value-not-a-literal`     | A TYPICALLY default that is not a literal.                                               |
-| `check/unread-implicit-supply`            | A WITH names a section input the callee does not read.                                   |
-| `check/whose-not-a-field`                 | The first word of a WHOSE line is not a field of the cast.                               |
-| `check/whose-operand-not-bare`            | A WHOSE line does not begin with a bare word.                                            |
-| `check/whose-without-cast`                | WHOSE under an EVERY with no cast to take fields from.                                   |
+| Code                                        | Meaning                                                                                  |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `check/ambiguous-identifier`                | Several definitions fit this name, and none can be chosen.                               |
+| `check/ambiguous-operator`                  | Several types fit this operator, and none can be chosen.                                 |
+| `check/ambiguous-type`                      | Several types have this name, and none can be chosen.                                    |
+| `check/clause-pattern-count`                | Clauses have another number of patterns than the GIVEN has inputs.                       |
+| `check/cyclic-computed-fields`              | Computed fields depend on each other in a ring.                                          |
+| `check/cyclic-type-synonyms`                | Type synonyms refer to each other in a ring.                                             |
+| `check/duplicate-name`                      | A name occurs twice where names must be distinct.                                        |
+| `check/export-clauses-without-given`        | An `@export` of clauses with no GIVEN.                                                   |
+| `check/export-event-type`                   | An `@export` takes or returns an EVENT.                                                  |
+| `check/export-function-input`               | An `@export` has an input of a function type.                                            |
+| `check/internal-error`                      | A bug in the checker.                                                                    |
+| `check/invalid-type-parameter`              | A parameter of a type declaration is not of type TYPE.                                   |
+| `check/missing-named-arguments`             | A call with named arguments leaves some out.                                             |
+| `check/mixfix-mismatch`                     | An expression does not match the mixfix form of a rule.                                  |
+| `check/name-not-in-definition`              | A name in the signature is not in the definition.                                        |
+| `check/name-not-in-signature`               | A name in the definition is not in the signature.                                        |
+| `check/not-a-function`                      | Something that is not a function is applied to arguments.                                |
+| `check/result`                              | The answer to a `#CHECK`. Severity Information.                                          |
+| `check/supplied-computed-field`             | A record constructor supplies a computed field.                                          |
+| `check/type-mismatch`                       | A value has another type than the place it is in requires.                               |
+| `check/type-synonym-chain-too-long`         | A chain of type synonyms is too long to follow.                                          |
+| `check/unknown-identifier`                  | Nothing in scope defines this name.                                                      |
+| `check/wrong-argument-count`                | A function is applied to the wrong number of arguments.                                  |
+| `check/wrong-type-argument-count`           | A type is applied to the wrong number of arguments.                                      |
+| `check/absolute-edge-anchored`              | AFTER a DATE given an OF anchor.                                                         |
+| `check/action-pattern-not-comparable`       | An action pattern pins a value that cannot be compared, such as a function.              |
+| `check/ambiguous-implicit-supply`           | A WITH names an input the callee reads under several same-spelled section inputs.        |
+| `check/ambiguous-root-binders`              | A directive or `@export` reads several same-spelled section inputs.                      |
+| `check/anchor-not-an-instant`               | The anchor after OF in a WITHIN or AFTER is neither a NUMBER nor a DATE.                 |
+| `check/anchor-unavailable`                  | OF THE JOIN, THE DEADLINE or THE ARMING where that position does not exist.              |
+| `check/arming-unavailable`                  | THE ARMING as a value where no obligation has been entered.                              |
+| `check/before-on-join-line`                 | BEFORE a date on a join line.                                                            |
+| `check/breach-by-list-needs-party-type`     | BREACH BY names a list where the rule's party type is not known.                         |
+| `check/continuation-without-join`           | An EVERY with a HENCE or LEST has no join line.                                          |
+| `check/empty-breach-by`                     | BREACH BY names an empty list.                                                           |
+| `check/empty-window`                        | A window that closes before it opens.                                                    |
+| `check/export-assume-arity-input`           | An `@export` reads an ASSUME that takes inputs.                                          |
+| `check/export-assume-name-clash`            | An `@export` has an input spelled as an ASSUME it reads.                                 |
+| `check/fixity-annotation-malformed`         | A fixity annotation whose level is not a whole number from 1 to 9.                       |
+| `check/fixity-conflict`                     | An operator with disagreeing fixity declarations in scope.                               |
+| `check/fixity-reassociation-clash`          | An operator chain that fixity cannot group without parentheses.                          |
+| `check/implicit-crosses-import`             | An `@export` reaches an imported definition that takes section inputs.                   |
+| `check/join-without-every`                  | A join line (ONCE ...) under a single PARTY, not an EVERY.                               |
+| `check/jsondecode-at-type-parameter`        | A JSONDECODE applied where the type to decode into mentions a type parameter.            |
+| `check/jsondecode-passed-at-type-parameter` | A bare JSONDECODE handed on as a function at a type that mentions a type parameter.      |
+| `check/lifecycle-unavailable`               | THE JOIN or THE DEADLINE as a value where that position does not exist.                  |
+| `check/misattached-section-given`           | A column-1 GIVEN declares a name the declaration below it never uses.                    |
+| `check/misdelivered-implicit-supply`        | A WITH value checked against one section input would reach another of the same spelling. |
+| `check/nonassertable-on-non-definition`     | `@nonassertable` above something that is not a definition.                               |
+| `check/not-reaches-connective`              | NOT on one line reaches over an AND, OR or IMPLIES after it.                             |
+| `check/opened-field-collision-at-opening`   | An input opens a field name an earlier input already opens.                              |
+| `check/opened-field-collision-at-read`      | A bare field name that several opened inputs have, at the read.                          |
+| `check/opening-not-an-instant`              | The value after AFTER is neither a NUMBER nor a DATE.                                    |
+| `check/regulative-actor-mismatch`           | A party performs an action that belongs to another actor.                                |
+| `check/restated-section-binder`             | A definition's GIVEN restates a name a section GIVEN binds.                              |
+| `check/typically-on-type-variable`          | A TYPICALLY default on a type.                                                           |
+| `check/typically-requires-type`             | A TYPICALLY default on a name with no explicit type.                                     |
+| `check/typically-value-not-a-literal`       | A TYPICALLY default that is not a literal.                                               |
+| `check/unread-implicit-supply`              | A WITH names a section input the callee does not read.                                   |
+| `check/whose-not-a-field`                   | The first word of a WHOSE line is not a field of the cast.                               |
+| `check/whose-operand-not-bare`              | A WHOSE line does not begin with a bare word.                                            |
+| `check/whose-without-cast`                  | WHOSE under an EVERY with no cast to take fields from.                                   |
 
 ## lint/
 
@@ -158,32 +160,41 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 
 Severity Information for `eval/result` and `eval/assertion-passed`, Warning for `eval/refused`, Error for the rest. An `#ASSERT` that raises has the code of what it raised, not `eval/assertion-failed`.
 
-| Code                           | Meaning                                                     |
-| ------------------------------ | ----------------------------------------------------------- |
-| `eval/assertion-failed`        | An `#ASSERT` evaluated to FALSE.                            |
-| `eval/assertion-passed`        | An `#ASSERT` evaluated to TRUE.                             |
-| `eval/division-by-zero`        | A division by zero.                                         |
-| `eval/infinite-loop`           | A value defined in terms of itself.                         |
-| `eval/internal-error`          | A bug in the evaluator.                                     |
-| `eval/non-exhaustive-patterns` | No branch or clause matched a value at run time.            |
-| `eval/not-an-integer`          | An operation that needs integers got something else.        |
-| `eval/refused`                 | A rule reached a REFUSE: it declined to answer.             |
-| `eval/result`                  | The result of a directive.                                  |
-| `eval/stack-overflow`          | Evaluation went too deep.                                   |
-| `eval/stuck`                   | Evaluation needs the value of an ASSUME'd term.             |
-| `eval/unsupported-equality`    | Equality on values that do not support it.                  |
-| `eval/user-error`              | A user-facing evaluation error, such as a missing TIMEZONE. |
-| `eval/value-too-deep`          | An #ASSERT REFUSED value too deep to read: undecided.       |
+| Code                             | Meaning                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `eval/assertion-failed`          | An `#ASSERT` evaluated to FALSE.                                                           |
+| `eval/assertion-passed`          | An `#ASSERT` evaluated to TRUE.                                                            |
+| `eval/division-by-zero`          | A division by zero.                                                                        |
+| `eval/infinite-loop`             | A value defined in terms of itself.                                                        |
+| `eval/internal-error`            | A bug in the evaluator.                                                                    |
+| `eval/non-exhaustive-patterns`   | No branch or clause matched a value at run time.                                           |
+| `eval/not-an-integer`            | An operation that needs integers got something else.                                       |
+| `eval/not-evaluated`             | Not evaluated: an earlier directive went over a time or memory limit, which stops the run. |
+| `eval/over-memory-limit`         | A directive allocated more than `--max-eval-memory-mb`; the run stops.                     |
+| `eval/over-time-limit`           | A directive ran longer than `--eval-timeout`; the run stops.                               |
+| `eval/refused`                   | A rule reached a REFUSE: it declined to answer.                                            |
+| `eval/result`                    | The result of a directive.                                                                 |
+| `eval/stack-overflow`            | Evaluation went too deep.                                                                  |
+| `eval/stuck`                     | Evaluation needs the value of an ASSUME'd term.                                            |
+| `eval/too-many-joined-failures`  | A RAND, ROR or EVERY would join more failures into one breach than `--max-open`.           |
+| `eval/too-many-open-obligations` | More obligations open at once than `--max-open`.                                           |
+| `eval/too-many-steps`            | More function applications and contract hand-offs than `--max-steps`.                      |
+| `eval/unsupported-equality`      | Equality on values that do not support it.                                                 |
+| `eval/user-error`                | A user-facing evaluation error, such as a missing TIMEZONE.                                |
+| `eval/value-too-deep`            | An #ASSERT REFUSED value too deep to read: undecided.                                      |
 
 ## import/
 
-| Code                       | Meaning                                                                                                                                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `import/cycle`             | Files import each other in a ring.                                                                                                             |
-| `import/module-has-errors` | An imported module has errors, or could not be checked.                                                                                        |
-| `import/module-not-found`  | No module has this name.                                                                                                                       |
-| `import/self-import`       | A file imports itself.                                                                                                                         |
-| `import/self-dependency`   | Walking the files that depend on this one came back to it. A file that imports itself does that, and so does an `IMPORT` that finds no module. |
+Errors, except `import/case-variant-skipped`, which is a warning.
+
+| Code                          | Meaning                                                                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `import/case-variant-skipped` | An `IMPORT` used another module, passing over a file whose name differs from it only in its capitals.                                          |
+| `import/cycle`                | Files import each other in a ring.                                                                                                             |
+| `import/module-has-errors`    | An imported module has errors, or could not be checked.                                                                                        |
+| `import/module-not-found`     | No module has this name, spelled with these capitals.                                                                                          |
+| `import/self-import`          | A file imports itself.                                                                                                                         |
+| `import/self-dependency`      | Walking the files that depend on this one came back to it. A file that imports itself does that, and so does an `IMPORT` that finds no module. |
 
 ## file/
 

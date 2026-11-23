@@ -1,0 +1,10 @@
+-- For l4 batch: the function answers at once, but the file it imports,
+-- stoplib.l4, has an #EVAL that never ends. That #EVAL is worked out with
+-- every row, so under a time limit it stops the batch at row 1, and the
+-- batch says where the run stopped.
+IMPORT stoplib
+
+@export default twice the number
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+twice n MEANS n TIMES 2

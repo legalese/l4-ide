@@ -100,6 +100,13 @@ Comprehensive documentation completed:
 5. **No implicit precedence**: Require parentheses/indentation for disambiguation
 6. **Type-directed resolution**: Types help select correct function at call sites
 7. **Leverages existing scanning**: Multi-pass infrastructure already in place
+8. **A rule's own inputs shadow mixfix words in its body** (smucclaw/l4-ide#1076; decided by Claude 2026-11-22, pending Meng's review).
+   Inside a rule, inside each clause of a rule written as clauses, and inside a rule under a `WHERE`, a name that is one of the rule's `GIVEN` inputs is that input and not a word of a mixfix rule.
+   So `` `inc` `the day` `` is `inc` applied to the input `the day`, and not a postfix use of the rule ``the day n `days before` s`` on `inc`.
+   The parser reads the body with those names in `shadowedWords` of its `MixfixHintRegistry`; the typechecker is unchanged.
+   The line that defines a rule already did this (`mixfixRulesWrittenAs`).
+   Not covered: names bound by a section `GIVEN`, a `LET`, a `GIVEN ... YIELD` function or a `CONSIDER` pattern, each of which would need the parser to know the binder's scope.
+   Taken away: in a rule with an input called `plus`, ``1 `plus` 2`` is no longer a use of the rule ``a `plus` b``, and fails to parse.
 
 ## Key Insights from Discussion
 
