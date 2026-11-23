@@ -508,7 +508,7 @@ GIVETH A DEONTIC Party Action
 
 The discounted 80 counts only if it arrives by day 10.
 At day 12 it does not, so the payment of 80 is skipped, and the payment of 100 at day 13 fulfils the rule.
-(The same file is `the-instant-example.l4`.)
+**Example file:** [the-instant-example.l4](the-instant-example.l4)
 
 What to know about it:
 

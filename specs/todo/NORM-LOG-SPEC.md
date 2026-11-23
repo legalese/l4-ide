@@ -317,6 +317,8 @@ It is available inside a guard and nowhere else (decided by Claude 2026-11-23, p
 Written elsewhere (at the top level, in a `WHERE`, in a `HENCE` or `LEST`, as an anchor after `OF`, in the body of a function) it is a check error naming the reason, which is the loud failure; a guard that calls a function passes it in as an argument.
 It takes no address from the evaluation's supply, so a guard that does not mention it prints what it printed before.
 A `NOW` inside a guard draws the warning the ruling requires (`lint/now-in-provided`); `NOW` is still the wall clock.
+`INSTANT` is now a noun after `THE`, so a program that defines a value spelled `INSTANT` and writes `THE INSTANT` gets the lifecycle-noun-hides-name warning, and `jl4-service` refuses to deploy it, as it does for `JOIN`, `DEADLINE` and `ARMING`.
+No `.l4` file under `jl4/examples` (the canon mirror included), `jl4-core/libraries` or `doc` uses `INSTANT` as a name (`grep -w`, case-sensitive, 2026-11-23), so nothing in the tree changes meaning; a program outside it that wrote `THE INSTANT` for its own value would, and the warning is its notice.
 The spelling of the read itself, which this ruling says returns as its own question, is not built.
 
 **N5 — ANSWERED 2026-09-27: a separate constructor, in a ledger of its own.**
@@ -499,7 +501,7 @@ No bench card; Meng ruled in prose while discussing the two inks, which he defin
 That is the reading `norm-log-howto-draft.md` already gives the two inks, so it stands.
 Meng's ruling, verbatim: _"i guess "not satisfied" means the second LEST hasn't fired; indeed it means the corresponding HENCE hasn't fired. so it means outstanding, not failed."_
 So a norm has three readable states, and the history expressions must spell them apart: **outstanding** (armed, and no fate yet: for any modal, none of performed, failed, violated, kept, exercised or lapsed), **failed** (a `MUST`/`DO`'s `LEST` fired; a `MAY`'s `LEST` on lapse and a `SHANT`'s on violation are N1's lapsed and violated, not failures, `DeonticStep.hs:308-311`), and **failed and not cured** (N8: failed, and the whole `LEST` continuation was not then done by the failing party).
-"Satisfied" is already L4's word for an assertion that holds (`EvaluateLazy.hs:642`, "assertion satisfied"), so the predicate is not spelled `NOT SATISFIED`; `OUTSTANDING` is a placeholder like the how-to's other spellings, since N4 left the spelling open.
+"Satisfied" is already L4's word for an assertion that holds (`prettyAssertionOutcome`, `EvaluateLazy.hs:782`, "assertion satisfied"), so the predicate is not spelled `NOT SATISFIED`; `OUTSTANDING` is a placeholder like the how-to's other spellings, since N4 left the spelling open.
 Consequences recorded with the ruling, none of them built.
 _Corrected 2026-10-14, the same day, after a skeptic's check (re-run here): the first and fourth bullets missed compounds, the third named no axis, and the last misdated a fact; the corrections are marked._
 
@@ -767,6 +769,34 @@ Kept so that a later editor does not un-change a repair.
   A compound's entry is therefore named by the place of its first operand that is still an expression, not by the span of both operands (decided by Claude 2026-11-23, pending Meng's review: two ways to say where a compound is would drift, and the norm reference is found by `scope`, not by the site).
 
 ---
+
+### 6.4 What P2's first half measured (2026-11-23, on `lhs`)
+
+P2 is built in two halves (decided by Claude 2026-11-23, pending Meng's review), because the second half, the read's own syntax, waits for a ruling on its spelling.
+The first half is the two new entry fields, the pure reader, `THE INSTANT` and the `NOW` warning.
+Read from the run logs, on the head that carries them.
+
+**What passed.**
+`etc/verify-branch.sh` against the P1 head: `jl4-test` 5,077 examples, `l4-cli-test` 1,185, `jl4-core-test` 2,377, `jl4-service-test` 877, no failure; the corpus goldens (647 files), the canon checks, prettier and the trailers.
+`jl4-test` with the writer forced on is 5,077 examples with no failure, in 1,356 s on a host with a load of 1.0.
+The unchanged `jl4-test` count and goldens are the evidence that `THE INSTANT` took no address from the evaluation's supply: a guard that does not mention it prints what it printed before.
+
+**What failed first, and what was done.**
+The docs check (`doc/test-docs.sh`) failed once, on one orphaned file: the example file of the new docs section was named in the text and not linked.
+It is linked now, and the check passes (1,821 links, 121 `.l4` files type-checked, 265 pages linked, none orphaned).
+The parse-time probe (`etc/probe-parse-scaling.mjs`, which the gate runs when the parser changes) could not run on `lhs`, which has no `/usr/bin/time`.
+It was run there with a shim that prints the same `-p` output, on the binary built at the head: 1,000 lines against 4,000 take 0.90 s and 3.53 s of CPU for distinct names (ratio 3.9) and 0.84 s and 3.44 s for one repeated name (ratio 4.1), where linear is 4 and the limit is 8.
+That is the probe's own script with its one constant changed, not the unmodified probe.
+
+**What was not run.**
+Mutants of the reader (`NormLogReadSpec`: five, each caught) and of the guard binding (`THE INSTANT` left unbound: `I1` goes red) were run; the forcing mutant of P1 (`mutant-force`) and the allocation measurements were not repeated for this half, although the guard path of the machine changed.
+The editor highlighter's word lists do not name the other three lifecycle nouns, so none was added for `THE INSTANT` (`ARMING` is in no file of `ts-shared` or the extension).
+The suites listed under 6.3 as not run are still not run, except the three below.
+
+**Suites the gate does not run, run by hand.**
+A new lint code must also be in `jl4-lsp/DIAGNOSTIC-CODES.md`, and the test that enforces it is in `jl4-lsp-test`, which `etc/verify-branch.sh` does not run, so the gate was green with `lint/now-in-provided` missing from the list.
+That was found after the gate, by a search for the lifecycle noun `ARMING`; the row was added, and `jl4-lsp-test` then ran on `lhs`: 336 examples, no failure.
+`jl4-mlir-test` and `jl4-websessions-test` exited 0; their example counts were not read.
 
 ## 7. Probe — what a crude projection shows
 
