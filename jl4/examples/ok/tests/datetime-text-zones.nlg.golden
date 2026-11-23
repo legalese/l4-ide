@@ -1,0 +1,18 @@
+`read` with 2026-01-31T10:30:00Z is equal to `JUST` with `ten thirty in UTC`
+`read` with 2026-01-31T10:30:00+0800 is equal to `JUST` with `two thirty in UTC`
+`read` with 2026-01-31T10:30:00+08:00 is equal to `JUST` with `two thirty in UTC`
+`read` with 2026-01-31 10:30:00+08:00 is equal to `JUST` with `two thirty in UTC`
+`read` with 2026-01-31T10:30:00-0500 is equal to `JUST` with `three thirty in UTC`
+`read` with 2026-01-31T10:30:00UTC is equal to `JUST` with `ten thirty in UTC`
+`read` with 2026-01-31T10:30:00GMT is equal to `JUST` with `ten thirty in UTC`
+`read` with 2026-01-31T10:30:00CST is equal to `NOTHING`
+`read` with 2026-01-31T10:30:00EST is equal to `NOTHING`
+`read` with 2026-01-31T10:30:00PST is equal to `NOTHING`
+`read` with 2026-01-31T10:30:00MDT is equal to `NOTHING`
+`read` with 2026-01-31T10:30:00UT is equal to `NOTHING`
+`read` with 2026-01-31T10:30:00SGT is equal to `NOTHING`
+`read` with 2026-01-31T10:30:00 is equal to `NOTHING`
+`read` with 2026-01-31T10:30:00 UTC is equal to `NOTHING`
+`decode` with "2026-01-31T10:30:00CST"
+`decode` with "2026-01-31T10:30:00"
+`decode` with "2026-01-31T10:30:00+08:00"
