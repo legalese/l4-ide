@@ -1714,10 +1714,14 @@ finish ex acc = MkGraph
 mergeReasons :: [Text] -> [Text] -> [Text]
 mergeReasons new old = Map.elems (Map.fromListWith larger [ (shape r, r) | r <- new <> old ])
   where
-    shape r = Text.pack (concatMap squash (groupBy (\ a b -> isDigit a == isDigit b) (Text.unpack r)))
-    squash g = case g of
-      c : _ | isDigit c -> "#"
-      _                 -> g
+    -- a number is its digits and a minus sign directly before them: below 0 an
+    -- instant is negative, and (-3.5) is the same reason as (1.5)
+    shape r = Text.pack (squash (Text.unpack r))
+    squash ('-' : c : rest) | isDigit c = '#' : squash (dropWhile isDigit rest)
+    squash (c : rest)
+      | isDigit c = '#' : squash (dropWhile isDigit rest)
+      | otherwise = c : squash rest
+    squash [] = []
     numbers r = [ read n :: Integer | n <- words (map (\ c -> if isDigit c then c else ' ') (Text.unpack r)) ]
     larger a b = if numbers a >= numbers b then a else b
 

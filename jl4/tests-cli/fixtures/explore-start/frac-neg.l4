@@ -1,0 +1,27 @@
+-- The explorer's X2 with #1081: frac-re.l4 started at -5, its fixed deadline
+-- anchored at -5 as it was at 0. The graph is the same graph shifted by 5, and
+-- the one thing a state's fraction is named once for is unchanged: b's window
+-- holds a fraction from either visit (1.5 and -3.5 here, 6.5 and 1.5 there),
+-- and a sign in front of its digits is not a different reason.
+IMPORT prelude
+DECLARE Person IS ONE OF T, U, Q, B, V, S1
+DECLARE Action IS ONE OF t, u, q, b, v, s1
+
+GIVETH A DEONTIC Person Action
+k MEANS
+       (PARTY B MUST b WITHIN 20
+          HENCE (PARTY V MUST v WITHIN 5 HENCE FULFILLED LEST BREACH BY V)
+          LEST BREACH BY B)
+  RAND (PARTY S1 MUST s1 WITHIN 6.5 OF -5 HENCE FULFILLED LEST BREACH BY S1)
+
+GIVETH A DEONTIC Person Action
+qk MEANS PARTY Q MUST q WITHIN 1 HENCE k LEST BREACH BY Q
+
+GIVETH A DEONTIC Person Action
+rc MEANS
+  PARTY T MUST t WITHIN 1
+    HENCE (PARTY U MUST u WITHIN 1 HENCE qk LEST BREACH BY U)
+    LEST qk
+
+#TRACE rc AT -5 WITH
+  PARTY T DOES t AT -5

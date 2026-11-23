@@ -600,6 +600,12 @@ spec bin = describe "l4 explore" $ do
       Output code sout serr <- runL4 bin ["explore", startFixtures </> "unreadable.l4"]
       code `shouldBe` ExitFailure 1
       (sout <> serr) `shouldSatisfy` ("is neither a number nor a date the explorer can read" `isInfixOf`)
+
+    it "frac-neg.l4: below 0 a state reached again still names its fraction once, whatever its sign" $ do
+      Output code sout _ <- runL4 bin ["explore", startFixtures </> "frac-neg.l4"]
+      code `shouldBe` ExitFailure 2
+      let occurrences needle hay = length [ () | i <- [0 .. length hay - length needle], needle `isPrefixOf` drop i hay ]
+      occurrences "PARTY B DOES b at instants that are not whole numbers" (lastLine sout) `shouldBe` 1
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"
