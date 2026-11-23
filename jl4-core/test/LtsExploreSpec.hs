@@ -46,7 +46,7 @@ import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Control.Monad (forM)
+import Control.Monad (forM, forM_)
 import Text.Read (readMaybe)
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
@@ -58,7 +58,7 @@ import L4.Lts.Explore
 import L4.Lts.Explore.Check
 import L4.Lts.WhatIf
   ( Candidate (..), CandidateKind (..), Hypothetical (..), Outcome (..), Position (..), Rig (..), Verdict (..)
-  , candidatesOf, hypotheticalExpr, position, tryCandidateFrom )
+  , candidatesOf, hypotheticalExpr, position, tickPast, tryCandidateFrom )
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
@@ -474,6 +474,47 @@ remergedSrc = Text.unlines
   , "    LEST (PARTY Q MUST q WITHIN 10 HENCE `rest` LEST BREACH BY Q)"
   ]
 
+-- | A lapse of a deadline FIXED at the outset: R's, at 6, has the cure W, 2 after
+-- it (8). `a` at 5 puts Q's deadline (3 after it) on W's.
+lapseFixedSrc :: Text.Text
+lapseFixedSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF P, Q, R, W"
+  , "DECLARE Action IS ONE OF a, b, r, w"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`lapsef` MEANS"
+  , "       (PARTY R MUST r WITHIN 6 HENCE FULFILLED"
+  , "          LEST (PARTY W MUST w WITHIN 2 HENCE FULFILLED LEST BREACH BY W))"
+  , "  RAND (PARTY P MUST a WITHIN 9"
+  , "          HENCE (PARTY Q MUST b WITHIN 3 HENCE FULFILLED LEST BREACH BY Q)"
+  , "          LEST BREACH BY P)"
+  ]
+
+-- | `k` is reached at clock 2 by two events and again at clock 0 by three, and
+-- b's window is a unit longer from the earlier clock: under a cap of 3 instants
+-- only the second visit cuts it.
+capReSrc :: Text.Text
+capReSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF T, U, Q, B, V, S1"
+  , "DECLARE Action IS ONE OF t, u, q, b, v, s1"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "k MEANS"
+  , "       (PARTY B MUST b WITHIN 6 OF 0"
+  , "          HENCE (PARTY V MUST v WITHIN 4 HENCE FULFILLED LEST BREACH BY V)"
+  , "          LEST BREACH BY B)"
+  , "  RAND (PARTY S1 SHANT s1 WITHIN 5 OF 0 HENCE FULFILLED LEST BREACH BY S1)"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "qk MEANS PARTY Q MUST q WITHIN 1 HENCE k LEST BREACH BY Q"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`rc` MEANS"
+  , "  PARTY T MUST t WITHIN 1"
+  , "    HENCE (PARTY U MUST u WITHIN 1 HENCE qk LEST BREACH BY U)"
+  , "    LEST qk"
+  ]
+
 -- | A deadline that is fixed in absolute time and only the successor holds
 -- (an anchor on the arming of the outset): Q's is at 3, S's at 7, whichever
 -- instant `a` is done at, so `a` at 3 and at 7 are boundaries.
@@ -824,6 +865,8 @@ spec = describe "l4 explore" do
           | "`anchored`" `Text.isInfixOf` src = "anchored"
           | "`cascade`" `Text.isInfixOf` src = "cascade"
           | "`lapsed`" `Text.isInfixOf` src = "lapsed"
+          | "`lapsef`" `Text.isInfixOf` src = "lapsef"
+          | "`rc`" `Text.isInfixOf` src = "rc"
           | "`remerged`" `Text.isInfixOf` src = "remerged"
           | otherwise = "deal"
         clocks = clocksSrc 3 5 7
@@ -855,6 +898,43 @@ spec = describe "l4 explore" do
       -- again from the earlier one
       honest "two positions with one key at different clocks" remergedSrc regions Nothing 4 5
       holdsEvery "two positions with one key at different clocks, with --chains" remergedSrc regions {eoChains = True} Nothing 4 5
+      -- a lapse of a deadline that no act started: the cure's instant is
+      -- learned at the tick that reveals the lapse, and the acts tried at that
+      -- state are tied with it
+      holdsEvery "a lapse of a deadline FIXED at the outset, by default" lapseFixedSrc regions Nothing 4 9
+      holdsEvery "a lapse of a deadline FIXED at the outset, with --chains" lapseFixedSrc regions {eoChains = True} Nothing 4 9
+      honest "a lapse of a deadline FIXED at the outset" lapseFixedSrc regions Nothing 4 9
+      -- an instant-cap cut that only a second visit to a state makes is named
+      it "a cut that only the second visit to a state makes is named, with the cap at 3 (it is not with the cap at 4)" do
+        capped <- exploreSrc capReSrc "rc" regions {eoMaxInstants = 3} []
+        coverageComplete capped.gCoverage `shouldBe` False
+        coverageLine capped.gCoverage `shouldSatisfy` Text.isInfixOf "past the instant cap"
+        roomy <- exploreSrc capReSrc "rc" regions {eoMaxInstants = 4} []
+        coverageComplete roomy.gCoverage `shouldBe` True
+      -- the tallies are per state: a state reached again adds what the first visit
+      -- did not find and repeats nothing
+      it "ticks past the clock bound are counted once per state, as its first visit sees them" do
+        forM_ [(remergedSrc, "remerged"), (lapseSrc, "lapsed")] \ (src, name) -> do
+          (rig, sites, start) <- setupSrc src name
+          let o = regions {eoUntil = Just 12, eoChains = True}
+          ex <- newExplorer o sites rig start
+          g <- explore o sites rig start >>= either (fail . Text.unpack) pure
+          expected <- fmap sum $ forM g.gStates \ st -> do
+            let (rig', tr') = rigFor ex st.snPath
+            pos <- position rig' tr' >>= maybe (fail "a state's path gave no position") pure
+            ds <- liveDeadlines ex pos
+            let known = nub [ d | (_, Just (Right d)) <- ds ]
+            pure (length [ () | d <- known, max pos.posClock (tickPast known d) > 12 ])
+          g.gCoverage.cvBeyondClock `shouldBe` expected
+      it "the states a state bound keeps out are counted as states: no more than the full graph has beyond the bound" do
+        full <- exploreSrc remergedSrc "remerged" regions {eoChains = True} []
+        cut <- exploreSrc remergedSrc "remerged" regions {eoChains = True, eoMaxStates = 20} []
+        case cut.gCoverage.cvStops of
+          [StopStates 20 n] -> do
+            n `shouldSatisfy` (> 0)
+            n `shouldSatisfy` (<= full.gCoverage.cvStates - 20)
+          other -> expectationFailure ("expected the state bound alone, got " <> show other)
+
       it "no tick runs time backwards (the anchored deadlines)" do
         g <- exploreSrc anchoredSrc "anchored" regions []
         let clockOf = Map.fromList [ (s.snId, s.snClock) | s <- g.gStates ]

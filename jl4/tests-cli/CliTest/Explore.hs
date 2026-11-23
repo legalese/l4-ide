@@ -31,7 +31,7 @@ instants = "tests-cli" </> "fixtures" </> "explore-instants"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -448,6 +448,35 @@ spec bin = describe "l4 explore" $ do
       -- the chain made the graph larger, not smaller
       let states l = read (takeWhile (/= ' ') (drop (length ("Coverage: " :: String)) l)) :: Int
       states (lastLine csout) `shouldSatisfy` (> states (lastLine sout))
+
+    it "lapse-fixed.l4: a lapse of a deadline that no act started is tied with the acts of its state, and the position it reaches is in the graph" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "lapse-fixed.l4"]
+      code `shouldBe` ExitSuccess
+      lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf` )
+      got <- reachedBy bin (instants </> "lapse-fixed.l4") "lapsef" ["PARTY P DOES a AT 5", "(WAITUNTIL 7)"]
+      unwords (words (filter (/= '\r') sout)) `shouldSatisfy` (got `isInfixOf`)
+
+    it "cap-re.l4: a cut that only a second visit to a state makes is named (exit 2), and is not made with room for one more instant" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "cap-re.l4", "--max-instants", "3"]
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("past the instant cap" `isInfixOf`)
+      Output wide wout _ <- runL4 bin ["explore", instants </> "cap-re.l4", "--max-instants", "4"]
+      wide `shouldBe` ExitSuccess
+      lastLine wout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+
+    it "merged.l4 --chains --max-states 20: the states the bound keeps out are counted as states, no more than the graph has past the bound" $ do
+      Output _ full _ <- runL4 bin ["explore", instants </> "merged.l4", "--chains"]
+      Output code cut _ <- runL4 bin ["explore", instants </> "merged.l4", "--chains", "--max-states", "20"]
+      code `shouldBe` ExitFailure 3
+      let states l = read (takeWhile (/= ' ') (drop (length ("Coverage: " :: String)) l)) :: Int
+          notAdded l = case words (snd (breakOn "frontier NOT exhausted:" l)) of
+            (_ : _ : _ : n : _) -> read n :: Int
+            _                   -> -1
+          breakOn needle hay = case [ i | i <- [0 .. length hay - length needle], needle `isPrefixOf` drop i hay ] of
+            (i : _) -> splitAt i hay
+            []      -> (hay, "")
+      notAdded (lastLine cut) `shouldSatisfy` (<= states (lastLine full) - 20)
+      notAdded (lastLine cut) `shouldSatisfy` (> 0)
 
     it "clocks.l4: no chain, so nothing is said about chains" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "clocks.l4"]

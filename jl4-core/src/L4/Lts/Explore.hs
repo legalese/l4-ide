@@ -1251,7 +1251,7 @@ data Tried
   | TriedStats !InstantStats
     -- ^ how many instants one act was tried at, and why those
   | TriedUntried !Text !Text
-  | TriedBeyond
+  | TriedBeyond !Text
     -- ^ a tick past the clock bound, not taken
   | TriedRefused !Refusal
 
@@ -1265,12 +1265,27 @@ data Accum = MkAccum
     -- ^ newest first
   , acEdgeEvents :: !(Map (Int, Text, Int) (Expr Resolved))
   , acQueue      :: !(Seq Node)
-  , acPassed     :: !Int
-  , acBeyond     :: !Int
-  , acDepthCut   :: !Int
-  , acStatesCut  :: !Int
+  , acPassedAt   :: !(Map Int (Set Text))
+    -- ^ per state, the acts some visit passed over; a state is visited again
+    -- when it is reached at an earlier clock ('ndRe'), and each tally below is
+    -- kept per STATE so that a second visit adds only what the first did not
+    -- find
+  , acFiredAt    :: !(Map Int (Set Text))
+    -- ^ per state, the acts some instant took: an act that was passed over at
+    -- one clock and taken at another is not passed over
+  , acBeyondAt   :: !(Map Int Int)
+    -- ^ per state, how many of its ticks fall past the clock bound: the most
+    -- any visit found (the same ticks are there at every clock, and the bound
+    -- takes some of them according to where the clock is)
+  , acDepthCutIds :: !(Set Int)
+    -- ^ the states at the depth bound with something left to try
+  , acCutKeys    :: !(Set StateKey)
+    -- ^ the states the state bound kept out, each once: what the line says is a
+    -- number of states, and a state reached by ten moves is one state
   , acUntried    :: !(Map (Text, Text) Int)
+  , acUntriedSeen :: !(Set (Int, (Text, Text)))
   , acRefused    :: ![Refusal]
+  , acRefusedSeen :: !(Set (Int, (Text, Text, Maybe Text, Text)))
   , acDropped    :: !(Set (Text, Text))
   , acMerged     :: !(Set Text)
   , acUnspell    :: !Int
@@ -1441,12 +1456,15 @@ exploreWith ex = do
               , acEdgeList = []
               , acEdgeEvents = Map.empty
               , acQueue = Seq.singleton node0
-              , acPassed = 0
-              , acBeyond = 0
-              , acDepthCut = 0
-              , acStatesCut = 0
+              , acPassedAt = Map.empty
+              , acFiredAt = Map.empty
+              , acBeyondAt = Map.empty
+              , acDepthCutIds = Set.empty
+              , acCutKeys = Set.empty
               , acUntried = Map.empty
+              , acUntriedSeen = Set.empty
               , acRefused = []
+              , acRefusedSeen = Set.empty
               , acDropped = Set.empty
               , acMerged = Set.empty
               , acUnspell = 0
@@ -1481,29 +1499,37 @@ loop ex acc = case acc.acQueue of
         cands <- candidatesOf rig tr node.ndPos
         loop ex if null cands
           then terminal node acc {acQueue = rest}
-          else acc {acQueue = rest, acDepthCut = acc.acDepthCut + 1}
+          else acc {acQueue = rest, acDepthCutIds = Set.insert node.ndId acc.acDepthCutIds}
     | otherwise -> do
         tried <- expand ex node
         acc' <- foldM (record ex node) acc {acQueue = rest} tried
-        if node.ndRe then loop ex acc' else do
-          let fired = not (null [ () | TriedEdge {} <- tried ])
-              blocked = not (null [ () | t <- tried, isBlocked t ])
-              acc'' = if fired || blocked then acc' else terminal node acc'
-              -- a pass-over counts once per state and act, and only if no
-              -- instant took the act
-              firedLabels = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
-              passed = Set.fromList [ l | TriedPassed l _ <- tried, not (Set.member l firedLabels) ]
-              -- an untried candidate counts once per state and reason
-              untriedHere = Set.fromList [ (l, why) | TriedUntried l why <- tried ]
-          loop ex acc''
-            { acPassed = acc''.acPassed + Set.size passed
-            , acUntried = foldl' (\ m k -> Map.insertWith (+) k 1 m) acc''.acUntried (Set.toList untriedHere)
-            , acRefused = foldl' mergeRefusal acc''.acRefused (nubOrdOn refusalKey [ r | TriedRefused r <- tried ])
-            }
+        let fired = not (null [ () | TriedEdge {} <- tried ])
+            blocked = not (null [ () | t <- tried, isBlocked t ])
+            -- what this visit found, merged into what the state's earlier
+            -- visits found: a pass-over counts once per state and act, and
+            -- only if no instant of any visit took the act; an untried
+            -- candidate and a refusal once per state and reason
+            firedHere = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
+            passedHere = Set.fromList [ l | TriedPassed l _ <- tried ]
+            newUntried = [ k | k <- Set.toList (Set.fromList [ (l, why) | TriedUntried l why <- tried ]), not (Set.member (node.ndId, k) acc'.acUntriedSeen) ]
+            newRefused = [ r | r <- nubOrdOn refusalKey [ r | TriedRefused r <- tried ], not (Set.member (node.ndId, refusalKey r) acc'.acRefusedSeen) ]
+            beyondHere = length (nubOrd [ l | TriedBeyond l <- tried ])
+            acc'' = acc'
+              { acBeyondAt = Map.insertWith max node.ndId beyondHere acc'.acBeyondAt
+              , acFiredAt = Map.insertWith Set.union node.ndId firedHere acc'.acFiredAt
+              , acPassedAt = Map.insertWith Set.union node.ndId passedHere acc'.acPassedAt
+              , acUntried = foldl' (\ m k -> Map.insertWith (+) k 1 m) acc'.acUntried newUntried
+              , acUntriedSeen = acc'.acUntriedSeen <> Set.fromList [ (node.ndId, k) | k <- newUntried ]
+              , acRefused = foldl' mergeRefusal acc'.acRefused newRefused
+              , acRefusedSeen = acc'.acRefusedSeen <> Set.fromList [ (node.ndId, refusalKey r) | r <- newRefused ]
+              }
+        -- a state is terminal by its first visit; a second one, at an earlier
+        -- clock, adds edges and states and leaves that standing
+        loop ex if node.ndRe || fired || blocked then acc'' else terminal node acc''
   where
     isBlocked = \ case
       TriedUntried {} -> True
-      TriedBeyond     -> True
+      TriedBeyond {}  -> True
       TriedRefused {} -> True
       _               -> False
     -- the one self-loop of §4.6, and the mark on the state
@@ -1527,14 +1553,18 @@ record ex node acc = \ case
       Just j -> do
         let acc1 = addEdge (noteKey notes acc) (Just event) (MkTransition node.ndId label j kind)
             earlier = maybe False (pos'.posClock <) (Map.lookup j acc.acBest)
-        pure if earlier && node.ndDepth + 1 < ex.exOptions.eoMaxDepth
-          then acc1
-            { acBest = Map.insert j pos'.posClock acc.acBest
-            , acQueue = acc.acQueue :|> MkNode {ndId = j, ndDepth = node.ndDepth + 1, ndEvents = node.ndEvents <> [event], ndPos = pos', ndRe = True} }
-          else acc1
+        pure if not earlier then acc1
+          else if node.ndDepth + 1 < ex.exOptions.eoMaxDepth
+            then acc1
+              { acBest = Map.insert j pos'.posClock acc.acBest
+              , acQueue = acc.acQueue :|> MkNode {ndId = j, ndDepth = node.ndDepth + 1, ndEvents = node.ndEvents <> [event], ndPos = pos', ndRe = True} }
+            -- the earlier clock allows more than the later one did, and the bound
+            -- keeps it from being explored: a state at the bound with something
+            -- left to try ('finish' leaves out the ones that were terminal)
+            else acc1 {acDepthCutIds = Set.insert j acc1.acDepthCutIds}
       Nothing
         | Map.size acc.acSeen >= ex.exOptions.eoMaxStates ->
-            pure acc {acStatesCut = acc.acStatesCut + 1}
+            pure acc {acCutKeys = Set.insert key acc.acCutKeys}
         | otherwise -> do
             let j = acc.acNext
                 events = node.ndEvents <> [event]
@@ -1546,7 +1576,6 @@ record ex node acc = \ case
               , acNext = j + 1
               , acQueue = acc.acQueue :|> new
               }) (Just event) (MkTransition node.ndId label j kind)
-  TriedBeyond -> pure acc {acBeyond = acc.acBeyond + 1}
   TriedStats st -> pure acc {acInstants = acc.acInstants <> st}
   _ -> pure acc
 
@@ -1592,20 +1621,23 @@ finish ex acc = MkGraph
   , gCoverage = MkCoverage
       { cvStates = Map.size acc.acSeen
       , cvTransitions = Set.size acc.acEdges
-      , cvStops = [ StopDepth ex.exOptions.eoMaxDepth acc.acDepthCut | acc.acDepthCut > 0 ]
-               <> [ StopStates ex.exOptions.eoMaxStates acc.acStatesCut | acc.acStatesCut > 0 ]
+      , cvStops = [ StopDepth ex.exOptions.eoMaxDepth depthCut | depthCut > 0 ]
+               <> [ StopStates ex.exOptions.eoMaxStates (Set.size acc.acCutKeys) | not (Set.null acc.acCutKeys) ]
       , cvRefused = acc.acRefused
       , cvUntried = [ MkUntriedNote what why n | ((what, why), n) <- Map.toList acc.acUntried ]
-      , cvPassedOver = acc.acPassed
+      , cvPassedOver = sum [ Set.size (ps `Set.difference` Map.findWithDefault Set.empty i acc.acFiredAt) | (i, ps) <- Map.toList acc.acPassedAt ]
       , cvDropped = Set.toList acc.acDropped
       , cvTime = timeText ex.exOptions
-      , cvBeyondClock = acc.acBeyond
+      , cvBeyondClock = sum (Map.elems acc.acBeyondAt)
       , cvMergedByName = Set.toList acc.acMerged
       , cvUnspellable = acc.acUnspell
       , cvAnswersByForm = Set.toList acc.acByForm
       , cvInstants = acc.acInstants
       }
   }
+  where
+    -- a state that was cut and then found to be terminal had nothing left to try
+    depthCut = Set.size (acc.acDepthCutIds `Set.difference` Set.fromList [ st.snId | st <- acc.acNodes, st.snTerminal ])
 
 timeText :: ExploreOptions -> Text
 timeText opts = Text.concat
@@ -1646,21 +1678,30 @@ expand ex node = do
           _ -> case (cand.cdHypothetical, mpos) of
             (Right hyp, Just pos') | isJust pos'.posResidual -> TriedEdge label kind (hypotheticalExpr hyp) pos'
             _ -> TriedUntried label "the replay produced no position"
+      -- a tick, and the instants a lapse it reveals arms (see 'tickRecord')
       tick label d cand = case cand.cdHypothetical of
-        Right (Tick t) | Just u <- ex.exOptions.eoUntil, t > u -> pure [TriedBeyond]
+        Right (Tick t) | Just u <- ex.exOptions.eoUntil, t > u -> pure ([TriedBeyond label], [])
         Right (Tick t) -> do
           r <- run label EdgeTick cand
-          case r of
+          armed <- case r of
             TriedEdge _ _ _ pos' | Regions <- ex.exOptions.eoTime -> tickRecord label d t pos'
-            _ -> pure ()
-          pure [r]
-        _ -> pure <$> run label EdgeTick cand
+            _ -> pure []
+          pure ([r], armed)
+        _ -> (\ r -> ([r], [])) <$> run label EdgeTick cand
       -- A deadline started by a LAPSE (a LEST that arms a cure) is not started
       -- by an act, so the act that led here never saw it move; it is read here,
       -- at the tick that revealed the lapse, as an act's successor is read, and
       -- kept as the offsets (relative to the deadline that lapsed, which the
       -- act's own offset already reaches) and fixed instants that the paths
-      -- through this state carry ('pathPools')
+      -- through this state carry ('pathPools'). The instants a lapse arms are
+      -- also returned, because they are a fact about THIS state that the acts
+      -- tried in it have to be tied with, whichever way the lapsed deadline
+      -- came to be: to them it is a deadline already running, and so fixed. An
+      -- act that starts a deadline of 3 at 5 puts it on a cure armed at 8 by a
+      -- deadline fixed at 6, and only the tick (6 and the cure's 2) says 8 is
+      -- there. The acts before this state learn it from their own state's tick,
+      -- where the same deadline is running, or, if the lapsed deadline is one
+      -- they started, as an offset from it.
       tickRecord label d t pos' = do
         before <- thresholdsOf ex pos
         after <- thresholdsOf ex pos'
@@ -1676,15 +1717,24 @@ expand ex node = do
           , arTried = Set.singleton t, arFixed = []
           , arOffsets = [ h.heldAt - d | h <- new, movesH h ]
           , arLearnedFixed = [ h.heldAt | h <- new, anchoredH h || not (movesH h) ] } :)
-  moves <- fmap concat $ for cands \ cand -> case cand.cdKind of
-    TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) d cand'
-    NoTick live -> case snd <$> lookup live lives of
-      Just (Just (Right d))
-        | d `notElem` offeredTicks ->
-            let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickTime d))}
-            in tick (tickLabel cand' d) d cand'
-        | otherwise -> pure []
-      _ -> pure [TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)]
+        pure [ h.heldAt | h <- new ]
+      tickMove cand = case cand.cdKind of
+        TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) d cand'
+        NoTick live -> case snd <$> lookup live lives of
+          Just (Just (Right d))
+            | d `notElem` offeredTicks ->
+                let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickTime d))}
+                in tick (tickLabel cand' d) d cand'
+            | otherwise -> pure ([], [])
+          _ -> pure ([TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)], [])
+        ActBy _ -> pure ([], [])
+  -- the ticks first, and each in its own place in the result: what a lapse
+  -- arms is a fact about this state that the acts tried in it are tied with
+  ticked <- for (zip [0 :: Int ..] cands) \ (i, cand) -> (i,) <$> tickMove cand
+  let lapseFixed = nubOrd (concatMap (snd . snd) ticked)
+  moves <- fmap concat $ for (zip [0 :: Int ..] cands) \ (i, cand) -> case cand.cdKind of
+    TickPast {} -> pure (maybe [] fst (lookup i ticked))
+    NoTick {} -> pure (maybe [] fst (lookup i ticked))
     ActBy live -> case lookup live lives of
       Nothing -> pure [TriedUntried live.lnAction "the obligation could not be found in the residual again"]
       Just (raw, _) -> do
@@ -1694,7 +1744,8 @@ expand ex node = do
           (Nothing, _) -> pure [TriedUntried live.lnAction "the party was never forced and could not be read back"]
           (Just party, Left why) -> pure [TriedUntried (obligationText party raw) why]
           (Just party, Right (actions, refusals)) -> do
-            win <- windowOf ex node pos "" live lives raw
+            win0 <- windowOf ex node pos "" live lives raw
+            let win = win0 {wnFixed = nubOrd (win0.wnFixed <> lapseFixed)}
             ran <- for actions \ a -> do
               let label = actLabel party a
                   probe t = run label EdgeAct cand

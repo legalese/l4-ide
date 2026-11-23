@@ -174,7 +174,7 @@ Measured on the 78 files in this repository's examples and docs that carry a `#T
   `jl4/examples/explore/ledger/d3-reopen.l4` takes about five minutes before and after, at the 300 second limit the sweep ran under (it ended at that limit before and at the state bound in one run after), so its exit status is not a comparison;
 - of the 405 graphs those files explore (leaving out the one that timed out), 354 have the same number of states as before, 42 have more and 9 have fewer.
   The largest growth is a block of `run-after.l4`, `EVERY Tenant t IN tenants MUST Sign t AFTER 3 WITHIN 30`, from 1 state to 11: the old explorer passed both acts over at every instant it tried and stopped at the outset, and the new one tries them at the instant the window opens;
-- `--chains` costs time as well as states: `run-in.l4` takes 254 seconds against 34, and the whole set 720 seconds against 505 (wall clock, four files at a time on a busy machine, so read the ratios and not the seconds).
+- `--chains` costs states, and some time: the wall-clock figures this machine gave were too noisy to quote (the whole set took 505 and 593 seconds on two runs by default and 720 and 1169 on two under `--chains`, four files at a time, under a load that changed between them; `run-in.l4` under `--chains` took 254 seconds on one and ran past the sweep's 300 second limit on the other), so read the states and not the seconds.
   `run-modals.l4` still exits 2 under it, because the offsets kept growing after three passes, and the line says so.
   With no live deadline and no `--until`, the instants are the first one the act's window is open and the one after it.
   The boundaries matter: a rule that treats an act at exactly the deadline differently from one just before it is only visible if the explorer tries the deadline itself, and a breach that names two parties is only visible if it tries the instant at which the deadlines meet.
@@ -347,7 +347,8 @@ These are sorted by which signal carries them.
   On `jl4/tests-cli/fixtures/sibling-reads/one-event.l4`, a `RAND` whose two sides take one event, one side making a record and the other reading it at the same instant, `--until 20` gave 2 states, `UNTRIED 3` (three `PARTY P DOES go` moves) and exited 2 (measured 2026-11-13).
   The two sides of a `RAND` that read each other's records at different events are run in step and explored like any other contract: on `jl4/tests-cli/fixtures/sibling-reads/dinner-ab.l4`, Alice and Bob as the two sides of a `RAND`, `--until 100 --always "every dinner was accepted while open"` gave 18 states, `violated after 3 events` with Alice checking, Bob buying and Alice buying, and exited 4 (measured 2026-11-13).
 - **A bound stopped it (exit 3).** `frontier NOT exhausted`, with the number of states left.
-  `--max-states 5` on `jl4/examples/explore/brief/d1-naive.l4`, a 10-state graph, printed `frontier NOT exhausted: 9 new states past the state bound 5 not added` and exited 3.
+  `--max-states 5` on `jl4/examples/explore/brief/d1-naive.l4`, a 20-state graph, printed `frontier NOT exhausted: 6 new states past the state bound 5 not added` and exited 3 (measured 2026-11-23).
+  The number is of states the bound kept out, each once; before that date the same run printed 12, because the code added one for each move that reached such a state.
 - **An act could not be tried at an instant the scheme chose (exit 2).** The coverage line has `UNTRIED n` and the text before it names the act and why:
   - _an instant that is not a whole number_: a deadline or stamp in the file is a fraction (`WITHIN 2.5`), so the instants the scheme needs for it are not whole, and only whole instants are tried.
     `jl4/tests-cli/fixtures/explore-instants/half.l4` gives 3 states, 4 transitions and `UNTRIED 1` (measured 2026-11-22);
@@ -437,7 +438,11 @@ These are all in the output, on the coverage line or the property's own line, an
   What it does say, loudly (exit 2): a tie that needs a chain of acts (above), a deadline or stamp that is not a whole number, and a state that needs more instants than the cap.
   What it does not say: an act whose behaviour changes at some instant for a reason that is neither a deadline nor a window opening, and a window opening the explorer cannot read (an `AFTER` that names a date).
   Two cases a review found (2026-11-23) were silent and are now handled, and are listed so that the next one is looked for in the same places.
-  A deadline started by a lapse (a `LEST` that arms a cure) is not started by an act, so no act's own offset named the tie it makes: ticks are read the way an act's successors are, and the chain they make is named like any other.
+  A deadline started by a lapse (a `LEST` that arms a cure) is not started by an act, so no act's own offset named the tie it makes.
+  Ticks are now read the way an act's successors are: what a lapse arms is learned at the tick that reveals it, and the acts tried in that state are tied with it, whether the deadline that lapsed was started by an act or was fixed at the outset (a second review found the fixed case still silent, 2026-11-23).
+  A tie that needs a chain of acts through a lapse is named by default and searched by `--chains`, like any other chain.
+  Checked against the enumeration of every act at every whole instant, under `--chains`: the lapse of a deadline an act started, two lapses in a row, a lapse inside an `EVERY` (a fork and a barrier), a recurring rent with a guarantor's cure, and an outset that is a literal date serial; and, by default as well, the lapse of a deadline fixed at the outset and two lapses in a row from one.
+  Not checked: a lapse of a deadline fixed at the outset inside an `EVERY`, and a lapse whose cure reads the clock arithmetically.
   Two positions with one state key can be at different clocks, and a deadline anchored in absolute time prints the same at every clock, so the later one first found stood for the earlier one, which can still do more: a state reached again at an earlier clock is explored again from there.
   (Read from the code, not measured, 2026-11-22: a deadline the explorer cannot read is listed as untried, so that case is loud; an opening it cannot read is left out without a word.)
   The exact graph, for a contract small enough, is `--grid 1`.
