@@ -693,7 +693,15 @@ analyzeSafety inp cg decides =
         ]
    where
     selfU = getUnique (decideResolvedA d)
-    params = map fst (decideParams d)
+    -- The positions of a call's arguments, which hold the value arguments
+    -- only: a type parameter (@a IS A TYPE@) is a binder of the @GIVEN@ with
+    -- no argument, so counting it shifted every position by one and matched
+    -- each argument with the parameter after the one it is passed to
+    -- (smucclaw/l4-ide#1077).
+    params = [ p | (p, mty) <- decideParams d, not (isTypeParameter mty) ]
+    isTypeParameter = \ case
+      Just (Type _) -> True
+      _             -> False
 
     allExprs = universeExpr body
 

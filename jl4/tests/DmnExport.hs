@@ -3233,6 +3233,32 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               \  WHEN x FOLLOWED BY rest THEN x PLUS total rest\n"
         notesOf "D-PARTIAL" drg `shouldBe` []
 
+      -- A type parameter (@a IS A TYPE@) is a binder of the GIVEN and no
+      -- argument of a call, so it must not shift the positions the check
+      -- compares: with one first, the call that never ends was certified and
+      -- the call on the tail was refused (smucclaw/l4-ide#1077).
+      it "TERMINATES: a type parameter does not shift the argument positions" $ do
+        let source polymorphic call =
+              Text.unlines $
+                [ "IMPORT prelude", "" ]
+                  <> ( if polymorphic
+                         then [ "GIVEN a IS A TYPE", "      xs IS A LIST OF a", "      ys IS A LIST OF a" ]
+                         else [ "GIVEN xs IS A LIST OF NUMBER", "      ys IS A LIST OF NUMBER" ] )
+                  <> [ "GIVETH A NUMBER"
+                     , "f xs ys MEANS"
+                     , "  CONSIDER xs"
+                     , "    WHEN EMPTY THEN 0"
+                     , "    WHEN z FOLLOWED BY zs THEN f " <> call
+                     ]
+            refused src =
+              not (null [n | n <- notesOf "D-PARTIAL" (drgOf src), Text.isInfixOf "TERMINATES" n.message])
+        -- recurses on xs itself, so never ends on a non-empty list: refused
+        refused (source False "xs zs") `shouldBe` True
+        refused (source True  "xs zs") `shouldBe` True
+        -- recurses on the tail, so ends: certified
+        refused (source False "zs ys") `shouldBe` False
+        refused (source True  "zs ys") `shouldBe` False
+
       it "TERMINATES: rejects NUMBER-measure recursion (a don't-know, not a proof)" $ do
         let drg = drgOf
               "GIVEN n IS A NUMBER\n\
@@ -3521,9 +3547,9 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         let live = drgOf (helperSrc <> "GIVETH A NUMBER\nliveuse MEANS helper 5\n")
         map (.bkmName) (drgBkms live) `shouldSatisfy` elem "helper"
 
-    -- §7.7: the 10th-constructor tripwire. 'UserEvalException' has exactly 9
+    -- §7.7: the constructor tripwire. 'UserEvalException' has exactly 12
     -- constructors, and every one is either foreclosed by a DMN-SAFE clause
-    -- or deliberately NOT foreclosed. A tenth constructor makes the case
+    -- or deliberately NOT foreclosed. A thirteenth constructor makes the case
     -- below incomplete — under -Wall -Werror the WARNING is the alarm — and
     -- the count assertion is the belt to those braces. When it fires: add the
     -- constructor to the coverage map AND to L4.Dmn.Analysis, or record why
@@ -3547,11 +3573,19 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
               -- unknown input, and never reported: the directive boundary
               -- rewrites it into 'Stuck' (UNKNOWN-EVALUATION-SPEC §4.5)
               RanOutOfSteps               -> "TERMINATES (a resource bound on an unknown; reported as Stuck)"
-            constructorCount = 10 :: Int
+              -- smucclaw/l4-ide#1075: a program TERMINATES certifies can
+              -- still be stopped by a budget on a large enough input, as it
+              -- can by StackOverflow
+              OverBudget _                -> "TERMINATES (a resource bound, not a clause)"
+              -- a directive after one that went over the opt-in time or
+              -- memory limit, which stops the run (ruling L2): a resource
+              -- bound on an earlier directive, not this one's
+              NotEvaluated _ _            -> "TERMINATES (a resource bound on an earlier directive, not a clause)"
+            constructorCount = 12 :: Int
         -- the case above is TOTAL; -Werror's incomplete-pattern warning fires
-        -- on an eleventh constructor before this assertion ever runs
+        -- on a thirteenth constructor before this assertion ever runs
         coveredBy (StackOverflow 0) `shouldSatisfy` (not . Text.null)
-        constructorCount `shouldBe` 10
+        constructorCount `shouldBe` 12
 
   -- smucclaw/l4-ide#936. Two gaps, one issue, and the tests are written in that
   -- order deliberately: the FEEL lowering alone would have removed a loud

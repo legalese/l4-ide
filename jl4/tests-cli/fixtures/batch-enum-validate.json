@@ -1,0 +1,8 @@
+[
+  {"p": "Tenant", "l": {"payer": "Landlord", "guests": ["Tenant"], "proxy": null}},
+  {"p": "Lodger", "l": {"payer": "Landlord", "guests": [], "proxy": "Tenant"}},
+  {"p": "Tenant", "l": {"payer": "Lodger", "guests": [], "proxy": null}},
+  {"p": "Tenant", "l": {"payer": "Landlord", "guests": ["Tenant", "Lodger"], "proxy": null}},
+  {"p": "Tenant", "l": {"payer": "Landlord", "guests": [], "proxy": "Lodger"}},
+  {"p": 1, "l": {"payer": "Landlord", "guests": [], "proxy": null}}
+]

@@ -18,6 +18,15 @@ module L4.EvaluateLazy.Machine
 -- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
 , tickUnknownSteps
 , resetUnknownSteps
+, resetBudget
+, withTracedWorkLimit
+, budgetSpent
+, moduleRules
+, runStoppedAt
+, noteRunStopped
+, tickLimits
+, DirectiveLimits (..)
+, LimitClock (..)
 , reachedUnknowns
 , unknownNames
 , withPoppedFrame
@@ -127,7 +136,10 @@ import L4.Evaluate.Ledger
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (CtxReads (..), EvalClause (..), ReadObs (..), TemporalContext (..), applyEvalClauses, hasReads, noReads, validFor)
-import L4.Parser.SrcSpan (SrcRange, prettySrcRangeM)
+import Control.Applicative ((<|>))
+import Data.Ord (comparing)
+import qualified Optics
+import L4.Parser.SrcSpan (SrcRange (..), prettySrcRangeM)
 import L4.Print hiding (tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
@@ -149,6 +161,8 @@ import Text.Read (readMaybe)
 import qualified Data.Scientific as Sci
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Exception (SomeException, catch, fromException, throwIO, uninterruptibleMask_)
+import Data.Int (Int64)
+import GHC.Clock (getMonotonicTime)
 import GHC.Conc (getAllocationCounter, setAllocationCounter)
 import qualified Control.Exception
 
@@ -329,6 +343,8 @@ data LockstepFrame = MkLockstepFrame
     -- ^ the sibling-read check's scope for this application of the compound
   , lsOp      :: RBinOp
   , lsEnv     :: Environment
+  , lsSite    :: Maybe SrcRange
+    -- ^ where the compound is in the source ('operandsSite')
   , lsTime    :: Reference
     -- ^ the compound's own time, every operand's first clock
   , lsType    :: Maybe (Type' Resolved)
@@ -476,6 +492,55 @@ data EvalState =
       -- ^ UNKNOWN-EVALUATION-SPEC §4.5's step counter (C4): negative until a
       -- site of §4.3's table first receives a term in this directive, then
       -- the machine steps still allowed. Reset per directive.
+    , armings :: !(IORef Int)
+      -- ^ smucclaw/l4-ide#1075: the obligations this directive has armed
+      -- ('noteArming'). Reset per directive.
+    , closes :: !(IORef Int)
+      -- ^ the armed obligations this directive has closed: handed on to a
+      -- HENCE or LEST, breached with no LEST ('noteClose'), or thrown away
+      -- still waiting when the compound or barrier holding them was decided
+      -- ('noteDropped'). @armings - closes@ is the number open: Note [What
+      -- the open count counts]. Kept apart from 'armings' so that a missed
+      -- close shows as a count that grows with the trace.
+    , applications :: !(IORef Int)
+      -- ^ the work this directive has done: applications of L4 functions
+      -- ('noteApplication') and deontic hand-offs ('noteHandoff'), in one
+      -- total. Reset per directive.
+    , openLimit :: !(Maybe Int)
+      -- ^ the open number: the most obligations a directive may have open
+      -- at once ('OpenObligations'), and the most failures one join may
+      -- gather ('JoinedBreaches'); 'Nothing' sets no limit
+    , applicationLimit :: !(Maybe Int)
+      -- ^ the work number: the most function applications and deontic
+      -- hand-offs a directive may make, in all ('ClosureApplications');
+      -- 'Nothing' sets no limit
+    , tracedApplicationLimit :: !(Maybe Int)
+      -- ^ the work number for a directive that collects a trace, which
+      -- 'withTracedWorkLimit' puts in 'applicationLimit''s place. The same
+      -- as 'applicationLimit' unless the configuration says otherwise
+      -- ('L4.EvaluateLazy.withTracedWorkNumber')
+    , usualApplicationLimit :: !(Maybe (Maybe Int))
+      -- ^ while a directive that collects a trace runs under a work number
+      -- of its own that is not the usual one ('withTracedWorkLimit'), the
+      -- usual one, which its stop's message names; 'Nothing' otherwise
+    , budgetRules :: [(SrcRange, Text)]
+      -- ^ the module's own definitions, each with its name: what a budget
+      -- that goes over names its site by ('budgetSite'). Lazy, so it is
+      -- built only for a directive that goes over. Empty where the caller
+      -- has no module ('runEvalAction').
+    , runStopped :: !(IORef (Maybe (Budget, Maybe SrcRange)))
+      -- ^ set when a directive goes over the opt-in time or memory limit,
+      -- which stops the run (ruling L2): the limit, and that directive.
+      -- Every later directive is refused ('runStoppedAt'). The caller's
+      -- ('EvalConfig.runStop') where it gives one, so that it spans every
+      -- module of the run, imports included; otherwise this module's own.
+    , directiveLimits :: !(Maybe DirectiveLimits)
+      -- ^ the opt-in time and allocation limits on each directive
+      -- (@--eval-timeout@, @--max-eval-memory-mb@); 'Nothing' when neither
+      -- is set, and then 'tickLimits' costs one field read per step
+    , limitClock :: !(IORef LimitClock)
+      -- ^ where this directive's time and allocation started, and how many
+      -- steps until 'tickLimits' next reads them. Reset per directive.
     , unknownReached :: !(IORef [Term])
       -- ^ every input, or field of one, that reached a §4.3 site in this
       -- directive, first first: what a directive that runs out of steps is
@@ -1103,11 +1168,18 @@ raiseException e0 = loop e0
 -- resumes. A built-in's 'RuntimeTypeError', which is how one reports an
 -- argument it cannot take (FETCH of a string that is no https URL), is
 -- rewritten the same way; the machine's own invariant failures, the other
--- internal errors, propagate as they are.
+-- internal errors, propagate as they are. So does a budget (smucclaw/l4-ide#1075):
+-- going over one stops the directive whatever it was evaluating, and ruling L2
+-- of the Recursion Limits bench makes the hit an error on that directive that
+-- names the limit, so it is never turned into 'Stuck'. Rewritten, a time or
+-- memory hit under @x AND …@ with @x@ unknown read as "needs x", and did not
+-- stop the run (review of 2026-11-21).
 rewriteUnwinding :: Frame -> EvalException -> EvalException
 rewriteUnwinding f e = case speculativeLeft f of
   Nothing -> e
   Just p  -> case e of
+    UserEvalException (OverBudget _)     -> e
+    UserEvalException (NotEvaluated _ _) -> e
     UserEvalException (Stuck ns) -> stuckException (termNames p <> toList ns)
     UserEvalException _          -> stuckException (termNames p)
     RefusalException _           -> stuckException (termNames p)
@@ -1317,6 +1389,293 @@ resetUnknownSteps = do
   liftIO (writeIORef stepsRef (-1))
   reachedRef <- asks (.unknownReached)
   liftIO (writeIORef reachedRef [])
+
+-- | smucclaw/l4-ide#1075: an obligation meets its events. Counted, and
+-- stopped with 'OpenObligations' when more are open than the limit allows.
+-- The count is of what the machine does, so the stop falls at the same
+-- place on every machine and under every load.
+noteArming :: RAction Resolved -> Eval ()
+noteArming act = do
+  armedRef <- asks (.armings)
+  armed <- liftIO (readIORef armedRef)
+  let armed' = armed + 1
+  liftIO (writeIORef armedRef armed')
+  asks (.openLimit) >>= traverse_ \ limit -> do
+    closed <- liftIO . readIORef =<< asks (.closes)
+    when (armed' - closed > limit) $ do
+      site <- budgetSite (rangeOf act)
+      userException (OverBudget (OpenObligations limit site))
+
+-- | An armed obligation is handed on to its HENCE or LEST, or breached
+-- with no LEST to go to: it is no longer open.
+noteClose :: Eval ()
+noteClose = do
+  closedRef <- asks (.closes)
+  liftIO (modifyIORef' closedRef (+ 1))
+
+-- | A compound or a barrier is decided, and throws away a residual that was
+-- still waiting: every obligation in it is no longer open.
+noteDropped :: [WHNF] -> Eval ()
+noteDropped residuals = case sum (map heldObligations residuals) of
+  0 -> pure ()
+  n -> do
+    closedRef <- asks (.closes)
+    liftIO (modifyIORef' closedRef (+ n))
+
+-- | The armed obligations a residual still holds: one for each obligation
+-- waiting at the end of its events, through the operands of a compound that
+-- was waiting on both. A breach or a fulfilment holds none.
+heldObligations :: WHNF -> Int
+heldObligations = \ case
+  ValObligation {} -> 1
+  ValROp _ _ l r -> held l + held r
+  _ -> 0
+  where
+    held = either (const 0) heldObligations
+
+-- Note [What the open count counts]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- smucclaw/l4-ide#1075. Every arming ('noteArming', in 'App1') starts one
+-- chain of contract frames for one obligation, and the chain ends in one of:
+-- a hand-off to its HENCE or LEST ('continueWithFollowup'), a breach with no
+-- LEST (the two 'DeadlineMissed' sites), the end of its events (the 'ValNil'
+-- residual in 'Contract1'), or an exception, which ends the directive and
+-- with it the count. The first two close it ('noteClose').
+--
+-- An obligation waiting at the end of its events is NOT closed there: it
+-- stays open for as long as the residual holding it is kept, because that is
+-- what a runaway piles up when the operands do not run in step. An @ROR@
+-- runs its left operand to the end of the events before it starts its right
+-- one ('startCompound'), so @x MEANS (Bob MUST never) ROR (Carol MUST tick
+-- WITHIN 1 LEST (x ROR x))@ doubles its waiting residuals every unit of time
+-- with one or two obligations meeting events at any moment; counted this
+-- way it stops at the limit (measured: 100,000 open, 3 s). Closed at the end
+-- of its events instead, it never counts more than one open, and runs until
+-- memory runs out (measured on a build that did that: a 3 GB heap exhausted
+-- after 77 s, and the run's output lost with it).
+--
+-- So a residual that is thrown away must be closed where it is thrown away
+-- ('noteDropped'). That happens in exactly two places: a compound decided by
+-- one operand while the other was still waiting ('RBinOp2': an @RAND@ one
+-- side of which is breached, an @ROR@ one side of which is fulfilled), and a
+-- barrier that fails or lapses while members are still waiting
+-- ('barrierFinish'). Until they closed it, an @RAND@ breached on one side
+-- under a repeating @LEST@ added one open obligation per round, and a trace
+-- of 100,010 rounds stopped for no reason (measured on the commit before
+-- this one). The state layer's missed @ONCE … WITHIN@ ('barrierStateMissed')
+-- is reached only once every member has completed, so it drops nothing.
+--
+-- Known over-count, which errs towards stopping: a residual that L4 code
+-- applies to more events (EVALTRACE in a fold) is armed again while its first
+-- arming is still counted, because the machine does not know the value it
+-- applies is a residual. No path inside the machine re-applies one.
+
+-- | A function written in L4 is applied to its arguments. Counted, and
+-- stopped with 'ClosureApplications' past the limit: a function that calls
+-- itself with new inputs pushes no frame, so nothing else stops it.
+--
+-- The site is the function's body, or, where the body has no place in the
+-- source, its @GIVEN@, or else the first part of the body that has one: the
+-- body of a definition written as clauses is a generated @CONSIDER@ or @LET@
+-- with no place, and so is its @GIVEN@, but each clause's own body has one.
+-- A closure with none of these, such as a record field's selector, is not
+-- where the hit is reported: past the limit, the count goes on to the next
+-- application that has a place, which is the next function written in L4 to
+-- be applied (not necessarily the one that read the field), and stops at
+-- 'rangelessSlack' past the limit at the latest, so that a run of such
+-- closures still stops: closures with no place can take the count past the
+-- limit by at most the slack.
+noteApplication :: GivenSig Resolved -> Expr Resolved -> Eval ()
+noteApplication givens body = noteWork (rangeOf body <|> rangeOf givens <|> firstPlaceIn body)
+{-# INLINE noteApplication #-}
+
+-- | A contract value meets its events: an obligation is armed, an EVERY
+-- calls its roll, a RAND or ROR starts on its operands, or a FULFILLED or a
+-- breach is handed on. Counted with the applications, in the same total
+-- (L2's numbers, ruled by Meng 2026-11-21: the WORK number is function applications
+-- plus deontic hand-offs). A HENCE that leads back to itself through a
+-- shared value hands off without applying any function, so the
+-- applications alone never see it: @d MEANS e RAND e@ over a shared
+-- FULFILLED doubles the hand-offs at each level with one application in all
+-- (measured: 4,194,303 hand-offs in 3.4 s at 22 levels). The place is the
+-- action, the EVERY, or the compound's operands; a FULFILLED or a breach has
+-- none, and is reported as an application with none is.
+noteHandoff :: Maybe SrcRange -> Eval ()
+noteHandoff = noteWork
+{-# INLINE noteHandoff #-}
+
+-- | Run with the work number for a directive that collects a trace: a trace
+-- holds about 10 KB a step, so it has a lower number by default
+-- ('tracedApplicationLimit'; decided by Claude 2026-11-21, pending Meng's review). Where that number is not the
+-- usual one, the usual one is kept for the stop's message.
+withTracedWorkLimit :: Eval a -> Eval a
+withTracedWorkLimit (MkEval f) = MkEval \ s -> f s
+  { applicationLimit = s.tracedApplicationLimit
+  , usualApplicationLimit = if s.tracedApplicationLimit == s.applicationLimit then Nothing else Just s.applicationLimit
+  }
+
+-- | One step of work, at a place in the source when it has one: counted,
+-- and stopped with 'ClosureApplications' past the limit. The place is read
+-- only past the limit.
+noteWork :: Maybe SrcRange -> Eval ()
+noteWork place = do
+  appliedRef <- asks (.applications)
+  applied <- liftIO (readIORef appliedRef)
+  let applied' = applied + 1
+  liftIO (writeIORef appliedRef applied')
+  asks (.applicationLimit) >>= traverse_ \ limit ->
+    when (applied' > limit) $
+      when (isJust place || applied' > limit + rangelessSlack) $ do
+        site <- budgetSite place
+        usual <- asks (.usualApplicationLimit)
+        userException (OverBudget (ClosureApplications limit site usual))
+{-# INLINE noteWork #-}
+
+-- | Where a RAND or an ROR is in the source, as its operands place it: the
+-- first operand still an expression. One already a value has no place.
+operandsSite :: MaybeEvaluated -> MaybeEvaluated -> Maybe SrcRange
+operandsSite l r = placeOf l <|> placeOf r
+  where
+    placeOf = either rangeOf (const Nothing)
+
+-- | A RAND, an ROR or a barrier joins the breaches of its parts into one
+-- list of failures: stopped with 'JoinedBreaches' when that list would be
+-- longer than the open number (L2's numbers, ruled by Meng 2026-11-21, amending L5:
+-- the list is bounded by L2's open number). A list is a level, not a total,
+-- so a long run of small joins never adds up to a stop; but a breach that is
+-- shared, and joined with itself again and again, doubles its list at each
+-- join with no new work, so nothing else bounds it: @d MEANS c RAND c@ over
+-- a shared BREACH gives 32,768 failures from one built (measured,
+-- 2026-11-21). Each part is counted only as far as the limit, so a join
+-- costs no more than the limit to check.
+noteJoin :: Maybe SrcRange -> [Blame a] -> Eval ()
+noteJoin place blames = asks (.openLimit) >>= traverse_ \ limit ->
+  when (sum (map (length . take (limit + 1) . toList . blameList) blames) > limit) $ do
+    site <- budgetSite place
+    userException (OverBudget (JoinedBreaches limit site))
+
+-- | The first part of an expression, itself included, that has a place in
+-- the source. Read only past the limit, so its walk costs nothing before.
+firstPlaceIn :: Expr Resolved -> Maybe SrcRange
+firstPlaceIn = listToMaybe . mapMaybe rangeOf . Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved)))
+
+-- | How far past the limit on applications the count may go while it looks
+-- for an application with a place in the source ('noteApplication').
+rangelessSlack :: Int
+rangelessSlack = 1_000
+
+-- | A budget's site, with the name of the module's own definition it is in
+-- (ruling L2: the hit names the rule). A site in an imported module, or in
+-- none, keeps only its place in the source.
+budgetSite :: Maybe SrcRange -> Eval BudgetSite
+budgetSite mRange = do
+  rules <- asks (.budgetRules)
+  pure MkBudgetSite
+    { siteRange = mRange
+    , siteRule = mRange >>= \ r -> innermost [ (d, name) | (d, name) <- rules, d `encloses` r ]
+    }
+  where
+    -- the definitions that hold a site nest (overloads split from one run
+    -- of clauses keep the run's range on the first), so the innermost, the
+    -- one that starts last, is the one the site is in
+    innermost = \ case
+      [] -> Nothing
+      ds -> Just (snd (maximumBy (comparing (\ (d, _) -> d.start)) ds))
+    -- 'SrcPos' orders by line, then column
+    encloses :: SrcRange -> SrcRange -> Bool
+    encloses d r = d.moduleUri == r.moduleUri && d.start <= r.start && r.end <= d.end
+
+-- | Every definition of a module, at any depth of its sections, with its
+-- name as the source writes it, without the @\@nlg@ text a head may carry
+-- ('bareName'). Definitions may nest ('budgetSite' takes the innermost).
+moduleRules :: Module Resolved -> [(SrcRange, Text)]
+moduleRules (MkModule _ _ top) = inSection top
+  where
+    inSection (MkSection _ _ _ _ decls) = concatMap inDecl decls
+    inDecl = \ case
+      Decide _ d@(MkDecide _ _ (MkAppForm _ name _ _) _)
+        | Just r <- rangeOf d -> [(r, docText (bareName name))]
+      Section _ sec -> inSection sec
+      _ -> []
+
+-- | Whether an earlier directive stopped the run, and if so on which limit
+-- and where: the directive boundary refuses the next one without starting
+-- it, so that it records no trace ('L4.EvaluateLazy.nfDirectiveWith').
+runStoppedAt :: Eval (Maybe (Budget, Maybe SrcRange))
+runStoppedAt = liftIO . readIORef =<< asks (.runStopped)
+
+-- | A directive went over a limit that stops the run: remember which, and
+-- where, for the directives after it.
+noteRunStopped :: Budget -> Maybe SrcRange -> Eval ()
+noteRunStopped b at = do
+  stoppedRef <- asks (.runStopped)
+  liftIO (writeIORef stoppedRef (Just (b, at)))
+
+-- | Start a directive with nothing armed, closed or applied, and its time
+-- and allocation counted from now.
+resetBudget :: Eval ()
+resetBudget = do
+  for_ [(.armings), (.closes), (.applications)] \ field -> do
+    counter <- asks field
+    liftIO (writeIORef counter 0)
+  clockRef <- asks (.limitClock)
+  liftIO do
+    now <- getMonotonicTime
+    allocation <- getAllocationCounter
+    writeIORef clockRef (MkLimitClock limitCheckInterval now allocation)
+
+-- | The opt-in limits on one directive: wall-clock seconds and megabytes
+-- allocated. Unlike the counted budgets, neither falls at the same place on
+-- every run: the time depends on the machine and its load, and the
+-- allocation on the compiler.
+data DirectiveLimits = MkDirectiveLimits
+  { seconds :: !(Maybe Int)
+  , megabytes :: !(Maybe Int)
+  }
+
+-- | Steps left until the next check, and the monotonic time and the
+-- thread's allocation counter when the directive started.
+data LimitClock = MkLimitClock !Int !Double !Int64
+
+-- | How many machine steps pass between two readings of the clock and the
+-- allocation counter: a step takes about a microsecond, so a few
+-- milliseconds.
+limitCheckInterval :: Int
+limitCheckInterval = 4_096
+
+-- | One machine step under the opt-in limits: every 'limitCheckInterval'
+-- steps, stop the directive if it has run longer or allocated more than
+-- its limit. The stop is an ordinary evaluation exception, so the stack
+-- unwinds as for any other; the directive boundary then stops the run, and
+-- no directive after it is evaluated (ruling L2). The allocation is
+-- read from the counter of the thread that runs the machine, which is the
+-- thread doing the work, whichever thread the caller is on (#1018). A step
+-- that runs one long Haskell computation (a huge power of a number) is not
+-- interrupted until it ends.
+tickLimits :: Eval ()
+tickLimits = asks (.directiveLimits) >>= traverse_ \ lims -> do
+  clockRef <- asks (.limitClock)
+  MkLimitClock left started allocation <- liftIO (readIORef clockRef)
+  if left > 0
+    then liftIO (writeIORef clockRef (MkLimitClock (left - 1) started allocation))
+    else do
+      liftIO (writeIORef clockRef (MkLimitClock limitCheckInterval started allocation))
+      for_ lims.seconds \ limit -> do
+        now <- liftIO getMonotonicTime
+        when (now - started > fromIntegral limit) $
+          userException (OverBudget (TimeLimit limit))
+      for_ lims.megabytes \ limit -> do
+        remaining <- liftIO getAllocationCounter
+        when (allocation - remaining > fromIntegral limit * 1_048_576) $
+          userException (OverBudget (MemoryLimit limit))
+{-# INLINE tickLimits #-}
+
+-- | What this directive has spent so far: obligations armed, obligations
+-- closed, and function applications.
+budgetSpent :: Eval (Int, Int, Int)
+budgetSpent = do
+  let readCounter field = liftIO . readIORef =<< asks field
+  (,,) <$> readCounter (.armings) <*> readCounter (.closes) <*> readCounter (.applications)
 
 -- | The inputs that reached a §4.3 site in this directive.
 reachedUnknowns :: Eval [Term]
@@ -1742,6 +2101,7 @@ startCompound env op rexpr1 rexpr2 rs appType = do
         _                      -> False
       (scope, opened) = openScope (MkScope opText (operandLabel "left" rexpr1) (operandLabel "right" rexpr2) fork inStep) clock outer
       outerPath = outer.ssPath
+      rsite = operandsSite rexpr1 rexpr2
   liftIO (writeIORef sref opened)
   case (clock, rs) of
     (Nothing, t : _) -> do
@@ -1754,7 +2114,7 @@ startCompound env op rexpr1 rexpr2 rs appType = do
       liftIO (modifyIORef' sref (setTaken scope 0))
       dyn0 <- captureDyn
       lockstepNext MkLockstepFrame
-        { lsGate = scope, lsScope = scope, lsOp = op, lsEnv = env, lsTime = time, lsType = appType
+        { lsGate = scope, lsScope = scope, lsOp = op, lsEnv = env, lsSite = rsite, lsTime = time, lsType = appType
         , lsStream = events, lsSlots = [SlotPending rexpr1, SlotPending rexpr2]
         , lsRunning = Nothing, lsRound = [0, 1], lsCell = Nothing, lsTaken = 0, lsHead = Nothing
         , lsBase = dyn0 {dyPath = outerPath, dyClock = outer.ssClock} }
@@ -1924,7 +2284,7 @@ lockstepNext ls = case ls.lsRound of
         continueRef ls.lsStream
     | [SlotDone v1, SlotDone v2] <- ls.lsSlots -> do
         setDyn ls.lsBase
-        pushFrame (ContractFrame (RBinOp2 MkRBinOp2 {op = ls.lsOp, rval1 = v1, env = ls.lsEnv}))
+        pushFrame (ContractFrame (RBinOp2 MkRBinOp2 {op = ls.lsOp, rval1 = v1, env = ls.lsEnv, rsite = ls.lsSite}))
         continueBackward v2
     | otherwise -> internalException $ RuntimeTypeError
         "an in-step compound ended its round with an operand neither waiting nor finished"
@@ -2219,7 +2579,7 @@ forwardExpr env = \ case
     continueExpr env (App emptyAnno l [e]) -- we desugar projection to plain function application
   -- an operand of an in-step compound wants the next event (Note [Operands in step])
   Var _ann n | isGate n -> lockstepPause (getUnique n).unique
-  Var _ann n -> do -- still problematic: similarity / overlap between this and App with no args
+  Var ann n -> do -- still problematic: similarity / overlap between this and App with no args
     -- Auto-apply a discharged import only in VALUE position. The App case above
     -- fetches the function it is about to apply by re-entering here, and
     -- applying it twice would hand the caller the RESULT where it expects a
@@ -2229,8 +2589,14 @@ forwardExpr env = \ case
     -- allocated, not forwarded -- so an 'App1' carrying arguments on top of the
     -- stack means this reference is the function of that application.
     beingApplied <- topFrameAppliesArguments
-    r <- expectTerm env n
-    if beingApplied then continueRef r else autoApplyDischargedImport r
+    -- A bare JSONDECODE in value position, passed as a function, decodes at
+    -- the type its own reference was checked at ('jsonDecodeTargetOfReference').
+    target <- if beingApplied then pure Nothing else jsonDecodeTargetOfReference ann n
+    case target of
+      Just ty -> continueBackward (ValUnaryBuiltinFun (UnaryJsonDecodeAt ty))
+      Nothing -> do
+        r <- expectTerm env n
+        if beingApplied then continueRef r else autoApplyDischargedImport r
   Cons _ann e1 e2 -> do
     rf1 <- allocate_ e1 env
     rf2 <- allocate_ e2 env
@@ -2528,6 +2894,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
   Just f@(App1 rs mTy) -> do
     case val of
       ValClosure givens e env' -> do
+        noteApplication givens e
         env'' <- matchGivens env' givens f rs
         continueExpr (Map.union env'' env') e
       ValUnappliedConstructor r ->
@@ -2540,6 +2907,8 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- P2b: this is the ENTRY into the obligation's site — the activation
         -- the step log's key counts. Lazy when the log is off.
         norm <- armNormKey party act
+        noteHandoff (rangeOf act)
+        noteArming act
         -- smucclaw/l4-ide#1069: the sibling-read check's clock is the arming
         -- time until an event is taken
         noteClock time
@@ -2552,12 +2921,14 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       ValQuantified env deonton -> do
         -- EVERY meets its event stream: this is the arming point, so the roll
         -- call runs here (spec §2.2.7.5 point 5, R-Q6).
+        noteHandoff (rangeOf deonton)
         (time, events) <- case rs of
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
         startRollCall env deonton time events
-      ValROp env op rexpr1 rexpr2 ->
+      ValROp env op rexpr1 rexpr2 -> do
+        noteHandoff (operandsSite rexpr1 rexpr2)
         startCompound env op rexpr1 rexpr2 rs mTy
       ValConnective conn ->
         case (conn, rs) of
@@ -2599,7 +2970,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
         -- We need to evaluate arg1, then arg2, then z
         pushFrame (TernaryBuiltin1 fn arg2 z)
         continueRef arg1
-      ValFulfilled -> continueBackward ValFulfilled
+      ValFulfilled -> noteHandoff Nothing >> continueBackward ValFulfilled
       -- SEESAW (spec §6.1.2): a declared breach takes its effective instant
       -- from the clock of the hand-off that reached it — the deadline (no
       -- earlier than the failed obligation's arming) under a LEST, the
@@ -2611,9 +2982,10 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
       -- continuations is one cached thunk, reached at two clocks.
       ValBreached r
         | hasUntimed (breachBlame r), [t, evs] <- rs -> do
+            noteHandoff Nothing
             pushFrame (ContractFrame (StampBreach StampBreachFrame {reason = r, eventsRef = evs}))
             continueRef t
-        | otherwise -> continueBackward (ValBreached r)
+        | otherwise -> noteHandoff Nothing >> continueBackward (ValBreached r)
       -- An assumed function applied is a term (§4.2), keyed by the function
       -- and its arguments' values, read without forcing anything; an
       -- argument that cannot be read so leaves the call Stuck on the
@@ -3349,6 +3721,7 @@ backwardContractFrame val = \ case
                   mBearer <- peekWHNF partyR
                   expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
                 let timing = Timing {effective, observed = stamp, revealedBy = Just (ev'party, ev'act)}
+                noteClose
                 continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline timing))))
               Just lestFollowup -> reofferResolve False lestFollowup ToLest
       else do
@@ -3485,6 +3858,7 @@ backwardContractFrame val = \ case
               -- not contradict the spec.
               -- SEESAW: a violation takes effect when it happens, and is seen then
               let timing = Timing {effective = stamp, observed = stamp, revealedBy = Just (ev'partyRef, ev'act)}
+              noteClose
               continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp timing))))
           -- MUST, MAY, DO: action done = success
           _ -> do
@@ -3831,6 +4205,7 @@ backwardContractFrame val = \ case
       -- first, with duplicates: @PARTY alice MUST x RAND PARTY alice MUST y@
       -- both missed names alice twice, once per way. A breach with no BY is
       -- one entry naming nobody.
+      noteJoin rsite [breachBlame r1, breachBlame r2]
       let (decider, blame) = combineBlame op (breachBlame r1) (breachBlame r2)
           chosen = breachOf blame
       -- P2b: which operand decides the compound's instant (both, on a tie).
@@ -3867,6 +4242,7 @@ backwardContractFrame val = \ case
       whenDeonticLog \ _ -> do
         summary <- breachSummary reason
         joinedStep op (JoinBreached summary) (Just LeftSide) False
+      noteDropped [val] -- Note [What the open count counts]
       continueBackward (ValBreached reason)
   RBinOp2 MkRBinOp2 {..}
     | ValRAnd <- op
@@ -3875,6 +4251,7 @@ backwardContractFrame val = \ case
       whenDeonticLog \ _ -> do
         summary <- breachSummary reason
         joinedStep op (JoinBreached summary) (Just RightSide) False
+      noteDropped [rval1] -- Note [What the open count counts]
       continueBackward (ValBreached reason)
 
   -- OR
@@ -3883,6 +4260,7 @@ backwardContractFrame val = \ case
     , ValFulfilled <- val
     -> do
       joinedStep op JoinFulfilled (Just RightSide) False
+      noteDropped [rval1] -- Note [What the open count counts]
       continueBackward ValFulfilled
   -- NOTE: unreachable — a fulfilled LEFT operand of an OR never gets past
   -- the RBinOp1 short-circuit above, which is where that step is logged.
@@ -3892,6 +4270,7 @@ backwardContractFrame val = \ case
     , ValFulfilled <- rval1
     -> do
       joinedStep op JoinFulfilled (Just LeftSide) False
+      noteDropped [val] -- Note [What the open count counts]
       continueBackward ValFulfilled
 
 
@@ -4047,6 +4426,9 @@ backwardContractFrame val = \ case
     -- See 'sentinelArgs'.
     continueWithFollowup :: Maybe Text -> Lifecycle -> Environment -> RExpr -> Reference -> Reference -> Int -> Machine Config
     continueWithFollowup mParty lifecycle env followup events time seen = do
+      -- smucclaw/l4-ide#1075: every hand-off closes the obligation that
+      -- makes it; whatever the continuation arms is counted when it arms
+      noteClose
       mOriginal <- getCurrentParty
       putCurrentParty mParty
       -- smucclaw/l4-ide#1069: a RECORD or RECALL in the continuation is made
@@ -4548,7 +4930,7 @@ barrierNext step = case step.queue of
 -- join cannot fire and the verdict is @FULFILLED@, as before.
 barrierFinish :: BarrierStepFrame -> Machine Config
 barrierFinish step = case reverse step.failures of
-  (f : fs) -> case earliestFailure (f :| fs) of
+  (f : fs) -> noteDropped step.pending >> case earliestFailure (f :| fs) of
     -- the LEST is handed the anchor, the residual stream AND the missed
     -- deadline of the member whose failure anchors it (R-Q7B's THE
     -- DEADLINE under a barrier's LEST is the earliest failer's, by the
@@ -4564,6 +4946,13 @@ barrierFinish step = case reverse step.failures of
        Nothing -> internalException $ RuntimeTypeError
          "a barrier with no LEST recorded a failure that is not a breach"
        Just blames -> do
+        -- A guard: no test reaches it. Each failed member gives one
+        -- failure, its own missed deadline, and every member is armed when
+        -- the barrier is, so a join longer than the open number was
+        -- already stopped by 'OpenObligations' at arming (measured
+        -- 2026-11-21: twelve members answer under an open number of 12,
+        -- naming twelve failures, and stop as obligations under 11).
+        noteJoin (rangeOf step.ctx.deonton) (toList blames)
         let verdict = breachOf (combineAll blames)
         -- P2b: the barrier's own step, logged once the verdict is decided
         -- (every member has run). The clock is the anchoring failure's
@@ -4579,6 +4968,7 @@ barrierFinish step = case reverse step.failures of
         -- P2b: a MAY member lapsed under a barrier with no LEST; the join
         -- can never fire. 'ValFulfilled' carries no time, so no clock.
         tellDeonticStep $ plainStep Nothing Nothing NoEvent step.ctx.norm JoinStalled
+        noteDropped step.pending -- Note [What the open count counts]
         continueBackward ValFulfilled
     | otherwise -> case reverse step.pending of
       -- Some members are still waiting for their event. The barrier has neither
@@ -5180,6 +5570,41 @@ topFrameAppliesArguments = do
     App1 (_ : _) _ : _ -> True
     _                  -> False
 
+-- | The type a bare @JSONDECODE@ reference decodes into, when it is passed as
+-- a function (@map JSONDECODE xs@) rather than applied where it is written
+-- (smucclaw/l4-ide#1078).
+--
+-- A decode is otherwise typed by the node that applies it (the 'App' case,
+-- 'UnaryJsonDecode'), and for a function passed on, that node is wherever it
+-- is finally applied: inside the prelude's @map@ it is @f x@, whose type says
+-- nothing about this call. The reference's own annotation does, once the type
+-- checker has resolved it ('L4.TypeCheck.zonkDecodeTargets').
+--
+-- Only a target the decoder can find is used: every type it names must be a
+-- type in the evaluator's entity table, the same table the decoder looks a
+-- record or an enumeration up in. A type parameter (@GIVEN a IS A TYPE@)
+-- never is, and a reference checked at one is common: the body of
+-- @GIVEN a IS A TYPE GIVETH A FUNCTION FROM STRING TO EITHER STRING a@ is
+-- stamped with that type. Using it would replace the type of the node that
+-- applies the function, which can be concrete, with @a@, and stop a decode
+-- that works. So anything else, an inference variable included, gives
+-- 'Nothing', and the reference stays the shared builtin, as before.
+jsonDecodeTargetOfReference :: Anno -> Resolved -> Machine (Maybe (Type' Resolved))
+jsonDecodeTargetOfReference ann n
+  | getUnique n == TypeCheck.jsonDecodeUnique
+  , Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} <- ann
+  , Fun _ [_] (TyApp _ eitherRef [_, target]) <- ty
+  , getUnique eitherRef == TypeCheck.eitherUnique = do
+      entityInfo <- getEntityInfo
+      let declared r = case Map.lookup (getUnique r) entityInfo of
+            Just (_, TypeCheck.KnownType {}) -> True
+            _ -> False
+          decodable = \ case
+            TyApp _ r ts -> declared r && all decodable ts
+            _ -> False
+      pure (if decodable target then Just target else Nothing)
+  | otherwise = pure Nothing
+
 autoApplyDischargedImport :: Reference -> Machine Config
 autoApplyDischargedImport r = do
   needsIt <- dischargedImportClosure r
@@ -5563,34 +5988,7 @@ extractFieldNamesAndTypes ty = case ty of
 cannotDecode :: DecodeAt -> Text -> Aeson.Value -> Text -> Machine a
 cannotDecode at typeName jsonValue why =
   userException $ UserError $
-    "Could not decode " <> TE.decodeUtf8 (BS.toStrict (Aeson.encode jsonValue))
-      <> " as " <> typeName <> atField at <> ": " <> why
-
--- | What a value of a choice type is given as in JSON, for 'cannotDecode':
--- the constructors without fields, by name, and those with fields, which
--- cannot be given at all.
-choiceExpectation :: Text -> [Text] -> [Text] -> Text
-choiceExpectation typeName withoutFields withFields = case (withoutFields, withFields) of
-  ([], [])  -> typeName <> " has no constructor that JSON input can name."
-  ([], _)   -> "every constructor of " <> typeName <> " has fields (" <> commas withFields
-                 <> "), and a constructor with fields cannot be given as JSON input."
-  (_, [])   -> "expected a string naming one of: " <> commas withoutFields <> "."
-  (_, _)    -> "expected a string naming one of: " <> commas withoutFields
-                 <> ". A constructor with fields (" <> commas withFields
-                 <> ") cannot be given as JSON input."
-  where commas = Text.intercalate ", "
-
--- | Why a JSON string is not a value of a choice type, for 'cannotDecode'.
-choiceNameMiss :: Text -> Text -> [Text] -> [Text] -> Text
-choiceNameMiss typeName name withoutFields withFields
-  | name `elem` withFields =
-      name <> " has fields, and a constructor with fields cannot be given as JSON input"
-        <> if null withoutFields
-             then "."
-             else "; expected a string naming one of: " <> Text.intercalate ", " withoutFields <> "."
-  | otherwise =
-      "it names no constructor of " <> typeName <> "; "
-        <> choiceExpectation typeName withoutFields withFields
+    couldNotDecodeText (TE.decodeUtf8 (BS.toStrict (Aeson.encode jsonValue))) typeName (atField at) why
 
 -- | Is this a constructor of the given type, with or without fields?
 constructorReturning :: Type' Resolved -> Resolved -> Bool
@@ -6289,6 +6687,12 @@ runBuiltin es op mTy = do
           decodeJsonToValueTyped jsonStr innerTy
         Nothing ->
           decodeJsonToValue jsonStr
+      continueBackward result
+    -- The type came with the function value ('jsonDecodeTargetOfReference');
+    -- the node applying it, here, may know less.
+    UnaryJsonDecodeAt target -> do
+      jsonStr <- expectString es
+      result <- decodeJsonToValueTyped jsonStr target
       continueBackward result
 #ifdef HTTP_ENABLED
     UnaryFetch -> do
@@ -7495,20 +7899,27 @@ preAllocate ns = do
   pure (Map.fromList pairs)
 
 allocate_ :: Expr Resolved -> Environment -> Machine Reference
-allocate_ (Var _ann n) env = do
-  -- special case where we do not actually need to allocate
-  --
-  -- NOT extended to auto-apply a discharged import (see
-  -- 'dischargedImportClosure'). Allocating the application here instead of
-  -- sharing the cell fixes an operand-position reference across an IMPORT, but
-  -- it also fires on every RECORD CONSTRUCTOR: a @DECLARE@'s field names are
-  -- module-level selectors, so a constructor's parameters are keys in its own
-  -- captured environment exactly as a discharged reader's are, and the guard
-  -- cannot tell them apart. Measured 2026-09-05 on the sweep corpus:
-  -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ both went red with
-  -- \"expected a function but found: Money OF ...\". See the operand-position
-  -- limitation recorded in IMPLICIT-PROPS-DESIGN.md.
-  expectTerm env n
+allocate_ (Var ann n) env = do
+  -- An argument that is a bare JSONDECODE, as in @map JSONDECODE xs@, gets
+  -- its own cell, which knows the type to decode at; sharing the builtin's
+  -- cell would lose it ('jsonDecodeTargetOfReference', smucclaw/l4-ide#1078).
+  target <- jsonDecodeTargetOfReference ann n
+  case target of
+    Just ty -> allocateValue (ValUnaryBuiltinFun (UnaryJsonDecodeAt ty))
+    Nothing ->
+      -- special case where we do not actually need to allocate
+      --
+      -- NOT extended to auto-apply a discharged import (see
+      -- 'dischargedImportClosure'). Allocating the application here instead of
+      -- sharing the cell fixes an operand-position reference across an IMPORT, but
+      -- it also fires on every RECORD CONSTRUCTOR: a @DECLARE@'s field names are
+      -- module-level selectors, so a constructor's parameters are keys in its own
+      -- captured environment exactly as a discharged reader's are, and the guard
+      -- cannot tell them apart. Measured 2026-09-05 on the sweep corpus:
+      -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ both went red with
+      -- \"expected a function but found: Money OF ...\". See the operand-position
+      -- limitation recorded in IMPLICIT-PROPS-DESIGN.md.
+      expectTerm env n
 allocate_ expr env =
   fst <$> allocateRecursive expr (const env)
 

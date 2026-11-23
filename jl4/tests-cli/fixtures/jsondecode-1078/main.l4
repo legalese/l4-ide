@@ -1,0 +1,5 @@
+-- Uses a decode written in another module (treelib.l4). Prints 2.
+IMPORT prelude
+IMPORT treelib
+
+#EVAL `label in` "{\"label\":2,\"kids\":[]}"

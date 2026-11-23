@@ -548,7 +548,7 @@ probe.
 investor has a net worth; nobody established it) versus `NOTHING` as _unexamined_
 (deliberately not forced, because income already cleared). Only the second is the statute's
 licensed silence. **Established from the tree: L4 cannot currently distinguish them.** The
-prelude `MAYBE` has a single `NOTHING` constructor (`jl4-core/libraries/prelude.l4:356-380`
+prelude `MAYBE` has a single `NOTHING` constructor (`jl4-core/libraries/prelude.l4:359-383`
 show its two-constructor pattern matches), and nothing in the evaluator tags _why_ a value is
 absent. The design that would make the split — the four-state input model distinguishing
 explicit-value / explicit-unknown / not-yet-asked / not-applicable, `Either (Maybe a) (Maybe

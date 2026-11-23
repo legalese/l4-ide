@@ -203,6 +203,22 @@ data CheckError =
   | RestatedSectionBinder Name
     -- ^ A function's own @GIVEN@ restates a name a section-level @GIVEN@
     -- already binds (R2). Carries the parameter name.
+  | JsonDecodeAtTypeParameter Resolved (Type' Resolved) [Resolved]
+    -- ^ A @JSONDECODE@ applied to its text whose type to decode into mentions
+    -- a type parameter (a @GIVEN a IS A TYPE@), which has no value when the
+    -- rules run, so nothing can guide the decode (smucclaw/l4-ide#1078,
+    -- option C).
+    -- Arguments: the @JSONDECODE@ itself, the type it would decode into, and
+    -- the type parameters that type mentions. Not raised for a type that is
+    -- only unsolved. See 'L4.TypeCheck.decodesAtTypeParameters'.
+  | JsonDecodePassedAtTypeParameter Resolved (Type' Resolved) [Resolved] (Maybe (Resolved, Maybe SrcRange, Type' Resolved))
+    -- ^ A bare @JSONDECODE@, handed on as a function, at a function type that
+    -- mentions a type parameter (smucclaw/l4-ide#1078, option C extended to
+    -- the bare reference; decided by Claude 2026-11-21, pending Meng's review).
+    -- Arguments: the @JSONDECODE@, the function type it is handed on at, the
+    -- type parameters that type mentions, and the innermost definition around
+    -- it whose @GIVETH@ mentions one of them (its name, where that @GIVETH@
+    -- is, and its type), which is where the message says to write the type.
   | ImplicitCrossesImport Resolved Name
     -- ^ An @\@export@ed definition reaches a definition in an IMPORTED module
     -- that takes section binders as implicit inputs. Arguments: the exported
@@ -980,6 +996,9 @@ checkErrorCode = \ case
   EndsBecauseOnNonDefinition {}   -> "check/ends-because-on-non-definition"
   EndsBecauseNeedsReason {}       -> "check/ends-because-needs-reason"
   EndsBecauseNoted {}             -> "lint/ends-because-noted"
+  -- smucclaw/l4-ide#1078 (codes decided by Claude 2026-11-22, pending Meng's review)
+  JsonDecodeAtTypeParameter {}       -> "check/jsondecode-at-type-parameter"
+  JsonDecodePassedAtTypeParameter {} -> "check/jsondecode-passed-at-type-parameter"
 
 -- | The code of a checker warning. See 'checkErrorCode'.
 checkWarningCode :: CheckWarning -> Text
@@ -1141,6 +1160,8 @@ instance HasSrcRange CheckError where
   rangeOf (AmbiguousRootBinders r _ _)      = rangeOf r
   rangeOf (ImplicitCrossesImport r _)       = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
+  rangeOf (JsonDecodeAtTypeParameter r _ _) = rangeOf r
+  rangeOf (JsonDecodePassedAtTypeParameter r _ _ _) = rangeOf r
   rangeOf (NotReachesConnective site)       = Just site.range
   rangeOf (OpenedFieldCollisionAtRead c)    = rangeOf c.fieldRead
   rangeOf (OpenedFieldCollisionAtOpening _ b _) = rangeOf b.binderName

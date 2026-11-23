@@ -132,7 +132,7 @@ and I do not have sufficient information to make a choice between them.
 The options are:
 
   `__MINUS__` (predefined) of type FUNCTION FROM NUMBER AND NUMBER TO NUMBER
-  `__MINUS__` (defined at prelude.l4:1289:1-12) of type FOR ALL a FUNCTION FROM SET OF a AND SET OF a TO SET OF a
+  `__MINUS__` (defined at prelude.l4:1364:1-12) of type FOR ALL a FUNCTION FROM SET OF a AND SET OF a TO SET OF a
 ```
 
 Note the asymmetry with the neighbouring rule you have probably already read:
