@@ -1200,11 +1200,24 @@ GIVETH A Dictionary k (LIST OF v)
 fromListGrouped pairs MEANS Dictionary WITH contents IS groupPairs pairs
 
 -- Pair: mapSnd (map over second element - alias for pmap)
+-- The GIVETH is pmap's type. Without it, the first use of mapSnd settled
+-- its types and a second use at other types was refused (smucclaw/l4-ide#1079).
+GIVEN
+  a    IS A TYPE
+  b    IS A TYPE
+  c    IS A TYPE
+GIVETH A FUNCTION FROM (FUNCTION FROM b TO c) AND (PAIR OF a, b) TO PAIR OF a, c
 @nlg a pair transformed in its second part
 mapSnd MEANS pmap
 
 -- Pair: mapPairs (map over second element of each pair - alias for fmap on pairs)
 -- Note: This is fmap specialized to List of Pairs
+-- The GIVETH is fmap's type, for the reason given at mapSnd.
+GIVEN
+  a    IS A TYPE
+  b    IS A TYPE
+  c    IS A TYPE
+GIVETH A FUNCTION FROM (FUNCTION FROM b TO c) AND (LIST OF PAIR OF a, b) TO LIST OF PAIR OF a, c
 @nlg pairs transformed in their second parts
 mapPairs MEANS fmap
 

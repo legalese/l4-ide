@@ -567,14 +567,16 @@ this rule is the one part of the criterion the measurement did **not** score.
 requires **L12**'s cycle test over those locals.
 
 The prelude is the proof that the two hard checks are orthogonal and compose exactly right: `at`
-(`prelude.l4:132`) is structurally decreasing _and_ non-exhaustive, hence partial; `sum`/`map`/
+(`prelude.l4:136`) is structurally decreasing _and_ non-exhaustive, hence partial; `sum`/`map`/
 `filter` are structurally decreasing _and_ exhaustive, hence total. A criterion combining them
 classifies the whole prelude with no hand-maintained table — which matters, because the alternative
 (a trusted totality basis, hand-audited) has to be re-audited on every prelude edit, and this
 branch's prelude proves edits go wrong: **`maximum` over `LIST OF MAYBE NUMBER` (`prelude.l4:375`)
 computes the _minimum_**, its body being `minimum1 x xs`, with `maximum1` (`:384`) recursing on
-`min x y`. Fixed on `main` by PR #45; still wrong here. That and the `SPLIT` escape in L4 are live
-evaluator bugs rather than R2 concerns, and each deserves its own issue.
+`min x y`. Fixed on `main` by PR #45; still wrong here. (No longer true: measured 2026-11-22,
+`maximum` over `LIST OF MAYBE NUMBER` (`prelude.l4:388`) calls `maximum1` (`:398`), which recurses
+on `max x y` (`:402`).) That and the `SPLIT` escape in L4 are live evaluator bugs rather than R2
+concerns, and each deserves its own issue.
 
 **The refinement that saves the corpus: _strict position_.** Partiality is dangerous only where the
 position is evaluated unconditionally.

@@ -347,6 +347,7 @@ test-suite jl4-core-test
     MaxFrameDepthSpec
     HoverApiSpec
     BudgetSpec
+    JsonDecodeCostSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:

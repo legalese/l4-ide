@@ -2575,7 +2575,7 @@ forwardExpr env = \ case
     continueExpr env (App emptyAnno l [e]) -- we desugar projection to plain function application
   -- an operand of an in-step compound wants the next event (Note [Operands in step])
   Var _ann n | isGate n -> lockstepPause (getUnique n).unique
-  Var _ann n -> do -- still problematic: similarity / overlap between this and App with no args
+  Var ann n -> do -- still problematic: similarity / overlap between this and App with no args
     -- Auto-apply a discharged import only in VALUE position. The App case above
     -- fetches the function it is about to apply by re-entering here, and
     -- applying it twice would hand the caller the RESULT where it expects a
@@ -2585,8 +2585,14 @@ forwardExpr env = \ case
     -- allocated, not forwarded -- so an 'App1' carrying arguments on top of the
     -- stack means this reference is the function of that application.
     beingApplied <- topFrameAppliesArguments
-    r <- expectTerm env n
-    if beingApplied then continueRef r else autoApplyDischargedImport r
+    -- A bare JSONDECODE in value position, passed as a function, decodes at
+    -- the type its own reference was checked at ('jsonDecodeTargetOfReference').
+    target <- if beingApplied then pure Nothing else jsonDecodeTargetOfReference ann n
+    case target of
+      Just ty -> continueBackward (ValUnaryBuiltinFun (UnaryJsonDecodeAt ty))
+      Nothing -> do
+        r <- expectTerm env n
+        if beingApplied then continueRef r else autoApplyDischargedImport r
   Cons _ann e1 e2 -> do
     rf1 <- allocate_ e1 env
     rf2 <- allocate_ e2 env
@@ -5559,6 +5565,41 @@ topFrameAppliesArguments = do
     App1 (_ : _) _ : _ -> True
     _                  -> False
 
+-- | The type a bare @JSONDECODE@ reference decodes into, when it is passed as
+-- a function (@map JSONDECODE xs@) rather than applied where it is written
+-- (smucclaw/l4-ide#1078).
+--
+-- A decode is otherwise typed by the node that applies it (the 'App' case,
+-- 'UnaryJsonDecode'), and for a function passed on, that node is wherever it
+-- is finally applied: inside the prelude's @map@ it is @f x@, whose type says
+-- nothing about this call. The reference's own annotation does, once the type
+-- checker has resolved it ('L4.TypeCheck.zonkDecodeTargets').
+--
+-- Only a target the decoder can find is used: every type it names must be a
+-- type in the evaluator's entity table, the same table the decoder looks a
+-- record or an enumeration up in. A type parameter (@GIVEN a IS A TYPE@)
+-- never is, and a reference checked at one is common: the body of
+-- @GIVEN a IS A TYPE GIVETH A FUNCTION FROM STRING TO EITHER STRING a@ is
+-- stamped with that type. Using it would replace the type of the node that
+-- applies the function, which can be concrete, with @a@, and stop a decode
+-- that works. So anything else, an inference variable included, gives
+-- 'Nothing', and the reference stays the shared builtin, as before.
+jsonDecodeTargetOfReference :: Anno -> Resolved -> Machine (Maybe (Type' Resolved))
+jsonDecodeTargetOfReference ann n
+  | getUnique n == TypeCheck.jsonDecodeUnique
+  , Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} <- ann
+  , Fun _ [_] (TyApp _ eitherRef [_, target]) <- ty
+  , getUnique eitherRef == TypeCheck.eitherUnique = do
+      entityInfo <- getEntityInfo
+      let declared r = case Map.lookup (getUnique r) entityInfo of
+            Just (_, TypeCheck.KnownType {}) -> True
+            _ -> False
+          decodable = \ case
+            TyApp _ r ts -> declared r && all decodable ts
+            _ -> False
+      pure (if decodable target then Just target else Nothing)
+  | otherwise = pure Nothing
+
 autoApplyDischargedImport :: Reference -> Machine Config
 autoApplyDischargedImport r = do
   needsIt <- dischargedImportClosure r
@@ -6668,6 +6709,12 @@ runBuiltin es op mTy = do
           decodeJsonToValueTyped jsonStr innerTy
         Nothing ->
           decodeJsonToValue jsonStr
+      continueBackward result
+    -- The type came with the function value ('jsonDecodeTargetOfReference');
+    -- the node applying it, here, may know less.
+    UnaryJsonDecodeAt target -> do
+      jsonStr <- expectString es
+      result <- decodeJsonToValueTyped jsonStr target
       continueBackward result
 #ifdef HTTP_ENABLED
     UnaryFetch -> do
@@ -7874,20 +7921,27 @@ preAllocate ns = do
   pure (Map.fromList pairs)
 
 allocate_ :: Expr Resolved -> Environment -> Machine Reference
-allocate_ (Var _ann n) env = do
-  -- special case where we do not actually need to allocate
-  --
-  -- NOT extended to auto-apply a discharged import (see
-  -- 'dischargedImportClosure'). Allocating the application here instead of
-  -- sharing the cell fixes an operand-position reference across an IMPORT, but
-  -- it also fires on every RECORD CONSTRUCTOR: a @DECLARE@'s field names are
-  -- module-level selectors, so a constructor's parameters are keys in its own
-  -- captured environment exactly as a discharged reader's are, and the guard
-  -- cannot tell them apart. Measured 2026-09-05 on the sweep corpus:
-  -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ both went red with
-  -- \"expected a function but found: Money OF ...\". See the operand-position
-  -- limitation recorded in IMPLICIT-PROPS-DESIGN.md.
-  expectTerm env n
+allocate_ (Var ann n) env = do
+  -- An argument that is a bare JSONDECODE, as in @map JSONDECODE xs@, gets
+  -- its own cell, which knows the type to decode at; sharing the builtin's
+  -- cell would lose it ('jsonDecodeTargetOfReference', smucclaw/l4-ide#1078).
+  target <- jsonDecodeTargetOfReference ann n
+  case target of
+    Just ty -> allocateValue (ValUnaryBuiltinFun (UnaryJsonDecodeAt ty))
+    Nothing ->
+      -- special case where we do not actually need to allocate
+      --
+      -- NOT extended to auto-apply a discharged import (see
+      -- 'dischargedImportClosure'). Allocating the application here instead of
+      -- sharing the cell fixes an operand-position reference across an IMPORT, but
+      -- it also fires on every RECORD CONSTRUCTOR: a @DECLARE@'s field names are
+      -- module-level selectors, so a constructor's parameters are keys in its own
+      -- captured environment exactly as a discharged reader's are, and the guard
+      -- cannot tell them apart. Measured 2026-09-05 on the sweep corpus:
+      -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ both went red with
+      -- \"expected a function but found: Money OF ...\". See the operand-position
+      -- limitation recorded in IMPLICIT-PROPS-DESIGN.md.
+      expectTerm env n
 allocate_ expr env =
   fst <$> allocateRecursive expr (const env)
 

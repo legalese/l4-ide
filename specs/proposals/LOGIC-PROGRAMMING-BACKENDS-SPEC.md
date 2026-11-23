@@ -289,7 +289,7 @@ harness's queries).
 
 **Defunctionalised, not general:** saturated calls to the known prelude
 higher-order functions — `map`, `filter`, `all`, `any`, `foldr`, `elem`
-(`jl4-core/libraries/prelude.l4:38-465`) — with a lambda or named-function
+(`jl4-core/libraries/prelude.l4:40-468`) — with a lambda or named-function
 argument specialise to fresh first-order predicates at each call site
 (Reynolds defunctionalisation). General lambda-passing, partial
 application, and functions stored in data are **rejected** in v1 with a

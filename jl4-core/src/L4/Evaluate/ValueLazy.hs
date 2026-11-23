@@ -487,6 +487,12 @@ data UnaryBuiltinFun
   | UnaryEnv
   | UnaryJsonEncode
   | UnaryJsonDecode
+    -- ^ Decodes at the type of the node that applies it.
+  | UnaryJsonDecodeAt (Type' Resolved)
+    -- ^ A bare @JSONDECODE@ passed as a function, decoding at the type its
+    -- own reference was checked at (smucclaw/l4-ide#1078). The node that
+    -- applies it is then elsewhere, such as inside the prelude's @map@,
+    -- whose type says nothing about this call.
   | UnaryDateValue
   | UnaryDateSerial
   | UnaryDateFromSerial
@@ -594,6 +600,7 @@ instance NFData UnaryBuiltinFun where
   rnf UnaryEnv = ()
   rnf UnaryJsonEncode = ()
   rnf UnaryJsonDecode = ()
+  rnf (UnaryJsonDecodeAt t) = rnf t
   rnf UnaryDateValue = ()
   rnf UnaryDateSerial = ()
   rnf UnaryDateFromSerial = ()

@@ -135,7 +135,7 @@ example MEANS
 The `WHO` clause takes a **Boolean expression in which the bound variable is free**. The variable is
 written where it is used, as in any other L4 expression; nothing is inserted for the drafter.
 
-For set membership, apply the prelude's `elem` (`jl4-core/libraries/prelude.l4:465`) to the variable
+For set membership, apply the prelude's `elem` (`jl4-core/libraries/prelude.l4:468`) to the variable
 (this document's `member_of` is `elem` under an illustrative name):
 
 > **Read the example below for what a `WHO` condition is, NOT for how to give a rule its group.**
@@ -5770,7 +5770,7 @@ EVERY Tenant t IN arrears WHOSE monthly_rent AT LEAST 1000 MUST …
 
 — where `arrears` is a dynamically constructed LIST of tenants behind on rent (the roll), not a
 number. As sugar this is `WHOSE f` ≡ `WHO t's f`, and every part it needs already exists: `AT LEAST`
-is an infix operator (`jl4-core/libraries/prelude.l4:780`), possessive projection is idiomatic
+is an infix operator (`jl4-core/libraries/prelude.l4:790`), possessive projection is idiomatic
 (`a's age`, `a's income`), and computed fields are implemented (`COMPUTED-FIELDS-SPEC.md`).
 
 #### The objection, and why it does not land as stated
