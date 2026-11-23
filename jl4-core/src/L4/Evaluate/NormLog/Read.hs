@@ -45,7 +45,10 @@
 --     'CompoundNoInstant'): the machine runs an @ROR@'s left operand over the
 --     whole trace, so the log holds a miss the contract never had, and a
 --     fulfilment cannot say whether the miss came first (N17 and N18, not
---     built).
+--     built). The miss may be a real one, inside the alternative that won,
+--     and the reader cannot tell it from the loser's: a read whose pattern
+--     matches it refuses from the instant the norm is armed, and one whose
+--     pattern leaves it out answers.
 --
 -- A refusal is raised only for a norm that the rest of the pattern (modal,
 -- action constructor, how it was armed) matches, and naming a different
@@ -391,12 +394,25 @@ data JoinStatus = Decided | NotYet | Unplaced !NormRef
 -- behind because a compound decided without it is not part of the answer
 -- (N13's join condition applies here too).
 --
--- An @ROR@ in the continuation is settled by the alternative that was
--- fulfilled first (N8), so the other alternative's miss does not count: the
--- cure is read from that alternative alone. If no alternative of an @ROR@
--- that was fulfilled can be told to have settled it (it settled through a
--- compound that is itself an alternative, or through none of the
--- continuation's norms), the read refuses by name.
+-- An @ROR@ in the continuation is settled by an alternative that was itself
+-- fulfilled (N8): its norm performed, or kept, exercised or lapsed, and
+-- everything its own continuation armed fulfilled in turn. An alternative
+-- whose norm was performed and whose @HENCE@ then reached a breach did not
+-- settle it, and neither did one whose continuation is still owed or failed
+-- (decided by Claude 2026-11-24, pending Meng's review, after the delta
+-- review of P2's first half found the reader choosing the alternative whose
+-- first norm came first). The other alternative's miss does not count, so
+-- the cure is read from the one that settled it. With two alternatives
+-- fulfilled the earliest by its own norm's instant settled it; if two share
+-- the instant and their answers differ, or one was fulfilled by a reparation
+-- and so cannot be placed by its own norm, the read refuses by name, because
+-- a fulfilment carries no time to say which came first. The machine as built
+-- never arms an @ROR@'s right alternative once its left was fulfilled, so a
+-- log it wrote has one fulfilled alternative at most.
+-- If no alternative was fulfilled yet, the failure is not cured as at the
+-- instant when the log holds a fulfilling fate at all; if it holds none, the
+-- choice was settled by something the log does not say, and the read refuses
+-- (it also refuses when an alternative is itself a compound).
 --
 -- A failure that went straight to a breach, or was reported to a barrier,
 -- has nothing to cure with and is not cured; anything that is not a failure
@@ -404,7 +420,7 @@ data JoinStatus = Decided | NotYet | Unplaced !NormRef
 -- call.
 isCured :: Rational -> [NormEntry] -> NormView -> Either Refusal Bool
 isCured d es v = case v.nvState of
-  Failed FailedToLest -> childrenFulfilled (Set.singleton v.nvNorm) v.nvNorm
+  Failed FailedToLest -> childrenFulfilled fullState performedBy (Set.singleton v.nvNorm) v.nvNorm
   _                   -> Right False
   where
     ctx = mkCtx d es
@@ -412,50 +428,83 @@ isCured d es v = case v.nvState of
     kidsOf r = fromMaybe [] (Map.lookup r ctx.cxKids)
     who = instanceBearer (entriesOf v.nvNorm)
 
+    -- how a norm is read: with the compounds it sits in, or by its own
+    -- entries alone (inside an ROR's alternatives, where the ROR itself is
+    -- what is being decided)
     fullState r = fmap (.nvState) <$> viewNorm ctx r
+    ownOnly r = ownState ctx r
+
+    -- who performed it: the party that failed (a cure), or anyone (was the
+    -- alternative fulfilled at all)
+    anyone _ = Right True
 
     -- nothing a norm armed is a breach that has been reached, and every norm
     -- it armed is fulfilled
-    childrenFulfilled seen r = do
+    childrenFulfilled stateOf by seen r = do
       reached <- anyM (breachReached r) [ e | e <- kidsOf r, isBreach e.neFate ]
       let kids = nubOrd [ c | e <- kidsOf r, isNormFate e.neFate, Just c <- [e.neNorm] ]
-      if reached then Right False else allM (groupFulfilled kids seen) (groupByCompound kids)
+      if reached then Right False else allM (groupFulfilled stateOf by kids seen) (groupByCompound r kids)
 
-    -- the norms a norm armed, in groups by the compound each was armed inside
-    groupByCompound ks =
-      [ (key, [ k | k <- ks, innermost k == key ]) | key <- nubOrd (map innermost ks) ]
-    innermost k = case entriesOf k of
-      g : _ -> listToMaybe (armedOf g (entriesOf k)).neEnclosing
-      []    -> Nothing
+    -- the norms a norm armed, in groups by the compound each was armed
+    -- inside that the armer was not already in: a norm armed by an
+    -- alternative's own @HENCE@ shares the alternative's compounds, and is
+    -- not another alternative of them
+    groupByCompound r ks =
+      [ (key, [ k | k <- ks, newInnermost r k == key ]) | key <- nubOrd (map (newInnermost r) ks) ]
+    chainOf k = case entriesOf k of
+      g : _ -> (armedOf g (entriesOf k)).neEnclosing
+      []    -> []
+    newInnermost r k =
+      let kc = chainOf k
+          rc = chainOf r
+      in listToMaybe (if rc `isSuffixOf` kc then take (length kc - length rc) kc else kc)
 
-    groupFulfilled kids seen (key, ks) = case key >>= \ c -> (,) c <$> Map.lookup c ctx.cxJoins of
-      Just (c, j) | j.neFate == FateJoinedFulfilled JoinOr -> settledGroup kids seen c ks
-      _ -> allM (fulfilled fullState seen) ks
+    groupFulfilled stateOf by kids seen (key, ks) = case key >>= \ c -> (,) c <$> Map.lookup c ctx.cxJoins of
+      Just (c, j) | j.neFate == FateJoinedFulfilled JoinOr -> settledGroup by kids seen c ks
+      _ -> allM (fulfilled stateOf by seen) ks
 
-    -- an ROR that was fulfilled: the earliest fulfilled alternative settled
-    -- it, so a miss of the other does not count. The alternatives are read by
-    -- their own entries, because their own compound is what is being decided
-    settledGroup kids seen c ks
+    -- An ROR that was fulfilled was settled by an alternative that was
+    -- itself fulfilled, as at the instant: its norm performed (or kept, or
+    -- exercised, or lapsed) and everything its own continuation armed
+    -- fulfilled in turn, so an alternative whose @HENCE@ reached a breach is
+    -- not the one, and neither is one whose continuation is still owed or
+    -- failed. The alternatives are read by their own entries, because the ROR
+    -- is what is being decided.
+    -- One alternative fulfilled: it settled the choice. Several: the
+    -- earliest by its own norm's instant, and if two share the instant and
+    -- the answers differ, or one cannot be placed by its own norm (it was
+    -- fulfilled by a reparation), the read refuses, because a fulfilment
+    -- carries no time to say which came first. None yet: not cured as at the
+    -- instant, if the log holds a fulfilling fate at all; otherwise the
+    -- choice was settled by something the log does not say, and the read
+    -- refuses.
+    settledGroup by kids seen c ks
       | any (nestedUnder c) kids = Left (CompoundNoInstant c)
       | otherwise = do
           states <- traverse (\ k -> (,) k <$> ownNorm ctx k) ks
-          let visible = [ (t, k) | (k, Just (_, Just e)) <- states, fulfilling (stateOfFate e.neFate), Just t <- [e.neObserved] ]
+          settlers <- filterM (fulfilled ownOnly anyone seen) ks
+          let placed k = listToMaybe
+                [ t | (k', Just (_, Just e)) <- states, k' == k, fulfilling (stateOfFate e.neFate), Just t <- [e.neObserved] ]
               everFulfilled = or [ fulfilling (stateOfFate e.neFate) | k <- ks, e <- entriesOf k, e.neFate /= FateArmed ]
-          case sortOn fst visible of
-            (_, w) : _ -> fulfilled ownOnly seen w
-            []
-              -- the choice was settled, but not by anything this read can see
-              -- yet, or not by a norm of this continuation at all
-              | everFulfilled -> allM (fulfilled ownOnly seen) ks
-              | otherwise -> Left (CompoundNoInstant c)
-    ownOnly r = ownState ctx r
+          case settlers of
+            [] | everFulfilled -> Right False
+               | otherwise     -> Left (CompoundNoInstant c)
+            [k] -> fulfilled ownOnly by seen k
+            _ -> case traverse (\ k -> (,) k <$> placed k) settlers of
+              Nothing    -> Left (CompoundNoInstant c)
+              Just timed -> do
+                let t0 = minimum (map snd timed)
+                answers <- traverse (fulfilled ownOnly by seen) [ k | (k, t) <- timed, t == t0 ]
+                case nubOrd answers of
+                  [a] -> Right a
+                  _   -> Left (CompoundNoInstant c)
     nestedUnder c k = case entriesOf k of
       g : _ -> case (armedOf g (entriesOf k)).neEnclosing of
         enc@(h : _) -> c `elem` enc && h /= c
         []          -> False
       []    -> False
 
-    fulfilled stateOf seen r
+    fulfilled stateOf by seen r
       | r `Set.member` seen = Right False
       | otherwise = stateOf r >>= \case
           Nothing -> Right False
@@ -464,13 +513,13 @@ isCured d es v = case v.nvState of
             Outstanding    -> Right False
             -- a violation is repaired by what it armed, as a failure is; with
             -- nothing armed after it, it is a breach
-            Violated       -> if null (kidsOf r) then Right False else childrenFulfilled seen' r
-            Failed FailedToLest -> childrenFulfilled seen' r
+            Violated       -> if null (kidsOf r) then Right False else childrenFulfilled stateOf by seen' r
+            Failed FailedToLest -> childrenFulfilled stateOf by seen' r
             Failed _       -> Right False
-            Performed      -> performedBy r `andThenM` childrenFulfilled seen' r
-            Exercised      -> performedBy r `andThenM` childrenFulfilled seen' r
-            Kept           -> childrenFulfilled seen' r
-            Lapsed         -> childrenFulfilled seen' r
+            Performed      -> by r `andThenM` childrenFulfilled stateOf by seen' r
+            Exercised      -> by r `andThenM` childrenFulfilled stateOf by seen' r
+            Kept           -> childrenFulfilled stateOf by seen' r
+            Lapsed         -> childrenFulfilled stateOf by seen' r
       where seen' = Set.insert r seen
 
     performedBy r = case (who, instanceBearer (entriesOf r)) of

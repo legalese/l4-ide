@@ -36,7 +36,7 @@ import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..))
 import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..))
 import L4.Evaluate.NormLog
 import L4.Evaluate.NormLog.Read
-  ( BearerPattern (..), NormPattern (..), NormState (..), NormView (..), Refusal (..)
+  ( BearerPattern (..), BranchPattern (..), NormPattern (..), NormState (..), NormView (..), Refusal (..)
   , anyNorm, isCured, readNorms )
 import L4.EvaluateLazy
   ( EvalConfig (..)
@@ -1201,8 +1201,9 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
             where vs = either (const []) id (readNorms d anyNorm es)
           readEither d es = fmap (map (\ v -> (v.nvArmed.neActionHead, v.nvState))) (readNorms d anyNorm es)
           noInstant = \case { Left (CompoundNoInstant _) -> True; _ -> False }
+          noInstant' = \case { Left (CompoundNoInstant _) -> True; _ -> False :: Bool }
           -- is the failure of the first failed norm named so cured, as at d?
-          curedAs d name es = case readNorms d anyNorm {npAction = Just name} es of
+          curedAs d name es = case readNorms d anyNorm {npAction = Just name, npBranch = TopLevel} es of
             Left r -> Left r
             Right vs -> case [ v | v <- vs, isFailure v.nvState ] of
               v : _ -> Just <$> isCured d es v
@@ -1253,6 +1254,27 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
           [ e.neFate | e <- es, e.neFate == FateFailed FailedToBreach ] `shouldSatisfy` (not . null)
           for_ [11, 30] \ d -> readEither d es `shouldSatisfy` noInstant
 
+      it "D2: a real miss inside the alternative that settled an ROR makes a read that matches it refuse, which is the stated cost of N17 and N18 not being built" do
+        let w1 = src
+              [ "c MEANS"
+              , "  (PARTY Alice MUST deliver WITHIN 3 LEST PARTY Alice MUST pay 1 WITHIN 5)"
+              , "  ROR (PARTY Bob MUST pay 2 WITHIN 20)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 4"
+              ]
+        rs <- run True w1
+        let es = fatesOf 0 rs
+        -- the left alternative failed, was repaired, and settled the ROR
+        [ e.neFate | e <- es, isJoinFate e.neFate ] `shouldBe` [FateJoinedFulfilled JoinOr]
+        [ e.neFate | e <- es, e.neFate == FateFailed FailedToLest ] `shouldSatisfy` (not . null)
+        -- every read that matches the miss refuses, from the instant it is armed
+        for_ [0, 3, 4, 30] \ d -> do
+          readEither d es `shouldSatisfy` noInstant
+          readNorms d anyNorm {npAction = Just "deliver"} es `shouldSatisfy` noInstant'
+          readNorms d anyNorm {npBranch = TopLevel} es `shouldSatisfy` noInstant'
+        -- a read that leaves the miss out answers (the claim of the spec's N13 note)
+        readNorms 30 anyNorm {npAction = Just "pay"} es `shouldSatisfy` either (const False) (const True)
+
       it "S2: a failure cured through an ROR reparation is cured when the alternative that settled the choice was the failing party's" do
         let c1 = src
               [ "c MEANS"
@@ -1281,6 +1303,59 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         curedAs 12 "deliver" (fatesOf 1 rs) `shouldBe` Right (Just True)
         -- and when the other party performed it, it is not a cure
         curedAs 12 "deliver" (fatesOf 2 rs) `shouldBe` Right (Just False)
+
+      it "D1: an ROR alternative whose first norm was performed, but whose HENCE reached a BREACH, did not settle the choice" do
+        let t7 = src
+              [ "t7 MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST ((PARTY Alice MUST pay 1 WITHIN 10 HENCE BREACH) ROR (PARTY Alice MUST pay 2 WITHIN 20))"
+              , "#TRACE t7 AT 0 WITH"
+              , "  PARTY Dan DOES deliver AT 4"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              , "  PARTY Alice DOES pay 2 AT 9"
+              ]
+            t8 = src
+              [ "t8 MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST ((PARTY Bob MUST pay 1 WITHIN 10 HENCE PARTY Bob SHANT deliver WITHIN 10) ROR (PARTY Alice MUST pay 2 WITHIN 20))"
+              , "#TRACE t8 AT 0 WITH"
+              , "  PARTY Dan DOES deliver AT 4"
+              , "  PARTY Bob DOES pay 1 AT 5"
+              , "  PARTY Bob DOES deliver AT 6"
+              , "  PARTY Alice DOES pay 2 AT 9"
+              ]
+            -- the left alternative's HENCE is a norm that fails (t1) or is still owed (t2)
+            t1 = src
+              [ "t1 MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST ((PARTY Alice MUST pay 1 WITHIN 10 HENCE PARTY Alice MUST pay 3 WITHIN 2) ROR (PARTY Alice MUST pay 2 WITHIN 20))"
+              , "#TRACE t1 AT 0 WITH"
+              , "  PARTY Dan DOES deliver AT 4"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              , "  PARTY Alice DOES pay 2 AT 9"
+              , ""
+              , "t2 MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST ((PARTY Alice MUST pay 1 WITHIN 10 HENCE PARTY Alice MUST pay 3 WITHIN 100) ROR (PARTY Alice MUST pay 2 WITHIN 20))"
+              , "#TRACE t2 AT 0 WITH"
+              , "  PARTY Dan DOES deliver AT 4"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              , "  PARTY Alice DOES pay 2 AT 9"
+              ]
+        rs7 <- run True t7
+        -- the machine says FULFILLED: the ROR was settled by pay 2, by the party that failed
+        [ e.neFate | e <- fatesOf 0 rs7, isJoinFate e.neFate ] `shouldBe` [FateJoinedFulfilled JoinOr]
+        curedAs 5 "deliver" (fatesOf 0 rs7) `shouldBe` Right (Just False)
+        curedAs 9 "deliver" (fatesOf 0 rs7) `shouldBe` Right (Just True)
+        curedAs 30 "deliver" (fatesOf 0 rs7) `shouldBe` Right (Just True)
+        rs8 <- run True t8
+        [ e.neFate | e <- fatesOf 0 rs8, isJoinFate e.neFate ] `shouldBe` [FateJoinedFulfilled JoinOr]
+        curedAs 9 "deliver" (fatesOf 0 rs8) `shouldBe` Right (Just True)
+        rs1 <- run True t1
+        for_ [0, 1] \ i -> do
+          [ e.neFate | e <- fatesOf i rs1, isJoinFate e.neFate ] `shouldBe` [FateJoinedFulfilled JoinOr]
+          curedAs 9 "deliver" (fatesOf i rs1) `shouldBe` Right (Just True)
+          curedAs 30 "deliver" (fatesOf i rs1) `shouldBe` Right (Just True)
 
       it "S3: a violated SHANT whose own LEST was then performed by the failing party is cured; a violation with nothing armed after it is not" do
         let d = src

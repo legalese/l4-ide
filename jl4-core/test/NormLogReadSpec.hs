@@ -173,6 +173,8 @@ spec = describe "NormLogRead, the pure read of the norm log (NORM-LOG-SPEC P2)" 
       states 4 anyNorm es `shouldBe` Right [Outstanding, Outstanding]
       -- once every fate the log has is behind the read, the instant of the join is unknowable again
       states 6 anyNorm es `shouldBe` Left (CompoundNoInstant (ref 9))
+      -- and at the last operand's own instant the RAND may just have decided, which the log cannot say
+      states 5 anyNorm es `shouldBe` Left (CompoundNoInstant (ref 9))
 
     it "refuses when the compound was fulfilled, because a fulfilment carries no time" do
       let es = [ within [9] (armedAt 1 1), joinFulfilled 9 ]
@@ -269,8 +271,9 @@ spec = describe "NormLogRead, the pure read of the norm log (NORM-LOG-SPEC P2)" 
     it "an exercised MAY whose HENCE reached a BREACH is not a cure; with no BREACH it is" do
       cured 12 (failedAt10 <> [ fateAt FateExercised 12 2, breachFrom 2 12 ]) 1 `shouldBe` Right False
       cured 12 (failedAt10 <> [ fateAt FateExercised 12 2 ]) 1 `shouldBe` Right True
-    it "a kept SHANT with nothing armed after it is a cure" do
+    it "a kept SHANT with nothing armed after it is a cure; one whose own LEST reached a BREACH is not" do
       cured 12 (failedAt10 <> [ fateAt FateKept 12 2 ]) 1 `shouldBe` Right True
+      cured 12 (failedAt10 <> [ fateAt FateKept 12 2, breachFrom 2 12 ]) 1 `shouldBe` Right False
     it "a violated SHANT is a cure when its own LEST was performed by the failing party, and not when nothing was armed after it" do
       let repaired = failedAt10
             <> [ fateAt FateViolated 11 2, child ViaLest 2 (armedAt 11 3), fateAt FatePerformed 13 3 ]
@@ -321,3 +324,56 @@ spec = describe "NormLogRead, the pure read of the norm log (NORM-LOG-SPEC P2)" 
     it "a failure under a compound that was fulfilled by an ROR is a refusal, not a failure: the reader cannot tell it from one the compound made moot" do
       let es = settled <> [ within [9] (fateAt (FateFailed FailedToBreach) 11 3), winner ]
       states 12 anyNorm es `shouldBe` Left (CompoundNoInstant (ref 9))
+    it "a barrier member's miss under a fulfilled ROR is a refusal as well: the ROR is not the innermost compound it sits in" do
+      -- member 4 of barrier 8, inside the ROR 9, failed to the join at 12
+      let es = [ within [8, 9] (armedAt 10 4), within [8, 9] (fateAt (FateFailed FailedToJoin) 12 4), joinFulfilled 9 ]
+      states 12 anyNorm es `shouldBe` Left (CompoundNoInstant (ref 9))
+
+  describe "N8 and N18: the alternative that settles an ROR is one that was fulfilled, not one whose first norm was performed" do
+    let alternatives =
+          [ armedAt 1 1, fateAt (FateFailed FailedToLest) 10 1
+          , within [9] (child ViaLest 1 (armedAt 10 2)), within [9] (child ViaLest 1 (armedAt 10 3)) ]
+        settled = alternatives <> [ child ViaLest 1 (joinFulfilled 9) ]
+        performed t n = within [9] (fateAt FatePerformed t n)
+    it "an alternative whose HENCE reached a BREACH did not settle the choice: the other one did" do
+      -- norm 2 was performed at 11 and its HENCE was a BREACH; norm 3 was performed at 12
+      let es = settled <> [ performed 11 2, breachFrom 2 11, performed 12 3 ]
+      cured 11 es 1 `shouldBe` Right False
+      cured 12 es 1 `shouldBe` Right True
+      -- by someone else, it is not a cure
+      cured 12 (ofNorm 3 (bearer "Bob") es) 1 `shouldBe` Right False
+    it "an alternative whose HENCE norm was violated, with nothing after it, did not settle the choice, whoever performed it" do
+      let es = settled <>
+            [ performed 11 2
+            , within [9] (child ViaHence 2 (modalled DMustNot (armedAt 11 4)))
+            , within [9] (fateAt FateViolated 12 4)
+            , performed 13 3 ]
+          bobs = ofNorm 2 (bearer "Bob") es
+      cured 13 bobs 1 `shouldBe` Right True
+      cured 12 bobs 1 `shouldBe` Right False
+    it "an alternative's own continuation, failed or still owed, is read by its own entries: it neither refuses nor settles" do
+      let owed = settled <> [ performed 11 2, within [9] (child ViaHence 2 (armedAt 11 4)), performed 13 3 ]
+          failedToo = owed <> [ within [9] (fateAt (FateFailed FailedToBreach) 12 4) ]
+      cured 13 owed 1 `shouldBe` Right True
+      cured 13 failedToo 1 `shouldBe` Right True
+      cured 12 owed 1 `shouldBe` Right False
+    it "the alternative that settled it may itself have failed and been repaired inside, which its own entries say without refusing" do
+      let es = settled <>
+            [ performed 11 2
+            , within [9] (child ViaHence 2 (armedAt 11 4))
+            , within [9] (fateAt (FateFailed FailedToLest) 12 4)
+            , within [9] (child ViaLest 4 (armedAt 12 5))
+            , performed 13 5 ]
+      cured 13 es 1 `shouldBe` Right True
+    it "two alternatives fulfilled, one of them only by a reparation, cannot be ordered, so the read refuses" do
+      let es = settled <>
+            [ performed 11 2
+            , within [9] (fateAt (FateFailed FailedToLest) 11 3)
+            , within [9] (child ViaLest 3 (armedAt 11 5))
+            , performed 12 5 ]
+      cured 12 es 1 `shouldBe` Left (CompoundNoInstant (ref 9))
+    it "two alternatives fulfilled at one instant by different parties cannot be told apart, so the read refuses; by the same party it answers" do
+      let tied = settled <> [ performed 11 2, performed 11 3 ]
+      cured 11 (ofNorm 3 (bearer "Bob") tied) 1 `shouldBe` Left (CompoundNoInstant (ref 9))
+      cured 11 tied 1 `shouldBe` Right True
+      cured 11 (ofNorm 2 (bearer "Bob") (ofNorm 3 (bearer "Bob") tied)) 1 `shouldBe` Right False
