@@ -87,6 +87,7 @@ The type you expect guides the decoding, so say it, with `GIVETH` or by the way 
 - An array decodes to a LIST, a number to a NUMBER, a string to a STRING, `true` and `false` to a BOOLEAN.
 - `null` decodes to `NOTHING` for a MAYBE type; any other value decodes to `JUST` it.
 - A string with a constructor's name decodes to that constructor of an enumeration.
+- An object with the one key `LEFT` or `RIGHT`, holding an array of one value, decodes to that side of an EITHER, the value decoded at the type of that side: `{"RIGHT": [5]}` at `EITHER STRING NUMBER` is `RIGHT 5`. The array is the wire form Meng ruled for an EITHER on 2026-10-15 (card J3, "Wire Form of Sums", option B); it keeps a payload that is itself a list apart from the wrapper. Any other JSON at an EITHER type stops the evaluation with an error naming the type, `{"RIGHT": 5}` without the array included. **`JSONENCODE` on this line still writes the payload bare, `{"RIGHT": 5}` (see the table above), so its output is refused by `JSONDECODE` until the two agree.**
 - A type declared as another name for a type (`DECLARE Year IS A NUMBER`) decodes as that type, and so does one for a MAYBE: with `DECLARE MaybeYear IS A MAYBE NUMBER`, `null` decodes to `NOTHING` and `2026` to `JUST 2026`.
 
 ```l4

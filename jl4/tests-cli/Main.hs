@@ -500,6 +500,10 @@ batchChoiceFixture, batchChoiceJson :: FilePath
 batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
 batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
 
+batchEitherFixture, batchEitherJson :: FilePath
+batchEitherFixture = fixtureDir </> "batch-either-input.l4"
+batchEitherJson    = fixtureDir </> "batch-either-input.json"
+
 batchEnumValidateFixture, batchEnumValidateJson :: FilePath
 batchEnumValidateFixture = fixtureDir </> "batch-enum-validate.l4"
 batchEnumValidateJson    = fixtureDir </> "batch-enum-validate.json"
@@ -4070,6 +4074,34 @@ spec bin = do
         [] -> expectationFailure "l4 batch printed no rows"
       sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
       sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "decodes an EITHER input written as {\"LEFT\": [x]} or {\"RIGHT\": [x]}, and refuses every other JSON" $ do
+      -- Rows: {"RIGHT": [5]}, {"LEFT": ["no"]}, then six that are refused: the
+      -- bare {"RIGHT": 5}, two values in the array, both keys, a payload of
+      -- the wrong type, "RIGHT" and 5.
+      -- The typed decoder had no case for a type of two type arguments, so
+      -- each row took the untyped decode: NOTHING for an object, the string or
+      -- the number itself, none of them an EITHER (#1084). The first two are
+      -- the form ruled for the wire (J3, option B); the rest are refused.
+      Output code sout _ <-
+        runL4 bin ["batch", batchEitherFixture, "--inputs", batchEitherJson, "--continue-on-error"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      let rows = filter (not . all isSpace) (lines sout)
+      length rows `shouldBe` 8
+      case rows of
+        [right, left, bare, two, both, wrongType, side, number] -> do
+          right `shouldSatisfy` ("\"result\":\"right\"" `isInfixOf`)
+          left  `shouldSatisfy` ("\"result\":\"left\"" `isInfixOf`)
+          -- {"RIGHT": ["x"]}: the form is right, and "x" is not a NUMBER
+          wrongType `shouldSatisfy` ("Expected JSON number for field 'e' but got:" `isInfixOf`)
+          -- the bare payload, two values, both keys, "RIGHT" and 5 are not the form
+          flip mapM_ [bare, two, both, side, number] $ \r -> do
+            r `shouldSatisfy` ("Could not decode" `isInfixOf`)
+            r `shouldSatisfy` ("as EITHER OF STRING, NUMBER for field 'e'" `isInfixOf`)
+            r `shouldSatisfy` ("holding an array of one value: {\\\"LEFT\\\": [value]} or {\\\"RIGHT\\\": [value]}" `isInfixOf`)
+          flip mapM_ [bare, two, both, wrongType, side, number] $ \r ->
+            r `shouldSatisfy` (not . ("\"result\":\"" `isInfixOf`))
+        _ -> expectationFailure "l4 batch did not print the eight rows"
 
     it "refuses with --validate-only a row the run refuses for a choice type, with the run's words" $ do
       -- #1086: --validate-only judged only NUMBER, BOOLEAN and STRING, so a

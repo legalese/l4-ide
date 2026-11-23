@@ -6144,6 +6144,33 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
             innerRef <- allocateValue innerVal
             pure $ ValConstructor TypeCheck.justRef [innerRef]
 
+    -- Handle EITHER α β. Without this case an EITHER took the untyped decode
+    -- below, which gave @NOTHING@ for an object, a value of the wrong type
+    -- handed on with no error (smucclaw/l4-ide#1084). An EITHER is read in the
+    -- form Meng ruled for the wire on 2026-10-15 (card J3, "Wire Form of
+    -- Sums", option B): an object with the side as its one key and an array
+    -- of one value under it, @{"LEFT": [a]}@ or @{"RIGHT": [b]}@, the value
+    -- decoded at the type of that side. The array keeps a payload that is
+    -- itself a list apart from the wrapper. Any other JSON, the bare
+    -- @{"RIGHT": 5}@ included, is refused, naming the type.
+    TyApp _anno eitherRef [leftType, rightType]
+      | nameToText (TypeCheck.getName eitherRef) == "EITHER" -> do
+        let side = \ case
+              "LEFT"  -> Just (TypeCheck.leftRef, leftType)
+              "RIGHT" -> Just (TypeCheck.rightRef, rightType)
+              _       -> Nothing
+        case jsonValue of
+          Aeson.Object obj
+            | [(key, Aeson.Array payloads)] <- KeyMap.toList obj
+            , Just (conRef, sideType) <- side (Key.toText key)
+            , [payload] <- Vector.toList payloads -> do
+                value <- jsonValueToWHNFTyped at payload sideType
+                valueRef <- allocateValue value
+                pure $ ValConstructor conRef [valueRef]
+          _ ->
+            cannotDecode at (prettyLayout ty) jsonValue
+              "an EITHER is written as an object with one key, LEFT or RIGHT, holding an array of one value: {\"LEFT\": [value]} or {\"RIGHT\": [value]}."
+
     -- Handle custom record types and primitives: TyApp conRef []
     TyApp _anno tyRef [] -> do
       let typeName = nameToText (TypeCheck.getName tyRef)
