@@ -835,6 +835,25 @@ Run there with the shim described above it gives 0.94 s and 3.74 s of CPU for di
 `jl4-lsp-test` is 336 examples with no failure; `jl4-mlir-test` and `jl4-websessions-test` exited 0.
 That a guard that does not mention `THE INSTANT` prints what it printed before rests on the unchanged goldens: the reviewer did not re-run them.
 
+**The delta review (2026-11-24), and the third gate.**
+The same reviewer built the head with the fixes and re-ran every probe.
+S0 to S3, the `RAND` bound, the wall-clock lint and `THE INSTANT` all re-ran correctly on real traces.
+It found one more silent wrong answer (D1) and one refusal that was true but unstated (D2).
+
+- **D1.** The cure of a failure through `LEST (x ROR y)` took as the winner the alternative whose first norm was performed earliest, and never asked whether that alternative was itself fulfilled. `LEST ((Alice MUST pay 1 HENCE BREACH) ROR (Alice MUST pay 2))`, with Alice paying 1 and then 2, is `FULFILLED` to `l4`, and the reader said not cured. The winner is now an alternative that was itself fulfilled (§6.1 N8, decided by Claude 2026-11-24, pending Meng's review). Reproduced first: 5 of 276 examples red, then 279 green.
+- **Found while fixing D1.** A norm armed by an alternative's own `HENCE` shares the alternative's compounds, so it was being read as another alternative of the `ROR`; norms are now grouped by the compounds new to them. The loser's continuation, failed or still owed (the reviewer's T1 and T2), used to refuse where the answer is definite, and answers now.
+- **D2.** A real miss inside the alternative that won an `ROR` makes every read that matches it refuse, `anyNorm` and a top-level read among them, from the instant the norm is armed; a read that leaves it out answers. This was what §6.1 N13 said without its cost; the cost is stated there now, and a real-trace fixture pins both halves.
+
+The reviewer's surviving mutants are caught: `settledByRor` reading only the innermost compound (a barrier member under an `ROR`), the `RAND` bound at its boundary, and the same-instant tie.
+The mutation run over the new logic had 21 mutants of the reader: 16 were caught at once, 3 survived (a kept norm's continuation ignored, a lone settler read with compounds, an unplaceable settler guessed) and 2 did not compile (an unused binding under `-Werror`).
+Each survivor has an example now. The 2 that did not compile were rewritten, and they were run again with the 3 survivors and with the lapsed half of the kept-or-lapsed mutant on its own, 6 runs in all after a green check: every one is caught.
+
+The third gate ran at the head with these fixes (`etc/verify-branch.sh` against the P1 head, on `lhs`): `jl4-test` 5,077 examples, `l4-cli-test` 1,185, `jl4-core-test` 2,407, `jl4-service-test` 877, no failure, and every other step passes except the parse-time probe, which cannot run on `lhs` (no `/usr/bin/time`).
+Run there with the same shim it gives ratios 4.0 and 4.0 (0.94 s and 3.72 s of CPU for distinct names, 0.89 s and 3.55 s for one repeated name).
+`jl4-test` with the writer forced on is 5,077 examples with no failure, in 1,351 s at a load of 1.0.
+`jl4-lsp-test` is 336 examples with no failure; `jl4-mlir-test` and `jl4-websessions-test` exited 0.
+The reader's own suites are `NormLog` and `NormLogRead`, 279 examples with no failure.
+
 ## 7. Probe — what a crude projection shows
 
 Measured 2026-09-23 on the local branch `probe/norm-log` @ `65fb65201` (never pushed, never merges), built from `unstable` @ `20e71b65d`.
