@@ -5,6 +5,7 @@ import Base hiding (trace)
 import qualified Base.DList as DList
 import qualified Base.Map as Map
 import qualified Base.Text as Text
+import qualified Data.Time.Format.ISO8601 as ISO8601
 
 import L4.Annotation
 -- import qualified L4.Evaluate.Value as Eval
@@ -1661,8 +1662,13 @@ valueToFnLiteral ei = \case
     pure $ FnLitString (Text.textShow day)
   Eval.ValTime tod ->
     pure $ FnLitString (Text.textShow tod)
+  -- A DATETIME answer is RFC 3339 in UTC, "2026-01-31T10:30:00Z", the form the
+  -- published schema's `format: date-time` promises, whatever the value's zone
+  -- (W1, JSON Wire Forms bench, option B; see README, Answers). The compiled
+  -- backend writes the same text (jl4-mlir/runtime/jl4-runtime.mjs,
+  -- formatDatetime).
   Eval.ValDateTime utc _tzName ->
-    pure $ FnLitString (Text.textShow utc)
+    pure $ FnLitString (Text.pack (ISO8601.iso8601Show utc))
   Eval.ValString t -> pure $ FnLitString t
   Eval.ValNil -> pure $ FnArray []
   Eval.ValCons v1 v2 -> nfToFnLiteral ei v1 >>= \ l1 -> listToFnLiteral ei (DList.singleton l1) v2

@@ -767,6 +767,33 @@ spec = describe "integration" do
         assertSuccess resp \r ->
           Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
 
+    -- W1 (JSON Wire Forms bench, option B): a DATETIME answer is RFC 3339 in
+    -- UTC on both paths, whatever the value's zone; the compiled backend writes
+    -- the same text (jl4-mlir/runtime/jl4-runtime.test.mjs).
+    it "answers a DATETIME as RFC 3339 in UTC on both paths" do
+      let src = Text.unlines
+            [ "IMPORT prelude"
+            , ""
+            , "TIMEZONE IS \"Asia/Singapore\""
+            , ""
+            , "DECLARE Meeting HAS at IS A DATETIME"
+            , ""
+            , "@export the moment of a meeting"
+            , "GIVEN m IS A Meeting"
+            , "      pad IS A MAYBE NUMBER"
+            , "GIVETH A DATETIME"
+            , "`moment` m pad MEANS m's at"
+            ]
+          call baseUrl mgr pad = evalFunction baseUrl mgr "datetime-answer" "moment"
+            (Aeson.object ["arguments" Aeson..= Aeson.object
+              [ "m" Aeson..= Aeson.object ["at" Aeson..= ("2026-01-31T10:30:00Z" :: Text)]
+              , "pad" Aeson..= pad ]])
+      withServiceFromSources "datetime-answer" [("moment.l4", src)] \baseUrl mgr -> do
+        direct <- call baseUrl mgr Aeson.Null
+        direct `shouldCarry` Answers (Aeson.String "2026-01-31T10:30:00Z")
+        wrapped <- call baseUrl mgr (Aeson.object [])
+        wrapped `shouldCarry` Answers (Aeson.String "2026-01-31T10:30:00Z")
+
     it "reads an absent MAYBE DATE as NOTHING" do
       withServiceFromSources "maybe-of-nothing" [("dated.l4", maybeInputsJL4)] \baseUrl mgr -> do
         resp <- evalFunction baseUrl mgr "maybe-of-nothing" "dated"

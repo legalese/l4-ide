@@ -2794,6 +2794,8 @@ export function createRuntime(opts) {
     memView.setBigUint64(p + 8, BigInt(writeString(tzStr)), true);
     return u64ToF64(p);
   }
+  // A DATETIME answer is RFC 3339 in UTC, "2026-01-31T10:30:00Z", as
+  // jl4-service writes it (W1, JSON Wire Forms bench, option B).
   function formatDatetime(dtPtrF) {
     const p = Number(f64ToU64(dtPtrF));
     if (!p) return "";
@@ -2805,13 +2807,13 @@ export function createRuntime(opts) {
       String(d.getUTCMonth() + 1).padStart(2, "0") +
       "-" +
       String(d.getUTCDate()).padStart(2, "0") +
-      " " +
+      "T" +
       String(d.getUTCHours()).padStart(2, "0") +
       ":" +
       String(d.getUTCMinutes()).padStart(2, "0") +
       ":" +
       String(d.getUTCSeconds()).padStart(2, "0") +
-      " UTC"
+      "Z"
     );
   }
 
