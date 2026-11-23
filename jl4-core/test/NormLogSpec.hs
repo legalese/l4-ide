@@ -973,7 +973,7 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
     -- members traced with no events logs one Waiting step per member, and each
     -- step walked the whole list of Armed rows still waiting on a clock (all N
     -- of them): +346 MB at 800 members and +3,903 MB at 3,200, 11.3 times the
-    -- excess for a step of 4 in N (the reviewers' figures, 2b155b2f5). A step
+    -- excess for a step of 4 in N (the reviewers' figures, on their build). A step
     -- that writes no fate has nothing to put the waiting rows before, so it
     -- no longer walks them.
     --
