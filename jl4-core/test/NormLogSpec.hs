@@ -44,7 +44,7 @@ import L4.EvaluateLazy
   , resolveEvalConfig
   )
 import L4.Syntax (DeonticModal (..))
-import L4.TypeCheck.Types (CheckResult (..))
+import L4.TypeCheck.Types (AnchorRefusal (..), CheckResult (..), CheckErrorWithContext (..), CheckError (..), CheckWarning (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
 import qualified Data.Text.IO as TextIO
@@ -1112,6 +1112,77 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
       sort [ e.neActionHead | e <- es, e.neFate == FateArmed ] `shouldBe` [Just "deliver", Just "pay"]
       [ e.neActionHead | e <- es, isJoinFate e.neFate ] `shouldBe` [Nothing]
       [ e.neActionHead | e <- es, e.neFate == FateBreached ] `shouldBe` []
+
+    -- NORM-LOG-SPEC N4 (P2): THE INSTANT, the contract clock inside a guard
+
+    it "I1: THE INSTANT in a PROVIDED guard is the stamp of the event being matched, not the arming" do
+      let src = Text.unlines $ prologue4 <>
+            [ "GIVETH DEONTIC Person Action"
+            , "c MEANS"
+            , "  PARTY Alice MUST pay n PROVIDED n = THE INSTANT"
+            , "  WITHIN 10"
+            , ""
+            , "#TRACE c AT 0 WITH"
+            , "  PARTY Alice DOES pay 3 AT 3"
+            , ""
+            , "#TRACE c AT 0 WITH"
+            , "  PARTY Alice DOES pay 5 AT 3"
+            , ""
+            , "#TRACE c AT 0 WITH"
+            , "  PARTY Alice DOES pay 0 AT 3"
+            ]
+      rs <- run True src
+      -- armed at 0, the act is seen at 3: the guard holds only for 3
+      [ (e.neFate, e.neObserved) | e <- fatesOf 0 rs, isNormFate e.neFate ] `shouldBe` [(FatePerformed, Just 3)]
+      [ e.neFate | e <- fatesOf 1 rs, isNormFate e.neFate ] `shouldBe` []
+      -- and 0, the arming instant, is not it
+      [ e.neFate | e <- fatesOf 2 rs, isNormFate e.neFate ] `shouldBe` []
+
+    it "I2: THE INSTANT reads the same with the writer off" do
+      let src = Text.unlines $ prologue4 <>
+            [ "GIVETH DEONTIC Person Action"
+            , "c MEANS"
+            , "  PARTY Alice MUST pay n PROVIDED n = THE INSTANT"
+            , "  WITHIN 10"
+            , ""
+            , "#TRACE c AT 0 WITH"
+            , "  PARTY Alice DOES pay 3 AT 3"
+            ]
+      on <- run True src
+      off <- run False src
+      map prettyEvalDirectiveResult off `shouldBe` map (prettyEvalDirectiveResult . withoutNormLog) on
+
+    it "I3: THE INSTANT is refused outside a guard, as a value and as an anchor" do
+      let refused body = case checkWithImports (vfsFromList []) (Text.unlines (prologue4 <> body)) of
+            Left _  -> False
+            Right r -> not (null [ () | e <- r.tcdErrors, LifecycleUnavailable _ _ InstantOutsideGuard <- [e.kind] ])
+      refused [ "GIVETH A NUMBER", "t MEANS THE INSTANT" ] `shouldBe` True
+      refused [ "GIVETH DEONTIC Person Action", "c MEANS PARTY Alice MUST deliver WITHIN 5 OF THE INSTANT" ] `shouldBe` True
+      -- the body of a function is not a guard, even when a guard calls it
+      refused [ "GIVEN n IS A NUMBER", "GIVETH A BOOLEAN", "late n MEANS n > THE INSTANT" ] `shouldBe` True
+      -- and the one place it is allowed is accepted
+      case checkWithImports (vfsFromList [])
+             (Text.unlines (prologue4 <>
+               [ "GIVETH DEONTIC Person Action"
+               , "c MEANS"
+               , "  PARTY Alice MUST pay n PROVIDED n = THE INSTANT"
+               , "  WITHIN 10"
+               ])) of
+        Left errs -> expectationFailure ("a guard may read THE INSTANT: " <> show errs)
+        Right r   -> r.tcdSuccess `shouldBe` True
+
+    it "I4: NOW in a PROVIDED draws a warning that it is the wall clock, and THE INSTANT draws none (N4)" do
+      let guarded g = Text.unlines $ prologue4 <>
+            [ "GIVETH DEONTIC Person Action"
+            , "c MEANS"
+            , "  PARTY Alice MUST pay n PROVIDED " <> g
+            , "  WITHIN 10"
+            ]
+          nowWarnings src = case checkWithImports (vfsFromList []) src of
+            Left errs -> error ("typecheck failed: " <> show errs)
+            Right r   -> length [ () | e <- r.tcdErrors, CheckWarning (NowInGuard _) <- [e.kind] ]
+      nowWarnings (guarded "n > NOW") `shouldBe` 1
+      nowWarnings (guarded "n = THE INSTANT") `shouldBe` 0
 
     -- The writer's cost must be linear in the norms it writes. An EVERY of N
     -- members traced with no events logs one Waiting step per member, and each

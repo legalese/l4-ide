@@ -884,6 +884,7 @@ instance Linearize (Expr Resolved) where
       LifecycleJoin     -> "the join"
       LifecycleDeadline -> "the deadline"
       LifecycleArming   -> "the arming"
+      LifecycleInstant  -> "the instant"
 
 -- | An operand, in brackets if it is the kind of compound that flat text would
 -- regroup: @a AND (b OR c)@ reads "a and (b or c)", and not "a and b or c", which

@@ -99,6 +99,7 @@ import qualified Base.Text as Text
 import qualified Base.Map as Map
 import qualified Base.Set as Set
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Unique as DU
 import Data.IntMap.Strict (IntMap)
 import Control.Concurrent
 import System.Environment (lookupEnv)
@@ -1005,6 +1006,20 @@ withoutHandoffStamp env = asks (.deonticLog) >>= \ case
         pure (Map.insert lifecycleOriginUnique carrier' env)
       _ -> pure env
   _ -> pure env
+
+-- | The reference @THE INSTANT@ reads inside a guard: the stamp of the event
+-- being matched, already evaluated. Like the norm log's parent link, it takes
+-- no address from the evaluation's supply, because every printed party key
+-- that holds an unforced field names its address, and a guard that does not
+-- mention @THE INSTANT@ must print what it printed before; the address is
+-- negative and unique per carrier, so nothing that keys on an address can
+-- mistake it for another reference.
+instantCarrier :: WHNF -> Eval Reference
+instantCarrier v = do
+  uri <- asks (.moduleUri)
+  u <- liftIO DU.newUnique
+  pointer <- liftIO (newIORef (WHNF v))
+  pure (MkReference (MkAddress uri (negate (1099511627776 + DU.hashUnique u))) pointer)
 
 -- | The origin a continuation's environment carries, if the writer is on and
 -- a hand-off bound one ('lifecycleOriginUnique').
@@ -4064,7 +4079,13 @@ backwardContractFrame val = \ case
         -- event's stamp
         noteClockWHNF time
         pushCFrame $ Contract10 ScrutinizeActions {..}
-        continueExpr (env `Map.union` henceEnv) (fromMaybe trueExpr act.provided)
+        -- N4 (P2): THE INSTANT in the guard is the stamp of this event
+        guardEnv <- case act.provided of
+          Nothing -> pure (env `Map.union` henceEnv)
+          Just _  -> do
+            instantRef <- instantCarrier time
+            pure (Map.insert lifecycleInstantUnique instantRef (env `Map.union` henceEnv))
+        continueExpr guardEnv (fromMaybe trueExpr act.provided)
       _ -> internalException $ RuntimeTypeError $
         "expected environment but found: " <> prettyLayout val
   Contract10 ScrutinizeActions {..} ->
@@ -5554,7 +5575,7 @@ barrierStateLest ctx lestExpr tRef cellRef = do
 
 -- | The three uniques. Sort @l@ is used nowhere else (@b@ builtins, @c@
 -- checker, @d@ discharge, @e@ evaluator, @s@ the barrier's sentinels).
-lifecycleJoinUnique, lifecycleDeadlineUnique, lifecycleArmingUnique, lifecycleOriginUnique :: Unique
+lifecycleJoinUnique, lifecycleDeadlineUnique, lifecycleArmingUnique, lifecycleOriginUnique, lifecycleInstantUnique :: Unique
 lifecycleJoinUnique     = MkUnique 'l' 1 lifecycleUri
 lifecycleDeadlineUnique = MkUnique 'l' 2 lifecycleUri
 lifecycleArmingUnique   = MkUnique 'l' 3 lifecycleUri
@@ -5562,6 +5583,11 @@ lifecycleArmingUnique   = MkUnique 'l' 3 lifecycleUri
 -- anchors so that it travels exactly as they do ('bindLifecycle',
 -- 'rebindLifecycle', 'operandHandoff'). Not an anchor: no program can read it.
 lifecycleOriginUnique   = MkUnique 'l' 4 lifecycleUri
+-- | NORM-LOG-SPEC N4 (P2): @THE INSTANT@, bound for the evaluation of a
+-- @PROVIDED@ guard only ('instantCarrier'), to the stamp of the event the
+-- guard is matched against. Not a hand-off position: 'bindLifecycle' neither
+-- sets nor deletes it, because a guard is not an obligation's continuation.
+lifecycleInstantUnique  = MkUnique 'l' 5 lifecycleUri
 
 lifecycleUri :: NormalizedUri
 lifecycleUri = toNormalizedUri (Uri "jl4:lifecycle")
@@ -5638,6 +5664,7 @@ lifecyclePointUnique = \ case
   LifecycleJoin     -> lifecycleJoinUnique
   LifecycleDeadline -> lifecycleDeadlineUnique
   LifecycleArming   -> lifecycleArmingUnique
+  LifecycleInstant  -> lifecycleInstantUnique
 
 -- | An obligation's environment as it is armed: THE ARMING bound to the
 -- arming instant ONLY where no hand-off bound one (§2.6 card B1, "THE
