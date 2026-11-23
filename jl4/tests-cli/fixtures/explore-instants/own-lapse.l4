@@ -1,0 +1,20 @@
+-- smucclaw/l4-ide#1081, found by an independent re-check: T's deadline is at
+-- 4 and its lapse arms Q's cure, 10 after it (14). `t` starts U's deadline of
+-- 3, and `u` starts V's of 8, so the chain from `t` is 3 + 8 = 11 and 14 - 11 = 3
+-- would be a tie for `t`. But Q's cure exists only if `t` is never done, and
+-- V's deadline only if it is: the two never coexist, so no instant of `t`
+-- can make them meet, and the act is not tied with the cure of its own lapse.
+IMPORT prelude
+DECLARE Person IS ONE OF T, U, V, Q
+DECLARE Action IS ONE OF t, u, v, q
+
+GIVETH A DEONTIC Person Action
+own MEANS
+  PARTY T MUST t WITHIN 4
+    HENCE (PARTY U MUST u WITHIN 3
+             HENCE (PARTY V MUST v WITHIN 8 HENCE FULFILLED LEST BREACH BY V)
+             LEST BREACH BY U)
+    LEST (PARTY Q MUST q WITHIN 10 HENCE FULFILLED LEST BREACH BY Q)
+
+#TRACE own AT 0 WITH
+  PARTY T DOES t AT 3

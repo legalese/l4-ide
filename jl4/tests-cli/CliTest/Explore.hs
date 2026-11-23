@@ -12,7 +12,7 @@
 module CliTest.Explore (spec, fixtures) where
 
 import Control.Monad (forM_)
-import Data.List (isInfixOf, isPrefixOf, sort)
+import Data.List (isInfixOf, isPrefixOf, isSuffixOf, sort)
 import System.Directory (copyFile, listDirectory)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
@@ -31,7 +31,7 @@ instants = "tests-cli" </> "fixtures" </> "explore-instants"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -441,6 +441,8 @@ spec bin = describe "l4 explore" $ do
       code `shouldBe` ExitFailure 2
       lastLine sout `shouldSatisfy` ("UNTRIED 1: ties through chains of acts, for " `isInfixOf`)
       lastLine sout `shouldSatisfy` ("--chains tries them" `isInfixOf`)
+      -- and what --chains does not reach, with the way that does
+      lastLine sout `shouldSatisfy` ("--grid 1 tries every whole instant" `isInfixOf`)
       lastLine sout `shouldSatisfy` (not . ("nothing untried" `isInfixOf`))
       Output ccode csout _ <- runL4 bin ["explore", instants </> "room.l4", "--chains"]
       ccode `shouldBe` ExitSuccess
@@ -463,6 +465,24 @@ spec bin = describe "l4 explore" $ do
       Output wide wout _ <- runL4 bin ["explore", instants </> "cap-re.l4", "--max-instants", "4"]
       wide `shouldBe` ExitSuccess
       lastLine wout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+
+    it "own-lapse.l4: an act is not tied with the cure its own lapse would arm, so no chain is named for it (exit 0)" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "own-lapse.l4"]
+      code `shouldBe` ExitSuccess
+      lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+
+    it "frac-re.l4: a state reached again names its fraction once, not once for each fraction its visits find" $ do
+      Output _ sout _ <- runL4 bin ["explore", instants </> "frac-re.l4"]
+      let occurrences needle hay = length [ () | i <- [0 .. length hay - length needle], needle `isPrefixOf` drop i hay ]
+      occurrences "PARTY B DOES b at instants that are not whole numbers" (lastLine sout) `shouldBe` 1
+
+    it "fx-fork.l4, fx-barrier.l4: a lapse of a deadline fixed at the outset, inside an EVERY, ties the act of its state with the cure: pia's act at 5 is in the graph" $
+      forM_ ["fx-fork.l4", "fx-barrier.l4"] \ f -> do
+        Output code sout _ <- runL4 bin ["explore", instants </> f]
+        code `shouldBe` ExitSuccess
+        lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+        let piaAtFive = [ l | l <- lines (filter (/= '\r') sout), "pia" `isInfixOf` l || "Pia" `isInfixOf` l, " AT 5" `isSuffixOf` l ]
+        piaAtFive `shouldSatisfy` (not . null)
 
     it "merged.l4 --chains --max-states 20: the states the bound keeps out are counted as states, no more than the graph has past the bound" $ do
       Output _ full _ <- runL4 bin ["explore", instants </> "merged.l4", "--chains"]

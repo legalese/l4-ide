@@ -163,6 +163,7 @@ It is never tried past `--until`.
 An act is never tried past the earliest live deadline, and the deadline the first act starts is one of those, so where the first act falls decides whether a second act's tie can be reached at all.
 The first act's boundary is then the fixed instant minus both offsets, and a longer chain adds more.
 By default the explorer searches the ties of one act's own offsets only, and the coverage line says what it did not search: `UNTRIED 1: ties through chains of acts, for <acts> …`, with the instants that could put a tie in reach, and the exit status is 2.
+The note also says what `--chains` does not reach and that `--grid 1` tries every whole instant; the cases are listed under "Where the region scheme stops being exact" below.
 It says so only for an act that a later act's offset could reach, so a contract with no chain says nothing about chains.
 `--chains` searches them as well: the explorer runs again with what the acts that can follow each one were found to do, up to three times, until that stops growing.
 It costs a larger graph, so it is not the default.
@@ -441,9 +442,12 @@ These are all in the output, on the coverage line or the property's own line, an
   A deadline started by a lapse (a `LEST` that arms a cure) is not started by an act, so no act's own offset named the tie it makes.
   Ticks are now read the way an act's successors are: what a lapse arms is learned at the tick that reveals it, and the acts tried in that state are tied with it, whether the deadline that lapsed was started by an act or was fixed at the outset (a second review found the fixed case still silent, 2026-11-23).
   A tie that needs a chain of acts through a lapse is named by default and searched by `--chains`, like any other chain.
-  Checked against the enumeration of every act at every whole instant, under `--chains`: the lapse of a deadline an act started, two lapses in a row, a lapse inside an `EVERY` (a fork and a barrier), a recurring rent with a guarantor's cure, and an outset that is a literal date serial; and, by default as well, the lapse of a deadline fixed at the outset and two lapses in a row from one.
-  Not checked: a lapse of a deadline fixed at the outset inside an `EVERY`, and a lapse whose cure reads the clock arithmetically.
+  Checked against the enumeration of every act at every whole instant, by default and under `--chains`: the lapse of a deadline fixed at the outset (the cure of a lapse at 6 that an act ties with, including inside an `EVERY` fork and an `EVERY` barrier, and a cure anchored to `THE DEADLINE`), and two lapses in a row from one when the act is done after the first lapse.
+  Checked under `--chains` (by default the chain it needs is named, exit 2): a lapse of a deadline an act started, a recurring rent with a guarantor's cure, and an outset that is a literal date serial.
+  Not checked, and silent unless said: two lapses in a row from a deadline fixed at the outset when the act is done BEFORE the first lapse (the tie is with the cure of the second lapse, which no state the act is tried in has seen yet), a deadline fixed in absolute time that no act has started yet (`WITHIN 10 OF 0` under a branch that is armed later), and a lapse whose cure reads the clock arithmetically.
+  For the first two the graph misses positions and says `nothing untried`, with or without `--chains`; the chain note says that `--chains` does not reach them, and `--grid 1` tries every whole instant.
   Two positions with one state key can be at different clocks, and a deadline anchored in absolute time prints the same at every clock, so the later one first found stood for the earlier one, which can still do more: a state reached again at an earlier clock is explored again from there.
+  The converse is not covered: a state first reached at an earlier clock and again at a later one is not explored again, and the later clock can do more when a deadline fixed in absolute time is not yet running (it has no place in the key until an act starts it), which is the second gap above.
   (Read from the code, not measured, 2026-11-22: a deadline the explorer cannot read is listed as untried, so that case is loud; an opening it cannot read is left out without a word.)
   The exact graph, for a contract small enough, is `--grid 1`.
 

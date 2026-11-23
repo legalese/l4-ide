@@ -515,6 +515,74 @@ capReSrc = Text.unlines
   , "    LEST qk"
   ]
 
+-- | The act that discharges a deadline is not tied with the cure that deadline's
+-- lapse arms: T's lapse at 4 arms Q's cure at 14, and `t` starts a chain of
+-- 3 + 8 = 11, which would put a tie at 3 for `t`. But the cure exists only if `t`
+-- is never done, and the chain only if it is.
+ownLapseSrc :: Text.Text
+ownLapseSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF T, U, V, Q"
+  , "DECLARE Action IS ONE OF t, u, v, q"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`own` MEANS"
+  , "  PARTY T MUST t WITHIN 4"
+  , "    HENCE (PARTY U MUST u WITHIN 3"
+  , "             HENCE (PARTY V MUST v WITHIN 8 HENCE FULFILLED LEST BREACH BY V)"
+  , "             LEST BREACH BY U)"
+  , "    LEST (PARTY Q MUST q WITHIN 10 HENCE FULFILLED LEST BREACH BY Q)"
+  ]
+
+-- | `k` is reached at clock 2 and again at clock 0, and S1's deadline is fixed
+-- at 6.5, so b's window always holds a fraction: the reason text names a
+-- different fraction (6.5 from clock 2, 1.5 from clock 0) at each visit of the
+-- one state.
+fracReSrc :: Text.Text
+fracReSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF T, U, Q, B, V, S1"
+  , "DECLARE Action IS ONE OF t, u, q, b, v, s1"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "k MEANS"
+  , "       (PARTY B MUST b WITHIN 20"
+  , "          HENCE (PARTY V MUST v WITHIN 5 HENCE FULFILLED LEST BREACH BY V)"
+  , "          LEST BREACH BY B)"
+  , "  RAND (PARTY S1 MUST s1 WITHIN 6.5 OF 0 HENCE FULFILLED LEST BREACH BY S1)"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "qk MEANS PARTY Q MUST q WITHIN 1 HENCE k LEST BREACH BY Q"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`rc` MEANS"
+  , "  PARTY T MUST t WITHIN 1"
+  , "    HENCE (PARTY U MUST u WITHIN 1 HENCE qk LEST BREACH BY U)"
+  , "    LEST qk"
+  ]
+
+-- | `k` just armed is reached at three clocks, the first two in decreasing order
+-- of discovery and the last at clock 0, so the records of b's acts at it are
+-- written three times for one state: the chain note must count states, not
+-- records.
+famSrc :: Text.Text
+famSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF T1, T2, Q, B, V, W, S1"
+  , "DECLARE Action IS ONE OF t1, t2, q, b, v, w, s1"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "k MEANS"
+  , "       (PARTY B MUST b WITHIN 40"
+  , "          HENCE (PARTY V MUST v WITHIN 5 HENCE FULFILLED"
+  , "                   LEST (PARTY W MUST w WITHIN 1 HENCE FULFILLED LEST BREACH BY W))"
+  , "          LEST BREACH BY B)"
+  , "  RAND (PARTY S1 MUST s1 WITHIN 30 HENCE FULFILLED LEST BREACH BY S1)"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "qk MEANS PARTY Q MUST q WITHIN 10 HENCE k LEST BREACH BY Q"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`fam` MEANS PARTY T1 MUST t1 WITHIN 2 HENCE (PARTY T2 MUST t2 WITHIN 1 HENCE qk LEST qk) LEST qk"
+  ]
+
 -- | A deadline that is fixed in absolute time and only the successor holds
 -- (an anchor on the arming of the outset): Q's is at 3, S's at 7, whichever
 -- instant `a` is done at, so `a` at 3 and at 7 are boundaries.
@@ -709,7 +777,7 @@ spec = describe "l4 explore" do
       g.gCoverage.cvStops `shouldBe` [StopDepth 3 8]
       length [ () | s <- g.gStates, s.snDepth == 3, s.snTerminal ] `shouldBe` 4
       coverageComplete g.gCoverage `shouldBe` False
-      coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "frontier NOT exhausted: 8 states at the depth bound 3 not expanded"
+      coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "frontier NOT exhausted: 8 states with a visit at the depth bound 3 not expanded"
     it "a cell kept by request is no longer dropped, and splits the states it tells apart" do
       g <- exploreSrc (switchSrc "RECALL" "A MAYBE BOOLEAN") "switch" defaultExploreOptions [("log", False)]
       counts g `shouldBe` (8, 16)
@@ -865,6 +933,8 @@ spec = describe "l4 explore" do
           | "`anchored`" `Text.isInfixOf` src = "anchored"
           | "`cascade`" `Text.isInfixOf` src = "cascade"
           | "`lapsed`" `Text.isInfixOf` src = "lapsed"
+          | "`own`" `Text.isInfixOf` src = "own"
+          | "`fam`" `Text.isInfixOf` src = "fam"
           | "`lapsef`" `Text.isInfixOf` src = "lapsef"
           | "`rc`" `Text.isInfixOf` src = "rc"
           | "`remerged`" `Text.isInfixOf` src = "remerged"
@@ -904,6 +974,11 @@ spec = describe "l4 explore" do
       holdsEvery "a lapse of a deadline FIXED at the outset, by default" lapseFixedSrc regions Nothing 4 9
       holdsEvery "a lapse of a deadline FIXED at the outset, with --chains" lapseFixedSrc regions {eoChains = True} Nothing 4 9
       honest "a lapse of a deadline FIXED at the outset" lapseFixedSrc regions Nothing 4 9
+      -- the act that discharges a deadline is not tied with the cure its lapse arms
+      it "the act whose own lapse arms a cure is not tied with that cure (no chain is named for it)" do
+        g <- exploreSrc ownLapseSrc "own" regions []
+        coverageComplete g.gCoverage `shouldBe` True
+      holdsEvery "an act and the cure its own lapse would arm" ownLapseSrc regions Nothing 3 16
       -- an instant-cap cut that only a second visit to a state makes is named
       it "a cut that only the second visit to a state makes is named, with the cap at 3 (it is not with the cap at 4)" do
         capped <- exploreSrc capReSrc "rc" regions {eoMaxInstants = 3} []
@@ -913,8 +988,18 @@ spec = describe "l4 explore" do
         coverageComplete roomy.gCoverage `shouldBe` True
       -- the tallies are per state: a state reached again adds what the first visit
       -- did not find and repeats nothing
+      it "the chain note counts the states in which the act is tried, not the records of its visits" do
+        g <- exploreSrc famSrc "fam" regions []
+        let notes = [ n | n <- g.gCoverage.cvUntried, "ties through chains of acts, for PARTY B DOES b" `Text.isInfixOf` n.unWhat ]
+            statesWithB = Set.fromList [ t.tnFrom | t <- g.gTransitions, t.tnKind == EdgeAct, "PARTY B DOES b" `Text.isInfixOf` t.tnLabel ]
+        map (.unStates) notes `shouldBe` [Set.size statesWithB]
+        Set.size statesWithB `shouldSatisfy` (> 0)
+      it "a state reached again names a fraction once, whatever fraction its visit finds" do
+        g <- exploreSrc fracReSrc "rc" regions []
+        let fractions = [ n | n <- g.gCoverage.cvUntried, "PARTY B DOES b" `Text.isInfixOf` n.unWhat, "not whole numbers" `Text.isInfixOf` n.unWhat ]
+        map (.unStates) fractions `shouldBe` [1]
       it "ticks past the clock bound are counted once per state, as its first visit sees them" do
-        forM_ [(remergedSrc, "remerged"), (lapseSrc, "lapsed")] \ (src, name) -> do
+        forM_ [(remergedSrc, "remerged")] \ (src, name) -> do
           (rig, sites, start) <- setupSrc src name
           let o = regions {eoUntil = Just 12, eoChains = True}
           ex <- newExplorer o sites rig start
