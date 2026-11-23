@@ -182,6 +182,7 @@ An undetermined answer names every input it waits on (`x AND y` with both unknow
 
 How the connectives get there: `AND`, `OR`, `IMPLIES` and `NOT` are frames of their own (`ConnectiveLeft`, `ConnectiveRight`; `connectiveLeft` and `connectiveRight`, `Machine.hs`), which is UES's build step 2 (U2, U2b), and no longer a rewrite to `IF`.
 An error or a `REFUSE` in the right operand under an unknown left is reported as stuck on the left's inputs, not as the error (UES §4.3, U13's interim; `rewriteUnwinding`; `x AND (1 DIVIDED BY 0 EQUALS 0)` and `x AND REFUSE "no"` both come back undetermined and name `x`, _measured_).
+In the `l4` commands that evaluate, the REPL and the editor, the error of a count, time or memory limit there is the exception since ruling L2 (extended by Meng 2026-11-21) (UES §4.13, C4 as amended): it is reported as itself; jl4-service sets none of those limits in the evaluator, so it is unaffected.
 
 **What a caller gets back.**
 
@@ -257,6 +258,7 @@ See Q2 in §8.
 
 - The service reports "the answer depends on `x`" and "you left out `x`" under the same `"tag": "InterpreterError"`, so a client has to parse prose to tell them apart (_measured_ 2026-10-09).
 - An error or a `REFUSE` to the right of an unknown is reported as stuck on the left's inputs, not as itself (UES U13's interim).
+  A limit's error in `l4 run`, `l4 batch` or the editor is the exception (UES §4.13, ruling L2).
 
 **Different readings of one request** (until branch `feat/typically-gaps`, not landed: see the note at the top): `/evaluation` refuses a top-level `null` on a `BOOLEAN` that MCP and the batch endpoint carry as an unknown (smucclaw/l4-ide#1021); the refusal is T3b's interim for the direct path, and which way they should converge is Q1.
 

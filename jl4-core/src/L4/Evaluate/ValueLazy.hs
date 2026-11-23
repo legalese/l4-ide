@@ -2,6 +2,7 @@ module L4.Evaluate.ValueLazy where
 
 import Base
 import Control.Concurrent (ThreadId)
+import qualified Data.IntSet as IntSet
 import Data.Time (Day, UTCTime)
 import Data.Time.LocalTime (TimeOfDay)
 import L4.Syntax
@@ -423,11 +424,19 @@ combineAll (b :| bs) = foldl' (\ acc x -> snd (combineBlame ValRAnd acc x)) b bs
 -- first in order. Only a tie on all three falls to position, and the entries
 -- it then chooses between took effect at one instant and came to light at
 -- one instant.
+--
+-- The decisive positions are looked up in an 'IntSet'. A list lookup made
+-- this linear in the entries TIMES the decisive ones at every combine, so a
+-- chain of n tied operands, every entry decisive, cost n cubed in all (2,000
+-- tied deadlines under @l4 run@: 12.0 s, against 3.5 s with the 'IntSet' and
+-- 2.8 s untied). The candidates and their order are the same, so the answer
+-- is. The port of this list to main made the same change (legalese/l4-ide#842).
 representative :: [Failure a] -> [Int] -> Int
-representative entries decisive = case sortOn key [ (i, f) | (i, f) <- zip [0 ..] entries, i `elem` decisive ] of
+representative entries decisive = case sortOn key [ (i, f) | (i, f) <- zip [0 ..] entries, i `IntSet.member` decisiveSet ] of
   ((i, _) : _) -> i
   []           -> 0
   where
+    decisiveSet = IntSet.fromList decisive
     -- kind, then whether it has a time at all (an untimed one last), then
     -- when it was observed, then position
     key (i, f) = case f of
@@ -478,6 +487,12 @@ data UnaryBuiltinFun
   | UnaryEnv
   | UnaryJsonEncode
   | UnaryJsonDecode
+    -- ^ Decodes at the type of the node that applies it.
+  | UnaryJsonDecodeAt (Type' Resolved)
+    -- ^ A bare @JSONDECODE@ passed as a function, decoding at the type its
+    -- own reference was checked at (smucclaw/l4-ide#1078). The node that
+    -- applies it is then elsewhere, such as inside the prelude's @map@,
+    -- whose type says nothing about this call.
   | UnaryDateValue
   | UnaryDateSerial
   | UnaryDateFromSerial
@@ -585,6 +600,7 @@ instance NFData UnaryBuiltinFun where
   rnf UnaryEnv = ()
   rnf UnaryJsonEncode = ()
   rnf UnaryJsonDecode = ()
+  rnf (UnaryJsonDecodeAt t) = rnf t
   rnf UnaryDateValue = ()
   rnf UnaryDateSerial = ()
   rnf UnaryDateFromSerial = ()

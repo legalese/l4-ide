@@ -58,6 +58,9 @@ executable l4
   if !os(windows)
     build-depends: unix
   main-is: Main.hs
+  -- smucclaw/l4-ide#1075: let a user cap the heap (+RTS -M…) or read GC statistics (+RTS -s)
+  -- without a rebuild. jl4-lsp, jl4-repl and jl4-service already take -rtsopts.
+  ghc-options: -rtsopts
   other-modules:
     L4.Cli.Ast
     L4.Cli.Batch
@@ -135,6 +138,7 @@ test-suite jl4-test
     LtsExplore
     LtsList
     Hover
+    KeywordList
     SemanticTokens
     VizAutoRefresh
     VizImplies
@@ -172,6 +176,7 @@ test-suite l4-cli-test
   main-is: Main.hs
   other-modules:
     CliTest.Blawx
+    CliTest.Budgets
     CliTest.BuildIdentity
     CliTest.BuildVersion
     CliTest.Catala
@@ -182,6 +187,7 @@ test-suite l4-cli-test
     CliTest.Docassemble
     CliTest.Ledger
     CliTest.Explore
+    CliTest.JsonDecode
     CliTest.SiblingReads
     CliTest.WithOverride
     CliTest.OpenFisca
@@ -191,6 +197,7 @@ test-suite l4-cli-test
   autogen-modules:
     Paths_jl4
   build-tool-depends:
+    jl4:jl4-schema,
     jl4:l4,
     jl4-lsp:jl4-lsp,
     jl4-repl:jl4-repl
@@ -202,6 +209,7 @@ test-suite l4-cli-test
     hspec,
     http-types,
     jl4-core,
+    lsp-types,
     process,
     temporary,
     text,

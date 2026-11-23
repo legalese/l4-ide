@@ -6,7 +6,7 @@ File: section-given-root-ambiguous.l4
   Range: 22:7-22:13
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-root-binders
   Message:
     Working out
 

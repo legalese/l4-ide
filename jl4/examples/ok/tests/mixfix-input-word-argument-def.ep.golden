@@ -1,0 +1,24 @@
+-- smucclaw/l4-ide#1076. The mixfix rule below is under a `§`, and it has the
+-- word `the day`. The two rules after it have an INPUT called `the day`, and
+-- pass that input on as the argument of another rule. The input is the rule's
+-- own, so inside the rule it is the input and not the word of the mixfix rule.
+-- It was read as the word, a postfix use of the mixfix rule applied to `inc`,
+-- and refused ("You are giving 1 input to `the day` ... but it is not a
+-- function"), and every importer then got #1025's internal error.
+§ `Lib`
+GIVEN n IS A NUMBER
+      s IS A NUMBER
+`the day` n `days before` s MEANS s MINUS n
+
+GIVEN `the day` IS A NUMBER
+GIVETH A NUMBER
+`inc` `the day` MEANS `the day` PLUS 1
+
+GIVEN `the day` IS A NUMBER
+GIVETH A NUMBER
+`twice` `the day` MEANS `inc` `the day`
+
+-- In a rule with no input of that name, the word is still the word.
+#EVAL `the day` 3 `days before` 10    -- 7
+#EVAL `inc` 5                         -- 6
+#EVAL `twice` 5                       -- 6

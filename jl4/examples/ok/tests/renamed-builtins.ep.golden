@@ -1,0 +1,31 @@
+-- ISINTEGER and WAITUNTIL used to be written `IS INTEGER` and `WAIT UNTIL`.
+-- The old spellings still work and mean the same built-ins; each place one is
+-- written draws a warning that it has been renamed. Every pair of directives
+-- below gives the same answer both ways, and only the old spelling warns.
+-- (Note [Renamed built-ins] in jl4-core/src/L4/TypeCheck/Environment.hs.)
+
+DECLARE Person IS ONE OF Tenant
+DECLARE Action IS ONE OF pay
+
+GIVETH A DEONTIC Person Action
+rent MEANS PARTY Tenant MUST pay WITHIN 7 HENCE FULFILLED LEST BREACH
+
+-- The old spelling: one warning here.
+#TRACE rent AT 0 WITH
+    (`WAIT UNTIL` 8)
+
+-- The new spelling: the same breach, and no warning.
+#TRACE rent AT 0 WITH
+    (WAITUNTIL 8)
+
+-- The old spelling, twice on one line: two warnings, one for each.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`both whole` n MEANS `IS INTEGER` n AND `IS INTEGER` (n TIMES 2)
+
+#EVAL `both whole` 3
+#EVAL `both whole` 2.5
+
+-- The new spelling.
+#EVAL ISINTEGER 3
+#EVAL ISINTEGER 2.5

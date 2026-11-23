@@ -6,7 +6,7 @@ File: withal-overloaded.l4
   Range: 14:7-14:19
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -23,7 +23,7 @@ File: withal-overloaded.l4
   Range: 25:7-25:20
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

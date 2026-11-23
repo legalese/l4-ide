@@ -1,0 +1,14 @@
+-- Imported by main.l4. The decode is in a CONSIDER, an inferred position, so
+-- its type, Tree, comes from this module's own type check
+-- (smucclaw/l4-ide#1078).
+IMPORT prelude
+
+DECLARE Tree HAS
+  label IS A NUMBER
+  kids IS A LIST OF Tree
+
+GIVEN s IS A STRING GIVETH A NUMBER
+`label in` s MEANS
+  CONSIDER JSONDECODE s
+    WHEN RIGHT v THEN v's label
+    WHEN LEFT problem THEN 0 - 1

@@ -338,7 +338,7 @@ spec = describe "l4 explore" do
         [ (0, "PARTY W DOES tap OF TRUE", 0)
         , (0, "PARTY W DOES tap OF FALSE", 0)
         , (0, "PARTY W DOES stop", 1)
-        , (0, "time passes the deadline 10 (WAIT UNTIL 11)", 1)
+        , (0, "time passes the deadline 10 (WAITUNTIL 11)", 1)
         , (1, "terminal", 1)
         ]
       case g.gCoverage.cvRefused of
@@ -427,7 +427,7 @@ spec = describe "l4 explore" do
       case pathOf always of
         Nothing -> expectationFailure "no counterexample"
         Just p -> traceText g.gStart "c" p.ptEvents `shouldBe` Text.unlines
-          [ "-- c", "#TRACE late AT 0 WITH", "    (`WAIT UNTIL` OF 11)" ]
+          [ "-- c", "#TRACE late AT 0 WITH", "    (WAITUNTIL OF 11)" ]
       -- the step leaves the outset: its path is the tick alone
       fmap (\ p -> (p.ptState, p.ptStep, length p.ptEvents)) (pathOf stays) `shouldBe` Just (0, True, 1)
       reasonOf stays `shouldSatisfy` Text.isInfixOf "it holds at the outset, and the first event takes it away"

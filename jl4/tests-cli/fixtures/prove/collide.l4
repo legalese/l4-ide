@@ -9,4 +9,4 @@ GIVETH A NUMBER
 § `Wrong proved`
     GIVEN x IS A NUMBER
 
-#ASSERT `IS INTEGER` x OR (`d1` x 0 EQUALS 0)
+#ASSERT ISINTEGER x OR (`d1` x 0 EQUALS 0)

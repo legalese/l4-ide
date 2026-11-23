@@ -9,6 +9,7 @@ import L4.Annotation
 import L4.Citations
 import qualified L4.Evaluate.ValueLazy as EvaluateLazy
 import qualified L4.EvaluateLazy as EvaluateLazy
+import qualified L4.Diagnostic as Diagnostic
 import qualified L4.ExactPrint as ExactPrint
 import L4.FindReferences (ReferenceMapping(..), singletonReferenceMapping)
 import L4.Lexer (PError, PosToken)
@@ -18,9 +19,9 @@ import qualified L4.Lexer as Lexer
 import qualified L4.SmartPunctuation as SP
 import qualified L4.IgnoredAnnotation as IA
 import qualified L4.Parser as Parser
+import L4.Parser.AnnotationWarning (annotationWarningCode, annotationWarningMessage, annotationWarningSpan)
 import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.Parser.SrcSpan
-import qualified L4.Print as Print
 import L4.Syntax
 import L4.TypeCheck (CheckErrorWithContext (..), CheckResult (..), Substitution, applyFinalSubstitution, toResolved)
 import qualified L4.TypeCheck as TypeCheck
@@ -56,6 +57,7 @@ import qualified Data.Text.Encoding as TextEncoding
 import System.Directory
 import System.Environment (getExecutablePath, lookupEnv)
 import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
+import qualified L4.Import.ModuleNameCase as ModuleNameCase
 import qualified L4.Utils.IntervalMap as IV
 
 type instance RuleResult GetLexTokens = ([PosToken], Text)
@@ -112,14 +114,25 @@ data GetImports = GetImports
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
+-- | The modules a file imports, each with the range of its @IMPORT@, from a
+-- first parse that needs no mixfix hints. Unlike 'GetImports', whose full parse
+-- needs the hints of every imported module, this has an answer for a file in an
+-- import cycle. An @IMPORT@ that resolves to no module is left out.
+type instance RuleResult GetImportEdges = [(Maybe SrcRange, NormalizedUri)]
+data GetImportEdges = GetImportEdges
+  deriving stock (Generic, Show, Eq)
+  deriving anyclass (NFData, Hashable)
+
 type instance RuleResult GetMixfixRegistry = Parser.MixfixHintRegistry
 data GetMixfixRegistry = GetMixfixRegistry
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
 
--- | The typecheck results of a module's direct imports. Keyed by file alone:
--- see 'CheckModule'.
-type instance RuleResult GetTypeCheckDependencies = [(ImportResult, TypeCheckResult)]
+-- | Each of a module's direct imports with its typecheck, 'Nothing' when it
+-- has none (it does not parse, it is in an import cycle, or it resolves to the
+-- importing file, which is not checked). Keyed by file alone: see
+-- 'CheckModule'.
+type instance RuleResult GetTypeCheckDependencies = [(ImportResult, Maybe TypeCheckResult)]
 data GetTypeCheckDependencies = GetTypeCheckDependencies
   deriving stock (Generic, Show, Eq)
   deriving anyclass (NFData, Hashable)
@@ -160,11 +173,20 @@ pattern TypeCheck = AttachCallStack [] TypeCheckNoCallstack
 --
 -- Nothing is lost by dropping the stack from the recursion. Apart from passing
 -- it on, the only thing that read it was the cycle check in
--- 'defineWithCallStack', and an import cycle never reaches that check:
--- 'GetMixfixRegistry', keyed by file, recurses over the same imports first, and
--- hls-graph stops it with a 'StackException'. That is still what reports a
--- cycle, and hls-graph would stop a cycle through these per-file keys the same
--- way.
+-- 'defineWithCallStack', and an import cycle never reaches that check: no rule
+-- follows an import that leads back to its file ('importsThatDoNotLeadBack').
+-- The message on the IMPORT that names the files of the ring follows
+-- 'GetImportEdges' ('firstImportCycleFrom'), which reads no typecheck and no
+-- call stack.
+--
+-- A module on a ring has no typecheck ('onImportRing'), like a module that does
+-- not parse. It would have to be checked with an import left out, and a result
+-- like that is not one to act on: a name from the module left out reads as
+-- undefined, which @jl4-service@ takes for an input the caller must supply.
+--
+-- What this rule says about an import ('importsOk', and the messages on the
+-- IMPORT lines) is computed from that import's own 'CheckModule' result, which
+-- this rule depends on, so an edit to an imported file recomputes it here too.
 type instance RuleResult CheckModule = TypeCheckResult
 data CheckModule = CheckModule
   deriving stock (Generic, Show, Eq)
@@ -192,7 +214,12 @@ data TypeCheckResult = TypeCheckResult
     -- each: the direct imports first, in import order, then the rest in the
     -- order the old per-path tree first met them ('closeDependencies'). Each
     -- entry carries its own closure, so walking it recursively visits a module
-    -- once per path; use 'transitiveDependencies' for a walk.
+    -- once per path; use 'transitiveDependencies' for a walk. An import with
+    -- no typecheck is not in it; 'importsOk' is what records one.
+  , importsOk :: Bool
+  -- ^ Every module this one imports, transitively, was found and typechecks.
+  -- 'success' doesn't depend on it: a module checks against what its imports
+  -- did provide.
   , mixfixRegistry :: TypeCheck.MixfixRegistry
   , sectionPaths :: TypeCheck.SectionPaths
     -- ^ Where each binding this module can see was defined, section-wise,
@@ -231,6 +258,7 @@ instance NFData TypeCheckResult where
     `seq` scopeMap
     `seq` descMap
     `seq` rnf success
+    `seq` rnf importsOk
     `seq` rnf environment
     `seq` rnf entityInfo
     `seq` rnf infos
@@ -440,7 +468,73 @@ data LibraryResolution = LibraryResolution
   , hasExplicitPath :: !Bool
     -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted). Always
     -- False under 'EmbeddedStdlibOnly', which does not read the variable.
+  , caseVariantsFound :: ![(Int, LibraryCandidate, [FilePath])]
+    -- ^ The file tiers whose folder holds the module's file only under other
+    -- capitals (smucclaw/l4-ide#1080): the tier's 1-based index into
+    -- 'candidates', the tier, and the names of those entries. Such a file is
+    -- never a copy of the module, so it is in neither 'winner' nor 'existing'.
+    --
+    -- Collected for every file tier ranked ABOVE the winner, and for every
+    -- file tier when nothing won, by listing the folder WHATEVER the existence
+    -- probe said: a case-sensitive disk says no for @dayDate.l4@ beside
+    -- @daydate.l4@, and the not-found hint and the skipped-variant warning
+    -- must not depend on the disk. A variant below the winner could not have
+    -- won under any rule, so it is not collected, and neither is the
+    -- importing file itself: see 'importerCaseVariant'.
+  , importerCaseVariant :: !(Maybe FilePath)
+    -- ^ The importing file's own name as its folder lists it (@Foo.l4@), when
+    -- a tier that 'caseVariantsFound' looks at lists it as the asked module
+    -- under other capitals (@IMPORT foo@). Kept out of 'caseVariantsFound',
+    -- because offering a file its own name tells it to import itself, and kept
+    -- here so the messages can say what is true instead: the name is the
+    -- file's own, and a module cannot import itself (review finding A, as
+    -- revised by GM on 2026-11-21; assumed, not ruled).
+  , embeddedCaseVariants :: ![Text]
+    -- ^ Embedded stdlib modules whose names differ from the asked one only in
+    -- capitals. Empty when the embedded tier was not probed (JL4_LIBRARY_PATH
+    -- is set), because suggesting a module the run cannot see would mislead.
+  , unlistedFolders :: ![FilePath]
+    -- ^ Folders where the existence probe found the module's file but whose
+    -- entries could not be listed, so the capitals could not be checked. The
+    -- existence answer stands there, as it did before the case rule: refusing
+    -- would break a setup that works for a check that could not be made.
   }
+
+-- | How 'resolveLibraryWith' looks at the disk.
+--
+-- Separate from the resolver so a test can stand in for a case-insensitive
+-- disk (the macOS and Windows defaults) on a case-sensitive one: PR CI runs
+-- @jl4-lsp-test@ on Linux only, where a real disk already refuses
+-- @dayDate.l4@ beside @daydate.l4@, so a test that used the real disk there
+-- would pass with or without the case rule.
+data LibraryProbe = LibraryProbe
+  { probeExists  :: FilePath -> IO Bool
+    -- ^ does a file exist at this path (the operating system's answer, which
+    -- ignores capitals on a case-insensitive disk)
+  , probeListing :: FilePath -> IO (Maybe [FilePath])
+    -- ^ the entries of a folder, 'Nothing' when it cannot be listed
+  }
+
+-- | The real disk.
+realLibraryProbe :: LibraryProbe
+realLibraryProbe = LibraryProbe
+  { probeExists  = doesFileExist
+  , probeListing = \ dir -> either (\ (_ :: SomeException) -> Nothing) Just <$> tryAny (listDirectory dir)
+  }
+
+-- | What the existence probe and the folder's listing said about one file tier.
+data FileTierAnswer
+  = TierPresent
+    -- ^ the file exists, spelled as asked (or the listing could not tell)
+  | TierAbsent
+    -- ^ no file, under any capitals the operating system would accept
+  | TierCaseOnly [FilePath]
+    -- ^ the operating system said yes, but the folder holds the file only
+    -- under these other capitals: refused
+  | TierUnlisted
+    -- ^ the operating system said yes and the folder could not be listed:
+    -- kept, see 'unlistedFolders'
+  deriving stock (Eq, Show)
 
 -- | Resolve a library module across the filesystem and the embedded stdlib.
 -- Candidates are probed in order of priority (first existing wins):
@@ -464,8 +558,36 @@ data LibraryResolution = LibraryResolution
 --
 -- Under 'EmbeddedStdlibOnly' the ladder is the embedded copy alone, whatever the
 -- environment and the working directory hold.
+--
+-- __Capitals count__ (smucclaw/l4-ide#1080; rulings assumed (GM, 2026-11-21),
+-- for Meng's review). A file tier holds the module only when its folder has an
+-- entry spelled exactly @<modName>.l4@. The embedded tier and every in-memory
+-- map already compared names exactly; the file tiers asked 'doesFileExist',
+-- which a case-insensitive disk answers yes for any capitalisation, and the
+-- hit was then loaded under the asked spelling. So on a Mac
+-- @IMPORT dayDate@ found @daydate.l4@ through @JL4_LIBRARY_PATH@ or the XDG
+-- store (there with no shadow warning, because the embedded tier, compared
+-- exactly, missed), loaded a second
+-- copy beside an @IMPORT daydate@, and fooled the exporters' "is this the
+-- stdlib" checks; on Linux, in the web playground and in jl4-service the same
+-- line failed. The rule is stated once, in "L4.Import.ModuleNameCase": a file
+-- the disk reports is refused only on a positive sighting of a case variant
+-- ('ModuleNameCase.CaseVariantEntries'), never on a name the listing merely
+-- spells in another Unicode normal form.
 resolveLibrary :: LibraryScope -> FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
-resolveLibrary EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
+resolveLibrary = resolveLibraryWith realLibraryProbe
+
+-- | 'resolveLibrary' against a chosen 'LibraryProbe'.
+resolveLibraryWith :: LibraryProbe -> LibraryScope -> FilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
+resolveLibraryWith probe scope rootDirectory mImportingFile =
+  resolveLibraryFor probe scope rootDirectory mImportingFile mImportingFile
+
+-- | 'resolveLibraryWith', told which file counts as the importing one when that
+-- is not the file that wrote the IMPORT ('ImporterStandIns'). It decides only
+-- which file is set apart in 'importerCaseVariant'; the folders searched are
+-- still those of the file that wrote the IMPORT.
+resolveLibraryFor :: LibraryProbe -> LibraryScope -> FilePath -> Maybe NormalizedFilePath -> Maybe NormalizedFilePath -> String -> IO LibraryResolution
+resolveLibraryFor _probe EmbeddedStdlibOnly _rootDirectory _mImportingFile _mSelf modName =
   pure LibraryResolution
     { winner = Maybe.listToMaybe present
     , existing = present
@@ -473,11 +595,15 @@ resolveLibrary EmbeddedStdlibOnly _rootDirectory _mImportingFile modName =
     , searchedPaths = []
     , tiersInOrder = [EmbeddedCandidate]
     , hasExplicitPath = False
+    , caseVariantsFound = []
+    , importerCaseVariant = Nothing
+    , embeddedCaseVariants = ModuleNameCase.caseVariants (Text.pack modName) EmbeddedLibraries.embeddedLibraryNames
+    , unlistedFolders = []
     }
   where
     present = [ (1, EmbeddedCandidate)
               | Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName)) ]
-resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
+resolveLibraryFor probe AmbientLibraries rootDirectory mImportingFile mSelf modName = do
   mEnvPath <- lookupEnv "JL4_LIBRARY_PATH"
   xdgDataDir <- getXdgDirectory XdgData "jl4"
   exePath <- getExecutablePath
@@ -502,16 +628,73 @@ resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
            <> [EmbeddedCandidate]
            <> [xdgCand, bundledCand]
       cands = [ c | c <- tiers, not (hasExplicit && c == EmbeddedCandidate) ]
+      indexed = zip [1 :: Int ..] cands
 
-      probe (i, c) = case c of
+  -- Each folder is listed at most once per resolution: from the CLI the
+  -- project root and the importer-relative tier are the same folder.
+  listingCache <- UnliftIO.newIORef (Map.empty :: Map.Map FilePath (Maybe [FilePath]))
+  let listingOf dir = do
+        cached <- Map.lookup dir <$> UnliftIO.readIORef listingCache
+        case cached of
+          Just l -> pure l
+          Nothing -> do
+            l <- probe.probeListing dir
+            UnliftIO.modifyIORef' listingCache (Map.insert dir l)
+            pure l
+      matchOf p =
+        fmap (\ entries -> ModuleNameCase.classifyEntry entries (takeFileName p))
+          <$> listingOf (takeDirectory p)
+
+      -- Pass 1, the copies: what the operating system reports, minus the
+      -- files whose folder spells them only with other capitals.
+      answer c = case c of
         FileCandidate _ p -> do
-          ok <- doesFileExist p
-          pure $ if ok then Just (i, c) else Nothing
+          ok <- probe.probeExists p
+          if not ok then pure TierAbsent else do
+            m <- matchOf p
+            pure $ case m of
+              Nothing -> TierUnlisted
+              Just (ModuleNameCase.CaseVariantEntries vs) -> TierCaseOnly vs
+              -- 'NoEntry' with a yes from the disk is a name listed in another
+              -- Unicode normal form (HFS+ decomposes): the file IS there.
+              Just _ -> TierPresent
         EmbeddedCandidate ->
           pure $ if Maybe.isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack modName))
-                   then Just (i, c) else Nothing
+                   then TierPresent else TierAbsent
 
-  present <- catMaybes <$> traverse probe (zip [1 :: Int ..] cands)
+  answers <- traverse (\ (i, c) -> (i, c,) <$> answer c) indexed
+  let present = [ (i, c) | (i, c, a) <- answers, a `elem` [TierPresent, TierUnlisted] ]
+      aboveWinner i = maybe True (\ (w, _) -> i < w) (Maybe.listToMaybe present)
+
+  -- The importing file is never a near miss of what it imports: @Foo.l4@
+  -- that writes @IMPORT foo@ would otherwise be told to import @Foo@, which is
+  -- itself, or to rename itself to @foo.l4@, which makes it import itself
+  -- (CLAUDE.md §5). It is still refused above, as any variant is, and it is
+  -- set apart in 'importerCaseVariant' so that the messages can say so.
+  -- Compared by canonical path, because the two spellings of one file
+  -- differ: from @l4 check Zzself.l4@ the importer is the relative
+  -- @Zzself.l4@ and the folder's entry is @./Zzself.l4@, two strings that are
+  -- not equal (measured 2026-11-21 on nye, HFS+ and APFS).
+  let canonical f = either (\ (_ :: SomeException) -> normalise f) id <$> tryAny (canonicalizePath f)
+  importerSelf <- traverse (canonical . fromNormalizedFilePath) mSelf
+  let nearMisses i c p vs = do
+        marked <- case importerSelf of
+          Nothing -> pure [ (False, e) | e <- vs ]
+          Just self -> traverse (\ e -> (, e) . (== self) <$> canonical (takeDirectory p </> e)) vs
+        let others = [ e | (False, e) <- marked ]
+        pure ([ e | (True, e) <- marked ], if null others then Nothing else Just (i, c, others))
+
+  -- Pass 2, the near misses: every file tier above the winner, listed whatever
+  -- the existence probe said (see 'caseVariantsFound').
+  nearMissesByTier <- forM [ x | x@(i, _, _) <- answers, aboveWinner i ] $ \ case
+    (i, c@(FileCandidate _ p), TierCaseOnly vs) -> nearMisses i c p vs
+    (i, c@(FileCandidate _ p), TierAbsent) -> do
+      m <- matchOf p
+      case m of
+        Just (ModuleNameCase.CaseVariantEntries vs) -> nearMisses i c p vs
+        _ -> pure ([], Nothing)
+    _ -> pure ([], Nothing)
+  let variants = catMaybes (map snd nearMissesByTier)
 
   pure LibraryResolution
     { winner = Maybe.listToMaybe present
@@ -520,6 +703,13 @@ resolveLibrary AmbientLibraries rootDirectory mImportingFile modName = do
     , searchedPaths = [ p | FileCandidate _ p <- cands ]
     , tiersInOrder = tiers
     , hasExplicitPath = hasExplicit
+    , caseVariantsFound = variants
+    , importerCaseVariant = Maybe.listToMaybe (concatMap fst nearMissesByTier)
+    , embeddedCaseVariants =
+        if EmbeddedCandidate `elem` cands
+          then ModuleNameCase.caseVariants (Text.pack modName) EmbeddedLibraries.embeddedLibraryNames
+          else []
+    , unlistedFolders = [ takeDirectory p | (_, FileCandidate _ p, TierUnlisted) <- answers ]
     }
 
 -- | Fetch a candidate's content for the shadow check ('warnOnLibraryShadow').
@@ -613,6 +803,26 @@ data ImportOutcome = ImportOutcome
     -- not-found diagnostic listed only paths, so the one tier that can silently
     -- be empty was the one tier the error could not mention. See
     -- 'renderEmbedStatus'.
+  , caseVariantNames :: ![Text]
+    -- ^ Module names that differ from the asked one only in capitals and that
+    -- an IMPORT could load: the base names of the @.l4@ entries in
+    -- 'caseVariantsFound', then 'embeddedCaseVariants'. What the not-found
+    -- diagnostic's hint names ('ModuleNameCase.caseVariantHint'); empty when
+    -- the import resolved, and when nothing is that close.
+  , ownModuleVariant :: !(Maybe Text)
+    -- ^ The importing file's own module name (@Foo@) when its folder lists it
+    -- as the asked module under other capitals ('importerCaseVariant'), and
+    -- the import did not resolve. With no 'caseVariantNames' to offer, the
+    -- not-found diagnostic then says that a module cannot import itself
+    -- ('ModuleNameCase.selfImportHint').
+  , skippedCaseVariantWarning :: !(Maybe Text)
+    -- ^ The skipped-variant warning's text ('skippedCaseVariantMessage', or
+    -- 'selfCaseVariantMessage' when the file passed over is the importing
+    -- file itself) when the import resolved but passed a file over, on EVERY
+    -- resolution, where
+    -- the log line is once per session: 'GetImports' publishes it as a
+    -- Warning on the IMPORT, so an editor lists it with the problems
+    -- (smucclaw/l4-ide#1080; assumed (GM, 2026-11-21), for Meng's review).
   }
 
 -- | The embedded-stdlib tier, as the not-found diagnostic needs to describe it.
@@ -730,6 +940,57 @@ triedLocations outcome = do
           , sameFileAs = Just key
           , spelledAsPath = True
           }
+-- | The first ring of imports reachable from a module, as the files around it
+-- with the first repeated at the end (@[a, b, a]@), following 'GetImportEdges'.
+firstImportCycleFrom :: NormalizedUri -> Action (Maybe [NormalizedUri])
+firstImportCycleFrom start = snd <$> go Set.empty [] start
+  where
+    go done path u
+      | u `elem` path = pure (done, Just (dropWhile (/= u) (reverse path) <> [u]))
+      | u `Set.member` done = pure (done, Nothing)
+      | otherwise = do
+          targets <- maybe [] (map snd) <$> use GetImportEdges u
+          let step (d, found@(Just _)) _ = pure (d, found)
+              step (d, Nothing) t = go d (u : path) t
+          (done', found) <- foldM step (done, Nothing) targets
+          pure (Set.insert u done', found)
+
+-- | The file and every module it imports, transitively, root first. Each module
+-- appears once. The walk follows 'GetImportEdges', which needs only a first
+-- parse of each module, so it reaches modules whose typecheck failed or that sit
+-- in a cycle. A module that does not parse is included but not walked further.
+importClosure :: NormalizedUri -> Action [NormalizedUri]
+importClosure root = reverse . snd <$> go (Set.empty, []) root
+  where
+    go acc@(seen, out) uri
+      | uri `Set.member` seen = pure acc
+      | otherwise = do
+          edges <- Maybe.fromMaybe [] <$> use GetImportEdges uri
+          foldM go (Set.insert uri seen, uri : out) (map snd edges)
+
+-- | Those of a file's imports that a rule may follow: the ones that do not lead
+-- back to the file.
+--
+-- Every rule that recurses over imports must go through this, because a ring
+-- of imports must never become a ring of Shake keys. hls-graph stops a key that
+-- waits on itself in one chain of calls, but not two threads that enter a ring
+-- at different files: each waits for the key the other is running, for ever,
+-- and nothing is reported, not even for an edit, which only starts it again.
+-- The language server does that as soon as two files of a ring are open, and
+-- a service that checks a whole bundle at once does too.
+-- 'GetImportEdges' does not recurse, so walking it is safe.
+importsThatDoNotLeadBack :: NormalizedUri -> [NormalizedUri] -> Action [NormalizedUri]
+importsThatDoNotLeadBack uri imported =
+  firstImportCycleFrom uri >>= \ case
+    Nothing -> pure imported
+    Just _ -> filterM (fmap (uri `notElem`) . importClosure) imported
+
+-- | Whether following IMPORT from a module leads back to it: it is on a ring of
+-- imports, or it imports itself. Such a module has no typecheck.
+onImportRing :: NormalizedUri -> Action Bool
+onImportRing uri = do
+  imported <- maybe [] (map snd) <$> use GetImportEdges uri
+  (/= imported) <$> importsThatDoNotLeadBack uri imported
 
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
@@ -751,6 +1012,8 @@ resolveImportShared
   :: Recorder (WithPriority Log)
   -> IORef (Set.Set (String, [Text]))
      -- ^ shadow configurations already warned about this session (warn-once)
+  -> IORef (Set.Set (String, [Text]))
+     -- ^ skipped case variants already warned about this session (warn-once)
   -> IORef (Set.Set (Text, String))
      -- ^ (importing module, module name) pairs already announced as not found
   -> LibraryScope
@@ -758,8 +1021,8 @@ resolveImportShared
   -> NormalizedUri     -- ^ importing module
   -> String            -- ^ bare module name
   -> Action ImportOutcome
-resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory importerUri modName = do
-  outcome <- resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName
+resolveImportShared recorder shadowWarnedRef caseSkipWarnedRef notFoundWarnedRef scope rootDirectory importerUri modName = do
+  outcome <- resolveImportQuietly recorder shadowWarnedRef caseSkipWarnedRef scope rootDirectory importerUri modName
   let key = ((fromNormalizedUri importerUri).getUri, modName)
   case outcome.importUri of
     Just _ ->
@@ -773,16 +1036,26 @@ resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirecto
           _            -> "Module not found: " <> Text.pack modName
   pure outcome
 
+-- | Files that stand in for another as the importer of what they IMPORT, keyed
+-- by the stand-in. jl4-repl checks each expression in an in-memory file beside
+-- the loaded one, holding a copy of its text, and registers that file here, so
+-- an IMPORT of the loaded file's own name under other capitals is still told
+-- that a module cannot import itself (smucclaw/l4-ide#1080; assumed, not
+-- ruled). 'jl4RulesIn' registers it empty, and no other host writes to it.
+newtype ImporterStandIns = ImporterStandIns (IORef (Map.Map NormalizedFilePath NormalizedFilePath))
+instance IsIdeGlobal ImporterStandIns
+
 -- | 'resolveImportShared' without the not-found announcement.
 resolveImportQuietly
   :: Recorder (WithPriority Log)
+  -> IORef (Set.Set (String, [Text]))
   -> IORef (Set.Set (String, [Text]))
   -> LibraryScope
   -> FilePath
   -> NormalizedUri
   -> String
   -> Action ImportOutcome
-resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri modName = do
+resolveImportQuietly recorder shadowWarnedRef caseSkipWarnedRef scope rootDirectory importerUri modName = do
   logWith recorder Info $ LogImportResolution $
     "Resolving import: " <> Text.pack modName <> " from " <> (fromNormalizedUri importerUri).getUri
 
@@ -836,10 +1109,29 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
         "Found in VFS: " <> (fromNormalizedUri vfsUri).getUri
       -- Resolved above the library tiers entirely, so the embed was never reached.
       pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, libTried = []
-                         , embedTried = EmbedSkipped }
+                         , embedTried = EmbedSkipped, caseVariantNames = []
+                         , ownModuleVariant = Nothing
+                         , skippedCaseVariantWarning = Nothing }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
-      res <- liftIO $ resolveLibrary scope rootDirectory mImportingNfp modName
+      ImporterStandIns standInsRef <- getIdeGlobalAction
+      standIns <- UnliftIO.readIORef standInsRef
+      let mSelf = (\ nfp -> Map.findWithDefault nfp nfp standIns) <$> mImportingNfp
+      res <- liftIO $ resolveLibraryFor realLibraryProbe scope rootDirectory mImportingNfp mSelf modName
+
+      -- Only when a file was found and its folder could not be listed, which
+      -- no ordinary run meets, so the logs the golden suite captures are
+      -- unchanged.
+      forM_ res.unlistedFolders $ \ dir ->
+        logWith recorder Debug $ LogImportResolution $
+          "Could not list " <> Text.pack dir <> " to check the capitals of "
+          <> Text.pack (modName <.> "l4") <> "; using the file the disk reports"
+
+      -- Not gated on JL4_LIBRARY_PATH, unlike the shadow warning below, and
+      -- never said about an IMPORT inside the embedded library: see
+      -- 'skippedCaseVariants'.
+      skipped <- liftIO $ skippedCaseVariants res
+      warnOnSkippedCaseVariant skipped
 
       -- Detailed candidate accounting + the shadow warning run only when
       -- JL4_LIBRARY_PATH is unset: with the env var set the operator has
@@ -865,7 +1157,17 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
             where n = Map.size EmbeddedLibraries.embeddedLibraries
           outcome mUri = ImportOutcome
             { importUri = mUri, vfsTried = vfsUris, libTried = res.tiersInOrder
-            , embedTried = embedStatus }
+            , embedTried = embedStatus
+            , caseVariantNames =
+                if Maybe.isJust mUri then [] else
+                  [ Text.pack (dropExtension e)
+                  | (_, _, es) <- res.caseVariantsFound, e <- es, takeExtension e == ".l4" ]
+                  <> res.embeddedCaseVariants
+            , ownModuleVariant =
+                if Maybe.isJust mUri then Nothing else
+                  Text.pack . dropExtension <$> res.importerCaseVariant
+            , skippedCaseVariantWarning = snd <$> skipped
+            }
 
       case res.winner of
         Just (ix, FileCandidate _ fp) -> do
@@ -931,6 +1233,201 @@ resolveImportQuietly recorder shadowWarnedRef scope rootDirectory importerUri mo
                    <> ".l4 in the project root or beside the importing file."
                  ]
 
+    -- The skipped-variant warning (smucclaw/l4-ide#1080, ruling 3, assumed
+    -- (GM, 2026-11-21), for Meng's review). The import resolved, but a file
+    -- ranked above the copy it used has the module's name in other capitals
+    -- (design probe P12: @Math.l4@ beside a file that writes @IMPORT math@).
+    -- Before the case rule a Mac used that file and the shadow warning said
+    -- so; under the rule the file is not a copy, and without this nothing
+    -- would say it was passed over. On Linux nothing ever did.
+    --
+    -- Unlike the shadow warning it is printed whether or not JL4_LIBRARY_PATH
+    -- is set: the file passed over is the user's own, not ambient machine
+    -- state, and the message names files by their name and the tier in words,
+    -- never by path, so it is the same on every machine and cannot make a
+    -- golden machine-dependent (assumed, not ruled). Warned once per
+    -- configuration per session, as the shadow warning is, because two rules
+    -- resolve every import.
+    --
+    -- Not said about an IMPORT written inside the embedded library (review
+    -- finding B; assumed, not ruled): @currency@'s @IMPORT jurisdiction@
+    -- would otherwise tell a user with a @Jurisdiction.l4@ in the project
+    -- root to change an IMPORT they cannot see and did not write. The library
+    -- is still kept from loading that file; it is only not reported. A
+    -- library loaded from a folder tier (the XDG store, the editor bundle)
+    -- has a @file:@ URI and is not recognised as one.
+    --
+    -- When the only file passed over is the importing file itself (@Math.l4@
+    -- that writes @IMPORT math@), the warning says that, and that a module
+    -- cannot import itself, rather than offer the file its own name (review
+    -- finding A, as revised by GM on 2026-11-21; assumed, not ruled). A file
+    -- whose name differs from the IMPORT only in its extension's capitals
+    -- (@math.L4@) is not a near match of its own module name, so for it
+    -- nothing is said, as for any file passed over that the IMPORT could
+    -- never have named.
+    skippedCaseVariants res
+      | embeddedImporter = pure Nothing
+      | otherwise = case res.winner of
+          Nothing -> pure Nothing
+          Just (_, chosen) -> do
+            let found = [ (lbl, takeDirectory p </> e) | (_, FileCandidate lbl p, es) <- res.caseVariantsFound, e <- es ]
+                asked = Text.pack modName
+                ownName = Text.pack . dropExtension . takeFileName
+            if null found then pure $ case res.importerCaseVariant of
+                Just own | not (null (ModuleNameCase.caseVariants asked [ownName own])) ->
+                  Just ( ["the importing file " <> Text.pack own, candidateDisplay chosen]
+                       , selfCaseVariantMessage asked chosen own )
+                _ -> Nothing
+            else do
+              -- One entry per file: from the CLI the project root and the
+              -- importer-relative tier are one folder.
+              keyed <- traverse
+                (\ (lbl, f) -> (,(lbl, f)) . either (\ (_ :: SomeException) -> normalise f) id <$> tryAny (canonicalizePath f))
+                found
+              let firsts = List.nubBy (\ a b -> fst a == fst b) keyed
+                  files = [ ([ l | (k', (l, _)) <- keyed, k' == k ], f) | (k, (_, f)) <- firsts ]
+                  key = map (Text.pack . fst) firsts <> [candidateDisplay chosen]
+              pure (Just (key, skippedCaseVariantMessage asked chosen files))
+
+    embeddedImporter =
+      (Shake.embeddedLibraryUriScheme <> ":") `Text.isPrefixOf` (fromNormalizedUri importerUri).getUri
+
+    warnOnSkippedCaseVariant = \ case
+      Nothing -> pure ()
+      Just (key, msg) -> do
+        fresh <- UnliftIO.atomicModifyIORef' caseSkipWarnedRef $ \ s ->
+          if Set.member (modName, key) s then (s, False) else (Set.insert (modName, key) s, True)
+        when fresh $
+          logWith recorder Warning $ LogImportResolution msg
+
+-- | The text of the skipped-variant warning ('resolveImportQuietly'): the
+-- module asked for, the copy that was used, and each file passed over, with
+-- the labels of the tiers that name it. Wording assumed, not ruled.
+--
+-- The reason and the fix depend on how the file's name differs, so that each
+-- sentence is true (review findings C and D; wordings assumed, not ruled):
+--
+--   * only in capitals, and it ends in @.l4@ (@Math.l4@ for @math@): "capital
+--     letters count", and either fix works;
+--   * by more than capitals (@straße.l4@ for @strasse@): "letter for letter",
+--     and either fix works;
+--   * in its extension (@prelude.L4@, @Math.L4@): an IMPORT names no
+--     extension, so no spelling of it reaches the file; only a rename does.
+skippedCaseVariantMessage :: Text -> LibraryCandidate -> [([Text], FilePath)] -> Text
+skippedCaseVariantMessage modName chosen files = Text.unlines $ case files of
+  [(lbls, f)]
+    | not (endsInL4 f) && stem f == modName ->
+        [ "`IMPORT " <> modName <> "` did not use " <> mention lbls f
+            <> ", because a module's file name must end in `.l4`, in small letters."
+        , "It used " <> used <> " instead."
+        , "To use that file, rename it to `" <> modName <> ".l4`."
+        ]
+    | not (endsInL4 f) ->
+        [ "`IMPORT " <> modName <> "` did not use " <> mention lbls f
+            <> ", because a module's file must be named exactly `" <> modName
+            <> ".l4`, and capitals count."
+        , "It used " <> used <> " instead."
+        , "To use that file, rename it to `" <> modName <> ".l4`."
+        ]
+    | otherwise ->
+        [ "`IMPORT " <> modName <> "` did not use " <> mention lbls f
+            <> ", because " <> reason f <> ": `" <> stem f
+            <> "` and `" <> modName <> "` are different names."
+        , "It used " <> used <> " instead."
+        , "To use that file, change the IMPORT to `" <> stem f <> "`, or rename the file to `"
+            <> modName <> ".l4`."
+        ]
+  _ ->
+    [ if all (\ (_, f) -> endsInL4 f && capitalsOnly f) files
+        then "`IMPORT " <> modName <> "` did not use these files, because capital letters count"
+               <> " in a module name and none of them is spelled `" <> modName <> "`:"
+        else "`IMPORT " <> modName <> "` did not use these files, because a module's file must be"
+               <> " named exactly `" <> modName <> ".l4`, and none of them is:" ]
+    <> [ "  " <> mention lbls f | (lbls, f) <- files ]
+    <> [ "It used " <> used <> " instead."
+       , case (all (endsInL4 . snd) files, any (endsInL4 . snd) files) of
+           (True, _) ->
+             "To use one of them, change the IMPORT to that file's spelling, or rename the file to `"
+               <> modName <> ".l4`."
+           (False, True) ->
+             "To use one of them, rename it to `" <> modName
+               <> ".l4`, or, if its name ends in `.l4`, change the IMPORT to its spelling."
+           (False, False) ->
+             "To use one of them, rename it to `" <> modName <> ".l4`."
+       ]
+  where
+    stem = Text.pack . dropExtension . takeFileName
+    endsInL4 f = takeExtension f == ".l4"
+    capitalsOnly f = ModuleNameCase.differsOnlyInCapitals (stem f) modName
+    reason f
+      | capitalsOnly f = "capital letters count in a module name"
+      | otherwise = "module names must match exactly, letter for letter"
+    mention = fileInWords
+    used = copyInWords modName chosen
+
+-- | The skipped-variant warning when the file passed over is the importing
+-- file itself (@Math.l4@ that writes @IMPORT math@): what is true, instead of
+-- advice that would make the file import itself (review finding A, as revised
+-- by GM on 2026-11-21; wording assumed, not ruled).
+selfCaseVariantMessage :: Text -> LibraryCandidate -> FilePath -> Text
+selfCaseVariantMessage modName chosen own = Text.unlines
+  [ "`IMPORT " <> modName <> "` did not use `" <> Text.pack (takeFileName own)
+      <> "`, which is the importing file itself: "
+      <> ModuleNameCase.ownModuleDifference modName (Text.pack (dropExtension (takeFileName own)))
+  , "It used " <> used <> " instead."
+  , ModuleNameCase.selfImportAdvice <> " If you meant " <> used <> ", nothing needs to change."
+  ]
+  where
+    used = copyInWords modName chosen
+
+-- | A file, by its name and its place in words, never by its path.
+fileInWords :: [Text] -> FilePath -> Text
+fileInWords lbls f = "`" <> Text.pack (takeFileName f) <> "` " <> wherePhrase
+  where
+    -- The tier in words. When two tiers name one file, which from the CLI the
+    -- project root and the importer-relative tier do, "beside the importing
+    -- file" is the one a reader recognises.
+    wherePhrase
+      | "importer-relative" `elem` lbls = "beside the importing file"
+      | otherwise = case lbls of
+          ("$JL4_LIBRARY_PATH" : _) -> "in the folder JL4_LIBRARY_PATH names"
+          ("project root" : _)      -> "in the project's root folder"
+          ("XDG data dir" : _)      -> "in your personal library folder (the XDG data dir)"
+          ("VSCode bundle" : _)     -> "in the libraries folder of the editor extension"
+          _                         -> "in " <> Text.intercalate ", " lbls
+
+-- | The copy an IMPORT used, in words.
+copyInWords :: Text -> LibraryCandidate -> Text
+copyInWords modName = \ case
+  EmbeddedCandidate -> "the standard library's `" <> modName <> "`"
+  FileCandidate lbl p -> fileInWords [lbl] p
+
+-- | A type-checked module evaluated on top of its imports' heaps, under the
+-- configuration given: the work of 'GetLazyEvaluationDependenciesFile', which
+-- passes the rules' own. The REPL's @:trace@ and @:traceascii@ call it with a
+-- configuration that traces every directive, so that a line written as
+-- @#EVAL@ or @#ASSERT@ shows its trace (decided by Claude 2026-11-21, pending Meng's review); that result is not
+-- cached. Each import is evaluated once, by the rule, under the rules'
+-- configuration, either way.
+evaluateOn :: EvaluateLazy.EvalConfig -> [ImportResult] -> TypeCheckResult -> Action (EvaluateLazy.Environment, [EvaluateLazy.EvalDirectiveResult])
+evaluateOn cfg imports tcRes = do
+    deps    <- fmap catMaybes $ uses GetLazyEvaluationDependenciesFile $ map (.moduleUri) imports
+    let environment = mconcat (fst <$> deps)
+        -- the modules this one imports, transitively and once each (a diamond of
+        -- imports would otherwise list a module once per path): the JSON decoder
+        -- fills an absent field of a record declared in any of them from its
+        -- DECLARE (T1b)
+        importedModules = go Map.empty tcRes.dependencies
+          where
+            go seen [] = Map.elems seen
+            go seen (d : ds) =
+              let MkModule _ depUri _ = d.module'
+              in if Map.member depUri seen
+                   then go seen ds
+                   else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
+    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports cfg tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
+    pure (ownEnv <> environment, ownDirectives)
+
 -- | The modules a file imports that resolved to nothing, by bare name, in the
 -- order they are written, each once.
 --
@@ -964,6 +1461,21 @@ unresolvedImports uri = do
     moduleBaseName :: Name -> Text
     moduleBaseName n = Text.pack $ takeBaseName $ Text.unpack $ rawNameToText $ rawName n
 
+-- | The imports of a file that name another module, in the order they are
+-- written: 'GetImports' (which leaves out an IMPORT that resolved to nothing,
+-- see 'unresolvedImports') without an IMPORT of the file itself.
+-- 'GetLazyEvaluationDependenciesFile' evaluates these. 'GetTypeCheckDependencies'
+-- leaves a self-import unchecked, but keeps it in its list with no typecheck,
+-- so that 'importsOk' counts it.
+--
+-- 'CheckModule' and 'GetLazyEvaluationDependenciesFile' are keyed by file
+-- alone, so reading a self-import as a dependency would be a cycle in the
+-- engine's own keys. 'GetImportEdges' reports the self-import on the IMPORT,
+-- and a module on a ring has no typecheck ('onImportRing'), so evaluating one
+-- stops there, before it follows any import.
+dependencyImports :: NormalizedUri -> Action [ImportResult]
+dependencyImports uri = filter (\r -> r.moduleUri /= uri) <$> use_ GetImports uri
+
 -- | The rules of a session that may use every tier of the library ladder: the
 -- CLI, the REPL and the language server. See 'LibraryScope'.
 jl4Rules :: EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
@@ -971,13 +1483,17 @@ jl4Rules = jl4RulesIn AmbientLibraries
 
 jl4RulesIn :: LibraryScope -> EvaluateLazy.EvalConfig -> FilePath -> Recorder (WithPriority Log) -> Rules ()
 jl4RulesIn scope evalConfig rootDirectory recorder = do
+  -- The files a host has made stand in for another importer (jl4-repl's).
+  addIdeGlobal . ImporterStandIns =<< UnliftIO.newIORef Map.empty
   -- Session-scoped memory for 'resolveImportShared''s shadow warning, so a
   -- given shadow configuration is reported once, not on every re-resolution.
   shadowWarnedRef <- UnliftIO.newIORef Set.empty
+  -- ...for the skipped-variant warning, likewise (smucclaw/l4-ide#1080)...
+  caseSkipWarnedRef <- UnliftIO.newIORef Set.empty
   -- ...and for its not-found warning, which two rules would otherwise each print.
   notFoundWarnedRef <- UnliftIO.newIORef Set.empty
   let resolveImport :: NormalizedUri -> String -> Action ImportOutcome
-      resolveImport = resolveImportShared recorder shadowWarnedRef notFoundWarnedRef scope rootDirectory
+      resolveImport = resolveImportShared recorder shadowWarnedRef caseSkipWarnedRef notFoundWarnedRef scope rootDirectory
 
   define shakeRecorder $ \GetLexTokens uri -> do
     mRope <- runMaybeT $
@@ -992,7 +1508,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         lift $ addVirtualFileFromFS file
 
     case mRope of
-      Nothing -> pure ([mkSimpleFileDiagnostic uri (mkSimpleDiagnostic (fromNormalizedUri uri).getUri "could not obtain file contents" Nothing)], Nothing)
+      Nothing -> pure ([mkSimpleFileDiagnostic uri (mkSimpleDiagnostic "file/unreadable" (fromNormalizedUri uri).getUri "could not obtain file contents" Nothing)], Nothing)
       Just rope -> do
         let contents = Rope.toText rope
         case Lexer.execLexer uri contents of
@@ -1063,11 +1579,33 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         resolvedUris <- catMaybes <$> traverse resolveImportUri importNames
 
         -- Recursively get mixfix hints from imported modules
-        importedHints <- mconcat . catMaybes <$> uses GetMixfixRegistry resolvedUris
+        importedHints <- mconcat . catMaybes <$> (uses GetMixfixRegistry =<< importsThatDoNotLeadBack uri resolvedUris)
 
         -- Combine local + imported hints
         let combinedHints = localHints <> importedHints
         pure ([], Just combinedHints)
+
+  define shakeRecorder $ \GetImportEdges uri -> do
+    (tokens, contents) <- use_ GetLexTokens uri
+    case Parser.execProgramParserForTokens uri contents tokens of
+      Left _errs -> pure ([], Just [])
+      Right (firstProg, _) -> do
+        let extractImport :: TopDecl Name -> [(Maybe SrcRange, Name)]
+            extractImport = \case
+              Import _ (MkImport a n _) -> [(rangeOf a, n)]
+              _ -> []
+            resolveEdge (range, n) = do
+              let modName = takeBaseName $ Text.unpack $ rawNameToText $ rawName n
+              outcome <- resolveImport uri modName
+              pure (fmap (\u -> (range, u)) outcome.importUri)
+        edges <- catMaybes <$> traverse resolveEdge (foldTopDecls extractImport firstProg)
+        let selfImportDiags =
+              [ mkSimpleFileDiagnostic uri
+                  (mkSimpleDiagnostic "import/self-import" "import" "This IMPORT names the file it is in. A file cannot import itself." (fromSrcRange <$> range))
+              | (range, target) <- edges
+              , target == uri
+              ]
+        pure (selfImportDiags, Just edges)
 
   define shakeRecorder $ \GetParsedAst uri -> do
     (tokens, contents) <- use_ GetLexTokens uri
@@ -1102,7 +1640,11 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- truth; the error is already reported here.
         mkImportUri (range, modName, outcome) = case outcome.importUri of
           Just u ->
-            pure ([], Just u)
+            -- The skipped-variant warning (#1080), on the IMPORT that passed
+            -- the file over, so that an editor lists it with the problems;
+            -- the log line reaches only its output channel. Assumed (GM,
+            -- 2026-11-21), for Meng's review.
+            pure (Maybe.maybeToList (skippedVariantDiagnostic range <$> outcome.skippedCaseVariantWarning), Just u)
           Nothing -> do
             -- One line per location, in probe order, deduped by the FILE rather
             -- than by the spelling: see 'dedupeTriedLocations', which is where
@@ -1111,17 +1653,44 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
             -- appended after everything else as it was until 2026-09-21: a list
             -- that says it is in the order things were tried has to be.
             allPaths <- liftIO $ triedLocations outcome
-            let diag = mkSimpleFileDiagnostic uri
+            -- The case hint (#1080), second because it is the line that says
+            -- what to type; present only when a module of nearly that name
+            -- exists, so every other not-found message is byte-for-byte as
+            -- before.
+            -- When the only near match is the importing file itself, the line
+            -- says that instead of offering it (review finding A, as revised by
+            -- GM on 2026-11-21; assumed, not ruled).
+            let caseHint = Maybe.maybeToList $
+                  ModuleNameCase.caseVariantHint (Text.pack modName) outcome.caseVariantNames
+                    <|> (ModuleNameCase.selfImportHint (Text.pack modName) =<< outcome.ownModuleVariant)
+                diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
+                    "import/module-not-found"
                     (fromNormalizedUri uri).getUri
-                    (Text.unlines
-                      [ "I could not find a module with this name: " <> Text.pack modName
-                      , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
+                    (Text.unlines $
+                      [ "I could not find a module with this name: " <> Text.pack modName ]
+                      <> caseHint <>
+                      [ "Nothing it defines is in scope here; names you expected from it are reported as undefined."
                       , "I have tried the following locations:"
                       , Text.intercalate ",\n" allPaths
                       ])
                     (fromSrcRange <$> range)
             pure ([diag], Nothing)
+
+        -- The same text as the log line, at Warning, over the IMPORT. One code
+        -- for every wording, the importing file's own included (code decided
+        -- by Claude 2026-11-22, pending Meng's review).
+        skippedVariantDiagnostic range msg = mkSimpleFileDiagnostic uri Diagnostic
+          { _range = srcSpanToLspRange (fromSrcRange <$> range)
+          , _severity = Just LSP.DiagnosticSeverity_Warning
+          , _code = diagnosticCode "import/case-variant-skipped"
+          , _codeDescription = diagnosticCodeDescription "import/case-variant-skipped"
+          , _source = Just "import"
+          , _message = msg
+          , _tags = Nothing
+          , _relatedInformation = Nothing
+          , _data_ = Nothing
+          }
 
         mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], Maybe ImportResult)]
         mkDiagsAndImports = \ case
@@ -1138,7 +1707,18 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
 
   define shakeRecorder $ \GetTypeCheckDependencies uri -> do
     imports <- use_  GetImports uri
-    ress    <- fmap catMaybes $ zipWith (\res mres -> (res,) <$> mres) imports <$> uses CheckModule (map (.moduleUri) imports)
+    -- An import that resolves to this file is the file importing itself
+    -- ('GetImportEdges' reports that; 'GetImports' leaves out an IMPORT that
+    -- finds no module, and reports it). It is not typechecked:
+    -- 'CheckModule' is keyed by file alone, so that would be the rule waiting
+    -- on itself (see 'dependencyImports', which drops the same imports from the
+    -- evaluation). Nor is an import that leads back to this file
+    -- ('importsThatDoNotLeadBack'); 'CheckModule' reports that. Each is kept in
+    -- the list, with no typecheck, so that 'importsOk' counts it.
+    checkable <- importsThatDoNotLeadBack uri (filter (/= uri) (map (.moduleUri) imports))
+    results <- uses CheckModule checkable
+    let byUri = Map.fromList (zip checkable results)
+        ress = [ (i, join (Map.lookup i.moduleUri byUri)) | i <- imports ]
     pure ([], Just ress)
 
   -- The call stack is ignored, and nothing is reported here: the diagnostics
@@ -1148,8 +1728,63 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     ([],) <$> use CheckModule uri
 
   define shakeRecorder $ \CheckModule uri -> do
+    -- This publishes the error for a file that imports itself.
+    _            <- use GetImportEdges uri
     parsed       <- use_ GetParsedAst uri
-    (imported, dependencies) <- unzip <$> use_ GetTypeCheckDependencies uri
+    importResults <- use_ GetTypeCheckDependencies uri
+    onRing       <- onImportRing uri
+    -- An import with no typecheck is usually in a ring of imports. Find it, so
+    -- the message can name the files instead of the engine's rule names.
+    rings <- traverse
+      (\(imp, mTc) -> case mTc of
+          Nothing | imp.moduleUri /= uri -> firstImportCycleFrom imp.moduleUri
+          _ -> pure Nothing)
+      importResults
+    let (imported, dependencies) = unzip [ (i, tc) | (i, Just tc) <- importResults ]
+        fileName u = Text.takeWhileEnd (/= '/') (getUri (fromNormalizedUri u))
+        arrows = Text.intercalate " -> " . map fileName
+        -- What is wrong with an imported module, if anything, as its diagnostic
+        -- code and message. The error itself is reported in that module; this
+        -- points at it from the IMPORT.
+        importProblem :: ImportResult -> Maybe [NormalizedUri] -> Maybe TypeCheckResult -> Maybe (Text, Text)
+        importProblem imp ring = \case
+          Nothing -> Just $ case ring of
+            Just r
+              | uri `elem` r ->
+                  ( "import/cycle"
+                  , "This IMPORT makes a ring of imports: " <> arrows (startingAt uri r)
+                    <> ". Files cannot import each other in a ring."
+                  )
+              | otherwise ->
+                  ( "import/cycle"
+                  , "The imported module " <> modName <> " is in a ring of imports: " <> arrows r
+                    <> ". Files cannot import each other in a ring."
+                  )
+            Nothing -> ("import/module-has-errors", "The imported module " <> modName <> " could not be checked; see the errors in it.")
+          Just tc
+            | e : _ <- tc.errors ->
+                Just
+                  ( "import/module-has-errors"
+                  , "The imported module " <> modName <> " has errors"
+                      <> maybe "" (\r -> " (line " <> Text.pack (show r.start.line) <> ": " <> firstLine e <> ")") (rangeOf e)
+                  )
+            | not tc.success -> Just ("import/module-has-errors", "The imported module " <> modName <> " has errors.")
+            | not tc.importsOk -> Just ("import/module-has-errors", "The imported module " <> modName <> " imports a module with errors.")
+            | otherwise -> Nothing
+          where
+            modName = rawNameToText (rawName imp.importName)
+            -- The same ring, read from @u@: [b, a, b] from a is [a, b, a].
+            startingAt u r = case break (== u) (List.init r) of
+              (before, after) -> after <> before <> take 1 after
+            firstLine e = Text.strip $ Maybe.fromMaybe "" $ Maybe.listToMaybe $ concatMap Text.lines $ TypeCheck.prettyCheckError e.kind
+        importDiags =
+          [ mkSimpleFileDiagnostic uri (mkSimpleDiagnostic code "import" msg (fromSrcRange <$> imp.importRange))
+          | ((imp, mTc), ring) <- zip importResults rings
+          -- An IMPORT of the file itself is reported on that IMPORT by
+          -- 'GetImportEdges'.
+          , imp.moduleUri /= uri
+          , Just (code, msg) <- [importProblem imp ring mTc]
+          ]
 
     let parsedAndAnnotated = overImports (updateImport $ map (\res -> (res.importName, res.moduleUri)) imported) parsed
 
@@ -1190,8 +1825,8 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         -- All diagnostics are still published to the editor below regardless
         -- of this partition — it decides which go to 'infos' and which to 'errors'.
         (infos, errors) = partition ((/= TypeCheck.SError) . TypeCheck.severity) result.errors
-    pure
-      ( fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
+    pure $ if onRing then (importDiags, Nothing) else
+      ( importDiags <> fmap (checkErrorToDiagnostic >>= mkFileDiagnosticWithSource uri) result.errors
       , Just TypeCheckResult
         { module' = result.program
         , substitution = result.substitution
@@ -1205,6 +1840,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         , scopeMap = result.scopeMap
         , descMap = result.descMap
         , dependencies = closeDependencies dependencies
+        , importsOk = all (\(_, mTc) -> maybe False (\tc -> tc.success && tc.importsOk) mTc) importResults
         , mixfixRegistry = result.mixfixRegistry
         , sectionPaths = result.sectionPaths
         , implicitReaders = result.implicitReaders
@@ -1259,24 +1895,9 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
   -- forcing one thunk at once is the case the NOTE above 'evalRef' allows for:
   -- a thunk is blackholed per thread, so the second thread evaluates it too.
   define shakeRecorder $ \GetLazyEvaluationDependenciesFile f -> do
-    imports <- use_  GetImports f
+    imports <- dependencyImports f
     tcRes   <- use_  SuccessfulTypeCheck f
-    deps    <- fmap catMaybes $ uses GetLazyEvaluationDependenciesFile $ map (.moduleUri) imports
-    let environment = mconcat (fst <$> deps)
-        -- the modules this one imports, transitively and once each (a diamond of
-        -- imports would otherwise list a module once per path): the JSON decoder
-        -- fills an absent field of a record declared in any of them from its
-        -- DECLARE (T1b)
-        importedModules = go Map.empty tcRes.dependencies
-          where
-            go seen [] = Map.elems seen
-            go seen (d : ds) =
-              let MkModule _ depUri _ = d.module'
-              in if Map.member depUri seen
-                   then go seen ds
-                   else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
-    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports evalConfig tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
-    pure ([], Just (ownEnv <> environment, ownDirectives))
+    ([],) . Just <$> evaluateOn evalConfig imports tcRes
 
   define shakeRecorder $ \EvaluateLazy uri -> do
     res  <- use_ (AttachCallStack [uri] GetLazyEvaluationDependencies) uri
@@ -1368,7 +1989,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     parsed <- use_ GetParsedAst f
     let pfp = (fromNormalizedUri f).getUri
     pure case ExactPrint.exactprint parsed of
-      Left trErr -> ([mkSimpleFileDiagnostic f $ mkSimpleDiagnostic pfp (prettyTraverseAnnoError trErr) Nothing], Nothing)
+      Left trErr -> ([mkSimpleFileDiagnostic f $ mkSimpleDiagnostic "internal/exactprint-failed" pfp (prettyTraverseAnnoError trErr) Nothing], Nothing)
       Right ep'd -> ([], Just ep'd)
 
   where
@@ -1394,22 +2015,24 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
         Diagnostic
           { _range = rangeOfResolveWarning warn
           , _severity = Just LSP.DiagnosticSeverity_Warning
-          , _code = Nothing
-          , _codeDescription = Nothing
+          , _code = diagnosticCode code
+          , _codeDescription = diagnosticCodeDescription code
           , _source = Just "parser"
           , _message = prettyNlgResolveWarning warn
           , _tags = Nothing
           , _relatedInformation = Nothing
           , _data_ = Nothing
           }
+      where
+        code = annotationWarningCode warn
 
     mkAndOrLintWarning :: Lint.AndOrWarning -> Diagnostic
     mkAndOrLintWarning warn =
         Diagnostic
           { _range = srcRangeToLspRange warn.warningRange
           , _severity = Just LSP.DiagnosticSeverity_Warning
-          , _code = Nothing
-          , _codeDescription = Nothing
+          , _code = diagnosticCode "lint/and-or-same-indentation"
+          , _codeDescription = diagnosticCodeDescription "lint/and-or-same-indentation"
           , _source = Just "linter"
           , _message = Text.pack $ "AND and OR operators appear at the same indentation level (column " <> show warn.conflictingColumn <> "). This may indicate a precedence error - please use indentation to clarify precedence; in a pinch, parentheses may also be used."
           , _tags = Nothing
@@ -1418,15 +2041,15 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
           }
 
     mkParseErrorDiagnostic :: PError -> Diagnostic
-    mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.origin parseError.message (Just parseError.range)
+    mkParseErrorDiagnostic parseError = mkSimpleDiagnostic parseError.code parseError.origin parseError.message (Just parseError.range)
 
-    mkSimpleDiagnostic :: Text -> Text -> Maybe SrcSpan -> Diagnostic
-    mkSimpleDiagnostic origin _message range =
+    mkSimpleDiagnostic :: Text -> Text -> Text -> Maybe SrcSpan -> Diagnostic
+    mkSimpleDiagnostic code origin _message range =
       Diagnostic
         { _range = srcSpanToLspRange range
         , _severity = Just LSP.DiagnosticSeverity_Error
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just origin
         , _message
         , _tags = Nothing
@@ -1473,8 +2096,8 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
       Diagnostic
         { _range = srcRangeToLspRange (Just range)
         , _severity = Just LSP.DiagnosticSeverity_Hint
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode "lint/redundant-lang-en"
+        , _codeDescription = diagnosticCodeDescription "lint/redundant-lang-en"
         , _source = Just "linter"
         , _message = "A module that declares nothing is English; this line can go."
         , _tags = Nothing
@@ -1505,36 +2128,51 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
               -- (UNKNOWN-EVALUATION-SPEC §4.7.4, U1b)
               EvaluateLazy.Assertion EvaluateLazy.Holds              -> Just LSP.DiagnosticSeverity_Information
               EvaluateLazy.Reduction (EvaluateLazy.Reduced _)        -> Just LSP.DiagnosticSeverity_Information
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just "eval"
         , _message = EvaluateLazy.prettyEvalDirectiveResult r
         , _tags = Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }
+      where
+        code = EvaluateLazy.evalDirectiveCode res
 
     checkErrorToDiagnostic :: CheckErrorWithContext -> Diagnostic
     checkErrorToDiagnostic checkError =
       Diagnostic
         { _range = srcRangeToLspRange (rangeOf checkError)
         , _severity = Just (translateSeverity (TypeCheck.severity checkError))
-        , _code = Nothing
-        , _codeDescription = Nothing
+        , _code = diagnosticCode code
+        , _codeDescription = diagnosticCodeDescription code
         , _source = Just "check"
         , _message = Text.unlines (TypeCheck.prettyCheckError checkError.kind)
           -- A deprecation warning is tagged so that editors render the retired
           -- spelling the way they render any other deprecated one (typically
-          -- struck through), on top of the warning squiggle. Two spellings are
-          -- being retired: ASSUME, and EXACTLY in a regulative action (R3 of
-          -- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md).
+          -- struck through), on top of the warning squiggle. The spellings being
+          -- retired: ASSUME, EXACTLY in a regulative action (R3 of
+          -- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md), and the old names of
+          -- two built-ins, `IS INTEGER` and `WAIT UNTIL` (Note [Renamed
+          -- built-ins] in L4.TypeCheck.Environment).
         , _tags = case checkError.kind of
             TypeCheck.CheckWarning (TypeCheck.DeprecatedAssume {}) -> Just [LSP.DiagnosticTag_Deprecated]
             TypeCheck.CheckWarning (TypeCheck.DeprecatedExactly {}) -> Just [LSP.DiagnosticTag_Deprecated]
+            TypeCheck.CheckWarning (TypeCheck.RenamedBuiltin {})    -> Just [LSP.DiagnosticTag_Deprecated]
             _                                                      -> Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing
         }
+      where
+        code = TypeCheck.checkErrorCode checkError.kind
+
+-- | The language server's severity for one of L4's own.
+diagnosticSeverityToLsp :: Diagnostic.DiagnosticSeverity -> DiagnosticSeverity
+diagnosticSeverityToLsp = \case
+  Diagnostic.DSError       -> LSP.DiagnosticSeverity_Error
+  Diagnostic.DSWarning     -> LSP.DiagnosticSeverity_Warning
+  Diagnostic.DSInformation -> LSP.DiagnosticSeverity_Information
+  Diagnostic.DSHint        -> LSP.DiagnosticSeverity_Hint
 
 translateSeverity :: TypeCheck.Severity -> DiagnosticSeverity
 translateSeverity TypeCheck.SInfo  = LSP.DiagnosticSeverity_Information
@@ -1563,57 +2201,10 @@ lspPositionToSrcPos :: LSP.Position -> SrcPos
 lspPositionToSrcPos (LSP.Position { _character = c, _line = l }) =
   MkSrcPos (fromIntegral $ l + 1) (fromIntegral $ c + 1)
 
+-- | The text of an annotation warning, shared with the web editor's check
+-- ('L4.API.l4Check').
 prettyNlgResolveWarning :: Resolve.Warning -> Text
-prettyNlgResolveWarning = \ case
-  Resolve.NotAttached _ ->
-    "Not attached to any valid syntax node."
-  Resolve.UnknownLocation nlg -> Text.unlines
-    [ "The following NLG Annotation has no source location. This might be an internal compiler error."
-    , "```"
-    , Print.prettyLayout nlg
-    , "```"
-    ]
-  Resolve.EmptyNlg name _ ->
-    "This @nlg annotation has no text, so it is ignored: "
-      <> Print.prettyLayout name
-      <> " would otherwise render as nothing at all, because an annotation replaces what it annotates."
-  Resolve.Ambiguous name mtag nlgs -> Text.unlines $
-    ( case mtag of
-        -- Every parsed annotation carries a language by the time it gets
-        -- here: an untagged one is stamped with the module's `@lang`, or with
-        -- `en`. So the hint has to cover BOTH shapes at once — it is wrong to
-        -- say "tag these" to someone who already tagged them `:he` twice, and
-        -- wrong to talk about `en` without saying where `en` came from.
-        Just (Lexer.MkLangTag tag) ->
-          [ "More than one NLG annotation in language `" <> tag <> "` attached to: "
-              <> Print.prettyLayout name
-          , "An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags."
-          ]
-        -- Only an annotation we could not parse reaches here without one.
-        Nothing ->
-          [ "More than one NLG annotation attached to: " <> Print.prettyLayout name ]
-    ) <>
-    [ "The following annotations would be attached:"
-    , ""
-    ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
-  Resolve.RefUnattached r ->
-    Resolve.refUnattachedMessage r.payload
-  Resolve.RefTrailing r code ->
-    Resolve.refTrailingMessage r.payload code
-  Resolve.RefNoLocation ref ->
-    Resolve.refNoLocationMessage ref
-  Resolve.FixityAnnotationMisplaced _ ->
-    "This fixity annotation is not on the line directly above a binary operator definition, so it is ignored. Put @infixl / @infixr / @infix immediately above the operator's definition."
-  Resolve.FixityAnnotationNoLocation _ ->
-    "A fixity annotation has no source location. This might be an internal compiler error."
-  Resolve.NonassertableAnnotationMisplaced _ ->
-    "This @nonassertable sits inside a definition's body, or after the last construct of the file, so no definition carries it. Write it on a line of its own above the definition's GIVEN, or directly above its MEANS or DECIDE. A definition inside a WHERE or LET block cannot carry it yet."
-  Resolve.NonassertableAnnotationSuperseded _ ->
-    "Two or more @nonassertable marks sit above one construct; this one is an earlier one and is ignored, since the closest to the construct is the one that counts. One mark is enough."
-  Resolve.NonassertableAnnotationSameLine _ ->
-    "This @nonassertable shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
-  Resolve.NonassertableAnnotationNoLocation _ ->
-    "A @nonassertable annotation has no source location. This might be an internal compiler error."
+prettyNlgResolveWarning = annotationWarningMessage
 
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
@@ -1625,33 +2216,7 @@ listL4Files dir = do
 
 
 rangeOfResolveWarning :: Resolve.Warning -> LSP.Range
-rangeOfResolveWarning = \ case
-  Resolve.NotAttached nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.UnknownLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.EmptyNlg _ nlg ->
-    srcSpanToLspRange $ Just nlg.range
-  Resolve.Ambiguous name _ _ ->
-    srcRangeToLspRange $ rangeOf name
-  Resolve.RefUnattached r ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefTrailing r _ ->
-    srcSpanToLspRange $ Just r.range
-  Resolve.RefNoLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.FixityAnnotationMisplaced fx ->
-    srcSpanToLspRange $ Just fx.range
-  Resolve.FixityAnnotationNoLocation _ ->
-    srcSpanToLspRange Nothing
-  Resolve.NonassertableAnnotationMisplaced na ->
-    srcSpanToLspRange $ Just na.range
-  Resolve.NonassertableAnnotationSameLine na ->
-    srcSpanToLspRange $ Just na.range
-  Resolve.NonassertableAnnotationSuperseded na ->
-    srcSpanToLspRange $ Just na.range
-  Resolve.NonassertableAnnotationNoLocation _ ->
-    srcSpanToLspRange Nothing
+rangeOfResolveWarning = srcSpanToLspRange . annotationWarningSpan
 
 -- ----------------------------------------------------------------------------
 -- The nlg map hover reads

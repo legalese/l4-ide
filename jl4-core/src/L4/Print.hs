@@ -7,6 +7,7 @@ import qualified Base.Text as Text
 import L4.Evaluate.ValueLazy as Lazy
 import qualified L4.Lexer as Lexer
 import L4.Print.Columnar (Cell, Grid, DittoOpts, defaultDittoOpts, renderDittoGrid)
+import L4.Print.Layout (layoutUnboundedLocal)
 import L4.Syntax
 import qualified L4.TypeCheck.Environment as TCEnv
 import qualified L4.TypeCheck.Types as TC
@@ -34,8 +35,12 @@ import System.FilePath (takeFileName)
 prettyLayout :: LayoutPrinter a => a -> Text
 prettyLayout a = docText $ printWithLayout a
 
+-- | One line per hard line break, however long: the same text as
+-- @layoutPretty (LayoutOptions Unbounded)@, in time linear in the text when
+-- every group fits (smucclaw/l4-ide#1075; Note [Why L4.Print does not use
+-- the library's Unbounded layout] in "L4.Print.Layout").
 docText :: Doc ann -> Text
-docText = renderStrict . layoutPretty (LayoutOptions Unbounded)
+docText = renderStrict . layoutUnboundedLocal
 
 -- | A map from constructor 'Unique' to its field names (in order).
 -- Used for pretty-printing constructor values with named fields.
@@ -187,7 +192,7 @@ prefixKeywordBuiltin r
 quotedName :: Name -> Text
 quotedName n =
     renderStrict
-  $ layoutPretty (LayoutOptions Unbounded)
+  $ layoutUnboundedLocal
   $ pretty . quote . rawNameToText . rawName $ n
 
 class LayoutPrinter a where
@@ -481,18 +486,33 @@ instance LayoutPrinterWithName a => LayoutPrinter (Type' a) where
 -- schema's @returnType@ non-deterministic across compiles, which trips the
 -- deploy breaking-change check. Here we normalise every inference variable to a
 -- stable type-variable name (@a@, @b@, @c@, …) by order of first appearance.
+-- A name that already prints as a type in the same type is skipped, so that a
+-- function from any type to a declared type @a@ prints as
+-- @FUNCTION FROM b TO a@, not as the identity function's @FUNCTION FROM a TO a@.
 -- The plain 'prettyLayout' instance keeps the raw id, which is what we want for
 -- internal debugging.
 prettyTypeForDisplay :: Type' Resolved -> Text
 prettyTypeForDisplay ty = docText (goDisplayTy naming ty)
   where
-    naming = Map.fromList (zip (collectInfVarUniques ty) displayTypeVarNames)
+    taken = Set.fromList (collectTypeNameTexts ty)
+    naming = Map.fromList (zip (collectInfVarUniques ty) (filter (`Set.notMember` taken) displayTypeVarNames))
+
+-- | The text of every type name and @FOR ALL@ binder in a type, as
+-- 'printWithLayout' prints it.
+collectTypeNameTexts :: Type' Resolved -> [Text]
+collectTypeNameTexts = \ case
+  Type _          -> []
+  TyApp _ n ps    -> docText (printWithLayout n) : concatMap collectTypeNameTexts ps
+  Fun _ args ty'  -> concatMap (collectTypeNameTexts . ontType) args <> collectTypeNameTexts ty'
+  Forall _ vs ty' -> map (docText . printWithLayout) vs <> collectTypeNameTexts ty'
+  InfVar {}       -> []
+  where
+    ontType (MkOptionallyNamedType _ _ t) = t
 
 -- | Distinct inference-variable uniques, in order of first appearance.
 collectInfVarUniques :: Type' Resolved -> [Int]
-collectInfVarUniques = ordNub . go
+collectInfVarUniques = nubOrd . go
   where
-    ordNub = foldr (\x xs -> x : filter (/= x) xs) []
     go = \ case
       Type _          -> []
       TyApp _ _ ps     -> concatMap go ps
@@ -860,8 +880,11 @@ instance LayoutPrinterWithName a => LayoutPrinter (Directive a) where
       map (indent 2 . printWithLayout) stmts
     Assert _ e ->
       "#ASSERT" <+> printWithLayout e
+    -- An expression with an open tail is bracketed, so that a BECAUSE in it,
+    -- a BREACH's, is inside the brackets, where the parser reads it as the
+    -- BREACH's and not as the directive's.
     AssertRefused _ e mmsg ->
-      "#ASSERT REFUSED" <+> printWithLayout e <>
+      "#ASSERT REFUSED" <+> parensIfOpenTailed e <>
         maybe mempty (\m -> " BECAUSE" <+> printWithLayout m) mmsg
 
 instance LayoutPrinterWithName a => LayoutPrinter (Import a) where
@@ -981,6 +1004,11 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
       parensIfNeeded e1 <+> "LESS THAN" <+> parensIfNeeded e2
     Gt         _ e1 e2 ->
       parensIfNeeded e1 <+> "GREATER THAN" <+> parensIfNeeded e2
+    -- The left of 's is an atom to the parser ('L4.Parser.projection' reads
+    -- it with 'atomicExpr'): a literal, a name or a bracketed expression.
+    -- A REFUSE is none of these, so it is bracketed here.
+    Proj       _ e1@Refuse{} n ->
+      surround (printWithLayout e1) "(" ")" <> "'s" <+> printWithLayout n
     Proj       _ e1 n ->
       parensIfNeeded e1 <> "'s" <+> printWithLayout n
     Var        _ n ->
@@ -1143,7 +1171,9 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     Var{} -> printWithLayout e
     -- A BREACH with neither BY nor BECAUSE is a single keyword, i.e. an atom.
     Breach _ Nothing Nothing -> printWithLayout e
-    -- REFUSE is a keyword followed by a literal: an atom.
+    -- REFUSE and its literal read back as one operand wherever the parser
+    -- takes an expression ('L4.Parser.baseExpr'), so they need no brackets.
+    -- The left of 's takes an atom instead; the 'Proj' arm brackets it there.
     Refuse{} -> printWithLayout e
     -- THE JOIN \/ THE DEADLINE \/ THE ARMING: two words, one atom, admitted
     -- as a juxtaposed argument ('L4.Parser.atomicExpr'' — keep the two in step)

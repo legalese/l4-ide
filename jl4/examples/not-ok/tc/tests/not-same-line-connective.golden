@@ -6,7 +6,7 @@ File: not-same-line-connective.l4
   Range: 12:18-12:27
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/not-reaches-connective
   Message:
     On one line, NOT reaches to the end of the line, so this reads as
 
@@ -28,7 +28,7 @@ File: not-same-line-connective.l4
   Range: 15:17-15:25
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/not-reaches-connective
   Message:
     On one line, NOT reaches to the end of the line, so this reads as
 
@@ -50,7 +50,7 @@ File: not-same-line-connective.l4
   Range: 18:22-18:35
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/not-reaches-connective
   Message:
     On one line, NOT reaches to the end of the line, so this reads as
 
@@ -72,7 +72,7 @@ File: not-same-line-connective.l4
   Range: 23:26-23:35
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/not-reaches-connective
   Message:
     On one line, NOT reaches to the end of the line, so this reads as
 
@@ -94,7 +94,7 @@ File: not-same-line-connective.l4
   Range: 29:3-29:12
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/not-reaches-connective
   Message:
     On one line, NOT reaches to the end of the line, so this reads as
 
@@ -116,7 +116,7 @@ File: not-same-line-connective.l4
   Range: 33:7-33:19
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/not-reaches-connective
   Message:
     On one line, NOT reaches to the end of the line, so this reads as
 

@@ -6,7 +6,7 @@ File: lifecycle-value-on-join-line.l4
   Range: 18:58-18:72
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/lifecycle-unavailable
   Message:
     THE JOIN cannot be read in the WITHIN on a join line.
 
@@ -20,7 +20,7 @@ File: lifecycle-value-on-join-line.l4
   Range: 22:27-22:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -33,7 +33,7 @@ File: lifecycle-value-on-join-line.l4
   Range: 23:60-23:78
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/lifecycle-unavailable
   Message:
     THE DEADLINE cannot be read in the WITHIN on a join line.
 

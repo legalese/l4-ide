@@ -40,7 +40,7 @@ GIVETH A DEONTIC Actor Action
     PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 5
 
 #TRACE `the rent is due` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 #TRACE `the rent is due` AT 0 WITH
     PARTY `Ms Ng` DOES Inspect `Ms Ng` AT 2
@@ -71,7 +71,7 @@ GIVETH A DEONTIC Actor Action
     PARTY Alice DOES Pay Alice `Ms Ng` 1500 AT 6
 
 #TRACE `rent, receipt, guarantee` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 -- At once: two flatmates each owe a share (all of these) ...
 GIVETH A DEONTIC Actor Action
@@ -94,7 +94,7 @@ GIVETH A DEONTIC Actor Action
     PARTY Bob DOES Pay Bob `Ms Ng` 1500 AT 2
 
 #TRACE `either pays the whole` AT 0 WITH
-    (`WAIT UNTIL` 8)
+    (WAITUNTIL 8)
 
 
 -- ====================================================================

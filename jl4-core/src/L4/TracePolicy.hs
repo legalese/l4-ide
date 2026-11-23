@@ -33,7 +33,7 @@ Each tool creates a TracePolicy based on its context:
 -- CLI: Default no traces (clean output), enable with flags
 cliPolicy = cliDefaultPolicy
 
--- REPL: Full traces for exploration
+-- REPL: traces for :trace and :traceascii lines only
 replPolicy = replDefaultPolicy graphVizOptions
 
 -- API: Controlled by request parameters
@@ -100,9 +100,24 @@ cliDefaultPolicy = TracePolicy
   , evaltraceDirectiveTrace = NoTrace
   }
 
--- | REPL default: Full trace collection for exploration
+-- | REPL default: a trace only where one is asked for. A plain line is run as
+-- an @#EVAL@, whose trace the REPL never shows ('formatResult' in
+-- @jl4-repl/app/Main.hs@ drops it), so it is not collected; @:trace@ and
+-- @:traceascii@ run the line as an @#EVALTRACE@, which still is.
+--
+-- Until 2026-11-21 this collected a trace for every @#EVAL@ too, which held
+-- about 10 KB per step: a runaway plain line used 10.6 GB by 1,000,000 steps
+-- (measured), and was thrown away unread. Decided by Claude 2026-11-21, pending Meng's review.
 replDefaultPolicy :: GraphVizOptions -> TracePolicy
 replDefaultPolicy gvOpts = TracePolicy
+  { evalDirectiveTrace = NoTrace
+  , evaltraceDirectiveTrace = CollectTrace (TraceOptions TextTrace Stdout gvOpts)
+  }
+
+-- | Every directive traced, @#EVAL@ and @#EVALTRACE@ alike: what
+-- 'replDefaultPolicy' was before 2026-11-21. For tests that need a traced run.
+fullTracePolicy :: GraphVizOptions -> TracePolicy
+fullTracePolicy gvOpts = TracePolicy
   { evalDirectiveTrace = CollectTrace (TraceOptions TextTrace Stdout gvOpts)
   , evaltraceDirectiveTrace = CollectTrace (TraceOptions TextTrace Stdout gvOpts)
   }

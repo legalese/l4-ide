@@ -123,7 +123,7 @@ Result:
   assertion failed
 ```
 
-`l4 run` exits with a non-zero code for type errors and for directives that fail while evaluating (including an `#ASSERT` that stops and says why, as described below), but **not** for a failed assertion: the file is still valid L4, so the exit code is `0`. In CI, look for failures explicitly: grep the output for `assertion failed`, or run `l4 run --json` and check each result whose `"kind"` is `"assertion"` for `"value": false`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
+`l4 run` exits with a non-zero code for type errors, for directives that fail while evaluating (including an `#ASSERT` that stops and says why, as described below), and for a failed assertion, but **not** for an `#EVAL` or an `#ASSERT` the rules decline to answer with `REFUSE`: the file is still valid L4, so the exit code is `0`. In CI, look for those explicitly: grep the output for `assertion refused`, or run `l4 run --json` and check that each result whose `"kind"` is `"assertion"` has `"value": true`. [Manage rules in git and CI](version-control-for-rules.md) has a ready-made workflow.
 
 ### What an error looks like
 
@@ -153,7 +153,7 @@ The same holds for a bare yes-or-no fact, left open the same way, asserted direc
 
 ### What a refusal looks like
 
-A fourth outcome is neither a verdict nor a breakdown. A rule can be written to _decline_ a case with `REFUSE "..."`: this case is outside what the encoding covers, and here is the sentence saying so. Regulation Crowdfunding took effect in 2016, so an encoding of it has no dollar figure to give for an earlier year, and refuses rather than inventing one:
+A fourth outcome is neither a verdict nor a breakdown. A rule can be written to _decline_ a case with `REFUSE "..."`: this case is outside what the encoding covers, and here is the sentence saying so. A grant scheme that began in 2016 has nothing to say about 2015, so an encoding of its funding limit declines to:
 
 ```l4
 GIVEN year IS A NUMBER
@@ -161,7 +161,7 @@ GIVETH A NUMBER
 DECIDE `funding limit for` IS
     IF year AT LEAST 2016
     THEN 5000000
-    ELSE REFUSE "no Regulation Crowdfunding figure exists before commencement in 2016"
+    ELSE REFUSE "the scheme began in 2016, so no funding limit exists before then"
 ```
 
 A plain `#ASSERT` does not test that. Asked about 2015, it reports the refusal — which is neither `assertion satisfied` nor `assertion failed`:
@@ -170,14 +170,14 @@ A plain `#ASSERT` does not test that. Asked about 2015, it reports the refusal �
 Result:
   assertion refused:
   The model refuses to answer:
-    no Regulation Crowdfunding figure exists before commencement in 2016
+    the scheme began in 2016, so no funding limit exists before then
 ```
 
 To pin down that a case refuses — and declining is often the legally meaningful outcome — use `#ASSERT REFUSED`. Add `BECAUSE` to require the message too, which says _which_ refusal you expected when a rule has more than one:
 
 ```l4
 #ASSERT REFUSED `funding limit for` 2015
-#ASSERT REFUSED `funding limit for` 2015 BECAUSE "no Regulation Crowdfunding figure exists before commencement in 2016"
+#ASSERT REFUSED `funding limit for` 2015 BECAUSE "the scheme began in 2016, so no funding limit exists before then"
 ```
 
 Both report the same thing when the rule does refuse with that message:

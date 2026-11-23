@@ -1,6 +1,5 @@
 <script lang="ts">
-  // Section-sign "spotlight trace" spinner, ported from the
-  // legalese.github.io /console/logs page. A faint § outline is always
+  // Section-sign "spotlight trace" spinner. A faint § outline is always
   // visible while a brighter segment continuously traces around it;
   // three gradient stops shimmer across the fill in staggered phase.
   let { size = 36 }: { size?: number } = $props()

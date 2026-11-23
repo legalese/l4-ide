@@ -62,10 +62,10 @@ GIVETH A DEONTIC Actor Action
 
 -- Alice never pays: one breach, naming her.
 #TRACE `those in arrears` AT 0 WITH
-  `WAIT UNTIL` 9
+  WAITUNTIL 9
 
 #TRACE `those in arrears, spelled out` AT 0 WITH
-  `WAIT UNTIL` 9
+  WAITUNTIL 9
 
 -- == 2. More than one constraint: the asyndetic operators ==
 

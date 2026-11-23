@@ -1,0 +1,20 @@
+-- Choice types as inputs: a name that is no constructor of the type. The run
+-- refuses it, and `l4 batch --validate-only` called the row valid
+-- (smucclaw/l4-ide#1086). The input is an enumeration on its own, in a record's
+-- field, in a list and in a MAYBE.
+
+DECLARE Party IS ONE OF Landlord, Tenant
+
+DECLARE Lease HAS
+  payer IS A Party
+  guests IS A LIST OF Party
+  proxy IS A MAYBE Party
+
+@export default Who pays
+GIVEN p IS A Party
+      l IS A Lease
+GIVETH A NUMBER
+`who pays` MEANS
+  CONSIDER p
+    WHEN Landlord THEN 1
+    WHEN Tenant THEN 2

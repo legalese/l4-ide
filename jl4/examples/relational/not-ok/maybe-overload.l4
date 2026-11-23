@@ -1,8 +1,8 @@
 -- Named rejection: the MAYBE-valued overload of a recognised aggregate.
 --
 -- `minimum` and `maximum` are overloaded in the prelude — once over
--- `LIST OF NUMBER` (prelude.l4:336,345) and again over `LIST OF MAYBE NUMBER`
--- (:353,385) — and the middle-end recognises aggregates BY NAME, which matches
+-- `LIST OF NUMBER` (prelude.l4:339,348) and again over `LIST OF MAYBE NUMBER`
+-- (:356,388) — and the middle-end recognises aggregates BY NAME, which matches
 -- both. The overloads are separated by SORT, using the resolved callee's own
 -- result type, and the MAYBE one is refused: lowering it to a plain
 -- `RAggregate` would silently drop the NOTHINGs, and a bridge that quietly

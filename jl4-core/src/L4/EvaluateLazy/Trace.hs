@@ -8,7 +8,7 @@ import qualified Base.Text as Text
 import L4.Annotation (emptyAnno)
 import L4.Syntax
 import L4.Evaluate.ValueLazy
-import L4.EvaluateLazy.Exceptions (EvalException(..), InternalEvalException(..), UserEvalException(..), Refusal(..), prettyEvalException)
+import L4.EvaluateLazy.Exceptions (Budget (..), EvalException(..), InternalEvalException(..), UserEvalException(..), Refusal(..), prettyEvalException)
 import L4.Print
 import L4.TypeCheck.Environment.TH (builtinUri)
 import L4.Utils.RevList
@@ -164,6 +164,12 @@ splitEvalTraceActions = go 0 [(0, Nothing, mempty)] Map.empty
         m' = insertIfMissing (Just r.address) (Left v) m
       in
         go d1 ((d2, ma, casf `DList.snoc` a) : stack) m' as
+    go d1 ((d2, ma, casf) : stack) m (a@(SetRef _) : as@(Exit (Left _) : _)) =
+      -- If a 'SetRef' is immediately followed by an exception, then forcing that
+      -- address raised before any frame was pushed for it: a stack overflow at its
+      -- update frame, or a blackhole. The depth will never reach the threshold a
+      -- new address frame would wait for, so we must not create one.
+      go d1 ((d2, ma, casf `DList.snoc` a) : stack) m as
     go d1 ((d2, ma, casf) : stack) m (a@(SetRef r) : as) =
       -- The normal situation if we encounter a 'SetRef' is to create a new frame on
       -- our address stack with an empty action list.
@@ -295,7 +301,7 @@ printEvalExceptionShort (InternalEvalException e) = printInternalEvalExceptionSh
 printEvalExceptionShort (UserEvalException e)     = printUserEvalExceptionShort e
 -- A refusal is a designed outcome, so the trace names it as one and carries the
 -- author's reason. 'raiseException' emits an @Exit (Left e)@ before unwinding,
--- so a refusal is already a first-class trace event.
+-- so a refusal is a first-class trace event.
 printEvalExceptionShort (RefusalException r)     = "refused: " <> pretty (r.message :: Text)
 
 printInternalEvalExceptionShort :: InternalEvalException -> Doc ann
@@ -310,12 +316,22 @@ printUserEvalExceptionShort (BlackholeForced _)             = "loop detected"
 printUserEvalExceptionShort (EqualityOnUnsupportedType _ _) = "called equality on unsupported type"
 printUserEvalExceptionShort (NonExhaustivePatterns Nothing _)  = "non-exhaustive patterns"
 printUserEvalExceptionShort (NonExhaustivePatterns (Just g) _) = "no clause of " <> pretty (quotedName (MkName emptyAnno g.groupHead)) <> " matches"
-printUserEvalExceptionShort StackOverflow                   = "stack overflow"
+printUserEvalExceptionShort (StackOverflow _)               = "stack overflow"
 printUserEvalExceptionShort (DivisionByZero _)              = "division by zero"
 printUserEvalExceptionShort (NotAnInteger _ _)              = "not an integer"
 printUserEvalExceptionShort (Stuck _)                       = "stuck"
 printUserEvalExceptionShort RanOutOfSteps                   = "gave up"
 printUserEvalExceptionShort (UserError _)                   = "user error"
+printUserEvalExceptionShort (OverBudget b)                  = case b of
+  OpenObligations _ _     -> "stopped: too many obligations open"
+  JoinedBreaches _ _      -> "stopped: too many failures joined"
+  ClosureApplications {}  -> "stopped: too many steps"
+  TimeLimit _             -> "stopped: time limit"
+  MemoryLimit _           -> "stopped: memory limit"
+printUserEvalExceptionShort (NotEvaluated _ _)              = "not evaluated: the run stopped"
+-- 'ValueTooDeep' is the outcome of an #ASSERT REFUSED, not of an evaluation,
+-- and a trace carries the evaluation's, so no trace holds it.
+printUserEvalExceptionShort ValueTooDeep                    = "value deeper than read"
 
 -- | This is a stack data structure that is maintained while building an 'EvalPreTrace'.
 type PreTraceStack = [PreTraceFrame]

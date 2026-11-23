@@ -108,4 +108,4 @@ GIVETH A DEONTIC Party Act
     PARTY World DOES `Alice checks whether dinner is bought` AT 65100
     PARTY World DOES (`Alice buys dinner` TRUE)              AT 65130
     PARTY World DOES `ledger records Bob's purchase`         AT 65160
-    (`WAIT UNTIL` 75601)
+    (WAITUNTIL 75601)

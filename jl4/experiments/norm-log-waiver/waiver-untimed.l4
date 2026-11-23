@@ -1,0 +1,68 @@
+-- The naive userspace waiver, WITHOUT times, kept to reproduce one trap for NORM-LOG-SPEC N9.
+-- Tutorial: specs/todo/norm-log-waiver-userspace-draft.md. Not goldened; run with `l4 run`.
+IMPORT prelude
+
+DECLARE Person IS ONE OF patron, librarian
+DECLARE Action IS ONE OF
+  `return` HAS book IS A NUMBER
+  payFine
+  borrow HAS book IS A NUMBER
+  waive
+
+-- upstream: the loan author records the failure by hand (the userspace price)
+GIVETH DEONTIC Person Action
+loan MEANS
+  PARTY patron MUST `return` 1 WITHIN 14
+  HENCE FULFILLED
+  LEST  RECORD `overdue` IS TRUE
+        HENCE PARTY patron MUST payFine WITHIN 100
+              HENCE RECORD `cured` IS TRUE
+              HENCE FULFILLED
+
+-- the waiver: a standing power of the librarian, exercised by an act
+GIVETH DEONTIC Person Action
+waiverPower MEANS
+  PARTY librarian MAY waive WITHIN 100
+  HENCE COMMIT `waived` IS TRUE
+  HENCE FULFILLED
+
+-- "continuing" = failed, not cured, not waived
+GIVETH A BOOLEAN
+`default is continuing` MEANS
+      RECALL patron's `overdue` EQUALS JUST TRUE
+  AND RECALL patron's `cured` EQUALS NOTHING
+  AND RECALL OFFICIAL's `waived` EQUALS NOTHING
+
+GIVETH DEONTIC Person Action
+borrowing MEANS
+  PARTY patron MAY borrow 2 PROVIDED NOT `default is continuing` WITHIN 100
+
+GIVETH DEONTIC Person Action
+lwb MEANS loan RAND waiverPower RAND borrowing
+GIVETH DEONTIC Person Action
+bwl MEANS borrowing RAND waiverPower RAND loan
+
+-- W1 late, unpaid, not waived: expect blocked
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES borrow 2 AT 30
+-- W2 late, unpaid, waived at 25, borrow at 30: expect allowed
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY librarian DOES waive AT 25
+  PARTY patron DOES borrow 2 AT 30
+-- W3 waived AFTER the borrow attempt (borrow 30, waive 40): should block; ALLOWS (trap: plain RECALL reads the whole log)
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES borrow 2 AT 30
+  PARTY librarian DOES waive AT 40
+-- W4 late, fine paid: expect allowed
+#TRACE lwb AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY patron DOES payFine AT 21
+  PARTY patron DOES borrow 2 AT 30
+-- W5 = W2 with the reader on the left: allowed, but only because the reader saw an empty ledger
+#TRACE bwl AT 0 WITH
+  PARTY patron DOES `return` 1 AT 20
+  PARTY librarian DOES waive AT 25
+  PARTY patron DOES borrow 2 AT 30

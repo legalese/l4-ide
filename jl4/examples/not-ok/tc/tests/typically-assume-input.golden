@@ -6,7 +6,7 @@ File: typically-assume-input.l4
   Range: 11:8-11:9
   Source: check
   Severity: DiagnosticSeverity_Warning
-  Code: <none>
+  Code: lint/deprecated-assume
   Message:
     ASSUME is an older way of introducing a name, and it is being retired.
     Nothing is broken: the file still checks, runs and exports as before.
@@ -31,7 +31,7 @@ File: typically-assume-input.l4
   Range: 14:9-14:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/missing-named-arguments
   Message:
     In this use of
 

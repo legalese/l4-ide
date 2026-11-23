@@ -20,6 +20,9 @@ module L4.Presumption
   , nearestName
   , editDistance
   , requestRecordName
+  , couldNotDecodeText
+  , choiceExpectation
+  , choiceNameMiss
   ) where
 
 import Data.List (sortOn)
@@ -152,3 +155,38 @@ editDistance a b = last (foldl' step [0 .. length bs] (Text.unpack a))
 -- ('L4.EvaluateLazy.EvalConfig'.@requestRecord@).
 requestRecordName :: Text
 requestRecordName = "InputArgs"
+
+-- | The message of a JSON value that a decode cannot make into a type, as the
+-- evaluator's decoder says it and as @l4 batch --validate-only@ says it of a
+-- row the run would refuse (smucclaw/l4-ide#1086): the JSON as written, the
+-- type, where it sits (@ for field 'l.payer'@, or nothing at the root), and
+-- why.
+couldNotDecodeText :: Text -> Text -> Text -> Text -> Text
+couldNotDecodeText json typeName atField why =
+  "Could not decode " <> json <> " as " <> typeName <> atField <> ": " <> why
+
+-- | What a value of a choice type is given as in JSON, for 'couldNotDecodeText':
+-- the constructors without fields, by name, and those with fields, which
+-- cannot be given at all.
+choiceExpectation :: Text -> [Text] -> [Text] -> Text
+choiceExpectation typeName withoutFields withFields = case (withoutFields, withFields) of
+  ([], [])  -> typeName <> " has no constructor that JSON input can name."
+  ([], _)   -> "every constructor of " <> typeName <> " has fields (" <> commas withFields
+                 <> "), and a constructor with fields cannot be given as JSON input."
+  (_, [])   -> "expected a string naming one of: " <> commas withoutFields <> "."
+  (_, _)    -> "expected a string naming one of: " <> commas withoutFields
+                 <> ". A constructor with fields (" <> commas withFields
+                 <> ") cannot be given as JSON input."
+  where commas = Text.intercalate ", "
+
+-- | Why a JSON string is not a value of a choice type, for 'couldNotDecodeText'.
+choiceNameMiss :: Text -> Text -> [Text] -> [Text] -> Text
+choiceNameMiss typeName name withoutFields withFields
+  | name `elem` withFields =
+      name <> " has fields, and a constructor with fields cannot be given as JSON input"
+        <> if null withoutFields
+             then "."
+             else "; expected a string naming one of: " <> Text.intercalate ", " withoutFields <> "."
+  | otherwise =
+      "it names no constructor of " <> typeName <> "; "
+        <> choiceExpectation typeName withoutFields withFields

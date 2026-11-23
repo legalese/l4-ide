@@ -563,12 +563,12 @@ formatTraceLabel opts mlabel steps result =
       resultText = if opts.includeValues
         then case result of
           Right nf -> "\n────────────────\n" <> firstLine (prettyLayout nf)
-          -- A refusal is not a crash, and the graph render must say so as the
-          -- text render does ('printEvalExceptionShort' emits @refused: <msg>@).
-          -- Reporting it as @<error>@ was the one surface where the two
-          -- disagreed, and the reason is statically known, so print it.
+          -- A refusal is not a crash, and the graph render says so as the text
+          -- render does ('printEvalExceptionShort' emits @refused: <msg>@).
+          -- The reason is statically known, so it is printed, every line of
+          -- it, as the text render prints it.
           Left (RefusalException r) ->
-            "\n────────────────\n↯ refused: " <> firstLine r.message
+            "\n────────────────\n↯ refused: " <> r.message
           Left _ -> "\n────────────────\n<error>"
         else ""
   in labelText <> exprText <> resultText

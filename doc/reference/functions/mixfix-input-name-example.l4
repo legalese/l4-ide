@@ -1,0 +1,20 @@
+-- An input named like a word of a mixfix function
+
+GIVEN n IS A NUMBER
+      s IS A NUMBER
+GIVETH A NUMBER
+`the day` n `days before` s MEANS s MINUS n
+
+-- Here `the day` is an input, and `inc` is called with it.
+GIVEN `the day` IS A NUMBER
+GIVETH A NUMBER
+`inc` `the day` MEANS `the day` PLUS 1
+
+GIVEN `the day` IS A NUMBER
+GIVETH A NUMBER
+`twice` `the day` MEANS `inc` `the day`
+
+#EVAL `twice` 5                        -- 6
+
+-- In a rule with no input of that name, `the day` is still the function's word.
+#EVAL `the day` 3 `days before` 10     -- 7

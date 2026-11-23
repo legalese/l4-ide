@@ -77,7 +77,7 @@ Each reference label is written `step(<label>)` in the `.aut` files.
 **Time.**
 The brief is untimed, and so are the guards: no act carries a time, and nothing reads one.
 Times appear only in the traces, as seconds after midnight: the arrangement opens at 18:00 (64800), Alice checks at 18:05 (65100), Bob's purchase is recorded at 18:06 (65160), Alice buys at 18:07 (65220), the message arrives at 18:08 (65280).
-The evening closes at 21:00 (75600) with an anchored deadline, `WITHIN 0 OF closing`, so ``(`WAIT UNTIL` 75601)`` ends a trace.
+The evening closes at 21:00 (75600) with an anchored deadline, `WITHIN 0 OF closing`, so `(WAITUNTIL 75601)` ends a trace.
 
 ## Reading a trace
 
@@ -211,7 +211,7 @@ Three things these fixtures need from `l4 explore` (WP1) and its harness (WP4), 
   Measured: a zero-input `` `ledger open` MEANS NOT (elem taken (RECALL ALL OFFICIAL's …)) `` used as a guard let Bob's purchase be recorded twice, because its first answer was kept and reused.
   Give every rule that reads a ledger an input; here every reader takes the cell's value as its input, and the call site does the `RECALL`.
 - **A relative `WITHIN` on a recursive `MAY` restarts at every act.**
-  Measured: with `WITHIN 10800` in place of the anchor, the counterexample trace of `d1-naive.l4` ends with the chain still open after `` `WAIT UNTIL` 75601 ``, 419 seconds left, counted from Alice's purchase at 65220; anchor it, `WITHIN 0 OF closing`.
+  Measured: with `WITHIN 10800` in place of the anchor, the counterexample trace of `d1-naive.l4` ends with the chain still open after `WAITUNTIL 75601`, 419 seconds left, counted from Alice's purchase at 65220; anchor it, `WITHIN 0 OF closing`.
 - **Cell names in `RECORD` and `RECALL` must be in backticks.**
   `` RECALL `plan` `` parses and `RECALL plan` does not, and the parser's complaint points at the `(` before `RECALL`, not at the name.
 - **A record's fields print as heap references in a ledger.**

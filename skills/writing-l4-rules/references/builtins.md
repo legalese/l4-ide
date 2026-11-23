@@ -58,17 +58,17 @@ The bridge from L4 rules to real-world data. No `IMPORT` required.
 | Function     | Signature                           | Purpose                                                                                                                     |
 | ------------ | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `FETCH`      | `STRING → STRING`                   | HTTP GET; returns response body as STRING. **Lazy + cached** — multiple references to the same call return the same result. |
-| `POST`       | `STRING → STRING → STRING → STRING` | HTTP POST: `POST url headers body` where `headers` is a JSON string                                                         |
-| `ENV`        | `STRING → STRING`                   | Read environment variable; returns `""` if unset. Use this for application programming interface (API) keys.                |
+| `POST`       | `STRING → STRING → STRING → STRING` | HTTP POST: `POST url headers body`; `headers` is one `Name: value` line per header, joined by `\n`                          |
+| `ENV`        | `STRING → MAYBE STRING`             | Read environment variable: `JUST` the value, or `NOTHING` if unset. Use for application programming interface (API) keys.   |
 | `JSONENCODE` | `a → STRING`                        | Serialize a value to a JSON string                                                                                          |
-| `JSONDECODE` | `STRING → a`                        | Parse a JSON string into a typed value                                                                                      |
+| `JSONDECODE` | `STRING → EITHER STRING a`          | Parse a JSON string into a typed value: `RIGHT value`, or `LEFT message` when the text is not valid JSON                    |
 
 ```l4
 DECIDE uuid     IS FETCH "https://www.uuidtools.com/api/generate/v4"
 DECIDE apiKey   IS ENV "ANTHROPIC_API_KEY"
 DECIDE response IS POST
     "https://api.example.com/data"
-    "{\"Content-Type\": \"application/json\"}"
+    "Content-Type: application/json"
     "{\"name\": \"test\"}"
 ```
 

@@ -65,7 +65,7 @@ import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
 import L4.Cli.Trace (TraceOptions, traceCmd, traceOptionsParser)
-import L4.Cli.Verify (VerifyOptions, propositionalBound, verifyCmd, verifyOptionsParser)
+import L4.Cli.Verify (VerifyOptions, propositionalBound, verifyCmd, verifyLimitsNote, verifyOptionsParser)
 import L4.Cli.Yscript (YscriptOptions, yscriptCmd, yscriptOptionsParser)
 
 ----------------------------------------------------------------------------
@@ -115,7 +115,7 @@ commandParser =
              (progDesc "Typecheck an L4 file only (fast path; no evaluation)"))
       <> command "format"
            (info (helper <*> (CmdFormat <$> formatOptionsParser))
-             (progDesc "Reformat an L4 file and print to stdout"))
+             (progDesc "Print an L4 file to stdout exactly as written"))
       <> command "ast"
            (info (helper <*> (CmdAst <$> astOptionsParser))
              (progDesc "Dump the parsed AST of an L4 file"))
@@ -157,7 +157,7 @@ commandParser =
       <> command "verify"
            (info (helper <*> (CmdVerify <$> verifyOptionsParser))
              (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
-               <> footerDoc (Just (verbatim propositionalBound))))
+               <> footerDoc (Just (verbatim (propositionalBound <> "\n" <> verifyLimitsNote)))))
       <> command "prove"
            (info (helper <*> (CmdProve <$> proveOptionsParser))
              (progDesc "Prove or refute, with an SMT solver (z3), each #ASSERT the evaluator cannot decide because it reads a section GIVEN"

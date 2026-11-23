@@ -1,0 +1,4 @@
+# Link previews need the page to be crawlable. Shared programs load through
+# /session, which stays out of crawls.
+User-agent: *
+Disallow: /session

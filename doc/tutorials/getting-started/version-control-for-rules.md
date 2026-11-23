@@ -48,7 +48,7 @@ Guidelines:
 Because the diff is the amendment, cut commits along legal lines, not editing sessions:
 
 - **One substantive change per commit.** Raising an age threshold and adding a new exemption are two amendments — two commits.
-- **Separate substance from form.** Run `l4 format` in its own commit so reformatting noise never obscures a change of meaning.
+- **Separate substance from form.** Make layout changes, such as re-indenting or realigning a rule, in a commit of their own, so they never obscure a change of meaning.
 - **Update the assertions in the same commit.** A rule change without its test change is an unreviewable claim.
 - **Say why, cite the source.** The message should name the instrument and reason, not describe the syntax.
 
@@ -118,12 +118,16 @@ jobs:
             l4 check "$f"
           done
 
-      - name: Run tests (fail on failed assertions)
+      - name: Run tests (fail on failed, refused and unevaluable assertions)
         run: |
           status=0
           for f in $(git ls-files '*.l4'); do
             if ! out=$(l4 run "$f" 2>&1); then
-              echo "::error file=$f::l4 run failed in $f"
+              echo "::error file=$f::l4 run failed for $f (a type error, a failed assertion, or a directive that could not be evaluated)"
+              echo "$out"
+              status=1
+            elif echo "$out" | grep -q "assertion refused"; then
+              echo "::error file=$f::an assertion was refused in $f"
               echo "$out"
               status=1
             fi
@@ -136,7 +140,7 @@ To pin a version, replace the `tag=$(...)` line with a fixed tag, such as `tag=l
 Two details worth knowing:
 
 - `l4 check` exits non-zero on any parse or type error, so the typecheck step needs no extra logic.
-- `l4 run` exits non-zero on type errors, on directives that crash during evaluation, and on a failed `#ASSERT`, which prints `assertion failed` and exits 1 while the file still typechecks. So the test step needs only the exit status; with `l4 run --json` the same failure shows as `"ok": false` and an `"assertion"` result whose `"value"` is `false`.
+- `l4 run` exits non-zero on type errors, on directives that crash during evaluation (an `#ASSERT` whose expression raises is one), and on a failed `#ASSERT`, which prints `assertion failed` and exits 1 while the file still typechecks. It does **not** exit non-zero on a refused assertion: one the rules decline to answer prints `assertion refused` and exits 0. That is why the test step checks two things: the exit code, which catches the type errors, the failed assertions and the ones that could not be evaluated, and a grep for `assertion refused`, which catches the refusals (alternatively, use `l4 run --json` and check that each result of `"kind": "assertion"` has `"value": true`, which a failed assertion, with `false`, and a refused one, with `null`, both break).
 
 If rules use `NOW` or `TODAY`, add `--fixed-now <ISO8601>` to the `l4 run` calls so CI results do not depend on the day the job runs.
 

@@ -9,6 +9,11 @@ module L4.Cli.Common
     FixedNowOpt(..)
   , fixedNowParser
   , parseFixedNowText
+  , EvalLimits(..)
+  , evalLimitsParser
+  , evalLimitsParserNoting
+  , withEvalLimits
+  , guardRunStop
   , langTagReader
   , langOption
 
@@ -23,9 +28,9 @@ module L4.Cli.Common
   , runOneshot
   , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , hasBlockingError
   , transitiveDeps
   , dedupModules
-  , hasBlockingError
 
     -- * Rendering
   , TraceTextMode(..)
@@ -50,13 +55,17 @@ import Base.Text (Text)
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import Data.Maybe (catMaybes)
+import Data.IORef (readIORef)
 import Data.Time (UTCTime)
 import Options.Applicative (ReadM, eitherReader, long, metavar, help, option, optional)
 import qualified Options.Applicative as Options
 import System.IO (hPutStrLn, stderr)
+import Control.Exception (throwIO, try)
+import System.Exit (ExitCode, exitFailure)
 import Control.Applicative ((<|>))
 
 import LSP.Core.Types.Diagnostics (FileDiagnostic(..))
+import LSP.L4.BlockingErrors (hasBlockingError)
 import LSP.L4.Oneshot (oneshotL4Action)
 import qualified LSP.L4.Oneshot as Oneshot
 import LSP.Logger
@@ -64,11 +73,10 @@ import LSP.Logger
   , Recorder
   , WithPriority(..)
   , cfilter
-  , cmapWithPrio
-  , makeRefRecorder
+  , makeKeyedRefRecorder
   , pretty
   )
-import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
+import Language.LSP.Protocol.Types (NormalizedFilePath)
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
@@ -76,18 +84,24 @@ import qualified LSP.L4.Rules as Rules
 import L4.Syntax (Module (..), Resolved)
 import qualified Data.List as List
 import L4.EvaluateLazy
-  ( EvalConfig
+  ( EvalConfig(..)
   , EvalDirectiveResult(..)
   , EvalDirectiveValue(..)
+  , AssertionOutcome(..)
+  , ReductionOutcome(..)
   , parseFixedNow
   , prettyAssertionOutcome
   , prettyReductionOutcome
   , prettyLedger
   , readFixedNowEnv
   , resolveEvalConfig
+  , EvalLimits(..)
+  , applyEvalLimits
+  , withRunStop
   )
+import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), maximumClosureApplications, maximumOpenObligations, maximumTracedClosureApplications, prettyEvalException)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz2
-import L4.Parser.SrcSpan (prettySrcRange)
+import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM)
 import L4.Print (prettyLayout)
 import qualified L4.TracePolicy as TracePolicy
 import L4.TracePolicy
@@ -120,6 +134,87 @@ fixedNowParser = fmap FixedNowOpt $ optional $
     <> metavar "ISO8601"
     <> help "Pin evaluation clock (e.g. 2025-01-31T15:45:30Z) so NOW/TODAY stay deterministic"
     )
+
+-- | The limits on evaluation that every @l4@ command that evaluates takes
+-- (smucclaw/l4-ide#1075: ruling L2 of the Recursion Limits bench for @l4
+-- run@ and @l4 batch@, Meng's ruling of 2026-11-21 for @l4 trace@, @l4 lts@, @l4 explore@,
+-- @l4 coverage@, @l4 prove@ and @l4 verify@). The REPL takes the same
+-- flags from its own copy of this parser (@jl4-repl/app/Main.hs@), which is
+-- kept in step with this one.
+--
+-- The two counts are on by default ('L4.EvaluateLazy.withCountedBudgets'):
+-- they count what the machine does, so they stop the same program at the
+-- same place on every machine, and an evaluation that goes over one is an
+-- error on that one alone; the others still answer. A flag changes either
+-- one, and @none@ turns it off.
+--
+-- Time and memory are off unless asked for, named as jl4-service names its
+-- own, and neither is deterministic. An evaluation that goes over one stops
+-- the run: it is an error naming the limit, and nothing after it is
+-- evaluated.
+evalLimitsParser :: Options.Parser EvalLimits
+evalLimitsParser = evalLimitsParserNoting ""
+
+-- | 'evalLimitsParser', with a sentence added to @--max-steps@'s help, for a
+-- command with another flag that a reader could take for it (@l4 lts
+-- --steps@, the step log).
+evalLimitsParserNoting :: String -> Options.Parser EvalLimits
+evalLimitsParserNoting stepsNote = EvalLimits
+  <$> optional (option countReader
+        ( long "max-open"
+        <> metavar "N|none"
+        <> help ("Stop any one evaluation (an #EVAL, #ASSERT or #TRACE, or one input or trace the command tries) that has more than N obligations open at once, or joins more than N failures into one breach, as an error on that one (default "
+                 <> show maximumOpenObligations <> "; none: no limit)")
+        ))
+  <*> optional (option countReader
+        ( long "max-steps"
+        <> metavar "N|none"
+        <> help ("Stop any one evaluation that takes more than N steps, counting each function applied and each contract handed the events, as an error on that one" <> stepsNote <> " (default "
+                 <> show maximumClosureApplications <> ", and " <> show maximumTracedClosureApplications <> " for one that collects a trace, such as an #EVALTRACE, which keeps a record of every step; this sets both, and none removes both)")
+        ))
+  <*> optional (option positiveIntReader
+        ( long "eval-timeout"
+        <> metavar "SECONDS"
+        <> help "Stop the run when any one evaluation runs longer than SECONDS of wall-clock time; nothing after it is evaluated"
+        ))
+  <*> optional (option positiveIntReader
+        ( long "max-eval-memory-mb"
+        <> metavar "MB"
+        <> help "Stop the run when any one evaluation allocates more than MB megabytes (every byte allocated, not only what is kept); nothing after it is evaluated"
+        ))
+  where
+    positiveIntReader = eitherReader \ input -> case reads input of
+      [(n, "")] | n > (0 :: Int) -> Right n
+      _ -> Left ("expected a whole number above 0, got " <> show input)
+    countReader = eitherReader \ case
+      "none" -> Right Nothing
+      input -> case reads input of
+        [(n, "")] | n > (0 :: Int) -> Right (Just n)
+        _ -> Left ("expected a whole number above 0, or none, got " <> show input)
+
+-- | The limits one invocation of an @l4@ command evaluates under: the
+-- counted budgets at their defaults, then whatever the flags say, and one
+-- run stop for the whole invocation ('withRunStop').
+withEvalLimits :: EvalLimits -> EvalConfig -> IO EvalConfig
+withEvalLimits lims cfg = withRunStop (applyEvalLimits lims cfg)
+
+-- | Do a command's work under its configuration's run stop, and when a time
+-- or memory limit stopped the run, say so on the error output, naming the
+-- limit and where, and fail, whatever the work's own exit. A command that
+-- evaluates many inputs or traces reports each one after the stop as not
+-- evaluated; this is what says why, and makes sure the command does not
+-- exit 0 on an answer that was cut short (ruled by Meng 2026-11-21, extending L2).
+guardRunStop :: Text -> EvalConfig -> IO a -> IO a
+guardRunStop command cfg work = do
+  outcome <- try @ExitCode work
+  stopped <- maybe (pure Nothing) readIORef cfg.runStop
+  case stopped of
+    Just (b, at) -> do
+      hPutStrLn stderr $ Text.unpack $
+        command <> ": " <> prettySrcRangeM at <> ": "
+          <> Text.unwords (prettyEvalException (UserEvalException (OverBudget b)))
+      exitFailure
+    Nothing -> either throwIO pure outcome
 
 -- | Read a @--lang@ value into a 'LangTag'.
 --
@@ -262,52 +357,60 @@ runOneshot
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], b)
 runOneshot evalConfig fp act = do
-  (getLog, refRecorder) <- makeRefRecorder
-  let prettyRecorder = cmapWithPrio pretty refRecorder
-      -- Drop Debug-priority messages (very verbose Shake internals) but
-      -- keep Info/Warning/Error: real parse/type diagnostics come through
-      -- at Info priority via the LSP publishDiagnostics hook, so we can't
-      -- just filter by priority alone.  We scrub progress chatter out of
-      -- the rendered Text list below with `isProgressChatter`.
-      keep wp = wp.priority /= Debug
-      filteredRec = cfilter keep prettyRecorder
+  -- Debug-priority messages (very verbose Shake internals) are dropped, and
+  -- Info/Warning/Error kept: real parse/type diagnostics come through at Info
+  -- priority via the LSP publishDiagnostics hook, so we can't just filter by
+  -- priority alone.  We scrub progress chatter out of the rendered Text list
+  -- below with `isProgressChatter`.
+  (getLog, filteredRec) <- makeCliRecorder
   res <- oneshotL4Action filteredRec evalConfig fp act
   rawErrs <- getLog
   -- Post-filter: drop lines matching known progress-chatter prefixes.
   pure (filter (not . isProgressChatter) rawErrs, res)
 
 -- | Like 'runOneshot', but additionally returns the structured diagnostics
--- published to the Shake store during the run (across every file in the
--- import closure, not just the entry file).
+-- published to the Shake store during the run, across every file in the import
+-- closure and not just the entry file.
 --
 -- The rendered @[Text]@ is still returned for display; the @[FileDiagnostic]@
--- is what callers should consult for a severity-aware pass/fail verdict, since
--- some structural errors (notably an import cycle) attach their diagnostic to a
--- transitively-imported module rather than the entry file — so the entry
--- file's own typecheck result can spuriously look successful.
+-- is what a caller consults for a verdict that knows severity. An import cycle
+-- is the case that needs it: a module on a ring has no typecheck, so a file that
+-- imports one is checked without it, and its own result can look successful.
 runOneshotWithDiagnostics
   :: EvalConfig
   -> FilePath
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], [FileDiagnostic], b)
 runOneshotWithDiagnostics evalConfig fp act = do
-  (getLog, refRecorder) <- makeRefRecorder
-  let prettyRecorder = cmapWithPrio pretty refRecorder
-      keep wp = wp.priority /= Debug
-      filteredRec = cfilter keep prettyRecorder
+  (getLog, filteredRec) <- makeCliRecorder
   (diags, res) <- Oneshot.oneshotL4ActionWithDiags filteredRec evalConfig fp act
   rawErrs <- getLog
   pure (filter (not . isProgressChatter) rawErrs, diags, res)
 
--- | Does the diagnostics set contain an error that should make a CLI command
--- fail (exit non-zero)?
+-- | The recorder a command collects the pipeline's log with, as text, without
+-- its Debug-priority messages.
 --
--- An Error-severity diagnostic from any source /except/ @\"eval\"@ counts as
--- blocking: parse errors, type errors, unresolved/failed imports, and the raw
--- engine cycle exception all qualify. @#EVAL@ directive outcomes are tagged
--- with source @\"eval\"@ and are excluded /here/, so that this predicate speaks
--- only about structural diagnostics and stays usable by commands that never
--- evaluate (notably @l4 check@).
+-- With no editor to publish to, the pipeline logs every diagnostic of a file
+-- each time that file's diagnostics change ('Shake.LogDiagsDiffButNoLspEnv'),
+-- so a command that printed the log printed each diagnostic once for every
+-- later change to its file's diagnostics: @l4 run@ printed a type checker's
+-- warning three times and an error of the export check twice, and @l4 check@
+-- a type checker's warning twice (review of #779, 2026-11-21). Each list
+-- holds all of the file's diagnostics, so only the last one of each file is
+-- kept, where it falls in the log ('Oneshot.latestDiagnostics'); it is printed as it
+-- was.
+makeCliRecorder :: IO (IO [Text], Recorder (WithPriority Oneshot.Log))
+makeCliRecorder = do
+  (getLog, refRecorder) <- makeKeyedRefRecorder Oneshot.diagnosticsOf pretty
+  let keep wp = wp.priority /= Debug
+  pure (Oneshot.latestDiagnostics <$> getLog, cfilter keep refRecorder)
+
+-- 'hasBlockingError' (re-exported) is the rule for whether a diagnostics set
+-- should make a CLI command exit non-zero. It lives in jl4-lsp so that the
+-- editor's Deploy buttons refuse exactly what @l4 check@ and @l4 deploy@ do.
+-- It leaves out the evaluator's diagnostics (source @\"eval\"@), so that it
+-- speaks only about structural diagnostics and stays usable by commands that
+-- never evaluate (notably @l4 check@).
 --
 -- That exclusion is NOT the whole exit-code contract for @l4 run@. Ruled by
 -- Meng 2026-08-01: a @#EVAL@ that CRASHES during evaluation must be loud — it
@@ -318,11 +421,6 @@ runOneshotWithDiagnostics evalConfig fp act = do
 -- If silencing is ever wanted, add a @-q@ \/ @--quiet-eval@ option to @l4 run@
 -- that restores exit 0 for a crashed directive — rather than flipping the
 -- default back.
-hasBlockingError :: [FileDiagnostic] -> Bool
-hasBlockingError = any isBlocking
-  where
-    isBlocking FileDiagnostic{fdLspDiagnostic = Diagnostic{_severity, _source}} =
-      _severity == Just DiagnosticSeverity_Error && _source /= Just "eval"
 
 -- | Returns True for rendered log lines that represent internal
 -- bookkeeping (import resolution, VFS lookups, Shake db progress) rather
@@ -421,7 +519,13 @@ renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, tra
     traceSection = case traceMode of
       TraceTextNone -> Nothing
       TraceTextFull ->
-        let traceBody = maybe "(no trace captured; add #EVALTRACE to the directive)" prettyLayout mTrace
+        let traceBody = case (mTrace, result) of
+              (Just t, _) -> prettyLayout t
+              -- refused because an earlier directive stopped the run: it
+              -- was not evaluated, so there is nothing to trace
+              (Nothing, Reduction (ReducedErrored (UserEvalException (NotEvaluated _ _)))) -> "(not evaluated)"
+              (Nothing, Assertion (Errored (UserEvalException (NotEvaluated _ _)))) -> "(not evaluated)"
+              (Nothing, _) -> "(no trace captured; add #EVALTRACE to the directive)"
         in Just ("Trace:\n" <> indentBlockText traceBody)
 
 renderEvalValue :: EvalDirectiveValue -> Text

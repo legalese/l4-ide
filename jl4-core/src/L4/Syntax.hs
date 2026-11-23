@@ -8,7 +8,7 @@ module L4.Syntax where
 
 import Base
 import L4.Annotation
-import L4.Lexer (PosToken (..), FixityDirection, LangTag (..), TokenType (TKeywords), TKeywords (TKExact))
+import L4.Lexer (PosToken (..), FixityDirection, LangTag (..), TokenType (TKeywords), TKeywords (TKExact), langMatchRank)
 import L4.Parser.SrcSpan (SrcRange)
 
 #if defined(SERIALISE_ENABLED)
@@ -239,6 +239,18 @@ data Directive n =
     -- assertion means on its surface.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | How a directive is named to a user: in the editor's code lenses, which
+-- pass the name back when they ask for the directive's result, and in its
+-- outline. A @#CHECK@ with a contract is named as a plain @#CHECK@ is.
+directiveLabel :: Directive n -> Text
+directiveLabel = \case
+  LazyEval{}      -> "#EVAL"
+  LazyEvalTrace{} -> "#EVALTRACE"
+  Check{}         -> "#CHECK"
+  Contract{}      -> "#CHECK"
+  Assert{}        -> "#ASSERT"
+  AssertRefused{} -> "#ASSERT REFUSED"
 
 data Event n
   = MkEvent
@@ -1266,14 +1278,23 @@ annNlgAlts = #extra % #nlgAlts
 -- @'nlgFor' 'Nothing'@ is the default rendering, which is what every caller
 -- that predates tags wants. @'nlgFor' ('Just' he)@ prefers the @he@ rendering
 -- and falls back to the default when there is none — so asking for a language
--- a document does not have yields the document\'s own wording rather than
+-- a document does not have yields the document's own wording rather than
 -- nothing, which is the behaviour a reader wants from a partial translation.
+--
+-- The closest rendering wins ('langMatchRank'), so @he@ picks a rendering
+-- tagged @he-IL@ when there is no @he@ one, and @he-IL@ picks a @he@ one.
+-- Among equally close renderings the first, default first, wins.
 nlgFor :: Maybe LangTag -> Anno -> Maybe Nlg
 nlgFor Nothing a = view annNlg a
-nlgFor want@(Just _) a =
-  case filter ((== want) . nlgLangTag) (toList (view annNlg a) <> view annNlgAlts a) of
-    (n : _) -> Just n
-    []      -> view annNlg a
+nlgFor (Just want) a =
+  case sortOn fst
+         [ (rank, n)
+         | n <- toList (view annNlg a) <> view annNlgAlts a
+         , Just have <- [nlgLangTag n]
+         , Just rank <- [langMatchRank want have]
+         ] of
+    ((_, n) : _) -> Just n
+    []           -> view annNlg a
 
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc

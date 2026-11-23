@@ -122,7 +122,7 @@ spec = describe "WebMCP script and MCP endpoint (property names)" do
         | otherwise -> pendingWith "node is not on the PATH"
       Just node -> withSystemTempDirectory "webmcp-parity" \dir -> do
         let params = paramsOf trickyNames
-            RawJs js = renderOrgWebMCPScript
+            RawJs js = renderOrgWebMCPScript Nothing
             deployments = Aeson.toJSON
               [ Aeson.object
                   [ "id" Aeson..= ("d" :: Text)

@@ -504,7 +504,7 @@ blameLine b = Text.concat $ catMaybes
       (Nothing, Just t) -> Just ("; at " <> prettyRatio t)
       _ -> Nothing
 
--- | Is this the machine's own no-party clock event (a @WAIT UNTIL@)? Its
+-- | Is this the machine's own no-party clock event (a @WAITUNTIL@)? Its
 -- party and action are the builtins @neverMatchesParty@ \/
 -- @neverMatchesAct@, whose surface names are @NEVERMATCHESPARTY@ \/
 -- @NEVERMATCHESACT@ because the builtin environment upper-cases every

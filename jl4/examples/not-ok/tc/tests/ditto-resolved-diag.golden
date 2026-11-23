@@ -5,7 +5,7 @@ File: ditto-resolved-diag.l4
   Range: 7:13-7:14
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-PLUS
   Message:
       |
     7 | huh MEANS   ^

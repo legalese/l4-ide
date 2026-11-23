@@ -8,6 +8,11 @@ Built-in functions for calling web APIs and for turning L4 values into JSON and 
 
 `FETCH` and `POST` make a real request every time they are evaluated, and only when their result is needed. They accept `https://` addresses only. Where L4 runs in safe mode, as it does in the browser, both give an error instead of making a request.
 
+## When a request fails
+
+In `l4 run`, a request that fails, for example because the server can't be reached, hides the results of every directive in the file, not only that one.
+[Evaluate a file with `l4 run`](../../tutorials/getting-started/l4-cli.md#step-3-l4-run--evaluate-a-file) says what to do.
+
 ## FETCH
 
 `FETCH url` sends a GET request and gives the response body as a STRING.
@@ -59,6 +64,7 @@ DECIDE `the API key` IS
 | constructor with fields                   | an object of its fields; the constructor's name is not included |
 | `NOTHING`                                 | `null`                                                          |
 | `JUST x`                                  | the JSON for `x`                                                |
+| `LEFT x`, `RIGHT x`                       | an object with the side as its one key: `{"LEFT": x}`           |
 
 ```l4
 DECLARE Person HAS
@@ -96,6 +102,10 @@ DECIDE person IS
   WHEN RIGHT p THEN p
   WHEN LEFT problem THEN Person WITH name IS "Unknown", age IS 0
 ```
+
+A rule that works for any type, written with `GIVEN a IS A TYPE`, cannot decode into `a`.
+When the rules run nothing says which type `a` is, so the decoder would have nothing to go by, and L4 refuses such a decode before anything runs.
+Decode in a rule whose `GIVETH` names the type, and hand the decoded value on to the rule that works for any type.
 
 ## Example: an authenticated request
 

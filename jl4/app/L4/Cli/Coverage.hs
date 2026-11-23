@@ -68,6 +68,8 @@ import qualified L4.Decision.QueryPlan as QP
 import L4.Evaluate.ValueLazy (Environment, NF (..), Value (..))
 import L4.EvaluateLazy (EvalConfig, EvalDirectiveResult (..), EvalDirectiveValue (..), ReductionOutcome (..), execEvalExprInContextOfModule)
 import L4.EvaluateLazy.Machine (pattern ValBool)
+import L4.EvaluateLazy.Exceptions (LimitStopped (..), isLimitStop, prettyEvalException)
+import Control.Exception (handle, throwIO)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print (prettyLayout)
 import L4.Prove.Lower
@@ -169,8 +171,15 @@ hasUndecided :: Cover ans -> Bool
 hasUndecided c = or [ True | Bucket _ (Undecided _) <- c.cvBuckets ]
 
 -- | Cover one decision. 'Left' says why not even the rungs could be covered.
-coverTarget :: forall ans. CoverEnv ans -> CoverTarget -> IO (Either Text (Cover ans))
-coverTarget ce t
+-- An evaluation stopped at a limit (ruled by Meng 2026-11-21, extending L2) is one such reason:
+-- read as "raises", it would drop that input or blame a condition for it.
+coverTarget :: CoverEnv ans -> CoverTarget -> IO (Either Text (Cover ans))
+coverTarget ce t =
+  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit at an input it tried: " <> why)))
+    (coverTargetWith ce t)
+
+coverTargetWith :: forall ans. CoverEnv ans -> CoverTarget -> IO (Either Text (Cover ans))
+coverTargetWith ce t
   | t.ctReadsAssumes = pure (Left "it reads an ASSUME, which a witness input cannot supply")
   | otherwise = case traverse paramOf (zip t.ctParams (map Just t.ctAppArgs <> repeat Nothing)) of
       Nothing -> pure (Left "a parameter has no declared type")
@@ -338,8 +347,12 @@ coverTarget ce t
   -- when one raises (or does not reduce to a Boolean) there. Evaluated in
   -- batches, one module evaluation per batch, and one by one only when a batch
   -- raises.
+  -- A batch is one evaluation, so its count is shared by every input in it:
+  -- a batch stopped at a limit says nothing about any one of them, and each
+  -- is tried on its own instead.
   atomVectors params atoms cands = concat <$> for (chunksOf 128 cands) \batch -> do
-    r <- evalExpr (List emptyAnno [ bindAt params c (List emptyAnno atoms) | c <- batch ])
+    r <- handle (\ (LimitStopped _) -> pure Nothing)
+           (evalExpr (List emptyAnno [ bindAt params c (List emptyAnno atoms) | c <- batch ]))
     case r >>= listOf of
       Just rows | length rows == length batch -> pure (map boolsOf rows)
       _ -> for batch \c -> do
@@ -358,9 +371,12 @@ coverTarget ce t
 
   evalExpr e = do
     res <- execEvalExprInContextOfModule ce.ceEval tc.entityInfo e (ce.ceImportEnv, tc.module')
-    pure case res of
-      Just d | Reduction (Reduced nf) <- d.result -> Just nf
-      _ -> Nothing
+    case res of
+      Just d
+        | Reduction (Reduced nf) <- d.result -> pure (Just nf)
+        | Reduction (ReducedErrored exc) <- d.result, isLimitStop exc ->
+            throwIO (LimitStopped (Text.unwords (prettyEvalException exc)))
+      _ -> pure Nothing
 
   listOf = \case
     MkNF v -> spine v

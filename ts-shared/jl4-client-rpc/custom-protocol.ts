@@ -164,12 +164,26 @@ export type QueryPlanResponse = {
 }
 
 /**
+ * The answer for a rule that may refuse to answer: no plan, because a plan
+ * would say which inputs settle an answer the rule may not give. `error` is
+ * the sentence that says why, naming the rule and every reason; `rule` is the
+ * rule as L4 writes it, and `reasons` are the reasons it may refuse with.
+ */
+export type QueryPlanDecline = {
+  kind: 'declined'
+  error: string
+  rule: string
+  reasons: string[]
+}
+
+/**
  * Request type for computing the query plan (elicitation ordering)
  * for a visualized DECIDE function, given current boolean bindings.
+ * A rule that may refuse to answer is declined.
  */
 export const QueryPlanRequestType = makeL4RpcRequestType<
   QueryPlanRequestParams,
-  QueryPlanResponse
+  QueryPlanResponse | QueryPlanDecline
 >('l4/queryPlan')
 
 /****************************************
@@ -275,9 +289,22 @@ export interface GetExportedFunctionsParams {
   verDocId: { uri: string; version: number }
 }
 
+/** An error that stops the file from being deployed: a parse or type error,
+ *  an IMPORT that finds no module, or an import cycle, in the file or in a
+ *  module it imports. */
+export interface BlockingErrorInfo {
+  uri: string
+  /** 1-based */
+  line: number
+  message: string
+}
+
 export interface GetExportedFunctionsResponse {
   functions: ExportedFunctionInfo[]
   importedFiles: string[]
+  /** Non-empty when the file must not be deployed. Absent from older
+   *  language servers. */
+  blockingErrors?: BlockingErrorInfo[]
 }
 
 /**
@@ -330,6 +357,9 @@ export interface ExportDocumentParams {
   toc?: boolean
   /** Module URIs to exclude from the render (deselected imports). */
   excludeModules?: string[]
+  /** The language to render, spelled exactly as one of the result's
+   *  `languages` (e.g. "he", "he-IL"). Omitted: the module's own language. */
+  lang?: string
 }
 
 export interface ExportDocumentResult {
@@ -338,6 +368,13 @@ export interface ExportDocumentResult {
   content: string
   /** The structured document IR (always present). */
   ir: unknown
+  /** The distinct languages the main file's wordings are in: the module's
+   *  own language first, then the others. Empty when the file has no
+   *  wordings. Absent from servers that predate it. */
+  languages?: string[]
+  /** The language the returned document is in. Absent from servers that
+   *  predate it. */
+  lang?: string
 }
 
 export const ExportDocumentRequestType = makeL4RpcRequestType<

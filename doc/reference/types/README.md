@@ -42,6 +42,15 @@ L4 has no null value inside a rule: a value that may be missing has a `MAYBE` ty
 A case sent to `l4 batch` or to the decision service may carry a `null`, which means "not known": it is refused for a fact that is not a `MAYBE`, and is `NOTHING` for one that is (see [TYPICALLY](TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
 Functions on these types, and the `PAIR` and `Dictionary` types, are in the [prelude](../libraries/prelude.md).
 
+## Events and regulative rules
+
+These built-in types take the type of the parties and the type of the actions as their two parameters.
+
+| Type                   | Values                                                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `DEONTIC party action` | a regulative rule: an obligation, permission or prohibition, or `FULFILLED` or `BREACH`; see [DEONTIC](../regulative/DEONTIC.md) |
+| `EVENT party action`   | that a party did an action at a time (a `NUMBER`): `EVENT Seller delivery 2`; see [EVENT](../regulative/EVENT.md)                |
+
 ## Records and enumerations
 
 A record has named fields; an enumeration has a fixed list of values, each of which can carry fields. Both are made with [DECLARE](DECLARE.md).

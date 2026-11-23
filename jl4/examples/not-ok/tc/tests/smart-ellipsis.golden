@@ -5,7 +5,7 @@ File: smart-ellipsis.l4
   Range: 13:36-13:37
   Source: lexer
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/syntax-error
   Message:
     This is … (Horizontal Ellipsis, U+2026). It looks like `...`, but L4 only understands the plain one.
 

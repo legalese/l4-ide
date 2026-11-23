@@ -82,6 +82,9 @@ The service logs three `WARN` lines about this:
 - `JL4_LIBRARY_PATH is set and ignored`, at start-up, with the path, when the variable is set.
 - `Bundle file stands in for a standard library module`, each time a bundle is compiled that ships a file named like a standard library module with different text. It names the deployment, the file and the module.
 - `Bundle IMPORT resolves to nothing: no bundle file and no built-in standard library module has this name`, for each `IMPORT` that resolves to neither. It names the deployment, the importing file and the module, and is logged when the bundle is compiled, which a restart does again from the stored sources. The deployment is still accepted, and a call that needs the missing definition answers 422.
+  When the module's name differs only in capital letters from a built-in standard library module, or from a bundle `.l4` file the importing file could have reached (other than itself), the line also has a `hint` field: ``Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?``.
+  When the only near match is the importing file itself (`Foo.l4` that writes `IMPORT foo`), the `hint` is ```foo` differs from `Foo`, the name of this file's own module, only in its capitals. If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT.``
+  For a name that differs by more than capitals in a way some disks ignore, such as `ß` for `ss`, the field begins `Module names must match exactly, letter for letter:` instead.
 
 [Library Resolution](../doc/reference/libraries/resolution.md) has the whole order for the `l4` command and the editor.
 
@@ -157,7 +160,7 @@ No way through needs the deployment to be deleted.
 - Zip uploads: max 2 MB (configurable), max 5096 files (configurable), no path traversal
 - If the `id` field is omitted, a UUID is generated automatically
 - Duplicate detection: if the uploaded sources match the deployment already registered under the requested id (by content hash), that deployment is returned, as `ready` with no `updateId`, instead of recompiling
-- **An upload without an `id` always compiles and takes a deployment slot.** It is given a new id, so it never matches an existing deployment, however identical its sources. A client that redeploys in a loop without an `id` therefore gains one deployment per upload, until the service reaches `--max-deployments` (default 1024) and refuses every new one with `400` `Maximum deployment limit reached`. To replace a deployment rather than add one, send the same `id` each time, or `PUT /deployments/{id}`. Until legalese/l4-ide#162 (2026-07-28), an upload whose sources matched any ready deployment got that deployment back, whatever id it asked for, and nothing was created
+- **An upload without an `id` always compiles and takes a deployment slot.** It is given a new id, so it never matches an existing deployment, however identical its sources. A client that redeploys in a loop without an `id` therefore gains one deployment per upload, until the service reaches `--max-deployments` (default 1024) and rejects every new one with `400` `Maximum deployment limit reached`. To replace a deployment rather than add one, send the same `id` each time, or `PUT /deployments/{id}`. Until legalese/l4-ide#162 (2026-07-28), an upload whose sources matched any ready deployment got that deployment back, whatever id it asked for, and nothing was created
 
 ### Data Plane
 
@@ -209,8 +212,8 @@ Browse L4 source files within a deployment. **File browsing works immediately af
 
 The `/files` endpoint supports three query parameters (combinable):
 
-- `?identifier=name` — find definitions and references of an L4 identifier (text-based, works pre-compilation)
-- `?search=text` — grep source files (case-insensitive, works pre-compilation)
+- `?identifier=name` — find definitions and references of an L4 identifier: one whole name, case-sensitive, backticks optional (text-based, works pre-compilation)
+- `?search=patterns` — grep source files (works pre-compilation). Each space-separated pattern is a case-insensitive regular expression, and a line matches if any one does; spaces inside `()`, `[]`, `{}`, backticks or double quotes stay in one pattern, and double quotes make a phrase. `\s \d \w` work; a pattern that isn't a valid regular expression is matched as plain text. The MCP tool `search_text` takes the same query and says when nothing matched, or a pattern was taken as plain text.
 - `?file=path.l4` — scope to a specific file
 
 Export information (which functions a file exports) is available only after compilation. Pre-compilation responses include file content but empty export lists.
@@ -255,8 +258,8 @@ A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer to
 Any other error response has no `presumed`, since it carries no answer.
 An input the rule never reached is not listed, even if it was left out.
 A section `GIVEN` that one rule reads and another overrides for one calculation, as in `outer MEANS inner PLUS (inner WITH r IS 100)`, answers the same whether the request supplies it or leaves it out: the request's value, or the default, for the read that was not overridden, and the override for the one that was. A request that supplies a section `GIVEN` whose every read is overridden is accepted, and the value changes nothing.
-**A misspelled name is refused where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is refused, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored, as before.
-`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation`, an MCP call and a batch case all refuse it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`). A type that is a synonym for a `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
+**A misspelled name is rejected where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is rejected, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored.
+`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation`, an MCP call and a batch case all reject it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`). A type that is a synonym for a `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
 The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 For this rule:
 
@@ -682,7 +685,7 @@ The service exposes an [MCP](https://modelcontextprotocol.io/) JSON-RPC 2.0 endp
 | `POST` | `/{id}/.mcp`                | Deployment-scoped MCP endpoint (short route)                  |
 | `POST` | `/deployments/{id}/.mcp`    | Deployment-scoped MCP endpoint (canonical route)              |
 
-The org-wide endpoint (`/.mcp`) exposes tools from all deployments. The scoped endpoints (`/{id}/.mcp`) restrict tool visibility to a single deployment.
+The org-wide endpoint (`/.mcp`) exposes tools from all deployments. The scoped endpoints (`/{id}/.mcp`) restrict tool visibility to a single deployment. On a scoped endpoint the file tools (`list_files`, `read_file`, `search_identifier`, `search_text`) also reach only that deployment: a `deployment` argument naming another one finds nothing.
 
 Beside the decision tools, every endpoint lists one tool of the [instance ledger](#instance-ledger), `what-may-I-do-now`, to callers that may evaluate.
 Given an `instance` (and on the org-wide endpoint its `deployment`), it answers with the instance's position, the same answer as `GET .../position`, and, given a `party` and an `action`, what the ledger would do with that act were it proposed now.
@@ -777,13 +780,20 @@ The script registers tools based on the `data-tools` attribute. By default (`aut
 
 #### Visibility Headers
 
-The proxy injects these headers to control what jl4-service includes in responses. All default to `true` when absent (local dev, direct access).
+A reverse proxy can set these headers to control what jl4-service includes in responses. All default to `true` when absent (local dev, direct access).
 
-| Header                | Controls                                                                     | Proxy permission |
-| --------------------- | ---------------------------------------------------------------------------- | ---------------- |
-| `X-Include-Functions` | Functions in deployment metadata, function listing tools in MCP/WebMCP       | `l4:rules`       |
-| `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP              | `l4:read`        |
-| `X-Include-Evaluate`  | Evaluation/batch/query-plan/ladder paths in OpenAPI, evaluation tools in MCP | `l4:evaluate`    |
+| Header                | Controls                                                                     | Permission    |
+| --------------------- | ---------------------------------------------------------------------------- | ------------- |
+| `X-Include-Functions` | Functions in deployment metadata, function listing tools in MCP/WebMCP       | `l4:rules`    |
+| `X-Include-Files`     | Files in deployment metadata, file browsing tools in MCP/WebMCP              | `l4:read`     |
+| `X-Include-Evaluate`  | Evaluation/batch/query-plan/ladder paths in OpenAPI, evaluation tools in MCP | `l4:evaluate` |
+
+#### Origin-Trial Token
+
+While WebMCP is a Chrome origin trial, Chrome offers the API to a page only if the page carries a trial token or the user has turned the feature on. A reverse proxy can pass a token in the `X-Origin-Trial-Token` request header on `GET /.webmcp/embed.js`; the script then adds it to the embedding page as an `origin-trial` meta tag.
+
+- Without the header, or with a value that is not base64, the script adds no token.
+- Register the token for the origin that serves the script, with third-party matching enabled.
 
 > **Note:** The legacy path `/webmcp.js` is redirected to `/.webmcp/embed.js` with a 301. Update existing embeds when convenient.
 

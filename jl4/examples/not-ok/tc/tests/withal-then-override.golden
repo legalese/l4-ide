@@ -5,7 +5,7 @@ File: withal-then-override.l4
   Range: 12:33-12:35
   Source: parser
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: parse/unexpected-IS
   Message:
        |
     12 | glossy MEANS Paint WITHAL label IS "gloss"

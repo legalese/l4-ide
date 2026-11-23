@@ -6,7 +6,7 @@ File: withal-maybe-field.l4
   Range: 11:7-11:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-fields-without-default
   Message:
     WITHAL takes the default of every field, but these fields of
 
@@ -24,7 +24,7 @@ File: withal-maybe-field.l4
   Range: 13:7-13:32
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/missing-named-arguments
   Message:
     In this use of
 

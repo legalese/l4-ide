@@ -29,7 +29,9 @@
 --
 -- Error handling follows the spec: batch processing stops at the first
 -- failing row by default; pass @--continue-on-error@ to process every row
--- and aggregate failures. Either way the process exits non-zero if any row
+-- and aggregate failures. A row that goes over the opt-in time or memory
+-- limit stops the batch even then (smucclaw/l4-ide#1075, ruling L2: such a
+-- hit stops the run). Either way the process exits non-zero if any row
 -- failed.
 module L4.Cli.Batch
   ( BatchOptions(..)
@@ -61,6 +63,7 @@ import qualified Data.Set as Set
 import qualified Data.Vector as Vector
 import qualified Data.Yaml as Yaml
 import Control.Monad (void)
+import Data.IORef (readIORef)
 import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word8)
 import Data.Char (isAlpha, isAlphaNum)
@@ -72,6 +75,7 @@ import System.IO
   ( Handle
   , IOMode(WriteMode)
   , hFlush
+  , stderr
   , stdin
   , stdout
   , withFile
@@ -94,6 +98,8 @@ import L4.Export
   )
 import L4.Discharge (Binder (..), readSets, sectionBinders)
 import L4.DirectiveFilter (filterIdeDirectives)
+import L4.Parser.SrcSpan (prettySrcRangeM)
+import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), stopsTheRun)
 import L4.EvaluateLazy
   ( EvalConfig(..)
   , EvalDirectiveResult(..)
@@ -109,12 +115,12 @@ import L4.EvaluateLazy
   )
 import L4.IgnoredAnnotation (ignoredAnnotations, renderIgnoredAnnotation)
 import L4.Lexer (execLexer, showStringLit)
-import L4.Presumption (nearestName, requestRecordName, unrecognisedMessage)
+import L4.Presumption (choiceExpectation, choiceNameMiss, couldNotDecodeText, nearestName, requestRecordName, unrecognisedMessage)
 import L4.Print (prettyLayout, restoreMixfixPatterns)
 import L4.Syntax
-  ( AppForm(..), Assume(..), Declare(..), Decide(..), Expr, GivenSig(..), Module(..), Resolved
+  ( AppForm(..), Assume(..), ConDecl(..), Declare(..), Decide(..), Expr, GivenSig(..), Module(..), Resolved
   , Type'(..), TypeDecl(..), TypedName(..), TypeSig(..), Unique, getActual, getUnique, rawName
-  , rawNameToText
+  , rawNameToText, unqualifiedRawNameToText
   )
 import L4.TypeCheck.Environment (listUnique, maybeUnique)
 
@@ -181,6 +187,7 @@ data BatchOptions = BatchOptions
   , batchValidateOnly   :: Bool
   , batchFixedNow       :: FixedNowOpt
   , batchPresumption    :: Presumption
+  , batchLimits         :: EvalLimits
   }
 
 outputFormatReader :: ReadM OutputFormat
@@ -233,7 +240,7 @@ batchOptionsParser = BatchOptions
   <*> switch
         ( long "continue-on-error"
         <> short 'c'
-        <> help "Process every row and aggregate failures (default: stop at the first failing row)"
+        <> help "Process every row and aggregate failures (default: stop at the first failing row); a row over --eval-timeout or --max-eval-memory-mb stops the batch even so"
         )
   <*> switch
         ( long "validate-only"
@@ -247,6 +254,7 @@ batchOptionsParser = BatchOptions
         <> showDefaultWith (const "soft")
         <> help "soft (default): an input a row leaves out takes its TYPICALLY default; hard: it is a missing input, and the row is an error naming it"
         )
+  <*> evalLimitsParser
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -254,7 +262,7 @@ batchOptionsParser = BatchOptions
 
 batchCmd :: BatchOptions -> IO ()
 batchCmd opts = do
-  evalConfig0 <- makeEvalConfig opts.batchFixedNow
+  evalConfig0 <- withEvalLimits opts.batchLimits =<< makeEvalConfig opts.batchFixedNow
   -- T4: one switch for the whole evaluation. The JSON decoder reads it for
   -- every input and record field it fills; discharge reads it for a section
   -- binder (which batch supplies through the decoder anyway, see below).
@@ -366,9 +374,10 @@ batchCmd opts = do
   -- Step 3: process each row into an envelope, honoring stop-on-error, and
   -- write the results in the requested format.
       declares       = concatMap (moduleDeclares . (.module')) (tcRes : allDependencies tcRes)
-      -- every record an input may hold, this module's and its imports', for
-      -- --validate-only's check of an unknown key (review M1)
-      shapes         = recordShapes declares
+      -- every record and choice type an input may hold, this module's and its
+      -- imports', for --validate-only's check of an unknown key (review M1)
+      -- and of a name that is no constructor of a choice type (#1086)
+      shapes         = typeShapes declares
       -- what each input declares, for reading a case against it (the synonyms
       -- are this module's and its imports', as the records are)
       synonyms       = typeSynonyms declares
@@ -380,13 +389,13 @@ batchCmd opts = do
       -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
       -- each envelope, let it become garbage, and never build the row list.
       FmtNdjson -> do
-        outcome <- streamRows opts.batchContinueOnErr inputs process
+        outcome <- streamRows (stoppedAt evalConfig) opts.batchContinueOnErr inputs process
           (\env -> BSL8.hPutStrLn h (Aeson.encode env) >> hFlush h)
         finish outcome
       -- The buffered formats must see every row before they can render, so
       -- here (and only here) we retain the whole list of envelopes.
       _ -> do
-        (envs, outcome) <- bufferRows opts.batchContinueOnErr inputs process
+        (envs, outcome) <- bufferRows (stoppedAt evalConfig) opts.batchContinueOnErr inputs process
         writeBuffered h opts.batchOutputFormat envs
         finish outcome
   where
@@ -398,6 +407,7 @@ batchCmd opts = do
       RowFine         -> exitSuccess
       RowUndetermined -> exitFailure
       RowFailed       -> exitFailure
+      RowStopped      -> exitFailure
 
 -- | Open the requested output sink (a file, or stdout) and run an action
 -- against its handle.
@@ -416,48 +426,73 @@ withOutputHandle (Just path) act = withFile path WriteMode \h -> do
 -- is handed to @emit@ as soon as it is produced and then dropped, so the fold
 -- carries only a strict 'Bool' (any-row-failed) accumulator — never the list
 -- of envelopes. This is what keeps NDJSON output memory-flat for huge batches.
--- Stops at the first failing row unless @continueOnErr@ is set.
+-- Stops at the first failing row unless @continueOnErr@ is set, and at a row
+-- that stopped the run whether or not it is ('RowStopped').
 streamRows
-  :: Bool
+  :: (Int -> IO ())
+  -> Bool
   -> [row]
   -> (Int -> row -> IO (Aeson.Value, RowOutcome))
   -> (Aeson.Value -> IO ())
   -> IO RowOutcome
-streamRows continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) RowFine
+streamRows stoppedAfter continueOnErr inputs process emit = go (zip [1 :: Int ..] inputs) RowFine
   where
     go [] !worst = pure worst
     go ((idx, input) : rest) !worst = do
       (env, outcome) <- process idx input
       emit env
       let !worst' = max worst outcome
-      if outcome == RowFailed && not continueOnErr
+      if outcome == RowStopped
+        then stoppedAfter idx >> pure RowStopped   -- a time or memory limit
+      else if outcome == RowFailed && not continueOnErr
         then pure RowFailed              -- stop-on-error (the default)
         else go rest worst'
 
 -- | What a row came to, for the batch's exit code, worst last. Only a failed
--- row trips stop-on-error; an undetermined one does not (U7b).
-data RowOutcome = RowFine | RowUndetermined | RowFailed
+-- row trips stop-on-error; an undetermined one does not (U7b). A row that
+-- went over the opt-in time or memory limit stops the batch even under
+-- @--continue-on-error@ (smucclaw/l4-ide#1075, ruling L2: such a hit stops
+-- the run).
+data RowOutcome = RowFine | RowUndetermined | RowFailed | RowStopped
   deriving stock (Eq, Ord, Show)
 
 -- | Fold over the input rows for the buffered formats (json/yaml/csv), which
 -- genuinely need every row in hand before they can render. Returns the
 -- collected envelopes (in input order) and whether any row failed. Stops at
--- the first failing row unless @continueOnErr@ is set.
+-- the first failing row unless @continueOnErr@ is set, and at a row that
+-- stopped the run whether or not it is ('RowStopped').
 bufferRows
-  :: Bool
+  :: (Int -> IO ())
+  -> Bool
   -> [row]
   -> (Int -> row -> IO (Aeson.Value, RowOutcome))
   -> IO ([Aeson.Value], RowOutcome)
-bufferRows continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] RowFine
+bufferRows stoppedAfter continueOnErr inputs process = go (zip [1 :: Int ..] inputs) [] RowFine
   where
     go [] acc worst = pure (reverse acc, worst)
     go ((idx, input) : rest) acc worst = do
       (env, outcome) <- process idx input
       let acc'   = env : acc
           worst' = max worst outcome
-      if outcome == RowFailed && not continueOnErr
+      if outcome == RowStopped
+        then stoppedAfter idx >> pure (reverse acc', RowStopped)
+      else if outcome == RowFailed && not continueOnErr
         then pure (reverse acc', RowFailed)  -- stop-on-error (the default)
         else go rest acc' worst'
+
+-- | Say on stderr that a time or memory limit stopped the batch, at which
+-- row, and where the run stopped: the envelopes carry the row's own message,
+-- but not that the rows after it were never read. The place matters because
+-- the directive that went over need not be the row's: an imported file's own
+-- #EVAL is evaluated with every row, and stops the batch at the first.
+stoppedAt :: EvalConfig -> Int -> IO ()
+stoppedAt cfg idx = do
+  stopped <- maybe (pure Nothing) readIORef cfg.runStop
+  TIO.hPutStrLn stderr
+    ("l4 batch: stopped at row " <> Text.pack (show idx) <> case stopped of
+       Just (_, at) -> ": the run stopped at " <> prettySrcRangeM at
+                         <> ", which went over the time or memory limit; no row after it was evaluated"
+       Nothing      -> ", which went over the time or memory limit; no row after it was evaluated")
 
 -- | Process a single input row into a result envelope, returning the
 -- envelope and whether the row failed.
@@ -470,7 +505,7 @@ processRow
   -> ReadInputs                              -- ^ the ASSUMEs and section GIVENs the export reads
   -> Map.Map Text (Expr Resolved)            -- ^ the defaults a row may take, by input
   -> [ExportedParam]                         -- ^ full schema for validation
-  -> RecordShapes                            -- ^ the records an input may hold, for validation
+  -> TypeShapes                              -- ^ the records and choice types an input may hold, for validation
   -> Map.Map Unique (Type' Resolved)         -- ^ the type synonyms, for validation
   -> DeclaredInputs                          -- ^ what each input declares, for reading a case
   -> Int
@@ -508,7 +543,15 @@ processRow opts evalConfig filteredSource exportFn givenParams reads' defaults s
       let wrapperCode     = generateBatchWrapper exportFn.exportName givenParams reads' defaults input
           combinedProgram = filteredSource <> wrapperCode
           virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
-      (evalErrs, mEval) <- runOneshot evalConfig virtualPath \nfp -> do
+          -- A function with inputs is asked for as JUST (f args). That JUST
+          -- is the wrapper's, so the answer inside it is read as deep as
+          -- `l4 run` reads an #EVAL of the call.
+          -- (The wrapper asks for JUST (f args) exactly when it has inputs,
+          -- given or assumed: see 'generateBatchWrapper'.)
+          rowConfig
+            | null givenParams && null reads'.allReads = evalConfig
+            | otherwise   = evalConfig { answerInJust = True }
+      (evalErrs, mEval) <- runOneshot rowConfig virtualPath \nfp -> do
         let uri = normalizedFilePathToUri nfp
         _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) combinedProgram
         Shake.use Rules.EvaluateLazy uri
@@ -522,7 +565,11 @@ processRow opts evalConfig filteredSource exportFn givenParams reads' defaults s
             Just evalResults ->
               -- The wrapper evaluated; a row still "fails" if evaluation raised
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
-              -- declared type). Those surface as `Reduction (Left …)`.
+              -- declared type). Those surface as `Reduction (ReducedErrored …)`.
+              -- A row that reached a REFUSE is neither an answer nor a failure:
+              -- it is "refused", its reason sits under the result and in the
+              -- diagnostics, and the batch carries on (it is not counted as an
+              -- error).
               let excMsgs = concatMap resultExceptionMsgs evalResults
                   undMsgs = concatMap resultUndeterminedMsgs evalResults
                   refMsgs = concatMap resultRefusalMsgs evalResults
@@ -550,7 +597,8 @@ processRow opts evalConfig filteredSource exportFn givenParams reads' defaults s
             , Key.fromString "diagnostics" Aeson..= diags
             ]
       pure (env, case status of
-        "error"        -> RowFailed
+        "error" | any stoppedTheRun (concat mEval) -> RowStopped
+                | otherwise -> RowFailed
         "undetermined" -> RowUndetermined
         _              -> RowFine)
   where
@@ -577,6 +625,18 @@ rowPresumed schema results =
   requestPresumed id inputs (concatMap (.presumed) (take 1 (reverse results)))
   where
     inputs = Set.fromList [ x.paramName | x <- schema ]
+
+-- | Did this result go over a limit that stops the run (time or memory)?
+stoppedTheRun :: EvalDirectiveResult -> Bool
+stoppedTheRun (MkEvalDirectiveResult _ res _ _ _ _) = case res of
+  Reduction (ReducedErrored exc) -> stops exc
+  Assertion (Errored exc)        -> stops exc
+  _                              -> False
+  where
+    stops = \ case
+      UserEvalException (OverBudget b)     -> stopsTheRun b
+      UserEvalException (NotEvaluated _ _) -> True
+      _                                    -> False
 
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
@@ -646,10 +706,12 @@ resultRefusalMsgs (MkEvalDirectiveResult _ res _ _ _ _) = case res of
 -- refused, naming it and the nearest input, as evaluation refuses it (review
 -- M1), and likewise inside a record an input holds, where a field left out
 -- takes its default.
-validateRow :: Presumption -> Map.Map Unique (Type' Resolved) -> [ExportedParam] -> RecordShapes -> Aeson.Value -> [Text]
+validateRow :: Presumption -> Map.Map Unique (Type' Resolved) -> [ExportedParam] -> TypeShapes -> Aeson.Value -> [Text]
 validateRow presumption synonyms schema shapes (Aeson.Object o) =
   unknownAtRoot <> concatMap checkParam schema
-    <> concat [ unknownIn presumption shapes [p.paramName] ty v
+    <> concat [ unknownIn presumption shapes.records [p.paramName] ty v
+              | p <- schema, Just ty <- [p.paramType], Just v <- [KeyMap.lookup (Key.fromText p.paramName) o] ]
+    <> concat [ choiceIssues synonyms shapes [p.paramName] ty v
               | p <- schema, Just ty <- [p.paramType], Just v <- [KeyMap.lookup (Key.fromText p.paramName) o] ]
   where
     names = map (.paramName) schema
@@ -705,6 +767,58 @@ allDependencies = go Set.empty . (.dependencies)
       | otherwise = d : go (Set.insert key seen) (d.dependencies <> ds)
       where key = moduleKey d.module'
     moduleKey (MkModule _ uri _) = uri
+
+-- | The choice types (@DECLARE ... IS ONE OF@) an input may hold, keyed by the
+-- type's 'Unique': the type's name, the names of its constructors that carry no
+-- fields, which are the ones JSON can name, and of those that do.
+type ChoiceShapes = Map.Map Unique (Text, [Text], [Text])
+
+-- | The types an input may hold that @--validate-only@ looks into.
+data TypeShapes = MkTypeShapes
+  { records :: RecordShapes
+  , choices :: ChoiceShapes
+  }
+
+typeShapes :: [Declare Resolved] -> TypeShapes
+typeShapes decls = MkTypeShapes (recordShapes decls) choiceShapes
+  where
+    choiceShapes = Map.fromList
+      [ (getUnique tyName, (typeText, [ n | (n, False) <- cons ], [ n | (n, True) <- cons ]))
+      | MkDeclare _ _ (MkAppForm _ tyName _ _) (EnumDecl _ conDecls) <- decls
+      , let typeText = rawNameToText (rawName (getActual tyName))
+            cons = [ (unqualifiedRawNameToText (rawName (getActual cn)), not (null fields))
+                   | MkConDecl _ cn fields <- conDecls ]
+      ]
+
+-- | The refusals of a value for a choice type, wherever one sits in one value
+-- of an input: through a @MAYBE@, in the elements of a list, in the fields of a
+-- record. A JSON string that names no constructor of the type without fields,
+-- and any other kind of JSON, is refused with the words the run refuses it
+-- with ('couldNotDecodeText', 'choiceNameMiss', 'choiceExpectation'), so a row
+-- is called valid only if it would decode (smucclaw/l4-ide#1086). @null@ is
+-- judged where nullability is, and a type it cannot see into is left alone.
+choiceIssues :: Map.Map Unique (Type' Resolved) -> TypeShapes -> [Text] -> Type' Resolved -> Aeson.Value -> [Text]
+choiceIssues synonyms shapes = go
+  where
+    go path ty0 v = case (expandSynonyms synonyms ty0, v) of
+      (_, Aeson.Null) -> []
+      (TyApp _ name [inner], _) | getUnique name == maybeUnique -> go path inner v
+      (TyApp _ name [inner], Aeson.Array xs) | getUnique name == listUnique ->
+        concat [ go (path <> ["[" <> Text.pack (show i) <> "]"]) inner x
+               | (i, x) <- zip [0 :: Int ..] (Vector.toList xs) ]
+      (TyApp _ name [], _)
+        | Just (typeName, withoutFields, withFields) <- Map.lookup (getUnique name) shapes.choices ->
+            case v of
+              Aeson.String s
+                | s `elem` withoutFields -> []
+                | otherwise -> [refused path v typeName (choiceNameMiss typeName s withoutFields withFields)]
+              _ -> [refused path v typeName (choiceExpectation typeName withoutFields withFields)]
+        | Just fields <- Map.lookup (getUnique name) shapes.records, Aeson.Object o <- v ->
+            concat [ go (path <> [f]) fty x | (f, fty, _) <- fields, Just x <- [KeyMap.lookup (Key.fromText f) o] ]
+      _ -> []
+    refused path v typeName why =
+      couldNotDecodeText (decodeUtf8 (BSL.toStrict (Aeson.encode v))) typeName
+        (" for field '" <> renderPresumedPath path <> "'") why
 
 -- | The unknown-key refusals inside one value of an input, at @path@: in a
 -- record object where a field left out takes its default (with presumption

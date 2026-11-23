@@ -6,7 +6,7 @@ File: typically-non-literal.l4
   Range: 4:9-4:14
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-value-not-a-literal
   Message:
     The TYPICALLY value for `x` must be a literal:
     a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.

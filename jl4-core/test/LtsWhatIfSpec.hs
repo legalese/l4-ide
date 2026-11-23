@@ -226,7 +226,7 @@ aReturnSrc = Text.unlines
   , "#TRACE aContract AT 0 WITH"
   , "  PARTY S DOES delivery AT 2"
   , "  PARTY B DOES payment 21 AT 4"
-  , "  (`WAIT UNTIL` 10)"
+  , "  (WAITUNTIL 10)"
   ]
 
 -- 11'. the same shape with nothing authored to draw a witness from: the set

@@ -6,16 +6,21 @@ module Main where
 
 import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.ByteString.Char8 as BS8
 import Data.IORef
 import Data.List (sortOn, isPrefixOf)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text.Encoding
 import qualified Data.Text.IO as Text.IO
 import Data.Time (UTCTime, getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Options.Applicative
 import System.Console.Haskeline
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory, makeAbsolute)
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
+import System.IO (hFlush, hIsEOF, hIsTerminalDevice, hSetEncoding, stdin, stdout, stderr)
+import System.Info (os)
 import System.FilePath (takeDirectory, takeBaseName)
 import Text.Printf (printf)
 
@@ -33,10 +38,11 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
+import L4.EvaluateLazy (EvalConfig (..), EvalLimits(..), applyEvalLimits, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyReductionOutcome, prettyUndetermined, prettyRefusal, prettyNotes)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
-import L4.TracePolicy (replDefaultPolicy)
+import L4.EvaluateLazy.Exceptions (maximumClosureApplications, maximumOpenObligations, maximumTracedClosureApplications)
+import L4.TracePolicy (fullTracePolicy, replDefaultPolicy)
 import L4.DirectiveFilter (filterIdeDirectives)
 import qualified L4.Print as Print
 import L4.Syntax (Module (..), Resolved, RawName (..), Unique, rawName, rawNameToText, getActual, Name (..), Decide (..), TopDecl (..), Section (..), AppForm (..))
@@ -52,12 +58,56 @@ import qualified L4.Decision.QueryPlan as QP
 data Options = Options
   { files   :: [FilePath]
   , verbose :: Bool
+  , limits  :: EvalLimits
   }
 
 optionsParser :: Parser Options
 optionsParser = Options
   <$> many (strArgument (metavar "FILES..." <> help "L4 files to load"))
   <*> switch (long "verbose" <> short 'v' <> help "Verbose output")
+  <*> limitsParser
+
+-- | The limits on evaluation, with the flags and defaults of the @l4@
+-- commands (ruled by Meng 2026-11-21, extending L2). A copy of
+-- @L4.Cli.Common.evalLimitsParser@, kept in step with it by hand: the REPL
+-- cannot import the @l4@ executable's modules, and the parser is kept out
+-- of the libraries so that no library takes on optparse-applicative.
+-- Here a time or memory stop ends the line that went over, not the session.
+-- A @:trace@ or @:traceascii@ line has the lower work number of every
+-- evaluation that collects a trace ('maximumTracedClosureApplications').
+limitsParser :: Parser EvalLimits
+limitsParser = EvalLimits
+  <$> optional (option countReader
+        ( long "max-open"
+        <> metavar "N|none"
+        <> help ("Stop any one line's evaluation that has more than N obligations open at once, or joins more than N failures into one breach (default "
+                 <> show maximumOpenObligations <> "; none: no limit)")
+        ))
+  <*> optional (option countReader
+        ( long "max-steps"
+        <> metavar "N|none"
+        <> help ("Stop any one line's evaluation that takes more than N steps, counting each function applied and each contract handed the events (default "
+                 <> show maximumClosureApplications <> ", and " <> show maximumTracedClosureApplications <> " for a :trace or :traceascii line, which keeps a record of every step; this sets both, and none removes both)")
+        ))
+  <*> optional (option positiveIntReader
+        ( long "eval-timeout"
+        <> metavar "SECONDS"
+        <> help "Stop any one line's evaluation that runs longer than SECONDS of wall-clock time"
+        ))
+  <*> optional (option positiveIntReader
+        ( long "max-eval-memory-mb"
+        <> metavar "MB"
+        <> help "Stop any one line's evaluation that allocates more than MB megabytes (every byte allocated, not only what is kept)"
+        ))
+  where
+    positiveIntReader = eitherReader \ input -> case reads input of
+      [(n, "")] | n > (0 :: Int) -> Right n
+      _ -> Left ("expected a whole number above 0, got " <> show input)
+    countReader = eitherReader \ case
+      "none" -> Right Nothing
+      input -> case reads input of
+        [(n, "")] | n > (0 :: Int) -> Right (Just n)
+        _ -> Left ("expected a whole number above 0, or none, got " <> show input)
 
 optionsInfo :: ParserInfo Options
 optionsInfo = info (helper <*> optionsParser)
@@ -85,11 +135,23 @@ data TraceSink = TraceSink
 
 main :: IO ()
 main = do
+  -- UTF-8 everywhere, as `l4` does (jl4/app/Main.hs): on Windows the
+  -- locale encoding is the user's code page, so a trace saved with
+  -- :tracefile lost its header. New handles take the locale encoding; the
+  -- standard handles were opened before `main` and need setting one by one.
+  -- haskeline reads a query and writes a reply in an encoding of its own:
+  -- see `runRepl`.
+  setLocaleEncoding utf8
+  hSetEncoding stdin  utf8
+  hSetEncoding stdout utf8
+  hSetEncoding stderr utf8
   opts <- execParser optionsInfo
   curDir <- getCurrentDirectory
   -- REPL default: enable traces for exploration (TRACE-GRAPHVIZ-ARCHITECTURE.md)
   let tracePolicy = replDefaultPolicy defaultGraphVizOptions
-  evalConfig <- resolveEvalConfig Nothing tracePolicy
+  -- the counts on by default, and the flags; no run stop, so a stop ends
+  -- only the line that went over (each line is evaluated as its own module)
+  evalConfig <- applyEvalLimits opts.limits <$> resolveEvalConfig Nothing tracePolicy
   baseRecorder <- cmapWithPrio pretty <$> makeDefaultStderrRecorder Nothing
   let recorder = if opts.verbose
                  then baseRecorder
@@ -174,19 +236,45 @@ runRepl replState = do
         { historyFile = Just ".jl4_history"
         , complete = completeFunc replState
         }
-  runInputT settings (loop replState)
+  fromConsole <- hIsTerminalDevice stdin
+  toConsole <- hIsTerminalDevice stdout
+  let write = writer toConsole
+  runInputT settings (loop (reader fromConsole write) (write . (<> "\n")) replState)
   where
-    loop :: ReplState -> InputT IO ()
-    loop st = do
-      minput <- getInputLine "jl4> "
+    -- On Windows haskeline writes to the console in Unicode, but to a pipe
+    -- or a file in the console's code page, whatever the encoding of
+    -- stdout, so a `↯` came out as `?`. There what is not for the console
+    -- goes to stdout, which is UTF-8.
+    writer :: Bool -> String -> InputT IO ()
+    writer toConsole
+      | os == "mingw32", not toConsole = \s -> liftIO (putStr s >> hFlush stdout)
+      | otherwise = outputStr
+    -- It reads a pipe or a file in that code page too, so a `§` came in as
+    -- `┬º`. There a line that is not from the console is read as haskeline
+    -- reads it, its bytes up to the newline after a prompt, and decoded as
+    -- UTF-8, a byte that is not UTF-8 as U+FFFD.
+    reader :: Bool -> (String -> InputT IO ()) -> String -> InputT IO (Maybe String)
+    reader fromConsole write
+      | os == "mingw32", not fromConsole = \prompt -> do
+          liftIO (hFlush stdout)
+          write prompt
+          liftIO $ do
+            eof <- hIsEOF stdin
+            if eof
+              then pure Nothing
+              else Just . Text.unpack . Text.Encoding.decodeUtf8Lenient <$> BS8.hGetLine stdin
+      | otherwise = getInputLine
+    loop :: (String -> InputT IO (Maybe String)) -> (String -> InputT IO ()) -> ReplState -> InputT IO ()
+    loop readInput say st = do
+      minput <- readInput "jl4> "
       case minput of
-        Nothing -> outputStrLn "Goodbye!"
+        Nothing -> say "Goodbye!"
         Just input -> do
           (output, newState, shouldQuit) <- liftIO $ processInput st (Text.pack input)
-          unless (Text.null output) $ outputStrLn (Text.unpack output)
+          unless (Text.null output) $ say (Text.unpack output)
           if shouldQuit
-            then outputStrLn "Goodbye!"
-            else loop newState
+            then say "Goodbye!"
+            else loop readInput say newState
 
 -- | Load a file and trigger type checking
 loadFile :: ReplState -> FilePath -> IO (Either Text ())
@@ -201,6 +289,15 @@ loadFile st fp = do
     Just tc | tc.success -> pure (Right ())
     Just _tc -> pure (Left "Type checking failed (see diagnostics above)")
     Nothing -> pure (Left "Failed to type check file")
+
+-- | Say that the REPL's in-memory file @replNfp@ stands in for the loaded file
+-- @contextFile@, whose text it copies, so that an IMPORT of the loaded file's own
+-- name under other capitals is still told that a module cannot import itself
+-- (smucclaw/l4-ide#1080; assumed, not ruled).
+standInFor :: ReplState -> LSP.NormalizedFilePath -> FilePath -> IO ()
+standInFor st replNfp contextFile = do
+  Rules.ImporterStandIns ref <- Shake.getIdeGlobalState st.ideState
+  atomicModifyIORef' ref (\ m -> (MapStrict.insert replNfp (toNormalizedFilePath contextFile) m, ()))
 
 -- | Process a single REPL input
 processInput :: ReplState -> Text -> IO (Text, ReplState, Bool)
@@ -599,6 +696,7 @@ evalExpression st contextFile exprText = do
       replUri = normalizedFilePathToUri replNfp
 
   -- Add the virtual file
+  standInFor st replNfp contextFile
   _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFile replNfp replContent]
 
   -- Type check and evaluate
@@ -651,14 +749,22 @@ formatResult (MkEvalDirectiveResult _range res _trace _ledger ns _) = (<> pretty
   Assertion Fails            -> "False (assertion failed)"
   Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"
   -- A refusal is not an error: the model declined to answer and said why.
-  Assertion (Refused r)      -> "Refused: " <> r.message
+  Assertion (Refused r)      -> refusedReply r
   Assertion a@(Errored _)    -> "Error: " <> prettyAssertionOutcome a
   -- as the Stuck it used to be (UNKNOWN-EVALUATION-SPEC §4.7.4)
   Assertion a@(Undetermined _) -> "Error: " <> prettyAssertionOutcome a
   Reduction (Reduced nf)     -> Print.prettyLayout nf
-  Reduction (ReducedRefused r) -> "Refused: " <> r.message
+  Reduction (ReducedRefused r) -> refusedReply r
   Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
   Reduction o@(ReducedUndetermined _) -> "Error: " <> prettyReductionOutcome o
+
+-- | "Refused: " and the reason, every further line of a reason that runs over
+-- several lines standing under its first.
+refusedReply :: Refusal -> Text
+refusedReply r =
+  prefix <> Text.intercalate ("\n" <> Text.map (const ' ') prefix) (Text.splitOn "\n" r.message)
+  where
+    prefix = "Refused: "
 
 -- | Evaluate an expression and show its GraphViz trace
 evalWithTrace :: ReplState -> FilePath -> Text -> IO Text
@@ -692,6 +798,7 @@ evalWithTrace st contextFile exprText = do
       replNfp = toNormalizedFilePath replPath
       replUri = normalizedFilePathToUri replNfp
   
+  standInFor st replNfp contextFile
   _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFile replNfp replContent]
   
   -- Type check and evaluate
@@ -703,7 +810,7 @@ evalWithTrace st contextFile exprText = do
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
     Just tc -> do
       -- Get evaluation results WITH trace
-      [meval] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.EvaluateLazy replUri]
+      meval <- traceLine st replUri tc
       case meval of
         Nothing -> pure "Evaluation failed"
         Just [] -> pure "(no result)"
@@ -741,6 +848,7 @@ evalWithTraceAscii st contextFile exprText = do
       replNfp = toNormalizedFilePath replPath
       replUri = normalizedFilePathToUri replNfp
 
+  standInFor st replNfp contextFile
   _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFile replNfp replContent]
 
   -- Type check and evaluate
@@ -750,13 +858,27 @@ evalWithTraceAscii st contextFile exprText = do
     Just tc | not tc.success -> do
       let errors = tc.infos
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
-    Just _tc -> do
+    Just tc -> do
       -- Get evaluation results WITH trace
-      [meval] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.EvaluateLazy replUri]
+      meval <- traceLine st replUri tc
       case meval of
         Nothing -> pure "Evaluation failed"
         Just [] -> pure "(no result)"
         Just results -> pure $ formatAsciiTraceResults results
+
+-- | A @:trace@ or @:traceascii@ line's results, with every directive in it
+-- traced ('fullTracePolicy'): a plain line collects no trace for its @#EVAL@
+-- ('replDefaultPolicy'), so the line is evaluated again, outside the rule's
+-- cache, under the REPL's configuration with that policy. A line written as
+-- @#EVAL@ or @#ASSERT@ then shows its trace, and an @#ASSERT@ its outcome,
+-- as they did before 2026-11-21 (decided by Claude 2026-11-21, pending Meng's review). A traced directive has the
+-- traced work number ('withTracedWorkNumber'), whichever way it is written.
+traceLine :: ReplState -> NormalizedUri -> Rules.TypeCheckResult -> IO (Maybe [EvalDirectiveResult])
+traceLine st uri tc = do
+  let traced = st.evalConfig {tracePolicy = fullTracePolicy defaultGraphVizOptions}
+  [r] <- shakeRunDatabase st.ideState.shakeDb
+    [ Shake.use Rules.GetImports uri >>= traverse \ imports -> snd <$> Rules.evaluateOn traced imports tc ]
+  pure r
 
 -- | Format evaluation results showing ASCII trace
 formatAsciiTraceResults :: [EvalDirectiveResult] -> Text
@@ -768,11 +890,11 @@ formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger _notes _
         Assertion Holds              -> "Result: True (assertion passed)"
         Assertion Fails              -> "Result: False (assertion failed)"
         Assertion a@(FailsBecause _) -> "Result: False (" <> prettyAssertionOutcome a <> ")"
-        Assertion (Refused r)        -> "Refused: " <> r.message
+        Assertion (Refused r)        -> refusedReply r
         Assertion a@(Errored _)      -> "Error: " <> prettyAssertionOutcome a
         Assertion a@(Undetermined _) -> "Error: " <> prettyAssertionOutcome a
         Reduction (Reduced nf)         -> "Result: " <> Print.prettyLayout nf
-        Reduction (ReducedRefused r)   -> "Refused: " <> r.message
+        Reduction (ReducedRefused r)   -> refusedReply r
         Reduction (ReducedErrored err) -> "Error: " <> Text.unlines (prettyEvalException err)
         Reduction o@(ReducedUndetermined _) -> "Error: " <> prettyReductionOutcome o
   in case mtrace of
@@ -888,8 +1010,10 @@ getNameInfo st contextFile nameText = do
       in case ce of
         KnownType _kind _params _mty ->
           nText <> " :: TYPE" <> location
+        -- An inferred polymorphic type carries the checker's labels (@z5@);
+        -- show @a@, @b@, … as #CHECK and :type do.
         KnownTerm ty _termKind ->
-          nText <> " :: " <> Print.prettyLayout ty <> location
+          nText <> " :: " <> Print.prettyTypeForDisplay ty <> location
         KnownSection _sec ->
           nText <> " :: SECTION" <> location
         KnownTypeVariable ->
@@ -944,7 +1068,7 @@ listEnvironment st contextFile = do
 
     formatShortInfo _n ce = case ce of
       KnownType _ _ _ -> "TYPE"
-      KnownTerm ty _ -> Print.prettyLayout ty
+      KnownTerm ty _ -> Print.prettyTypeForDisplay ty
       KnownSection _ -> "SECTION"
       KnownTypeVariable -> "TYPE_VAR"
 
@@ -978,6 +1102,7 @@ getExpressionType st contextFile exprText = do
       replUri = normalizedFilePathToUri replNfp
 
   -- Add the virtual file
+  standInFor st replNfp contextFile
   _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFile replNfp replContent]
 
   -- Type check (no evaluation needed)
@@ -1035,6 +1160,7 @@ helpText = Text.unlines
   , "  <expr>             Evaluate expression (implicit #EVAL)"
   , "  #EVAL <expr>       Evaluate expression and show result"
   , "  #ASSERT <expr>     Evaluate boolean expression, report pass/fail"
+  , "  #ASSERT REFUSED <expr> [BECAUSE \"reason\"]   Pass if the expression refuses (with that reason, if named)"
   , "  #EVALTRACE <expr>  Evaluate with trace output"
   , ""
   , "Trace visualization:"

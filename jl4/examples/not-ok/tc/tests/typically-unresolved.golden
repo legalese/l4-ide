@@ -6,7 +6,7 @@ File: typically-unresolved.l4
   Range: 12:31-12:34
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -21,7 +21,7 @@ File: typically-unresolved.l4
   Range: 14:1-14:2
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-value-not-a-literal
   Message:
     The TYPICALLY value for `x` must be a literal:
     a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.
@@ -35,7 +35,7 @@ File: typically-unresolved.l4
   Range: 17:31-17:34
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 

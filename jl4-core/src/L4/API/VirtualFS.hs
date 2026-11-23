@@ -31,6 +31,7 @@ module L4.API.VirtualFS
   , lookupEmbeddedLibrary
     -- * Type Checking with Imports
   , checkWithImports
+  , checkWithImportsLocated
   , checkWithImportsAndUri
     -- * Re-exports from shared resolution
   , TypeCheckWithDepsResult(..)
@@ -43,6 +44,7 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import Control.Applicative ((<|>))
+import L4.Parser.SrcSpan (SrcRange)
 
 -- Re-export embedded libraries
 import L4.API.EmbeddedLibraries (embeddedLibraries, embeddedLibraryNames, lookupEmbeddedLibrary)
@@ -52,7 +54,7 @@ import L4.Import.Resolution
   ( ModuleLookup
   , extractImportNames
   , moduleNameToProjectUri
-  , typecheckWithDependencies
+  , typecheckWithDependenciesKnowingLocated
   , TypeCheckWithDepsResult(..)
   , ResolvedImport(..)
   )
@@ -118,10 +120,36 @@ checkWithImports :: VFS -> Text -> Either [Text] TypeCheckWithDepsResult
 checkWithImports vfs source =
   checkWithImportsAndUri vfs "main" source
 
+-- | 'checkWithImports', where an import error also carries the range of the
+-- @IMPORT@ it belongs to, when that is known. The web playground's check
+-- comes this way, so it names the spelling as 'checkWithImports' does
+-- (smucclaw/l4-ide#1080).
+checkWithImportsLocated :: VFS -> Text -> Either (Maybe SrcRange, [Text]) TypeCheckWithDepsResult
+checkWithImportsLocated vfs source =
+  checkLocatedAs vfs "main" source
+
 -- | Type-check with a specific module name.
 checkWithImportsAndUri :: VFS -> Text -> Text -> Either [Text] TypeCheckWithDepsResult
 checkWithImportsAndUri vfs moduleName source =
+  either (Left . snd) Right (checkLocatedAs vfs moduleName source)
+
+-- | Both entry points above, so that the names offered by the not-found hint
+-- are decided in one place.
+checkLocatedAs :: VFS -> Text -> Text -> Either (Maybe SrcRange, [Text]) TypeCheckWithDepsResult
+checkLocatedAs vfs moduleName source =
   let uri = moduleNameToProjectUri moduleName
       lookup' = apiModuleLookup vfs
-      Identity result = typecheckWithDependencies lookup' uri source
+      -- The module being checked is never offered as a spelling of what it
+      -- imports: it would import itself. Its name is passed on its own, so
+      -- that the error can say so ('selfImportHint').
+      known = filter (/= moduleName) (apiKnownModuleNames vfs)
+      Identity result = typecheckWithDependenciesKnowingLocated known (Just moduleName) lookup' uri source
   in result
+
+-- | Every module name 'apiModuleLookup' can find: the embedded stdlib's and the
+-- VFS's, each without its @.l4@. They feed only the not-found hint, which names
+-- the ones that differ from a missing import only in capital letters
+-- (smucclaw/l4-ide#1080); lookups stay exact.
+apiKnownModuleNames :: VFS -> [Text]
+apiKnownModuleNames vfs =
+  embeddedLibraryNames <> [ fromMaybe k (Text.stripSuffix ".l4" k) | k <- vfsKeys vfs ]

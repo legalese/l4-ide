@@ -6,7 +6,7 @@ File: every-join-under-party.l4
   Range: 14:27-14:32
   Source: check
   Severity: DiagnosticSeverity_Information
-  Code: <none>
+  Code: lint/action-pattern-reference
   Message:
     In this action, `alice` refers to
 
@@ -19,7 +19,7 @@ File: every-join-under-party.l4
   Range: 14:43-14:56
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/join-without-every
   Message:
     A join line needs an EVERY.
 

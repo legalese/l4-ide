@@ -6,7 +6,7 @@ File: withal-not-a-record.l4
   Range: 16:7-16:17
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-misused
   Message:
     WITHAL builds a record with the default of every field, but
 
@@ -20,7 +20,7 @@ File: withal-not-a-record.l4
   Range: 23:7-23:20
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-misused
   Message:
     WITHAL builds a record with the default of every field, but
 
@@ -36,7 +36,7 @@ File: withal-not-a-record.l4
   Range: 28:7-28:19
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-misused
   Message:
     WITHAL builds a record with the default of every field, but
 
@@ -50,7 +50,7 @@ File: withal-not-a-record.l4
   Range: 31:7-31:21
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-misused
   Message:
     WITHAL builds a record with the default of every field, but
 

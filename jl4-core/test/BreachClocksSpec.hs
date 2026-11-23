@@ -5,7 +5,7 @@
 -- report keeps, checked over a few hundred generated contracts.
 --
 -- Each case is a tree of @RAND@ / @ROR@ over single obligations, every leaf a
--- different party and action, and a trace of idle @WAIT UNTIL@ events and
+-- different party and action, and a trace of idle @WAITUNTIL@ events and
 -- acts. The generator is a fixed linear congruential sequence, so a failure
 -- reproduces exactly; the case number is in the test's name.
 --
@@ -18,7 +18,7 @@
 --     the same two instants and the same decisive failures. (A compound
 --     still waiting prints its operands in the order they are written, so
 --     two of those are compared only as still waiting.)
---   * L3 — an idle event decides nothing: adding a @WAIT UNTIL@ between two
+--   * L3 — an idle event decides nothing: adding a @WAITUNTIL@ between two
 --     events leaves the verdict, the effective instant and the decisive
 --     failures as they were. (The generator writes only @MUST@s; a kept
 --     @SHANT@'s @HENCE@, where an idle event used to move the clock, is
@@ -67,7 +67,7 @@ import L4.EvaluateLazy.Machine (emptyEnvironment, pattern ValFulfilled)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Print (prettyLayout)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
-import L4.TracePolicy (TracePolicy, apiDefaultPolicy, replDefaultPolicy)
+import L4.TracePolicy (TracePolicy, apiDefaultPolicy, fullTracePolicy)
 
 -- | An obligation tree: a leaf is party/action @i@ due at @d@.
 data Tree = Leaf Int Integer | Node RBinOp Tree Tree
@@ -132,7 +132,7 @@ renderLedger = \ case
 
 traceLines :: [Ev] -> [Text.Text]
 traceLines = map \ case
-  Tick t  -> "  (`WAIT UNTIL` " <> Text.pack (show t) <> ")"
+  Tick t  -> "  (WAITUNTIL " <> Text.pack (show t) <> ")"
   Act i t -> "  PARTY P" <> Text.pack (show i) <> " DOES a" <> Text.pack (show i) <> " AT " <> Text.pack (show t)
 
 -- | A module with one rule per tree and one #TRACE per (tree, trace) pair.
@@ -153,7 +153,7 @@ moduleWith render' cs = Text.unlines $
       , "`c" <> Text.pack (show n) <> "` MEANS " <> render' t
       , ""
       , "#TRACE `c" <> Text.pack (show n) <> "` AT 0 WITH" ]
-      <> (if null evs then ["  (`WAIT UNTIL` 0)"] else traceLines evs)
+      <> (if null evs then ["  (WAITUNTIL 0)"] else traceLines evs)
       <> [""]
     | (n, (t, evs)) <- zip [0 :: Int ..] cs ]
 
@@ -398,8 +398,8 @@ spec = describe "a compound breach's report (SEESAW, spec §6.1.2)" do
       Breached {vEffective = Just e, vObserved = Just o} -> (n, e <= o) `shouldBe` (n, True)
       _ -> pure ()
   where
-    -- the REPL's policy traces every directive
-    tracedPolicy = replDefaultPolicy defaultGraphVizOptions
+    -- a policy that traces every directive
+    tracedPolicy = fullTracePolicy defaultGraphVizOptions
     pairs (a : b : rest) = (a, b) : pairs rest
     pairs _              = []
     -- a compound still waiting keeps its operands in the drafter's order,

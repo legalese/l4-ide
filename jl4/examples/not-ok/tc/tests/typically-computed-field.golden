@@ -6,7 +6,7 @@ File: typically-computed-field.l4
   Range: 9:3-9:8
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-on-computed-field
   Message:
     `taxed` is a computed field (it has a MEANS clause), so its value always comes
     from the MEANS expression and a TYPICALLY default would never be used.

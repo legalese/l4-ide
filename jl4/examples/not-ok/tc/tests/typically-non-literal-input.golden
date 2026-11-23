@@ -6,7 +6,7 @@ File: typically-non-literal-input.l4
   Range: 14:34-14:35
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -21,7 +21,7 @@ File: typically-non-literal-input.l4
   Range: 16:1-16:20
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-value-not-a-literal
   Message:
     The TYPICALLY value for `base` must be a literal:
     a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.
@@ -35,7 +35,7 @@ File: typically-non-literal-input.l4
   Range: 19:31-19:32
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -50,7 +50,7 @@ File: typically-non-literal-input.l4
   Range: 21:1-21:23
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-value-not-a-literal
   Message:
     The TYPICALLY value for `b` must be a literal:
     a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.
@@ -64,7 +64,7 @@ File: typically-non-literal-input.l4
   Range: 23:32-23:33
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -79,7 +79,7 @@ File: typically-non-literal-input.l4
   Range: 25:1-25:14
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/typically-value-not-a-literal
   Message:
     The TYPICALLY value for `n` must be a literal:
     a number, a string, or a nullary constructor such as TRUE, FALSE or NOTHING.

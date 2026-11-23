@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+mixfix-input-word-argument-import.l4:7:1-25:
+  assertion satisfied
+mixfix-input-word-argument-import.l4:8:1-27:
+  assertion satisfied
+mixfix-input-word-argument-import.l4:9:1-46:
+  assertion satisfied

@@ -6,7 +6,7 @@ File: typically-named-site.l4
   Range: 15:7-15:16
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 
@@ -25,7 +25,7 @@ File: typically-named-site.l4
   Range: 18:7-18:28
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/missing-named-arguments
   Message:
     In this use of
 
@@ -40,7 +40,7 @@ File: typically-named-site.l4
   Range: 22:31-22:34
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/unknown-identifier
   Message:
     I could not find a definition for the identifier
 
@@ -55,7 +55,7 @@ File: typically-named-site.l4
   Range: 26:16-26:40
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/missing-named-arguments
   Message:
     In this use of
 
@@ -70,7 +70,7 @@ File: typically-named-site.l4
   Range: 27:18-27:29
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 

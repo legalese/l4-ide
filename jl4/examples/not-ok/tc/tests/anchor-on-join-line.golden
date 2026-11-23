@@ -6,7 +6,7 @@ File: anchor-on-join-line.l4
   Range: 16:56-16:67
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/anchor-unavailable
   Message:
     OF THE JOIN cannot anchor the WITHIN on a join line.
 
@@ -21,7 +21,7 @@ File: anchor-on-join-line.l4
   Range: 20:52-20:67
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/anchor-unavailable
   Message:
     OF THE DEADLINE cannot anchor the WITHIN on a join line.
 

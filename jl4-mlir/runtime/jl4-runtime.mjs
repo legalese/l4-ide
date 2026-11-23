@@ -521,8 +521,10 @@ export class MissingInputError extends Error {
  * worker's wasm state may be inconsistent after it. A missing input gets
  * jl4-service's own 422 body, byte for byte: an 'InterpreterError' under
  * the 'Error' tag, with the report every response states (U7b). A
- * malformed deontic request is a 400 and a memory cap a 413, each with a
- * plain error body; anything else is a 500. Only the last two are fatal.
+ * malformed deontic request is a 400, a function the schema marks
+ * "supported": false a 501 ('UnsupportedFunctionError', thrown before
+ * anything runs), and a memory cap a 413, each with a plain error body;
+ * anything else is a 500. Only the last two are fatal.
  */
 export function evaluationErrorResponse(err) {
   if (err instanceof MissingInputError) {
@@ -539,9 +541,39 @@ export function evaluationErrorResponse(err) {
   const body = JSON.stringify({ error: String(err.message || err) });
   if (err instanceof DeonticInputError)
     return { status: 400, body, fatal: false };
+  // This backend does not evaluate the function; jl4-service does.
+  if (err instanceof UnsupportedFunctionError)
+    return { status: 501, body, fatal: false };
   if (err instanceof MemoryLimitError)
     return { status: 413, body, fatal: true };
   return { status: 500, body, fatal: true };
+}
+
+/**
+ * Thrown, before anything is run, for a function the schema marks
+ * "supported": false: one from which evaluation may reach a REFUSE, or
+ * one that holds a construct the backend cannot compile. Its compiled
+ * body would answer where jl4-service does not, so the runtime runs no
+ * part of it. 'unsupportedReason' is the schema's reason. The HTTP
+ * wrapper answers it with a 501.
+ */
+export class UnsupportedFunctionError extends Error {
+  constructor(meta) {
+    const reason = meta.unsupportedReason || "it is marked unsupported";
+    super(
+      (meta.name || meta.wasmSymbol || "this function") +
+        " is not evaluated by the WASM backend: " +
+        reason +
+        ". Evaluate it with jl4-service.",
+    );
+    this.name = "UnsupportedFunctionError";
+    this.unsupportedReason = reason;
+  }
+}
+
+// Every entry point that evaluates a function calls this first.
+function declineUnsupported(meta) {
+  if (meta.supported === false) throw new UnsupportedFunctionError(meta);
 }
 
 // ===========================================================================
@@ -3517,6 +3549,7 @@ export function createRuntime(opts) {
   // ---- High-level helper: marshal args, call an exported function,
   //      decode the return per the schema's return type. ----
   function invokeFunction(instance, meta, args) {
+    declineUnsupported(meta);
     resetHeap();
     // M6 — deontic functions never invoke the wasm body. The JS
     // interpreter walks 'meta.deonticContract' against the request's
@@ -3628,6 +3661,7 @@ export function createRuntime(opts) {
   }
 
   function invokeFunctionWithReasoning(instance, meta, args) {
+    declineUnsupported(meta);
     // M6 — deontic functions skip wasm entirely; the JS interpreter
     // owns the value AND the reasoning. For the parameter-less
     // variant (sale-contract pattern) we synthesise an 'EVALTRACE'

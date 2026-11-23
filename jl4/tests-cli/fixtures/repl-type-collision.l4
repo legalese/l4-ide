@@ -1,0 +1,4 @@
+-- For the REPL's :type in a module that declares a type named `a`, which the
+-- display names of inference variables skip.
+
+DECLARE a IS ONE OF approved, rejected

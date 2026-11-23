@@ -1,0 +1,6 @@
+`JSONENCODE` with `LEFT` with 1
+`JSONENCODE` with `RIGHT` with approved
+`JSONENCODE` with `LEFT` with list of 1 and 2
+`JSONENCODE` with `RIGHT` with `JUST` with 3
+`JSONENCODE` with list of `LEFT` with missing document and `RIGHT` with 250
+`JSONENCODE` with `Decision` where `applicant` is Kim and `outcome` is `RIGHT` with 250

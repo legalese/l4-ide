@@ -70,15 +70,16 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 
 ## Control flow
 
-| Keyword                          | Meaning                                                                                                                                    | Reference                            |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
-| **IF** ... **THEN** ... **ELSE** | Chooses between two values                                                                                                                 | [IF](control-flow/IF.md)             |
-| **BRANCH**                       | A multi-way conditional: a list of `IF ... THEN` lines and an `OTHERWISE`                                                                  | [BRANCH](control-flow/BRANCH.md)     |
-| **CONSIDER**                     | Pattern matching: picks a branch by the shape of a value                                                                                   | [CONSIDER](control-flow/CONSIDER.md) |
-| **WHEN**                         | One branch of a CONSIDER                                                                                                                   | [CONSIDER](control-flow/CONSIDER.md) |
-| **OTHERWISE**                    | The branch for every remaining case, in CONSIDER and BRANCH                                                                                | [CONSIDER](control-flow/CONSIDER.md) |
-| **EXACTLY**                      | In a pattern, matches a given value. In a regulative rule it is deprecated: a name in an action already refers to the thing it names       | [CONSIDER](control-flow/CONSIDER.md) |
-| **REFUSE**                       | Declines to answer: this case is outside what the model covers. No later rule can turn a refusal into an answer; only the boundary sees it | [REFUSE](control-flow/REFUSE.md)     |
+| Keyword                          | Meaning                                                                                                                              | Reference                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| **IF** ... **THEN** ... **ELSE** | Chooses between two values                                                                                                           | [IF](control-flow/IF.md)             |
+| **BRANCH**                       | A multi-way conditional: a list of `IF ... THEN` lines and an `OTHERWISE`                                                            | [BRANCH](control-flow/BRANCH.md)     |
+| **CONSIDER**                     | Pattern matching: picks a branch by the shape of a value                                                                             | [CONSIDER](control-flow/CONSIDER.md) |
+| **WHEN**                         | One branch of a CONSIDER                                                                                                             | [CONSIDER](control-flow/CONSIDER.md) |
+| **OTHERWISE**                    | The branch for every remaining case, in CONSIDER and BRANCH                                                                          | [CONSIDER](control-flow/CONSIDER.md) |
+| **EXACTLY**                      | In a pattern, matches a given value. In a regulative rule it is deprecated: a name in an action already refers to the thing it names | [CONSIDER](control-flow/CONSIDER.md) |
+| **REFUSE**                       | Declines to answer, and gives the author's reason: `REFUSE "reason"`; no later rule can turn a refusal into an answer                | [REFUSE](control-flow/REFUSE.md)     |
+| **REFUSED**                      | Reserved for `#ASSERT REFUSED`; a name spelled `REFUSED` is written in backticks                                                     | [REFUSE](control-flow/REFUSE.md)     |
 
 ## Operators
 
@@ -143,14 +144,14 @@ Every keyword, operator, type, directive and annotation in L4, with a one-line m
 
 ## Directives
 
-| Directive         | Meaning                                                                                               | Reference                                            |
-| ----------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `#EVAL`           | Evaluates an expression and shows the result                                                          | [Syntax and directives](syntax/README.md#directives) |
-| `#EVALTRACE`      | Evaluates and shows each step                                                                         | [Syntax and directives](syntax/README.md#directives) |
-| `#CHECK`          | Shows the type of an expression without evaluating it                                                 | [Syntax and directives](syntax/README.md#directives) |
-| `#ASSERT`         | Reports an error unless the expression is TRUE                                                        | [Syntax and directives](syntax/README.md#directives) |
-| `#ASSERT REFUSED` | Asserts that an expression refuses; add `BECAUSE "..."` to require the refusal message too            | [REFUSE](control-flow/REFUSE.md)                     |
-| `#TRACE`          | Runs a regulative rule against events: `#TRACE rule AT 0 WITH ...`; `STARTING AT` is the same as `AT` | [Syntax and directives](syntax/README.md#directives) |
+| Directive         | Meaning                                                                                                   | Reference                                                      |
+| ----------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `#EVAL`           | Evaluates an expression and shows the result                                                              | [Syntax and directives](syntax/README.md#directives)           |
+| `#EVALTRACE`      | Evaluates and shows each step                                                                             | [Syntax and directives](syntax/README.md#directives)           |
+| `#CHECK`          | Shows the type of an expression without evaluating it                                                     | [Syntax and directives](syntax/README.md#directives)           |
+| `#ASSERT`         | Reports whether the expression is TRUE: FALSE is an error, and a refusal a warning                        | [What `#ASSERT` reports](syntax/README.md#what-assert-reports) |
+| `#ASSERT REFUSED` | Reports an error unless the expression refuses to answer, with the reason after `BECAUSE` if there is one | [REFUSE](control-flow/REFUSE.md#testing-a-refusal)             |
+| `#TRACE`          | Runs a regulative rule against events: `#TRACE rule AT 0 WITH ...`; `STARTING AT` is the same as `AT`     | [Syntax and directives](syntax/README.md#directives)           |
 
 ## Annotations
 

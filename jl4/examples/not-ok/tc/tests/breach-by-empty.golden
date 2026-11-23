@@ -6,7 +6,7 @@ File: breach-by-empty.l4
   Range: 11:54-11:59
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/empty-breach-by
   Message:
     BREACH BY names an empty list.
 
@@ -19,7 +19,7 @@ File: breach-by-empty.l4
   Range: 14:54-14:60
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/empty-breach-by
   Message:
     BREACH BY names an empty list.
 

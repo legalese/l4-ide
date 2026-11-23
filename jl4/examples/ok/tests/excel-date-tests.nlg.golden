@@ -22,8 +22,14 @@ the year fraction from `Basis start` to `Basis end` on Excel basis 1 (negative i
 the year fraction from `Basis start` to `Basis end` on Excel basis 2 (negative if reversed)
 the date 1 month after `Late Jan 24` (capped at the last day of that month)
 the date -1 months after `Late Jan 24` (capped at the last day of that month)
-the day before the date 0 months plus one month after `Jan 2024`
-the day before the date 1 month plus one month after `Jan 2024`
+the last day of the month 0 months after the month of `Jan 2024`
+the last day of the month 1 month after the month of `Jan 2024`
+the last day of the month 1 month after the month of 15 January 2025
+the last day of the month 0 months after the month of 31 January 2025
+the last day of the month 1 month after the month of 15 January 2024
+the last day of the month 3 months after the month of 30 November 2026
+the last day of the month -1 months after the month of 15 March 2025
+the last day of the month -12 months after the month of 31 December 2025
 the date 10 working days after `Jan 2024` (skipping weekends)
 the date -5 working days after `Late Jan 24` (skipping weekends)
 the date 10 working days after `Jan 2024` (counting weekdays, and weekend days listed in `Holidays 24`)

@@ -4,17 +4,20 @@ Built-in functions are part of the language, so they work in every file without 
 
 Operators (`+`, `AND`, `EQUALS`, `UNLESS`, `FOLLOWED BY` and the rest) are described under [Operators](../operators/README.md). The conversions `TOSTRING`, `TONUMBER`, `TODATE`, `TOTIME`, `TODATETIME` and `AS STRING` are described under [Coercions](../types/coercions.md).
 
+Every built-in is written as one word. Two used to have a space, and so had to be written in backquotes: `ISINTEGER` was `` `IS INTEGER` `` and `WAITUNTIL` was `` `WAIT UNTIL` ``.
+The old spellings still work and mean the same thing, but each place one is written draws a warning that it has been renamed. Some versions of L4 no longer accept them, so write the new names.
+
 ## Numbers
 
 | Function            | Inputs         | Gives   | What it does                                                                                                                                                   |
 | ------------------- | -------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IS INTEGER`        | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
+| `ISINTEGER`         | NUMBER         | BOOLEAN | TRUE if the number has no fractional part                                                                                                                      |
 | `FLOOR`             | NUMBER         | NUMBER  | Rounds down to a whole number                                                                                                                                  |
 | `CEILING`           | NUMBER         | NUMBER  | Rounds up to a whole number                                                                                                                                    |
 | `ROUND`             | NUMBER         | NUMBER  | Rounds to the nearest whole number; a half goes to the even number, so 2.5 gives 2 and 3.5 gives 4                                                             |
 | `TRUNC`             | NUMBER, NUMBER | NUMBER  | `TRUNC x n` cuts `x` toward zero to `n` decimal places: `TRUNC 12.987 2` is 12.98. A negative `n` cuts to tens, hundreds and so on: `TRUNC 123.45 (-1)` is 120 |
-| `EXPONENT`          | NUMBER, NUMBER | NUMBER  | `EXPONENT base power`: `EXPONENT 2 10` is 1024                                                                                                                 |
-| `SQRT`              | NUMBER         | NUMBER  | Square root                                                                                                                                                    |
+| `EXPONENT`          | NUMBER, NUMBER | NUMBER  | `EXPONENT base power`: `EXPONENT 2 10` is 1024. An error for 0 to a negative power, a negative base with a fractional power, or overflow                       |
+| `SQRT`              | NUMBER         | NUMBER  | Square root; an error for a negative number                                                                                                                    |
 | `LN`                | NUMBER         | NUMBER  | Natural logarithm; an error for 0 or less                                                                                                                      |
 | `LOG10`             | NUMBER         | NUMBER  | Base-10 logarithm; an error for 0 or less                                                                                                                      |
 | `SIN`, `COS`, `TAN` | NUMBER         | NUMBER  | Trigonometry, in radians                                                                                                                                       |
@@ -22,6 +25,9 @@ Operators (`+`, `AND`, `EQUALS`, `UNLESS`, `FOLLOWED BY` and the rest) are descr
 | `ATAN`              | NUMBER         | NUMBER  | Inverse tangent                                                                                                                                                |
 
 The [math](../libraries/math.md) library has lowercase versions (`ln`, `sqrt`, `asin`, ...) that give `NOTHING` instead of an error.
+
+These functions work in floating point, exact to about 15 digits, and stop with an error when the answer comes out infinite.
+A number beyond about 10^308, or very close to 0, is treated as infinite or as 0, which can give a wrong answer.
 
 ## Text
 
@@ -123,10 +129,10 @@ See `jl4/examples/ok/temporal-pin-deep.l4` and the ruling in `specs/todo/TEMPORA
 
 ## Regulative traces
 
-| Function     | Inputs                                 | Gives       | What it does                                                                                        |
-| ------------ | -------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
-| `WAIT UNTIL` | NUMBER                                 | EVENT a b   | An event that matches no party and no action; in a `#TRACE` it moves time forward to the given time |
-| `EVALTRACE`  | DEONTIC a b, NUMBER, LIST OF EVENT a b | DEONTIC a b | The function behind `#TRACE`: what remains of a rule after the events, starting at the given time   |
+| Function    | Inputs                                 | Gives       | What it does                                                                                        |
+| ----------- | -------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
+| `WAITUNTIL` | NUMBER                                 | EVENT a b   | An event that matches no party and no action; in a `#TRACE` it moves time forward to the given time |
+| `EVALTRACE` | DEONTIC a b, NUMBER, LIST OF EVENT a b | DEONTIC a b | The function behind `#TRACE`: what remains of a rule after the events, starting at the given time   |
 
 See [EVENT](../regulative/EVENT.md) and [Regulative rules](../regulative/README.md).
 

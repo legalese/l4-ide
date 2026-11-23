@@ -405,11 +405,17 @@ ExcelEDate startDate months MEANS
 GIVEN startDate IS A DATE
       months    IS A NUMBER
 GIVETH AN EITHER STRING DATE
-@nlg the day before the date %months% months plus one month after %startDate%
+@nlg the last day of the month %months% months after the month of %startDate%
 ExcelEOMonth startDate months MEANS
-    CONSIDER ExcelEDate startDate (months PLUS 1)
+    CONSIDER ensureWhole "EOMONTH months" months
     WHEN LEFT err THEN LEFT err
-    WHEN RIGHT nextMonthFirst THEN RIGHT (Date (Day nextMonthFirst MINUS 1))
+    WHEN RIGHT monthsInt THEN
+        RIGHT (Date lastDay targetMonth targetYear)
+        WHERE
+            totalMonths MEANS startDate's month MINUS 1 PLUS monthsInt
+            targetYear  MEANS startDate's year PLUS FLOOR (totalMonths DIVIDED BY `Months in a year`)
+            targetMonth MEANS (totalMonths MODULO `Months in a year`) PLUS 1
+            lastDay     MEANS `Days in month` targetMonth targetYear
 
 
 

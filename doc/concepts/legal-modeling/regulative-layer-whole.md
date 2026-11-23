@@ -141,7 +141,7 @@ Result:
 The rules of the clock are few and worth having in one place:
 
 - the deadline day itself is in time (`WITHIN 7` includes day 7);
-- time passes only through events, so ``(`WAIT UNTIL` 8)`` is how to say "day 8 came and nobody did anything";
+- time passes only through events, so `(WAITUNTIL 8)` is how to say "day 8 came and nobody did anything";
 - an event that does not fit the obligation is passed over, but the clock still moves to its time;
 - an event whose act holds a fact the case has not supplied, at a place where the act written in the obligation's `MUST`, `MAY` or `SHANT` line names one particular kind of thing (Alice delivered goods of a kind nobody has stated, and the line says `MUST Deliver Retail`), is not passed over: the run stops and names the missing fact, because passing it over would mean deciding that she delivered the wrong kind;
 - the same holds when that missing fact is checked by a rule that uses `CONSIDER`, in the act or in a `PROVIDED` condition: an `OTHERWISE` line is not taken just because the fact is missing, so where a line before it could still match, the run stops and names it;
@@ -295,15 +295,15 @@ One place where two questions meet deserves to be named, because it is where rea
 
 ## Built, and proposed
 
-| Built, in the current release                                                                                                                                             | Proposed, not landed (2026-09-08)                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                                                                    | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
-| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                                                                        | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
-| `RAND`, `ROR`, and how they group without brackets; a breach that names every party who failed (since 2026-09-15)                                                         |                                                                                               |
-| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST` (the `LEST` clock counted from the missed deadline since 2026-09-16) |                                                                                               |
-| a name in an act requiring the value it names, on the whole act or on one figure; a shape with a blank; `PROVIDED`; handing a blank to a rule                             |                                                                                               |
-| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`                                                           |                                                                                               |
-| the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement                                                     | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
+| Built, in the current release                                                                                                                                            | Proposed, not landed (2026-09-08)                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                                                                   | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
+| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                                                                       | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
+| `RAND`, `ROR`, and how they group without brackets; a breach that names every party who failed (since 2026-09-15)                                                        |                                                                                               |
+| `#TRACE`, `AT`, `DOES`, `WAITUNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST` (the `LEST` clock counted from the missed deadline since 2026-09-16) |                                                                                               |
+| a name in an act requiring the value it names, on the whole act or on one figure; a shape with a blank; `PROVIDED`; handing a blank to a rule                            |                                                                                               |
+| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`                                                          |                                                                                               |
+| the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement                                                    | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
 
 The last row of the right-hand column is one the design documents record as the next axis after this one, and it is not on this page: an L4 obligation says who is bound and to do what, but not to whom it is owed, so "payment to any one of several creditors discharges the debt" cannot yet be written at all.
 

@@ -6,7 +6,7 @@ File: typically-overloaded-fit.l4
   Range: 19:7-19:29
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -23,7 +23,7 @@ File: typically-overloaded-fit.l4
   Range: 19:7-19:29
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/not-a-function
   Message:
     You are giving named inputs to
 
@@ -36,7 +36,7 @@ File: typically-overloaded-fit.l4
   Range: 40:7-40:30
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 
@@ -54,7 +54,7 @@ File: typically-overloaded-fit.l4
   Range: 40:7-40:30
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/not-a-function
   Message:
     You are giving named inputs to
 
@@ -67,7 +67,7 @@ File: typically-overloaded-fit.l4
   Range: 54:7-54:17
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/ambiguous-identifier
   Message:
     There are multiple definitions for the identifier
 

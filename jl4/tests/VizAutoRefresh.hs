@@ -158,6 +158,7 @@ partialTypeCheckResult r =
     , sectionPaths = unused "sectionPaths"
     , implicitReaders = unused "implicitReaders"
     , inputDefaults = unused "inputDefaults"
+    , importsOk = unused "importsOk"
     }
   where
     unused field =

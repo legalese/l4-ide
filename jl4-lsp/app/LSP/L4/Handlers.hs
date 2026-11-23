@@ -7,14 +7,14 @@ module LSP.L4.Handlers where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.Strict (Chan, writeChan)
-import Control.Exception.Safe (MonadCatch, MonadMask, MonadThrow)
+import Control.Exception.Safe (MonadCatch, MonadMask, MonadThrow, SomeException, displayException, handleAny)
 import Control.Lens ((^.))
 import qualified Control.Monad.Extra as Extra
 import Control.Monad.Reader (MonadReader (..))
 import Control.Monad.Trans.Reader (ReaderT)
 import Data.Monoid (Ap (..))
 import Data.Tuple (swap)
-import UnliftIO (MonadUnliftIO, atomically, STM, MonadIO(..))
+import UnliftIO (MonadUnliftIO, atomically, evaluateDeep, STM, MonadIO(..))
 import qualified StmContainers.Map as STM
 import Control.Applicative
 import Control.Monad.Except (runExceptT, throwError, MonadError(..), ExceptT(..))
@@ -22,6 +22,8 @@ import Control.Monad.Trans.Maybe
 import qualified Control.Monad.Trans.Reader as ReaderT
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Text as Aeson
+import Data.Foldable (traverse_)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
@@ -34,6 +36,7 @@ import GHC.Generics
 import GHC.TypeLits (Symbol)
 import Data.Proxy (Proxy (..))
 import System.FilePath (takeExtension)
+import Development.IDE.Graph (Action, actionCatch)
 import L4.FindReferences (lookupReference)
 import LSP.L4.Base
 import LSP.L4.Config
@@ -62,6 +65,7 @@ import Language.LSP.VFS (VFS)
 import LSP.L4.Actions
 import LSP.L4.DocumentSymbols (documentSymbols)
 import LSP.L4.EmbeddedLibrary
+import qualified LSP.L4.BlockingErrors as BlockingErrors
 import qualified LSP.L4.Inspector as Inspector
 import L4.EvaluateLazy (EvalConfig)
 import qualified L4.EvaluateLazy as EL
@@ -103,6 +107,7 @@ data Log
   | LogHandlingCustomRequest !Uri !Text          -- ^ Uri CustomMethodName
   | LogSuppliedTooManyArguments [Aeson.Value]
   | LogExecutingCommand !Text
+  | LogFileCheckedFailed !Uri !Text
   | LogShake Shake.Log
   deriving (Show)
 
@@ -115,6 +120,7 @@ instance Pretty Log where
     LogMultipleDecideClauses uri -> "Document contains multiple decide clauses:" <+> pretty (getUri uri)
     LogSuppliedTooManyArguments args -> "Visualization command was passed too many arguments, this is a bug:" <+> pretty (Aeson.encodeToLazyText args)
     LogExecutingCommand cmd -> "Executing command:" <+> pretty cmd
+    LogFileCheckedFailed uri msg -> "Could not report the check of" <+> pretty (getUri uri) <> ":" <+> pretty msg
     LogFileStore msg -> pretty msg
     LogShake msg -> pretty msg
     LogHandlingCustomRequest uri method -> "Handling custom request:" <+> pretty (getUri uri) <+> pretty method
@@ -161,61 +167,122 @@ notificationHandler m k = LSP.notificationHandler m $ \TNotificationMessage{_par
   liftIO $ writeChan st.reactor $ ReactorNotification (LSP.runLspT env $ runServerM st $ k st.ideState vfs _params)
 
 -- ----------------------------------------------------------------------------
--- Directive results notification
+-- What a check found
 -- ----------------------------------------------------------------------------
 
--- | After a file change, wait for evaluation to complete then push all directive
--- results to the client as a @l4/directiveResultsUpdated@ notification.
--- Runs in a background thread so it doesn't block the reactor.
-scheduleDirectiveResultsNotification
-  :: IdeState -> Uri -> NormalizedUri -> ServerM Config ()
-scheduleDirectiveResultsNotification ide doc nuri = do
+-- | After a change to a document, report the check of that document and of each
+-- open document that imports it, in a background thread so as not to block the
+-- reactor.
+--
+-- The importers need this because 'LSP.L4.LanguageServer.kick' re-checks every
+-- open file after any change, and their published diagnostics do follow, but
+-- without it a client hears nothing else: no directive results, and no way to
+-- tell that a file was checked again and nothing changed.
+scheduleFileChecked :: Recorder (WithPriority Log) -> IdeState -> Uri -> ServerM Config ()
+scheduleFileChecked recorder ide doc = do
   env <- LSP.getLspEnv
   liftIO $ Extra.void $ forkIO $ do
-    -- Wait for EvaluateLazy (also blocks on SuccessfulTypeCheck transitively).
-    -- If type-checking fails, mEvalResults is Nothing and we send nothing,
-    -- leaving inspector sections frozen at their last valid state (matching WASM behaviour).
-    (mEvalResults, mTcResult, mRope) <- runAction "l4/directiveResultsNotif" ide $ do
-      mEval <- use EvaluateLazy nuri
-      mTc   <- use SuccessfulTypeCheck nuri
-      mRope <- getFileContents nuri
-      pure (mEval, mTc, mRope)
-    case mEvalResults of
-      Nothing -> pure ()
-      Just evalResults -> do
-        -- `body` carries the directive's full source span (the inclusive
-        -- [startLine, endLine] slice joined by '\n'), so multi-line
-        -- directives stay distinguishable. Render sites truncate to one
-        -- line when a header is wanted.
-        let getLines startLine endLine = case mRope of
-              Nothing   -> ""
-              Just rope ->
-                let ls = Text.lines (Rope.toText rope)
-                    s  = max 1 startLine
-                    e  = min (length ls) endLine
-                in if s <= e
-                   then Text.intercalate "\n" (take (e - s + 1) (drop (s - 1) ls))
-                   else ""
-            conFields    = maybe mempty (extractConstructorFieldNames . (.entityInfo)) mTcResult
-            evalUpdates  = Maybe.mapMaybe (Inspector.evalDirectiveToUpdateItem conFields getLines) evalResults
-            checkUpdates =
-              [ Inspector.DirectiveUpdateItem
-                  { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
-                  , prettyText  = Text.intercalate "\n" (prettyCheckErrorWithContext info)
-                  , success     = Just True
-                  , body        = getLines startLine endLine
-                  }
-              | Just tcResult <- [mTcResult]
-              , info <- checkDirectiveResults tcResult.infos
-              , Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _) <- [rangeOf info]
-              ]
-        LSP.runLspT env $
-          sendNotification
-            (SMethod_CustomMethod (Proxy @Inspector.DirectiveResultsUpdatedMethodName))
-            (Aeson.toJSON $ Inspector.DirectiveResultsUpdatedParams
-              { uri     = getUri doc
-              , results = evalUpdates <> checkUpdates
-              })
+    let nuri = toNormalizedUri doc
+    reportFileChecked recorder env ide doc
+    importers <-
+      logFileCheckedFailure recorder doc [] $
+        runAction "l4/fileChecked.importers" ide do
+          open <- HashMap.keys <$> getFilesOfInterestUntracked
+          Extra.filterM (fmap (nuri `elem`) . BlockingErrors.importClosure) (filter (/= nuri) open)
+    traverse_ (reportFileChecked recorder env ide . fromNormalizedUri) importers
+
+-- | Wait until a document's checking and evaluation have finished, then push
+-- its directive results and @l4/fileChecked@, in that order.
+--
+-- All of this runs in one 'Action', for two reasons. A session cannot start while
+-- an action of the session before it runs, so the diagnostics read here cannot
+-- be those of a newer version than the check that was waited for, which they
+-- could be if they were read after 'runAction' returned. And it keeps the
+-- notifications of consecutive sessions in order. An edit that cancels the
+-- session runs the whole action again in the next one, so a client may hear of a
+-- version twice, but it always hears.
+--
+-- Nothing that goes wrong before the last step may cost the client its
+-- @l4/fileChecked@: a client that waits for it would hang. A rule that failed
+-- is no problem, since 'use' just answers 'Nothing'. Any other exception on the
+-- way to the directive results is logged here, and 'actionCatch' lets the
+-- cancellation of the session through.
+reportFileChecked
+  :: Recorder (WithPriority Log)
+  -> LSP.LanguageContextEnv Config
+  -> IdeState
+  -> Uri
+  -> IO ()
+reportFileChecked recorder env ide doc =
+  logFileCheckedFailure recorder doc () $ runAction "l4/fileChecked" ide do
+    actionCatch (pushDirectiveResults env doc) \(e :: SomeException) ->
+      logWith recorder Error $ LogFileCheckedFailed doc (Text.pack (displayException e))
+    (version, diagnostics) <- liftIO $ atomically $ getFileDiagnostics (shakeExtras ide) nuri
+    liftIO $ LSP.runLspT env $
+      sendNotification
+        (SMethod_CustomMethod (Proxy @Inspector.FileCheckedMethodName))
+        (Aeson.toJSON Inspector.FileCheckedParams
+          { uri = getUri doc
+          , version
+          , diagnostics = map (.fdLspDiagnostic) diagnostics
+          })
+ where
+  nuri = toNormalizedUri doc
+
+logFileCheckedFailure :: Recorder (WithPriority Log) -> Uri -> a -> IO a -> IO a
+logFileCheckedFailure recorder doc fallback =
+  handleAny \e -> do
+    logWith recorder Error $ LogFileCheckedFailed doc (Text.pack (displayException e))
+    pure fallback
+
+-- | Wait for evaluation to complete, then push all directive results to the
+-- client as a @l4/directiveResultsUpdated@ notification.
+pushDirectiveResults :: LSP.LanguageContextEnv Config -> Uri -> Action ()
+pushDirectiveResults env doc = do
+  let nuri = toNormalizedUri doc
+  -- Wait for EvaluateLazy (also blocks on SuccessfulTypeCheck transitively).
+  -- If type-checking fails, mEvalResults is Nothing and we send nothing,
+  -- leaving inspector sections frozen at their last valid state (matching WASM behaviour).
+  mEvalResults <- use EvaluateLazy nuri
+  mTcResult    <- use SuccessfulTypeCheck nuri
+  mRope        <- getFileContents nuri
+  case mEvalResults of
+    Nothing -> pure ()
+    Just evalResults -> do
+      -- `body` carries the directive's full source span (the inclusive
+      -- [startLine, endLine] slice joined by '\n'), so multi-line
+      -- directives stay distinguishable. Render sites truncate to one
+      -- line when a header is wanted.
+      let getLines startLine endLine = case mRope of
+            Nothing   -> ""
+            Just rope ->
+              let ls = Text.lines (Rope.toText rope)
+                  s  = max 1 startLine
+                  e  = min (length ls) endLine
+              in if s <= e
+                 then Text.intercalate "\n" (take (e - s + 1) (drop (s - 1) ls))
+                 else ""
+          conFields    = maybe mempty (extractConstructorFieldNames . (.entityInfo)) mTcResult
+          evalUpdates  = Maybe.mapMaybe (Inspector.evalDirectiveToUpdateItem conFields getLines) evalResults
+          checkUpdates =
+            [ Inspector.DirectiveUpdateItem
+                { directiveId = Text.pack (show startLine) <> ":" <> Text.pack (show colNo)
+                , prettyText  = Text.intercalate "\n" (prettyCheckErrorWithContext info)
+                , success     = Just True
+                , body        = getLines startLine endLine
+                }
+            | Just tcResult <- [mTcResult]
+            , info <- checkDirectiveResults tcResult.infos
+            , Just (MkSrcRange (MkSrcPos startLine colNo) (MkSrcPos endLine _) _ _) <- [rangeOf info]
+            ]
+      -- Rendered here, not when the message is encoded: an exception in a
+      -- result would otherwise surface in the thread that writes to the client.
+      params <- evaluateDeep $ Aeson.toJSON Inspector.DirectiveResultsUpdatedParams
+        { uri     = getUri doc
+        , results = evalUpdates <> checkUpdates
+        }
+      liftIO $ LSP.runLspT env $
+        sendNotification (SMethod_CustomMethod (Proxy @Inspector.DirectiveResultsUpdatedMethodName)) params
 
 -- ----------------------------------------------------------------------------
 -- Handlers
@@ -242,7 +309,7 @@ handlers evalConfig recorder =
             setFileModified (VFSModified vfs) ide nuri $
               addFileOfInterest ide nuri Modified{firstOpen=True}
             logWith recorder Debug $ LogOpenedTextDocument doc
-          scheduleDirectiveResultsNotification ide doc nuri
+          scheduleFileChecked recorder ide doc
     , notificationHandler SMethod_TextDocumentDidChange $ \ide vfs msg -> do
         let
           doc = msg ^. J.textDocument . J.uri
@@ -256,7 +323,7 @@ handlers evalConfig recorder =
             setFileModified (VFSModified vfs) ide nuri $
               addFileOfInterest ide nuri Modified{firstOpen=False}
             logWith recorder Debug $ LogModifiedTextDocument doc
-          scheduleDirectiveResultsNotification ide doc nuri
+          scheduleFileChecked recorder ide doc
     , notificationHandler SMethod_TextDocumentDidSave $ \ide vfs msg -> do
         let
           doc = msg ^. J.textDocument . J.uri
@@ -267,7 +334,7 @@ handlers evalConfig recorder =
             setFileModified (VFSModified vfs) ide nuri $
               addFileOfInterest ide nuri OnDisk
             logWith recorder Debug $ LogSavedTextDocument doc
-          scheduleDirectiveResultsNotification ide doc nuri
+          scheduleFileChecked recorder ide doc
     , notificationHandler SMethod_TextDocumentDidClose $ \ide vfs msg -> liftIO $ do
         let
           doc = msg ^. J.textDocument . J.uri
@@ -402,15 +469,6 @@ handlers evalConfig recorder =
           visualizeDecides :: [CodeLens] =
             decisionGraphCodeLenses verTextDocId typeCheck
               <> stateGraphCodeLenses verTextDocId typeCheck
-
-          directiveLabel :: Directive Resolved -> Text
-          directiveLabel = \case
-            LazyEval{}      -> "#EVAL"
-            LazyEvalTrace{} -> "#EVALTRACE"
-            Check{}         -> "#CHECK"
-            Contract{}      -> "#CHECK"
-            Assert{}        -> "#ASSERT"
-            AssertRefused{} -> "#ASSERT REFUSED"
 
           mkRenderResultCodeLens srcPos label = CodeLens
             { _command = Just Command
@@ -630,14 +688,38 @@ handlers evalConfig recorder =
           Just reqParams -> do
             let nuri = toNormalizedUri reqParams.verDocId._uri
 
-            mTcResult <- liftIO $ runAction "l4/getExportedFunctions" _ide $
-              use TypeCheck nuri
+            (mTcResult, closure) <- liftIO $ runAction "l4/getExportedFunctions" _ide $
+              (,) <$> use TypeCheck nuri
+                  <*> BlockingErrors.importClosure nuri
+            -- Read after the action: the rules it ran have published their
+            -- diagnostics for every file in the closure by now.
+            diags <- liftIO $ atomically $ getDiagnostics _ide
+            let
+                diagErrors =
+                  [ Inspector.BlockingError
+                      { uri = getUri (fromNormalizedUri fd.fdFilePath)
+                      , line = fromIntegral fd.fdLspDiagnostic._range._start._line + 1
+                      , message = Text.strip fd.fdLspDiagnostic._message
+                      }
+                  -- The engine's own errors (a raw exception, or "depends on
+                  -- itself", which an IMPORT that finds no module also
+                  -- causes) say less than the parser's and the typechecker's,
+                  -- so they go last.
+                  | fd <- uncurry (<>) $ List.partition
+                      (\fd -> fd.fdLspDiagnostic._source `notElem` [Just "jl4", Just "compiler"])
+                      (BlockingErrors.blockingErrorsIn closure diags)
+                  ]
+                -- A diagnostic is stored once per rule that published it, and
+                -- a typecheck runs once per import path that reaches it.
+                blockingErrors = List.nub diagErrors
 
             case mTcResult of
-              Nothing -> pure $ Left $ TResponseError
-                { _code = InR ErrorCodes_InvalidRequest
-                , _message = "No type check result available"
-                , _xdata = Nothing
+              -- The file does not parse, or is on a ring of imports: nothing
+              -- to export, and that error is the reason Deploy is off.
+              Nothing -> pure $ Right $ Aeson.toJSON Inspector.GetExportedFunctionsResponse
+                { functions = []
+                , importedFiles = []
+                , blockingErrors
                 }
               Just tcResult -> do
                 let -- `tc.dependencies` is the transitive-import *tree*, so a
@@ -677,6 +759,7 @@ handlers evalConfig recorder =
                     response = Inspector.GetExportedFunctionsResponse
                       { functions = summaries
                       , importedFiles = importUris
+                      , blockingErrors
                       }
                 pure $ Right $ Aeson.toJSON response
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.ExportDocumentMethodName)) $ \_ide params -> do
@@ -694,10 +777,9 @@ handlers evalConfig recorder =
             -- The token stream alongside the type-check result, for the same
             -- reason `l4 render` reads it: the document's language — the HTML
             -- wrapper's @lang@, and the AKN Expression FRBR URIs — comes from the
-            -- module's declared @\@lang@, which lives in the tokens. This request
-            -- carries no language of its own, so there is nothing to override it
-            -- with here, and nothing to fall back FROM either: the CLI's
-            -- "asked-for language nothing renders in" case cannot arise.
+            -- module's declared @\@lang@, which lives in the tokens, unless the
+            -- request names one (@lang@, which the Render tab's language picker
+            -- sets, as @--lang@ does for the CLI).
             (mTc, mToks) <- liftIO $ runAction "l4/exportDocument" _ide $
               (,) <$> use TypeCheck nuri <*> use GetLexTokens nuri
             case mTc of
@@ -713,7 +795,12 @@ handlers evalConfig recorder =
                     -- plain prose names.
                     hidden = Map.fromList
                       [ (toNormalizedUri (Uri u), ExportDoc.Hidden) | u <- reqParams.excludeModules ]
-                    deps = drop 1 (flattenExportModules tcResult)
+                    rawDeps = drop 1 (flattenExportModules tcResult)
+                    declaredLang =
+                      Maybe.fromMaybe defaultModuleLang (declaredModuleLang . fst =<< mToks)
+                    requestedLang = MkLangTag <$> reqParams.lang
+                    (docLang, _unsupported) =
+                      Nlg.documentLanguage declaredLang requestedLang (tcResult.module' : rawDeps)
                     ecfg = ExportDoc.defaultExportConfig
                       { ExportDoc.dropUnused = not reqParams.includeUnused
                       , ExportDoc.moduleDispositions = hidden
@@ -727,22 +814,28 @@ handlers evalConfig recorder =
                              , ExportRender.numberClauses = reqParams.numberClauses
                              , ExportRender.toc = reqParams.toc
                              , ExportRender.sourceLinks = maybe mempty (ExportRender.sourceLinksFrom . fst) mToks
-                             , ExportRender.docLang =
-                                 Maybe.fromMaybe defaultModuleLang
-                                   (declaredModuleLang . fst =<< mToks) }
+                             , ExportRender.docLang = docLang }
                     -- The same preparation as `l4 render`: a herald written after a
-                    -- rule's last input is moved onto the rule.
-                    (docModule, docDeps) = Nlg.prepareModules Nothing tcResult.module' deps
+                    -- rule's last input is moved onto the rule, then the language
+                    -- is chosen, in the imports too.
+                    (docModule, docDeps) = Nlg.prepareModules requestedLang tcResult.module' rawDeps
                     doc = ExportDoc.buildDocument ecfg docModule docDeps
+                    -- What the Render tab offers to switch to: the languages
+                    -- of the file's own wordings, not of its imports, whose
+                    -- English would otherwise be offered for every file.
+                    languages = Nlg.moduleLanguages declaredLang tcResult.module'
+                    langText (MkLangTag t) = t
                     content = case reqParams.format of
                       "text" -> ExportRender.renderText rcfg doc
                       "akn"  -> ExportRender.renderAkn rcfg doc
                       "json" -> ""
                       _      -> ExportRender.renderHtml rcfg doc
                 pure $ Right $ Aeson.object
-                  [ "format"  Aeson..= reqParams.format
-                  , "content" Aeson..= content
-                  , "ir"      Aeson..= doc
+                  [ "format"    Aeson..= reqParams.format
+                  , "content"   Aeson..= content
+                  , "ir"        Aeson..= doc
+                  , "languages" Aeson..= map langText languages
+                  , "lang"      Aeson..= langText docLang
                   ]
     , requestHandler (SMethod_CustomMethod (Proxy @Ladder.ExportPlanMethodName)) $ \_ide params -> do
         let parseParams :: Aeson.Value -> Maybe Ladder.ExportPlanParams

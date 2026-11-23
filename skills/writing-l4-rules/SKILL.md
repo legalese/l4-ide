@@ -288,14 +288,18 @@ DECLARE PaymentAction IS ONE OF
     `pay invoice`   HAS amount IS A NUMBER, recipient IS AN Actor
     `waive payment` HAS reason IS A STRING
 
+DECLARE Invoice HAS
+    customer IS AN Actor
+    amount   IS A NUMBER
+
 GIVEN invoice IS AN Invoice
 GIVETH A DEONTIC Actor PaymentAction
 DECIDE obligation IS
-    PARTY Customer
-    MUST  (`pay invoice` (invoice's amount) Company)
+    PARTY invoice's customer
+    MUST  `pay invoice` (invoice's amount) Company
     WITHIN 30
     HENCE FULFILLED
-    LEST  BREACH BY Customer BECAUSE "payment overdue"
+    LEST  BREACH BY (invoice's customer) BECAUSE "payment overdue"
 ```
 
 Both type names may be backticked multi-word names, as in `` GIVETH A DEONTIC `A party under this Part` `An act under section 8` ``.
@@ -369,7 +373,8 @@ gap as a dropped directive.
 
 **Other subcommands** (run `l4 <command> --help` for details):
 
-- `l4 format FILE` — reformat an `.l4` file to stdout (`gofmt`-style).
+- `l4 format FILE` — print an `.l4` file to stdout exactly as written
+  (it does not change the layout; exits 1 if the file does not parse).
 - `l4 ast FILE` — dump the parsed AST (debugging L4 itself or tooling).
 - `l4 batch FILE --inputs rows.{json,yaml,csv}` — evaluate an `@export`
   function against many rows, streaming NDJSON (newline-delimited JSON) output (one object per
@@ -411,7 +416,7 @@ gap as a dropped directive.
 #ASSERT `assess risk` `Alice` EQUALS LowRisk
 ```
 
-Available directives: `#EVAL`, `#EVALTRACE`, `#TRACE`, `#CHECK`, `#ASSERT`.
+Available directives: `#EVAL`, `#EVALTRACE`, `#TRACE`, `#CHECK`, `#ASSERT`, `#ASSERT REFUSED`.
 
 `#CHECK expr` prints the expression's type (`BOOLEAN `, at Information
 severity) and never makes the run exit 1, even when the rule reads a section
@@ -667,7 +672,7 @@ Construct literals (after `IMPORT daydate`) with `YMD year month day` — e.g. `
 
 The older `Date`/`DATE` constructors are **little-endian** — `Date day month year`, e.g. `Date 15 1 2025`. So writing year-first with them is a bug: `Date 2025 1 15` is read as day 2025 of month 1 and silently evaluates to `0020-07-17`, not 2025-01-15.
 
-The two constructors split strict/lenient deliberately: `YMD` bounds-checks — a transposed `YMD 2025 15 1` produces no date, and neither does `YMD 2023 2 29` (no such leap day); both are invalid input, and evaluate to the distinguished assumed term `` `YMD refused an out-of-range month or day` ``, which is what the result shows. Despite the name, that is not a `REFUSE`: out-of-range date components were deliberately left as invalid input. `Date` stays lenient and rolls overflow silently, which month arithmetic relies on. Strict literals via `YMD`; lenient arithmetic via `Date`.
+The two constructors split strict/lenient deliberately: `YMD` bounds-checks — a transposed `YMD 2025 15 1` produces no date, and neither does `YMD 2023 2 29` (no such leap day); both refuse, with the reason `YMD refused an out-of-range month or day`, which is what the result shows. It is a `REFUSE`, so no rule can turn it back into a date. `Date` stays lenient and rolls overflow silently, which month arithmetic relies on. Strict literals via `YMD`; lenient arithmetic via `Date`.
 
 Also: `Time hour minute second`, `DateTime date time`.
 
@@ -762,8 +767,8 @@ Entry 6.2 of the phrasebook, [references/source-patterns/06-parties-and-things.m
 - `#EVAL expr` — evaluate and print
 - `#EVALTRACE expr` — evaluate with execution trace
 - `#CHECK expr` — print the type without evaluating; never exits 1 (see §7)
-- `#ASSERT bool_expr` — assert must be TRUE; a failure prints `assertion failed` at Error severity and the exit code stays 0
-- `#ASSERT REFUSED expr [BECAUSE "message"]` — assert that evaluating the expression refuses, optionally with that exact message (a string literal)
+- `#ASSERT bool_expr` — assert must be TRUE; a failure prints `assertion failed` at Error severity and `l4 run` exits 1
+- `#ASSERT REFUSED expr [BECAUSE "message"]` — assert that evaluating the expression refuses, optionally with that exact message (a string literal, on the `#ASSERT`'s line or indented on the next)
 - `#TRACE contract AT time WITH ...` — simulate a regulative rule; see [references/regulative.md](references/regulative.md)
 
 A directive is one line. Continuing an `#ASSERT` onto a second line that begins
@@ -782,13 +787,56 @@ that back typechecks and evaluates. See [Record construction and access](#record
 
 - `@desc` — human-readable description behind any line or `GIVEN` parameter (internal unless paired with `@export`)
 - `@export` — atop the `GIVEN`. mark a function for deployment
-- `@nlg` — natural-language generation hint. A rule's goes on its own line immediately ABOVE the definition — trailing the definition line never reaches the rule, and can silently land on the next `DECLARE`. A parameter's trails its own line, or goes on its own line BELOW it — under the LAST parameter only when indented past `GIVEN`, since at `GIVEN`'s column it describes what follows; a record field's goes on its own line BELOW the field. Takes a language subtag and several per name — `@nlg:he`, `@nlg:en` — selected with `l4 nlg --lang he` or `l4 render --lang he`, and `@lang he` sets what an untagged one means. [gotchas](references/gotchas.md) has the measured placements and what the tag does not buy.
+- `@nlg` — the wording `l4 nlg` and `l4 render` print for a rule, an input or a field; where it sits and how to tag its language are below, and [gotchas](references/gotchas.md) has the measured placements
+- `@lang` — the language an untagged `@nlg` in the module is written in
 - `@ref`, `@ref-map` — cross-reference to a legal source.
   An `@ref` on its own line binds to the next syntax node, so it goes above the rule it cites.
   To tie an `@ref` to lines of a raw source text with `src:` locators that a script can check, see [`source-locators.md`](../encoding-a-subject/references/source-locators.md) in the `encoding-a-subject` skill.
 - `@ref-src` — accepted and ignored.
   It once loaded a CSV of citation links, and that loading was removed; `@ref-src missing.csv` passes `l4 check` without a message.
   [gotchas](references/gotchas.md) has the evidence.
+
+#### `@nlg`: where a wording sits, and its language
+
+An `@nlg` gives a rule, an input or a record field the words that `l4 nlg` and `l4 render` print for it, with `%name%` slots for a rule's inputs.
+What it describes depends on where it sits.
+Trailing a line, it describes what is on that line.
+On a line of its own, it describes what follows.
+
+```l4
+GIVEN amount IS A NUMBER @nlg the claim amount
+GIVETH A BOOLEAN
+@nlg the claim of %amount% is large
+DECIDE `is large` IF amount GREATER THAN 100
+```
+
+- **A rule's sentence** goes trailing the head, or on its own line between the `GIVEN` block and the `DECIDE`.
+  Never above the `GIVEN`: the `GIVEN` comes between them, so the wording is not the rule's.
+  When nothing written just before it can take it, L4 warns "Not attached to any valid syntax node"; when an `IMPORT` or a `§` heading comes just before it, that one takes the wording and nothing is reported.
+- **An input's gloss** trails the input's name in the `GIVEN`, or sits on its own line under the input, indented further than the `GIVEN` keyword.
+  It labels the input in a `WITH` call's `where` clause, and it is never the rule's sentence.
+- **A field's gloss** trails the field, `HAS dob IS A DATE @nlg date of birth`, or sits on its own line under the field, indented further than the `DECLARE` keyword.
+  It is read after the owner's name, so `@nlg date of birth` on `dob` reads "the employee's date of birth"; do not repeat the owner in it.
+- **One wording per language.**
+  Write the language subtag straight after `@nlg`, joined by a colon, as in `@nlg:he …`, and put each further wording on a continuation line under the first.
+  `l4 nlg --lang he` and `l4 render --lang he` pick the Hebrew wording, `he` or `he-IL` alike, and a rule with none keeps its default one.
+  A word glued to the colon is always a tag: `@nlg:the employee pays` has the tag `the` and reads `employee pays`, so write `@nlg the employee pays`, with no colon, for a sentence that starts with that word.
+  `l4 check` warns when a rule, input or field has only one wording and nothing backs its tag as a language: no `@lang` line declares it, nothing else has a wording in it beside one in another language, and it is not `en`, `he` or a declared language with only a region or script after it (`en-GB`, `he-IL`). So `@nlg:en-route …` and the same word used as the tag of several rules draw it too.
+- **A module in one language says so once**, on a line of its own: `@lang he` makes every untagged `@nlg` Hebrew.
+  Do not write `@lang en`: a module without a declaration is English, and `l4 check` hints that the line can go.
+  Two `@lang` lines that name different languages draw a warning on the earlier one, and the last is used.
+- **Two wordings in the same language on one rule** draw a warning, `l4 check` succeeds, and neither is used.
+- **A literal `%` or `]` inside an `@nlg`** is written `\%` or `\]`.
+  A bare `%and%` is read as the input `and`, and nothing is reported.
+- **A percent pair with spaces inside it**, `% amount %`, is plain text and draws a warning: write the slot as `%amount%`.
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the claim of %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
 
 ### Imports
 
@@ -804,6 +852,11 @@ IMPORT `excel-date`
 Twenty-two libraries ship: `prelude`, `daydate`, `time`, `datetime`, `timezone`, `excel-date`, `date-compat`, `math`, `currency`, `hierarchy`, `negation-as-failure`, `legal-persons`, `jurisdiction`, `holdings`, `llm`, `actus`, and the six `actus-*` files `actus` is assembled from. `hierarchy` is the one to know about early: it builds numbered outlines, which is what recitals, schedules and numbered paragraphs want. For the purpose and import line of each, see [references/builtins.md](references/builtins.md) or <https://legalese.com/l4/reference/libraries.md>.
 
 **Filenames with hyphens, spaces, or other non-identifier characters must be backtick-quoted.**
+
+**Write a module name with its file's exact capitals:** `IMPORT daydate` for `daydate.l4`; `IMPORT dayDate` finds nothing.
+When the capitals are all that is wrong, the error names the spelling to use: ``Did you mean `daydate`?``.
+This holds for `l4` and the language server from the fix for smucclaw/l4-ide#1080 on.
+An older binary on a Mac or Windows computer can still find a file under other capitals in some folders, so a line that checks there may fail on Linux, in the web playground and on Legalese Cloud: match the capitals anyway.
 
 ---
 

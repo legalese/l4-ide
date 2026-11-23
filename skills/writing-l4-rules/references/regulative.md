@@ -441,18 +441,30 @@ Full treatment, including the state-graph behaviour and the measured sharp edges
 For recurring payments (loans, subscriptions, installments), define a function that emits the next period's obligation:
 
 ```l4
+DECLARE Party IS ONE OF `The Borrower`
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+
+`monthly installment` MEANS 100
+`late penalty` MEANS 10
+
 GIVEN remainingBalance IS A NUMBER
-`monthly payments` MEANS
+GIVETH A DEONTIC Party Action
+`monthly payments` remainingBalance MEANS
     IF remainingBalance GREATER THAN 0
     THEN PARTY `The Borrower`
          MUST pay `monthly installment`
-         WITHIN `next due date`
+         WITHIN 30
          HENCE `monthly payments` (remainingBalance MINUS `monthly installment`)
          LEST  `monthly payments` (remainingBalance PLUS `late penalty`)
     ELSE FULFILLED
+
+#TRACE `monthly payments` 200 AT 0 WITH
+    PARTY `The Borrower` DOES pay 100 AT 20
+    PARTY `The Borrower` DOES pay 100 AT 45
+-- Result: FULFILLED
 ```
 
-The `HENCE` branch reduces the balance; the `LEST` branch increases it with a penalty and re-emits the obligation. The recursion base is `FULFILLED`.
+The `HENCE` branch reduces the balance; the `LEST` branch increases it with a penalty and re-emits the obligation. The recursion base is `FULFILLED`. `` `monthly installment` `` names a constant, so the action refers to it ([Reference and wildcard names](#reference-and-wildcard-names)): a payment of 50 does not discharge a rung.
 
 ---
 
@@ -481,23 +493,23 @@ One event per line, in the order they happen. There are exactly **two** kinds an
 #TRACE `the payment duty` AT 0 WITH
     PARTY `the Company` DOES `pay the invoice` AT 12
 
--- A clock advance with no act: `WAIT UNTIL` n
+-- A clock advance with no act: WAITUNTIL n
 #TRACE `the payment duty` AT 0 WITH
-    (`WAIT UNTIL` 31)
+    (WAITUNTIL 31)
 
 -- Both kinds in one block, in authored order — the only way to show a LEST
 -- chain expiring on its first rung and then discharging on its second.
 #TRACE `the payment duty` AT 0 WITH
-    (`WAIT UNTIL` 45)
+    (WAITUNTIL 45)
     PARTY `the Company` DOES `pay the unpaid amount with interest` AT 50
 ```
 
-- **`` `WAIT UNTIL` `` is built into the compiler, not a library name.** The probe above has no
+- **`WAITUNTIL` is built into the compiler, not a library name.** The probe above has no
   `IMPORT` line at all and every trace runs. The parentheses are the house form and what the corpus
-  writes; a bare `` `WAIT UNTIL` 31 `` on its own line also parses and gives the same result
+  writes; a bare `WAITUNTIL 31` on its own line also parses and gives the same result
   (probes `g11b`, `g11c`).
 - **The deadline is inclusive.** An act `AT 30` against `WITHIN 30` is timely; it takes
-  ``(`WAIT UNTIL` 31)`` to expire it.
+  `(WAITUNTIL 31)` to expire it.
 - **A rule that takes arguments is applied before `AT`, and more than one argument is fine.**
   ``#TRACE `cl 6 -- confidentiality` `the Contractor` (`disclose` "the world") AT 0 WITH`` runs and
   produces the breach. Parenthesise a constructed argument.
@@ -564,7 +576,7 @@ saleContract MEANS
 -- Result: FULFILLED
 
 #TRACE saleContract AT 0 WITH
-    (`WAIT UNTIL` 4)
+    (WAITUNTIL 4)
 -- Result: DEONTIC BREACHED: BREACH BY Seller
 --         BECAUSE "the goods were not delivered within 3 days"
 ```

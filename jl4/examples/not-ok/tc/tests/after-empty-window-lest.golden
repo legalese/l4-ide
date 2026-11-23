@@ -6,7 +6,7 @@ File: after-empty-window-lest.l4
   Range: 21:40-21:64
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/empty-window
   Message:
     This window closes before it opens: the WITHIN closes it 2 after its anchor,
     and the AFTER opens it 3 after that same anchor, or later still — so

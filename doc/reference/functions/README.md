@@ -38,6 +38,30 @@ mom and dad `have a baby named` kid MEANS
 - A word of the name can be a quoted identifier with spaces, such as `` `is entitled to` ``, so the words can be legal phrases.
 - The words that are not inputs act as keywords of that function. When a call mixes inputs and words, L4 finds the function by those words.
 
+An infix function can also be a later operand of a built-in operator such as `AND`, `OR`, `PLUS` or `EQUALS`:
+
+```l4
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A BOOLEAN
+a `exceeds by at least` b MEANS a AT LEAST b
+
+#EVAL TRUE AND 5 `exceeds by at least` 3
+```
+
+- The call needs no parentheses, because it binds tighter than the infix operators in the precedence table. See [Precedence](../operators/README.md#precedence).
+- All the words of the call must be on the operand's own line.
+- To spread a call over several lines, put it in parentheses and start a new line after the opening parenthesis.
+
+Inside a rule, a name that is one of the rule's own `GIVEN` inputs is that input, even when it is also a word of a mixfix function in the file.
+In the example below, the rule `twice` has an input called `` `the day` ``, which is also the first word of the function ``the day n `days before` s``; inside `twice`, `` `the day` `` is the input, and `inc` is called with it.
+
+**Example file:** [mixfix-input-name-example.l4](mixfix-input-name-example.l4)
+
+- The same holds in each clause of a rule written as [several clauses](DECIDE.md#several-clauses), and in a rule written under a `WHERE`.
+- It does not hold for a name that is bound in another way: the `GIVEN` of a section, a `LET`, the parameter of a `GIVEN ... YIELD` function, or a variable in a `CONSIDER` pattern. If such a name is also a word of a mixfix function, it is still read as the word, so give it another name.
+- The other side of the same rule: in a rule that has an input called `plus`, the text ``1 `plus` 2`` is not a call of ``a `plus` b``, and is refused. Give the input another name, or call the function from a rule that has no input of that name.
+
 A mixfix function cannot be written as [several clauses](DECIDE.md#several-clauses); use `CONSIDER` in its body.
 
 When to use mixfix, with worked examples: [Make rules read like law](../../tutorials/natural-language-functions/optimising-natural-language-generation.md).

@@ -349,6 +349,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
+  /** Re-fetch the active file's exported functions and blocking errors,
+   *  without resetting the Deploy tab's form the way a file switch does. */
+  refreshExportedFunctions() {
+    if (!this.view) return
+    this.view.webview.postMessage({
+      type: 'l4-sidebar-refresh-exports',
+    })
+  }
+
   clearActiveFile() {
     if (!this.view) return
     this.view.webview.postMessage({
@@ -489,6 +498,7 @@ export function initializeSidebarMessenger(
           numberClauses: params.numberClauses,
           toc: params.toc,
           excludeModules: params.excludeModules ?? [],
+          lang: params.lang,
         })
         if (!res) {
           return {
@@ -563,8 +573,9 @@ export function initializeSidebarMessenger(
   })
 
   // Render the active L4 document to a content string in the requested
-  // format via the LSP. Returns the rendered content and the IR title.
-  // Shared by the inline preview and the Save action. Throws on LSP failure.
+  // format via the LSP. Returns the rendered content, the IR title, and the
+  // languages the file offers / the one the content is in. Shared by the
+  // inline preview and the Save action. Throws on LSP failure.
   async function renderToContent(
     verDocId: { uri: string; version: number },
     params: {
@@ -574,8 +585,14 @@ export function initializeSidebarMessenger(
       numberClauses: boolean
       toc: boolean
       excludeModules?: string[]
+      lang?: string
     }
-  ): Promise<{ content: string; title: string | undefined }> {
+  ): Promise<{
+    content: string
+    title: string | undefined
+    languages?: string[]
+    lang?: string
+  }> {
     if (params.format === 'plan') {
       const plan = await client.sendRequest(ExportPlanRequestType, { verDocId })
       return { content: JSON.stringify(plan ?? {}, null, 2), title: undefined }
@@ -588,6 +605,7 @@ export function initializeSidebarMessenger(
       numberClauses: params.numberClauses,
       toc: params.toc,
       excludeModules: params.excludeModules ?? [],
+      lang: params.lang,
     })
     if (!res) throw new Error('No response from the language server.')
     const title =
@@ -598,7 +616,7 @@ export function initializeSidebarMessenger(
       params.format === 'json'
         ? JSON.stringify(res.ir ?? {}, null, 2)
         : res.content
-    return { content, title }
+    return { content, title, languages: res.languages, lang: res.lang }
   }
 
   // Handle Render-tab live inline preview: render the active file as HTML
@@ -614,15 +632,19 @@ export function initializeSidebarMessenger(
     }
     try {
       const verDocId = { uri: doc.uri.toString(), version: doc.version }
-      const { content, title } = await renderToContent(verDocId, {
-        format: 'html',
-        includeUnused: params.includeUnused,
-        numberSections: params.numberSections,
-        numberClauses: params.numberClauses,
-        toc: params.toc,
-        excludeModules: params.excludeModules ?? [],
-      })
-      return { success: true, html: content, title }
+      const { content, title, languages, lang } = await renderToContent(
+        verDocId,
+        {
+          format: 'html',
+          includeUnused: params.includeUnused,
+          numberSections: params.numberSections,
+          numberClauses: params.numberClauses,
+          toc: params.toc,
+          excludeModules: params.excludeModules ?? [],
+          lang: params.lang,
+        }
+      )
+      return { success: true, html: content, title, languages, lang }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       return { success: false, error: msg }
@@ -721,7 +743,7 @@ export function initializeSidebarMessenger(
           error: dep.error,
           description: dep.metadata?.description,
           // Backend omits `metadata.files` entirely when the read scope is
-          // absent (proxy strips it via X-Include-Files: false). A non-empty
+          // absent (the server strips it via X-Include-Files: false). A non-empty
           // list means the user is allowed to read sources — gate the
           // sidebar's Download action on this.
           hasFiles: (dep.metadata?.files?.length ?? 0) > 0,
@@ -773,7 +795,44 @@ export function initializeSidebarMessenger(
         GetExportedFunctionsRequestType,
         { verDocId: { uri: params.fileUri, version: doc.version } }
       )
+      // The sidebar disables Deploy for such a file; this catches a click
+      // that raced an edit which broke it.
+      const blocking = lspResponse.blockingErrors ?? []
+      if (blocking.length > 0) {
+        const first = blocking[0]
+        const where = `${path.basename(vscode.Uri.parse(first.uri).fsPath)}:${first.line}`
+        return {
+          success: false,
+          error: `Fix the errors before deploying (${where}: ${first.message.split('\n')[0]})`,
+        }
+      }
       const importUris = lspResponse.importedFiles ?? []
+
+      // A rule whose test fails can still be deployed, on purpose. But once
+      // deployed, tools and agents treat its answers as authoritative, so
+      // make that a decision rather than an accident.
+      const failedChecks = [params.fileUri, ...importUris]
+        .flatMap((uri) =>
+          vscode.languages.getDiagnostics(vscode.Uri.parse(uri))
+        )
+        .filter(
+          (d) =>
+            d.source === 'eval' &&
+            d.severity === vscode.DiagnosticSeverity.Error
+        ).length
+      if (failedChecks > 0) {
+        const choice = await vscode.window.showWarningMessage(
+          `${failedChecks} check${failedChecks === 1 ? '' : 's'} in this file or its imports failed. Once deployed, its answers are treated as authoritative.`,
+          { modal: true },
+          'Deploy anyway'
+        )
+        if (choice !== 'Deploy anyway') {
+          return {
+            success: false,
+            error: 'Deployment cancelled: failed checks in the file.',
+          }
+        }
+      }
 
       // Collect the main file and all its LSP-resolved imports
       const files = await collectL4Sources(
@@ -1159,7 +1218,7 @@ export function initializeSidebarMessenger(
 
   // Install a per-deployment plugin bundle (SKILL.md + hosted MCP entry)
   // into either Claude Code or VS Code Chat. The bundle is downloaded
-  // from the auth-proxy's .plugin endpoint with the user's session token.
+  // from the .plugin endpoint with the user's session token.
   messenger.onNotification(
     RequestInstallDeploymentSkill,
     async ({ deploymentId, target }) => {

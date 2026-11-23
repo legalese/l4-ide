@@ -1,0 +1,61 @@
+{
+    "$defs": {
+        "Holder": {
+            "properties": {
+                "n": {
+                    "type": "number"
+                },
+                "o": {
+                    "$ref": "#/$defs/Optional"
+                }
+            },
+            "required": [
+                "o",
+                "n"
+            ],
+            "type": "object"
+        },
+        "Optional": {
+            "oneOf": [
+                {
+                    "properties": {
+                        "tag": {
+                            "const": "Absent"
+                        }
+                    },
+                    "required": [
+                        "tag"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "tag": {
+                            "const": "Present"
+                        },
+                        "value": {
+                            "$ref": "#/$defs/a"
+                        }
+                    },
+                    "required": [
+                        "tag",
+                        "value"
+                    ],
+                    "type": "object"
+                }
+            ]
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "reads a holder",
+    "properties": {
+        "h": {
+            "$ref": "#/$defs/Holder"
+        }
+    },
+    "required": [
+        "h"
+    ],
+    "title": "f",
+    "type": "object"
+}

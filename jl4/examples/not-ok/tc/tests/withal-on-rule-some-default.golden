@@ -6,7 +6,7 @@ File: withal-on-rule-some-default.l4
   Range: 10:7-10:20
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-misused
   Message:
     WITHAL builds a record with the default of every field, but
 

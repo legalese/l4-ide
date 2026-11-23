@@ -1,6 +1,6 @@
 # Using the l4 CLI
 
-Run, check, format, render, and deploy L4 files from the command line.
+Run, check, render, and deploy L4 files from the command line.
 
 **Prerequisites:** [Install L4 and write your first rule](first-l4-file.md)
 
@@ -49,7 +49,7 @@ Available commands:
   run                      Typecheck and evaluate an L4 file (prints diagnostics
                            + #EVAL results)
   check                    Typecheck an L4 file only (fast path; no evaluation)
-  format                   Reformat an L4 file and print to stdout
+  format                   Print an L4 file to stdout exactly as written
   ast                      Dump the parsed AST of an L4 file
   batch                    Evaluate an @export function against many input rows
                            (json|yaml|csv in, NDJSON streaming out)
@@ -172,7 +172,9 @@ Trace:
   (no trace captured; add #EVALTRACE to the directive)
 ```
 
-Each `Evaluation[n]` block corresponds to one `#EVAL` (or `#EVALTRACE`) directive, in file order, with the source range it came from. The `Trace:` line under each result is explained in the next section. Diagnostics (errors and warnings, and an information message that repeats each result) are printed to stderr; results go to stdout. The exit code is `0` when the file typechecks, every directive evaluates without crashing, and no `#ASSERT` fails; type errors, runtime evaluation errors (such as a `CONSIDER` with no matching branch) and a failing `#ASSERT` exit non-zero. Warnings alone do not change the exit code — a file with warnings still evaluates.
+Each `Evaluation[n]` block shows the result of one `#EVAL` (or `#EVALTRACE`), in file order, with the source range it came from. The `Trace:` line under each result is explained in the next section. Results go to standard output; errors and warnings, and an information message that repeats each result, go to standard error.
+
+`l4 run` fails when the file, or a file it imports, has an error, when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero, or when an `#ASSERT` comes out false. The other directives still show their results. Warnings don't make it fail, and neither does an `#ASSERT` that the rules refuse to answer.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
@@ -295,6 +297,59 @@ If your rules use `NOW` or `TODAY`, pin the evaluation clock so results are repr
 l4 run --fixed-now 2025-01-31T15:45:30Z myfile.l4
 ```
 
+### Stopping a line that runs too long
+
+A rule can be written so that working it out never ends: a function that keeps calling itself, or obligations that keep starting more obligations.
+L4 stops any one `#EVAL`, `#ASSERT` or `#TRACE` that takes more than 10,000,000 steps (each function applied, and each contract handed the events, is one step), has more than 10,000 obligations open at once, or would join more than 10,000 failures into one breach. It says which, and names the rule it stopped in and its place (only the place, when that is in a file this one imports, such as the prelude); the [error messages](../../reference/errors/README.md#it-took-more-than-so-many-steps) page explains each.
+Those limits count steps, not seconds, so a file stops at the same place on every computer.
+They limit how long a line runs, not how much memory it holds: a function that keeps every value it passes along can run out of memory first.
+Only the line that went over a count stops: the lines after it still run, and `l4 run` exits with an error; in `l4 batch` that row fails, as a row with any other error does.
+The editor counts the same way.
+So do the other `l4` commands that work out values (`l4 trace`, `l4 lts`, `l4 explore`, `l4 coverage`, `l4 prove` and `l4 verify`) and the REPL, and each takes the same four flags as `l4 run`.
+None of them reads an answer off a line a limit stopped: `l4 trace` names the stop on its error output and fails, `l4 lts` lists that trace with the stop as its standing, `l4 explore` lists that try as untried, or refuses the contract when it could not work out the outset or a deadline it needed, `l4 coverage` leaves that decision uncovered and says why, and `l4 prove` calls that assertion unknown.
+`l4 verify` works out no values, so its limits never fire.
+In the REPL a time or memory stop ends only the line that went over, though its message says nothing after it was evaluated: the next line still runs.
+A line that collects a trace has 100,000 steps instead, because a trace keeps a record of every step: on one machine 1,000,000 such steps used about 7 GB under `l4 run`.
+That is an `#EVALTRACE` under `l4 run` (unless you give it `--trace none`, when it collects none) and `l4 trace` and in the editor, and a `:trace` or `:traceascii` line in the REPL; a plain REPL line has the usual 10,000,000.
+Its message says that its limit is the lower one.
+`--max-eval-memory-mb` stops a line by the memory it takes.
+jl4-service has limits of its own.
+
+To change either count, or turn it off:
+
+```bash
+l4 run --max-steps 1000000 --max-open none myfile.l4
+```
+
+- `--max-steps N` sets the number of steps, for a line that collects a trace too, and `--max-steps none` removes the limit.
+- `--max-open N` sets the number of obligations open at once, and of failures one join may gather, and `--max-open none` removes the limit.
+
+Two more limits are off unless you ask for them:
+
+```bash
+l4 run --eval-timeout 10 --max-eval-memory-mb 500 myfile.l4
+```
+
+- `--eval-timeout SECONDS` stops any one line that runs longer than that, by the clock on the wall. The same file can stop on a busy computer and finish on an idle one.
+- `--max-eval-memory-mb MB` stops any one line that allocates more than that many megabytes. It counts every byte allocated while working, not only what is kept, so set it well above what the file holds; because what is kept can never be more than what was allocated, it also stops a line before it holds that much.
+
+Either way, the run stops there: that line is reported as an error, each line after it says `I did not evaluate this` and names the line that stopped the run, and `l4 run` exits with an error.
+The line that stops the run can be in a file this one imports: L4 works out an imported file's lines too, though `l4 run` prints only this file's, and when no line of this file says so, `l4 run` says on its error output where the run stopped.
+In `--json` output, the result of a line that went over a limit carries `"limit"`, which is `"time"`, `"memory"`, `"obligations"`, `"breaches"` or `"steps"`; the result of a line that was not evaluated carries `"limit"` too, with `"evaluated": false`; no other result has either key.
+`l4 batch` takes the same four flags; a row that goes over a time or memory limit stops the batch, even with `--continue-on-error`, and the batch says on its error output at which row, and where the run stopped.
+An imported file's own lines are worked out with every row, so one of them that goes over a limit stops the batch at row 1.
+In `l4 batch`, a place reads like `myfile.l4.batch2.l4:23:1`: it is in the copy of the file that L4 lays out afresh for row 2, so its line numbers are not the file's, though a rule's name is the same in both.
+
+What the limits do not cover: they are checked between steps of the evaluation, so one step that is itself a long calculation (raising a number to a huge power) finishes before it is stopped, and printing the answer comes after the line has finished, outside the limits.
+
+To cap the memory the whole run may hold, whatever it is doing, add `+RTS -M2g -RTS` (or another size) after the other arguments:
+
+```bash
+l4 run myfile.l4 +RTS -M2g -RTS
+```
+
+This cap is not per line: when the run holds more than that, the whole run stops with `Heap exhausted`, and none of the lines after it run.
+
 ---
 
 ## Step 4: `l4 check` — Typecheck Without Running
@@ -309,8 +364,10 @@ l4 check late-fee.l4
 Check succeeded.
 ```
 
-Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics). `--json` and `--fixed-now` work here too.
-`l4 render` still writes its document when an imported file has an error, and then exits with status 1.
+Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
+`--json` and `--fixed-now` work here too.
+`l4 check` also checks every file your file imports, so use it as the check in CI for a project of several files. `l4 render` still writes its document when an imported file has an error, and then exits with status 1. Other commands, such as `l4 nlg`, don't stop on an error in an imported file.
+Files can't import each other in a ring; [Import cycle](../../reference/errors/README.md#import-cycle) says how to fix one.
 
 ---
 
@@ -324,6 +381,9 @@ When a file says `IMPORT daydate` (or `time`, `currency`, ...), the tools resolv
 4. The standard library built into the `l4` you are running
 5. The XDG data directory (`~/.local/share/jl4/libraries/`)
 6. The libraries bundled with the VS Code extension
+
+At each place the name must match exactly, capital letters included: `IMPORT daydate` finds `daydate.l4`, and `IMPORT dayDate` finds nothing, on every computer.
+When the capitals are all that is wrong, the error says which spelling to use; see [Module not found](../../reference/errors/README.md#module-not-found).
 
 When `JL4_LIBRARY_PATH` is set, it takes explicit control: the built-in standard library is skipped. This matters when you work from a source checkout and want the CLI to use the checkout's libraries rather than a previously installed copy:
 
@@ -359,9 +419,9 @@ See the [library reference](../../reference/libraries/README.md) for what each l
 
 ## Step 6: The Other Subcommands
 
-### `l4 format` — canonical formatting
+### `l4 format` — print a file as written
 
-Reformats a file and prints the result to stdout (like `gofmt`):
+Prints a file to stdout exactly as it is written: the same layout, comments, line endings and spelling of every literal. It does not change the layout. It only parses the file, without type-checking it (use `l4 check` for that); if the file does not parse, it prints the parse errors instead and exits with status 1.
 
 ```bash
 l4 format late-fee.l4
@@ -402,6 +462,35 @@ In this document, unless the context otherwise requires:
 Options: `--format html|text|json|plan|akn` (`xml` is accepted as a synonym for `akn`, which emits Akoma Ntoso 3.0), `-o/--output FILE`, `--toc` (table of contents), `--no-number-sections`, `--no-number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`, and in `akn` the language of the FRBR Expression URIs).
 
 With no flags, `l4 render` writes the same document as the VS Code Render tab: sections and clauses numbered, and the file's own rules only. Imported modules still decide how those rules read. Definitions and assumptions open the document as an interpretation section, branches with short results become decision tables, long constant lists move to numbered Schedules at the end, and a citation with a `@ref-map` entry is a link in `html`. `--include-imports` adds the imported rules the document uses, `--include-import NAME` adds those of one module, and `--include-unused` adds everything.
+
+### `l4 nlg` — the directives, as sentences
+
+Writes each `#EVAL`, `#ASSERT` and other directive of a file as one line of prose.
+It is the quick way to read what a set of test cases says without running them.
+Where a definition has an `@nlg` wording, `l4 nlg` uses it in place of the name.
+
+```l4
+GIVEN days_overdue IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is late` @nlg the invoice is late
+  IF days_overdue GREATER THAN 30
+
+#EVAL `is late` 45
+#EVAL NOT `is late` 5
+```
+
+```bash
+l4 nlg is-late.l4
+```
+
+```
+the invoice is late with 45
+not the invoice is late with 5
+```
+
+`l4 nlg` prints nothing and exits non-zero if the file does not typecheck, rather than writing prose about a module that does not hold together.
+Options: `-o/--output FILE` writes to a file instead of standard output, and `--lang SUBTAG` uses the `@nlg:SUBTAG` wordings for the rules that have them (and the module's default wording for those that do not).
+See [one encoding, several languages](../natural-language-functions/optimising-natural-language-generation.md#one-encoding-several-languages).
 
 ### `l4 batch` — many cases at once
 
@@ -466,7 +555,7 @@ Anything else given for such a fact, a name that is not one of its choices, a nu
 Could not decode "Bogus" as Shape for field 's': it names no constructor of Shape; expected a string naming one of: Square. A constructor with fields (Circle) cannot be given as JSON input.
 ```
 
-`--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error`, and `--validate-only` checks rows against the function's inputs without evaluating them.
+`--format ndjson|json|csv|yaml` and `--output FILE` choose the result format and destination; the run stops at the first failing row unless you pass `--continue-on-error` (a time or memory limit is different: see [Stopping a line that runs too long](#stopping-a-line-that-runs-too-long)), and `--validate-only` checks rows against the function's inputs without evaluating them.
 
 #### Facts a case leaves out
 
@@ -558,7 +647,7 @@ Every case that is run produces one line, or one item with `--format json`, `yam
 `status` is one of four words:
 
 - `success`: the rules gave an answer.
-- `error`: the rules could not be run on the case, or raised an error. A fact is missing or `null`, a value cannot be read as the type the fact declares, a CSV line has the wrong number of cells, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`.
+- `error`: the rules could not be run on the case, or raised an error. A fact is missing or `null`, a value cannot be read as the type the fact declares, a CSV line has the wrong number of cells, or the rules themselves failed (the `result` is then an object holding the message); `diagnostics` says which. The batch stops after the first such case unless you pass `--continue-on-error`; a case that goes over a time or memory limit stops it even then ([Stopping a line that runs too long](#stopping-a-line-that-runs-too-long)).
 - `undetermined`: the rules need a fact the case does not supply (see [Needed the value of an assumed term](../../reference/errors/README.md#needed-the-value-of-an-assumed-term)). The batch carries on.
 - `refused`: the rules declined to answer this case, and `diagnostics` says why. That is an answer, not a failure, and the batch carries on. A case turned away before the rules ran is an `error`, not `refused`.
 
@@ -570,7 +659,8 @@ The command exits with status 0 when every case was `success` or `refused`, and 
 
 It checks that every fact the rules need is in the case (with `--presumption soft`, a fact that has a usual value may be left out), that no fact other than a `MAYBE` is `null`, and that a value given for a `NUMBER`, `BOOLEAN` or `STRING` fact, or a `MAYBE` of one, is of that type, counting text that spells a number or a boolean as a run does. A fact declared through a synonym (`DECLARE Year IS A NUMBER`) is judged as the type the synonym stands for, and so is a synonym for a `MAYBE`. A synonym that takes a type (`Optional OF NUMBER`) is not: a case can be `valid` that a run refuses, and `invalid` that a run answers.
 
-**It judges those three types only.** For any other type, such as a `DATE`, a list, a record or a list of choices, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
+**It judges those three types, and the names of a choice type.** A fact whose type is a choice (`DECLARE Party IS ONE OF Landlord, Tenant`) must be the name of one of its choices, written as text, and a name that is none, or a value that is not text, is `invalid` with the message a run gives: `Could not decode "Lodger" as Party for field 'p': it names no constructor of Party; expected a string naming one of: Landlord, Tenant.` The same is checked for a choice in a record's field, in an element of a list and in a `MAYBE`, and the message names where it sits (`l.guests[1]`).
+For any other type, such as a `DATE` or a list of numbers, whatever is given is let through, and a bad value fails only when the case is run. With this rule:
 
 ```l4
 @export Echo a date
@@ -618,6 +708,7 @@ A cases file or a rules file that does not exist ends the command with the opera
 - `l4 trace myfile.l4` draws every `#EVALTRACE` in the file as a diagram, where `l4 run` prints it as text.
   It prints a description of the diagram in GraphViz DOT: GraphViz is a free diagram-drawing program, and DOT is its text format.
   `--format dot|png|svg` chooses the output and `-o DIR` writes one file per `#EVALTRACE` into a directory; PNG and SVG pictures need GraphViz installed.
+  If a trace cannot be built (an internal error), its graph says `trace unavailable` and the command exits with status 1.
 - `l4 state-graph myfile.l4` extracts the state transition graph of regulative rules (`PARTY ... MUST ...`) as GraphViz DOT. With `--dominators` it prints, instead, the acts every path to `FULFILLED` and to `BREACH` must pass through; with `--dominators --dot` it keeps the DOT and draws those acts heavy. See [State graph and `--dominators`](../../reference/regulative/STATE-GRAPH.md).
 - `l4 lts myfile.l4` reads every `#TRACE` out as a plain list: what is owed now, what would discharge it, what would put someone in breach, and the next deadline (`--steps` for the history, `--json` for a program). See [What is owed now](../../reference/regulative/lts-list.md).
 
@@ -656,7 +747,7 @@ Deployed 'late-fee' (version 1.0.0) with 1 function:
 API: https://api.legalese.cloud/acme/late-fee
 ```
 
-The deployment is named after the file unless you pass `--name`. `l4` typechecks the file first, then uploads it with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
+The deployment is named after the file unless you pass `--name`. `l4` runs the same check as `l4 check` on the file first; if it finds an error, nothing is uploaded. Otherwise it uploads the file with the files it imports. The standard libraries are not uploaded: a deployment finds `prelude`, `daydate` and the others in the copy built into the service.
 
 | Command            | What it does                                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

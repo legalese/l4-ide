@@ -26,6 +26,7 @@ Things that will trip up a general-purpose large language model because they are
 - [`@export` placement](#export-placement)
 - [Annotation fence](#annotation-fence)
 - [A library's own example definitions are visible to importers](#a-librarys-own-example-definitions-are-visible-to-importers)
+- [`@nlg` placement and language](#nlg-placement-and-language)
 - [NLG and reference annotations](#nlg-and-reference-annotations)
 - [`EVERY … WHO elem` is deprecated and nothing tells you](#every--who-elem-is-deprecated-and-nothing-tells-you)
 - [Four errors that do not point at the fix](#four-errors-that-do-not-point-at-the-fix)
@@ -338,15 +339,23 @@ Both introduce local bindings. Pick by position:
 - **`LET … IN`** — leading. Use for a single binding consumed immediately.
 
 ```l4
--- WHERE: trailing helpers
-circleArea radius IS pi TIMES radius TIMES radius
-WHERE
-    pi MEANS 3.14159
+-- WHERE: trailing helpers, indented under the body
+GIVEN radius IS A NUMBER
+GIVETH A NUMBER
+`circle area` radius MEANS
+    pi TIMES radius TIMES radius
+    WHERE
+        pi MEANS 3.14159
 
 -- LET ... IN: inline
-LET taxRate MEANS 0.08 IN
-    price TIMES (1 PLUS taxRate)
+GIVEN price IS A NUMBER
+GIVETH A NUMBER
+`price with tax` price MEANS
+    LET `tax rate` MEANS 0.08 IN
+        price TIMES (1 PLUS `tax rate`)
 ```
+
+`WHERE` must be indented under the body it belongs to; at column 1 it is a parse error (`unexpected WHERE`).
 
 ---
 
@@ -372,16 +381,14 @@ squared x MEANS x TIMES x
 
 ## Annotation fence
 
-All annotations begin with `@`.
-On its own line, an annotation applies to the **following** definition; trailing a line, it applies to what is on that line.
-`@nlg` follows that rule with two twists — a rule takes it only on the line above, and inside a field list or a `GIVEN` list an own-line annotation describes the field or input **above** it — which the next section measures.
-Read it before writing one:
+All annotations begin with `@`. `@export`, `@ref` and `@desc` apply to the definition they sit with or precede; `@nlg` is described under its own heading below.
 
 | Annotation | Purpose                                                            |
 | ---------- | ------------------------------------------------------------------ |
 | `@desc`    | Human-readable description (internal unless paired with `@export`) |
 | `@export`  | Mark function for deployment via `jl4-service`                     |
-| `@nlg`     | Natural-language-generation hint (for rendering the rule as prose) |
+| `@nlg`     | The wording `l4 nlg` and `l4 render` print; see below              |
+| `@lang`    | The language an untagged `@nlg` in the module is written in        |
 | `@ref`     | Cross-reference to a legal source                                  |
 | `@ref-src` | Accepted and ignored (the CSV loading it did was removed)          |
 | `@ref-map` | Mapping table for references                                       |
@@ -586,6 +593,41 @@ round-trips byte-identically. Two limits:
   is a mis-aligned ditto caret, which is the silent kind.
 
 ---
+
+---
+
+## `@nlg` placement and language
+
+`@nlg` describes the thing it sits with: **trailing a line, what is on that line; on a line of its own, what follows.**
+Under an input of a `GIVEN` or a field of a `DECLARE`, an annotation indented further than the keyword describes the input or field above it.
+A rule's own sentence goes trailing its head, or on its own line between the `GIVEN` block and the `DECIDE`.
+
+The failures, sorted by whether L4 tells you:
+
+| what you wrote                                                                          | what happens                                                           | does L4 say so? |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------- |
+| the rule's sentence on its own line above the `GIVEN`, nothing before it                | the wording is dropped                                                 | yes, a warning  |
+| two wordings in the same language on one rule                                           | neither is used; the rule reads by its name                            | yes, a warning  |
+| an `@nlg` with no text, or only a tag                                                   | ignored                                                                | yes, a warning  |
+| two `@lang` lines that name different languages                                         | the last is used and the earlier has no effect                         | yes, a warning  |
+| the rule's sentence above the `GIVEN`, with an `IMPORT` or `§` heading above            | that `IMPORT` or heading takes it; the rule reads by its name          | no              |
+| the rule's sentence indented under the last input, even by one space                    | it becomes that input's gloss                                          | no              |
+| `10%and%20` in a wording, with an input called `and`                                    | `and` is replaced by the input's value: `10520`                        | no              |
+| `@nlg:the employee pays`, or `@nlg:en-route …`, on a rule with no other wording         | the first word is the language tag; the sentence reads `employee pays` | yes, a warning  |
+| `@nlg:the …` beside a wording in another language, on the same rule                     | `the` is taken for a language; the sentence loses its first word       | no              |
+| `% amount %` in a wording                                                               | it prints as plain text, and the slot is lost                          | yes, a warning  |
+| a field's gloss that repeats its owner: `@nlg the employee's date of birth` under `dob` | it reads "the employee's the employee's date of birth"                 | no              |
+| two wordings in one language on one field: `head [the first] IS AN a [an item]`         | neither is used; the field reads by its name                           | yes, a warning  |
+
+Write `\%` and `\]` for a literal percent sign or close bracket.
+A percent sign followed by a space is plain text, so `a 5% levy on %amount%` needs no escape.
+A pair with spaces inside it around one word, `% amount %`, is plain text too and draws a warning: write `%amount%`.
+
+**One wording per language.**
+`@nlg:he …` tags a wording with its language, each further wording goes on a continuation line, and `l4 nlg --lang he` or `l4 render --lang he` picks it.
+`@lang he` on a line of its own labels every untagged `@nlg` in the module.
+A module that declares nothing is English, and `@lang en` draws a hint that the line can go.
+Two `@lang` lines that name different languages draw a warning on the earlier one, and the last is used.
 
 ---
 

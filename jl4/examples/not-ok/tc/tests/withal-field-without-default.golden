@@ -6,7 +6,7 @@ File: withal-field-without-default.l4
   Range: 22:7-22:20
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-fields-without-default
   Message:
     WITHAL takes the default of every field, but these fields of
 
@@ -35,7 +35,7 @@ File: withal-field-without-default.l4
   Range: 31:7-31:17
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-fields-without-default
   Message:
     WITHAL takes the default of every field, but these fields of
 
@@ -56,7 +56,7 @@ File: withal-field-without-default.l4
   Range: 37:7-37:19
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/withal-fields-without-default
   Message:
     WITHAL takes the default of every field, but these fields of
 

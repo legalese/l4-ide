@@ -1,0 +1,8 @@
+-- One definition that raises, asserted in both polarities. Both must report
+-- what it raised: neither "assertion failed", nor an infinite loop on the
+-- second use.
+GIVETH A NUMBER
+`one over zero` MEANS 1 DIVIDED BY 0
+
+#ASSERT `one over zero` EQUALS 1
+#ASSERT NOT (`one over zero` EQUALS 1)

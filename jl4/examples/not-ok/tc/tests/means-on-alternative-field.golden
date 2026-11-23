@@ -6,7 +6,7 @@ File: means-on-alternative-field.l4
   Range: 8:12-8:18
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/means-on-alternative-field
   Message:
     `height` is a field of the alternative `Rect` and has a MEANS clause,
     but only the fields of a record can be computed. An alternative's fields are

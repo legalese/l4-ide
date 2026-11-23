@@ -14,7 +14,8 @@ module McpServer (
 import qualified BundleStore
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import EvalLimits (withEvalLimits)
-import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
+import FileBrowser (searchIdentifier, searchTextWith, SearchMatch (..))
+import SearchPattern (compilePatterns, identifierSyntax, invalidPatternNote, noMatchHint, patternSyntax)
 import Logging (logInfo, logWarn)
 import L4.FunctionSchema (Parameters (..))
 import DeonticTrace (isDeonticFunction, isStrayTraceField, noTraceForOtherFunctions, runDeonticLimited, traceFromJSON)
@@ -371,12 +372,13 @@ fileToolDefinitions =
     ]
   , Aeson.object
     [ "name" .= ("search_identifier" :: Text)
-    , "description" .= ("Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments." :: Text)
+    , "description" .= ("Tooling: Find definitions and references of an L4 identifier. Text-based, may match in comments. " <> identifierSyntax)
     , "inputSchema" .= Aeson.object
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
             [ "identifier" .= Aeson.object
                 [ "type" .= ("string" :: Text)
+                , "description" .= ("One L4 name as written, e.g. `the greater of`" :: Text)
                 ]
             , "deployment" .= Aeson.object
                 [ "type" .= ("string" :: Text)
@@ -392,12 +394,13 @@ fileToolDefinitions =
     ]
   , Aeson.object
     [ "name" .= ("search_text" :: Text)
-    , "description" .= ("Tooling: Search text in .l4 source files (case-insensitive)" :: Text)
+    , "description" .= ("Tooling: Search .l4 source files line by line, like grep -E -i. Returns matching lines with context." :: Text)
     , "inputSchema" .= Aeson.object
         [ "type" .= ("object" :: Text)
         , "properties" .= Aeson.object
             [ "query" .= Aeson.object
                 [ "type" .= ("string" :: Text)
+                , "description" .= patternSyntax
                 ]
             , "deployment" .= Aeson.object
                 [ "type" .= ("string" :: Text)
@@ -469,10 +472,10 @@ findUniquePrefix dep others = go 1
 callTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Bool -> Aeson.Value -> AppM Aeson.Value
 callTool vis mScope reqId toolName tasksRequested presumptionBesideArguments arguments = do
   case toolName of
-    "list_files" | vis.showFiles -> callListFiles reqId arguments
-    "read_file" | vis.showFiles -> callReadFile reqId arguments
-    "search_identifier" | vis.showFiles -> callSearchIdentifier reqId arguments
-    "search_text" | vis.showFiles -> callSearchText reqId arguments
+    "list_files" | vis.showFiles -> callListFiles mScope reqId arguments
+    "read_file" | vis.showFiles -> callReadFile mScope reqId arguments
+    "search_identifier" | vis.showFiles -> callSearchIdentifier mScope reqId arguments
+    "search_text" | vis.showFiles -> callSearchText mScope reqId arguments
     _ -> callFunctionTool vis mScope reqId toolName tasksRequested presumptionBesideArguments arguments
 
 -- | Execute a function evaluation tool call.
@@ -1015,13 +1018,24 @@ handleTasksCancel reqId params = case parseTaskId params of
 -- File browsing tool handlers
 -- ----------------------------------------------------------------------------
 
-callListFiles :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callListFiles reqId arguments = do
+-- | Does the endpoint's scope admit this deployment? On the org-wide endpoint
+-- every deployment; on a scoped one (@/{id}/.mcp@) only the scope itself.
+--
+-- The file tools name their deployment in an argument, not in the route, so
+-- they check it here: a caller with a grant for one deployment reaches that
+-- deployment's route only, and an argument naming another
+-- deployment must not reach past it. A deployment outside the scope is treated
+-- as one that does not exist.
+inScope :: Maybe Text -> Text -> Bool
+inScope mScope deployId = maybe True (== deployId) mScope
+
+callListFiles :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callListFiles mScope reqId arguments = do
   env <- ask
   let mDeployment = getStringArg "deployment" arguments
   registry <- liftIO $ readTVarIO env.deploymentRegistry
 
-  let deployIds = case mDeployment of
+  let deployIds = filter (inScope mScope) $ case mDeployment of
         Nothing -> [did.unDeploymentId | (did, _) <- Map.toList registry]
         Just d  -> [d]
 
@@ -1051,8 +1065,8 @@ callListFiles reqId arguments = do
       ]
     ]
 
-callReadFile :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callReadFile reqId arguments = do
+callReadFile :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callReadFile mScope reqId arguments = do
   env <- ask
   let mDeployment = getStringArg "deployment" arguments
       mPath = getStringArg "path" arguments
@@ -1061,7 +1075,9 @@ callReadFile reqId arguments = do
   case (mDeployment, mPath) of
     (Just deployId, Just rawPath) -> do
       let path = normalizeReadFilePath deployId rawPath
-      mContent <- liftIO $ BundleStore.loadSingleFile env.bundleStore deployId (Text.unpack path)
+      mContent <- if inScope mScope deployId
+        then liftIO $ BundleStore.loadSingleFile env.bundleStore deployId (Text.unpack path)
+        else pure Nothing
       case mContent of
         Nothing ->
           pure $ mcpTextResult reqId "File not found" True
@@ -1089,8 +1105,8 @@ normalizeReadFilePath deployId path
   | Just rest <- Text.stripPrefix "/" path = rest
   | otherwise = path
 
-callSearchIdentifier :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callSearchIdentifier reqId arguments = do
+callSearchIdentifier :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callSearchIdentifier mScope reqId arguments = do
   env <- ask
   let mIdentifier = getStringArg "identifier" arguments
       mDeployment = getStringArg "deployment" arguments
@@ -1100,13 +1116,14 @@ callSearchIdentifier reqId arguments = do
     Nothing ->
       pure $ jsonRpcError reqId (-32602) "Missing required argument: identifier"
     Just identifier -> do
-      sources <- loadSourcesForSearch env mDeployment mFile
+      sources <- loadSourcesForSearch env mScope mDeployment mFile
       let matches = searchIdentifier identifier sources
-          result = Aeson.encode (map matchToJson matches)
-      pure $ mcpTextResult reqId (Text.Encoding.decodeUtf8 (LBS.toStrict result)) False
+          hint = "No definitions or references. " <> identifierSyntax
+      pure $ mcpTextResults reqId $
+        matchesJson matches : [hint | null matches]
 
-callSearchText :: Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
-callSearchText reqId arguments = do
+callSearchText :: Maybe Text -> Maybe Aeson.Value -> Aeson.Value -> AppM Aeson.Value
+callSearchText mScope reqId arguments = do
   env <- ask
   let mQuery = getStringArg "query" arguments
       mDeployment = getStringArg "deployment" arguments
@@ -1116,15 +1133,27 @@ callSearchText reqId arguments = do
     Nothing ->
       pure $ jsonRpcError reqId (-32602) "Missing required argument: query"
     Just query -> do
-      sources <- loadSourcesForSearch env mDeployment mFile
-      let matches = searchText query sources
-          result = Aeson.encode (map matchToJson matches)
-      pure $ mcpTextResult reqId (Text.Encoding.decodeUtf8 (LBS.toStrict result)) False
+      sources <- loadSourcesForSearch env mScope mDeployment mFile
+      let pats = compilePatterns query
+          matches = searchTextWith pats sources
+          -- never the query: a scoped endpoint's answer mustn't show it
+          elsewhere = case (mFile, mDeployment) of
+            (Just _, _) -> "drop `file` to search every file"
+            (Nothing, Just _) -> "drop `deployment` to search every deployment"
+            _ -> "search_identifier for one whole L4 name"
+      pure $ mcpTextResults reqId $
+        matchesJson matches
+          : maybe [] pure (invalidPatternNote pats)
+          <> [noMatchHint elsewhere | null matches]
 
-loadSourcesForSearch :: AppEnv -> Maybe Text -> Maybe Text -> AppM (Map FilePath Text)
-loadSourcesForSearch env mDeployment mFile = do
+-- | The matches as JSON: always the first content item of a search result.
+matchesJson :: [SearchMatch] -> Text
+matchesJson = Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode . map matchToJson
+
+loadSourcesForSearch :: AppEnv -> Maybe Text -> Maybe Text -> Maybe Text -> AppM (Map FilePath Text)
+loadSourcesForSearch env mScope mDeployment mFile = do
   registry <- liftIO $ readTVarIO env.deploymentRegistry
-  let deployIds = case mDeployment of
+  let deployIds = filter (inScope mScope) $ case mDeployment of
         Nothing -> [did.unDeploymentId | (did, _) <- Map.toList registry]
         Just d  -> [d]
 
@@ -1155,6 +1184,13 @@ matchToJson m = Aeson.object
   , "lineEnd" .= m.smLineEnd
   , "content" .= m.smContent
   , "isDefinition" .= m.smIsDefinition
+  ]
+
+-- | A successful result of several text items, in order. Clients that read
+-- only the first still get what 'mcpTextResult' would have given them.
+mcpTextResults :: Maybe Aeson.Value -> [Text] -> Aeson.Value
+mcpTextResults reqId texts = jsonRpcResult reqId $ Aeson.object
+  [ "content" .= [ Aeson.object [ "type" .= ("text" :: Text), "text" .= t ] | t <- texts ]
   ]
 
 mcpTextResult :: Maybe Aeson.Value -> Text -> Bool -> Aeson.Value

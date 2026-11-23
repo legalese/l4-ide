@@ -6,7 +6,7 @@ File: opaque-head-absorbs-typo.l4
   Range: 20:12-20:21
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-type-argument-count
   Message:
     This type is given the wrong number of inputs.
     I expected 2, but I found 0.

@@ -557,6 +557,10 @@ every list-touching decision, and the design collapses. The cheap check that sav
 > every recursive call to `f` passes, in position `k`, a variable bound by a `FOLLOWED BY` pattern
 > of a `CONSIDER` whose scrutinee is transitively parameter `k`.
 
+The positions are those of the call's arguments, so they number the value parameters of the `GIVEN`
+only: a type parameter (`a IS A TYPE`) is a binder with no argument, and counting it shifted every
+position by one (smucclaw/l4-ide#1077; `selfRecursionIssues`, `jl4-core/src/L4/Dmn/Analysis.hs`).
+
 That certifies `foldr`/`foldl`/`map`/`filter`/`sum`/`count`/`and`/`or`/`reverse`/`maximum1`/
 `minimum1`/`at` in `prelude.l4` automatically. Mutual recursion and `NUMBER`-measure recursion
 (`countdown (n - 1)`) reject in v1; the corpora contain neither — but see §2.4.3 on the fact that
@@ -567,14 +571,16 @@ this rule is the one part of the criterion the measurement did **not** score.
 requires **L12**'s cycle test over those locals.
 
 The prelude is the proof that the two hard checks are orthogonal and compose exactly right: `at`
-(`prelude.l4:132`) is structurally decreasing _and_ non-exhaustive, hence partial; `sum`/`map`/
+(`prelude.l4:136`) is structurally decreasing _and_ non-exhaustive, hence partial; `sum`/`map`/
 `filter` are structurally decreasing _and_ exhaustive, hence total. A criterion combining them
 classifies the whole prelude with no hand-maintained table — which matters, because the alternative
 (a trusted totality basis, hand-audited) has to be re-audited on every prelude edit, and this
 branch's prelude proves edits go wrong: **`maximum` over `LIST OF MAYBE NUMBER` (`prelude.l4:375`)
 computes the _minimum_**, its body being `minimum1 x xs`, with `maximum1` (`:384`) recursing on
-`min x y`. Fixed on `main` by PR #45; still wrong here. That and the `SPLIT` escape in L4 are live
-evaluator bugs rather than R2 concerns, and each deserves its own issue.
+`min x y`. Fixed on `main` by PR #45; still wrong here. (No longer true: measured 2026-11-22,
+`maximum` over `LIST OF MAYBE NUMBER` (`prelude.l4:388`) calls `maximum1` (`:398`), which recurses
+on `max x y` (`:402`).) That and the `SPLIT` escape in L4 are live evaluator bugs rather than R2
+concerns, and each deserves its own issue.
 
 **The refinement that saves the corpus: _strict position_.** Partiality is dangerous only where the
 position is evaluated unconditionally.

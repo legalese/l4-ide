@@ -48,6 +48,9 @@ module L4.Import.Resolution
   , ImportResolutionError(..)
     -- * Type Checking with Dependencies
   , typecheckWithDependencies
+  , typecheckWithDependenciesKnowing
+  , typecheckWithDependenciesLocated
+  , typecheckWithDependenciesKnowingLocated
   , TypeCheckWithDepsResult(..)
   ) where
 
@@ -55,11 +58,15 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Control.Applicative ((<|>))
 
-import L4.Annotation (emptyAnno)
+import L4.Annotation (emptyAnno, rangeOf)
+import L4.Import.ModuleNameCase (caseVariantHint, selfImportHint)
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Lexer (PError(..))
 import L4.Syntax
 import L4.Parser (execProgramParserWithHintPass)
+import qualified L4.Parser.ResolveAnnotation as Resolve
 import L4.TypeCheck (doCheckProgramWithDependencies, initialCheckState, initialCheckEnv, applyFinalSubstitution)
 import L4.TypeCheck.Types (CheckResult(..), CheckErrorWithContext, Substitution, Environment, EntityInfo, MixfixRegistry, InfoMap, ScopeMap, NlgMap, DescMap, SectionPaths)
 import qualified L4.TypeCheck as TypeCheck
@@ -152,7 +159,11 @@ data ResolvedImport = ResolvedImport
 
 -- | Errors that can occur during import resolution.
 data ImportResolutionError
-  = ModuleNotFound Text [Text]  -- ^ Module name, list of places searched
+  = ModuleNotFound Text [Text] [Text]
+    -- ^ Module name, list of places searched, and the modules whose
+    -- resolution was in progress when it was missed: each one's import of
+    -- this name led here, so importing any of them would be a cycle, and the
+    -- not-found hint never offers one (smucclaw/l4-ide#1080)
   | ParseError Text [Text]      -- ^ Module name, parse error messages
   | CyclicImport [Text]         -- ^ Cycle of module names
   deriving stock (Eq, Show, Generic)
@@ -197,7 +208,7 @@ resolveImports lookupModule inProgress resolved (modName : rest)
       mSource <- lookupModule modName
       case mSource of
         Nothing -> 
-          pure $ Left $ ModuleNotFound modName ["embedded libraries", "project VFS"]
+          pure $ Left $ ModuleNotFound modName ["embedded libraries", "project VFS"] (toList inProgress)
         
         Just source -> do
           let uri = moduleNameToProjectUri modName
@@ -205,7 +216,7 @@ resolveImports lookupModule inProgress resolved (modName : rest)
           -- Parse the module
           case execProgramParserWithHintPass uri source of
             Left parseErrors ->
-              pure $ Left $ ParseError modName $ map (\(PError msg _ _ _) -> msg) (toList parseErrors)
+              pure $ Left $ ParseError modName $ map (.message) (toList parseErrors)
             
             Right (parsed, _hints, _warnings) -> do
               -- Extract and resolve transitive imports first
@@ -285,37 +296,114 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
   , tcdInputDefaults :: TypeCheck.InputDefaults
     -- ^ The @TYPICALLY@ defaults of this module's rules and records, and its
     -- imports'. See 'L4.TypeCheck.Types.CheckResult.inputDefaults'.
+  , tcdAnnotationWarnings :: [Resolve.Warning]
+    -- ^ The main module's annotation warnings, from the parser: an @\@nlg@
+    -- that attaches to nothing, a lone language tag, a slot with spaces in it.
   }
   deriving stock (Generic)
 
 -- | Type-check a module with its dependencies.
 --
 -- This is the main entry point for type-checking with import resolution.
+-- A not-found error from it never names another module; a host that can say
+-- which modules exist uses 'typecheckWithDependenciesKnowing' instead.
 typecheckWithDependencies
   :: forall m. Monad m
   => ModuleLookup m     -- ^ How to find module sources
   -> NormalizedUri      -- ^ URI of the main module
   -> Text               -- ^ Source code of the main module
   -> m (Either [Text] TypeCheckWithDepsResult)
-typecheckWithDependencies lookupModule uri source = do
+typecheckWithDependencies = typecheckWithDependenciesKnowing [] Nothing
+
+-- | 'typecheckWithDependencies', where an import error also carries the range
+-- of the main module's @IMPORT@ it belongs to, when that is known: the
+-- @IMPORT@ of the module the error names, or for a cycle, of a module in it.
+typecheckWithDependenciesLocated
+  :: forall m. Monad m
+  => ModuleLookup m     -- ^ How to find module sources
+  -> NormalizedUri      -- ^ URI of the main module
+  -> Text               -- ^ Source code of the main module
+  -> m (Either (Maybe SrcRange, [Text]) TypeCheckWithDepsResult)
+typecheckWithDependenciesLocated = typecheckWithDependenciesKnowingLocated [] Nothing
+
+-- | 'typecheckWithDependencies', told every module name the host can see.
+-- When an import is not found and one of those names differs from it only in
+-- capital letters, the error says so, on a line of its own after the usual
+-- one (smucclaw/l4-ide#1080, ruling 2: every surface gives the hint, assumed
+-- (GM, 2026-11-21), for Meng's review). The lookup itself is unchanged: a
+-- name is found only under its exact spelling, as it always was here.
+--
+-- A module whose resolution is in progress is never offered, because
+-- importing it would be a cycle; the module being checked is not among them,
+-- so a host leaves its name out of @knownNames@ itself (as
+-- 'L4.API.VirtualFS.checkWithImportsAndUri' and
+-- 'L4.API.VirtualFS.checkWithImportsLocated' do). Assumed, not ruled: the
+-- editor and the command line leave out only the importing file.
+--
+-- When the module being checked writes its own name under other capitals
+-- (@Foo@ writing @IMPORT foo@) and no other name is near, the line is
+-- 'selfImportHint' instead, which says so and that a module cannot import
+-- itself (review finding A, as revised by GM on 2026-11-21; assumed, not
+-- ruled). Not for the same shape in a module further down: the error names
+-- no file, so its "this file" would point at the module being checked.
+typecheckWithDependenciesKnowing
+  :: forall m. Monad m
+  => [Text]             -- ^ Every module name the host can see, for the hint
+  -> Maybe Text         -- ^ The name of the module being checked, if it has one
+  -> ModuleLookup m     -- ^ How to find module sources
+  -> NormalizedUri      -- ^ URI of the main module
+  -> Text               -- ^ Source code of the main module
+  -> m (Either [Text] TypeCheckWithDepsResult)
+typecheckWithDependenciesKnowing knownNames ownName lookupModule uri source =
+  either (Left . snd) Right <$> typecheckWithDependenciesKnowingLocated knownNames ownName lookupModule uri source
+
+-- | The worker behind the three above: 'typecheckWithDependenciesKnowing'
+-- (the case hint, smucclaw/l4-ide#1080), where an import error also carries
+-- the range of the main module's @IMPORT@ it belongs to, as
+-- 'typecheckWithDependenciesLocated' says. Each of the others is this one
+-- told less or reporting less, so no entry point can miss the hint or the
+-- range by calling another.
+typecheckWithDependenciesKnowingLocated
+  :: forall m. Monad m
+  => [Text]             -- ^ Every module name the host can see, for the hint
+  -> Maybe Text         -- ^ The name of the module being checked, if it has one
+  -> ModuleLookup m     -- ^ How to find module sources
+  -> NormalizedUri      -- ^ URI of the main module
+  -> Text               -- ^ Source code of the main module
+  -> m (Either (Maybe SrcRange, [Text]) TypeCheckWithDepsResult)
+typecheckWithDependenciesKnowingLocated knownNames ownName lookupModule uri source = do
   -- Parse the main module
   case execProgramParserWithHintPass uri source of
     Left parseErrors ->
-      pure $ Left $ map (\(PError msg _ _ _) -> msg) (toList parseErrors)
+      pure $ Left (Nothing, map (.message) (toList parseErrors))
     
-    Right (parsed, _hints, _warnings) -> do
+    Right (parsed, _hints, annotationWarnings) -> do
       -- Extract and resolve imports
       let importNames = extractImportNames parsed
+          importRanges = foldTopDecls importRange parsed
+          importRange = \case
+            Import _ (MkImport a n _) -> [(rawNameToText (rawName n), rangeOf a)]
+            _ -> []
+          rangeOfImportOf names = case [ r | (n, Just r) <- importRanges, n `elem` names ] of
+            r : _ -> Just r
+            [] -> Nothing
       
       importResult <- resolveImports lookupModule Set.empty Map.empty importNames
       
       case importResult of
-        Left (ModuleNotFound modName searched) ->
-          pure $ Left ["Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"]
+        Left (ModuleNotFound modName searched importing) ->
+          pure $ Left
+            ( rangeOfImportOf [modName]
+            , [ "Module not found: " <> modName <> " (searched: " <> Text.intercalate ", " searched <> ")"
+                  <> maybe "" ("\n" <>)
+                       (caseVariantHint modName (filter (`notElem` importing) knownNames)
+                          <|> (if null importing then selfImportHint modName =<< ownName else Nothing))
+              ]
+            )
         Left (ParseError modName errs) ->
-          pure $ Left $ ("Parse error in " <> modName <> ":") : errs
+          pure $ Left (rangeOfImportOf [modName], ("Parse error in " <> modName <> ":") : errs)
         Left (CyclicImport cycleModules) ->
-          pure $ Left ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules]
+          pure $ Left (rangeOfImportOf cycleModules, ["Cyclic import detected: " <> Text.intercalate " -> " cycleModules])
         
         Right resolvedImports -> do
           -- Combine environments from imports
@@ -349,6 +437,7 @@ typecheckWithDependencies lookupModule uri source = do
             , tcdSectionPaths = result.sectionPaths
             , tcdImplicitReaders = result.implicitReaders
             , tcdInputDefaults = result.inputDefaults
+            , tcdAnnotationWarnings = annotationWarnings
             }
 
 -- ----------------------------------------------------------------------------

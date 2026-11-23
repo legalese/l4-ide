@@ -6,7 +6,7 @@ File: typically-arity-hint.l4
   Range: 22:7-22:32
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 
@@ -25,7 +25,7 @@ File: typically-arity-hint.l4
   Range: 26:7-26:25
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 
@@ -44,7 +44,7 @@ File: typically-arity-hint.l4
   Range: 29:7-29:22
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 
@@ -58,7 +58,7 @@ File: typically-arity-hint.l4
   Range: 32:7-32:35
   Source: check
   Severity: DiagnosticSeverity_Error
-  Code: <none>
+  Code: check/wrong-argument-count
   Message:
     The function
 

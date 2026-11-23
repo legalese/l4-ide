@@ -3,8 +3,10 @@
   import { colorize } from '@repo/l4-highlight'
   import {
     AiToolRenderMeta,
+    RenderMetaLoader,
     renderArgumentsAsL4,
     renderJsonAsL4,
+    renderMetaQuery,
     type FunctionParameter,
   } from 'jl4-client-rpc'
   import type { Messenger } from 'vscode-messenger-webview'
@@ -29,6 +31,8 @@
     'read_file',
     'search_identifier',
     'search_text',
+    'search_rules',
+    'get_schema',
   ])
 
   let {
@@ -36,6 +40,7 @@
     messenger,
     onOpenFile,
     onOpenDiff,
+    filesOpenable = true,
   }: {
     call: RenderedToolCall
     /** Webview→extension messenger; used to fetch render metadata
@@ -49,6 +54,9 @@
     /** Applied-diff open: shows the before/after of a completed edit
      *  in the diff editor with red/green change markers. */
     onOpenDiff: (callId: string) => void
+    /** False when the call's paths aren't on this machine (cloud
+     *  sessions): the target renders as plain text. */
+    filesOpenable?: boolean
   } = $props()
 
   // Best-effort arg parse; keep going even if the JSON is malformed
@@ -70,7 +78,10 @@
    *     to done / error ("Edit"). Pairs with the chevron that opens
    *     the result / diff.
    */
-  const view = $derived.by(() => viewFor(call.name, args))
+  const view = $derived.by(() => {
+    const v = viewFor(call.name, args)
+    return filesOpenable ? v : { ...v, click: null }
+  })
 
   function viewFor(
     name: string,
@@ -82,7 +93,20 @@
     click: ClickMode
   } {
     const path = typeof a.path === 'string' ? a.path : null
-    if (name === 'fs__read_file')
+    if (name === 'fs__read_file') {
+      const keywords =
+        typeof a.search_keywords === 'string' ? a.search_keywords.trim() : ''
+      // What was searched, not the patterns: they're written for the
+      // tool (`^(GIVEN|DECIDE).*sum`) and read as noise in the row.
+      if (keywords) {
+        const inFile = !!path && path !== '.'
+        return {
+          running: 'Searching…',
+          settled: 'Searched',
+          target: inFile ? path : 'the workspace',
+          click: inFile ? 'open' : null,
+        }
+      }
       // "Read" works as both base and past tense (read/read/read) —
       // settled label stays unchanged.
       return {
@@ -91,6 +115,7 @@
         target: path,
         click: 'open',
       }
+    }
     if (name === 'fs__create_file')
       return {
         running: 'Creating…',
@@ -107,6 +132,17 @@
         // just open the file so the user can see the context.
         click: call.status === 'done' ? 'diff' : 'open',
       }
+    if (name === 'fs__copy_file') {
+      const from = typeof a.from === 'string' ? a.from : null
+      const to = typeof a.to === 'string' ? a.to : null
+      const move = a.deleteSource === true
+      return {
+        running: move ? 'Moving…' : 'Copying…',
+        settled: move ? 'Moved' : 'Copied',
+        target: from && to ? `${from} → ${to}` : to,
+        click: to ? 'open' : null,
+      }
+    }
     if (name === 'fs__delete_file')
       return {
         running: 'Deleting…',
@@ -141,6 +177,13 @@
         running: 'Asking…',
         settled: 'Asked',
         target: null,
+        click: null,
+      }
+    if (name === 'web__fetch')
+      return {
+        running: 'Fetching…',
+        settled: 'Fetched',
+        target: typeof a.url === 'string' ? a.url : null,
         click: null,
       }
     if (name.startsWith('l4-rules__')) {
@@ -266,40 +309,30 @@
   // Lazy-fetched: we only ask the extension for the schema once the
   // row's expand panel is opened on a rule call, and cache the result
   // for the lifetime of this component.
-  let renderMeta = $state<{
+  type RenderMeta = {
     parameters: FunctionParameter
     returnSchema?: FunctionParameter
-  } | null>(null)
-  let renderMetaInFlight = false
-  async function ensureRenderMeta(): Promise<void> {
-    if (renderMeta || renderMetaInFlight || !messenger || !isRuleCall) return
-    renderMetaInFlight = true
-    try {
-      const res = await messenger.sendRequest(
+  }
+  let renderMeta = $state<RenderMeta | null>(null)
+  // One request at a time, and another when the call names its rule
+  // while one is out (the generic `evaluate` does, as its arguments
+  // arrive): see RenderMetaLoader.
+  const renderMetaLoader = new RenderMetaLoader<RenderMeta>({
+    query: () => (messenger && isRuleCall ? renderMetaQuery(call) : null),
+    fetch: async (query) => {
+      const res = await messenger!.sendRequest(
         AiToolRenderMeta,
         { type: 'extension' },
-        {
-          toolName: call.name,
-          ...(call.deploymentId ? { deploymentId: call.deploymentId } : {}),
-          ...(call.ruleFnName ? { fnName: call.ruleFnName } : {}),
-        }
+        query
       )
-      if (res.kind === 'meta') {
-        renderMeta = {
-          parameters: res.parameters,
-          returnSchema: res.returnSchema,
-        }
-      }
-      // `unavailable` responses leave `renderMeta` null and the
-      // in-flight flag clears below, so the next effect tick retries
-      // once the call settles (the MCP tool list may not have been
-      // populated yet when the first row mounted on a streaming turn).
-    } catch {
-      // Network / proxy hiccup — retry on the next effect tick.
-    } finally {
-      renderMetaInFlight = false
-    }
-  }
+      return res.kind === 'meta'
+        ? { parameters: res.parameters, returnSchema: res.returnSchema }
+        : null
+    },
+    onLoaded: (meta) => {
+      renderMeta = meta
+    },
+  })
 
   // Pre-fetch render-meta as soon as the row mounts on a rule call,
   // not on first expand. The previous on-expand fire produced a
@@ -316,10 +349,14 @@
   // target map is warm. Without this, multiple rows for the same rule
   // in a streaming turn would race the MCP list refresh, the early
   // ones would get `unavailable`, and only the last row (mounting
-  // after the list settled) would render as L4.
+  // after the list settled) would render as L4. And on the rule's name
+  // and deployment, which a generic `evaluate` row only learns from its
+  // arguments.
   $effect(() => {
     void call.status
-    if (isRuleCall && !renderMeta) void ensureRenderMeta()
+    void call.deploymentId
+    void call.ruleFnName
+    if (isRuleCall && !renderMeta) void renderMetaLoader.load()
   })
 
   // L4-rendered argument block. Falls back to null when we don't have
@@ -448,7 +485,7 @@
   // rows in message-assistant.svelte) — no chevron, not expandable,
   // dot pulsating. The instant the call resolves to `done` or
   // `error`, the row swaps to the standard chevron card so the user
-  // can expand the diff or the error message. The proxy now streams
+  // can expand the diff or the error message. The AI service now streams
   // partial tool-call frames as soon as the model commits to a tool
   // name (toolCallStreaming) so the pulsating dot appears
   // immediately — even before the args JSON has finished streaming.
