@@ -1,7 +1,7 @@
 # Specification: the norm log — letting a contract read its own deontic history
 
 > **Status (2026-11-23): P1, the fates writer, is built in this change (branch `feat/norm-log-fates`); nothing a user can invoke is on `unstable` yet, and P2 onwards is proposed, not landed.**
-> The text below P1 was checked 2026-11-22 against `origin/unstable` @ `a12991789`, by reading the code and the landed commits; P1's own claims (§6.2 and §6.3) were checked 2026-11-23, on `lhs`, by running `etc/verify-branch.sh`, `NormLogSpec` and `jl4-test` with the writer forced on, in the final gate; §6.3 says what that did not cover.
+> The text below P1 was checked 2026-11-22 against `origin/unstable` @ `a12991789`, by reading the code and the landed commits; P1's own claims (§6.2 and §6.3) were checked 2026-11-23, on `lhs`, by running `etc/verify-branch.sh`, `NormLogSpec` and `jl4-test` with the writer forced on, in the merge gate; §6.3 says what that did not cover.
 > The measurements in §7 and in the notes of §6.1 were not re-run unless an entry says so.
 > All twenty rulings are answered (§6.1): N1–N6 by Meng on 2026-09-27, N8 on 2026-09-28, N10 and N11 on 2026-10-11, N13 and N14 on 2026-10-14, and N7, N9, N12 (option D only), N15, N16 and N17–N20 on 2026-10-26; N20 amends N10.
 > N12's contract instants are held, not ruled.
@@ -296,6 +296,7 @@ _Settled 2026-11-23 (decided by the GM session, assumed, for Meng's review), aft
 A norm armed by a `HENCE` or a `LEST` is effective at the hand-off's clock and observed at the stamp of the event that revealed the hand-off, which for a `LEST` is later (a `LEST` norm armed at the missed deadline 3 on an event stamped 100 is `effective=3, observed=100`).
 P1's first build wrote the hand-off clock in both fields, so `observed` went backwards in log position (0, 100, 3, 100) on a stream with a single stamp.
 A root norm has no hand-off and is seen when it is armed.
+The stamp belongs to the trace the hand-off happened in: a residual obligation, whose events ran out, that is traced again keeps its parent link but not the stamp, and is seen where it is armed (decided by Claude 2026-11-23, pending Meng's review, after the re-verification of P1 found a norm armed at 9 written as observed 5; `NormLogSpec` "W2b").
 Three exceptions to "`observed` does not go backwards in log position" remain, and a reader that windows on time orders by (observed, log position): an `armed` entry is written when the machine first forces the clock the norm was armed at, which can be after another norm's fate with a later stamp; a compound's entry and a declared `BREACH`'s carry SEESAW's instants, the earliest moment the breach could be known; and an `ROR` runs its left operand over the whole trace before its right, because N17 is not built.
 **Amended by SEESAW, ruled 2026-10-09:** a failure's `effective` is max(missed deadline, the failed obligation's own arming), not the missed deadline alone, and whenever that floor engages — an obligation entered after its own deadline — the run emits a note on the existing notes channel, a note and not an error because the deadline is a run-time value and an error would stop the trace before the drafter's own `LEST` ran; Meng's words with the ruling: "re N3, surely we should warn/error loudly about the impossible to satisfy obligation" (`EVERY-EACH-QUANTIFIER-SPEC.md` §6.1.2 rule 4 and card A2, built and landed on `unstable` in legalese/l4-ide#640, merge `c56278dd7`, 2026-10-13; the run-time note is `armedAfterDeadlineNote` in `Machine.hs`, and the witness is `jl4/examples/ok/breach-clocks.l4`, whose goldens show the note firing, re-run 2026-10-13 on an `l4` installed from `unstable` after #640).
 
@@ -631,7 +632,8 @@ The phase column is the build plan of the status header (decided by Claude 2026-
 ### 6.3 What P1's gate measured (2026-11-23, on `lhs`, after the review of P1)
 
 Read from the run logs, not recalled.
-The gate ran four times on `lhs`: on the first build, after the forcing mutant was added, after the review's fixes (the third gate), and after the cost fix (the final gate).
+The gate ran five times on `lhs`: on the first build, after the forcing mutant was added, after the review's fixes (the third gate), after the cost fix (the fourth gate), and after the merge with `unstable` @ `b33800df7` and the fix for the re-verification's finding (the merge gate).
+The merge gate is the one that ran on the code in this change; a figure from an earlier gate says which.
 A figure the reviewers measured says so, and says on which build.
 The branch's own commits are not cited by hash; a figure says which gate it came from.
 
@@ -640,13 +642,13 @@ It is off unless `EvalConfig.normLog` is set, and only tests set it (`NormLogSpe
 No syntax, CLI flag or printed output of `l4 run` depends on it, which is why P1 has no `doc/` page: a user cannot invoke it (`CLAUDE.md` §6 applies from P2, which adds the read).
 
 **The observer property (N6).**
-`jl4-test` with `JL4_TEST_NORM_LOG=1` reproduces every golden once the "Norm log:" block is removed from the output: 5,031 examples, 0 failures.
+`jl4-test` with `JL4_TEST_NORM_LOG=1` reproduces every golden once the "Norm log:" block is removed from the output: 5,077 examples, 0 failures at the merge gate (5,031 and 0 at the earlier gates, which ran before the merge).
 The first such run found one real difference, in `ok/every/run-lifecycle-values.l4`: the carrier of N8's parent link took an address from the evaluation's supply, which moved the heap address that a ledger listing prints for a party with an unforced field.
 The carrier now takes none, and `NormLogSpec` has the shape as a fixture.
 Two deliberately wrong writers show that the differential can go red.
 `JL4_TEST_NORM_LOG=mutant` also writes the official record, and fails 38 goldens (run in the first gate, not repeated since).
 `JL4_TEST_NORM_LOG=mutant-force` evaluates a party at arming, which is the writer the ruling cares about.
-It fails exactly one golden, `ok/every/run-lifecycle-values.l4` (run in the final gate): the heap address of the unforced party moves, from `&1436@` to `&1432@` in the reviewers' run.
+It fails exactly one golden, `ok/every/run-lifecycle-values.l4` (run in the fourth gate, before the merge, and not repeated at the merge gate): the heap address of the unforced party moves, from `&1436@` to `&1432@` in the reviewers' run.
 No corpus file's answer changes when a party is evaluated early, so the differential catches that writer by one printed address and by nothing else.
 An earlier version of this section said the golden differential alone would not catch it; the review of P1 showed that was wrong.
 The fixture where the answer does change stays: `NormLogSpec` carries a party that cannot be evaluated (a trace with no events, so nothing needs it), where the forcing writer's printed result differs from the writer-off result and the real writer's does not.
@@ -660,8 +662,9 @@ The writer was not run through `jl4-service`, `l4 batch`, the REPL or the ledger
 
 **Overhead (N6).**
 Wall time of `jl4-test` on `lhs`, one run each: writer off 1,301 s (an earlier draft of the branch, in a job that began 2026-11-22 at 23:42, +08:00); writer forced on 1,291 s, 1,312 s and 1,323 s in the first three gates.
+At the merge gate the forced-on run took 1,380 s for 5,077 examples, with a load average of 0.20 at the start of the job and 1.00 at the end of the run; the writer-off run inside `etc/verify-branch.sh` prints no wall time, so the merge gate has no off-and-on pair, and the 1,380 s is not comparable with the 1,301 s (a different tree, 46 more examples).
 The load average printed at the start of those jobs was between 0.02 and 0.42.
-In the final gate the forced-on run took 1,721 s and the `mutant-force` run 1,746 s, in one job that shared `lhs` with a second job (load 1.08 at its start, 2.00 at its end).
+In the fourth gate the forced-on run took 1,721 s and the `mutant-force` run 1,746 s, in one job that shared `lhs` with a second job (load 1.08 at its start, 2.00 at its end).
 Both runs are about 30 per cent slower than the earlier ones, and the cost fix removes work, so the difference is probably the load; that is an inference, because the writer-off suite was not run under that load.
 The wall times of different jobs are not comparable, and the suite is dominated by parsing and type-checking, so the wall time over the corpus says little about the writer's cost on one long trace; the allocation figures below are the measure.
 
@@ -671,7 +674,7 @@ The reviewers measured on their own machine and the other columns on `lhs`, so o
 
 An `EVERY` of N members traced with no events, so that every member is armed with its clock still a thunk (the worst case for the Armed rows that wait for a clock):
 
-| members                        | reviewers' build                     | third gate                           | final gate                         |
+| members                        | reviewers' build                     | third gate                           | fourth gate                        |
 | ------------------------------ | ------------------------------------ | ------------------------------------ | ---------------------------------- |
 | 800                            | +346 MB                              | +447 MB (whole process 1.14 times)   | +191 MB (whole process 1.06 times) |
 | 3,200                          | +3,903 MB (whole process 1.31 times) | +5,502 MB (whole process 1.44 times) | +776 MB (whole process 1.06 times) |
@@ -706,9 +709,14 @@ N6's fallback (on only when a module in the import closure has a fate read) is t
 `l4 run` on the five agent-shopping laptop files and the `shopping-rules` module they import (`legalese/solutions` @ `4041f63`), with `JL4_FIXED_NOW` pinned, before (unstable @ `a12991789`) and after, on snapshot binaries: every run exits 0 on both, and the output differs only in the verb of a `NOTIFY` line, in two of the six files, `laptop-party-reread` (38 lines) and `laptop-service-party` (54 lines).
 That verb is N5's printer fix (a `NOTIFY` entry used to print as `RECORD`, §6.1 N5).
 The check normalises that verb in the new output and requires the rest to be byte-identical; it ran, and did not just find no difference, because each old output is between 178 and 530 lines.
+It ran at the fourth gate and was not repeated at the merge gate.
 
 **The gate.**
 `etc/verify-branch.sh` passed on `lhs`: build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `jl4-service-test`, `check-corpus-goldens`, `check-canon-citations`, the canon mirror, `doc/test-docs.sh`, prettier and the commit trailers.
+At the merge gate it ran with `--base` set to `unstable` @ `b33800df7`, on the head that carries the merge and the fix for the re-verification's finding, and counted 5,077 examples in `jl4-test`, 1,185 in `l4-cli-test` (141 pending), 2,338 in `jl4-core-test` (26 pending, `NormLogSpec` among them, with the `W3c` fixture) and 877 in `jl4-service-test` (1 pending), all with no failure.
+Then `jl4-test` ran again with the writer forced on, which is the 5,077 above under "The observer property".
+This section was edited after that run, in a commit that changes no code.
+The cost measurements and the forcing mutant were not repeated at the merge gate, although the merge changed `Machine.hs`.
 It did not run `jl4-lsp-test`, `jl4-mlir-test`, `jl4-websessions-test`, the proleg suites, the DMN harnesses, WASM or TypeScript, and a green run is not a green CI.
 `lhs` builds with GHC 9.10.3 and CI pins 9.10.2.
 
@@ -740,6 +748,17 @@ Kept so that a later editor does not un-change a repair.
 - W3: a compound's entry has its identity, its parent link and the two instants of the breach it reduced to; a barrier's entries name nobody.
 - W4: a declared `BREACH` flushes the waiting Armed rows first, so the Armed row precedes it.
 - Cost: the `Waiting` walk above.
+
+**What the re-verification of P1 changed (2026-11-23).**
+
+- W2b: a residual obligation armed by a `HENCE` or `LEST`, whose events ran out and which was traced again, carried the first trace's hand-off stamp into the second, so a norm armed at 9 was written `effective=9, observed=5`, which breaks N3's invariant, with a right answer and no error.
+  The residual now keeps its parent link and drops the stamp (decided by Claude 2026-11-23, pending Meng's review: the lineage stays, because the residual still descends from the same hand-off).
+- W2c: two identical directives over an imported residual armed the norm at different instants: the re-verifier saw observed 5 in the first directive and 0 in the second; the red run here saw the first (effective 0, observed 5) and stopped at that assertion.
+  Both directives now write 0 and 0.
+- M1b: the extra corpus's control did not reach a file whose only trace is an imported `#EVAL r`; it follows the import closure now, by text (`runsATrace`), so a file that mentions `TRACE` only in a comment would count as one that runs a trace.
+- The N3 property of every entry covers every directive of a fixture, not only the first.
+- The merge with `unstable` @ `b33800df7` (the work and open-obligation limits of #1075) kept one way to name a compound's place, `unstable`'s `rsite` and its `operandsSite`, and deleted the norm log's own `operandsSite`.
+  A compound's entry is therefore named by the place of its first operand that is still an expression, not by the span of both operands (decided by Claude 2026-11-23, pending Meng's review: two ways to say where a compound is would drift, and the norm reference is found by `scope`, not by the site).
 
 ---
 
