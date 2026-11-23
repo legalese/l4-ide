@@ -218,8 +218,9 @@ data Continuation = HenceOf DeonticModal | LestOf DeonticModal | AfterRecord
 
 -- | The warning, a line per element. Written for a reader who has never met
 -- the words cycle or recursion (@doc\/STYLE.md@): a rule that "starts itself
--- again". It names no limit or flag of a run-time stop: ruling L2's counts are
--- not on this branch.
+-- again". It names no limit or flag of ruling L2's run-time stop (@--max-steps@,
+-- @--max-open@, on @unstable@ since legalese/l4-ide#855): ruling L3's printed
+-- text does not ask it to.
 cycleWarningText :: CycleWarning -> [Text]
 cycleWarningText w = case w.trouble of
   CouldNotCheckThat d ->

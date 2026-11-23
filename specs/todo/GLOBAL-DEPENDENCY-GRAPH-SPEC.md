@@ -130,7 +130,8 @@ New module `L4.DependencyGraph` in `jl4-core`. Depends on the resolved AST (`Mod
 
 ## Cycles of rules: rulings L3, L4 and the scope ruling
 
-Status, 2026-11-22: proposed, not landed: this branch must not merge before `fix/runaway-lest-1075` lands L2's run-time stop, because ruling L3 ships only "after card L2’s run-time stop exists" (below).
+Status, 2026-11-23: proposed, not landed.
+Ruling L3 ships only "after card L2’s run-time stop exists" (below), and that stop has been on `unstable` since 2026-11-23 (legalese/l4-ide#855, merged as b33800df7).
 It is built on `feat/cycle-report-1075`, which is not merged.
 This is not the computed-field pass sketched above.
 `L4.Cycles` (`jl4-core/src/L4/Cycles.hs`) finds the cycles among one module's definitions, top level and `WHERE`/`LET` alike, and asks of each whether it comes to an end, not only whether it exists (smucclaw/l4-ide#1075).
@@ -144,8 +145,10 @@ Card L3: option A, accepted by Meng on 2026-11-20 at 22:49:58Z, with no note; be
   It was measured before the scope ruling was given: 67 warnings and 23 goldens moved with every cycle in scope, against 2 and 3 with obligation cycles only.
   The 2 are "could not check" warnings; the third golden moves for a "no time" warning, which the scope ruling left as it was.
   Re-measured on this branch on 2026-11-21: all 1,602 tracked `.l4` files checked with the binary before and after, with identical exit codes and cycle warnings in exactly three files, none of them "multiplies".
-- L2's run-time stop: **not met on this branch.**
-  It is on `fix/runaway-lest-1075`, which has not landed in `unstable` (`git merge-base --is-ancestor` says so, 2026-11-21), so this branch must not merge before it.
+- L2's run-time stop: met.
+  It landed in `unstable` with legalese/l4-ide#855 on 2026-11-23 (b33800df7), and this branch has merged it in.
+  Measured on the merged tree, 2026-11-23: smucclaw/l4-ide#1075's `w1`, whose `LEST (w3 ROR w1)` meets `w3`'s `LEST (w1 RAND w3)`, draws "starts 2 copies", and its `#TRACE` to 60 stops with `more than 10000 obligations were open at once`, exit 1; the page's `chaser` does the same.
+  The stop does not make every run end soon: the page's `reminder`, traced to 100 from `` `reminder` 30 ``, took 27 seconds to pass 100,000 steps and had not passed the default 10,000,000 after ten minutes.
 - The fixtures: met.
   `jl4/examples/ok/cycles/` has a file for each warning a cycle of rules can draw, `multiplies.l4`, `no-time.l4` and `could-not-check.l4`, each with rules that draw it beside rules of the same shape that do not, and `marks.l4`, with an `@ends-because` above rules where it changes nothing.
   Their goldens pin the text of each warning and each note.
@@ -182,10 +185,10 @@ Answer (ii), given by Meng on 2026-11-21 at 09:03:09Z, with no note, as written:
 
 - Built in `L4.Cycles.alarms`, which returns no alarm for a `FunctionCycle`, so the checker and the report (`findingJSON`, written by `JL4_CYCLE_REPORT`) agree; the report still lists every cycle of functions.
 - Guarded by tests: with that line removed (2026-11-21), four `jl4-core-test` cases fail (the three under "a function cycle draws no warning", and the note on a function cycle), and so do 21 `jl4-test` goldens: 20 that would gain a warning, three of them under `jl4/examples/canon/`, which with the three above make (i)'s 23, and `ok/ends-because-basic`, whose notes change.
-- "stopped at run time by L2's counts": **not true on this branch.**
-  The counts are on `fix/runaway-lest-1075`, not landed.
-  Until they land, a function that calls itself forever without a blackhole keeps running, as `doc/reference/errors/README.md` ("Infinite loop detected") says.
-- No warning text names a limit, a number of steps or a flag, since L2's are not on this branch.
+- "stopped at run time by L2's counts": true since legalese/l4-ide#855 (2026-11-23), with the limits `doc/reference/errors/README.md` gives under "Infinite loop detected" and "It took more than so many steps".
+  Measured on the merged tree, 2026-11-23: `f n MEANS f (n + 1)` stops after 10,000,000 steps (`eval/too-many-steps`, exit 1, 18 seconds).
+- No warning text names a limit, a number of steps or a flag.
+  L2's (`--max-steps`, `--max-open`) are on `unstable` now; ruling L3's printed text does not ask the warning to name them.
 - A mixed cycle, a rule that uses itself directly and also has a `HENCE` or `LEST` back to itself, is an obligation cycle under the literal reading of (ii): "could not check" fires on it, and a mark above it silences it.
   Decided by Claude 2026-11-21, pending Meng's review.
   Pinned by the mixed-cycle cases in `jl4-core/test/CyclesSpec.hs`: one rule (`obligation:unproved-self+fans`), two that use each other (`obligation:unproved-mutual+fans`), and a rule that only hands on by a `HENCE` to one that uses itself, where the warning names the rule that uses itself.

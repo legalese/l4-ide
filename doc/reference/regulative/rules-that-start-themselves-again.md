@@ -259,7 +259,9 @@ When the copies are of several rules that lead back to each other, the warning i
 - L4 cannot see a loop that goes through a rule kept in a record or passed in as an input.
   An obligation that leads back to itself that way draws no warning.
 - A warning does not stop a run, and a rule L4 warns about may not give an answer when you run it.
-  Some runs that cannot go on are stopped with an error, as `pay at once` is, but not all: `reminder` above, run with `#TRACE`, goes on until you stop it.
+  A run that cannot go on is stopped with an error, but not always soon.
+  `pay at once` is stopped straight away, and `chaser` once more than 10,000 duties are open at once (see [More obligations were open at once than the limit](../errors/README.md#more-obligations-were-open-at-once-than-the-limit)).
+  `reminder` above, run with `#TRACE`, slows down as it goes, and can run for longer than you will want to wait before L4 stops it at 10,000,000 steps (see [It took more than so many steps](../errors/README.md#it-took-more-than-so-many-steps)); `--max-steps 20000` stops it in about a second.
 - L4 reads the rule as written, not as it will be run.
   A `WITHIN` worked out from an input counts as "not a number written out" even if every input you will ever give it is positive.
   That is what `@ends-because` is for.
