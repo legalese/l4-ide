@@ -486,12 +486,14 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
-  | NowInGuard (Maybe SrcRange)
+  | NowInGuard Text (Maybe SrcRange)
     -- ^ @NOW@ inside a @PROVIDED@ guard (NORM-LOG-SPEC N4, P2): it is the
     -- computer's wall clock when the program runs, not the time of the event
-    -- the guard is checked against, which is @THE INSTANT@. Carries the
-    -- source range of the @NOW@. Only a warning: @NOW@ is still the wall
-    -- clock, and a rule may mean exactly that.
+    -- the guard is checked against, which is @THE INSTANT@. @TODAY@ and
+    -- @CURRENTTIME@ read the same clock and draw the same warning (decided
+    -- by Claude 2026-11-24, pending Meng's review: N4 names only @NOW@).
+    -- Carries the word and its source range. Only a warning: the wall clock
+    -- is still the wall clock, and a rule may mean exactly that.
   | LifecycleNounHidesName LifecyclePoint (Maybe SrcRange) [Name] [Name]
     -- ^ @THE JOIN@, @THE DEADLINE@ or @THE ARMING@ written where the program
     -- has its own value spelled @JOIN@, @DEADLINE@ or @ARMING@ in scope
@@ -1103,7 +1105,7 @@ instance HasSrcRange CheckError where
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   rangeOf (CheckWarning (LifecycleNounHidesName _ mr _ _)) = mr
-  rangeOf (CheckWarning (NowInGuard mr)) = mr
+  rangeOf (CheckWarning (NowInGuard _ mr)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r

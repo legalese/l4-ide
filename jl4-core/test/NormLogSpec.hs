@@ -35,6 +35,9 @@ import L4.API.VirtualFS (VFS, vfsFromList, checkWithImports)
 import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..))
 import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..))
 import L4.Evaluate.NormLog
+import L4.Evaluate.NormLog.Read
+  ( BearerPattern (..), NormPattern (..), NormState (..), NormView (..), Refusal (..)
+  , anyNorm, isCured, readNorms )
 import L4.EvaluateLazy
   ( EvalConfig (..)
   , EvalDirectiveResult (..)
@@ -1180,9 +1183,177 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
             ]
           nowWarnings src = case checkWithImports (vfsFromList []) src of
             Left errs -> error ("typecheck failed: " <> show errs)
-            Right r   -> length [ () | e <- r.tcdErrors, CheckWarning (NowInGuard _) <- [e.kind] ]
+            Right r   -> length [ () | e <- r.tcdErrors, CheckWarning (NowInGuard _ _) <- [e.kind] ]
       nowWarnings (guarded "n > NOW") `shouldBe` 1
+      -- TODAY and CURRENTTIME read the same clock
+      nowWarnings (guarded "TODAY = TODAY") `shouldBe` 2
+      nowWarnings (guarded "CURRENTTIME = CURRENTTIME") `shouldBe` 2
       nowWarnings (guarded "n = THE INSTANT") `shouldBe` 0
+
+    -- NORM-LOG-SPEC P2, the review of the first half (2026-11-24): the reader on
+    -- real traces, with the writer on. The reviewer's probes, as fixtures.
+
+    describe "the reader on real traces (review of P2, first half)" do
+      let tracePrologue = prologue4 <> ["GIVETH DEONTIC Person Action"]
+          src body = Text.unlines (tracePrologue <> body)
+          -- each norm by the constructor of its action, with its state
+          readAt d es = [ (v.nvArmed.neActionHead, v.nvState) | v <- vs ]
+            where vs = either (const []) id (readNorms d anyNorm es)
+          readEither d es = fmap (map (\ v -> (v.nvArmed.neActionHead, v.nvState))) (readNorms d anyNorm es)
+          noInstant = \case { Left (CompoundNoInstant _) -> True; _ -> False }
+          -- is the failure of the first failed norm named so cured, as at d?
+          curedAs d name es = case readNorms d anyNorm {npAction = Just name} es of
+            Left r -> Left r
+            Right vs -> case [ v | v <- vs, isFailure v.nvState ] of
+              v : _ -> Just <$> isCured d es v
+              []    -> Right Nothing
+          isFailure = \case { Failed _ -> True; Violated -> True; _ -> False }
+
+      it "S0: an EVERY barrier member left armed when the barrier failed is decided without, not outstanding for ever" do
+        let barrier = Text.unlines $ everyPrologue <>
+              [ "GIVETH A DEONTIC Actor Action"
+              , "`the tenancy` MEANS"
+              , "    EVERY Tenant t IN tenants"
+              , "        MUST   Sign (EXACTLY t)"
+              , "        WITHIN (IF t EQUALS alice THEN 5 ELSE 20)"
+              , "        ONCE   ALL HAVE"
+              , "        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)"
+              , "        LEST   BREACH"
+              , ""
+              , "#TRACE `the tenancy` AT 0 WITH"
+              , "  PARTY theLandlord DOES Sign theLandlord AT 10"
+              ]
+        rs <- run True barrier
+        let es = fatesOf 0 rs
+            members = [ e | e <- es, e.neFate == FateArmed, e.neMember /= Nothing ]
+        length members `shouldBe` 2
+        -- both members name the barrier they are in
+        [ length e.neEnclosing | e <- members ] `shouldBe` [1, 1]
+        readAt 6 es `shouldBe` [(Just "Sign", Outstanding), (Just "Sign", Outstanding)]
+        readAt 10 es `shouldBe` [(Just "Sign", Failed FailedToJoin), (Just "Sign", DecidedWithout)]
+        readAt 30 es `shouldBe` [(Just "Sign", Failed FailedToJoin), (Just "Sign", DecidedWithout)]
+
+      it "S1: an ROR operand that fails after the other alternative settled the choice is not read as a failure, nor as anything the reader cannot place" do
+        let k = src
+              [ "c MEANS (PARTY Alice MUST deliver WITHIN 5) ROR (PARTY Bob MUST pay 1 WITHIN 20)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Bob DOES pay 1 AT 3"
+              , "  PARTY Dan DOES deliver AT 6"
+              , ""
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Bob DOES pay 1 AT 3"
+              , "  PARTY Dan DOES deliver AT 10"
+              ]
+        rs <- run True k
+        for_ [0, 1] \ i -> do
+          let es = fatesOf i rs
+          -- the ROR was fulfilled, and the machine ran its left operand over
+          -- the whole trace, so the log holds a failure the contract never had
+          [ e.neFate | e <- es, isJoinFate e.neFate ] `shouldBe` [FateJoinedFulfilled JoinOr]
+          [ e.neFate | e <- es, e.neFate == FateFailed FailedToBreach ] `shouldSatisfy` (not . null)
+          for_ [11, 30] \ d -> readEither d es `shouldSatisfy` noInstant
+
+      it "S2: a failure cured through an ROR reparation is cured when the alternative that settled the choice was the failing party's" do
+        let c1 = src
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST ((PARTY Alice MUST pay 1 WITHIN 5) ROR (PARTY Alice MUST pay 2 WITHIN 20))"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Dan DOES deliver AT 4"
+              , "  PARTY Dan DOES deliver AT 9"
+              , "  PARTY Alice DOES pay 2 AT 12"
+              , ""
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Dan DOES deliver AT 4"
+              , "  PARTY Alice DOES pay 2 AT 12"
+              , ""
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Dan DOES deliver AT 4"
+              , "  PARTY Bob DOES pay 2 AT 12"
+              ]
+        rs <- run True c1
+        -- the losing alternative failed first, then the other was performed
+        curedAs 12 "deliver" (fatesOf 0 rs) `shouldBe` Right (Just True)
+        curedAs 30 "deliver" (fatesOf 0 rs) `shouldBe` Right (Just True)
+        -- not yet, as at 11
+        curedAs 11 "deliver" (fatesOf 0 rs) `shouldBe` Right (Just False)
+        -- the losing alternative still armed when the other was performed
+        curedAs 12 "deliver" (fatesOf 1 rs) `shouldBe` Right (Just True)
+        -- and when the other party performed it, it is not a cure
+        curedAs 12 "deliver" (fatesOf 2 rs) `shouldBe` Right (Just False)
+
+      it "S3: a violated SHANT whose own LEST was then performed by the failing party is cured; a violation with nothing armed after it is not" do
+        let d = src
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST (PARTY Alice SHANT pay 1 WITHIN 5 LEST PARTY Alice MUST pay 2 WITHIN 5)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 4"
+              , "  PARTY Alice DOES pay 2 AT 6"
+              , ""
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 4"
+              , ""
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 4"
+              , "  PARTY Bob DOES pay 2 AT 6"
+              ]
+            noLest = src
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST (PARTY Alice SHANT pay 1 WITHIN 5)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 4"
+              ]
+        rs <- run True d
+        curedAs 7 "deliver" (fatesOf 0 rs) `shouldBe` Right (Just True)
+        curedAs 7 "deliver" (fatesOf 1 rs) `shouldBe` Right (Just False)
+        curedAs 7 "deliver" (fatesOf 2 rs) `shouldBe` Right (Just False)
+        rs' <- run True noLest
+        curedAs 7 "deliver" (fatesOf 0 rs') `shouldBe` Right (Just False)
+
+      it "J: a lapsed MAY in a reparation whose own LEST is a BREACH is not a cure" do
+        let j = src
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST (PARTY Alice MAY pay 1 WITHIN 5 LEST BREACH)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 4"
+              , "  PARTY Dan DOES deliver AT 20"
+              ]
+        rs <- run True j
+        curedAs 30 "deliver" (fatesOf 0 rs) `shouldBe` Right (Just False)
+
+      it "L2: a RAND that ends fulfilled does not make every earlier read refuse: an operand whose fate comes later is not yet decided" do
+        let h = src
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST ((PARTY Alice MUST pay 1 WITHIN 5) RAND (PARTY Bob MUST pay 2 WITHIN 5))"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 4"
+              , "  PARTY Bob DOES pay 2 AT 5"
+              ]
+        rs <- run True h
+        readEither 4 (fatesOf 0 rs)
+          `shouldBe` Right [(Just "deliver", Failed FailedToLest), (Just "pay", Performed), (Just "pay", Outstanding)]
+        readEither 5 (fatesOf 0 rs)
+          `shouldBe` Right [(Just "deliver", Failed FailedToLest), (Just "pay", Performed), (Just "pay", Performed)]
+
+      it "Q: a bearer filter refuses on an ordinary outstanding norm, whoever it is for: the party was never forced (N7 rule 3 is not built)" do
+        let q = src
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  HENCE PARTY Bob MUST pay 1 WITHIN 10"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 1"
+              ]
+        rs <- run True q
+        let es = fatesOf 0 rs
+            refused who = case readNorms 5 anyNorm {npBearer = BearerIs who} es of
+              Left (BearerNotKnown _ (WrittenBearer _)) -> True
+              _ -> False
+        refused "Bob" `shouldBe` True
+        refused "Alice" `shouldBe` True
 
     -- The writer's cost must be linear in the norms it writes. An EVERY of N
     -- members traced with no events logs one Waiting step per member, and each

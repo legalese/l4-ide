@@ -39,10 +39,23 @@
 --   * an operand's enclosing compound decided with a fulfilment, which carries
 --     no time ('CompoundNoInstant'): until a fulfilment has an instant
 --     (SEESAW's dual, not built), a read cannot say whether the compound had
---     decided yet.
+--     decided yet, except that a @RAND@ cannot have decided before its last
+--     operand's fate;
+--   * a miss under a compound that an @ROR@ fulfilled (also
+--     'CompoundNoInstant'): the machine runs an @ROR@'s left operand over the
+--     whole trace, so the log holds a miss the contract never had, and a
+--     fulfilment cannot say whether the miss came first (N17 and N18, not
+--     built).
 --
--- A refusal is raised only for a norm that the rest of the pattern matches,
--- so a read of one bearer is not stopped by another's unknown party.
+-- A refusal is raised only for a norm that the rest of the pattern (modal,
+-- action constructor, how it was armed) matches, and naming a different
+-- bearer does not avoid it: a bearer filter refuses on every norm whose party
+-- the machine never forced, whoever the filter names, and the party of an
+-- ordinary @PARTY name MUST ...@ is known only as written while the norm is
+-- outstanding (N7 rule 3, which forces it when a read filters by bearer, is
+-- not built). Until it is, a bearer pattern is usable on norms that have
+-- performed or failed and on the members of an @EVERY@, not on the norms
+-- that are still owed.
 -- The silent failure that remains is a pattern that matches nothing: the
 -- answer is an empty list, which a caller turns into "not outstanding", and
 -- only the type checker's lint (a later part of P2) can warn of it.
@@ -165,11 +178,34 @@ isNormFate = \case
   FateLapsed    -> True
   _             -> False
 
+-- | The outcomes that decide a compound or a barrier: the reduction of an
+-- @AND@\/@OR@, and an @EVERY ... ONCE@ barrier's own outcome. What each leaves
+-- behind is read by 'decidedWithout'.
 isJoinOutcome :: Fate -> Bool
 isJoinOutcome = \case
   FateJoinedFulfilled _ -> True
   FateJoinedBreached _  -> True
+  FateJoinReleased      -> True
+  FateJoinExpired       -> True
+  FateJoinFailed        -> True
+  FateJoinStalled       -> True
   _                     -> False
+
+-- | A fate that leaves a norm in no way owed: it was done, or it closed.
+fulfilling :: NormState -> Bool
+fulfilling = \case
+  Performed -> True
+  Exercised -> True
+  Kept      -> True
+  Lapsed    -> True
+  _         -> False
+
+-- | A fate that is a miss or a breach of what the norm asked.
+negative :: Fate -> Bool
+negative = \case
+  FateFailed _ -> True
+  FateViolated -> True
+  _            -> False
 
 -- | The state a fate puts a norm in.
 stateOfFate :: Fate -> NormState
@@ -189,8 +225,11 @@ data Ctx = MkCtx
     -- ^ every entry of each norm instance, in log order
   , cxOrder  :: [NormRef]
     -- ^ the norm instances, in the order they first appear
-  , cxJoins  :: !(Map NormRef (Maybe Rational))
-    -- ^ each compound that has reduced, and the instant it was observed
+  , cxJoins  :: !(Map NormRef NormEntry)
+    -- ^ each compound or barrier that has decided, by its own entry
+  , cxBound  :: !(Map NormRef Rational)
+    -- ^ for each compound, the latest instant a fate of one of its direct
+    -- operands was observed: a @RAND@ cannot have decided before it
   , cxKids   :: !(Map NormRef [NormEntry])
     -- ^ every entry, by the norm whose @HENCE@ or @LEST@ armed it
   }
@@ -200,7 +239,11 @@ mkCtx d es = MkCtx
   { cxAsOf = d
   , cxNorms = Map.fromListWith (flip (<>)) [ (r, [e]) | e <- es, isNormFate e.neFate, Just r <- [e.neNorm] ]
   , cxOrder = nubOrd [ r | e <- es, isNormFate e.neFate, Just r <- [e.neNorm] ]
-  , cxJoins = Map.fromList [ (c, e.neObserved) | e <- es, isJoinOutcome e.neFate, Just c <- [e.neNorm] ]
+  , cxJoins = Map.fromList [ (c, e) | e <- es, isJoinOutcome e.neFate, Just c <- [e.neNorm] ]
+  , cxBound = Map.fromListWith max
+      [ (c, t)
+      | e <- es, isNormFate e.neFate, e.neFate /= FateArmed
+      , c : _ <- [e.neEnclosing], Just t <- [e.neObserved] ]
   , cxKids = Map.fromListWith (flip (<>)) [ (o.noParent, [e]) | e <- es, Just o <- [e.neOrigin] ]
   }
 
@@ -254,10 +297,11 @@ bearerMatches r grp = \case
     NobodyBearer  -> Right False
     b             -> Left (BearerNotKnown r b)
 
--- | One norm instance as at the context's instant; 'Nothing' when it was not
--- armed yet.
-viewNorm :: Ctx -> NormRef -> Either Refusal (Maybe NormView)
-viewNorm ctx r = case Map.lookup r ctx.cxNorms of
+-- | One norm instance by its own entries alone, as at the context's
+-- instant: its armed entry, and its fate entry if one was observed by then.
+-- 'Nothing' when it was not armed yet. No compound is consulted.
+ownNorm :: Ctx -> NormRef -> Either Refusal (Maybe (NormEntry, Maybe NormEntry))
+ownNorm ctx r = case Map.lookup r ctx.cxNorms of
   Just grp@(g : _) -> do
     let armed = armedOf g grp
         fateE = find (\ e -> e.neFate /= FateArmed) grp
@@ -268,18 +312,47 @@ viewNorm ctx r = case Map.lookup r ctx.cxNorms of
         Just e  -> do
           t <- instantOf r e
           pure (if t <= ctx.cxAsOf then Just e else Nothing)
-      st <- case seen of
-        Just e  -> Right (stateOfFate e.neFate)
-        Nothing -> do
-          moot <- decidedWithout ctx armed
-          pure (if moot then DecidedWithout else Outstanding)
-      Right (Just MkNormView {nvNorm = r, nvArmed = armed, nvFate = seen, nvState = st})
+      Right (Just (armed, seen))
   _ -> Right Nothing
 
--- | N13's join condition: has a compound this norm was armed inside decided
--- at or before the instant? A compound decided with a breach has its
--- instants; one decided with a fulfilment has none, and is a refusal unless
--- another compound outside it settles the question.
+-- | The state of a norm by its own entries alone: outstanding until a fate
+-- has been observed.
+ownState :: Ctx -> NormRef -> Either Refusal (Maybe NormState)
+ownState ctx r = fmap (\ (_, seen) -> maybe Outstanding (stateOfFate . (.neFate)) seen) <$> ownNorm ctx r
+
+-- | One norm instance as at the context's instant; 'Nothing' when it was not
+-- armed yet.
+viewNorm :: Ctx -> NormRef -> Either Refusal (Maybe NormView)
+viewNorm ctx r = ownNorm ctx r >>= \case
+  Nothing -> Right Nothing
+  Just (armed, seen) -> do
+    st <- case seen of
+      Just e  -> do
+        -- a miss under a compound that an ROR fulfilled: the machine runs an
+        -- ROR's left operand over the whole trace, so the log holds a miss
+        -- the contract never had, and a fulfilment carries no time to say
+        -- whether this one came first (N17 and N18, not built)
+        when (negative e.neFate) (settledByRor ctx armed)
+        Right (stateOfFate e.neFate)
+      Nothing -> do
+        moot <- decidedWithout ctx armed
+        pure (if moot then DecidedWithout else Outstanding)
+    Right (Just MkNormView {nvNorm = r, nvArmed = armed, nvFate = seen, nvState = st})
+
+-- | Refuse when a compound this norm was armed inside was fulfilled by an
+-- @ROR@: the norm's miss may have come after the choice was settled.
+settledByRor :: Ctx -> NormEntry -> Either Refusal ()
+settledByRor ctx armed =
+  case [ c | c <- armed.neEnclosing, Just j <- [Map.lookup c ctx.cxJoins], j.neFate == FateJoinedFulfilled JoinOr ] of
+    c : _ -> Left (CompoundNoInstant c)
+    []    -> Right ()
+
+-- | N13's join condition: has a compound or barrier this norm was armed
+-- inside decided at or before the instant? A compound decided with a breach,
+-- and a barrier's failure, have their instants. A compound decided with a
+-- fulfilment has none, and is a refusal unless another compound outside it
+-- settles the question, or the read is earlier than the last of its direct
+-- operands' fates, which a @RAND@ cannot have decided before.
 decidedWithout :: Ctx -> NormEntry -> Either Refusal Bool
 decidedWithout ctx armed
   | any isDecided statuses = Right True
@@ -288,9 +361,14 @@ decidedWithout ctx armed
   where
     statuses = map status armed.neEnclosing
     status c = case Map.lookup c ctx.cxJoins of
-      Nothing        -> NotYet
-      Just Nothing   -> Unplaced c
-      Just (Just t)  -> if t <= ctx.cxAsOf then Decided else NotYet
+      Nothing -> NotYet
+      Just j -> case j.neObserved of
+        Just t  -> if t <= ctx.cxAsOf then Decided else NotYet
+        Nothing
+          | j.neFate == FateJoinedFulfilled JoinAnd
+          , Just bound <- Map.lookup c ctx.cxBound
+          , ctx.cxAsOf < bound -> NotYet
+          | otherwise -> Unplaced c
     isDecided = \case { Decided -> True; _ -> False }
 
 data JoinStatus = Decided | NotYet | Unplaced !NormRef
@@ -302,16 +380,23 @@ data JoinStatus = Decided | NotYet | Unplaced !NormRef
 -- performance in it was by the party that failed. Each norm in the
 -- continuation is fulfilled when it was performed (by that party) or closed
 -- without a failure (a kept prohibition, a lapsed permission) and everything
--- its own continuation armed is fulfilled too; or when it failed and its own
--- @LEST@ continuation is fulfilled, because a reparation that is itself
--- repaired is a cure (N8's chained case: @MUST a LEST MUST b LEST MUST c@ is
--- cured for @a@ when @c@ was done). It is not fulfilled when it is still
--- outstanding, was violated, failed with nothing to repair it (a breach, or a
--- report to a barrier), is not yet armed, or has a declared @BREACH@ or a
--- breached compound among what it armed, at or before the instant. A norm the
--- continuation left behind because a compound decided without it is not part
--- of the answer (N13's join condition applies here too), so the settled
--- alternative of an @ROR@ is what counts.
+-- its own continuation armed is fulfilled too; or when it failed or was
+-- violated and its own @LEST@ continuation is fulfilled, because a reparation
+-- that is itself repaired is a cure (N8's chained case: @MUST a LEST MUST b
+-- LEST MUST c@ is cured for @a@ when @c@ was done). It is not fulfilled when it
+-- is still outstanding, failed with nothing to repair it (a breach, or a
+-- report to a barrier), was violated with nothing armed after the violation,
+-- is not yet armed, or has a declared @BREACH@ or a breached compound among
+-- what it armed, at or before the instant. A norm the continuation left
+-- behind because a compound decided without it is not part of the answer
+-- (N13's join condition applies here too).
+--
+-- An @ROR@ in the continuation is settled by the alternative that was
+-- fulfilled first (N8), so the other alternative's miss does not count: the
+-- cure is read from that alternative alone. If no alternative of an @ROR@
+-- that was fulfilled can be told to have settled it (it settled through a
+-- compound that is itself an alternative, or through none of the
+-- continuation's norms), the read refuses by name.
 --
 -- A failure that went straight to a breach, or was reported to a barrier,
 -- has nothing to cure with and is not cured; anything that is not a failure
@@ -327,21 +412,59 @@ isCured d es v = case v.nvState of
     kidsOf r = fromMaybe [] (Map.lookup r ctx.cxKids)
     who = instanceBearer (entriesOf v.nvNorm)
 
+    fullState r = fmap (.nvState) <$> viewNorm ctx r
+
     -- nothing a norm armed is a breach that has been reached, and every norm
     -- it armed is fulfilled
     childrenFulfilled seen r = do
       reached <- anyM (breachReached r) [ e | e <- kidsOf r, isBreach e.neFate ]
-      if reached then Right False else
-        allM (fulfilled seen) (nubOrd [ c | e <- kidsOf r, isNormFate e.neFate, Just c <- [e.neNorm] ])
+      let kids = nubOrd [ c | e <- kidsOf r, isNormFate e.neFate, Just c <- [e.neNorm] ]
+      if reached then Right False else allM (groupFulfilled kids seen) (groupByCompound kids)
 
-    fulfilled seen r
+    -- the norms a norm armed, in groups by the compound each was armed inside
+    groupByCompound ks =
+      [ (key, [ k | k <- ks, innermost k == key ]) | key <- nubOrd (map innermost ks) ]
+    innermost k = case entriesOf k of
+      g : _ -> listToMaybe (armedOf g (entriesOf k)).neEnclosing
+      []    -> Nothing
+
+    groupFulfilled kids seen (key, ks) = case key >>= \ c -> (,) c <$> Map.lookup c ctx.cxJoins of
+      Just (c, j) | j.neFate == FateJoinedFulfilled JoinOr -> settledGroup kids seen c ks
+      _ -> allM (fulfilled fullState seen) ks
+
+    -- an ROR that was fulfilled: the earliest fulfilled alternative settled
+    -- it, so a miss of the other does not count. The alternatives are read by
+    -- their own entries, because their own compound is what is being decided
+    settledGroup kids seen c ks
+      | any (nestedUnder c) kids = Left (CompoundNoInstant c)
+      | otherwise = do
+          states <- traverse (\ k -> (,) k <$> ownNorm ctx k) ks
+          let visible = [ (t, k) | (k, Just (_, Just e)) <- states, fulfilling (stateOfFate e.neFate), Just t <- [e.neObserved] ]
+              everFulfilled = or [ fulfilling (stateOfFate e.neFate) | k <- ks, e <- entriesOf k, e.neFate /= FateArmed ]
+          case sortOn fst visible of
+            (_, w) : _ -> fulfilled ownOnly seen w
+            []
+              -- the choice was settled, but not by anything this read can see
+              -- yet, or not by a norm of this continuation at all
+              | everFulfilled -> allM (fulfilled ownOnly seen) ks
+              | otherwise -> Left (CompoundNoInstant c)
+    ownOnly r = ownState ctx r
+    nestedUnder c k = case entriesOf k of
+      g : _ -> case (armedOf g (entriesOf k)).neEnclosing of
+        enc@(h : _) -> c `elem` enc && h /= c
+        []          -> False
+      []    -> False
+
+    fulfilled stateOf seen r
       | r `Set.member` seen = Right False
-      | otherwise = viewNorm ctx r >>= \case
+      | otherwise = stateOf r >>= \case
           Nothing -> Right False
-          Just nv -> case nv.nvState of
+          Just st -> case st of
             DecidedWithout -> Right True
             Outstanding    -> Right False
-            Violated       -> Right False
+            -- a violation is repaired by what it armed, as a failure is; with
+            -- nothing armed after it, it is a breach
+            Violated       -> if null (kidsOf r) then Right False else childrenFulfilled seen' r
             Failed FailedToLest -> childrenFulfilled seen' r
             Failed _       -> Right False
             Performed      -> performedBy r `andThenM` childrenFulfilled seen' r

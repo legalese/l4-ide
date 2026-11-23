@@ -1260,10 +1260,15 @@ armNormKey env party act = do
   origin <- case mlog of
     Just l | l.dlWriteFates -> originFromEnv l env
     _                       -> pure Nothing
-  -- N13 (P2): the compound whose operand this norm is armed inside
+  -- N13 (P2): the compounds whose operand this norm is armed inside, and for
+  -- a member of an @EVERY ... ONCE@ barrier, the barrier itself: it is not an
+  -- AND or an OR, so no scope names it, and when it fails it leaves its other
+  -- members armed
   enclosing <- case mlog of
-    Just l | l.dlWriteFates -> enclosingNow l
-    _                       -> pure []
+    Just l | l.dlWriteFates -> case member of
+      Just m | isBarrier m.moJoin -> (m.moJoinRef :) <$> enclosingNow l
+      _                           -> enclosingNow l
+    _ -> pure []
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = bearer, nkBearerName = name
     , nkBearerSource = source, nkModal = act.modal, nkMember = member
@@ -1344,7 +1349,7 @@ registerCast ctx kind members = whenDeonticLog \ l -> liftIO do
       jsite = joinSiteOf ctx.deonton
       total = length members
       entries =
-        [ ((site, partyKeyWHNF mval), MkMemberOf {moJoin = kind, moIndex = i, moTotal = total, moJoinSite = jsite})
+        [ ((site, partyKeyWHNF mval), MkMemberOf {moJoin = kind, moIndex = i, moTotal = total, moJoinSite = jsite, moJoinRef = normRefOf ctx.norm})
         | (i, (_, mval)) <- zip [1 ..] members ]
   modifyIORef' l.dlMembers (\ m -> foldl' (\ acc (k, v) -> Map.insert k v acc) m entries)
   modifyIORef' l.dlJoinDone (Map.insert jsite 0)

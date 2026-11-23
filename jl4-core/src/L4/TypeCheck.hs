@@ -3611,22 +3611,29 @@ checkAction MkAction {anno, modal, action, provided = mprovided} actionT = do
       checkExpr ExpectRegulativeProvidedContext provided boolean
     -- N4 (P2): NOW here is the wall clock; the time of the event is THE INSTANT.
     -- Only this guard is walked, never the module.
-    for_ (nowReads providedR) \ e -> addWarning (NowInGuard (rangeOf e))
+    for_ (wallClockReads providedR) \ (word, e) -> addWarning (NowInGuard word (rangeOf e))
     pure providedR
   pure (MkAction {anno, modal, action = pat, provided}, bounds)
 
--- | The reads of @NOW@ in an expression: applied or bare.
-nowReads :: Expr Resolved -> [Expr Resolved]
-nowReads e =
-  [ x
+-- | The reads of the wall clock (@NOW@, @TODAY@, @CURRENTTIME@) in an
+-- expression, applied or bare, with the word each was written as.
+wallClockReads :: Expr Resolved -> [(Text, Expr Resolved)]
+wallClockReads e =
+  [ (w, x)
   | x <- Optics.toListOf (Optics.cosmosOf (gplate @(Expr Resolved))) e
-  , isNow x
+  , Just w <- [wordOf x]
   ]
   where
-    isNow = \ case
-      Var _ r   -> getUnique r == nowSerialUnique
-      App _ r _ -> getUnique r == nowSerialUnique
-      _         -> False
+    wordOf = \ case
+      Var _ r   -> clock r
+      App _ r _ -> clock r
+      _         -> Nothing
+    clock r
+      | u == nowSerialUnique     = Just "NOW"
+      | u == todaySerialUnique   = Just "TODAY"
+      | u == currentTimeUnique   = Just "CURRENTTIME"
+      | otherwise                = Nothing
+      where u = getUnique r
 
 -- | Rung 2 of actor-indexed actions: a PARTY may only be obligated to perform
 -- its /own/ actions. When the action's type is a single-index, actor-typed
@@ -8979,8 +8986,8 @@ prettyCheckWarning = \ case
       whichClause = case drop (k - 1) ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] of
         w : _ | k >= 1 -> "the " <> w <> " clause"
         _ -> "clause " <> Text.textShow k
-  NowInGuard _ ->
-    [ "NOW in a PROVIDED is the computer's own clock at the moment the program"
+  NowInGuard word _ ->
+    [ word <> " in a PROVIDED is the computer's own clock at the moment the program"
     , "runs, not the time of the event the condition is checked against."
     , ""
     , "So the same trace can give different answers on different days. To test"

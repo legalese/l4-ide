@@ -248,6 +248,11 @@ data MemberOf = MkMemberOf
     -- ^ @rangeOf@ the join line (@ONCE ALL HAVE@ \/ @UPON EACH@) when there
     -- is one, else of the whole @EVERY@ rule; the site the join's own steps
     -- ('JoinReleased', 'JoinExpired', 'JoinFailed') carry
+  , moJoinRef  :: !NormRef
+    -- ^ NORM-LOG-SPEC N13 (P2): which application of the @EVERY@ this member
+    -- belongs to, as its own join entries name it ('armJoinKey'). A barrier
+    -- that fails leaves its other members armed, and this is how a read
+    -- tells them from members still owed ('nkEnclosing')
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
