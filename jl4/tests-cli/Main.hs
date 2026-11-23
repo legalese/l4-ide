@@ -499,10 +499,11 @@ batchChoiceFixture, batchChoiceJson :: FilePath
 batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
 batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
 
-batchDatetimeFixture, batchDatetimeIso, batchDatetimeService :: FilePath
+batchDatetimeFixture, batchDatetimeIso, batchDatetimeService, batchDatetimeYear99 :: FilePath
 batchDatetimeFixture = fixtureDir </> "batch-datetime-result.l4"
 batchDatetimeIso     = fixtureDir </> "batch-datetime-iso.json"
 batchDatetimeService = fixtureDir </> "batch-datetime-service.json"
+batchDatetimeYear99  = fixtureDir </> "batch-datetime-year99.json"
 
 batchEnumValidateFixture, batchEnumValidateJson :: FilePath
 batchEnumValidateFixture = fixtureDir </> "batch-enum-validate.l4"
@@ -4076,6 +4077,10 @@ spec bin = do
       fromIso `shouldSatisfy` (not . ("\"timezone\"" `isInfixOf`))
       fromService <- resultOf batchDatetimeService
       fromService `shouldSatisfy` ("\"result\":\"2026-01-31T10:30:00Z\"" `isInfixOf`)
+      -- a year before 1000 keeps its four digits, as RFC 3339 has it; the
+      -- writer used formatTime's %Y, which wrote "99-01-31T10:30:00Z"
+      fromOld <- resultOf batchDatetimeYear99
+      fromOld `shouldSatisfy` ("\"result\":\"0099-01-31T10:30:00Z\"" `isInfixOf`)
 
     it "refuses with --validate-only a row the run refuses for a choice type, with the run's words" $ do
       -- #1086: --validate-only judged only NUMBER, BOOLEAN and STRING, so a
