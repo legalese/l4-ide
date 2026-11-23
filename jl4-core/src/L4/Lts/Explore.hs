@@ -947,6 +947,13 @@ data Window = MkWindow
     -- ^ the instants OTHER live obligations hold in absolute time: their
     -- deadlines and openings. An act that starts a deadline of its own ties
     -- with one of these at one instant
+  , wnChainFixed :: ![Rational]
+    -- ^ the part of 'wnFixed' that a chain of acts can end on. Not what the
+    -- lapse of the act's OWN deadline arms: that cure exists only if the act is
+    -- never done, so an instant tried on account of it is a real run (and is
+    -- tried: the act's successor may carry a deadline at the same instant with
+    -- the same cure, and then the cure does stand) but a tie through a chain
+    -- of acts with it is not one that can be reached, and is not named
   , wnOtherOpens :: ![Rational]
     -- ^ the others' openings: an act that two obligations would take is
     -- taken by one of them or both according to which side of its opening it
@@ -1100,7 +1107,7 @@ regionInstants ex w probe = go Map.empty
     settle tried learnedOffsets learnedFixed critical ties notWhole cutN sumsTruncated = do
       modifyIORef' ex.exRecords (MkActRecord
         { arState = w.wnState, arLabel = w.wnLabel, arClock = c, arLimit = w.wnLimit
-        , arTried = Set.fromList (Map.keys tried), arFixed = nubOrd (w.wnFixed <> maybeToList w.wnLimit)
+        , arTried = Set.fromList (Map.keys tried), arFixed = nubOrd (w.wnChainFixed <> maybeToList w.wnLimit)
         , arOffsets = learnedOffsets, arLearnedFixed = learnedFixed } :)
       let runs = [ (t, r) | (t, (r, _)) <- Map.toList tried ]
           ts = map fst runs
@@ -1282,8 +1289,13 @@ data Accum = MkAccum
   , acCutKeys    :: !(Set StateKey)
     -- ^ the states the state bound kept out, each once: what the line says is a
     -- number of states, and a state reached by ten moves is one state
-  , acUntried    :: !(Map (Text, Text) Int)
-  , acUntriedSeen :: !(Set (Int, Text))
+  , acUntriedAt  :: !(Map (Int, Text) [Text])
+    -- ^ per state and label, the reasons of the LAST visit that left it: that
+    -- visit is the one at the state's earliest clock, which can do everything
+    -- an earlier one could, so a cap's shortfall is the largest the state has
+    -- and a fraction is the one its widest window holds. Two reasons for one
+    -- label in one visit (the label may name the action and not the party)
+    -- are both kept
   , acRefused    :: ![Refusal]
   , acRefusedSeen :: !(Set (Int, (Text, Text, Maybe Text, Text)))
   , acDropped    :: !(Set (Text, Text))
@@ -1419,7 +1431,7 @@ chainsLeftOut after =
          <> (if length instants > 4 then ", …" else "")
          <> " could put a tie in reach and were not tried; --chains tries them, at the cost of a larger graph."
          <> " It does not reach a tie with a deadline fixed in absolute time that no act has started yet,"
-         <> " nor one with the cure of a second lapse in a row, for an act done before the first lapse: --grid 1 tries every whole instant")
+         <> " nor one with the cure of a second lapse in a row, for an act done before the first lapse: --grid 1 tries every whole instant up to a deadline or --until")
       (Set.size (Set.fromList [ st | (st, _, _) <- short ]))
   | not (null short) ]
   where
@@ -1463,8 +1475,7 @@ exploreWith ex = do
               , acBeyondAt = Map.empty
               , acDepthCutIds = Set.empty
               , acCutKeys = Set.empty
-              , acUntried = Map.empty
-              , acUntriedSeen = Set.empty
+              , acUntriedAt = Map.empty
               , acRefused = []
               , acRefusedSeen = Set.empty
               , acDropped = Set.empty
@@ -1513,18 +1524,15 @@ loop ex acc = case acc.acQueue of
             -- candidate and a refusal once per state and reason
             firedHere = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
             passedHere = Set.fromList [ l | TriedPassed l _ <- tried ]
-            -- once per state and label: the label says what was left (an act
-            -- and the way its instants were cut), and its reason can carry a
-            -- number that depends on the clock of the visit
-            newUntried = [ k | k@(l, _) <- nubOrdOn fst [ (l, why) | TriedUntried l why <- tried ], not (Set.member (node.ndId, l) acc'.acUntriedSeen) ]
+            -- once per state and label, as the state's latest visit left it
+            untriedHere = Map.map nubOrd (Map.fromListWith (flip (<>)) [ ((node.ndId, l), [why]) | TriedUntried l why <- tried ])
             newRefused = [ r | r <- nubOrdOn refusalKey [ r | TriedRefused r <- tried ], not (Set.member (node.ndId, refusalKey r) acc'.acRefusedSeen) ]
             beyondHere = length (nubOrd [ l | TriedBeyond l <- tried ])
             acc'' = acc'
               { acBeyondAt = Map.insertWith max node.ndId beyondHere acc'.acBeyondAt
               , acFiredAt = Map.insertWith Set.union node.ndId firedHere acc'.acFiredAt
               , acPassedAt = Map.insertWith Set.union node.ndId passedHere acc'.acPassedAt
-              , acUntried = foldl' (\ m k -> Map.insertWith (+) k 1 m) acc'.acUntried newUntried
-              , acUntriedSeen = acc'.acUntriedSeen <> Set.fromList [ (node.ndId, l) | (l, _) <- newUntried ]
+              , acUntriedAt = Map.union untriedHere acc'.acUntriedAt
               , acRefused = foldl' mergeRefusal acc'.acRefused newRefused
               , acRefusedSeen = acc'.acRefusedSeen <> Set.fromList [ (node.ndId, refusalKey r) | r <- newRefused ]
               }
@@ -1629,7 +1637,8 @@ finish ex acc = MkGraph
       , cvStops = [ StopDepth ex.exOptions.eoMaxDepth depthCut | depthCut > 0 ]
                <> [ StopStates ex.exOptions.eoMaxStates (Set.size acc.acCutKeys) | not (Set.null acc.acCutKeys) ]
       , cvRefused = acc.acRefused
-      , cvUntried = [ MkUntriedNote what why n | ((what, why), n) <- Map.toList acc.acUntried ]
+      , cvUntried = [ MkUntriedNote what why n
+                    | ((what, why), n) <- Map.toList (Map.fromListWith (+) [ ((l, why'), 1 :: Int) | ((_, l), whys) <- Map.toList acc.acUntriedAt, why' <- whys ]) ]
       , cvPassedOver = sum [ Set.size (ps `Set.difference` Map.findWithDefault Set.empty i acc.acFiredAt) | (i, ps) <- Map.toList acc.acPassedAt ]
       , cvDropped = Set.toList acc.acDropped
       , cvTime = timeText ex.exOptions
@@ -1750,12 +1759,16 @@ expand ex node = do
           (Just party, Left why) -> pure [TriedUntried (obligationText party raw) why]
           (Just party, Right (actions, refusals)) -> do
             win0 <- windowOf ex node pos "" live lives raw
-            -- the cure its OWN lapse would arm is not one this act can be tied
-            -- with: doing the act removes the lapse. Only a tick that lapsed
-            -- this act's norm alone is left out; one that lapsed it together
-            -- with others keeps its instants, which can add a tie and cannot
-            -- lose one.
-            let win = win0 {wnFixed = nubOrd (win0.wnFixed <> [ at | (lapsed, at) <- lapseArms, lapsed /= [live] ])}
+            -- the cure its OWN lapse would arm: the act is tried at the ties
+            -- with it (a run through any instant is a real run, and the act's
+            -- successor may arm the same deadline and the same cure), but a
+            -- chain of acts is not tied with it ('wnChainFixed'). Only a tick
+            -- that lapsed this act's norm alone counts as its own lapse; one
+            -- that lapsed it together with others keeps its instants for both
+            let others = [ at | (lapsed, at) <- lapseArms, lapsed /= [live] ]
+                own = [ at | (lapsed, at) <- lapseArms, lapsed == [live] ]
+                win = win0 { wnFixed = nubOrd (win0.wnFixed <> others <> own)
+                           , wnChainFixed = nubOrd (win0.wnChainFixed <> others) }
             ran <- for actions \ a -> do
               let label = actLabel party a
                   probe t = run label EdgeAct cand
@@ -1808,6 +1821,7 @@ windowOf ex node pos label live lives own = do
         Just (Right o) -> Just o
         _              -> Nothing
     , wnFixed = [ d | (_, Just (Right d)) <- others ] <> opens
+    , wnChainFixed = [ d | (_, Just (Right d)) <- others ] <> opens
     , wnOtherOpens = filter (> c) opens
     , wnHeld = held
     }

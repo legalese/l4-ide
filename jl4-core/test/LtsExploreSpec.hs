@@ -533,6 +533,27 @@ ownLapseSrc = Text.unlines
   , "    LEST (PARTY Q MUST q WITHIN 10 HENCE FULFILLED LEST BREACH BY Q)"
   ]
 
+-- | Doing `t` does not remove the cure of t's lapse: t's continuation holds another
+-- norm with the same deadline (4) and the same cure, so `t` at 3 starts U's 11
+-- (14) and the cure falls at 14 as well. K's deadline makes every clock a
+-- distinct state, so what is checked is whether `t` is tried at 3.
+succ2Src :: Text.Text
+succ2Src = Text.unlines
+  [ "DECLARE Person IS ONE OF T, U, Q, K"
+  , "DECLARE Action IS ONE OF t, t2, u, q, k"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "cure MEANS PARTY Q MUST q WITHIN 10 HENCE FULFILLED LEST BREACH BY Q"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`succ2` MEANS"
+  , "       (PARTY T MUST t WITHIN 4 OF 0"
+  , "          HENCE (     (PARTY T MUST t2 WITHIN 4 OF 0 HENCE FULFILLED LEST cure)"
+  , "                 RAND (PARTY U MUST u WITHIN 11 HENCE FULFILLED LEST BREACH BY U))"
+  , "          LEST cure)"
+  , "  RAND (PARTY K MUST k WITHIN 20 HENCE FULFILLED LEST BREACH BY K)"
+  ]
+
 -- | `k` is reached at clock 2 and again at clock 0, and S1's deadline is fixed
 -- at 6.5, so b's window always holds a fraction: the reason text names a
 -- different fraction (6.5 from clock 2, 1.5 from clock 0) at each visit of the
@@ -934,6 +955,7 @@ spec = describe "l4 explore" do
           | "`cascade`" `Text.isInfixOf` src = "cascade"
           | "`lapsed`" `Text.isInfixOf` src = "lapsed"
           | "`own`" `Text.isInfixOf` src = "own"
+          | "`succ2`" `Text.isInfixOf` src = "succ2"
           | "`fam`" `Text.isInfixOf` src = "fam"
           | "`lapsef`" `Text.isInfixOf` src = "lapsef"
           | "`rc`" `Text.isInfixOf` src = "rc"
@@ -979,6 +1001,13 @@ spec = describe "l4 explore" do
         g <- exploreSrc ownLapseSrc "own" regions []
         coverageComplete g.gCoverage `shouldBe` True
       holdsEvery "an act and the cure its own lapse would arm" ownLapseSrc regions Nothing 3 16
+      holdsEvery "an act that re-arms its own lapse, by default" succ2Src regions Nothing 3 16
+      holdsEvery "an act that re-arms its own lapse, with --chains" succ2Src regions {eoChains = True} Nothing 3 16
+      it "a state reached again says the larger shortfall of the instant cap, which its earlier clock has" do
+        g <- exploreSrc capReSrc "rc" regions {eoMaxInstants = 2} []
+        let caps = [ n | n <- g.gCoverage.cvUntried, "PARTY B DOES b" `Text.isInfixOf` n.unWhat, "instant cap" `Text.isInfixOf` n.unWhat ]
+        map (.unWhy) caps `shouldSatisfy` all (Text.isInfixOf "needs 2 more")
+        caps `shouldSatisfy` (not . null)
       -- an instant-cap cut that only a second visit to a state makes is named
       it "a cut that only the second visit to a state makes is named, with the cap at 3 (it is not with the cap at 4)" do
         capped <- exploreSrc capReSrc "rc" regions {eoMaxInstants = 3} []

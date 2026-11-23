@@ -31,7 +31,7 @@ instants = "tests-cli" </> "fixtures" </> "explore-instants"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -442,7 +442,7 @@ spec bin = describe "l4 explore" $ do
       lastLine sout `shouldSatisfy` ("UNTRIED 1: ties through chains of acts, for " `isInfixOf`)
       lastLine sout `shouldSatisfy` ("--chains tries them" `isInfixOf`)
       -- and what --chains does not reach, with the way that does
-      lastLine sout `shouldSatisfy` ("--grid 1 tries every whole instant" `isInfixOf`)
+      lastLine sout `shouldSatisfy` ("--grid 1 tries every whole instant up to a deadline or --until" `isInfixOf`)
       lastLine sout `shouldSatisfy` (not . ("nothing untried" `isInfixOf`))
       Output ccode csout _ <- runL4 bin ["explore", instants </> "room.l4", "--chains"]
       ccode `shouldBe` ExitSuccess
@@ -475,6 +475,25 @@ spec bin = describe "l4 explore" $ do
       Output _ sout _ <- runL4 bin ["explore", instants </> "frac-re.l4"]
       let occurrences needle hay = length [ () | i <- [0 .. length hay - length needle], needle `isPrefixOf` drop i hay ]
       occurrences "PARTY B DOES b at instants that are not whole numbers" (lastLine sout) `shouldBe` 1
+
+    it "succ2.l4: an act that re-arms its own lapse is tried at the tie with the cure the lapse arms: t at 3 is in the graph" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "succ2.l4"]
+      code `shouldBe` ExitSuccess
+      lastLine sout `shouldSatisfy` ("nothing untried" `isInfixOf`)
+      let tAtThree = [ l | l <- lines (filter (/= '\r') sout), "PARTY T DOES t AT 3" `isInfixOf` l ]
+      tAtThree `shouldSatisfy` (not . null)
+
+    it "hidden.l4: two reasons under one label in one state are both named" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "hidden.l4"]
+      code `shouldBe` ExitFailure 2
+      let occurrences needle hay = length [ () | i <- [0 .. length hay - length needle], needle `isPrefixOf` drop i hay ]
+      occurrences "no WITHIN: the obligation has no deadline to tick past" (lastLine sout) `shouldBe` 1
+      occurrences "the BEFORE date was never evaluated" (lastLine sout) `shouldBe` 1
+
+    it "cap-re.l4 --max-instants 2: a state reached again at an earlier clock says the shortfall it has there, the larger" $ do
+      Output _ sout _ <- runL4 bin ["explore", instants </> "cap-re.l4", "--max-instants", "2"]
+      lastLine sout `shouldSatisfy` ("PARTY B DOES b at the instants past the instant cap" `isInfixOf`)
+      lastLine sout `shouldSatisfy` ("it needs 2 more instants than the instant cap of 2 allows" `isInfixOf`)
 
     it "fx-fork.l4, fx-barrier.l4: a lapse of a deadline fixed at the outset, inside an EVERY, ties the act of its state with the cure: pia's act at 5 is in the graph" $
       forM_ ["fx-fork.l4", "fx-barrier.l4"] \ f -> do
