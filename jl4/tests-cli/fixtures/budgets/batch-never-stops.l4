@@ -1,0 +1,11 @@
+-- For l4 batch: zero answers at once, and any other number counts up for
+-- ever. Under a time limit, the row that never stops stops the batch, and
+-- the row after it is not evaluated, even with --continue-on-error.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+countUp n MEANS countUp (n + 1)
+
+@export default zero for zero, and never stops otherwise
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+answer n MEANS IF n EQUALS 0 THEN 0 ELSE countUp n

@@ -75,6 +75,7 @@ import qualified CliTest.Ledger as Ledger
 import qualified CliTest.Explore as Explore
 import qualified CliTest.JsonDecode as JsonDecode
 import qualified CliTest.SiblingReads as SiblingReads
+import qualified CliTest.Budgets as Budgets
 import qualified CliTest.Docassemble as Docassemble
 import qualified CliTest.OpenFisca as OpenFisca
 import qualified CliTest.Prove as Prove
@@ -969,6 +970,7 @@ main = do
          , Coverage.fixtures
          , Explore.fixtures
          , SiblingReads.fixtures
+         , Budgets.fixtures
          , JsonDecode.fixtures
          , Prove.fixtures
          , BuildIdentity.fixtures
@@ -7022,6 +7024,7 @@ spec bin = do
   Coverage.spec bin
   Explore.spec bin
   SiblingReads.spec bin
+  Budgets.spec bin
   JsonDecode.spec bin
   Prove.spec bin
   BuildVersion.spec bin

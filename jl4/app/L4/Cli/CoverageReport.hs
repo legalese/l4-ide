@@ -66,6 +66,7 @@ import L4.Syntax
 import qualified L4.TypeCheck as TC
 
 import L4.Cli.Common
+import L4.EvaluateLazy (EvalConfig)
 import L4.Cli.Coverage
 import L4.Cli.Prove (Solver (..), findZ3)
 
@@ -126,6 +127,7 @@ data CoverageOptions = CoverageOptions
   , covJson      :: Bool
   , covTimeout   :: Int
   , covFixedNow  :: FixedNowOpt
+  , covLimits    :: EvalLimits
   }
 
 coverageOptionsParser :: Parser CoverageOptions
@@ -149,6 +151,7 @@ coverageOptionsParser = CoverageOptions
        <> help "Give the solver this long per bucket; past it the bucket is undecided"
         )
   <*> fixedNowParser
+  <*> evalLimitsParser
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -171,7 +174,12 @@ data Entry = Entry
 
 coverageCmd :: CoverageOptions -> IO ()
 coverageCmd opts = do
-  evalConfig <- makeEvalConfig opts.covFixedNow
+  evalConfig <- withEvalLimits opts.covLimits =<< makeEvalConfig opts.covFixedNow
+  guardRunStop "l4 coverage" evalConfig (coverageWith opts evalConfig)
+
+-- | 'coverageCmd' under the limits its flags set (ruled by Meng 2026-11-21, extending L2).
+coverageWith :: CoverageOptions -> EvalConfig -> IO ()
+coverageWith opts evalConfig = do
   (errs, res) <- runOneshot evalConfig opts.covFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp

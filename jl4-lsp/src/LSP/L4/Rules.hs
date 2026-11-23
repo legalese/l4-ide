@@ -1395,6 +1395,32 @@ copyInWords modName = \ case
   EmbeddedCandidate -> "the standard library's `" <> modName <> "`"
   FileCandidate lbl p -> fileInWords [lbl] p
 
+-- | A type-checked module evaluated on top of its imports' heaps, under the
+-- configuration given: the work of 'GetLazyEvaluationDependenciesFile', which
+-- passes the rules' own. The REPL's @:trace@ and @:traceascii@ call it with a
+-- configuration that traces every directive, so that a line written as
+-- @#EVAL@ or @#ASSERT@ shows its trace (decided by Claude 2026-11-21, pending Meng's review); that result is not
+-- cached. Each import is evaluated once, by the rule, under the rules'
+-- configuration, either way.
+evaluateOn :: EvaluateLazy.EvalConfig -> [ImportResult] -> TypeCheckResult -> Action (EvaluateLazy.Environment, [EvaluateLazy.EvalDirectiveResult])
+evaluateOn cfg imports tcRes = do
+    deps    <- fmap catMaybes $ uses GetLazyEvaluationDependenciesFile $ map (.moduleUri) imports
+    let environment = mconcat (fst <$> deps)
+        -- the modules this one imports, transitively and once each (a diamond of
+        -- imports would otherwise list a module once per path): the JSON decoder
+        -- fills an absent field of a record declared in any of them from its
+        -- DECLARE (T1b)
+        importedModules = go Map.empty tcRes.dependencies
+          where
+            go seen [] = Map.elems seen
+            go seen (d : ds) =
+              let MkModule _ depUri _ = d.module'
+              in if Map.member depUri seen
+                   then go seen ds
+                   else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
+    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports cfg tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
+    pure (ownEnv <> environment, ownDirectives)
+
 -- | The modules a file imports that resolved to nothing, by bare name, in the
 -- order they are written, each once.
 --
@@ -1862,22 +1888,7 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
   define shakeRecorder $ \GetLazyEvaluationDependenciesFile f -> do
     imports <- dependencyImports f
     tcRes   <- use_  SuccessfulTypeCheck f
-    deps    <- fmap catMaybes $ uses GetLazyEvaluationDependenciesFile $ map (.moduleUri) imports
-    let environment = mconcat (fst <$> deps)
-        -- the modules this one imports, transitively and once each (a diamond of
-        -- imports would otherwise list a module once per path): the JSON decoder
-        -- fills an absent field of a record declared in any of them from its
-        -- DECLARE (T1b)
-        importedModules = go Map.empty tcRes.dependencies
-          where
-            go seen [] = Map.elems seen
-            go seen (d : ds) =
-              let MkModule _ depUri _ = d.module'
-              in if Map.member depUri seen
-                   then go seen ds
-                   else go (Map.insert depUri d.module' seen) (d.dependencies <> ds)
-    (ownEnv, ownDirectives) <- liftIO (EvaluateLazy.execEvalModuleWithEnvAndImports evalConfig tcRes.entityInfo environment (concatMap EvaluateLazy.moduleDeclares importedModules) tcRes.module')
-    pure ([], Just (ownEnv <> environment, ownDirectives))
+    ([],) . Just <$> evaluateOn evalConfig imports tcRes
 
   define shakeRecorder $ \EvaluateLazy uri -> do
     res  <- use_ (AttachCallStack [uri] GetLazyEvaluationDependencies) uri

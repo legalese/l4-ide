@@ -1,0 +1,7 @@
+-- A function that ends after 2,001 applications: over --max-steps 1000, and
+-- answered under --max-steps none.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+countDown n MEANS IF n EQUALS 0 THEN 0 ELSE countDown (n - 1)
+
+#EVAL countDown 2000
