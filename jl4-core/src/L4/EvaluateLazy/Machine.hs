@@ -118,6 +118,7 @@ import Data.Time (UTCTime)
 import qualified Data.Time as Time
 import Data.Time.LocalTime (TimeOfDay(..), LocalTime(..), timeToTimeOfDay, timeOfDayToTime)
 import qualified Data.Time.Format as TimeFormat
+import Data.Time.Format.ISO8601 (iso8601Show)
 import qualified Data.Time.Zones as TZ
 import L4.Annotation
 import L4.Evaluate.Ledger
@@ -6015,6 +6016,15 @@ encodeValueToJson = \case
     | otherwise -> pure $ Text.pack $ show (fromRational n :: Double)
   ValBool True -> pure "true"
   ValBool False -> pure "false"
+  -- A DATE and a TIME are written as strings in the text form the language
+  -- prints them in (@2026-01-31@, @10:30:00@), and a DATETIME as RFC 3339 in
+  -- UTC, whatever its own zone (@2026-01-31T10:30:00Z@), the one text every
+  -- writer of a DATETIME uses (W1, option B: smucclaw/l4-ide#1083).
+  -- 'parseDateText', 'parseTimeText' and 'parseDatetimeText' read each back at
+  -- the same type.
+  ValDate day -> pure $ quoted (formatDateIso day)
+  ValTime tod -> pure $ quoted (formatTimeOfDayExact tod)
+  ValDateTime utc _tz -> pure $ quoted (formatUTCTimeIsoExact utc)
   ValNil -> pure "[]"
   ValCons _x _xs ->
     -- This should not be reached as lists are handled in runBuiltin with frames
@@ -6035,6 +6045,9 @@ encodeValueToJson = \case
   v | Just ns <- unknownNames v -> stuckOn ns
   val -> internalException $ RuntimeTypeError $ "Cannot encode value to JSON: " <> prettyLayout val
   where
+    quoted :: Text -> Text
+    quoted t = "\"" <> escapeJson t <> "\""
+
     escapeJson :: Text -> Text
     escapeJson = Text.concatMap \case
       '"' -> "\\\""
@@ -9110,6 +9123,13 @@ formatTimeOfDay :: TimeOfDay -> Text
 formatTimeOfDay tod =
   Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S" tod
 
+-- | 'formatTimeOfDay', with the fraction of a second after the seconds when
+-- there is one (@10:30:00.5@), so that 'parseTimeText' reads back the same
+-- time. A whole number of seconds is written as before.
+formatTimeOfDayExact :: TimeOfDay -> Text
+formatTimeOfDayExact tod =
+  Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%H:%M:%S%Q" tod
+
 -- | Format a 'UTCTime' as a plain ISO-8601 UTC string (e.g.
 -- @2026-06-12T08:30:00Z@). Used for ledger provenance positions (M2), where we
 -- only have the evaluation clock and no tz context.
@@ -9119,16 +9139,29 @@ formatUTCTimeIso utc =
 
 -- | Format a UTCTime with timezone offset as ISO-8601
 formatDateTimeIso :: UTCTime -> Text -> Text
-formatDateTimeIso utc tzName =
+formatDateTimeIso = formatDateTimeIsoWith "%S"
+
+-- | An instant as RFC 3339 in UTC (@2026-01-31T10:30:00Z@), with the fraction
+-- of a second after the seconds when there is one (@2026-01-31T10:30:00.5Z@),
+-- so that 'parseDatetimeText' reads back the same instant. 'iso8601Show' keeps
+-- four digits for a year before 1000 (@0099-01-31T10:30:00Z@), which
+-- @formatTime@'s @%Y@ does not.
+formatUTCTimeIsoExact :: UTCTime -> Text
+formatUTCTimeIsoExact = Text.pack . iso8601Show
+
+-- | The datetime in the given timezone as @YYYY-MM-DDTHH:MM:SS@ followed by its
+-- UTC offset, the seconds written with the given format.
+formatDateTimeIsoWith :: String -> UTCTime -> Text -> Text
+formatDateTimeIsoWith secondsFmt utc tzName =
   case tryLoadTZPure tzName of
     Just tz ->
       let localTime' = TZ.utcToLocalTimeTZ tz utc
           offset = TZ.timeZoneForUTCTime tz utc
           offsetStr = TimeFormat.formatTime TimeFormat.defaultTimeLocale "%z" offset
-      in Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%S" localTime') <> Text.pack offsetStr
+      in Text.pack (TimeFormat.formatTime TimeFormat.defaultTimeLocale ("%Y-%m-%dT%H:%M:" <> secondsFmt) localTime') <> Text.pack offsetStr
     Nothing ->
       -- Fallback: format as UTC
-      Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" utc
+      Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale ("%Y-%m-%dT%H:%M:" <> secondsFmt <> "Z") utc
 
 -- | Pure-ish wrapper for TZ loading (uses unsafePerformIO since TZ data is static)
 tryLoadTZPure :: Text -> Maybe TZ.TZ
