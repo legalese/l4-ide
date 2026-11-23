@@ -239,7 +239,7 @@ it now covers.
 ### 5.3 R3 — an empty match set is an answer, and the report must say so
 
 Under `R`, no matching rule yields the empty list; under `C+` the sum `0`; under `C#` the count
-`0`. In L4, `sum EMPTY` and `count EMPTY` are `0` by definition (`prelude.l4:119`, `:265`, the
+`0`. In L4, `sum EMPTY` and `count EMPTY` are `0` by definition (`prelude.l4:122`, `:268`, the
 `go 0` accumulator), and `mapMaybe` over no hits is `EMPTY`. So the identities agree and the
 empty case needs no row. **This is not a gap.** The clean plan's empty blocker list is the
 _desired_ answer (`nlg.golden:14`), and in A&B's terms the empty multiset is a solution, not the
@@ -280,8 +280,8 @@ space-bearing names is the precedent for why the comparison is by value and not 
 
 DMN's `+` and `#` have identities that match L4's (`0`). `>` and `<` over no matching rule return
 `null` in DMN, and L4's `maximum`/`minimum` over `LIST OF NUMBER` are `@nonexhaustive` with no
-`EMPTY` arm (`prelude.l4:332-338`, `:341-347`) — a partial decision, which R2 of the program-model
-spec refuses at the boundary anyway. The `LIST OF MAYBE NUMBER` forms (`:381-387`, `:349-355`)
+`EMPTY` arm (`prelude.l4:335-342`, `:344-351`) — a partial decision, which R2 of the program-model
+spec refuses at the boundary anyway. The `LIST OF MAYBE NUMBER` forms (`:385-392`, `:353-360`)
 return `NOTHING` on `EMPTY`, and `NOTHING ↔ null` is the mapping `D-MAYBE-NULL` already governs.
 So: lower `sum`/`count` unconditionally; lower `maximum`/`minimum` only when the L4 uses the
 `MAYBE`-typed variant, else refuse with the existing partiality message. DMN restricts aggregation

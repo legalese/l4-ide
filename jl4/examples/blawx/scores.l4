@@ -2,12 +2,12 @@
 -- combinators, plus one `map`-projected aggregate over a list of records.
 --
 -- The names here are the PRELUDE's, which are not the ones the M1 brief's IR
--- constraint 6 names: the prelude has `count`, not `length` (prelude.l4:119),
+-- constraint 6 names: the prelude has `count`, not `length` (prelude.l4:122),
 -- and has no `average` at all — `RAvg` exists only for the composite idiom
 -- `sum xs DIVIDED BY count xs` over one and the same list, which is what
--- `average score` writes. `max`/`min` (prelude.l4:302,309) are the BINARY
+-- `average score` writes. `max`/`min` (prelude.l4:305,312) are the BINARY
 -- combinators and are deliberately NOT aggregates; the list forms are
--- `maximum`/`minimum` (:336,345).
+-- `maximum`/`minimum` (:339,348).
 --
 -- Two lowerings to read in the golden, because they differ on purpose:
 --

@@ -140,3 +140,41 @@ spec = describe "Import Resolution" $ do
       case result of
         Left errs -> errs `shouldSatisfy` \es -> any (Text.isInfixOf "not found") es
         Right _ -> fail "Expected an error for missing module"
+
+    -- smucclaw/l4-ide#1080. This resolver always compared names exactly; what
+    -- it lacked was the hint. Pure (no disk), so the same on every OS.
+    it "names the stdlib spelling when only the capitals differ" $
+      importErrors emptyVFS "IMPORT dayDate\nDECLARE x IS A NUMBER" `shouldBe`
+        [ "Module not found: dayDate (searched: embedded libraries, project VFS)\n\
+          \Capital letters count in a module name: `dayDate` and `daydate` are different names. Did you mean `daydate`?" ]
+
+    it "names a project file's spelling when only the capitals differ" $ do
+      let vfs = vfsFromList [("helper", "DECLARE y IS A NUMBER")]
+      importErrors vfs "IMPORT Helper\nDECLARE x IS A NUMBER" `shouldSatisfy` any ("Did you mean `helper`?" `Text.isInfixOf`)
+
+    it "reads a project file's name without its .l4" $ do
+      let vfs = vfsFromList [("helper.l4", "DECLARE y IS A NUMBER")]
+      importErrors vfs "IMPORT HELPER\nDECLARE x IS A NUMBER" `shouldSatisfy` any ("Did you mean `helper`?" `Text.isInfixOf`)
+
+    it "adds nothing when no module is that close" $
+      importErrors emptyVFS "IMPORT nonexistent\nDECLARE x IS A NUMBER" `shouldBe`
+        ["Module not found: nonexistent (searched: embedded libraries, project VFS)"]
+
+    -- Review finding A, as revised by GM (2026-11-21): a module is never
+    -- offered as a spelling of its own IMPORT, which would make it import
+    -- itself; it is told what is true instead.
+    it "tells the module being checked that it cannot import itself" $ do
+      let vfs = vfsFromList [("Foo", "DECLARE y IS A NUMBER")]
+      either id (const ["(no import error)"]) (checkWithImportsAndUri vfs "Foo" "IMPORT foo\nDECLARE x IS A NUMBER")
+        `shouldBe` ["Module not found: foo (searched: embedded libraries, project VFS)\n\
+          \`foo` differs from `Foo`, the name of this file's own module, only in its capitals. If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT."]
+
+    -- The same shape one IMPORT down gets no line: the error does not say
+    -- which module wrote the IMPORT, so "this file" would be wrong.
+    it "does not offer a project file as a spelling of its own IMPORT" $ do
+      let vfs = vfsFromList [("Bar", "IMPORT bar\nDECLARE y IS A NUMBER")]
+      importErrors vfs "IMPORT Bar\nDECLARE x IS A NUMBER" `shouldBe`
+        ["Module not found: bar (searched: embedded libraries, project VFS)"]
+  where
+    -- The resolver's errors, or one marker line when it checked the file.
+    importErrors vfs src = either id (const ["(no import error)"]) (checkWithImports vfs src)

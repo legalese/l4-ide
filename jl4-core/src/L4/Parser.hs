@@ -79,6 +79,11 @@ type Parser = ReaderT Env (StateT PState (ParsecT Void TokenStream (StateT Group
 data Env = Env
   { moduleUri :: NormalizedUri
   , mixfixHints :: MixfixHintRegistry
+    -- ^ The mixfix words in scope, fixed for a whole run except that the body
+    -- of a rule reads them with the rule's own inputs shadowed
+    -- ('shadowMixfixWords', set by 'clauseBody'). Which inputs those are is
+    -- decided by the position: every body is read under the one signature
+    -- that precedes it.
   , ofIsAnchor :: Bool
     -- ^ Are we parsing the DURATION of a @WITHIN@ (or the offset of an
     -- @AFTER@)? There @OF@ introduces the edge's anchor — @WITHIN 5 OF THE
@@ -90,9 +95,9 @@ data Env = Env
     -- inside the anchor itself ('inExprSlot'). Everywhere else it is
     -- 'False' — including inside a @BEFORE@, which takes no anchor.
     --
-    -- 'memoGroup' keys on this field. It is one of two fields any parser
-    -- changes with 'local'; the other is 'clauseCtx', which the memo does
-    -- not need to key on, for the reason given there.
+    -- 'memoGroup' keys on this field. It is one of three fields any parser
+    -- changes with 'local'; the others are 'clauseCtx' and 'mixfixHints',
+    -- which the memo does not need to key on, for the reasons given there.
   , clauseCtx :: ClauseCtx
     -- ^ Where a rule parsed here sits, which decides whether it takes a
     -- @HENCE@ or @LEST@ written on a later line (smucclaw/l4-ide#1068; see
@@ -1253,7 +1258,7 @@ decide sig = do
           <*  annoLexeme (spacedKeyword_ TKDecide)
           <*> annoHole appForm
           <*  annoLexeme (spacedKeyword_ TKIs <|> spacedKeyword_ TKIf)
-          <*> annoHole (clauseBody current)
+          <*> annoHole (clauseBody sig current)
 
     meansKW current =
       attachAnno $
@@ -1261,7 +1266,7 @@ decide sig = do
           <$> annoHole (pure sig)
           <*> annoHole appForm
           <*  annoLexeme (spacedKeyword_ TKMeans)
-          <*> annoHole (clauseBody current)
+          <*> annoHole (clauseBody sig current)
 
 -- ----------------------------------------------------------------------------
 -- Pattern matching in function definitions (Phase 1)
@@ -1336,7 +1341,7 @@ decidePatternMatch sig = do
     -- the resulting Decide's annotation, and drop the hole for the fused body, so
     -- @l4 format@ round-trips the source (see 'desugarPatternClauses').
     (rawToks, (firstClause, rest, restStarts)) <- match $ do
-      firstClause <- pmClause clauseCol
+      firstClause <- pmClause sig clauseCol
       let firstHead  = pmHead firstClause
           firstArity = length (pmPats firstClause)
       rest <- many (try (withIndent EQ clauseCol (\ _ -> (,) <$> getOffset <*> sameHeadClause clauseCol firstHead firstArity)))
@@ -1379,7 +1384,7 @@ decidePatternMatch sig = do
     pure (desugarPatternClauses sig rawToks firstClause rest)
   where
     sameHeadClause clauseCol h ar = do
-      c <- pmClause clauseCol
+      c <- pmClause sig clauseCol
       guard (rawName (pmHead c) == rawName h && length (pmPats c) == ar)
       pure c
     clauseIsPatternMatching c = any isDistinguishablePat (pmPats c)
@@ -1570,8 +1575,8 @@ recordRunFailure p =
 -- @head pats MEANS body@ form. Argument patterns are parsed with
 -- 'atomicPattern', so applied constructors must be parenthesised (as in
 -- Haskell), e.g. @(JUST n)@ or @(x FOLLOWED BY xs)@.
-pmClause :: Pos -> Parser PMClause
-pmClause clauseCol =
+pmClause :: TypeSig Name -> Pos -> Parser PMClause
+pmClause sig clauseCol =
       pmDecideForm
   <|> pmMeansForm
   where
@@ -1582,37 +1587,48 @@ pmClause clauseCol =
       ps <- pmArgs
       ak <- optional aka
       _  <- spacedKeyword_ TKIs <|> spacedKeyword_ TKIf
-      b  <- clauseBody clauseCol
+      b  <- clauseBody sig clauseCol
       pure (PMClause hd ps ak b)
     pmMeansForm = do
       hd <- name
       ps <- pmArgs
       ak <- optional aka
       _  <- spacedKeyword_ TKMeans
-      b  <- clauseBody clauseCol
+      b  <- clauseBody sig clauseCol
       pure (PMClause hd ps ak b)
 
--- | The body of a @DECIDE@ or @MEANS@ clause that starts in column @col@,
--- parsed at most once per position ('memoGroupAt'). Every definition is read
--- first as a clause ('pmClause', for 'decidePatternMatch') and, unless it
--- starts a clause group, again as an ordinary definition ('decide'); both
--- readings parse the same body at the same position with the same column,
--- so the second replays the first instead of parsing the body again.
+-- | The body of a @DECIDE@ or @MEANS@ clause that starts in column @col@, in a
+-- rule with this signature, parsed at most once per position ('memoGroupAt').
+-- Every definition is read first as a clause ('pmClause', for
+-- 'decidePatternMatch') and, unless it starts a clause group, again as an
+-- ordinary definition ('decide'); both readings parse the same body at the
+-- same position with the same column and the same signature, so the second
+-- replays the first instead of parsing the body again.
 --
 -- The body's 'clauseCtx' is @'topClauseCtx' col@, keeping only the enclosing
 -- 'standAside' (a @WHERE@ inside a @RECORD@'s value is still inside it), set
 -- inside the memo so the memoised parser depends on nothing but the position,
--- @col@ and that flag, which make its key: the outermost rule of a definition
+-- @col@ and the two flags in its key: the outermost rule of a definition
 -- takes any @HENCE@ or @LEST@ written right of the definition.
-clauseBody :: Pos -> Parser (Expr Name)
-clauseBody col = do
+--
+-- The body reads the mixfix words with the rule's own inputs shadowed
+-- ('shadowMixfixWords'), also inside the memo. That makes the memoised parser
+-- depend on the signature as well, which the position already fixes: a body
+-- follows one signature, in every reading of it (smucclaw\/l4-ide#1076).
+clauseBody :: TypeSig Name -> Pos -> Parser (Expr Name)
+clauseBody sig col = do
   outer <- asks (.clauseCtx)
   let outerAside = outer.standAside
       -- Inside a rule's body, that rule is still open and may take a HENCE
       -- or LEST written after the definition (smucclaw/l4-ide#1074, F3).
       inRule = outer.ruleOutside || isJust outer.nestedIn
   memoGroupAt (4 * unPos col + 2 * fromEnum inRule + fromEnum outerAside) #clauseBodies
-    (local (\ e -> e { clauseCtx = (topClauseCtx col) { standAside = outerAside, ruleOutside = inRule } }) (indentedExpr col))
+    (local (\ e -> e { clauseCtx = (topClauseCtx col) { standAside = outerAside, ruleOutside = inRule }
+                     , mixfixHints = shadowMixfixWords inputWords e.mixfixHints
+                     })
+           (indentedExpr col))
+  where
+    inputWords = map rawName (givenTermNames sig)
 
 
 -- | Extract the term (value) parameter names from a GIVEN signature, skipping
@@ -2046,11 +2062,13 @@ type GroupReply a = Megaparsec.Reply Void TokenStream (a, PState)
 --     replayed state was only advanced to offsets at or below the group's
 --     end, which is where parsing resumes;
 --
---   * of the 'Env', only 'ofIsAnchor' and 'clauseCtx' are ever changed
---     with 'local', and no memoised parser's reply depends on the 'clauseCtx'
---     it was reached with (see there); the module's URI and the
---     mixfix hints are fixed for a whole run, and so is this memo, which a
---     run starts empty ('runJl4Parser');
+--   * of the 'Env', only 'ofIsAnchor', 'clauseCtx' and 'mixfixHints' are ever
+--     changed with 'local', and no memoised parser's reply depends on the
+--     'clauseCtx' it was reached with (see there); 'clauseBody' sets
+--     'mixfixHints' from the signature of the rule whose body it parses, which
+--     is the same for every reading of a position, so the hints a position is
+--     read with are fixed too; the module's URI is fixed for a whole run, and
+--     so is this memo, which a run starts empty ('runJl4Parser');
 --
 --   * nothing reads the collected annotations ('PState') or megaparsec's
 --     delayed errors while parsing; they are only ever added to, at the

@@ -131,7 +131,7 @@ Facts, verified against the tree:
 | A `SET` type               | **Does not exist.** L4 has `LIST OF a` only.                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Operator overloading       | **Exists**, via magic names. `jl4-core/src/L4/TypeCheck/Environment.hs:81-95` maps `__PLUS__`, `__MINUS__`, `__TIMES__`, `__DIVIDE__`, `__LT__`, `__LEQ__`, `__GT__`, `__GEQ__`, **`__AND__`**, **`__OR__`**, `__NOT__`, `__CONS__`, `__EQUALS__`.                                                                                                                                                                                                                        |
 | How you overload           | Define a function with the magic name; resolution is **by argument type**. See `jl4/examples/ok/overloaded.l4`, which overloads `PLUS`/`MINUS`/`TIMES`/`LESS THAN` for a `Vector` record.                                                                                                                                                                                                                                                                                 |
-| Library-defined containers | **Precedent exists.** `Dictionary` is declared _in the prelude_, not the compiler: `DECLARE Dictionary k v HAS contents IS A LIST OF PAIR OF k, v` (`jl4-core/libraries/prelude.l4:793`), with `dictUnion` / `dictUnionWith` alongside.                                                                                                                                                                                                                                   |
+| Library-defined containers | **Precedent exists.** `Dictionary` is declared _in the prelude_, not the compiler: `DECLARE Dictionary k v HAS contents IS A LIST OF PAIR OF k, v` (`jl4-core/libraries/prelude.l4:831`), with `dictUnion` / `dictUnionWith` alongside.                                                                                                                                                                                                                                   |
 | `LESS`                     | Token **already exists** (`Lexer.hs:281`, `TKLess`) but the parser only ever consumes it as the two-token sequence `LESS THAN` → `Lt` (`Parser.hs:1491`). **Bare `LESS` is unclaimed.**                                                                                                                                                                                                                                                                                   |
 | `PLUS` / `MINUS`           | `Lexer.hs:274-275`; precedence 6, `AssocLeft` (`Parser.hs:1492-1493`).                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `AND` / `OR`               | Precedence 3 / 2, `AssocRight` (`Parser.hs:1484-1485`).                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -145,7 +145,7 @@ compiler changes.** The compiler work is confined to ergonomics — bare keyword
 ### D1 — A real `Set a` type, not `LIST` sugar
 
 **Decision: introduce `SET OF a` as a library type**, following the prelude's `PAIR` precedent
-(`DECLARE PAIR OF a, b`, `prelude.l4:577`) — which is an even better template than `Dictionary`,
+(`DECLARE PAIR OF a, b`, `prelude.l4:600`) — which is an even better template than `Dictionary`,
 because the `OF`-style declaration buys the type-position syntax for free (§D7):
 
 ```l4
@@ -948,7 +948,7 @@ right answer, only that **the choice becomes explicit**.
 - [`specs/done/ASYNDETIC-DISJUNCTION-SPEC.md`](../done/ASYNDETIC-DISJUNCTION-SPEC.md) — the other
   place where and/or surface syntax got hard.
 - `jl4/examples/ok/overloaded.l4` — the overloading mechanism, by example.
-- `jl4-core/libraries/prelude.l4:789+` — `Dictionary`, the template for a library container type.
+- `jl4-core/libraries/prelude.l4:825+` — `Dictionary`, the template for a library container type.
 
 ## 10. The judicial and canon authority (researched 2026-07-15)
 
