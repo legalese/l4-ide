@@ -37,6 +37,22 @@ Every form below also takes a time zone as a last input, an IANA name such as `"
 
 The number forms take the day before the month, as in `Datetime 15 6 2024 10 30 0`.
 
+## The text a DATETIME is read from
+
+`Datetime` text, `TODATETIME` and a DATETIME in JSON input all read the same text: a date, then `T` or a space, then the time, then the zone.
+The zone is one of these:
+
+- `Z`, as in `"2026-01-31T10:30:00Z"`.
+- An offset from UTC, `+0800` or `+08:00`, or `-0500`.
+- The word `UTC` or `GMT` straight after the time, as in `"2026-01-31T10:30:00UTC"`.
+
+Any other letters after the time are refused.
+`"2026-01-31T10:30:00CST"` gives NOTHING from `Datetime`, and a DATETIME in JSON input is refused with a message that says to write Z or an offset such as `+08:00`.
+A time zone abbreviation does not fix an instant: `CST` is US Central Standard Time to one reader and China Standard Time to another.
+An offset does fix the instant, but it is not a rule about local time.
+"11pm local" is a different offset in summer than in winter wherever daylight saving applies, and Arizona keeps one offset all year.
+A rule about local time needs an IANA zone name such as `"America/Phoenix"`, which the document's `TIMEZONE IS` line and the last input of `Datetime` both take.
+
 ## Reading a DATETIME
 
 | Function                                                        | Gives   | What it does                                                |

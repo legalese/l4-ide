@@ -6195,8 +6195,7 @@ jsonValueToWHNFTyped at jsonValue ty0 = do
                   mTzName <- readTcDocumentTimezone
                   let tzName = fromMaybe "Etc/UTC" mTzName
                   pure $ ValDateTime utc tzName
-                Nothing -> userException $ UserError $
-                  "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ"
+                Nothing -> userException $ UserError $ datetimeRefusal s
             _ -> userException $ UserError $
                   "Expected JSON string for DATETIME" <> atField at <> " but got: " <> Text.pack (show jsonValue)
 
@@ -9059,25 +9058,52 @@ parseTimeText raw =
        , Just tod <- [TimeFormat.parseTimeM True TimeFormat.defaultTimeLocale fmt (Text.unpack trimmed)]
        ]
 
--- | Parse an ISO-8601 datetime string to UTCTime
+-- | Parse an ISO-8601 datetime string to UTCTime. The time ends in @Z@, in a
+-- numeric offset (@+0800@ or @+08:00@), or in the word @UTC@ or @GMT@, which
+-- stand for the offset 0. No other zone name is read: @CST@ is US Central to
+-- one reader and China Standard Time to another, so the text does not fix an
+-- instant. 'datetimeRefusal' says so when a text is refused.
 parseDatetimeText :: Text -> Maybe UTCTime
 parseDatetimeText raw =
-  let trimmed = Text.strip raw
-      formats =
-        [ "%Y-%m-%dT%H:%M:%S%Z"
-        , "%Y-%m-%dT%H:%M:%S%Q%Z"
-        , "%Y-%m-%dT%H:%M:%SZ"
-        , "%Y-%m-%dT%H:%M:%S%QZ"
-        , "%Y-%m-%dT%H:%M:%S%z"
-        , "%Y-%m-%dT%H:%M:%S%Q%z"
-        , "%Y-%m-%d %H:%M:%S%Z"
-        , "%Y-%m-%d %H:%M:%S%z"
-        ]
-  in listToMaybe
-       [ utc
-       | fmt <- formats
-       , Just utc <- [TimeFormat.parseTimeM True TimeFormat.defaultTimeLocale fmt (Text.unpack trimmed)]
-       ]
+  listToMaybe
+    [ utc
+    | fmt <- formats
+    , Just utc <- [TimeFormat.parseTimeM True TimeFormat.defaultTimeLocale fmt (Text.unpack zoned)]
+    ]
+  where
+    trimmed = Text.strip raw
+    -- the word touches the time, as it did when the zone was read by name
+    zoned = case [ body
+                 | word <- ["UTC", "GMT"]
+                 , Just body <- [Text.stripSuffix word trimmed]
+                 , not (Text.null body)
+                 , not (Char.isSpace (Text.last body))
+                 ] of
+      body : _ -> body <> "Z"
+      []       -> trimmed
+    formats =
+      [ "%Y-%m-%dT%H:%M:%SZ"
+      , "%Y-%m-%dT%H:%M:%S%QZ"
+      , "%Y-%m-%dT%H:%M:%S%z"
+      , "%Y-%m-%dT%H:%M:%S%Q%z"
+      , "%Y-%m-%d %H:%M:%SZ"
+      , "%Y-%m-%d %H:%M:%S%z"
+      ]
+
+-- | What is said of a text that 'parseDatetimeText' refused. It names the fix:
+-- the time is followed by Z or by an offset such as @+08:00@. A text that
+-- would be read if its time zone abbreviation were a Z says that it is the
+-- abbreviation that is not read.
+datetimeRefusal :: Text -> Text
+datetimeRefusal s
+  | Text.length letters >= 2, isJust (parseDatetimeText (body <> "Z")) =
+      "Could not parse datetime string '" <> s <> "': the time zone abbreviation '" <> letters
+        <> "' is not read, because an abbreviation does not fix one offset. Write Z or an offset such as +08:00 after the time."
+  | otherwise =
+      "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SS followed by Z or an offset such as +08:00"
+  where
+    letters = Text.takeWhileEnd Char.isAlpha (Text.strip s)
+    body = Text.stripEnd (Text.dropWhileEnd Char.isAlpha (Text.strip s))
 
 -- | Format a TimeOfDay as HH:MM:SS
 formatTimeOfDay :: TimeOfDay -> Text

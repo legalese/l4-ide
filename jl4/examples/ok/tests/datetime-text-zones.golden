@@ -1,0 +1,39 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+datetime-text-zones.l4:29:1-70:
+  assertion satisfied
+datetime-text-zones.l4:30:1-74:
+  assertion satisfied
+datetime-text-zones.l4:31:1-75:
+  assertion satisfied
+datetime-text-zones.l4:32:1-75:
+  assertion satisfied
+datetime-text-zones.l4:33:1-76:
+  assertion satisfied
+datetime-text-zones.l4:34:1-72:
+  assertion satisfied
+datetime-text-zones.l4:35:1-72:
+  assertion satisfied
+datetime-text-zones.l4:38:1-55:
+  assertion satisfied
+datetime-text-zones.l4:39:1-55:
+  assertion satisfied
+datetime-text-zones.l4:40:1-55:
+  assertion satisfied
+datetime-text-zones.l4:41:1-55:
+  assertion satisfied
+datetime-text-zones.l4:42:1-54:
+  assertion satisfied
+datetime-text-zones.l4:43:1-55:
+  assertion satisfied
+datetime-text-zones.l4:46:1-52:
+  assertion satisfied
+datetime-text-zones.l4:47:1-56:
+  assertion satisfied
+datetime-text-zones.l4:50:1-44:
+  Could not parse datetime string '2026-01-31T10:30:00CST': the time zone abbreviation 'CST' is not read, because an abbreviation does not fix one offset. Write Z or an offset such as +08:00 after the time.
+datetime-text-zones.l4:51:1-41:
+  Could not parse datetime string '2026-01-31T10:30:00'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SS followed by Z or an offset such as +08:00
+datetime-text-zones.l4:52:1-47:
+  RIGHT OF (2026-01-31T02:30:00+0000)
