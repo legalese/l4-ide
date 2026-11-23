@@ -48,7 +48,9 @@ GIVEN startDate IS A DATE
 GIVETH A LIST OF DATE
 @nlg the monthly dates from %current% months up to but excluding %numMonths% months after %startDate%
 `monthly schedule helper` MEANS
-    IF current EQUALS numMonths
+    -- AT LEAST rather than EQUALS: a count that starts past numMonths, or a
+    -- numMonths that is not a whole number, still stops
+    IF current AT LEAST numMonths
     THEN EMPTY
     ELSE (`add months` startDate current) FOLLOWED BY
          (`monthly schedule helper` startDate numMonths (current PLUS 1))

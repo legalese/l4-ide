@@ -383,15 +383,16 @@ squared x MEANS x TIMES x
 
 All annotations begin with `@`. `@export`, `@ref` and `@desc` apply to the definition they sit with or precede; `@nlg` is described under its own heading below.
 
-| Annotation | Purpose                                                            |
-| ---------- | ------------------------------------------------------------------ |
-| `@desc`    | Human-readable description (internal unless paired with `@export`) |
-| `@export`  | Mark function for deployment via `jl4-service`                     |
-| `@nlg`     | The wording `l4 nlg` and `l4 render` print; see below              |
-| `@lang`    | The language an untagged `@nlg` in the module is written in        |
-| `@ref`     | Cross-reference to a legal source                                  |
-| `@ref-src` | Accepted and ignored (the CSV loading it did was removed)          |
-| `@ref-map` | Mapping table for references                                       |
+| Annotation      | Purpose                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `@desc`         | Human-readable description (internal unless paired with `@export`)                                               |
+| `@export`       | Mark function for deployment via `jl4-service`                                                                   |
+| `@nlg`          | The wording `l4 nlg` and `l4 render` print; see below                                                            |
+| `@lang`         | The language an untagged `@nlg` in the module is written in                                                      |
+| `@ref`          | Cross-reference to a legal source                                                                                |
+| `@ref-src`      | Accepted and ignored (the CSV loading it did was removed)                                                        |
+| `@ref-map`      | Mapping table for references                                                                                     |
+| `@ends-because` | Why a rule whose `HENCE` or `LEST` leads back to itself ends ([regulative](regulative.md#recursive-obligations)) |
 
 `@ref` and `@ref-map` are the "link this rule to §3.2 of the statute" annotations — use them whenever the source document has stable citations.
 An `@ref` on its own line binds to the next syntax node, whatever it is, so it goes above the rule it cites.

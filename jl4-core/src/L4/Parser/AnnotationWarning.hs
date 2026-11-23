@@ -42,6 +42,11 @@ annotationWarningCode = \ case
   NonassertableAnnotationSameLine {}   -> "lint/nonassertable-same-line"
   NonassertableAnnotationSuperseded {} -> "lint/nonassertable-superseded"
   NonassertableAnnotationNoLocation {} -> "lint/annotation-without-location"
+  -- codes decided by Claude 2026-11-22, pending Meng's review
+  EndsBecauseAnnotationMisplaced {}    -> "lint/ends-because-not-attached"
+  EndsBecauseAnnotationSameLine {}     -> "lint/ends-because-same-line"
+  EndsBecauseAnnotationSuperseded {}   -> "lint/ends-because-superseded"
+  EndsBecauseAnnotationNoLocation {}   -> "lint/annotation-without-location"
 
 annotationWarningMessage :: Warning -> Text
 annotationWarningMessage = \ case
@@ -129,6 +134,14 @@ annotationWarningMessage = \ case
     "This @nonassertable shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
   NonassertableAnnotationNoLocation _ ->
     "A @nonassertable annotation has no source location. This might be an internal compiler error."
+  EndsBecauseAnnotationMisplaced _ ->
+    "This @ends-because sits inside a definition's body without being directly above a definition in a WHERE or LET block, or after the last construct of the file, so no definition carries it. Write it on a line of its own above the definition's GIVEN, or directly above its MEANS or DECIDE."
+  EndsBecauseAnnotationSuperseded _ ->
+    "Two or more @ends-because marks sit above one construct; this one is an earlier one and is ignored, since the closest to the construct is the one that counts. One mark is enough."
+  EndsBecauseAnnotationSameLine _ ->
+    "This @ends-because shares its line with another construct, so nothing carries it. Put it on a line of its own above the definition it is meant for."
+  EndsBecauseAnnotationNoLocation _ ->
+    "An @ends-because annotation has no source location. This might be an internal compiler error."
  where
   tagOf :: NlgWithSpan -> Text
   tagOf nlg = maybe "" (\ (MkLangTag t) -> t) (nlgLangTag nlg.payload)
@@ -167,3 +180,7 @@ annotationWarningSpan = \ case
   NonassertableAnnotationSameLine na   -> Just na.range
   NonassertableAnnotationSuperseded na -> Just na.range
   NonassertableAnnotationNoLocation _  -> Nothing
+  EndsBecauseAnnotationMisplaced eb    -> Just eb.range
+  EndsBecauseAnnotationSameLine eb     -> Just eb.range
+  EndsBecauseAnnotationSuperseded eb   -> Just eb.range
+  EndsBecauseAnnotationNoLocation _    -> Nothing

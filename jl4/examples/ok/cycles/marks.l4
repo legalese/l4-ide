@@ -1,0 +1,36 @@
+-- @ends-because above rules where it changes nothing. Recursion-limit
+-- ruling L4 (2026-11-20) says each use emits one
+-- information-level message carrying its reason; the golden pins what each
+-- one says. Described in
+-- doc/reference/regulative/rules-that-start-themselves-again.md.
+
+DECLARE Person IS ONE OF Alex, Sam
+DECLARE Action IS ONE OF `pay rent`
+
+-- L4 can check this one: each new copy waits 30 days.
+@ends-because Alex stops renting one day
+GIVETH A DEONTIC Person Action
+`monthly rent` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN 30
+    HENCE `monthly rent`
+    LEST BREACH
+
+-- L4 can check this one too: `n` gets smaller each time round, and AT MOST 0
+-- is a stop it is sure to reach.
+@ends-because n drops by one at every instalment
+GIVEN n IS A NUMBER
+GIVETH A DEONTIC Person Action
+`instalments` n MEANS
+    IF n AT MOST 0
+    THEN FULFILLED
+    ELSE (PARTY Alex MUST `pay rent` WITHIN 30 LEST `instalments` (n MINUS 1))
+         RAND `instalments` (n MINUS 1)
+
+-- A rule that uses itself with no HENCE or LEST: no warning either way.
+@ends-because each step moves one day nearer the end date
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`days left` d MEANS
+    IF d AT MOST 0 THEN 0 ELSE `days left` (d MINUS 1)

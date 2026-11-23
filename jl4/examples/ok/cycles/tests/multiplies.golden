@@ -1,0 +1,50 @@
+Parsing successful
+Typechecking successful
+multiplies.l4:18:1-37:
+  `fixed chaser` can start itself again: a HENCE or LEST in it leads back to `fixed chaser`, and I could not check that this comes to an end, because one of its deadlines is counted from a fixed moment (WITHIN … OF …), and once that moment is past, each new copy is already late.
+  Its author says why it does, with the @ends-because above `fixed chaser`:
+  
+    Alex pays before day 2
+  
+  So L4 does not warn about it. That reason is what a reader should check.
+multiplies.l4:24:10-46:
+  `fixed chaser` starts 2 copies of itself at once: its LEST joins them with RAND.
+  So every time a deadline is missed, the number of copies open doubles.
+  Nothing written limits how many times round it goes.
+  
+  If one copy is what you meant, start it once.
+  
+  @ends-because does not silence this warning: L4 has checked that the copies multiply, and the mark answers only the warning that L4 could not check that a rule comes to an end.
+multiplies.l4:32:10-34:
+  `chaser` starts 2 copies of itself at once: its LEST joins them with RAND.
+  So every time a deadline is missed, the number of copies open doubles.
+  Nothing written limits how many times round it goes.
+  
+  If one copy is what you meant, start it once.
+multiplies.l4:51:1-35:
+  The @ends-because above `first chaser` says why it comes to an end:
+  
+    Alex pays in the end
+  
+  It silences nothing: the warning shown on `second chaser` is about something L4 has checked, and the mark answers only the warning that L4 could not check that a rule comes to an end.
+multiplies.l4:64:10-46:
+  `second chaser` starts 2 copies of rules that lead back to it at once: its LEST joins them with RAND.
+  The rules that lead back to each other are `second chaser` and `first chaser`.
+  So every time a deadline is missed, the number of copies open doubles.
+  Nothing written limits how many times round it goes.
+  
+  If one copy is what you meant, start it once.
+  
+  @ends-because does not silence this warning: L4 has checked that the copies multiply, and the mark answers only the warning that L4 could not check that a rule comes to an end.
+multiplies.l4:75:15-83:
+  `spreading chaser` starts 2 copies of itself at once: its LEST joins them with RAND.
+  So every time a deadline is missed, the number of copies open doubles.
+  Each copy is given `n` less 1, so if `n` reaches a stop, this comes to an end, but only after the number open has doubled at every step down: as many as 2 to the power of `n`.
+  
+  If one copy is what you meant, start it once.
+multiplies.l4:86:15-77:
+  `faster chaser` starts 2 copies of itself at once: its LEST joins them with RAND.
+  So every time a deadline is missed, the number of copies open doubles.
+  Each copy is given `n` less 2, so if `n` reaches a stop, this comes to an end, but only after the number open has doubled at every step down: as many as 2 to the power of (`n` divided by 2).
+  
+  If one copy is what you meant, start it once.

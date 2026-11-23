@@ -621,6 +621,12 @@ run-lest.l4:550:1-551:50:
       MUST Refund theLandlord
     before their deadline, which was at
       15
+run-lest.l4:564:1-21:
+  `forthwith, forever` starts itself again with no time passing: its deadline falls at the very moment each copy starts.
+  So the time of each copy is up the moment it starts, and the next copy starts straight away.
+  Waiting does not help, because no time passes between one copy and the next, so it does not stop by itself.
+  
+  To give each copy time, make its deadline fall after the moment it starts.
 run-lest.l4:565:27-32:
   I found a problem while checking the definition of `forthwith, forever`:
     In this action, `alice` refers to
@@ -629,4 +635,4 @@ run-lest.l4:565:27-32:
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-lest.l4:569:1-570:50:
-  A chain of HENCE or LEST continuations has stalled: the event at 50 has been handed on 1000 times in a row to continuations whose deadlines never advanced past 0, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, a LEST's WITHIN 0, or an anchored deadline no later than the one just missed - is such a chain. Give it a positive WITHIN, anchor it later than the missed deadline, or end the chain with BREACH. (EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)
+  A chain of HENCE or LEST continuations has stalled: the event at 50 has been handed on 1000 times in a row to continuations whose deadlines never advanced past 0, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, a WITHIN 0 in a LEST or in the HENCE of a SHANT that was kept, or an anchored deadline no later than the one just missed - is such a chain. Give it a positive WITHIN, anchor it later than the missed deadline, or end the chain with BREACH. (EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)

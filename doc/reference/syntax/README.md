@@ -121,6 +121,32 @@ A mark at the end of the line that names a definition, or inside its body, is a 
 A `@desc` whose text begins with the word `nonassertable` is a description, not the mark.
 Not yet: the mark on a definition inside a `WHERE` or `LET` block, and the request-side assertion the mark closes; both are designed in `specs/todo/presumption-assertion/CONTRACT.md` and not built.
 
+### @ends-because
+
+The author of a rule that uses itself again writes `@ends-because` above it to vouch that it comes to an end, and to say why.
+What it changes is described with the warnings about rules that start themselves again, in [Rules that start themselves again](../regulative/rules-that-start-themselves-again.md).
+In short: it silences the warning L4 gives when it cannot check that a rule whose `HENCE` or `LEST` leads back to itself comes to an end, written on the rule that warning is shown on, and L4 then shows the reason in an information message instead.
+On a rule like `countdown` below, which uses itself only directly, with no `HENCE` or `LEST` that leads back to it, L4 gives no such warning, so the mark changes nothing and records why the rule ends.
+Either way, L4 shows the reason of every `@ends-because` in an information message that says what the mark did; above a rule L4 finds no way back to itself from, the mark also draws a warning that L4 sees nothing for it to explain.
+Write it on a line of its own above a `MEANS` or `DECIDE` definition, followed by the reason: above the definition's `GIVEN`, or directly above the line that names it.
+It goes on a definition at the top level of a file, inside a section, or inside a `WHERE` or `LET` block.
+
+```l4
+@ends-because each step moves one day nearer the end date, and the end date is fixed
+GIVEN d IS A NUMBER
+GIVETH A NUMBER
+`countdown` d MEANS
+  IF d EQUALS 0 THEN 0 ELSE `countdown` (d MINUS 1)
+```
+
+The reason is free text, it is required, and it is the rest of the line, so a `--` comment after the mark is part of the reason.
+A mark with no reason, or only spaces after it, is an error that says a reason is needed: the reason is what a reader checks.
+On anything that is not a definition, above it or among its lines, it is an error that names what it sits on: a `DECLARE`, an `ASSUME`, a section heading or the `GIVEN` under it, a directive, an `IMPORT`, a `TIMEZONE`.
+On one of a definition's own `GIVEN` lines it is an error too, one per mark, naming the input on that line (or the next one, for a mark on a line of its own among them); a mark above the same definition still counts.
+A mark at the end of the line that names a definition, or inside its body but not above a definition in a `WHERE` or `LET` block, is a warning and carries nothing; one at the end of the `GIVETH` line is above the name line and counts; two marks above one definition are one mark and a warning.
+The mark survives a re-print: `l4 batch` and the REPL, which re-print a module before running it, keep it, and its reason.
+A `@desc` whose text begins with the words `ends-because` is a description, not the mark.
+
 ### @nlg
 
 `@nlg` gives a definition its wording in natural language, with `%name%` slots for its inputs.
@@ -301,7 +327,7 @@ The other is a file written for a newer version of L4 that has an annotation thi
 That file still opens, checks and is highlighted in the older version, which reads past what it does not know.
 An annotation that changes what a rule means is not applied by a version that does not know it, so the warning is the only sign that it was left out.
 
-The annotations this version knows are `@desc`, `@export`, `@infix`, `@infixl`, `@infixr`, `@lang`, `@nlg`, `@nonassertable`, `@nonexhaustive`, `@ref`, `@ref-map` and `@ref-src`.
+The annotations this version knows are `@desc`, `@ends-because`, `@export`, `@infix`, `@infixl`, `@infixr`, `@lang`, `@nlg`, `@nonassertable`, `@nonexhaustive`, `@ref`, `@ref-map` and `@ref-src`.
 
 - **What counts as a name.** A letter, then letters, digits and underscores, with hyphens between them, as in `@ref-src`. An `@` followed by anything else, a space or a digit or a symbol, is still an error.
 - **A name that begins with a known annotation's is that annotation.** `@exports default x` is `@export` followed by the text `s default x`, and `@descr` is `@desc` followed by `r`, as they always have been. They are not unknown, so they are not warned about, and the stray text is the annotation's own: `@exports` publishes nothing, because the first word of an export's text must be `export`. The lexer ignores only a name it used to refuse.
