@@ -1,0 +1,5 @@
+-- Imports stoplib.l4, whose own #EVAL never ends: under a time or memory
+-- limit this file's #EVAL is not evaluated, and says where the run stopped.
+IMPORT stoplib
+
+#EVAL 2 PLUS 2

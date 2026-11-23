@@ -1,0 +1,16 @@
+-- Ruled by Meng 2026-11-21, extending L2 (smucclaw/l4-ide#1075): l4 coverage counts. The
+-- decision's condition applies two functions at each input, so under
+-- --max-steps 1 every input it tries stops at the limit, and the decision
+-- is not covered, with the stop as the reason; a stopped input is never
+-- read as one at which the condition raises.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`double` n MEANS n PLUS n
+
+@export Which band a number falls into.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`band` n MEANS
+  BRANCH
+    IF `double` (`double` n) GREATER THAN 100 THEN 2
+    OTHERWISE                                       1
