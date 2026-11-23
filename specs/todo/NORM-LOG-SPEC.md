@@ -414,6 +414,7 @@ _Settled 2026-11-22 (decided by Claude, pending Meng's review), before the build
   The other alternative's miss does not count; the reader reads the cure from the alternative that settled it.
   With two alternatives fulfilled, the earliest by its own norm's instant settled it; if two share an instant and the cure answers differ, or one was fulfilled by a reparation and so cannot be placed by its own norm, or an alternative is itself a compound, or the log holds no fulfilling fate at all, the reader refuses by name, because a fulfilment carries no time.
   The machine as built never arms an `ROR`'s right alternative once its left was fulfilled (N17 is not built), so a log it wrote has one fulfilled alternative at most.
+  A reparation that is a `MAY` nobody takes up lapses, which is `FULFILLED` with no performance, so the reader counts it as a cure: N8's wording read literally (decided by Claude 2026-11-24, pending Meng's review, as a meaning question, not a ruling); a `MAY` that lapses into a `BREACH` is not a cure, and a one-word change in `Read.hs` (`Lapsed`) would flip the first reading if Meng rules the other way.
 
 **N9 — ANSWERED 2026-10-26 (option B, revised): waiver is an idiom, not a primitive.**
 Bench card N9 (https://claude.ai/artifact/VW7xe4F73mi5qLST8PB1CJ), marked accept, option B, at 2026-10-26 06:47:50Z; Meng's note: none.
