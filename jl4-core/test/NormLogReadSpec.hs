@@ -372,6 +372,14 @@ spec = describe "NormLogRead, the pure read of the norm log (NORM-LOG-SPEC P2)" 
             , within [9] (child ViaLest 3 (armedAt 11 5))
             , performed 12 5 ]
       cured 12 es 1 `shouldBe` Left (CompoundNoInstant (ref 9))
+    it "a known limit (X4): an alternative that is fulfilled only through its own reparation makes an earlier read refuse, where not-yet is knowable; a later read answers" do
+      -- norm 2 failed at 12, its LEST armed norm 5, which was performed at 20
+      let es = settled <>
+            [ within [9] (fateAt (FateFailed FailedToLest) 12 2)
+            , within [9] (child ViaLest 2 (armedAt 12 5))
+            , performed 20 5 ]
+      cured 15 es 1 `shouldBe` Left (CompoundNoInstant (ref 9))
+      cured 20 es 1 `shouldBe` Right True
     it "two alternatives fulfilled at one instant by different parties cannot be told apart, so the read refuses; by the same party it answers" do
       let tied = settled <> [ performed 11 2, performed 11 3 ]
       cured 11 (ofNorm 3 (bearer "Bob") tied) 1 `shouldBe` Left (CompoundNoInstant (ref 9))
