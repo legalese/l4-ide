@@ -109,6 +109,7 @@ import Data.Time (UTCTime)
 import qualified Data.Time as Time
 import Data.Time.LocalTime (TimeOfDay(..), LocalTime(..), timeToTimeOfDay, timeOfDayToTime)
 import qualified Data.Time.Format as TimeFormat
+import Data.Time.Format.ISO8601 (iso8601Show)
 import qualified Data.Time.Zones as TZ
 import L4.Annotation
 import L4.Evaluate.Ledger
@@ -8730,12 +8731,13 @@ formatUTCTimeIso utc =
 formatDateTimeIso :: UTCTime -> Text -> Text
 formatDateTimeIso = formatDateTimeIsoWith "%S"
 
--- | 'formatUTCTimeIso', with the fraction of a second after the seconds when
--- there is one (@2026-01-31T10:30:00.5Z@), so that 'parseDatetimeText' reads
--- back the same instant.
+-- | An instant as RFC 3339 in UTC (@2026-01-31T10:30:00Z@), with the fraction
+-- of a second after the seconds when there is one (@2026-01-31T10:30:00.5Z@),
+-- so that 'parseDatetimeText' reads back the same instant. 'iso8601Show' keeps
+-- four digits for a year before 1000 (@0099-01-31T10:30:00Z@), which
+-- @formatTime@'s @%Y@ does not.
 formatUTCTimeIsoExact :: UTCTime -> Text
-formatUTCTimeIsoExact utc =
-  Text.pack $ TimeFormat.formatTime TimeFormat.defaultTimeLocale "%Y-%m-%dT%H:%M:%S%QZ" utc
+formatUTCTimeIsoExact = Text.pack . iso8601Show
 
 -- | The datetime in the given timezone as @YYYY-MM-DDTHH:MM:SS@ followed by its
 -- UTC offset, the seconds written with the given format.

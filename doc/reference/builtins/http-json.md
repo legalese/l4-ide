@@ -69,6 +69,7 @@ DECIDE `the API key` IS
 
 A DATE is written as `"2026-01-31"` and a TIME as `"10:30:00"`, with the fraction of a second after the seconds when there is one (`"10:30:00.5"`).
 A DATETIME is written as RFC 3339 in UTC, whatever timezone it carries: 10:30 on 31 January 2026 in `Asia/Singapore` is `"2026-01-31T02:30:00Z"`, with the fraction of a second after the seconds when there is one (`"2026-01-31T02:30:00.5Z"`).
+A year before 1000 keeps its four digits (`"0099-01-31T10:30:00Z"`), as RFC 3339 requires.
 Meng ruled on 2026-11-22 (card W1, option B) that every writer of a DATETIME as JSON uses this text; this page describes `JSONENCODE`, and the other writers' pages say what they write.
 It differs from `TOSTRING`, which writes a DATETIME in its own timezone with the offset from UTC (`"2026-01-31T10:30:00+0800"`, and `"...+0000"` for UTC).
 `JSONDECODE` reads each of these back at the same type.

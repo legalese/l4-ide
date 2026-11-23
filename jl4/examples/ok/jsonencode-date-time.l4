@@ -35,6 +35,10 @@ GIVETH A DATETIME
 GIVETH A Meeting
 `the meeting` MEANS Meeting `the date` `the time` `the datetime`
 
+-- A year before 1000 keeps its four digits, as RFC 3339 has it.
+GIVETH A DATETIME
+`a datetime in year 99` MEANS DATETIME_FROM_DTZ (DATE_FROM_DMY 31 1 99) `the time` "UTC"
+
 GIVEN s IS A STRING
 GIVETH AN EITHER STRING DATE
 `decode a date` s MEANS JSONDECODE s
@@ -58,6 +62,7 @@ GIVETH AN EITHER STRING Meeting
 #EVAL JSONENCODE `the datetime`                -- "2026-01-31T02:30:00Z", in UTC whatever the zone
 #EVAL JSONENCODE `the datetime with a fraction` -- "2026-01-31T02:30:00.5Z"
 #EVAL JSONENCODE `the datetime in UTC`         -- "2026-01-31T10:30:00Z"
+#EVAL JSONENCODE `a datetime in year 99`       -- "0099-01-31T10:30:00Z"
 #EVAL JSONENCODE `the meeting`
 #EVAL JSONENCODE (LIST `the date`, `the date`)
 #EVAL JSONENCODE (JUST `the time`)
@@ -68,4 +73,6 @@ GIVETH AN EITHER STRING Meeting
 #ASSERT `decode a time` (JSONENCODE `a time with a fraction`) EQUALS RIGHT `a time with a fraction`
 #ASSERT `decode a datetime` (JSONENCODE `the datetime`) EQUALS RIGHT `the datetime`
 #ASSERT `decode a datetime` (JSONENCODE `the datetime with a fraction`) EQUALS RIGHT `the datetime with a fraction`
+#ASSERT JSONENCODE `a datetime in year 99` EQUALS "\"0099-01-31T10:30:00Z\""
+#ASSERT `decode a datetime` (JSONENCODE `a datetime in year 99`) EQUALS RIGHT `a datetime in year 99`
 #ASSERT `decode a meeting` (JSONENCODE `the meeting`) EQUALS RIGHT `the meeting`

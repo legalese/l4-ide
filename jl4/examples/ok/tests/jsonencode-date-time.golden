@@ -1,33 +1,39 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-jsonencode-date-time.l4:55:1-28:
+jsonencode-date-time.l4:59:1-28:
   "\"2026-01-31\""
-jsonencode-date-time.l4:56:1-28:
+jsonencode-date-time.l4:60:1-28:
   "\"10:30:00\""
-jsonencode-date-time.l4:57:1-42:
+jsonencode-date-time.l4:61:1-42:
   "\"10:30:00.5\""
-jsonencode-date-time.l4:58:1-32:
+jsonencode-date-time.l4:62:1-32:
   "\"2026-01-31T02:30:00Z\""
-jsonencode-date-time.l4:59:1-48:
+jsonencode-date-time.l4:63:1-48:
   "\"2026-01-31T02:30:00.5Z\""
-jsonencode-date-time.l4:60:1-39:
+jsonencode-date-time.l4:64:1-39:
   "\"2026-01-31T10:30:00Z\""
-jsonencode-date-time.l4:61:1-31:
+jsonencode-date-time.l4:65:1-41:
+  "\"0099-01-31T10:30:00Z\""
+jsonencode-date-time.l4:66:1-31:
   "{\"day\":\"2026-01-31\",\"starts\":\"10:30:00\",\"fixed at\":\"2026-01-31T02:30:00Z\"}"
-jsonencode-date-time.l4:62:1-47:
+jsonencode-date-time.l4:67:1-47:
   "[\"2026-01-31\",\"2026-01-31\"]"
-jsonencode-date-time.l4:63:1-35:
+jsonencode-date-time.l4:68:1-35:
   "\"10:30:00\""
-jsonencode-date-time.l4:66:1-72:
+jsonencode-date-time.l4:71:1-72:
   assertion satisfied
-jsonencode-date-time.l4:67:1-72:
+jsonencode-date-time.l4:72:1-72:
   assertion satisfied
-jsonencode-date-time.l4:68:1-100:
+jsonencode-date-time.l4:73:1-100:
   assertion satisfied
-jsonencode-date-time.l4:69:1-84:
+jsonencode-date-time.l4:74:1-84:
   assertion satisfied
-jsonencode-date-time.l4:70:1-116:
+jsonencode-date-time.l4:75:1-116:
   assertion satisfied
-jsonencode-date-time.l4:71:1-81:
+jsonencode-date-time.l4:76:1-77:
+  assertion satisfied
+jsonencode-date-time.l4:77:1-102:
+  assertion satisfied
+jsonencode-date-time.l4:78:1-81:
   assertion satisfied
