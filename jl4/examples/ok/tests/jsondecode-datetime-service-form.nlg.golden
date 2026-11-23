@@ -1,0 +1,6 @@
+`hour of` with "2026-01-31 10:30:00 UTC"
+`hour of` with "2026-01-31 10:30:00.5 UTC"
+`hour of` with "2026-01-31T10:30:00Z"
+`hour of` with "2026-01-31T18:30:00+0800"
+`decode` with "2026-01-31 10:30:00 UTC" is equal to `decode` with "2026-01-31T10:30:00Z"
+`decode` with "2026-01-31 10:30:00 UTC" is equal to `decode` with "2026-01-31T18:30:00+0800"

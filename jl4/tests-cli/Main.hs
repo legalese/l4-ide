@@ -500,6 +500,12 @@ batchChoiceFixture, batchChoiceJson :: FilePath
 batchChoiceFixture = fixtureDir </> "batch-choice-input.l4"
 batchChoiceJson    = fixtureDir </> "batch-choice-input.json"
 
+batchDatetimeFixture, batchDatetimeIso, batchDatetimeService, batchDatetimeYear99 :: FilePath
+batchDatetimeFixture = fixtureDir </> "batch-datetime-result.l4"
+batchDatetimeIso     = fixtureDir </> "batch-datetime-iso.json"
+batchDatetimeService = fixtureDir </> "batch-datetime-service.json"
+batchDatetimeYear99  = fixtureDir </> "batch-datetime-year99.json"
+
 batchEnumValidateFixture, batchEnumValidateJson :: FilePath
 batchEnumValidateFixture = fixtureDir </> "batch-enum-validate.l4"
 batchEnumValidateJson    = fixtureDir </> "batch-enum-validate.json"
@@ -4070,6 +4076,26 @@ spec bin = do
         [] -> expectationFailure "l4 batch printed no rows"
       sout `shouldSatisfy` ("Circle has fields" `isInfixOf`)
       sout `shouldSatisfy` ("it names no constructor of Shape" `isInfixOf`)
+
+    it "writes a DATETIME result as RFC 3339 in UTC, and reads that text and the older \"... UTC\" text back as a fact" $ do
+      -- #1085: the result was the object {"timezone": ..., "utc": ...}, which
+      -- neither l4 batch nor JSONDECODE reads. Now it is a string, and the
+      -- string, given back as a row, is read as the same instant; so is the
+      -- "2026-01-31 10:30:00 UTC" text jl4-service used to answer with.
+      let resultOf file = do
+            Output code sout _ <- runL4 bin ["batch", batchDatetimeFixture, "--inputs", file]
+            code `shouldBe` ExitSuccess
+            sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+            pure sout
+      fromIso <- resultOf batchDatetimeIso
+      fromIso `shouldSatisfy` ("\"result\":\"2026-01-31T10:30:00Z\"" `isInfixOf`)
+      fromIso `shouldSatisfy` (not . ("\"timezone\"" `isInfixOf`))
+      fromService <- resultOf batchDatetimeService
+      fromService `shouldSatisfy` ("\"result\":\"2026-01-31T10:30:00Z\"" `isInfixOf`)
+      -- a year before 1000 keeps its four digits, as RFC 3339 has it; the
+      -- writer used formatTime's %Y, which wrote "99-01-31T10:30:00Z"
+      fromOld <- resultOf batchDatetimeYear99
+      fromOld `shouldSatisfy` ("\"result\":\"0099-01-31T10:30:00Z\"" `isInfixOf`)
 
     it "refuses with --validate-only a row the run refuses for a choice type, with the run's words" $ do
       -- #1086: --validate-only judged only NUMBER, BOOLEAN and STRING, so a
