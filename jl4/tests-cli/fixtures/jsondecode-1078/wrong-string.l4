@@ -1,0 +1,11 @@
+-- The decode's type, STRING, comes from CONCAT; the JSON is a number. The run
+-- stops with the decoder's error, which names the JSON string it expected.
+IMPORT prelude
+
+GIVETH A STRING
+shout MEANS
+  CONSIDER JSONDECODE "7"
+    WHEN RIGHT s THEN CONCAT s, "!"
+    WHEN LEFT problem THEN problem
+
+#EVAL shout

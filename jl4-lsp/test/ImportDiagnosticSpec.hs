@@ -36,6 +36,8 @@ import LSP.L4.Rules
   , LibraryCandidate (..)
   , TriedLocation (..)
   , dedupeTriedLocations
+  , selfCaseVariantMessage
+  , skippedCaseVariantMessage
   , triedLocations
   )
 
@@ -59,6 +61,9 @@ cliOutcome = ImportOutcome
       , FileCandidate "VSCode bundle"     "/opt/l4/bin/../../libraries/zz-nope-971.l4"
       ]
   , embedTried = EmbedMissing 22
+  , caseVariantNames = []
+  , ownModuleVariant = Nothing
+  , skippedCaseVariantWarning = Nothing
   }
 
 embedLine :: Text.Text
@@ -115,6 +120,9 @@ spec = do
                 , EmbeddedCandidate
                 ]
             , embedTried = EmbedMissing 22
+            , caseVariantNames = []
+            , ownModuleVariant = Nothing
+            , skippedCaseVariantWarning = Nothing
             }
       got <- triedLocations lspOutcome
       got `shouldBe` [ "project:/zz.l4", asPath "/zz.l4", asPath "/abs/lsp1/zz.l4", embedLine ]
@@ -148,3 +156,103 @@ spec = do
     it "keys a location with no path on its own text" $
       dedupeTriedLocations [keyless "project:/a.l4", keyless "project:/a.l4", keyless "embedded"]
         `shouldBe` ["project:/a.l4", "embedded"]
+
+  -- smucclaw/l4-ide#1080: the warning for a file passed over because its name
+  -- differs from the IMPORT in capitals, in its extension's capitals, or by a
+  -- difference such as ß for ss that a case-insensitive disk may ignore. Pure
+  -- text, so the same on every disk; the CLI suite checks that it is printed,
+  -- once.
+  describe "skippedCaseVariantMessage (the skipped-variant warning)" $ do
+    it "names the file, the reason, the copy used and the two fixes" $
+      skippedCaseVariantMessage "math" EmbeddedCandidate [(["project root", "importer-relative"], "/w/Math.l4")]
+        `shouldBe` Text.unlines
+          [ "`IMPORT math` did not use `Math.l4` beside the importing file, because capital letters count in a module name: `Math` and `math` are different names."
+          , "It used the standard library's `math` instead."
+          , "To use that file, change the IMPORT to `Math`, or rename the file to `math.l4`."
+          ]
+
+    it "describes a file the import used, by its name and tier" $
+      skippedCaseVariantMessage "zzmod" (FileCandidate "XDG data dir" "/home/dev/.local/share/jl4/libraries/zzmod.l4")
+        [(["project root"], "/w/Zzmod.l4")]
+        `shouldBe` Text.unlines
+          [ "`IMPORT zzmod` did not use `Zzmod.l4` in the project's root folder, because capital letters count in a module name: `Zzmod` and `zzmod` are different names."
+          , "It used `zzmod.l4` in your personal library folder (the XDG data dir) instead."
+          , "To use that file, change the IMPORT to `Zzmod`, or rename the file to `zzmod.l4`."
+          ]
+
+    it "lists several files passed over, one per line" $
+      skippedCaseVariantMessage "math" EmbeddedCandidate
+        [ (["$JL4_LIBRARY_PATH"], "/lib/MATH.l4")
+        , (["importer-relative"], "/w/Math.l4")
+        ]
+        `shouldBe` Text.unlines
+          [ "`IMPORT math` did not use these files, because capital letters count in a module name and none of them is spelled `math`:"
+          , "  `MATH.l4` in the folder JL4_LIBRARY_PATH names"
+          , "  `Math.l4` beside the importing file"
+          , "It used the standard library's `math` instead."
+          , "To use one of them, change the IMPORT to that file's spelling, or rename the file to `math.l4`."
+          ]
+
+    it "never prints a folder's path" $ do
+      let msg = skippedCaseVariantMessage "zzmod" (FileCandidate "VSCode bundle" "/opt/l4/bin/../../libraries/zzmod.l4")
+                  [(["XDG data dir"], "/home/dev/.local/share/jl4/libraries/Zzmod.l4")]
+      msg `shouldSatisfy` (not . Text.isInfixOf "/")
+
+    -- Review finding C: an IMPORT names no extension, so when the file ends
+    -- in `.L4` no spelling of the IMPORT reaches it; only a rename does.
+    it "advises only a rename when just the extension's capitals differ" $
+      skippedCaseVariantMessage "prelude" EmbeddedCandidate [(["project root", "importer-relative"], "/w/prelude.L4")]
+        `shouldBe` Text.unlines
+          [ "`IMPORT prelude` did not use `prelude.L4` beside the importing file, because a module's file name must end in `.l4`, in small letters."
+          , "It used the standard library's `prelude` instead."
+          , "To use that file, rename it to `prelude.l4`."
+          ]
+
+    it "advises only a rename when the name and the extension both differ" $
+      skippedCaseVariantMessage "math" EmbeddedCandidate [(["project root", "importer-relative"], "/w/Math.L4")]
+        `shouldBe` Text.unlines
+          [ "`IMPORT math` did not use `Math.L4` beside the importing file, because a module's file must be named exactly `math.l4`, and capitals count."
+          , "It used the standard library's `math` instead."
+          , "To use that file, rename it to `math.l4`."
+          ]
+
+    -- Review finding D: `straße` and `strasse` do not differ in capitals.
+    it "does not blame capitals for a name that differs by ß and ss" $
+      skippedCaseVariantMessage "strasse" (FileCandidate "XDG data dir" "/home/dev/.local/share/jl4/libraries/strasse.l4")
+        [(["importer-relative"], "/w/stra\xdf\&e.l4")]
+        `shouldBe` Text.unlines
+          [ "`IMPORT strasse` did not use `stra\xdf\&e.l4` beside the importing file, because module names must match exactly, letter for letter: `stra\xdf\&e` and `strasse` are different names."
+          , "It used `strasse.l4` in your personal library folder (the XDG data dir) instead."
+          , "To use that file, change the IMPORT to `stra\xdf\&e`, or rename the file to `strasse.l4`."
+          ]
+
+    it "words a mixed list so that every fix it offers works" $
+      skippedCaseVariantMessage "math" EmbeddedCandidate
+        [ (["$JL4_LIBRARY_PATH"], "/lib/MATH.L4")
+        , (["importer-relative"], "/w/Math.l4")
+        ]
+        `shouldBe` Text.unlines
+          [ "`IMPORT math` did not use these files, because a module's file must be named exactly `math.l4`, and none of them is:"
+          , "  `MATH.L4` in the folder JL4_LIBRARY_PATH names"
+          , "  `Math.l4` beside the importing file"
+          , "It used the standard library's `math` instead."
+          , "To use one of them, rename it to `math.l4`, or, if its name ends in `.l4`, change the IMPORT to its spelling."
+          ]
+
+  -- Review finding A, as revised by GM (2026-11-21).
+  describe "selfCaseVariantMessage (the importing file passed over)" $ do
+    it "says the IMPORT is the file's own name, and offers no fix that imports it" $
+      selfCaseVariantMessage "math" EmbeddedCandidate "/w/Math.l4"
+        `shouldBe` Text.unlines
+          [ "`IMPORT math` did not use `Math.l4`, which is the importing file itself: `math` differs from `Math`, the name of this file's own module, only in its capitals."
+          , "It used the standard library's `math` instead."
+          , "If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT. If you meant the standard library's `math`, nothing needs to change."
+          ]
+
+    it "names a copy found on disk the way the other warnings do" $
+      selfCaseVariantMessage "zzmod" (FileCandidate "XDG data dir" "/home/dev/.local/share/jl4/libraries/zzmod.l4") "/w/Zzmod.l4"
+        `shouldBe` Text.unlines
+          [ "`IMPORT zzmod` did not use `Zzmod.l4`, which is the importing file itself: `zzmod` differs from `Zzmod`, the name of this file's own module, only in its capitals."
+          , "It used `zzmod.l4` in your personal library folder (the XDG data dir) instead."
+          , "If you meant this file, remove the IMPORT: a module cannot import itself, and a file's own definitions need no IMPORT. If you meant `zzmod.l4` in your personal library folder (the XDG data dir), nothing needs to change."
+          ]

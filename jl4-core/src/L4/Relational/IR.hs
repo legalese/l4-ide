@@ -367,7 +367,7 @@ data RArithOp = RAdd | RSub | RMul | RDiv | RMod
 -- Spelled after L4's /prelude/ names, which are not the ones a Haskell or SQL
 -- reader expects: the prelude has @sum@, @count@ (not @length@), @maximum@ and
 -- @minimum@ over lists — @max@ and @min@ are the BINARY combinators
--- (@jl4-core\/libraries\/prelude.l4:265,119,336,345,302,309@). @average@ has no
+-- (@jl4-core\/libraries\/prelude.l4:268,122,339,348,305,312@). @average@ has no
 -- prelude definition at all; 'RAvg' is produced only from the composite idiom
 -- @sum xs \/ count xs@ over one @xs@.
 data RAggOp = RSum | RCount | RMinimum | RMaximum | RAvg
