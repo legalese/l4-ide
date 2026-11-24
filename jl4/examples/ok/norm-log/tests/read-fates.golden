@@ -1,0 +1,38 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+read-fates.l4:19:1-21:30:
+  FULFILLED
+  Norm log:
+    FATE armed MUST deliver   [bearer=Alice (as written), effective=0, observed=0, activation=1]
+    FATE failed (to LEST) MUST deliver   [bearer=Alice, effective=3, observed=5, activation=1]
+    FATE armed MUST pay fee   [bearer=Alice (as written), effective=3, observed=5, origin=LEST of activation 1 (line 14), activation=1]
+    FATE performed MUST pay fee   [bearer=Alice, effective=6, observed=6, origin=LEST of activation 1 (line 14), activation=1]
+read-fates.l4:32:1-34:28:
+  FULFILLED
+  Norm log:
+    FATE armed MUST deliver   [bearer=Alice (as written), effective=0, observed=0, activation=1]
+    FATE performed MUST deliver   [bearer=Alice, effective=4, observed=4, activation=1]
+    FATE armed MUST pay amount   [bearer=Bob (as written), effective=4, observed=4, origin=HENCE of activation 1 (line 27), activation=1]
+    FATE performed MUST pay amount   [bearer=Bob, effective=6, observed=6, origin=HENCE of activation 1 (line 27), activation=1]
+read-fates.l4:43:1-45:28:
+  PARTY Bob MUST pay amount PROVIDED (OUTSTANDING (PARTY Alice MUST deliver) AS OF 5) WITHIN 8 HENCE FULFILLED
+  Norm log:
+    FATE armed MUST deliver   [bearer=Alice (as written), effective=0, observed=0, activation=1]
+    FATE performed MUST deliver   [bearer=Alice, effective=4, observed=4, activation=1]
+    FATE armed MUST pay amount   [bearer=Bob (as written), effective=4, observed=4, origin=HENCE of activation 1 (line 38), activation=1]
+read-fates.l4:56:1-57:30:
+  FULFILLED
+  Norm log:
+    FATE armed MUST deliver   [bearer=Alice (as written), effective=0, observed=0, activation=1]
+    FATE failed (to LEST) MUST deliver   [bearer=Alice, effective=3, observed=5, activation=1]
+    FATE armed MUST pay fee   [bearer=Alice (as written), effective=3, observed=5, origin=LEST of activation 1 (line 51), activation=1]
+    FATE performed MUST pay fee   [bearer=Alice, effective=5, observed=5, origin=LEST of activation 1 (line 51), activation=1]
+read-fates.l4:66:1-67:30:
+  PARTY Alice MUST pay fee PROVIDED (EVER FAILED (PARTY Alice MUST deliver UNDER LEST)) WITHIN 8 HENCE FULFILLED
+  Norm log:
+    FATE armed MUST deliver   [bearer=Alice (as written), effective=0, observed=0, activation=1]
+    FATE failed (to LEST) MUST deliver   [bearer=Alice, effective=3, observed=5, activation=1]
+    FATE armed MUST pay fee   [bearer=Alice (as written), effective=3, observed=5, origin=LEST of activation 1 (line 61), activation=1]
+read-fates.l4:73:1-25:
+  4

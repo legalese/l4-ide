@@ -1,0 +1,73 @@
+-- Reading what has become of a norm (NORM-LOG-SPEC N4b).
+-- The spelling of the read is decided by Claude 2026-11-24, pending Meng's review.
+-- See doc/reference/regulative/norm-log-read.md.
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF
+  deliver
+  pay HAS amount IS A NUMBER
+
+-- EVER FAILED: the fee is owed only because the delivery failed, and counts
+-- only from 5 up. The payment of 1 does not count; the payment of 7 does.
+GIVETH A DEONTIC Person Action
+`late fee` MEANS
+  PARTY Alice MUST deliver WITHIN 3
+  LEST (PARTY Alice MUST pay fee
+          PROVIDED EVER FAILED (PARTY Alice MUST deliver) AND fee >= 5
+          WITHIN 10)
+
+#TRACE `late fee` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 5
+  PARTY Alice DOES pay 7 AT 6
+
+-- OUTSTANDING, AS OF an instant: the delivery was made at 4, so it was still
+-- outstanding as of 2 (the payment counts) and not as of 5 (it is skipped).
+GIVETH A DEONTIC Person Action
+`pay while undelivered` MEANS
+  PARTY Alice MUST deliver WITHIN 10
+  HENCE (PARTY Bob MUST pay amount
+           PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF 2
+           WITHIN 10)
+
+#TRACE `pay while undelivered` AT 0 WITH
+  PARTY Alice DOES deliver AT 4
+  PARTY Bob DOES pay 1 AT 6
+
+GIVETH A DEONTIC Person Action
+`pay once delivered` MEANS
+  PARTY Alice MUST deliver WITHIN 10
+  HENCE (PARTY Bob MUST pay amount
+           PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF 5
+           WITHIN 10)
+
+#TRACE `pay once delivered` AT 0 WITH
+  PARTY Alice DOES deliver AT 4
+  PARTY Bob DOES pay 1 AT 6
+
+-- A wildcard stands for any party, and UNDER LEST narrows the pattern to the
+-- norms a LEST armed: the delivery was armed at the top, so none is under LEST.
+GIVETH A DEONTIC Person Action
+`any party` MEANS
+  PARTY Alice MUST deliver WITHIN 3
+  LEST (PARTY Alice MUST pay fee
+          PROVIDED EVER FAILED (PARTY _ MUST deliver)
+          WITHIN 10)
+
+#TRACE `any party` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 5
+
+GIVETH A DEONTIC Person Action
+`under lest only` MEANS
+  PARTY Alice MUST deliver WITHIN 3
+  LEST (PARTY Alice MUST pay fee
+          PROVIDED EVER FAILED (PARTY Alice MUST deliver UNDER LEST)
+          WITHIN 10)
+
+#TRACE `under lest only` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 5
+
+-- The phrases are not reserved: a value may still be named OUTSTANDING.
+GIVETH A NUMBER
+OUTSTANDING MEANS 3
+
+#EVAL OUTSTANDING PLUS 1

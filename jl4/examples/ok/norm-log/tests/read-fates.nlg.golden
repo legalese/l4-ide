@@ -1,0 +1,6 @@
+executing contract `late fee` at 0 with the following events: party `Alice` did `pay` with 1 at 5 party `Alice` did `pay` with 7 at 6
+executing contract `pay while undelivered` at 0 with the following events: party `Alice` did `deliver` at 4 party `Bob` did `pay` with 1 at 6
+executing contract `pay once delivered` at 0 with the following events: party `Alice` did `deliver` at 4 party `Bob` did `pay` with 1 at 6
+executing contract `any party` at 0 with the following events: party `Alice` did `pay` with 1 at 5
+executing contract `under lest only` at 0 with the following events: party `Alice` did `pay` with 1 at 5
+the sum of `OUTSTANDING` and 1
