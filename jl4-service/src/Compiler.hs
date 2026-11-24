@@ -8,7 +8,7 @@ import qualified Backend.Jl4 as Jl4
 import Backend.Jl4 (ModuleContext, buildCompiledFromShared, typecheckAndEvalBundle)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
-import Shared (validateNoSanitizationCollisions)
+import Shared (sanitizePropertyName, validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
 import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, uncheckedParameter, declaresFromModule)
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
@@ -23,6 +23,7 @@ import Data.Aeson (toJSON)
 import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Data.Ord (comparing)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -131,7 +132,17 @@ compileBundle logger deployId sources = do
       let allFunctionsWithFile = [ (fp, fn) | (fp, Right (fns, _)) <- results, fn <- fns ]
           allFunctions = map snd allFunctionsWithFile
           errors = [err | (_, Left err) <- results]
-          refused = concat [rs | (_, Right (_, rs)) <- results]
+          -- A refused export whose name a served export also answers to (in
+          -- another file) is marked, so the status does not read as "this
+          -- name cannot be called" when a call by it is served. Matched as
+          -- 'DataPlane.requireFunction' matches a call: the exact name, or
+          -- the same sanitized name.
+          servedNames = Set.fromList [sanitizePropertyName fn.fnImpl.name | fn <- allFunctions]
+          refused =
+            [ r { reNameServed = sanitizePropertyName r.reName `Set.member` servedNames }
+            | (_, Right (_, rs)) <- results
+            , r <- rs
+            ]
 
       -- Any file that failed to compile (a parse or type error) fails the
       -- whole deploy. Previously this only rejected when NO file produced
@@ -218,14 +229,14 @@ processTypecheckedFile logger deployId filepath content moduleContext
         exports = Export.withoutRefused exportErrs allExports
         reasonOf e = Text.unwords (Export.prettyExportError e)
         refusedExports =
-          [ RefusedExport ef.exportName (Text.pack filepath) (map reasonOf rs)
+          [ RefusedExport ef.exportName (Text.pack filepath) (map reasonOf rs) False
           | ef <- allExports
           , let rs = Export.refusalsOf exportErrs ef
           , not (null rs)
           ]
           -- A refusal of a rule that is not among the exports found (there
           -- should be none) still names it, rather than vanish.
-          <> [ RefusedExport name (Text.pack filepath) reasons
+          <> [ RefusedExport name (Text.pack filepath) reasons False
              | (name, reasons) <- Map.toList $ Map.fromListWith (flip (<>))
                  [ (rawNameToText (rawName (getActual (Export.exportErrorFunction e))), [reasonOf e])
                  | e <- exportErrs

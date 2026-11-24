@@ -245,7 +245,9 @@ app env req sendResp = do
       reqEnv = case lookup "X-L4-Origin" (requestHeaders req) of
         Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks
         Nothing     -> env
-  -- Every response says what this build can do ('serviceCapabilities').
+  -- Every response from the API routes says what this build can do
+  -- ('serviceCapabilities'). The middlewares in 'defaultMain' answer some
+  -- requests before they reach here, without it.
   serve (Proxy @ServiceApi) (serverT reqEnv vis originTrialToken) req
     (sendResp . mapResponseHeaders (("X-L4-Capabilities", Text.Encoding.encodeUtf8 capabilitiesHeaderValue) :))
 

@@ -168,15 +168,21 @@ data RefusedExport = RefusedExport
   -- ^ Relative path of the file it is written in.
   , reReasons :: ![Text]
   -- ^ One line per refusal (an export can be refused for several inputs).
+  , reNameServed :: !Bool
+  -- ^ The deployment also serves an export under this name, from another
+  -- file, so a call by this name is answered, by that one. A client must not
+  -- read the entry as "this name cannot be called".
   }
   deriving stock (Show, Eq, Generic)
 
 instance ToJSON RefusedExport where
-  toJSON r = Aeson.object
-    [ "name"    .= r.reName
-    , "file"    .= r.reFile
-    , "reasons" .= r.reReasons
-    ]
+  -- @file@ is left out when it is empty, which is how a response hides it
+  -- from a caller that may not see files; @nameServed@ only when it is true.
+  toJSON r = Aeson.object $
+    [ "name"    .= r.reName ]
+    <> [ "file" .= r.reFile | not (Text.null r.reFile) ]
+    <> [ "reasons" .= r.reReasons ]
+    <> [ "nameServed" .= True | r.reNameServed ]
 
 instance FromJSON RefusedExport where
   parseJSON = Aeson.withObject "RefusedExport" $ \o ->
@@ -184,6 +190,7 @@ instance FromJSON RefusedExport where
       <$> o .: "name"
       <*> o .:? "file" .!= ""
       <*> o .:? "reasons" .!= []
+      <*> o .:? "nameServed" .!= False
 
 -- | Summary of a single exported function within a deployment.
 data FunctionSummary = FunctionSummary
@@ -706,9 +713,12 @@ data HealthResponse = HealthResponse
 
 -- | What this build of the service can do that an older one cannot, for a
 -- client to ask before it relies on it. On @\/health@ as @capabilities@, and
--- on every response as the header @X-L4-Capabilities@ (comma-separated), so a
--- client can read it from a request it makes anyway, through a proxy that
--- forwards the backend's headers.
+-- as the header @X-L4-Capabilities@ (comma-separated) on every response from
+-- the API routes ('Application.app'), so a client can read it from a request
+-- it makes anyway, through a proxy that forwards the backend's headers. A
+-- response made outside them (the concurrency limit's 503, the 500 for an
+-- unhandled exception, Warp's own, the explorer page, the @.l4@ file
+-- middleware) does not carry it.
 --
 -- * @refused-exports@: an @\@export@ that the export check refuses is left
 --   out of its deployment and named in @refusedExports@, and the rest of the

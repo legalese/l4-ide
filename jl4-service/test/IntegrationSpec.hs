@@ -1205,6 +1205,30 @@ spec = describe "integration" do
             (Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (11 :: Int)]])
           assertSuccess resp \r ->
             Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+        -- Each refused entry's fields other than its reasons.
+        refusedFields :: Either LBS.ByteString Aeson.Value -> [[(Aeson.Key, Aeson.Value)]]
+        refusedFields = \case
+          Right (Aeson.Array xs) ->
+            [ List.sortOn fst [(k, v) | (k, v) <- Aeson.KeyMap.toList o, k /= "reasons"]
+            | Aeson.Object o <- toList xs ]
+          _ -> []
+        absent :: Either LBS.ByteString Aeson.Value -> Bool
+        absent = either (const True) (const False)
+        -- The visibility headers a gateway sets for a caller that may see
+        -- nothing, or everything but the files.
+        hideAll = [("X-Include-Functions", "false"), ("X-Include-Files", "false"), ("X-Include-Evaluate", "false")]
+        hideFiles = [("X-Include-Files", "false")]
+        getWith mgr hs url = do
+          req <- parseRequest url
+          httpLbs req { requestHeaders = hs } mgr
+        mcpWith baseUrl mgr deployId hs method' params = do
+          req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+            [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int)
+            , "method" Aeson..= (method' :: Text), "params" Aeson..= params ]
+          httpLbs req { requestHeaders = hs <> requestHeaders req } mgr
+        callTool baseUrl mgr deployId hs name args =
+          mcpWith baseUrl mgr deployId hs "tools/call" $ Aeson.object
+            ["name" Aeson..= (name :: Text), "arguments" Aeson..= Aeson.object args]
 
     it "deploys the file's other exports, and names the refused one in the job, the status and a call to it" do
       withEmptyService \baseUrl mgr -> do
@@ -1222,6 +1246,8 @@ spec = describe "integration" do
         status <- httpGet mgr (baseUrl <> "/deployments/refused-one")
         wireAt status ["status"] `shouldBe` Right (Aeson.String "ready")
         refusedAt status ["metadata", "refusedExports"] `shouldSatisfy` refusedAsEvent
+        refusedFields (wireAt status ["metadata", "refusedExports"])
+          `shouldBe` [[("file", Aeson.String "mixed.l4"), ("name", Aeson.String "who acted")]]
         -- and the list of deployments
         list <- httpGet mgr (baseUrl <> "/deployments")
         case Aeson.decode (responseBody list) :: Maybe [Aeson.Value] of
@@ -1265,7 +1291,120 @@ spec = describe "integration" do
               `shouldSatisfy` notElem "who-acted"
           other -> expectationFailure ("Expected a tool list, got " <> show other)
 
-    it "says on /health, and in a header on every response, that it leaves out a refused export" do
+    -- The refused exports name rules and quote their inputs, so they follow
+    -- the visibility headers as the functions and files do.
+    it "names no refused export to a caller that may not see functions, and no file to one that may not see files: status, list, job and a repeated POST" do
+      withEmptyService \baseUrl mgr -> do
+        let bundle = createZipBundle [("mixed.l4", mixed)]
+        resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "refused-vis" bundle
+        pollUpdate baseUrl mgr "refused-vis" resp `shouldReturn` ("applied", Nothing)
+        jobUrl <- case jobOutcome resp of
+          Just j -> pure (baseUrl <> "/deployments/refused-vis/updates/" <> Text.unpack j)
+          Nothing -> fail "the deploy named no job"
+        let statusUrl = baseUrl <> "/deployments/refused-vis"
+            listed hs = do
+              list <- getWith mgr hs (baseUrl <> "/deployments")
+              pure [ Aeson.KeyMap.lookup "refusedExports" m
+                   | Just entries <- [Aeson.decode (responseBody list) :: Maybe [Aeson.Value]]
+                   , Aeson.Object o <- entries
+                   , Aeson.KeyMap.lookup "id" o == Just (Aeson.String "refused-vis")
+                   , Just (Aeson.Object m) <- [Aeson.KeyMap.lookup "metadata" o] ]
+        -- nothing visible: no names anywhere
+        hidden <- getWith mgr hideAll statusUrl
+        wireAt hidden ["metadata", "refusedExports"] `shouldSatisfy` absent
+        BS8.unpack (LBS.toStrict (responseBody hidden)) `shouldNotContain` "who acted"
+        listed hideAll `shouldReturn` [Nothing]
+        hiddenJob <- getWith mgr hideAll jobUrl
+        wireAt hiddenJob ["refusedExports"] `shouldSatisfy` absent
+        again <- (`httpLbs` mgr) =<< (\r -> r { requestHeaders = hideAll <> requestHeaders r })
+          <$> buildMultipartRequest (baseUrl <> "/deployments") "refused-vis" bundle
+        wireAt again ["status"] `shouldBe` Right (Aeson.String "ready")
+        wireAt again ["metadata", "refusedExports"] `shouldSatisfy` absent
+        BS8.unpack (LBS.toStrict (responseBody again)) `shouldNotContain` "who acted"
+        -- functions visible, files not: the names, without their files
+        let nameOnly = [[("name", Aeson.String "who acted")]]
+        noFiles <- getWith mgr hideFiles statusUrl
+        refusedFields (wireAt noFiles ["metadata", "refusedExports"]) `shouldBe` nameOnly
+        refusedAt noFiles ["metadata", "refusedExports"] `shouldSatisfy` refusedAsEvent
+        map (refusedFields . maybe (Left "") Right) <$> listed hideFiles `shouldReturn` [nameOnly]
+        noFilesJob <- getWith mgr hideFiles jobUrl
+        refusedFields (wireAt noFilesJob ["refusedExports"]) `shouldBe` nameOnly
+
+    it "names no refused export under MCP's tools/list, and gives no reason for a call, to a caller that may not see functions" do
+      withServiceFromSources "refused-mcp-vis" [("mixed.l4", mixed)] \baseUrl mgr -> do
+        let rpc hs = mcpWith baseUrl mgr "refused-mcp-vis" hs
+        hidden <- rpc hideAll "tools/list" (Aeson.object [])
+        wireAt hidden ["result", "_meta"] `shouldSatisfy` absent
+        BS8.unpack (LBS.toStrict (responseBody hidden)) `shouldNotContain` "who acted"
+        called <- callTool baseUrl mgr "refused-mcp-vis" hideAll "who-acted" []
+        wireAt called ["error", "message"] `shouldBe` Right (Aeson.String "Unknown tool: who-acted")
+        -- functions visible, files not: named, without the file
+        noFiles <- rpc hideFiles "tools/list" (Aeson.object [])
+        map (filter ((/= "deployment") . fst)) (refusedFields (wireAt noFiles ["result", "_meta", "l4/refusedExports"]))
+          `shouldBe` [[("name", Aeson.String "who acted")]]
+        withFiles <- rpc [] "tools/list" (Aeson.object [])
+        map (lookup "file") (refusedFields (wireAt withFiles ["result", "_meta", "l4/refusedExports"]))
+          `shouldBe` [Just (Aeson.String "mixed.l4")]
+
+    it "gives no reason in a REST call's 404 to a caller that may not see functions" do
+      withServiceFromSources "refused-rest-vis" [("mixed.l4", mixed)] \baseUrl mgr -> do
+        req <- buildJsonPost (baseUrl <> "/deployments/refused-rest-vis/functions/who%20acted/evaluation")
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        resp <- httpLbs req { requestHeaders = hideAll <> requestHeaders req } mgr
+        statusCode' resp `shouldBe` 404
+        wireAt resp ["error"] `shouldBe` Right (Aeson.String "Function not found")
+
+    -- Two files may export the same name, and the export check may refuse
+    -- one and not the other. The name is served, by the export it does not
+    -- refuse, and the refused entry says so, with its file.
+    it "marks a refused export whose name another file's export serves, and serves the call" do
+      let numberWho = "@export Who acted\nGIVEN p IS A NUMBER\nGIVETH A NUMBER\n`who acted` MEANS p\n"
+      withServiceFromSources "refused-shared-name" [("a.l4", numberWho), ("b.l4", eventExport)] \baseUrl mgr -> do
+        status <- httpGet mgr (baseUrl <> "/deployments/refused-shared-name")
+        refusedFields (wireAt status ["metadata", "refusedExports"])
+          `shouldBe` [[("file", Aeson.String "b.l4"), ("name", Aeson.String "who acted"), ("nameServed", Aeson.Bool True)]]
+        listed <- httpGet mgr (baseUrl <> "/deployments/refused-shared-name/functions")
+        functionNames (responseBody listed) `shouldBe` ["who acted"]
+        resp <- evalFunction baseUrl mgr "refused-shared-name" "who%20acted"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["p" Aeson..= (3 :: Int)]])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 3)
+        tools <- mcpWith baseUrl mgr "refused-shared-name" [] "tools/list" (Aeson.object [])
+        map (lookup "nameServed") (refusedFields (wireAt tools ["result", "_meta", "l4/refusedExports"]))
+          `shouldBe` [Just (Aeson.Bool True)]
+        called <- callTool baseUrl mgr "refused-shared-name" [] "who-acted" ["p" Aeson..= (3 :: Int)]
+        wireAt called ["error"] `shouldSatisfy` absent
+
+    -- Under --lazy-load the tool list is read from the metadata cache that
+    -- the service which last compiled the deployment wrote. One written
+    -- before the export check lists an export this build refuses; a call to
+    -- it compiles the deployment, and then says why it is not there.
+    it "says why, when a call to a function a stale cache lists finds it refused once compiled" do
+      let staleCache meta = meta
+            { metaFunctions = meta.metaFunctions <> [fs { fsName = "who acted" } | fs <- take 1 meta.metaFunctions]
+            , metaRefusedExports = []
+            }
+      withPendingCachedService "refused-stale-cache" [("mixed.l4", mixed)] staleCache \baseUrl mgr -> do
+        tools <- mcpWith baseUrl mgr "refused-stale-cache" [] "tools/list" (Aeson.object [])
+        case wireAt tools ["result", "tools"] of
+          Right (Aeson.Array ts) ->
+            [n | Aeson.Object t <- toList ts, Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" t]]
+              `shouldSatisfy` elem "who-acted"
+          other -> expectationFailure ("Expected a tool list, got " <> show other)
+        let untilCompiled (n :: Int) = do
+              called <- callTool baseUrl mgr "refused-stale-cache" [] "who-acted" []
+              if n > 0 && BS8.isInfixOf "compiling" (LBS.toStrict (responseBody called))
+                then threadDelay 500_000 >> untilCompiled (n - 1)
+                else pure called
+        called <- untilCompiled 120
+        case wireAt called ["error", "message"] of
+          Right (Aeson.String m) -> do
+            m `shouldSatisfy` Text.isInfixOf "`who acted` was not deployed, because its @export is refused"
+            m `shouldSatisfy` Text.isInfixOf eventReason
+          other -> expectationFailure ("Expected an error naming the refusal, got " <> show other)
+        callRefused baseUrl mgr "refused-stale-cache"
+
+    it "says on /health, and in a header on every API response, that it leaves out a refused export" do
       withEmptyService \baseUrl mgr -> do
         health <- httpGet mgr (baseUrl <> "/health")
         wireAt health ["capabilities"] `shouldBe` Right (Aeson.toJSON ["refused-exports" :: Text])
@@ -4452,9 +4591,9 @@ withPendingServices' storeName deployments act = do
     pure result
 
 -- | A deployment registered as pending, as after a lazy restart, whose stored
--- metadata says version MAJOR.0.0 and whose cached metadata is what this
--- binary compiles the sources to, changed by the given function: the cache an
--- older binary would have written.
+-- metadata says version MAJOR.0.0 and whose cached metadata (in the registry
+-- and in the store) is what this binary compiles the sources to, changed by
+-- the given function: the cache an older binary would have written.
 withPendingCachedService
   :: Text -> [(FilePath, Text)] -> (DeploymentMetadata -> DeploymentMetadata)
   -> (String -> Manager -> IO a) -> IO a
@@ -4476,6 +4615,10 @@ withPendingCachedService deployId sources change act = do
     , BundleStore.smServiceVersion = Nothing
     , BundleStore.smDeploymentVersion = Just major
     }
+  -- A lazy start registers the pending deployment with the cache it reads
+  -- from the store (Application.hs), and the tool list reads the same cache,
+  -- so both hold the changed metadata.
+  BundleStore.saveMetadataCache store deployId (encodeMetadataCache meta)
   registry <- newTVarIO (Map.singleton (DeploymentId deployId) (DeploymentPending (Just meta)))
   pendingUpd <- newTVarIO Map.empty
   tasksReg <- newTVarIO Map.empty

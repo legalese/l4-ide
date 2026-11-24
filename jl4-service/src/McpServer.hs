@@ -15,7 +15,7 @@ import qualified BundleStore
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
-import Shared (collectMetadataEntries, collectDeploymentMetadata, collectRefusedExports, refusedExportReason, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
+import Shared (collectMetadataEntries, collectDeploymentMetadata, collectRefusedExports, findRefused, refusedExportReason, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
 import Types
 
 import Control.Monad.IO.Class (liftIO)
@@ -146,17 +146,21 @@ handleMethod vis mScope reqId "tools/list" _params = do
   tools <- buildToolList vis mScope
   -- The exports the deploy left out are not tools. They are named, with why,
   -- under the result's @_meta@, which MCP leaves to the server; a client that
-  -- does not read it sees the same list as before.
-  refused <- collectRefusedExports mScope
+  -- does not read it sees the same list as before. They follow the
+  -- visibility headers as the deployment status does ('visibleRefused').
+  refused <- collectRefusedExports vis mScope
   pure $ jsonRpcResult reqId $ Aeson.object $
     [ "tools" .= tools ]
     <> [ "_meta" .= Aeson.object
            [ "l4/refusedExports" .=
                [ Aeson.object
-                   [ "deployment" .= did
-                   , "name" .= r.reName
-                   , "reasons" .= r.reReasons
-                   ]
+                   ( [ "deployment" .= did
+                     , "name" .= r.reName
+                     ]
+                     <> [ "file" .= r.reFile | not (Text.null r.reFile) ]
+                     <> [ "reasons" .= r.reReasons ]
+                     <> [ "nameServed" .= True | r.reNameServed ]
+                   )
                | (did, r) <- refused
                ]
            ]
@@ -465,7 +469,7 @@ callTool vis mScope reqId toolName tasksRequested arguments = do
 -- in the background. Otherwise we fall back to the legacy synchronous
 -- "{status:'compiling'}" text payload that 2025-era clients understand.
 callFunctionTool :: Visibility -> Maybe Text -> Maybe Aeson.Value -> Text -> Bool -> Aeson.Value -> AppM Aeson.Value
-callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
+callFunctionTool vis mScope reqId toolName tasksRequested arguments = do
   env <- ask
   entries <- collectMetadataEntries mScope
   let toolMap = Map.fromList
@@ -476,8 +480,9 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
   case Map.lookup toolName toolMap of
     Nothing -> do
       -- A tool that would have been an export the deploy left out is
-      -- answered with why, as the REST 404 is; any other name is unknown.
-      refused <- collectRefusedExports mScope
+      -- answered with why, as the REST 404 is, when the caller may see
+      -- functions; any other name is unknown.
+      refused <- collectRefusedExports vis mScope
       let wouldBe r = toolName == r.reName || toolName == sanitizeName 60 r.reName
       case [r | (_, r) <- refused, wouldBe r] of
         (r : _) -> do
@@ -501,16 +506,16 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
       let did = DeploymentId deployId
       compResult <- tryCompileWithTimeout did 2_000_000
       case compResult of
-        CompilationReady fns _meta ->
+        CompilationReady fns meta ->
           case Map.lookup fnName fns of
             Just vf -> do
               evalResult <- runMcpEvaluation vf argPairs
               pure $ evalResultToToolResponse reqId reverseMap evalResult
             Nothing ->
-              pure $ jsonRpcError reqId (-32602) ("Function not found: " <> fnName)
+              pure $ jsonRpcError reqId (-32602) (functionNotFound vis meta fnName)
         CompilationInProgress
           | tasksRequested ->
-              spawnEvaluationTask reqId did fnName isDeontic reverseMap argPairs
+              spawnEvaluationTask vis reqId did fnName isDeontic reverseMap argPairs
           | otherwise ->
               pure $ mcpTextResult reqId
                 "{\"status\":\"compiling\",\"retryAfterMs\":2000}" False
@@ -629,21 +634,22 @@ defaultTaskPollIntervalMs = 1000
 -- the evaluation, and stores the result. Returns the JSON-RPC response
 -- carrying the task handle so the client can begin polling immediately.
 spawnEvaluationTask
-  :: Maybe Aeson.Value
+  :: Visibility
+  -> Maybe Aeson.Value
   -> DeploymentId
   -> Text
   -> Bool
   -> Map Text Text
   -> [(Text, Maybe FnLiteral)]
   -> AppM Aeson.Value
-spawnEvaluationTask reqId did fnName _isDeontic reverseMap argPairs = do
+spawnEvaluationTask vis reqId did fnName _isDeontic reverseMap argPairs = do
   env <- ask
   taskIdRaw <- liftIO UUID.nextRandom
   now <- liftIO getCurrentTime
   let taskId = TaskId (UUID.toText taskIdRaw)
   let cfg = env.options
   -- Spawn the worker first so we can store its Async handle in the task.
-  workerAsync <- liftIO $ async $ runEvalWorker env cfg taskId did fnName reverseMap argPairs
+  workerAsync <- liftIO $ async $ runEvalWorker vis env cfg taskId did fnName reverseMap argPairs
   let initial = TaskState
         { tsStatus = TaskPending
         , tsResult = Nothing
@@ -664,7 +670,8 @@ spawnEvaluationTask reqId did fnName _isDeontic reverseMap argPairs = do
 -- finishes (or fails), then run the evaluation and store the outcome on
 -- the task. Cancelled mid-flight via @tasks/cancel@.
 runEvalWorker
-  :: AppEnv
+  :: Visibility
+  -> AppEnv
   -> Options
   -> TaskId
   -> DeploymentId
@@ -672,7 +679,7 @@ runEvalWorker
   -> Map Text Text
   -> [(Text, Maybe FnLiteral)]
   -> IO ()
-runEvalWorker env cfg taskId did fnName reverseMap argPairs = do
+runEvalWorker vis env cfg taskId did fnName reverseMap argPairs = do
   outcome <- catchSomeException $ waitForCompileAndEval
   finaliseTask env taskId outcome
  where
@@ -682,11 +689,11 @@ runEvalWorker env cfg taskId did fnName reverseMap argPairs = do
     mFns <- pollForReady env did deadlineMicros
     case mFns of
       Left err -> pure (ToolFailed err)
-      Right fns -> do
+      Right (fns, meta) -> do
         atomically $ modifyTVar' env.mcpTasks $ Map.adjust
           (\t -> t { tsStatus = TaskWorking }) taskId
         case Map.lookup fnName fns of
-          Nothing -> pure $ ToolFailed ("Function not found: " <> fnName)
+          Nothing -> pure $ ToolFailed (functionNotFound vis meta fnName)
           Just vf -> runMcpEvaluationIO cfg vf argPairs
 
   catchSomeException io = io `catch` \(e :: SomeException) ->
@@ -712,7 +719,7 @@ pollForReady
   :: AppEnv
   -> DeploymentId
   -> Int
-  -> IO (Either Text (Map Text ValidatedFunction))
+  -> IO (Either Text (Map Text ValidatedFunction, DeploymentMetadata))
 pollForReady env did deadlineMicros = go 0
  where
   tickMicros = 250_000 :: Int
@@ -722,11 +729,23 @@ pollForReady env did deadlineMicros = go 0
     | otherwise = do
         registry <- readTVarIO env.deploymentRegistry
         case Map.lookup did registry of
-          Just (DeploymentReady fns _meta) -> pure $ Right fns
+          Just (DeploymentReady fns meta) -> pure $ Right (fns, meta)
           Just (DeploymentFailed err) -> pure $ Left ("Deployment failed: " <> err)
           _ -> do
             threadDelay tickMicros
             go (elapsed + tickMicros)
+
+-- | What a call is told when the tool it named is not a function of the
+-- compiled deployment. The tool list can be older than the deployment: under
+-- @--lazy-load@ it is read from the metadata cache that the service which
+-- last compiled it wrote, and a cache written before the export check can
+-- list an export that this build refuses. The call compiles the deployment
+-- first, so its fresh metadata names the refusal, and the call says why, as
+-- a call to a name the tool list leaves out does ('findRefused').
+functionNotFound :: Visibility -> DeploymentMetadata -> Text -> Text
+functionNotFound vis meta fnName = case findRefused vis meta fnName of
+  Just r -> "Function not found: " <> refusedExportReason r
+  Nothing -> "Function not found: " <> fnName
 
 -- | The standard JSON shape for a task handle returned from @tools/call@
 -- and @tasks/get@.

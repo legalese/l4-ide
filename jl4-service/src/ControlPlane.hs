@@ -24,7 +24,7 @@ import qualified Version
 import DeploymentLoader (triggerCompilationIfPending)
 import Logging (logInfo, logWarn)
 import Options (Options (..))
-import Shared (jsonError, encodeMetadataCache)
+import Shared (jsonError, encodeMetadataCache, visibleRefused)
 import Types
 
 import Control.Applicative ((<|>))
@@ -131,9 +131,9 @@ type ControlPlaneApi =
 -- | Combined handler for the control plane.
 controlPlaneHandler :: Visibility -> ServerT ControlPlaneApi AppM
 controlPlaneHandler vis =
-       postDeploymentHandler
+       postDeploymentHandler vis
   :<|> getDeploymentsHandler vis
-  :<|> getUpdateStatusHandler
+  :<|> getUpdateStatusHandler vis
   :<|> getDeploymentHandler vis
   :<|> putDeploymentHandler
   :<|> deleteDeploymentHandler
@@ -145,8 +145,8 @@ controlPlaneHandler vis =
 -- (if the id already exists) keeps serving until the job applies; a
 -- brand-new id simply does not exist until then. Returns 202 with an
 -- @updateId@ to poll, or "ready" immediately on a content-hash dedupe.
-postDeploymentHandler :: MultipartData Mem -> AppM DeploymentStatusResponse
-postDeploymentHandler multipart = do
+postDeploymentHandler :: Visibility -> MultipartData Mem -> AppM DeploymentStatusResponse
+postDeploymentHandler vis multipart = do
   env <- asks id
 
   -- Extract deployment ID (from multipart field or generate UUID)
@@ -187,7 +187,10 @@ postDeploymentHandler multipart = do
     Just (DeploymentReady _ existingMeta)
       | existingMeta.metaVersion == version ->
         -- Identical sources already deployed UNDER THIS ID — no recompile, no job.
-        pure (mkStatus deployId.unDeploymentId "ready" (Just existingMeta) Nothing)
+        -- The metadata is filtered by the visibility headers, as GET's is,
+        -- with the full function detail this answer always carried.
+        let fnMode = if vis.showFunctions then FnFull else FnNone
+        in pure (mkStatus deployId.unDeploymentId "ready" (Just (visibleMeta vis fnMode existingMeta)) Nothing)
     _ -> do
       let cfg = env.options
           isNew = not (Map.member deployId registry)
@@ -293,8 +296,8 @@ getDeploymentHandler vis deployIdText mFunctions = do
 -- | GET /deployments/{id}/updates/{updateId} — poll an async
 -- deploy/update job. Independent of the live deployment: a job's
 -- progress or failure never changes what GET /deployments/{id} reports.
-getUpdateStatusHandler :: Text -> Text -> AppM UpdateStatusResponse
-getUpdateStatusHandler deployIdText jobId = do
+getUpdateStatusHandler :: Visibility -> Text -> Text -> AppM UpdateStatusResponse
+getUpdateStatusHandler vis deployIdText jobId = do
   env <- asks id
   now <- liftIO getCurrentTime
   liftIO $ atomically $ modifyTVar' env.updateJobs (pruneJobs now)
@@ -312,7 +315,7 @@ getUpdateStatusHandler deployIdText jobId = do
             JobRejected m -> Just m
             _             -> Nothing
         , usRefusedExports = case j.ujStatus of
-            JobApplied rs -> rs
+            JobApplied rs -> visibleRefused vis rs
             _             -> []
         }
     _ -> throwError err404
@@ -577,22 +580,27 @@ nextDeploymentVersion major mPrev isBreaking =
 stateToResponse :: Bool -> Visibility -> FnMode -> DeploymentId -> DeploymentState -> DeploymentStatusResponse
 stateToResponse debugMode vis fnMode (DeploymentId did) = \case
   DeploymentPending mCachedMeta ->
-    let meta = case mCachedMeta of
-          Just m -> Just m { metaFunctions = case fnMode of FnNone -> []; FnSimple -> map simplify m.metaFunctions; FnFull -> m.metaFunctions, metaFiles = if vis.showFiles then m.metaFiles else [] }
-          Nothing -> Nothing
-    in mkStatus did "pending" meta Nothing
+    mkStatus did "pending" (visibleMeta vis fnMode <$> mCachedMeta) Nothing
   DeploymentCompiling -> mkStatus did "compiling" Nothing Nothing
   DeploymentReady _ meta ->
-    let filteredMeta = meta
-          { metaFunctions = case fnMode of
-              FnNone -> []
-              FnSimple -> map simplify meta.metaFunctions
-              FnFull -> meta.metaFunctions
-          , metaFiles = if vis.showFiles then meta.metaFiles else []}
-    in mkStatus did "ready" (Just filteredMeta) Nothing
+    mkStatus did "ready" (Just (visibleMeta vis fnMode meta)) Nothing
   DeploymentFailed err ->
     let errorMsg = if debugMode then Just err else Just "Compilation failed"
     in mkStatus did "failed" Nothing errorMsg
+
+-- | Deployment metadata as far as the request may see it: functions at the
+-- detail asked for (none without function visibility), files only with file
+-- visibility, and the refused exports by 'visibleRefused' (none without
+-- function visibility, and without their files without file visibility).
+visibleMeta :: Visibility -> FnMode -> DeploymentMetadata -> DeploymentMetadata
+visibleMeta vis fnMode meta = meta
+  { metaFunctions = case fnMode of
+      FnNone -> []
+      FnSimple -> map simplify meta.metaFunctions
+      FnFull -> meta.metaFunctions
+  , metaFiles = if vis.showFiles then meta.metaFiles else []
+  , metaRefusedExports = visibleRefused vis meta.metaRefusedExports
+  }
 
 -- | Validate a deployment ID.
 -- Must be <= 36 characters (UUID length), alphanumeric + hyphens + underscores,

@@ -9,6 +9,8 @@ module Shared (
   collectMetadataEntries,
   collectDeploymentMetadata,
   collectRefusedExports,
+  visibleRefused,
+  findRefused,
   refusedExportReason,
   -- * JSON error encoding
   jsonError,
@@ -129,16 +131,29 @@ collectDeploymentMetadata mScope = do
     ) (Map.toList registry)
 
 -- | The exports that deployments in scope left out because the export check
--- refuses them ('metaRefusedExports'), with the deployment's ID.
-collectRefusedExports :: Maybe Text -> AppM [(Text, RefusedExport)]
-collectRefusedExports mScope = do
+-- refuses them ('metaRefusedExports'), with the deployment's ID, as far as
+-- the caller may see them ('visibleRefused').
+collectRefusedExports :: Visibility -> Maybe Text -> AppM [(Text, RefusedExport)]
+collectRefusedExports vis mScope = do
   metas <- collectDeploymentMetadata mScope
   pure
     [ (did, r)
     | (did, meta) <- metas
-    , r <- meta.metaRefusedExports
+    , r <- visibleRefused vis meta.metaRefusedExports
     , matchesScope mScope did r.reName
     ]
+
+-- | The refused exports a caller may see. They name rules and quote their
+-- inputs, so a caller that may not see functions (@X-Include-Functions:
+-- false@) sees none, and one that may not see files (@X-Include-Files:
+-- false@) sees no file. Every surface that names them (the deployment status,
+-- the job status, MCP's @tools/list@ and the reason a call is given) goes
+-- through here.
+visibleRefused :: Visibility -> [RefusedExport] -> [RefusedExport]
+visibleRefused vis rs
+  | not vis.showFunctions = []
+  | vis.showFiles = rs
+  | otherwise = [r { reFile = "" } | r <- rs]
 
 -- | Why a call to an export the deployment left out gets no answer: the same
 -- words on REST (a 404) and MCP (an error for the tool call).
@@ -146,6 +161,21 @@ refusedExportReason :: RefusedExport -> Text
 refusedExportReason r =
   "`" <> r.reName <> "` was not deployed, because its @export is refused: "
     <> Text.intercalate "; " r.reReasons
+
+-- | The refused export, among those the caller may see, that a call by this
+-- name would have reached: by its exact name, else by the same sanitized
+-- name, as 'DataPlane.requireFunction' matches a served one. Only consulted
+-- once no served function answers to the name, so an entry whose name is also
+-- served ('reNameServed') is never the answer to a call that was served.
+findRefused :: Visibility -> DeploymentMetadata -> Text -> Maybe RefusedExport
+findRefused vis meta fnName =
+  case [r | r <- rs, r.reName == fnName] of
+    (r : _) -> Just r
+    [] -> case [r | r <- rs, sanitizePropertyName r.reName == sanitizePropertyName fnName] of
+      (r : _) -> Just r
+      [] -> Nothing
+ where
+  rs = visibleRefused vis meta.metaRefusedExports
 
 -- | Encode an error message as a JSON object: @{\"error\": \"...\"}@
 jsonError :: Text -> LBS.ByteString
