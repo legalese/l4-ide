@@ -51,6 +51,7 @@ curl -X POST http://localhost:8080/deployments \
 # Poll the deploy/update job until it applies (or is rejected)
 curl http://localhost:8080/deployments/my-rules/updates/<job>
 # {"updateId":"<job>","deploymentId":"my-rules","status":"applied"}
+# (with "refusedExports" when an @export could not be deployed; see below)
 
 # The deployment itself is then ready
 curl http://localhost:8080/deployments/my-rules
@@ -123,6 +124,27 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 | `rejected`  | Breaking change, compile failure, or timeout — `error` has details |
 
 `POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. For a `oneOf`, a form (the names, or the tagged object) that is removed is rejected; one that is added is fine on an input and rejected on the return value, as a new enum value there is; a form on both sides is compared by these same rules. The keys of the tagged object are constructors, of which a value holds one, so they are compared as an enum's values are, not as a record's fields: a constructor that carries data added to the return value is rejected ("may now return new values"), one removed from an input is rejected ("no longer accepts"), and the fields of a constructor on both sides are compared as a record's are. A type whose only constructor is named like it is a record, its fields alone; given a second constructor, its form changes to the tagged object, and that is rejected in either direction with "form changed from an object of its fields (amount) to an object keyed by its constructor (Appealed, Outcome)". Terminal jobs are retained for 10 minutes, then pruned.
+
+#### An `@export` that cannot be sent
+
+An `@export` whose input or result has no JSON form (an `EVENT`, a function, a `DEONTIC` inside a `MAYBE`, and the other types in [the error's reference entry](../doc/reference/errors/README.md#an-export-with-an-input-or-result-that-cannot-be-sent-yet)) is left out of the deployment, and the file's other exports are deployed.
+The deployment names each one it left out, with the reasons the editor and `l4 check` give, in a `refusedExports` field: in the applied job, and in the `metadata` of `GET /deployments/{id}` and of the list.
+
+```json
+"refusedExports": [
+  { "name": "who acted", "file": "rules.l4",
+    "reasons": ["`who acted` is published with @export, but its input `e` is an EVENT, and @export does not support that yet. ..."] }
+]
+```
+
+The field is left out when nothing was refused, so a client that does not know it sees the same response as before.
+A call to a refused export answers `404`, as for a function that does not exist, with an `error` that begins ``Function not found: `who acted` was not deployed, because its @export is refused:`` and gives the reasons.
+An MCP client is not told why: the export is simply not among the tools, and a call to it gets `Unknown tool`.
+A `PUT` that leaves out a function the live version serves is rejected as a breaking change, and the message says `rule who acted removed: its @export is refused, because ...`.
+
+A deployment in which **every** `@export` is refused is still rejected, with the reasons, because it would serve nothing.
+A parse or type error in any file still rejects the whole deployment.
+A restart compiles the stored sources the same way, so a deployment stored before an export was refused comes back with its other exports, and says which one it left out.
 
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
 

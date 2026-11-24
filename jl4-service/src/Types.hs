@@ -8,6 +8,7 @@ module Types (
   DeploymentMetadata (..),
   FunctionSummary (..),
   FileEntry (..),
+  RefusedExport (..),
   Visibility (..),
   ValidatedFunction (..),
   Function (..),
@@ -91,7 +92,8 @@ data UpdateJob = UpdateJob
 data UpdateJobStatus
   = JobCompiling
   -- ^ Bundle is compiling / being compatibility-checked.
-  | JobApplied
+  | JobApplied ![RefusedExport]
+  -- ^ Applied; the @\@export@s the deploy left out, and why (usually none).
   -- ^ The new bundle is compiled, compatible, and now the live version.
   | JobRejected !Text
   -- ^ Rejected: breaking change, compile failure, or timeout (reason).
@@ -120,6 +122,11 @@ data DeploymentMetadata = DeploymentMetadata
   -- single string — the BREAKING/RUNNING counters are parsed back out of it at
   -- the next deploy and bumped (string-edited), so there are no separate
   -- counter fields to keep in sync. Empty when unknown.
+  , metaRefusedExports :: ![RefusedExport]
+  -- ^ The @\@export@s that the export check refuses, which the deployment
+  -- serves without. One refused export no longer refuses its file: the rest
+  -- of the file deploys (Meng, DEADWOOD, 2026-11-24). Empty for most
+  -- deployments, and for metadata written before the field existed.
   }
   deriving stock (Show, Generic)
 
@@ -134,6 +141,8 @@ instance ToJSON DeploymentMetadata where
             else ["serviceVersion" .= dm.metaServiceVersion])
       <> (if Text.null dm.metaDeploymentVersion then []
             else ["deploymentVersion" .= dm.metaDeploymentVersion])
+      <> (if null dm.metaRefusedExports then []
+            else ["refusedExports" .= dm.metaRefusedExports])
 
 instance FromJSON DeploymentMetadata where
   parseJSON = Aeson.withObject "DeploymentMetadata" $ \o ->
@@ -145,6 +154,34 @@ instance FromJSON DeploymentMetadata where
       <*> (o .:? "description" <|> o .:? "metaDescription")
       <*> o .:? "serviceVersion" .!= ""
       <*> o .:? "deploymentVersion" .!= ""
+      <*> o .:? "refusedExports" .!= []
+
+-- | An @\@export@ that the deploy left out, because the export check refuses
+-- it ('L4.Export.checkExports'): its input or result cannot be sent as JSON.
+-- Its reasons are the words the editor and @l4 check@ show for it.
+data RefusedExport = RefusedExport
+  { reName    :: !Text
+  -- ^ The name the export would have been published under.
+  , reFile    :: !Text
+  -- ^ Relative path of the file it is written in.
+  , reReasons :: ![Text]
+  -- ^ One line per refusal (an export can be refused for several inputs).
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance ToJSON RefusedExport where
+  toJSON r = Aeson.object
+    [ "name"    .= r.reName
+    , "file"    .= r.reFile
+    , "reasons" .= r.reReasons
+    ]
+
+instance FromJSON RefusedExport where
+  parseJSON = Aeson.withObject "RefusedExport" $ \o ->
+    RefusedExport
+      <$> o .: "name"
+      <*> o .:? "file" .!= ""
+      <*> o .:? "reasons" .!= []
 
 -- | Summary of a single exported function within a deployment.
 data FunctionSummary = FunctionSummary

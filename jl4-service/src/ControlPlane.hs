@@ -96,6 +96,9 @@ data UpdateStatusResponse = UpdateStatusResponse
   , usDeploymentId :: !Text
   , usStatus       :: !Text   -- "compiling" | "applied" | "rejected"
   , usError        :: !(Maybe Text)
+  , usRefusedExports :: ![RefusedExport]
+  -- ^ On an applied job, the @\@export@s the deploy left out, and why. The
+  -- deployment's own metadata carries the same list.
   }
   deriving stock (Show, Generic)
 
@@ -105,6 +108,7 @@ instance ToJSON UpdateStatusResponse where
     , "deploymentId" .= u.usDeploymentId
     , "status"       .= u.usStatus
     ] <> maybe [] (\e -> ["error" .= e]) u.usError
+      <> (if null u.usRefusedExports then [] else ["refusedExports" .= u.usRefusedExports])
 
 instance FromJSON UpdateStatusResponse where
   parseJSON = Aeson.withObject "UpdateStatusResponse" $ \o ->
@@ -113,6 +117,7 @@ instance FromJSON UpdateStatusResponse where
       <*> o Aeson..: "deploymentId"
       <*> o Aeson..: "status"
       <*> o Aeson..:? "error"
+      <*> o Aeson..:? "refusedExports" Aeson..!= []
 
 -- | The control plane API for managing deployments.
 type ControlPlaneApi =
@@ -301,11 +306,14 @@ getUpdateStatusHandler deployIdText jobId = do
         , usDeploymentId = j.ujDeploymentId
         , usStatus = case j.ujStatus of
             JobCompiling  -> "compiling"
-            JobApplied    -> "applied"
+            JobApplied _  -> "applied"
             JobRejected _ -> "rejected"
         , usError = case j.ujStatus of
             JobRejected m -> Just m
             _             -> Nothing
+        , usRefusedExports = case j.ujStatus of
+            JobApplied rs -> rs
+            _             -> []
         }
     _ -> throwError err404
 
@@ -464,7 +472,15 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
       reject ("Update rejected: compilation failed: " <> err)
     Just (Right (fns, meta0)) -> do
       let newIfaces = map (ifaceFromFunction . (.fnImpl)) (Map.elems fns)
-          breaking = maybe [] (`detectBreakingChanges` newIfaces) mGate
+          -- A live rule that this bundle leaves out because its @export is
+          -- now refused is a removed rule to its callers; say why it went.
+          refusedWhy n = case [r | r <- meta0.metaRefusedExports, r.reName == n] of
+            (r : _) -> ": its @export is refused, because " <> Text.intercalate "; " r.reReasons
+            [] -> ""
+          explain msg = case Text.stripSuffix " removed" =<< Text.stripPrefix "rule " msg of
+            Just n -> msg <> refusedWhy n
+            Nothing -> msg
+          breaking = map explain $ maybe [] (`detectBreakingChanges` newIfaces) mGate
       case breaking of
         (_:_) ->
           reject $ "Update rejected — it would break existing integrations: "
@@ -516,7 +532,7 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
                 ]
           atomically $ modifyTVar' env.deploymentRegistry $
             Map.insert deployId (DeploymentReady fns meta)
-          setJob env jobId JobApplied
+          setJob env jobId (JobApplied meta.metaRefusedExports)
           logInfo env.logger "Deploy job applied"
             [ ("deploymentId", toJSON deployId.unDeploymentId)
             , ("jobId", toJSON jobId)

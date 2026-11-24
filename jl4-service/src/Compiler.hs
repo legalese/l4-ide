@@ -128,18 +128,35 @@ compileBundle logger deployId sources = do
               ]
             pure (filepath, Left (Text.intercalate "\n" (("Typecheck failed: " <> Text.pack filepath) : why)))
 
-      let allFunctionsWithFile = [ (fp, fn) | (fp, Right fns) <- results, fn <- fns ]
+      let allFunctionsWithFile = [ (fp, fn) | (fp, Right (fns, _)) <- results, fn <- fns ]
           allFunctions = map snd allFunctionsWithFile
           errors = [err | (_, Left err) <- results]
+          refused = concat [rs | (_, Right (_, rs)) <- results]
 
-      -- Any file that failed to compile (typecheck errors, unsupported
-      -- @export inputs, …) fails the whole deploy. Previously this only
-      -- rejected when NO file produced functions, so a bundle with one broken
-      -- file and one good file would deploy the good half and silently drop
-      -- the error — and a single broken file would deploy a garbage schema
-      -- built from unresolved inference variables.
+      -- Any file that failed to compile (a parse or type error) fails the
+      -- whole deploy. Previously this only rejected when NO file produced
+      -- functions, so a bundle with one broken file and one good file would
+      -- deploy the good half and silently drop the error — and a single broken
+      -- file would deploy a garbage schema built from unresolved inference
+      -- variables.
+      --
+      -- An @export that the export check refuses is not such an error: the
+      -- deploy leaves it out, serves the file's other exports, and names it in
+      -- the metadata ('metaRefusedExports'). Only a deployment in which every
+      -- @export is refused fails, with the reasons, because it would serve
+      -- nothing (Meng, DEADWOOD, 2026-11-24).
       if not (null errors)
         then pure $ Left $ Text.intercalate "\n" errors
+        else if null allFunctions && not (null refused)
+        then do
+          logWarn logger "Deploy rejected: every @export has an input or result that cannot be sent"
+            [ ("deploymentId", toJSON deployId)
+            , ("refused", toJSON [r.reName | r <- refused])
+            ]
+          pure $ Left $ Text.intercalate "\n"
+            [ Text.intercalate "; " (concatMap (.reReasons) rs)
+            | (_, Right (_, rs@(_ : _))) <- results
+            ]
         else do
           let fnMap = Map.fromList [(fn.fnImpl.name, fn) | fn <- allFunctions]
 
@@ -159,6 +176,7 @@ compileBundle logger deployId sources = do
                 , metaDescription = Nothing
                 , metaServiceVersion = ""
                 , metaDeploymentVersion = ""
+                , metaRefusedExports = refused
                 }
 
           unless (null allFunctions) $
@@ -180,14 +198,14 @@ processTypecheckedFile
   -> ModuleContext
   -> Rules.TypeCheckResult
   -> Map FilePath EvalEnv.Environment  -- ^ Import environments from shared session
-  -> IO (FilePath, Either Text [ValidatedFunction])
+  -> IO (FilePath, Either Text ([ValidatedFunction], [RefusedExport]))
 processTypecheckedFile logger deployId filepath content moduleContext
   tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors}
   evalMap = do
-    let exports = enrichReturnTypes ei $ getExportedFunctions resolvedModule
+    let allExports = enrichReturnTypes ei $ getExportedFunctions resolvedModule
         -- What cannot cross the boundary of an @export, and the exports that
         -- the editor refuses with the same words ('Export.checkExports'). A
-        -- missing type is a warning, which does not block the deploy.
+        -- missing type is a warning, which does not refuse anything.
         shapeEnv = Shape.shapeEnvFromDeclares declaredTypes ei
         exportErrs =
           [ e
@@ -195,7 +213,33 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , Export.exportErrorSeverity e == SError
           ]
         declaredTypes = foldMap (Shape.moduleDeclares . (.module')) (tcResult : Rules.transitiveDependencies tcResult)
-        exportFnTypeErrs = [Text.unwords (Export.prettyExportError e) | e <- exportErrs]
+        -- The deploy publishes the exports the check does not refuse, and
+        -- names each one it refuses, with the words of each refusal.
+        exports = Export.withoutRefused exportErrs allExports
+        reasonOf e = Text.unwords (Export.prettyExportError e)
+        refusedExports =
+          [ RefusedExport ef.exportName (Text.pack filepath) (map reasonOf rs)
+          | ef <- allExports
+          , let rs = Export.refusalsOf exportErrs ef
+          , not (null rs)
+          ]
+          -- A refusal of a rule that is not among the exports found (there
+          -- should be none) still names it, rather than vanish.
+          <> [ RefusedExport name (Text.pack filepath) reasons
+             | (name, reasons) <- Map.toList $ Map.fromListWith (flip (<>))
+                 [ (rawNameToText (rawName (getActual (Export.exportErrorFunction e))), [reasonOf e])
+                 | e <- exportErrs
+                 , not (any (\ef -> e `elem` Export.refusalsOf exportErrs ef) allExports)
+                 ]
+             ]
+        logRefused =
+          unless (null refusedExports) $
+            logWarn logger "Deploy leaves out an @export that has an input or result that cannot be sent"
+              [ ("deploymentId", toJSON deployId)
+              , ("file", toJSON filepath)
+              , ("refused", toJSON [r.reName | r <- refusedExports])
+              , ("errors", toJSON (concatMap (.reReasons) refusedExports))
+              ]
         -- Genuine type errors that must block the deploy. We deliberately
         -- tolerate OutOfScopeError for a name an expression reads: it's
         -- repurposed by extractImplicitAssumeParams to derive implicit ASSUME
@@ -225,17 +269,12 @@ processTypecheckedFile logger deployId filepath content moduleContext
       -- back, as in the editor: on one that does not, an input or result may
       -- still be an unsolved inference variable, and the type error already
       -- says what is wrong.
-      else if not (null exportFnTypeErrs)
-      then do
-        logWarn logger "Deploy rejected: an @export has an input or result that cannot be sent"
-          [ ("deploymentId", toJSON deployId)
-          , ("file", toJSON filepath)
-          , ("errors", toJSON exportFnTypeErrs)
-          ]
-        pure (filepath, Left (Text.intercalate "; " exportFnTypeErrs))
       else if null exports
-      then pure (filepath, Right [])
+      then do
+        logRefused
+        pure (filepath, Right ([], refusedExports))
       else do
+        logRefused
         let implicitParams = extractImplicitAssumeParams tcErrors
             allDeclares = collectAllDeclares tcResult
             -- Look up the import environment from the shared session
@@ -306,12 +345,13 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , ("file", toJSON filepath)
           , ("exportCount", toJSON (length fns))
           ]
-        pure (filepath, Right fns)
+        pure (filepath, Right (fns, refusedExports))
 
 -- | Convert an ExportedFunction to our Function type.
 -- | What a deployment publishes for an @export: the schema of each input and
 -- of the result is the shape the export check gives its type ('typeToParameter').
--- The deploy has refused an @export the check refuses, so each of those has one.
+-- The deploy leaves out an @export the check refuses ('Export.withoutRefused'),
+-- so each one it publishes has one.
 exportToFunction :: Shape.ShapeEnv -> Map Text (Declare Resolved) -> [(Text, Type' Resolved)] -> ExportedFunction -> Function
 exportToFunction env declares implicitParams export =
   let schemaOf ty = either (const uncheckedParameter) id (typeToParameter env ty)

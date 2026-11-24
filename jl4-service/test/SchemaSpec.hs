@@ -324,6 +324,10 @@ instance Arbitrary DeploymentMetadata where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
+    <*> arbitrary
+
+instance Arbitrary RefusedExport where
+  arbitrary = RefusedExport <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary FunctionSummary where
   arbitrary = FunctionSummary <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary

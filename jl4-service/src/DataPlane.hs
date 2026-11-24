@@ -37,6 +37,7 @@ import Control.Exception (catch, evaluate, finally)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Reader (runReaderT, asks, ask)
+import Control.Applicative ((<|>))
 import Data.List (find)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -163,17 +164,31 @@ requireDeploymentReady deployId = do
 -- | Look up a function by name within a deployment.
 -- Tries the exact name first, then falls back to matching by sanitized name
 -- (so that "check-person" in a URL matches the function "check person").
-requireFunction :: Map Text ValidatedFunction -> Text -> AppM ValidatedFunction
-requireFunction fns fnName =
+--
+-- A name that the deployment left out because its @export is refused
+-- ('metaRefusedExports') is not found either, and the 404 says why, matched
+-- the same way.
+requireFunction :: DeploymentMetadata -> Map Text ValidatedFunction -> Text -> AppM ValidatedFunction
+requireFunction meta fns fnName =
   case Map.lookup fnName fns of
     Just vf -> pure vf
     Nothing ->
       -- Fall back: find a function whose name sanitizes to the same form
       let sanitized = sanitizePropertyName fnName
           match = find (\(k, _) -> sanitizePropertyName k == sanitized) (Map.toList fns)
-      in case match of
-        Just (_, vf) -> pure vf
-        Nothing -> throwError err404 { errBody = jsonError "Function not found" }
+          refused =
+            find (\r -> r.reName == fnName) meta.metaRefusedExports
+              <|> find (\r -> sanitizePropertyName r.reName == sanitized) meta.metaRefusedExports
+      in case (match, refused) of
+        (Just (_, vf), _) -> pure vf
+        (Nothing, Just r) -> throwError err404 { errBody = jsonError (refusedExportMessage r) }
+        (Nothing, Nothing) -> throwError err404 { errBody = jsonError "Function not found" }
+
+-- | What a call to an @export that the deploy left out is told.
+refusedExportMessage :: RefusedExport -> Text
+refusedExportMessage r =
+  "Function not found: `" <> r.reName <> "` was not deployed, because its @export is refused: "
+    <> Text.intercalate "; " r.reReasons
 
 -- ----------------------------------------------------------------------------
 -- Handlers
@@ -197,7 +212,7 @@ getFunctionHandler deployId fnName = do
     , ("functionName", Aeson.toJSON fnName)
     ]
   (fns, meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  vf <- requireFunction meta fns fnName
   let fn = vf.fnImpl
   -- Find the source file from metadata
   let sourceFile = case [fs.fsSourceFile | fs <- meta.metaFunctions, fs.fsName == fn.name] of
@@ -229,8 +244,8 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
     , ("functionName", Aeson.toJSON fnName)
     ]
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction meta fns fnName
 
   -- Check if this function has deontic parameters (indicating DEONTIC return type)
   let paramMap = vf.fnImpl.parameters.parameterMap :: Map Text Parameter
@@ -285,8 +300,8 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     ]
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction meta fns fnName
 
   -- Capture the environment before going concurrent
   env <- ask
@@ -373,8 +388,8 @@ queryPlanHandler' deployId fnName fnArgs = do
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
     , ("functionName", Aeson.toJSON fnName)
     ]
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction meta fns fnName
 
   cached <- case vf.fnDecisionQueryCache of
     Just c -> pure c
@@ -421,8 +436,8 @@ listStateGraphsHandler deployId fnName = do
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
     , ("functionName", Aeson.toJSON fnName)
     ]
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction meta fns fnName
   case vf.fnCompiled of
     Nothing -> throwError err404 { errBody = jsonError "No compiled module found for function" }
     Just compiled -> do
@@ -440,8 +455,8 @@ getStateGraphDotHandler deployId fnName graphName = do
     , ("functionName", Aeson.toJSON fnName)
     , ("graphName", Aeson.toJSON graphName)
     ]
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction meta fns fnName
   case vf.fnCompiled of
     Nothing -> throwError err404 { errBody = jsonError "No compiled module found for function" }
     Just compiled -> do

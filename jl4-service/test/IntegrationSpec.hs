@@ -1146,6 +1146,124 @@ spec = describe "integration" do
               a3 `shouldBe` a1
             other -> expectationFailure ("Expected six cases, got " <> take 300 (show other))
 
+  -- One @export that cannot be sent no longer refuses its file: the deploy
+  -- serves the file's other exports, and names the refused one, with its
+  -- reasons, in the job, in the deployment's status and in the 404 that a call
+  -- to it gets (Meng, DEADWOOD, 2026-11-24). A deployment in which every
+  -- @export is refused still fails, with the reasons.
+  describe "an @export that cannot be sent" do
+    let eventExport = Text.unlines
+          [ "DECLARE Party IS ONE OF alice, bob"
+          , "DECLARE Act IS ONE OF ping, pong"
+          , ""
+          , "@export Who acted"
+          , "GIVEN e IS AN EVENT Party Act"
+          , "GIVETH A Party"
+          , "`who acted` MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a n THEN p"
+          ]
+        bigExport = Text.unlines
+          [ "@export Whether a number is big"
+          , "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE big IF n > 10"
+          ]
+        -- One file: one export that can be sent, one that cannot.
+        mixed = bigExport <> "\n" <> eventExport
+        eventReason = "its input `e` is an EVENT, and @export does not support that yet"
+        -- The refused exports a response names at a path: each name and its reasons.
+        refusedAt :: Response LBS.ByteString -> [Aeson.Key] -> [(Text, [Text])]
+        refusedAt resp path = case wireAt resp path of
+          Right (Aeson.Array xs) ->
+            [ (n, [r | Aeson.String r <- reasons])
+            | Aeson.Object o <- toList xs
+            , Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" o]
+            , let reasons = case Aeson.KeyMap.lookup "reasons" o of
+                    Just (Aeson.Array a) -> toList a
+                    _ -> []
+            ]
+          _ -> []
+        refusedAsEvent :: [(Text, [Text])] -> Bool
+        refusedAsEvent = \case
+          [("who acted", [reason])] -> eventReason `Text.isInfixOf` reason
+          _ -> False
+        -- A call to the refused export is not found, and says why.
+        callRefused baseUrl mgr deployId = do
+          resp <- evalFunction baseUrl mgr deployId "who%20acted"
+            (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' resp `shouldBe` 404
+          case wireAt resp ["error"] of
+            Right (Aeson.String e) -> do
+              e `shouldSatisfy` Text.isInfixOf "`who acted` was not deployed, because its @export is refused"
+              e `shouldSatisfy` Text.isInfixOf eventReason
+            other -> expectationFailure ("Expected an error naming the refusal, got " <> show other)
+        callBig baseUrl mgr deployId = do
+          resp <- evalFunction baseUrl mgr deployId "big"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (11 :: Int)]])
+          assertSuccess resp \r ->
+            Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+
+    it "deploys the file's other exports, and names the refused one in the job, the status and a call to it" do
+      withEmptyService \baseUrl mgr -> do
+        resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "refused-one"
+          (createZipBundle [("mixed.l4", mixed)])
+        statusCode' resp `shouldBe` 202
+        (st, err) <- pollUpdate baseUrl mgr "refused-one" resp
+        (st, err) `shouldBe` ("applied", Nothing)
+        -- the job, read again once it is applied
+        job <- case jobOutcome resp of
+          Just j -> httpGet mgr (baseUrl <> "/deployments/refused-one/updates/" <> Text.unpack j)
+          Nothing -> fail "the deploy named no job"
+        refusedAt job ["refusedExports"] `shouldSatisfy` refusedAsEvent
+        -- the deployment's status, as a later read returns it
+        status <- httpGet mgr (baseUrl <> "/deployments/refused-one")
+        wireAt status ["status"] `shouldBe` Right (Aeson.String "ready")
+        refusedAt status ["metadata", "refusedExports"] `shouldSatisfy` refusedAsEvent
+        listed <- httpGet mgr (baseUrl <> "/deployments/refused-one/functions")
+        functionNames (responseBody listed) `shouldBe` ["big"]
+        callBig baseUrl mgr "refused-one"
+        callRefused baseUrl mgr "refused-one"
+
+    it "still refuses a deployment in which every @export is refused, with the reasons" do
+      withEmptyService \baseUrl mgr -> do
+        resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "refused-all"
+          (createZipBundle [("event.l4", eventExport), ("plain.l4", "DECIDE nothing IS 1\n")])
+        statusCode' resp `shouldBe` 202
+        (st, err) <- pollUpdate baseUrl mgr "refused-all" resp
+        st `shouldBe` "rejected"
+        err `shouldSatisfy` maybe False (Text.isInfixOf eventReason)
+        gone <- httpGet mgr (baseUrl <> "/deployments/refused-all")
+        statusCode' gone `shouldBe` 404
+
+    it "names a live rule that a redeploy now refuses as removed because it is refused" do
+      withEmptyService \baseUrl mgr -> do
+        first <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "refused-put"
+          (createZipBundle [("rules.l4", bigExport <> "\n@export Who acted\nGIVEN p IS A NUMBER\nGIVETH A NUMBER\n`who acted` MEANS p\n")])
+        pollUpdate baseUrl mgr "refused-put" first `shouldReturn` ("applied", Nothing)
+        put <- (`httpLbs` mgr) =<< buildMultipartMethod "PUT" (baseUrl <> "/deployments/refused-put") Nothing
+          (createZipBundle [("rules.l4", mixed)])
+        (st, err) <- pollUpdate baseUrl mgr "refused-put" put
+        st `shouldBe` "rejected"
+        err `shouldSatisfy` maybe False (Text.isInfixOf "rule who acted removed: its @export is refused, because")
+        err `shouldSatisfy` maybe False (Text.isInfixOf eventReason)
+
+    it "loads a stored deployment that has a refused export with its other exports after a restart" do
+      -- A store an older service wrote, before the export check refused
+      -- anything, holds such a file; the restart used to register it as failed.
+      withServicesRestarted [("refused-restart", [("qualifies.l4", qualifiesJL4), ("mixed.l4", mixed)])] (const (pure ())) \logLines baseUrl mgr -> do
+        assertRecompiled "refused-restart" logLines
+        status <- httpGet mgr (baseUrl <> "/deployments/refused-restart")
+        wireAt status ["status"] `shouldBe` Right (Aeson.String "ready")
+        refusedAt status ["metadata", "refusedExports"] `shouldSatisfy` refusedAsEvent
+        listed <- httpGet mgr (baseUrl <> "/deployments/refused-restart/functions")
+        functionNames (responseBody listed) `shouldBe` ["big", "compute_qualifies"]
+        resp <- evalFunction baseUrl mgr "refused-restart" "compute_qualifies" allTrueArgs
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+        callBig baseUrl mgr "refused-restart"
+        callRefused baseUrl mgr "refused-restart"
+
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
       withEmptyService \baseUrl mgr -> do
