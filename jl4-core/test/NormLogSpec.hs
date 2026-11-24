@@ -1415,6 +1415,27 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         rs <- run False (src own)
         length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "deliver" ] `shouldBe` 1
 
+      it "R16: a read in an event's own time, before the norm's clock has been used, still sees the norm as outstanding" do
+        -- the forcing in 'readNormForcing': a root norm's clock is forced when its
+        -- first event is taken, after the event's own time is evaluated, so a read
+        -- in that time meets the norm's Armed entry while its clock is unevaluated
+        -- (`start` has not been used). R14 does not reach this: a guard comes after
+        -- the clock is forced, and flushing is enough there.
+        let own =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH A NUMBER"
+              , "start MEANS 1 - 1"
+              , "GIVETH A NUMBER"
+              , "arrival MEANS IF OUTSTANDING (PARTY _ MUST deliver) AS OF 5 THEN 2 ELSE 70"
+              , "#TRACE c AT start WITH"
+              , "  PARTY Alice DOES deliver AT arrival"
+              ]
+        checked own `shouldBe` True
+        rs <- run False (src own)
+        -- seen as outstanding the delivery is at 2 and performed; not seen, it is at 70 and late
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
       it "R15: the same read with the party named is refused at the first event, by name, and does not answer no" do
         -- the norm has not met its party yet: the log knows the bearer only as written (N7 rule 4, rule 3 not built)
         let own =

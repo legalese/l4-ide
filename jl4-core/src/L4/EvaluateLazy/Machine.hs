@@ -2242,11 +2242,13 @@ tellEventRouted route ev = do
     RouteNotify recipientKey ->
       liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
 
--- | NORM-LOG-SPEC N4b: before the log is read, force the arming clock of every
--- norm whose @Armed@ entry still waits in the writer for it. The writer never
--- forces ('tellArmed'), and a root norm's clock is forced at its first event,
--- so a read in the first guard of a root norm, which is where a norm reads
--- itself, would otherwise see a log without that norm and answer "no" (R14).
+-- | NORM-LOG-SPEC N4b: before the log is read, write what the writer holds
+-- back, forcing the arming clock of every norm whose @Armed@ entry still waits
+-- for it. The writer never forces ('tellArmed'), and a root norm's clock is
+-- forced when its first event is taken: after the event's own time is
+-- evaluated, and before any guard of the event is. So a read in a guard needs
+-- only the flush (R14), and a read in the event's time needs the forcing
+-- (R16); either would otherwise see a log without the norm and answer "no".
 -- A read is the one place that may force: its answer is the log as it is now.
 readNormForcing :: ReadWord -> Rational -> BearerPattern -> DeonticModal -> Resolved -> ReadBranch -> Maybe SrcRange -> Machine Config
 readNormForcing word d who modal con branch site = do
