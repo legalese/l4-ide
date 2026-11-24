@@ -1383,18 +1383,37 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- the shared-thunk probe (NORM-LOG-SPEC N4): `pending` has no inputs, so
         -- its value could be kept from the first guard, where deliver is
         -- outstanding, and served again at the second, where it is not
+        -- (Carol's payment arms Alice's delivery, so Alice's norm is armed at a
+        -- forced clock when her own guard reads it; R14 is the root case)
         let shared =
               [ "c MEANS"
-              , "  PARTY Alice MUST deliver PROVIDED pending WITHIN 10"
-              , "  HENCE (PARTY Bob MUST pay n PROVIDED NOT pending WITHIN 10)"
+              , "  PARTY Carol MUST pay m WITHIN 10"
+              , "  HENCE (PARTY Alice MUST deliver PROVIDED pending WITHIN 10"
+              , "         HENCE (PARTY Bob MUST pay n PROVIDED NOT pending WITHIN 10))"
               , "GIVETH A BOOLEAN"
-              , "pending MEANS OUTSTANDING (PARTY Alice MUST deliver) AS OF 10"
+              , "pending MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 20"
               , "#TRACE c AT 0 WITH"
+              , "  PARTY Carol DOES pay 1 AT 1"
               , "  PARTY Alice DOES deliver AT 2"
-              , "  PARTY Bob DOES pay 1 AT 4"
+              , "  PARTY Bob DOES pay 1 AT 3"
               ]
         checked shared `shouldBe` True
-        holds shared `shouldReturn` True
+        rs <- run False (src shared)
+        -- Carol's payment and Bob's: Bob's guard is NOT pending, true only if pending was read again
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 2
+
+      it "R14: a norm's own guard can read the norm, as outstanding, at its first event" do
+        -- a root norm's arming clock is not forced until its first event, and the
+        -- writer waits for it (tellArmed); the read must not see the log without it
+        let own =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) AS OF 10 WITHIN 10"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 2"
+              ]
+        checked own `shouldBe` True
+        rs <- run False (src own)
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "deliver" ] `shouldBe` 1
 
       it "R8: a module's reads are found from its names, and the pass costs a fraction of one evaluation" do
         let readsLog body = case checkWithImports (vfsFromList []) (src body) of
