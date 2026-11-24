@@ -298,6 +298,7 @@ test-suite jl4-core-test
     YmdOwnDefinitionSpec
     CheckDirectiveResultsSpec
     TraceFractionalStampSpec
+    LestWithoutDeadlineSpec
     ResolutionCascadeSpec
     RefAnnotationSpec
     NlgPercentSpec

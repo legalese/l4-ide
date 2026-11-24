@@ -3129,7 +3129,8 @@ checkDeonton
   :: Anno -> Subject Name -> RAction Name
   -> Maybe (Opening Name) -> Maybe (Deadline Name) -> Maybe (Join Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
   -> Type' Resolved -> Type' Resolved -> Check (Deonton Resolved)
-checkDeonton ann subject action opens due mjoin hence lest partyT actionT =
+checkDeonton ann subject action opens due mjoin hence lest partyT actionT = do
+  warnLestWithoutDeadline ann subject action.modal opens due mjoin lest
   case subject of
     Party sann party -> do
       partyR <- ownSlots $ checkExprExact ExpectRegulativePartyContext party partyT
@@ -3217,6 +3218,70 @@ checkDeonton ann subject action opens due mjoin hence lest partyT actionT =
         (actionR, opensR, dueR, henceR, lestR) <-
           checkDeontonBody Nothing partyT actionT action opens due (hasJoinDeadline mjoin) hence lest
         pure (MkDeonton ann (Every sann mCastR rv' mRollR filterR) actionR opensR dueR joinR henceR lestR)
+
+-- | smucclaw/l4-ide#1097: a @LEST@ that nothing can reach. For @MUST@, @DO@
+-- and @MAY@ the only way into the @LEST@ is the deadline passing, so with no
+-- deadline the @LEST@ is dead text, most often a forgotten @WITHIN@.
+--
+-- The condition is the evaluator's, read in "L4.EvaluateLazy.Machine":
+--
+--   * A single obligation with no closing edge skips the timing step
+--     altogether ('scrutinizeDue', its @Left Nothing@ arm), so 'Contract5',
+--     the only frame that sends a @MUST@, @DO@ or @MAY@ to its @LEST@, never
+--     runs. An @AFTER@ alone opens a window and never closes it, so it does
+--     not count: the early act is passed over, not failed.
+--   * A member of an @EVERY@ expires by the act's @WITHIN@ or @BEFORE@, else
+--     by the @WITHIN@ on EITHER join line ('memberDue', 'joinDue'), so a
+--     deadline on the @ONCE@ or @UPON EACH@ line counts. A barrier's state
+--     deadline ('barrierStateMissed') and an empty roll's join both need the
+--     @ONCE@ line's @WITHIN@, which already counts.
+--   * A @MUST NOT@ reaches its @LEST@ when the forbidden act is performed
+--     ('Contract10'), deadline or not, so it never draws this.
+--
+-- This is the same rule as 'hasDeadline' in 'checkDeontonBody', and as the
+-- state graph's "unreachable: no WITHIN" caption
+-- ('L4.StateGraph.lestArmWording' over 'L4.StateGraph.memberDeadline'), which
+-- reads a @BEFORE@ as a deadline too.
+--
+-- The warning covers @DO@ and @MAY@ as well as the @MUST@ the issue names,
+-- because their @LEST@ is reached the same way (decided by Claude 2026-11-25,
+-- pending Meng's review).
+warnLestWithoutDeadline
+  :: Anno -> Subject Name -> DeonticModal -> Maybe (Opening Name) -> Maybe (Deadline Name) -> Maybe (Join Name)
+  -> Maybe (Expr Name) -> Check ()
+warnLestWithoutDeadline ann subject modal opens due mjoin = \ case
+  Just lestExpr
+    | reachedOnlyByDeadline modal
+    , isNothing due
+    , not (hasJoinDeadline mjoin)
+    -> addWarning $ LestWithoutDeadline MkLestWithoutDeadlineInfo
+         { range = lestKeywordRange ann <|> rangeOf lestExpr
+         , modal
+         , quantified = case subject of
+             Every {} -> True
+             Party {} -> False
+         , opens = isJust opens
+         }
+  _ -> pure ()
+  where
+    -- no wildcard, so a new modal has to say how its LEST is reached
+    reachedOnlyByDeadline = \ case
+      DMust    -> True
+      DDo      -> True
+      DMay     -> True
+      DMustNot -> False
+
+-- | The @LEST@ keyword of a deonton, read off the deonton's own concrete
+-- syntax: a nested rule's @LEST@ is in that rule's own annotation, so this
+-- finds only this rule's.
+lestKeywordRange :: Anno -> Maybe SrcRange
+lestKeywordRange ann =
+  listToMaybe
+    [ t.range
+    | AnnoCsn _ cluster <- ann.payload
+    , t <- allClusterTokens cluster
+    , t.payload == Lexer.TKeywords Lexer.TKLest
+    ]
 
 -- | The @ONCE@ line: its threshold carries no expression in phase 1; its
 -- @WITHIN@ bounds the joined state and is a NUMBER like the act's (R-T2).
@@ -9189,6 +9254,38 @@ prettyCheckWarning = \ case
     , "built-in is written. Some versions of L4 no longer accept the old spelling."
     ]
   CycleAlarm w -> cycleWarningText w
+  LestWithoutDeadline info ->
+    [ "This LEST can never be reached, because the rule has no deadline."
+    , ""
+    , meaning
+    , "This rule has " <> missing <> afterNote <> ", so " <> never
+    , ""
+    , remedy <> " Otherwise, remove the LEST."
+    ]
+    where
+      modalWord = case info.modal of
+        DMust    -> "MUST"
+        DDo      -> "DO"
+        DMay     -> "MAY"
+        DMustNot -> "MUST NOT"
+      meaning = case info.modal of
+        DMay -> "After MAY, the LEST is what follows when the permission goes unused until its deadline passes."
+        _    -> "After " <> modalWord <> ", the LEST is what follows when the deadline passes without the action."
+      missing
+        | info.quantified = "no WITHIN or BEFORE on its action and no WITHIN on its ONCE or UPON EACH line"
+        | otherwise       = "no WITHIN and no BEFORE"
+      afterNote
+        | info.opens = " (its AFTER says when the action may begin, not when it is due)"
+        | otherwise  = ""
+      never = case info.modal of
+        DMay -> "the permission never runs out, and this LEST never follows."
+        _    -> "it waits for its action however long it takes, and time alone never takes it to this LEST."
+      addWhat
+        | info.quantified = "a WITHIN (or a BEFORE) to the action, or a WITHIN to the ONCE or UPON EACH line"
+        | otherwise       = "a WITHIN (or a BEFORE)"
+      remedy = case info.modal of
+        DMay -> "To say when the permission ends, add " <> addWhat <> "."
+        _    -> "To say by when the action is due, add " <> addWhat <> "."
   SiblingLedgerRead w
     | Just rorSite <- w.unrunRor ->
     [ opening

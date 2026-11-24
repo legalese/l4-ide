@@ -69,6 +69,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 
 - [#EVAL shows the rule instead of an outcome](#eval-shows-the-rule-instead-of-an-outcome)
 - [A rule that starts itself again](#a-rule-that-starts-itself-again)
+- [A LEST that can never be reached](#a-lest-that-can-never-be-reached)
 - [More obligations were open at once than the limit](#more-obligations-were-open-at-once-than-the-limit)
 - [More failures were joined into one breach than the limit](#more-failures-were-joined-into-one-breach-than-the-limit)
 
@@ -1487,6 +1488,35 @@ The first three warnings say that L4 cannot see that it waits, that it can see i
 The fourth says that an `@ends-because`, the mark that answers the first warning, is above a rule L4 finds no way back to itself from, so L4 sees nothing for it to explain.
 
 **How to fix it:** see [Rules that start themselves again](../regulative/rules-that-start-themselves-again.md), which takes each warning in turn, says when `@ends-because` is the answer, and says when it is not.
+
+<a id="lint-lest-without-deadline"></a>
+
+### A LEST that can never be reached
+
+**Warning:** `This LEST can never be reached, because the rule has no deadline.`
+
+```l4
+DECLARE Party IS ONE OF Tenant, Landlord
+DECLARE Action IS ONE OF payRent, refund
+
+GIVETH A DEONTIC Party Action
+`the rent` MEANS
+    PARTY Tenant
+    MUST  payRent
+    LEST  PARTY Landlord MUST refund WITHIN 10
+```
+
+After `MUST`, `DO` or `MAY`, the `LEST` is what follows when the deadline passes without the action.
+This rule has no `WITHIN` and no `BEFORE`, so it has no deadline: it waits for the rent however long it takes, and time alone never takes it to its `LEST`.
+A `#TRACE` that waits a million days still ends with the rent owed and no refund.
+A forgotten `WITHIN` is the usual cause.
+
+An `AFTER` with no `WITHIN` draws the warning too: it says when the action may begin, not when it is due.
+Under `EVERY`, a `WITHIN` on the `ONCE` or `UPON EACH` line is a deadline, so a rule with one there is not warned about.
+A `MUST NOT` (or `SHANT`) is never warned about: its `LEST` follows the forbidden act, deadline or not.
+
+**How to fix it:** add a `WITHIN` (or a `BEFORE`) to say by when the action is due, or, for a `MAY`, when the permission ends. If nothing should follow, remove the `LEST`.
+See [Deadlines and consequences](../regulative/consequences.md#hence-and-lest) for when a `LEST` is taken.
 
 ---
 

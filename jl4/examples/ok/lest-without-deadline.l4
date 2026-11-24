@@ -1,0 +1,141 @@
+-- smucclaw/l4-ide#1097: a LEST that nothing can reach.
+--
+-- For MUST, DO and MAY the LEST is what follows when the deadline passes, so
+-- a rule with no deadline (no WITHIN, no BEFORE, and under EVERY no WITHIN on
+-- its ONCE or UPON EACH line) never reaches its LEST, and `l4 check` warns
+-- at the LEST. MUST NOT is the exception: its LEST follows the forbidden act,
+-- deadline or not. Each rule is traced with a long wait (or, for MUST NOT,
+-- the forbidden act), so the results below show the evaluator agreeing with
+-- each warning, and with each absence of one.
+
+IMPORT prelude
+IMPORT daydate
+
+DECLARE Actor IS ONE OF
+    Landlord
+    Tenant HAS name IS A STRING
+
+DECLARE Act IS ONE OF payRent, refund, smoke
+
+alice   MEANS Tenant OF "Alice"
+tenants MEANS LIST alice
+
+§ `Warned: no deadline`
+
+-- The issue's own case. A million days on, the rent is still owed and the
+-- LEST has not followed.
+GIVETH A DEONTIC Actor Act
+`rent, no deadline` MEANS
+    PARTY alice
+    MUST  payRent
+    LEST  PARTY Landlord MUST refund WITHIN 10
+
+#TRACE `rent, no deadline` AT 0 WITH
+  (WAITUNTIL 1000000)
+
+GIVETH A DEONTIC Actor Act
+`DO, no deadline` MEANS
+    PARTY alice
+    DO    payRent
+    LEST  BREACH
+
+#TRACE `DO, no deadline` AT 0 WITH
+  (WAITUNTIL 1000000)
+
+-- A MAY with no deadline never runs out, so its LEST never follows.
+GIVETH A DEONTIC Actor Act
+`MAY, no deadline` MEANS
+    PARTY alice
+    MAY   payRent
+    LEST  BREACH
+
+#TRACE `MAY, no deadline` AT 0 WITH
+  (WAITUNTIL 1000000)
+
+-- AFTER opens the window; nothing closes it.
+GIVETH A DEONTIC Actor Act
+`AFTER alone` MEANS
+    PARTY alice
+    MUST  payRent
+    AFTER 10
+    LEST  BREACH
+
+#TRACE `AFTER alone` AT 0 WITH
+  (WAITUNTIL 1000000)
+
+GIVETH A DEONTIC Actor Act
+`everyone, no deadline` MEANS
+    EVERY Tenant t IN tenants
+        MUST  payRent
+        ONCE  ALL HAVE
+        LEST  BREACH
+
+#TRACE `everyone, no deadline` AT 0 WITH
+  (WAITUNTIL 1000000)
+
+-- Only the rule under the LEST is warned: the outer rule has a deadline.
+GIVETH A DEONTIC Actor Act
+`nested, inner has none` MEANS
+    PARTY  alice
+    MUST   payRent
+    WITHIN 30
+    LEST
+        PARTY alice
+        MUST  refund
+        LEST  BREACH
+
+#TRACE `nested, inner has none` AT 0 WITH
+  (WAITUNTIL 1000000)
+
+§ `Not warned`
+
+GIVETH A DEONTIC Actor Act
+`rent within 30` MEANS
+    PARTY  alice
+    MUST   payRent
+    WITHIN 30
+    LEST   PARTY Landlord MUST refund WITHIN 10
+
+#TRACE `rent within 30` AT 0 WITH
+  (WAITUNTIL 1000000)
+
+GIVETH A DEONTIC Actor Act
+`rent before a date` MEANS
+    PARTY  alice
+    MUST   payRent
+    BEFORE (YMD 2026 6 30)
+    LEST   BREACH
+
+#TRACE `rent before a date` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  (WAITUNTIL (DATE_SERIAL (YMD 2027 1 1)))
+
+-- The deadline is on the ONCE line, and it bounds each member's act too.
+GIVETH A DEONTIC Actor Act
+`everyone within 30` MEANS
+    EVERY Tenant t IN tenants
+        MUST  payRent
+        ONCE  ALL HAVE WITHIN 30
+        LEST  BREACH
+
+#TRACE `everyone within 30` AT 0 WITH
+  (WAITUNTIL 1000000)
+
+-- The forbidden act reaches the LEST with no deadline at all.
+GIVETH A DEONTIC Actor Act
+`no smoking` MEANS
+    PARTY    alice
+    MUST NOT smoke
+    LEST     PARTY Landlord MUST refund WITHIN 10
+
+#TRACE `no smoking` AT 0 WITH
+  PARTY alice DOES smoke AT 5
+
+-- No LEST, nothing to warn about.
+GIVETH A DEONTIC Actor Act
+`rent, HENCE only` MEANS
+    PARTY alice
+    MUST  payRent
+    HENCE FULFILLED
+
+#TRACE `rent, HENCE only` AT 0 WITH
+  PARTY alice DOES payRent AT 3

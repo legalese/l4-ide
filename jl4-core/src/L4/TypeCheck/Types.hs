@@ -582,6 +582,27 @@ data CheckWarning
     -- spelling and the new one (@`WAIT UNTIL`@ is now @WAITUNTIL@). The old
     -- spelling still resolves to the same built-in, so nothing changes but
     -- the warning (Note [Renamed built-ins] in "L4.TypeCheck.Environment").
+  | LestWithoutDeadline LestWithoutDeadlineInfo
+    -- ^ smucclaw/l4-ide#1097: a @LEST@ that nothing can ever reach, because
+    -- the rule's modal reaches its @LEST@ only when its deadline passes and
+    -- the rule has no deadline ('L4.TypeCheck.warnLestWithoutDeadline').
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Everything 'LestWithoutDeadline' needs to phrase its advice.
+data LestWithoutDeadlineInfo = MkLestWithoutDeadlineInfo
+  { range :: Maybe SrcRange
+    -- ^ The @LEST@ keyword, the warning's anchor; the @LEST@'s body when the
+    -- keyword cannot be found.
+  , modal :: DeonticModal
+    -- ^ @MUST@, @DO@ or @MAY@: never 'DMustNot', whose @LEST@ is reached by
+    -- the forbidden act, deadline or not.
+  , quantified :: Bool
+    -- ^ An @EVERY@ rule, whose deadline may also go on its @ONCE@ or
+    -- @UPON EACH@ line.
+  , opens :: Bool
+    -- ^ The rule has an @AFTER@: a window that opens and never closes.
+  }
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -1045,6 +1066,8 @@ checkWarningCode = \ case
   RenamedBuiltin {}               -> "lint/renamed-builtin"
   -- codes decided by Claude 2026-11-22, pending Meng's review
   CycleAlarm w                    -> cycleTroubleCode w.trouble
+  -- smucclaw/l4-ide#1097 (code decided by Claude 2026-11-25, pending Meng's review)
+  LestWithoutDeadline {}          -> "lint/lest-without-deadline"
 
 -- | The code of each warning about a rule that starts itself again
 -- (smucclaw/l4-ide#1075; "L4.Cycles.Warning"). One code for each warning,
@@ -1176,6 +1199,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (RenamedBuiltin r _ _)) = Just r
+  rangeOf (CheckWarning (LestWithoutDeadline info)) = info.range
   rangeOf (CheckWarning (SiblingLedgerRead w)) = w.compound
   rangeOf (CheckWarning (CycleAlarm w)) = w.at
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
