@@ -138,15 +138,27 @@ The deployment names each one it left out, with the reasons the editor and `l4 c
 ```
 
 The field is left out when nothing was refused, so a client that does not know it sees the same response as before.
+It follows the visibility headers, as `functions` and `files` do: with `X-Include-Functions: false` it is left out, and with `X-Include-Files: false` each entry is left without its `file`.
+That holds for the deployment's status, the list, the job, an identical `POST` that answers at once, MCP's `tools/list`, and the reason a call is given (below), which a caller that may not see functions does not get.
+
+**Two files may export the same name.**
+The export check judges each export by itself, so it may refuse one and not the other.
+The name is then served, by the export the check does not refuse: it is among the functions, a call by it is answered, and over MCP it is a tool.
+The refused entry is still listed, with its `file`, and carries `"nameServed": true`, so a client reading `refusedExports` must not conclude that a name listed there cannot be called; it can, whenever `nameServed` is true.
+A name is served when a call by it would reach a served export: the same name, or one that sanitizes to the same name, as a call's own name is matched.
 A call to a refused export answers `404`, as for a function that does not exist, with an `error` that begins ``Function not found: `who acted` was not deployed, because its @export is refused:`` and gives the reasons.
-Over MCP the export is not among the tools; `tools/list` names each one left out, with its reasons, under the result's `_meta`, as `l4/refusedExports` (`deployment`, `name`, `reasons`), and a `tools/call` of the name it would have had (`who-acted`) gets the `-32602` error a name that is no tool gets, with the reason added: ``Unknown tool: who-acted: `who acted` was not deployed, because its @export is refused: ...``.
+Over MCP the export is not among the tools; `tools/list` names each one left out, with its reasons, under the result's `_meta`, as `l4/refusedExports` (`deployment`, `name`, `file`, `reasons`, and `nameServed` when true), and a `tools/call` of the name it would have had (`who-acted`) gets the `-32602` error a name that is no tool gets, with the reason added: ``Unknown tool: who-acted: `who acted` was not deployed, because its @export is refused: ...``.
 A `PUT` that leaves out a function the live version serves is rejected as a breaking change, and the message says `rule who acted removed: its @export is refused, because ...`.
 
 A deployment in which **every** `@export` is refused is still rejected, with the reasons, because it would serve nothing.
+The rule is about the whole deployment, not each file: a file all of whose exports are refused deploys, with nothing served from it, when another file in the deployment has an export that is served.
 A parse or type error in any file still rejects the whole deployment.
 A restart compiles the stored sources the same way, so a deployment stored before an export was refused comes back with its other exports, and says which one it left out.
+Under `--lazy-load`, MCP's tool list is read from the metadata cache that the service which last compiled the deployment wrote, so a cache written before the export check can list as a tool an export this build refuses, until the deployment is compiled.
+A call to it compiles the deployment, and then gets the error for a function that is not there with the reason: ``Function not found: `who acted` was not deployed, because its @export is refused: ...``.
 
-A client can ask whether a service does this before it relies on it: the service lists `refused-exports` in `capabilities` on `GET /health`, and sends `X-L4-Capabilities: refused-exports` on every response.
+A client can ask whether a service does this before it relies on it: the service lists `refused-exports` in `capabilities` on `GET /health`, and sends `X-L4-Capabilities: refused-exports` on every response from its API routes.
+Responses made outside them do not carry it: the `503` of the concurrency limit, the `500` for an unhandled exception, anything Warp answers itself, and what the explorer page and the `.l4` file middleware serve.
 `l4 deploy` reads the header from the lookup it makes before uploading, and uploads a file with a refused export only to a service that sends it; to any other (an older service, or one behind a proxy that drops the header) it refuses the file before uploading, as it did before.
 
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
