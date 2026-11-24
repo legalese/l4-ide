@@ -203,6 +203,7 @@ spec bin = describe "l4 explore" $ do
       sout `shouldSatisfy` ("PARTY P DOES a AT 0.5" `isInfixOf`)
       code' `shouldBe` ExitFailure 2
       lastLine sout `shouldSatisfy` ("an instant it needs (3.5) is not a whole number" `isInfixOf`)
+      lastLine sout `shouldSatisfy` ("the clock where it stands, are tried; --grid N tries the multiples of N" `isInfixOf`)
 
     it "frac-wait.l4: after time passes a deadline that is a fraction, the act that follows is tried at the clock there, a fraction, and the deadline it then needs is named" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "frac-wait.l4"]
@@ -560,6 +561,9 @@ spec bin = describe "l4 explore" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "half.l4"]
       code `shouldBe` ExitFailure 2
       lastLine sout `shouldSatisfy` ("not a whole number" `isInfixOf`)
+      -- what is tried by default and under --grid, not "only whole instants"
+      lastLine sout `shouldSatisfy` ("by default only whole instants, and the clock where it stands, are tried; --grid N tries the multiples of N" `isInfixOf`)
+      lastLine sout `shouldSatisfy` (not . ("and only whole instants are tried" `isInfixOf`))
       lastLine sout `shouldSatisfy` (not . ("nothing untried" `isInfixOf`))
 
     it "--max-instants 2 cuts a grid of 1 on clocks.l4, says how, and exits 2" $ do

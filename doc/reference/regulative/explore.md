@@ -424,6 +424,7 @@ These are sorted by which signal carries them.
   The number is of states the bound kept out, each once; before that date the same run printed 12, because the code added one for each move that reached such a state.
 - **An act could not be tried at an instant the scheme chose (exit 2).** The coverage line has `UNTRIED n` and the text before it names the act and why:
   - _an instant that is not a whole number_: a deadline in the file is a fraction (`WITHIN 2.5`), or a trace starts at one (`AT 0.5`) and a deadline counted from it falls on one, so an instant the scheme needs is not whole, and only whole instants, and the instant the clock already stands at, are tried.
+    The line says so in its own words, `by default only whole instants, and the clock where it stands, are tried; --grid N tries the multiples of N`: with `--grid 0.5` the 2.5 is a multiple of the step and is tried (`half.l4` under `--grid 0.5` exits 0, measured 2026-11-24).
     `jl4/tests-cli/fixtures/explore-instants/half.l4` gives 3 states, 4 transitions and `UNTRIED 1` (measured 2026-11-22);
   - _the instant cap_: one act in one state would need more than `--max-instants` instants (256 unless you say otherwise), which a grid reaches quickly: `--grid 1` on an obligation that is `WITHIN 365` needs 366;
   - _the grid's end_: with `--grid`, no deadline and no `--until`, so the clock has no end to try up to; or a clock, deadline or window opening that is not a multiple of the step.
@@ -508,7 +509,7 @@ These are all in the output, on the coverage line or the property's own line, an
 - **Where the region scheme stops being exact.** Positions that differ only in the clock are merged under `time by regions` when the same deadlines have passed and the deadlines and openings come in the same order, and an act is tried only at the instants where something can change.
   Both are right while no guard reads the clock arithmetically, or compares it against a value the contract recorded, and the explorer does not check that none does.
   The line names the scheme and that is all it does.
-  What it does say, loudly (exit 2): a tie that needs a chain of acts (above), a deadline or stamp that is not a whole number, and a state that needs more instants than the cap.
+  What it does say, loudly (exit 2): a tie that needs a chain of acts (above), a deadline or window opening that is not a whole number, and a state that needs more instants than the cap.
   What it does not say: an act whose behaviour changes at some instant for a reason that is neither a deadline nor a window opening, and a window opening the explorer cannot read (an `AFTER` that names a date).
   Two cases a review found (2026-11-23) were silent and are now handled, and are listed so that the next one is looked for in the same places.
   A deadline started by a lapse (a `LEST` that arms a cure) is not started by an act, so no act's own offset named the tie it makes.
