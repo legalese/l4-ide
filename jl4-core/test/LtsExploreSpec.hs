@@ -44,6 +44,7 @@ module LtsExploreSpec (spec) where
 import Data.List (nub, sort)
 import Data.Maybe (isJust)
 import qualified Data.Map.Strict as Map
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Control.Monad (forM, forM_)
@@ -52,13 +53,15 @@ import Text.Read (readMaybe)
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Evaluate.Ledger (emptyStore)
+import L4.Evaluate.ValueLazy (Value (ValBreached))
 import L4.EvaluateLazy (EvalDirectiveResult (..), execEvalModuleWithDeonticLog, resolveEvalConfig)
+import L4.EvaluateLazy.DeonticStep (DeonticStep (..), StepOutcome (..))
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Lts.Explore
 import L4.Lts.Explore.Check
 import L4.Lts.WhatIf
   ( Candidate (..), CandidateKind (..), Hypothetical (..), Outcome (..), Position (..), Rig (..), Verdict (..)
-  , candidatesOf, hypotheticalExpr, position, tickPast, tryCandidateFrom )
+  , afterCommonPrefix, candidatesOf, carryBreach, eventTaken, hypotheticalExpr, position, tickPast, tryCandidateFrom )
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
@@ -680,6 +683,48 @@ capShiftSrc = Text.unlines
   , "    LEST qk"
   ]
 
+-- | smucclaw/l4-ide#1087: the left side of a RAND is breached by the buyer's
+-- deadline at 2, and the seller's, at 5, is still being waited on: the
+-- evaluator adds the seller's blame when time passes it.
+soldSrc :: Text.Text
+soldSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF Buyer, Seller"
+  , "DECLARE Action IS ONE OF pay, deliver"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`sold` MEANS"
+  , "        (PARTY Buyer MUST pay WITHIN 2 HENCE FULFILLED LEST BREACH BY Buyer)"
+  , "  RAND  (PARTY Seller MUST deliver WITHIN 5 HENCE FULFILLED LEST BREACH BY Seller)"
+  ]
+
+-- | The issue's own contract: the right side is a prohibition, breached by the act.
+resoldSrc :: Text.Text
+resoldSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF Buyer, Seller"
+  , "DECLARE Action IS ONE OF pay, resell"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`resold` MEANS"
+  , "  (PARTY Buyer MUST pay WITHIN 2 LEST BREACH BY Buyer)"
+  , "  RAND"
+  , "  (PARTY Seller SHANT resell LEST BREACH BY Seller)"
+  ]
+
+-- | What cannot be read: the seller's delivery has a continuation, armed after
+-- the breach.
+invoicedSrc :: Text.Text
+invoicedSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF Buyer, Seller"
+  , "DECLARE Action IS ONE OF pay, deliver, invoice"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`invoiced` MEANS"
+  , "        (PARTY Buyer MUST pay WITHIN 2 HENCE FULFILLED LEST BREACH BY Buyer)"
+  , "  RAND  (PARTY Seller MUST deliver WITHIN 5"
+  , "           HENCE (PARTY Seller MUST invoice WITHIN 3 HENCE FULFILLED LEST BREACH BY Seller)"
+  , "           LEST BREACH BY Seller)"
+  ]
+
 -- | A deadline that is fixed in absolute time and only the successor holds
 -- (an anchor on the arming of the outset): Q's is at 3, S's at 7, whichever
 -- instant `a` is done at, so `a` at 3 and at 7 are boundaries.
@@ -734,13 +779,18 @@ enumerated :: Explorer -> Int -> Integer -> IO (Set.Set Text.Text, Set.Set Text.
 enumerated ex depth horizon = do
   let (rig0, tr0) = rigFor ex []
   pos0 <- position rig0 tr0 >>= maybe (fail "the outset gave no position") pure
-  go (0 :: Int) [([], pos0)] Set.empty Set.empty
+  -- every act the contract has offered at any position met so far: what is
+  -- tried, at every instant, at a breached position, which offers none of its
+  -- own (the evaluator holds the right side of a breached RAND to later events
+  -- all the same; the explorer carries it, and the oracle does not)
+  universe <- newIORef []
+  go universe (0 :: Int) [([], pos0)] Set.empty Set.empty
   where
     -- a position is expanded once per key AND CLOCK: two positions with one key
     -- can differ in how far the clock is from a deadline anchored in absolute
     -- time, and so in what they can still reach; expanding only the first one
     -- met would be the blind spot the graph itself used to have
-    go d frontier seen sigs
+    go universe d frontier seen sigs
       | null frontier = pure (sigs, Set.map fst seen)
       | otherwise = do
           keyed <- forM frontier \ (ev, pos) -> do
@@ -753,13 +803,16 @@ enumerated ex depth horizon = do
           if d >= depth
             then pure (sigs', Set.map fst seen')
             else do
-              next <- concat <$> forM fresh \ (_, _, ev, pos) -> successors ev pos
-              go (d + 1) next seen' sigs'
+              next <- concat <$> forM fresh \ (_, _, ev, pos) -> successors universe ev pos
+              go universe (d + 1) next seen' sigs'
     firstByKey _ [] = []
     firstByKey seen (x@(k, _, _, p) : xs)
       | Set.member (k, p.posClock) seen = firstByKey seen xs
       | otherwise = x : firstByKey (Set.insert (k, p.posClock) seen) xs
-    successors ev pos = do
+    successors universe ev pos = case pos.posResidual of
+      Just (ValBreached _) -> breachedSuccessors universe ev pos
+      _ -> liveSuccessors universe ev pos
+    liveSuccessors universe ev pos = do
       let (rig, tr) = rigFor ex ev
           c = pos.posClock
       cands <- candidatesOf rig tr pos
@@ -768,11 +821,16 @@ enumerated ex depth horizon = do
           limit = if null ahead then c + fromInteger horizon else minimum ahead
           try cand = do
             (outcome, mpos) <- tryCandidateFrom rig tr pos cand
-            pure case (outcome.ocVerdict, cand.cdHypothetical, mpos) of
-              (Untried _, _, _)    -> []
-              (PassedOver _, _, _) -> []
-              (_, Right hyp, Just pos') | isJust pos'.posResidual -> [(ev <> [hypotheticalExpr hyp], pos')]
-              _ -> []
+            case (outcome.ocVerdict, cand.cdHypothetical, mpos) of
+              (Untried _, _, _)    -> pure []
+              (PassedOver _, _, _) -> pure []
+              (_, Right hyp, Just pos') | isJust pos'.posResidual -> do
+                carried <- carryBreach pos pos'
+                pure [(ev <> [hypotheticalExpr hyp], carried)]
+              _ -> pure []
+      forM_ cands \ cand -> case cand.cdHypothetical of
+        Right Act {hyParty = p, hyAction = a} -> modifyIORef' universe (\ u -> if (p, a) `elem` u then u else u <> [(p, a)])
+        _ -> pure ()
       concat <$> forM cands \ cand -> case (cand.cdKind, cand.cdHypothetical) of
         (ActBy _, Right act@Act {}) ->
           concat <$> forM [ceiling c .. floor limit :: Integer] \ t ->
@@ -782,16 +840,63 @@ enumerated ex depth horizon = do
           -- earlier than the clock
           try cand {cdHypothetical = Right (Tick (max c (d + 1)))}
         _ -> pure []
+    -- a breached position offers nothing, and the evaluator goes on holding
+    -- the right side to events: every act met so far at every whole instant,
+    -- and the clock at every whole instant, each kept when the evaluator says
+    -- something took it
+    breachedSuccessors universe ev pos = do
+      acts <- readIORef universe
+      let c = pos.posClock
+          instants = [ceiling c .. floor (c + fromInteger horizon) :: Integer]
+          actEvents =
+            [ hypotheticalExpr Act {hyParty = p, hyAction = a, hyAt = fromInteger t} | (p, a) <- acts, t <- instants ]
+          expiries child = [ k | st <- afterCommonPrefix pos.posSteps child.posSteps, Expired _ _ <- [st.dsOutcome], Just k <- [st.dsNorm] ]
+          next e = do
+            let (rig', tr') = rigFor ex (ev <> [e])
+            position rig' tr'
+      fromActs <- fmap concat $ forM actEvents \ e -> next e >>= \ case
+        -- an act that comes after a deadline only shows the deadline's expiry,
+        -- which the clock showing it is already the answer to
+        Just child | isJust child.posResidual, eventTaken (afterCommonPrefix pos.posSteps child.posSteps), null (expiries child) -> do
+          carried <- carryBreach pos child
+          pure [(ev <> [e], carried)]
+        _ -> pure []
+      -- the clock at every whole instant, but only where it first shows an
+      -- expiry the instant before it did not: the evaluator's own answer to
+      -- "one unit past a deadline", with no deadline read by the explorer
+      ticks <- forM [ t | t <- instants, fromInteger t > c ] \ t -> do
+        let e = hypotheticalExpr (Tick (fromInteger t))
+        (,) e <$> next e
+      let revealed = [ maybe [] expiries m | (_, m) <- ticks ]
+          firstShown = [ (e, child) | ((e, Just child), now, prior) <- zip3 ticks revealed ([] : revealed), isJust child.posResidual, not (null now), now /= prior ]
+      fromTicks <- forM firstShown \ (e, child) -> do
+        carried <- carryBreach pos child
+        pure (ev <> [e], carried)
+      pure (fromActs <> fromTicks)
 
 -- | The graph's states, each replayed from its own path, as the signatures
 -- and the keys 'enumerated' gives its positions.
 graphViews :: Explorer -> Graph -> IO (Set.Set Text.Text, Set.Set Text.Text)
 graphViews ex g = do
   views <- forM g.gStates \ s -> do
-    let (rig, tr) = rigFor ex s.snPath
-    pos <- position rig tr >>= maybe (fail "a state's path gave no position") pure
+    pos <- positionAlong ex s.snPath >>= maybe (fail "a state's path gave no position") pure
     (,) <$> timeSignature ex pos <*> keyText ex pos
   pure (Set.fromList (map fst views), Set.fromList (map snd views))
+
+-- | What a graph leaves untried besides the norms armed behind a breach
+-- (smucclaw/l4-ide#1087): those are named (`(unread)`) and cannot be read back,
+-- so a contract whose right side of a `RAND` has a continuation is incomplete
+-- after a breach on the left, and says so. The tests of the instants and the
+-- chains are about everything else.
+besidesUnread :: Graph -> [UntriedNote]
+besidesUnread g = [ n | n <- g.gCoverage.cvUntried, not ("(unread)" `Text.isPrefixOf` n.unWhat) ]
+
+-- | Complete but for the norms armed behind a breach.
+completeBesidesUnread :: Graph -> Bool
+completeBesidesUnread g = null (besidesUnread g) && null g.gCoverage.cvRefused && null g.gCoverage.cvStops && g.gCoverage.cvBeyondClock == 0
+
+hasUnread :: Graph -> Bool
+hasUnread g = length (besidesUnread g) /= length g.gCoverage.cvUntried
 
 hasFraction :: Text.Text -> Bool
 hasFraction t = or [ isDigit' a && b == '.' && isDigit' c | (a, b, c) <- zip3 s (drop 1 s) (drop 2 s) ]
@@ -1005,9 +1110,13 @@ spec = describe "l4 explore" do
           g <- explore o sites rig start >>= either (fail . Text.unpack) pure
           (wantSigs, wantKeys) <- enumerated ex depth horizon
           (haveSigs, haveKeys) <- graphViews ex g
-          case o.eoTime of
-            Regions -> Set.toList (wantSigs `Set.difference` haveSigs) `shouldBe` []
-            Grid _  -> Set.toList (wantKeys `Set.difference` haveKeys) `shouldBe` []
+          -- a graph that names a norm armed behind a breach says it cannot
+          -- hold what follows it; then what it owes is to say so
+          if hasUnread g
+            then coverageComplete g.gCoverage `shouldBe` False
+            else case o.eoTime of
+              Regions -> Set.toList (wantSigs `Set.difference` haveSigs) `shouldBe` []
+              Grid _  -> Set.toList (wantKeys `Set.difference` haveKeys) `shouldBe` []
         -- what the oracle finds missing from the graph, and whether the graph
         -- says it is complete
         auditOf name src opts until' depth horizon = do
@@ -1037,6 +1146,9 @@ spec = describe "l4 explore" do
           | "`fam`" `Text.isInfixOf` src = "fam"
           | "`lapsef`" `Text.isInfixOf` src = "lapsef"
           | "`rc`" `Text.isInfixOf` src = "rc"
+          | "`sold`" `Text.isInfixOf` src = "sold"
+          | "`resold`" `Text.isInfixOf` src = "resold"
+          | "`invoiced`" `Text.isInfixOf` src = "invoiced"
           | "`remerged`" `Text.isInfixOf` src = "remerged"
           | otherwise = "deal"
         clocks = clocksSrc 3 5 7
@@ -1093,7 +1205,7 @@ spec = describe "l4 explore" do
           let caps = [ n | n <- g.gCoverage.cvUntried, "PARTY B DOES b" `Text.isInfixOf` n.unWhat, "instant cap" `Text.isInfixOf` n.unWhat ]
           map (.unWhy) caps `shouldSatisfy` any (Text.isInfixOf expected)
         full <- exploreSrc capShiftSrc "rc" regions {eoMaxInstants = 5} []
-        coverageComplete full.gCoverage `shouldBe` True
+        completeBesidesUnread full `shouldBe` True
       it "a state reached again says the larger shortfall of the instant cap, which its earlier clock has (cap-re)" do
         g <- exploreSrc capReSrc "rc" regions {eoMaxInstants = 2} []
         let caps = [ n | n <- g.gCoverage.cvUntried, "PARTY B DOES b" `Text.isInfixOf` n.unWhat, "instant cap" `Text.isInfixOf` n.unWhat ]
@@ -1105,7 +1217,7 @@ spec = describe "l4 explore" do
         coverageComplete capped.gCoverage `shouldBe` False
         coverageLine capped.gCoverage `shouldSatisfy` Text.isInfixOf "past the instant cap"
         roomy <- exploreSrc capReSrc "rc" regions {eoMaxInstants = 4} []
-        coverageComplete roomy.gCoverage `shouldBe` True
+        completeBesidesUnread roomy `shouldBe` True
       -- the tallies are per state: a state reached again adds what the first visit
       -- did not find and repeats nothing
       it "the chain note counts states, not the records of their visits: no more than the states in which the act is tried" do
@@ -1131,8 +1243,7 @@ spec = describe "l4 explore" do
           ex <- newExplorer o sites rig start
           g <- explore o sites rig start >>= either (fail . Text.unpack) pure
           expected <- fmap sum $ forM g.gStates \ st -> do
-            let (rig', tr') = rigFor ex st.snPath
-            pos <- position rig' tr' >>= maybe (fail "a state's path gave no position") pure
+            pos <- positionAlong ex st.snPath >>= maybe (fail "a state's path gave no position") pure
             ds <- liveDeadlines ex pos
             let known = nub [ d | (_, Just (Right d)) <- ds ]
             pure (length [ () | d <- known, max pos.posClock (tickPast known d) > 12 ])
@@ -1156,6 +1267,34 @@ spec = describe "l4 explore" do
                         , Just stamp <- [stampOf t.tnLabel], Just c <- [Map.lookup t.tnFrom clockOf], fromInteger stamp < c ]
         backwards `shouldBe` []
 
+    describe "a breached position that still has a part waiting (#1087)" do
+      holdsEvery "the right side of a RAND whose left side is breached still has its deadline" soldSrc regions Nothing 3 6
+      honest "the right side of a RAND whose left side is breached" soldSrc regions Nothing 3 6
+      holdsEvery "a prohibition on the right side of a breached RAND" resoldSrc regions Nothing 3 6
+      honest "a prohibition on the right side of a breached RAND" resoldSrc regions Nothing 3 6
+      it "the buyer's breach is not the end: the seller's deadline passing adds the seller's blame, and the breach is not terminal" do
+        g <- exploreSrc soldSrc "sold" regions []
+        let afterBuyer = [ s | s <- g.gStates, s.snEvents == ["WAITUNTIL OF 3"] ]
+            residualOf i = [ s.snResidual | s <- g.gStates, s.snId == i ]
+        map (.snTerminal) afterBuyer `shouldBe` [False]
+        [ s.snResidual | s <- afterBuyer ] `shouldSatisfy` all (Text.isInfixOf "still waiting on: Seller MUST deliver WITHIN 2")
+        -- the tick past the seller's deadline leaves the state that blames both
+        let ticks = [ t | s <- afterBuyer, t <- g.gTransitions, t.tnFrom == s.snId, t.tnKind == EdgeTick ]
+        map (\ t -> [ "BY Buyer" `Text.isInfixOf` r && "BY Seller" `Text.isInfixOf` r | r <- residualOf t.tnTo ]) ticks `shouldBe` [[True]]
+        coverageComplete g.gCoverage `shouldBe` True
+      it "a state with the seller still waiting and one without are two states (the key holds what is pending)" do
+        g <- exploreSrc soldSrc "sold" regions []
+        let breachedByBuyer = [ s | s <- g.gStates, "BY Buyer" `Text.isInfixOf` s.snResidual, not ("BY Seller" `Text.isInfixOf` s.snResidual) ]
+        length breachedByBuyer `shouldBe` length (nub (map (.snResidual) breachedByBuyer))
+        length [ () | s <- breachedByBuyer, "still waiting on" `Text.isInfixOf` s.snResidual ] `shouldSatisfy` (> 0)
+        length [ () | s <- breachedByBuyer, not ("still waiting on" `Text.isInfixOf` s.snResidual) ] `shouldSatisfy` (> 0)
+      it "an obligation armed after the breach is named as untried, never dropped, and the line says so" do
+        (_, g) <- auditOf "invoiced" invoicedSrc regions Nothing 3 8
+        coverageComplete g.gCoverage `shouldBe` False
+        coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "armed after the breach"
+        -- the state is there, and is not called finished
+        [ s.snTerminal | s <- g.gStates, "(unread)" `Text.isInfixOf` s.snResidual ] `shouldBe` [False]
+
     describe "the coverage line is honest about time" do
       honest "two clocks" clocks regions Nothing 3 3
       honest "two clocks with wide gaps" wide regions Nothing 2 3
@@ -1172,32 +1311,33 @@ spec = describe "l4 explore" do
         coverageComplete g.gCoverage `shouldBe` False
         coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "ties through chains of acts"
         coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "--chains tries them"
-      it "with --chains it is searched, and nothing is left out" do
+      it "with --chains it is searched, and nothing is left out but what is armed behind a breach" do
         g <- exploreSrc roomSrc "room" regions {eoChains = True} []
-        coverageComplete g.gCoverage `shouldBe` True
+        completeBesidesUnread g `shouldBe` True
+        coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "ties through chains")
       it "a contract with no chain says nothing about chains" do
         g <- exploreSrc clocks "clocks" regions []
         coverageComplete g.gCoverage `shouldBe` True
         coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "chains")
       it "the review's cascade, where one act starts a deadline and nothing follows it, says nothing about chains" do
         g <- exploreSrc (cascadeSrc 20 25 10) "cascade" regions []
-        coverageComplete g.gCoverage `shouldBe` True
-        coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "chains")
+        completeBesidesUnread g `shouldBe` True
+        coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "ties through chains")
 
     describe "the instants one act is tried at do not snowball" do
       it "two fixed deadlines and one offset: the whole graph of the review's cascade (20, 25 and 10) is small" do
         g <- exploreSrc (cascadeSrc 20 25 10) "cascade" regions []
         g.gCoverage.cvStates `shouldSatisfy` (< 200)
-        coverageComplete g.gCoverage `shouldBe` True
+        completeBesidesUnread g `shouldBe` True
       it "the same at ten times the size is no larger in instants, and not cut at the cap" do
         small <- exploreSrc (cascadeSrc 20 25 10) "cascade" regions []
         g <- exploreSrc (cascadeSrc 200 250 100) "cascade" regions []
-        coverageComplete g.gCoverage `shouldBe` True
+        completeBesidesUnread g `shouldBe` True
         g.gCoverage.cvInstants.isInstants `shouldSatisfy` (<= small.gCoverage.cvInstants.isInstants)
         g.gCoverage.cvStates `shouldBe` small.gCoverage.cvStates
       it "--chains on the cascade converges (it is a chain after all: r, then a) and is bounded" do
         g <- exploreSrc (cascadeSrc 8 10 4) "cascade" regions {eoChains = True} []
-        coverageComplete g.gCoverage `shouldBe` True
+        completeBesidesUnread g `shouldBe` True
         g.gCoverage.cvStates `shouldSatisfy` (< 600)
 
     describe "--grid 1: the graph holds every position the evaluator reaches" do
