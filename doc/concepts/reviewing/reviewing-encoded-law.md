@@ -100,6 +100,7 @@ A rule that calls another rule is read through to what that rule means, in the s
 A rule whose whole body is `FALSE` or `TRUE` is usually deliberate: an encoding records “the text says no” this way, or switches a provision off.
 `l4 verify` lists such a rule as a **constant** and checks nothing in it, so `DECIDE x IF FALSE` is not reported as a requirement nobody can meet.
 Only the bare word counts: a rule that is false for some other reason, such as one that asks for a constant `FALSE` rule and something else, is still reported.
+Such a finding names the constant it reads through, because that is usually the cause, and usually intended.
 
 What it is _not_, stated plainly because the tool says so itself: the analysis is propositional. Every other leaf is opaque, so `x > 5 AND x < 3` is invisible to it — no numeric, date or string contradiction is in range. **Findings are sound; silence is not a consistency proof.** On the Reg CF corpus it reports zero findings, and three numbers bound what that is worth (measured 2026-09-29): 25 of 43 analysed rules have exactly one condition (for 11 of them that condition is a call, now read through), 66 of 109 are outside the analysis entirely for not returning a boolean, and 5 more are nested where the analysis does not reach. Those are counted and named on the receipt rather than folded into the word “clean”. You will meet this style everywhere here — a green result that tells you what it did not look at.
 

@@ -1113,6 +1113,7 @@ analyseBody labels order defs body written
           , findingAtoms = atomLabels labels body
           , findingMessage =
               "the decision is TRUE for no assignment of its atoms: as drafting, a requirement nobody can meet."
+                <> readsThroughConstants labels body
           , findingWrittenAt = Nothing
           }
       ]
@@ -1124,6 +1125,24 @@ analyseBody labels order defs body written
     sat = satisfiable order defs
     atomLabels labs e = [label labs u | u <- nubOrd (varsOf e)]
     label labs u = stripBackticks (Map.findWithDefault (Text.pack (show u)) u labs)
+
+    -- A sentence naming each constant the subterm reads through: a call atom whose
+    -- meaning is the literal TRUE or FALSE ('literalBody', smucclaw/l4-ide#1095).
+    -- A finding through one is usually what the drafter meant, and says so. The
+    -- name keeps its backticks, which the atoms line drops, so that a name of
+    -- several words reads as one inside the sentence.
+    -- Wording decided by Claude 2026-11-25, pending Meng's review.
+    readsThroughConstants labs e =
+      mconcat
+        [ " It reads through " <> Map.findWithDefault (Text.pack (show v)) v labs <> ", which is the constant " <> literalText b <> "."
+        | v <- nubOrd (varsOf e)
+        , Just meaning <- [Map.lookup v defs]
+        , Just b <- [constantMeaning meaning]
+        ]
+    constantMeaning = \case
+      BDQ.BTrue -> Just True
+      BDQ.BFalse -> Just False
+      _ -> Nothing
 
     isSeam BDQ.BImplies{} = True
     isSeam _ = False
@@ -1138,6 +1157,7 @@ analyseBody labels order defs body written
               , findingAtoms = atomLabels labels body
               , findingMessage =
                   "the decision is TRUE for every assignment of its atoms, so its FALSE outcome is unreachable and the atoms it names do not affect the answer."
+                    <> readsThroughConstants labels body
               , findingWrittenAt = Nothing
               }
           ]
@@ -1164,7 +1184,7 @@ analyseBody labels order defs body written
             { findingKind = kind
             , findingSite = site
             , findingAtoms = atomLabels labs e
-            , findingMessage = message
+            , findingMessage = message <> readsThroughConstants labs e
             , findingWrittenAt = Map.lookup site starts
             }
 

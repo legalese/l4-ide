@@ -6859,6 +6859,28 @@ spec bin = do
       lookup "`the waiver was signed`" found `shouldBe` Just []
       lookup "`the rule is in force`" found `shouldBe` Just []
 
+    -- #1095's third ask: a finding on a rule that reads through a constant names
+    -- the constant, because the cause is usually intended, and "x cannot
+    -- matter" alone does not say why. A finding that reads through no constant
+    -- says nothing of the kind.
+    it "names the constant a finding reads through" $ do
+      env <- jsonEnvelope bin ["verify", verifyConstantsReadThroughFixture, "--format", "json"]
+      let messages nm =
+            [ T.unpack m
+            | (nm', f) <- findingObjectsByDecision env, nm' == nm
+            , Just (String m) <- [objField f "message"]
+            ]
+          names nm want = case messages nm of
+            [m] | want `isInfixOf` m -> pure ()
+            other -> expectationFailure ("expected one finding on " ++ nm ++ " saying " ++ show want ++ ", got " ++ show other)
+          namesNone nm = case messages nm of
+            [m] | not ("constant" `isInfixOf` m) -> pure ()
+            other -> expectationFailure ("expected one finding on " ++ nm ++ " naming no constant, got " ++ show other)
+      names "`needs the waiver`" "It reads through VerifyConstantsReadThroughFixture.`the waiver was signed`, which is the constant FALSE."
+      names "`x cannot matter`" "It reads through VerifyConstantsReadThroughFixture.`the rule is in force`, which is the constant TRUE."
+      namesNone "`nobody can satisfy this`"
+      namesNone "`false either way`"
+
     -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
     -- Before, it was skipped as not boolean; then its generated nesting made
     -- the analysis report a dead limb that is only the clause that returns
