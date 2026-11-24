@@ -1371,6 +1371,23 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         for_ [ "OUTSTANDING", "EVER FAILED", "FAILED AND NOT CURED", "CURED BY REPARATION" ] \ w ->
           (w, isRead (regulative w)) `shouldBe` (w, Just True)
 
+      it "R12: a read named once and used in two guards is read again at the second, not served from the first" do
+        -- the shared-thunk probe (NORM-LOG-SPEC N4): `pending` has no inputs, so
+        -- its value could be kept from the first guard, where deliver is
+        -- outstanding, and served again at the second, where it is not
+        let shared =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver PROVIDED pending WITHIN 10"
+              , "  HENCE (PARTY Bob MUST pay n PROVIDED NOT pending WITHIN 10)"
+              , "GIVETH A BOOLEAN"
+              , "pending MEANS OUTSTANDING (PARTY Alice MUST deliver) AS OF 10"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 2"
+              , "  PARTY Bob DOES pay 1 AT 4"
+              ]
+        checked shared `shouldBe` True
+        holds shared `shouldReturn` True
+
       it "R8: a module's reads are found from its names, and the pass costs a fraction of one evaluation" do
         let readsLog body = case checkWithImports (vfsFromList []) (src body) of
               Right r -> moduleReadsNormLog r.tcdModule
