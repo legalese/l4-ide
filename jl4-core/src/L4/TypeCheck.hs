@@ -1311,17 +1311,24 @@ assumeReplacementLine dHead declaredType mTypically = \ case
 
 -- | The literal time stamp one of a @#TRACE@'s events carries, when it is not
 -- a whole number: the @AT@ of @PARTY p DOES a AT t@, or the argument of
--- @WAITUNTIL t@. Anything that is not a literal is left alone: it has no value
--- to read until it is evaluated.
+-- @WAITUNTIL t@. A percentage of a literal counts as the literal it stands
+-- for, as the evaluator reads it (@50%@ is a half). Anything that is not a
+-- literal is left alone: it has no value to read until it is evaluated.
 --
 -- The trace's own start is not looked at: @l4 explore@ reads it as its clock
 -- and says itself what that leaves untried, whereas it reads no event stamp.
 fractionalTraceStamp :: Expr Resolved -> Maybe (Rational, Maybe SrcRange)
 fractionalTraceStamp = \ case
-  lit@(Lit _ (NumericLit _ r)) | denominator r /= 1 -> Just (r, rangeOf lit)
   Event _ (MkEvent _ _ _ at _) -> fractionalTraceStamp at
   App _ f [at] | getUnique f == waitUntilUnique -> fractionalTraceStamp at
+  e | Just r <- literalStamp e, denominator r /= 1 -> Just (r, rangeOf e)
   _ -> Nothing
+ where
+  literalStamp :: Expr Resolved -> Maybe Rational
+  literalStamp = \ case
+    Lit _ (NumericLit _ r) -> Just r
+    Percent _ e            -> (/ 100) <$> literalStamp e
+    _                      -> Nothing
 
 inferDirective :: Directive Name -> Check (Directive Resolved)
 inferDirective (LazyEval ann e) = errorContext (WhileCheckingExpression e) do

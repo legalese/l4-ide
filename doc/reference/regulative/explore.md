@@ -46,6 +46,7 @@ The exception is the clock where it already stands, which can be a fraction ("Wh
 
 A `#TRACE` can still write a time stamp that is not a whole number, and `l4 run` uses it as written.
 So that it is not a surprise that `l4 explore` does not explore a run at such a time, `l4 run` and `l4 check` print a note (code `lint/fractional-trace-stamp`, severity Information) on each such stamp in an event: in a `WAITUNTIL`, or in the `AT` of an act.
+A percentage of a number is read as the number it stands for, so `WAITUNTIL (350%)` is a stamp of 3.5 and gets the note, and `WAITUNTIL (400%)` is 4 and does not.
 It is a note and not an error: nothing is refused and the exit status is not changed.
 Two kinds of stamp get no note:
 

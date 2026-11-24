@@ -86,3 +86,7 @@ spec = describe "a fractional time stamp in a #TRACE" do
     text `shouldSatisfy` (not . ("does not explore the positions" `Text.isInfixOf`))
     text `shouldSatisfy` ("`l4 explore` does not read it" `Text.isInfixOf`)
     text `shouldSatisfy` ("`--grid 0.5`" `Text.isInfixOf`)
+
+  it "reads a percentage as the evaluator does, a hundredth of the number: `(350%)` is 3.5 and `(400%)` is a whole 4" do
+    stampsOf (notices ["#TRACE `one` AT 0 WITH", "  (WAITUNTIL (350%))", "  PARTY P DOES a AT 50%"]) `shouldBe` [7 / 2, 1 / 2]
+    stampsOf (notices ["#TRACE `one` AT 0 WITH", "  (WAITUNTIL (400%))"]) `shouldBe` []

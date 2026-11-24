@@ -267,7 +267,7 @@ data CheckError =
     -- defining name (whose range is the definition site).
   | FractionalTraceStamp Rational (Maybe SrcRange)
     -- ^ The time stamp of one of a @#TRACE@'s events (@AT@ or @WAITUNTIL@) is
-    -- a literal that is not a whole number. A notice,
+    -- a literal, or a percentage of one, that is not a whole number. A notice,
     -- never an error: the evaluator uses the stamp as written, and the notice
     -- is only to say what @l4 explore@ does with it, which is not to read it
     -- (from a @#TRACE@ it takes the contract and the start), and by default to
