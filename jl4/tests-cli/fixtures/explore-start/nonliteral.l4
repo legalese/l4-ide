@@ -1,0 +1,13 @@
+IMPORT prelude
+
+-- The explorer's X2, for a start that is not a literal: `AT (10 + 5)` is 15,
+-- so P's deadline is at 18. The explorer read only a literal `AT`, and took any
+-- other start for 0.
+
+DECLARE Person IS ONE OF P
+DECLARE Action IS ONE OF a
+
+GIVETH A DEONTIC Person Action
+nonliteral MEANS PARTY P MUST a WITHIN 3 HENCE FULFILLED LEST BREACH BY P
+
+#TRACE nonliteral AT (10 + 5) WITH

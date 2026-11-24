@@ -1187,10 +1187,11 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   limitClock   <- newIORef (MkLimitClock maxBound 0 0)
   runStopped   <- maybe (newIORef Nothing) pure evalConfig.runStop
   presumable <- newIORef IntMap.empty
+  instantSupply <- newIORef 0
   presumed   <- newIORef emptyPresumedLog
   maxFrameDepth <- readMaxFrameDepthEnv
   pure MkEvalState
-    { moduleUri, stack, supply, evalTrace, envLedger, currentParty, siblings, siblingStarts, traceMuted, entityInfo
+    { moduleUri, stack, supply, instantSupply, evalTrace, envLedger, currentParty, siblings, siblingStarts, traceMuted, entityInfo
     , operandsInStep = evalConfig.operandsInStep
     , normLog = evalConfig.normLog
     , normLogMutant = evalConfig.normLogMutant

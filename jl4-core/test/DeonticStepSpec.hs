@@ -650,7 +650,7 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
             , jnWinner   = Just BothSides
             , jnTieBreak = False
             -- what only the norm log writer fills in
-            , jnRef = Nothing, jnOrigin = Nothing, jnEffective = Nothing, jnObserved = Nothing })
+            , jnRef = Nothing, jnOrigin = Nothing, jnEnclosing = [], jnEffective = Nothing, jnObserved = Nothing })
           NoEvent Nothing Nothing Nothing
       ]
     -- the two expiries are two different sites, one activation each
@@ -693,7 +693,7 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 2) (Just 2) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 3) (Just 3) (Just (ForkContinued 2 2))
       , Row (Just "Landlord OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 4) (Just 4) Nothing
-      , Row Nothing 0 Nothing (Joined ValRAnd MkJoinNote {jnResult = JoinFulfilled, jnWinner = Just BothSides, jnTieBreak = False, jnRef = Nothing, jnOrigin = Nothing, jnEffective = Nothing, jnObserved = Nothing}) NoEvent Nothing Nothing Nothing
+      , Row Nothing 0 Nothing (Joined ValRAnd MkJoinNote {jnResult = JoinFulfilled, jnWinner = Just BothSides, jnTieBreak = False, jnRef = Nothing, jnOrigin = Nothing, jnEnclosing = [], jnEffective = Nothing, jnObserved = Nothing}) NoEvent Nothing Nothing Nothing
       ]
     let members' = [ s | s <- ss, Just m <- [member s], m.moJoin == Fork ]
     length (nubOrd (map rawBearer members')) `shouldBe` 2
@@ -719,7 +719,7 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
     rs <- runLogged orLeftSrc
     map row (stepsOf 0 rs) `shouldBe`
       [ Row (Just "Alice") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) Nothing
-      , Row Nothing 0 Nothing (Joined ValROr MkJoinNote {jnResult = JoinFulfilled, jnWinner = Just LeftSide, jnTieBreak = False, jnRef = Nothing, jnOrigin = Nothing, jnEffective = Nothing, jnObserved = Nothing}) NoEvent Nothing Nothing Nothing
+      , Row Nothing 0 Nothing (Joined ValROr MkJoinNote {jnResult = JoinFulfilled, jnWinner = Just LeftSide, jnTieBreak = False, jnRef = Nothing, jnOrigin = Nothing, jnEnclosing = [], jnEffective = Nothing, jnObserved = Nothing}) NoEvent Nothing Nothing Nothing
       ]
 
   it "10. the events run out with the obligation pending: Waiting, at the clock the last event advanced it to" $ do

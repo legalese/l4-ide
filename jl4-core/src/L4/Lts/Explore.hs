@@ -106,6 +106,7 @@ module L4.Lts.Explore
   , explore
   , coverageComplete
   , replayPath
+  , positionAlong
     -- * What tests hold the scheme to
   , Explorer
   , newExplorer
@@ -143,8 +144,10 @@ import qualified Optics
 import Control.Exception (handle, throwIO)
 
 import L4.Annotation (emptyAnno, getAnno)
+import L4.Parser.SrcSpan (prettySrcRange)
 import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..), Provenance (..))
 import L4.Evaluate.ValueLazy hiding (Blame)
+import L4.EvaluateLazy.Machine (anchorInstant)
 import L4.EvaluateLazy
   ( EntityInfo
   , EvalDirectiveResult (..)
@@ -154,6 +157,7 @@ import L4.EvaluateLazy
   , prettyEvalException
   , prettyReductionOutcome
   )
+import L4.EvaluateLazy.DeonticStep (NormKey (..))
 import L4.EvaluateLazy.Exceptions (LimitStopped (..), isLimitStop)
 import L4.Lts.Marking (Bearer (..), Countdown (..), LiveNorm (..), RawObligation (..), liveObligations, renderLive)
 import L4.Lts.WhatIf
@@ -173,14 +177,24 @@ data Start = MkStart
     -- ^ the contract as written, for the reader
   , stContract :: !(Expr Resolved)
   , stAt       :: !(Expr Resolved)
+    -- ^ the @AT@ as written, for the reader
+  , stClock    :: !(Maybe Rational)
+    -- ^ the clock it is, once read ('explore' reads it): the replay is handed
+    -- this as a literal, so a start below 0, or one that is an expression
+    -- (@AT (10 + 5)@, @AT (DATE_SERIAL ...)@), is where the clock begins
   }
+
+-- | What the replay is told the start is: the clock when it is read, else the
+-- @AT@ as written.
+startExpr :: Start -> Expr Resolved
+startExpr s = maybe s.stAt (Lit emptyAnno . NumericLit emptyAnno) s.stClock
 
 -- | One start per distinct contract and @AT@ among the module's @#TRACE@s,
 -- in source order. The traces' events are not replayed: from the outset
 -- they are one path among those the exploration walks.
 startsOf :: Module Resolved -> [Start]
 startsOf m = nubOrdOn (\ s -> (s.stName, prettyLayout s.stAt))
-  [ MkStart {stName = prettyLayout tr.trContract, stContract = tr.trContract, stAt = tr.trStart}
+  [ MkStart {stName = prettyLayout tr.trContract, stContract = tr.trContract, stAt = tr.trStart, stClock = Nothing}
   | tr <- tracesOf m ]
 
 -- | A top-level rule with no inputs, at this @AT@. Unlike
@@ -194,6 +208,7 @@ startNamed (MkModule _ _ section) wanted at =
       { stName = wanted
       , stContract = Var emptyAnno (Ref n u n)
       , stAt = Lit emptyAnno (NumericLit emptyAnno at)
+      , stClock = Just at
       }
 
 -- | Every @DECIDE@ in a section and the sections under it.
@@ -656,11 +671,11 @@ data ActRecord = MkActRecord
 -- | The rig and trace that replay this path.
 rigFor :: Explorer -> [Expr Resolved] -> (Rig, Trace)
 rigFor ex events =
-  let directive = Contract emptyAnno ex.exStart.stContract ex.exStart.stAt events
+  let directive = Contract emptyAnno ex.exStart.stContract (startExpr ex.exStart) events
       MkModule a uri (MkSection sa sn saka sg decls) = ex.exRig.rigModule
       m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))
   in ( ex.exRig {rigModule = m'}
-     , MkTrace {trDirective = directive, trContract = ex.exStart.stContract, trStart = ex.exStart.stAt, trEvents = events} )
+     , MkTrace {trDirective = directive, trContract = ex.exStart.stContract, trStart = startExpr ex.exStart, trEvents = events} )
 
 -- | A module with no directives: the explorer adds the one it replays.
 withoutDirectives :: Module Resolved -> Module Resolved
@@ -687,12 +702,15 @@ stateKey ex pos = do
       WHNF v -> answerText v
       WHNFWhen _ v _ _ -> answerText v
   deadlines <- liveDeadlines ex pos
-  openings <- for (maybe [] liveObligations pos.posResidual) (openingOf pos.posClock)
+  openings <- for (obligationsOf pos) (openingOf pos.posClock)
   let (dueRanks, openRanks) = ranksOf [ d | (_, d) <- deadlines ] openings
       clock = case ex.exOptions.eoTime of
         Regions -> ClockDropped [ pos.posClock > d | (_, Just (Right d)) <- deadlines ] dueRanks openRanks
         Grid _  -> ClockKept pos.posClock
-  pure ( MkStateKey {skResidual = residual, skLedger = cells, skCafs = map (second fst) cafs, skClock = clock}
+      -- a breached position holds on to what it still waits on: two that blame
+      -- the same party are not one state when one has a sibling pending
+      waiting = waitingLines True pos [ d | (_, d) <- deadlines ] openings
+  pure ( MkStateKey {skResidual = residual <> waitingText waiting, skLedger = cells, skCafs = map (second fst) cafs, skClock = clock}
        , MkKeyNotes
            { knMergedByName = merged
            , knDropped = dropped
@@ -735,10 +753,10 @@ timeSignature ex pos = do
     Nothing -> pure (standingText pos.posResult, [])
   (cells, _, _) <- projectLedger ex.exSites pos.posResult.ledger
   deadlines <- liveDeadlines ex pos
-  openings <- for (maybe [] liveObligations pos.posResidual) (openingOf pos.posClock)
+  openings <- for (obligationsOf pos) (openingOf pos.posClock)
   let (dueRanks, openRanks) = ranksOf [ d | (_, d) <- deadlines ] openings
   pure (Text.unlines
-    [ residual
+    [ residual <> waitingText (waitingLines False pos [ d | (_, d) <- deadlines ] openings)
     , textShow cells
     , "passed " <> textShow [ pos.posClock > d | (_, Just (Right d)) <- deadlines ]
     , "opening ranks " <> textShow openRanks
@@ -764,6 +782,64 @@ ranksOf dues opens = (map (>>= rank) dueOf, map (>>= rank) openOf)
     openOf = map known opens
     instants = sort (nubOrd (catMaybes dueOf <> catMaybes openOf))
     rank x = fmap fst (find ((== x) . snd) (zip [0 :: Int ..] instants))
+
+-- | What a BREACHED position still waits on, one line each, in a fixed order:
+-- who, what, and (when the key is to keep it) how long is left. The line has to
+-- say which obligations are still standing and nothing about the ones that are
+-- gone; the explorer does not know what the right side's continuation, armed
+-- after the breach, holds, and says that too ('posUnread'), so that a state
+-- with one waiting is not taken for a state with none.
+waitingLines :: Bool -> Position -> [Maybe (Either Text Rational)] -> [Maybe (Either Text Rational)] -> [Text]
+waitingLines withTimes pos dues opens = sort (carried <> unread)
+  where
+    own = length (maybe [] liveObligations pos.posResidual)
+    carried =
+      [ Text.unwords (catMaybes
+          [ Just (bearerWord live.lnBearer), Just (modalWord' live.lnModal), Just live.lnAction
+          , if withTimes then within due else Nothing
+          , if withTimes then opening open else Nothing ])
+      | (p, due, open) <- zip3 pos.posPending (drop own dues <> repeat Nothing) (drop own opens <> repeat Nothing)
+      , let live = renderLive pos.posContext p.pdRaw ]
+    unread = [ unreadLine k | k <- pos.posUnread ]
+    within = \ case
+      Just (Right d) -> Just ("WITHIN " <> prettyRatio (d - pos.posClock))
+      Just (Left _)  -> Just "WITHIN (not known here)"
+      Nothing        -> Nothing
+    opening = \ case
+      Just (Right o) | o > pos.posClock -> Just ("AFTER " <> prettyRatio (o - pos.posClock))
+      _                                 -> Nothing
+
+waitingText :: [Text] -> Text
+waitingText [] = ""
+waitingText ls = "\n  [still waiting on: " <> Text.intercalate "; " ls <> "]"
+
+bearerWord :: Bearer -> Text
+bearerWord = \ case
+  KnownParty t    -> t
+  UnforcedParty t -> t
+
+modalWord' :: DeonticModal -> Text
+modalWord' = \ case
+  DMust    -> "MUST"
+  DMay     -> "MAY"
+  DMustNot -> "SHANT"
+  DDo      -> "DO"
+
+firstJust :: [Maybe a] -> Maybe a
+firstJust = listToMaybe . catMaybes
+
+-- | A norm the log shows waiting behind a breach that the explorer holds no
+-- obligation for: who, what kind, and where in the source it is written
+-- (the file's name and the range, not its path).
+unreadLine :: NormKey -> Text
+unreadLine k = Text.unwords
+  [ "(unread)"
+  , fromMaybe "(party not yet known)" (firstJust [k.nkBearerName, k.nkBearer, fmap (<> " (as written)") k.nkBearerSource])
+  , modalWord' k.nkModal
+  , case k.nkSite of
+      Just r  -> "(at " <> prettySrcRange r <> ")"
+      Nothing -> "(no location)"
+  ]
 
 -- | What a result that is not a residual says, for a state key.
 standingText :: EvalDirectiveResult -> Text
@@ -868,7 +944,7 @@ projectLedger sites store = do
 -- WhatIf's 'deadlineOf' first; an anchor the residual holds unforced is then
 -- evaluated, when it is closed in the module ('resolveAnchor').
 liveDeadlines :: Explorer -> Position -> IO [(RawObligation NF, Maybe (Either Text Rational))]
-liveDeadlines ex pos = for (maybe [] liveObligations pos.posResidual) \ raw -> case raw.roDue of
+liveDeadlines ex pos = for (obligationsOf pos) \ raw -> case raw.roDue of
   Left Nothing -> pure (raw, Nothing)
   _ -> do
     d <- deadlineOf pos.posClock raw
@@ -932,6 +1008,33 @@ evalNumber ex e = do
       | Reduction (ReducedErrored exc) <- res.result, isLimitStop exc ->
           throwIO (LimitStopped ("working out a deadline's anchor: " <> Text.unwords (prettyEvalException exc)))
     _ -> pure Nothing
+
+-- | One @#EVAL@ of a closed expression in the module, read as an instant: a
+-- NUMBER as it is, a DATE by its serial (as the machine lowers an anchor).
+evalInstantIn :: Rig -> Expr Resolved -> IO (Maybe Rational)
+evalInstantIn rig e = do
+  let MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
+      m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno (LazyEval emptyAnno e)]))
+  (_, results) <- execEvalModuleWithDeonticLog rig.rigConfig rig.rigEntityInfo rig.rigEnv m'
+  pure case results of
+    ((res, _) : _) | Reduction (Reduced (MkNF v)) <- res.result -> case v of
+      ValNumber r -> Just r
+      ValDate d   -> either (const Nothing) Just (anchorInstant (ValDate d))
+      _           -> Nothing
+    _ -> Nothing
+
+-- | The start with its clock read. A literal @AT@ is its own clock; any
+-- other is evaluated once, here, so that the replay is handed a number. A start
+-- that is neither a number nor a date is refused: the explorer would otherwise
+-- take it for 0 and explore a contract that had not begun where it says it did.
+resolveStart :: Rig -> Start -> IO (Either Text Start)
+resolveStart rig start = case start.stClock of
+  Just _ -> pure (Right start)
+  Nothing -> case start.stAt of
+    Lit _ (NumericLit _ r) -> pure (Right start {stClock = Just r})
+    e -> evalInstantIn rig e >>= \ case
+      Just r  -> pure (Right start {stClock = Just r})
+      Nothing -> pure (Left ("the start of the trace, `AT " <> prettyLayout e <> "`, is neither a number nor a date the explorer can read, so it cannot say where the clock begins"))
 
 ----------------------------------------------------------------------------
 -- The instants an act is tried at
@@ -1184,7 +1287,7 @@ sameNorm x y = (x.lnSite, x.lnModal, x.lnAction) == (y.lnSite, y.lnModal, y.lnAc
 thresholdsOf :: Explorer -> Position -> IO [Held]
 thresholdsOf ex pos = do
   deadlines <- liveDeadlines ex pos
-  openings <- for (maybe [] liveObligations pos.posResidual) (openingOf pos.posClock)
+  openings <- for (obligationsOf pos) (openingOf pos.posClock)
   let norms = [ renderLive pos.posContext raw | (raw, _) <- deadlines ]
       nth i n = length [ () | n' <- take i norms, sameNorm n' n ]
   pure
@@ -1333,10 +1436,13 @@ newExplorerWith hint opts sites rig0 start = do
 -- stopped at a limit ('LimitStopped'): a graph built without it could be
 -- missing positions and still read as complete.
 explore :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)
-explore opts sites rig0 start =
-  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit " <> why)))
-    (exploreFrom opts sites rig0 start)
+explore opts sites rig0 start0 =
+  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit " <> why))) $
+    resolveStart rig0 start0 >>= \ case
+      Left e      -> pure (Left e)
+      Right start -> exploreFrom opts sites rig0 start
 
+-- | 'explore' from a start whose clock is read.
 exploreFrom :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)
 exploreFrom opts sites rig0 start = case opts.eoTime of
   Grid n | n <= 0 -> pure (Left "a grid needs a positive step")
@@ -1504,10 +1610,31 @@ exploreWith ex = do
 -- 'StateNode''s 'snPath', or that path and one edge's event after it.
 replayPath :: Rig -> Start -> [Expr Resolved] -> IO (Maybe Position)
 replayPath rig start events = do
-  let directive = Contract emptyAnno start.stContract start.stAt events
+  let directive = Contract emptyAnno start.stContract (startExpr start) events
       MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
       rig' = rig {rigModule = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))}
-  position rig' MkTrace {trDirective = directive, trContract = start.stContract, trStart = start.stAt, trEvents = events}
+  position rig' MkTrace {trDirective = directive, trContract = start.stContract, trStart = startExpr start, trEvents = events}
+
+-- | The position a path of events leads to, as the exploration holds it: each
+-- event replayed from the start, and what a breach on the way left standing
+-- carried from one position to the next ('carryBreach'). Unlike 'replayPath',
+-- which is the evaluator's own answer for the whole path and nothing more, this
+-- is what a state's key is made of, so it is what a test that recomputes a
+-- state's key from its path must use.
+positionAlong :: Explorer -> [Expr Resolved] -> IO (Maybe Position)
+positionAlong ex events = do
+  let (rig0, tr0) = rigFor ex []
+  start <- position rig0 tr0
+  go [] events start
+  where
+    go _ _ Nothing = pure Nothing
+    go _ [] mpos = pure mpos
+    go done (e : es) (Just parent) = do
+      let done' = done <> [e]
+          (rig, tr) = rigFor ex done'
+      position rig tr >>= \ case
+        Nothing    -> pure Nothing
+        Just child -> carryBreach parent child >>= go done' es . Just
 
 loop :: Explorer -> Accum -> IO Accum
 loop ex acc = case acc.acQueue of
@@ -1519,7 +1646,7 @@ loop ex acc = case acc.acQueue of
         -- Listing the candidates replays nothing, so asking costs nothing.
         let (rig, tr) = rigFor ex node.ndEvents
         cands <- candidatesOf rig tr node.ndPos
-        loop ex if null cands
+        loop ex if null cands && null node.ndPos.posUnread
           then terminal node acc {acQueue = rest}
           else acc {acQueue = rest, acDepthCutIds = Set.insert node.ndId acc.acDepthCutIds}
     | otherwise -> do
@@ -1672,10 +1799,14 @@ finish ex acc = MkGraph
 mergeReasons :: [Text] -> [Text] -> [Text]
 mergeReasons new old = Map.elems (Map.fromListWith larger [ (shape r, r) | r <- new <> old ])
   where
-    shape r = Text.pack (concatMap squash (groupBy (\ a b -> isDigit a == isDigit b) (Text.unpack r)))
-    squash g = case g of
-      c : _ | isDigit c -> "#"
-      _                 -> g
+    -- a number is its digits and a minus sign directly before them: below 0 an
+    -- instant is negative, and (-3.5) is the same reason as (1.5)
+    shape r = Text.pack (squash (Text.unpack r))
+    squash ('-' : c : rest) | isDigit c = '#' : squash (dropWhile isDigit rest)
+    squash (c : rest)
+      | isDigit c = '#' : squash (dropWhile isDigit rest)
+      | otherwise = c : squash rest
+    squash [] = []
     numbers r = [ read n :: Integer | n <- words (map (\ c -> if isDigit c then c else ' ') (Text.unpack r)) ]
     larger a b = if numbers a >= numbers b then a else b
 
@@ -1712,12 +1843,15 @@ expand ex node = do
       retimed d cand = cand {cdHypothetical = Right (Tick (tickTime d))}
       run label kind cand = do
         (outcome, mpos) <- tryCandidateFrom rig tr pos cand
-        pure case outcome.ocVerdict of
-          Untried why  -> TriedUntried label why
-          PassedOver r -> TriedPassed label (case r of TooEarly open -> Just open; _ -> Nothing)
+        case outcome.ocVerdict of
+          Untried why  -> pure (TriedUntried label why)
+          PassedOver r -> pure (TriedPassed label (case r of TooEarly open -> Just open; _ -> Nothing))
           _ -> case (cand.cdHypothetical, mpos) of
-            (Right hyp, Just pos') | isJust pos'.posResidual -> TriedEdge label kind (hypotheticalExpr hyp) pos'
-            _ -> TriedUntried label "the replay produced no position"
+            -- what a breach leaves standing is carried to the position it leads to
+            (Right hyp, Just pos') | isJust pos'.posResidual -> do
+              carried <- carryBreach pos pos'
+              pure (TriedEdge label kind (hypotheticalExpr hyp) carried)
+            _ -> pure (TriedUntried label "the replay produced no position")
       -- a tick, and the instants a lapse it reveals arms (see 'tickRecord')
       tick label d cand = case cand.cdHypothetical of
         Right (Tick t) | Just u <- ex.exOptions.eoUntil, t > u -> pure ([TriedBeyond label], [])
@@ -1806,8 +1940,16 @@ expand ex node = do
                       <> [ TriedUntried (label <> " " <> what) why | (what, why) <- ins.inCuts ])
             pure (concat ran <> map (TriedRefused . refusalFor party raw) refusals)
   grid <- offGrid ex pos
-  pure (moves <> grid)
+  pure (moves <> grid <> unreadTried)
   where
+    -- a norm waiting behind a breach that no obligation held before it
+    -- accounts for (usually one armed by the continuation of a sibling that was
+    -- taken; an EVERY member whose obligation the parent did not hold is
+    -- another) is in no residual the explorer can read; naming it is the least
+    -- it owes, because the breached position looks finished and is not
+    unreadTried = [ TriedUntried (unreadLine k)
+                      "it is waiting behind a breach and is not one the explorer held before it: usually armed after the breach, by the continuation of a part that was then taken (a breached value keeps only its blame), so what it asks and when cannot be read back"
+                  | k <- node.ndPos.posUnread ]
     tickLabel cand d = case cand.cdHypothetical of
       Right (Tick t) -> "time passes the deadline " <> prettyRatio d <> " (WAITUNTIL " <> prettyRatio t <> ")"
       _              -> "time passes the deadline " <> prettyRatio d

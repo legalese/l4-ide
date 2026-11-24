@@ -52,6 +52,8 @@ entryFor k fate effective observed = MkNormEntry
   , neModal = Just k.nkModal
   , neBearer = normBearerOf k
   , neAction = k.nkAction
+  , neActionHead = k.nkActionHead
+  , neEnclosing = k.nkEnclosing
   , neOrigin = k.nkOrigin
   , neMember = memberOfKey k
   , neEffective = effective
@@ -82,6 +84,8 @@ breachedEntry origin named effective observed = MkNormEntry
   , neModal = Nothing
   , neBearer = bearer
   , neAction = Nothing
+  , neActionHead = Nothing
+  , neEnclosing = []
   , neOrigin = origin
   , neMember = Nothing
   , neEffective = effective
@@ -159,7 +163,8 @@ fatesOfStep s = case (s.dsNorm, s.dsOutcome) of
       let jop = case op of { ValRAnd -> JoinAnd; ValROr -> JoinOr }
           mk fate = [MkNormEntry
             { neFate = fate, neNorm = note.jnRef, neModal = Nothing, neBearer = NobodyBearer
-            , neAction = Nothing, neOrigin = note.jnOrigin, neMember = Nothing
+            , neAction = Nothing, neActionHead = Nothing, neEnclosing = note.jnEnclosing
+            , neOrigin = note.jnOrigin, neMember = Nothing
             , neEffective = note.jnEffective, neObserved = note.jnObserved }]
       in case note.jnResult of
         JoinFulfilled  -> mk (FateJoinedFulfilled jop)

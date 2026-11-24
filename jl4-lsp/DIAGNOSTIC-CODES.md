@@ -100,7 +100,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/join-without-every`                  | A join line (ONCE ...) under a single PARTY, not an EVERY.                               |
 | `check/jsondecode-at-type-parameter`        | A JSONDECODE applied where the type to decode into mentions a type parameter.            |
 | `check/jsondecode-passed-at-type-parameter` | A bare JSONDECODE handed on as a function at a type that mentions a type parameter.      |
-| `check/lifecycle-unavailable`               | THE JOIN or THE DEADLINE as a value where that position does not exist.                  |
+| `check/lifecycle-unavailable`               | THE JOIN or THE DEADLINE with no such position; THE INSTANT outside a PROVIDED guard.    |
 | `check/means-on-alternative-field`          | A MEANS clause on a payload field of an enum constructor.                                |
 | `check/misattached-section-given`           | A column-1 GIVEN declares a name the declaration below it never uses.                    |
 | `check/misdelivered-implicit-supply`        | A WITH value checked against one section input would reach another of the same spelling. |
@@ -152,7 +152,8 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/deprecated-exactly`              | `check`  | An EXACTLY in an action, which is deprecated.                                              |
 | `lint/fixity-ignored-non-binary`       | `check`  | A fixity annotation on a definition that is not a binary infix operator.                   |
 | `lint/fixity-not-attached`             | `parser` | A fixity annotation attached to nothing.                                                   |
-| `lint/lifecycle-noun-hides-name`       | `check`  | THE JOIN, THE DEADLINE or THE ARMING where the program defines that word.                  |
+| `lint/lifecycle-noun-hides-name`       | `check`  | THE JOIN, THE DEADLINE, THE ARMING or THE INSTANT where the program defines that word.     |
+| `lint/now-in-provided`                 | `check`  | NOW, TODAY or CURRENTTIME in a PROVIDED, the wall clock; THE INSTANT is the event's time.  |
 | `lint/nonassertable-not-attached`      | `parser` | `@nonassertable` attached to nothing.                                                      |
 | `lint/nonassertable-same-line`         | `parser` | `@nonassertable` on the line of the definition it marks.                                   |
 | `lint/nonassertable-superseded`        | `parser` | A `@nonassertable` that a later one supersedes.                                            |

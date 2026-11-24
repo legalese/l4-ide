@@ -448,6 +448,11 @@ data LifecyclePoint
   = LifecycleJoin      -- ^ @THE JOIN@
   | LifecycleDeadline  -- ^ @THE DEADLINE@
   | LifecycleArming    -- ^ @THE ARMING@
+  | LifecycleInstant
+    -- ^ @THE INSTANT@: the contract clock at the point the expression runs
+    -- (NORM-LOG-SPEC N4, P2). Not an anchor: no @OF THE INSTANT@, and
+    -- 'lifecyclePointOfAnchor' never returns it. Available inside a
+    -- @PROVIDED@ guard, where it is the stamp of the event being matched
   deriving stock (GHC.Generic, Eq, Ord, Show, Enum, Bounded)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -476,6 +481,7 @@ lifecyclePointWords = \ case
   LifecycleJoin     -> "THE JOIN"
   LifecycleDeadline -> "THE DEADLINE"
   LifecycleArming   -> "THE ARMING"
+  LifecycleInstant  -> "THE INSTANT"
 
 -- | The noun alone, as the identifier it is spelled like (@JOIN@,
 -- @DEADLINE@, @ARMING@): the nouns are not reserved words, so a program may
@@ -485,6 +491,7 @@ lifecyclePointNoun = \ case
   LifecycleJoin     -> "JOIN"
   LifecycleDeadline -> "DEADLINE"
   LifecycleArming   -> "ARMING"
+  LifecycleInstant  -> "INSTANT"
 
 -- | Context for inert element evaluation.
 -- Inert elements evaluate to the identity for their containing boolean operator.

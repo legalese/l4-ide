@@ -2386,6 +2386,7 @@ rewriteWith rd0 e0 = alone (go e0)
       LifecycleJoin     -> fw "the join"
       LifecycleDeadline -> fw "the deadline"
       LifecycleArming   -> fw "the arming"
+      LifecycleInstant  -> fw "the instant"
     -- A refusal is not a value, and says so in the author's words.
     Refuse ann msg -> inert ann (fw "the model refuses to answer:" <> " " <> leafText msg)
     e -> e

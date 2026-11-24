@@ -1,0 +1,18 @@
+-- THE INSTANT: the time of the event a PROVIDED condition is checked against.
+-- See consequences.md, under PROVIDED.
+
+DECLARE Party IS ONE OF Buyer
+DECLARE Action IS ONE OF `pay invoice` HAS amount IS A NUMBER
+
+-- The discounted price of 80 counts only if it arrives by day 10;
+-- after that the full 100 is due.
+GIVETH A DEONTIC Party Action
+`discounted payment` MEANS
+  PARTY Buyer
+  MUST `pay invoice` amount
+  PROVIDED IF THE INSTANT <= 10 THEN amount >= 80 ELSE amount >= 100
+  WITHIN 30
+
+#TRACE `discounted payment` AT 0 WITH
+  PARTY Buyer DOES `pay invoice` 80 AT 12
+  PARTY Buyer DOES `pay invoice` 100 AT 13

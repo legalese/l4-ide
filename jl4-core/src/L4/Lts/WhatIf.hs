@@ -64,7 +64,10 @@ module L4.Lts.WhatIf
   , tracesOf
     -- * The position: the trace as written, replayed
   , Position (..)
+  , Pending (..)
   , position
+  , obligationsOf
+  , carryBreach
     -- * Hypotheticals
   , Hypothetical (..)
   , hypotheticalExpr
@@ -179,6 +182,13 @@ data Position = MkPosition
   , posClock    :: !Rational
     -- ^ the stamp of the last event scrutinised (else the @AT@): the clock
     -- every 'Remaining' countdown in the marking counts from
+  , posPending :: ![Pending]
+    -- ^ what a BREACHED position is still waiting on, which its own residual
+    -- no longer says ('carryBreach'); empty for every other position
+  , posUnread :: ![NormKey]
+    -- ^ norms the log shows waiting behind a breach that no obligation the
+    -- explorer holds accounts for: usually armed after the breach, so the
+    -- breached value, which keeps only its blame, never held them
   , posReplayScope :: !(Set Unique)
     -- ^ the names the replay resolves when it evaluates a hypothetical: the
     -- module's own top-level bindings, as the replay's own pass built them
@@ -188,6 +198,101 @@ data Position = MkPosition
     -- @GIVEN@-bound name — is not among them, which is how 'openLocals'
     -- tells the two apart without a second resolver.
   }
+
+-- | An obligation a breached position is still waiting on. @A RAND B@ with @A@
+-- breached is decided at once (@ValBreached@ holds the blame and nothing of
+-- @B@), and yet the evaluator goes on scrutinising @B@ against every later
+-- event, and later time adds its blame (smucclaw/l4-ide#1087). @B@'s
+-- obligations are not in the breached position's residual, so they are carried
+-- from the position the breach came of ('carryBreach').
+data Pending = MkPending
+  { pdRaw :: !(RawObligation NF)
+    -- ^ as the position that held it had it, with its countdown moved to the
+    -- clock of the position it is carried to, so that every reader of an
+    -- obligation in force ('deadlineOf', 'openingOf', 'renderLive') reads it
+    -- as it would read a live one
+  , pdKey :: !NormKey
+    -- ^ the log's own name for it, activation included, which is how a later
+    -- position's log is held to still show the same obligation waiting
+  }
+
+-- | The obligations a position is waiting on: those of its residual, and, for a
+-- breached one, those carried ('carryBreach').
+obligationsOf :: Position -> [RawObligation NF]
+obligationsOf pos = maybe [] liveObligations pos.posResidual <> map (.pdRaw) pos.posPending
+
+-- | The position a replay reached from this one, with what a breach left
+-- standing carried over.
+--
+-- Only a position whose residual is @ValBreached@ is touched. What is still
+-- waiting is what the log says: the 'Waiting' steps of the child. Each is held
+-- to be an obligation of this position (its own residual's, or one it had
+-- carried) by site, ACTIVATION and bearer, the activation so that a norm that
+-- re-entered its site after the old one was taken is not mistaken for it, and
+-- a bearer that one side has not forced yet agreeing with any. A waiting norm
+-- that no obligation here accounts for is, usually, one armed after the breach,
+-- by the continuation of one that was taken (the right side's @HENCE@): the
+-- breached value never held it. It can also be a member of an @EVERY@ that the
+-- position did not hold as an obligation of its own (measured 2026-11-23 on
+-- @every/run-lest.l4@). Either way no act or tick can be built for it, and it
+-- is listed in 'posUnread' to be named, never dropped.
+--
+-- The carried obligation's countdown is moved to the child's clock from its
+-- absolute deadline and opening, read at the clock they were counted from. A
+-- deadline that cannot be read is carried as it was and reported by whoever
+-- offers its tick.
+carryBreach :: Position -> Position -> IO Position
+carryBreach parent child = case child.posResidual of
+  Just (ValBreached _) -> do
+    carried <- for (known parent) \ (raw, key) -> do
+      moved <- retime parent.posClock child.posClock raw
+      pure (MkPending {pdRaw = moved, pdKey = key})
+    let waiting = [ k | s <- child.posSteps, Waiting <- [s.dsOutcome], Just k <- [s.dsNorm] ]
+        still = [ p | p <- carried, any (sameKey p.pdKey) waiting ]
+        unread = [ k | k <- waiting, not (any (\ p -> sameKey p.pdKey k) still) ]
+    pure child {posPending = still, posUnread = unread}
+  _ -> pure child
+  where
+    known pos = case pos.posResidual of
+      Just (ValBreached _) -> [ (p.pdRaw, p.pdKey) | p <- pos.posPending ]
+      Just residual ->
+        [ (raw, key)
+        | raw <- liveObligations residual
+        , [key] <- [keysFor pos raw] ]
+      Nothing -> []
+    -- the 'Waiting' steps a raw obligation is the subject of: its site, and its
+    -- bearer when the position has forced it
+    keysFor pos raw =
+      let live = renderLive pos.posContext raw
+          waits = [ k | s <- pos.posSteps, Waiting <- [s.dsOutcome], Just k <- [s.dsNorm], k.nkSite == live.lnSite ]
+      in case live.lnBearer of
+           KnownParty name -> [ k | k <- waits, maybe True (== name) k.nkBearerName ]
+           UnforcedParty _ -> waits
+    sameKey a b = a.nkSite == b.nkSite && a.nkActivation == b.nkActivation && bearerAgrees a b
+    bearerAgrees a b = case (a.nkBearerName, b.nkBearerName) of
+      (Just x, Just y) -> x == y
+      _                -> True
+
+-- | An obligation, with the countdowns it counted from one clock moved to
+-- count from another: the deadline and the opening are read as instants at the
+-- first ('deadlineOf', 'openingOf') and written back as remaining at the
+-- second. One whose deadline is not known is left as it was.
+retime :: Rational -> Rational -> RawObligation NF -> IO (RawObligation NF)
+retime origin dest raw
+  | origin == dest = pure raw
+  | otherwise = do
+      due <- deadlineOf origin raw
+      open <- openingOf origin raw
+      let opensLater = case open of
+            Just (Right o) | o > dest -> Just o
+            _                      -> Nothing
+          opens' = case open of
+            Just (Right _) -> Right (fmap (\ o -> ValNumber (o - dest)) opensLater)
+            _              -> raw.roOpens
+          due' = case due of
+            Right d -> Right (ValNumber (d - fromMaybe dest opensLater))
+            Left _  -> raw.roDue
+      pure raw {roOpens = opens', roDue = due'}
 
 -- | Replay the trace as written.
 position :: Rig -> Trace -> IO (Maybe Position)
@@ -211,7 +316,16 @@ positionFrom rig tr extra (topLevel, mres) = flip fmap mres \ (res, steps) ->
       , posResidual = residual
       , posContext  = ctx
       , posMarking  = maybe [] (markingOf ctx) residual
-      , posClock    = maximum (0 : literalStamps <> loggedClocks)
+      -- no floor: a trace that starts below 0 has its clock below 0. A trace
+      -- with no stamp the replay can read at all (a start that is not a
+      -- literal, no event yet) is read as 0, which is the one case left where the
+      -- clock is a guess; "L4.Lts.Explore" reads such a start first and hands
+      -- the replay a literal
+      , posClock    = case literalStamps <> loggedClocks of
+          [] -> 0
+          stamps -> maximum stamps
+      , posPending  = []
+      , posUnread   = []
       , posReplayScope = Map.keysSet topLevel <> Map.keysSet rig.rigEnv
       }
 
@@ -340,8 +454,8 @@ data BoundScope
 candidatesOf :: Rig -> Trace -> Position -> IO [Candidate]
 candidatesOf rig tr pos = case pos.posResidual of
   Nothing -> pure []
-  Just residual -> do
-    let raws   = liveObligations residual
+  Just _ -> do
+    let raws   = obligationsOf pos
         paired = [ (raw, renderLive pos.posContext raw) | raw <- raws ]
     acts <- for paired \ (raw, live) -> do
       party <- either (fmap Just . reifyExpr raw.roEnv) (reifyValue reifyNF) raw.roParty
@@ -657,6 +771,10 @@ tryCandidateFrom rig tr pos cand = case cand.cdHypothetical of
 confirmAct :: CandidateKind -> [DeonticStep] -> Verdict -> Verdict
 confirmAct kind steps verdict = case (kind, verdict) of
   (ActBy n, Advancing _) | not (eventTaken steps) -> PassedOver (reasonFor n)
+  -- a position that is already breached stays breached whatever it is told
+  -- (the obligations it still waits on, 'carryBreach'), so "breached" says
+  -- nothing about whether the act was taken
+  (ActBy n, Breaching _) | not (eventTaken steps) -> PassedOver (reasonFor n)
   _ -> verdict
   where
     reasonFor n =

@@ -559,6 +559,14 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
+  | NowInGuard Text (Maybe SrcRange)
+    -- ^ @NOW@ inside a @PROVIDED@ guard (NORM-LOG-SPEC N4, P2): it is the
+    -- computer's wall clock when the program runs, not the time of the event
+    -- the guard is checked against, which is @THE INSTANT@. @TODAY@ and
+    -- @CURRENTTIME@ read the same clock and draw the same warning (decided
+    -- by Claude 2026-11-24, pending Meng's review: N4 names only @NOW@).
+    -- Carries the word and its source range. Only a warning: the wall clock
+    -- is still the wall clock, and a rule may mean exactly that.
   | LifecycleNounHidesName LifecyclePoint (Maybe SrcRange) [Name] [Name]
     -- ^ @THE JOIN@, @THE DEADLINE@ or @THE ARMING@ written where the program
     -- has its own value spelled @JOIN@, @DEADLINE@ or @ARMING@ in scope
@@ -824,6 +832,11 @@ data AnchorRefusal
     -- @WITHIN@ IS the group's deadline, and its join has not fired when it
     -- is read. Only @THE ARMING@ (the EVERY's own arming) and an expression
     -- make sense there.
+  | InstantOutsideGuard
+    -- ^ @THE INSTANT@ written where no @PROVIDED@ guard is being checked: the
+    -- contract clock it names is the stamp of the event a guard is matched
+    -- against, and there is none at the top level, in a @WHERE@, in a
+    -- continuation or in the body of a function (NORM-LOG-SPEC N4, P2)
   | JoinUnderLest
     -- ^ @THE JOIN@ under @LEST@: the join did not fire, so there is no
     -- instant to count from. The conservative reading of §5.1.1's open
@@ -1073,6 +1086,7 @@ checkWarningCode = \ case
   -- unstable-only constructors (2026-11 sync; codes assumed, not ruled)
   FixityIgnoredNonBinary {}       -> "lint/fixity-ignored-non-binary"
   LifecycleNounHidesName {}       -> "lint/lifecycle-noun-hides-name"
+  NowInGuard {}                   -> "lint/now-in-provided"
   OpenedFieldShadowsDefinition {} -> "lint/opened-field-shadows-definition"
   DeprecatedAssume {}             -> "lint/deprecated-assume"
   SiblingLedgerRead {}            -> "lint/sibling-ledger-read"
@@ -1202,6 +1216,7 @@ instance HasSrcRange CheckError where
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   rangeOf (CheckWarning (LifecycleNounHidesName _ mr _ _)) = mr
+  rangeOf (CheckWarning (NowInGuard _ mr)) = mr
   -- The clause-head hull anchors the warning; it wins over the enclosing
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _ _)) = Just r
@@ -1487,6 +1502,11 @@ data CheckEnv =
     -- 'L4.TypeCheck.checkLifecycle') is refused as the bare anchor is
     -- (refusal 3, §5.1.1.1): that @WITHIN@ is what defines both. Set via
     -- 'local' in 'L4.TypeCheck.checkDeadline'; never carried across imports.
+    , inGuard              :: !Bool
+    -- ^ Are we checking a @PROVIDED@ guard? There @THE INSTANT@ is bound to
+    -- the stamp of the event being matched ('L4.EvaluateLazy.Machine'),
+    -- and nowhere else is it ('L4.TypeCheck.checkLifecycle'). Set via
+    -- 'local' in 'L4.TypeCheck.checkAction'; never carried across imports.
     , inOwnSlots           :: !Bool
     -- ^ Are we checking one of a deonton's own slots — its party, its action
     -- and @PROVIDED@, its @AFTER@ and @WITHIN@, an @EVERY@'s join line? The
@@ -1601,6 +1621,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , inNonexhaustiveDecide = False
     , enclosingObligation = Nothing
     , onJoinLine = False
+    , inGuard = False
     , inOwnSlots = False
     , errorContext = None
     , sectionStack = []
@@ -3087,6 +3108,7 @@ extendEnv cis env =
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , enclosingObligation = e.enclosingObligation
     , onJoinLine = e.onJoinLine
+    , inGuard = e.inGuard
     , inOwnSlots = e.inOwnSlots
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings

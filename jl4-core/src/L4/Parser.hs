@@ -4136,10 +4136,13 @@ anchor current = annoHole $ attachAnno $
     bareNoun = do
       (_, p) <- lifecycleWords
       wrapAnnoParser (WithAnno [] <$> notFollowedBy followingArithmetic)
-      pure $ case p of
-        LifecycleJoin     -> AnchorJoin emptyAnno
-        LifecycleDeadline -> AnchorDeadline emptyAnno
-        LifecycleArming   -> AnchorArming emptyAnno
+      case p of
+        LifecycleJoin     -> pure (AnchorJoin emptyAnno)
+        LifecycleDeadline -> pure (AnchorDeadline emptyAnno)
+        LifecycleArming   -> pure (AnchorArming emptyAnno)
+        -- not an anchor: @OF THE INSTANT@ is left to the expression form
+        -- below ('tryParser' backtracks), and the checker refuses it there
+        LifecycleInstant  -> empty
     followingArithmetic :: Parser ()
     followingArithmetic = do
       next <- anySingle
@@ -4160,6 +4163,7 @@ lifecycleWords =
     (   (\ t -> (t, LifecycleJoin))     <$> annoLexeme (spelled "JOIN")
     <|> (\ t -> (t, LifecycleDeadline)) <$> annoLexeme (spelled "DEADLINE")
     <|> (\ t -> (t, LifecycleArming))   <$> annoLexeme (spelled "ARMING")
+    <|> (\ t -> (t, LifecycleInstant))  <$> annoLexeme (spelled "INSTANT")
     )
   where
     spelled = spacedToken_ . TIdentifiers . TIdentifier
