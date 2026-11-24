@@ -1309,10 +1309,13 @@ assumeReplacementLine dHead declaredType mTypically = \ case
       Forall _ _ t'  -> mentionsOwnTypeVariable t'
       InfVar {}      -> False
 
--- | The literal time stamp a @#TRACE@'s start or event carries, when it is not
--- a whole number: the @AT@ of the trace, the @AT@ of @PARTY p DOES a AT t@, or
--- the argument of @WAITUNTIL t@. Anything that is not a literal is left alone:
--- it has no value to read until it is evaluated.
+-- | The literal time stamp one of a @#TRACE@'s events carries, when it is not
+-- a whole number: the @AT@ of @PARTY p DOES a AT t@, or the argument of
+-- @WAITUNTIL t@. Anything that is not a literal is left alone: it has no value
+-- to read until it is evaluated.
+--
+-- The trace's own start is not looked at: @l4 explore@ reads it as its clock
+-- and says itself what that leaves untried, whereas it reads no event stamp.
 fractionalTraceStamp :: Expr Resolved -> Maybe (Rational, Maybe SrcRange)
 fractionalTraceStamp = \ case
   lit@(Lit _ (NumericLit _ r)) | denominator r /= 1 -> Just (r, rangeOf lit)
@@ -1340,8 +1343,9 @@ inferDirective (Contract ann e t evs) = errorContext (WhileCheckingExpression e)
   rt <- prune $ checkExpr ExpectRegulativeTimestampContext t number
   revs <- traverse (prune . flip (checkExpr ExpectRegulativeEventContext) eventT) evs
   -- a stamp that is not a whole number is used as written; what is worth
-  -- saying is what @l4 explore@ will not do with it
-  for_ (mapMaybe fractionalTraceStamp (rt : revs)) \ (stamp, range) ->
+  -- saying is what @l4 explore@ does not do with it. The start, @rt@, is
+  -- left out on purpose: the explorer reads it (see 'fractionalTraceStamp')
+  for_ (mapMaybe fractionalTraceStamp revs) \ (stamp, range) ->
     addError (FractionalTraceStamp stamp range)
   pure (Contract ann re rt revs)
 inferDirective (AssertRefused ann e mmsg) = errorContext (WhileCheckingExpression e) do
@@ -8678,7 +8682,8 @@ prettyCheckError (FractionalTraceStamp stamp _) =
   -- stamp such as 2.0000000000000000001 would be printed as "2.0"
   [ "This #TRACE has a time stamp of " <> prettyRatioExact stamp <> ", which is not a whole number."
   , "`l4 run` uses it as written."
-  , "`l4 explore` tries whole instants only, so it does not explore the positions between them."
+  , "`l4 explore` does not read it: from a #TRACE it takes only the contract and where it starts."
+  , "By default it tries whole instants; `--grid 0.5`, for example, tries every half instant as well."
   ]
 prettyCheckError (ActionPatternReference n referent) =
   -- Wording ruled by Meng 2026-09-16 (PATTERN-REFERENCE-RULE-SPEC §4 R5): the fact,

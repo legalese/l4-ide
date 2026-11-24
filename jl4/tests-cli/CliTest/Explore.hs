@@ -39,7 +39,7 @@ startFixtures = "tests-cli" </> "fixtures" </> "explore-start"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
@@ -188,8 +188,34 @@ spec bin = describe "l4 explore" $ do
         Output code _ serr <- runL4 bin [verb, "examples" </> "ok" </> "breach-clocks.l4"]
         code `shouldBe` ExitSuccess
         length (filter ("lint/fractional-trace-stamp" `isInfixOf`) (lines serr)) `shouldBe` 2
-        serr `shouldSatisfy` ("`l4 explore` tries whole instants only" `isInfixOf`)
+        serr `shouldSatisfy` ("`l4 explore` does not read it" `isInfixOf`)
+        serr `shouldSatisfy` ("`--grid 0.5`, for example" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("tries whole instants only" `isInfixOf`))
         serr `shouldSatisfy` ("DiagnosticSeverity_Information" `isInfixOf`)
+
+    it "frac-start.l4: a start that is not a whole number gets no note, because `l4 explore` reads it as its clock and names what that leaves untried" $ do
+      forM_ ["run", "check"] \ verb -> do
+        Output code _ serr <- runL4 bin [verb, instants </> "frac-start.l4"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` (not . ("fractional-trace-stamp" `isInfixOf`))
+      Output code' sout _ <- runL4 bin ["explore", instants </> "frac-start.l4"]
+      sout `shouldSatisfy` ("explored from its outset at 0.5" `isInfixOf`)
+      sout `shouldSatisfy` ("PARTY P DOES a AT 0.5" `isInfixOf`)
+      code' `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("an instant it needs (3.5) is not a whole number" `isInfixOf`)
+
+    it "frac-wait.l4: after time passes a deadline that is a fraction, the act that follows is tried at the clock there, a fraction, and the deadline it then needs is named" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "frac-wait.l4"]
+      map (filter (/= '\r')) (lines sout) `shouldSatisfy` elem "      PARTY Q DOES b AT 3.5"
+      code `shouldBe` ExitFailure 2
+      lastLine sout `shouldSatisfy` ("not a whole number" `isInfixOf`)
+
+    it "half.l4 under --grid 0.5: acts are tried at the halves between whole instants (the explorer's side of what the note says)" $ do
+      Output code sout _ <- runL4 bin ["explore", instants </> "half.l4", "--grid", "0.5"]
+      code `shouldBe` ExitSuccess
+      forM_ ["0", "0.5", "1", "1.5", "2", "2.5"] \ t ->
+        map (filter (/= '\r')) (lines sout) `shouldSatisfy` elem ("      PARTY P DOES a AT " <> t)
+      lastLine sout `shouldSatisfy` ("time on a grid of 0.5" `isInfixOf`)
 
     it "must-example.l4: whole stamps get no note" $ do
       Output code _ serr <- runL4 bin ["run", ".." </> "doc" </> "reference" </> "regulative" </> "must-example.l4"]

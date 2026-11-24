@@ -258,7 +258,8 @@ breach-clocks.l4:112:1-115:16:
 breach-clocks.l4:113:14-17:
   This #TRACE has a time stamp of 3.8, which is not a whole number.
   `l4 run` uses it as written.
-  `l4 explore` tries whole instants only, so it does not explore the positions between them.
+  `l4 explore` does not read it: from a #TRACE it takes only the contract and where it starts.
+  By default it tries whole instants; `--grid 0.5`, for example, tries every half instant as well.
 breach-clocks.l4:117:1-120:16:
   DEONTIC BREACHED:
     party
@@ -288,7 +289,8 @@ breach-clocks.l4:117:1-120:16:
 breach-clocks.l4:118:14-17:
   This #TRACE has a time stamp of 3.8, which is not a whole number.
   `l4 run` uses it as written.
-  `l4 explore` tries whole instants only, so it does not explore the positions between them.
+  `l4 explore` does not read it: from a #TRACE it takes only the contract and where it starts.
+  By default it tries whole instants; `--grid 0.5`, for example, tries every half instant as well.
 breach-clocks.l4:129:1-130:17:
   DEONTIC BREACHED:
     party

@@ -144,7 +144,7 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/spaced-nlg-slot`                 | `parser` | A `% name %` slot with spaces, which prints as plain text.                                 |
 | `lint/unreachable-clause`              | `check`  | A clause that is never used.                                                               |
 | `lint/action-pattern-reference`        | `check`  | A bare name in an action was read as a reference to what it names. Severity Information.   |
-| `lint/fractional-trace-stamp`          | `check`  | A fractional `#TRACE` stamp: `l4 explore` tries whole instants only. Severity Information. |
+| `lint/fractional-trace-stamp`          | `check`  | A fractional `#TRACE` event stamp, which `l4 explore` ignores. Severity Information.       |
 | `lint/deprecated-assume`               | `check`  | An ASSUME, which is deprecated.                                                            |
 | `lint/deprecated-exactly`              | `check`  | An EXACTLY in an action, which is deprecated.                                              |
 | `lint/fixity-ignored-non-binary`       | `check`  | A fixity annotation on a definition that is not a binary infix operator.                   |

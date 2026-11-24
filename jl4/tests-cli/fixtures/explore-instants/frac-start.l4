@@ -1,0 +1,15 @@
+IMPORT prelude
+
+-- A trace whose start is not a whole number, over a deadline that is.
+-- `l4 explore` reads the start as its clock and explores from it; the deadline
+-- then falls on 3.5, which is not a whole instant, and the explorer says so.
+-- The type checker gives the start no note, because the explorer does read it.
+
+DECLARE Person IS ONE OF P
+DECLARE Action IS ONE OF a
+
+GIVETH A DEONTIC Person Action
+one MEANS PARTY P MUST a WITHIN 3 HENCE FULFILLED LEST BREACH BY P
+
+#TRACE one AT 0.5 WITH
+  PARTY P DOES a AT 2
