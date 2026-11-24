@@ -1343,8 +1343,10 @@ spec bin = do
         Output code sout serr <- runL4 bin (["deploy", refusedEntry] ++ server port)
         readIORef uploads `shouldReturn` 1
         code `shouldBe` ExitSuccess
-        serr `shouldSatisfy` isInfixOf "These rules cannot be deployed, because their @export cannot be sent as JSON"
+        serr `shouldSatisfy` isInfixOf "These rules cannot be deployed, because their @export cannot be sent as JSON (`l4 check` reports them as errors):"
         serr `shouldSatisfy` isInfixOf "`apply twice` is published with @export, but its input `f` is a function"
+        serr `shouldSatisfy` isInfixOf "Uploading the file; the service decides what it leaves out."
+        serr `shouldNotSatisfy` isInfixOf "the rest of the file is uploaded"
         let out = filter (/= '\r') sout
         out `shouldSatisfy` isInfixOf "Deployed 'deploy-export-refused'"
         out `shouldSatisfy` isInfixOf "Left out 1 function whose @export cannot be sent as JSON"
@@ -1373,6 +1375,14 @@ spec bin = do
         code `shouldBe` ExitSuccess
         serr `shouldSatisfy` isInfixOf "These rules cannot be deployed, because their @export cannot be sent as JSON"
         filter (/= '\r') sout `shouldNotSatisfy` isInfixOf "Left out"
+    it "still uploads a file with no refused @export, and says nothing of refused exports" $
+      withFakeService False False \port uploads -> do
+        Output code sout serr <- runL4 bin (["deploy", cleanImportEntry] ++ server port)
+        readIORef uploads `shouldReturn` 1
+        code `shouldBe` ExitSuccess
+        filter (/= '\r') sout `shouldNotSatisfy` isInfixOf "Left out"
+        serr `shouldNotSatisfy` isInfixOf "cannot be deployed"
+        serr `shouldNotSatisfy` isInfixOf "the service decides what it leaves out"
 
   -- The names a multi-clause group is compiled to are spelled so that no
   -- source can write them ('L4.Parser.generatedName'), and say what they are.

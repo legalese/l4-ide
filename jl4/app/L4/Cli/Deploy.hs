@@ -339,9 +339,13 @@ bundle fp = do
         , fd.fdLspDiagnostic._source == Just "export"
         , fd.fdLspDiagnostic._severity == Just DiagnosticSeverity_Error
         ]
+  -- Only what is known before the upload: the service may leave these out
+  -- and deploy the rest, reject the whole deployment, or (an older one)
+  -- publish them unchecked.
   unless (null exportErrors) $ do
-    note "These rules cannot be deployed, because their @export cannot be sent as JSON; the rest of the file is uploaded (`l4 check` reports them as errors):"
+    note "These rules cannot be deployed, because their @export cannot be sent as JSON (`l4 check` reports them as errors):"
     forM_ exportErrors \m -> mapM_ (note . ("  " <>)) (Text.lines m)
+    note "Uploading the file; the service decides what it leaves out."
 
   let paths = absFp : mapMaybe moduleFile (drop 1 (flatten tc))
   -- A standard library the typechecker took from the copies built into l4 has
