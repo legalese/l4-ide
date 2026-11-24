@@ -1094,8 +1094,8 @@ A contract rule that is refused is still evaluated where you write it, so its `#
 
 `l4 check` and `l4 run` report the error and fail, with exit status 1.
 The editor shows **Deploy** as off while the file has the error.
-`l4 deploy` and `l4 redeploy` upload the file to a jl4-service that says it can leave such a rule out, and the service deploys the file's other exported rules without this one.
-To a service that does not say so, such as an older one, they refuse the file before uploading it, as `l4 check` does, and say why.
+`l4 deploy` and `l4 redeploy` upload the file anyway, and say before the upload which rules cannot be deployed; the service deploys the file's other exported rules without this one.
+An older jl4-service answers as it would any upload: it may reject the whole file, or, if it is older than the export check, deploy the rule without checking it.
 `l4 deploy` then lists the rules it left out, each with its file and reason, under `Left out`, and exits with status 0, because the deployment is live; with `--json`, they are in a `refused` list.
 The service gives the same reasons in a `refusedExports` field of the deployment's status, and a call to the left-out rule gets a `404` that says why.
 If the deployment also exports a rule whose name matches it and that can be sent (in another file, or in the same file under a name a call addresses the same way, such as `` `who-acted` `` beside `` `who acted` ``), the service serves that one under the name: the entry in `refusedExports` carries `"nameServed": true`, and `l4 deploy` says that the name is still served.
