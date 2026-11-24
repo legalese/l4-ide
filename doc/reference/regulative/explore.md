@@ -42,7 +42,9 @@ To explore a rule no trace names, give `--contract NAME`, with `--at T` for the 
 From a `#TRACE` it takes the contract and the start, as above, and it chooses the instants it tries itself.
 By default those are whole instants: a day is 3 or 4, and a time between two whole days, such as 3.8, is not one it chooses.
 The exception is the clock where it already stands, which can be a fraction ("When", below): `AT 0.5` is explored from 0.5, and an act is tried there.
-`--grid` steps by any N you give it, and N need not be a whole number: `--grid 0.5` tries every half day as well (the section on `--grid`, below).
+`--grid` steps by any N above 0 that you give it, and N need not be a whole number: `--grid 0.5` tries every half day as well (the section on `--grid`, below).
+To reach a stamp such as 3.8 the step has to divide it, and 0.5 does not: `--grid 0.5` tries no act at 3.8 and says nothing about it, since the explorer never reads the stamp, while `--grid 0.2` does try one (measured 2026-11-24 on `jl4/tests-cli/fixtures/explore-instants/frac-stamp.l4`).
+The note names such a step, one over the stamp's denominator: 0.2 for 3.8, 0.25 for 1.25.
 
 A `#TRACE` can still write a time stamp that is not a whole number, and `l4 run` uses it as written.
 So that it is not a surprise that `l4 explore` does not explore a run at such a time, `l4 run` and `l4 check` print a note (code `lint/fractional-trace-stamp`, severity Information) on each such stamp in an event: in a `WAITUNTIL`, or in the `AT` of an act.
@@ -264,6 +266,7 @@ It does not promise that the graph holds every position the evaluator can reach:
 
 `--grid N` is the alternative, for a rule whose guard reads the clock arithmetically: it tries every multiple of N from the first instant the act's window is open up to the next deadline, and keeps the clock in the state.
 It explores the model in which every event happens at a multiple of N, so an act at any other instant is outside it, and the explorer cannot say what it did not try: `--grid 2` on a contract whose numbers are all even does not hold the position an act at 1 reaches (a review found one, 2026-11-23); use `--grid 1` to hold every whole instant.
+N must be above 0: `--grid 0` is refused with `N must be a positive number` and exit 1, and a negative one is refused as not a number (measured 2026-11-24).
 The step need not be a whole number: `--grid 0.5` on `half.l4`, whose deadline is 2.5, tried acts at 0, 0.5, 1, 1.5, 2 and 2.5 and exited 0 (measured 2026-11-24).
 What it does check is the other half of the condition: a clock, a deadline or a window opening that is not a multiple of N, in a position it reaches, is named as untried, and so is a run with no deadline and no `--until`, because a grid has no end to try up to then.
 The cost is the whole window: `--grid 1` on an obligation that is `WITHIN 365` tries 366 instants per act in each state, and the clock tells states apart, so the graph is several times larger than the regions graph for the same contract.

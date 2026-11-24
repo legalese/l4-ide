@@ -12,7 +12,7 @@
 module CliTest.Explore (spec, fixtures) where
 
 import Control.Monad (forM_)
-import Data.List (isInfixOf, isPrefixOf, isSuffixOf, sort)
+import Data.List (isInfixOf, isPrefixOf, isSuffixOf, sort, tails)
 import System.Directory (copyFile, listDirectory)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
@@ -39,7 +39,7 @@ startFixtures = "tests-cli" </> "fixtures" </> "explore-start"
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
-  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4"] ]
+  <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
@@ -189,7 +189,7 @@ spec bin = describe "l4 explore" $ do
         code `shouldBe` ExitSuccess
         length (filter ("lint/fractional-trace-stamp" `isInfixOf`) (lines serr)) `shouldBe` 2
         serr `shouldSatisfy` ("`l4 explore` does not read it" `isInfixOf`)
-        serr `shouldSatisfy` ("`--grid 0.5`, for example" `isInfixOf`)
+        serr `shouldSatisfy` ("`--grid 0.2`, a step that divides this stamp, also tries the multiples of 0.2." `isInfixOf`)
         serr `shouldSatisfy` (not . ("tries whole instants only" `isInfixOf`))
         serr `shouldSatisfy` ("DiagnosticSeverity_Information" `isInfixOf`)
 
@@ -210,6 +210,21 @@ spec bin = describe "l4 explore" $ do
       map (filter (/= '\r')) (lines sout) `shouldSatisfy` elem "      PARTY Q DOES b AT 3.5"
       code `shouldBe` ExitFailure 2
       lastLine sout `shouldSatisfy` ("not a whole number" `isInfixOf`)
+
+    it "frac-stamp.l4: the --grid step the note names is one under which the explorer tries the stamp, and a step that does not divide it never does" $ do
+      Output code _ serr <- runL4 bin ["check", instants </> "frac-stamp.l4"]
+      code `shouldBe` ExitSuccess
+      let marker = "`--grid "
+          steps = [ takeWhile (/= '`') (drop (length marker) t) | t <- tails serr, marker `isPrefixOf` t ]
+          triedAt38 sout = elem "      PARTY P DOES a AT 3.8" (map (filter (/= '\r')) (lines sout))
+      steps `shouldBe` ["0.2"]
+      forM_ steps \ step -> do
+        Output _ sout _ <- runL4 bin ["explore", instants </> "frac-stamp.l4", "--grid", step]
+        sout `shouldSatisfy` triedAt38
+      -- a step of 0.5 is not one the stamp is a multiple of: green, and no act at 3.8
+      Output code' sout' _ <- runL4 bin ["explore", instants </> "frac-stamp.l4", "--grid", "0.5"]
+      code' `shouldBe` ExitSuccess
+      sout' `shouldSatisfy` (not . triedAt38)
 
     it "half.l4 under --grid 0.5: acts are tried at the halves between whole instants (the explorer's side of what the note says)" $ do
       Output code sout _ <- runL4 bin ["explore", instants </> "half.l4", "--grid", "0.5"]

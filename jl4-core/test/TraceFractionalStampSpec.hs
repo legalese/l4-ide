@@ -85,7 +85,16 @@ spec = describe "a fractional time stamp in a #TRACE" do
     text `shouldSatisfy` (not . ("whole instants only" `Text.isInfixOf`))
     text `shouldSatisfy` (not . ("does not explore the positions" `Text.isInfixOf`))
     text `shouldSatisfy` ("`l4 explore` does not read it" `Text.isInfixOf`)
-    text `shouldSatisfy` ("`--grid 0.5`" `Text.isInfixOf`)
+
+  it "names a --grid step that divides the stamp, one over its denominator: 3.8 is reached by 0.2, 1.25 by 0.25, 0.5 by 0.5" do
+    let text traces = Text.unlines (concatMap prettyCheckErrorWithContext (notices traces))
+        wait3_8 = text ["#TRACE `one` AT 0 WITH", "  (WAITUNTIL 3.8)"]
+        act1_25 = text ["#TRACE `one` AT 0 WITH", "  PARTY P DOES a AT 1.25"]
+        half = text ["#TRACE `one` AT 0 WITH", "  (WAITUNTIL 0.5)"]
+    wait3_8 `shouldSatisfy` ("`--grid 0.2`, a step that divides this stamp, also tries the multiples of 0.2." `Text.isInfixOf`)
+    wait3_8 `shouldSatisfy` (not . ("`--grid 0.5`" `Text.isInfixOf`))
+    act1_25 `shouldSatisfy` ("`--grid 0.25`, a step that divides this stamp, also tries the multiples of 0.25." `Text.isInfixOf`)
+    half `shouldSatisfy` ("`--grid 0.5`, a step that divides this stamp, also tries the multiples of 0.5." `Text.isInfixOf`)
 
   it "reads a percentage as the evaluator does, a hundredth of the number: `(350%)` is 3.5 and `(400%)` is a whole 4" do
     stampsOf (notices ["#TRACE `one` AT 0 WITH", "  (WAITUNTIL (350%))", "  PARTY P DOES a AT 50%"]) `shouldBe` [7 / 2, 1 / 2]

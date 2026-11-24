@@ -8690,8 +8690,15 @@ prettyCheckError (FractionalTraceStamp stamp _) =
   [ "This #TRACE has a time stamp of " <> prettyRatioExact stamp <> ", which is not a whole number."
   , "`l4 run` uses it as written."
   , "`l4 explore` does not read it: from a #TRACE it takes only the contract and where it starts."
-  , "By default it tries whole instants; `--grid 0.5`, for example, tries every half instant as well."
+  , "By default it tries whole instants; `--grid " <> gridStep <> "`, a step that divides this stamp, also tries the multiples of " <> gridStep <> "."
   ]
+ where
+  -- one over the stamp's denominator, in lowest terms: the coarsest step that
+  -- reaches both the stamp and every whole instant, since n/d and every whole
+  -- number are multiples of 1/d. A step such as 0.5 does not reach 3.8. A
+  -- stamp is a decimal literal, or a percentage of one, so its denominator is
+  -- made of 2s and 5s and the step prints exactly.
+  gridStep = prettyRatioExact (1 / fromIntegral (denominator stamp))
 prettyCheckError (ActionPatternReference n referent) =
   -- Wording ruled by Meng 2026-09-16 (PATTERN-REFERENCE-RULE-SPEC §4 R5): the fact,
   -- the referent, and the one thing to do if a placeholder was meant. Nothing else.
