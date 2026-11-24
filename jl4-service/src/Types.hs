@@ -716,9 +716,9 @@ data HealthResponse = HealthResponse
 -- as the header @X-L4-Capabilities@ (comma-separated) on every response from
 -- the API routes ('Application.app'), so a client can read it from a request
 -- it makes anyway, through a proxy that forwards the backend's headers. A
--- response made outside them (the concurrency limit's 503, the 500 for an
--- unhandled exception, Warp's own, the explorer page, the @.l4@ file
--- middleware) does not carry it.
+-- response made outside them (among them the concurrency limit's 503, the 500
+-- for an unhandled exception, a CORS preflight, Warp's own, the explorer page,
+-- the @.l4@ file middleware) does not carry it.
 --
 -- * @refused-exports@: an @\@export@ that the export check refuses is left
 --   out of its deployment and named in @refusedExports@, and the rest of the

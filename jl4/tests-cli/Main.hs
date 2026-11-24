@@ -5411,8 +5411,10 @@ buildIdentitySpec = describe "etc/build-identity.sh" $ do
 -- a 404, an upload is accepted as a job that is applied at once, and the
 -- deployment is then ready, naming `apply twice` as refused when the service
 -- says it can leave a refused export out. With @capable@, every response
--- carries @X-L4-Capabilities: refused-exports@, as jl4-service's does. The
--- action gets the port and the number of uploads so far.
+-- carries @X-L4-Capabilities: refused-exports@, as jl4-service's API routes
+-- do; with @nameServed@, the refused entry says its name is still served by
+-- another file's export. The action gets the port and the number of uploads
+-- so far.
 withFakeService :: Bool -> Bool -> (Int -> IORef Int -> IO a) -> IO a
 withFakeService capable nameServed act = do
   uploads <- newIORef (0 :: Int)

@@ -158,7 +158,7 @@ Under `--lazy-load`, MCP's tool list is read from the metadata cache that the se
 A call to it compiles the deployment, and then gets the error for a function that is not there with the reason: ``Function not found: `who acted` was not deployed, because its @export is refused: ...``.
 
 A client can ask whether a service does this before it relies on it: the service lists `refused-exports` in `capabilities` on `GET /health`, and sends `X-L4-Capabilities: refused-exports` on every response from its API routes.
-Responses made outside them do not carry it: the `503` of the concurrency limit, the `500` for an unhandled exception, anything Warp answers itself, and what the explorer page and the `.l4` file middleware serve.
+Responses made outside them do not carry it, among them the `503` of the concurrency limit, the `500` for an unhandled exception, a CORS preflight, anything Warp answers itself, and what the explorer page and the `.l4` file middleware serve.
 `l4 deploy` reads the header from the lookup it makes before uploading, and uploads a file with a refused export only to a service that sends it; to any other (an older service, or one behind a proxy that drops the header) it refuses the file before uploading, as it did before.
 
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
