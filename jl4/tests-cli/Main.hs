@@ -685,6 +685,14 @@ verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
 verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
 verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
 
+-- A decision whose body is the literal FALSE or TRUE is a constant, not a
+-- finding (smucclaw/l4-ide#1095); the second file holds the rules that read
+-- through a constant, and a contradiction written out, which keep their
+-- findings.
+verifyConstantsFixture, verifyConstantsReadThroughFixture :: FilePath
+verifyConstantsFixture            = fixtureDir </> "verify-constants.l4"
+verifyConstantsReadThroughFixture = fixtureDir </> "verify-constants-read-through.l4"
+
 -- Two read-through copies of a recursive WHERE local, one per call, with
 -- different arguments: two atoms, not one (smucclaw/l4-ide#1013).
 verifyRecursiveLocalCopiesFixture :: FilePath
@@ -1034,6 +1042,7 @@ coreFixtures =
   , verifyManufacturedClausesFixture, verifyWrittenGuardsFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
+  , verifyConstantsFixture, verifyConstantsReadThroughFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture, verifyFieldReadsFixture
   , verifyUnfoldCallsFixture, verifyUnfoldNamedCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
   , verifyUnfoldRecursiveFixture
@@ -6802,6 +6811,53 @@ spec bin = do
     it "still finds a binder-level contradiction with --no-coalesce-atoms" $ do
       Output code _ _ <- runL4 bin ["verify", verifyUnsatFixture, "--no-coalesce-atoms"]
       code `shouldBe` ExitFailure 1
+
+    -- smucclaw/l4-ide#1095. A decision whose body IS the literal FALSE is a
+    -- constant the drafter chose ("the text says no", a provision switched
+    -- off), not "a requirement nobody can meet"; one whose body is the literal
+    -- TRUE already got no finding. Both spellings, `DECIDE ... IF` and
+    -- `... MEANS`, are listed as constants, counted in the summary, and the
+    -- run exits 0. Before the fix the two FALSE ones were each reported
+    -- `unsat` and the run exited 1.
+    it "lists a decision whose body is the literal FALSE or TRUE as a constant, not a finding" $ do
+      Output code text serr <- runL4 bin ["verify", verifyConstantsFixture]
+      unless (code == ExitSuccess) $
+        expectationFailure ("expected exit 0, got " ++ show code ++ "\n" ++ text ++ serr)
+      text `shouldSatisfy` ("`the schedule applies`  (0 atoms, 1 ladder nodes) — a constant: its body is the literal FALSE, so there is nothing to check" `isInfixOf`)
+      text `shouldSatisfy` ("`the rule is in force`  (0 atoms, 1 ladder nodes) — a constant: its body is the literal TRUE, so there is nothing to check" `isInfixOf`)
+      text `shouldSatisfy` ("3 of the analysed decision(s) are constants" `isInfixOf`)
+      env <- jsonEnvelope bin ["verify", verifyConstantsFixture, "--format", "json"]
+      [ (nm, c)
+        | Just (Array ds) <- [objField env "decisions"]
+        , d <- toList ds
+        , Just (String nm) <- [objField d "name"]
+        , Just (String c) <- [objField d "constant"]
+        ]
+        `shouldBe` [ ("`the schedule applies`", "FALSE")
+                   , ("`the waiver was signed`", "FALSE")
+                   , ("`the rule is in force`", "TRUE") ]
+      case objField env "summary" of
+        Just summ -> do
+          objField summ "constants" `shouldBe` Just (Number 3)
+          objField summ "analysed" `shouldBe` Just (Number 3)
+          objField summ "skipped" `shouldBe` Just (Number 0)
+          objField summ "findings" `shouldBe` Just (Number 0)
+        Nothing -> expectationFailure "expected a summary"
+
+    -- The controls for #1095: only a body that IS the literal is a constant.
+    -- A contradiction written out is still `unsat`, and a rule that reads
+    -- through a constant keeps the finding the constant gives it. Those four
+    -- findings read the same before the fix and after it; the constant FALSE
+    -- the file also holds was reported `unsat` before.
+    it "keeps the findings of a rule that reads through a constant, or contradicts itself" $ do
+      env <- jsonEnvelope bin ["verify", verifyConstantsReadThroughFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`false either way`" found `shouldBe` Just ["unsat"]
+      lookup "`nobody can satisfy this`" found `shouldBe` Just ["unsat"]
+      lookup "`needs the waiver`" found `shouldBe` Just ["unsat"]
+      lookup "`x cannot matter`" found `shouldBe` Just ["unreachable-outcome"]
+      lookup "`the waiver was signed`" found `shouldBe` Just []
+      lookup "`the rule is in force`" found `shouldBe` Just []
 
     -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
     -- Before, it was skipped as not boolean; then its generated nesting made

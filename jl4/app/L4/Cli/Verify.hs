@@ -10,7 +10,8 @@
 --   context that reaches it — that no assignment of its atoms satisfies. A
 --   decision whose body is @unsat@ is TRUE for nobody: as drafting, that is a
 --   requirement no one can ever meet. A nested one is the double bind: two
---   clauses that must both hold and cannot.
+--   clauses that must both hold and cannot. A decision whose body is the
+--   literal @FALSE@ is not reported: it is listed as a constant ('literalBody').
 --
 -- [@dead-branch@] A disjunct of an @OR@ that is unsatisfiable in its context.
 --   The rule would read identically with the limb deleted, which means either
@@ -83,6 +84,7 @@ import qualified L4.Decision.BooleanDecisionQuery as BDQ
 import qualified L4.Decision.QueryPlan as QP
 import qualified L4.Transform as Transform
 import qualified L4.TypeCheck as TC
+import qualified L4.Viz.GuardedRows as GR
 import L4.Annotation (Anno_ (..), getAnno)
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as VizQP
@@ -143,6 +145,12 @@ propositionalBound =
     , "  treats as a leaf is a leaf here too. A DECIDE that does not return"
     , "  BOOLEAN is not analysed, and is reported as skipped rather than as"
     , "  clean."
+    , ""
+    , "  A DECIDE whose body is the literal TRUE or FALSE, as written, is a"
+    , "  CONSTANT: it is listed as one and counted (summary.constants), and"
+    , "  nothing in it is checked, so a FALSE one is not reported as unsat."
+    , "  A body that is FALSE without being the literal -- `FALSE OR FALSE',"
+    , "  or a call read through to a constant -- is analysed as usual."
     , ""
     , "  A local WHERE / LET binding is substituted into the rule before"
     , "  analysis, with arguments put in place of parameters, so"
@@ -302,6 +310,10 @@ data Analysis = Analysis
   -- occurrences of one question were merged.
   , anLadderNodes :: Int
   , anFindings    :: [Finding]
+  , anConstant    :: Maybe Bool
+  -- ^ The literal the body is, for a decision whose body as written is the
+  -- literal TRUE or FALSE ('literalBody'). Such a decision has nothing to check
+  -- and no findings; it is listed as a constant (smucclaw/l4-ide#1095).
   }
 
 data DecisionReport = DecisionReport
@@ -335,7 +347,7 @@ instance Aeson.ToJSON DecisionReport where
         , "reason" .= reason
         ]
     Right a ->
-      Aeson.object
+      Aeson.object $
         [ "name" .= d.drName
         , "analysed" .= True
         , "atoms" .= a.anAtoms
@@ -345,6 +357,9 @@ instance Aeson.ToJSON DecisionReport where
         , "callsLeftOpaque" .= d.drUnfolding.leftOpaque
         , "findings" .= a.anFindings
         ]
+          -- Present only on a constant, and a string, so that a reader testing
+          -- the field for truth is not told a constant FALSE is no constant.
+          <> ["constant" .= literalText b | Just b <- [a.anConstant]]
 
 reportFindings :: DecisionReport -> [Finding]
 reportFindings d = either (const []) (.anFindings) d.drResult
@@ -457,6 +472,33 @@ nestedNotVisited tc =
 decideName :: Decide Resolved -> Text
 decideName (MkDecide _ _ (MkAppForm _ n _ _) _) = prettyLayout (getOriginal n)
 
+-- | The literal a decision's body is, as the drafter wrote it: @DECIDE x IF
+-- FALSE@ and @x MEANS FALSE@ alike. Such a decision is a deliberate constant
+-- ("the text says no", a provision switched off), so it is listed as a
+-- constant and nothing in it is checked: a FALSE one used to be reported
+-- @unsat@, "a requirement nobody can meet" (smucclaw/l4-ide#1095).
+--
+-- Read off the body as written, before local bindings are put in, and only the
+-- literal itself. Not "no atoms": inert prose lowers to a constant too
+-- ('interesting'), and a body that is FALSE without being the literal
+-- (@FALSE OR FALSE@, or a call read through to a constant) keeps its finding.
+--
+-- Listed as analysed, with no findings, counted in @summary.constants@ and
+-- marked @"constant": "TRUE"@ or @"FALSE"@ in the JSON, and "a constant: its
+-- body is the literal FALSE, so there is nothing to check" in the text
+-- (decided by Claude 2026-11-25, pending Meng's review).
+literalBody :: Decide Resolved -> Maybe Bool
+literalBody (MkDecide _ _ _ body) = GR.literalBool body
+
+literalText :: Bool -> Text
+literalText b = if b then "TRUE" else "FALSE"
+
+-- | A constant has no findings ('literalBody'); anything else is left alone.
+asConstant :: Analysis -> Analysis
+asConstant a = case a.anConstant of
+  Just _ -> a {anFindings = []}
+  Nothing -> a
+
 -- | Analyse one decision.
 --
 -- The unit of analysis is the decision's OWN ladder, as written: every finding
@@ -526,9 +568,10 @@ analyseDecide opts callees cfg decide0 =
                in DecisionReport
                     { drName = fnName
                     , drResult =
-                        Right
+                        Right . asConstant $
                           Analysis
                             { anAtoms = length order
+                            , anConstant = constant
                             , anAtomClasses = length order'
                             , anLadderNodes = nodes
                             , anFindings =
@@ -542,6 +585,7 @@ analyseDecide opts callees cfg decide0 =
     -- written as clauses too long to read through is left as written, and the
     -- ladder refuses it ('LadderViz.ClauseGroupTooLong'); a call to one is
     -- left as a box ('callMeanings').
+    constant = literalBody decide0
     decide = case decide0 of
       MkDecide ann sig af body -> MkDecide ann sig af (fromMaybe body (Transform.inlineLocalBindingsForDrawing body))
     notBrokenDown =
@@ -1250,6 +1294,8 @@ jsonEnvelope opts reports total nested =
             -- because never visited. Reported so that the three numbers above
             -- cannot be mistaken for a total. See 'nestedNotVisited'.
             "nestedNotVisited" .= nested
+          , -- Analysed decisions whose body is the literal TRUE or FALSE.
+            "constants" .= length [() | a <- analysed, isJust a.anConstant]
           ]
     ]
   where
@@ -1298,9 +1344,11 @@ textReport opts reports total nested =
                   else ", " <> Text.pack (show r.drUnfolding.readThrough) <> " call(s) read through"
                )
             <> ") — "
-            <> ( if null a.anFindings
-                  then "no propositional findings"
-                  else Text.pack (show (length a.anFindings)) <> " finding(s)"
+            <> ( case a.anConstant of
+                   Just b -> "a constant: its body is the literal " <> literalText b <> ", so there is nothing to check"
+                   Nothing
+                     | null a.anFindings -> "no propositional findings"
+                     | otherwise -> Text.pack (show (length a.anFindings)) <> " finding(s)"
                )
         ]
           <> [ "    call left as a leaf: " <> why | why <- r.drUnfolding.leftOpaque ]
@@ -1336,7 +1384,16 @@ textReport opts reports total nested =
                   <> " call(s) were left as leaves rather than read through \8212 the\n  \
                      \weaker analysis at those atoms; each is named on its rule."
            )
+        <> ( if constants == 0
+              then ""
+              else
+                " "
+                  <> Text.pack (show constants)
+                  <> " of the analysed decision(s) are constants: a body that is\n  \
+                     \the literal TRUE or FALSE, with nothing in it to check."
+           )
     opaque = sum [length r.drUnfolding.leftOpaque | r <- reports]
+    constants = length [() | a <- analysed, isJust a.anConstant]
 
 -- | Strip the backticks L4 uses to quote identifiers containing spaces. The
 -- wizard's JSON does the same thing for the same reason.
