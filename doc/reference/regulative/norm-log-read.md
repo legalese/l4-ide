@@ -77,6 +77,7 @@ Loud, each a named error and never a quiet "no":
 - A read inside an operand of `RAND`, `ROR` or `EVERY`.
   The operands run side by side, so what the read saw would depend on which sibling ran first; the check that makes this safe is not built.
 - The wrong number of `_` for the action's fields.
+- Anything but `_` in an argument place, such as `pay 3`: a parse error at that argument, which does not say that only `_` is allowed.
 - A pattern that names an action declared in this module with a modal no norm of the module has: it could never match.
 - A bearer the machine never had to look at (a norm still waiting, whose party nothing has evaluated yet), when the pattern names one: the read stops, saying so.
   `PARTY _` is never refused for this.
@@ -98,6 +99,12 @@ Silent, because the answer is a plain "no" with nothing to say that it is wrong:
 
 L4 keeps the record only for a contract that reads it: running a module that contains a read switches it on.
 A read written in a module that is imported does not switch it on, so the read stops with an error naming it.
+
+## Where the read has been run
+
+Through `l4 run` (`#EVAL` and `#TRACE`), by the tests and the example on this page.
+Not run with a read in it: `l4 explore`, `l4 lts --steps`, `jl4-service`, `l4 batch`, the REPL, and the WASM build.
+What each does with a read is not known yet, so do not rely on a read there until this page says it has been run.
 
 ## See also
 
