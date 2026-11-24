@@ -54,6 +54,10 @@ A read is true or false as at an instant, so it needs one.
 Inside a `PROVIDED` guard its instant is the event the guard is checking, `THE INSTANT` (see [the time of the event](consequences.md#the-time-of-the-event-the-instant)); anywhere else it needs an explicit `AS OF`.
 Written with neither, it is a check error that says so.
 
+A read is answered from the record as it stands when the read is reached.
+A rule that holds a read, such as `pending MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 20`, is asked again every time something uses it, so its answer in one guard is never kept for the next.
+A norm may read itself in its own guard with `PARTY _` and sees itself as outstanding; with a named party the read stops, as described below, because the norm has not met its party yet.
+
 ```l4
 GIVETH A DEONTIC Person Action
 `late fee` MEANS
