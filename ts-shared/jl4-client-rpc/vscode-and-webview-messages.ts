@@ -429,12 +429,40 @@ export const GetSidebarDeploymentStatus: RequestType<
   method: 'getSidebarDeploymentStatus',
 }
 
+/**
+ * A redeploy changed an input's default (the `default` the service
+ * publishes): reported, never blocking (ruling U2, option B, 2026-11-17; a
+ * redeploy that changes a published default is accepted and reported). The
+ * sidebar computes the list before the deploy is sent, and jl4-service puts
+ * the same list in the deploy job's `notices`.
+ */
+export interface DefaultChangeNotice {
+  kind: 'default-changed'
+  /** The rule's name. */
+  function: string
+  /** The input, as a dotted path: `b`, or `cfg.retries` for a record field
+   *  (`xs[].n` for a field of a list's elements, as in the breaking messages). */
+  input: string
+  /** The deployed default, as JSON. */
+  old: unknown
+  /** The default the new bundle publishes, as JSON. */
+  new: unknown
+}
+
 /** Sidebar polls an async deploy/update job (POST/PUT). Distinct from
  *  the deployment's own status — the live version is unaffected until
  *  the job applies. */
 export interface SidebarUpdateStatusResponse {
-  status: 'compiling' | 'applied' | 'rejected'
+  /** `unreadable` is the extension's own answer when it could not read the
+   *  job from the service (a network or HTTP error): it says nothing about
+   *  the job, which may have been applied. `rejected` is the service's. */
+  status: 'compiling' | 'applied' | 'rejected' | 'unreadable'
   error?: string
+  /** Changed defaults the service reports for this job. Absent when the
+   *  service predates the report, which is not the same as an empty list (the
+   *  service reported none): the sidebar then falls back to the list its review
+   *  held before the deploy, and says so. */
+  notices?: DefaultChangeNotice[]
 }
 
 export const GetSidebarUpdateStatus: RequestType<

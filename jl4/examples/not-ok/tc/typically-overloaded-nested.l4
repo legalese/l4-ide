@@ -1,0 +1,43 @@
+-- A written value that holds a call that names its inputs is not checked
+-- against the other rules of the callee's name, so a site whose choice only that
+-- value's type would settle stays ambiguous, as it was before TYPICALLY. The
+-- rules are named by what they take, and each site is an error that says so.
+-- (ok/typically-overload-nested.l4 has the ways to write the value so that it
+-- is checked.)
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN base IS A STRING
+      factor IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS factor
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+double MEANS x TIMES 2
+
+-- 1. The value is a call that names its input.
+#EVAL scaled WITH base IS (double WITH x IS 5)
+
+-- 2. A rule called inside a rule called, four deep: the value of each of the
+-- outer sites holds a named call.
+#EVAL (scaled WITH base IS (scaled WITH base IS (scaled WITH base IS (scaled WITH base IS 1))))
+
+-- 3. A value that builds a record is a named call too.
+DECLARE Order HAS total IS A NUMBER
+DECLARE Refund HAS total IS A NUMBER
+
+GIVEN order IS AN Order
+      markup IS A NUMBER TYPICALLY 2
+GIVETH A NUMBER
+levy MEANS order's total TIMES markup
+
+GIVEN order IS A Refund
+      cap IS A NUMBER
+GIVETH A NUMBER
+levy MEANS order's total MINUS cap
+
+#EVAL levy WITH order IS (Order WITH total IS 50)

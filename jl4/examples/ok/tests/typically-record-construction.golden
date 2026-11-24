@@ -1,0 +1,33 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+typically-record-construction.l4:26:1-21:
+  Red
+typically-record-construction.l4:27:1-20:
+  "plain"
+typically-record-construction.l4:28:1-19:
+  FALSE
+typically-record-construction.l4:29:1-19:
+  NOTHING
+typically-record-construction.l4:30:1-12:
+  Paint OF Red, 2, NOTHING, "plain", FALSE
+typically-record-construction.l4:33:1-21:
+  Green
+typically-record-construction.l4:34:1-20:
+  "gloss"
+typically-record-construction.l4:35:1-19:
+  TRUE
+typically-record-construction.l4:36:1-19:
+  JUST OF "mind the drips"
+typically-record-construction.l4:37:1-12:
+  Paint OF Green, 3, (JUST OF "mind the drips"), "gloss", TRUE
+typically-record-construction.l4:44:1-49:
+  assertion satisfied
+typically-record-construction.l4:45:1-52:
+  assertion satisfied
+typically-record-construction.l4:56:1-40:
+  assertion satisfied
+typically-record-construction.l4:64:1-36:
+  assertion satisfied
+typically-record-construction.l4:71:1-19:
+  LIST Paint OF Red, 1, NOTHING, "plain", FALSE, Paint OF Green, 2, NOTHING, "plain", FALSE

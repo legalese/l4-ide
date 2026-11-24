@@ -247,8 +247,8 @@ L4 treats the two differently.
 A fact left out is a gap: under soft it may be filled by a presumption, and under hard it is refused.
 A fact sent as `null` is a statement.
 On a fact that is allowed to have no value, a `MAYBE` like Alex's birthdate, the rule goes on with "no date": the date itself is not presumed, and whatever the rule presumes next, such as `presumed adult`, is listed as usual.
-On any other fact, in `l4 batch` and in a single request to the service, `null` is refused by name, because the rule needs a value and you have said you do not have one; `l4 batch` prints `Field 'is adult' is null, which means the value is not known: supply a value`.
-(Two other ways of asking the service do not refuse it yet, and that difference is a known defect, smucclaw/l4-ide#1021.)
+On any other fact, in `l4 batch` and in every way of asking the service (a single request, a batch case, an MCP tool call), `null` is refused by name, because the rule needs a value and you have said you do not have one; `l4 batch` prints `Field 'is adult' is null, which means the value is not known: supply a value`.
+(Until smucclaw/l4-ide#1021 was fixed, MCP and a service batch case did not refuse it; the fix is on branch `feat/typically-gaps`, not landed as of 2026-11-17.)
 
 **This runs today**, and the rows in `../PRESUMPTION-SCENARIOS.md` §2.2 and §2.6 show the columns side by side.
 Spreadsheet users take note: in a comma-separated values (CSV) file an empty cell is a gap, not a `null`, so a CSV cannot say "the value is not known" at all.

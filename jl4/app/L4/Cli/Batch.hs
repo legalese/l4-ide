@@ -13,10 +13,13 @@
 --
 -- Each result row is an envelope
 -- @{ input, output, status, presumed, diagnostics }@ (validate-only mode emits
--- @{ input, status, errors }@ instead). @presumed@ lists the inputs whose
--- @TYPICALLY@ default the row's answer rests on: those the row left out, that
+-- @{ input, status, errors }@ instead). @presumed@ lists the defaults the row's
+-- answer rests on: the inputs whose @TYPICALLY@ default the row left out, that
 -- took their default (or, for a MAYBE input with none, NOTHING), and that the
--- evaluation actually read (T6 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@).
+-- evaluation actually read (T6 of @specs\/todo\/TYPICALLY-ONE-BEHAVIOUR-SPEC.md@),
+-- and also a default the rules themselves took, written @WITH rule: input@
+-- (and @JSONDECODE T: path@, for a decode the rules made), so a reader that
+-- takes entries to be input names filters on the prefix.
 --
 -- An input the row leaves out takes its default while presumption is on
 -- (@--presumption soft@, the default); with @--presumption hard@ it is a
@@ -93,6 +96,7 @@ import L4.Export
   , isRequiredInput
   , rewriteModuleAssumes
   )
+import L4.Discharge (Binder (..), readSets, sectionBinders)
 import L4.DirectiveFilter (filterIdeDirectives)
 import L4.Parser.SrcSpan (prettySrcRangeM)
 import L4.EvaluateLazy.Exceptions (EvalException (..), UserEvalException (..), stopsTheRun)
@@ -315,20 +319,40 @@ batchCmd opts = do
       exitFailure
   -- 'getExportedFunctions' lists the GIVEN parameters first and then the
   -- ASSUMEs the export reads (directly or through any helper it reaches).
-  -- Only the GIVENs are call arguments; each read ASSUME is bound by
-  -- redefining it over the decoded row in the wrapper (see
-  -- 'generateBatchWrapper'), and dropped from the printed module so the
-  -- wrapper's definition takes its place. Redefining at the ASSUME's own
-  -- name is what lets a helper see the value: a LET around the call
-  -- would only be visible to the call expression, not to the closures
-  -- the module's definitions captured.
-  let MkDecide _ (MkTypeSig _ (MkGivenSig _ givenNames) _) _ _ = exportFn.exportDecide
+  -- Only the GIVENs are call arguments. What the wrapper does with the rest
+  -- depends on how each was declared:
+  --
+  -- * a written @ASSUME@ is bound by redefining it over the decoded row in the
+  --   wrapper (see 'generateBatchWrapper'), and dropped from the printed module
+  --   so that the wrapper's definition takes its place. Redefining at the
+  --   ASSUME's own name is what lets a helper see the value: a LET around the
+  --   call would only be visible to the call expression, not to the closures
+  --   the module's definitions captured.
+  -- * a section @GIVEN@ stays in the module and the call supplies it by name,
+  --   with @WITH@, as @#EVAL@ and the service's wrapper do. Redefining it as a
+  --   value would turn every rule that reads it into a plain value, and an
+  --   inner @WITH@ that overrides it for one call would have nothing to
+  --   override (smucclaw/l4-ide#1000). The call names only the section GIVENs
+  --   the export still reads once an inner @WITH@ has taken its share
+  --   ('L4.Discharge.readSets'): a @WITH@ for one it does not read is refused.
+  let MkDecide _ (MkTypeSig _ (MkGivenSig _ givenNames) _) (MkAppForm _ exportRef _ _) _ = exportFn.exportDecide
       (givenParams, assumeParams) =
         List.splitAt (length givenNames) (extractParamsFromExport exportFn)
-      readAssumes    = Set.fromList
-        [ getUnique r | (r, _) <- extractAssumeParamResolveds tcRes.module' exportFn.exportDecide ]
+      binders        = sectionBinders tcRes.module'
+      readAssumeRefs = extractAssumeParamResolveds tcRes.module' exportFn.exportDecide
+      nameOf r       = rawNameToText (rawName (getActual r))
+      readWritten    = Set.fromList
+        [ getUnique r | (r, _) <- readAssumeRefs, not (getUnique r `Map.member` binders) ]
+      -- the section GIVENs the call supplies, in the schema's order
+      callSupplies   = Set.fromList
+        [ nameOf b.resolved | b <- Map.findWithDefault [] (getUnique exportRef) (readSets tcRes.module' binders) ]
+      reads' = ReadInputs
+        { allReads         = assumeParams
+        , writtenAssumes   = Set.fromList [ nameOf r | (r, _) <- readAssumeRefs, getUnique r `Set.member` readWritten ]
+        , suppliedBinders  = [ n | (n, _) <- assumeParams, n `Set.member` callSupplies ]
+        }
       unbindRead (MkAssume _ _ (MkAppForm _ r _ _) _ _)
-        | getUnique r `Set.member` readAssumes = DropAssume
+        | getUnique r `Set.member` readWritten = DropAssume
         | otherwise                            = KeepAssume
       -- restoreMixfixPatterns BEFORE filtering and printing: the printer can
       -- otherwise emit only a mixfix name's head keyword, and a module with two
@@ -359,7 +383,7 @@ batchCmd opts = do
       synonyms       = typeSynonyms declares
       declared       = declaredInputs synonyms schema
 
-  let process = processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes synonyms declared
+  let process = processRow opts evalConfig filteredSource exportFn givenParams reads' defaults schema shapes synonyms declared
   withOutputHandle opts.batchOutput \h ->
     case opts.batchOutputFormat of
       -- NDJSON streams line-by-line so huge batches stay memory-flat: we emit
@@ -478,7 +502,7 @@ processRow
   -> Text                                    -- ^ filtered source
   -> ExportedFunction
   -> [(Text, Maybe (Type' Resolved))]        -- ^ GIVEN params (call arguments)
-  -> [(Text, Maybe (Type' Resolved))]        -- ^ read ASSUMEs (bound by name)
+  -> ReadInputs                              -- ^ the ASSUMEs and section GIVENs the export reads
   -> Map.Map Text (Expr Resolved)            -- ^ the defaults a row may take, by input
   -> [ExportedParam]                         -- ^ full schema for validation
   -> TypeShapes                              -- ^ the records and choice types an input may hold, for validation
@@ -505,7 +529,7 @@ processRow opts _ _ _ _ _ _ _ _ _ _ _ (RefusedRow input reason)
           , Key.fromString "diagnostics" Aeson..= [reason]
           ]
       , RowFailed )
-processRow opts evalConfig filteredSource exportFn givenParams assumeParams defaults schema shapes synonyms declared idx (BatchRow source cells)
+processRow opts evalConfig filteredSource exportFn givenParams reads' defaults schema shapes synonyms declared idx (BatchRow source cells)
   | opts.batchValidateOnly =
       let errs = validateRow opts.batchPresumption synonyms schema shapes input
           ok   = null errs
@@ -516,7 +540,7 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
             ]
       in pure (env, if ok then RowFine else RowFailed)
   | otherwise = do
-      let wrapperCode     = generateBatchWrapper exportFn.exportName givenParams assumeParams defaults input
+      let wrapperCode     = generateBatchWrapper exportFn.exportName givenParams reads' defaults input
           combinedProgram = filteredSource <> wrapperCode
           virtualPath     = opts.batchFile ++ ".batch" ++ show idx ++ ".l4"
           -- A function with inputs is asked for as JUST (f args). That JUST
@@ -525,7 +549,7 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
           -- (The wrapper asks for JUST (f args) exactly when it has inputs,
           -- given or assumed: see 'generateBatchWrapper'.)
           rowConfig
-            | null givenParams && null assumeParams = evalConfig
+            | null givenParams && null reads'.allReads = evalConfig
             | otherwise   = evalConfig { answerInJust = True }
       (evalErrs, mEval) <- runOneshot rowConfig virtualPath \nfp -> do
         let uri = normalizedFilePathToUri nfp
@@ -533,7 +557,7 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
         Shake.use Rules.EvaluateLazy uri
       let presumed = case mEval of
             Nothing          -> []
-            Just evalResults -> rowPresumed opts.batchPresumption schema evalResults
+            Just evalResults -> rowPresumed schema evalResults
           (status, outputJson, diags) = case mEval of
             Nothing ->
               -- The wrapper failed to typecheck/parse (e.g. a schema mismatch).
@@ -588,9 +612,17 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams defa
 -- decodes the row as the request record ('requestRecordName'), so the
 -- request's own events are the ones that decode raised. The filter is the
 -- service's too ('requestPresumed').
-rowPresumed :: Presumption -> [ExportedParam] -> [EvalDirectiveResult] -> [Text]
-rowPresumed presumption schema results =
-  requestPresumed (presumption == PresumeSoft) id inputs (concatMap (.presumed) results)
+--
+-- Only the row's own directive counts. The module a row runs against is the
+-- file's source with the directives 'filterIdeDirectives' drops removed, which
+-- keeps @#TRACE@ and @#CONTRACT@, and the wrapper's @#EVAL@ is appended after
+-- them: so a file that keeps a directive evaluates it once per row, ahead of the
+-- row's own, and a default that directive took (an event's party built without a
+-- defaulted field, say) is not one the row's answer rests on. The row's directive
+-- is the last result.
+rowPresumed :: [ExportedParam] -> [EvalDirectiveResult] -> [Text]
+rowPresumed schema results =
+  requestPresumed id inputs (concatMap (.presumed) (take 1 (reverse results)))
   where
     inputs = Set.fromList [ x.paramName | x <- schema ]
 
@@ -1247,21 +1279,36 @@ cellText = \case
 -- Wrapper code generation
 ----------------------------------------------------------------------------
 
+-- | What the wrapper does with each input the export reads beyond its own
+-- GIVENs.
+data ReadInputs = ReadInputs
+  { allReads        :: [(Text, Maybe (Type' Resolved))]
+    -- ^ every one, in the schema's order: each is a field of the row's record,
+    -- so that the decoder fills its default and reports it
+  , writtenAssumes  :: Set.Set Text
+    -- ^ the written ASSUMEs, which the wrapper redefines over the decoded row
+  , suppliedBinders :: [Text]
+    -- ^ the section GIVENs the call supplies by name, with @WITH@
+  }
+
 -- | The wrapper decodes the row into an @InputArgs@ record holding every
--- schema field (GIVENs and read ASSUMEs alike), applies the export to the
--- GIVEN fields, and redefines each read ASSUME as a definition over the
+-- schema field (GIVENs, section GIVENs and read ASSUMEs alike), and applies
+-- the export to it. A written ASSUME is redefined as a definition over the
 -- decoded row ('generateAssumeBinding') — the ASSUME itself having been
 -- dropped from the printed module by 'batchCmd', so the module's other
--- definitions now resolve the name to this binding.
+-- definitions now resolve the name to this binding. A section GIVEN is
+-- supplied by name at the call, with @WITH@ ('generateEvalDirective'); that
+-- needs every input by name, because a @WITH@ cannot follow positional
+-- arguments.
 generateBatchWrapper
   :: Text
   -> [(Text, Maybe (Type' Resolved))]        -- ^ GIVEN params (call arguments)
-  -> [(Text, Maybe (Type' Resolved))]        -- ^ read ASSUMEs (bound by name)
+  -> ReadInputs
   -> Map.Map Text (Expr Resolved)            -- ^ the defaults a row may take, by input
   -> Aeson.Value
   -> Text
-generateBatchWrapper funName givenParams assumeParams defaults inputJson
-  | null givenParams && null assumeParams =
+generateBatchWrapper funName givenParams reads' defaults inputJson
+  | null givenParams && null reads'.allReads =
       Text.unlines
         [ ""
         , "-- ========== GENERATED WRAPPER =========="
@@ -1273,15 +1320,15 @@ generateBatchWrapper funName givenParams assumeParams defaults inputJson
         [ ""
         , "-- ========== GENERATED WRAPPER =========="
         , ""
-        , generateInputRecord defaults (givenParams <> assumeParams)
+        , generateInputRecord defaults (givenParams <> reads'.allReads)
         , ""
         , generateDecoder
         , ""
         , generateJsonPayload inputJson
         , ""
         ]
-        ++ map generateAssumeBinding assumeParams
-        ++ [ generateEvalDirective funName givenParams ]
+        ++ [ generateAssumeBinding a | a@(name, _) <- reads'.allReads, name `Set.member` reads'.writtenAssumes ]
+        ++ [ generateEvalDirective funName givenParams reads'.suppliedBinders ]
 
 -- | Bind one read ASSUME to its field of the decoded row. Only the
 -- @RIGHT@ branch is needed: the @#EVAL@ directive decodes the row first
@@ -1346,16 +1393,20 @@ escapeAsL4String val =
   let jsonText = Text.Lazy.toStrict $ Text.Lazy.Encoding.decodeUtf8 $ Aeson.encode val
   in showStringLit jsonText
 
-generateEvalDirective :: Text -> [(Text, Maybe (Type' Resolved))] -> Text
-generateEvalDirective funName params = Text.unlines
+generateEvalDirective :: Text -> [(Text, Maybe (Type' Resolved))] -> [Text] -> Text
+generateEvalDirective funName params binders = Text.unlines
   [ "#EVAL"
   , "  CONSIDER decodeArgs inputJson"
   , "    WHEN RIGHT args THEN JUST (" <> functionCall <> ")"
   , "    WHEN LEFT error THEN NOTHING"
   ]
   where
-    functionCall = quoteIdent funName <> " " <> Text.unwords (map mkArgAccess params)
-    mkArgAccess (name, _) = "(args's " <> quoteIdent name <> ")"
+    functionCall
+      | null binders = quoteIdent funName <> " " <> Text.unwords (map (mkArgAccess . fst) params)
+      | otherwise =
+          quoteIdent funName <> " WITH "
+            <> Text.intercalate ", " [ quoteIdent name <> " IS " <> mkArgAccess name | name <- map fst params <> binders ]
+    mkArgAccess name = "(args's " <> quoteIdent name <> ")"
 
 -- | Quote an identifier in backticks when it isn't a plain identifier
 -- (e.g. exported names and parameters written in natural language with

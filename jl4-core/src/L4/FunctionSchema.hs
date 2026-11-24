@@ -12,7 +12,7 @@ module L4.FunctionSchema (
 ) where
 
 import Base
-import Data.Aeson (FromJSON, ToJSON, (.:), (.:?), (.=), (.!=))
+import Data.Aeson (FromJSON, ToJSON, (.:), (.:!), (.:?), (.=), (.!=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -24,7 +24,7 @@ import L4.Export (extractAssumeParamsWithDefaults, extractImplicitAssumeParams)
 import L4.TypeSynonym (declaresFromModule, expandSynonyms)
 import L4.Syntax
 import L4.TypeCheck.Environment
-  ( booleanUnique, dateUnique, datetimeUnique, falseUnique, listUnique
+  ( booleanUnique, dateUnique, datetimeUnique, emptyUnique, falseUnique, listUnique
   , maybeUnique, nothingUnique, numberUnique, stringUnique, timeUnique
   , trueUnique
   )
@@ -113,7 +113,11 @@ instance FromJSON Parameter where
       <*> p .:? "items"
       <*> p .:? "required"
       <*> p .:? "x-l4-type"
-      <*> p .:? "default"
+      -- `.:!`, not `.:?`: an explicit null is the default NOTHING (a MAYBE
+      -- input), a default like any other. `.:?` reads it as no default, so a
+      -- schema read back from the metadata cache would lose it and a changed
+      -- NOTHING default would go unreported on redeploy.
+      <*> p .:! "default"
 
 typeToParameter ::
   Map Text (Declare Resolved) ->
@@ -333,8 +337,9 @@ parametersFromDecideWithErrors resolvedModule decide@(MkDecide _ (MkTypeSig _ (M
 -- | Convert a TYPICALLY default value to a JSON value for the function schema.
 -- A default is a literal ('L4.TypeCheck.isTypicallyLiteral'): a number, a
 -- string, or a nullary constructor. TRUE and FALSE are JSON booleans, NOTHING
--- is null, and any other nullary constructor is an enum value, which the wire
--- spells as its name. Anything else yields Nothing (no "default" key emitted).
+-- is null, EMPTY (the empty list) is the empty array, and any other nullary
+-- constructor is an enum value, which the wire spells as its name. Anything
+-- else yields Nothing (no "default" key emitted).
 typicallyToJson :: Expr Resolved -> Maybe Aeson.Value
 typicallyToJson = \case
   Lit _ (NumericLit _ r) -> Just (Aeson.Number (Scientific.fromFloatDigits (fromRational r :: Double)))
@@ -346,6 +351,9 @@ typicallyToJson = \case
     | getUnique r == trueUnique = Aeson.Bool True
     | getUnique r == falseUnique = Aeson.Bool False
     | getUnique r == nothingUnique = Aeson.Null
+    -- an array input's default: the constructor's own name would publish the
+    -- text "EMPTY" as the default of a list
+    | getUnique r == emptyUnique = Aeson.Array mempty
     -- the constructor's own name, as a request spells the value: a
     -- section-qualified reference (`Light`.Red) is still "Red"
     | otherwise = Aeson.String (unqualifiedRawNameToText (rawName (getActual r)))

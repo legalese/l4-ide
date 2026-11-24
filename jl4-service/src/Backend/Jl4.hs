@@ -774,8 +774,11 @@ buildFunctionCallExpr funName args =
 -- key with no value, or an MCP argument that fails to parse
 -- ('parseFnLiteral'). The direct path then fills the input's default, makes
 -- a MAYBE NOTHING, or refuses it ('L4.Presumption.fillDecision'). MCP and
--- the batch endpoint decode a top-level @null@ as 'FnUnknown' instead, so
--- they take the wrapper path for it (smucclaw/l4-ide#1021).
+-- the batch endpoint decode a top-level @null@ as 'FnUnknown' instead;
+-- 'evaluateWithCompiled' reads it as the key with no value that
+-- @/evaluation@ reads ('topLevelNull'), before it asks this, so it does not
+-- take the wrapper path (smucclaw/l4-ide#1021). A @null@ inside a record or a
+-- list still does.
 requiresWrapperEvaluation :: [(Text, Maybe FnLiteral)] -> Bool
 requiresWrapperEvaluation = any (\(_, mVal) -> maybe False needsWrapper mVal)
   where
@@ -866,11 +869,26 @@ requestEvalConfig policy presumption viaWrapper = do
     , Eval.allocationLimit = limit
     }
 
+-- | A top-level @null@ is the same request on every surface: a key with no
+-- value, as @/evaluation@ decodes it ('FnArguments'). MCP and the batch
+-- endpoint decode it as 'FnUnknown', a value, which sent the request down the
+-- wrapper path, where a BOOLEAN input became the assumed term
+-- @p (not supplied)@ and the answer depended on the order of the operands
+-- (smucclaw/l4-ide#1021). Read as a key with no value, it is T3's @null@: an
+-- input that is not a MAYBE is refused, naming it, and never takes its
+-- default ('L4.Presumption.fillDecision', 'RefuseNull'); a MAYBE takes NOTHING.
+-- A DEONTIC function takes the wrapper path on every surface and decodes both
+-- the same way, so it does not come through here.
+topLevelNull :: (Text, Maybe FnLiteral) -> (Text, Maybe FnLiteral)
+topLevelNull (name, Just FnUnknown) = (name, Nothing)
+topLevelNull param = param
+
 -- | Evaluate using precompiled module (fast path) - direct AST evaluation
 -- This avoids the text round-trip through prettyLayout and re-parsing
 -- Sends a request to the wrapper path instead when it holds a @{}@ anywhere,
--- or a @null@ the decoder kept as a value: inside a record or list, or at
--- the top level from MCP and batch ('requiresWrapperEvaluation').
+-- or a @null@ the decoder kept as a value, inside a record or list
+-- ('requiresWrapperEvaluation'). A @null@ at the top level does not: it is
+-- the same on every surface ('topLevelNull').
 evaluateWithCompiled
   :: FilePath
   -> FunctionDeclaration
@@ -882,10 +900,11 @@ evaluateWithCompiled
   -> Bool
   -> Presumption
   -> ExceptT EvaluatorError IO ResponseWithReason
-evaluateWithCompiled filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption = do
-  -- One entry per GIVEN: Nothing for one left out, or for a top-level null on
-  -- /evaluation, which 'FnArguments' decodes the same way.
-  let expectedParams = map fst (extractParamTypes compiled.compiledDecide)
+evaluateWithCompiled filepath fnDecl compiled sourceText modContext params0 traceLevel includeGraphViz presumption = do
+  -- One entry per GIVEN: Nothing for one left out, or for a top-level null,
+  -- which every surface now sends as /evaluation does ('topLevelNull').
+  let params = map topLevelNull params0
+      expectedParams = map fst (extractParamTypes compiled.compiledDecide)
       inputMap = Map.fromList params
       -- join flattens Maybe (Maybe FnLiteral) -> Maybe FnLiteral
       fullParams = [(name, join $ Map.lookup name inputMap) | name <- expectedParams]
@@ -900,13 +919,55 @@ evaluateWithCompiled filepath fnDecl compiled sourceText modContext params trace
     (inputNames compiled.compiledModule compiled.compiledDecide) params
 
   -- Take the wrapper path only for a @{}@ anywhere, or a @null@ the decoder
-  -- kept as a value: inside a record or list, or at the top level from MCP
-  -- and batch ('requiresWrapperEvaluation'). A parameter left out, or a
-  -- top-level @null@ on /evaluation, stays on the direct path, and so do the
-  -- ASSUMEs, which 'evaluateDirectAST' binds by 'rewriteModuleAssumes'.
+  -- kept as a value: inside a record or list ('requiresWrapperEvaluation'). A
+  -- parameter left out, or a top-level @null@, stays on the direct path, and
+  -- so do the ASSUMEs, which 'evaluateDirectAST' binds by 'rewriteModuleAssumes'.
   if requiresWrapperEvaluation (fullParams ++ assumeValues)
-    then evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption
+    then do
+      -- A top-level @null@ is refused wherever the request goes: a @{}@ or a
+      -- nested @null@ elsewhere in it must not hand it to a wrapper where a
+      -- BOOLEAN would be an assumed term ('refuseTopLevelNulls').
+      refuseTopLevelNulls presumption compiled inputMap
+      evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceLevel includeGraphViz presumption
     else evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presumption
+
+-- | Refuse every top-level @null@ for an input that is not a @MAYBE@, in the
+-- words the direct path uses ('rootInputExpr': @Parameter 'p' is null, which
+-- means the value is not known: supply a value@), before a request that the
+-- wrapper path evaluates is built. T3 gives a @null@ the meaning "not known",
+-- which never takes a default, and that must not depend on what else the
+-- request holds: a @{}@ in another input, or a @null@ inside a record, sends the
+-- whole request to the wrapper, where a BOOLEAN @null@ is an assumed term that
+-- is refused only if the rule reads it, so the answer used to turn on the order
+-- of the operands (review round 1 of smucclaw/l4-ide#1021). A @{}@ IN PLACE of
+-- an input is not checked here: it is "uncertain" and the wrapper treats it as
+-- an assumed term, the documented early/late split.
+refuseTopLevelNulls
+  :: Monad m
+  => Presumption -> CompiledModule -> Map Text (Maybe FnLiteral) -> ExceptT EvaluatorError m ()
+refuseTopLevelNulls presumption compiled inputMap =
+  unless (null refusals) $ throwError $ InterpreterError (Text.intercalate "\n" refusals)
+  where
+    mi        = buildModuleInfo compiled.compiledAllDeclares
+    defaults  = inputDefaults compiled.compiledModule compiled.compiledDecide
+    binders   = sectionBinders compiled.compiledModule
+    nameOf r  = rawNameToText (rawName (getActual r))
+    inputs =
+      [ ("Parameter '" <> name <> "'", name, ty) | (name, ty) <- extractParamTypes compiled.compiledDecide ]
+      <> [ (label, nm, ty)
+         | (r, ty) <- extractAssumeParamResolveds compiled.compiledModule compiled.compiledDecide
+         , let nm = nameOf r
+               -- as the direct path labels them: a section GIVEN is a parameter
+               label | Map.member (getUnique r) binders = "Parameter '" <> nm <> "'"
+                     | otherwise = "ASSUME '" <> nm <> "'"
+         ]
+    refusals =
+      [ label <> " " <> nullRefusalText spelling hasDefault
+      | (label, name, ty) <- inputs
+      , Just Nothing <- [Map.lookup name inputMap]
+      , RefuseNull spelling hasDefault <-
+          [fillDecision (presumption == PresumeSoft) (isJust (stripMaybe (expandSyn mi ty))) (Map.lookup name defaults) (suppliedIn inputMap name)]
+      ]
 
 -- | How the wrapper path decodes one request, decided once for the three
 -- places that build a wrapper ('evaluateWithWrapper', the deontic one, and
@@ -984,9 +1045,9 @@ wrapperPlan presumption m decide params (givens, binders, assumes) =
 
 -- | The request's @presumed@ list on the wrapper path ('Eval.requestPresumed'),
 -- mapping the wrapper's field names back to the inputs'.
-wrapperPresumed :: Presumption -> WrapperPlan -> [Eval.Presumed] -> [Text]
-wrapperPresumed presumption plan =
-  Eval.requestPresumed (presumption == PresumeSoft) unInputField plan.wpInputs
+wrapperPresumed :: WrapperPlan -> [Eval.Presumed] -> [Text]
+wrapperPresumed plan =
+  Eval.requestPresumed unInputField plan.wpInputs
 
 -- | The wrapper names a field @x (input)@ ('Backend.CodeGen.inputFieldName');
 -- messages and @presumed@ name the input.
@@ -1027,6 +1088,8 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     (inputDefaults compiled.compiledModule compiled.compiledDecide)
     (inputNames compiled.compiledModule compiled.compiledDecide) params
 
+  refuseEventRecordGaps (buildModuleInfo compiled.compiledAllDeclares) mPartyType mActionType traceEvents
+
   -- Convert input parameters to JSON
   inputJson <- paramsToJson plan.wpArguments
 
@@ -1043,9 +1106,92 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
       handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
-        (wrapperPresumed presumption plan r.presumed)
+        (wrapperPresumed plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
+
+-- | Refuse an event whose party or action record leaves out a field that has a
+-- @TYPICALLY@ default (W5, T4b; review silent F2, 2026-10-03).
+--
+-- The wrapper turns each event's record into SOURCE
+-- (@`event party 0` MEANS Driver WITH name IS "Alice"@, 'Backend.CodeGen.prepareEvents'),
+-- and since W5 the checker fills a field a construction leaves out from its
+-- @TYPICALLY@. That would make a request's own record take a default the request
+-- could have supplied, under @"presumption": "hard"@ as well, and list it as a
+-- default "no request could supply": the answer changes (the event no longer
+-- matches the party it names) and the switch that exists to withdraw such
+-- defaults does nothing. Before W5 the omission failed to check, loudly.
+--
+-- So an event's record keeps what it always had: every field is written. A
+-- record nested inside it is generated as source too, and is held to the same
+-- (review rulings R2-2). The request's arguments are not affected, because
+-- their records are decoded from JSON, where the switch applies.
+--
+-- This is a stop-gap and not T1's reading: T1 says a field absent in JSON takes
+-- its default under soft and is refused under hard. The record here is written
+-- as source, so a default it took would be a construction's: listed in both
+-- modes under the record's name, and not withdrawn by hard. Card O4
+-- (ruled 2026-10-11, option B) makes listing such a default the target and
+-- keeps this refusal until the listing holds. It does not hold yet: option B
+-- was built and reviewed twice, and is parked (2026-11-18; see
+-- specs/todo/O4-B-EVENT-DEFAULTS-PARKED.md on the branch
+-- feat/o4-b-event-defaults), so this refusal is the rule, in both modes. Not
+-- built: decoding the event records as the arguments are, so that soft takes a
+-- default and lists it as @events[0].party.licence@, and hard refuses it.
+refuseEventRecordGaps
+  :: Monad m
+  => ModuleInfo -> Maybe Text -> Maybe Text -> [TraceEvent] -> ExceptT EvaluatorError m ()
+refuseEventRecordGaps mi mParty mAction events =
+  unless (null gaps) $
+    throwError $ InterpreterError $ Text.intercalate "\n"
+      [ "Missing required field '" <> path <> "." <> field <> "' (" <> con <> "): "
+          <> "an event's record is part of the request, so it never takes the field's TYPICALLY default. "
+          <> "Give every field of it."
+      | (path, con, field) <- gaps
+      ]
+  where
+    -- constructor name -> its fields that have a TYPICALLY
+    defaultedFields :: Map Text [Text]
+    defaultedFields = Map.fromList
+      [ (rawNameToText (rawName (getActual ctor)), [ f | (f, _, Just _) <- fields ])
+      | (ctor, fields) <- Map.elems mi.miRecords
+      ]
+
+    gaps =
+      [ (path, con, field)
+      | (i, ev) <- zip [0 :: Int ..] events
+      , (label, mType, lit) <- [("party", mParty, ev.party), ("action", mAction, ev.action)]
+      , (path, con, given) <- recordsIn ("events[" <> Text.textShow i <> "]." <> label) mType lit
+      , field <- Map.findWithDefault [] con defaultedFields
+      , field `notElem` given
+      ]
+
+    -- Every record 'Backend.CodeGen.fnLiteralToL4ExprWithType' and
+    -- 'Backend.CodeGen.fnLiteralToL4Expr' turn into @Con WITH field IS value, ...@
+    -- in this literal, with the path the request wrote it at and the fields it
+    -- gives. With the type name known the top level is a record of that type
+    -- (any object); without it, a one-key object whose value is an object names
+    -- the constructor itself.
+    --
+    -- A record INSIDE it is generated as source too, so it fills a field it
+    -- leaves out from the field's TYPICALLY exactly as the top level would
+    -- (review rulings R2-2): the walk follows the codegen's own cases, a
+    -- constructor-keyed object, an array, or a constructor applied to one
+    -- argument, down to the leaves. Below the top level the type name is never
+    -- known, so a nested record is always constructor-keyed.
+    recordsIn :: Text -> Maybe Text -> FnLiteral -> [(Text, Text, [Text])]
+    recordsIn path (Just t) (FnObject fs@(_ : _)) = (path, t, map fst fs) : inFields path fs
+    recordsIn path Nothing  (FnObject [(c, FnObject fs)]) = (path, c, map fst fs) : inFields path fs
+    recordsIn path _        lit = nested path lit
+
+    inFields path fs = concat [ nested (path <> "." <> k) v | (k, v) <- fs ]
+
+    nested :: Text -> FnLiteral -> [(Text, Text, [Text])]
+    nested path = \case
+      FnArray xs -> concat [ nested (path <> "[" <> Text.textShow i <> "]") x | (i, x) <- zip [0 :: Int ..] xs ]
+      FnObject [(c, FnObject fs)] -> (path <> "." <> c, c, map fst fs) : inFields (path <> "." <> c) fs
+      FnObject [(c, v)] -> nested (path <> "." <> c) v
+      _ -> []
 
 -- | Direct AST evaluation (fast path), for a request with no @{}@ in it and
 -- no @null@ the decoder kept as a value ('requiresWrapperEvaluation');
@@ -1056,7 +1202,11 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
 -- 'Unique', and the module's own definitions are evaluated fresh per
 -- call, so all of them see the supplied value. A LET around the call (or
 -- around the inlined body) would not: a helper's closure captures the
--- module environment, where the ASSUME is still 'ValAssumed'.
+-- module environment, where the ASSUME is still 'ValAssumed'. A section
+-- GIVEN's elaboration is bound the same way but stays on its section's
+-- heading ('BindAssume'), so that discharge still makes every rule that reads
+-- it a function of it: an inner @WITH@ that overrides it for one call
+-- would otherwise reach the evaluator undischarged (smucclaw/l4-ide#1000).
 --
 -- An input the request left out that has a default takes it while
 -- presumption is soft (W3): a GIVEN, or a record field inside any input, by a
@@ -1117,7 +1267,12 @@ evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presum
   let bindAssume (MkAssume _ tySig appForm@(MkAppForm _ r _ _) _ _) =
         case Map.lookup (getUnique r) assumeExprs of
           Nothing        -> KeepAssume
-          Just valueExpr -> ReplaceAssume (Decide emptyAnno (MkDecide emptyAnno tySig appForm valueExpr))
+          Just valueExpr ->
+            let bound = Decide emptyAnno (MkDecide emptyAnno tySig appForm valueExpr)
+            -- a section GIVEN stays one, so that discharge still makes the rules
+            -- that read it functions of it and an inner WITH has something to
+            -- override (smucclaw/l4-ide#1000); a written ASSUME is a plain value
+            in if Map.member (getUnique r) binders then BindAssume bound else ReplaceAssume bound
       boundModule = addRootFills fills (rewriteModuleAssumes bindAssume compiled.compiledModule)
       rootFills = Map.fromList [ (getUnique f.fillRef, f.fillPresumed) | f <- fills ]
       callExpr = buildFunctionCallExpr (getFunctionResolved compiled.compiledDecide) argExprs
@@ -1152,7 +1307,7 @@ evaluateDirectAST compiled inputMap assumeRefs traceLevel includeGraphViz presum
     Nothing -> throwError $ InterpreterError "L4: Expression evaluation failed."
     Just r@Eval.MkEvalDirectiveResult{result, trace} ->
       handleEvalResultDirect compiled.compiledEntityInfo result trace traceLevel includeGraphViz compiled.compiledModule
-        (Eval.requestPresumed soft id (functionInputs compiled) r.presumed)
+        (Eval.requestPresumed id (functionInputs compiled) r.presumed)
 
 -- | Add each root fill to the module as a 0-ary definition of its default.
 -- At the top of the module, so nothing it is appended to can capture it.
@@ -1258,7 +1413,7 @@ evaluateWithWrapper filepath fnDecl compiled sourceText modContext params traceL
     Nothing -> throwError $ InterpreterError (mconcat errs)
     Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
       handleEvalResult compiled.compiledEntityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz compiled.compiledModule
-        (wrapperPresumed presumption plan r.presumed)
+        (wrapperPresumed plan r.presumed)
     Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
@@ -1552,7 +1707,7 @@ createFunction filepath fnDecl fnImpl moduleContext = do
                   Nothing -> throwError $ InterpreterError (mconcat errs)
                   Just [r@Eval.MkEvalDirectiveResult{result, trace}] ->
                     handleEvalResult tcRes.entityInfo result trace fnDecl.name genCode plan.wpArguments traceLevel includeGraphViz tcRes.module'
-                      (wrapperPresumed presumption plan r.presumed)
+                      (wrapperPresumed plan r.presumed)
                   Just [] -> throwError $ InterpreterError "L4: No #EVAL found in the program."
                   Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
             }

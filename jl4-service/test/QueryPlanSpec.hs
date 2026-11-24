@@ -973,8 +973,8 @@ atomIdentityShapeTests = do
   -- fields (the key is `show` of the AST with its annotations emptied, and a
   -- derived `show` of an `Extension` lists every field it has, so a new field
   -- moved every id). `Show Extension` has since been written by hand, in
-  -- L4.Syntax, and leaves the `@ends-because` fields out while they are empty,
-  -- which moved none.
+  -- L4.Syntax, and leaves the `@ends-because` fields and `defaultFill` out
+  -- while they are empty, which moved none.
   it "the atomIds committed in the ladder-core TS fixture are unmoved" do
     src <- Text.pack <$> readFile "../jl4/examples/ok/typically-basic.l4"
     (info, vizState, _params) <- lspCache "may purchase alcohol" src

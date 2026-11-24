@@ -338,7 +338,11 @@ enumWithPayloads ctx' desc constructors =
             SAnyOf opts _ -> SAnyOf opts (Just d)
             SStringFormat fmt _ -> SStringFormat fmt (Just d)
             SNull -> SNull
-     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType ctx''.ctxDeclares fieldTy), typicallyToJson =<< mTypically) : acc, newDefs)
+        -- A payload field with a TYPICALLY is optional, as a record field's is
+        -- (L7, ruled 2026-10-12): a construction that leaves it out
+        -- takes the default, so a payload that omits it is a valid one.
+        isRequired = not (isMaybeOrOptionalType ctx''.ctxDeclares fieldTy) && isNothing mTypically
+     in ((fieldNameText, schemaWithDesc, isRequired, typicallyToJson =<< mTypically) : acc, newDefs)
 
 -- | Is this the builtin MAYBE, or a synonym for it, the types whose schema can
 -- be null? Decided from the resolved, synonym-expanded type, as the decoder

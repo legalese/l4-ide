@@ -1,0 +1,30 @@
+-- A rule declared in a WHERE is named bare, so it shares an entry with a
+-- top-level rule of the same name (overnight card O6, 2026-10-11; found in
+-- review). `useOne` calls the top-level `scaled` (rate 3) and `useTwo` its own
+-- local `scaled` (rate 5). The rows answer 30, 50 and 80, and every one lists
+-- `WITH scaled: rate`.
+
+GIVEN rate IS A NUMBER TYPICALLY 3
+      base IS A NUMBER
+GIVETH A NUMBER
+scaled MEANS rate TIMES base
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+useOne MEANS scaled WITH base IS n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+useTwo MEANS scaled WITH base IS n
+  WHERE
+    GIVEN rate IS A NUMBER TYPICALLY 5
+          base IS A NUMBER
+    GIVETH A NUMBER
+    scaled MEANS rate TIMES base
+
+@export default Combine
+GIVEN n IS A NUMBER
+      one IS A BOOLEAN
+      two IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE combine IS (IF one THEN useOne n ELSE 0) PLUS (IF two THEN useTwo n ELSE 0)

@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+withal-import-use.l4:11:1-44:
+  assertion satisfied
+withal-import-use.l4:12:1-41:
+  assertion satisfied
+withal-import-use.l4:13:1-53:
+  assertion satisfied
+withal-import-use.l4:14:1-20:
+  Paint OF Red, 2
+withal-import-use.l4:21:1-40:
+  assertion satisfied

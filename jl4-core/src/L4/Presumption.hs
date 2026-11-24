@@ -12,6 +12,7 @@ module L4.Presumption
   ( Supplied (..)
   , FillDecision (..)
   , Withheld (..)
+  , NullDefault (..)
   , fillDecision
   , withheldText
   , nullRefusalText
@@ -50,9 +51,22 @@ data FillDecision d
     -- ^ @null@ on a MAYBE: a value, not an omission
   | RefuseMissing Withheld
     -- ^ absent, and nothing fills it
-  | RefuseNull Text Bool
-    -- ^ not known (spelled as the 'Text') on a non-MAYBE; the 'Bool' says
-    -- whether it has a default it may not take (T3)
+  | RefuseNull Text NullDefault
+    -- ^ not known (spelled as the 'Text') on a non-MAYBE; the 'NullDefault'
+    -- says whether it has a default it may not take, and whether leaving the
+    -- input out would take it (T3)
+
+-- | What a refusal of a not-known value says about the input's @TYPICALLY@
+-- default. The refusal may point at leaving the input out only where that would
+-- take the default, which is only so while presumption is soft: under hard an
+-- input left out is refused too (documentation review, round 1, C10).
+data NullDefault
+  = NoDefaultToTake
+    -- ^ the input has no default
+  | LeavingOutTakesIt
+    -- ^ it has one, and presumption is soft: leaving the input out takes it
+  | LeavingOutRefusedToo
+    -- ^ it has one, and presumption is hard: leaving the input out is refused
 
 -- | Why an absent input is refused, beyond "nothing supplies it".
 data Withheld
@@ -70,7 +84,10 @@ fillDecision presume isMaybe mDefault = \ case
   Supplied _ -> UseValue
   SuppliedNull spelling
     | isMaybe   -> NullIsNothing
-    | otherwise -> RefuseNull spelling (isJust mDefault)
+    | otherwise -> RefuseNull spelling $ case mDefault of
+        Nothing -> NoDefaultToTake
+        Just _ | presume   -> LeavingOutTakesIt
+               | otherwise -> LeavingOutRefusedToo
   Absent
     | presume, Just d <- mDefault -> UseDefault d
     | presume, isMaybe            -> UseNothing
@@ -87,12 +104,13 @@ withheldText = \ case
 
 -- | The refusal of a not-known value on a non-MAYBE, after the thing's name
 -- (@Field 'x' …@, @Parameter 'x': …@).
-nullRefusalText :: Text -> Bool -> Text
+nullRefusalText :: Text -> NullDefault -> Text
 nullRefusalText spelling hasDefault =
   "is " <> spelling <> ", which means the value is not known"
-    <> (if hasDefault
-          then ", and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"
-          else ": supply a value")
+    <> case hasDefault of
+         NoDefaultToTake      -> ": supply a value"
+         LeavingOutTakesIt    -> ", and that never takes the TYPICALLY default: supply a value, or leave it out to use the default"
+         LeavingOutRefusedToo -> ", and that never takes the TYPICALLY default: supply a value (leaving it out is refused too, because presumption is hard)"
 
 -- | The refusal of names that match nothing a request may supply, in an
 -- object where something left out took its default (review M1, decided

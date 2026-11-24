@@ -1,0 +1,32 @@
+-- A TYPICALLY default on a rule's input that is not a literal gets the same
+-- error as one on a record's field: "must be a literal", with the hint that
+-- points at an OTHERWISE branch and a MAYBE input (HAIRCUT, ruled 2026-10-12).
+-- Three shapes, each naming something that is in this file: a definition, a
+-- sibling input, and a call.
+--
+-- A rule's signature is read before the definitions after it are in scope, so
+-- each of the three is ALSO told "I could not find a definition", which is not
+-- true of a name that is in the file. That sentence was said before a default
+-- could be left out, and is not changed here. What this file pins is that the
+-- literal error and its hint are not lost behind it.
+-- not-ok/tc/typically-unresolved.l4 pins a name that is in the file nowhere.
+
+GIVEN base IS A NUMBER TYPICALLY g
+GIVETH A NUMBER
+`from a definition` MEANS base
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER TYPICALLY a
+GIVETH A NUMBER
+`from a sibling input` MEANS a PLUS b
+
+GIVEN n IS A NUMBER TYPICALLY (h 3)
+GIVETH A NUMBER
+`from a call` MEANS n
+
+GIVETH A NUMBER
+g MEANS 3
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+h MEANS x TIMES 2

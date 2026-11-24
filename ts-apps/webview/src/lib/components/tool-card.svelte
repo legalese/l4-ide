@@ -1,5 +1,11 @@
 <script lang="ts">
   import type { ExportedFunctionInfo, FunctionParameter } from 'jl4-client-rpc'
+  import {
+    PRESUMPTION_NOTE,
+    anyInputHasDefault,
+    inputStatus,
+  } from '$lib/param-defaults'
+  import { publishedInputSchema } from '$lib/published-schema'
 
   let {
     func,
@@ -38,6 +44,22 @@
     return params.required?.includes(name) ?? false
   }
 
+  /** Inputs the file gives a default that the service does not publish
+   *  (an `ASSUME`'s), named by the language server. */
+  let unpublished = $derived(new Set(func.unpublishedDefaults ?? []))
+
+  /** Whether any input shows a default, which is when the presumption switch
+   *  is worth a line. */
+  let showsDefault = $derived(anyInputHasDefault([func]))
+
+  /** The inputs' schema as this card was given it, less the keys only the
+   *  language server and the service use (alias, propertyOrder, x-l4-type,
+   *  x-sanitized-name), which the OpenAPI document and the MCP tool list drop:
+   *  what a client is shown. Never composed here. */
+  let publishedSchema = $derived(
+    JSON.stringify(publishedInputSchema(func.parameters), null, 2)
+  )
+
   function hasNestedProps(param: FunctionParameter): boolean {
     return (
       param.properties !== undefined && Object.keys(param.properties).length > 0
@@ -48,18 +70,27 @@
 {#snippet nestedProperties(
   props: Record<string, FunctionParameter>,
   depth: number,
-  requiredFields?: string[]
+  requiredFields: string[] | undefined,
+  parentPath: string
 )}
   <div class="nested-props">
     {#each Object.entries(props) as [nestedName, nestedParam]}
+      {@const path = `${parentPath}.${nestedName}`}
+      {@const status = inputStatus(
+        path,
+        nestedParam,
+        requiredFields?.includes(nestedName) ?? false
+      )}
       <div class="param-row nested">
-        <span class="param-name">{nestedName}</span>
+        <span class="param-name">{path}</span>
         <span class="param-type"
           >{nestedParam.type}{#if nestedParam.alias}
             ({nestedParam.alias}){/if}</span
         >
-        {#if requiredFields && !requiredFields.includes(nestedName)}
-          <span class="badge optional-badge">optional</span>
+        {#if requiredFields !== undefined || status.kind === 'typically'}
+          <span class="badge status-badge status-{status.kind}"
+            >{status.label}</span
+          >
         {/if}
       </div>
       {#if nestedParam.description}
@@ -67,10 +98,17 @@
           {nestedParam.description}
         </div>
       {/if}
+      {#if status.hint}
+        <div class="param-hint nested">{status.hint}</div>
+      {/if}
       {#if nestedParam.enum && nestedParam.enum.length > 0}
         <div class="param-enums nested">
           {#each nestedParam.enum as val}
-            <span class="enum-tag">{val}</span>
+            <span
+              class="enum-tag"
+              class:default={status.kind === 'typically' &&
+                nestedParam.default === val}>{val}</span
+            >
           {/each}
         </div>
       {/if}
@@ -78,7 +116,8 @@
         {@render nestedProperties(
           nestedParam.properties ?? {},
           depth + 1,
-          nestedParam.required
+          nestedParam.required,
+          path
         )}
       {/if}
     {/each}
@@ -99,7 +138,11 @@
     {/if}
     <span class="func-name">{func.name}</span>
     {#if func.isDefault}
-      <span class="badge default-badge">DEFAULT</span>
+      <span
+        class="badge entry-badge"
+        title="The rule l4 batch runs when you name none: the one marked @export default, or the first exported rule"
+        >ENTRY POINT</span
+      >
     {/if}
     {#if !expanded && paramCount > 0}
       <span class="param-count"
@@ -121,23 +164,36 @@
         <div class="section-label">Inputs</div>
         <div class="params-list">
           {#each paramEntries(func.parameters) as [name, param]}
+            {@const status = inputStatus(
+              name,
+              param,
+              isRequired(name, func.parameters),
+              unpublished.has(name)
+            )}
             <div class="param-row">
               <span class="param-name">{name}</span>
               <span class="param-type"
                 >{param.type}{#if param.alias}
                   ({param.alias}){/if}</span
               >
-              {#if !isRequired(name, func.parameters)}
-                <span class="badge optional-badge">optional</span>
-              {/if}
+              <span class="badge status-badge status-{status.kind}"
+                >{status.label}</span
+              >
             </div>
             {#if param.description}
               <div class="param-desc">{param.description}</div>
             {/if}
+            {#if status.hint}
+              <div class="param-hint">{status.hint}</div>
+            {/if}
             {#if param.enum && param.enum.length > 0}
               <div class="param-enums">
                 {#each param.enum as val}
-                  <span class="enum-tag">{val}</span>
+                  <span
+                    class="enum-tag"
+                    class:default={status.kind === 'typically' &&
+                      param.default === val}>{val}</span
+                  >
                 {/each}
               </div>
             {/if}
@@ -145,11 +201,27 @@
               {@render nestedProperties(
                 param.properties ?? {},
                 1,
-                param.required
+                param.required,
+                name
               )}
             {/if}
           {/each}
         </div>
+        {#if showsDefault}
+          <div class="presumption-note">{PRESUMPTION_NOTE}</div>
+        {/if}
+        <details class="callers-see">
+          <summary>What callers see</summary>
+          <p class="callers-see-note">
+            The schema of this rule's inputs, as the service describes them to
+            callers, less the keys that are only for L4's own tools. MCP and
+            WebMCP spell input names without spaces (for example start year
+            becomes start-year).{#if func.isDeontic}
+              A DEONTIC rule also takes <code>startTime</code> and
+              <code>events</code>, which the service adds.{/if}
+          </p>
+          <pre class="callers-see-json">{publishedSchema}</pre>
+        </details>
       {/if}
 
       {#if func.returnType}
@@ -348,7 +420,7 @@
     flex-shrink: 0;
   }
 
-  .default-badge {
+  .entry-badge {
     background: none;
     border: none;
     padding: 0;
@@ -356,12 +428,74 @@
     opacity: 0.5;
   }
 
-  .optional-badge {
+  /* What a caller must do about an input: "required", "optional", or
+     "optional, typically 0" (the default a caller who leaves it out gets).
+     A default is information a person acts on, so it is not dimmed. */
+  .status-badge {
     background: none;
     border: none;
     padding: 0;
     color: var(--vscode-descriptionForeground);
-    opacity: 0.5;
+  }
+
+  .status-required,
+  .status-optional {
+    opacity: 0.6;
+  }
+
+  .status-typically,
+  .status-unpublished {
+    font-family: var(--vscode-editor-font-family, monospace);
+  }
+
+  .param-hint {
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+    padding: 0 4px 2px 4px;
+  }
+
+  .param-hint.nested {
+    padding-left: 4px;
+  }
+
+  .enum-tag.default {
+    border-color: var(--vscode-descriptionForeground);
+    color: var(--vscode-foreground);
+  }
+
+  .presumption-note {
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+    margin: 6px 0 0;
+  }
+
+  .callers-see {
+    margin: 6px 0 0;
+  }
+
+  .callers-see summary {
+    cursor: pointer;
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+  }
+
+  .callers-see-note {
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+    margin: 4px 0;
+  }
+
+  .callers-see-json {
+    margin: 0;
+    padding: 6px 8px;
+    overflow-x: auto;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 0.85em;
+    background: var(
+      --vscode-textCodeBlock-background,
+      rgba(127, 127, 127, 0.1)
+    );
+    border-radius: 3px;
   }
 
   .return-info {

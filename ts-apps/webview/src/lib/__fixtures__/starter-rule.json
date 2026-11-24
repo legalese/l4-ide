@@ -1,0 +1,122 @@
+{
+  "_about": "What a running jl4-service published for the two sources below, captured 2026-11-17 from a jl4-service built from unstable 35aa3bd67 (l4 deploy --server; GET /deployments/{id}?functions=full, the `parameters` of the function in `metadata.functions`, which is what the sidebar gets for a deployed rule; GET /deployments/{id}/openapi.json, the evaluation request body's `arguments` schema; POST /deployments/{id}/.mcp tools/list, the tool's inputSchema). Recorded, not live: regenerate it the same way if the schema shape changes. `starter` has a record input, an enumerated input and an input whose name has a space. `quirk` has an input named alias, which the OpenAPI document leaves out of `properties` and keeps in `required`.",
+  "starter": {
+    "source": "DECLARE Colour IS ONE OF Red, Green\n\n@desc A person\nDECLARE Person HAS\n  name IS A STRING\n  age  IS A NUMBER TYPICALLY 18\n\n@export default Describe a starter\nGIVEN `start year` IS A NUMBER @desc The year the person starts\n      shade        IS A Colour TYPICALLY Green\n      who          IS A Person @desc The starter\nGIVETH A NUMBER\ndescribe MEANS\n  IF shade EQUALS Green THEN `start year` PLUS who's age ELSE 0\n",
+    "metadataParameters": {
+      "properties": {
+        "shade": {
+          "default": "Green",
+          "enum": ["Red", "Green"],
+          "type": "string",
+          "x-l4-type": "Colour"
+        },
+        "start year": {
+          "description": "The year the person starts",
+          "type": "number"
+        },
+        "who": {
+          "description": "The starter",
+          "properties": {
+            "age": {
+              "default": 18,
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "propertyOrder": ["name", "age"],
+          "required": ["name"],
+          "type": "object",
+          "x-l4-type": "Person"
+        }
+      },
+      "required": ["start year", "who"],
+      "type": "object"
+    },
+    "openApiArguments": {
+      "properties": {
+        "shade": {
+          "default": "Green",
+          "enum": ["Red", "Green"],
+          "type": "string"
+        },
+        "start year": {
+          "description": "The year the person starts",
+          "type": "number"
+        },
+        "who": {
+          "description": "The starter",
+          "properties": {
+            "age": {
+              "default": 18,
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": ["name"],
+          "type": "object"
+        }
+      },
+      "required": ["start year", "who"],
+      "type": "object"
+    },
+    "mcpInputSchema": {
+      "properties": {
+        "shade": {
+          "default": "Green",
+          "enum": ["Red", "Green"],
+          "type": "string"
+        },
+        "start-year": {
+          "description": "The year the person starts",
+          "type": "number"
+        },
+        "who": {
+          "description": "The starter",
+          "properties": {
+            "age": {
+              "default": 18,
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": ["name"],
+          "type": "object"
+        }
+      },
+      "required": ["start-year", "who"],
+      "type": "object"
+    }
+  },
+  "quirk": {
+    "source": "@export default echo\nGIVEN alias IS A NUMBER\nGIVETH A NUMBER\necho MEANS alias\n",
+    "metadataParameters": {
+      "properties": {
+        "alias": {
+          "type": "number"
+        }
+      },
+      "required": ["alias"],
+      "type": "object"
+    },
+    "openApiArguments": {
+      "properties": {},
+      "required": ["alias"],
+      "type": "object"
+    },
+    "mcpInputSchema": {
+      "properties": {
+        "alias": {
+          "type": "number"
+        }
+      },
+      "required": ["alias"],
+      "type": "object"
+    }
+  }
+}

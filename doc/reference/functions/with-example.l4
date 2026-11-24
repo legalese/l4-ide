@@ -1,4 +1,4 @@
--- Supplying arguments by name, and supplying a section binder.
+-- Supplying arguments by name, and supplying a section GIVEN.
 -- Reference: doc/reference/functions/WITH.md
 
 GIVEN principal IS A NUMBER
@@ -23,7 +23,7 @@ quadrupled MEANS doubled TIMES 2
 #EVAL doubled    WITH `the rate` IS 5                          -- 10
 #EVAL quadrupled WITH `the rate` IS 5                          -- 20
 
--- An override for one call and everything under it. Elsewhere the binder is
+-- An override for one call and everything under it. Elsewhere the section GIVEN is
 -- unchanged, which is what the second directive below shows.
 GIVETH A NUMBER
 `under the strict reading` MEANS quadrupled WITH `the rate` IS 10

@@ -134,10 +134,9 @@ migration that lost it would silently change which programs compile.
 **A hand-written `ASSUME` of a name the heading already binds.** A section that
 binds a name on its heading and _also_ writes its own `ASSUME` of that name in
 its body type-checks when the two are at different types (L4 resolves names by
-type), and the `ASSUME` draws the usual deprecation warning. Until 2026-09-07
-the printer took the hand-written `ASSUME` for the section's own and dropped
-it, so `l4 batch` and the REPL rebuilt a module that had lost it; it now tells
-the two apart and keeps it. Write the second binding as another `GIVEN`
+type), and the `ASSUME` draws the usual deprecation warning. The printer tells
+the hand-written `ASSUME` from the section's own and keeps it, so `l4 batch` and
+the REPL rebuild the module with it intact. Write the second binding as another `GIVEN`
 parameter on the heading anyway — that is what the warning asks for.
 
 ## One name, one value
@@ -240,10 +239,13 @@ A `GIVEN` at column 1 followed by another `§` heading is rejected outright. The
 formatter never moves a `GIVEN` across the column boundary, so formatting
 cannot introduce the hazard.
 
-## What a section `GIVEN` does in this release
+## What a section `GIVEN` does
 
 **A section `GIVEN` that nothing supplies behaves as an assumed term, exactly
-as an older `ASSUME` did.** A rule whose answer depends on one cannot be run to
+as an older `ASSUME` did.** An **assumed term** is a name that a rule is told
+but that nobody has given a value: that is what an [`ASSUME`](../types/ASSUME.md)
+declares, and what a section `GIVEN` without a `TYPICALLY` is until something
+supplies it. A rule whose answer depends on one cannot be run to
 an answer until the name is supplied; `#EVAL` on such a rule reports
 
 ```
@@ -252,8 +254,7 @@ I could not continue evaluating, because I needed to know the value of
 but it is an assumed term.
 ```
 
-**Supplying one inside the file works, by name, with `WITH`** (landed with the
-discharge change, 2026-09-05): ``#EVAL `the fee` WITH `applicable rate` IS 0.2``
+**Supplying one inside the file works, by name, with `WITH`**: ``#EVAL `the fee` WITH `applicable rate` IS 0.2``
 supplies the name to the rule and to everything it relies on, and `#ASSERT`
 takes the same form. This is the one thing an `ASSUME` never had; against an
 `ASSUME`d name the same line is a check error. A value written _before_ the
@@ -327,6 +328,13 @@ What else works:
   request the same way they supply a read `ASSUME`, and fill in a name's
   `TYPICALLY` value when the request leaves it out (see
   [TYPICALLY](../types/TYPICALLY.md#at-the-boundary-l4-batch-and-the-decision-service)).
+  `l4 batch` hands the name to the rules by name, as `#EVAL` does, so an inner
+  `WITH` that overrides it works. Two limits: a name
+  whose every read is overridden is still read from the case, which has to give
+  it a value of the right kind or leave it out, and two section `GIVEN`s of one
+  name, one in a section and one in a section inside it, that a single rule
+  reaches are refused by `l4 batch` where `#EVAL` answers. Both are described on
+  [the `l4` command-line page](../../tutorials/getting-started/l4-cli.md).
 - **Every export backend** — Decision Model and Notation (DMN), Business Process
   Model and Notation (BPMN), docassemble, Catala, OpenFisca, Blawx and the
   Multi-Level Intermediate Representation (MLIR) — treats a section `GIVEN` as
@@ -335,7 +343,7 @@ What else works:
 - **Diagnostics and hover**, which point at the `GIVEN` line under the heading
   (a "defined at" note names that line, and hovering the name shows the kind
   of thing it stands for). Go-to-definition and find-references have not been
-  exercised on a section `GIVEN` in this release.
+  exercised on a section `GIVEN`.
 
 **What Catala makes of one, measured 2026-09-07.** The backends compile the
 module as you wrote it, not the rewritten one in which the section's `GIVEN` has
@@ -389,7 +397,7 @@ into its own caller — and the same module with the same two `@export`s compile
 and typechecks. A module may export
 as many rules as it likes; what it may not do is route a call between two of them
 through one that is not exported. If you are here because of a section `GIVEN`
-the condition costs you little, since every rule that reads the binder has to be
+the condition costs you little, since every rule that reads the section `GIVEN` has to be
 exported anyway; if you are applying `@export` to an ordinary helper, it is the
 whole story.
 
@@ -424,8 +432,8 @@ It is worth saying plainly that this is the opposite of where the temptation is
 strongest. The repetition a section `GIVEN` removes grows with the size of the
 encoding — and a large encoding is exactly the one likely to have been split
 into a domain module, several subject modules and a file of test cases. Both of
-the limits below then bite at once: a rule in another module cannot be given the
-binder by name, and the Catala route out of the export refusal needs the whole
+the limits below then bite at once: a rule in another module cannot be given a value for the
+section `GIVEN` by name, and the Catala route out of the export refusal needs the whole
 call chain exported, which a chain that spans modules cannot be. Neither is
 about how many rules share the input; both are about where the callers live.
 
@@ -490,9 +498,9 @@ accepted, and it went wrong in the worst order — the reassuring step came firs
 - Running the very same row then stopped with _"I could not continue evaluating,
   because I needed to know the value of `gst rate` but it is an assumed term."_
   Adding `"gst rate"` to the row did **not** help: the value was accepted into
-  the row and then ignored, because the way `l4 batch` supplies a value is by
-  rewriting the module it was handed, and it cannot rewrite a module that module
-  merely imports.
+  the row and then ignored, because the way `l4 batch` supplied a value then was
+  by rewriting the module it was handed, and it cannot rewrite a module that
+  module merely imports.
 
 So the answer to _"is this request valid?"_ was yes for a request that could
 never be answered. That is why the first repair is the refusal rather than a

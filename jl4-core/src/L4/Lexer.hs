@@ -230,6 +230,7 @@ data TKeywords
   | TKOne
   | TKOf
   | TKWith
+  | TKWithal
   | TKA
   | TKAn
   | TKThe
@@ -338,6 +339,7 @@ keywords = Map.fromList
   , ("ONE"        , TKOne        )
   , ("OF"         , TKOf         )
   , ("WITH"       , TKWith       )
+  , ("WITHAL"     , TKWithal     )
   , ("A"          , TKA          )
   , ("AN"         , TKAn         )
   , ("HAS"        , TKHas        )

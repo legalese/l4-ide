@@ -184,6 +184,7 @@ test-suite jl4-service-test
     TestData
     TestStoreDir
     UnresolvedImportSpec
+    WebMcpParitySpec
 
   hs-source-dirs:
     test
@@ -213,6 +214,7 @@ test-suite jl4-service-test
     jl4-service,
     lsp-types,
     optparse-applicative,
+    process,
     QuickCheck,
     quickcheck-instances,
     servant >=0.20.2 && <0.21,

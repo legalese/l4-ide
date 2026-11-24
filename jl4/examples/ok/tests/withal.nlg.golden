@@ -1,0 +1,20 @@
+`stock paint`
+`stock paint` 's `colour`
+`stock paint` 's `note`
+`stock paint` 's `label`
+`stock paint` 's `rush`
+`stock paint` 's `coats`
+`stock paint` is equal to `Paint` where `colour` is `Red`, `note` is `NOTHING`, `label` is plain, `rush` is `FALSE` and `coats` is 2
+`stock paint` is equal to `Paint` where `coats` is 2, `colour` is `Red` by default, `note` is `NOTHING` by default, `label` is plain by default and `rush` is `FALSE` by default
+`stock paint` is equal to `Paint` with `Red`, `NOTHING`, plain, `FALSE` and 2
+`Paint` where `colour` is `Green`, `note` is `NOTHING` by default, `label` is plain by default, `rush` is `FALSE` by default and `coats` is 2 by default 's `colour` is equal to `Green`
+`Paint` where `colour` is `Green`, `note` is `NOTHING` by default, `label` is plain by default, `rush` is `FALSE` by default and `coats` is 2 by default 's `coats` is equal to 2
+`coats of` with `Paint` where `colour` is `Red` by default, `note` is `NOTHING` by default, `label` is plain by default, `rush` is `FALSE` by default and `coats` is 2 by default is equal to 2
+`two paints` is equal to list of `Paint` where `coats` is 2, `colour` is `Red` by default, `note` is `NOTHING` by default, `label` is plain by default and `rush` is `FALSE` by default and `Paint` where `coats` is 3, `colour` is `Red` by default, `note` is `NOTHING` by default, `label` is plain by default and `rush` is `FALSE` by default
+`order paint` with `FALSE` 's `rush` is equal to `FALSE`
+`order paint` with `TRUE` 's `rush` is equal to `TRUE`
+`Paint` where `colour` is `Red` by default, `note` is `NOTHING` by default, `label` is plain by default, `rush` is `FALSE` by default and `coats` is 2 by default 's `label` is equal to plain
+`a brick` 's `weight` is equal to 3
+`a brick` 's `baked` is equal to `TRUE`
+`the marker` is equal to `Marker`
+`withal` is equal to 7

@@ -247,6 +247,15 @@ export interface FunctionParameter {
    *  the sanitised keys) back to the schema's original L4 names
    *  without re-implementing the server's sanitisation. */
   'x-sanitized-name'?: string
+  /** The input's default (`TYPICALLY`), the JSON Schema `default` keyword: a
+   *  rule input, or a record field in its parent's `properties`. A caller may
+   *  leave the input out and the rule then uses this value.
+   *  A plain value: a number, a piece of text, TRUE or FALSE, an enumerated
+   *  constructor by its name, or NOTHING, which is `null`. Not published for
+   *  an `ASSUME`. The key is absent when there is none, so test for the key,
+   *  not for truthiness: 0, `false`, "" and `null` are all defaults.
+   *  Absent from a deployment that an older service stored. */
+  default?: unknown
 }
 
 export interface FunctionParameters {
@@ -267,6 +276,13 @@ export interface ExportedFunctionInfo {
    *  recursive return-value compatibility diff at deploy time. */
   returnSchema?: FunctionParameter
   srcLine?: number
+  /** Inputs the file gives a default (`TYPICALLY`) that the service does not
+   *  publish: today an `ASSUME`'s. Their schema has no `default` key, so
+   *  without this list they would read as having no default. Sent by the
+   *  language server for the local rule only; absent when there are none, and
+   *  always absent from a deployed rule, which the service publishes without
+   *  it. */
+  unpublishedDefaults?: string[]
 }
 
 export interface GetExportedFunctionsParams {

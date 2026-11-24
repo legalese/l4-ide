@@ -403,6 +403,13 @@ data ExportedFunctionSummary = ExportedFunctionSummary
   -- 'Nothing' for DEONTIC functions (the surface return shape is the
   -- simulation envelope, not the user's record type).
   , srcLine :: !(Maybe Int)
+  , unpublishedDefaults :: ![Text]
+  -- ^ Inputs whose declared @TYPICALLY@ the schema does not publish: today an
+  -- @ASSUME@'s ('Export.honouredDefault' drops it). Such an input has no
+  -- @default@ key in 'parameters', which reads the same as an input with no
+  -- default at all, so the deploy sidebar needs the names to say that the file
+  -- gives it one that callers do not see. Empty for nearly every function, and
+  -- then left out of the JSON.
   }
   deriving stock (Eq, Show, Generic)
 
@@ -419,6 +426,7 @@ instance ToJSON ExportedFunctionSummary where
     ++ case f.srcLine of
       Nothing -> []
       Just l -> ["srcLine" .= l]
+    ++ [ "unpublishedDefaults" .= f.unpublishedDefaults | not (null f.unpublishedDefaults) ]
 
 -- | An error that stops the file from being deployed, in the file itself or in
 -- a module it imports (see "LSP.L4.BlockingErrors").
@@ -527,6 +535,14 @@ exportedFunctionToSummary declares ef =
     -- Extract line number from the function name's AppForm annotation
     MkDecide _ _ (MkAppForm (Anno _ appRange _) _ _ _) _ = ef.exportDecide
     fnLine = fmap (\r -> r.start.line) appRange
+
+    -- A default the file declares but 'mkParam' leaves out of the schema.
+    unpublished =
+      [ ep.paramName
+      | ep <- ef.exportParams
+      , isJust ep.paramDefault
+      , isNothing (FSchema.typicallyToJson =<< Export.honouredDefault ep)
+      ]
   in
     ExportedFunctionSummary
       { name = ef.exportName
@@ -537,4 +553,5 @@ exportedFunctionToSummary declares ef =
       , parameters = params
       , returnSchema = mReturnSchema
       , srcLine = fnLine
+      , unpublishedDefaults = unpublished
       }

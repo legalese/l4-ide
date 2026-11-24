@@ -125,17 +125,32 @@ Poll the returned job at `GET /deployments/{id}/updates/{job}`:
 | `applied`   | The new bundle is compiled, compatible, and now the live version   |
 | `rejected`  | Breaking change, compile failure, or timeout — `error` has details |
 
-`POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. Terminal jobs are retained for 10 minutes, then pruned.
+Every job response also carries a `notices` array, `[]` when there is nothing to report. A notice reports a published default the upload changed, and never blocks: `{"kind":"default-changed","function":"<rule>","input":"<dotted path>","old":<json>,"new":<json>}`, where `input` is the input's path (a record field is `cfg.retries`; a record held in a list is `jobs[].retries`, the `[]` standing for the list's elements, as in the breaking messages). An `applied` job lists them, and a `rejected` job for a breaking change lists them beside the `error`, so one response shows everything the upload changes, except that an input whose type changed is reported as breaking and its defaults are not compared, so a retype adds no notice. A `PUT` whose only differences are changed defaults is `applied`; the breaking component of the deployment version does not move for a notice.
+
+`POST` is **ungated** (create/overwrite — it does not run the compatibility check). `PUT` enforces the **backwards-compatibility gate**: the new bundle's exported-function interface (every parameter name/type/required-ness and the return type, recursively) must stay compatible with what is currently deployed. Adding a new optional parameter or a new function is fine; renames, type changes, removed/newly-required parameters, narrowed input enums (and the mirror cases on the return value) are rejected. A changed default is reported as a notice and not rejected; the report compares a default only when both the deployed and the incoming interface publish one, and does not see a default that is not a literal or sits on a written `ASSUME`, a rate written in a rule body, or numbers that differ only beyond about 16 digits (the published value goes through a `Double`). Cached metadata written by a service older than the published `default` has none, so for that deployment the first `PUT` reports nothing. Likewise, a deployment loaded with `--lazy-load` from a cache written before a list input's `TYPICALLY EMPTY` was published as `[]` holds `"default":"EMPTY"` for it, so the first `PUT` of the same file reports one default that did not change (`"EMPTY"` to `[]`); without `--lazy-load`, startup compiles the deployment again and regenerates the metadata, and there is none. Terminal jobs are retained for 10 minutes, then pruned.
 
 While the [instance ledger](#instance-ledger) holds instances of a deployment, `DELETE` and an overwriting `POST` are refused with `409`, naming the instances, and with `503` when the ledger's store cannot say whether it holds any.
 A `POST` of the same bytes is no overwrite and is still answered `ready`.
-`PUT` is not refused: it changes the rule the instances replay against, which is open (OPERATIONAL-LOWERING-SPEC D-O9).
+`PUT` is not refused: it changes the rule the instances replay against, which is an open question.
 
 **An annotation line the compiler ignores is a compile failure here.** `l4 check` and the editor lex an `@name` that is none of the annotations L4 knows as a comment and warn about it, so that a file written for a newer L4 still opens. A deployment is what this service publishes, and a misspelt `@export` is a rule that silently is not, so a deploy (`POST` or `PUT`) of a bundle that holds one is `rejected`, with the file, the line and the column, and the warning's own text, which names the annotation and suggests the known one. The same goes for a known annotation without the form it needs, such as a bare `@lang`. A service older than the file it is given therefore refuses an annotation it cannot honour, and names it. This is what the service always did with such a line, as a lexer error, now with a better message; nothing already stored can hold one, so a restart refuses nothing it accepted before. Each ignored line is also logged at warn level (`Ignored annotation`, with the deployment and the file).
 
 A name that merely begins with a known annotation's is not an ignored line: `@exports` is `@export` followed by the text `s`, and `@descr` is `@desc` followed by `r`, as they always were. The service accepts them, as it did, and does not warn about them; an `@exports` does not publish a function (a bundle whose only `@export` is spelt that way is `applied` with `functions: []`). `l4 check` does not warn about them either.
 
 The API shows a failed deployment's reason only when the service runs with `--debug`, and says `Compilation failed` otherwise (an existing choice, not changed here); the reason is always in the server log.
+
+**The gate compares the incoming bundle with the interface the deployment had when the service last loaded it.**
+By default every deployment is compiled when the service starts, so that is the interface the running service publishes.
+Under `--lazy-load` (off by default; it registers each deployment as pending when the service starts and compiles it on its first evaluation or function access, as [CLI Options](#cli-options) says) a deployment that has not been loaded since the start is compared with the schema the previous run cached for it.
+So an upgrade of the service that changes how a function's schema is published appears, under `--lazy-load`, as a change in every such deployment, whatever its source: a `PUT` of an unchanged bundle is rejected as breaking, and a `POST` overwrite raises the breaking component of `deploymentVersion`.
+The upgrade that listed every field of an event's party and action under `required` ([An event's party and action](#an-events-party-and-action)) is one: it changes the published schema of every `DEONTIC` function whose party or action has a defaulted field, a nested record or a `MAYBE` field, and the gate compares the `events` and `startTime` of a `DEONTIC` function, as it does every parameter.
+Starting the upgraded service without `--lazy-load`, or loading the deployment before redeploying it (any request for it compiles it), compares with the schema as it is now.
+Take an unchanged bundle that was deployed by a service that did not yet list every event field as required, and is now served under `--lazy-load`: the `PUT` is rejected (`seatbelt requirement parameter events[].party.licence is now required`), and each of these gets the same bundle through.
+Load the deployment first, by asking for one of its functions, and send the `PUT`.
+Or start the service without `--lazy-load`, and send the `PUT`.
+Or send the bundle with `POST`, which is not gated: that is what `l4 redeploy --force` sends, and it is refused with `409` while the [instance ledger](#instance-ledger) holds instances of the deployment.
+Or `POST` it under a new id.
+No way through needs the deployment to be deleted.
 
 **Optimistic compilation:** Evaluation and function listing on pending deployments trigger compilation with a 2-second optimistic timeout. If compilation finishes within 2 seconds, the result is returned inline (200). If not, the response is HTTP 202 with `{"status":"compiling","retryAfterMs":2000}` and a `Retry-After: 2` header — the client should retry after the delay. File browsing endpoints never require compilation.
 
@@ -183,7 +198,7 @@ Every reply is JSON and says whether it `applied` anything.
 `503` applied nothing: the evaluator could not decide, a limit stopped the request, every one of the ledger's slots was taken, or the store could not be opened.
 A retry with the same `idempotencyKey` is always safe; if the row was written before the reply was lost, the retry reads it back.
 The contract's source is the one `.l4` file of the deployment that no other `.l4` file imports, and a deployment with two such files is refused with `422`.
-The ledger clock is whole seconds since the Unix epoch, and what one unit of a contract's time is against wall time is not decided (D-O8), so a contract written against another unit or epoch runs with every deadline shifted, and nothing says so.
+The ledger clock is whole seconds since the Unix epoch, and what one unit of a contract's time is against wall time is not decided, so a contract written against another unit or epoch runs with every deadline shifted, and nothing says so.
 Each request runs under `--eval-timeout` and the ledger's own allocation limit, `--ledger-max-eval-memory-mb`.
 
 ### File Browsing
@@ -214,6 +229,8 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/compute_qualif
 #### Answers
 
 The direct path and the wrapper path described below encode an answer the same way.
+On the direct path the service evaluates the rule directly; on the wrapper path it writes a short piece of L4 source around the request's values, the generated wrapper, and runs that.
+Which path a request takes depends on what it contains: [Missing and uncertain inputs](#missing-and-uncertain-inputs) lists the requests that take the wrapper path.
 A `MAYBE` answer is `null` for `NOTHING` and the value itself for `JUST`.
 A list is a JSON array, even when it has one element.
 An enum answer is its name, without backticks; a constructor named `TRUE` or `FALSE`, in any case, comes back as `true` or `false`.
@@ -225,18 +242,24 @@ The function's published `returnSchema` does not describe two of these shapes ye
 
 #### Missing and uncertain inputs
 
-An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` ("uncertain") is treated exactly like `null`, whatever its type, a record's included.
-The two are different: an absent input can take a default, and a `null` one never does.
+An input left out of `arguments` is _absent_. An input sent as `null` is _not known_, and one sent as `{}` is _uncertain_.
+They are different: an absent input can take a default, a `null` one never does, and a `{}` one is neither: on the wrapper path a `BOOLEAN` that is `{}` is an assumed term (a name the rule needs that nobody has given a value), refused only if the rule reads it.
 
 **Defaults.** An input with a `TYPICALLY` default — on the exported function's own `GIVEN`, on a section `GIVEN` it reads, or on a field of a record it takes — may be left out, and then takes its default.
 The function's schema says so: such an input is not under `required`, and its default is the JSON Schema `default` keyword.
-Every response says which defaults the answer rests on, in `presumed`, beside `result`: the names of inputs that were left out, took their default, and were actually read by the evaluation (a record field by its path, `cfg.timeout`).
+Every response says which defaults the answer rests on, in `presumed`, beside `result`.
+Most entries are the names of the request's own inputs that were left out, took their default, and were actually read by the evaluation (a record field by its path, `cfg.timeout`).
 A `MAYBE` input with no default, left out, is `NOTHING`, and is listed the same way.
+**The entries come in more than one shape**, so a client that treats an entry as the name of an input filters on the prefix: a bare name or path (`rate`, `cfg.timeout`) is an input of the request; `WITH scaled: rate` is a default the rules took (below); and `JSONDECODE Settings: limit` is a default in a decode the rules made, of JSON written in the rules or of text the request sent.
+A default the rules themselves take, where a `WITH` call or a record construction inside them leaves out an input or a field that has one, is taken whether `presumption` is `soft` or `hard`, because no request could supply it, and is listed whichever it is, since the answer rests on it just the same. It is written `WITH`, the rule or record named as its declaration writes it (not an alias) behind the section it is declared in, a colon, and the input or field: `WITH Pricing.scaled: rate` and `WITH Pricing.Config: timeout` for a rule and a record in `§ Pricing` (a nested section gives `Part.Pricing.scaled`), and `WITH scaled: rate` for a rule at the top of a file, which has no section to name. It is not an input of the request, and the request cannot supply it. The TYPICALLY page, under [What `presumed` lists](../doc/reference/types/TYPICALLY.md#what-presumed-lists), has the table of the shapes, a sample answer, and how a client splits an entry that has backticks, dots or colons in it.
+A record the rules decode with `JSONDECODE` also takes its defaults whether `presumption` is `soft` or `hard`, whether the JSON is written in the rules or is text the request sent in an argument, and is listed too, written `JSONDECODE`, the type, a colon and the path (`JSONDECODE Pricing.Settings: limit`); the presumption switch reaches neither kind of decode. One service-side detail: a record declared under a heading in an imported file is named without the heading (``JSONDECODE `Paint Order`: coats``), where its `WITH` entry names it (``WITH `Stock items`.`Paint Order`: coats``), because the headings of an imported file are not carried to the evaluator (carrying them would change the format of `bundle.cbor`).
+An event's party or action record, in a request to a function that describes obligations, is part of the request but is built into the generated wrapper as source, not decoded, so it has no default to take: a field it leaves out is refused, whether `presumption` is `soft` or `hard`, as `Missing required field 'events[0].party.licence' (Driver)`; so is a field left out of a record nested in it, named by the path the request wrote (`events[0].party.zhome.Address.floor`).
 A refusal (`EvaluatorRefused`, from a `REFUSE` the rule reached) is an answer too, and carries the defaults it rests on in its own `presumed`, beside the reason: `{"contents":{"contents":"cannot decide for a non-resident","presumed":["is resident"],"tag":"EvaluatorRefused"},"tag":"Error"}`.
 Any other error response has no `presumed`, since it carries no answer.
 An input the rule never reached is not listed, even if it was left out.
+A section `GIVEN` that one rule reads and another overrides for one calculation, as in `outer MEANS inner PLUS (inner WITH r IS 100)`, answers the same whether the request supplies it or leaves it out: the request's value, or the default, for the read that was not overridden, and the override for the one that was. A request that supplies a section `GIVEN` whose every read is overridden is accepted, and the value changes nothing.
 **A misspelled name is rejected where a default is taken.** In a request that leaves out an input with a default, an argument that names no input is rejected, naming the nearest one (`Unknown parameter 'has capasity' (did you mean 'has capacity'?)`), since it may be the input left out; the same holds for a field inside a record argument. Where no default is taken, an extra argument is ignored.
-`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation` rejects it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`); MCP and batch take it to the wrapper path instead (below). A type that is a synonym for a `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
+`null` is "not known" on every input that is not a `MAYBE`, whatever its type, so `/evaluation`, an MCP call and a batch case all reject it by name even where there is no default (`Parameter 'shade' is null, which means the value is not known: supply a value`). A type that is a synonym for a `MAYBE` is a `MAYBE`, so it may be left out or sent as `null`: `DECLARE MaybeYear IS A MAYBE NUMBER`, or a synonym that takes a type, `DECLARE Optional OF a IS A MAYBE a` used as `Optional OF NUMBER`.
 The function's published schema still lists such an input as required: `GET /functions/{fn}`, `openapi.json` and MCP `tools/list` put it in `required`, where a plain `MAYBE NUMBER` has `required: []`, so a client that obeys the schema cannot leave it out.
 For this rule:
 
@@ -257,12 +280,20 @@ curl -X POST http://localhost:8080/deployments/my-rules/functions/may-contract/e
 # {"contents":{"presumed":["has capacity"],"result":{"value":true}},"tag":"SimpleResponse"}
 ```
 
-**`"presumption": "hard"`** in the request (beside `arguments`) uses no defaults: an input left out is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. `"soft"`, the default, uses them. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. The MCP tools take no `presumption` argument and always evaluate with `"soft"`; their result is the same JSON as the HTTP response, `presumed` included.
+**Not in an event's record.** An event's party and action records are part of the request, so they never take a default and are not published with one: see [An event's party and action](#an-events-party-and-action).
+
+**`"presumption": "hard"`** in the request (beside `arguments`) uses no default for an input the request leaves out: that input is absent with none, as below, and a `MAYBE` input left out is missing rather than `NOTHING`. A default a rule takes itself, in a `WITH` call or a `JSONDECODE` inside the rules, is still used and listed. `"soft"`, the default, uses the defaults for what the request leaves out. The batch endpoint takes the same field for all its cases, and each case carries its own `@presumed`; see [Batch Evaluation](#batch-evaluation) for a case that is refused or fails. An MCP tool takes the same argument under the same name, `presumption`, with the same two values (see [MCP Schema Design](#mcp-schema-design)), and its result is the same JSON as the HTTP response, `presumed` included, so a tool call's `presumed` names the defaults the rules took (`WITH scaled: rate`) as well as the inputs the call left out. The WebMCP script's tools forward it into the request.
 
 **Absent with no default, or `null`.**
 Most requests are evaluated directly, and such an input that is not a `MAYBE` is refused before evaluation starts: `Parameter 'walks': missing required parameter`, or `ASSUME 'age': missing required parameter` for an input declared with `ASSUME`, or, for `null` on an input that has a default, a message saying `null` never takes it. Every such input is named, one per line.
 
-Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; every request to a `DEONTIC` function, whether to `/evaluation`, over MCP or as a batch case; and a batch case or an MCP call with a `null` at the top level of its arguments, whatever the input's type; on an input that is not a `MAYBE`, `/evaluation` would refuse that `null`.
+A `null` at the top level of a request's arguments is read the same way on `/evaluation`, over MCP and in a batch case: as an input the caller does not know.
+It is refused for an input that is not a `MAYBE`, before evaluation starts, whatever else the request holds (a `{}` in another input included) and whichever operand a rule reads first, with the message `/evaluation` always gave, `Parameter 'p' is null, which means the value is not known: supply a value`.
+That message does not call the input "not supplied", which is the wording for an input left out; every null input is named, one per line.
+A `MAYBE` input sent as `null` is `NOTHING` on all three.
+A function that describes obligations is the exception, and a `{}` in place of an input is a different case: both are below.
+
+Some requests go through a generated wrapper instead: any request with a `{}` in the value of one of its inputs, or a `null` inside a record or list; and every request to a `DEONTIC` function, whether to `/evaluation`, over MCP or as a batch case.
 On that path a missing `BOOLEAN` input costs nothing unless the answer depends on it.
 A rule that reads it where the other facts decide anyway, as in `walks OR TRUE`, still answers.
 If the answer does depend on it, evaluation stops and names it, and every other input the answer is waiting for:
@@ -285,7 +316,11 @@ The default report is the only one: it shows an answer that is still waiting for
 Limits, measured 2026-10-02:
 
 - On the wrapper path, a missing input that is neither a `BOOLEAN` nor a `MAYBE`, and has no default, fails the whole request even when the rule would never have read it. The message names it, `Missing required field 'unused' in JSON object`, or, for a `DATE`, `TIME` or `DATETIME`, which the wrapper reads as a string and converts, `Parameter 'unused': missing required parameter`.
-- **`null` on an input with a default is refused early on the direct path and late on the wrapper path.** The direct path refuses it before evaluation; on the wrapper path, a `BOOLEAN` sent as `null` is an assumed term, which is refused only if the rule reads it. So `{"is adult": false, "has capacity": null, "unused flag": false}` is refused by `/evaluation`, and the same request with `"unused flag": {}` answers `false`, because `has capacity` is never read. MCP and batch take a top-level `null` to the wrapper path whatever else the request holds, so there a `BOOLEAN` sent as `null` is refused only if the rule reads it, even with no `{}` beside it.
+- **`null` is refused early; a `{}` in its place is refused late.** A top-level `null` for an input that is not a `MAYBE` is refused before evaluation, on every surface, whatever else the request holds: `{"is adult": false, "has capacity": null, "unused flag": false}` is refused, and so is the same request with `"unused flag": {}`, both naming `has capacity`. A `{}` in place of the input is uncertain, and on the wrapper path it is an assumed term, refused only if the rule reads it: `{"is adult": false, "has capacity": {}, "unused flag": false}` answers `false`, because `has capacity` is never read.
+  So with `p` sent as `{}`, `p AND q` answers `false` when `q` is `false` and is refused, naming `p (not supplied)`, when `q` is `true`: the answer can depend on the order of the operands. `"presumption": "hard"` does not change this, because that switch is about defaults and not about uncertainty. `l4 batch` is stricter, and the two differ: it refuses a `{}` for an input that is not a `MAYBE` (`Field 'p' is {}, which means the value is not known: supply a value`) where the service answers. This is the early/late split described above; it is the documented behaviour of `{}`, not a defect of the null rule.
+  - A `DEONTIC` function is the exception on every surface, since it always takes the wrapper path: a top-level `null` for its `BOOLEAN` input is an assumed term there, refused only if the rule reads it, so the answer can depend on the order of the operands there too.
+  - The wording is not the same on every surface: `l4 batch` says `Field 'p'` where the service says `Parameter 'p'`, an MCP call spells the input as its tool does (`has-capacity` for `has capacity`), and where more than one input is `null` `l4 batch` names only the first and the service names each.
+  - The slow path of `createFunction`, which runs only when a module does not precompile and then type-checks, does not read a top-level `null` as the other paths do. No request that reaches it has been found.
 - On the wrapper path, a value supplied for an input declared with `ASSUME` does not reach the rule, which stops as if the input were missing. So the `422` can name an `ASSUME` input the request did supply: the wrapper never passed its value on. Inputs declared with a section `GIVEN` are delivered.
 - A `TYPICALLY` on a written `ASSUME` is not a default here, as it is not for `#EVAL`: it is not published, and the input stays required.
 - The decoders fill a default only for an input or a record field. A field of an enum constructor that carries data keeps its `TYPICALLY` as metadata.
@@ -299,10 +334,10 @@ Measured 2026-10-15, on `unstable` at `6930bccf6`:
 
 - On the wrapper path, an input declared through a synonym for a `BOOLEAN` is decoded as its own type, where a `BOOLEAN` written out is lifted to `MAYBE` (above).
   Left out, it is refused with `Missing required field 'b' in JSON object`, even when the rule never reads it; a `BOOLEAN` written out and left out is refused only if the rule reads it, and then names `b (not supplied)`.
-  A `null` for it in a batch case or an MCP call is refused with `Field 'b' is null, which means the value is not known: supply a value`, where a `BOOLEAN` written out is treated as left out.
+  A top-level `null` for it is refused like any input that is not a `MAYBE`, with `Parameter 'b' is null, which means the value is not known: supply a value` (a `null` inside a record is the decoder's `Field …`).
   A value, and a string that is not a boolean, are treated the same: the string is refused in both, with `Expected JSON boolean for field 'b' but got: String "maybe"`.
 - On the wrapper path, an input declared through a synonym for a `DATE`, `TIME` or `DATETIME` is decoded as its own type, where the type written out is read from a string and converted (above).
-  Left out, it is refused with `Missing required field 'd' in JSON object`; a string that does not parse, with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD` (`Could not parse time string …` for a `TIME`, `Could not parse datetime string …` for a `DATETIME`); a `null` in a batch case or an MCP call, with `Field 'd' is null, which means the value is not known: supply a value`.
+  Left out, it is refused with `Missing required field 'd' in JSON object`; a string that does not parse, with `Could not parse date string 'garbage'. Expected format: YYYY-MM-DD` (`Could not parse time string …` for a `TIME`, `Could not parse datetime string …` for a `DATETIME`); a top-level `null`, with `Parameter 'd' is null, which means the value is not known: supply a value`.
   The type written out gives `Parameter 'd': missing required parameter` and `Parameter 'd': could not read "garbage" as a DATE`.
   A value that parses is answered the same.
 
@@ -367,6 +402,80 @@ The name is the identifier the rule uses, not the party it stands for: a party w
 Rule source stays L4, backticks included: an action that carries a value, such as `say "pay\nnow"`, an action given by a `GIVEN` input, the reasoning tree of a trace, the graphviz source, the state graph, and a `RAND` or `ROR` operand the evaluation has not reached yet.
 Escapes in that source are the ones the Trace Output section describes.
 
+#### An event's party and action
+
+An event's `party` and `action` are values of the two types the function's `DEONTIC` result names, and the function's schema describes them.
+When one is a record, **every field of it is written, whether or not the field has a `TYPICALLY` default.**
+An argument record may leave a defaulted field out and take the default.
+An event's record is part of the request, so it never takes one.
+The schema says so: each field of an event's `party` and `action` is under `required`, and none carries a `default`, at any depth.
+A request that leaves a field out is refused with `422`, whether `"presumption"` is `"soft"` or `"hard"`.
+
+**A record inside an event's record is written under its constructor's name**, and so is each record in a list, including a party or action that is itself a list.
+The party or action record itself is written plainly.
+For a `Driver` whose `zhome` is an `Address`:
+
+```json
+{
+  "party": {
+    "name": "Alice",
+    "zhome": { "Address": { "zip": 5, "floor": 2 } }
+  },
+  "action": "wear seatbelt",
+  "at": 1
+}
+```
+
+The plain form an argument takes, `"zhome": { "zip": 5, "floor": 2 }`, is refused.
+The schema describes the form the service reads.
+
+**Where `openapi.json` describes an event.**
+The typed schema of an event is in the function document (`GET .../functions/{fn}`), and in `openapi.json` under each batch case's `events`, which the service reads.
+In `openapi.json` it also sits under `arguments` of the `/evaluation` request body, listed beside the function's own inputs, where the service does not read it: a request that puts `events` only there is refused (`events is required for functions returning DEONTIC`).
+The top-level `events` of the `/evaluation` request body, which is the one it reads, has items of just `{"type": "object"}`, and so has the query-plan request's.
+So a client that builds an `/evaluation` request from `openapi.json` alone has no description of an event.
+
+**What the service cannot yet read in an event's record, sorted by how it shows.**
+The service writes an event's record into the generated wrapper as source text, and does not decode it as it decodes an argument, so it reads only what it can write as source.
+These were measured on 2026-11-18.
+The schema describes these fields as ordinary ones, so a client that follows it can meet them.
+
+**Refused, loudly: `422`, usually with a type-check message.**
+
+- A field of text type is written as text directly in the party or action, and is refused inside a record nested in it.
+  A field of an enumeration type is the other way round: inside a nested record it is its plain name (`"kind": "Home"`); directly in the party or action the plain name is refused, and it is written `{"tag": "Active"}` or `{"Active": []}`.
+- A `MAYBE` field is written as `null`, which is `NOTHING`; the schema's description of the field says so.
+  A `MAYBE NUMBER` can also be written `{"JUST": [3]}`; a plain value for a `MAYBE` of number or text, and `{"JUST": ["Al"]}` for text, are refused.
+  A `MAYBE` of a record written under its constructor's name, or as `{"JUST": [...]}`, is refused.
+- The service writes a record's fields in the sorted order of their JSON keys, whatever order the request wrote them in, and a record nested in another takes every field written after it.
+  So a nested record has to be the last of its parent's fields in that order: a record with a field whose name sorts after the nested record's is refused, and a record with two record-typed fields can never be written.
+- A list of records is read for one element only: two records are refused with a parser message (`unexpected WITH`), not a type-check one.
+- A fractional number below 0.1, or of 10,000,000 or more, is written in exponent form (`1.0e-2`) and refused (`could not find a definition for the identifier e`).
+
+**Read wrongly, with no warning: `200`, nothing in `presumed`, no refusal.**
+
+- **A `MAYBE` field of a record type, written as an object of two or more keys, is read as `NOTHING`.**
+  For a `Driver` whose `home` is a `MAYBE Address` with the fields `zip` and `floor`, `"home": {"zip": 5, "floor": 1}` in an event is accepted and means no home, so the event does not match a party that states that home, and does match one that leaves it out.
+  The schema publishes the record inside a `MAYBE` field in that plain form, and its description of the field says to write `null`.
+  An argument is not affected: the same object in an argument is read as a record, on the direct path and on the wrapper path (measured with a function that returns whether `home` is `NOTHING`).
+  The same holds under `"presumption": "hard"`, which does not refuse it.
+- **A number that has no exact binary form does not equal itself.**
+  A fractional number that a binary floating-point number cannot hold exactly, such as `0.1`, `0.3` or `1.1`, is read, but it does not equal the same number given in `arguments`.
+  An event that carries it does not match the party, so the obligation stays open, with nothing in the answer to say why.
+  `0.25` and `0.5` are held exactly and match, and so do whole numbers.
+  This predates the schema change and is not part of it.
+
+The spellings `{"tag": ...}`, `{"Active": []}` and `{"JUST": [3]}` are what the writer happens to read today.
+The schema does not publish them, and they are not promised.
+
+Fields of boolean type, whole numbers, and lists of text or numbers were tried and are read.
+Other types were not tried.
+
+**Three choices of the schema are assumed, not ruled** (the ruling covers the constructor-keyed nested record and nothing else).
+Every `MAYBE` field is under `required` with its inner type and a description that says to write `null`, since the format has no way to say "or `null`".
+A record inside a `MAYBE` field is published plain, with no constructor-name hint, because the constructor-keyed form is refused there.
+A record that contains itself is cut short in the schema, so it is published plain too, with its `x-l4-type` and no hint, because there is nothing to wrap.
+
 ### Batch Evaluation
 
 Evaluate a function across many input cases:
@@ -406,9 +515,9 @@ The response has one entry per case, in the order the cases were sent, each unde
 
 An answered case carries the function's result under `value`.
 `outcomes` is required, but the service does not use it yet: every answered case carries the whole result.
-Every case carries its own `@presumed`, the inputs it left out whose defaults its answer or refusal used (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
+Every case carries its own `@presumed`, the defaults its answer or refusal rests on: the inputs it left out whose defaults were used, and the defaults the rules took (see [Missing and uncertain inputs](#missing-and-uncertain-inputs), which gives the forms an entry takes).
 A case the rule refused carries `@refused` (the reason) and still counts as processed; a case that failed carries `@error` (the message) and is counted in `casesIgnored`.
-That message is not always the one the single-case endpoint gives for the same input, because a case with a `null` in it goes through the generated wrapper and a single request does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
+That message is not always the one the single-case endpoint gives for the same input, because a case with a `{}` or a `null` inside a record goes through the generated wrapper, and a single request holding neither does not (see [Missing and uncertain inputs](#missing-and-uncertain-inputs)).
 Neither has a `value`.
 A case whose evaluation fails on the service's own fault, and not on a limit or on what the case said, is an `@error` too: it says the case could not be evaluated, the details are in the service log, and the cases beside it are answered.
 That wording and that treatment are **assumed, not ruled**.
@@ -540,7 +649,7 @@ diagram calls its leaves.
 > inserting section headings, do not change it. It changes when what the leaf
 > says changes, including a `WHERE` definition the leaf reads, since a leaf is
 > keyed by what it means and not by the name of a local it uses. It can also
-> change when a binder with the same name is added above one it names (the later
+> change when another declaration of the same name is added above one it names (the later
 > of the two is then told apart by its sections), when an imported module it
 > names changes, or on an L4 release that changes how terms are represented. A
 > `unique`, by contrast, changes whenever anything above it in the file does, so
@@ -633,8 +742,14 @@ curl -X POST http://localhost:8080/my-rules/.mcp \
 
 MCP tool schemas are optimized to minimize tokens in AI context windows:
 
-- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`. A `startTime` or `events` that is not one of the function's inputs is an error result. An `arguments` that is not one of the function's inputs is left out, and one that is, is read as an input.
+- **Non-deontic functions**: parameters are listed directly at the top level of the tool's `inputSchema` (no wrapper). The AI calls the tool with `{"product": {...}}`. A `startTime` or `events` that is not one of the function's inputs is an error result; an input is matched by the rule's own spelling or by the name the tool lists it under, so an input spelt `events?` is the key `events`, here and in a batch case. An `arguments` that is not one of the function's inputs is refused with an error result that names it and says the inputs go at the top level of the call (it used to be left out, so that `{"arguments": {"m": 7}}` on a rule whose only input is a `MAYBE` or has a default was answered from NOTHING or the default, with a success; assumed, not ruled, and the alternative, reading the nested object as the inputs, is a leniency that was not ruled); one that is an input is read as an input, and a `null` is a key left out.
 - **Deontic functions**: parameters are wrapped in `arguments` alongside `startTime` and `events`. The AI calls with `{"arguments": {...}, "startTime": 0, "events": [...]}`, and the contract is replayed against that trace as it is on `/evaluation`. A call without a trace is an error result, not the contract's initial obligation (see [Deontic (Contract) Evaluation](#deontic-contract-evaluation)). A function with an input of its own called `arguments` takes its inputs nested as the schema lists them, `{"arguments": {"arguments": ...}}`; a call that sends them flat loses that input (a known limit, read from the code and not run).
+
+- **`presumption`**: every function tool advertises an optional `presumption` argument, `"soft"` or `"hard"`, in its `inputSchema`, and reads it as `/evaluation` does (absent or `null` is `"soft"`). On a non-deontic tool it is one of the top-level arguments and is never an input; on a deontic tool it sits beside `arguments`, `startTime` and `events`. The two values are accepted in any capitalisation, as on `/evaluation` (`Backend/Api.hs` lowercases them); any other value is refused with an error result that names it, `presumption must be "soft" or "hard", not "medium"`, and is not read as soft. A `presumption` put in one of three wrong places is refused, not dropped, and the error says where it goes: inside `arguments` on a deontic tool (for a rule with no input of that name), beside `arguments` in the `tools/call` params (the shape of an HTTP body), and inside an `arguments` wrapper around a flat tool's inputs (a flat tool is the tool of a non-deontic function, whose inputs sit at the top level of the call). Any other placement, such as `_meta.presumption` or a member of the JSON-RPC envelope, is not read and is ignored, and the call is answered soft. A known limit, unchanged: a key with any other name, such as a misspelling, on a tool whose only unread input is a `MAYBE` is ignored. The tasks path (a call made while the deployment compiles) reads it too, and a call it refuses is refused at once rather than queued. A hard request is answered hard or refused: no default is taken for an input the call left out. A default the rule takes inside its own text is still used under `"hard"`, as on `/evaluation`: a record the rule decodes from JSON of its own (`JSONDECODE`) takes its defaults, and the answer lists them under `presumed` as `JSONDECODE <type>: <field>`. This service's MCP tools advertise `presumption` and read it. A server placed in front of this service, such as the auth-proxy that derives MCP schemas from cached metadata (outside this repository), may not list it until that server is updated. [Connect an AI agent](../doc/tutorials/legalese-cloud/ai-agents.md#telling-a-rule-not-to-assume-anything) says which servers list it and what a server that does not know the argument does.
+- **A rule with an input named `presumption`** (tested on the sanitized name, so `presumption ` also matches) cannot be offered as a flat tool, since the argument would shadow the input or the input the argument. Such a tool is **left out of `tools/list`** with a warning in the log naming the input, and a call to it is an error result that names the input. A deontic tool is listed and runs, since its inputs are nested in `arguments` and the switch is beside them; a call to it that sends no `arguments` object cannot say which is which and is refused in the same way. This reading of "refused when the tools are listed" (`specs/todo/presumption-assertion/CONTRACT.md` §4.1) is **assumed, not ruled**: the alternative is to fail the whole `tools/list`, which would take down every other tool in the scope for one rule.
+  **A consequence of this choice:** such a tool used to be listed and to take every key but a wrapper as an input, so after an upgrade, with no redeploy, it **vanishes from `tools/list`**, and the reason is only in the server log (`MCP tool not listed: an input is named like the reserved presumption key`). The fix is to rename the input in the rule and redeploy, or to call the rule over HTTP.
+- **The wording of a refusal differs by surface, and the meaning does not.** A missing input is `Missing required field` in `l4 batch`, `Parameter '...': missing required parameter` from the service, and the same on MCP and WebMCP with the input named as the tool lists it, hyphenated (`has-capacity` for `has capacity`). A client that matches the text of a refusal should match on the input's name, not on the sentence.
+- **The two surfaces do not always spell a name the same way.** A tool name that starts with a digit is kept as it is on the MCP endpoint and gets a leading `_` in the WebMCP script. And what counts as a letter or a number outside ASCII is decided by each engine's own Unicode tables, the service's (GHC) and the browser's, which are not the same set for every code point, so an input with an unusual character in its name can be listed differently by the two. Property names are otherwise cut and suffixed alike (WebMcpParitySpec checks the cases that differed).
 
 This differs from the REST API which always uses `{"arguments": {...}}` for consistency.
 
@@ -661,7 +776,7 @@ Query parameters for `GET /deployments` (and `GET /deployments/{id}`; `scope` is
 - `?functions=none` — omit functions from metadata
 - `?scope=id1,id2` — filter to specific deployments
 
-The script registers tools based on the `data-tools` attribute. By default (`auto`), it registers per-rule tools if ≤ 20 rules, otherwise discovery tools (`search_rules`, `get_rule_schema`, `evaluate_rule`). File browsing tools (`list_files`, `read_file`, `search_identifier`, `search_text`) must be opted into explicitly via `file-tools` or `all`. Use comma-separated values to combine categories (e.g., `data-tools="rules,file-tools"`).
+The script registers tools based on the `data-tools` attribute. By default (`auto`), it registers per-rule tools if there are at most 10 rules in scope, otherwise discovery tools (`search_rules`, `get_rule_schema`, `evaluate_rule`). File browsing tools (`list_files`, `read_file`, `search_identifier`, `search_text`) must be opted into explicitly via `file-tools` or `all`. Use comma-separated values to combine categories (e.g., `data-tools="rules,file-tools"`).
 
 #### Visibility Headers
 

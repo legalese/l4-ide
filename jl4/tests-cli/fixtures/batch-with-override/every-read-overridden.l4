@@ -1,0 +1,15 @@
+-- smucclaw/l4-ide#1000, case P08: every read of the section GIVEN `r` is
+-- overridden, so the row's `r` is never read. `l4 run` answers 300.
+
+§ `Rates`
+    GIVEN r IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+inner MEANS r
+
+@export Every read overridden
+GIVEN b IS A NUMBER
+GIVETH A NUMBER
+outer b MEANS b PLUS (inner WITH r IS 100) PLUS (inner WITH r IS 100) PLUS (inner WITH r IS 100)
+
+#EVAL outer 0

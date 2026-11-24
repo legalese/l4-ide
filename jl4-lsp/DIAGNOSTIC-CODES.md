@@ -101,6 +101,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/jsondecode-at-type-parameter`        | A JSONDECODE applied where the type to decode into mentions a type parameter.            |
 | `check/jsondecode-passed-at-type-parameter` | A bare JSONDECODE handed on as a function at a type that mentions a type parameter.      |
 | `check/lifecycle-unavailable`               | THE JOIN or THE DEADLINE with no such position; THE INSTANT outside a PROVIDED guard.    |
+| `check/means-on-alternative-field`          | A MEANS clause on a payload field of an enum constructor.                                |
 | `check/misattached-section-given`           | A column-1 GIVEN declares a name the declaration below it never uses.                    |
 | `check/misdelivered-implicit-supply`        | A WITH value checked against one section input would reach another of the same spelling. |
 | `check/nonassertable-on-non-definition`     | `@nonassertable` above something that is not a definition.                               |
@@ -110,6 +111,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/opening-not-an-instant`              | The value after AFTER is neither a NUMBER nor a DATE.                                    |
 | `check/regulative-actor-mismatch`           | A party performs an action that belongs to another actor.                                |
 | `check/restated-section-binder`             | A definition's GIVEN restates a name a section GIVEN binds.                              |
+| `check/typically-on-computed-field`         | A TYPICALLY default on a computed field.                                                 |
 | `check/typically-on-type-variable`          | A TYPICALLY default on a type.                                                           |
 | `check/typically-requires-type`             | A TYPICALLY default on a name with no explicit type.                                     |
 | `check/typically-value-not-a-literal`       | A TYPICALLY default that is not a literal.                                               |
@@ -119,6 +121,8 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/whose-without-cast`                  | WHOSE under an EVERY with no cast to take fields from.                                   |
 | `check/ends-because-needs-reason`           | An `@ends-because` with no reason after it on its line.                                  |
 | `check/ends-because-on-non-definition`      | `@ends-because` above something that is not a definition, such as an input.              |
+| `check/withal-fields-without-default`       | A record's WITHAL names fields that declare no TYPICALLY.                                |
+| `check/withal-misused`                      | WITHAL on something that is not a record whose defaults it can take.                     |
 
 ## lint/
 
