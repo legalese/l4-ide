@@ -1415,6 +1415,18 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         rs <- run False (src own)
         length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "deliver" ] `shouldBe` 1
 
+      it "R15: the same read with the party named is refused at the first event, by name, and does not answer no" do
+        -- the norm has not met its party yet: the log knows the bearer only as written (N7 rule 4, rule 3 not built)
+        let own =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF 10 WITHIN 10"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 2"
+              ]
+        checked own `shouldBe` True
+        rs <- run False (src own)
+        Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "only known as written"
+
       it "R8: a module's reads are found from its names, and the pass costs a fraction of one evaluation" do
         let readsLog body = case checkWithImports (vfsFromList []) (src body) of
               Right r -> moduleReadsNormLog r.tcdModule
