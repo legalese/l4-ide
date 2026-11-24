@@ -30,6 +30,7 @@
 module NormLogSpec (spec) where
 
 import qualified Data.Text as Text
+import Base (Uri (..), toNormalizedUri)
 
 import L4.API.VirtualFS (VFS, vfsFromList, checkWithImports)
 import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..))
@@ -39,6 +40,7 @@ import L4.Evaluate.NormLog.Read
   ( BearerPattern (..), BranchPattern (..), NormPattern (..), NormState (..), NormView (..), Refusal (..)
   , anyNorm, isCured, readNorms )
 import L4.EvaluateLazy
+import L4.Parser (execProgramParserWithHintPass)
   ( EvalConfig (..)
   , EvalDirectiveResult (..)
   , NormLogMutant (..)
@@ -1350,6 +1352,19 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
               ]
         rs <- runIn (vfsFromList [("rlib", lib)]) id user
         Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "switched off"
+
+      it "R11: a phrase applied to a bracketed event is still an application; applied to a bracketed regulative it is a read" do
+        let parsed body = case execProgramParserWithHintPass uri (Text.unlines body) of
+              Left errs -> error ("the module did not parse: " <> show errs)
+              Right (m, _, _) -> m
+            uri = toNormalizedUri (Uri "file:///norm-log-r11")
+            isRead m = "ReadNorm" `Text.isInfixOf` Text.pack (show m)
+            -- an event has a party and an action, and no modal
+            event w = [ "x MEANS " <> w <> " (PARTY Tenant DOES pay AT 30)" ]
+        for_ [ "OUTSTANDING", "EVER FAILED", "FAILED AND NOT CURED", "CURED BY REPARATION" ] \ w ->
+          isRead (parsed (event w)) `shouldBe` False
+        -- the control: with a modal in the same place the text is a read
+        isRead (parsed [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay)" ]) `shouldBe` True
 
       it "R8: a module's reads are found from its names, and the pass costs a fraction of one evaluation" do
         let readsLog body = case checkWithImports (vfsFromList []) (src body) of

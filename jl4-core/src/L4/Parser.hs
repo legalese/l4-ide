@@ -3393,10 +3393,11 @@ recallExpr =
 -- The phrases are not reserved words: they are matched by SPELLING, as the
 -- lifecycle nouns are ('lifecycleWords'), so a program may still name a value
 -- @OUTSTANDING@. The read is entered only when the words are followed by
--- @( PARTY@ ('readHead'), the one place an ordinary program has no meaning for
--- them, so every text that parsed before parses as it did; once entered, a
--- mistake in the pattern is an error of its own and not a retreat to
--- application.
+-- @( PARTY@, a bearer and a modal ('readHead'); once entered, a mistake in the
+-- pattern is an error of its own and not a retreat to application. A text that
+-- parsed before parses as it did, except one that names a function like a
+-- phrase and applies it to a bracketed regulative (@PARTY x MUST ...@), which
+-- is now a read.
 --
 -- Hole order is the field order of 'ReadNorm': phrase, its marker name, bearer, modal, the
 -- action's constructor, the count of @_@, the branch, the @AS OF@ instant.
@@ -3446,9 +3447,17 @@ wildcardOutsideRead = do
     , "to leave an input unused, give it a name."
     ]
 
--- | What makes a text a read: a phrase, @(@, @PARTY@.
+-- | What makes a text a read: a phrase, @(@, @PARTY@, the bearer, a modal.
+-- The modal is part of it so that a function a program has named like a phrase,
+-- applied to a bracketed event (@PARTY x DOES y AT 1@), is still an
+-- application: an event has no modal.
 readHead :: Parser ()
-readHead = void (unwrapAnnoParser readWordTokens *> spacedSymbol_ TPOpen *> spacedKeyword_ TKParty)
+readHead = do
+  _ <- unwrapAnnoParser readWordTokens
+  _ <- spacedSymbol_ TPOpen
+  _ <- spacedKeyword_ TKParty
+  _ <- void (spacedSymbol_ TUnderscore) <|> void (try partyAtom <|> parenExpr)
+  void (unwrapAnnoParser readModal)
 
 -- | The four phrases, as the tokens they are spelled with.
 readWordTokens :: AnnoParser ReadWord
