@@ -52,13 +52,13 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import Data.Time (diffUTCTime, getCurrentTime)
 import qualified Data.Text.Encoding as Text.Encoding
-import Network.HTTP.Client (defaultManagerSettings, managerRetryableException, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, responseHeaders, Manager)
+import Network.HTTP.Client (HttpException, defaultManagerSettings, managerResponseTimeout, managerRetryableException, newManager, responseTimeoutMicro, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, responseHeaders, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.FilePath (takeDirectory, (</>))
 import System.Directory (createDirectoryIfMissing, doesFileExist, removePathForcibly, withCurrentDirectory)
 import System.Environment (lookupEnv, setEnv, unsetEnv)
-import System.IO (Handle, IOMode (..), hClose, openFile, withFile)
+import System.IO (Handle, IOMode (..), hClose, hPutStrLn, openFile, stderr, withFile)
 import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
@@ -1365,25 +1365,31 @@ spec = describe "integration" do
     --
     -- These run at one capability, set here rather than by the RTS options, so
     -- that GHCRTS=-N10 cannot hand the forty cases ten cores and hide the bug.
+    --
+    -- What they prove is an inequality: one fast case is far inside the time
+    -- limit, and forty of them are not. The limit and the client's patience
+    -- are therefore set from the machine ('withSpinService'), not fixed.
+    -- A fixed 3 s limit was set for a fast case of 0.19 s on an M-series Mac,
+    -- and the 0.65 s case of the batches test meets it at 4.6 times slower.
+    -- The HTTP client's default of 30 s ends forty fast cases at 3.9 times
+    -- slower, with a timeout in the client and nothing the service did.
     describe "at one capability" $ around_ (withCapabilities 1) do
-      it "answers 10 fast cases under a 3-second limit" do
-        withServiceFromSourcesOpts spinOptions "spin-10" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+      it "answers 10 fast cases under a time limit that one case is far inside" do
+        withSpinService "spin-10" [("spin.l4", spinJL4)] \_ baseUrl mgr -> do
           resp <- postSpinBatch baseUrl mgr "spin-10" (replicate 10 spinFast)
           expectBatchOutcomes resp (replicate 10 CaseAnswered)
 
-      it "answers 40 fast cases under a 3-second limit that no one case comes near" do
-        withServiceFromSourcesOpts spinOptions "spin-40" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+      it "answers 40 fast cases under a time limit that no one case comes near" do
+        withSpinService "spin-40" [("spin.l4", spinJL4)] \_ baseUrl mgr -> do
           resp <- postSpinBatch baseUrl mgr "spin-40" (replicate 40 spinFast)
           expectBatchOutcomes resp (replicate 40 CaseAnswered)
 
       it "answers 39 fast cases and errs on 1 slow one, without failing the batch" do
         -- The slow case comes first, so the others wait behind it: a case's
         -- clock starts when the case starts running, not when the batch arrives.
-        withServiceFromSourcesOpts spinOptions "spin-39-1" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+        withSpinService "spin-39-1" [("spin.l4", spinJL4)] \opts baseUrl mgr -> do
           resp <- postSpinBatch baseUrl mgr "spin-39-1" (spinSlow : replicate 39 spinFast)
-          expectBatchOutcomes resp
-            ( CaseLimited TimeLimitHit "Evaluation resource limit exceeded: this case did not finish within the time limit of 3 s (--eval-timeout)"
-                : replicate 39 CaseAnswered )
+          expectBatchOutcomes resp (timeLimitHit opts : replicate 39 CaseAnswered)
 
       it "errs on the case that allocates too much, and answers the cases after it" do
         let stingy = testOptions { maxEvalMemoryMb = 64 }
@@ -1398,7 +1404,7 @@ spec = describe "integration" do
 
       -- SPEEDTRAP (2026-10-03): only a case a limit stopped carries @limit.
       it "puts @limit on the case a limit stopped, and on no other" do
-        withServiceFromSourcesOpts spinOptions "spin-limit-key" [("spin.l4", spinOrRefuseJL4)] \baseUrl mgr -> do
+        withSpinService "spin-limit-key" [("spin.l4", spinOrRefuseJL4)] \_ baseUrl mgr -> do
           let body = Aeson.object
                 [ "outcomes" Aeson..= ([] :: [Text])
                 , "cases" Aeson..=
@@ -1420,7 +1426,7 @@ spec = describe "integration" do
         -- The slots are the process's, not each request's. With a set per
         -- request, ten one-case batches ran ten cases at once on the core, and
         -- a case taking a fifth of the limit alone ran past it.
-        withServiceFromSourcesOpts spinOptions "spin-shared" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+        withSpinService "spin-shared" [("spin.l4", spinJL4)] \_ baseUrl mgr -> do
           resps <- forConcurrently [1 .. 10 :: Int] \_ ->
             postSpinBatch baseUrl mgr "spin-shared" [spinFifth]
           mapM_ (\resp -> expectBatchOutcomes resp [CaseAnswered]) resps
@@ -1434,7 +1440,7 @@ spec = describe "integration" do
         -- against about one case-time with the bound. The case-time is
         -- measured, as the big batch's time over its eight cases, so that the
         -- test does not depend on how fast the machine is.
-        withServiceFromSourcesOpts spinOptions "spin-hol" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+        withSpinService "spin-hol" [("spin.l4", spinJL4)] \_ baseUrl mgr -> do
           bigStarted <- getCurrentTime
           (bigDone, (smallResp, smallSent, smallDone)) <- concurrently
             (postSpinBatch baseUrl mgr "spin-hol" (replicate 8 spinFifth) >> getCurrentTime)
@@ -1452,7 +1458,7 @@ spec = describe "integration" do
     -- cases at once. At two, the forty cases still each meet the limit alone.
     describe "at two capabilities" $ around_ (withCapabilities 2) do
       it "answers 40 fast cases, none of them past its limit" do
-        withServiceFromSourcesOpts spinOptions "spin-40-n2" [("spin.l4", spinJL4)] \baseUrl mgr -> do
+        withSpinService "spin-40-n2" [("spin.l4", spinJL4)] \_ baseUrl mgr -> do
           resp <- postSpinBatch baseUrl mgr "spin-40-n2" (replicate 40 spinFast)
           expectBatchOutcomes resp (replicate 40 CaseAnswered)
 
@@ -5671,7 +5677,9 @@ withCapabilities n act =
 spinFast :: Int
 spinFast = 150_000
 
--- | Steps that take about a fifth of 'spinOptions'' 3-second limit (about 0.65 s).
+-- | Steps that take about a fifth of the time limit the spin tests set: 3.3
+-- times the steps of 'spinFast', against a limit of 'spinLimitFactor' (15)
+-- times its time. About 0.65 s on the Mac of 'spinFast'.
 spinFifth :: Int
 spinFifth = 500_000
 
@@ -5685,14 +5693,125 @@ powerSlow = 40_000
 spinSlow :: Int
 spinSlow = 1_000_000_000
 
--- | A 3-second time limit, and an allocation limit (100 GB) that a spinning
--- case cannot reach in three seconds, so the time limit is the one it meets.
+-- | The limits of the spin tests: an allocation limit (100 GB) that a spinning
+-- case cannot reach in the time it has, so that the time limit is the one it
+-- meets. The time limit here is a placeholder; 'withSpinService' sets it from
+-- the machine.
 spinOptions :: Options
 spinOptions = testOptions { evalTimeout = 3, maxEvalMemoryMb = 100_000 }
 
+-- | How many times what one fast case takes now the spin tests' time limit is,
+-- before it is rounded up to whole seconds. It is the room a fast case has to
+-- run slower, under load or on a slow runner, before it meets the limit.
+-- (The fixed 3 s the tests used to have was 16 times the 0.19 s a fast case
+-- took on the Mac that 'spinFast' was measured on.)
+--
+-- The same limit is what the all-at-once bug has to be caught by: forty fast
+-- cases started together each take 40 t, and ten batches of 'spinFifth' each
+-- take about 33 t, against a limit L of 15 t rounded up. So the margins are
+-- 40 t / L and 33 t / L: 2.7 and 2.2 at best; at L = 4 s, with t just over
+-- 0.2 s, 2.0 and 1.7; at L = 2 s, with t just over 0.07 s, 1.3 and 1.1. They
+-- are over 1 for any t over 0.03 s (a machine six times faster than that Mac);
+-- below that the tests cannot tell the bug, and 'spinFast' wants raising.
+spinLimitFactor :: Double
+spinLimitFactor = 15
+
+-- | The most cases any spin test sends in one request, and so the most a
+-- request can wait for in line, each of which ends by the time limit. The
+-- client of 'withSpinService' is as patient as this says; 'postSpinBatch'
+-- refuses a bigger batch, so that raising a batch past it cannot go unseen.
+spinMostCases :: Int
+spinMostCases = 40
+
+-- | What the calibration allows one fast case: the service's time limit, in
+-- seconds, and twice that for the client. A case that takes longer is not a
+-- machine to calibrate to but a service that has stopped, and the calibration
+-- says so by name, rather than wait an hour for a test that would hang.
+spinCalibrationLimit :: Int
+spinCalibrationLimit = 60
+
+-- | Seconds the round trip of a one-case batch of 'spinFast' takes on this
+-- machine now: the slowest of three runs, after a run that is not counted
+-- because it pays for what the first evaluation of a deployment does once.
+-- It is the client's time, so it takes in the request and the response as
+-- well as the case.
+--
+-- A run that gets no answered case within 'spinCalibrationLimit' fails the
+-- test, and says that it was the calibration.
+fastCaseSeconds :: IO Double
+fastCaseSeconds =
+  withServiceFromSourcesOpts patient "spin-calibration" [("spin.l4", spinJL4)] \baseUrl _ -> do
+    mgr <- managerWaiting (2 * spinCalibrationLimit)
+    let calibrationFailed why = do
+          expectationFailure $
+            "calibrating the spin tests: a one-case batch of spinFast was not answered within "
+              <> show spinCalibrationLimit <> " s (the service's limit; the client waits twice that): " <> why
+          pure 0
+        timedRun = do
+          start <- getCurrentTime
+          sent <- try (postSpinBatch baseUrl mgr "spin-calibration" [spinFast])
+          case sent of
+            Left (e :: HttpException) -> calibrationFailed ("no response: " <> show e)
+            Right resp -> do
+              end <- getCurrentTime
+              case Aeson.decode (responseBody resp) :: Maybe BatchResponse of
+                Just batch | statusCode' resp == 200, map (.outcome) batch.cases == [CaseAnswered] ->
+                  pure (realToFrac (diffUTCTime end start) :: Double)
+                _ -> calibrationFailed ("status " <> show (statusCode' resp) <> ": " <> show (responseBody resp))
+    _ <- timedRun
+    maximum <$> replicateM 3 timedRun
+ where
+  patient = spinOptions { evalTimeout = spinCalibrationLimit }
+
+-- | An HTTP client that waits this many seconds for a response, in place of
+-- the 30 that 'defaultManagerSettings' gives. A client that gives up first
+-- fails a test with a timeout in the client, about nothing the service did.
+managerWaiting :: Int -> IO Manager
+managerWaiting seconds =
+  newManager defaultManagerSettings {managerResponseTimeout = responseTimeoutMicro (seconds * 1_000_000)}
+
+-- | 'withServiceFromSourcesOpts' for the spin tests, with the time limit and
+-- the client's patience set from this machine instead of fixed.
+--
+-- The limit is 'spinLimitFactor' times what one fast case takes now
+-- ('fastCaseSeconds'), rounded up to whole seconds, and never under 1 s. A
+-- fast case is far inside it at any speed, and the whole batch of them is not,
+-- which is what the tests are about; 'spinLimitFactor' says by how much. The
+-- client waits for as many cases as the biggest batch ('spinMostCases'), plus
+-- one, each taking as long as the limit allows. The limit bounds a case, and
+-- so a batch, apart from the overhead of the request. A response later than
+-- that is the service's fault, and it is the test's own assertions, not a
+-- default of the client, that should say so.
+--
+-- The test is handed the options it ran under, for the limit it reports.
+withSpinService
+  :: Text -> [(FilePath, Text)] -> (Options -> String -> Manager -> IO a) -> IO a
+withSpinService deployId sources act = do
+  caseSeconds <- fastCaseSeconds
+  let opts = spinOptions { evalTimeout = max 1 (ceiling (spinLimitFactor * caseSeconds)) }
+  -- so that a failure in the log says what the limit was and why
+  hPutStrLn stderr $
+    "spin service " <> Text.unpack deployId <> ": a fast case's round trip takes "
+      <> show (fromIntegral (round (caseSeconds * 100) :: Int) / 100 :: Double)
+      <> " s here now, so the time limit is " <> show opts.evalTimeout <> " s"
+  withServiceFromSourcesOpts opts deployId sources \baseUrl _ -> do
+    mgr <- managerWaiting ((spinMostCases + 1) * opts.evalTimeout)
+    act opts baseUrl mgr
+
+-- | What a batch case reports when it meets the time limit 'opts' sets.
+timeLimitHit :: Options -> CaseOutcome
+timeLimitHit opts = CaseLimited TimeLimitHit
+  ( "Evaluation resource limit exceeded: this case did not finish within the time limit of "
+      <> Text.pack (show opts.evalTimeout) <> " s (--eval-timeout)" )
+
 -- | Post one batch of 'spinJL4' cases, the i-th spinning for the i-th count.
 postSpinBatch :: String -> Manager -> String -> [Int] -> IO (Response LBS.ByteString)
-postSpinBatch baseUrl mgr deployId = postBatchTo baseUrl mgr deployId "spin"
+postSpinBatch baseUrl mgr deployId steps = do
+  when (length steps > spinMostCases) $
+    expectationFailure $
+      "postSpinBatch: " <> show (length steps) <> " cases, and the client of 'withSpinService' is patient for "
+        <> show spinMostCases <> " ('spinMostCases'): raise that first"
+  postBatchTo baseUrl mgr deployId "spin" steps
 
 -- | Post one batch of cases to a function that takes @n@, the i-th with the
 -- i-th value.
