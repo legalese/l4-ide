@@ -235,6 +235,11 @@ data Frame =
   -- anything the read does not name.
   | ReadNorm1 ReadWord (Maybe (Expr Resolved)) DeonticModal Resolved ReadBranch Environment (Maybe SrcRange)
   | ReadNorm2 ReadWord Rational DeonticModal Resolved ReadBranch (Maybe SrcRange)
+  -- 'ReadNorm3' waits for the arming clock of a norm the writer has not yet
+  -- written (a root norm's clock is forced at its first event), holding the
+  -- whole read; it asks again, so every such clock is forced before the log
+  -- is read (R14).
+  | ReadNorm3 ReadWord Rational BearerPattern DeonticModal Resolved ReadBranch (Maybe SrcRange)
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -1596,6 +1601,7 @@ unwindFrame = \ case
   ReadCell2 {}                  -> pure ()
   ReadNorm1 {}                  -> pure ()
   ReadNorm2 {}                  -> pure ()
+  ReadNorm3 {}                  -> pure ()
   App1 {}                       -> pure ()
   ConnectiveLeft {}             -> pure ()
   ConnectiveRight {}            -> pure ()
@@ -2235,6 +2241,31 @@ tellEventRouted route ev = do
     -- we simply pass the recipient key instead of the acting party.
     RouteNotify recipientKey ->
       liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
+
+-- | NORM-LOG-SPEC N4b: before the log is read, force the arming clock of every
+-- norm whose @Armed@ entry still waits in the writer for it. The writer never
+-- forces ('tellArmed'), and a root norm's clock is forced at its first event,
+-- so a read in the first guard of a root norm, which is where a norm reads
+-- itself, would otherwise see a log without that norm and answer "no" (R14).
+-- A read is the one place that may force: its answer is the log as it is now.
+readNormForcing :: ReadWord -> Rational -> BearerPattern -> DeonticModal -> Resolved -> ReadBranch -> Maybe SrcRange -> Machine Config
+readNormForcing word d who modal con branch site = do
+  mlog <- asks (.deonticLog)
+  case mlog of
+    Just l | l.dlWriteFates -> do
+      pending <- liftIO (readIORef l.dlPendingArmed)
+      unforced <- firstUnforced (reverse pending)
+      case unforced of
+        Just time -> do
+          pushFrame (ReadNorm3 word d who modal con branch site)
+          continueRef time
+        Nothing -> flushArmed l >> finishNormRead word d who modal con branch site
+    _ -> finishNormRead word d who modal con branch site
+  where
+    firstUnforced [] = pure Nothing
+    firstUnforced ((_, time, _) : rest) = peekWHNF time >>= \ case
+      Nothing -> pure (Just time)
+      Just _  -> firstUnforced rest
 
 -- | Finish a read of the norm log (NORM-LOG-SPEC N4b): the pure reader over
 -- the entries written so far, as at the instant. A read is only meaningful
@@ -3227,13 +3258,15 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     finishRead mode cellVal (OwnKey key) site ledger
   Just (ReadNorm1 word mParty modal con branch env site) -> case val of
     ValNumber d -> case mParty of
-      Nothing -> finishNormRead word d AnyBearer modal con branch site
+      Nothing -> readNormForcing word d AnyBearer modal con branch site
       Just p  -> do
         pushFrame (ReadNorm2 word d modal con branch site)
         continueExpr env p
     _ -> userException (UserError "the instant of a norm-log read did not evaluate to a number")
   Just (ReadNorm2 word d modal con branch site) ->
-    finishNormRead word d (BearerIs (partyKeyWHNF val)) modal con branch site
+    readNormForcing word d (BearerIs (partyKeyWHNF val)) modal con branch site
+  Just (ReadNorm3 word d who modal con branch site) ->
+    readNormForcing word d who modal con branch site
   Just (RestoreSibling path clock) -> do
     restoreSibling path clock
     continueBackward val
