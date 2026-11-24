@@ -875,6 +875,19 @@ The allocation figures are within one per cent of P1's, and the shapes do not ch
 `fork` and `barrier` are still superlinear, as in §6.3, and nothing was done about it here; the barrier's extra prepend per member costs about 1 per cent.
 The whole-process ratios are within 0.002 of P1's: 1.06 on the `EVERY` files; at 400 norms 1.111, 1.165, 1.106 and 1.102 (chain, lest, fork, barrier); at 800, 1.115, 1.171, 1.115 and 1.143.
 
+**What CI's WASM job found (2026-11-24), and what was done.**
+The required "WASM Build & Test" job of the pull request was red on `Machine.hs`: `instantCarrier` took `negate (1099511627776 + hashUnique u)` as the address of the reference `THE INSTANT` reads, and an `Int` is 32 bits on the WASM target, so the literal is out of range (`-Woverflowed-literals`, fatal under `-Werror`).
+Neither the native build nor `etc/verify-branch.sh` builds WASM, so no gate of the first half could have shown it; I did not build WASM myself, and CI's job is the check.
+The defect was more than a literal: `hashUnique` is the value of a process-wide counter, so the address also depended on how many unique values the process had already made, and on a 32-bit `Int` a sum with it wraps to a positive address, which belongs to the supply of the evaluation.
+The carrier addresses are now one plan in `L4.Evaluate.NormLog` (decided by Claude 2026-11-24, pending Meng's review): the negative 32-bit range is split in two halves of 2^30; the parent-link carriers of a directive's log are numbered from -1 down, and the instant carriers of an evaluation from -2^30 down, each from a counter of its own (the second is a field of the evaluation's state, not a global).
+The numbers cannot meet, and a counter that reaches the end of its half stops the evaluation with a named error, never a wrapped address, which would be a silent wrong answer.
+The limits are 2^30 - 1 parent-link carriers per directive and 2^30 instants read per evaluation; an evaluation that reads `THE INSTANT` once per guard would need a billion guards to reach the second.
+Two properties are tests (`NormLogSpec`, "carrier addresses fit a 32-bit Int"): every address is within the range of a 32-bit `Int`, and the two halves are disjoint.
+They were run first against the old address, as red: `NormLog` and `NormLogRead`, 282 examples, 2 failures (the address for the extreme hash is outside 32 bits, and a wrapped address is positive).
+Then the gate was run again on `lhs` at the head that carries the fix (`etc/verify-branch.sh` against the P1 head, with `jl4-test` forced on): `jl4-test` 5,077 examples, `l4-cli-test` 1,185, `jl4-core-test` 2,412, `jl4-service-test` 877, no failure, and every other step passes except the parse-time probe, which cannot run on `lhs` and was run with the shim described above, ratios 3.9 and 4.1 (0.91 s and 3.57 s of CPU for distinct names, 0.86 s and 3.50 s for one repeated name).
+`jl4-test` with the writer forced on is 5,077 examples with no failure, in 1,337 s; `jl4-lsp-test` is 336 examples with no failure; `jl4-mlir-test` and `jl4-websessions-test` exited 0.
+A scan of the first half's Haskell diff for any other literal of nine or more digits found none (`originKey`'s 2^40 is a `Rational`).
+
 ## 7. Probe — what a crude projection shows
 
 Measured 2026-09-23 on the local branch `probe/norm-log` @ `65fb65201` (never pushed, never merges), built from `unstable` @ `20e71b65d`.
