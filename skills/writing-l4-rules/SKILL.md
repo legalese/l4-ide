@@ -330,7 +330,9 @@ that is a `DEONTIC` itself (a contract rule): it is published, and
 `FUNCTION FROM … TO …`, an `EVENT`, a type variable, and a `DEONTIC` anywhere
 else (an input, or inside a `MAYBE`, `LIST` or `EITHER` result) have no JSON
 form yet, so an `@export` of a rule with one is an error at the `@export`, and
-`jl4-service` refuses to deploy it. The error says "its input `x` is a
+`jl4-service` deploys the file's other exports without it, naming it in
+`refusedExports` (a deployment whose every export is refused fails). The
+error says "its input `x` is a
 function, and @export does not support that yet" (or "its result", or "an
 EVENT", or "a DEONTIC, a contract rule"), and `l4 check` fails. The error
 does not stop the rest of the file: it is still type-checked, and the rule

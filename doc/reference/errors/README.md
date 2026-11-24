@@ -1092,7 +1092,10 @@ For a result written with such a name, the error says ``its result is written wi
 A rule with no `GIVETH` whose result L4 works out to be such a name gets ``its result is inferred to be `...`, a type name for a DEONTIC``, and the fix is to add a `GIVETH` that writes the `DEONTIC` type out.
 A contract rule that is refused is still evaluated where you write it, so its `#EVAL` and `#EVALTRACE` results still show.
 
-`l4 check` and `l4 run` report the error and fail, with exit status 1, and deploying is refused until you remove the `@export` or change the type.
+`l4 check` and `l4 run` report the error and fail, with exit status 1.
+The editor shows **Deploy** as off while the file has the error.
+A file that reaches jl4-service with the error is deployed without that rule: the service deploys its other exported rules, gives the reasons in a `refusedExports` field of the deployment's status, and answers a call to the left-out rule with a `404` that says why.
+When every exported rule of the deployment, in the file and in the files it imports, is refused, nothing is deployed.
 The editor shows it as an error from `export`.
 The error does not stop the rest of the file: it is still checked for type errors, `l4 run` still evaluates it and prints its results, and the editor still shows the results of its `#EVAL`s and `#EVALTRACE`s, the refused rule's own included.
 `@export default` is refused the same way.
