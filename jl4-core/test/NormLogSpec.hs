@@ -40,7 +40,6 @@ import L4.Evaluate.NormLog.Read
   ( BearerPattern (..), BranchPattern (..), NormPattern (..), NormState (..), NormView (..), Refusal (..)
   , anyNorm, isCured, readNorms )
 import L4.EvaluateLazy
-import L4.Parser (execProgramParserWithHintPass)
   ( EvalConfig (..)
   , EvalDirectiveResult (..)
   , NormLogMutant (..)
@@ -48,6 +47,7 @@ import L4.Parser (execProgramParserWithHintPass)
   , prettyEvalDirectiveResult
   , resolveEvalConfig
   )
+import L4.Parser (execProgramParserWithHintPass)
 import L4.Syntax (DeonticModal (..), RawName (..), moduleReadsNormLog)
 import L4.TypeCheck.Types (AnchorRefusal (..), CheckResult (..), CheckErrorWithContext (..), CheckError (..), CheckWarning (..), ReadRefusal (..))
 import L4.TracePolicy (apiDefaultPolicy)
