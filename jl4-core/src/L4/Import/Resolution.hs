@@ -43,6 +43,8 @@ module L4.Import.Resolution
     -- * Written import names: bare or path
   , ImportForm(..)
   , classifyImport
+  , splitAlias
+  , projectMarkerFile
   , pathImportFile
   , CollapsedPath(..)
   , collapsePath
@@ -135,9 +137,9 @@ moduleNameToCandidateUris mBaseUri mRoot modName =
 -- | How the text of a written @IMPORT@ name is resolved
 -- (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.2).
 --
--- The class is decided by the text alone, and only by whether it contains a
--- @\/@: a name without one is resolved by the bare-name ladder, exactly as it
--- was before path imports existed.
+-- The class is decided by the text alone. A name without a @\/@ is resolved by
+-- the bare-name ladder, exactly as it was before path imports existed; one with
+-- a @\/@ is a path, and how it starts says what it is counted from.
 data ImportForm
   = BareImport
     -- ^ No @\/@: @IMPORT prelude@, @IMPORT \`sg-succession-domain\`@, and also
@@ -145,9 +147,14 @@ data ImportForm
     -- @foo@ and @a@.
   | PathImport
     -- ^ A relative path with at least one @\/@: @IMPORT \`..\/other-row\/mod\`@.
-  | RootedImport
-    -- ^ A path with a leading @\/@. Reserved for a root-relative form that is
-    -- not specified yet, and refused until it is.
+  | RootRelativeImport
+    -- ^ A path with a leading @\/@: @IMPORT \`\/subjects\/vn\/nouns\`@, counted from
+    -- the project root and not from the importing file
+    -- (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.7, proposed and not ruled).
+  | AliasImport
+    -- ^ A name that starts with @\@@ and has a @\/@: @IMPORT \`\@vn10\/nouns\`@, a
+    -- folder named in the project's @l4-project.json@ and a path under it
+    -- (§4.7 C6, proposed and not ruled).
   deriving stock (Eq, Show)
 
 -- | Classify the text of a written import name. A backslash is not a path
@@ -155,12 +162,33 @@ data ImportForm
 classifyImport :: Text -> ImportForm
 classifyImport t
   | not (Text.isInfixOf "/" t) = BareImport
-  | Text.isPrefixOf "/" t      = RootedImport
+  | Text.isPrefixOf "/" t      = RootRelativeImport
+  | Text.isPrefixOf "@" t      = AliasImport
   | otherwise                  = PathImport
 
--- | The file a path import names, relative to the importing file's directory:
--- one trailing @.l4@ is dropped if present and @.l4@ appended, so
--- @..\/b\/mod@ and @..\/b\/mod.l4@ name the same file.
+-- | The alias and the path under it, in a name that 'classifyImport' calls an
+-- 'AliasImport': @\@vn10\/nouns@ is the alias @vn10@ and the path @nouns@. The
+-- alias is what lies between the @\@@ and the first @\/@, and may be empty.
+splitAlias :: Text -> Maybe (Text, Text)
+splitAlias t = do
+  afterAt <- Text.stripPrefix "@" t
+  let (alias, slashAndPath) = Text.breakOn "/" afterAt
+  (_slash, path) <- Text.uncons slashAndPath
+  pure (alias, path)
+
+-- | The file whose presence marks the root of a project: the root of a
+-- root-relative import is the folder of the nearest one at or above the
+-- importing file (specs\/proposals\/RELATIVE-IMPORTS-SPEC.md §4.7, C2). It is
+-- named here because the resolver looks for it and the service must keep it
+-- across a restart.
+projectMarkerFile :: FilePath
+projectMarkerFile = "l4-project.json"
+
+-- | The file a path import names, relative to the importing file's directory
+-- (or, for a root-relative name, to the project root): one trailing @.l4@ is
+-- dropped if present and @.l4@ appended, so @..\/b\/mod@ and @..\/b\/mod.l4@
+-- name the same file. Empty segments are dropped, which is also what turns the
+-- leading @\/@ of a root-relative name into a relative path.
 pathImportFile :: Text -> FilePath
 pathImportFile t =
   joinPath (filter (not . null) (map Text.unpack (Text.splitOn "/" bare)))

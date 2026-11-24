@@ -1,0 +1,3 @@
+IMPORT `/shared/units`
+
+definitionmarker MEANS unitmarker * 2

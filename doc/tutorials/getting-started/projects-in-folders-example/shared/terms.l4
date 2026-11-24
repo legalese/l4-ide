@@ -1,0 +1,6 @@
+-- The numbers that the tenancy rules share, kept in one place.
+-- The rule files in ../rules import this file in three different spellings.
+
+`notice period in days` MEANS 30
+`deposit cap in months of rent` MEANS 2
+`grace period in days` MEANS 5

@@ -1,0 +1,12 @@
+-- When a landlord may charge a late fee.
+-- Imports the shared terms by an alias: `common` is a short name for the
+-- folder `shared`, defined in l4-project.json. This file is one folder deeper
+-- than the others, and its import line is the same as it would be anywhere.
+IMPORT `@common/terms`
+
+GIVEN `days late` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `a late fee may be charged` IF `days late` GREATER THAN `grace period in days`
+
+#EVAL `a late fee may be charged` 3
+#EVAL `a late fee may be charged` 12

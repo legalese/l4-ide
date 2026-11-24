@@ -72,10 +72,129 @@ IMPORT `rules/section-3`
 - **Leave off `.l4`.** ``IMPORT `../shared/definitions.l4` `` names the same file.
 - **Always write `/`**, on every system, and never `\`. A name without a `/` is a bare module name, whatever else is in it.
 - **The backticks are required.** ``IMPORT `../shared/definitions` `` works; `IMPORT ../shared/definitions` is a parse error.
-- **A path names one file.** L4 looks for that file and no other: the standard library, `JL4_LIBRARY_PATH`, the project root and the per-user store are not searched, so nothing can stand in for it. If it is not there, the error says which path was tried: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path).
+- **A path names one file.** L4 looks for that file and no other: the standard library, `JL4_LIBRARY_PATH`, the session root and the per-user store are not searched, so nothing can stand in for it. If it is not there, the error says which path was tried: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path).
 - **Two files with one name in different folders are two modules.** ``IMPORT `a/rates` `` and ``IMPORT `b/rates` `` can both appear in one program, and neither replaces the other. If both define a name you then use, L4 asks which you meant, as it does for any two imports that define the same name.
-- **Two spellings of one path are one module.** `sub/../core`, `./core` and `core` all name the same file, so a definition in it is not "defined twice". L4 works this out from the words of the path, not by looking at the disk, so a symbolic link, or a different capitalisation on a system that ignores capitals, still reaches one file as two modules.
-- **A path cannot start with `/`.** A leading slash is reserved and refused: [This import leaves the root of this deployment](../errors/README.md#this-import-leaves-the-root-of-this-deployment).
+- **Two spellings of one path are one module.** `sub/../core`, `./core` and `core` all name the same file, so a definition in it is not "defined twice". L4 works this out from the words of the path, not by looking at the disk, so a symbolic link, a different capitalisation on a system that ignores capitals, or a folder name with an accented letter written once as a single character and once as a letter followed by a combining accent (the same text to the eye, two spellings to the computer) still reaches one file as two modules.
+- **A path that starts with `/` is counted from the root of the project instead.** See [Importing from the root of a project](#importing-from-the-root-of-a-project).
+- **A path that starts with `@` is a folder with a short name instead.** See [Importing by alias](#importing-by-alias). A relative path through a folder whose own name starts with `@` is written ``IMPORT `./@folder/mod` ``, with the `./`, for that reason.
+
+A step-by-step walk-through that splits one file into folders and uses this form, the root form and the alias form is [Split a project into folders](../../tutorials/getting-started/projects-in-folders.md) (proposed, not landed).
+
+#### Importing from the root of a project
+
+A path that starts with `/` is counted from the **project root**, not from the file that writes the `IMPORT`:
+
+```l4
+IMPORT `/shared/definitions`
+IMPORT `/subjects/vn/nouns`
+```
+
+**Example:** [rules/main.l4](project-root-example/rules/main.l4) imports [shared/definitions.l4](project-root-example/shared/definitions.l4) from the root of its project, which is marked by [l4-project.json](project-root-example/l4-project.json).
+
+- **The project root is the folder of the nearest `l4-project.json`.** `l4` looks in the folder of the file that writes the `IMPORT`, then in the folder above it, and so on upwards, and stops at the first folder that holds a file with that name. The file can contain just `{}`: a root-relative import looks only for the file, and the one thing that reads what is inside it is an [alias](#importing-by-alias). A project inside a project has its own root, so the inner `l4-project.json` decides for the files below it.
+- **The same line works from every folder of the project.** ``IMPORT `../shared/definitions` `` changes when the file that writes it moves to another folder; ``IMPORT `/shared/definitions` `` does not.
+- **No `l4-project.json` above the file is an error, not a guess.** `l4` does not fall back to the folder of the file or the folder you ran it in, because the answer would then change with where you ran it: [This import is relative to the project root, but no project root was found](../errors/README.md#this-import-is-relative-to-the-project-root-but-no-project-root-was-found).
+- **A leading `/` names the root of the project, not the root of the disk.**
+  An absolute path from a file manager or a terminal does not work here: ``IMPORT `/Users/me/work/proj/shared/definitions` `` is looked for under the project root, as `<project root>/Users/me/work/proj/shared/definitions.l4`, and is not found.
+  The error repeats the path you wrote and shows it joined onto the end of the project root: [I could not find a module at this path](../errors/README.md#i-could-not-find-a-module-at-this-path).
+  Write the path from the project root instead: ``IMPORT `/shared/definitions` ``.
+- **An `l4-project.json` in any folder above the file counts.**
+  The search goes up to the top of the disk, and does not stop at the folder you opened, at your home folder or at the root of a git repository.
+  A file left in a folder above, in your home folder by another tool say, becomes the project root of every project below it that has no file of its own.
+  A root-relative import in such a project then reads files from outside the folder you opened, and says nothing.
+  Put an `l4-project.json` at the top of each project, and none in a folder above your projects that you do not mean as a project root.
+- **A root-relative path never leaves the project.** ``IMPORT `/../elsewhere` `` is refused, on your own machine as well as in a deployment: [This import leaves the root of this deployment](../errors/README.md#this-import-leaves-the-root-of-this-deployment). A path that starts from the importing file, such as ``IMPORT `../elsewhere` ``, may still leave the folder you started in.
+  The check is made on the path as written, not on the file it reaches.
+  A symbolic link inside the project that points outside it still leads out, on your own machine, because `l4` follows links.
+  A deployment is not affected: the service looks for the file among the uploaded files only.
+- **Leave off `.l4`, and always write `/`**, as for any path import. The backticks are required.
+- **Two spellings of one file are one module.** `/identity/core`, `./core` and `../identity/core` can all name the same file, and then it is one module and nothing in it is "defined twice".
+- **A deployment has no `l4-project.json` to find.** In `jl4-service` and Legalese Cloud the project root is the top of the uploaded files, and a leading `/` is counted from there. The file is needed there only for [aliases](#importing-by-alias).
+
+**What this cannot do yet.** These are limits, not oversights:
+
+- **The browser editor** does not have root-relative imports, as it does not have path imports. It gets both forms when the two changes that add them have both landed: this one, and the separate one that gives the browser build its own path resolver.
+- **A deployed project has to be uploaded with its project root at the top of the upload.** If the folder that holds `l4-project.json` is not the top of the zip, ``IMPORT `/shared/definitions` `` is looked up from the top of the zip and not found there, though it works on your machine. Today `l4 deploy` and the VS Code deploy action put every file at the top level, whatever its folder, so they cannot deploy a project that uses either form; see [what a deployment contains](#what-a-deployment-contains). Both also upload only the entry file and the files it imports. A deploy tool that supports root-relative projects has to find the project root, the folder of the nearest `l4-project.json` above the entry file, and make that folder the top of the zip.
+- **The language server does not watch `l4-project.json`.**
+  The VS Code extension shows it only L4 files, so a marker counts once it is on disk.
+  If you add or remove one while a file that imports from the root is open, that file keeps the project root it found until you type a change in it.
+  Saving that file, closing and reopening it, and editing another file do not make it look again.
+  That was measured with a scripted client against the built language server on 2026-10-26, and not in VS Code itself.
+  `l4 check` always looks afresh.
+- **A project inside a project is read differently by `l4` and by a deployment.**
+  `l4` takes the nearest `l4-project.json`, so a folder that holds its own file has its own project root.
+  A deployment takes the top of the uploaded files and looks for no other file, so the same files can name one file on your machine and another one there.
+  Nothing refuses it and nothing warns of it, and the deployment says `ready`.
+
+#### Importing by alias
+
+A project that keeps its shared rules deep in a folder tree can give a folder a short name, an **alias**, and import from it by that name:
+
+```l4
+IMPORT `@common/definitions`
+IMPORT `@vn10/nouns`
+```
+
+The aliases are written in the `l4-project.json` that marks the root of the project:
+
+```json
+{ "aliases": { "common": "shared", "vn10": "subjects/vn/nd67" } }
+```
+
+**Example:** [rules/main.l4](alias-example/rules/main.l4) imports [shared/definitions.l4](alias-example/shared/definitions.l4) by the alias `common` and [nouns.l4](alias-example/subjects/vn/nd67/nouns.l4) by the alias `vn10`, which [l4-project.json](alias-example/l4-project.json) defines.
+
+- **An alias stands for a folder.**
+  `@vn10/nouns` is the file `nouns.l4` in the folder that `vn10` stands for.
+  The folder is written from the folder that holds `l4-project.json`, which is the project root, and it has to be inside the project.
+  Leave off `.l4` after the file, as for any path import.
+- **The name starts with `@` and has a `/` after the alias.**
+  A name like ``IMPORT `@vn10` ``, with no `/`, is not an alias import: it is read as a module called `@vn10`, as it always was.
+- **The aliases come from the nearest `l4-project.json`**, found as the project root is (see above), and from that file alone.
+  A project inside a project has its own aliases, and does not inherit its outer project's.
+  That is so for `l4`; a deployment reads the file at the top of the uploaded files instead (see the limits below).
+- **An alias that is not defined is an error that lists the ones that are:** [This import uses an alias that is not defined](../errors/README.md#this-import-uses-an-alias-that-is-not-defined).
+- **An alias cannot stand for another alias.**
+  A folder that starts with `@` is refused; to name a folder that really starts with `@`, write it with `./`: `"./@common"`.
+  See [An alias in l4-project.json cannot be used](../errors/README.md#an-alias-in-l4-projectjson-cannot-be-used).
+- **If an alias is written twice, the first one is used.**
+  Another program that reads the same file as JSON, a deploy tool or an editor written in TypeScript say, may use the last one.
+- **The file has to be JSON.**
+  A file that is not JSON, or an `aliases` that is not an object of folders written as text, is an error that names the file and says where: [I could not read the project file](../errors/README.md#i-could-not-read-the-project-file).
+  Keys other than `aliases` are ignored.
+  On your own machine, L4 opens the file only when an alias import needs it, so an `l4-project.json` that does not parse breaks the imports that use an alias and nothing else.
+  In a deployment a file like that can reject the whole deployment: the service reads every uploaded file as L4 first, and a line of the file that L4 takes for an annotation, such as `@exprot foo`, refuses the upload.
+  Valid JSON was not affected in any file tried, because an `@` inside a JSON string is part of the string.
+- **An alias never leads out of the project.**
+  A folder that climbs above the project root is refused, and so is a path under the alias that does: ``IMPORT `@common/../../elsewhere` ``.
+  Both are refused on your own machine as well as in a deployment.
+  A path under an alias may use `..` to reach another folder of the project.
+  The check is made on the folder and the path as written, not on the file they reach.
+  A symbolic link inside the project that points outside it still leads out, on your own machine, because `l4` follows links.
+  A deployment is not affected: the service looks for the file among the uploaded files only.
+- **Two spellings of one file are one module.**
+  `@common/core`, `/shared/core` and `../shared/core` can all name the same file, and then it is one module and nothing in it is "defined twice".
+- **In a deployment the aliases come from the `l4-project.json` at the top of the uploaded files.**
+  The service does not search for another one, and it keeps the file with the sources across a restart.
+  A deployment whose top holds none says so: [This import uses an alias, but there is no project file to read it from](../errors/README.md#this-import-uses-an-alias-but-there-is-no-project-file-to-read-it-from).
+
+**What this cannot do yet.** These are limits, not oversights, and they are the limits of the root-relative form as well:
+
+- **The browser editor** does not have aliases, as it does not have root-relative imports.
+  It gets both when the changes that add them have both landed.
+- **A deployed project has to be uploaded with its project root, and its `l4-project.json`, at the top of the upload.**
+  `l4 deploy` and the VS Code deploy action put every file at the top level, whatever its folder, so they cannot build such an upload today.
+  They also upload only the entry file and the files it imports, so neither would upload the `l4-project.json` even with folders kept.
+  A deploy tool that supports alias projects has to add the nearest `l4-project.json` itself and make its folder the top of the zip.
+- **The language server does not watch `l4-project.json`.**
+  The VS Code extension shows it only L4 files, so the file counts once it is on disk.
+  An alias you add, remove or change while a file that uses it is open is not noticed until you type a change in that file.
+  Saving that file, closing and reopening it, and editing another file did not make the language server read the project file again when this was measured with a scripted client on 2026-10-26; VS Code itself was not tried.
+  `l4 check` always checks afresh.
+- **A project inside a project reads its aliases from different files in `l4` and in a deployment.**
+  `l4` reads the nearest `l4-project.json`, and the service reads the one at the top of the uploaded files and no other.
+  An alias that only the inner file defines is then not defined in the deployment, and an alias that both define can stand for a different folder there.
+  The deployment is accepted either way, with at most a warning in the service's log, as for the project root above.
+- **A deployed bundle that cannot resolve an alias import is accepted**, as it is for any import that finds nothing, and the only trace is a warning in the service's log.
 
 #### Where path imports work, and where they do not
 
@@ -106,8 +225,10 @@ A deployment is the set of files that were uploaded, and a path import can only 
 
 For `IMPORT helpers`, L4 uses the first of these that exists:
 
-1. `helpers.l4` in your project's root folder, or in the folder of the file that writes the `IMPORT`.
+1. `helpers.l4` in the **session root**, or in the folder of the file that writes the `IMPORT`. The session root is the folder `l4` starts from: the folder of the file you name on the command line, the folder the editor's language server was started in, or the working directory of the REPL.
 2. The standard library built into the `l4` you are running. It needs no files on disk and always matches that `l4`.
+
+The session root is not the [project root](#importing-from-the-root-of-a-project): an `l4-project.json` does not change where a bare name is looked for.
 
 So a file of your own with the name of a standard library, such as `prelude.l4` beside your rules, is used instead of the standard one. Operators and library developers can change the search with the `JL4_LIBRARY_PATH` environment variable; [How IMPORT finds libraries](resolution.md) gives the full order, what Legalese Cloud does, and the warning shown when two different copies of a module are visible. When nothing is found, the error is [Module not found](../errors/README.md#module-not-found).
 An `IMPORT` that resolves to nothing is an error even if your file never uses anything from it: the message names the module and every location that was searched.

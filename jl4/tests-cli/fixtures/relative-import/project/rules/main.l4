@@ -1,0 +1,6 @@
+IMPORT `/shared/definitions`
+IMPORT `/rules/helper`
+
+`answer` MEANS definitionmarker + helpmarker
+
+#EVAL answer

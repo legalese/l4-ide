@@ -1,0 +1,4 @@
+-- Definitions that several rule files share.
+-- This file is imported by the alias `common`, which stands for this folder.
+
+`age of majority` MEANS 18

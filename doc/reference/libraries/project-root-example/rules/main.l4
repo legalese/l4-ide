@@ -1,0 +1,12 @@
+-- A rule file that imports a shared file by its place in the PROJECT.
+-- The leading / means "from the project root": the folder that holds
+-- l4-project.json, which here is the example folder. The same line works
+-- from a file in any folder of the project.
+IMPORT `/shared/definitions`
+
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is an adult` age IF age AT LEAST `age of majority`
+
+#EVAL `is an adult` 21
+#EVAL `is an adult` 17

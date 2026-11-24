@@ -1,0 +1,13 @@
+-- A rule file that imports from two folders of its project by their aliases.
+-- An alias is a short name for a folder, defined in l4-project.json, which
+-- here is in the example folder. The same lines work from a file in any folder
+-- of the project.
+IMPORT `@common/definitions`
+IMPORT `@vn10/nouns`
+
+GIVEN age IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is an adult` age IF age AT LEAST `age of majority`
+
+#EVAL `is an adult` 21
+#EVAL `is an adult` 17

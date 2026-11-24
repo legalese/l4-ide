@@ -1,0 +1,5 @@
+IMPORT `../alias-escape-planted`
+
+x MEANS plantedmarker
+
+#EVAL x

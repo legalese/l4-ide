@@ -1,0 +1,6 @@
+IMPORT `@common/definitions`
+IMPORT `@vn10/nouns`
+
+`answer` MEANS definitionmarker + nounmarker
+
+#EVAL answer

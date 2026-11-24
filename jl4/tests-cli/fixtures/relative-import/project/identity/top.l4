@@ -1,0 +1,7 @@
+IMPORT `/identity/core`
+IMPORT `./core`
+IMPORT `../identity/core`
+
+twice MEANS coremarker + coremarker
+
+#EVAL twice
