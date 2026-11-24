@@ -1354,17 +1354,22 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "switched off"
 
       it "R11: a phrase applied to a bracketed event is still an application; applied to a bracketed regulative it is a read" do
-        let parsed body = case execProgramParserWithHintPass uri (Text.unlines body) of
-              Left errs -> error ("the module did not parse: " <> show errs)
-              Right (m, _, _) -> m
+        -- Nothing: the text did not parse; Just b: it parsed, and b says whether it holds a read
+        let isRead body = case execProgramParserWithHintPass uri (Text.unlines body) of
+              Left _ -> Nothing
+              Right (m, _, _) -> Just ("ReadNorm" `Text.isInfixOf` Text.pack (show m))
             uri = toNormalizedUri (Uri "file:///norm-log-r11")
-            isRead m = "ReadNorm" `Text.isInfixOf` Text.pack (show m)
             -- an event has a party and an action, and no modal
             event w = [ "x MEANS " <> w <> " (PARTY Tenant DOES pay AT 30)" ]
+            -- with a modal in the same place the text is a regulative
+            regulative w = [ "x MEANS " <> w <> " (PARTY Tenant MUST pay)" ]
+        -- CURED BY REPARATION is not in this list: BY is a keyword, so
+        -- that text was never an application, with or without a read
+        for_ [ "OUTSTANDING", "EVER FAILED", "FAILED AND NOT CURED" ] \ w ->
+          (w, isRead (event w)) `shouldBe` (w, Just False)
+        -- the control: each of the four is a read of a bracketed regulative
         for_ [ "OUTSTANDING", "EVER FAILED", "FAILED AND NOT CURED", "CURED BY REPARATION" ] \ w ->
-          isRead (parsed (event w)) `shouldBe` False
-        -- the control: with a modal in the same place the text is a read
-        isRead (parsed [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay)" ]) `shouldBe` True
+          (w, isRead (regulative w)) `shouldBe` (w, Just True)
 
       it "R8: a module's reads are found from its names, and the pass costs a fraction of one evaluation" do
         let readsLog body = case checkWithImports (vfsFromList []) (src body) of
