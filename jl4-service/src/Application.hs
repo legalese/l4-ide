@@ -33,7 +33,7 @@ import Data.IORef (newIORef, readIORef, atomicModifyIORef')
 import qualified Data.Map.Strict as Map
 import Data.Time (getCurrentTime, diffUTCTime)
 import Network.HTTP.Types.Status (statusCode)
-import Network.Wai (Middleware, Request, requestMethod, rawPathInfo, responseStatus, pathInfo, responseLBS, requestHeaders, queryString, responseToStream)
+import Network.Wai (Middleware, Request, mapResponseHeaders, requestMethod, rawPathInfo, responseStatus, pathInfo, responseLBS, requestHeaders, queryString, responseToStream)
 import Network.HTTP.Types (status503, mkStatus, ok200)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -245,7 +245,9 @@ app env req sendResp = do
       reqEnv = case lookup "X-L4-Origin" (requestHeaders req) of
         Just origin -> MkAppEnv env.deploymentRegistry env.updateJobs env.bundleStore (Just (Text.Encoding.decodeUtf8 origin)) env.logger env.options env.mcpTasks
         Nothing     -> env
-  serve (Proxy @ServiceApi) (serverT reqEnv vis originTrialToken) req sendResp
+  -- Every response says what this build can do ('serviceCapabilities').
+  serve (Proxy @ServiceApi) (serverT reqEnv vis originTrialToken) req
+    (sendResp . mapResponseHeaders (("X-L4-Capabilities", Text.Encoding.encodeUtf8 capabilitiesHeaderValue) :))
 
 serverT :: AppEnv -> Visibility -> Maybe OriginTrialToken -> Server ServiceApi
 serverT env vis originTrialToken =
@@ -299,6 +301,7 @@ healthHandler = do
         }
     , hrInstanceToken = env.options.instanceToken
     , hrVersion = Version.serviceVersion
+    , hrCapabilities = serviceCapabilities
     }
 
 -- | GET /.well-known/webmcp — discovery manifest for WebMCP crawlers.

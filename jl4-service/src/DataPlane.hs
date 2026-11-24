@@ -23,7 +23,7 @@ import qualified L4.StateGraph as StateGraph
 import Compiler (toDecl)
 import Logging (logInfo)
 import Options (Options (..))
-import Shared (jsonError)
+import Shared (jsonError, refusedExportReason)
 import Types
 
 import qualified Data.Aeson as Aeson
@@ -186,9 +186,7 @@ requireFunction meta fns fnName =
 
 -- | What a call to an @export that the deploy left out is told.
 refusedExportMessage :: RefusedExport -> Text
-refusedExportMessage r =
-  "Function not found: `" <> r.reName <> "` was not deployed, because its @export is refused: "
-    <> Text.intercalate "; " r.reReasons
+refusedExportMessage r = "Function not found: " <> refusedExportReason r
 
 -- ----------------------------------------------------------------------------
 -- Handlers

@@ -46,7 +46,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import qualified Data.Text.Encoding as Text.Encoding
-import Network.HTTP.Client (defaultManagerSettings, managerRetryableException, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
+import Network.HTTP.Client (defaultManagerSettings, managerRetryableException, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseHeaders, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getTemporaryDirectory, removeDirectoryRecursive, removePathForcibly, withCurrentDirectory)
@@ -1238,6 +1238,41 @@ spec = describe "integration" do
         functionNames (responseBody listed) `shouldBe` ["big"]
         callBig baseUrl mgr "refused-one"
         callRefused baseUrl mgr "refused-one"
+
+    it "answers an MCP call to the refused export with why, and names it under the tool list's _meta" do
+      withServiceFromSources "refused-mcp" [("mixed.l4", mixed)] \baseUrl mgr -> do
+        let rpc method' params = do
+              req <- buildJsonPost (baseUrl <> "/deployments/refused-mcp/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= (method' :: Text), "params" Aeson..= params ]
+              httpLbs req mgr
+        called <- rpc "tools/call" $ Aeson.object
+          ["name" Aeson..= ("who-acted" :: Text), "arguments" Aeson..= Aeson.object []]
+        case wireAt called ["error", "message"] of
+          Right (Aeson.String m) -> do
+            m `shouldSatisfy` Text.isInfixOf "`who acted` was not deployed, because its @export is refused"
+            m `shouldSatisfy` Text.isInfixOf eventReason
+          other -> expectationFailure ("Expected an error naming the refusal, got " <> show other)
+        -- a name that is no export at all is still just unknown
+        unknown <- rpc "tools/call" $ Aeson.object
+          ["name" Aeson..= ("no-such-rule" :: Text), "arguments" Aeson..= Aeson.object []]
+        wireAt unknown ["error", "message"] `shouldBe` Right (Aeson.String "Unknown tool: no-such-rule")
+        listed <- rpc "tools/list" (Aeson.object [])
+        refusedAt listed ["result", "_meta", "l4/refusedExports"] `shouldSatisfy` refusedAsEvent
+        case wireAt listed ["result", "tools"] of
+          Right (Aeson.Array tools) ->
+            [n | Aeson.Object t <- toList tools, Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" t]]
+              `shouldSatisfy` notElem "who-acted"
+          other -> expectationFailure ("Expected a tool list, got " <> show other)
+
+    it "says on /health, and in a header on every response, that it leaves out a refused export" do
+      withEmptyService \baseUrl mgr -> do
+        health <- httpGet mgr (baseUrl <> "/health")
+        wireAt health ["capabilities"] `shouldBe` Right (Aeson.toJSON ["refused-exports" :: Text])
+        -- the answer `l4 deploy` reads before it uploads: a 404 for a new name
+        missing <- httpGet mgr (baseUrl <> "/deployments/not-there?functions=none")
+        statusCode' missing `shouldBe` 404
+        lookup "X-L4-Capabilities" (responseHeaders missing) `shouldBe` Just "refused-exports"
 
     it "still refuses a deployment in which every @export is refused, with the reasons" do
       withEmptyService \baseUrl mgr -> do

@@ -8,6 +8,8 @@ module Shared (
   -- * Metadata collection
   collectMetadataEntries,
   collectDeploymentMetadata,
+  collectRefusedExports,
+  refusedExportReason,
   -- * JSON error encoding
   jsonError,
   -- * Property name sanitization and remapping
@@ -125,6 +127,25 @@ collectDeploymentMetadata mScope = do
            then []
            else [(did.unDeploymentId, meta { metaFunctions = filteredFns })]
     ) (Map.toList registry)
+
+-- | The exports that deployments in scope left out because the export check
+-- refuses them ('metaRefusedExports'), with the deployment's ID.
+collectRefusedExports :: Maybe Text -> AppM [(Text, RefusedExport)]
+collectRefusedExports mScope = do
+  metas <- collectDeploymentMetadata mScope
+  pure
+    [ (did, r)
+    | (did, meta) <- metas
+    , r <- meta.metaRefusedExports
+    , matchesScope mScope did r.reName
+    ]
+
+-- | Why a call to an export the deployment left out gets no answer: the same
+-- words on REST (a 404) and MCP (an error for the tool call).
+refusedExportReason :: RefusedExport -> Text
+refusedExportReason r =
+  "`" <> r.reName <> "` was not deployed, because its @export is refused: "
+    <> Text.intercalate "; " r.reReasons
 
 -- | Encode an error message as a JSON object: @{\"error\": \"...\"}@
 jsonError :: Text -> LBS.ByteString

@@ -15,7 +15,7 @@ import qualified BundleStore
 import DeploymentLoader (tryCompileWithTimeout, CompilationResult (..))
 import FileBrowser (searchIdentifier, searchText, SearchMatch (..))
 import Logging (logInfo, logWarn)
-import Shared (collectMetadataEntries, collectDeploymentMetadata, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
+import Shared (collectMetadataEntries, collectDeploymentMetadata, collectRefusedExports, refusedExportReason, sanitizeParameters, buildPropertyReverseMap, remapFnLiteralKeys, sanitizeFieldNamesInText)
 import Types
 
 import Control.Monad.IO.Class (liftIO)
@@ -144,8 +144,24 @@ handleMethod _vis _mScope reqId "notifications/initialized" _params =
 
 handleMethod vis mScope reqId "tools/list" _params = do
   tools <- buildToolList vis mScope
-  pure $ jsonRpcResult reqId $ Aeson.object
+  -- The exports the deploy left out are not tools. They are named, with why,
+  -- under the result's @_meta@, which MCP leaves to the server; a client that
+  -- does not read it sees the same list as before.
+  refused <- collectRefusedExports mScope
+  pure $ jsonRpcResult reqId $ Aeson.object $
     [ "tools" .= tools ]
+    <> [ "_meta" .= Aeson.object
+           [ "l4/refusedExports" .=
+               [ Aeson.object
+                   [ "deployment" .= did
+                   , "name" .= r.reName
+                   , "reasons" .= r.reReasons
+                   ]
+               | (did, r) <- refused
+               ]
+           ]
+       | not (null refused)
+       ]
 
 handleMethod vis mScope reqId "tools/call" params = do
   case params of
@@ -459,9 +475,19 @@ callFunctionTool _vis mScope reqId toolName tasksRequested arguments = do
 
   case Map.lookup toolName toolMap of
     Nothing -> do
-      liftIO $ logWarn env.logger "MCP tool not found"
-        [("toolName", Aeson.toJSON toolName)]
-      pure $ jsonRpcError reqId (-32602) ("Unknown tool: " <> toolName)
+      -- A tool that would have been an export the deploy left out is
+      -- answered with why, as the REST 404 is; any other name is unknown.
+      refused <- collectRefusedExports mScope
+      let wouldBe r = toolName == r.reName || toolName == sanitizeName 60 r.reName
+      case [r | (_, r) <- refused, wouldBe r] of
+        (r : _) -> do
+          liftIO $ logWarn env.logger "MCP tool call to a refused export"
+            [("toolName", Aeson.toJSON toolName)]
+          pure $ jsonRpcError reqId (-32602) ("Unknown tool: " <> toolName <> ": " <> refusedExportReason r)
+        [] -> do
+          liftIO $ logWarn env.logger "MCP tool not found"
+            [("toolName", Aeson.toJSON toolName)]
+          pure $ jsonRpcError reqId (-32602) ("Unknown tool: " <> toolName)
     Just (deployId, fnName, params, isDeontic) -> do
       liftIO $ logInfo env.logger "MCP tool called"
         [ ("toolName", Aeson.toJSON toolName)
