@@ -141,7 +141,7 @@ The field is left out when nothing was refused, so a client that does not know i
 It follows the visibility headers, as `functions` and `files` do: with `X-Include-Functions: false` it is left out, and with `X-Include-Files: false` each entry is left without its `file`.
 That holds for the deployment's status, the list, the job, an identical `POST` that answers at once, MCP's `tools/list`, and the reason a call is given (below), which a caller that may not see functions does not get.
 
-**Two files may export the same name.**
+**Two exports may answer to the same name**: two files may export the same name, or one file may export two names that sanitize the same (`` `who-acted` `` and `who acted`).
 The export check judges each export by itself, so it may refuse one and not the other.
 The name is then served, by the export the check does not refuse: it is among the functions, a call by it is answered, and over MCP it is a tool.
 The refused entry is still listed, with its `file`, and carries `"nameServed": true`, so a client reading `refusedExports` must not conclude that a name listed there cannot be called; it can, whenever `nameServed` is true.

@@ -1098,7 +1098,7 @@ The editor shows **Deploy** as off while the file has the error.
 To a service that does not say so, such as an older one, they refuse the file before uploading it, as `l4 check` does, and say why.
 `l4 deploy` then lists the rules it left out, each with its file and reason, under `Left out`, and exits with status 0, because the deployment is live; with `--json`, they are in a `refused` list.
 The service gives the same reasons in a `refusedExports` field of the deployment's status, and a call to the left-out rule gets a `404` that says why.
-If another file of the deployment exports a rule of the same name that can be sent, the service serves that one under the name: the entry in `refusedExports` carries `"nameServed": true`, and `l4 deploy` says that the name is still served.
+If the deployment also exports a rule whose name matches it and that can be sent (in another file, or in the same file under a name a call addresses the same way, such as `` `who-acted` `` beside `` `who acted` ``), the service serves that one under the name: the entry in `refusedExports` carries `"nameServed": true`, and `l4 deploy` says that the name is still served.
 When every exported rule of the deployment, in the file and in the files it imports, is refused, nothing is deployed, and `l4 deploy` prints the reasons and exits with status 1.
 The editor shows it as an error from `export`.
 The error does not stop the rest of the file: it is still checked for type errors, `l4 run` still evaluates it and prints its results, and the editor still shows the results of its `#EVAL`s and `#EVALTRACE`s, the refused rule's own included.

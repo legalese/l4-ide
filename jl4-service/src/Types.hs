@@ -169,8 +169,9 @@ data RefusedExport = RefusedExport
   , reReasons :: ![Text]
   -- ^ One line per refusal (an export can be refused for several inputs).
   , reNameServed :: !Bool
-  -- ^ The deployment also serves an export under this name, from another
-  -- file, so a call by this name is answered, by that one. A client must not
+  -- ^ The deployment also serves an @export whose name matches this one (the
+  -- same name, or one that sanitizes the same, in this file or another), so
+  -- a call by this name is answered, by that one. A client must not
   -- read the entry as "this name cannot be called".
   }
   deriving stock (Show, Eq, Generic)

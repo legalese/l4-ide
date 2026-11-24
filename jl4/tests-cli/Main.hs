@@ -1354,12 +1354,12 @@ spec bin = do
         out `shouldNotSatisfy` isInfixOf "is still served"
     -- Another file may export the same name, and the service serves that
     -- one; the refused entry says so ("nameServed"), and so does the output.
-    it "says when the name of an @export it left out is still served, by another file's export" $
+    it "says when the name of an @export it left out is still served, by an @export whose name matches it" $
       withFakeService True True \port _ -> do
         Output code sout _ <- runL4 bin (["deploy", refusedEntry] ++ server port)
         code `shouldBe` ExitSuccess
         filter (/= '\r') sout `shouldSatisfy` isInfixOf
-          "  apply twice (deploy-export-refused.l4)\n    `apply twice` is published with @export, but its input `f` is a function, and @export does not support that yet.\n    `apply twice` is still served, by another file's @export of that name.\n"
+          "  apply twice (deploy-export-refused.l4)\n    `apply twice` is published with @export, but its input `f` is a function, and @export does not support that yet.\n    `apply twice` is still served, by an @export whose name matches it.\n"
     it "says in --json when the name of an @export it left out is still served" $
       withFakeService True True \port _ -> do
         Output code json _ <- runL4 bin (["deploy", refusedEntry, "--json"] ++ server port)
@@ -5413,7 +5413,7 @@ buildIdentitySpec = describe "etc/build-identity.sh" $ do
 -- says it can leave a refused export out. With @capable@, every response
 -- carries @X-L4-Capabilities: refused-exports@, as jl4-service's API routes
 -- do; with @nameServed@, the refused entry says its name is still served by
--- another file's export. The action gets the port and the number of uploads
+-- an @export whose name matches it. The action gets the port and the number of uploads
 -- so far.
 withFakeService :: Bool -> Bool -> (Int -> IORef Int -> IO a) -> IO a
 withFakeService capable nameServed act = do

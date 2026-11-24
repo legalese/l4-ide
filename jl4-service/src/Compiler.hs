@@ -133,7 +133,7 @@ compileBundle logger deployId sources = do
           allFunctions = map snd allFunctionsWithFile
           errors = [err | (_, Left err) <- results]
           -- A refused export whose name a served export also answers to (in
-          -- another file) is marked, so the status does not read as "this
+          -- this file or another) is marked, so the status does not read as "this
           -- name cannot be called" when a call by it is served. Matched as
           -- 'DataPlane.requireFunction' matches a call: the exact name, or
           -- the same sanitized name.

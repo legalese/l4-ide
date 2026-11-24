@@ -1375,6 +1375,19 @@ spec = describe "integration" do
         called <- callTool baseUrl mgr "refused-shared-name" [] "who-acted" ["p" Aeson..= (3 :: Int)]
         wireAt called ["error"] `shouldSatisfy` absent
 
+    -- One file may export two names that a call addresses the same way; the
+    -- check refuses one, and the other serves the name.
+    it "marks a refused export whose name an export of the same file serves once sanitized" do
+      let hyphenWho = "@export Who acted, hyphenated\nGIVEN p IS A NUMBER\nGIVETH A NUMBER\n`who-acted` MEANS p\n"
+      withServiceFromSources "refused-same-file" [("both.l4", hyphenWho <> "\n" <> eventExport)] \baseUrl mgr -> do
+        status <- httpGet mgr (baseUrl <> "/deployments/refused-same-file")
+        refusedFields (wireAt status ["metadata", "refusedExports"])
+          `shouldBe` [[("file", Aeson.String "both.l4"), ("name", Aeson.String "who acted"), ("nameServed", Aeson.Bool True)]]
+        resp <- evalFunction baseUrl mgr "refused-same-file" "who%20acted"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["p" Aeson..= (3 :: Int)]])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 3)
+
     -- Under --lazy-load the tool list is read from the metadata cache that
     -- the service which last compiled the deployment wrote. One written
     -- before the export check lists an export this build refuses; a call to

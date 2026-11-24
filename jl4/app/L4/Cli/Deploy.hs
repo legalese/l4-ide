@@ -254,7 +254,7 @@ publish mode opts = do
           url = Text.pack (t.baseUrl <> deploymentPath t depName)
           -- The @exports the service left out because they cannot be sent
           -- (an older service sends none), each with its file, and whether
-          -- another file's export of the same name is served, so the name
+          -- an @export whose name matches it is served, so the name
           -- still answers. The exit status stays 0: the deployment is live,
           -- with the rest of its rules.
           refused =
@@ -290,7 +290,7 @@ publish mode opts = do
               Text.putStrLn ("  " <> n <> (if Text.null f then "" else " (" <> f <> ")"))
               mapM_ (Text.putStrLn . ("    " <>)) rs
               when served $
-                Text.putStrLn ("    `" <> n <> "` is still served, by another file's @export of that name.")
+                Text.putStrLn ("    `" <> n <> "` is still served, by an @export whose name matches it.")
           Text.putStrLn ("API: " <> url)
   where
     verb = case mode of
