@@ -1,0 +1,69 @@
+l4 coverage: examples/coverage-report/consider-shapes.l4
+
+Decision `fee for every plan`  (consider-shapes.l4:8:1-14:22)
+  Inputs: p
+  Cover points (3):
+    c0  p EQUALS basic  consider-shapes.l4:12:5-15
+    c1  p EQUALS pro    consider-shapes.l4:13:5-13
+    c2  p EQUALS team   consider-shapes.l4:14:5-14
+
+  Buckets (8 combinations: 3 witnessed, 5 proved impossible, none undecided):
+    c0 c1 c2   status
+    F  F  F    proved impossible: no input makes these conditions hold together
+    F  F  T    witnessed by 1 input; L4 answers 50
+          p = team gives 50
+    F  T  F    witnessed by 1 input; L4 answers 20
+          p = pro gives 20
+    F  T  T    proved impossible: no input makes these conditions hold together
+    T  F  F    witnessed by 1 input; L4 answers 5
+          p = basic gives 5
+    T  F  T    proved impossible: no input makes these conditions hold together
+    T  T  F    proved impossible: no input makes these conditions hold together
+    T  T  T    proved impossible: no input makes these conditions hold together
+
+Decision `fee for seats`  (consider-shapes.l4:16:1-22:17)
+  Inputs: seats
+  Cover points (2):
+    c0  seats EQUALS 1  consider-shapes.l4:20:5-11
+    c1  seats EQUALS 2  consider-shapes.l4:21:5-11
+
+  Buckets (4 combinations: 3 witnessed, 1 proved impossible, none undecided):
+    c0 c1   status
+    F  F    witnessed by 2 inputs; L4 answers 20
+          seats = 0 gives 20
+    F  T    witnessed by 1 input; L4 answers 9
+          seats = 2 gives 9
+    T  F    witnessed by 1 input; L4 answers 5
+          seats = 1 gives 5
+    T  T    proved impossible: no input makes these conditions hold together
+
+Decision `is billed monthly`  (consider-shapes.l4:24:1-29:20)
+  Inputs: p
+  Cover points (1):
+    c0  p EQUALS basic
+
+  Buckets (2 combinations: 2 witnessed, 0 proved impossible, none undecided):
+    c0   status
+    F    witnessed by 2 inputs; L4 answers FALSE
+          p = pro gives FALSE
+    T    witnessed by 1 input; L4 answers TRUE
+          p = basic gives TRUE
+
+Decision `fee up to the cap`  (consider-shapes.l4:33:1-39:17)
+  Inputs: seats, cap
+  Cover points (2):
+    c0  seats EQUALS cap  consider-shapes.l4:37:5-21
+    c1  seats EQUALS 1    consider-shapes.l4:38:5-11
+
+  Buckets (4 combinations: 4 witnessed, 0 proved impossible, none undecided):
+    c0 c1   status
+    F  F    witnessed by 4 inputs; L4 answers 20
+          seats = 2, cap = 0 gives 20
+    F  T    witnessed by 2 inputs; L4 answers 5
+          seats = 1, cap = 0 gives 5
+    T  F    witnessed by 2 inputs; L4 answers 0
+          seats = 0, cap = 0 gives 0
+    T  T    witnessed by 1 input; L4 answers 0
+          seats = 1, cap = 1 gives 0
+
+Coverage: 4 decisions covered (8 cover points, 18 buckets); 12 witnessed by 19 inputs, at most 8 per bucket; 6 proved impossible by Z3 version $Z3_VERSION, whose claim it is alone; nothing undecided; every decision at leaf level; nothing skipped; a call to another rule is one cover point, and conditions inside an arm's result are not cover points.

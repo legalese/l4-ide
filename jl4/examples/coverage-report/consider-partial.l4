@@ -1,0 +1,20 @@
+-- A CONSIDER with no OTHERWISE whose WHENs miss an option: L4 raises an error
+-- at the plan that none of them names, so the bucket in which none of the
+-- conditions holds is undecided, and the run exits 2. Marking the rule
+-- @nonexhaustive silences the checker's warning, and changes nothing here.
+DECLARE Plan IS ONE OF basic, pro, team
+
+GIVEN p IS A Plan
+GIVETH A NUMBER
+DECIDE `fee for some plans` p IS
+    CONSIDER p
+    WHEN basic THEN 5
+    WHEN pro THEN 20
+
+@nonexhaustive
+GIVEN p IS A Plan
+GIVETH A NUMBER
+DECIDE `fee for some plans, on purpose` p IS
+    CONSIDER p
+    WHEN basic THEN 5
+    WHEN pro THEN 20

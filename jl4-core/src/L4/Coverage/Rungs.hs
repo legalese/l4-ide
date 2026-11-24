@@ -4,11 +4,20 @@
 -- A decision written as a proviso chain (@c AND NOT d1 AND NOT d2@) has the
 -- rungs @c@, @d1@, @d2@; a @BRANCH@, an @IF@ or a literal @CONSIDER@ has the
 -- condition of each arm; any other BOOLEAN decision is one rung, its body.
--- "L4.Catala.Lower" builds its exception ladders from the first two shapes,
--- and "L4.Cli.Coverage" counts the leaves of these rungs; both read the shape
--- from here, so they cannot come to disagree about what a rung is.
+-- "L4.Catala.Lower" builds its exception ladders from the first two shapes
+-- ('ladderAtoms'), and "L4.Cli.Coverage" counts the leaves of the rungs
+-- ('rungsOf'); both read those shapes from here, so they cannot come to
+-- disagree about what a rung of them is.
+--
+-- The coverage report reads one shape more, and the Catala lowering does not:
+-- a non-BOOLEAN decision whose body is a @CONSIDER@ whose every @WHEN@ is one
+-- condition ('considerRungs'), which takes in the literal @CONSIDER@ of such a
+-- decision as well (smucclaw/l4-ide#1094). That shape is kept out of
+-- 'ladderAtoms', 'cascadeArms' and 'litConsiderArms', which the lowering
+-- reads, so that @l4 export catala@ does not change with it.
 module L4.Coverage.Rungs
   ( rungsOf
+  , considerRungs
   , ladderAtoms
   , peelProvisos
   , cascadeArms
@@ -21,15 +30,54 @@ module L4.Coverage.Rungs
 
 import Base
 import L4.Syntax
+import qualified L4.TypeCheck.Environment as TC
 
 -- | The rungs of a decision's body: the ladder shapes' conditions, else the
 -- whole body when the decision is BOOLEAN, else none (a decision with nothing
--- it branches on).
+-- it branches on). The body of a non-BOOLEAN decision that is a @CONSIDER@
+-- is read by 'considerRungs' instead, and has no rungs here when that refuses
+-- it ('considerRungs' says why).
 rungsOf :: Bool -> Expr Resolved -> Maybe [Expr Resolved]
-rungsOf isCondition body = case ladderAtoms isCondition body of
-  Just rs -> Just rs
-  Nothing | isCondition -> Just [body]
-          | otherwise -> Nothing
+rungsOf isCondition body
+  | not isCondition, Just r <- considerRungs body = either (const Nothing) Just r
+  | otherwise = case ladderAtoms isCondition body of
+      Just rs -> Just rs
+      Nothing | isCondition -> Just [body]
+              | otherwise -> Nothing
+
+-- | A @CONSIDER@ as the conditions of its arms, for the coverage report:
+-- @WHEN basic@ over @p@ is @p EQUALS basic@, a literal or an @EXACTLY@ arm
+-- likewise, which is how "L4.Viz.GuardedRows" reads a pattern. 'Nothing' when
+-- the expression is not a @CONSIDER@. @'Left' lhs@ names the first arm that is
+-- not one yes-or-no condition: a @WHEN@ that takes an option's fields apart,
+-- has a pattern inside a pattern, or gives a new name to what it matches, or
+-- an @OTHERWISE@ that is not the last arm, after which the arms are never
+-- reached (CONSIDER is first-match). A text arm gets its condition too, but
+-- the solver's lowering refuses text ('L4.Prove.Lower.sortOf'), so a decision
+-- with one is not covered all the same.
+--
+-- Each condition carries the span of its @WHEN@ and the type BOOLEAN. The
+-- type is what the ladder diagram insists on before it breaks rungs into
+-- leaves; 'litConsiderArms' gives its equalities the annotation of the whole
+-- @CONSIDER@ instead, whose type in a non-BOOLEAN decision is not BOOLEAN, so
+-- the coverage report used to cover such a decision at rung level, every cover
+-- point spanning the whole @CONSIDER@. That function is left as it is, because
+-- "L4.Catala.Lower" reads it.
+considerRungs :: Expr Resolved -> Maybe (Either (BranchLhs Resolved) [Expr Resolved])
+considerRungs = \case
+  Consider _ scrut branches -> Just (arms scrut branches)
+  _ -> Nothing
+ where
+  arms scrut = \case
+    [] -> Right []
+    [MkBranch _ (Otherwise _) _] -> Right []
+    MkBranch _ lhs@(Otherwise _) _ : _ -> Left lhs
+    MkBranch _ lhs@(When wAnn pat) _ : rest -> case pat of
+      PatApp pAnn con [] -> (equals wAnn scrut (App pAnn con []) :) <$> arms scrut rest
+      PatLit pAnn l      -> (equals wAnn scrut (Lit pAnn l) :) <$> arms scrut rest
+      PatExpr _ e        -> (equals wAnn scrut e :) <$> arms scrut rest
+      _                  -> Left lhs
+  equals wAnn = Equals (set annInfo (Just (TypeInfo TC.boolean Nothing)) wAnn)
 
 -- | The defining name with any section qualification dropped: this is what the
 -- builtin, prelude-combinator and date recognisers match against, because a

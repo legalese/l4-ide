@@ -159,10 +159,21 @@ Without it, a bucket that none of the tried inputs produces is `UNDECIDED`, and 
 These are stated here, and printed in `l4 coverage --help`, because you would otherwise find them out from a wrong conclusion.
 
 - **What a cover point is.**
-  The separate conditions in the conditions a rule branches on: an `UNLESS` chain, a `BRANCH` or `IF`, or the body of a rule that returns true or false.
+  The separate conditions in the conditions a rule branches on: an `UNLESS` chain, a `BRANCH` or `IF`, each `WHEN` of a `CONSIDER`, or the body of a rule that returns true or false.
   `a OR b` is two; a condition used twice is one.
   A call to another rule is **one** cover point, and its body is not read.
   A condition inside the _result_ of one arm is not a cover point.
+- **A `CONSIDER`** in a rule that does not return true or false has one cover point for each `WHEN`: `CONSIDER p WHEN basic` is the condition `p EQUALS basic`, as the same rule written with `BRANCH` and `IF` has it.
+  That holds when every `WHEN` names a number, an option that has no fields, or `EXACTLY` a value, and any `OTHERWISE` comes last.
+  A `WHEN` that takes an option's fields apart (`WHEN many n`), puts a pattern inside a pattern (`WHEN JUST basic`), or gives a new name to whatever reaches it is not one yes-or-no condition, and neither is a `WHEN` after an `OTHERWISE`, which is never reached.
+  A rule with one of those is not covered: the report names it, says which arm stopped it, and the exit status is 3.
+  A `CONSIDER` with no `OTHERWISE` whose `WHEN`s miss an option leaves `UNDECIDED` the bucket in which none of them holds, since the rule raises an error at that option, and marking the rule `@nonexhaustive` does not change this.
+  In a rule that returns true or false, a `CONSIDER` whose `WHEN`s all name numbers and which ends in an `OTHERWISE` has one cover point for each `WHEN`, each shown with the place of the whole `CONSIDER`; any other `CONSIDER` there is one condition, which the ladder diagram breaks into its parts.
+- **Text, dates and other values the solver cannot read.**
+  To find inputs and to prove combinations impossible, L4 first writes a rule's inputs and conditions in the language of the solver, and that language has no text, no dates, no lists, no `MAYBE` and no other type that takes a parameter.
+  So a rule is not covered when one of its inputs is text, a date, a list, a `MAYBE` or of another type that takes a parameter, whether or not a condition reads it, or when a condition works on any of those, such as one that calls `DATE_SERIAL`: the report says `NOT COVERED`, with a reason that starts `out of fragment`, and the exit status is 3.
+  That includes a `CONSIDER` over text, such as `CONSIDER colour WHEN "red" THEN …`, and one with a `WHEN NOTHING`, such as `CONSIDER m WHEN NOTHING THEN …`.
+  A date built in the result of an arm, from numbers, does not stop it.
 - **How many.**
   With _n_ cover points there are 2ⁿ buckets, and past twelve cover points the rule is covered by its conditions as written instead: the report says `AT RUNG LEVEL` and why, and the exit status is 3.
   It does the same where a condition raises an error at an input that an earlier condition of the same rule already decides, such as `x EQUALS 0` guarding `10 DIVIDED BY x GREATER THAN 2`: that input would otherwise belong to no bucket.

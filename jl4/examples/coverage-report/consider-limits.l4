@@ -1,0 +1,37 @@
+-- CONSIDERs with a WHEN that is not one yes-or-no condition: a pattern that
+-- names the fields of an option, a pattern inside a pattern, a new name that
+-- matches anything, and an OTHERWISE before the last WHEN. None of these
+-- rules answers TRUE or FALSE, so none of them is covered, and the report
+-- must say so and say why, not count them as rules with no condition to
+-- branch on (smucclaw/l4-ide#1094).
+DECLARE Plan IS ONE OF basic, pro, team
+DECLARE Seats IS ONE OF single, many HAS count IS A NUMBER
+
+GIVEN s IS A Seats
+GIVETH A NUMBER
+DECIDE `fee by seats` s IS
+    CONSIDER s
+    WHEN single THEN 5
+    WHEN many n THEN n TIMES 4
+
+GIVEN m IS A MAYBE Plan
+GIVETH A NUMBER
+DECIDE `fee if any` m IS
+    CONSIDER m
+    WHEN JUST basic THEN 5
+    OTHERWISE 0
+
+GIVEN p IS A Plan
+GIVETH A NUMBER
+DECIDE `fee with a new name` p IS
+    CONSIDER p
+    WHEN basic THEN 5
+    WHEN other THEN 50
+
+GIVEN p IS A Plan
+GIVETH A NUMBER
+DECIDE `fee with an early OTHERWISE` p IS
+    CONSIDER p
+    WHEN basic THEN 5
+    OTHERWISE 50
+    WHEN pro THEN 20

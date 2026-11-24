@@ -59,9 +59,9 @@ import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Annotation (rangeOf)
-import L4.Coverage.Rungs (rungsOf)
+import L4.Coverage.Rungs (considerRungs, rungsOf)
 import L4.Parser.SrcSpan (SrcRange, prettySrcRange)
-import L4.Print (extractConstructorFieldNames, prettyLayoutNF)
+import L4.Print (extractConstructorFieldNames, prettyLayout, prettyLayoutNF)
 import L4.Syntax
 import qualified L4.TypeCheck as TC
 
@@ -80,12 +80,16 @@ coverageBound =
   unlines
     [ "WHAT THIS COVERS, AND WHAT IT DOES NOT"
     , ""
+    -- The WHENs of a CONSIDER, and the sentence about the CONSIDERs that are
+    -- not covered in the last paragraph but one, came after the ruled run
+    -- (smucclaw/l4-ide#1094): decided by Claude 2026-11-25, pending Meng's
+    -- review.
     , "  The cover points of a decision are the separate yes-or-no conditions in"
-    , "  the conditions it branches on (an UNLESS chain, a BRANCH or IF, or the"
-    , "  body of a BOOLEAN decision): `a OR b' is two, a condition used twice is"
-    , "  one. A bucket is one combination of their truth values; with n cover"
-    , "  points there are 2^n buckets, and past 12 the decision is covered by"
-    , "  its conditions as written instead."
+    , "  the conditions it branches on (an UNLESS chain, a BRANCH or IF, the"
+    , "  WHENs of a CONSIDER, or the body of a BOOLEAN decision): `a OR b' is"
+    , "  two, a condition used twice is one. A bucket is one combination of"
+    , "  their truth values; with n cover points there are 2^n buckets, and"
+    , "  past 12 the decision is covered by its conditions as written instead."
     , ""
     , "  WITNESSED means an input realises the bucket and the evaluator agrees;"
     , "  the inputs come from a fixed set of candidates (each number the rule"
@@ -107,8 +111,15 @@ coverageBound =
     , "  A condition inside the result of an arm, or a condition that raises at"
     , "  an input where an earlier condition of its rung already decides it,"
     , "  is not a cover point; the second keeps the decision at rung level."
-    , "  A decision that reads an ASSUME is not covered, since a witness"
-    , "  cannot supply one."
+    , "  A decision that is not BOOLEAN and whose body is a CONSIDER is covered"
+    , "  only when each WHEN names a number, an option without fields, or"
+    , "  EXACTLY a value, and any OTHERWISE comes last; any other is named as"
+    , "  not covered. A decision with an input that is text, a date, a list,"
+    , "  a MAYBE or of another type that takes a parameter, read or not, or a"
+    , "  condition that works on text, dates or such types, a CONSIDER over"
+    , "  text or with a WHEN NOTHING among them, is not covered, since the"
+    , "  solver cannot read them. A decision that reads an ASSUME is not"
+    , "  covered, since a witness cannot supply one."
     , ""
     , "  Exit status: 0 every decision covered at leaf level and every bucket"
     , "  witnessed or proved impossible; 1 the file does not type-check or an"
@@ -249,6 +260,19 @@ partitionEntries unfiltered es
 noConditionReason :: Text
 noConditionReason = "it branches on no condition"
 
+-- | Why a non-BOOLEAN decision whose body is a @CONSIDER@ is not covered,
+-- given the first arm 'considerRungs' could not read as one condition. It
+-- names the CONSIDER, so that it is never mistaken for a rule that branches
+-- on nothing (smucclaw/l4-ide#1094). Its wording was decided by Claude on
+-- 2026-11-25, pending Meng's review.
+considerRefusal :: BranchLhs Resolved -> Text
+considerRefusal lhs = case lhs of
+  Otherwise _ -> "its body is a CONSIDER whose OTHERWISE is not its last arm, so the arms after it are never reached; " <> covered
+  When _ pat -> "its body is a CONSIDER whose `WHEN " <> oneLine (prettyLayout pat) <> "` is not one yes-or-no condition; " <> covered
+ where
+  covered = "this report covers a CONSIDER only when each WHEN names a number, an option without fields, or EXACTLY a value, and any OTHERWISE comes last"
+  oneLine = Text.unwords . Text.words
+
 -- | Every top-level DECIDE of the module, by name, with what covering it needs
 -- or why it cannot be covered.
 decideTargets
@@ -273,7 +297,8 @@ decideTargets tc =
 
   build d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) (MkAppForm _ fnRes appArgs _) body) =
     case rungsOf (isBoolean mGiveth) body of
-      Nothing | wrapped body -> Left "its body is wrapped in WHERE or LET, which this report does not look inside unless the decision is BOOLEAN"
+      Nothing | not (isBoolean mGiveth), Just (Left lhs) <- considerRungs body -> Left (considerRefusal lhs)
+              | wrapped body -> Left "its body is wrapped in WHERE or LET, which this report does not look inside unless the decision is BOOLEAN"
               | otherwise -> Left noConditionReason
       Just [] -> Left noConditionReason
       Just rungs
