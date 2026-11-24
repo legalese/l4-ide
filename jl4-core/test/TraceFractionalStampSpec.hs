@@ -13,6 +13,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
+import L4.TypeCheck (prettyCheckErrorWithContext)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.TypeCheck.Types
@@ -66,3 +67,9 @@ spec = describe "a fractional time stamp in a #TRACE" do
 
   it "says nothing about a stamp that is not a literal, which has no value until it is evaluated" do
     stampsOf (notices ["#TRACE `one` AT 0 WITH", "  (WAITUNTIL (7 / 2))"]) `shouldBe` []
+
+  it "is printed exactly, not through a Double" do
+    let ns = notices ["#TRACE `one` AT 0 WITH", "  PARTY P DOES a AT 2.0000000000000000001"]
+        text = Text.unlines (concatMap prettyCheckErrorWithContext ns)
+    stampsOf ns `shouldBe` [20000000000000000001 / 10000000000000000000]
+    text `shouldSatisfy` ("a time stamp of 2.0000000000000000001, which" `Text.isInfixOf`)

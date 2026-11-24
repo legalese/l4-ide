@@ -106,7 +106,7 @@ import L4.Parser.ResolveAnnotation (pickDesc)
 import L4.Parser.SrcSpan (inRange, prettySrcRange, prettySrcRangeM, SrcPos (..), SrcRange (..), zeroSrcPos)
 import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import Data.Ratio (denominator)
-import L4.Utils.Ratio (prettyRatio)
+import L4.Utils.Ratio (prettyRatio, prettyRatioExact)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
@@ -8674,7 +8674,9 @@ prettyCheckError (ExportAssumeNameClash fnName paramName) =
   , "Rename the input or the ASSUME."
   ]
 prettyCheckError (FractionalTraceStamp stamp _) =
-  [ "This #TRACE has a time stamp of " <> prettyRatio stamp <> ", which is not a whole number."
+  -- 'prettyRatioExact', not 'prettyRatio': the latter goes through Double, and a
+  -- stamp such as 2.0000000000000000001 would be printed as "2.0"
+  [ "This #TRACE has a time stamp of " <> prettyRatioExact stamp <> ", which is not a whole number."
   , "`l4 run` uses it as written."
   , "`l4 explore` tries whole instants only, so it does not explore the positions between them."
   ]
