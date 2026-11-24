@@ -3404,7 +3404,11 @@ recallExpr =
 -- words and the @_@s are tokens of the node's own 'Anno'.
 readNormExpr :: Parser (Expr Name)
 readNormExpr = do
-  try (lookAhead readHead)
+  -- hidden: the four phrases are spelled as identifiers and are a read only
+  -- before @( PARTY@, so they must not join the "expecting" list of every
+  -- parse error that stops where an expression could start (the corpus's
+  -- parse-error goldens record that list).
+  hidden (try (lookAhead readHead))
   attachAnno do
     word <- readWordTokens
     _    <- annoHole (pure word)
@@ -3433,7 +3437,9 @@ readNormExpr = do
 -- so it fires only where nothing else can take the token.
 wildcardOutsideRead :: Parser (Expr Name)
 wildcardOutsideRead = do
-  void (try (lookAhead (spacedSymbol_ TUnderscore)))
+  -- hidden, for the same reason: @_@ is refused here, so it is not something
+  -- the parser "expects", and naming it in the list would invite it.
+  void (hidden (try (lookAhead (spacedSymbol_ TUnderscore))))
   fancyFailure $ Set.singleton $ ErrorFail $ Text.unpack $ Text.unlines
     [ "A bare _ is the wildcard of a norm-log read pattern, and it means nothing anywhere else."
     , "Write it inside a read, as in  OUTSTANDING (PARTY patron MUST `return` _);"
