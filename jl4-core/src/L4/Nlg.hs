@@ -870,6 +870,7 @@ instance Linearize (Expr Resolved) where
     Post _ e1 e2 e3 -> hcat [ frame "post", lin e1, lin e2, lin e3 ]
     Record _ mParty cell val isOfficial mHence -> hcat ([ frame (if isOfficial then "commit" else "record") ] <> maybe [] (\p -> [ lin p, frame "'s" ]) mParty <> [ lin cell, frame "is", lin val ] <> maybe [] (\k -> [ frame "hence", lin k ]) mHence)
     ReadCell _ mParty isOfficial mode cell -> hcat ([ frame "recall" ] <> (case mode of RecallAll -> [ frame "all" ]; RecallLast -> []) <> (if isOfficial then [ frame "official's" ] else []) <> maybe [] (\p -> [ lin p, frame "'s" ]) mParty <> [ lin cell ])
+    ReadNorm _ w _ mParty _ _ _ _ asOf -> hcat ([ frame (Text.toLower (readWordText w)), frame "norm" ] <> maybe [] (\ p -> [ frame "of", lin p ]) mParty <> maybe [] (\ e -> [ frame "as", frame "of", lin e ]) asOf)
     Concat _ exprs -> hcat [ frame "concatenate", enumerate (punctuate ",") (spaced $ frame "and") (fmap lin exprs) ]
     AsString _ e -> hcat [ lin e, frame "as", frame "string" ]
     Breach _ mParty mReason -> hcat $

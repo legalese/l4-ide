@@ -1135,7 +1135,11 @@ execEvalModuleWithDefaults rootFills imported runDirective evalConfig entityInfo
   -- With presumption off (T4), discharge fills no section binder's default, so
   -- one that nothing supplies stays an assumed term.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
-  st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
+  -- NORM-LOG-SPEC N6's fallback, with N4b: a module that reads the norm log
+  -- switches the writer on, so its reads see the fates written so far. A read
+  -- in an IMPORTED module is not seen from here; if one runs with the writer
+  -- off it refuses by name (the machine's 'finishNormRead').
+  st0 <- mkInitialEvalStateWith (moduleReadsNormLog m0) evalConfig entityInfo moduleUri
   let st = (withDefaultsKnown evalConfig rootFills m0 imported st0) {budgetRules = moduleRules m0}
   r <- try (withAllocationLimit evalConfig.allocationLimit (runEval st (evalModuleAndDirectivesWith runDirective env m)))
   case r of
@@ -1157,7 +1161,14 @@ withAllocationLimit (Just limit) act =
     `finally` disableAllocationLimit
 
 mkInitialEvalState :: EvalConfig -> EntityInfo -> NormalizedUri -> IO EvalState
-mkInitialEvalState evalConfig entityInfo moduleUri = do
+mkInitialEvalState = mkInitialEvalStateWith False
+
+-- | The same, with the norm-log writer forced on when the module being run
+-- reads the norm log (NORM-LOG-SPEC N6's fallback, with N4b). Written as an
+-- argument and not as an update of the configuration, because @normLog@ is a
+-- field of both 'EvalConfig' and 'EvalState'.
+mkInitialEvalStateWith :: Bool -> EvalConfig -> EntityInfo -> NormalizedUri -> IO EvalState
+mkInitialEvalStateWith readsNormLog evalConfig entityInfo moduleUri = do
   stack     <- newIORef emptyStack
   supply    <- newIORef 0
   actualTime <- resolveEvalTime evalConfig
@@ -1193,7 +1204,7 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   pure MkEvalState
     { moduleUri, stack, supply, instantSupply, evalTrace, envLedger, currentParty, siblings, siblingStarts, traceMuted, entityInfo
     , operandsInStep = evalConfig.operandsInStep
-    , normLog = evalConfig.normLog
+    , normLog = readsNormLog || evalConfig.normLog
     , normLogMutant = evalConfig.normLogMutant
     , normLogForce = \ env e -> do
         fresh <- liftIO (newIORef emptyStack)

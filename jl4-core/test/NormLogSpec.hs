@@ -46,12 +46,13 @@ import L4.EvaluateLazy
   , prettyEvalDirectiveResult
   , resolveEvalConfig
   )
-import L4.Syntax (DeonticModal (..))
-import L4.TypeCheck.Types (AnchorRefusal (..), CheckResult (..), CheckErrorWithContext (..), CheckError (..), CheckWarning (..))
+import L4.Syntax (DeonticModal (..), RawName (..), moduleReadsNormLog)
+import L4.TypeCheck.Types (AnchorRefusal (..), CheckResult (..), CheckErrorWithContext (..), CheckError (..), CheckWarning (..), ReadRefusal (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
 import qualified Data.Text.IO as TextIO
 import Control.Exception (evaluate)
+import Control.DeepSeq (rnf)
 import Control.Monad (forM, when)
 import Data.Foldable (for_, toList)
 import Data.Int (Int32)
@@ -1225,6 +1226,161 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- the last of each is the edge of its half
         originCarrierAddress (originCarrierLimit - 1) `shouldBe` Just (-1073741823)
         instantCarrierAddress (instantCarrierLimit - 1) `shouldBe` Just (-2147483647)
+
+    -- NORM-LOG-SPEC N4b: the read as written. Built by Claude 2026-11-24 as the
+    -- fallback of the card's option A, decided pending Meng's review.
+    describe "N4b: the read as written (the fallback spelling)" do
+      let tracePrologue = prologue4 <> ["GIVETH DEONTIC Person Action"]
+          src body = Text.unlines (tracePrologue <> body)
+          errorsOf body = case checkWithImports (vfsFromList []) (src body) of
+            Left _  -> Nothing
+            Right r -> Just r.tcdErrors
+          checked body = fmap null (errorsOf body) == Just True
+          refusals body = case errorsOf body of
+            Just es -> [ r | e <- es, ReadNormRefused r _ <- [e.kind] ]
+            Nothing -> []
+          performed rs i = not (null [ () | e <- fatesOf i rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ])
+          -- does the guard hold at the event of trace 0?
+          holds body = do { rs <- run False (src body); pure (performed rs 0) }
+          lestPay g =
+            [ "c MEANS"
+            , "  PARTY Alice MUST deliver WITHIN 3"
+            , "  LEST (PARTY Alice MUST pay n PROVIDED " <> g <> " WITHIN 10)"
+            , "#TRACE c AT 0 WITH"
+            , "  PARTY Alice DOES pay 1 AT 5"
+            ]
+
+      it "R1: EVER FAILED, read in a guard, is true once the norm failed, and the guard decides the event" do
+        checked (lestPay "EVER FAILED (PARTY Alice MUST deliver)") `shouldBe` True
+        holds (lestPay "EVER FAILED (PARTY Alice MUST deliver)") `shouldReturn` True
+        holds (lestPay "NOT EVER FAILED (PARTY Alice MUST deliver)") `shouldReturn` False
+
+      it "R2: PARTY _ matches any party, a named party only its own norms, and UNDER LEST narrows to the reparation's branch" do
+        holds (lestPay "EVER FAILED (PARTY _ MUST deliver)") `shouldReturn` True
+        holds (lestPay "EVER FAILED (PARTY Bob MUST deliver)") `shouldReturn` False
+        -- deliver was armed from the top level, so under LEST there is none
+        holds (lestPay "EVER FAILED (PARTY Alice MUST deliver UNDER LEST)") `shouldReturn` False
+        holds (lestPay "EVER FAILED (PARTY Alice MAY deliver)") `shouldReturn` False
+
+      it "R3: AS OF reads the past: a norm performed at 4 was still outstanding as of 2, and not as of 5" do
+        let asOf t =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 10"
+              , "  HENCE (PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF " <> t <> " WITHIN 10)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 4"
+              , "  PARTY Alice DOES pay 1 AT 6"
+              ]
+        holds (asOf "2") `shouldReturn` True
+        holds (asOf "5") `shouldReturn` False
+
+      it "R4: from inside a reparation's own continuation a failure is not yet cured, because the continuation includes the rule asking" do
+        let inside w =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST (PARTY Alice MUST pay n WITHIN 10"
+              , "        HENCE (PARTY Alice MUST pay m PROVIDED " <> w <> " (PARTY Alice MUST deliver) WITHIN 10))"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              , "  PARTY Alice DOES pay 2 AT 6"
+              ]
+            both rs = (length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed ])
+        rsA <- run False (src (inside "FAILED AND NOT CURED"))
+        rsB <- run False (src (inside "CURED BY REPARATION"))
+        -- the first pay is performed in either; the second only where the read holds
+        both rsA `shouldBe` 2
+        both rsB `shouldBe` 1
+
+      it "R5: a read where it has no answer is a check error that says why" do
+        refusals (lestPay "TRUE") `shouldBe` []
+        -- outside a guard, with no AS OF
+        let aSite = "c MEANS PARTY Alice MUST deliver WITHIN 3"
+        refusals [ aSite, "x MEANS OUTSTANDING (PARTY Alice MUST deliver)" ] `shouldBe` [ReadNoInstant]
+        -- with AS OF it has an instant
+        refusals [ aSite, "x MEANS OUTSTANDING (PARTY Alice MUST deliver) AS OF 3" ] `shouldBe` []
+        -- inside a RAND operand
+        refusals
+          [ "c MEANS"
+          , "  (PARTY Alice MUST deliver WITHIN 3)"
+          , "  RAND (PARTY Bob MUST pay n PROVIDED OUTSTANDING (PARTY Alice MUST deliver) WITHIN 10)"
+          ] `shouldBe` [ReadInOperand]
+        -- the wrong number of _ for the constructor's fields
+        refusals (lestPay "OUTSTANDING (PARTY Alice MUST pay _ _)") `shouldBe` [ReadArity (NormalName "pay") 1 2]
+        refusals (lestPay "OUTSTANDING (PARTY Alice MUST pay)") `shouldBe` [ReadArity (NormalName "pay") 1 0]
+
+      it "R7: a wildcard outside a read is refused by name, not left to a bare 'unexpected'" do
+        let wild = src [ "x MEANS _" ]
+        case checkWithImports (vfsFromList []) wild of
+          Left msgs -> Text.unlines msgs `shouldSatisfy` Text.isInfixOf "wildcard of a norm-log read pattern"
+          Right _   -> expectationFailure "a lone _ was accepted"
+
+      it "R9: a read whose pattern matches no norm of the module is a check error, and one that might match is not" do
+        let site = [ "c MEANS PARTY Alice MUST deliver WITHIN 3"
+                   , "d MEANS PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Alice MAY deliver) AS OF 1 WITHIN 3"
+                   ]
+        -- the modal differs: deliver is only ever MUST
+        refusals site `shouldBe` [ReadMatchesNoSite (NormalName "deliver")]
+        -- the same modal matches
+        refusals [ "c MEANS PARTY Alice MUST deliver WITHIN 3"
+                 , "d MEANS PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF 1 WITHIN 3" ] `shouldBe` []
+        -- a norm armed in a continuation is a site too
+        refusals [ "c MEANS PARTY Alice MUST pay n WITHIN 3 HENCE (PARTY Bob MAY deliver)"
+                 , "d MEANS PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Bob MAY deliver) AS OF 1 WITHIN 3" ] `shouldBe` []
+        -- a norm whose action is not a constructor is taken to match any pattern
+        refusals [ "GIVEN a IS AN Action"
+                 , "c MEANS PARTY Alice MAY a WITHIN 3"
+                 , "d MEANS PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Alice MAY deliver) AS OF 1 WITHIN 3" ] `shouldBe` []
+
+      it "R10: a read in an imported module does not switch the record on, and stops with a named error, not an answer from an empty log" do
+        let lib = Text.unlines $ prologue4 <>
+              [ "GIVETH DEONTIC Person Action"
+              , "c MEANS PARTY Alice MUST deliver WITHIN 3"
+              , ""
+              , "GIVETH A BOOLEAN"
+              , "failedAlready MEANS EVER FAILED (PARTY Alice MUST deliver) AS OF 10"
+              ]
+            user = Text.unlines
+              [ "IMPORT rlib"
+              , "GIVETH DEONTIC Person Action"
+              , "d MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST (PARTY Alice MUST pay n PROVIDED failedAlready WITHIN 10)"
+              , "#TRACE d AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              ]
+        rs <- runIn (vfsFromList [("rlib", lib)]) id user
+        Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "switched off"
+
+      it "R8: a module's reads are found from its names, and the pass costs a fraction of one evaluation" do
+        let readsLog body = case checkWithImports (vfsFromList []) (src body) of
+              Right r -> moduleReadsNormLog r.tcdModule
+              Left es -> error ("the module failed to check: " <> show es)
+        readsLog (lestPay "OUTSTANDING (PARTY Alice MUST deliver)") `shouldBe` True
+        readsLog (lestPay "TRUE") `shouldBe` False
+        -- measured with the module forced: a walk over every expression
+        -- allocated 12.0 MB for the module below and its evaluation 10.7 MB,
+        -- a names walk through gplate 0.6 MB, and this question 24 bytes
+        case checkWithImports (vfsFromList []) (everyEmptySrc 400) of
+          Left es -> expectationFailure ("the module failed to check: " <> show es)
+          Right r -> do
+            (off, _, _) <- evalAllocated (everyEmptySrc 400)
+            -- what the checked module holds lazily is computed once, and not by the question
+            _ <- evaluate (rnf r.tcdModule)
+            a0 <- getAllocationCounter
+            found <- evaluate (moduleReadsNormLog r.tcdModule)
+            a1 <- getAllocationCounter
+            found `shouldBe` False
+            (fromIntegral (a0 - a1) :: Double) `shouldSatisfy` (< off / 20)
+
+      it "R6: the phrases are not reserved: a program may still name a value OUTSTANDING" do
+        -- no prologue: its dangling GIVETH would swallow the first line
+        let named = Text.unlines
+              [ "GIVETH A NUMBER"
+              , "OUTSTANDING MEANS 3"
+              , "#EVAL OUTSTANDING PLUS 1"
+              ]
+        either (const Nothing) (Just . (.tcdErrors)) (checkWithImports (vfsFromList []) named)
+          `shouldSatisfy` maybe False null
 
     describe "the reader on real traces (review of P2, first half)" do
       let tracePrologue = prologue4 <> ["GIVETH DEONTIC Person Action"]

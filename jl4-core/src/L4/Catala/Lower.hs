@@ -2395,6 +2395,7 @@ unsupported e = "this construct is outside the v1 Catala fragment (§6): " <> ca
   ROr{}        -> "regulative OR — Catala models no deontic layer (§5.1)"
   Record{}     -> "a ledger RECORD/COMMIT — Catala is pure (§5.1)"
   ReadCell{}   -> "a ledger RECALL — Catala is pure (§5.1)"
+  ReadNorm{}   -> "a norm-log read — Catala models no deontic layer (§5.1)"
   Lam{}        -> "a lambda outside a combinator argument; only combinator absorption survives \
                   \(R5, §8.5)"
   Concat{}     -> "string concatenation — Catala has no string type (§4.8)"

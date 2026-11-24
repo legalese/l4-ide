@@ -222,6 +222,7 @@ touchesWorld :: Expr Resolved -> Bool
 touchesWorld = \case
   Record {} -> True
   ReadCell {} -> True
+  ReadNorm {} -> True
   Fetch {} -> True
   Post {} -> True
   _ -> False

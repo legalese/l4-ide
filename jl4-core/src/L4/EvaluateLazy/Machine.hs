@@ -149,6 +149,8 @@ import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.EvaluateLazy.ContractFrame
 import L4.Evaluate.NormLog
+import L4.Evaluate.NormLog.Read (BearerPattern (..), answerRead, readPattern)
+import qualified L4.Evaluate.NormLog.Read as NormRead
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import L4.EvaluateLazy.Fates
 import qualified L4.EvaluateLazy.DeonticStep as DS
@@ -225,6 +227,13 @@ data Frame =
   -- too: the cross-party branch pushes 'ReadCell2' before reaching 'finishRead',
   -- so without it @RECALL ALL <party>'s@ would silently fall back to last-write-wins.
   | ReadCell2 WHNF RecallMode {- -} (Maybe SrcRange)
+  -- NORM-LOG-SPEC N4b (built by Claude 2026-11-24, pending Meng's review): a
+  -- read of the norm log. 'ReadNorm1' waits for the instant it is asked at
+  -- (its @AS OF@, or @THE INSTANT@), holding the rest of the read; 'ReadNorm2'
+  -- waits for the bearer's party, holding the instant. Neither forces
+  -- anything the read does not name.
+  | ReadNorm1 ReadWord (Maybe (Expr Resolved)) DeonticModal Resolved ReadBranch Environment (Maybe SrcRange)
+  | ReadNorm2 ReadWord Rational DeonticModal Resolved ReadBranch (Maybe SrcRange)
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -1584,6 +1593,8 @@ unwindFrame = \ case
   Record2 {}                    -> pure ()
   ReadCell1 {}                  -> pure ()
   ReadCell2 {}                  -> pure ()
+  ReadNorm1 {}                  -> pure ()
+  ReadNorm2 {}                  -> pure ()
   App1 {}                       -> pure ()
   ConnectiveLeft {}             -> pure ()
   ConnectiveRight {}            -> pure ()
@@ -2219,6 +2230,27 @@ tellEventRouted route ev = do
     -- we simply pass the recipient key instead of the acting party.
     RouteNotify recipientKey ->
       liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
+
+-- | Finish a read of the norm log (NORM-LOG-SPEC N4b): the pure reader over
+-- the entries written so far, as at the instant. A read is only meaningful
+-- when the writer is on, so a run that reaches one without it says so, by
+-- name, instead of answering "nothing is outstanding" from an empty log (the
+-- checker's switch, 'L4.EvaluateLazy.moduleReadsNormLog', is the first line
+-- of defence; this is the second). A refusal of the reader (a party the
+-- machine never forced, an entry with no instant) is a run-time error naming
+-- the norm, never a smaller answer (N7 rule 4).
+finishNormRead :: ReadWord -> Rational -> BearerPattern -> DeonticModal -> Resolved -> ReadBranch -> Maybe SrcRange -> Machine Config
+finishNormRead word d who modal con branch _site = do
+  mlog <- asks (.deonticLog)
+  case mlog of
+    Just l | l.dlWriteFates -> do
+      store <- readEvalRef (.envLedger)
+      let entries = [ e | Fate e <- toList store.normLedger ]
+          pat = readPattern who modal (nameToText (getOriginal con)) branch
+      case answerRead word d pat entries of
+        Left r  -> userException (UserError ("a norm-log read (" <> readWordText word <> ") cannot be answered: " <> NormRead.prettyRefusal r))
+        Right b -> continueBackward (ValBool b)
+    _ -> userException (UserError ("a norm-log read (" <> readWordText word <> ") ran with the norm log switched off, so it would see no norms"))
 
 -- | Read the /current acting party's/ own ledger (M1.5 @RECALL@ semantics).
 currentLedgerEval :: Eval Ledger
@@ -3058,6 +3090,12 @@ forwardExpr env = \ case
     -- yielding MAYBE (RecallLast) or a LIST (RecallAll).
     pushFrame (ReadCell1 mParty isOfficial mode env (rangeOf ann))
     continueExpr env cell
+  -- NORM-LOG-SPEC N4b: evaluate the instant first (the @AS OF@ expression, or
+  -- @THE INSTANT@, the stamp of the event a guard is matched against: the
+  -- checker admits a read with neither only inside a guard), then the bearer.
+  ReadNorm ann word _ mParty modal con _ branch asOf -> do
+    pushFrame (ReadNorm1 word mParty modal con branch env (rangeOf ann))
+    continueExpr env (fromMaybe (Lifecycle emptyAnno LifecycleInstant) asOf)
   Concat _ann [] ->
     continueBackward (ValString "")
   Concat _ann (e : es) -> do
@@ -3178,6 +3216,15 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     let key = partyKeyWHNF val
     ledger <- partyLedgerEval key
     finishRead mode cellVal (OwnKey key) site ledger
+  Just (ReadNorm1 word mParty modal con branch env site) -> case val of
+    ValNumber d -> case mParty of
+      Nothing -> finishNormRead word d AnyBearer modal con branch site
+      Just p  -> do
+        pushFrame (ReadNorm2 word d modal con branch site)
+        continueExpr env p
+    _ -> userException (UserError "the instant of a norm-log read did not evaluate to a number")
+  Just (ReadNorm2 word d modal con branch site) ->
+    finishNormRead word d (BearerIs (partyKeyWHNF val)) modal con branch site
   Just (RestoreSibling path clock) -> do
     restoreSibling path clock
     continueBackward val

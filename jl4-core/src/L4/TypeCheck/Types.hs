@@ -321,6 +321,10 @@ data CheckError =
     -- since 2026-09-16, §5.1.2) written where the position it names does
     -- not exist. Carries the edge's keyword (for the wording), the anchor
     -- for its source range and the reason (see 'AnchorRefusal').
+  | ReadNormRefused ReadRefusal (Expr Name)
+    -- ^ A norm-log read (NORM-LOG-SPEC N4b, built by Claude 2026-11-24,
+    -- pending Meng's review) written where it has no answer, or whose pattern
+    -- cannot be matched: see 'ReadRefusal'. Carries the read, for its range.
   | LifecycleUnavailable LifecyclePoint (Expr Name) AnchorRefusal
     -- ^ A lifecycle VALUE (@THE JOIN@ \/ @THE DEADLINE@ as an expression,
     -- §2.6 card B1, built 2026-10-24) written where the position it names
@@ -765,6 +769,28 @@ data AnchorRefusal
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
+-- | Why a norm-log read is refused at check time (NORM-LOG-SPEC N4b; build
+-- decisions of Claude 2026-11-24, pending Meng's review).
+data ReadRefusal
+  = ReadNoInstant
+    -- ^ written outside a @PROVIDED@ guard with no @AS OF@: a read is true or
+    -- false as at an instant, and only a guard has the event's own
+  | ReadInOperand
+    -- ^ written inside an operand of @RAND@, @ROR@ or an @EVERY@: the operands
+    -- run side by side, so what such a read sees would depend on which
+    -- sibling the machine ran first (N10, N19 and N20; the check is not built,
+    -- so the read is refused instead)
+  | ReadArity RawName Int Int
+    -- ^ the action's constructor, how many fields it has, how many @_@ were
+    -- written for them
+  | ReadMatchesNoSite RawName
+    -- ^ the action's constructor, declared in this module, with the written
+    -- modal: no norm of the module has this modal and this constructor, so
+    -- the read could never match anything and its answer would be "no" for
+    -- every trace (NORM-LOG-SPEC N4b, condition 2)
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
 -- | Which continuation slot of an obligation a deonton sits in, for the
 -- anchored @WITHIN@ (R-Q7B): a lifecycle anchor names a position in the
 -- life of the ENCLOSING obligation, and two of them exist only in one slot.
@@ -959,6 +985,7 @@ checkErrorCode = \ case
   WhoseOperandNotBare {}          -> "check/whose-operand-not-bare"
   AnchorUnavailable {}            -> "check/anchor-unavailable"
   LifecycleUnavailable {}         -> "check/lifecycle-unavailable"
+  ReadNormRefused {}              -> "check/read-refused"
   ArmingUnavailable {}            -> "check/arming-unavailable"
   AnchorNotAnInstant {}           -> "check/anchor-not-an-instant"
   OpeningNotAnInstant {}          -> "check/opening-not-an-instant"
@@ -1094,6 +1121,7 @@ instance HasSrcRange CheckError where
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
   rangeOf (AnchorUnavailable _ a _)         = rangeOf a
   rangeOf (LifecycleUnavailable _ e _)      = rangeOf e
+  rangeOf (ReadNormRefused _ e)             = rangeOf e
   rangeOf (ArmingUnavailable e)             = rangeOf e
   rangeOf (AnchorNotAnInstant _ e _)        = rangeOf e
   rangeOf (OpeningNotAnInstant e _)         = rangeOf e
@@ -1357,6 +1385,11 @@ data CheckEnv =
     -- 'L4.TypeCheck.checkLifecycle') is refused as the bare anchor is
     -- (refusal 3, §5.1.1.1): that @WITHIN@ is what defines both. Set via
     -- 'local' in 'L4.TypeCheck.checkDeadline'; never carried across imports.
+    , inOperand            :: !Bool
+    -- ^ Are we checking inside an operand of @RAND@, @ROR@ or an @EVERY@?
+    -- There a norm-log read is refused ('ReadInOperand'). Set via 'local' in
+    -- 'L4.TypeCheck.checkRegulativeBinOp' and 'L4.TypeCheck.checkDeonton';
+    -- never carried across imports.
     , inGuard              :: !Bool
     -- ^ Are we checking a @PROVIDED@ guard? There @THE INSTANT@ is bound to
     -- the stamp of the event being matched ('L4.EvaluateLazy.Machine'),
@@ -1476,6 +1509,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , enclosingObligation = Nothing
     , onJoinLine = False
     , inGuard = False
+    , inOperand = False
     , inOwnSlots = False
     , errorContext = None
     , sectionStack = []
@@ -2927,6 +2961,7 @@ extendEnv cis env =
     , enclosingObligation = e.enclosingObligation
     , onJoinLine = e.onJoinLine
     , inGuard = e.inGuard
+    , inOperand = e.inOperand
     , inOwnSlots = e.inOwnSlots
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings

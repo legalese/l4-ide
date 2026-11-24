@@ -367,6 +367,27 @@ data Expr n =
     -- @Just k@ makes the write an *event-free deontic step* (@RECORD <cell> IS <v>
     -- HENCE k@), so the write fires its effect and then forwards @[time, events]@
     -- straight to @k@ — the @do { tell (x ↦ v); k }@ correspondence (spec App. B).
+  | ReadNorm   Anno ReadWord n (Maybe (Expr n)) DeonticModal n Int ReadBranch (Maybe (Expr n))
+    -- ^ read the norm log: what has become of a norm (NORM-LOG-SPEC N4b,
+    -- the spelling of the read; built by Claude 2026-11-24, pending Meng's
+    -- review, the fallback of the card's option A).
+    -- @OUTSTANDING (PARTY p MUST act _ [UNDER LEST]) [AS OF e]@, and the
+    -- three other phrases of 'ReadWord'. A BOOLEAN: true when any norm the
+    -- pattern matches is in the state the phrase names, as at the instant.
+    --
+    -- The fields, in source and hole order: the phrase, a marker name (below),
+    -- the bearer (@PARTY _@ is 'Nothing'), the modal, the action's constructor, how many @_@ stand
+    -- for its arguments, the branch, and the @AS OF@ instant (the event's own
+    -- instant, as @THE INSTANT@ has it, when 'Nothing'). The phrase, the modal,
+    -- the count and the branch carry no tokens of their own: the words are
+    -- tokens of this node's 'Anno' and these fields are placeholder holes, as
+    -- 'ReadCell'\'s 'RecallMode' is.
+    --
+    -- The marker name carries no tokens either. It is the phrase's spelling,
+    -- and the checker resolves it to 'normLogReadUnique', so that a module's
+    -- reads are found from its names alone ('moduleReadsNormLog'), the way a
+    -- use of JSONDECODE is: a walk over every expression of a module to find
+    -- them cost several times the evaluation it was asked before.
   | ReadCell   Anno (Maybe (Expr n)) Bool RecallMode (Expr n)
     -- ^ read a cell back from the ledger (STATE-AS-LEDGER M1.5 / M4.5).
     -- @RECALL [ALL] [<party>'s | OFFICIAL's] <cell>@. (@OFFICIAL@ is a
@@ -440,6 +461,42 @@ data Expr n =
     -- is a placeholder hole, the way 'ReadCell'\'s 'RecallMode' is.
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The four questions a read of the norm log asks (NORM-LOG-SPEC N4b, the
+-- phrases of @specs/todo/norm-log-howto-draft.md@; the keyword table of the
+-- read lives here, in 'readWordText', and nowhere else).
+data ReadWord
+  = ReadOutstanding         -- ^ @OUTSTANDING@: armed, with no fate yet (N13)
+  | ReadEverFailed          -- ^ @EVER FAILED@: the spec's FAILED, cured or not
+  | ReadFailedNotCured      -- ^ @FAILED AND NOT CURED@ (N8)
+  | ReadCuredByReparation   -- ^ @CURED BY REPARATION@ (N8)
+  deriving stock (GHC.Generic, Eq, Ord, Show, Enum, Bounded)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | Which branch a read pattern narrows to: a bare pattern matches every
+-- branch (card condition 3), @UNDER LEST@ and @UNDER HENCE@ narrow it.
+data ReadBranch
+  = ReadAnyBranch
+  | ReadUnderLest
+  | ReadUnderHence
+  deriving stock (GHC.Generic, Eq, Ord, Show, Enum, Bounded)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | The words of each phrase, in ONE place: the printer, the diagnostics and
+-- the highlighter's list read this.
+readWordText :: ReadWord -> Text
+readWordText = \ case
+  ReadOutstanding       -> "OUTSTANDING"
+  ReadEverFailed        -> "EVER FAILED"
+  ReadFailedNotCured    -> "FAILED AND NOT CURED"
+  ReadCuredByReparation -> "CURED BY REPARATION"
+
+-- | @UNDER LEST@, @UNDER HENCE@, or nothing.
+readBranchText :: ReadBranch -> Text
+readBranchText = \ case
+  ReadAnyBranch  -> ""
+  ReadUnderLest  -> "UNDER LEST"
+  ReadUnderHence -> "UNDER HENCE"
 
 -- | Which lifecycle position a 'Lifecycle' expression names. The same three
 -- an 'Anchor' names after @OF@; 'lifecyclePointOfAnchor' maps one onto the
@@ -951,6 +1008,26 @@ cosmosExpr :: Optics.Fold (Expr Resolved) (Expr Resolved)
 cosmosExpr = Optics.folding (\ e -> universe e [])
   where
     universe e rest = e : foldr universe rest (Optics.toListOf (Optics.gplate @(Expr Resolved)) e)
+
+-- | The unique every read of the norm log carries in its marker name
+-- (NORM-LOG-SPEC N4b); no definition has it.
+normLogReadUnique :: Unique
+normLogReadUnique = MkUnique 'r' (-1) (toNormalizedUri (Uri "l4:norm-log-read"))
+
+-- | Does the module contain a read of the norm log (NORM-LOG-SPEC N4b)?
+-- The norm log writer is switched on for a module that does: a read with the
+-- writer off would see an empty log and answer "nothing is outstanding".
+--
+-- Read from the names alone, through the derived 'Foldable'.
+-- Measured on a module of 400 rules whose evaluation allocates 10.7 MB, with
+-- the module already forced (jl4-core-test R8, a Linux host, 2026-11-24): a
+-- walk over every expression, the way 'cosmosExpr' reads them, allocated
+-- 12.0 MB, as much as the evaluation it would have preceded; a walk over the
+-- names through 'Optics.gplate', 0.6 MB; this one, 24 bytes.
+-- Only the module itself is asked: the evaluation is not given the modules it
+-- imports, so a read in one of them is not seen here (see 'L4.EvaluateLazy').
+moduleReadsNormLog :: Module Resolved -> Bool
+moduleReadsNormLog = any (\ r -> getUnique r == normLogReadUnique)
 
 overImports :: forall nodeType n. (Optics.GPlate (Import n) (nodeType n)) => (Import n -> Import n) -> nodeType n -> nodeType n
 overImports = Optics.over Optics.gplate
@@ -1750,6 +1827,29 @@ instance ToConcreteNodes PosToken RecallMode where
 instance ToConcreteNodes PosToken LifecyclePoint where
   toNodes _ = pure []
 
+-- ReadWord and ReadBranch likewise: their words are tokens of the surrounding
+-- 'ReadNorm' node's Anno, and each field is a placeholder hole
+-- ('L4.Parser.readNormExpr').
+instance ToConcreteNodes PosToken ReadWord where
+  toNodes _ = pure []
+
+instance ToConcreteNodes PosToken ReadBranch where
+  toNodes _ = pure []
+
+instance HasSrcRange ReadWord where
+  rangeOf _ = Nothing
+
+-- The modal and the count of @_@ of a 'ReadNorm' are placeholder holes too:
+-- the modal's keyword and the underscores are tokens of the node's own Anno.
+instance HasSrcRange DeonticModal where
+  rangeOf _ = Nothing
+
+instance HasSrcRange Int where
+  rangeOf _ = Nothing
+
+instance HasSrcRange ReadBranch where
+  rangeOf _ = Nothing
+
 -- Its field still occupies one holeFit slot ('L4.Parser.lifecycleExpr'
 -- emits the placeholder), so the hole needs a range hint: none.
 instance HasSrcRange LifecyclePoint where
@@ -1894,6 +1994,8 @@ deriving anyclass instance Serialise n => Serialise (Expr n)
 deriving anyclass instance Serialise InertContext
 deriving anyclass instance Serialise RecallMode
 deriving anyclass instance Serialise LifecyclePoint
+deriving anyclass instance Serialise ReadWord
+deriving anyclass instance Serialise ReadBranch
 deriving anyclass instance Serialise n => Serialise (GuardedExpr n)
 deriving anyclass instance Serialise n => Serialise (Deonton n)
 deriving anyclass instance Serialise n => Serialise (Subject n)

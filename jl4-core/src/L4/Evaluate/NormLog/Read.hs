@@ -72,6 +72,8 @@ module L4.Evaluate.NormLog.Read
   , Refusal (..)
   , prettyRefusal
   , readNorms
+  , answerRead
+  , readPattern
   , isCured
   ) where
 
@@ -81,7 +83,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import L4.Evaluate.NormLog
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
-import L4.Syntax (DeonticModal (..))
+import L4.Syntax (DeonticModal (..), ReadBranch (..), ReadWord (..))
 
 -- | Whose norm (N2).
 data BearerPattern
@@ -535,6 +537,37 @@ isCured d es v = case v.nvState of
       FateBreached         -> True
       FateJoinedBreached _ -> True
       _                    -> False
+
+-- | The pattern a written read means (NORM-LOG-SPEC N4b): the bearer, the
+-- modal and the action's constructor, and the branch. A bare pattern matches
+-- every branch; @UNDER LEST@ and @UNDER HENCE@ narrow it.
+readPattern :: BearerPattern -> DeonticModal -> Text -> ReadBranch -> NormPattern
+readPattern who modal con branch = MkNormPattern
+  { npBearer = who
+  , npAction = Just con
+  , npModal  = Just modal
+  , npBranch = case branch of
+      ReadAnyBranch  -> AnyBranch
+      ReadUnderLest  -> ArmedByLest
+      ReadUnderHence -> ArmedByHence
+  }
+
+-- | The answer to one of the four phrases (N4b), as at an instant: true when
+-- ANY norm the pattern matches is in the state the phrase names (card
+-- condition 2). @EVER FAILED@ is the spec's FAILED: a @MUST@'s @LEST@ fired
+-- at or before the instant, cured or not; a lapsed @MAY@ and a violated
+-- @SHANT@ are not failures (N13, N1). A refusal of 'readNorms' or 'isCured'
+-- is the answer's refusal: it never turns into @False@.
+answerRead :: ReadWord -> Rational -> NormPattern -> [NormEntry] -> Either Refusal Bool
+answerRead word d pat es = do
+  vs <- readNorms d pat es
+  case word of
+    ReadOutstanding       -> Right (any (\ v -> v.nvState == Outstanding) vs)
+    ReadEverFailed        -> Right (any failed vs)
+    ReadFailedNotCured    -> anyM (\ v -> if failed v then not <$> isCured d es v else Right False) vs
+    ReadCuredByReparation -> anyM (\ v -> if failed v then isCured d es v else Right False) vs
+  where
+    failed v = case v.nvState of { Failed _ -> True; _ -> False }
 
 -- | Short-circuiting over 'Either', so a refusal in a branch that another
 -- branch has already settled does not stop the read.

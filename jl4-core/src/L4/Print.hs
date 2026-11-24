@@ -1129,6 +1129,13 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         <> (if isOfficial then " OFFICIAL's" else mempty)
         <> maybe mempty (\p -> space <> printWithLayout p <> "'s") mParty
         <+> printWithLayout cell
+    ReadNorm _ word _ mParty modal con n branch asOf ->
+      pretty (readWordText word)
+        <+> parens (hsep ([ "PARTY", maybe "_" printWithLayout mParty
+                          , printDeonticModal modal, printWithLayout con ]
+                          <> replicate n "_"
+                          <> [ pretty (readBranchText branch) | branch /= ReadAnyBranch ]))
+        <> maybe mempty (\ e -> " AS OF" <+> parensIfNeeded e) asOf
     Concat _ exprs ->
       "CONCAT" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
     AsString _ e ->

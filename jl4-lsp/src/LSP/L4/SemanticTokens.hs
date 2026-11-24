@@ -255,6 +255,12 @@ instance ToSemTokens Context PosToken LifecyclePoint where
 -- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
 instance ToSemTokens Context PosToken RecallMode where
   toSemTokens _ = pure []
+-- A norm-log read's phrase and branch have no tokens of their own (the words
+-- are in the ReadNorm node's Anno; NORM-LOG-SPEC N4b)
+instance ToSemTokens Context PosToken ReadWord where
+  toSemTokens _ = pure []
+instance ToSemTokens Context PosToken ReadBranch where
+  toSemTokens _ = pure []
 instance ToSemTokens Context PosToken (RAction Name) where
 instance ToSemTokens Context PosToken (LocalDecl Name) where
 instance ToSemTokens Context PosToken (Assume Name) where
@@ -389,6 +395,11 @@ instance ToSemTokens () PosToken LifecyclePoint where
   toSemTokens _ = pure []
 -- RecallMode has no tokens to highlight (the ALL keyword is in the RECALL Anno)
 instance ToSemTokens () PosToken RecallMode where
+  toSemTokens _ = pure []
+-- See the Name-phase instances of the norm-log read's phrase and branch
+instance ToSemTokens () PosToken ReadWord where
+  toSemTokens _ = pure []
+instance ToSemTokens () PosToken ReadBranch where
   toSemTokens _ = pure []
 instance ToSemTokens () PosToken (RAction Resolved) where
 instance ToSemTokens () PosToken (Event Resolved) where

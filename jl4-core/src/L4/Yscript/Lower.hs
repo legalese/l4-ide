@@ -306,6 +306,7 @@ describeUnsupported e = "uses a construct outside yscript's propositional fragme
   Post{}       -> "POST"
   Record{}     -> "a ledger RECORD/COMMIT/ATTEST write"
   ReadCell{}   -> "a ledger RECALL read"
+  ReadNorm{}   -> "a norm-log read"
   Concat{}     -> "string concatenation"
   AsString{}   -> "a string coercion"
   Breach{}     -> "BREACH"

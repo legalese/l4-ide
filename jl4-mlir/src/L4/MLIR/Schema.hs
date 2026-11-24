@@ -1613,6 +1613,7 @@ collectTraceNodes infoMap declares paramTypes fnReturnTypes unannotatedParams un
       Post{}                 -> (a, r, n)
       Record{}               -> (a, r, n)
       ReadCell{}             -> (a, r, n)
+      ReadNorm{}             -> (a, r, n)
       Breach{}               -> (a, r, n)
       -- A refusal has no trace children: it stops evaluation.
       Refuse{}               -> (a, r, n)

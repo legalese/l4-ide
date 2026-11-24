@@ -2258,6 +2258,7 @@ kindOfExpr = \case
   Env{}        -> LEEffect
   Record{}     -> LELedger
   ReadCell{}   -> LELedger
+  ReadNorm{}   -> LELedger
   Breach{}     -> LEBreach
   Refuse{}     -> LEUnsupported "REFUSE"
   Lifecycle{}  -> LEUnsupported "THE JOIN / THE DEADLINE / THE ARMING"
@@ -2286,6 +2287,7 @@ msgOfExpr = \case
   Env{}      -> "a rule body must be pure; an environment lookup is not"
   Record{}   -> "a ledger write has no image in a clause body"
   ReadCell{} -> "a ledger read has no image in a clause body"
+  ReadNorm{} -> "a norm-log read has no image in a clause body"
   Breach{}   -> "BREACH is a deontic outcome, not a proposition"
   Refuse{}   -> "REFUSE is a declined answer, not a proposition: a Horn clause could only \
                 \assert or negate it, which is precisely the conversion a refusal forbids"
@@ -2313,6 +2315,7 @@ constructorName = \case
   Env{}        -> "environment lookup"
   Record{}     -> "RECORD/COMMIT/ATTEST"
   ReadCell{}   -> "RECALL"
+  ReadNorm{}   -> "a norm-log read"
   Breach{}     -> "BREACH"
   Refuse{}     -> "REFUSE"
   Lifecycle{}  -> "THE JOIN / THE DEADLINE / THE ARMING"

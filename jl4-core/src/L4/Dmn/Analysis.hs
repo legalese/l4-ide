@@ -567,6 +567,7 @@ analyzeSafety inp cg decides =
     Env _ a    -> issue "PURE" e "GETENV reads the environment" : walkIssues s a
     Record {}  -> [issue "PURE" e "RECORD/COMMIT/ATTEST writes the ledger"]
     ReadCell {} -> [issue "PURE" e "RECALL reads the ledger"]
+    ReadNorm {} -> [issue "PURE" e "a norm-log read depends on the trace, not on the decision's inputs"]
     _ -> concatMap (walkIssues s) (toListOf (gplate @(Expr Resolved)) e)
 
   builtinAppIssues :: Strictness -> Expr Resolved -> Unique -> [Expr Resolved] -> [SafetyIssue]

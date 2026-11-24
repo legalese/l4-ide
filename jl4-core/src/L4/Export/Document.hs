@@ -2350,6 +2350,9 @@ rewriteWith rd0 e0 = alone (go e0)
     ReadCell ann mParty isOfficial mode cell -> inert ann $ case mode of
       RecallLast -> fw "the value last recorded as" <> " " <> leafText cell <> ledgerOf mParty isOfficial <> ", " <> fw "if any"
       RecallAll  -> fw "every value recorded as" <> " " <> leafText cell <> ledgerOf mParty isOfficial <> ", " <> fw "oldest first"
+    -- A read of the norm log (NORM-LOG-SPEC N4b): named, not described; the
+    -- pattern is not an expression, so it has no leaves to show.
+    ReadNorm ann w _ _ _ _ _ _ _ -> inert ann (fw ("a read of the norm log: " <> Text.toLower (readWordText w)))
     -- A lifecycle noun as a value, in the words a deadline's anchor uses
     -- ('deonticClause', @anchorProse@).
     Lifecycle ann p -> inert ann $ case p of

@@ -1271,6 +1271,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
       mParty' <- traverse addNlg mParty
       cell' <- addNlg cell
       pure $ ReadCell ann mParty' isOfficial mode cell'
+    ReadNorm ann w mk mParty m con n b asOf -> do
+      mParty' <- traverse addNlg mParty
+      asOf' <- traverse addNlg asOf
+      pure $ ReadNorm ann w mk mParty' m con n b asOf'
     Concat ann es -> do
       es' <- traverse addNlg es
       pure $ Concat ann es'
@@ -1596,6 +1600,9 @@ instance HasDesc (Expr n) where
     ReadCell   ann mp off mode c ->
       (\mp' c' -> ReadCell ann mp' off mode c')
         <$> traverse addDesc mp <*> addDesc c
+    ReadNorm   ann w mk mp m con n b asOf ->
+      (\mp' asOf' -> ReadNorm ann w mk mp' m con n b asOf')
+        <$> traverse addDesc mp <*> traverse addDesc asOf
     Concat     ann es    -> Concat     ann <$> traverse addDesc es
     AsString   ann e     -> AsString   ann <$> addDesc e
     Breach     ann mp mr -> Breach     ann <$> traverse addDesc mp <*> traverse addDesc mr
@@ -2445,6 +2452,10 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       mParty' <- traverse addRef mParty
       cell' <- addRef cell
       pure $ ReadCell ann' mParty' isOfficial mode cell'
+    ReadNorm ann w mk mParty m con n b asOf -> attachRef expr ann >>= \ann' -> do
+      mParty' <- traverse addRef mParty
+      asOf' <- traverse addRef asOf
+      pure $ ReadNorm ann' w mk mParty' m con n b asOf'
     Lit ann lit -> attachRef expr ann >>= \ann' -> pure (Lit ann' lit)
     Percent ann e -> attachRef expr ann >>= \ann' -> Percent ann' <$> addRef e
     List ann es -> attachRef expr ann >>= \ann' -> List ann' <$> traverse addRef es

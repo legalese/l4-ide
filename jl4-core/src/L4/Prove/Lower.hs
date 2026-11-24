@@ -555,6 +555,7 @@ lowerExpr env cx = \case
   Post {}       -> refuse "out of fragment: POST performs I/O"
   Record {}     -> refuse "out of fragment: a ledger write"
   ReadCell {}   -> refuse "out of fragment: a ledger read"
+  ReadNorm {}   -> refuse "out of fragment: a norm-log read"
   _             -> refuse "out of fragment: this kind of expression"
  where
   go = lowerExpr env cx
