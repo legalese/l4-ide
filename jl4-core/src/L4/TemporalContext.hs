@@ -179,19 +179,28 @@ data CtxReads = MkCtxReads
     -- 'validFor'; it exists so read-ness propagates through the Semigroup
     -- and future work can key on it (e.g. a ledger version in the
     -- fingerprint).
+  , crNormRead :: !Bool
+    -- ^ NORM-LOG-SPEC N4b (built by Claude 2026-11-24, pending Meng's review):
+    -- did the force READ THE NORM LOG (an @OUTSTANDING@, @EVER FAILED@,
+    -- @FAILED AND NOT CURED@ or @CURED BY REPARATION@)? Unlike a @RECALL@'s
+    -- snapshot per scope, such a value is never served again: the norm log
+    -- grows between one guard and the next within one scope and one instant,
+    -- so a rule with no inputs that reads a fate, used in two guards, must
+    -- be read again at the second. It vetoes 'validFor', and propagates
+    -- through the Semigroup to every thunk that consumed the read.
   }
   deriving stock (Eq, Show)
 
 instance Semigroup CtxReads where
-  MkCtxReads a b v rv w r <> MkCtxReads a' b' v' rv' w' r' =
-    MkCtxReads (a <> a') (b <> b') (v <> v') (rv <> rv') (w || w') (r || r')
+  MkCtxReads a b v rv w r n <> MkCtxReads a' b' v' rv' w' r' n' =
+    MkCtxReads (a <> a') (b <> b') (v <> v') (rv <> rv') (w || w') (r || r') (n || n')
 
 instance Monoid CtxReads where
   mempty = noReads
 
 -- | The empty fingerprint: no axis was read.
 noReads :: CtxReads
-noReads = MkCtxReads NotRead NotRead NotRead NotRead False False
+noReads = MkCtxReads NotRead NotRead NotRead NotRead False False False
 
 -- | Did this force observe the temporal context at all?
 hasReads :: CtxReads -> Bool
@@ -209,10 +218,12 @@ hasReads r = r /= noReads
 -- plain WHNF instead); this arm is defensive. 'crLedgerRead' deliberately
 -- does NOT veto: a read-only ledger force is valid exactly while its
 -- recorded temporal axes match (snapshot per temporal scope — see the field
--- doc on 'crLedgerRead').
+-- doc on 'crLedgerRead'). A fingerprint carrying 'crNormRead' never
+-- validates either: the norm log changes between two uses of a shared thunk.
 validFor :: TemporalContext -> CtxReads -> Bool
 validFor tc r =
   not r.crLedgerWrite
+    && not r.crNormRead
     && axisValid tc.tcSystemTime r.crSystemTime
     && axisValid tc.tcDocumentTimezone r.crDocumentTimezone
     && axisValid tc.tcValidTime r.crValidTime

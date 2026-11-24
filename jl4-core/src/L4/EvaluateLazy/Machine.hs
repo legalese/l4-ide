@@ -2249,6 +2249,10 @@ finishNormRead word d who modal con branch _site = do
   mlog <- asks (.deonticLog)
   case mlog of
     Just l | l.dlWriteFates -> do
+      -- the value of a read depends on the norm log as it is now, and the log
+      -- grows between two guards at one instant: a thunk that holds a read
+      -- must not be served at a later guard (R12; 'crNormRead' vetoes 'validFor')
+      noteCtxRead noReads { crNormRead = True }
       store <- readEvalRef (.envLedger)
       let entries = [ e | Fate e <- toList store.normLedger ]
           pat = readPattern who modal (nameToText (getOriginal con)) branch
