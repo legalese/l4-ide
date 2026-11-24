@@ -69,12 +69,15 @@
 -- the finite constructors beside it still explored. No sample is ever
 -- tried in a refused constructor's place (§4.2, ruled R-L4).
 --
--- An act fires at a choice of WHOLE instants (§4.5, T2: contract time is
--- discrete): the instant of the last event, the earliest live deadline
+-- By default an act fires at a choice of WHOLE instants (§4.5, T2: contract
+-- time is discrete): the instant of the last event, the earliest live deadline
 -- exactly, the instants where a window opens, the instants at which a
 -- deadline some chain of acts would start falls on one fixed in absolute
--- time (a /tie/), and one instant between each of those. See
--- 'instantsFor'. An act is never fired past a live deadline: the machine
+-- time (a /tie/), and one instant between each of those. The clock where the
+-- position already stands is tried too, and it is a fraction after a start
+-- such as @AT 0.5@ or after time passes a deadline that is one; @--grid N@
+-- tries the multiples of N instead. See 'instantsFor'. An act is never fired
+-- past a live deadline: the machine
 -- would expire the deadline first and the edge would carry the act's name for
 -- the deadline's effect, so a later instant is reached by the tick past the
 -- deadline and then the act, which is the same position with honest labels.
@@ -249,8 +252,8 @@ data ExploreOptions = MkExploreOptions
 -- | How the instant an act fires at is chosen (§4.5).
 data TimeScheme
   = Regions
-    -- ^ whole instants where something can change, chosen by 'instantsFor';
-    -- the clock is not in the state
+    -- ^ whole instants where something can change, and the clock where the
+    -- position stands, chosen by 'instantsFor'; the clock is not in the state
   | Grid !Rational
     -- ^ the instant of the last event and every multiple of this step from
     -- the first instant the act's window is open to the earliest live
@@ -1111,7 +1114,9 @@ instance Monoid InstantStats where
 -- instants are the clock; the limit; the act's own opening; every other
 -- opening between the clock and the limit; every tie; and one whole instant
 -- inside each gap between two of those that has one. Only whole instants
--- are tried (contract time is discrete, T2).
+-- are tried, and the clock where the position stands (contract time is
+-- discrete, T2; the clock is a fraction after a fractional start or after
+-- time passes a fractional deadline).
 --
 -- The offsets @w@ and the fixed instants are READ from the replays, not from
 -- the text of the @HENCE@: the act is tried at the clock and at the limit,
@@ -1223,7 +1228,7 @@ regionInstants ex w probe = go Map.empty
         { inRuns = runs
         , inCuts =
             [ ("at instants that are not whole numbers"
-              , "an instant it needs (" <> prettyRatio (minimum notWhole) <> ") is not a whole number, and only whole instants are tried")
+              , "an instant it needs (" <> prettyRatio (minimum notWhole) <> ") is not a whole number, and by default only whole instants, and the clock where it stands, are tried; --grid N tries the multiples of N")
             | not (null notWhole) ]
             <> [ ("at the instants past the instant cap"
                  , "it needs " <> (if cutN > 100000 then "more than 100000" else textShow cutN) <> " more instants than the instant cap of "

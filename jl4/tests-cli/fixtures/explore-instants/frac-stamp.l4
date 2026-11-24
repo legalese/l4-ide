@@ -1,0 +1,16 @@
+IMPORT prelude
+
+-- An event whose time stamp is not a whole number, inside an obligation whose
+-- window reaches it. `l4 explore` never reads the stamp. The note on it names
+-- a --grid step that divides it (0.2 for 3.8); under that step the explorer
+-- tries an act at 3.8, and under a step that does not divide it (0.5) it does
+-- not, and says nothing about the stamp.
+
+DECLARE Person IS ONE OF P
+DECLARE Action IS ONE OF a
+
+GIVETH A DEONTIC Person Action
+one MEANS PARTY P MUST a WITHIN 5 HENCE FULFILLED LEST BREACH BY P
+
+#TRACE one AT 0 WITH
+  PARTY P DOES a AT 3.8

@@ -1,0 +1,20 @@
+IMPORT prelude
+
+-- A deadline that is not a whole number, followed by an obligation that is
+-- entered when it lapses. `l4 explore` lets time pass the 2.5 by waiting until
+-- 3.5, and the act that follows is tried there: the clock stands at a fraction
+-- although the trace starts at a whole number.
+
+DECLARE Person IS ONE OF P, Q
+DECLARE Action IS ONE OF a, b
+
+GIVETH A DEONTIC Person Action
+two MEANS
+  PARTY P MUST a WITHIN 2.5
+  HENCE FULFILLED
+  LEST PARTY Q MUST b WITHIN 3
+       HENCE PARTY P MUST a WITHIN 4 HENCE FULFILLED LEST BREACH BY P
+       LEST BREACH BY Q
+
+#TRACE two AT 0 WITH
+  PARTY P DOES a AT 1

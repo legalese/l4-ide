@@ -266,11 +266,13 @@ data CheckError =
     -- Arguments: the name as written in the pattern, and the referent's
     -- defining name (whose range is the definition site).
   | FractionalTraceStamp Rational (Maybe SrcRange)
-    -- ^ A @#TRACE@'s start, or the time stamp of one of its events (@AT@ or
-    -- @WAITUNTIL@), is a literal that is not a whole number. A notice, never
-    -- an error: the evaluator uses the stamp as written, and the notice is
-    -- only to say what @l4 explore@ will not do with it, which is try
-    -- instants between whole ones. Severity 'SInfo'.
+    -- ^ The time stamp of one of a @#TRACE@'s events (@AT@ or @WAITUNTIL@) is
+    -- a literal, or a percentage of one, that is not a whole number. A notice,
+    -- never an error: the evaluator uses the stamp as written, and the notice
+    -- is only to say what @l4 explore@ does with it, which is not to read it
+    -- (from a @#TRACE@ it takes the contract and the start), and by default to
+    -- try whole instants. The trace's own start is not noticed, because the
+    -- explorer reads it as its clock. Severity 'SInfo'.
     --
     -- Arguments: the stamp, and where it is written.
   | ActionPatternNotComparable (Expr Name) (Type' Resolved)

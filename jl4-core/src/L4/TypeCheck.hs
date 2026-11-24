@@ -106,7 +106,7 @@ import L4.Parser.ResolveAnnotation (pickDesc)
 import L4.Parser.SrcSpan (inRange, prettySrcRange, prettySrcRangeM, SrcPos (..), SrcRange (..), zeroSrcPos)
 import L4.Print (clauseBodies, hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
 import Data.Ratio (denominator)
-import L4.Utils.Ratio (prettyRatio)
+import L4.Utils.Ratio (prettyRatio, prettyRatioExact)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
@@ -1309,16 +1309,26 @@ assumeReplacementLine dHead declaredType mTypically = \ case
       Forall _ _ t'  -> mentionsOwnTypeVariable t'
       InfVar {}      -> False
 
--- | The literal time stamp a @#TRACE@'s start or event carries, when it is not
--- a whole number: the @AT@ of the trace, the @AT@ of @PARTY p DOES a AT t@, or
--- the argument of @WAITUNTIL t@. Anything that is not a literal is left alone:
--- it has no value to read until it is evaluated.
+-- | The literal time stamp one of a @#TRACE@'s events carries, when it is not
+-- a whole number: the @AT@ of @PARTY p DOES a AT t@, or the argument of
+-- @WAITUNTIL t@. A percentage of a literal counts as the literal it stands
+-- for, as the evaluator reads it (@50%@ is a half). Anything that is not a
+-- literal is left alone: it has no value to read until it is evaluated.
+--
+-- The trace's own start is not looked at: @l4 explore@ reads it as its clock
+-- and says itself what that leaves untried, whereas it reads no event stamp.
 fractionalTraceStamp :: Expr Resolved -> Maybe (Rational, Maybe SrcRange)
 fractionalTraceStamp = \ case
-  lit@(Lit _ (NumericLit _ r)) | denominator r /= 1 -> Just (r, rangeOf lit)
   Event _ (MkEvent _ _ _ at _) -> fractionalTraceStamp at
   App _ f [at] | getUnique f == waitUntilUnique -> fractionalTraceStamp at
+  e | Just r <- literalStamp e, denominator r /= 1 -> Just (r, rangeOf e)
   _ -> Nothing
+ where
+  literalStamp :: Expr Resolved -> Maybe Rational
+  literalStamp = \ case
+    Lit _ (NumericLit _ r) -> Just r
+    Percent _ e            -> (/ 100) <$> literalStamp e
+    _                      -> Nothing
 
 inferDirective :: Directive Name -> Check (Directive Resolved)
 inferDirective (LazyEval ann e) = errorContext (WhileCheckingExpression e) do
@@ -1340,8 +1350,9 @@ inferDirective (Contract ann e t evs) = errorContext (WhileCheckingExpression e)
   rt <- prune $ checkExpr ExpectRegulativeTimestampContext t number
   revs <- traverse (prune . flip (checkExpr ExpectRegulativeEventContext) eventT) evs
   -- a stamp that is not a whole number is used as written; what is worth
-  -- saying is what @l4 explore@ will not do with it
-  for_ (mapMaybe fractionalTraceStamp (rt : revs)) \ (stamp, range) ->
+  -- saying is what @l4 explore@ does not do with it. The start, @rt@, is
+  -- left out on purpose: the explorer reads it (see 'fractionalTraceStamp')
+  for_ (mapMaybe fractionalTraceStamp revs) \ (stamp, range) ->
     addError (FractionalTraceStamp stamp range)
   pure (Contract ann re rt revs)
 inferDirective (AssertRefused ann e mmsg) = errorContext (WhileCheckingExpression e) do
@@ -8674,10 +8685,20 @@ prettyCheckError (ExportAssumeNameClash fnName paramName) =
   , "Rename the input or the ASSUME."
   ]
 prettyCheckError (FractionalTraceStamp stamp _) =
-  [ "This #TRACE has a time stamp of " <> prettyRatio stamp <> ", which is not a whole number."
+  -- 'prettyRatioExact', not 'prettyRatio': the latter goes through Double, and a
+  -- stamp such as 2.0000000000000000001 would be printed as "2.0"
+  [ "This #TRACE has a time stamp of " <> prettyRatioExact stamp <> ", which is not a whole number."
   , "`l4 run` uses it as written."
-  , "`l4 explore` tries whole instants only, so it does not explore the positions between them."
+  , "`l4 explore` does not read it: from a #TRACE it takes only the contract and where it starts."
+  , "By default it tries whole instants; `--grid " <> gridStep <> "`, a step that divides this stamp, also tries the multiples of " <> gridStep <> "."
   ]
+ where
+  -- one over the stamp's denominator, in lowest terms: the coarsest step that
+  -- reaches both the stamp and every whole instant, since n/d and every whole
+  -- number are multiples of 1/d. A step such as 0.5 does not reach 3.8. A
+  -- stamp is a decimal literal, or a percentage of one, so its denominator is
+  -- made of 2s and 5s and the step prints exactly.
+  gridStep = prettyRatioExact (1 / fromIntegral (denominator stamp))
 prettyCheckError (ActionPatternReference n referent) =
   -- Wording ruled by Meng 2026-09-16 (PATTERN-REFERENCE-RULE-SPEC §4 R5): the fact,
   -- the referent, and the one thing to do if a placeholder was meant. Nothing else.

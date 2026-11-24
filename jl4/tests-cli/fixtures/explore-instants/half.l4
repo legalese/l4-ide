@@ -1,8 +1,8 @@
 IMPORT prelude
 
 -- smucclaw/l4-ide#1081. A deadline that is not a whole number: contract time
--- is discrete, so the explorer tries only whole instants and says what that
--- left out.
+-- is discrete, so by default the explorer tries whole instants (and the clock
+-- where it stands) and says what that left out; --grid 0.5 tries the halves.
 
 DECLARE Person IS ONE OF P
 DECLARE Action IS ONE OF a
