@@ -178,6 +178,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , inNonexhaustiveDecide = False
     , enclosingObligation = Nothing
     , onJoinLine = False
+    , inGuard = False
     , inOwnSlots = False
     , moduleUri
     , sectionStack = []
@@ -798,8 +799,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd ir ne eo jl os h i lb apos uo) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd ir ne eo jl os h i lb apos uo
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd ir ne eo jl ig os h i lb apos uo) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd ir ne eo jl ig os h i lb apos uo
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -3343,6 +3344,7 @@ checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
         Just LifecycleArming   -> True
         Just LifecycleJoin     -> direct && (slotIs InHence || (slotIs InLest && enclosingIs DMustNot))
         Just LifecycleDeadline -> direct && slotIs InLest && not (enclosingIs DMustNot)
+        Just LifecycleInstant  -> False
         Nothing                -> False
       where
         direct = maybe False (.direct) menc
@@ -3466,10 +3468,15 @@ checkLifecycle p e = do
   menc <- asks (.enclosingObligation)
   owned <- asks (.inOwnSlots)
   let refuse = addError . LifecycleUnavailable p e
+  guarded <- asks (.inGuard)
   case p of
     LifecycleArming
       | owned || isJust menc -> pure ()
       | otherwise -> addError (ArmingUnavailable e)
+    -- the stamp of the event a PROVIDED guard is matched against (N4, P2)
+    LifecycleInstant
+      | guarded -> pure ()
+      | otherwise -> refuse InstantOutsideGuard
     _ | onLine -> refuse OnJoinLine
     LifecycleJoin -> case menc of
       Nothing -> refuse NoEnclosingObligation
@@ -3659,10 +3666,34 @@ checkAction :: RAction Name -> Type' Resolved -> Check (RAction Resolved, [Check
 checkAction MkAction {anno, modal, action, provided = mprovided} actionT = do
   (pat, bounds) <- checkActionPattern action actionT
   -- NOTE: the provided clauses must evaluate to booleans
-  provided <- forM mprovided \provided ->
-    extendKnownMany bounds do
+  provided <- forM mprovided \provided -> do
+    providedR <- extendKnownMany bounds $ local (\ env -> env {inGuard = True}) do
       checkExpr ExpectRegulativeProvidedContext provided boolean
+    -- N4 (P2): NOW here is the wall clock; the time of the event is THE INSTANT.
+    -- Only this guard is walked, never the module.
+    for_ (wallClockReads providedR) \ (word, e) -> addWarning (NowInGuard word (rangeOf e))
+    pure providedR
   pure (MkAction {anno, modal, action = pat, provided}, bounds)
+
+-- | The reads of the wall clock (@NOW@, @TODAY@, @CURRENTTIME@) in an
+-- expression, applied or bare, with the word each was written as.
+wallClockReads :: Expr Resolved -> [(Text, Expr Resolved)]
+wallClockReads e =
+  [ (w, x)
+  | x <- Optics.toListOf (Optics.cosmosOf (gplate @(Expr Resolved))) e
+  , Just w <- [wordOf x]
+  ]
+  where
+    wordOf = \ case
+      Var _ r   -> clock r
+      App _ r _ -> clock r
+      _         -> Nothing
+    clock r
+      | u == nowSerialUnique     = Just "NOW"
+      | u == todaySerialUnique   = Just "TODAY"
+      | u == currentTimeUnique   = Just "CURRENTTIME"
+      | otherwise                = Nothing
+      where u = getUnique r
 
 -- | Rung 2 of actor-indexed actions: a PARTY may only be obligated to perform
 -- its /own/ actions. When the action's type is a single-index, actor-typed
@@ -8757,6 +8788,14 @@ prettyCheckError (AnchorUnavailable edge a reason) =
       , "the EVERY's arming), as WITHIN d OF THE ARMING, or as WITHIN d OF an"
       , "instant, a NUMBER or DATE expression."
       ]
+    InstantOutsideGuard ->
+      [ "THE INSTANT cannot anchor " <> article <> " " <> kw <> "."
+      , ""
+      , "THE INSTANT is the contract clock inside a PROVIDED guard, not a"
+      , "position in the life of an obligation, so nothing can be counted from it"
+      , "with OF. Anchor to THE JOIN, THE DEADLINE or THE ARMING, or to an instant"
+      , "you compute."
+      ]
     JoinUnderLest ->
       [ "OF THE JOIN cannot anchor " <> article <> " " <> kw <> " under LEST."
       , ""
@@ -8806,6 +8845,18 @@ prettyCheckError (LifecycleUnavailable p _ reason) =
       , "read. Only THE ARMING (the EVERY's own arming) and other instants can be"
       , "used there."
       ]
+    InstantOutsideGuard ->
+      [ "THE INSTANT can only be read inside a PROVIDED guard."
+      , ""
+      , "It is the contract clock at the point the guard is evaluated: the stamp"
+      , "of the event the guard is matched against. Elsewhere there is no such"
+      , "event: at the top level, in a WHERE, in a HENCE or LEST, and in the body"
+      , "of a function."
+      , ""
+      , "Write it in the PROVIDED of the action it is about. To use it in a"
+      , "function or a rule defined elsewhere, pass it as an argument from there:"
+      , "PROVIDED f THE INSTANT."
+      ]
     JoinUnderLest ->
       [ "THE JOIN cannot be read under LEST."
       , ""
@@ -8829,6 +8880,7 @@ prettyCheckError (LifecycleUnavailable p _ reason) =
       LifecycleJoin     -> "join"
       LifecycleDeadline -> "deadline"
       LifecycleArming   -> "arming"
+      LifecycleInstant  -> "instant"
 prettyCheckError (ArmingUnavailable _) =
   [ "THE ARMING cannot be read here: no obligation has been entered where this"
   , "is written."
@@ -9011,6 +9063,14 @@ prettyCheckWarning = \ case
       whichClause = case drop (k - 1) ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] of
         w : _ | k >= 1 -> "the " <> w <> " clause"
         _ -> "clause " <> Text.textShow k
+  NowInGuard word _ ->
+    [ word <> " in a PROVIDED is the computer's own clock at the moment the program"
+    , "runs, not the time of the event the condition is checked against."
+    , ""
+    , "So the same trace can give different answers on different days. To test"
+    , "the time of the event, in the contract's own timeline, write THE INSTANT."
+    , "If the wall clock is what you mean, this warning can be ignored."
+    ]
   LifecycleNounHidesName p _ defined imported ->
     [ lifecyclePointWords p <> " here is the lifecycle position, not "
         <> Text.intercalate ", " (map quotedName (defined <> imported)) <> "."

@@ -449,6 +449,10 @@ data EvalState =
     { moduleUri  :: !NormalizedUri
     , stack      :: !(IORef Stack)
     , supply     :: !(IORef Int)   -- used for uniques and addresses
+    , instantSupply :: !(IORef Int)
+                                     -- ^ how many instant carriers (@THE INSTANT@, one per
+                                     -- guard evaluation) this evaluation has made; the
+                                     -- next one's index in 'instantCarrierAddress'
     , evalTrace  :: !(Maybe (IORef (DList EvalTraceAction)))
     , envLedger  :: !(IORef LedgerStore) -- append-only event store (M0 substrate, M4
                                          -- per-party + official record); always collected
@@ -985,8 +989,10 @@ newCarrier l origin observed = do
   -- listing prints (found by the forced-on jl4-test run on
   -- ok/every/run-lifecycle-values.l4). A negative address cannot clash.
   uri <- asks (.moduleUri)
+  address <- maybe (userException (UserError "the norm log made more parent-link carriers than an evaluation can number")) pure
+    (originCarrierAddress n)
   pointer <- liftIO (newIORef (WHNF (ValNumber (originKey l n))))
-  pure (MkReference (MkAddress uri (negate (n + 1))) pointer)
+  pure (MkReference (MkAddress uri address) pointer)
 
 -- | The environment a residual obligation keeps when its events run out. The
 -- parent link stays, because the residual descends from the same hand-off
@@ -1006,6 +1012,24 @@ withoutHandoffStamp env = asks (.deonticLog) >>= \ case
         pure (Map.insert lifecycleOriginUnique carrier' env)
       _ -> pure env
   _ -> pure env
+
+-- | The reference @THE INSTANT@ reads inside a guard: the stamp of the event
+-- being matched, already evaluated. Like the norm log's parent link, it takes
+-- no address from the evaluation's supply, because every printed party key
+-- that holds an unforced field names its address, and a guard that does not
+-- mention @THE INSTANT@ must print what it printed before. The address is the
+-- next of the instant carriers' half of the negative 32-bit range, counted per
+-- evaluation, so nothing that keys on an address can mistake it for another
+-- reference of the same evaluation ('instantCarrierAddress' says why).
+instantCarrier :: WHNF -> Eval Reference
+instantCarrier v = do
+  uri <- asks (.moduleUri)
+  counter <- asks (.instantSupply)
+  k <- liftIO (atomicModifyIORef' counter \ c -> (c + 1, c))
+  address <- maybe (userException (UserError "an evaluation read THE INSTANT in more guards than it can number")) pure
+    (instantCarrierAddress k)
+  pointer <- liftIO (newIORef (WHNF v))
+  pure (MkReference (MkAddress uri address) pointer)
 
 -- | The origin a continuation's environment carries, if the writer is on and
 -- a hand-off bound one ('lifecycleOriginUnique').
@@ -1246,10 +1270,42 @@ armNormKey env party act = do
   origin <- case mlog of
     Just l | l.dlWriteFates -> originFromEnv l env
     _                       -> pure Nothing
+  -- N13 (P2): the compounds whose operand this norm is armed inside, and for
+  -- a member of an @EVERY ... ONCE@ barrier, the barrier itself: it is not an
+  -- AND or an OR, so no scope names it, and when it fails it leaves its other
+  -- members armed
+  enclosing <- case mlog of
+    Just l | l.dlWriteFates -> case member of
+      Just m | isBarrier m.moJoin -> (m.moJoinRef :) <$> enclosingNow l
+      _                           -> enclosingNow l
+    _ -> pure []
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = bearer, nkBearerName = name
     , nkBearerSource = source, nkModal = act.modal, nkMember = member
-    , nkAction = Just (prettyLayout act.action), nkOrigin = origin }
+    , nkAction = Just (prettyLayout act.action), nkOrigin = origin
+    , nkActionHead = actionHeadOf act.action, nkEnclosing = enclosing }
+
+-- | The constructor an action pattern names: what a read of the norm log
+-- matches the action on (NORM-LOG-SPEC N2, P2). Read from the syntax, not
+-- from the printed action.
+actionHeadOf :: Pattern Resolved -> Maybe Text
+actionHeadOf = \ case
+  PatApp _ n _ -> Just (nameToText (getOriginal n))
+  _            -> Nothing
+
+-- | The compounds the evaluation is inside an operand of, innermost first,
+-- as the norm log names them (NORM-LOG-SPEC N13, P2): the sibling check's own
+-- scope path, whose head is the innermost scope, looked up in the writer's
+-- table of the compounds it has seen start. The table keeps each compound's
+-- own chain, so the answer is one lookup and shares its tail. Reads and
+-- writes nothing else, and forces nothing.
+enclosingNow :: DeonticLog -> Eval [NormRef]
+enclosingNow l = do
+  sref <- asks (.siblings)
+  st <- liftIO (readIORef sref)
+  case st.ssPath of
+    (scope, _) : _ -> maybe [] (uncurry (:)) . Map.lookup scope <$> liftIO (readIORef l.dlCompounds)
+    []             -> pure []
 
 -- | Refresh a key's bearer once the machine has forced the party to WHNF.
 -- Pure and lazy, so the log-off path pays nothing for it.
@@ -1286,10 +1342,13 @@ armJoinKey env d = do
   origin <- case mlog of
     Just l | l.dlWriteFates -> originFromEnv l env
     _                       -> pure Nothing
+  enclosing <- case mlog of
+    Just l | l.dlWriteFates -> enclosingNow l
+    _                       -> pure []
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = Nothing, nkBearerName = Nothing
     , nkBearerSource = Nothing, nkModal = d.action.modal, nkMember = Nothing
-    , nkAction = Nothing, nkOrigin = origin }
+    , nkAction = Nothing, nkOrigin = origin, nkActionHead = Nothing, nkEnclosing = enclosing }
 
 -- | Register an @EVERY@'s cast, so each member's obligation can find its
 -- membership when it is armed ('armNormKey'). A barrier's arm count starts
@@ -1300,7 +1359,7 @@ registerCast ctx kind members = whenDeonticLog \ l -> liftIO do
       jsite = joinSiteOf ctx.deonton
       total = length members
       entries =
-        [ ((site, partyKeyWHNF mval), MkMemberOf {moJoin = kind, moIndex = i, moTotal = total, moJoinSite = jsite})
+        [ ((site, partyKeyWHNF mval), MkMemberOf {moJoin = kind, moIndex = i, moTotal = total, moJoinSite = jsite, moJoinRef = normRefOf ctx.norm})
         | (i, (_, mval)) <- zip [1 ..] members ]
   modifyIORef' l.dlMembers (\ m -> foldl' (\ acc (k, v) -> Map.insert k v acc) m entries)
   modifyIORef' l.dlJoinDone (Map.insert jsite 0)
@@ -2349,7 +2408,12 @@ startCompound env op rexpr1 rexpr2 rs appType = do
   -- place of its first operand that is still an expression
   whenDeonticLog \ l -> when l.dlWriteFates do
     n <- liftIO (bumpCounter l.dlActivations rsite)
-    liftIO (modifyIORef' l.dlCompounds (Map.insert scope (MkNormRef {nrSite = rsite, nrActivation = n})))
+    -- the compounds this one is an operand of: the path as it stood before
+    -- this compound opened its own scope, innermost first
+    enclosing <- case outerPath of
+      (s, _) : _ -> maybe [] (uncurry (:)) . Map.lookup s <$> liftIO (readIORef l.dlCompounds)
+      []         -> pure []
+    liftIO (modifyIORef' l.dlCompounds (Map.insert scope (MkNormRef {nrSite = rsite, nrActivation = n}, enclosing)))
   case (clock, rs) of
     (Nothing, t : _) -> do
       tref <- asks (.siblingStarts)
@@ -4035,7 +4099,13 @@ backwardContractFrame val = \ case
         -- event's stamp
         noteClockWHNF time
         pushCFrame $ Contract10 ScrutinizeActions {..}
-        continueExpr (env `Map.union` henceEnv) (fromMaybe trueExpr act.provided)
+        -- N4 (P2): THE INSTANT in the guard is the stamp of this event
+        guardEnv <- case act.provided of
+          Nothing -> pure (env `Map.union` henceEnv)
+          Just _  -> do
+            instantRef <- instantCarrier time
+            pure (Map.insert lifecycleInstantUnique instantRef (env `Map.union` henceEnv))
+        continueExpr guardEnv (fromMaybe trueExpr act.provided)
       _ -> internalException $ RuntimeTypeError $
         "expected environment but found: " <> prettyLayout val
   Contract10 ScrutinizeActions {..} ->
@@ -4664,13 +4734,15 @@ backwardContractFrame val = \ case
     -- hand-off that armed it, and, for a breach, SEESAW's two instants.
     joinedStep :: Int -> Environment -> RBinOp -> JoinResult -> (Maybe Rational, Maybe Rational) -> Maybe Side -> Bool -> Eval ()
     joinedStep scope env op result (effective, observed) winner tieBreak = whenDeonticLog \ l -> do
-      (site, origin) <- if l.dlWriteFates
+      (entry, origin) <- if l.dlWriteFates
         then (,) <$> liftIO (Map.lookup scope <$> readIORef l.dlCompounds) <*> originFromEnv l env
         else pure (Nothing, Nothing)
+      let site = fst <$> entry
+          enclosing = maybe [] snd entry
       logStep l MkDeonticStep
         { dsClock = Nothing, dsEvent = Nothing, dsScrutiny = NoEvent, dsNorm = Nothing
         , dsOutcome = Joined op MkJoinNote
-            { jnResult = result, jnRef = site, jnOrigin = origin
+            { jnResult = result, jnRef = site, jnOrigin = origin, jnEnclosing = enclosing
             , jnEffective = if l.dlWriteFates then effective else Nothing
             , jnObserved = if l.dlWriteFates then observed else Nothing
             , jnWinner = winner, jnTieBreak = tieBreak }
@@ -5523,7 +5595,7 @@ barrierStateLest ctx lestExpr tRef cellRef = do
 
 -- | The three uniques. Sort @l@ is used nowhere else (@b@ builtins, @c@
 -- checker, @d@ discharge, @e@ evaluator, @s@ the barrier's sentinels).
-lifecycleJoinUnique, lifecycleDeadlineUnique, lifecycleArmingUnique, lifecycleOriginUnique :: Unique
+lifecycleJoinUnique, lifecycleDeadlineUnique, lifecycleArmingUnique, lifecycleOriginUnique, lifecycleInstantUnique :: Unique
 lifecycleJoinUnique     = MkUnique 'l' 1 lifecycleUri
 lifecycleDeadlineUnique = MkUnique 'l' 2 lifecycleUri
 lifecycleArmingUnique   = MkUnique 'l' 3 lifecycleUri
@@ -5531,6 +5603,11 @@ lifecycleArmingUnique   = MkUnique 'l' 3 lifecycleUri
 -- anchors so that it travels exactly as they do ('bindLifecycle',
 -- 'rebindLifecycle', 'operandHandoff'). Not an anchor: no program can read it.
 lifecycleOriginUnique   = MkUnique 'l' 4 lifecycleUri
+-- | NORM-LOG-SPEC N4 (P2): @THE INSTANT@, bound for the evaluation of a
+-- @PROVIDED@ guard only ('instantCarrier'), to the stamp of the event the
+-- guard is matched against. Not a hand-off position: 'bindLifecycle' neither
+-- sets nor deletes it, because a guard is not an obligation's continuation.
+lifecycleInstantUnique  = MkUnique 'l' 5 lifecycleUri
 
 lifecycleUri :: NormalizedUri
 lifecycleUri = toNormalizedUri (Uri "jl4:lifecycle")
@@ -5607,6 +5684,7 @@ lifecyclePointUnique = \ case
   LifecycleJoin     -> lifecycleJoinUnique
   LifecycleDeadline -> lifecycleDeadlineUnique
   LifecycleArming   -> lifecycleArmingUnique
+  LifecycleInstant  -> lifecycleInstantUnique
 
 -- | An obligation's environment as it is armed: THE ARMING bound to the
 -- arming instant ONLY where no hand-off bound one (§2.6 card B1, "THE
