@@ -1094,8 +1094,10 @@ A contract rule that is refused is still evaluated where you write it, so its `#
 
 `l4 check` and `l4 run` report the error and fail, with exit status 1.
 The editor shows **Deploy** as off while the file has the error.
-A file that reaches jl4-service with the error is deployed without that rule: the service deploys its other exported rules, gives the reasons in a `refusedExports` field of the deployment's status, and answers a call to the left-out rule with a `404` that says why.
-When every exported rule of the deployment, in the file and in the files it imports, is refused, nothing is deployed.
+`l4 deploy` and `l4 redeploy` upload the file anyway, and the service deploys its other exported rules without this one.
+`l4 deploy` then lists the rules it left out, each with its reason, under `Left out`, and exits with status 0, because the deployment is live; with `--json`, they are in a `refused` list.
+The service gives the same reasons in a `refusedExports` field of the deployment's status, and a call to the left-out rule gets a `404` that says why.
+When every exported rule of the deployment, in the file and in the files it imports, is refused, nothing is deployed, and `l4 deploy` prints the reasons and exits with status 1.
 The editor shows it as an error from `export`.
 The error does not stop the rest of the file: it is still checked for type errors, `l4 run` still evaluates it and prints its results, and the editor still shows the results of its `#EVAL`s and `#EVALTRACE`s, the refused rule's own included.
 `@export default` is refused the same way.

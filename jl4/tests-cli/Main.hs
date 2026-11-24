@@ -1316,6 +1316,23 @@ spec bin = do
           serr `shouldSatisfy` isInfixOf "Could not reach http://127.0.0.1:9"
           serr `shouldNotSatisfy` isInfixOf "doesn't typecheck"
 
+    -- An @export that cannot be sent is the one error that does not stop the
+    -- upload: `l4 check` still fails on it, and jl4-service deploys the file's
+    -- other exports and names the refused one, which the deploy prints
+    -- (DEADWOOD; decided by Claude 2026-11-24, pending Meng's review).
+    forM_ ["deploy", "redeploy"] \cmd ->
+      it ("lets " <> cmd <> " of a file with an @export that cannot be sent past the local check, where l4 check fails") $ do
+        let entry = fixtureDir </> "run-export-refused.l4"
+        Output check _ _ <- runL4 bin ["check", entry]
+        check `shouldBe` ExitFailure 1
+        Output code _ serr <- runL4 bin ([cmd, entry] ++ noServer)
+        code `shouldBe` ExitFailure 1
+        serr `shouldSatisfy` isInfixOf "Could not reach http://127.0.0.1:9"
+        serr `shouldNotSatisfy` isInfixOf "doesn't typecheck"
+        -- and says, before the upload, which rule cannot be deployed and why
+        serr `shouldSatisfy` isInfixOf "These rules cannot be deployed, because their @export cannot be sent as JSON"
+        serr `shouldSatisfy` isInfixOf "`apply twice` is published with @export, but its input `f` is a function"
+
   -- The names a multi-clause group is compiled to are spelled so that no
   -- source can write them ('L4.Parser.generatedName'), and say what they are.
   describe "multi-clause groups: the names they are compiled to" $ do

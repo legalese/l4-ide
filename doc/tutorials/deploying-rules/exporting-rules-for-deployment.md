@@ -79,7 +79,7 @@ Deploying to a name that already exists updates that deployment. The extension f
 
 ### From the command line
 
-The `l4` command deploys the same way. Sign in once with the `legalese` command (`l4 install legalese`, then `legalese login`), then run `l4 deploy insurance-premium.l4` to create the deployment and `l4 redeploy insurance-premium.l4` to update it; `redeploy` refuses breaking changes unless you add `--force`. `l4 deployments` lists your deployments and `l4 undeploy NAME` removes one. With `--server`, the same commands deploy to a jl4-service you run yourself. See [Using the l4 CLI](../getting-started/l4-cli.md).
+The `l4` command deploys the same way. Sign in once with the `legalese` command (`l4 install legalese`, then `legalese login`), then run `l4 deploy insurance-premium.l4` to create the deployment and `l4 redeploy insurance-premium.l4` to update it; `redeploy` refuses breaking changes unless you add `--force`. Unlike the sidebar, `l4 deploy` uploads a file that has a rule whose input or result cannot be sent: the service deploys the other rules, and `l4 deploy` lists the one it left out, with the reason. `l4 deployments` lists your deployments and `l4 undeploy NAME` removes one. With `--server`, the same commands deploy to a jl4-service you run yourself. See [Using the l4 CLI](../getting-started/l4-cli.md).
 
 ---
 

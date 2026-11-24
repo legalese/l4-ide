@@ -33,14 +33,14 @@ import qualified Base.Text as Text
 import qualified Codec.Archive.Zip as Zip
 import Control.Concurrent (threadDelay)
 import Control.Exception (IOException, try)
-import Control.Monad (forM, unless, when)
+import Control.Monad (forM, forM_, unless, when)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.Char (isAscii, isAlphaNum)
-import Data.List (sortOn)
+import Data.List (nub, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
@@ -57,8 +57,11 @@ import System.IO (hFlush, hIsTerminalDevice, stderr, stdin)
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
+import LSP.Core.Types.Diagnostics (FileDiagnostic (..))
 import Language.LSP.Protocol.Types
-  ( NormalizedUri
+  ( Diagnostic (..)
+  , DiagnosticSeverity (..)
+  , NormalizedUri
   , fromNormalizedFilePath
   , normalizedFilePathToUri
   , uriToNormalizedFilePath
@@ -235,11 +238,20 @@ publish mode opts = do
           fns = maybe [] (mapMaybe (textField "name") . arrayField "functions") meta
           version = meta >>= textField "deploymentVersion"
           url = Text.pack (t.baseUrl <> deploymentPath t depName)
+          -- The @exports the service left out because they cannot be sent
+          -- (an older service sends none). The exit status stays 0: the
+          -- deployment is live, with the rest of its rules.
+          refused =
+            [ (n, mapMaybe (\case Aeson.String s -> Just s; _ -> Nothing) (arrayValues "reasons" r))
+            | r <- maybe [] (arrayField "refusedExports") meta
+            , Just n <- [textField "name" r]
+            ]
       if opts.jsonOut
         then BSL8.putStrLn $ Aeson.encode $ result status
           [ "version"   Aeson..= version
           , "functions" Aeson..= fns
           , "url"       Aeson..= url
+          , "refused"   Aeson..= [Aeson.object ["name" Aeson..= n, "reasons" Aeson..= rs] | (n, rs) <- refused]
           ]
         else do
           Text.putStrLn $
@@ -249,6 +261,13 @@ publish mode opts = do
                    [] -> "."
                    _ -> " with " <> plural (length fns) "function" <> ":"
           mapM_ (Text.putStrLn . ("  " <>)) fns
+          unless (null refused) $ do
+            Text.putStrLn $ "Left out " <> plural (length refused) "function"
+              <> " whose @export cannot be sent as JSON (`l4 check` reports "
+              <> (if length refused == 1 then "it as an error" else "them as errors") <> "):"
+            forM_ refused \(n, rs) -> do
+              Text.putStrLn ("  " <> n)
+              mapM_ (Text.putStrLn . ("    " <>)) rs
           Text.putStrLn ("API: " <> url)
   where
     verb = case mode of
@@ -289,11 +308,29 @@ bundle fp = do
   -- published anywhere in its import closure. The entry file's own result can
   -- look fine when a file it imports is broken, when an IMPORT finds no module,
   -- or when imports form a cycle.
+  --
+  -- With one exception: an @export that the export check refuses (an error
+  -- from "export") does not stop the upload. jl4-service deploys the file's
+  -- other exports and names the refused ones, and the summary below prints
+  -- them; `l4 check` and the editor still report it as an error (decided by
+  -- Claude 2026-11-24, pending Meng's review).
+  let blocking = filter (\fd -> fd.fdLspDiagnostic._source /= Just "export") diags
   tc <- case mTc of
-    Just tc | tc.success, not (hasBlockingError diags) -> pure tc
+    Just tc | tc.success, not (hasBlockingError blocking) -> pure tc
     _ -> do
       putDiagnostics errs
       die (Text.pack fp <> " doesn't typecheck; fix it before deploying (see `l4 check`).")
+  -- Say so before the upload, so that it is said with --no-wait too, and to a
+  -- service that does not report what it left out.
+  let exportErrors = nub
+        [ Text.strip fd.fdLspDiagnostic._message
+        | fd <- diags
+        , fd.fdLspDiagnostic._source == Just "export"
+        , fd.fdLspDiagnostic._severity == Just DiagnosticSeverity_Error
+        ]
+  unless (null exportErrors) $ do
+    note "These rules cannot be deployed, because their @export cannot be sent as JSON; the rest of the file is uploaded (`l4 check` reports them as errors):"
+    forM_ exportErrors \m -> mapM_ (note . ("  " <>)) (Text.lines m)
 
   let paths = absFp : mapMaybe moduleFile (drop 1 (flatten tc))
   -- A standard library the typechecker took from the copies built into l4 has
@@ -474,6 +511,11 @@ objectField :: Text -> Aeson.Object -> Maybe Aeson.Object
 objectField k o = case KeyMap.lookup (Key.fromText k) o of
   Just (Aeson.Object x) -> Just x
   _ -> Nothing
+
+arrayValues :: Text -> Aeson.Object -> [Aeson.Value]
+arrayValues k o = case KeyMap.lookup (Key.fromText k) o of
+  Just (Aeson.Array a) -> Vector.toList a
+  _ -> []
 
 arrayField :: Text -> Aeson.Object -> [Aeson.Object]
 arrayField k o = case KeyMap.lookup (Key.fromText k) o of

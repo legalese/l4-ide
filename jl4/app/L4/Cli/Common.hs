@@ -300,7 +300,9 @@ latestDiagnostics = snd . foldr step (Set.empty, [])
 
 -- 'hasBlockingError' (re-exported) is the rule for whether a diagnostics set
 -- should make a CLI command exit non-zero. It lives in jl4-lsp so that the
--- editor's Deploy buttons refuse exactly what @l4 check@ and @l4 deploy@ do.
+-- editor's Deploy buttons refuse exactly what @l4 check@ does. @l4 deploy@
+-- uses it too, with one exception: an error from the export check does not
+-- stop its upload ("L4.Cli.Deploy".'bundle').
 -- It leaves out the evaluator's diagnostics (source @\"eval\"@): a failed
 -- @#ASSERT@ is one, at Error severity, and keeps @l4 run@ at exit 0. A
 -- directive that CRASHES does fail the run, but @l4 run@ decides that from the
