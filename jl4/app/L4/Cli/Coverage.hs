@@ -68,7 +68,7 @@ import qualified L4.Decision.QueryPlan as QP
 import L4.Evaluate.ValueLazy (Environment, NF (..), Value (..))
 import L4.EvaluateLazy (EvalConfig, EvalDirectiveResult (..), EvalDirectiveValue (..), ReductionOutcome (..), execEvalExprInContextOfModule)
 import L4.EvaluateLazy.Machine (pattern ValBool)
-import L4.EvaluateLazy.Exceptions (LimitStopped (..), isLimitStop, prettyEvalException)
+import L4.EvaluateLazy.Exceptions (LimitStopped (..), Refusal (..), isLimitStop, prettyEvalException)
 import Control.Exception (handle, throwIO)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print (prettyLayout)
@@ -108,9 +108,11 @@ data CoverEnv ans = CoverEnv
   , ceImportEnv :: Environment
   , ceSolver :: Maybe Solver
   , ceSolverSecs :: Int
-  , ceAnswer :: NF -> Maybe ans
-    -- ^ how the caller renders the decision's answer at a witness; 'Nothing'
-    -- leaves the bucket undecided
+  , ceAnswer :: NF -> Either Text ans
+    -- ^ how the caller renders the decision's answer at a witness; 'Left'
+    -- says why it cannot, which is the reason the bucket is left undecided.
+    -- An answer L4 could not compute (it raised an error) never gets here:
+    -- the reason for that names L4's error, and is the same for every caller.
   , ceFallbackOnUndecided :: Bool
     -- ^ cover at rung level when the leaf cross leaves any bucket undecided,
     -- for a caller that needs every bucket decided (the Catala gate)
@@ -303,19 +305,37 @@ coverTargetWith ce t
           Just argss -> Bucket bs <$> witnessed argss False
           Nothing -> viaSolver params exprs space bs
 
-  -- The decision's answer at each witness.
+  -- The decision's answer at each witness. A witness where L4 gives no answer
+  -- leaves the bucket undecided, and the reason says what L4 did there and
+  -- at which input (smucclaw/l4-ide#1096).
   witnessed argss fromSolver = do
     rows <- for argss \args -> do
       r <- evalExpr (App emptyAnno t.ctName args)
-      pure case r >>= ce.ceAnswer of
-        Just a -> Right Row
-          { rowArgs = args
-          , rowArgsText = map (oneLine . prettyLayout . exactValue) args
-          , rowAnswer = a, rowFromSolver = fromSolver }
-        Nothing -> Left "L4 produced no Catala-renderable value at a witness"
+      let argsText = map (oneLine . prettyLayout . exactValue) args
+          at = maybe "" (" at " <>) (inputsText args)
+      pure case r of
+        Value nf -> case ce.ceAnswer nf of
+          Right a -> Right Row
+            { rowArgs = args, rowArgsText = argsText
+            , rowAnswer = a, rowFromSolver = fromSolver }
+          Left why -> Left why
+        Raised err -> Left ("L4 raises an error" <> at <> ": \"" <> err <> "\"")
+        NoValue why -> Left ("L4 gives no answer" <> at <> ": " <> why)
     pure case [ why | Left why <- rows ] of
       (why : _) -> Undecided why
       [] -> Witnessed [ r | Right r <- rows ]
+
+  paramNames = [ nameToText (getOriginal r) | (r, _) <- t.ctParams ]
+
+  -- The inputs of a witness, named, for a reason; 'Nothing' when the
+  -- decision has none. A constructor value with more than one argument is
+  -- put in parentheses, so that its fields do not read as more inputs.
+  inputsText args
+    | null args = Nothing
+    | otherwise = Just (Text.intercalate ", " [ n <> " = " <> valueText v | (n, v) <- zip paramNames args ])
+  valueText v = case exactValue v of
+    e@(App _ _ (_ : _ : _)) -> "(" <> oneLine (prettyLayout e) <> ")"
+    e -> oneLine (prettyLayout e)
 
   -- A bucket no candidate realises: the solver says it is impossible, or gives
   -- a witness the evaluator must confirm.
@@ -352,12 +372,12 @@ coverTargetWith ce t
   -- is tried on its own instead.
   atomVectors params atoms cands = concat <$> for (chunksOf 128 cands) \batch -> do
     r <- handle (\ (LimitStopped _) -> pure Nothing)
-           (evalExpr (List emptyAnno [ bindAt params c (List emptyAnno atoms) | c <- batch ]))
+           (valueOf <$> evalExpr (List emptyAnno [ bindAt params c (List emptyAnno atoms) | c <- batch ]))
     case r >>= listOf of
       Just rows | length rows == length batch -> pure (map boolsOf rows)
       _ -> for batch \c -> do
         r1 <- evalExpr (bindAt params c (List emptyAnno atoms))
-        pure (r1 >>= boolsOf)
+        pure (valueOf r1 >>= boolsOf)
 
   -- The parameters bound to a candidate's values, around an expression, at
   -- the parameters' own addresses.
@@ -369,14 +389,24 @@ coverTargetWith ce t
       | ((rs, _), v) <- zip params vals, r <- rs ]
       body
 
+  -- A stop at a limit is thrown, not returned: it is not "raises" (see
+  -- 'coverTarget'), and it is checked before any other error.
   evalExpr e = do
     res <- execEvalExprInContextOfModule ce.ceEval tc.entityInfo e (ce.ceImportEnv, tc.module')
-    case res of
-      Just d
-        | Reduction (Reduced nf) <- d.result -> pure (Just nf)
-        | Reduction (ReducedErrored exc) <- d.result, isLimitStop exc ->
-            throwIO (LimitStopped (Text.unwords (prettyEvalException exc)))
-      _ -> pure Nothing
+    case fmap (.result) res of
+      Just (Reduction (Reduced nf)) -> pure (Value nf)
+      Just (Reduction (ReducedErrored exc))
+        | isLimitStop exc -> throwIO (LimitStopped (Text.unwords (prettyEvalException exc)))
+        | otherwise -> pure (Raised (oneLine (Text.unwords (prettyEvalException exc))))
+      Just (Reduction (ReducedRefused r)) -> pure (NoValue ("it refuses to answer: \"" <> oneLine r.message <> "\""))
+      -- Neither of the last two is reached as the report stands, and no
+      -- fixture can reach them: a decision that reads an ASSUME is not
+      -- covered at all, and every input of a witness is given a value, so no
+      -- answer waits on one; and the evaluator returns one result for the one
+      -- directive it is given ('execEvalExprInContextOfModule'). They are
+      -- named so that a change elsewhere shows up as a reason, not a silence.
+      Just (Reduction (ReducedUndetermined _)) -> pure (NoValue "its answer waits on a value it was not given")
+      _ -> pure (NoValue "the evaluator returned nothing")
 
   listOf = \case
     MkNF v -> spine v
@@ -388,6 +418,18 @@ coverTargetWith ce t
   boolsOf nf = listOf nf >>= traverse \case
     MkNF (ValBool b) -> Just b
     _ -> Nothing
+
+-- | What the evaluator made of an expression: its value, the error it raised,
+-- or why it gave neither.
+data Evaluated
+  = Value NF
+  | Raised Text
+  | NoValue Text
+
+valueOf :: Evaluated -> Maybe NF
+valueOf = \case
+  Value nf -> Just nf
+  _ -> Nothing
 
 chunksOf :: Int -> [a] -> [[a]]
 chunksOf _ [] = []

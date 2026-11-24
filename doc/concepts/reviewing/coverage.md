@@ -81,6 +81,16 @@ Coverage: 1 decision covered (4 cover points, 16 buckets); 16 witnessed by 72 in
 - **proved impossible** means no input at all makes this combination true, and a solver, a program that decides such questions, proved it.
   See below.
 - **UNDECIDED** means neither: L4 did not find an input and could not prove there is none, and says why (there is no solver installed, the solver ran out of time, and so on).
+  A bucket is also undecided when the rule raises an error at one of the inputs found for it, such as a division by zero or a day that is not a date; the reason then quotes the error and shows the input (from `examples/coverage-report/dates.l4`, which counts the days from 1 March to a date it builds from a day, a month and a year):
+
+  ```
+      T    UNDECIDED: L4 raises an error at d = 0, m = 3, y = 0: "DATE_FROM_DMY produced an invalid date from day=0, month=3, year=0"
+  ```
+
+  A rule that calls itself without end at such an input stops at one of L4's limits, and which one decides what the report says.
+  One that adds to the answer of its own call, such as one that sums the numbers from its input down to zero, called with a number below zero, stops at L4's limit on depth, and that counts as an error too: `L4 raises an error at n = -1: "Stack overflow: …"`.
+  One whose answer is the answer of its own call, such as one that counts down to zero, called the same way, stops at L4's limit on steps instead, and a stop at a limit says nothing about the rule's answer there, so the rule is not covered at all: `NOT COVERED: the evaluator stopped at a limit at an input it tried: …`, and the exit status is 3.
+  A rule that answers with `REFUSE` there leaves the bucket undecided as well, and the reason quotes the refusal: `L4 gives no answer at n = 0: it refuses to answer: "…"`.
   An undecided bucket is never counted as covered.
 
 ### A combination that cannot happen

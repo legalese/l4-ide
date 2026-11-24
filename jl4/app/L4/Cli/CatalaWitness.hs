@@ -49,7 +49,8 @@ witnessGates evalConfig tc importEnv msolver secs jsonOf humanOf = do
   ce = CoverEnv
     { ceEval = evalConfig, ceTc = tc, ceImportEnv = importEnv
     , ceSolver = msolver, ceSolverSecs = secs
-    , ceAnswer = \nf -> fmap (\j -> (j, humanOf nf)) (jsonOf nf)
+    , ceAnswer = \nf -> maybe (Left "L4 produced no Catala-renderable value at a witness")
+                              (\j -> Right (j, humanOf nf)) (jsonOf nf)
     -- the lowering needs every combination decided; a leaf cross that leaves
     -- one undecided gives way to the rungs, which may not
     , ceFallbackOnUndecided = True

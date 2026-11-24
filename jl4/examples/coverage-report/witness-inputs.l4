@@ -1,0 +1,22 @@
+-- How an UNDECIDED bucket names the input at which L4 raised an error
+-- (smucclaw/l4-ide#1096). An account with a positive balance and no limit
+-- divides by zero; a record input is named in parentheses, so that its
+-- fields do not read as more inputs.
+DECLARE Account HAS
+    balance IS A NUMBER
+    limit IS A NUMBER
+
+GIVEN a IS AN Account
+GIVETH A NUMBER
+DECIDE `usage` a IS
+    IF a's balance GREATER THAN 0
+    THEN a's balance DIVIDED BY a's limit
+    ELSE 0
+
+-- A rule with no inputs, whose one witness divides by zero: the reason names
+-- no input.
+GIVETH A NUMBER
+DECIDE `constant share` IS
+    IF 1 GREATER THAN 0
+    THEN 1 DIVIDED BY 0
+    ELSE 0

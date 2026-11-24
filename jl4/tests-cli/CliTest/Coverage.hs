@@ -24,6 +24,10 @@ fixtures =
   , "examples/catala/or-leaves.l4"
   , "examples/catala/guarded-leaf.l4"
   , "examples/coverage-report/expected/bands.txt"
+  , "examples/coverage-report/divide.l4"
+  , "examples/coverage-report/dates.l4"
+  , "examples/coverage-report/refuse.l4"
+  , "examples/coverage-report/witness-inputs.l4"
   , "examples/coverage-report/expected/or-leaves.txt"
   , "examples/coverage-report/no-condition.l4"
   , "examples/coverage-report/varies.l4"
@@ -110,6 +114,55 @@ spec bin = describe "l4 coverage" $ do
     Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/unread.l4"]
     code `shouldBe` ExitSuccess
     sout `shouldSatisfy` ("Inputs no condition reads (tried at one value only, so the answers below may vary with them): income" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1096. When L4 raises an error at a witness, the bucket
+  -- is undecided, and the reason must say what L4 raised and at which input.
+  -- It used to say "no Catala-renderable value", which named neither, and
+  -- mentioned Catala though no export was asked for.
+  it "names the error L4 raises at a witness, and the input, without mentioning Catala" $ do
+    Output code' sout' _ <- runL4 bin ["coverage", "examples/coverage-report/dates.l4"]
+    sout' `shouldNotSatisfy` ("Catala" `isInfixOf`)
+    sout' `shouldSatisfy` ("T    UNDECIDED: L4 raises an error at d = 0, m = 3, y = 0: \"DATE_FROM_DMY produced an invalid date from day=0, month=3, year=0\"" `isInfixOf`)
+    code' `shouldBe` ExitFailure 2
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/divide.l4"]
+    sout `shouldNotSatisfy` ("Catala" `isInfixOf`)
+    sout `shouldSatisfy` ("F    UNDECIDED: L4 raises an error at casual = FALSE, salary = 0, hours = 0, flat = 0: \"Division by zero in the operation: DIVIDED BY\"" `isInfixOf`)
+    code `shouldBe` ExitFailure 2
+
+  -- The JSON report carries the same reason.
+  it "carries the error L4 raises at a witness in the JSON report" $ do
+    Output code sout _ <- runL4 bin ["coverage", "--json", "examples/coverage-report/divide.l4"]
+    code `shouldBe` ExitFailure 2
+    let whys = case Aeson.decode (BSL8.pack sout) :: Maybe Aeson.Value of
+          Just (Aeson.Object o) | Just (Aeson.Array ds) <- KM.lookup "decisions" o ->
+            [ w | Aeson.Object d <- toList ds, Just (Aeson.Array bs) <- [KM.lookup "buckets" d]
+                , Aeson.Object b <- toList bs, Just w <- [KM.lookup "why" b] ]
+          _ -> []
+    whys `shouldBe` [Aeson.String "L4 raises an error at casual = FALSE, salary = 0, hours = 0, flat = 0: \"Division by zero in the operation: DIVIDED BY\""]
+
+  -- A refusal at a witness has a reason of its own, which quotes it.
+  it "quotes a refusal at a witness, and exits 2" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/refuse.l4"]
+    sout `shouldSatisfy` ("F    UNDECIDED: L4 gives no answer at n = 0: it refuses to answer: \"no rate up to 10\"" `isInfixOf`)
+    code `shouldBe` ExitFailure 2
+
+  -- How that reason names the input: a record value in parentheses, so that
+  -- its fields do not read as more inputs, and no input at all for a rule
+  -- that has none (it read "at :" before).
+  it "names a record input in parentheses, and no input for a rule with none, where L4 raises at a witness" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/witness-inputs.l4"]
+    sout `shouldSatisfy` ("    T    UNDECIDED: L4 raises an error at a = (Account OF " `isInfixOf`)
+    sout `shouldSatisfy` ("    T    UNDECIDED: L4 raises an error: \"Division by zero in the operation: DIVIDED BY\"" `isInfixOf`)
+    sout `shouldNotSatisfy` (" at :" `isInfixOf`)
+    code `shouldBe` ExitFailure 2
+
+  -- A CONSIDER with no OTHERWISE whose WHENs miss an option raises at that
+  -- option, and the reason says so, plain and @nonexhaustive alike. (This
+  -- reads the fixture of the CONSIDER tests, so it needs that change too.)
+  it "quotes the error a CONSIDER with no branch for an option raises at it" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/consider-partial.l4"]
+    length (filter ("    F  F    UNDECIDED: L4 raises an error at p = team: \"The value team reached a CONSIDER that has no branch for it." `isPrefixOf`) (lines sout)) `shouldBe` 2
+    code `shouldBe` ExitFailure 2
 
   it "refuses a --decision that names nothing, exit 1" $ do
     Output code _ serr <- runL4 bin ["coverage", "--decision", "no such rule", "examples/catala/bands.l4"]

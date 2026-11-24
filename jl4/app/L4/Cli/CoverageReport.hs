@@ -24,7 +24,8 @@
 -- [proved impossible] no input realises it, which the solver (z3, @Z3_EXE@
 --   else @PATH@) proved;
 -- [undecided] neither, with the reason: no solver, a timeout, a solver
---   answer of @unknown@, an input the evaluator could not run.
+--   answer of @unknown@, an input at which L4 raises an error (quoted, with
+--   the input).
 --
 -- A decision whose leaves cannot all be taken separately is covered at rung
 -- level, the conditions as written, and the report says so and says why. A
@@ -216,7 +217,7 @@ coverageWith opts evalConfig = do
           ce = CoverEnv
             { ceEval = evalConfig, ceTc = tc, ceImportEnv = importEnv
             , ceSolver = msolver, ceSolverSecs = opts.covTimeout
-            , ceAnswer = \nf -> Just (Text.strip (prettyLayoutNF fields nf))
+            , ceAnswer = \nf -> Right (Text.strip (prettyLayoutNF fields nf))
             , ceFallbackOnUndecided = False }
       entries <- for chosen \(name, mt) -> case mt of
         Left why -> pure (Entry name Nothing [] [] (NotCovered why))

@@ -1,0 +1,29 @@
+-- Illustrative rules, not a statute, for where L4 raises an error at an input
+-- the witness gate would test (smucclaw/l4-ide#1096).
+--
+-- A share divides a hundred by the difference of two inputs, x and y, when
+-- either of them is five. At five and five the difference is zero, so L4
+-- raises there, and the combination in which both conditions hold cannot be
+-- tested. The gate falls back to testing the condition as written, and the
+-- note in the emitted document says why, quoting the error and naming the
+-- input. The gate tests the first eight inputs that make that condition
+-- true. z, which no condition reads, is tried at four values and varies
+-- first, so those eight are the four with x five and y zero and the four
+-- with x zero and y five. L4 answers at each of them, and the gate is built.
+@export default A share that divides by a difference
+GIVEN z IS A NUMBER, x IS A NUMBER, y IS A NUMBER
+GIVETH A NUMBER
+DECIDE `share` z x y IS
+    IF x EQUALS 5 OR y EQUALS 5
+    THEN 100 DIVIDED BY (x MINUS y)
+    ELSE 0
+
+-- The reciprocal of zero raises at the only input where its one condition
+-- holds, so no gate can be built, and the message on stderr quotes the error.
+@export The reciprocal of zero, which has none
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `reciprocal at zero` n IS
+    IF n EQUALS 0
+    THEN 1 DIVIDED BY n
+    ELSE 0
