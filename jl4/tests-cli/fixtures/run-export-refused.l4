@@ -1,9 +1,7 @@
 -- l4 run prints what l4 check reports of an @export (review of #779,
 -- 2026-11-20): this one takes a function, which cannot be sent, and the file
--- is still evaluated. l4 deploy uploads it, past the local check, only to a
--- service that says it leaves such an export out (X-L4-Capabilities:
--- refused-exports; DEADWOOD), which then refuses the export; to any other
--- service it refuses the file before uploading.
+-- is still evaluated. l4 deploy uploads it past the local check (DEADWOOD),
+-- and the service, not the local check, refuses the export.
 
 @export Apply twice
 GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER

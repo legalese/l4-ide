@@ -1,6 +1,6 @@
 -- l4 deploy of a file with one @export that can be sent and one that cannot
--- (DEADWOOD): it is uploaded only to a service that says it leaves such an
--- export out ("refused-exports"), and refused locally otherwise.
+-- (DEADWOOD): it is uploaded past the local check, and l4 deploy reports
+-- what the service left out.
 
 @export Double a number
 GIVEN m IS A NUMBER

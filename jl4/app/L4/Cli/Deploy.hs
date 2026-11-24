@@ -150,24 +150,10 @@ redeployCmd = publish Update
 publish :: Mode -> DeployOptions -> IO ()
 publish mode opts = do
   depName <- either die pure $ deploymentName opts.file opts.name
-  (files, exportErrors, checkLog) <- bundle opts.file
+  files <- bundle opts.file
   t <- resolveTarget opts.target
 
-  (existing, serviceCaps) <- lookupDeployment t depName
-  -- A file with an @export that cannot be sent goes only to a service that
-  -- leaves such an export out and deploys the rest ("refused-exports"). One
-  -- that does not say so either rejects the whole file or, if it predates the
-  -- export check, publishes the export unchecked; so the file is refused here,
-  -- as it always was.
-  unless (null exportErrors) $
-    if "refused-exports" `elem` serviceCaps
-      then do
-        note "These rules cannot be deployed, because their @export cannot be sent as JSON; the rest of the file is uploaded (`l4 check` reports them as errors):"
-        forM_ exportErrors \m -> mapM_ (note . ("  " <>)) (Text.lines m)
-      else do
-        putDiagnostics checkLog
-        note (t.label <> " does not say that it can leave out an @export that cannot be sent, so the file is not uploaded.")
-        die (Text.pack opts.file <> " doesn't typecheck; fix it before deploying (see `l4 check`).")
+  existing <- lookupDeployment t depName
   case (mode, existing) of
     (Create, Just _) -> die $
       "'" <> depName <> "' already exists in " <> t.label <> ".\n"
@@ -253,10 +239,10 @@ publish mode opts = do
           version = meta >>= textField "deploymentVersion"
           url = Text.pack (t.baseUrl <> deploymentPath t depName)
           -- The @exports the service left out because they cannot be sent
-          -- (an older service sends none), each with its file, and whether
-          -- an @export whose name matches it is served, so the name
-          -- still answers. The exit status stays 0: the deployment is live,
-          -- with the rest of its rules.
+          -- (a service built before it left them out sends none), each with
+          -- its file, and whether an @export whose name matches it is served,
+          -- so the name still answers. The exit status stays 0: the
+          -- deployment is live, with the rest of its rules.
           refused =
             [ ( n
               , fromMaybe "" (textField "file" r)
@@ -316,10 +302,8 @@ deploymentName fp explicit
     validChar c = isAscii c && (isAlphaNum c || c == '-' || c == '_')
 
 -- | Check the file as @l4 check@ does, and collect it plus its transitive
--- imports as (name in the zip, contents), root first; with the errors of the
--- export check, which do not stop it here, and the check's log to print if the
--- caller refuses the file for them.
-bundle :: FilePath -> IO ([(FilePath, BSL.ByteString)], [Text], [Text])
+-- imports as (name in the zip, contents), root first.
+bundle :: FilePath -> IO [(FilePath, BSL.ByteString)]
 bundle fp = do
   absFp <- makeAbsolute fp
   present <- doesFileExist absFp
@@ -335,22 +319,29 @@ bundle fp = do
   -- or when imports form a cycle.
   --
   -- With one exception: an @export that the export check refuses (an error
-  -- from "export") does not stop the check here. The caller uploads such a
-  -- file only to a service that deploys the file's other exports and names
-  -- the refused ones ('publish'); `l4 check` and the editor still report it as
-  -- an error (decided by Claude 2026-11-24, pending Meng's review).
+  -- from "export") does not stop the upload. jl4-service deploys the file's
+  -- other exports and names the refused ones, and the summary below prints
+  -- them; `l4 check` and the editor still report it as an error (decided by
+  -- Claude 2026-11-24, pending Meng's review). A service built before it left
+  -- such an export out answers as it would any client: it rejects the file,
+  -- or, built before the export check, publishes the export unchecked.
   let blocking = filter (\fd -> fd.fdLspDiagnostic._source /= Just "export") diags
   tc <- case mTc of
     Just tc | tc.success, not (hasBlockingError blocking) -> pure tc
     _ -> do
       putDiagnostics errs
       die (Text.pack fp <> " doesn't typecheck; fix it before deploying (see `l4 check`).")
+  -- Say so before the upload, so that it is said with --no-wait too, and to a
+  -- service that does not report what it left out.
   let exportErrors = nub
         [ Text.strip fd.fdLspDiagnostic._message
         | fd <- diags
         , fd.fdLspDiagnostic._source == Just "export"
         , fd.fdLspDiagnostic._severity == Just DiagnosticSeverity_Error
         ]
+  unless (null exportErrors) $ do
+    note "These rules cannot be deployed, because their @export cannot be sent as JSON; the rest of the file is uploaded (`l4 check` reports them as errors):"
+    forM_ exportErrors \m -> mapM_ (note . ("  " <>)) (Text.lines m)
 
   let paths = absFp : mapMaybe moduleFile (drop 1 (flatten tc))
   -- A standard library the typechecker took from the copies built into l4 has
@@ -367,7 +358,7 @@ bundle fp = do
     clashes -> die $ Text.unlines $
       "These imported files share a name, but the upload is flat (as from VS Code). Rename one of each:"
         : [ "  " <> Text.pack n <> ": " <> Text.intercalate ", " (map Text.pack ps) | (n, ps) <- clashes ]
-  pure ([ (takeFileName p, c) | (p, c) <- files ], exportErrors, errs)
+  pure [ (takeFileName p, c) | (p, c) <- files ]
   where
     moduleUri :: Rules.TypeCheckResult -> NormalizedUri
     moduleUri r = case r.module' of MkModule _ u _ -> u
@@ -390,14 +381,14 @@ bundle fp = do
           | otherwise = x : go (Set.insert x s) xs
 
 -- | The deployment's status (without functions), or Nothing if there's
--- no such deployment; and what the service says it can do.
-lookupDeployment :: Target -> Text -> IO (Maybe Aeson.Object, [Text])
+-- no such deployment.
+lookupDeployment :: Target -> Text -> IO (Maybe Aeson.Object)
 lookupDeployment t depName = do
   r <- send t =<< newRequest t "GET" (deploymentPath t depName <> "?functions=none")
   if r.status == 404
-    then pure (Nothing, r.capabilities)
+    then pure Nothing
     else if isSuccess r
-      then pure (Just (fromMaybe mempty (decodeObject r.body)), r.capabilities)
+      then pure (Just (fromMaybe mempty (decodeObject r.body)))
       else die ("Could not look up '" <> depName <> "' in " <> t.label <> ": " <> errorMessage r)
 
 getDeployment :: Target -> Text -> IO (Maybe Aeson.Object)

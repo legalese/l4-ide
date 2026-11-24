@@ -1333,11 +1333,9 @@ spec bin = do
         serr `shouldSatisfy` isInfixOf "Could not reach http://127.0.0.1:9"
         serr `shouldNotSatisfy` isInfixOf "doesn't typecheck"
 
-    -- Whether it uploads depends on the service: only one that says it leaves
-    -- out a refused export ("refused-exports") gets the file. One that does
-    -- not say so rejects the whole file, or, built before the export check,
-    -- publishes the export unchecked, so the file is refused here as before.
-    -- 'withFakeService' stands in for jl4-service and counts the uploads.
+    -- It uploads the file whatever the service, and reports what the service
+    -- answers. 'withFakeService' stands in for jl4-service and counts the
+    -- uploads.
     let refusedEntry = fixtureDir </> "deploy-export-refused.l4"
         server port = ["--server", "http://127.0.0.1:" <> show port]
     it "uploads a file with an @export that cannot be sent to a service that leaves it out, and prints what it left out" $
@@ -1365,18 +1363,16 @@ spec bin = do
         Output code json _ <- runL4 bin (["deploy", refusedEntry, "--json"] ++ server port)
         code `shouldBe` ExitSuccess
         json `shouldSatisfy` isInfixOf "{\"file\":\"deploy-export-refused.l4\",\"name\":\"apply twice\",\"nameServed\":true,"
-    it "refuses, before the upload, a file with an @export that cannot be sent to a service that does not say it leaves it out" $
+    -- A service built before it left such an export out names none, so
+    -- nothing is listed; what it did with the export is its own answer, as
+    -- for any client (the fake applies the deploy).
+    it "uploads a file with an @export that cannot be sent to a service that reports nothing left out, and lists nothing" $
       withFakeService False False \port uploads -> do
-        Output code _ serr <- runL4 bin (["deploy", refusedEntry] ++ server port)
-        readIORef uploads `shouldReturn` 0
-        code `shouldBe` ExitFailure 1
-        serr `shouldSatisfy` isInfixOf "does not say that it can leave out an @export that cannot be sent, so the file is not uploaded"
-        serr `shouldSatisfy` isInfixOf "doesn't typecheck; fix it before deploying (see `l4 check`)."
-    it "still uploads a file with no refused @export to a service that does not say it leaves one out" $
-      withFakeService False False \port uploads -> do
-        Output code _ _ <- runL4 bin (["deploy", cleanImportEntry] ++ server port)
-        code `shouldBe` ExitSuccess
+        Output code sout serr <- runL4 bin (["deploy", refusedEntry] ++ server port)
         readIORef uploads `shouldReturn` 1
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` isInfixOf "These rules cannot be deployed, because their @export cannot be sent as JSON"
+        filter (/= '\r') sout `shouldNotSatisfy` isInfixOf "Left out"
 
   -- The names a multi-clause group is compiled to are spelled so that no
   -- source can write them ('L4.Parser.generatedName'), and say what they are.
@@ -5409,17 +5405,15 @@ buildIdentitySpec = describe "etc/build-identity.sh" $ do
 
 -- | A stand-in for jl4-service, for `l4 deploy`: a new deployment's lookup is
 -- a 404, an upload is accepted as a job that is applied at once, and the
--- deployment is then ready, naming `apply twice` as refused when the service
--- says it can leave a refused export out. With @capable@, every response
--- carries @X-L4-Capabilities: refused-exports@, as jl4-service's API routes
--- do; with @nameServed@, the refused entry says its name is still served by
--- an @export whose name matches it. The action gets the port and the number of uploads
--- so far.
+-- deployment is then ready. With @reportsRefused@ it names `apply twice` as
+-- refused, as jl4-service does; without, it names nothing, as a service built
+-- before it left such an export out does. With @nameServed@, the refused
+-- entry says its name is still served by an @export whose name matches it.
+-- The action gets the port and the number of uploads so far.
 withFakeService :: Bool -> Bool -> (Int -> IORef Int -> IO a) -> IO a
-withFakeService capable nameServed act = do
+withFakeService reportsRefused nameServed act = do
   uploads <- newIORef (0 :: Int)
-  let caps = [("X-L4-Capabilities", "refused-exports") | capable]
-      reply code v = Wai.responseLBS code ((HTTP.hContentType, "application/json") : caps) (Aeson.encode v)
+  let reply code v = Wai.responseLBS code [(HTTP.hContentType, "application/json")] (Aeson.encode v)
       refused =
         [ Aeson.object $
             [ "name" Aeson..= ("apply twice" :: T.Text)
@@ -5427,7 +5421,7 @@ withFakeService capable nameServed act = do
             , "reasons" Aeson..= ["`apply twice` is published with @export, but its input `f` is a function, and @export does not support that yet." :: T.Text]
             ]
             <> [ "nameServed" Aeson..= True | nameServed ]
-        | capable ]
+        | reportsRefused ]
       ready name = Aeson.object
         [ "id" Aeson..= name
         , "status" Aeson..= ("ready" :: T.Text)
@@ -5436,7 +5430,7 @@ withFakeService capable nameServed act = do
               , "version" Aeson..= ("v" :: T.Text)
               , "createdAt" Aeson..= ("2026-11-24T00:00:00Z" :: T.Text)
               ]
-              <> [ "refusedExports" Aeson..= refused | capable ] )
+              <> [ "refusedExports" Aeson..= refused | reportsRefused ] )
         ]
       app req respond = case (Wai.requestMethod req, Wai.pathInfo req) of
         ("POST", ["deployments"]) -> do
@@ -5448,7 +5442,7 @@ withFakeService capable nameServed act = do
         ("GET", ["deployments", name]) -> do
           n <- readIORef uploads
           if n == 0
-            then respond (Wai.responseLBS HTTP.status404 caps "")
+            then respond (Wai.responseLBS HTTP.status404 [] "")
             else respond (reply HTTP.status200 (ready name))
-        _ -> respond (Wai.responseLBS HTTP.status404 caps "")
+        _ -> respond (Wai.responseLBS HTTP.status404 [] "")
   testWithApplication (pure app) \port -> act port uploads
