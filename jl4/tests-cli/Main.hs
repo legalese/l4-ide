@@ -1341,7 +1341,7 @@ spec bin = do
     let refusedEntry = fixtureDir </> "deploy-export-refused.l4"
         server port = ["--server", "http://127.0.0.1:" <> show port]
     it "uploads a file with an @export that cannot be sent to a service that leaves it out, and prints what it left out" $
-      withFakeService True \port uploads -> do
+      withFakeService True False \port uploads -> do
         Output code sout serr <- runL4 bin (["deploy", refusedEntry] ++ server port)
         readIORef uploads `shouldReturn` 1
         code `shouldBe` ExitSuccess
@@ -1350,16 +1350,30 @@ spec bin = do
         let out = filter (/= '\r') sout
         out `shouldSatisfy` isInfixOf "Deployed 'deploy-export-refused'"
         out `shouldSatisfy` isInfixOf "Left out 1 function whose @export cannot be sent as JSON"
-        out `shouldSatisfy` isInfixOf "  apply twice\n"
+        out `shouldSatisfy` isInfixOf "  apply twice (deploy-export-refused.l4)\n"
+        out `shouldNotSatisfy` isInfixOf "is still served"
+    -- Another file may export the same name, and the service serves that
+    -- one; the refused entry says so ("nameServed"), and so does the output.
+    it "says when the name of an @export it left out is still served, by another file's export" $
+      withFakeService True True \port _ -> do
+        Output code sout _ <- runL4 bin (["deploy", refusedEntry] ++ server port)
+        code `shouldBe` ExitSuccess
+        filter (/= '\r') sout `shouldSatisfy` isInfixOf
+          "  apply twice (deploy-export-refused.l4)\n    `apply twice` is published with @export, but its input `f` is a function, and @export does not support that yet.\n    `apply twice` is still served, by another file's @export of that name.\n"
+    it "says in --json when the name of an @export it left out is still served" $
+      withFakeService True True \port _ -> do
+        Output code json _ <- runL4 bin (["deploy", refusedEntry, "--json"] ++ server port)
+        code `shouldBe` ExitSuccess
+        json `shouldSatisfy` isInfixOf "{\"file\":\"deploy-export-refused.l4\",\"name\":\"apply twice\",\"nameServed\":true,"
     it "refuses, before the upload, a file with an @export that cannot be sent to a service that does not say it leaves it out" $
-      withFakeService False \port uploads -> do
+      withFakeService False False \port uploads -> do
         Output code _ serr <- runL4 bin (["deploy", refusedEntry] ++ server port)
         readIORef uploads `shouldReturn` 0
         code `shouldBe` ExitFailure 1
         serr `shouldSatisfy` isInfixOf "does not say that it can leave out an @export that cannot be sent, so the file is not uploaded"
         serr `shouldSatisfy` isInfixOf "doesn't typecheck; fix it before deploying (see `l4 check`)."
     it "still uploads a file with no refused @export to a service that does not say it leaves one out" $
-      withFakeService False \port uploads -> do
+      withFakeService False False \port uploads -> do
         Output code _ _ <- runL4 bin (["deploy", cleanImportEntry] ++ server port)
         code `shouldBe` ExitSuccess
         readIORef uploads `shouldReturn` 1
@@ -5399,17 +5413,18 @@ buildIdentitySpec = describe "etc/build-identity.sh" $ do
 -- says it can leave a refused export out. With @capable@, every response
 -- carries @X-L4-Capabilities: refused-exports@, as jl4-service's does. The
 -- action gets the port and the number of uploads so far.
-withFakeService :: Bool -> (Int -> IORef Int -> IO a) -> IO a
-withFakeService capable act = do
+withFakeService :: Bool -> Bool -> (Int -> IORef Int -> IO a) -> IO a
+withFakeService capable nameServed act = do
   uploads <- newIORef (0 :: Int)
   let caps = [("X-L4-Capabilities", "refused-exports") | capable]
       reply code v = Wai.responseLBS code ((HTTP.hContentType, "application/json") : caps) (Aeson.encode v)
       refused =
-        [ Aeson.object
+        [ Aeson.object $
             [ "name" Aeson..= ("apply twice" :: T.Text)
             , "file" Aeson..= ("deploy-export-refused.l4" :: T.Text)
             , "reasons" Aeson..= ["`apply twice` is published with @export, but its input `f` is a function, and @export does not support that yet." :: T.Text]
             ]
+            <> [ "nameServed" Aeson..= True | nameServed ]
         | capable ]
       ready name = Aeson.object
         [ "id" Aeson..= name

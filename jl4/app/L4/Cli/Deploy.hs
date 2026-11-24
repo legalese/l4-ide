@@ -253,10 +253,15 @@ publish mode opts = do
           version = meta >>= textField "deploymentVersion"
           url = Text.pack (t.baseUrl <> deploymentPath t depName)
           -- The @exports the service left out because they cannot be sent
-          -- (an older service sends none). The exit status stays 0: the
-          -- deployment is live, with the rest of its rules.
+          -- (an older service sends none), each with its file, and whether
+          -- another file's export of the same name is served, so the name
+          -- still answers. The exit status stays 0: the deployment is live,
+          -- with the rest of its rules.
           refused =
-            [ (n, mapMaybe (\case Aeson.String s -> Just s; _ -> Nothing) (arrayValues "reasons" r))
+            [ ( n
+              , fromMaybe "" (textField "file" r)
+              , objectBool "nameServed" r
+              , mapMaybe (\case Aeson.String s -> Just s; _ -> Nothing) (arrayValues "reasons" r) )
             | r <- maybe [] (arrayField "refusedExports") meta
             , Just n <- [textField "name" r]
             ]
@@ -265,7 +270,9 @@ publish mode opts = do
           [ "version"   Aeson..= version
           , "functions" Aeson..= fns
           , "url"       Aeson..= url
-          , "refused"   Aeson..= [Aeson.object ["name" Aeson..= n, "reasons" Aeson..= rs] | (n, rs) <- refused]
+          , "refused"   Aeson..=
+              [ Aeson.object (["name" Aeson..= n] <> ["file" Aeson..= f | not (Text.null f)] <> ["nameServed" Aeson..= True | served] <> ["reasons" Aeson..= rs])
+              | (n, f, served, rs) <- refused ]
           ]
         else do
           Text.putStrLn $
@@ -279,9 +286,11 @@ publish mode opts = do
             Text.putStrLn $ "Left out " <> plural (length refused) "function"
               <> " whose @export cannot be sent as JSON (`l4 check` reports "
               <> (if length refused == 1 then "it as an error" else "them as errors") <> "):"
-            forM_ refused \(n, rs) -> do
-              Text.putStrLn ("  " <> n)
+            forM_ refused \(n, f, served, rs) -> do
+              Text.putStrLn ("  " <> n <> (if Text.null f then "" else " (" <> f <> ")"))
               mapM_ (Text.putStrLn . ("    " <>)) rs
+              when served $
+                Text.putStrLn ("    `" <> n <> "` is still served, by another file's @export of that name.")
           Text.putStrLn ("API: " <> url)
   where
     verb = case mode of
@@ -527,6 +536,11 @@ arrayValues :: Text -> Aeson.Object -> [Aeson.Value]
 arrayValues k o = case KeyMap.lookup (Key.fromText k) o of
   Just (Aeson.Array a) -> Vector.toList a
   _ -> []
+
+-- | A boolean field, false when it is absent (as a service leaves out a flag
+-- that is false) or not a boolean.
+objectBool :: Text -> Aeson.Object -> Bool
+objectBool k o = KeyMap.lookup (Key.fromText k) o == Just (Aeson.Bool True)
 
 arrayField :: Text -> Aeson.Object -> [Aeson.Object]
 arrayField k o = case KeyMap.lookup (Key.fromText k) o of
