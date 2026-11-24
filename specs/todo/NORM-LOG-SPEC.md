@@ -888,6 +888,65 @@ Then the gate was run again on `lhs` at the head that carries the fix (`etc/veri
 `jl4-test` with the writer forced on is 5,077 examples with no failure, in 1,337 s; `jl4-lsp-test` is 336 examples with no failure; `jl4-mlir-test` and `jl4-websessions-test` exited 0.
 A scan of the first half's Haskell diff for any other literal of nine or more digits found none (`originKey`'s 2^40 is a `Rational`).
 
+### 6.5 What P2's second half builds: the read as written (N4b, option A as a fallback; decided by Claude 2026-11-24, pending Meng's review)
+
+**Status, 2026-11-24: decided, build in progress, not landed.**
+Nothing in this section is in `unstable`, and a sentence below that says what the read does describes what the branch `feat/norm-log-read-syntax` is being built to do, not what a released `l4` does.
+
+N4's spelling is the one decision of P2 that is Meng's, and it is on the bench as card N4b ("Norm Log Read Spelling"), where option A takes the how-to draft's spellings and adds `AS OF`.
+Meng has not marked the card.
+GM asked for option A to be built as a fallback, on its own branch and in its own commits, so that the first half of P2 (§6.4) is not held and so that a ruling for another spelling replaces these commits and nothing under them.
+Every decision in this section is therefore "decided by Claude 2026-11-24, pending Meng's review", and the same label is on the reference page.
+
+**What option A is, with the five conditions of the card.**
+
+```
+OUTSTANDING          (PARTY patron MUST `return` _)
+EVER FAILED          (PARTY patron MUST `return` _ UNDER LEST)
+FAILED AND NOT CURED (PARTY patron MUST `return` _) AS OF deadline
+CURED BY REPARATION  (PARTY _ MUST `pay` _ _ UNDER HENCE)
+```
+
+1. **`_` is a token only inside a read pattern.**
+   The lexer makes a lone `_` a token (it was a lexical error before), and the parser accepts it only in a read pattern; anywhere else it says by name that a wildcard belongs in a read pattern.
+   The editor's token list (`ts-shared/l4-highlight/src/tokens.ts`) and the exact printer change in the same commit as the lexer.
+2. **A phrase is true when any matching norm is in that state.**
+   A pattern may match more than one norm (every `MUST` of a constructor in the module); the read is true if one of them is.
+   A pattern that matches no norm site in the module or its imports is a check error, because the answer "no" would be a wrong answer with exit 0.
+3. **A bare pattern matches every branch.**
+   `UNDER LEST` narrows it to the norms armed by a `LEST`, `UNDER HENCE` to those armed by a `HENCE`.
+4. **Four phrases, and nothing else.**
+   `OUTSTANDING`, `EVER FAILED`, `FAILED AND NOT CURED`, `CURED BY REPARATION`, each with an optional `AS OF <instant>`, and `THE INSTANT` (§6.4).
+   `EVER FAILED` is §6.1 N13's "failed"; the counts and windows are P3's and are not built, and an argument pattern other than `_` is refused by name (the entry holds the action as written, not as evaluated, §6.4).
+5. **`NOW` stays the wall clock**, with the warning inside a `PROVIDED` that §6.4 built.
+   The words of the read are in one table in the source, so a ruling for other words changes that table and the tests that name them.
+
+**What I decided myself (assumed, not ruled).**
+
+- The read is an expression of type `BOOLEAN` with its own `Expr` constructor, `ReadNorm`, and not a desugaring, because a pattern is not an expression.
+- The words are not reserved: `OUTSTANDING` and the others are read as a read only when what follows is `( PARTY`, and in every other position the text parses as it does today, as a name.
+  A program that parses today means what it meant; this is checked by parsing every `.l4` file of the tree before and after and comparing the printed result.
+- Where a read may stand: inside a `PROVIDED` (its instant is then `THE INSTANT`), or anywhere with an explicit `AS OF`.
+  A read with neither has no instant, and is a check error saying so.
+- A read inside an operand of a `RAND`, `ROR` or `EVERY` is a check error until the sibling check of N10, N19 and N20 is built (P5 and P6): the read could see a sibling's fate written before or after it, which is the order dependence those rulings forbid.
+  It is the loud fallback of the P2 design, and it means the how-to's library example, which reads a fate beside `RAND` siblings, cannot be written yet.
+- The bearer: `PARTY _` matches every norm; `PARTY name` is compared with the entry's party by the machine's own party key.
+  An entry whose party the machine never forced refuses the read by name (N7 rule 4) until rule (3) is built, so `OUTSTANDING (PARTY x ...)` refuses on a norm that is still outstanding and has not been performed by anyone; this is the known cost of leaving rule (3) for its own step.
+- The writer is switched on when the module being run contains a read.
+  A read in an imported module does not switch it on, and a read reached with the writer off is a run-time error naming the site, never an answer from an empty log.
+
+**What fails loudly, and what could fail silently.**
+Loud, each with a name: a wildcard outside a read, a read with no instant, a read inside a compound's operand, an argument pattern other than `_`, a bearer never forced, a fate with no instant when the read needs one, a read with the writer off.
+Silent, and the reason the check for a pattern that matches no site is a rule and not a nicety: a pattern that names the wrong constructor, a bearer compared by the wrong key, and the limits of the reader already listed in §6.1 N13 and N8 (a miss inside a winning `ROR` alternative, an alternative fulfilled only through its own reparation).
+
+**Not built in this step, and why.**
+The check for a pattern that matches no site in the module and its imports (it needs each checked module to export its norm sites).
+Rule (3), forcing the bearer at the read (it needs the party's thunk in the entry, which `NormBearer` does not hold).
+The sibling check.
+A read in an imported module switching the writer on.
+The cache key: a read's value depends on the contract clock of its guard, which the guard's `CtxReads` fingerprint carries for `THE INSTANT` and which an explicit `AS OF` fixes by its own value; whether that is enough for a read reused in two guards is a test of this step, and is listed as built only when its result is here.
+Any claim in this paragraph that a later commit makes false is corrected in that commit.
+
 ## 7. Probe — what a crude projection shows
 
 Measured 2026-09-23 on the local branch `probe/norm-log` @ `65fb65201` (never pushed, never merges), built from `unstable` @ `20e71b65d`.
