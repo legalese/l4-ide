@@ -146,7 +146,7 @@ validForSpec = describe "validFor" $ do
     validFor (applyEvalClauses [AsOfSystemTime t1] ambient) fp `shouldBe` False
     validFor ambient (noReads { crNormRead = True }) `shouldBe` False
     -- and it merges as OR, so a thunk that consumed such a read inherits it
-    (sysOnly <> noReads { crNormRead = True }).crNormRead `shouldBe` True
+    (noReads { crSystemTime = ReadEq t1 } <> noReads { crNormRead = True }).crNormRead `shouldBe` True
     (noReads <> noReads).crNormRead `shouldBe` False
 
   it "crLedgerRead does NOT veto: a read-only ledger fingerprint validates on its axes (#914 snapshot-per-scope)" $ do
