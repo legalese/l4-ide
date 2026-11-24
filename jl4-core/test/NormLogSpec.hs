@@ -1371,6 +1371,14 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         for_ [ "OUTSTANDING", "EVER FAILED", "FAILED AND NOT CURED", "CURED BY REPARATION" ] \ w ->
           (w, isRead (regulative w)) `shouldBe` (w, Just True)
 
+      it "R13: an argument other than _ in a read pattern is a parse error (loud, and it does not say why)" do
+        let parses body = case execProgramParserWithHintPass (toNormalizedUri (Uri "file:///norm-log-r13")) (Text.unlines body) of
+              Left _ -> False
+              Right _ -> True
+        -- the control: the same read with _ for the argument parses
+        parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay _)" ] `shouldBe` True
+        parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay 3)" ] `shouldBe` False
+
       it "R12: a read named once and used in two guards is read again at the second, not served from the first" do
         -- the shared-thunk probe (NORM-LOG-SPEC N4): `pending` has no inputs, so
         -- its value could be kept from the first guard, where deliver is
