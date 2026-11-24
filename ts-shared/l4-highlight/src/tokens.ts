@@ -164,3 +164,14 @@ export const L4_OPERATORS: ReadonlySet<string> = new Set([
   '=>',
   '/',
 ])
+
+/**
+ * Symbols that the Lexer's `symbols` map makes a CSymbol (LSP Operator) and
+ * that the colorizers do not reach through an operator or identifier pattern.
+ *
+ * `_` is the wildcard of a norm-log read pattern, as in
+ * `OUTSTANDING (PARTY patron MUST return _)` (jl4-core/src/L4/Lexer.hs,
+ * `TUnderscore`; NORM-LOG-SPEC N4b, decided by Claude 2026-11-24, pending
+ * Meng's review). The parser accepts it only inside a read pattern.
+ */
+export const L4_SYMBOLS: ReadonlySet<string> = new Set(['_'])
