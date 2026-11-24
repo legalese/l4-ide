@@ -669,6 +669,15 @@ verifyClauseTableFixture = fixtureDir </> "verify-clause-table.l4"
 verifyClauseGroupMaybeFixture = fixtureDir </> "verify-clause-group-maybe.l4"
 verifyClauseTableLargeFixture = fixtureDir </> "verify-clause-table-large.l4"
 
+-- A redundant condition is looked for in the rule as written, not in the
+-- normal form, which manufactures clauses nobody wrote (smucclaw/l4-ide#1093).
+-- The first file is the positive control (nothing redundant, so nothing
+-- reported), the second the negatives (each redundant condition reported once,
+-- where it is written).
+verifyManufacturedClausesFixture, verifyWrittenGuardsFixture :: FilePath
+verifyManufacturedClausesFixture = fixtureDir </> "verify-manufactured-clauses.l4"
+verifyWrittenGuardsFixture       = fixtureDir </> "verify-written-guards.l4"
+
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
 -- however its limbs are named. The recursive file is the termination control.
@@ -1022,6 +1031,7 @@ coreFixtures =
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
   , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
   , verifyClauseTableLargeFixture
+  , verifyManufacturedClausesFixture, verifyWrittenGuardsFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture, verifyFieldReadsFixture
@@ -6715,15 +6725,74 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       sout `shouldSatisfy` ("\"unreachable-outcome\"" `isInfixOf`)
 
-    -- The suppression that keeps the checker usable. `x XOR y` normalises into
-    -- a CNF containing `x OR NOT x`; reporting that clause as a vacuous guard
-    -- would fire on ordinary drafting and teach the reader to ignore the tool.
-    -- verify-clean.l4's first decision IS an xor, so this is measured, not
-    -- asserted.
+    -- `x XOR y` normalises into a CNF containing `x OR NOT x`; reporting that
+    -- clause as a vacuous guard would fire on ordinary drafting and teach the
+    -- reader to ignore the tool. verify-clean.l4's first decision IS an xor, so
+    -- this is measured, not asserted. Two things keep it out now: the clause is
+    -- valid on its own, and redundancy is looked for in the rule as written,
+    -- where the clause does not exist (smucclaw/l4-ide#1093).
     it "does not report the tautological clauses CNF distribution manufactures" $ do
       Output code sout _ <- runL4 bin ["verify", verifyCleanFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` (not . ("vacuous-guard" `isInfixOf`))
+
+    -- smucclaw/l4-ide#1093. The normal form also manufactures clauses that are
+    -- CONTINGENTLY entailed by their siblings: `(a AND b) OR ((NOT a) AND e)`
+    -- distributes into four clauses, and the last, `b OR e`, follows from the
+    -- two before it. Nothing the drafter wrote is redundant in any rule of this
+    -- file, so nothing may be reported and the run exits 0. Before the fix,
+    -- `eligible` had one finding, `three ways in` nine, and `exclusive rows`
+    -- one, on the negation of the first row that the second row carries;
+    -- `eligible, as a choice` was already clean (an IF is expanded after the
+    -- normal form, so nothing is distributed) and is the control.
+    it "does not report a clause the normal form manufactured, however it is entailed" $ do
+      Output code sout serr <- runL4 bin ["verify", verifyManufacturedClausesFixture, "--format", "json"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("expected exit 0, got " ++ show code ++ "\n" ++ sout ++ serr)
+      env <- jsonEnvelope bin ["verify", verifyManufacturedClausesFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+      lookup "eligible" found `shouldBe` Just []
+      lookup "`eligible, as a choice`" found `shouldBe` Just []
+      lookup "`three ways in`" found `shouldBe` Just []
+      lookup "`exclusive rows`" found `shouldBe` Just []
+
+    -- The other half of #1093: a condition the drafter DID write that excludes
+    -- nothing is still reported, once, at the place it sits in the rule as
+    -- written, and the report says where that is in the source. Before the
+    -- fix, `a hurdle in two parts` had two findings, one per clause of the
+    -- condition's normal form, and `a hurdle inside a limb` was reported at
+    -- `body.and[1]`, a conjunction the rule as written does not have. The
+    -- requirement case, the row of a BRANCH and verify-vacuous-guard.l4 read
+    -- the same either way, and are the controls.
+    it "reports a redundant condition the drafter wrote, once, where it is written" $ do
+      env <- jsonEnvelope bin ["verify", verifyWrittenGuardsFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+      lookup "`a hurdle in two parts`" found `shouldBe` Just [("vacuous-guard", "body.and[1]")]
+      lookup "`a hurdle inside a limb`" found `shouldBe` Just [("vacuous-guard", "body.or[0].and[1]")]
+      lookup "`a hurdle in the requirement`" found `shouldBe` Just [("vacuous-guard", "body.requirement.and[1]")]
+      lookup "`a hurdle in a row`" found `shouldBe` Just [("vacuous-guard", "body.and[1].and[1]")]
+      plain <- jsonEnvelope bin ["verify", verifyVacuousGuardFixture, "--format", "json"]
+      lookup "`the second hurdle is not one`" (findingSitesByDecision plain)
+        `shouldBe` Just [("vacuous-guard", "body.and[1]")]
+      -- Where each is written: the condition's own text starts there.
+      source <- lines <$> readFile verifyWrittenGuardsFixture
+      let startsWith nm want =
+            case [ (line, col)
+                 | (nm', f) <- findingObjectsByDecision env, nm' == nm
+                 , Just w <- [objField f "writtenAt"]
+                 , Just (Number line) <- [objField w "line"]
+                 , Just (Number col) <- [objField w "column"]
+                 ] of
+              [(line, col)] ->
+                take (length want) (drop (round col - 1) (headOr "" (drop (round line - 1) source)))
+                  `shouldBe` want
+              other -> expectationFailure ("expected one writtenAt for " ++ nm ++ ", got " ++ show other)
+      startsWith "`a hurdle in two parts`" "(x OR (q AND r))"
+      startsWith "`a hurdle inside a limb`" "(p OR q)"
+      startsWith "`a hurdle in the requirement`" "(x OR y)"
+      startsWith "`a hurdle in a row`" "(x OR y)"
+      Output _ text _ <- runL4 bin ["verify", verifyWrittenGuardsFixture]
+      text `shouldSatisfy` ("[vacuous-guard] at body.or[0].and[1], written at 23:15" `isInfixOf`)
 
     -- The weaker mode is documented as weaker; pin that it is not SILENTLY
     -- weaker. `x` here is a nullary reference to a GIVEN binder, so the two
@@ -7080,6 +7149,35 @@ findingsByDecision env =
   | Just (Array ds) <- [objField env "decisions"]
   , d <- toList ds
   , Just (String nm) <- [objField d "name"]
+  ]
+
+-- | Each decision in an @l4 verify@ JSON envelope, with the kind and site of
+-- each of its findings, in report order.
+findingSitesByDecision :: Value -> [(String, [(String, String)])]
+findingSitesByDecision env =
+  [ ( T.unpack nm
+    , [ (T.unpack k, T.unpack s)
+      | Just (Array fs) <- [objField d "findings"]
+      , f <- toList fs
+      , Just (String k) <- [objField f "kind"]
+      , Just (String s) <- [objField f "site"]
+      ]
+    )
+  | Just (Array ds) <- [objField env "decisions"]
+  , d <- toList ds
+  , Just (String nm) <- [objField d "name"]
+  ]
+
+-- | Every finding object in an @l4 verify@ JSON envelope, with the name of its
+-- decision.
+findingObjectsByDecision :: Value -> [(String, Value)]
+findingObjectsByDecision env =
+  [ (T.unpack nm, f)
+  | Just (Array ds) <- [objField env "decisions"]
+  , d <- toList ds
+  , Just (String nm) <- [objField d "name"]
+  , Just (Array fs) <- [objField d "findings"]
+  , f <- toList fs
   ]
 
 -- | The placement table of doc/reference/syntax/nlg.md: each row's number

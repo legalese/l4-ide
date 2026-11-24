@@ -26,6 +26,8 @@ module LSP.L4.Viz.Ladder (
   getLeafKeys,
   getRefusingAtoms,
   getFreshLeaves,
+  getNodeRanges,
+  irNodeId,
   getVizConfig,
   getKeyEnv,
 
@@ -56,6 +58,7 @@ import L4.TypeCheck.Types (substituteType)
 import L4.Viz.Ladder (InputRef(..), collectTypicallyDefaults, seamLabel)
 import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful, fieldReads)
 import L4.Annotation
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
 import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, holdsGeneratedNodes, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindingsForDrawing, clausesReadThrough, positionalCall)
@@ -258,6 +261,11 @@ data VizState = MkVizState
   -- ^ How many leaves keyed apart per occurrence ('keyLeaf') so far.
   , freshLeafIds :: IntSet
   -- ^ The ids of those leaves ('getFreshLeaves').
+  , nodeRanges :: IntMap SrcRange
+  -- ^ Node id -> the source range of the expression 'translateGo' drew that node
+  -- from, where that expression has one ('getNodeRanges'). A node the
+  -- normal form made ('Transform.simplify' builds every node it makes with no
+  -- annotation) or a guarded chain copied has none.
   , expansionNodes :: !Int
   -- ^ IR nodes the expansions so far have added (see 'expansionNodeBudget').
   , expansionOverBudget :: !Bool
@@ -305,6 +313,7 @@ mkInitialVizState cfg =
     , leafKeys = Map.empty
     , freshLeaves = 0
     , freshLeafIds = IntSet.empty
+    , nodeRanges = Map.empty
     , expansionNodes = 0
     , refusingDefs = Refusal.alwaysRefusing cfg.module'
     , refusingAtoms = Map.empty
@@ -430,6 +439,14 @@ getRefusingAtoms vs = vs.refusingAtoms
 -- separately drawn diagrams by atomId must not join these.
 getFreshLeaves :: VizState -> IntSet
 getFreshLeaves vs = vs.freshLeafIds
+
+-- | The source range each node was drawn from, by node id, where it has one
+-- ('nodeRanges'). In a diagram drawn without the normal form
+-- ('withSimplification' False) every @AND@ operand, @OR@ limb and leaf the
+-- drafter wrote has its range here; @l4 verify@ uses that to say where a
+-- condition it reports is written.
+getNodeRanges :: VizState -> IntMap SrcRange
+getNodeRanges vs = vs.nodeRanges
 
 defsForInliningOf :: Module Resolved -> IntMap (Unique, Transform.Unfoldable)
 defsForInliningOf module' =
@@ -709,8 +726,17 @@ translateExpr shouldSimplify = top
 translateGo :: TranslateContext -> Expr Resolved -> Viz IRExpr
 translateGo = go
   where
+    -- Each node remembers the range of the expression it was drawn from
+    -- ('getNodeRanges'). Through a WHERE the inner expression is drawn first and
+    -- keeps its own, narrower range.
     go :: TranslateContext -> Expr Resolved -> Viz IRExpr
-    go _ctx e =
+    go ctx e = do
+      node <- draw ctx e
+      for_ (rangeOf e) \r -> #nodeRanges %= Map.insertWith (\_new old -> old) (irNodeId node).id r
+      pure node
+
+    draw :: TranslateContext -> Expr Resolved -> Viz IRExpr
+    draw _ctx e =
       case e of
         Not _ negand -> do
           vid <- getFresh
@@ -842,6 +868,19 @@ scanOr :: Expr Resolved -> [Expr Resolved]
 scanOr (Or _ e1 e2) =
   scanOr e1 <> scanOr e2
 scanOr e = [e]
+
+-- | A node's own id.
+irNodeId :: IRExpr -> V.ID
+irNodeId = \case
+  V.And i _ -> i
+  V.Or i _ -> i
+  V.Not i _ -> i
+  V.Implies i _ _ _ -> i
+  V.UBoolVar i _ _ _ _ _ _ -> i
+  V.App i _ _ _ _ -> i
+  V.TrueE i _ -> i
+  V.FalseE i _ -> i
+  V.InertE i _ _ -> i
 
 ------------------------------------------------------
 -- Leaf makers

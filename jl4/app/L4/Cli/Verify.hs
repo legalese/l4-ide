@@ -18,9 +18,11 @@
 --
 -- [@vacuous-guard@] Either (a) the scope of a seam (the @scope IMPLIES
 --   requirement@ shape the ladder draws with two lamps) is unsatisfiable, so the
---   rule never reaches anybody and is vacuously true; or (b) a conjunct that its
---   own siblings already entail, so it excludes nothing and is a guard in name
---   only.
+--   rule never reaches anybody and is vacuously true; or (b) a condition the
+--   draftsman wrote that its own siblings already entail, so it excludes nothing
+--   and is a guard in name only. (b) is read off the rule AS WRITTEN, not off the
+--   normal form the other families read, because the normal form manufactures
+--   conjuncts nobody wrote ('Written', smucclaw/l4-ide#1093).
 --
 -- [@unreachable-outcome@] One of a rule's two verdicts cannot be reached.
 --   @scope AND requirement@ unsatisfiable means whoever the rule /does/ reach is
@@ -65,6 +67,7 @@ import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -85,6 +88,7 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as VizQP
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
+import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..), prettySrcPos)
 import L4.Print (prettyLayout)
 import L4.Syntax
 
@@ -133,10 +137,12 @@ propositionalBound =
     , "  much weaker claim and must be reported as the weaker one."
     , ""
     , "  The unit of analysis is the LADDER's AND/OR normal form of each"
-    , "  boolean DECIDE, not the L4 source. Guarded chains (IF/BRANCH/CONSIDER"
-    , "  over booleans) are expanded; whatever the ladder treats as a leaf is a"
-    , "  leaf here too. A DECIDE that does not return BOOLEAN is not analysed,"
-    , "  and is reported as skipped rather than as clean."
+    , "  boolean DECIDE (for a vacuous guard, the ladder drawn without the"
+    , "  normal form: see below), not the L4 source. Guarded chains"
+    , "  (IF/BRANCH/CONSIDER over booleans) are expanded; whatever the ladder"
+    , "  treats as a leaf is a leaf here too. A DECIDE that does not return"
+    , "  BOOLEAN is not analysed, and is reported as skipped rather than as"
+    , "  clean."
     , ""
     , "  A local WHERE / LET binding is substituted into the rule before"
     , "  analysis, with arguments put in place of parameters, so"
@@ -169,11 +175,20 @@ propositionalBound =
     , ""
     , "  The normal form is CONJUNCTIVE, and reaching it MANUFACTURES clauses"
     , "  the draftsman never wrote: `x XOR y' distributes into a conjunction"
-    , "  containing `x OR NOT x'. So a conjunct that is valid ON ITS OWN is not"
-    , "  reported as a vacuous guard -- only CONTINGENT entailment is, i.e."
-    , "  this condition adds nothing GIVEN THE OTHERS. A hand-written"
-    , "  always-true guard therefore goes unreported. That is deliberate: a"
-    , "  checker that fires on every XOR is a checker nobody runs twice."
+    , "  containing `x OR NOT x', and `(a AND b) OR ((NOT a) AND e)' into four"
+    , "  clauses, the last of which, `b OR e', follows from two of the others."
+    , "  So a vacuous guard -- a condition its siblings already entail -- is"
+    , "  looked for in the rule AS WRITTEN, drawn without the normal form, and"
+    , "  reported at its place there, with the line and column where it starts"
+    , "  in the source. In a guarded chain (IF/BRANCH/CONSIDER) each row also"
+    , "  carries the negations of the guards before it, which nobody wrote, so"
+    , "  the guards are not checked for this, only what each row's THEN and the"
+    , "  OTHERWISE say: a redundant condition inside a guard goes unreported."
+    , "  The sites of the other findings are places in the normal form, which"
+    , "  need not exist in the source. Only CONTINGENT entailment is reported,"
+    , "  i.e. this condition adds nothing GIVEN THE OTHERS: a hand-written"
+    , "  condition that is true on its own, such as `y OR NOT y', is a"
+    , "  different defect and goes unreported."
     , ""
     , "  Atom identity matters more here than anything else. By default,"
     , "  syntactically identical leaves are MERGED into one variable, keyed by"
@@ -257,16 +272,27 @@ data Finding = Finding
   , findingSite    :: Text
   , findingAtoms   :: [Text]
   , findingMessage :: Text
+  , findingWrittenAt :: Maybe SrcPos
+  -- ^ Where the condition starts in the source, for a finding read off the rule
+  -- as written ('AsWritten'): @writtenAt@ in the JSON, ", written at L:C" in the
+  -- text (decided by Claude 2026-11-25, pending Meng's review). A finding read
+  -- off the normal form has none: that form's nodes are not in the source. Only
+  -- the start: the end of an expression's range can run on past it (a
+  -- parenthesised limb followed by an operator on the next line ends at that
+  -- operator).
   }
 
 instance Aeson.ToJSON Finding where
   toJSON f =
-    Aeson.object
+    Aeson.object $
       [ "kind" .= f.findingKind
       , "site" .= f.findingSite
       , "atoms" .= f.findingAtoms
       , "message" .= f.findingMessage
       ]
+        <> [ "writtenAt" .= Aeson.object ["line" .= p.line, "column" .= p.column]
+           | Just p <- [f.findingWrittenAt]
+           ]
 
 data Analysis = Analysis
   { anAtoms       :: Int
@@ -495,6 +521,8 @@ analyseDecide opts callees cfg decide0 =
                   meanings
                     | opts.verifyCoalesce = callMeanings opts callees cfg decide fnName atomIds labels' vizState order'
                     | otherwise = noMeanings
+                  analysisOrder = if null meanings.cmOrder then order' else meanings.cmOrder
+                  written = writtenForm opts cfg decide fnName atomIds order labels' analysisOrder
                in DecisionReport
                     { drName = fnName
                     , drResult =
@@ -504,7 +532,7 @@ analyseDecide opts callees cfg decide0 =
                             , anAtomClasses = length order'
                             , anLadderNodes = nodes
                             , anFindings =
-                                analyseBody labels' (if null meanings.cmOrder then order' else meanings.cmOrder) meanings.cmDefs expr'
+                                analyseBody labels' analysisOrder meanings.cmDefs expr' written
                             }
                     , drUnfolding = Unfolding (Map.size meanings.cmDefs) meanings.cmOpaque
                     }
@@ -795,6 +823,124 @@ ladderNodeCount budget root = go 0 [root]
       VizExpr.InertE{} -> []
 
 ----------------------------------------------------------------------------
+-- The rule as written
+----------------------------------------------------------------------------
+
+-- | The rule as written: its body drawn WITHOUT the normal form, so its
+-- conjunctions are the drafter's own, with its atoms in the analysis's atom
+-- space. A redundant condition is looked for here and nowhere else
+-- (smucclaw/l4-ide#1093): the normal form distributes a disjunction of
+-- conjunctions into clauses nobody wrote, and some of those are entailed by
+-- their siblings (@(a AND b) OR ((NOT a) AND e)@ yields @b OR e@, entailed by
+-- @a OR e@ and @NOT a OR b@), although no condition in the source is.
+--
+-- One expansion is still in this drawing, because the ladder draws it whether
+-- it simplifies or not ("L4.Viz.GuardedRows"): each row of a guarded chain
+-- (IF, BRANCH, CONSIDER) carries the negations of the guards before it, which
+-- nobody wrote. Every occurrence of a guard, negated or not, is drawn as a copy
+-- with no source range, so 'wStarts' has no entry for it, and the walk reports
+-- a redundant condition only where 'wStarts' has one: a row's THEN and the
+-- OTHERWISE are checked, the guards are not.
+--
+-- Reading this one finding off a second drawing, rather than mapping the normal
+-- form's clauses back to the source, was decided by Claude 2026-11-25, pending
+-- Meng's review: @Transform.simplify@ builds every node it makes with no
+-- annotation, so a clause cannot be traced to a condition, and a condition whose
+-- normal form is several clauses (@x AND (x OR (q AND r))@) maps to none of
+-- them.
+data Written = Written
+  { wBody   :: BDQ.BoolExpr Int
+  , wLabels :: Map Int Text
+  , wOrder  :: [Int]
+  -- ^ Every variable of 'wBody' and of the call meanings.
+  , wStarts :: Map Text SrcPos
+  -- ^ Site -> where the condition at that site starts in the source ('siteStarts').
+  }
+
+-- | Draw the rule as written and put its atoms in the analysis's atom space.
+--
+-- With atoms coalesced, a written atom is joined to the analysed atom with the
+-- same atomId, so the call meanings ('callMeanings') apply to it unchanged and
+-- are not drawn twice. Two kinds of atom are never joined, and get a variable
+-- of their own instead: a leaf keyed apart per occurrence ('LadderViz.getFreshLeaves'),
+-- whose atomId is numbered within its own diagram, and a leaf with no atomId.
+-- Keeping an atom apart only ever makes a formula more satisfiable, so it can
+-- hide a redundant condition but cannot invent one.
+--
+-- With @--no-coalesce-atoms@ there are no call meanings and no join: the drawing
+-- is analysed in its own atom space.
+--
+-- 'Nothing' if the rule cannot be drawn this way, in which case no redundant
+-- condition is reported for it. The analysed drawing is the same rule with
+-- more nodes, so this is not expected to happen.
+writtenForm
+  :: VerifyOptions
+  -> LadderViz.VizConfig
+  -> Decide Resolved
+  -> Text
+  -> Map Int Text
+  -- ^ The analysed drawing's atomIds, by leaf unique.
+  -> [Int]
+  -- ^ The analysed drawing's leaves, before coalescing.
+  -> Map Int Text
+  -- ^ The analysis's labels.
+  -> [Int]
+  -- ^ The analysis's variable order.
+  -> Maybe Written
+writtenForm opts cfg decide fnName atomIds order labels analysisOrder =
+  case LadderViz.doVisualize decide (LadderViz.withSimplification False cfg) of
+    Left _ -> Nothing
+    Right (li, vs) ->
+      let (bx, labelsW, orderW) = VizQP.vizExprToBoolExpr li.funDecl.body
+          starts = siteStarts (LadderViz.getNodeRanges vs) li.funDecl.body
+       in Just $
+            if not opts.verifyCoalesce
+              then Written bx labelsW orderW starts
+              else joined li vs bx labelsW orderW starts
+  where
+    joined li vs bx labelsW orderW starts =
+      Written
+        { wBody = mapVars target bx
+        , wLabels = labels <> Map.fromList [(target w, l) | (w, l) <- Map.toList labelsW, not (isJoined (keyOf w))]
+        , wOrder = analysisOrder <> [v | k <- newKeys, Just v <- [Map.lookup k newVar]]
+        , wStarts = starts
+        }
+      where
+        aidsW = atomIdsOf fnName li vs
+        freshW = LadderViz.getFreshLeaves vs
+        -- The analysed atom for each atomId: the representative coalescing chose.
+        analysed :: Map Text Int
+        analysed = Map.fromListWith (\_new old -> old) [(aid, u) | u <- order, Just aid <- [Map.lookup u atomIds]]
+        keyOf :: Int -> Either Int Text
+        keyOf w
+          | IntSet.member w freshW = Left w
+          | Just aid <- Map.lookup w aidsW = Right aid
+          | otherwise = Left w
+        isJoined = either (const False) (`Map.member` analysed)
+        newKeys = nubOrd [k | w <- orderW, let k = keyOf w, not (isJoined k)]
+        firstNew = 1 + maximum (0 : analysisOrder <> order)
+        newVar = Map.fromList (zip newKeys [firstNew ..])
+        target w = case keyOf w of
+          Right aid | Just v <- Map.lookup aid analysed -> v
+          k -> Map.findWithDefault w k newVar
+
+-- | Where each site of a drawing starts in the source: the start of the range
+-- of the node at that site, named as 'analyseBody' names sites (@body.and[1].or[0]@, and so
+-- on). 'VizQP.vizExprToBoolExpr' keeps the drawing's shape node for node, so a
+-- site of the formula is the same site of the drawing.
+siteStarts :: IntMap.IntMap SrcRange -> VizExpr.IRExpr -> Map Text SrcPos
+siteStarts ranges = go "body"
+  where
+    go site e =
+      maybe Map.empty (Map.singleton site . (.start)) (IntMap.lookup (LadderViz.irNodeId e).id ranges)
+        <> children site e
+    children site = \case
+      VizExpr.And _ xs -> Map.unions [go (site <> ".and[" <> Text.pack (show i) <> "]") x | (i, x) <- zip [(0 :: Int) ..] xs]
+      VizExpr.Or _ xs -> Map.unions [go (site <> ".or[" <> Text.pack (show i) <> "]") x | (i, x) <- zip [(0 :: Int) ..] xs]
+      VizExpr.Implies _ s r _ -> go (site <> ".scope") s <> go (site <> ".requirement") r
+      _ -> Map.empty
+
+----------------------------------------------------------------------------
 -- Atom coalescing
 ----------------------------------------------------------------------------
 
@@ -902,37 +1048,38 @@ varsOf = \case
 interesting :: BDQ.BoolExpr Int -> Bool
 interesting = not . null . varsOf
 
-analyseBody :: Map Int Text -> [Int] -> Map Int (BDQ.BoolExpr Int) -> BDQ.BoolExpr Int -> [Finding]
-analyseBody labels order defs body
+-- | Which findings a walk over one drawing of a rule reports ('analyseBody').
+data Pass
+  = Normalised
+  -- ^ Over the ladder's normal form, the drawing the rest of the analysis
+  -- reads: @unsat@, @dead-branch@, the seam's @vacuous-guard@ (a) and
+  -- @unreachable-outcome@.
+  | AsWritten
+  -- ^ Over the rule as written ('Written'): the @vacuous-guard@ (b), a
+  -- condition its own siblings already entail, and only that.
+  deriving stock Eq
+
+analyseBody
+  :: Map Int Text -> [Int] -> Map Int (BDQ.BoolExpr Int) -> BDQ.BoolExpr Int -> Maybe Written -> [Finding]
+analyseBody labels order defs body written
   | not (sat [] body) =
       [ Finding
           { findingKind = "unsat"
           , findingSite = "body"
-          , findingAtoms = atomLabels body
+          , findingAtoms = atomLabels labels body
           , findingMessage =
               "the decision is TRUE for no assignment of its atoms: as drafting, a requirement nobody can meet."
+          , findingWrittenAt = Nothing
           }
       ]
-  | otherwise = topTautology <> go [] "body" body
+  | otherwise =
+      topTautology
+        <> walk Normalised sat labels Map.empty [] "body" body
+        <> foldMap (\w -> walk AsWritten (satisfiable w.wOrder defs) w.wLabels w.wStarts [] "body" w.wBody) written
   where
     sat = satisfiable order defs
-    atomLabels e = [label u | u <- nubOrd (varsOf e)]
-    label u = stripBackticks (Map.findWithDefault (Text.pack (show u)) u labels)
-
-    -- Is this subterm capable of being false at all?
-    --
-    -- The gate that keeps "this condition excludes nothing" from crying wolf.
-    -- The ladder body is in CONJUNCTIVE normal form, and reaching CNF
-    -- MANUFACTURES valid clauses: `x XOR y' written out as
-    -- @(x AND NOT y) OR ((NOT x) AND y)@ distributes to a conjunction that
-    -- contains @x OR NOT x@. That clause is not in the draftsman's text and
-    -- telling him it adds nothing is telling him about our normaliser.
-    --
-    -- So only CONTINGENT entailment is reported: this condition adds nothing
-    -- GIVEN THE OTHERS. The price is that a hand-written always-true guard goes
-    -- unreported, which is the right side to err on — see the note in
-    -- 'propositionalBound'.
-    contingent e = sat [] (BDQ.BNot e)
+    atomLabels labs e = [label labs u | u <- nubOrd (varsOf e)]
+    label labs u = stripBackticks (Map.findWithDefault (Text.pack (show u)) u labs)
 
     isSeam BDQ.BImplies{} = True
     isSeam _ = False
@@ -944,106 +1091,131 @@ analyseBody labels order defs body
           [ Finding
               { findingKind = "unreachable-outcome"
               , findingSite = "body"
-              , findingAtoms = atomLabels body
+              , findingAtoms = atomLabels labels body
               , findingMessage =
                   "the decision is TRUE for every assignment of its atoms, so its FALSE outcome is unreachable and the atoms it names do not affect the answer."
+              , findingWrittenAt = Nothing
               }
           ]
       | otherwise = []
 
-    go :: [BDQ.BoolExpr Int] -> Text -> BDQ.BoolExpr Int -> [Finding]
-    go ctx site = \case
-      e@(BDQ.BAnd es)
-        | not (sat ctx e) ->
-            -- Stop here. Everything below an unsatisfiable conjunction is
-            -- vacuously dead, and saying so once per descendant is noise.
-            [ Finding
-                { findingKind = "unsat"
-                , findingSite = site
-                , findingAtoms = atomLabels e
-                , findingMessage =
+    -- One walk over one drawing. Both walks stop at the same places: below an
+    -- unsatisfiable conjunction, a dead limb or an unsatisfiable scope,
+    -- everything is entailed (anything follows from a contradiction), so a walk
+    -- that went on would report every condition there as redundant.
+    walk
+      :: Pass
+      -> ([BDQ.BoolExpr Int] -> BDQ.BoolExpr Int -> Bool)
+      -> Map Int Text
+      -> Map Text SrcPos
+      -> [BDQ.BoolExpr Int]
+      -> Text
+      -> BDQ.BoolExpr Int
+      -> [Finding]
+    walk pass sat' labs starts = go
+      where
+        normalised = pass == Normalised
+        finding kind site e message =
+          Finding
+            { findingKind = kind
+            , findingSite = site
+            , findingAtoms = atomLabels labs e
+            , findingMessage = message
+            , findingWrittenAt = Map.lookup site starts
+            }
+
+        -- Is this subterm capable of being false at all?
+        --
+        -- Only CONTINGENT entailment is reported: this condition adds nothing
+        -- GIVEN THE OTHERS. A condition that is true on its own (@y OR NOT y@)
+        -- excludes nothing whatever it stands beside, which is a different
+        -- defect, and is not looked for — see the note in 'propositionalBound'.
+        -- Until the redundancy check read the rule as written, this gate was
+        -- also what kept the clauses the normal form manufactures out of the
+        -- report: @x XOR y@ distributes into a conjunction containing
+        -- @x OR NOT x@.
+        contingent e = sat' [] (BDQ.BNot e)
+
+        go :: [BDQ.BoolExpr Int] -> Text -> BDQ.BoolExpr Int -> [Finding]
+        go ctx site = \case
+          e@(BDQ.BAnd es)
+            | not (sat' ctx e) ->
+                -- Stop here. Everything below an unsatisfiable conjunction is
+                -- vacuously dead, and saying so once per descendant is noise.
+                [ finding "unsat" site e
                     "these conditions cannot all hold at once in the context that reaches them — a double bind."
-                }
-            ]
-        | otherwise ->
-            concat
-              [ entailed <> go ctx' arm ei
-              | (i, ei) <- zip [(0 :: Int) ..] es
-              , let arm = site <> ".and[" <> Text.pack (show i) <> "]"
-              , let ctx' = ctx <> [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
-              , let entailed =
-                      [ Finding
-                          { findingKind = "vacuous-guard"
-                          , findingSite = arm
-                          , findingAtoms = atomLabels ei
-                          , findingMessage =
+                | normalised
+                ]
+            | otherwise ->
+                concat
+                  [ entailed <> go ctx' arm ei
+                  | (i, ei) <- zip [(0 :: Int) ..] es
+                  , let arm = site <> ".and[" <> Text.pack (show i) <> "]"
+                  , let ctx' = ctx <> [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
+                  , let entailed =
+                          [ finding "vacuous-guard" arm ei
                               "this condition is already entailed by the ones it is conjoined with, so it excludes nothing."
-                          }
-                      | interesting ei
-                      , contingent ei
-                      , not (sat ctx' (BDQ.BNot ei))
-                      ]
-              ]
-      BDQ.BOr es ->
-        concat
-          [ if interesting ei && not (sat ctx ei)
-              then
-                [ Finding
-                    { findingKind = "dead-branch"
-                    , findingSite = arm
-                    , findingAtoms = atomLabels ei
-                    , findingMessage =
-                        "this limb cannot hold in the context that reaches it; the rule reads identically with it deleted."
-                    }
-                ]
-              else go ctx arm ei
-          | (i, ei) <- zip [(0 :: Int) ..] es
-          , let arm = site <> ".or[" <> Text.pack (show i) <> "]"
-          ]
-      BDQ.BImplies scope req
-        | not (sat ctx scope) ->
-            [ Finding
-                { findingKind = "vacuous-guard"
-                , findingSite = site <> ".scope"
-                , findingAtoms = atomLabels scope
-                , findingMessage =
-                    "the scope of this rule is unsatisfiable, so it reaches nobody and its requirement is never tested. Note the decision still evaluates TRUE — vacuously."
-                }
-            ]
-        | otherwise ->
+                          | not normalised
+                            -- Only a node drawn from source has a place in it.
+                            -- The ones without are a guarded chain's copies
+                            -- ('Written'): the negations of earlier guards that
+                            -- each row carries, which nobody wrote, and the
+                            -- guard itself. Mutually exclusive rows make those
+                            -- negations entailed by the row's own guard, in a
+                            -- rule with nothing redundant in it. Skipping every
+                            -- copy also skips a redundancy written inside a
+                            -- guard (decided by Claude 2026-11-25, pending
+                            -- Meng's review).
+                          , Map.member arm starts
+                          , interesting ei
+                          , contingent ei
+                          , not (sat' ctx' (BDQ.BNot ei))
+                          ]
+                  ]
+          BDQ.BOr es ->
             concat
-              [ [ Finding
-                    { findingKind = "unreachable-outcome"
-                    , findingSite = site
-                    , findingAtoms = atomLabels (BDQ.BAnd [scope, req])
-                    , findingMessage =
-                        "no case both falls within the scope and meets the requirement: whoever this rule reaches is necessarily in breach."
-                    }
-                | interesting req
-                , not (sat (ctx <> [scope]) req)
-                ]
-              , [ Finding
-                    { findingKind = "unreachable-outcome"
-                    , findingSite = site
-                    , findingAtoms = atomLabels (BDQ.BAnd [scope, req])
-                    , findingMessage =
-                        "the scope already entails the requirement, so nothing within scope can breach it and the requirement adds nothing."
-                    }
-                | interesting req
-                , contingent req
-                , not (sat (ctx <> [scope]) (BDQ.BNot req))
-                ]
-              , go ctx (site <> ".scope") scope
-              , go (ctx <> [scope]) (site <> ".requirement") req
+              [ if interesting ei && not (sat' ctx ei)
+                  then
+                    [ finding "dead-branch" arm ei
+                        "this limb cannot hold in the context that reaches it; the rule reads identically with it deleted."
+                    | normalised
+                    ]
+                  else go ctx arm ei
+              | (i, ei) <- zip [(0 :: Int) ..] es
+              , let arm = site <> ".or[" <> Text.pack (show i) <> "]"
               ]
-      -- Not descended into: under a negation the polarity flips, and "dead
-      -- branch" would come to mean its own opposite. Reporting that under the
-      -- same word would be worse than not reporting it.
-      BDQ.BNot _ -> []
-      BDQ.BVar _ -> []
-      BDQ.BRefuse _ -> []
-      BDQ.BTrue -> []
-      BDQ.BFalse -> []
+          BDQ.BImplies scope req
+            | not (sat' ctx scope) ->
+                [ finding "vacuous-guard" (site <> ".scope") scope
+                    "the scope of this rule is unsatisfiable, so it reaches nobody and its requirement is never tested. Note the decision still evaluates TRUE — vacuously."
+                | normalised
+                ]
+            | otherwise ->
+                concat
+                  [ [ finding "unreachable-outcome" site (BDQ.BAnd [scope, req])
+                        "no case both falls within the scope and meets the requirement: whoever this rule reaches is necessarily in breach."
+                    | normalised
+                    , interesting req
+                    , not (sat' (ctx <> [scope]) req)
+                    ]
+                  , [ finding "unreachable-outcome" site (BDQ.BAnd [scope, req])
+                        "the scope already entails the requirement, so nothing within scope can breach it and the requirement adds nothing."
+                    | normalised
+                    , interesting req
+                    , contingent req
+                    , not (sat' (ctx <> [scope]) (BDQ.BNot req))
+                    ]
+                  , go ctx (site <> ".scope") scope
+                  , go (ctx <> [scope]) (site <> ".requirement") req
+                  ]
+          -- Not descended into: under a negation the polarity flips, and "dead
+          -- branch" would come to mean its own opposite. Reporting that under the
+          -- same word would be worse than not reporting it.
+          BDQ.BNot _ -> []
+          BDQ.BVar _ -> []
+          BDQ.BRefuse _ -> []
+          BDQ.BTrue -> []
+          BDQ.BFalse -> []
 
 ----------------------------------------------------------------------------
 -- Rendering
@@ -1136,6 +1308,7 @@ textReport opts reports total nested =
 
     finding f =
       [ "    [" <> f.findingKind <> "] at " <> f.findingSite
+          <> maybe "" (\p -> ", written at " <> prettySrcPos p) f.findingWrittenAt
       , "      " <> f.findingMessage
       , "      atoms: " <> (if null f.findingAtoms then "(none)" else Text.intercalate ", " f.findingAtoms)
       ]

@@ -1,0 +1,39 @@
+§ `VerifyWrittenGuardsFixture`
+
+-- Negative controls: conditions the drafter DID write that exclude nothing
+-- (smucclaw/l4-ide#1093). Each is reported once, as a `vacuous-guard`, at the
+-- place it sits in the rule as written.
+--
+-- verify-vacuous-guard.l4 has the plainest case, `x AND (x OR y)`, whose
+-- normal form is the rule itself. These are the cases where the normal form
+-- and the rule as written come apart.
+
+-- (1) The second condition is redundant, and its normal form is two clauses,
+--     `x OR q` and `x OR r`. One finding, at the condition, not one per clause.
+GIVEN x IS A BOOLEAN, q IS A BOOLEAN, r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in two parts` x q r IF
+    x AND (x OR (q AND r))
+
+-- (2) The redundant condition is inside one limb of a disjunction. The rule
+--     as written has no conjunction at the top; its normal form does.
+GIVEN p IS A BOOLEAN, q IS A BOOLEAN, r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle inside a limb` p q r IF
+       (p AND (p OR q))
+    OR r
+
+-- (3) The redundant condition is inside the requirement of a rule with a
+--     scope, which is read in the context of that scope.
+GIVEN s IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in the requirement` s x y IF
+    s IMPLIES (x AND (x OR y))
+
+-- (4) The redundant condition is in what a row of a BRANCH says, which is
+--     checked like any other condition the drafter wrote.
+GIVEN s IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in a row` s x y IF
+  BRANCH IF s THEN x AND (x OR y)
+         OTHERWISE FALSE
