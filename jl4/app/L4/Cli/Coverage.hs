@@ -24,10 +24,18 @@
 --   candidate realises one (that witness is replayed through the evaluator
 --   before it is used, and 'rowFromSolver' says where it came from).
 --
--- Candidates come from a fixed set ('sampleValues': each literal the cover
--- points reach, one either side of it, zero; both Booleans; every
--- constructor), so the witnesses do not depend on which solver, or which
--- version of it, is installed.
+-- Candidates come from a fixed set ('sampleValues': each number literal
+-- reached in lowering the cover points, the bodies of the rules they call
+-- included, one either side of it, and zero; both Booleans; every
+-- constructor, over its fields' samples, two levels deep), combined by
+-- 'samplePointsUpTo', every combination up to 'candidateLimit' and a spread
+-- past it. A witness found among them does not depend on which solver, or
+-- which version of it, is installed; a bucket that no candidate realises
+-- takes the solver's model as its witness ('viaSolver'), and that one does.
+-- When some parameter's type has no sample within two levels (a record
+-- nested three deep), the candidate set is empty, for every parameter, and
+-- every witness is the solver's. (Corrected 2026-11-25; this said before
+-- that the witnesses never depend on the solver.)
 --
 -- __Leaf level, and when it is not used.__ The cross over leaves is the
 -- finer model, and it is used unless one of these holds, in which case the

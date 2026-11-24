@@ -129,15 +129,26 @@ The row then says so, instead of printing one answer as if it covered the bucket
 
 ### Inputs that no condition reads
 
-L4 tries each input at values taken from the conditions: the numbers they mention, one either side of each, zero, both truth values, every option of a choice.
-An input that **no condition reads** has nothing to take values from, so it is tried at one value only (zero, for a number).
+L4 tries every input at a few values, the same values for every input of the same kind:
+
+- a number at zero, at each number the conditions mention (the rules they call count too), and at one either side of each, so at zero alone when they mention no number;
+- a true-or-false input at both;
+- a choice at every option, with the fields of an option or a record at the values of their own kinds, two levels deep.
+
+It tries every combination of those values, up to 4,096 of them (past that, 4,096 spread across them), and keeps the first eight that land in each bucket, in an order in which the first input changes fastest.
+A bucket that none of them lands in gets its input from the solver, if one is installed, and its row says so.
+
+If any input is of a kind that has no value within those two levels, such as a record whose field is a record whose field is a record with fields of its own, there are no combinations at all: no input is tried, not even a true-or-false one, and every bucket gets its input from the solver, or is `UNDECIDED` when there is none.
+
+An input that **no condition reads** is tried at those values too, but no bucket depends on it, so the values it has in a bucket are only those that came with the first eight inputs.
 The report names such inputs under the heading of the decision:
 
 ```
-  Inputs no condition reads (tried at one value only, so the answers below may vary with them): income
+  Inputs no condition reads (no bucket depends on them, so the answers below may vary with them): income
 ```
 
-The answers shown for that decision are then answers at that one value, and the rule may answer differently at others.
+The answers shown for that decision are then answers at those values only, and the rule may answer differently at others.
+(From `examples/coverage-report/unread.l4`, whose only condition is a true-or-false input: it mentions no number, so `income` is tried at zero alone.)
 
 ## The exit status
 
@@ -171,7 +182,7 @@ These are stated here, and printed in `l4 coverage --help`, because you would ot
 - **What a cover point is.**
   The separate conditions in the conditions a rule branches on: an `UNLESS` chain, a `BRANCH` or `IF`, each `WHEN` of a `CONSIDER`, or the body of a rule that returns true or false.
   `a OR b` is two; a condition used twice is one.
-  A call to another rule is **one** cover point, and its body is not read.
+  A call to another rule is **one** cover point: the conditions in its body are not cover points, though its numbers are among the values each input is tried at (see [Inputs that no condition reads](#inputs-that-no-condition-reads)).
   A condition inside the _result_ of one arm is not a cover point.
 - **A `CONSIDER`** in a rule that does not return true or false has one cover point for each `WHEN`: `CONSIDER p WHEN basic` is the condition `p EQUALS basic`, as the same rule written with `BRANCH` and `IF` has it.
   That holds when every `WHEN` names a number, an option that has no fields, or `EXACTLY` a value, and any `OTHERWISE` comes last.
@@ -188,11 +199,12 @@ These are stated here, and printed in `l4 coverage --help`, because you would ot
   With _n_ cover points there are 2ⁿ buckets, and past twelve cover points the rule is covered by its conditions as written instead: the report says `AT RUNG LEVEL` and why, and the exit status is 3.
   It does the same where a condition raises an error at an input that an earlier condition of the same rule already decides, such as `x EQUALS 0` guarding `10 DIVIDED BY x GREATER THAN 2`: that input would otherwise belong to no bucket.
 - **Witnessed** means the input realises the bucket and the evaluator agrees.
-  The inputs come from a fixed set of candidates (each number the rule mentions, one either side of it, zero, both truth values, every option of a choice), at most eight per bucket, so the report does not depend on which solver is installed.
-  An input outside that set is not tried.
+  The inputs come from a fixed set of candidates, the values listed above under "Inputs that no condition reads", at most eight per bucket.
+  An input outside that set is a witness only for a bucket that no candidate lands in: then the solver supplies one, and its row says it was found by the solver.
+  When one input's kind has no value two levels deep, there are no candidates, and every witness is the solver's; see above.
 - **Proved impossible** is the solver's claim alone, and nothing else checks it.
 - **Undecided** is neither, with its reason, and is never counted as covered.
-- **An input that no condition reads** is tried at one value only; see above.
+- **An input that no condition reads** is tried at the same values as any other input of its kind, but no bucket depends on it, so the answers shown may vary with it; see above.
 - **A rule that reads an `ASSUME`** is not covered, because an input cannot supply one.
   A rule whose body is wrapped in `WHERE` or `LET` is covered only if it returns true or false.
 - **Only this file's rules.**

@@ -19,8 +19,8 @@
 -- Catala). Each bucket is one of three things, and the report says which:
 --
 -- [witnessed] some input realises it, found among a fixed set of candidates
---   and confirmed by the evaluator, which also gives the decision's answer
---   there;
+--   (or, where none realises it, given by the solver) and confirmed by the
+--   evaluator, which also gives the decision's answer there;
 -- [proved impossible] no input realises it, which the solver (z3, @Z3_EXE@
 --   else @PATH@) proved;
 -- [undecided] neither, with the reason: no solver, a timeout, a solver
@@ -92,23 +92,34 @@ coverageBound =
     , "  their truth values; with n cover points there are 2^n buckets, and"
     , "  past 12 the decision is covered by its conditions as written instead."
     , ""
-    , "  WITNESSED means an input realises the bucket and the evaluator agrees;"
-    , "  the inputs come from a fixed set of candidates (each number the rule"
-    , "  mentions, one either side of it, zero, both truth values, every"
-    , "  constructor), at most 8 per bucket, so the witnesses do not depend on"
-    , "  the solver. PROVED IMPOSSIBLE is the solver's claim alone: nothing"
-    , "  else checks it. UNDECIDED is neither, with its reason, and is never"
-    , "  counted as covered."
+    -- The candidates and the solver's witnesses in the next paragraph, and the
+    -- first sentence of the one after it, were corrected on 2026-11-25 to say
+    -- what the search does, not what was ruled (CATALA-EXPORT-SPEC, "A
+    -- standalone report"): decided by Claude 2026-11-25, pending Meng's review.
+    , "  WITNESSED means an input realises the bucket and the evaluator agrees."
+    , "  Each input is tried at a fixed set of candidates, the same for every"
+    , "  input of its type: for a number, zero and each number in the"
+    , "  conditions or in the rules they call, with one either side of it (so"
+    , "  zero alone where there is none); both truth values; every constructor,"
+    , "  over its fields' candidates, two levels deep. If some input's type has"
+    , "  no value within two levels (a record nested three deep, say), there"
+    , "  are no candidates at all, not even for a BOOLEAN. A bucket keeps the"
+    , "  first 8 inputs that realise it, and only a bucket that no candidate"
+    , "  realises takes its witness from the solver, whose row says so. PROVED"
+    , "  IMPOSSIBLE is the solver's claim alone: nothing else checks it."
+    , "  UNDECIDED is neither, with its reason, and is never counted as"
+    , "  covered."
     , ""
     -- The next paragraph came after the example run that was ruled on, and
     -- was ruled separately (CROSSWORD).
-    , "  An input that no condition reads is tried at one value only (zero, for"
-    , "  a number), so a bucket whose answer varies with such an input shows"
-    , "  one answer; the report names those inputs. When the inputs that"
-    , "  realise one bucket give different answers, the row says so and shows"
-    , "  an input for each answer."
+    , "  An input that no condition reads takes the same candidates, but no"
+    , "  bucket depends on it, so a bucket whose answer varies with such an"
+    , "  input may show one answer; the report names those inputs. When the"
+    , "  inputs that realise one bucket give different answers, the row says"
+    , "  so and shows an input for each answer."
     , ""
-    , "  A call to another rule is one cover point and its body is not read."
+    , "  A call to another rule is one cover point: its conditions are not"
+    , "  cover points, though its numbers are among the candidates."
     , "  A condition inside the result of an arm, or a condition that raises at"
     , "  an input where an earlier condition of its rung already decides it,"
     , "  is not a cover point; the second keeps the decision at rung level."
@@ -179,8 +190,9 @@ data Entry = Entry
   , enRange  :: Maybe SrcRange
   , enParams :: [Text]
   , enUnread :: [Text]
-    -- ^ the inputs no cover point mentions: they are tried at one value, so
-    -- the answer can vary with them where the report shows one
+    -- ^ the inputs no cover point mentions: no bucket depends on them, and a
+    -- bucket keeps only its first inputs, so the answer can vary with them
+    -- where the report shows one
   , enResult :: Outcome
   }
 
@@ -391,7 +403,10 @@ renderEntry opts e = case e.enResult of
   Covered c ->
     [ "Decision `" <> e.enName <> "`" <> at e.enRange ]
     <> [ "  Inputs: " <> Text.intercalate ", " (map name' e.enParams) | not (null e.enParams) ]
-    <> [ "  Inputs no condition reads (tried at one value only, so the answers below may vary with them): "
+    -- The words in brackets were corrected on 2026-11-25 from "tried at one
+    -- value only", which holds only for a number where no condition mentions
+    -- one: decided by Claude 2026-11-25, pending Meng's review.
+    <> [ "  Inputs no condition reads (no bucket depends on them, so the answers below may vary with them): "
            <> Text.intercalate ", " e.enUnread
        | not (null e.enUnread) ]
     <> levelLine c

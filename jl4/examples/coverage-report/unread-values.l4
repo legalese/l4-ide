@@ -1,0 +1,14 @@
+-- No condition reads `amount` or `urgent`, but the condition calls a rule
+-- that mentions 50, so the report tries `amount` at 0, 50, 49 and 51, as it
+-- tries `days`, and `urgent` at TRUE and FALSE: an input that no condition
+-- reads takes the same values as any other input of its kind.
+GIVEN days IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is late` days IF days GREATER THAN 50
+
+GIVEN days IS A NUMBER, amount IS A NUMBER, urgent IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE `refund` days amount urgent IS
+    IF `is late` days
+    THEN amount
+    ELSE 0

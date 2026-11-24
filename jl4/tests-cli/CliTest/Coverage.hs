@@ -30,6 +30,7 @@ fixtures =
   , "examples/coverage-report/witness-inputs.l4"
   , "examples/coverage-report/expected/or-leaves.txt"
   , "examples/coverage-report/no-condition.l4"
+  , "examples/coverage-report/unread-values.l4"
   , "examples/coverage-report/varies.l4"
   , "examples/coverage-report/unread.l4"
   , "examples/coverage-report/consider.l4"
@@ -108,12 +109,28 @@ spec bin = describe "l4 coverage" $ do
     -- the other bucket has one input and one answer, and says so plainly
     sout `shouldSatisfy` ("witnessed by 1 input; L4 answers 100.1" `isInfixOf`)
 
-  -- An input no condition reads is tried at one value, and the report says
-  -- which, because the answers it prints are only as varied as its inputs.
+  -- No bucket depends on an input that no condition reads, and the report
+  -- says which those are, because the answers it prints are only as varied
+  -- as its inputs. In unread.l4 no condition mentions a number, so `income`
+  -- is tried at zero alone.
   it "names the inputs that no condition reads" $ do
     Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/unread.l4"]
     code `shouldBe` ExitSuccess
-    sout `shouldSatisfy` ("Inputs no condition reads (tried at one value only, so the answers below may vary with them): income" `isInfixOf`)
+    sout `shouldSatisfy` ("Inputs no condition reads (no bucket depends on them, so the answers below may vary with them): income" `isInfixOf`)
+
+  -- The report's help, its line above and the spec once said that such an
+  -- input "is tried at one value only". It is tried at the same candidates
+  -- as any other input of its kind: a number at each number the conditions
+  -- reach (here 50, inside the rule the condition calls) and one either
+  -- side, as well as zero, and a BOOLEAN at both values.
+  it "tries an input no condition reads at the same values as any other input of its kind" $ do
+    Output code sout _ <- runL4 bin ["coverage", "--all", "--decision", "refund", "examples/coverage-report/unread-values.l4"]
+    code `shouldBe` ExitSuccess
+    sout `shouldSatisfy` ("Inputs no condition reads (no bucket depends on them, so the answers below may vary with them): amount, urgent" `isInfixOf`)
+    mapM_ (\ row -> sout `shouldSatisfy` (row `isInfixOf`))
+      [ "days = 51, amount = 0, urgent = TRUE gives 0", "days = 51, amount = 50, urgent = TRUE gives 50"
+      , "days = 51, amount = 49, urgent = TRUE gives 49", "days = 51, amount = 51, urgent = FALSE gives 51" ]
+    sout `shouldSatisfy` ("L4's answer DIFFERS across them: 4 different values" `isInfixOf`)
 
   -- smucclaw/l4-ide#1096. When L4 raises an error at a witness, the bucket
   -- is undecided, and the reason must say what L4 raised and at which input.
