@@ -301,7 +301,7 @@ batchCmd opts = do
   (initErrs, mTc) <- runOneshot evalConfig opts.batchFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
+    Rules.useEvaluableTypeCheck uri
   tcRes <- case mTc of
     Just tc | tc.success -> pure tc
     _ -> do

@@ -4763,6 +4763,185 @@ spec bin = do
         it ("reports ok=false in JSON from " <> cmd <> " on " <> what) $
           expectJsonNotOk bin [cmd, entry]
 
+  -- smucclaw/l4-ide#1025. A file whose import has errors typechecks against
+  -- what that import did provide, but the import itself is not evaluated, so
+  -- every #EVAL and #ASSERT that read a name from it answered "Internal error:
+  -- ... is not in scope. Please report this as a bug.", which buried the error
+  -- in the import. Such a file is not evaluated at all now, as a file with an
+  -- error of its own is not (decided by Claude 2026-11-25, pending Meng's
+  -- review), and each command that evaluates says why it stopped. The
+  -- controls, the same files over a clean import and a file over an import
+  -- that only warns, are still evaluated.
+  describe "a file whose import has errors is not evaluated (#1025)" $ do
+    mRepl <- runIO locateReplBinary
+    mLsp <- runIO locateLspBinary
+    let errDir = fixtureDir </> "imports-error-eval"
+        okDir = fixtureDir </> "imports-ok-eval"
+        both :: Output -> String
+        both o = filter (/= '\r') (o.outStdout <> o.outStderr)
+        noInternalError :: String -> Expectation
+        noInternalError out = do
+          out `shouldNotSatisfy` isInfixOf "Internal error"
+          out `shouldNotSatisfy` isInfixOf "eval/internal-error"
+        withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+        -- The REPL keeps a history file in the directory it runs in, and an
+        -- IMPORT on a line resolves from there, so it runs in a copy.
+        replies repl dir queries = withSystemTempDirectory "l4-repl-imports" \work -> do
+          forM_ ["lib.l4", "main.l4"] \f -> copyFile (dir </> f) (work </> f)
+          replRepliesFor work repl (work </> "main.l4") queries
+        replQueries = ["`the answer`", "1 PLUS 1", ":trace `the answer`", ":traceascii `the answer`"]
+        withLsp act = maybe (pendingWith "no jl4-lsp binary (set JL4_LSP_BIN, or run under cabal test)") act mLsp
+        -- Draw the decision graph of `we agree` in ladder.l4 from its lens,
+        -- then ask the language server to evaluate the call in it to a rule
+        -- in lib, with TRUE: the answer, or the error.
+        evalAppIn lsp dir = withOpenDocument lsp (dir </> "ladder.l4") \uri _notify request -> do
+          lenses <- request "textDocument/codeLens" (Aeson.object ["textDocument" Aeson..= Aeson.object ["uri" Aeson..= uri]])
+          let lensArgs =
+                [ toList args
+                | Just (Array ls) <- [lenses >>= (`objField` "result")]
+                , lens <- toList ls
+                , Just (String "Show decision graph") <- [lens `objField` "command" >>= (`objField` "title")]
+                , Just (Array args) <- [lens `objField` "command" >>= (`objField` "arguments")]
+                ]
+          case lensArgs of
+            (args@(verDocId : _) : _) -> do
+              drawn <- request "workspace/executeCommand"
+                (Aeson.object ["command" Aeson..= ("l4.visualize" :: T.Text), "arguments" Aeson..= args])
+              case drawn >>= (`objField` "result") >>= firstCall of
+                Just appId -> do
+                  answer <- request "l4/evalApp" (Aeson.object
+                    ["appExpr" Aeson..= appId, "args" Aeson..= [String "TrueV"], "verDocId" Aeson..= verDocId])
+                  pure (answer >>= \a -> a `objField` "result" <|> a `objField` "error")
+                Nothing -> expectationFailure ("no call in the decision graph: " <> show drawn) >> pure Nothing
+            _ -> expectationFailure ("no decision graph lens: " <> show lenses) >> pure Nothing
+        -- The id of the first call ("App") node in a drawn decision graph.
+        firstCall :: Value -> Maybe Value
+        firstCall = \case
+          Object o
+            | Just (String "App") <- KeyMap.lookup "$type" o -> KeyMap.lookup "id" o
+            | otherwise -> foldr ((<|>) . firstCall) Nothing (KeyMap.elems o)
+          Array xs -> foldr ((<|>) . firstCall) Nothing (toList xs)
+          _ -> Nothing
+
+    forM_ [ ("main.l4", "reads a name from it", "The imported module lib has errors")
+          , ("plain.l4", "reads nothing from it", "The imported module lib has errors")
+          , ("top.l4", "reaches it through another import", "The imported module mid imports a module with errors.")
+          ] \(file, how, importError) ->
+      it ("l4 run evaluates nothing in a file that " <> how <> ", and reports both errors") $ do
+        o <- runL4 bin ["run", errDir </> file]
+        o.outExit `shouldBe` ExitFailure 1
+        noInternalError (both o)
+        both o `shouldNotSatisfy` isInfixOf "Evaluation["
+        both o `shouldSatisfy` isInfixOf importError
+        both o `shouldSatisfy` isInfixOf "The second input of PLUS is expected to be of type"
+
+    it "l4 run --json reports no results for it, ok=false and both errors" $ do
+      env <- jsonEnvelope bin ["run", errDir </> "main.l4", "--json"]
+      objField env "ok" `shouldBe` Just (Bool False)
+      objField env "results" `shouldBe` Just (Array mempty)
+      let diags = BSL8.unpack (Aeson.encode (objField env "diagnostics"))
+      diags `shouldSatisfy` isInfixOf "import/module-has-errors"
+      diags `shouldSatisfy` isInfixOf "check/type-mismatch"
+      diags `shouldNotSatisfy` isInfixOf "eval/internal-error"
+
+    it "l4 check fails on it, and evaluates nothing, as before" $ do
+      o <- runL4 bin ["check", errDir </> "main.l4"]
+      o.outExit `shouldBe` ExitFailure 1
+      both o `shouldNotSatisfy` isInfixOf "Evaluation["
+      noInternalError (both o)
+
+    it "l4 trace fails on it and says that evaluation failed" $ do
+      o <- runL4 bin ["trace", errDir </> "main.l4"]
+      o.outExit `shouldBe` ExitFailure 1
+      noInternalError (both o)
+      both o `shouldSatisfy` isInfixOf "evaluation failed"
+
+    forM_ ["lts", "explore", "prove", "coverage"] \cmd ->
+      it ("l4 " <> cmd <> " refuses it, with the IMPORT's error, as it refuses a file that does not typecheck") $ do
+        o <- runL4 bin [cmd, errDir </> "duty.l4"]
+        o.outExit `shouldBe` ExitFailure 1
+        noInternalError (both o)
+        both o `shouldSatisfy` isInfixOf "import/module-has-errors"
+
+    it "l4 batch refuses it before evaluating a row" $ do
+      o <- runL4 bin ["batch", errDir </> "export.l4", "--inputs", errDir </> "inputs.json"]
+      o.outExit `shouldBe` ExitFailure 1
+      noInternalError (both o)
+      o.outStdout `shouldSatisfy` isInfixOf "type checking failed"
+      o.outStdout `shouldNotSatisfy` isInfixOf "\"status\""
+
+    it "the language server's l4/evalApp evaluates no call in the decision graph of a rule in it" $ withLsp \lsp -> do
+      answer <- evalAppIn lsp errDir
+      let said = maybe "" (BSL8.unpack . Aeson.encode) answer
+      said `shouldNotSatisfy` isInfixOf "Internal error"
+      said `shouldSatisfy` isInfixOf "A module this file imports has errors, so nothing is evaluated"
+
+    it "the REPL evaluates no line of it, and says why" $ withRepl \repl -> do
+      rs <- replies repl errDir replQueries
+      rs `shouldBe` replicate (length replQueries)
+        "A module this file imports has errors, so nothing is evaluated; `l4 check` on the file shows them."
+
+    -- A file that imports a ring of imports without being in it is checked
+    -- without the ring, and was evaluated; it is not now. A file on the ring
+    -- has no typecheck, and never was.
+    it "l4 run evaluates nothing in a file that imports a ring of imports" $ do
+      o <- runL4 bin ["run", fixtureDir </> "cycle-eval" </> "outside.l4"]
+      o.outExit `shouldBe` ExitFailure 1
+      both o `shouldNotSatisfy` isInfixOf "Evaluation["
+      both o `shouldSatisfy` isInfixOf "import/cycle"
+
+    it "l4 run evaluates nothing in a file on a ring of imports, as before" $ do
+      o <- runL4 bin ["run", fixtureDir </> "cycle-eval" </> "ra.l4"]
+      o.outExit `shouldBe` ExitFailure 1
+      both o `shouldNotSatisfy` isInfixOf "Evaluation["
+      both o `shouldSatisfy` isInfixOf "import/cycle"
+
+    -- The controls.
+    it "still evaluates a file whose import is clean" $ do
+      o <- runL4 bin ["run", okDir </> "main.l4"]
+      o.outExit `shouldBe` ExitSuccess
+      evalBlockIn 1 o.outStdout `shouldSatisfy` T.isInfixOf "42"
+      evalBlockIn 2 o.outStdout `shouldSatisfy` T.isInfixOf "assertion satisfied"
+
+    it "still evaluates a line that reads nothing from a clean import" $ do
+      o <- runL4 bin ["run", okDir </> "plain.l4"]
+      o.outExit `shouldBe` ExitSuccess
+      evalBlockIn 1 o.outStdout `shouldSatisfy` T.isInfixOf "2"
+
+    it "still evaluates a file whose import only warns" $ do
+      o <- runL4 bin ["run", fixtureDir </> "imports-warning" </> "eval.l4"]
+      o.outExit `shouldBe` ExitSuccess
+      evalBlockIn 1 o.outStdout `shouldSatisfy` T.isInfixOf "1"
+
+    it "still traces, lists, explores, proves and covers over a clean import" $ do
+      traced <- runL4 bin ["trace", okDir </> "main.l4"]
+      traced.outExit `shouldBe` ExitSuccess
+      listed <- runL4 bin ["lts", okDir </> "duty.l4"]
+      listed.outExit `shouldBe` ExitSuccess
+      listed.outStdout `shouldSatisfy` isInfixOf "duty — after 1 event"
+      explored <- runL4 bin ["explore", okDir </> "duty.l4"]
+      explored.outStdout `shouldSatisfy` isInfixOf "2 states, 2 transitions"
+      proved <- runL4 bin ["prove", okDir </> "duty.l4"]
+      proved.outExit `shouldBe` ExitSuccess
+      proved.outStdout `shouldSatisfy` isInfixOf "by evaluation: assertion satisfied"
+      covered <- runL4 bin ["coverage", okDir </> "duty.l4"]
+      covered.outExit `shouldBe` ExitSuccess
+      mapM_ (noInternalError . both) [traced, listed, explored, proved, covered]
+
+    it "still runs l4 batch over a clean import" $ do
+      o <- runL4 bin ["batch", okDir </> "export.l4", "--inputs", okDir </> "inputs.json"]
+      o.outExit `shouldBe` ExitSuccess
+      o.outStdout `shouldSatisfy` isInfixOf "\"result\":43"
+
+    it "the language server's l4/evalApp still evaluates a call over a clean import" $ withLsp \lsp -> do
+      answer <- evalAppIn lsp okDir
+      (answer >>= (`objField` "value")) `shouldBe` Just (String "TrueV")
+
+    it "the REPL still evaluates every line over a clean import" $ withRepl \repl -> do
+      rs <- replies repl okDir replQueries
+      take 2 rs `shouldBe` ["42", "2"]
+      mapM_ (`shouldSatisfy` T.isInfixOf "42") (drop 2 rs)
+
   -- `l4 deploy` and `l4 redeploy` refuse a file for the reasons `l4 check`
   -- does, and say so before they touch the network. Nothing listens on the
   -- discard port, so a command that gets past the local check stops at the

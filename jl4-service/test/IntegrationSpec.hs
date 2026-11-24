@@ -270,6 +270,38 @@ spec = describe "integration" do
           assertSuccess resp \r ->
             Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
 
+  -- smucclaw/l4-ide#1025: `l4 run` and the editor do not evaluate a file whose
+  -- import has errors. The service deploys a bundle whose imported file's only
+  -- error is a name it reads and never declares, which 'Compiler' tolerates as
+  -- an implicit input, and it builds a deployed file's environment as it did
+  -- before. So a function that reads nothing from that file is answered on the
+  -- direct path, and the wrapper path, which a `{}` for an input takes, must
+  -- answer it too, not refuse what the direct path answers.
+  describe "a function over an import whose only error is an implicit input (#1025)" do
+    it "is answered alike on the direct path and on the wrapper path" do
+      withServiceFromSources
+        "implicit-import"
+        [ ("implicit_lib.l4", "`the flag value` MEANS flag\n")
+        , ("implicit_main.l4", Text.unlines
+            [ "IMPORT implicit_lib.l4"
+            , ""
+            , "@export Whether b holds"
+            , "GIVEN b IS A BOOLEAN"
+            , "      pad IS A BOOLEAN"
+            , "GIVETH A BOOLEAN"
+            , "DECIDE holds IF b"
+            ])
+        ] \baseUrl mgr -> do
+          let answer args = do
+                resp <- evalFunction baseUrl mgr "implicit-import" "holds"
+                  (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+                pure ( statusCode' resp
+                     , case Aeson.decode (responseBody resp) of
+                         Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                         _ -> Nothing )
+          answer [ "b" Aeson..= True, "pad" Aeson..= False ] >>= (`shouldBe` (200, Just (FnLitBool True)))
+          answer [ "b" Aeson..= True, "pad" Aeson..= Aeson.object [] ] >>= (`shouldBe` (200, Just (FnLitBool True)))
+
   describe "MAYBE parameter handling" do
     it "handles NOTHING (null) for a MAYBE parameter" do
       withServiceFromSources "maybe-null" [("maybe.l4", maybeParamJL4)] \baseUrl mgr -> do

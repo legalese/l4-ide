@@ -2040,7 +2040,14 @@ evaluateModule presumption file input moduleContext = do
       pure ()
     -- Add the main file
     _ <- Shake.addVirtualFile nfp input
-    Shake.use Rules.EvaluateLazy uri
+    -- The directive results straight from the heap, as 'Rules.EvaluateLazy'
+    -- gave them before it stopped evaluating a module whose import has errors
+    -- (smucclaw/l4-ide#1025). A deployed file's environment is built from the
+    -- same heap ('typecheckAndEvalBundle'), and the deploy tolerates an
+    -- imported file whose only errors are implicit inputs, so going through
+    -- 'Rules.EvaluateLazy' here would refuse on the wrapper path a call the
+    -- direct path answers (decided by Claude 2026-11-25, pending Meng's review).
+    fmap snd <$> Shake.use (Shake.AttachCallStack [uri] Rules.GetLazyEvaluationDependencies) uri
   -- The evaluator hit the allocation limit on a Shake thread, which reports
   -- an exception as a diagnostic. Raise it again here, on the calling thread,
   -- where 'withEvalLimits' answers it as the memory limit (smucclaw/l4-ide#1018).

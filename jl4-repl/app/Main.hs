@@ -286,9 +286,17 @@ loadFile st fp = do
   -- Trigger type check
   [mtc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck uri]
   case mtc of
+    Just tc | tc.success, not tc.importsOk -> pure (Left importsHaveErrors)
     Just tc | tc.success -> pure (Right ())
     Just _tc -> pure (Left "Type checking failed (see diagnostics above)")
     Nothing -> pure (Left "Failed to type check file")
+
+-- | What the REPL says, on loading a file and instead of evaluating a line, when
+-- a module the file imports, directly or not, has errors: nothing is evaluated
+-- then, as nothing is in a file with errors of its own (smucclaw/l4-ide#1025,
+-- 'Rules.evaluable'; decided by Claude 2026-11-25, pending Meng's review).
+importsHaveErrors :: Text
+importsHaveErrors = "A module this file imports has errors, so nothing is evaluated; `l4 check` on the file shows them."
 
 -- | Say that the REPL's in-memory file @replNfp@ stands in for the loaded file
 -- @contextFile@, whose text it copies, so that an IMPORT of the loaded file's own
@@ -707,6 +715,7 @@ evalExpression st contextFile exprText = do
       -- Extract error messages
       let errors = tc.infos
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
+    Just tc | not tc.importsOk -> pure importsHaveErrors
     Just _tc -> do
       -- Get evaluation results
       [meval] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.EvaluateLazy replUri]
@@ -808,6 +817,7 @@ evalWithTrace st contextFile exprText = do
     Just tc | not tc.success -> do
       let errors = tc.infos
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
+    Just tc | not tc.importsOk -> pure importsHaveErrors
     Just tc -> do
       -- Get evaluation results WITH trace
       meval <- traceLine st replUri tc
@@ -858,6 +868,7 @@ evalWithTraceAscii st contextFile exprText = do
     Just tc | not tc.success -> do
       let errors = tc.infos
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
+    Just tc | not tc.importsOk -> pure importsHaveErrors
     Just tc -> do
       -- Get evaluation results WITH trace
       meval <- traceLine st replUri tc

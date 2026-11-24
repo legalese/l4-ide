@@ -1,0 +1,7 @@
+-- A rule whose decision graph calls a rule in lib, for the language server's
+-- l4/evalApp.
+IMPORT lib
+
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `we agree` b IF `lib agrees` b
