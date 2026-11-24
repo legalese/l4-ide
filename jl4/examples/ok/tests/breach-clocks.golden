@@ -255,6 +255,10 @@ breach-clocks.l4:112:1-115:16:
         before their deadline, which was at
           3.5
   NOTE: An obligation, MUST z, was entered at 4, after its own deadline of 3, so it could never be met in time: it fails at 4, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+breach-clocks.l4:113:14-17:
+  This #TRACE has a time stamp of 3.8, which is not a whole number.
+  `l4 run` uses it as written.
+  `l4 explore` tries whole instants only, so it does not explore the positions between them.
 breach-clocks.l4:117:1-120:16:
   DEONTIC BREACHED:
     party
@@ -281,6 +285,10 @@ breach-clocks.l4:117:1-120:16:
         before their deadline, which was at
           3
   NOTE: An obligation, MUST z, was entered at 4, after its own deadline of 3, so it could never be met in time: it fails at 4, when it was entered. Its WITHIN counts from THE ARMING, which inside a HENCE or LEST is when the obligation it continues was entered, not when this one was. (EVERY-EACH-QUANTIFIER-SPEC section 6.1.2.)
+breach-clocks.l4:118:14-17:
+  This #TRACE has a time stamp of 3.8, which is not a whole number.
+  `l4 run` uses it as written.
+  `l4 explore` tries whole instants only, so it does not explore the positions between them.
 breach-clocks.l4:129:1-130:17:
   DEONTIC BREACHED:
     party
