@@ -376,9 +376,10 @@ GIVETH A DEONTIC Actor Action
 `enforcement response` MEANS
     IF violation's `the severity` EQUALS Critical
     THEN
-        -- Immediate suspension for critical violations
+        -- Immediate suspension for critical violations, within a day
         PARTY `the regulator`
         MUST `suspend immediately`
+        WITHIN 1
         HENCE FULFILLED
         LEST BREACH BY `the regulator` BECAUSE "failed to suspend critical violation"
     ELSE IF violation's `the severity` EQUALS Serious

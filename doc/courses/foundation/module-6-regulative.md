@@ -294,7 +294,7 @@ GIVETH A DEONTIC Person Action
     LEST BREACH BY Spouse1 BECAUSE "failed to exchange vows"
 ```
 
-**"To love and to cherish"** binds both spouses at once, so the two obligations are joined with `RAND`. **"Forsaking all others"** becomes two prohibitions, also joined with `RAND`:
+**"To love and to cherish"** binds both spouses at once, so the two obligations are joined with `RAND`. The vow sets no deadline, so they have no `WITHIN` and no `LEST`: on an obligation, a `LEST` is what follows a missed deadline, so with no deadline nothing could ever reach it (`l4 check` warns about such a `LEST`). **"Forsaking all others"** becomes two prohibitions, also joined with `RAND`. A prohibition needs no deadline for its `LEST`, because the forbidden act is what leads there:
 
 ```
 GIVETH A DEONTIC Person Action
