@@ -26,8 +26,6 @@ module Types (
   OutcomeStyle (..),
   -- * Health
   HealthResponse (..),
-  serviceCapabilities,
-  capabilitiesHeaderValue,
   HealthDeploymentCounts (..),
   -- * MCP Tasks extension
   TaskId (..),
@@ -707,30 +705,8 @@ data HealthResponse = HealthResponse
   -- ^ The jl4-service build version (e.g. "1.5.79"), baked in at compile time.
   -- Lets a caller report the running service version directly rather
   -- than inferring it from the configured binary release URL.
-  , hrCapabilities  :: ![Text]
-  -- ^ What this build can do that an older one cannot ('serviceCapabilities').
   }
   deriving stock (Show, Generic)
-
--- | What this build of the service can do that an older one cannot, for a
--- client to ask before it relies on it. On @\/health@ as @capabilities@, and
--- as the header @X-L4-Capabilities@ (comma-separated) on every response from
--- the API routes ('Application.app'), so a client can read it from a request
--- it makes anyway, through a proxy that forwards the backend's headers. A
--- response made outside them (among them the concurrency limit's 503, the 500
--- for an unhandled exception, a CORS preflight, Warp's own, the explorer page,
--- the @.l4@ file middleware) does not carry it.
---
--- * @refused-exports@: an @\@export@ that the export check refuses is left
---   out of its deployment and named in @refusedExports@, and the rest of the
---   file deploys (DEADWOOD, 2026-11-24). A service without it rejects the
---   whole file, or (before the export check) publishes the export unchecked;
---   @l4 deploy@ uploads a file with a refused export only to one that has it.
-serviceCapabilities :: [Text]
-serviceCapabilities = ["refused-exports"]
-
-capabilitiesHeaderValue :: Text
-capabilitiesHeaderValue = Text.intercalate "," serviceCapabilities
 
 instance ToJSON HealthResponse where
   toJSON hr =
@@ -738,7 +714,6 @@ instance ToJSON HealthResponse where
       [ "status" .= hr.hrStatus
       , "deployments" .= hr.hrDeployments
       , "version" .= hr.hrVersion
-      , "capabilities" .= hr.hrCapabilities
       ]
       <> maybe [] (\t -> ["instanceToken" .= t]) hr.hrInstanceToken
 
@@ -749,7 +724,6 @@ instance FromJSON HealthResponse where
       <*> o .: "deployments"
       <*> o .:? "instanceToken"
       <*> o .:? "version" .!= ""
-      <*> o .:? "capabilities" .!= []
 
 -- | Deployment counts in health response.
 data HealthDeploymentCounts = HealthDeploymentCounts

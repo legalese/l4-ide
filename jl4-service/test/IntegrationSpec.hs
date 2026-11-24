@@ -46,7 +46,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text.IO
 import qualified Data.Text.Encoding as Text.Encoding
-import Network.HTTP.Client (defaultManagerSettings, managerRetryableException, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseHeaders, responseStatus, responseBody, Manager)
+import Network.HTTP.Client (defaultManagerSettings, managerRetryableException, newManager, httpLbs, parseRequest, requestBody, requestHeaders, method, Request, RequestBody (..), Response, responseStatus, responseBody, Manager)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
 import System.Directory (createDirectoryIfMissing, doesDirectoryExist, doesFileExist, getTemporaryDirectory, removeDirectoryRecursive, removePathForcibly, withCurrentDirectory)
@@ -1416,15 +1416,6 @@ spec = describe "integration" do
             m `shouldSatisfy` Text.isInfixOf eventReason
           other -> expectationFailure ("Expected an error naming the refusal, got " <> show other)
         callRefused baseUrl mgr "refused-stale-cache"
-
-    it "says on /health, and in a header on every API response, that it leaves out a refused export" do
-      withEmptyService \baseUrl mgr -> do
-        health <- httpGet mgr (baseUrl <> "/health")
-        wireAt health ["capabilities"] `shouldBe` Right (Aeson.toJSON ["refused-exports" :: Text])
-        -- the answer `l4 deploy` reads before it uploads: a 404 for a new name
-        missing <- httpGet mgr (baseUrl <> "/deployments/not-there?functions=none")
-        statusCode' missing `shouldBe` 404
-        lookup "X-L4-Capabilities" (responseHeaders missing) `shouldBe` Just "refused-exports"
 
     it "still refuses a deployment in which every @export is refused, with the reasons" do
       withEmptyService \baseUrl mgr -> do
